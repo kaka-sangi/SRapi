@@ -9,7 +9,7 @@ SRapi 的视觉风格定义为 **“学术期刊/社论感 (Anthropic Claude)”
 ### 1.1 核心原则
 
 - **暖调纸张 (Warm Alabaster Paper)**：摒弃刺眼的冷灰 (`#F3F4F6`) 或纯黑白，主色调采用温暖的象牙纸张色、干墨炭黑与陶土泥土红，营造极佳的护眼阅读环境。
-- **排版压倒一切 (Typography Sovereign)**：主标题、核心段落和关键状态采用高雅的衬线体（Lora / Prata），与无衬线功能性文本 (Inter) 产生精美张力。
+- **排版压倒一切 (Typography Sovereign)**：主标题、核心段落和关键状态采用高雅的衬线体（Cormorant Garamond），与无衬线功能性文本 (Inter) 产生精美张力。
 - **1px 极细微刻 (1px Industrial Lines)**：杜绝任何粗重的彩色进度条。所有的额度指示、边界划分均使用 1px 的超轻砂岩线与垂直 notch，呈现出物理仪表的精细感。
 - **拒绝 AI 视觉套路 (No AI Tech-Slop)**：
   - **严禁**：任何闪烁的 Ping 绿点、彩色渐变背景、浮夸的卡片发光边框。
@@ -21,22 +21,28 @@ SRapi 的视觉风格定义为 **“学术期刊/社论感 (Anthropic Claude)”
 
 设计系统提供两套核心主题：**温润纸张 (Warm Light)** 与 **深邃墨水 (Ink Dark)**。
 
+> **唯一事实来源：[`apps/web/src/app/globals.css`](../apps/web/src/app/globals.css) 的 `@theme` / `.dark` 块。** 下表与该文件 1:1 同步（截至 0.1.0）；若两者出现差异，以 `globals.css` 为准并回填本表。组件中不得散落硬编码颜色，一律引用 `--color-srapi-*` 变量（见 §9.5）。
+
 ### 2.1 温润纸张 (Warm Light)
 
 适用于日间长时间管理运维。
 
 | Token 名 | CSS 变量值 | Tailwind 示例 | 视觉职责 |
 | :--- | :--- | :--- | :--- |
-| `background` | `#F9F6F0` | `bg-[#F9F6F0]` | 温暖的象牙白棉纸色整页背景 |
-| `card` | `#FFFFFF` | `bg-white` | 纯白纸张卡片，用于核心内容容器 |
-| `card-muted` | `#F1EBE4` | `bg-[#F1EBE4]` | 稍深微温的沙色，用于侧边栏和次要区 |
-| `text-primary` | `#191919` | `text-[#191919]` | 烟炱炭黑，温和有温度，用于主文本 |
-| `text-secondary`| `#6E6A5F` | `text-[#6E6A5F]` | 软砂岩灰，用于辅助说明和标签 |
-| `border` | `#E3DAC9` | `border-[#E3DAC9]` | 极细低对比度砂岩边框线 |
-| `primary` | `#C05638` | `bg-[#C05638]` | 陶土红 (Terracotta)，标志性核心强调色 |
-| `primary-hover` | `#A24329` | `bg-[#A24329]` | 陶土深红，用于 Hover |
-| `success` | `#15803D` | `bg-green-700` | 软罗勒绿，用于健康状态 |
-| `error` | `#B91C1C` | `bg-red-700` | 软砖红，用于故障或异常 |
+| `background` | `#F9F6F0` | `bg-srapi-bg` | 温暖的象牙白棉纸色整页背景 |
+| `card` | `#FFFFFF` | `bg-srapi-card` | 纯白纸张卡片，用于核心内容容器 |
+| `card-muted` | `#F1EBE4` | `bg-srapi-card-muted` | 稍深微温的沙色，用于侧边栏和次要区 |
+| `text-primary` | `#1C1A17` | `text-srapi-text-primary` | 烟炱炭黑，温和有温度，用于主文本 |
+| `text-secondary`| `#6E6A5F` | `text-srapi-text-secondary` | 软砂岩灰，用于辅助说明和标签 |
+| `text-tertiary` | `#9A9384` | `text-srapi-text-tertiary` | 更淡的砂岩灰，用于第三级提示文字 |
+| `border` | `#E7DDCB` | `border-srapi-border` | 极细低对比度砂岩边框线 |
+| `border-strong` | `#D8CCB4` | `border-srapi-border-strong` | 稍深的砂岩线，用于轨道底色、滚动条 |
+| `primary` | `#BF5638` | `bg-srapi-primary` | 陶土红 (Terracotta)，标志性核心强调色 |
+| `primary-hover` | `#A2452B` | `bg-srapi-primary-hover` | 陶土深红，用于 Hover |
+| `success` | `#3F6F3A` | `text-srapi-success` | 软罗勒绿，用于健康状态 |
+| `warning` | `#B07A28` | `text-srapi-warning` | 软琥珀，用于警示/降级态 |
+| `error` | `#B3432F` | `text-srapi-error` | 软砖红，用于故障或异常 |
+| `invert` / `invert-fg` | `#1C1A17` / `#F9F6F0` | — | 反相主按钮（炭黑底 + 纸白字），见 §8 |
 
 ### 2.2 深邃墨水 (Ink Dark)
 
@@ -44,16 +50,20 @@ SRapi 的视觉风格定义为 **“学术期刊/社论感 (Anthropic Claude)”
 
 | Token 名 | CSS 变量值 | Tailwind 示例 | 视觉职责 |
 | :--- | :--- | :--- | :--- |
-| `background` | `#111110` | `bg-[#111110]` | 枯墨黑，极其沉静的整页背景 |
-| `card` | `#1A1A18` | `bg-[#1A1A18]` | 石板黑纸张，用于卡片容器 |
-| `card-muted` | `#252420` | `bg-[#252420]` | 次级深炭色区 |
-| `text-primary` | `#F1EFEA` | `text-[#F1EFEA]` | 羊皮纸白，温润的主文本 |
-| `text-secondary`| `#9E9A90` | `text-[#9E9A90]` | 枯苇灰，用于次要说明 |
-| `border` | `#2D2C26` | `border-[#2D2C26]` | 枯墨边框线 |
-| `primary` | `#E26D5C` | `bg-[#E26D5C]` | 陶土金/暖金，用于夜间强调 |
-| `primary-hover` | `#C05638` | `bg-[#C05638]` | |
-| `success` | `#22C55E` | `bg-green-500` | |
-| `error` | `#EF4444` | `bg-red-500` | |
+| `background` | `#100F0D` | `bg-srapi-bg` | 枯墨黑，极其沉静的整页背景 |
+| `card` | `#1A1916` | `bg-srapi-card` | 石板黑纸张，用于卡片容器 |
+| `card-muted` | `#232019` | `bg-srapi-card-muted` | 次级深炭色区 |
+| `text-primary` | `#F1EFE9` | `text-srapi-text-primary` | 羊皮纸白，温润的主文本 |
+| `text-secondary`| `#A09A8D` | `text-srapi-text-secondary` | 枯苇灰，用于次要说明 |
+| `text-tertiary` | `#6F6A5F` | `text-srapi-text-tertiary` | 更深的枯苇灰，用于第三级提示文字 |
+| `border` | `#2C2A23` | `border-srapi-border` | 枯墨边框线 |
+| `border-strong` | `#3A372E` | `border-srapi-border-strong` | 稍亮的枯墨线，用于轨道底色、滚动条 |
+| `primary` | `#E07A5F` | `bg-srapi-primary` | 陶土金/暖金，用于夜间强调 |
+| `primary-hover` | `#C96243` | `bg-srapi-primary-hover` | 暖金 Hover |
+| `success` | `#5FA564` | `text-srapi-success` | 夜间罗勒绿 |
+| `warning` | `#D6A45A` | `text-srapi-warning` | 夜间琥珀 |
+| `error` | `#E2705A` | `text-srapi-error` | 夜间砖红 |
+| `invert` / `invert-fg` | `#F1EFE9` / `#100F0D` | — | 反相主按钮（纸白底 + 枯墨字），见 §8 |
 
 ---
 
@@ -61,35 +71,35 @@ SRapi 的视觉风格定义为 **“学术期刊/社论感 (Anthropic Claude)”
 
 ### 3.1 跨语言字族 (Font Family)
 
-SRapi 前端视觉由三种截然不同的字族构成：
+SRapi 前端视觉由三种截然不同的字族构成（均经 `next/font/google` 注入 CSS 变量，见 `apps/web/src/app/layout.tsx`）：
 
-- **文学/社论字族 (The Editorial Serif)**：`Lora` 或 `Georgia`。
-  - **应用范围**：大标题、栏目主入口名、数值大指标、调度器 Selected 节点名。
-- **高精度无衬线 (Functional UI Sans)**：`Inter`。
+- **文学/社论字族 (The Editorial Serif)**：`Cormorant Garamond`（高对比展示衬线，回退 `Georgia, serif`；变量 `--font-serif-display`）。
+  - **应用范围**：大标题、栏目主入口名、数值大指标、调度器 Selected 节点名。Cormorant 纤细，仅在大尺寸使用并配中重字重 + 光学字距。
+- **高精度无衬线 (Functional UI Sans)**：`Inter`（变量 `--font-inter`）。
   - **应用范围**：控制台常规 UI、表单、二级列表、按钮。
-- **技术等宽 (The Technical Mono)**：`JetBrains Mono`。
+- **技术等宽 (The Technical Mono)**：`JetBrains Mono`（变量 `--font-jetbrains`）。
   - **应用范围**：API Keys 掩码、Token 计数、用量、耗时数值、调度原始 JSON、流式终端输出。
 
 ### 3.2 字体排版分级 (字阶)
 
 ```css
-/* 页面大标题 */
+/* 页面大标题（示例字阶；实际请用 globals.css 的 --text-* token） */
 h1 {
-  font-family: 'Lora', 'Georgia', serif;
-  font-size: 2.25rem; /* 36px */
-  line-height: 1.2;
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
+  font-family: var(--font-serif-display), 'Cormorant Garamond', Georgia, serif;
+  font-size: 2.125rem; /* --text-3xl ≈ 34px */
+  line-height: 1.14;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  color: var(--color-srapi-text-primary);
 }
 
 /* 栏目/次级标题 */
 h2.editorial {
-  font-family: 'Lora', 'Georgia', serif;
-  font-size: 1.125rem; /* 18px */
+  font-family: var(--font-serif-display), 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.125rem; /* --text-lg ≈ 18px */
   font-style: italic;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--color-srapi-text-secondary);
 }
 
 /* 常规 UI 标签 */
@@ -156,10 +166,10 @@ span.mono-metric {
 
 不再使用 HTML5 风格的厚重圆角进度条。SRapi 的额度和健康度采用**超细刻度线仪表**：
 
-- **结构**：一条极细的 1px 水平背景线，通过绝对定位在其上方投射一个 12px 高、1px 宽的垂直 notch（指示针）。
-- **Light 颜色**：轨道背景 `#E3DAC9`，指示针 `#C05638`。
-- **Dark 颜色**：轨道背景 `#2D2C26`，指示针 `#E26D5C`。
-- **保护拦截态**：当 Quota 降至 30% 以下，指示针切换为黄色；低于 10% 切换为红色。
+- **结构**：一条极细的 1px 水平背景线，通过绝对定位在其上方投射一个 13px 高、1px 宽的垂直 notch（指示针）。
+- **Light 颜色**：轨道背景 `--color-srapi-border-strong` (`#D8CCB4`)，指示针 `--color-srapi-primary` (`#BF5638`)。
+- **Dark 颜色**：轨道背景 `--color-srapi-border-strong` (`#3A372E`)，指示针 `--color-srapi-primary` (`#E07A5F`)。
+- **保护拦截态**：当 Quota 进入警示阈值，指示针切换为 `--color-srapi-warning`（`data-level="warn"`）；进入危急阈值切换为 `--color-srapi-error`（`data-level="crit"`）。已实现于 `globals.css` 的 `.quota-rail .quota-notch` 与 `components/ui/quota-notch-rail.tsx`。
 
 ```txt
 轨道：━━━━━━━━━━━━━━━━━━━━┿━━━━━━━━━━━━
@@ -190,7 +200,7 @@ span.mono-metric {
 - **增量渲染**：单行文本以随机 `5ms - 15ms` 的间隔进行字符增量渲染。
 - **微光游标**：在正在打字的行末，投射一个 `4px` 宽、`14px` 高的流式游标 (`.stream-cursor`)。
 - **游标呼吸**：游标应用 `800ms` 的微光呼吸效果。打字结束时，游标静默移除。
-- **分步缩进**：每一行输出左侧伴随一条 `2px` 宽的 Lora 暖色细分割线作为空间定位。
+- **分步缩进**：每一行输出左侧伴随一条 `1.5px` 宽的暖色细分割线作为空间定位（`.stream-line`，色值取 `--color-srapi-primary` 的 45% 透明叠加）。
 
 ---
 
@@ -247,12 +257,12 @@ span.mono-metric {
 
 - **绝对禁止冷灰色**：Tailwind 的 `bg-gray-100`、`text-slate-900` 属于被禁用的“ generic AI slop ”。所有颜色必须严格映射至 `warm-bg`、`ink-bg` 变量。
 - **禁止使用第三方图标包发光**：只允许使用极轻量的 `lucide-react`，尺寸统一为 `w-4 h-4` 且不可设置发光特效。
-- **对焦高亮暖色化**：控制台内的所有输入框、按钮获取焦点时，其环绕高亮边框必须为 `border-[#C05638]` 或 `border-[#E26D5C]`，禁止出现系统默认的亮蓝色对焦环。
+- **对焦高亮暖色化**：键盘聚焦（`:focus-visible`）时统一投射一圈暖色对焦环（`--color-srapi-primary` 的 32% 透明叠加，见 `globals.css` 的 `*:focus-visible`），禁止出现系统默认的亮蓝色对焦环；文本输入框 / 文本域 / 下拉触发器改用「边框变深」表达聚焦，不叠加暖色环（否则看起来像红框报错）。
 - **极简大圆角按钮**：
   - 主操作按钮必须采用饱满优雅的 **`rounded-full`**（药丸钮）或 **`rounded-xl`**，严禁使用直角或生硬小圆角。
-  - **按键色彩（完美对标 Anthropic Research）**：
-    - **Light Mode**：背景为纯深炭黑 `#191919`，文字为纯白，Hover 时微弱泛出沙色或灰色阻尼。
-    - **Dark Mode**：背景为纯温羊皮白 `#F1EFEA`，文字为枯墨黑 `#111110`，Hover 时变为亮白。
+  - **按键色彩（完美对标 Anthropic Research）**，统一走反相 token `--color-srapi-invert` / `--color-srapi-invert-fg`：
+    - **Light Mode**：背景为炭黑 `#1C1A17`，文字为纸白 `#F9F6F0`，Hover 时微弱抬升（`.btn-raise`）。
+    - **Dark Mode**：背景为羊皮白 `#F1EFE9`，文字为枯墨黑 `#100F0D`，Hover 时同样轻微抬升。
   - 按钮文字进行微弱的大写字母间距加宽（`tracking-widest uppercase`），呈现出优雅的学术定制感。
 
 ## 9. 可访问性与工程约束
@@ -280,39 +290,45 @@ span.mono-metric {
 - Focus ring 必须可见，颜色使用暖色体系，但不得完全移除。
 - 表格横向滚动区域必须可通过键盘聚焦并滚动。
 
-### 9.4 组件映射
+### 9.4 组件映射（as-built 清单）
 
-第一阶段前端页面至少需要以下组件：
+控制台已成熟落地，下列为承载本设计系统的实有组件。命名以 `apps/web/src/components/` 实际文件为准；其中部分概念（卡片质感、API Key 列表、调度概览卡片、用量列表）由 **CSS 工具类 + 通用原语**实现，而非同名独立组件——这一点在表中明确标注，避免误把 CSS 类当成组件查找。
 
-```txt
-ApiKeyTable
-ApiKeyCreateDialog
-ProviderAccountTable
-ProviderAccountHealthCard
-SchedulerOverviewCards
-SchedulerDecisionStream
-UsageLogTable
-QuietBadge
-QuotaNotchRail
-TactileCard
-```
+| 视觉概念 | 实际承载 | 路径 / 备注 |
+| :--- | :--- | :--- |
+| 物理压凹卡片 | **CSS 类 `.tactile-card`**（非组件） + `Card` 原语 | `globals.css` §4.2；`components/ui/card.tsx` |
+| 静默状态标记 | `QuietBadge` | `components/ui/quiet-badge.tsx` |
+| 物理仪表 Quota 轨道 | `QuotaNotchRail` | `components/ui/quota-notch-rail.tsx`（配 `.quota-rail`） |
+| 调度决策流式输出 | `SchedulerDecisionStream` | `components/ui/scheduler-decision-stream.tsx` |
+| 指标卡片（概览） | `StatCard` | `components/ui/stat-card.tsx`（取代设想中的 `SchedulerOverviewCards`） |
+| API Key 创建 | `ApiKeyCreateDialog` | `components/features/api-key-create-dialog.tsx` |
+| API Key 用量 | `ApiKeyUsageDialog` | `components/features/api-key-usage-dialog.tsx` |
+| API Key / 用量列表 | `Table` 原语 + 页面组合 | `components/ui/table.tsx`；`app/api-keys/page.tsx`、`app/usage/...`（无 `ApiKeyTable` / `UsageLogTable` 同名组件） |
+| Provider 账号管理 | 一组 admin 组件 | `components/admin/account-{detail-sheet,form-dialog,import-dialog}.tsx`、`components/features/account-test-dialog.tsx`（无 `ProviderAccountTable` / `ProviderAccountHealthCard` 同名组件） |
+
+> 通用原语完整目录见 `components/ui/`（button / dialog / sheet / select / multi-select / tabs / popover / tooltip / toast / pagination / empty-state / skeleton 等）；features / admin / charts / chat / playground / layout 等业务组件目录见 `apps/web/src/components/`。本表只覆盖与设计系统直接相关的视觉原语，并非组件总清单——以 `components/` 目录为权威来源。
 
 ### 9.5 Tailwind Token 落地
 
-实现时应把本文颜色映射到 CSS variables 或 Tailwind theme token，避免在业务组件中散落硬编码颜色。
-
-推荐 token：
+颜色已映射到 Tailwind v4 的 `@theme` token（`globals.css`），业务组件统一引用，不散落硬编码颜色。已落地的颜色 token（以 `globals.css` 为准）：
 
 ```txt
---srapi-bg
---srapi-card
---srapi-card-muted
---srapi-text-primary
---srapi-text-secondary
---srapi-border
---srapi-primary
---srapi-primary-hover
---srapi-success
---srapi-error
+--color-srapi-bg
+--color-srapi-card
+--color-srapi-card-muted
+--color-srapi-text-primary
+--color-srapi-text-secondary
+--color-srapi-text-tertiary
+--color-srapi-border
+--color-srapi-border-strong
+--color-srapi-primary
+--color-srapi-primary-hover
+--color-srapi-success
+--color-srapi-warning
+--color-srapi-error
+--color-srapi-invert
+--color-srapi-invert-fg
 ```
+
+> 除颜色外，`globals.css` 的 `@theme` 还成套定义了字阶（`--text-2xs..--text-6xl` 含 line-height / letter-spacing 三件套与流体 `--text-hero`）、圆角语言（`--radius-sm..--radius-pill`）、缓动（`--ease-bloom` / `--ease-out-quint` / `--ease-spring` / `--ease-spring-bounce`）与高度阶梯（`--shadow-e1..e3`）。新增组件优先复用这些 token，不要一次性硬编码字号或阴影。
 

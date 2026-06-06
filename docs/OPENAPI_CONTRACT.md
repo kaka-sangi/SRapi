@@ -14,44 +14,15 @@ SRapi 使用 OpenAPI-first 工作流。OpenAPI 契约是前端、后端、SDK、
 
 ## 2. 文件组织
 
-推荐结构：
+契约是单一权威文件：
 
 ```txt
 packages/openapi/
-├── openapi.yaml
-├── paths/
-│   ├── auth.yaml
-│   ├── user.yaml
-│   ├── admin-users.yaml
-│   ├── api-keys.yaml
-│   ├── providers.yaml
-│   ├── models.yaml
-│   ├── accounts.yaml
-│   ├── gateway.yaml
-│   ├── gateway-routes.yaml
-│   ├── scheduler.yaml
-│   ├── billing.yaml
-│   ├── subscriptions.yaml
-│   ├── payments.yaml
-│   ├── affiliate.yaml
-│   ├── capabilities.yaml
-│   ├── operations.yaml
-│   └── observability.yaml
-├── schemas/
-│   ├── common.yaml
-│   ├── errors.yaml
-│   ├── auth.yaml
-│   ├── users.yaml
-│   ├── providers.yaml
-│   ├── models.yaml
-│   ├── accounts.yaml
-│   ├── scheduler.yaml
-│   ├── capabilities.yaml
-│   ├── events.yaml
-│   ├── billing.yaml
-│   └── payments.yaml
-└── examples/
+├── openapi.yaml                # 唯一契约源，~700KB，约 332 个 operationId
+└── oapi-codegen.server.yaml    # 后端 server 代码生成配置
 ```
+
+`packages/openapi/openapi.yaml` 内联了全部 `paths`、`components/schemas`、`securitySchemes` 和示例，无需 `$ref` 到分文件目录。早期设计曾考虑拆分为 `paths/`、`schemas/`、`examples/` 多文件结构，但实际落地采用单文件维护，以保证 lint / bundle / breaking-change 检查和代码生成都对一个确定来源运行。新增或修改接口直接编辑这一个文件，再跑生成与 CI 校验即可。
 
 ## 3. API 分区
 
@@ -302,9 +273,17 @@ configured token endpoint, fetches UserInfo with a bearer access token, and
 creates a short-lived pending OAuth session. The pending session stores only a
 keyed hash of the upstream subject plus a safe profile summary, then sets an
 HttpOnly `srapi_oauth_pending` cookie scoped to `/api/v1/auth/oauth/pending`
-and redirects to the bound local console path. Callback v1 supports public
-clients with `token_auth_method=none`; confidential-client secret handling and
-final account adoption routes are follow-up packages.
+and redirects to the bound local console path. The callback supports public
+clients with `token_auth_method=none` and confidential clients: when a provider
+client secret is configured (env `OAUTH_CLIENT_SECRETS_JSON`, keyed by
+`provider_key`, never on the Admin Settings / OpenAPI / SDK surface), the token
+exchange sends `client_secret` (client_secret_post) alongside PKCE. When an OIDC
+issuer is configured for the provider (env `OAUTH_ISSUERS_JSON`), the callback
+also verifies the returned `id_token` via OIDC discovery + JWKS (RS256 signature,
+`iss` / `aud` / `exp`, and the flow-bound `nonce`); a verification failure
+rejects login with `PROVIDER_AUTH_FAILED`. Final account adoption (creating or
+binding to a local account, with opt-in provider display-name adoption) is
+implemented through the pending-decision routes below.
 
 The console can inspect the pending decision through:
 
@@ -834,7 +813,7 @@ created_from
 created_to
 ```
 
-复杂过滤第一阶段不做 DSL，优先使用明确 query 参数。
+列表接口使用明确的 query 参数，不引入复杂过滤 DSL。
 
 ## 11. 幂等规范
 
@@ -922,7 +901,9 @@ Provider 特有字段放入：
 }
 ```
 
-## 16. 主要接口草案
+## 16. 主要接口一览
+
+以下是各分区的代表性接口；权威的完整接口清单（约 332 个 operationId）以 `packages/openapi/openapi.yaml` 为准。
 
 ### 16.1 Auth
 
@@ -1078,9 +1059,9 @@ POST /api/provider/antigravity/v1beta/models/{model}:generateContent
 POST /api/provider/antigravity/v1beta/models/{model}:streamGenerateContent
 ```
 
-第一阶段必须优先实现标准四个 Gateway 入口；已暴露的 Provider alias 必须复用同一 Gateway runtime，只改变 provider context。Root legacy aliases（例如 `/openai/v1/*`、`/anthropic/v1/*`、`/grok/v1/*` 和 `/antigravity/v1*`）同样只改变 provider context，并保留原始 alias path 作为 usage / scheduler evidence。
+标准 Gateway 入口（chat completions、responses、messages、models）与所有已暴露的 Provider alias 复用同一 Gateway runtime，只改变 provider context。Root legacy aliases（例如 `/openai/v1/*`、`/anthropic/v1/*`、`/grok/v1/*` 和 `/antigravity/v1*`）同样只改变 provider context，并保留原始 alias path 作为 usage / scheduler evidence。
 
-后续更多 Provider alias、passthrough、Gemini native、WebSocket、audio 等路由以 `GATEWAY_ROUTE_MATRIX.md` 为准。
+embeddings、images、audio、moderations、rerank、countTokens、Gemini native (`/v1beta/...`)、Responses WebSocket 和 Realtime WebSocket 路由均已上线。完整的 Provider alias、passthrough 与路由族边界以 `GATEWAY_ROUTE_MATRIX.md` 为准。
 
 ### 16.9 Admin Subscriptions
 
@@ -1170,33 +1151,29 @@ GET  /api/v1/admin/affiliates/transfers
 
 ## 17. AI 端点兼容边界
 
-第一阶段必须兼容：
+当前契约兼容的核心端点与字段：
 
-- `/v1/models`
+- `/v1/models`、`/v1beta/models`
 - `/v1/chat/completions`
-- `/v1/responses`
-- `/v1/messages`
+- `/v1/responses`、`/v1/responses/compact`、`/v1/responses/ws`、`GET /v1/responses/{response_id}/input_items`
+- `/v1/messages`、`/v1/messages/count_tokens`
+- `/v1/embeddings`、`/v1/images/*`、`/v1/audio/*`、`/v1/moderations`、`/v1/rerank`
+- `/v1/realtime`（OpenAI-compatible Realtime WebSocket，见 §3.3）
 - `stream: true`
-- `messages`
-- `input`
-- `model`
-- `temperature`
-- `top_p`
-- `max_tokens`
-- `max_output_tokens`
-- `instructions`
-- 基础 tool calls，可选
-- JSON mode / structured output 基础字段
+- `messages`、`input`、`model`、`temperature`、`top_p`、`max_tokens`、`max_output_tokens`、`instructions`
+- tool calls
+- JSON mode / structured output 字段
 
-端点转换规则以 `AI_ENDPOINT_COMPATIBILITY.md` 为准。
+端点转换规则以 `AI_ENDPOINT_COMPATIBILITY.md` 为准；路由族与协议边界以 `GATEWAY_ROUTE_MATRIX.md` 为准。
 
-第一阶段可以暂缓：
+明确不在当前契约范围内（Roadmap / 尚未实现）：
 
 - Assistants API。
-- Responses API stateful store 和内置工具全量兼容。
+- Responses API 服务端 stateful store（跨请求会话持久化）和全部内置工具的完整兼容；当前 Responses 支持非持久调用、`compact`、`input_items` 读取，并对同协议 Codex/OpenAI compact 响应原样回放，不在跨协议路径伪造压缩语义。
 - Batch API。
 - Fine-tuning API。
-- Realtime API（WebSocket / WebRTC）。
+
+WebRTC 形态的 Realtime 也不在当前范围内（已上线的 `/v1/realtime` 是 WebSocket upgrade，不是 WebRTC）。
 
 ## 18. 版本策略
 

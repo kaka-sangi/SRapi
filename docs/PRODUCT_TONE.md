@@ -210,12 +210,24 @@ SRapi 不是一个堆满酷炫词汇的 AI SaaS 落地页，而是一个**自托
 
 ---
 
-## 8. 落地清单（v0.1.0）
+## 8. 落地与持续治理
 
-- [x] 本文件作为 v0.1.0 的产品基调单一来源
-- [ ] `apps/web/src/context/LanguageContext.tsx` 中所有 `en` / `zh` 文案符合本文规则
-- [ ] `apps/web/src/app/page.tsx`（登录与落地）、`dashboard/page.tsx`、`admin/page.tsx`、`api-keys/page.tsx`、`usage/page.tsx`、`provider-accounts/page.tsx`、`scheduler-decisions/page.tsx`、`components/DashboardLayout.tsx`、`app/layout.tsx` 内的内联文案符合本文规则
-- [ ] OpenAPI 错误样板与 README 简介与本文一句话定位对齐
-- [ ] 任何新增 UI 文案先经过本文 §4 / §5 / §6 校对再合入
+本文件是产品基调的唯一来源；下面的去行话 / 词表 / 状态文案统一过滤已落地，并作为持续约束保留。
+
+**已落地（基线）**
+
+- [x] 本文件作为产品基调的单一来源
+- [x] 所有用户可见文案集中在 `apps/web/src/i18n/messages/`（`en.ts` / `zh.ts`）与 `apps/web/src/context/LanguageContext.tsx`，整体符合本文 §4 / §5 规则
+- [x] §6 词表替换已应用到全站文案，旧的行话词条（Operator Console / Channel / Vault / Telemetry 等）不再出现在 UI
+- [x] 后端状态枚举统一经 `apps/web/src/lib/status-badge.ts`（`statusLabel` + `quietStatusFor`）渲染，配合 i18n 的 `status` 命名空间；徽章与表格不再直接暴露原始枚举（`needs_reauth` / `suspended` / `monitor` 等）
+- [x] OpenAPI 错误样板与 README 简介与本文 §1 一句话定位对齐
+
+> 文案不再枚举到单个页面文件。早期的 `components/DashboardLayout.tsx` 已被 `components/layout/app-shell.tsx` / `admin-shell.tsx` 取代，页面集也已远超最初的 7 个；治理对象是**全部用户可见文案**，而非某个固定页面清单。
+
+**持续约束（每次改动）**
+
+- [ ] 任何新增或修改的用户可见文案，先经过本文 §4 / §5 / §6 校对再合入
+- [ ] 新出现的后端状态 / 模式枚举要在 i18n 的 `status` 命名空间补齐译名，并经 `statusLabel` 渲染，不得把原始 token 直接显示
+- [ ] 新增 / 改动的 API 错误信息满足 §7 三段式
 
 > 任何 PR 引入新的用户可见文案时，应在 PR 描述里链接到本文件并声明对应词条。

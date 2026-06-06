@@ -1,5 +1,10 @@
 # SRapi Work Packages
 
+> This is SRapi's internal development execution ledger — the work-package backlog that drives
+> long-running implementation goals. It is engineering process, not product documentation. For the
+> product overview and getting started, see the root [`README.md`](../README.md); for current
+> progress see [`STATUS.md`](STATUS.md); for the documentation map see [`README.md`](README.md).
+
 ## Package Format
 
 Each work package contains:

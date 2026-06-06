@@ -6,7 +6,7 @@ SRapi 中的“反代”按 AI 2api 语境使用，不等同于普通 API Gatewa
 
 本定义是后续 `reverse-proxy-*` Provider Adapter、Reverse Proxy Runtime、Scheduler evidence 和测试 harness 的约束来源。实现时如果与本文冲突，以本文为准。
 
-本文件不是开放讨论项。SRapi 的“反代 / 2api”已经由本地参考实现锁定为：
+本文件不是开放讨论项。SRapi 的“反代 / 2api”语义参照 sub2api / CLIProxyAPI / chatgpt2api 三个上游参考项目锁定（它们是私有的上游参考实现，不随 SRapi 发布，也不属于本仓库）：
 
 ```txt
 SRapi 模拟目标官方客户端或目标上游客户端请求形态，
@@ -16,18 +16,18 @@ SRapi 模拟目标官方客户端或目标上游客户端请求形态，
 
 硬规则：
 
-- 在 SRapi 项目内，“反代 / 2api”只按 `/home/senran/Desktop/sub2api`、`/home/senran/Desktop/CLIProxyAPI`、`/home/senran/Desktop/chatgpt2api` 的做法解释。
+- 在 SRapi 项目内，“反代 / 2api”只按 sub2api、CLIProxyAPI、chatgpt2api 参考项目的做法解释。
 - 不再用通用网络 reverse proxy 定义替代本定义。
 - 不再把“接入本地 Codex / Claude Code / Antigravity 客户端”当作 SRapi 反代目标。
 - 不在 Gateway service 增加 Codex / Claude Code / Antigravity 本地 DTO；官方客户端请求模拟属于 Provider Adapter 和 Reverse Proxy Runtime。
 
 ## 2. SRapi 反代定义来源
 
-SRapi 的“反代 / 2api”定义以本地参考项目为准：
+SRapi 的“反代 / 2api”定义以下列三个参考项目为准（私有的上游参考实现，不随 SRapi 发布，也不属于本仓库；这里只引用其概念做法，不依赖其源码）：
 
-- `/home/senran/Desktop/sub2api`
-- `/home/senran/Desktop/CLIProxyAPI`
-- `/home/senran/Desktop/chatgpt2api`
+- `sub2api`
+- `CLIProxyAPI`
+- `chatgpt2api`
 
 这些项目就是 SRapi 的 2api 语义来源，不需要再从通用代理术语重新推导：
 
@@ -112,7 +112,8 @@ Implementation status:
 - WP-530 extends Antigravity discovery with selected-account project bootstrap: if no project metadata is configured, SRapi posts `/v1internal:loadCodeAssist` and, when needed, `/v1internal:onboardUser` through Reverse Proxy Runtime using the same account credential before fetching available models. Persisted discovery writes the resolved project metadata; preview discovery remains side-effect free.
 - WP-620 implements Antigravity refresh-token-only onboarding for `reverse-proxy-antigravity`: admin create/import/update may receive only an Antigravity OAuth `refresh_token`, Reverse Proxy Runtime exchanges it at the Google OAuth token endpoint using the Antigravity client ID and configured client secret, persists encrypted access-token state, and Gateway text requests can immediately use the selected account OAuth identity.
 - WP-470 implements OpenAI-compatible Realtime WebSocket relay for `GET /v1/realtime`: SRapi parses downstream query `model`, schedules a realtime-capable account, builds upstream `/realtime?model=<mapped_upstream_model>`, and relays non-API-key accounts through Reverse Proxy Runtime using the selected account OAuth/session/client-token credential. WP-630 adds the official API-key Realtime path for `runtime_class = api_key` accounts, which deliberately bypasses 2api Reverse Proxy Runtime and uses only the selected account API key. Neither path is local Codex / Claude Code / Antigravity client ingress.
-- Persistent Codex WebSocket session reuse, richer prompt-cache policy, local Codex CLI client ingress, Claude Code WebSocket adapters, Antigravity onboarding UI/API, Antigravity WebSocket adapters, and Antigravity credit overage policy are still follow-up work.
+- Antigravity onboarding is already shipped: WP-530 admin model discovery (`POST /api/v1/admin/accounts/{id}/discover-models`, surfaced in the admin accounts console) drives the `/v1internal:loadCodeAssist` and `/v1internal:onboardUser` bootstrap through Reverse Proxy Runtime.
+- Roadmap (not yet implemented): persistent Codex WebSocket session reuse, richer prompt-cache policy, local Codex CLI client ingress (an explicit non-goal per Section 4, listed here only to keep the boundary visible), Claude Code WebSocket adapters, Antigravity WebSocket adapters, and an Antigravity-specific credit/overage policy are still follow-up work.
 
 ## 6. Local Reference Interpretation Rules
 
@@ -158,16 +159,10 @@ A valid 2api reverse-proxy test should prove at least:
 
 ## 9. Source References
 
-- `/home/senran/Desktop/CLIProxyAPI/internal/runtime/executor/codex_executor.go`: Codex official-client/OAuth upstream request shape.
-- `/home/senran/Desktop/CLIProxyAPI/internal/runtime/executor/codex_websockets_executor.go`: Codex Responses WebSocket upstream shape.
-- `/home/senran/Desktop/CLIProxyAPI/internal/runtime/executor/codex_openai_images.go`: Codex/OpenAI image upstream shape.
-- `/home/senran/Desktop/CLIProxyAPI/internal/runtime/executor/claude_executor.go`: Claude Code official-client/OAuth upstream request shape.
-- `/home/senran/Desktop/CLIProxyAPI/internal/runtime/executor/antigravity_executor.go`: Antigravity official-client/OAuth upstream request shape.
-- `/home/senran/Desktop/CLIProxyAPI/internal/auth/codex`: Codex OAuth/device token acquisition and storage behavior.
-- `/home/senran/Desktop/CLIProxyAPI/internal/auth/claude`: Claude OAuth/device token acquisition and storage behavior.
-- `/home/senran/Desktop/CLIProxyAPI/internal/auth/antigravity`: Antigravity OAuth/token acquisition and storage behavior.
-- `/home/senran/Desktop/sub2api/backend/internal/service/gateway_service.go`: account-pool Gateway behavior and compatible API rendering.
-- `/home/senran/Desktop/sub2api/backend/internal/service/openai_gateway_service.go`: OpenAI/Codex OAuth account dispatch, passthrough, compatible rendering, quota and sticky-session behavior.
-- `/home/senran/Desktop/sub2api/backend/internal/pkg/antigravity/request_transformer.go`: Antigravity request transformation into upstream internal protocol shape.
-- `/home/senran/Desktop/sub2api/backend/internal/service/antigravity_gateway_service.go`: Antigravity upstream forwarding and protocol conversion.
-- `/home/senran/Desktop/chatgpt2api/services/openai_backend_api.py`: ChatGPT Web upstream request shape using access token, browser-style headers, device/session IDs, Sentinel requirements, and backend API paths.
+The authoritative behavioral references for 2api upstream shapes are the **sub2api / CLIProxyAPI / chatgpt2api** reference projects — private upstream references, not shipped with SRapi and not part of this repository. They are consulted only to lock the official-client upstream semantics; SRapi never copies their code. The areas that define each upstream shape are:
+
+- **CLIProxyAPI** — runtime executors and auth flows for Codex (HTTP + Responses WebSocket + image), Claude Code, Gemini, and Antigravity official-client/OAuth upstream request shapes, plus OAuth/device token acquisition and storage behavior.
+- **sub2api** — account-pool Gateway behavior, OpenAI/Codex OAuth account dispatch, passthrough, compatible API rendering, quota and sticky-session handling, and Antigravity request transformation/forwarding into the upstream internal protocol.
+- **chatgpt2api** — ChatGPT Web upstream request shape using access token, browser-style headers, device/session IDs, Sentinel requirements, and `/backend-api/*` routes.
+
+For SRapi's own implementation, the authoritative source of truth is this repository's code: `apps/api/internal/modules/provider_adapters/service` (per-target adapters: `codex.go`, `claude_code.go`, `chatgpt_web.go`, `antigravity.go`, `realtime.go`, `conversation_stream.go`) and `apps/api/internal/httpserver` (`runtime_gateway_websocket.go`, `model_discovery_antigravity.go`, gateway runtime handlers).

@@ -1,5 +1,7 @@
 # SRapi Goal Execution Protocol
 
+> Historical record. `specs/` is a retained Codex development-process ledger — internal dev tooling, not product documentation. This protocol governed how the project was built work-package by work-package; SRapi is now a mature, shipped platform. Kept for provenance and to guide any future spec-driven extension work. For product/architecture documentation see `docs/`.
+
 ## 1. Goal Model
 
 SRapi development is a sequence of bounded work packages. A Codex goal should target exactly one work package at a time unless the user explicitly asks for a broader milestone.
@@ -61,7 +63,7 @@ A work package is complete only when:
 - Docs changed by behavior changes are updated.
 - No required follow-up inside the package remains.
 
-The overall SRapi goal is complete only when all final-state phases in `ROADMAP.md` are complete.
+Historical note: the original program treated "all final-state phases in `ROADMAP.md` complete" as the overall completion bar. Those phases (capped at WP-360) all shipped long ago — the program ran on past WP-1310. `specs/ROADMAP.md` is now a historical phase narrative, not a live target; `specs/STATUS.md` holds the authoritative completed-work ledger. For any future extension, treat the per-package Definition of Done above as the operative completion rule.
 
 ## 6. Blocked Rule
 
@@ -89,7 +91,7 @@ Codex should make conservative choices using existing SRapi rules:
 - Module contracts for cross-module calls.
 - Provider-neutral Scheduler core.
 - Reverse Proxy Runtime for non-API-key account classes.
-- For “反代 / 2api”, use only `docs/2API_REVERSE_PROXY_DEFINITION.md` and the local references `/home/senran/Desktop/sub2api`, `/home/senran/Desktop/CLIProxyAPI`, `/home/senran/Desktop/chatgpt2api`; do not substitute a generic reverse-proxy definition or local-client-ingress interpretation.
+- For “反代 / 2api”, use `docs/2API_REVERSE_PROXY_DEFINITION.md` as the authoritative definition, informed by the sub2api / CLIProxyAPI / chatgpt2api reference projects (private upstream references, not shipped with SRapi); do not substitute a generic reverse-proxy definition or local-client-ingress interpretation.
 - PostgreSQL as source of truth; Redis as rebuildable runtime state.
 - Security and observability built into the first implementation, not deferred when touching sensitive paths.
 

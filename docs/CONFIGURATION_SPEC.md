@@ -219,10 +219,8 @@ GATEWAY_REALTIME_MAX_OPEN_SLOTS_PER_API_KEY=0
 GATEWAY_MAX_CONNS_PER_HOST=2048
 GATEWAY_MAX_IDLE_CONNS=8192
 GATEWAY_MAX_IDLE_CONNS_PER_HOST=4096
-GATEWAY_FORCE_CODEX_CLI=false
 ```
 
-`GATEWAY_FORCE_CODEX_CLI` 会影响所有 Responses 请求，只能作为部署级兜底开关。
 Realtime slot limit 配置为 `0` 表示不启用该维度限制；生产部署建议按实例容量设置全局和单 API key 上限，防止长连接耗尽 Gateway 资源。
 Redis 可用时 realtime slot lifecycle 使用 Redis-backed store，限额和 AdminOps active slot 视图跨 API 节点生效；local 模式 Redis 不可用时降级为内存 store，release 模式 Redis 不可用必须启动失败。
 
@@ -461,6 +459,56 @@ PRICING_UPDATE_PROXY_URL=
 
 外部 fetch 必须遵守 URL allowlist / SSRF 规则。
 
+## 19.1 Console OAuth Secrets / Captcha / 账号巡检 Worker
+
+以下为按需启用的可选启动配置，均默认关闭；权威清单与默认值以
+`apps/api/internal/config/config.go` 和仓库根目录 `.env.example` 为准。
+
+```txt
+OAUTH_CLIENT_SECRETS_JSON=
+OAUTH_ISSUERS_JSON=
+
+CAPTCHA_ENABLED=false
+CAPTCHA_PROVIDER=turnstile
+CAPTCHA_SECRET_KEY=
+CAPTCHA_SITE_KEY=
+CAPTCHA_VERIFY_URL=
+
+ACCOUNT_QUOTA_REFRESH_ENABLED=false
+ACCOUNT_QUOTA_REFRESH_INTERVAL_SECONDS=1800
+ACCOUNT_QUOTA_REFRESH_TIMEOUT_SECONDS=15
+ACCOUNT_QUOTA_REFRESH_MAX_CONCURRENT=4
+
+ACCOUNT_CONNECTIVITY_TEST_ENABLED=false
+ACCOUNT_CONNECTIVITY_TEST_INTERVAL_SECONDS=3600
+ACCOUNT_CONNECTIVITY_TEST_TIMEOUT_SECONDS=30
+ACCOUNT_CONNECTIVITY_TEST_MAX_CONCURRENT=2
+
+ACCOUNT_SCHEDULED_TEST_ENABLED=false
+ACCOUNT_SCHEDULED_TEST_TICK_SECONDS=60
+ACCOUNT_SCHEDULED_TEST_TIMEOUT_SECONDS=30
+```
+
+规则：
+
+- `OAUTH_CLIENT_SECRETS_JSON` 是按 `provider_key` 索引的 JSON map；某个 key 存在时，该
+  provider 的 console OAuth token 交换在 PKCE 之上以 confidential client
+  （`client_secret`）方式执行。这些 secret 只来自部署环境，绝不进入 Admin Settings
+  （参见 §7.1）。
+- `OAUTH_ISSUERS_JSON` 是按 `provider_key` 索引的 JSON map；设置后，callback 阶段会校验
+  provider 的 `id_token`（OIDC：JWKS 验签 + `iss`/`aud`/`exp` + nonce）。
+- Captcha 用于登录/注册的人机校验，默认关闭。`CAPTCHA_PROVIDER` 取值
+  `turnstile`（默认）/ `hcaptcha` / `recaptcha`；`CAPTCHA_SECRET_KEY` 是部署 secret，
+  `CAPTCHA_SITE_KEY` 是前端 widget 渲染用的公开 site key（可暴露），`CAPTCHA_VERIFY_URL`
+  可选覆盖 provider 的 siteverify 端点。
+- `account_quota_refresh` worker 默认每 30 分钟刷新一次配置了 quota 端点的账号的额度/订阅
+  状态；仅在持久化 store 可用且 `ACCOUNT_QUOTA_REFRESH_ENABLED=true` 时启动。
+- `account_connectivity_test` worker 对配置了探测模型（account metadata 中的 `test_model`）
+  的账号发起**真实计费**的生成式连通性探测，覆盖廉价健康探测无法覆盖的 OAuth / 非 api_key
+  账号；默认关闭。
+- `account_scheduled_test` worker 按固定 tick 评估管理后台维护的 scheduled-test-plan，
+  并对每个 plan 运行真实生成式探测；默认关闭，plan 也只在该 worker 启用时运行。
+
 ## 20. 配置变更审计
 
 以下配置变更必须写 audit log：
@@ -474,12 +522,14 @@ PRICING_UPDATE_PROXY_URL=
 - Observability notification channel。
 - Transactional email non-secret settings；SMTP password 本身不进入 settings audit。
 
-## 21. MVP 最小要求
+## 21. 配置基线（已落地）
 
-MVP 至少提供：
+配置系统提供以下基线能力，均已实现：
 
-- `.env.example`。
-- 本地 `config.example.yaml`。
-- 配置加载校验。
-- release 模式弱 secret 拒绝启动。
-- 配置文档和默认值说明。
+- 仓库根目录 `.env.example` 提供完整的环境变量清单与默认值。
+- 本地 `config.example.yaml` 提供文件式配置样例。
+- 启动时执行配置加载校验（`config.go` 的 `Validate()`）。
+- release 模式拒绝弱 secret 与默认/占位管理员密码启动（`weakSecret` /
+  `weakBootstrapPassword`，覆盖 `JWT_SECRET`、`SRAPI_MASTER_KEY`、
+  `TOTP_ENCRYPTION_KEY`、`API_KEY_PEPPER`、`BOOTSTRAP_ADMIN_PASSWORD`）。
+- 配置文档（本文件）与默认值说明随代码维护；权威默认值以 `config.go` 为准。

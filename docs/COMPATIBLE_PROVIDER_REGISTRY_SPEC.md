@@ -29,68 +29,69 @@ Provider preset 的目标是减少硬编码分叉：
 
 ## 3. OpenAI-compatible preset
 
-第一阶段建议内置：
+内置 OpenAI-compatible preset（`internal/modules/providers/preset/registry.go`，均已随注册表发布）：
 
-| provider_key | 默认用途 | 阶段 |
+| provider_key | 默认用途 | default_base_url |
 | --- | --- | --- |
-| `openai-compatible` | 通用自定义 OpenAI-compatible 上游 | MVP |
-| `openai` | 官方 API Key 或官方兼容 API | MVP |
-| `groq` | Groq OpenAI-compatible | MVP preset |
-| `cerebras` | Cerebras OpenAI-compatible | MVP preset |
-| `deepseek` | DeepSeek Chat / Reasoner | MVP preset |
-| `grok` | xAI Grok OpenAI-compatible | MVP preset |
-| `moonshot` | Moonshot / Kimi | MVP preset |
-| `kimi` | Kimi route alias preset | MVP preset |
-| `mistral` | Mistral OpenAI-compatible | MVP preset |
-| `openrouter` | OpenRouter | MVP preset |
-| `anyrouter` | AnyRouter | MVP preset |
-| `qwen` | 通义千问 / DashScope OpenAI-compatible | MVP preset |
-| `together` | Together AI OpenAI-compatible (`https://api.together.ai/v1`) | MVP preset |
-| `zhipu` | GLM / Zhipu | MVP preset |
-| `zai` | Z.AI / GLM | MVP preset |
+| `openai-compatible` | 通用自定义 OpenAI-compatible 上游 | `https://api.openai.com/v1` |
+| `openai` | 官方 API Key 或 ChatGPT/Codex OAuth runtime | `https://api.openai.com/v1` |
+| `groq` | Groq OpenAI-compatible | `https://api.groq.com/openai/v1` |
+| `cerebras` | Cerebras OpenAI-compatible | `https://api.cerebras.ai/v1` |
+| `deepseek` | DeepSeek Chat / Reasoner | `https://api.deepseek.com` |
+| `grok` | xAI Grok OpenAI-compatible | `https://api.x.ai/v1` |
+| `moonshot` | Moonshot / Kimi | `https://api.moonshot.ai/v1` |
+| `kimi` | Kimi route alias preset | `https://api.moonshot.ai/v1` |
+| `mistral` | Mistral OpenAI-compatible | `https://api.mistral.ai/v1` |
+| `openrouter` | OpenRouter | `https://openrouter.ai/api/v1` |
+| `anyrouter` | AnyRouter | `https://anyrouter.dev/api/v1` |
+| `qwen` | 通义千问 / DashScope OpenAI-compatible | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| `together` | Together AI OpenAI-compatible | `https://api.together.ai/v1` |
+| `zhipu` | GLM / Zhipu | `https://open.bigmodel.cn/api/paas/v4` |
+| `zai` | Z.AI / GLM | `https://api.z.ai/api/paas/v4` |
 
-允许账号类型：
+允许的 runtime class（`RuntimeClassAllowlist`，第三方 preset 取默认集合）：
 
 ```txt
 api_key
-upstream
 custom_reverse_proxy
 ```
 
-不得进入 ChatGPT Web OAuth、Codex CLI 等 `openai` 反代专用 runtime。
+`openai` 一级 preset 额外放开 ChatGPT/Codex OAuth runtime（`oauth_refresh`、`oauth_device_code`）。
+第三方 OpenAI-compatible preset 不得进入 ChatGPT Web OAuth、Codex CLI 等 `openai` 反代专用 runtime。
 
 ## 4. Anthropic-compatible preset
 
-第一阶段建议内置：
+内置 Anthropic-compatible preset（均已随注册表发布）：
 
-| provider_key | 默认用途 | 阶段 |
+| provider_key | 默认用途 | default_base_url |
 | --- | --- | --- |
-| `anthropic-compatible` | 通用 Anthropic Messages-compatible 上游 | MVP |
-| `anthropic` | Anthropic official API Key / OAuth runtime | MVP |
-| `deepseek-anthropic` | DeepSeek Anthropic-compatible | MVP preset |
-| `moonshot-anthropic` | Moonshot/Kimi Anthropic-compatible | MVP preset |
-| `zhipu-anthropic` | Zhipu Anthropic-compatible | MVP preset |
-| `zai-anthropic` | Z.AI Anthropic-compatible | MVP preset |
+| `anthropic-compatible` | 通用 Anthropic Messages-compatible 上游 | `https://api.anthropic.com/v1` |
+| `anthropic` | Anthropic official API Key / OAuth runtime | `https://api.anthropic.com/v1` |
+| `deepseek-anthropic` | DeepSeek Anthropic-compatible | `https://api.deepseek.com/anthropic` |
+| `moonshot-anthropic` | Moonshot/Kimi Anthropic-compatible | `https://api.moonshot.ai/anthropic` |
+| `zhipu-anthropic` | Zhipu Anthropic-compatible | `https://open.bigmodel.cn/api/anthropic` |
+| `zai-anthropic` | Z.AI Anthropic-compatible | `https://api.z.ai/api/anthropic` |
 
-Anthropic-compatible preset 不得进入 Claude Web / Claude Code OAuth mimicry runtime。`claude-compatible` 只能作为历史兼容 route alias，不能作为新的 adapter_type 或 provider.protocol。
+`anthropic` 一级 preset 额外放开 Claude Code / Claude CLI / Vertex service-account runtime（`oauth_refresh`、`oauth_device_code`、`cli_client_token`、`service_account_json`）。
+第三方 Anthropic-compatible preset 不得进入 Claude Web / Claude Code OAuth mimicry runtime。`claude-compatible` 只能作为历史兼容 route alias（注册在 `anthropic-compatible` preset 下），不能作为新的 adapter_type 或 provider.protocol。
 
 ## 5. Rerank-compatible preset
 
-WP-320 起建议内置：
+内置 rerank preset（已发布）：
 
-| provider_key | 默认用途 | 阶段 |
+| provider_key | 默认用途 | default_base_url |
 | --- | --- | --- |
-| `rerank-compatible` | 通用 rerank 上游，兼容 Cohere/Jina 风格 `query` + `documents` 请求 | WP-320 |
+| `rerank-compatible` | 通用 rerank 上游，兼容 Cohere/Jina 风格 `query` + `documents` 请求 | `https://api.cohere.com/v2` |
 
 Rerank-compatible preset 只注册 rerank 路由别名，不自动暴露 chat、responses、images 或 moderation route。
 
 ## 6. Antigravity reverse-proxy preset
 
-WP-360 起内置：
+内置（platform_family `reverse_proxy_antigravity`）：
 
-| provider_key | 默认用途 | 阶段 |
-| --- | --- | --- |
-| `antigravity` | Antigravity desktop/IDE reverse-proxy text alias | WP-360 |
+| provider_key | 默认用途 |
+| --- | --- |
+| `antigravity` | Antigravity desktop/IDE reverse-proxy text alias |
 
 `antigravity` 是 reverse-proxy 客户端身份 preset，不是新的文本协议。它必须通过
 `provider.protocol` 选择目标上游协议：
@@ -101,7 +102,7 @@ anthropic-compatible -> /messages
 gemini-compatible    -> models/{model}:generateContent
 ```
 
-当前 registry 为 Antigravity 暴露 text alias：
+registry 为 Antigravity 暴露 text alias：
 
 ```txt
 /antigravity/v1
@@ -109,24 +110,37 @@ gemini-compatible    -> models/{model}:generateContent
 /api/provider/antigravity/v1
 ```
 
-WP-370 起还暴露 Gemini model-action alias：
+并暴露 Gemini model-action alias（`GeminiRouteAliases`）：
 
 ```txt
 /antigravity/v1beta
 /api/provider/antigravity/v1beta
 ```
 
-允许账号类型：
+允许的 runtime class：
 
 ```txt
 desktop_client_token
 ide_plugin_token
+oauth_refresh
 custom_reverse_proxy
 ```
 
 `antigravity` preset 不提供通用 `default_base_url`；管理员必须在 Provider Account
 metadata 中配置实际 `base_url`。Gemini model-action aliases 只复用标准 Gemini Gateway
 handler，并保留 alias source endpoint 作为 usage log 与 scheduler decision 证据。
+
+## 6a. Bedrock Anthropic preset
+
+内置（platform_family `bedrock_anthropic`）：
+
+| provider_key | 默认用途 | default_base_url |
+| --- | --- | --- |
+| `bedrock` | Amazon Bedrock 上的 Anthropic Messages 上游 | `https://bedrock-runtime.us-east-1.amazonaws.com` |
+
+`bedrock` 复用 Anthropic capability 集合，auth mode 为 `custom_header`（SigV4 header），允许的
+runtime class 为 `api_key` 与 `service_account_json`。route alias：`/bedrock/v1`、
+`/api/provider/bedrock`、`/api/provider/bedrock/v1`。
 
 ## 7. Preset Schema
 
@@ -152,13 +166,15 @@ capabilities:
   stream: true
 ```
 
-当前内置 registry 至少必须覆盖以下 key：
+内置 registry 当前覆盖以下 key（`preset.Default()`，权威清单见
+`internal/modules/providers/preset/registry.go`）：
 
 ```txt
 anthropic
 anthropic-compatible
 antigravity
 anyrouter
+bedrock
 cerebras
 deepseek
 deepseek-anthropic
@@ -213,7 +229,7 @@ Handler 不得复制 Provider-specific 转发逻辑。
 
 Provider alias 进入 Scheduler 前必须先应用 API Key policy，包括 `allowed_models` 与 `group_ids`。当 API Key 绑定了 `group_ids` 时，候选账号必须属于至少一个绑定的 account group；未绑定 group 的账号不得被 alias 路径调度。
 
-## 9. 模型目录优先级
+## 9a. 模型目录优先级
 
 模型目录来源优先级：
 
@@ -224,7 +240,7 @@ Provider alias 进入 Scheduler 前必须先应用 API Key policy，包括 `allo
 5. 通用 fallback catalog。
 
 `/v1/models` 必须按 API Key group、provider、model visibility 合并后返回。
-`POST /api/v1/admin/accounts/{id}/discover-models` 可以把 live discovery 结果写入 Account `supported_models`，供后续 Provider-neutral 候选选择使用。WP-500 起，`reverse-proxy-antigravity` 的 live discovery 通过 Reverse Proxy Runtime 使用选中账号凭证访问 `{base_url}/v1internal:fetchAvailableModels`，不是 API-key discovery。WP-530 起，缺少 project metadata 的 Antigravity discovery 会先通过同一 selected-account runtime 请求 `{base_url}/v1internal:loadCodeAssist`，必要时请求 `{base_url}/v1internal:onboardUser`，再做模型发现；仅 `persist=true` 写回 project metadata。
+`POST /api/v1/admin/accounts/{id}/discover-models` 把 live discovery 结果写入 Account `supported_models`，供后续 Provider-neutral 候选选择使用。`reverse-proxy-antigravity` 的 live discovery 通过 Reverse Proxy Runtime 使用选中账号凭证访问 `{base_url}/v1internal:fetchAvailableModels`，不是 API-key discovery。缺少 project metadata 的 Antigravity discovery 会先通过同一 selected-account runtime 请求 `{base_url}/v1internal:loadCodeAssist`，必要时请求 `{base_url}/v1internal:onboardUser`，再做模型发现；仅 `persist=true` 写回 project metadata。（实现见 `internal/httpserver/model_discovery.go`、`model_discovery_antigravity.go`。）
 
 ## 10. Upstream Endpoint Derivation
 
@@ -297,7 +313,7 @@ max_output_tokens
 - 通过 provider alias 绕过 API Key group 权限。
 - 将 upstream 详细错误直接泄漏给客户端。
 
-## 13. 与 Provider Adapter 的关系
+## 13a. 与 Provider Adapter 的关系
 
 Provider Adapter 实现协议转换和上游调用；Compatible Provider Registry 只提供配置、路由、能力和校验元数据。
 

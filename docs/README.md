@@ -9,10 +9,10 @@
 | 文档 | 作用 |
 | --- | --- |
 | `PROJECT_DEVELOPMENT_PLAN.md` | 项目定位、阶段路线图和技术方向。 |
-| `MVP_SPEC.md` | MVP 功能需求、非功能需求、验收条件和测试映射。 |
-| `MVP_IMPLEMENTATION_PLAN.md` | MVP 里程碑拆解和实现顺序。 |
+| `MVP_SPEC.md` | （历史 / 已被取代）最初 MVP 功能需求、非功能需求、验收条件和测试映射；现状以 `../specs/STATUS.md` 与 `ARCHITECTURE_REQUIREMENTS.md` 为准。 |
+| `MVP_IMPLEMENTATION_PLAN.md` | （历史 / 已被取代）最初 MVP 里程碑拆解和实现顺序；现状以 `../specs/WORK_PACKAGES.md` 与 `../specs/STATUS.md` 为准。 |
 | `ARCHITECTURE.md` | 后端模块边界、依赖方向和调用链。 |
-| `ARCHITECTURE_REQUIREMENTS.md` | MVP 架构要求、启动 harness 和证据映射。 |
+| `ARCHITECTURE_REQUIREMENTS.md` | 架构要求、启动 harness 和证据映射。 |
 | `MODULE_INTERFACE_CONTRACTS.md` | 模块间 contract、DTO、同步调用和事件边界。 |
 | `DOMAIN_EVENTS_SPEC.md` | 领域事件、Outbox、Inbox、幂等、重试和补偿规则。 |
 | `DOMAIN_MODEL.md` | 核心业务概念、术语和领域关系。 |
@@ -63,14 +63,30 @@
 
 ## 7. Codex 执行规格
 
+`../specs/README.md` 是执行规格的权威索引（含强制阅读顺序、Source Of Truth 与冲突优先级）。下表为当前 `specs/` 目录中的全部文件，新增或重命名时以 `../specs/README.md` 的 Directory Map 为准。
+
 | 文档 | 作用 |
 | --- | --- |
-| `../specs/README.md` | 长期 Codex goal 的入口、阅读顺序和恢复提示。 |
-| `../specs/WORK_PACKAGES.md` | 按阶段拆分的可执行工作包、责任范围和完成定义。 |
+| `../specs/README.md` | 长期 Codex goal 的入口、强制阅读顺序、Source Of Truth 和冲突优先级。 |
+| `../specs/STATUS.md` | 跨 goal 的当前进度、下一推荐工作包和最近门禁记录（进度权威来源）。 |
+| `../specs/GOAL_EXECUTION_PROTOCOL.md` | 多轮 Codex goal 的安全执行规则。 |
+| `../specs/WORK_PACKAGES.md` | 按阶段拆分的可执行工作包、责任范围、完成定义和门禁。 |
 | `../specs/QUALITY_GATES.md` | 不同变更类型必须运行的质量门禁。 |
-| `../specs/STATUS.md` | 跨 goal 的当前进度、下一推荐工作包和最近门禁记录。 |
+| `../specs/ROADMAP.md` | 通往最终平台形态的阶段计划。 |
+| `../specs/FINAL_STATE.md` | 最终产品与平台目标形态。 |
+| `../specs/REFERENCE_PROJECT_DECISIONS.md` | 从 `sub2api` / `CLIProxyAPI` 借鉴什么、不复制什么。 |
+| `../specs/COMMERCIALIZATION_PLAN.md` | 从骨架走向生产级网关的工程计划（历史 / 已完成记录；进度仍以 `STATUS.md` 为准）。 |
 
-## 8. 维护规则
+## 8. 仓库根目录治理文档
+
+| 文档 | 作用 |
+| --- | --- |
+| `../README.md` / `../README.zh-CN.md` | 仓库总览、快速开始和能力概览（英文 / 中文）。 |
+| `../CONTRIBUTING.md` | 贡献流程、本地开发和门禁约定。 |
+| `../SECURITY.md` | 安全披露流程与联系方式。 |
+| `../LICENSE` | 开源许可证。 |
+
+## 9. 维护规则
 
 - 改接口必须同步 `OPENAPI_CONTRACT.md`。
 - 改跨模块调用必须同步 `MODULE_INTERFACE_CONTRACTS.md`。

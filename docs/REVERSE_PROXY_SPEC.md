@@ -2,7 +2,7 @@
 
 ## 1. 目标
 
-术语边界以 `2API_REVERSE_PROXY_DEFINITION.md` 为准：SRapi 的“反代 / 2api”只按本地 `/home/senran/Desktop/sub2api`、`/home/senran/Desktop/CLIProxyAPI`、`/home/senran/Desktop/chatgpt2api` 的 2api 做法解释，即 SRapi 使用选中 Provider Account 模拟目标官方客户端请求上游，而不是把本地 Codex / Claude Code / Antigravity 客户端作为下游入口，也不是按通用网络 reverse proxy 定义重新解释。
+术语边界以 `2API_REVERSE_PROXY_DEFINITION.md` 为准：SRapi 的“反代 / 2api”只按 sub2api / CLIProxyAPI / chatgpt2api 这些参考项目（私有上游参考，不随 SRapi 发布）的 2api 做法解释，即 SRapi 使用选中 Provider Account 模拟目标官方客户端请求上游，而不是把本地 Codex / Claude Code / Antigravity 客户端作为下游入口，也不是按通用网络 reverse proxy 定义重新解释。
 
 实现时不要再把“反代”解释成 Gateway service 本地 DTO、本地 CLI 进程代理、或普通 API-key upstream fallback。SRapi 2api 的判定点是：Provider Adapter 构造目标官方客户端 upstream endpoint/header/body/stream/WSS shape，Reverse Proxy Runtime 使用选中账号的 OAuth/session/desktop/CLI/IDE credential 发给真实上游。
 
@@ -504,8 +504,10 @@ HTTP/3 模拟
 
 ## 23. 测试要求
 
-- TLS JA3/JA4 快照测试，匹配 Egress Profile 目标值。
-- HTTP/2 SETTINGS 快照测试。
+> 状态：本节是规范化的测试目标清单。TLS JA3/JA4 快照测试与 HTTP/2 SETTINGS 快照测试随完整指纹模拟一起属于 Roadmap / Phase 2，当前代码尚未实现（仍处于 §5/§20/§21 描述的 metadata opt-in HTTP/1.1 ClientHello 子集阶段）。其余项目（禁止头泄漏、SSE 字节透传、OAuth refresh 并发锁、cookie jar 隔离、封号信号识别等）已随反代运行时落地。
+
+- TLS JA3/JA4 快照测试，匹配 Egress Profile 目标值。（Roadmap / Phase 2，尚未实现）
+- HTTP/2 SETTINGS 快照测试。（Roadmap / Phase 2，尚未实现）
 - Header 顺序与大小写黄金测试。
 - 禁止头泄漏单元测试。
 - SSE 字节级 diff 测试：相同上游响应，反代输出与原始官方客户端抓包字节一致。

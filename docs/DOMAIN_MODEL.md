@@ -75,11 +75,11 @@ suspended
 deleted
 ```
 
-新用户默认归属一个个人 Workspace。当前不暴露 Workspace 管理 API；持久化层会在创建用户时为未指定 `workspace_id` 的用户创建 `personal-<user_id>` Workspace 并写回用户。
+新用户默认归属一个个人 Workspace。Workspace 是内部多租户边界，按设计不对外暴露独立的 Workspace 管理 API；持久化层会在创建用户时为未指定 `workspace_id` 的用户创建 `personal-<user_id>` Workspace 并写回用户。
 
 ## 4. Workspace
 
-Workspace 是当前多租户边界，用于把用户、API Key 和后续权限/安全策略聚合到同一租户作用域。第一阶段只支持个人 Workspace，不建 Organization/Team。
+Workspace 是多租户边界，用于把用户、API Key 和权限/安全策略聚合到同一租户作用域。当前作用域只支持个人 Workspace，不建 Organization/Team；Organization/Team 多人协作仍属 Roadmap，尚未实现。
 
 关键属性：
 
@@ -105,7 +105,7 @@ updated_at
 
 角色用于控制后台权限。内置角色负责平台级管理入口，自定义角色用于细粒度 Admin API 授权。
 
-建议第一阶段内置：
+内置角色（不可修改、不可删除）：
 
 ```txt
 owner
@@ -125,7 +125,7 @@ permissions
 规则：
 
 - `permissions` 是 `["resource:action"]` 字符串数组，例如 `payment_order:read`。
-- `owner` 和 `admin` 保留全量管理权限；自定义角色必须先通过 Admin Roles API 创建，再分配给用户。
+- `owner` 和 `admin` 保留全量管理权限；内置角色（`owner`/`admin`/`operator`/`user`）不可被修改或删除。自定义角色通过 Admin Roles API 创建/编辑/删除（`/api/v1/admin/roles`），再分配给用户。
 - 运行时从用户角色合并 permissions 到 session user DTO，Admin API 可以选择 `owner/admin` 或特定 permission 放行。
 - 角色只控制控制台和管理 API 权限，不直接控制模型访问。模型访问由 API Key、Subscription、Entitlement 和 User Group 共同决定。
 
@@ -393,7 +393,7 @@ supports_batch
 
 能力是 Gateway 和 Scheduler 判断候选 Provider 的基础。
 
-能力字段必须映射到 `CAPABILITY_TAXONOMY_SPEC.md` 的 canonical capability key。文档中的 `supports_*` 字段只是 DTO 表达形式，能力注册、匹配、降级和版本化必须使用 capability descriptor：
+能力字段映射到 `CAPABILITY_TAXONOMY_SPEC.md` 的 canonical capability key。上面的 `supports_*` 字段只是 DTO 表达形式；能力注册、匹配、降级和版本化由 capability descriptor 承载（实现见 `apps/api/internal/modules/capabilities`）：
 
 ```txt
 key
@@ -500,7 +500,7 @@ suspended
 
 ## 19. Entitlement
 
-Entitlement 是用户权益的可查询执行层。当前落库为 `entitlements`，每行表示一个 feature，来源是 active user subscription 的 `entitlements_snapshot`。
+Entitlement 是用户权益的可查询执行层。落库为 `entitlements`，每行表示一个 feature，来源是 active user subscription 的 `entitlements_snapshot`。
 
 示例：
 
@@ -522,17 +522,17 @@ Entitlement 可以来自：
 - Admin override。
 - API Key override。
 
-解析优先级建议：
+解析优先级：
 
 ```txt
 API Key override > User override > Subscription > User Group > System default
 ```
 
-当前实现：
+执行契约：
 
-- 已实现 Subscription 来源的 `entitlements` 查询缓存，字段包括 `user_id`、`scope_type`、`scope_id`、`feature_key`、`value_json`、`quota_limit`、`expires_at`、`source_subscription_id`。
+- Subscription 来源的 `entitlements` 查询层为热查询源，字段包括 `user_id`、`scope_type`、`scope_id`、`feature_key`、`value_json`、`quota_limit`、`expires_at`、`source_subscription_id`。
 - `CheckEntitlement()` 从 active entitlement rows 合并 `allowed_models`、`account_group_scope`、`scheduler_strategy`、`monthly_token_quota`、`monthly_cost_quota` 后再进入 Scheduler。
-- `entitlements_snapshot` 仍保留为审计/防漂移证据；Gateway admission 读取 `entitlements`，并校验来源 subscription 的 active window。
+- `entitlements_snapshot` 作为审计/防漂移证据保留；Gateway admission 读取 `entitlements`，并校验来源 subscription 的 active window。
 
 ## 20. Quota
 
@@ -607,25 +607,25 @@ strategy_hint
 
 Client Endpoint Adapter 负责把不同客户端协议转换为 Canonical AI Request，并把 Canonical AI Response 渲染回源端点格式。
 
-第一阶段必须支持：
+已支持的源端点（均已注册路由，见 `apps/api/internal/httpserver/server.go` 与 `apps/api/internal/modules/gateway/contract` 的 `SourceEndpoint`）：
 
 ```txt
-openai_chat_completions
-openai_responses
-anthropic_messages
+openai_chat_completions       /v1/chat/completions
+openai_responses              /v1/responses, /v1/responses/compact
+anthropic_messages            /v1/messages, /v1/messages/count_tokens
+gemini_generate_content       /v1beta/models/{model}:generateContent, :streamGenerateContent, :countTokens
+embeddings                    /v1/embeddings
+images                        /v1/images/generations, /edits, /variations
+audio                         /v1/audio/transcriptions, /audio/speech
+moderations                   /v1/moderations
+rerank                        /v1/rerank
+realtime                      /v1/realtime (WebSocket)
 ```
 
-后续支持：
+Roadmap / 尚未实现：
 
 ```txt
-gemini_generate_content
-embeddings
-images
-moderations
-rerank
-audio
-batch
-realtime
+batch    # 上游 Batch API（如 OpenAI /v1/batches）暂未提供源端点
 ```
 
 ## 22.2 Canonical AI Request

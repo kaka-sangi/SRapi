@@ -1,5 +1,7 @@
 # SRapi Final State
 
+> Status: this target architecture has been realized. The platform described below is shipped and route-registered today; for the full work-package ledger see `specs/STATUS.md`. The normative voice ("must", "the final runtime supports") is retained as the binding architectural contract that the implementation conforms to.
+
 ## 1. Product Definition
 
 SRapi is a self-hosted AI API Gateway and management platform for the fast-changing AI model ecosystem.
@@ -26,8 +28,8 @@ The Gateway Plane exposes client-facing AI endpoints:
 - OpenAI Responses `/v1/responses`
 - Anthropic-compatible `/v1/messages`
 - Provider-prefixed route aliases
-- Phase 2+ passthrough/media endpoints: embeddings, images, audio, rerank
-- Phase 3+ realtime and websocket endpoints
+- Passthrough/media endpoints: embeddings, images, audio, rerank (shipped)
+- Realtime and websocket endpoints (shipped: `GET /v1/realtime`, `GET /v1/responses/ws`)
 
 Every AI request must enter:
 
@@ -180,18 +182,19 @@ Minimum final surfaces:
 
 ### 2.9 Web Console Plane
 
-The final web app is a production console, not a landing page.
+The web app is a delivered production console (`apps/web`, Next.js), not a landing page.
 
-It must include:
+It includes:
 
 - user dashboard
 - API key management
 - usage and billing views
 - provider/account/model administration
-- scheduler simulator and decision stream
+- scheduler decision stream
 - ops dashboard
-- payment administration
+- payment and affiliate administration
 - settings and audit
+- self-service playground and an admin AI copilot
 
 Visual direction follows `docs/FRONTEND_DESIGN_SYSTEM.md`.
 

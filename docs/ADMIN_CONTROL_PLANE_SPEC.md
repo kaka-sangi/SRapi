@@ -32,8 +32,9 @@ The control plane must answer three operator questions:
 - Ops monitoring follows SRE golden signals: latency, traffic, errors, and
   saturation. SRapi adds AI-native signals such as tokens, TTFT-ready fields,
   account health, scheduler decisions, and reverse-proxy risk classes.
-- v1 favors clear live/read-model aggregation over premature rollup tables.
-  High-volume rollups and external log backends remain Phase 2 work.
+- The control plane favors clear live/read-model aggregation over premature
+  rollup tables. High-volume rollup tables and external log backends remain on
+  the roadmap (see §7) and are not yet implemented.
 
 ## 3. Route Families
 
@@ -111,6 +112,13 @@ Ops v1 is read-model based:
 
 The API must preserve low-cardinality labels and must not return raw API keys,
 session affinity keys, credentials, prompts, cookies, or provider-native frames.
+
+These routes are the console ops dashboard surface and match
+`packages/openapi/openapi.yaml` (`/api/v1/admin/ops/*`). They are complementary
+to the SLO / scheduler-decision / realtime-slot ops routes documented in
+`docs/OBSERVABILITY_SPEC.md` §11 (`overview`, `slo`, `scheduler/decisions`,
+`realtime/slots`, `alerts/{id}/ack`); see OpenAPI for the authoritative,
+combined ops route list.
 
 ### 3.3 Announcements
 
@@ -262,8 +270,12 @@ The response is a typed settings snapshot with these tabs:
 - `backup`
 
 The settings service stores typed JSON under stable keys. Secret-bearing fields
-must use encrypted storage before production use; v1 responses expose only
-configured flags for secrets.
+are encrypted at rest with the AES key derived from `Security.MasterKey` (see
+`internal/platform/crypto`) and follow a write-only / `configured` pattern:
+responses expose only configured flags for secrets, never the secret values. For
+example, the copilot dedicated API key is persisted as encrypted ciphertext that
+never crosses the API boundary, and the runtime SMTP password comes only from
+`EMAIL_SMTP_PASSWORD`.
 
 Email settings expose non-secret delivery metadata for the console UI:
 `smtp_configured`, `smtp_host`, `smtp_port`, `smtp_username`,
@@ -411,11 +423,22 @@ Admin Control Plane v1 includes:
 - OpenAPI/SDK parity.
 - Focused backend tests.
 
-Phase 2 includes:
+Since v1, several items originally listed as future work have shipped and are
+no longer roadmap items:
+
+- Admin notification email-template management (catalog, per-event subject/HTML
+  overrides, restore-to-default, and preview) — see §3.7.
+- Operational PostgreSQL backup/restore via the `make backup-postgres` and
+  `make restore-postgres` targets (see `docs/OPERATIONS.md`).
+
+Roadmap / not yet implemented:
 
 - Rollup tables for dashboard and ops trends.
 - Risk event tables and higher-level security/risk analytics.
 - External system-log export, retention policy automation, and archived-log
   retrieval.
-- Backup restore workflow with async job state and re-authentication.
-- External notification channels and alert-routing rules.
+- An in-console backup/restore workflow with async job state and
+  re-authentication (operational backup/restore today is the make-target CLI
+  flow above).
+- External notification channels (e.g. Slack/webhook fan-out) and alert-routing
+  rules beyond the shipped email notifications.

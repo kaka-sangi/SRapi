@@ -2,7 +2,7 @@
 
 ## 1. 目标
 
-本文档定义 SRapi 从 MVP 走向可自托管生产部署时必须具备的运维能力，覆盖配置、迁移、备份恢复、健康检查、发布门禁、日志脱敏、数据生命周期和事故处理。
+本文档定义 SRapi 可自托管生产部署所需的运维能力，覆盖配置、迁移、备份恢复、健康检查、发布门禁、日志脱敏、数据生命周期和事故处理。下文各节均为当前已落地实现，本文档作为生产运维参考。
 
 SRapi 的运维设计原则：
 
@@ -20,7 +20,7 @@ SRapi 的运维设计原则：
 - Gateway、Scheduler、Provider Adapter、Reverse Proxy Runtime 的运行诊断。
 - 支付、订阅、返利、用量、审计等高价值数据。
 
-MVP 可以只实现最小子集，但目录、配置和数据模型必须为本文档预留扩展点。
+目录、配置和数据模型已按本文档要求落地；新增能力时必须沿用此处约定的扩展点。
 
 ## 3. 运维端点
 
@@ -154,28 +154,16 @@ make smoke-failover
 
 该 smoke 会创建两个临时 OpenAI-compatible Provider、同一个临时模型映射和两个本地 mock upstream。Primary upstream 固定返回 503，Gateway 应自动切换到 Secondary upstream 并返回成功响应；随后 smoke 会断言 `usage_logs` 出现失败/成功两条 attempt、第二个 SchedulerDecision 通过 `fallback_from_decision_id` 链到第一个 decision、`fallback_excluded` 证据存在，并且 `/metrics` 暴露正数 `srapi_gateway_failover_total`。
 
-Stripe test mode 支付闭环 smoke 可单独执行：
+支付渠道闭环 smoke 可按渠道单独执行：
 
 ```bash
 STRIPE_SMOKE_SECRET_KEY=... STRIPE_SMOKE_WEBHOOK_SECRET=... make smoke-payment-stripe
-```
 
-该 smoke 需要已启动的 API、默认或显式配置的管理员账号，以及 Stripe test mode secret key / webhook signing secret。它会创建或更新名为 `STRIPE_SMOKE_PROVIDER_NAME` 的临时 Stripe provider instance，调用用户下单 API 发起 Checkout Session，验证返回的 Stripe checkout URL 和 session id，通过 SRapi webhook 入口提交本地签名的 `checkout.session.completed` 事件，确认订单 fulfilled、重复 webhook 幂等、余额按 `STRIPE_SMOKE_AMOUNT` 增加，并在退出前禁用临时 provider。它不会保存真实卡号或绕过 service 层的金额、币种、签名、provider instance 归属校验。
-
-Alipay Page Pay 支付 smoke 可单独执行：
-
-```bash
 ALIPAY_SMOKE_APP_ID=... \
 ALIPAY_SMOKE_PRIVATE_KEY='-----BEGIN RSA PRIVATE KEY-----...' \
 ALIPAY_SMOKE_ALIPAY_PUBLIC_KEY='-----BEGIN PUBLIC KEY-----...' \
 make smoke-payment-alipay
-```
 
-该 smoke 需要已启动的 API、默认或显式配置的管理员账号，以及支付宝沙箱或测试商户凭证。默认路径会创建或更新名为 `ALIPAY_SMOKE_PROVIDER_NAME` 的临时 Alipay provider instance，调用用户下单 API 并验证 Page Pay checkout URL 包含 `alipay.trade.page.pay`、`sign_type=RSA2` 和签名参数，最后禁用临时 provider。若设置 `ALIPAY_SMOKE_LOCAL_WEBHOOK=1` 且提供 `ALIPAY_SMOKE_NOTIFY_PRIVATE_KEY`，脚本会提交本地签名的 `TRADE_SUCCESS` 通知，确认 SRapi 返回支付宝异步通知要求的纯文本 `success`、订单 fulfilled、余额按 `ALIPAY_SMOKE_AMOUNT` 增加，并用重复通知验证余额不二次入账。该本地签名模式只验证 SRapi webhook 链路，不能替代支付宝沙箱真实异步通知演练。
-
-WeChat Pay APIv3 支付 smoke 可单独执行：
-
-```bash
 WECHAT_SMOKE_APP_ID=... \
 WECHAT_SMOKE_MCH_ID=... \
 WECHAT_SMOKE_API_V3_KEY=... \
@@ -184,7 +172,7 @@ WECHAT_SMOKE_PRIVATE_KEY='-----BEGIN RSA PRIVATE KEY-----...' \
 make smoke-payment-wechat
 ```
 
-该 smoke 需要已启动的 API、默认或显式配置的管理员账号、可用微信支付商户凭证和微信预支付网络连通性。默认路径会创建或更新名为 `WECHAT_SMOKE_PROVIDER_NAME` 的临时 WeChat provider instance，调用用户下单 API 发起真实预支付并校验 Native/H5/JSAPI checkout metadata，最后禁用临时 provider。若设置 `WECHAT_SMOKE_LOCAL_WEBHOOK=1` 且提供 `WECHAT_SMOKE_PLATFORM_PRIVATE_KEY`，脚本会提交本地签名且 AES-GCM 加密的 `TRANSACTION.SUCCESS` 通知，确认 SRapi webhook 验签解密、订单 fulfilled、余额按 `WECHAT_SMOKE_AMOUNT` 增加，并用重复通知验证余额不二次入账。该本地签名模式只验证 SRapi webhook 链路，不能替代微信支付平台真实通知演练。
+每个 smoke 需要已启动的 API、管理员账号和对应渠道的测试/沙箱凭证；它们会创建临时 provider instance、走一遍用户下单 + 本地签名 webhook 回调闭环（确认订单 fulfilled、webhook 幂等、余额按配置金额入账且不二次入账），并在退出前禁用临时 provider。本地签名模式只验证 SRapi webhook 链路，不能替代渠道真实异步通知演练。各渠道所需的全部 `*_SMOKE_*` 环境变量、可选 webhook 模式开关和逐项断言以 `PAYMENT_SPEC.md` §13（测试要求，含 §4 渠道说明）为准，避免两处描述漂移。
 
 OpenTelemetry 到 Jaeger 的可视化链路可单独执行：
 
@@ -446,9 +434,9 @@ payment order
 
 反代账号状态迁移以 `REVERSE_PROXY_SPEC.md` 为准。
 
-## 12. MVP 最小要求
+## 12. 生产运维能力基线
 
-MVP 必须至少实现：
+当前生产部署的运维能力基线（均已落地）：
 
 - `/api/v1/health`。
 - 基础 `/livez`、`/readyz`。
@@ -457,7 +445,7 @@ MVP 必须至少实现：
 - 数据库迁移验证。
 - Docker Compose 本地启动。
 - Provider 凭证和 API Key 脱敏测试。
+- `/metrics`、PostgreSQL 手动备份/恢复入口、release smoke、基础数据生命周期清理、部署 preflight。
+- SLO/告警控制面和 SLO burn-rate evaluator：SLO 定义和告警事件落库到 `obs_slo_definitions`、`obs_alert_events`。
 
-Phase 2 起必须补齐 `/metrics`、备份恢复、发布 smoke、数据生命周期清理和 SLO 告警。
-
-当前 Phase 2 已补齐 `/metrics`、PostgreSQL 手动备份/恢复入口、release smoke、基础数据生命周期清理、部署 preflight，以及 SLO/告警控制面 v1 和 SLO burn-rate evaluator。SLO 定义和告警事件落库到 `obs_slo_definitions`、`obs_alert_events`；告警通知、抑制规则和聚合 rollup 仍按 `OBSERVABILITY_SPEC.md` 后续展开。
+告警通知投递、抑制规则和聚合 rollup 为 Roadmap（尚未实现），按 `OBSERVABILITY_SPEC.md` 后续展开。

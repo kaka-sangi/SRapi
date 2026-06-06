@@ -10,7 +10,7 @@ SRapi 不只是 OpenAI-compatible 代理，而是多 AI 协议端点兼容与相
 任意主流客户端端点 -> SRapi Canonical AI IR -> 任意可用上游 Provider 端点 -> 原客户端协议响应
 ```
 
-第一阶段必须把以下能力作为 Gateway 核心能力设计：
+Gateway 核心能力（已实现）：
 
 - 同时暴露主流客户端端点。
 - 将不同端点请求转换为统一内部表示。
@@ -23,7 +23,7 @@ SRapi 不只是 OpenAI-compatible 代理，而是多 AI 协议端点兼容与相
 
 ### 2.1 OpenAI-compatible
 
-SRapi 必须优先支持：
+已暴露的核心端点：
 
 ```txt
 GET  /v1/models
@@ -31,9 +31,11 @@ GET  /v1/usage
 POST /v1/chat/completions
 POST /v1/responses
 POST /v1/responses/compact
+GET  /v1/responses/{response_id}/input_items
+GET  /v1/responses/ws        (WebSocket upgrade)
 ```
 
-后续扩展：
+已暴露的扩展端点：
 
 ```txt
 POST /v1/embeddings
@@ -42,29 +44,30 @@ POST /v1/images/edits
 POST /v1/images/variations
 POST /v1/audio/transcriptions
 POST /v1/audio/speech
+POST /v1/moderations
 POST /v1/rerank
+GET  /v1/realtime            (WebSocket upgrade)
+```
+
+Roadmap（尚未实现）：
+
+```txt
 POST /v1/batches
-GET  /v1/realtime  (WebSocket upgrade)
 ```
 
 ### 2.2 Anthropic-compatible
 
-SRapi 必须优先支持：
+已暴露的端点：
 
 ```txt
 POST /v1/messages
 POST /v1/messages/count_tokens
-```
-
-后续扩展：
-
-```txt
 GET  /v1/models
 ```
 
 统一命名为 `anthropic-compatible`，不使用 `claude-compatible`。
 
-WP-560 起，`POST /v1/messages/count_tokens` 接受 Anthropic Messages-style count body，包括 `model`、`messages`、`system`、`tools`、`tool_choice`、`thinking` 和兼容扩展字段。Gateway normalization 只用于 policy / entitlement / Scheduler / evidence，不在 Gateway service 构造 Provider-local DTO；Provider Adapter 保留 Anthropic count_tokens body shape，只把 `model` 替换成调度后 mapping 的 upstream model，再调用选中上游 `/messages/count_tokens`。API-key Anthropic 账号按 Anthropic auth mode 注入凭证；`runtime_class != api_key` 的 Claude Code / Anthropic 反代账号通过 Reverse Proxy Runtime 使用选中账号 OAuth/session/CLI credential，并构造 Claude Code count_tokens official-client path/header/body。成功 count_tokens 请求记录 Scheduler decision/feedback 和 request evidence，但不进入生成用量，usage tokens 与 cost 记 0。
+`POST /v1/messages/count_tokens` 接受 Anthropic Messages-style count body，包括 `model`、`messages`、`system`、`tools`、`tool_choice`、`thinking` 和兼容扩展字段。Gateway normalization 只用于 policy / entitlement / Scheduler / evidence，不在 Gateway service 构造 Provider-local DTO；Provider Adapter 保留 Anthropic count_tokens body shape，只把 `model` 替换成调度后 mapping 的 upstream model，再调用选中上游 `/messages/count_tokens`。API-key Anthropic 账号按 Anthropic auth mode 注入凭证；`runtime_class != api_key` 的 Claude Code / Anthropic 反代账号通过 Reverse Proxy Runtime 使用选中账号 OAuth/session/CLI credential，并构造 Claude Code count_tokens official-client path/header/body。成功 count_tokens 请求记录 Scheduler decision/feedback 和 request evidence，但不进入生成用量，usage tokens 与 cost 记 0。
 
 `adapter_type=bedrock` 复用 Anthropic Messages 入口和 Canonical AI Request，但上游不是 Anthropic `/messages`。Provider Adapter 会把请求转换为 Amazon Bedrock Runtime InvokeModel / InvokeModelWithResponseStream：
 
@@ -76,7 +79,7 @@ WP-560 起，`POST /v1/messages/count_tokens` 接受 Anthropic Messages-style co
 
 ### 2.3 Gemini-compatible
 
-SRapi 必须在 Provider Adapter 层支持 Gemini 原生请求模型：
+Provider Adapter 层支持 Gemini 原生请求模型：
 
 ```txt
 models/{model}:generateContent
@@ -85,7 +88,7 @@ models/{model}:countTokens
 models/{model}:embedContent
 ```
 
-WP-230 起公开 Gemini-native 文本生成路由：
+下游已公开 Gemini-native 文本生成路由：
 
 ```txt
 GET  /v1beta/models
@@ -410,9 +413,9 @@ Provider-hosted web search 是 built-in tool 的特例：Responses `web_search` 
 | `/v1/messages` | convert | convert | native | convert |
 | Gemini `generateContent` | convert | convert | convert | native |
 
-MVP 必须覆盖文本、流式、基础 tool calls、JSON mode / structured output 的转换测试。
+转换测试覆盖文本、流式、基础 tool calls、JSON mode / structured output。
 
-Vision、audio、file、built-in tools、reasoning、batch、realtime 可以分阶段实现，但 Canonical AI Request 必须从第一阶段预留字段。
+Vision、audio、file、built-in tools（含 web search）、reasoning、realtime 均已实现，并复用 Canonical AI Request 预留的统一字段。Batch 仍在 Roadmap（见第 13 节）。
 
 ## 10. 能力协商
 
@@ -481,9 +484,11 @@ unsupported_conversion_rejection
 - `raw_provider_metadata` 不得包含 Authorization、Cookie、API Key、OAuth token 或 Provider credential。
 - Stateful Responses 或 conversation 存储如果启用，必须有保留时间、用户隔离和删除策略。
 
-## 13. 阶段要求
+## 13. 当前能力与 Roadmap
 
-MVP 必须实现：
+> 下文 `WP-xxx` 标签为历史实现记录，仅用于追溯；以 `internal/httpserver/server.go` 的路由注册为权威清单。
+
+核心文本端点（已实现）：
 
 ```txt
 /v1/models
@@ -494,14 +499,15 @@ MVP 必须实现：
 /v1/messages
 ```
 
-MVP 必须完成：
+核心协议转换（已实现）：
 
 ```txt
 OpenAI Chat Completions <-> Canonical AI Request
 OpenAI Responses <-> Canonical AI Request
 Anthropic Messages <-> Canonical AI Request
+Gemini GenerateContent <-> Canonical AI Request
 Canonical AI Request -> OpenAI-compatible upstream
-Canonical AI Response -> OpenAI Chat / Responses / Anthropic Messages response
+Canonical AI Response -> OpenAI Chat / Responses / Anthropic Messages / Gemini response
 ```
 
 `GET /v1/responses/{response_id}/input_items` is an OpenAI Responses
@@ -674,19 +680,14 @@ OpenAI-compatible Realtime WebSocket relay
 - `runtime_class != api_key` 的 OpenAI-compatible Realtime 仍通过 Reverse Proxy Runtime 使用选中账号 OAuth/session/client-token credential 双向 relay text/binary frames；`reverse-proxy-*` 2api Realtime 路径继续拒绝 `runtime_class = api_key`。
 - 只允许 `OpenAI-Safety-Identifier` 等显式白名单握手 header 进入上游；caller `Authorization`、`Cookie`、`Sec-WebSocket-*`、`X-SRapi-*` 和 Gateway headers 不得定义上游身份。
 
-Phase 2 继续实现：
+已实现的扩展端点（边界见上文各 WP 块）：Embeddings、Images（generations / edits / variations）、Moderations、Rerank、Audio（transcriptions / speech）、Token counting（Anthropic `count_tokens` 与 Gemini `countTokens`）、Responses WebSocket transport、OpenAI-compatible Realtime WebSocket relay。
+
+### 13.1 Roadmap（尚未实现）
 
 ```txt
-Token counting endpoint
-```
-
-Phase 3+ 继续实现：
-
-```txt
-Audio
 Batch
-Provider-native Claude Code / Antigravity realtime protocol adapters
 Fine-tuning
+Provider-native Claude Code / Antigravity realtime protocol adapters
 Provider-native built-in tools
 Advanced stateful responses
 ```

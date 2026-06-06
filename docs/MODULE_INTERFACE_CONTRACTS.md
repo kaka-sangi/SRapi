@@ -2,7 +2,7 @@
 
 ## 1. 目标
 
-本文档定义 SRapi 模块之间的内部接口契约，防止模块化单体在实现阶段退化为跨模块互相调用 repository、handler 或具体实现。
+本文档定义 SRapi 模块之间的内部接口契约，防止模块化单体退化为跨模块互相调用 repository、handler 或具体实现。下列规则是当前已落地并由 architecture-check 强制执行的边界约定。
 
 目标：
 
@@ -10,11 +10,11 @@
 - 模块内部实现可以重构，外部调用方不受影响。
 - HTTP、数据库、Provider SDK、Ent schema 不泄漏进领域服务边界。
 - 同步调用和异步事件有明确选择标准。
-- 为未来拆分服务保留接口形态。
+- 保留接口形态，使模块在需要时可独立拆分为服务。
 
 ## 2. Contract 分层
 
-模块内部建议分为：
+模块内部按如下结构分层：
 
 ```txt
 modules/{module}/
@@ -148,6 +148,8 @@ Policy Contract 只能返回判断结果和原因，不得执行写操作。
 这些应使用 `DOMAIN_EVENTS_SPEC.md` 的事件机制。
 
 ## 6. 核心模块 Contract 清单
+
+本节列出核心跨模块 contract，并非穷举。`apps/api/internal/modules/` 下还有更多面向特定场景的模块（如 `copilot`、`notifications`、`content_safety`、`user_platform_quotas`、`payload_rules`、`error_passthrough`、`tls_profiles`、`channel_monitors`、`quality_eval`、`scheduled_tests`、`captcha`、`totp` 等），其对外接口同样遵循本文规则；§6.13 概述其中几个新增的跨模块契约，完整清单以 `apps/api/internal/modules/{module}/contract/` 为准。
 
 ### 6.1 Auth
 
@@ -327,6 +329,25 @@ AlertCommand.AcknowledgeAlert
 ```
 
 Observability 不承载业务真实状态，不得成为 Gateway、Scheduler、Billing 的强一致依赖。
+
+### 6.13 其他跨模块 contract（节选）
+
+以下模块同样以 contract 形态对外暴露，方法/类型名以各自 `contract` 包为准：
+
+```txt
+ContentSafety.Apply                 # content_safety：对 CanonicalRequest 做脱敏/拦截，返回 Result（Finding/Severity）
+Notifications.EmailSender.Send       # notifications：事件消费者，发送邮件
+Notifications.EmailTemplateProvider  # notifications：提供 NotificationEmailTemplates
+UserPlatformQuotaStore.FindByUserPlatform / UpsertQuota  # user_platform_quotas：按 (user, platform) 的额度
+PayloadRuleStore.ListRules / ResolvedTransform           # payload_rules：请求体 default/override/filter 规则
+```
+
+边界要求：
+
+- `content_safety` 只在 Gateway 规范化阶段对 `gatewaycontract.CanonicalRequest` 做转换与检测，不解密凭证、不选择 Provider Account。
+- `notifications` 是领域事件的下游消费者（见 `DOMAIN_EVENTS_SPEC.md`），不得被请求路径同步阻塞。
+- `user_platform_quotas`、`payload_rules` 通过 store/contract 暴露读写接口，HTTP 与 service 层不直接查询对应 Ent schema。
+- `copilot` 通过进程内 admin API 路由分发实现 agentic 工具调用，不绕过既有 contract 直接访问其他模块实现。
 
 ## 7. DTO 规则
 

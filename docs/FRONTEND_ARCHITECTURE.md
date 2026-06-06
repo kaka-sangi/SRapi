@@ -20,8 +20,8 @@
 | 动效 | `framer-motion` | 仅用于抽屉、阻尼回弹 |
 | 图标 | `lucide-react` | 锁定 16/14px |
 | 单测 | Vitest + Testing Library | happy-dom 环境 |
-| a11y | `axe-core` (单测) + `@axe-core/playwright` (e2e) | 阻断级别：`critical`、`serious` |
-| e2e | Playwright | Chromium，演示模式默认无后端依赖 |
+| a11y | `axe-core` / `vitest-axe` / `@axe-core/playwright` | 依赖已就绪；axe 自动化套件尚未接入（见 §8 Roadmap），当前靠 Radix 语义 + 字号/对比规约保证 |
+| e2e | Playwright | Chromium，默认通过 Next 同源代理访问后端 |
 | 性能预算 | `@next/bundle-analyzer` + `tools/bundle-budget.mjs` | `npm run analyze` 看图；`bundle-budget` 是 web-check 中的硬门槛 |
 | 遥测 | `web-vitals` + 自托管 beacon hook | 可选 DSN，不内置第三方 SaaS |
 
@@ -38,16 +38,24 @@ apps/web/
 │  │  ├─ loading.tsx            # 路由级 Suspense fallback
 │  │  ├─ global-error.tsx       # 应用级硬错误兜底
 │  │  ├─ globals.css            # @theme 设计令牌 + paper-grain + tactile-card
-│  │  ├─ dashboard/ api-keys/ usage/                # 用户工作区
+│  │  ├─ login/ setup/                               # 登录 / 首次初始化
+│  │  ├─ auth/{register,reset,oauth/callback}/        # 注册 / 重置密码 / OAuth·OIDC 回调
+│  │  ├─ dashboard/ api-keys/ usage/                 # 用户工作区
 │  │  ├─ account/ billing/ redeem/ affiliate/        # 用户自助
+│  │  ├─ playground/                                 # 交界地：经真实网关计费的对话
 │  │  ├─ provider-accounts/ scheduler-decisions/     # 网关只读视图
-│  │  ├─ admin/                                      # 管理后台（按域分组导航）
-│  │  │  ├─ dashboard/ users/ usage/                       # 概览
+│  │  ├─ admin/                                      # 管理后台（按域分组导航，见 nav-items.ts）
+│  │  │  ├─ dashboard/ users/ usage/ roles/                # 概览 + 访问控制
 │  │  │  ├─ providers/ models/ accounts/ groups/ proxies/  # 网关资源
-│  │  │  ├─ subscriptions/ orders(/plans) channels/pricing/
-│  │  │  │  payment-providers/ promo-codes/ redeem/        # 商业化
+│  │  │  ├─ payload-rules/ scheduled-tests/ tls-profiles/  #   请求改写 / 计划测试 / 出网指纹
+│  │  │  ├─ subscriptions/ orders(/dashboard,/plans)       # 商业化
+│  │  │  │  channels(/monitor,/pricing) payment-providers/
+│  │  │  │  promo-codes/ redeem/ billing-ledger/
 │  │  │  ├─ affiliates/{invites,rebates,transfers}/        # 推广联盟
-│  │  │  ├─ ops(/strategy) risk-control/ announcements/    # 运营
+│  │  │  ├─ ops(/events,/strategy) risk-control/           # 运营
+│  │  │  │  audit-logs/ error-passthrough/ announcements/
+│  │  │  ├─ api-keys/ user-attributes/                      #   全局 Key 控制台 / 用户属性
+│  │  │  ├─ notification-templates/ copilot/               #   通知模板 / 管理端 AI Copilot
 │  │  │  └─ settings/                                      # 系统
 │  │  └─ srapi-health/route.ts  # 健康代理
 │  │
@@ -96,8 +104,8 @@ apps/web/
 │     └─ telemetry.ts           # web-vitals + redacted exception collector
 │
 ├─ tests/
-│  ├─ unit/                     # Vitest 单测 + axe 单测
-│  └─ e2e/                      # Playwright + axe e2e
+│  ├─ unit/                     # Vitest 单测：cn / i18n-translate / messages（en↔zh 对齐）
+│  └─ e2e/                      # Playwright：landing.spec.ts（登录页 + 受保护路由重定向）
 │
 ├─ next.config.ts               # CSP / 安全头 / bundle analyzer
 ├─ vitest.config.ts             # 单测配置
@@ -145,16 +153,16 @@ AuthGate (client)      ──> 兜底守卫 + 注入 user / runtimeStatus 到子
 
 1. `npm run typecheck` — `tsc --noEmit`
 2. `npm run lint` — eslint（next + 严格规则）
-3. `npm run test` — vitest run（单测 + axe 单测，目前 98 例）
+3. `npm run test` — vitest run（当前 3 个单测文件 `cn` / `i18n-translate` / `messages`，共约 7 个用例；i18n 文件对齐由 `messages.test.ts` 断言）
 4. `npm run build` — `next build`（同时验证 CSP 头）
-5. `node tools/bundle-budget.mjs` — 读 `apps/web/bundle-budget.json` 校验 chunk 大小
+5. `node tools/bundle-budget.mjs` — 读 `apps/web/bundle-budget.json` 校验 chunk 大小（脚本位于仓库根的 `tools/bundle-budget.mjs`，由 `tools/web-check.mjs` 串起）
 
 `make web-check-e2e` 单独跑（成本高）：
 
 1. API preflight：检查 `SRAPI_WEB_E2E_API_URL`（默认 `http://127.0.0.1:8080`）的 `/livez` 与 `/readyz`；该目标同时传给 `SRAPI_API_PROXY_TARGET`，浏览器默认继续通过 Next 同源代理访问后端。只有在目标 API 已配置浏览器 CORS/cookie 凭据时，才用 `SRAPI_WEB_E2E_DIRECT_BROWSER_API=1` 让 SDK 直连 API。
 2. `next build`
 3. 安装 Playwright Chromium（可通过 `SRAPI_WEB_E2E_SKIP_INSTALL=1` 跳过；OS 依赖用 `npm run test:e2e:install-deps` 显式安装）
-4. `playwright test`（含 `@axe-core/playwright` 全页 a11y）
+4. `playwright test`（当前为 `landing.spec.ts`：登录页渲染 + 未登录访问受保护路由的重定向；全页 axe a11y 扫描见 §8 Roadmap，尚未接入）
 
 `make check` 已把 `web-check` 加在最后一步，前后端任意一侧出问题都拦截。
 
@@ -183,19 +191,31 @@ AuthGate (client)      ──> 兜底守卫 + 注入 user / runtimeStatus 到子
 
 - 所有原语（Button / Dialog / Label）继承 Radix 语义。
 - `text-[9px]` / `text-[10px]` 是历史遗留，**新代码禁止**；最小字号 12px (`--text-xs`)，11px (`--text-2xs`) 仅限 `font-mono` 大写小标签。
-- 单测：`tests/unit/a11y.test.tsx` 用 `axe-core` 跑核心原语。
-- e2e：`tests/e2e/a11y.spec.ts` 用 `@axe-core/playwright` 跑落地与工作台，`critical/serious` 级别任何一条违规都阻断 PR。
+- 当前 a11y 保障来自三处：Radix 原语语义、上面的字号/对比规约，以及人工核对（详见 `FRONTEND_DESIGN_SYSTEM.md`）。
+- **Roadmap / 尚未接入**：`axe-core` / `vitest-axe` / `@axe-core/playwright` 依赖已在 `devDependencies` 就绪，但还没有写成自动化套件——目前 `tests/unit/` 没有 axe 单测、`tests/e2e/` 只有 `landing.spec.ts`（未引入 axe）。计划补 `tests/unit/a11y.test.tsx`（核心原语）与 `tests/e2e/a11y.spec.ts`（落地/工作台全页扫描），并把 `critical/serious` 级别设为阻断门。**在套件落地前，本仓库不存在「axe 违规阻断 PR」这一门槛。**
 
 ## 9. 国际化
 
-- 字典分文件：`src/i18n/messages/{en,zh}.ts`，按命名空间组织：`common` / `adminCommon` / `feedback` / `nav` / `login` / `dashboard` / `apiKeys` / `usage` / `providers` / `scheduler` / `account` / `billing` / `redeem` / `affiliate`，以及管理域 `adminUsers` / `adminAccounts` / `adminGroups` / `adminProviders` / `adminModels` / `adminProxies` / `adminSubscriptions` / `adminOrders` / `adminPromos` / `adminAffiliates` / `adminAnnouncements` / `adminOps` / `adminRisk` / `adminUsage` / `adminSettings` / `adminPayments` / `adminPricing`。
+- 字典分文件：`src/i18n/messages/{en,zh}.ts`，按命名空间组织（以 `en.ts` 为权威清单，新增页面时在此追加）。已含约 60 个命名空间，覆盖：
+  - 通用与外壳：`common` / `commandPalette` / `adminCommon` / `feedback` / `status` / `nav` / `announcements`
+  - 鉴权与入口：`login` / `setup` / `authReset` / `authRegister` / `oauthCallback`
+  - 用户工作区与自助：`dashboard` / `apiKeys` / `usage` / `providers` / `scheduler` / `account` / `billing` / `redeem` / `affiliate` / `chat` / `playground`
+  - 管理域：`adminUsers` / `adminAccounts` / `codexImport` / `accountOAuth` / `adminGroups` / `adminProviders` / `adminModels` / `adminProxies` / `adminRateLimit` / `adminSubscriptions` / `adminOrders` / `adminPromos` / `adminAffiliates` / `adminAudit` / `adminOutbox` / `adminOpsCleanup` / `adminUsageCleanup` / `adminOpsSettings` / `adminBillingLedger` / `adminErrorPassthrough` / `adminPayloadRules` / `adminScheduledTests` / `adminTlsProfiles` / `adminRoles` / `adminApiKeys` / `adminUserQuota` / `adminUserAttributes` / `adminNotificationTemplates` / `adminMonitor` / `adminAnnouncements` / `adminOps` / `adminRisk` / `adminUsage` / `adminSettings` / `adminPayments` / `adminPricing` / `copilot`。
 - `LanguageContext` 通过 `useSyncExternalStore(localStorage + custom event)` 跨组件实时同步语言切换。
 - 添加新文案：先改 `en.ts`，再改 `zh.ts`，再在页面里 `t('newKey')`。`tests/unit/messages.test.ts` 会断言两边 key 完全对齐。
 
 ## 10. 演进路线
 
-- **WP-160a**（已完成）：P0–P3 + 前端 harness，组件库、TanStack Query 全量接入、AuthGate 修复 React #185、6 页全部走 hooks、API key 表单走 react-hook-form + zod、bundle 预算守门。98 单测 + 5 e2e 通过。
-- **WP-1310**（业务面补全，进行中）：在 `apps/web` 重写之上，把后端已具备但 UI 未暴露/未正确操作的能力补齐。slice 1 已落地：修复账号启停反向（P0）；admin 侧边栏改为分组导航使全部页面可达；账号域死能力接线（清错/恢复/发现模型/绑代理/导出 + allSettled 批量）；admin 仪表盘改用 `useAdminDashboard` 快照；新增支付渠道页；兑换码统计 + 安全批量停用；用量维度聚合；ops 告警/SLO 健康修正；API Key/订单取消反馈；错误/404 页 i18n；`PageQueryState` disabled query 修正。详见 `specs/STATUS.md` 的 WP-1310 条目与待办（SLO 增改 UI、模型分页、退款上限、策略回放字段、定价批量导入、账号详情抽屉、分组成员管理[受后端缺 list-members 端点阻塞]、状态徽章 i18n、浏览器验证）。
+### 已交付
+
+- **WP-160a**（已完成）：P0–P3 + 前端 harness，组件库、TanStack Query 全量接入、AuthGate 修复 React #185、6 页全部走 hooks、API key 表单走 react-hook-form + zod、bundle 预算守门。
+- **WP-1310**（前端业务面补全 + 正确性，已完成 / 已闭环——slices 1+2）：在 `apps/web` 重写之上，把后端已具备但 UI 未暴露/未正确操作的能力补齐。涵盖：修复账号启停反向（P0）；admin 侧边栏改为 6 个分组导航使全部约 22 个页面可达；账号域死能力接线（清错/恢复/发现模型/绑代理/导出 + `allSettled` 批量 + 健康/配额/RPM/代理质量详情抽屉）；admin 仪表盘改用 `useAdminDashboard` 快照；新增 `/admin/payment-providers`；兑换码统计 + 安全批量停用；用量维度聚合；ops 告警 `status==="firing"` + 派生 SLO 健康 + SLO 增改弹窗；模型分页/筛选/搜索；部分退款上限；策略回放扩展字段；定价批量导入；API Key/订单取消的确认+toast 反馈；错误/404 页 i18n；`PageQueryState` disabled-query 修正；`statusLabel` 助手 + `status` 命名空间应用到所有状态徽章；图形化配置（capabilities 多选 chips、`TagInput`、`KeyValueEditor`）；分组成员管理端到端闭环（新增后端 `GET /api/v1/admin/account-groups/{id}/accounts` 端点 + 前端管理弹窗）；并已对照 live 栈完成浏览器验证。详见 `specs/STATUS.md` 的 WP-1310 条目。
+
+### Roadmap / 尚未实现
+
+以下为有意延后、尚未落地的工程化增强；落地前不应在本文档其它章节按「已具备」陈述：
+
+- **a11y 自动化套件**：把已就绪的 `axe-core` / `vitest-axe` / `@axe-core/playwright` 接成 `tests/unit/a11y.test.tsx` 与 `tests/e2e/a11y.spec.ts`，并将 `critical/serious` 设为阻断门（见 §8）。
 - **WP-160b**：把 `LanguageContext` 替换成 `next-intl`，启用 ICU plural、按路由代码分割。
 - **WP-160c**：把 admin 总览、用量页改成 RSC + Server Action（form action 用现成的 `@/lib/schemas/api-key.ts` 直接复用）。
 - **WP-160d**：Storybook + Chromatic 视觉回归（如果团队真的需要设计评审产物）。

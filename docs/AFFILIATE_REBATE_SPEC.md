@@ -15,13 +15,30 @@
 提现或转余额必须审计
 ```
 
-## 2. 阶段边界
+## 1.1 当前实现状态
 
-| 阶段 | 内容 |
+返利系统已落地（模块 `apps/api/internal/modules/affiliate`，ent schema `invitecode` / `inviterelationship` / `affiliaterule` / `affiliateledger`，持久化 `internal/persistence/entstore/affiliate`）。下表区分已交付能力与仍在路线图上的能力。
+
+| 状态 | 能力 |
 | --- | --- |
-| MVP | 暂缓实现，只预留用户关系和账本扩展点。 |
-| Phase 2 | 支付订单完成后按规则生成返利 ledger。 |
-| Phase 3 | 返利提现、分层返利、活动规则、外部结算。 |
+| 已实现 | 邀请码与邀请关系（`CreateInviteCode` / `BindInvite`，自邀请与重复绑定拒绝）。 |
+| 已实现 | 返利规则（`CreateRule`，`GetEffectiveRule` 选取生效规则；当前 `trigger_type` 仅 `payment_paid`）。 |
+| 已实现 | 支付履约后按规则生成 `accrue` 账本（`AccrueRebate`，按订单号幂等）。 |
+| 已实现 | 退款反向补偿（`CompensateRefund`，追加 `refund_compensation`，支持部分/全额）。 |
+| 已实现 | 转余额（`TransferToBalance`，`Idempotency-Key` 幂等，写 billing ledger 与 user balance）。 |
+| 已实现 | 用户侧汇总/账本接口与管理侧只读列表（见 §9）。 |
+| 路线图（未实现） | 提现 / withdraw（`withdraw` 账本类型已预留为常量，但无服务方法与对外接口）。 |
+| 路线图（未实现） | 分层返利、活动规则、外部结算、风险评分。 |
+
+## 2. 阶段边界（历史设计 → 当前状态）
+
+下表为最初的分阶段规划，状态列反映落地情况。
+
+| 阶段 | 内容 | 状态 |
+| --- | --- | --- |
+| MVP | 用户关系与账本扩展点。 | 已实现（不再是"暂缓"）。 |
+| Phase 2 | 支付订单完成后按规则生成返利 ledger。 | 已实现（见 §4 触发流程）。 |
+| Phase 3 | 返利提现、分层返利、活动规则、外部结算。 | 路线图 / 未实现。 |
 
 ## 3. 领域对象
 
@@ -137,7 +154,7 @@ canceled
 compensated
 ```
 
-建议设置结算等待期，避免支付后立即退款导致返利被套取。
+可配置结算等待期，避免支付后立即退款导致返利被套取（退款发生在等待期内时由 `refund_compensation` 反向补偿，见 §6）。
 
 ## 6. 退款补偿
 
@@ -162,8 +179,8 @@ affiliate_ledger(type=refund_compensation, amount=-original_amount)
 
 | 方式 | 说明 |
 | --- | --- |
-| `transfer_to_balance` | 转入 SRapi 用户余额，可用于消费。 |
-| `withdraw` | 提现到外部渠道，Phase 3 后实现。 |
+| `transfer_to_balance` | 转入 SRapi 用户余额，可用于消费。已实现。 |
+| `withdraw` | 提现到外部渠道。路线图 / 未实现（账本类型常量已预留，尚无服务方法与对外接口）。 |
 
 转余额必须写入 Billing Ledger：
 
@@ -185,7 +202,7 @@ users.balance update
 - 退款套返利。
 - 管理员绕过审计调整返利。
 
-Phase 2 可只做基础规则；Phase 3 引入风险评分。
+当前已落地基础风控规则（自邀请拒绝、重复绑定拒绝、管理员调整写审计）。风险评分为路线图能力，尚未实现。
 
 ## 9. OpenAPI
 
@@ -199,13 +216,17 @@ POST /api/v1/me/affiliate/transfer-to-balance
 
 `POST /api/v1/me/affiliate/transfer-to-balance` 必须使用控制台 session、CSRF header 和 `Idempotency-Key` header。服务端按幂等 key 生成转余额 reference，重复请求返回同一 affiliate ledger 结果且不会重复写 billing ledger 或重复增加 user balance。
 
-管理侧：
+管理侧（均为只读列表）：
 
 ```txt
 GET   /api/v1/admin/affiliates/invites
 GET   /api/v1/admin/affiliates/rebates
 GET   /api/v1/admin/affiliates/transfers
 ```
+
+以上路由的契约以 `packages/openapi/openapi.yaml` 为准（`/api/v1/me/affiliate*` 与 `/api/v1/admin/affiliates/*`）。
+
+返利流程通过 outbox 发布事件，当前实现的事件类型为 `AffiliateRebateAccrued` 与 `AffiliateRebateCompensated`（事件名以 `internal/modules/affiliate/service` 为准）。
 
 ## 10. 数据一致性
 
@@ -230,7 +251,7 @@ GET   /api/v1/admin/affiliates/transfers
 - 邀请关系手动调整。
 - 手动返利调整。
 - 转余额。
-- 提现审批。
+- 提现审批（伴随 withdraw 落地，路线图能力）。
 - 退款补偿失败。
 
 不得在公开接口暴露其他用户敏感信息，邀请列表默认只展示脱敏邮箱或匿名 ID。

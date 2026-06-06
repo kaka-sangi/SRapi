@@ -2,7 +2,7 @@
 
 ## 1. 目标
 
-本文档定义 SRapi MVP 和后续阶段必须遵守的安全边界，覆盖控制台登录、API Key、Provider 凭证、Cookie、CSRF、日志脱敏、审计、密钥轮换和 AI Gateway 特有风险。
+本文档定义 SRapi 生产环境必须遵守的安全模型与边界，覆盖控制台登录、API Key、Provider 凭证、Cookie、CSRF、日志脱敏、审计、密钥轮换和 AI Gateway 特有风险。所列要求均已在代码中落地，本文档是平台的权威安全模型，而非待办清单。
 
 安全原则：
 
@@ -36,7 +36,7 @@ API Client
 
 ## 3. 控制台认证
 
-控制台 API 推荐：
+控制台 API 使用：
 
 ```txt
 HttpOnly Cookie + CSRF Token
@@ -65,7 +65,7 @@ CSRF 要求：
 - 只读 GET 不应产生状态变更。
 - CORS 默认只允许控制台来源。
 
-CSRF Token 实现建议：
+CSRF Token 实现采用：
 
 ```txt
 Synchronizer Token Pattern
@@ -103,32 +103,29 @@ Defense in depth：
 
 控制台用户密码不得明文或可逆加密存储。
 
-推荐哈希：
+当前哈希方案：
 
 ```txt
-Argon2id
+bcrypt cost 12
 ```
 
-MVP 推荐参数起点：
+实现细节：
 
-```txt
-memory = 19456 KiB
-iterations = 2
-parallelism = 1
-```
-
-如果运行环境暂不支持 Argon2id，可以使用：
-
-```txt
-bcrypt cost >= 12
-```
+- 密码哈希由 `apps/api/internal/modules/users/service/service.go` 的 `defaultBcryptCost = 12`
+  控制，使用 `golang.org/x/crypto/bcrypt`。
+- bcrypt 自带每密码独立 salt，并把 cost 与 salt 编码进 hash 字符串本身，
+  无需额外存储参数。
 
 要求：
 
-- 每个密码必须使用独立 salt。
-- 密码哈希参数必须随 hash 一起保存。
+- 每个密码必须使用独立 salt（bcrypt 默认满足）。
+- 密码哈希参数（cost）必须随 hash 一起保存（bcrypt 默认满足）。
 - 登录失败必须有速率限制。
 - 管理员密码重置必须写 audit log。
+
+> Roadmap / 尚未实现：迁移到 Argon2id 仍是可选演进方向（建议参数起点
+> memory = 19456 KiB、iterations = 2、parallelism = 1）。当前代码未使用 Argon2id；
+> 任何切换都必须保留 cost 12 bcrypt 的现有 hash 校验路径以兼容已有用户。
 
 Public registration:
 
@@ -393,23 +390,21 @@ API Key 用于 Gateway API。
 
 ### 4.1 格式
 
-建议格式：
+当前格式（见 `apps/api/internal/modules/api_keys/service/service.go` `GeneratePlaintextKey`）：
 
 ```txt
-sk_live_<prefix>_<secret>
-sk_test_<prefix>_<secret>
+sk_<prefix-hex>_<secret-hex>
 ```
 
-MVP 可简化为：
-
-```txt
-sk_<random>
-```
+- `sk` 固定前缀（`keyPrefix`）。
+- `<prefix-hex>` 是 6 字节随机值的 hex（12 个十六进制字符），`prefix = "sk_" + hex`
+  整体作为查找键持久化。
+- `<secret-hex>` 是 32 字节 CSPRNG 随机值的 hex（64 个十六进制字符）。
 
 要求：
 
 - 原文只展示一次。
-- `prefix` 用于快速定位，不用于认证。
+- `prefix`（即 `sk_<prefix-hex>`）用于快速定位，不用于认证。
 - `secret` 必须使用 CSPRNG 生成。
 - API Key 必须支持禁用、过期、模型范围、RPM/TPM 限制。
 
@@ -430,17 +425,19 @@ expires_at
 last_used_at
 ```
 
-哈希建议：
+哈希方案（见 `api_keys/service/service.go` `HashPlaintext`）：
 
 ```txt
-hash = HMAC-SHA256(server_pepper, full_api_key)
+hash = "hmac-sha256:" + hex(HMAC-SHA256(server_pepper, full_api_key))
 ```
 
 原因：
 
 - API Key 是高熵随机值，不需要像用户密码一样使用慢哈希。
 - HMAC pepper 可以防止数据库泄漏后离线验证 key。
-- `server_pepper` 必须来自环境变量或密钥管理系统。
+- `server_pepper`（`API_KEY_PEPPER`）必须来自环境变量或密钥管理系统；service 构造时
+  强制 pepper 至少 32 字节，否则返回 `ErrPepperUnavailable` 拒绝启动。
+- key 校验使用 `hmac.Equal` 常量时间比较，避免计时旁路。
 
 禁止：
 
@@ -479,7 +476,7 @@ settings.value_ciphertext when is_secret = true
 
 ### 5.1 加密方案
 
-MVP 推荐：
+当前方案：
 
 ```txt
 AES-256-GCM
@@ -543,7 +540,7 @@ Provider Account 的 import/export 是运维便利接口，不是明文凭证备
 
 ## 6. RBAC 与权限
 
-MVP 角色：
+内置角色（见 `apps/api/internal/modules/users/contract/contract.go`，角色名不可变）：
 
 ```txt
 owner
@@ -552,7 +549,7 @@ operator
 user
 ```
 
-建议权限边界：
+权限边界：
 
 | 能力 | owner | admin | operator | user |
 | --- | --- | --- | --- | --- |
@@ -660,6 +657,23 @@ Gateway admission 在 CanonicalRequest 生成后、Scheduler 和 Provider Adapte
 - 当前不会阻断请求；后续 block/mask/warn 策略必须显式配置并写入 audit。
 - 图片、音频二进制内容、文件内部隐藏文本和间接 prompt injection 仍需专用 detector 或上游安全能力处理。
 
+### 8.2 出站 SSRF 防护
+
+反代 / Reverse Proxy Runtime 向上游发起的直连必须经过 SSRF egress 防护
+（见 `apps/api/internal/modules/reverse_proxy/service/ssrf.go`），由
+`runtime_state.go` 在 `SERVER_MODE != "local"` 时启用
+（`WithBlockedPrivateEgress`）：
+
+- 防护点在 `net.Dialer.Control`，即 DNS 解析之后拿到真实 `ip:port` 时执行，
+  因此能拦截 URL 字符串检查无法识别的 DNS rebinding。
+- 被拒绝的目标地址包括 loopback、unspecified、link-local（含云元数据
+  `169.254.169.254` 与 `fe80::/10`）、各类 multicast、RFC1918 私网与 ULA
+  `fc00::/7`、以及 RFC 6598 运营级 NAT `100.64.0.0/10`。
+- 命中时返回 `egress_blocked`（502），错误消息不回显被拦截的内部地址。
+- 同一加密 isolated client / transport 同时服务上游业务请求与 OAuth refresh 拨号，
+  二者都受此防护覆盖。
+- 显式配置了 egress 代理 URL 的账号被视为运维可信，按代理路由且当前版本不做该筛查。
+
 ## 9. Provider Adapter 安全
 
 Adapter 禁止：
@@ -680,15 +694,15 @@ Adapter 必须：
 
 ## 10. AI / LLM 特有安全
 
-MVP 至少遵守：
+至少遵守：
 
 - 用户 prompt 不作为系统指令执行。
 - 管理后台展示 prompt 片段时默认隐藏或脱敏。
-- Tool call 参数如果后续支持，必须验证 schema。
+- Tool call 参数必须验证 schema。
 - Provider 返回内容不得直接注入管理后台 HTML。
 - 前端不得使用 `dangerouslySetInnerHTML` 渲染模型内容，除非经过可信 sanitizer。
 
-后续如果支持 MCP、工具调用或文件处理，需要新增专项威胁模型。
+MCP、工具调用与文件处理已在网关支持；新增此类能力或 detector 时需同步扩展专项威胁模型。
 
 ## 11. 审计日志
 
@@ -722,7 +736,7 @@ created_at
 
 ## 12. 密钥轮换
 
-MVP 必须预留：
+加密层保留以下版本字段以支持轮换：
 
 ```txt
 credential_version
@@ -755,9 +769,24 @@ provider account credential version
 
 本地默认管理员密码如果存在，必须只用于开发环境，并在 README 中标注不可用于生产。
 
+### 13.1 生产启动拒绝弱默认值
+
+为防止开发占位值被带进生产，配置校验在 `SERVER_MODE=release` 时拒绝启动
+（见 `apps/api/internal/config/config.go` `Validate`），具体拒绝项：
+
+- 弱或短（< 32 字节）或含 `local_dev` / `change_me` 等开发标记的
+  `JWT_SECRET`、`SRAPI_MASTER_KEY`、`TOTP_ENCRYPTION_KEY`、`API_KEY_PEPPER`。
+- 空或仍为开发值（如 `postgres` / `srapi` / `..._change_me`）的 `DATABASE_PASSWORD`。
+- 仍为开发默认值或过短（< 12 字节）的 `BOOTSTRAP_ADMIN_PASSWORD`
+  （如 `admin` / `admin123` / `..._change_me`）。
+- release 模式下还拒绝 `STORAGE_BACKEND=memory`。
+
+`SERVER_MODE=local` 下保留可用的开发默认值；这些默认值含显式 `change_me` /
+`local_dev` 标记，从而被上述 release 校验捕获。
+
 ## 14. 安全测试清单
 
-MVP 必须覆盖：
+测试套件覆盖：
 
 - API Key 原文不落库测试。
 - API Key hash 校验测试。
@@ -769,6 +798,8 @@ MVP 必须覆盖：
 - 反代请求不向上游泄漏 SRapi 自有 Header 的回归测试。
 - 反代凭证（cookie / OAuth token / device fingerprint）跨账号隔离测试。
 - 反代账号封号信号识别与 needs_reauth / disabled 自动切换测试。
+- 反代出站 SSRF 防护（loopback / RFC1918 / link-local 元数据 / CGNAT 等）拦截测试。
+- 生产模式弱默认 secret / 默认管理员密码启动拒绝测试。
 - 日志不包含 Authorization / Cookie / Provider credential 测试。
 - Provider 错误脱敏测试。
 - Audit log 高风险操作测试。
@@ -785,4 +816,6 @@ MVP 必须覆盖：
 - Cookie 使用安全属性。
 - CSRF 已启用。
 - 日志脱敏策略已验证。
+- 生产模式启动拒绝弱默认 secret 与默认管理员密码（`SERVER_MODE=release`）。
+- 反代出站 SSRF 防护在非 local 模式启用。
 - OpenAPI securitySchemes 与实际 middleware 一致。

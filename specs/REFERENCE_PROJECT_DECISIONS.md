@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-SRapi uses `/home/senran/Desktop/sub2api`, `/home/senran/Desktop/CLIProxyAPI`, and `/home/senran/Desktop/chatgpt2api` as references, not templates.
+SRapi uses the sub2api, CLIProxyAPI, and chatgpt2api reference projects as references, not templates. These are private upstream references, not shipped with SRapi.
 
 This file records what to adopt, what to improve, and what to avoid.
 
@@ -34,7 +34,7 @@ Avoid:
 - Business rules hidden in admin handlers.
 - Float values for real billing amounts.
 - Sensitive credentials in generic JSON without encryption boundaries.
-- Letting commercial features block the core Gateway MVP.
+- Letting commercial features block the correctness of the core Gateway.
 
 ## 3. Lessons From CLIProxyAPI
 
@@ -95,10 +95,10 @@ Avoid:
 | Endpoint compatibility | Many handlers and bridges | Strong translators | Canonical AI IR plus client renderers and provider adapters. |
 | Reverse proxy | TLS profiles and anti-risk ideas | CLI OAuth/runtime executors | Dedicated Reverse Proxy Runtime with account isolation. |
 | Observability | Admin/Ops dashboard | request logs and management API | AI-native Ops Plane with decisions, feedback, SLO, risk signals. |
-| Payments | Built-in commercial system | Out of scope | Phase 2 commercial plane after Gateway correctness. |
-| Frontend | Full admin dashboard | optional management UI/TUI | Modern console using generated SDK and SRapi design system. |
+| Payments | Built-in commercial system | Out of scope | Delivered a dedicated commercial plane (payments, billing, subscriptions, affiliate) layered on top of a correct Gateway. |
+| Frontend | Full admin dashboard | optional management UI/TUI | Delivered a modern console (apps/web) built on the generated SDK and the SRapi design system. |
 
-For ChatGPT Web specific reverse-proxy behavior, `chatgpt2api` is the local source reference for upstream browser/OAI/Sentinel request simulation and compatible rendering.
+For ChatGPT Web specific reverse-proxy behavior, the `chatgpt2api` reference project is the source reference for upstream browser/OAI/Sentinel request simulation and compatible rendering.
 
 ## 6. Rule For Future References
 

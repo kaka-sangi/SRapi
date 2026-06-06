@@ -1,6 +1,10 @@
 # SRapi Roadmap
 
-## Phase 0: Execution Foundation
+> **Status: all phases below are complete.** The program ran well past this roadmap — through ~WP-1310 (≈150 work packages beyond the WP-360 cap enumerated here), adding the 700-series Admin Control Plane, 900-series notifications, 1000-series OAuth/OIDC + TOTP 2FA, and the 1100–1300-series rate-limit matrix and frontend business-completeness work. See `specs/STATUS.md` for the authoritative ledger and `specs/WORK_PACKAGES.md` for the full package definitions.
+>
+> The phase narrative below is preserved as the historical plan that the project executed. Each phase records the exit criteria as **delivered**.
+
+## Phase 0: Execution Foundation — done
 
 Goal: make SRapi governable by specs and quality gates.
 
@@ -16,9 +20,9 @@ Primary packages:
 - WP-000
 - WP-010
 
-## Phase 1: MVP Gateway Closure
+## Phase 1: MVP Gateway Closure — done
 
-Goal: complete the first real Gateway loop.
+Goal: completed the first real Gateway loop (shipped long ago).
 
 Required loop:
 
@@ -37,9 +41,9 @@ Primary packages:
 
 - WP-020 through WP-090
 
-## Phase 2: Reverse Proxy Runtime v1
+## Phase 2: Reverse Proxy Runtime v1 — done
 
-Goal: support the first safe non-API-key account runtime.
+Goal: supported the first safe non-API-key account runtime (shipped long ago).
 
 Exit criteria:
 
@@ -52,11 +56,11 @@ Primary packages:
 
 - WP-100 through WP-130
 
-## Phase 3: Control Console And Ops v1
+## Phase 3: Control Console And Ops v1 — done
 
-Goal: make SRapi operable by humans.
+Goal: made SRapi operable by humans.
 
-Exit criteria:
+Exit criteria (delivered; the `apps/web` Next.js console was later rebuilt and extended under WP-1310):
 
 - Next.js console exists.
 - Admin can manage providers, models, accounts, API keys, usage, decisions, and audit.
@@ -67,9 +71,9 @@ Primary packages:
 
 - WP-140 through WP-170
 
-## Phase 4: Commercial Platform
+## Phase 4: Commercial Platform — done
 
-Goal: add self-service monetization without weakening ledger integrity.
+Goal: added self-service monetization without weakening ledger integrity.
 
 Exit criteria:
 
@@ -82,9 +86,9 @@ Primary packages:
 
 - WP-180 through WP-210
 
-## Phase 5: Provider Expansion
+## Phase 5: Provider Expansion — done
 
-Goal: broaden model and provider coverage through presets and adapters.
+Goal: broadened model and provider coverage through presets and adapters.
 
 Exit criteria:
 
@@ -98,9 +102,9 @@ Primary packages:
 
 - WP-220 through WP-250
 
-## Phase 6: Production Hardening
+## Phase 6: Production Hardening — done
 
-Goal: make SRapi safe to operate long term.
+Goal: made SRapi safe to operate long term.
 
 Exit criteria:
 
@@ -114,9 +118,9 @@ Primary packages:
 
 - WP-260 through WP-290
 
-## Phase 7: Advanced AI Surface
+## Phase 7: Advanced AI Surface — done
 
-Goal: expose advanced endpoint families without compromising the core architecture.
+Goal: exposed advanced endpoint families without compromising the core architecture.
 
 Exit criteria:
 
@@ -128,9 +132,9 @@ Primary packages:
 
 - WP-300 through WP-330
 
-## Phase 8: Ecosystem And Polish
+## Phase 8: Ecosystem And Polish — done
 
-Goal: make SRapi extensible and pleasant to integrate.
+Goal: made SRapi extensible and pleasant to integrate.
 
 Exit criteria:
 
@@ -142,4 +146,17 @@ Exit criteria:
 Primary packages:
 
 - WP-340 through WP-360
+
+## Beyond the roadmap (WP-500 → WP-1310)
+
+This roadmap's package enumeration stops at WP-360. The program kept going well past it; the following series shipped and are recorded individually in `specs/STATUS.md` / `specs/WORK_PACKAGES.md`:
+
+- **700-series — Admin Control Plane:** dashboard snapshot, ops monitoring, typed settings, announcements, redeem codes, promo codes, risk-control APIs (WP-700), and console TOTP 2FA (WP-770).
+- **900-series — Notifications:** low-balance notification triggers, outbox/email dispatch, admin-managed templates (WP-900).
+- **1000-series — OAuth/OIDC identity:** external-identity sign-in and current-user pending-OAuth binding (WP-1000).
+- **1100–1300-series — Egress, rate-limit matrix, and frontend completeness:** API-key egress consistency (WP-1100), TLS-fingerprint DB profiles (WP-1130), and the frontend business-completeness & correctness pass that rebuilt and fully wired the `apps/web` console (WP-1310).
+
+### Roadmap / not yet implemented
+
+Genuinely deferred items (tracked in `specs/STATUS.md` and the relevant `docs/`) include Batch / Fine-tuning API families, full JA3/JA4 + HTTP/2 fingerprinting, and affiliate withdrawal. Everything else enumerated in the phases above is delivered.
 

@@ -1,5 +1,12 @@
 # SRapi Codex Execution Specs
 
+> Historical development-process record. `specs/` is the long-running execution layer that drove
+> SRapi's implementation through Codex goals. The platform is now built and at 0.1.0
+> release-candidate maturity, so this directory is retained for provenance — decisions, work
+> packages, and gate records — rather than as an active backlog. For the product overview see the
+> root [`README.md`](../README.md); for the documentation map see [`../docs/README.md`](../docs/README.md);
+> for the completion ledger see [`STATUS.md`](STATUS.md).
+
 ## 1. Purpose
 
 `specs/` is the execution layer for long-running Codex work. It turns the architecture and product documents in `docs/` into a concrete sequence of goals, work packages, quality gates, and progress tracking rules.
@@ -36,13 +43,13 @@ If the work package touches Gateway, Scheduler, Provider Adapter, Reverse Proxy 
 Use this prompt when starting or resuming long-running development:
 
 ```txt
-Create a goal for SRapi: read /home/senran/Desktop/SRapi/specs/README.md, select the next pending work package from specs/STATUS.md, implement it end to end, run its quality gates, update specs/STATUS.md, and stop only when the selected work package is complete or genuinely blocked by the protocol.
+Create a goal for SRapi: read specs/README.md, select the next pending work package from specs/STATUS.md, implement it end to end, run its quality gates, update specs/STATUS.md, and stop only when the selected work package is complete or genuinely blocked by the protocol.
 ```
 
 For a specific package:
 
 ```txt
-Create a goal for SRapi: implement WP-XXX from /home/senran/Desktop/SRapi/specs/WORK_PACKAGES.md according to specs/GOAL_EXECUTION_PROTOCOL.md and specs/QUALITY_GATES.md.
+Create a goal for SRapi: implement WP-XXX from specs/WORK_PACKAGES.md according to specs/GOAL_EXECUTION_PROTOCOL.md and specs/QUALITY_GATES.md.
 ```
 
 ## 4. Execution Contract
@@ -82,9 +89,10 @@ If a conflict appears:
 | --- | --- |
 | `FINAL_STATE.md` | Final product and platform shape. |
 | `GOAL_EXECUTION_PROTOCOL.md` | Rules for using Codex goals safely over many turns. |
-| `ROADMAP.md` | Phase plan from current skeleton to final platform. |
+| `ROADMAP.md` | Phase plan toward the final platform. |
 | `WORK_PACKAGES.md` | Concrete implementation slices with docs, ownership, DoD, and gates. |
 | `QUALITY_GATES.md` | Required checks by change type. |
 | `REFERENCE_PROJECT_DECISIONS.md` | What to learn from `sub2api` and `CLIProxyAPI`, and what not to copy. |
+| `COMMERCIALIZATION_PLAN.md` | Historical (completed) engineering plan for the move from skeleton to a production-grade gateway (P1 lines + Pareto routing). Kept as a decision/implementation record; `STATUS.md` is the authoritative progress source. |
 | `STATUS.md` | Persistent progress ledger for future goal runs. |
 

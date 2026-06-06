@@ -9,7 +9,7 @@
 - 支付、计费、返利、观测、通知等跨模块流程最终一致。
 - 请求主链路保持短路径和可解释。
 - 事件可以重试、回放和审计。
-- 未来可从进程内事件演进到消息队列或独立服务。
+- 当前以数据库 Outbox + 进程内 Worker 实现；envelope 与消费者幂等语义保持稳定，可在不改变契约的前提下演进到消息队列或独立服务（Roadmap）。
 
 ## 2. 使用原则
 
@@ -43,6 +43,9 @@ ProviderAccountHealthChanged
 ProviderAccountQuotaChanged
 AccountQuotaAlertTriggered
 NotificationContactVerificationRequested
+AuthEmailVerificationRequested
+AuthPasswordResetRequested
+PendingOAuthEmailCompletionRequested
 SchedulerDecisionRecorded
 GatewayRequestCompleted
 AlertTriggered
@@ -91,7 +94,7 @@ metadata_json
 
 ## 5. Outbox 表
 
-建议新增 `domain_events_outbox`：
+已落库 `domain_events_outbox`（ent schema `DomainEventsOutbox`），字段如下：
 
 ```txt
 id
@@ -122,7 +125,7 @@ published
 failed
 ```
 
-MVP 状态机：
+状态机（当前实现）：
 
 ```txt
 pending --dispatch ok--> published
@@ -131,7 +134,7 @@ failed(next_retry_at <= now) --dispatch ok--> published
 failed(next_retry_at <= now) --dispatch failed--> failed(next_retry_at, last_error, attempt_count + 1)
 ```
 
-多 worker 或外部消息中间件阶段可增加：
+Roadmap / 尚未实现：多 worker 或外部消息中间件阶段可增加以下状态（当前 schema 仅有 `pending` / `published` / `failed`）：
 
 ```txt
 publishing
@@ -151,7 +154,7 @@ index(correlation_id)
 
 ## 6. Inbox / Consumer 去重
 
-建议新增 `domain_events_inbox`：
+已落库 `domain_events_inbox`（ent schema `DomainEventsInbox`），字段如下：
 
 ```txt
 id
@@ -176,7 +179,7 @@ index(consumer_name, status, created_at)
 
 ## 7. 发布模式
 
-MVP 可采用数据库 Outbox + Worker 轮询：
+当前采用数据库 Outbox + Worker 轮询（`internal/workers/outbox` 轮询分发，`internal/persistence/entstore/events` 持久化）：
 
 ```txt
 module local transaction
@@ -192,7 +195,7 @@ worker publishes / dispatches event
 consumer handles with inbox idempotency
 ```
 
-后续可替换为：
+Roadmap / 尚未实现 —— 可替换为外部消息中间件（当前未接入任何 MQ）：
 
 ```txt
 PostgreSQL outbox -> Redis Stream / NATS / Kafka
@@ -387,7 +390,93 @@ expires_at
 
 - Notification。
 
-### 8.7 PaymentOrderPaid
+### 8.7 AuthEmailVerificationRequested
+
+生产者：Auth（email verification API，`internal/modules/auth/service/email_verification.go`）。
+
+触发：活跃且邮箱未验证的用户请求发送邮箱验证邮件。
+
+关键 payload：
+
+```txt
+template
+recipient_user_id
+recipient_email_hash
+verification_token_ciphertext
+verification_token_version
+verification_url_path
+expires_at
+```
+
+安全规则：
+
+- payload 不得包含明文邮箱或明文 token；验证 token 仅以 deployment master key 派生密钥加密（`token_delivery=encrypted_outbox`）后进入 outbox。
+- 事件通过 `auth.email_verification:<user_id>:<token_hash_prefix>` 幂等键去重。
+- Outbox 通知消费者必须重新读取当前用户，跳过 inactive 或已验证邮箱的用户。
+- 邮箱验证邮件是 transactional mail，不受 optional unsubscribe preference 压制。
+
+消费者：
+
+- Notification。
+
+### 8.8 AuthPasswordResetRequested
+
+生产者：Auth（password reset API，`internal/modules/auth/service/password_reset.go`）。
+
+触发：用户请求重置密码。为防止账号枚举，无论邮箱是否存在都返回相同结果，仅当用户存在时入队事件。
+
+关键 payload：
+
+```txt
+template
+recipient_user_id
+recipient_email_hash
+reset_token_ciphertext
+reset_token_version
+reset_url_path
+expires_at
+```
+
+安全规则：
+
+- payload 不得包含明文邮箱或明文 token；reset token 仅以派生密钥加密（`token_delivery=encrypted_outbox`）后进入 outbox。
+- 事件通过 `auth.password_reset:<user_id>:<token_hash_prefix>` 幂等键去重。
+- Outbox 通知消费者必须重新读取当前用户，跳过 inactive user。
+- 密码重置邮件是 transactional mail，不受 optional unsubscribe preference 压制。
+
+消费者：
+
+- Notification。
+
+### 8.9 PendingOAuthEmailCompletionRequested
+
+生产者：Auth（pending OAuth 会话补全邮箱 API，`internal/modules/auth/service/pending_oauth.go`）。
+
+触发：OAuth / OIDC 登录后 provider 未返回可信邮箱，用户补填邮箱并请求验证以完成账号绑定。
+
+关键 payload：
+
+```txt
+template
+recipient_email_hash
+recipient_email_ciphertext
+verification_token_ciphertext
+verification_token_version
+verification_url_path
+expires_at
+```
+
+安全规则：
+
+- payload 不得包含明文邮箱或明文 token；待绑定邮箱与验证 token 都仅以派生密钥加密（`token_delivery=encrypted_outbox`，`scope=pending_oauth_email_completion`）后进入 outbox。
+- aggregate 为 `pending_oauth_session`，事件通过 `auth.pending_oauth_email:<session_id>:<token_hash_prefix>` 幂等键去重。
+- 该邮件是 transactional mail，不受 optional unsubscribe preference 压制。
+
+消费者：
+
+- Notification。
+
+### 8.10 PaymentOrderPaid
 
 生产者：Payments。
 
@@ -416,7 +505,7 @@ provider_transaction_id
 
 支付模块只负责支付事实，不直接写返利账本。
 
-### 8.8 PaymentOrderRefunded
+### 8.11 PaymentOrderRefunded
 
 生产者：Payments。
 
@@ -440,7 +529,7 @@ refunded_at
 - Affiliate rebate compensation。
 - Audit。
 
-### 8.9 SubscriptionActivated
+### 8.12 SubscriptionActivated
 
 生产者：Subscriptions。
 
@@ -463,7 +552,7 @@ entitlement_snapshot
 - Audit。
 - Observability。
 
-### 8.10 AffiliateRebateAccrued
+### 8.13 AffiliateRebateAccrued
 
 生产者：Affiliate。
 
@@ -488,7 +577,7 @@ status
 - Audit。
 - Observability。
 
-### 8.11 AffiliateRebateCompensated
+### 8.14 AffiliateRebateCompensated
 
 生产者：Affiliate。
 
@@ -510,7 +599,7 @@ reason
 - Billing。
 - Audit。
 
-### 8.12 ProviderAccountHealthChanged
+### 8.15 ProviderAccountHealthChanged
 
 生产者：Scheduler / Provider Adapter / Account Health Worker。
 
@@ -534,7 +623,7 @@ reason
 - Alerting。
 - Audit，高风险变更。
 
-### 8.13 SchedulerDecisionRecorded
+### 8.16 SchedulerDecisionRecorded
 
 生产者：Scheduler。
 

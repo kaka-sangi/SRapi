@@ -1,6 +1,6 @@
 # SRapi 2api 迁移指南
 
-本文面向已经使用 `/home/senran/Desktop/sub2api`、`/home/senran/Desktop/CLIProxyAPI`、`/home/senran/Desktop/chatgpt2api` 这类 2api / 反代项目的部署者。SRapi 迁移目标不是把这些项目的本地进程接进来，而是把相同的账号池、模型映射、请求模拟和兼容 API 能力沉到 SRapi 的 Provider Account、Scheduler、Provider Adapter 与 Reverse Proxy Runtime 边界里。
+本文面向已经使用 sub2api、CLIProxyAPI、chatgpt2api 这类 2api / 反代项目的部署者。这些是私有的上游参考项目，SRapi 不随仓库分发，也不依赖它们的本地进程。SRapi 迁移目标不是把这些项目的本地进程接进来，而是把相同的账号池、模型映射、请求模拟和兼容 API 能力沉到 SRapi 的 Provider Account、Scheduler、Provider Adapter 与 Reverse Proxy Runtime 边界里。
 
 ## 1. 术语边界
 

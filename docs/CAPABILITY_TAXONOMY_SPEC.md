@@ -422,7 +422,7 @@ unique(key, version)
 index(category, status)
 ```
 
-MVP 可以先以代码常量或 seed 数据实现，但语义必须与本文档一致。
+该 registry 已实现：canonical capability key 及其 descriptor（key、version、category、status、description、replacement_key、schema）以代码常量与 seed 数据形式维护于 `internal/modules/capabilities/contract`，并由 `ent/schema/capabilitydefinition.go`（`capability_definitions` 表）持久化；语义与本文档一致。
 
 ## 15. Capability Schema
 

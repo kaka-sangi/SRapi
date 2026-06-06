@@ -1,19 +1,27 @@
 # SRapi MVP 实现级规格
 
+> **历史文档 — 已被取代（Historical — superseded）。** 本文是 SRapi 最初的 MVP / 第一阶段实现级规格，记录了当年的范围裁剪与需求→测试契约。如今平台早已超出 MVP 阶段：多协议 Gateway、支付/订阅/邀请返利/账务台账、OAuth/OIDC + TOTP 双因子、完整的 Next.js 管理控制台与用户自助工作台、Copilot、Playground、调度内核与可观测性均已交付。本文仅作为设计渊源与原始验收契约保留——其中多数「暂缓 / 第一阶段 / 建议 / 骨架」描述已不再代表现状，请勿据此判断当前能力。
+>
+> **当前现状以下列文档为准（current status / authoritative sources）：** [`../specs/STATUS.md`](../specs/STATUS.md)（已完成工作包逐条台账）、[`ARCHITECTURE_REQUIREMENTS.md`](ARCHITECTURE_REQUIREMENTS.md)、[`../specs/WORK_PACKAGES.md`](../specs/WORK_PACKAGES.md)、以及 OpenAPI 契约 `packages/openapi/openapi.yaml`、各领域 `*_SPEC.md`。
+>
+> 下文保留原始 MVP 范围与契约；其中仍然成立的工程门禁（不存 API Key 原文、凭证加密、Gateway 必产 decision/feedback/usage、契约即代码等）至今依旧适用，故未删除。已落地但原文仍以「暂缓 / 未来」呈现的条目，已就地标注。
+
 ## 1. 元数据
 
 | 字段 | 值 |
 | --- | --- |
-| 状态 | Draft |
-| 适用阶段 | MVP / Phase 1 |
+| 状态 | Historical — superseded（历史，已被取代；当前现状见 `../specs/STATUS.md` 与 `ARCHITECTURE_REQUIREMENTS.md`） |
+| 适用阶段 | MVP / Phase 1（历史范围；平台现已远超此阶段） |
 | 关联文档 | `MVP_IMPLEMENTATION_PLAN.md`, `ARCHITECTURE.md`, `MODULE_INTERFACE_CONTRACTS.md`, `DOMAIN_EVENTS_SPEC.md`, `OPENAPI_CONTRACT.md`, `AI_ENDPOINT_COMPATIBILITY.md`, `GATEWAY_ROUTE_MATRIX.md`, `DATA_MODEL.md`, `DOMAIN_MODEL.md`, `CAPABILITY_TAXONOMY_SPEC.md`, `SCHEDULING_KERNEL_DESIGN.md`, `SCHEDULER_STRATEGY_EXTENSION_SPEC.md`, `PROVIDER_ADAPTER_SPEC.md`, `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`, `REVERSE_PROXY_SPEC.md`, `SECURITY_MODEL.md`, `CONFIGURATION_SPEC.md`, `OPERATIONS.md`, `OBSERVABILITY_SPEC.md`, `PAYMENT_SPEC.md`, `AFFILIATE_REBATE_SPEC.md` |
 | 目标读者 | 后端、前端、测试、文档、AI 编码代理 |
 
 ## 2. 目标
 
-MVP 必须交付一个可本地运行、可通过 Chat Completions、Responses、Messages 等主流 AI 端点调用上游模型、可进行端点互转、并能记录调度决策与用量的 AI Gateway 骨架。
+> 历史目标声明。本节描述的是 MVP 阶段的交付目标；下文所称「骨架 / 闭环」如今均已成长为成熟实现。
 
-MVP 的重点不是一次性完成商业化系统，而是把以下闭环打通：
+MVP 阶段需交付一个可本地运行、可通过 Chat Completions、Responses、Messages 等主流 AI 端点调用上游模型、可进行端点互转、并能记录调度决策与用量的 AI Gateway 骨架。（现状：该骨架已演进为成熟的多协议 Gateway，另已支持 `/v1/responses`、`/v1/messages`、`/v1/realtime`、Gemini-native `/v1beta/models/{model}:generateContent` 等端点。）
+
+MVP 阶段的重点不是一次性完成商业化系统，而是先把以下闭环打通；商业化系统（支付、订阅、邀请返利、账务台账）如今已全部交付：
 
 ```txt
 API Key -> Client Endpoint Adapter -> Canonical AI Request -> Scheduler v1 -> Provider Adapter -> Usage Log -> Admin Observability
@@ -22,6 +30,8 @@ API Key -> Client Endpoint Adapter -> Canonical AI Request -> Scheduler v1 -> Pr
 ## 3. 范围
 
 ### 3.1 必须包含
+
+> 历史范围。下列是 MVP 阶段的必含项，均已交付；当前平台的能力范围已远超此清单（见 §3.2 标注与 `../specs/STATUS.md`）。
 
 - Monorepo 基础目录。
 - Go API 服务。
@@ -48,20 +58,22 @@ API Key -> Client Endpoint Adapter -> Canonical AI Request -> Scheduler v1 -> Pr
 - 基础 Audit Log。
 - 本地质量门禁。
 
-### 3.2 明确暂缓
+### 3.2 明确暂缓（历史；下列绝大多数现已交付）
 
-- 支付和外部支付 Webhook，详见 `PAYMENT_SPEC.md` 的 Phase 2 规划。
-- 邀请返利、提现和退款返利补偿，详见 `AFFILIATE_REBATE_SPEC.md`。
-- 完整订阅购买流程。
-- 复杂 RBAC。
-- 高级策略 DSL。
-- 机器学习调度。
-- Realtime、Batch、Fine-tuning、Assistants 全量兼容。
-- Responses stateful store、内置工具、远程工具全量兼容。
-- Gemini-native 公开端点。
-- 完整 utls TLS 指纹 / HTTP/2 SETTINGS 模拟、Egress Profile 管理后台、Behavior Pacer 高级模式、外部 challenge solver 集成、HTTP/3、WSS 反代等高级反代能力，详见 `REVERSE_PROXY_SPEC.md` 阶段表。
-- Kubernetes 生产部署。
-- 完整 Ops Dashboard、SLO / burn-rate 告警、Provider 健康矩阵，详见 `OBSERVABILITY_SPEC.md` Phase 2。
+> 本节是 MVP 阶段「明确暂缓」的清单。截至 0.1.0 公开发布，下表中绝大多数条目已经落地并通过测试；仅在条目尾部以 **[已交付]** / **[Roadmap / 尚未实现]** 明确标注当前状态。当前能力以 `../specs/STATUS.md` 与 OpenAPI 契约为准。
+
+- 支付和外部支付 Webhook，详见 `PAYMENT_SPEC.md`。 **[已交付]** — Stripe / EasyPay / Alipay / WeChat 支付与退款均已上线；统一 Webhook 路由为 `POST /api/v1/webhooks/payments/{provider}`，代码位于 `apps/api/internal/modules/payments/providers/{checkout,stripe,easypay,alipay,wechat}`。
+- 邀请返利、提现和退款返利补偿，详见 `AFFILIATE_REBATE_SPEC.md`。 **[已交付]** — `apps/api/internal/modules/affiliate`；端点含 `GET /api/v1/me/affiliate`、`/api/v1/me/affiliate/ledger` 及 `AdminAffiliates` 管理端（邀请、返利、转账）。
+- 完整订阅购买流程。 **[已交付]** — `apps/api/internal/modules/subscriptions`；端点含 `/api/v1/me/subscriptions`、`/api/v1/admin/subscription-plans`、`/api/v1/admin/user-subscriptions`。
+- 复杂 RBAC。 **[已交付]** — 角色管理（含内置角色保护）与权限模型已上线，详见管理控制台与 `users` 模块。
+- 高级策略 DSL。 **[Roadmap / 尚未实现]** — Scheduler 已支持多策略与 StrategyRegistry/版本快照，但通用策略 DSL 仍为待办，详见 `SCHEDULER_STRATEGY_EXTENSION_SPEC.md`。
+- 机器学习调度。 **[Roadmap / 尚未实现]** — 当前调度为基于权重/能力/并发的确定性策略，ML 调度尚未实现。
+- Realtime、Batch、Fine-tuning、Assistants 全量兼容。 **[部分已交付]** — Realtime（WebSocket relay，`GET /v1/realtime`，`apps/api/internal/modules/realtime`）已交付；Batch、Fine-tuning、Assistants 仍为 **[Roadmap / 尚未实现]**（OpenAPI 中无 `/v1/batches` 等路径）。
+- Responses stateful store、内置工具、远程工具全量兼容。 **[大部分已交付]** — `/v1/responses`（含 `/v1/responses/compact`、`input_items`）已广泛实现；少数 stateful store 边缘语义与全量内置/远程工具兼容仍为 **[Roadmap / 尚未实现]**，详见 `AI_ENDPOINT_COMPATIBILITY.md`。
+- Gemini-native 公开端点。 **[已交付]** — `POST /v1beta/models/{model}:generateContent`（`generateGeminiContent`），请求经 Canonical AI Request 归一化后调度。
+- 完整 utls TLS 指纹 / HTTP/2 SETTINGS 模拟、Egress Profile 管理后台、Behavior Pacer 高级模式、外部 challenge solver 集成、HTTP/3、WSS 反代等高级反代能力，详见 `REVERSE_PROXY_SPEC.md` 阶段表。 **[部分已交付]** — Egress Profile / TLS Profile 管理后台已上线（`tls_profiles` 模块，`/api/v1/admin/tls-profiles`）；utls 指纹、HTTP/2 SETTINGS 模拟、Behavior Pacer 高级模式、外部 challenge solver、HTTP/3、WSS 反代等仍以 `REVERSE_PROXY_SPEC.md` 阶段表为准（多为 **[Roadmap / 尚未实现]**）。
+- Kubernetes 生产部署。 **[Roadmap / 尚未实现]** — 当前以 Docker Compose 自托管为准，详见 `OPERATIONS.md`；K8s 清单尚未随仓库提供。
+- 完整 Ops Dashboard、SLO / burn-rate 告警、Provider 健康矩阵，详见 `OBSERVABILITY_SPEC.md`。 **[已交付]** — 运维中心已上线：`/api/v1/admin/ops/{overview,...,slo,slo/{id},alerts,alerts/{id}/ack}`、SLO 控制面（`obs_slo_definitions`）、告警 ack、`/metrics` 直方图与失败转移指标、OTel 链路追踪。
 
 ## 4. 功能需求
 
@@ -179,7 +191,9 @@ API Key -> Client Endpoint Adapter -> Canonical AI Request -> Scheduler v1 -> Pr
 
 ## 8. MVP 最小数据集合
 
-MVP 必须实现的数据表以 `DATA_MODEL.md` 为准，但至少需要覆盖：
+> 历史范围。下列是 MVP 阶段的**最小**数据集合；当前实际 schema 远大于此（已新增支付、订阅、邀请返利、TLS Profile、可观测性 `obs_*`、限流、用户属性等多张表）。当前权威 schema 以 `DATA_MODEL.md`、`apps/api/internal/ent/schema` 与迁移文件为准。
+
+MVP 阶段必须实现的数据表以 `DATA_MODEL.md` 为准，但至少需要覆盖：
 
 ```txt
 users
