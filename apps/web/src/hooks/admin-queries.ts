@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/admin-api";
 import { queryKeys } from "@/lib/query-keys";
-import type { User } from "../../../../packages/sdk/typescript/src/types.gen";
+import type { User, ProviderAccountStatus } from "../../../../packages/sdk/typescript/src/types.gen";
 
 /**
  * Admin data hooks. Pages consume ONLY these (never useEffect+fetch).
@@ -94,7 +94,7 @@ type AccountList = Awaited<ReturnType<typeof adminApi.listAccounts>>;
 export function useSetAccountStatus() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: "active" | "disabled" }) =>
+    mutationFn: ({ id, status }: { id: string; status: ProviderAccountStatus }) =>
       adminApi.setAccountStatus(id, status),
     // 联动: flip the account row instantly; rollback on error, reconcile on settle.
     onMutate: async ({ id, status }) => {

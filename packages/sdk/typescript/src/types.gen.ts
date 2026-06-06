@@ -1271,7 +1271,7 @@ export type RuntimeClass = 'api_key' | 'oauth_refresh' | 'oauth_device_code' | '
  */
 export type PlatformFamily = 'openai_compatible' | 'anthropic_compatible' | 'bedrock_anthropic' | 'reverse_proxy_antigravity' | 'rerank_compatible';
 
-export type ProviderAccountStatus = 'active' | 'disabled' | 'needs_reauth' | 'suspended' | 'dead';
+export type ProviderAccountStatus = 'active' | 'disabled' | 'needs_reauth' | 'suspended' | 'dead' | 'archived';
 
 export type AccountGroupStatus = 'active' | 'disabled';
 

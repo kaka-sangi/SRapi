@@ -37,10 +37,29 @@ interface PendingAction {
   danger?: boolean;
 }
 
+// The copilot is intentionally stateless server-side (transcripts can carry user
+// PII and are never persisted to the backend). To avoid losing an in-progress
+// conversation on an accidental refresh, mirror it to sessionStorage — same-tab,
+// cleared when the tab closes, never sent anywhere.
+const CONVERSATION_STORAGE_KEY = "srapi.copilot.conversation";
+
+function loadStoredConversation(): CopilotMessage[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.sessionStorage.getItem(CONVERSATION_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+    return Array.isArray(parsed) ? (parsed as CopilotMessage[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 export function CopilotChat({ models, defaultModel }: { models: string[]; defaultModel: string }) {
   const { t } = useLanguage();
-  const [messages, setMessages] = useState<CopilotMessage[]>([]);
+  // Lazily restore from sessionStorage. Safe as a lazy initializer because this
+  // component only ever mounts client-side (it renders behind PageQueryState
+  // once the config query resolves), so there is no SSR/hydration mismatch.
+  const [messages, setMessages] = useState<CopilotMessage[]>(loadStoredConversation);
   const [input, setInput] = useState("");
   const [running, setRunning] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
@@ -65,6 +84,20 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, pending, running]);
+
+  // Persist the conversation so a refresh doesn't lose it; "新对话" (reset → []) clears it.
+  useEffect(() => {
+    try {
+      if (messages.length === 0) {
+        window.sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
+      } else {
+        window.sessionStorage.setItem(CONVERSATION_STORAGE_KEY, JSON.stringify(messages));
+      }
+    } catch {
+      // sessionStorage unavailable or over quota (e.g. large inline images) — the
+      // in-memory conversation still works, it just won't survive a refresh.
+    }
+  }, [messages]);
 
   const runTurn = useCallback(
     async (history: CopilotMessage[], approval?: { tool_call_id: string; approved: boolean }) => {

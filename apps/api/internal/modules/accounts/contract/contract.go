@@ -27,6 +27,10 @@ const (
 	StatusNeedsReauth Status = "needs_reauth"
 	StatusSuspended   Status = "suspended"
 	StatusDead        Status = "dead"
+	// StatusArchived is an operator soft-delete: the account is hidden from the
+	// default admin list and never scheduled (only "active" is a candidate), but
+	// the row is kept so historical usage/audit references stay intact.
+	StatusArchived Status = "archived"
 )
 
 type GroupStatus string

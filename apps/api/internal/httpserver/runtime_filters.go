@@ -61,6 +61,11 @@ func filterAccounts(accounts []accountcontract.ProviderAccount, status, provider
 	providerID = strings.TrimSpace(providerID)
 	out := make([]accountcontract.ProviderAccount, 0, len(accounts))
 	for _, account := range accounts {
+		// Archived accounts are soft-deleted: hidden from the default list, shown
+		// only when explicitly requested via ?status=archived (e.g. a restore view).
+		if status == "" && account.Status == accountcontract.StatusArchived {
+			continue
+		}
 		if status != "" && string(account.Status) != status {
 			continue
 		}

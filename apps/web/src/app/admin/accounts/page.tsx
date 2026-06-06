@@ -95,6 +95,7 @@ function AccountsContent() {
   const [detailTarget, setDetailTarget] = useState<ProviderAccount | null>(null);
   const [testTarget, setTestTarget] = useState<ProviderAccount | null>(null);
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<ProviderAccount | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [codexImportOpen, setCodexImportOpen] = useState(false);
 
@@ -364,6 +365,11 @@ function AccountsContent() {
                 t("feedback.saved"),
               ),
           });
+          actions.push({
+            label: t("adminAccounts.archive"),
+            destructive: true,
+            onSelect: () => setArchiveTarget(a),
+          });
           return <RowActionsMenu actions={actions} />;
         }}
       />
@@ -441,6 +447,21 @@ function AccountsContent() {
         body={t("adminAccounts.bulkDisableBody")}
         confirmLabel={t("common.disable")}
         onConfirm={() => applyBulkStatus("disabled")}
+      />
+
+      <ConfirmDialog
+        open={archiveTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setArchiveTarget(null);
+        }}
+        title={t("adminAccounts.archiveTitle")}
+        body={t("adminAccounts.archiveBody")}
+        confirmLabel={t("adminAccounts.archive")}
+        successMessage={t("feedback.saved")}
+        isPending={setStatus.isPending}
+        onConfirm={async () => {
+          if (archiveTarget) await setStatus.mutateAsync({ id: archiveTarget.id, status: "archived" });
+        }}
       />
 
       <AccountImportDialog open={importOpen} onOpenChange={setImportOpen} />

@@ -884,7 +884,7 @@ func validGroupStatus(status contract.GroupStatus) bool {
 
 func validAccountStatus(status contract.Status) bool {
 	switch status {
-	case contract.StatusActive, contract.StatusDisabled, contract.StatusNeedsReauth, contract.StatusSuspended, contract.StatusDead:
+	case contract.StatusActive, contract.StatusDisabled, contract.StatusNeedsReauth, contract.StatusSuspended, contract.StatusDead, contract.StatusArchived:
 		return true
 	default:
 		return false

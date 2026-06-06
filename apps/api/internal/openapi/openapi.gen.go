@@ -1952,6 +1952,7 @@ func (e PromoDiscountType) Valid() bool {
 // Defines values for ProviderAccountStatus.
 const (
 	ProviderAccountStatusActive      ProviderAccountStatus = "active"
+	ProviderAccountStatusArchived    ProviderAccountStatus = "archived"
 	ProviderAccountStatusDead        ProviderAccountStatus = "dead"
 	ProviderAccountStatusDisabled    ProviderAccountStatus = "disabled"
 	ProviderAccountStatusNeedsReauth ProviderAccountStatus = "needs_reauth"
@@ -1962,6 +1963,8 @@ const (
 func (e ProviderAccountStatus) Valid() bool {
 	switch e {
 	case ProviderAccountStatusActive:
+		return true
+	case ProviderAccountStatusArchived:
 		return true
 	case ProviderAccountStatusDead:
 		return true
