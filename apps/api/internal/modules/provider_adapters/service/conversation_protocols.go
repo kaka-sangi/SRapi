@@ -23,7 +23,6 @@ type anthropicMessagesRequest struct {
 	StopSequences     []string           `json:"stop_sequences,omitempty"`
 	Tools             []map[string]any   `json:"tools,omitempty"`
 	ToolChoice        any                `json:"tool_choice,omitempty"`
-	Metadata          map[string]any     `json:"metadata,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -36,7 +35,7 @@ func anthropicCompatiblePayload(req contract.ConversationRequest) anthropicMessa
 	if req.MaxOutputTokens != nil && *req.MaxOutputTokens > 0 {
 		maxTokens = *req.MaxOutputTokens
 	}
-	payload := anthropicMessagesRequest{
+	return anthropicMessagesRequest{
 		Model:             req.Mapping.UpstreamModelName,
 		Messages:          anthropicCompatibleMessages(req),
 		System:            anthropicCompatibleSystem(req),
@@ -50,12 +49,6 @@ func anthropicCompatiblePayload(req contract.ConversationRequest) anthropicMessa
 		Tools:             anthropicCompatibleTools(req.Tools),
 		ToolChoice:        anthropicCompatibleToolChoice(req.ToolChoice),
 	}
-	// Session-id spoofing: pin metadata.user_id to a stable per-conversation id
-	// so the upstream treats consecutive turns as one session.
-	if spoof := strings.TrimSpace(req.SpoofSessionID); spoof != "" {
-		payload.Metadata = map[string]any{"user_id": spoof}
-	}
-	return payload
 }
 
 func anthropicCompatibleRequestBody(req contract.ConversationRequest) ([]byte, error) {

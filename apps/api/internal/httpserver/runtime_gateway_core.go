@@ -1314,10 +1314,7 @@ func (rt *runtimeState) applyPayloadRules(ctx context.Context, req provideradapt
 		model = req.Model
 	}
 	resolved := rt.payloadRules.Resolve(ctx, model, req.TargetProtocol)
-	if len(resolved) == 0 {
-		return req
-	}
-	transforms := make([]provideradaptercontract.PayloadTransform, 0, len(resolved))
+	transforms := make([]provideradaptercontract.PayloadTransform, 0, len(resolved)+1)
 	for _, op := range resolved {
 		transforms = append(transforms, provideradaptercontract.PayloadTransform{
 			Action: op.Action,
@@ -1325,8 +1322,26 @@ func (rt *runtimeState) applyPayloadRules(ctx context.Context, req provideradapt
 			Value:  op.Value,
 		})
 	}
-	req.PayloadTransforms = transforms
+	// Session-id spoofing for Anthropic: pin metadata.user_id to the stable
+	// per-conversation id via an override transform (codex uses prompt_cache_key,
+	// injected directly in the codex body builder).
+	if transform := anthropicSpoofSessionTransform(req); transform != nil {
+		transforms = append(transforms, *transform)
+	}
+	if len(transforms) > 0 {
+		req.PayloadTransforms = transforms
+	}
 	return req
+}
+
+// anthropicSpoofSessionTransform returns a metadata.user_id override transform
+// when an Anthropic-targeted request carries a spoof session id, else nil.
+func anthropicSpoofSessionTransform(req provideradaptercontract.ConversationRequest) *provideradaptercontract.PayloadTransform {
+	spoof := strings.TrimSpace(req.SpoofSessionID)
+	if spoof == "" || req.TargetProtocol != string(gatewaycontract.ProtocolAnthropicCompatible) {
+		return nil
+	}
+	return &provideradaptercontract.PayloadTransform{Action: "override", Path: "metadata.user_id", Value: spoof}
 }
 
 func (rt *runtimeState) invokeProviderConversation(ctx context.Context, req provideradaptercontract.ConversationRequest) (provideradaptercontract.ConversationResponse, error) {
