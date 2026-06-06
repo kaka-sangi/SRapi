@@ -6,9 +6,15 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { ToastUIProvider } from "@/context/ToastContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  nonce,
+}: {
+  children: React.ReactNode;
+  nonce?: string;
+}) {
   return (
-    <ThemeProvider>
+    <ThemeProvider nonce={nonce}>
       <QueryProvider>
         <LanguageProvider>
           {/* App-wide tooltip context: a brief hover delay, instant re-show when
