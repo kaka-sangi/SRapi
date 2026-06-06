@@ -88,6 +88,7 @@ import (
 	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
 	sessionaffinitycontract "github.com/srapi/srapi/apps/api/internal/modules/sessionaffinity/contract"
+	sessionaffinitymemory "github.com/srapi/srapi/apps/api/internal/modules/sessionaffinity/store/memory"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
@@ -891,7 +892,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		realtimeStore:        opts.realtime,
 		rateLimiter:          opts.rateLimiter,
 		schedulerStore:       assembly.schedulerStore,
-		sessionAffinity:      opts.sessionAffinity,
+		sessionAffinity:      sessionAffinityStoreOrMemory(opts.sessionAffinity),
 		subscriptionStore:    assembly.subscriptionStore,
 		totpStore:            assembly.totpStore,
 		usageStore:           assembly.usageStore,
@@ -913,6 +914,16 @@ func newOperationsRuntime(store operationscontract.Store, usageStore usagecontra
 		return nil, nil, err
 	}
 	return store, service, nil
+}
+
+// sessionAffinityStoreOrMemory falls back to a per-instance in-memory session
+// affinity store when no shared (Redis) store was injected, so stickiness always
+// works (best-effort) even without Redis configured.
+func sessionAffinityStoreOrMemory(store sessionaffinitycontract.Store) sessionaffinitycontract.Store {
+	if store != nil {
+		return store
+	}
+	return sessionaffinitymemory.New()
 }
 
 func missingRuntimeStoreError(name string) error {
