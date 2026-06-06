@@ -464,7 +464,10 @@ func (s *Service) CancelOrder(ctx context.Context, userID int, orderID int) (con
 		return contract.PaymentOrder{}, err
 	}
 	if order.UserID != userID {
-		return contract.PaymentOrder{}, ErrInvalidInput
+		// Report a foreign order as not-found (404), mirroring handleGetPaymentOrder,
+		// so a caller can't distinguish "exists but not yours" (was 400) from
+		// "doesn't exist" (404) and enumerate other users' order IDs.
+		return contract.PaymentOrder{}, contract.ErrNotFound
 	}
 	if err := validateTransition(order.Status, contract.OrderStatusCanceled); err != nil {
 		return contract.PaymentOrder{}, err
@@ -488,12 +491,14 @@ func (s *Service) ExpirePendingOrders(ctx context.Context, now time.Time) (contr
 	result := contract.ExpireOrdersResult{Selected: len(orders)}
 	for _, order := range orders {
 		before := order
+		// Skip an order that can't be expired rather than aborting the whole pass —
+		// one bad order must not block every other expired order in the batch.
 		if err := validateTransition(order.Status, contract.OrderStatusExpired); err != nil {
-			return result, err
+			continue
 		}
 		updated, expired, err := s.store.ExpireOrder(ctx, order.ID, now)
 		if err != nil {
-			return result, err
+			continue
 		}
 		if !expired {
 			continue
@@ -724,6 +729,12 @@ func (s *Service) RequestRefund(ctx context.Context, req contract.RefundRequest)
 	if err != nil {
 		return contract.PaymentOrder{}, err
 	}
+	// One-shot refund: the order carries no cumulative-refunded accounting, so a
+	// second refund (PartiallyRefunded -> Refunded, or another partial) would claw
+	// back more balance than was ever paid. Reject once any refund has happened.
+	if order.Status == contract.OrderStatusRefunded || order.Status == contract.OrderStatusPartiallyRefunded {
+		return contract.PaymentOrder{}, ErrInvalidTransition
+	}
 	refundAmount, ok := normalizeMoney(req.Amount)
 	if strings.TrimSpace(req.Amount) == "" {
 		refundAmount = order.Amount
@@ -740,20 +751,21 @@ func (s *Service) RequestRefund(ctx context.Context, req contract.RefundRequest)
 		return contract.PaymentOrder{}, err
 	}
 	now := s.clock.Now()
+	// Claw back the spendable balance BEFORE persisting the refunded status. Only
+	// balance_credit orders ever credited balance, so only those are debited. If
+	// the debit fails (e.g. the user already spent the funds), the order is left
+	// untouched instead of marked Refunded with the money never recovered.
+	if order.ProductType == contract.ProductTypeBalanceCredit && s.deps.Balance != nil {
+		if err := s.deps.Balance.DebitBalance(ctx, order.UserID, refundAmount, order.Currency); err != nil {
+			return contract.PaymentOrder{}, err
+		}
+	}
 	order.Status = nextStatus
 	order.ClosedAt = &now
 	order.UpdatedAt = now
 	updated, err := s.store.UpdateOrder(ctx, order)
 	if err != nil {
 		return contract.PaymentOrder{}, err
-	}
-	// Claw back the spendable balance that the matching top-up credited. Only
-	// balance_credit orders ever credited balance, so only those are debited.
-	// The status transition above (Paid/Fulfilled -> Refunded) gates re-runs.
-	if order.ProductType == contract.ProductTypeBalanceCredit && s.deps.Balance != nil {
-		if err := s.deps.Balance.DebitBalance(ctx, order.UserID, refundAmount, order.Currency); err != nil {
-			return contract.PaymentOrder{}, err
-		}
 	}
 	negativeAmount := "-" + refundAmount
 	_, _ = s.recordBilling(ctx, billingcontract.RecordRequest{

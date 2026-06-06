@@ -30,6 +30,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import type { UsageLogSummary } from "@/lib/srapi-types";
+import { formatMoney } from "@/lib/admin-format";
 
 export default function UsagePage() {
   return (
@@ -97,6 +98,8 @@ function UsageBody({
       successRate: requests === 0 ? 0 : (success / requests) * 100,
       tokens,
       cost,
+      // Costs share a currency per deployment; use the first row as the label.
+      currency: logs[0]?.currency ?? "USD",
     };
   }, [logs]);
 
@@ -106,7 +109,7 @@ function UsageBody({
         <StatCard label={t("usage.requests")} value={totals.requests.toLocaleString()} />
         <StatCard label={t("usage.successRate")} value={`${totals.successRate.toFixed(1)}%`} />
         <StatCard label={t("usage.totalTokens")} value={totals.tokens.toLocaleString()} />
-        <StatCard label={t("usage.cost")} value={`$${totals.cost.toFixed(2)}`} />
+        <StatCard label={t("usage.cost")} value={formatMoney(totals.cost, totals.currency)} />
       </div>
 
       <Card>
@@ -194,7 +197,7 @@ function UsageBody({
                       {log.total_tokens.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right font-mono text-srapi-text-secondary tabular">
-                      ${log.cost.toFixed(4)}
+                      {formatMoney(log.cost, log.currency)}
                     </TableCell>
                   </TableRow>
                 ))}

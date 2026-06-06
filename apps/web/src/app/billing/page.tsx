@@ -81,7 +81,10 @@ function BalanceTab() {
   const methods = usePaymentMethods();
   const createMut = useCreateOrder();
   const [amount, setAmount] = useState("10");
-  const [method, setMethod] = useState("");
+  // Holds the chosen provider_instance_id (unique), not the method type — two
+  // instances can share a method type, which would give Radix Select duplicate
+  // values and break selection.
+  const [instanceId, setInstanceId] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const methodList = methods.data?.data ?? [];
@@ -89,14 +92,15 @@ function BalanceTab() {
   async function topUp(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
-    const selected = method || methodList[0]?.method;
+    const selected =
+      methodList.find((m) => m.provider_instance_id === instanceId) ?? methodList[0];
     if (!selected) {
       setError(t("billing.noMethods"));
       return;
     }
     try {
       await createMut.mutateAsync({
-        method: selected,
+        method: selected.method,
         amount: amount.trim(),
         product_type: "balance_credit",
       });
@@ -142,13 +146,16 @@ function BalanceTab() {
               {methodList.length === 0 ? (
                 <p className="text-2xs text-srapi-text-tertiary">{t("billing.noMethods")}</p>
               ) : (
-                <Select value={method || methodList[0]?.method} onValueChange={setMethod}>
+                <Select
+                  value={instanceId || methodList[0]?.provider_instance_id}
+                  onValueChange={setInstanceId}
+                >
                   <SelectTrigger id="method">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {methodList.map((m) => (
-                      <SelectItem key={m.provider_instance_id} value={m.method}>
+                      <SelectItem key={m.provider_instance_id} value={m.provider_instance_id}>
                         {m.name}
                       </SelectItem>
                     ))}

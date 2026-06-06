@@ -71,7 +71,9 @@ export function Composer({
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            onSend();
+            // Match the send button's disabled state: never send empty input or
+            // while a stream is already in flight.
+            if (canSend) onSend();
           }
         }}
         placeholder={placeholder}

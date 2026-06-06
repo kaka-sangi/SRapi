@@ -202,6 +202,63 @@ func TestPaidBalanceCreditCreditsThenRefundDebits(t *testing.T) {
 	}
 }
 
+// A refund is one-shot: because the order carries no cumulative-refunded total,
+// a second refund would claw back more balance than was ever paid. Verify the
+// second attempt is rejected and the balance is not debited again.
+func TestRefundIsOneShotPreventsDoubleDebit(t *testing.T) {
+	h := newHarness(t)
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "primary",
+		Config:           easypayTestConfig("provider-signing-secret"),
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "USD"},
+	}); err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      7,
+		Method:      "alipay",
+		Amount:      "25.00",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	payload := map[string]any{
+		"order_no":        order.OrderNo,
+		"amount":          "25.00000000",
+		"currency":        "USD",
+		"status":          "paid",
+		"transaction_id":  "txn_balance",
+		"idempotency_key": "evt_balance_paid",
+	}
+	if _, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{
+		Provider: "easypay",
+		Headers:  map[string]string{"X-SRapi-Payment-Signature": signWebhookPayload("provider-signing-secret", payload)},
+		Payload:  payload,
+	}); err != nil {
+		t.Fatalf("handle webhook: %v", err)
+	}
+
+	// First refund: a partial 10.00 of the 25.00 order.
+	if _, err := h.payments.RequestRefund(t.Context(), contract.RefundRequest{OrderID: order.ID, ActorUserID: 1, Amount: "10.00", Reason: "partial"}); err != nil {
+		t.Fatalf("first (partial) refund: %v", err)
+	}
+	if got := h.balance.net(7); got != "15.00000000" {
+		t.Fatalf("balance after partial refund = %s, want 15.00000000", got)
+	}
+
+	// Second refund must be rejected, leaving the balance untouched.
+	if _, err := h.payments.RequestRefund(t.Context(), contract.RefundRequest{OrderID: order.ID, ActorUserID: 1, Reason: "double"}); err == nil {
+		t.Fatal("expected the second refund to be rejected, got nil error")
+	}
+	if got := h.balance.net(7); got != "15.00000000" {
+		t.Fatalf("balance after rejected second refund = %s, want 15.00000000 (no double debit)", got)
+	}
+}
+
 func TestPaymentWebhookRejectsInvalidSignatureFailClosed(t *testing.T) {
 	exporter := oteltest.NewExporter(t)
 	h := newHarness(t)

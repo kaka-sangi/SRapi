@@ -52,6 +52,9 @@ func (s *Server) handleListAdminApiKeys(w http.ResponseWriter, r *http.Request) 
 			pageSize = n
 		}
 	}
+	if pageSize > 1000 {
+		pageSize = 1000
+	}
 	paged, total, hasNext := paginateApiKeys(keys, page, pageSize)
 
 	data := make([]apiopenapi.ApiKey, 0, len(paged))
