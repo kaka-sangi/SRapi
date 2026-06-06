@@ -11034,6 +11034,45 @@ export type CreateAdminPricingRuleResponses = {
 
 export type CreateAdminPricingRuleResponse = CreateAdminPricingRuleResponses[keyof CreateAdminPricingRuleResponses];
 
+export type DeleteAdminPricingRuleData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/pricing-rules/{id}';
+};
+
+export type DeleteAdminPricingRuleErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminPricingRuleError = DeleteAdminPricingRuleErrors[keyof DeleteAdminPricingRuleErrors];
+
+export type DeleteAdminPricingRuleResponses = {
+    /**
+     * Pricing rule deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminPricingRuleResponse = DeleteAdminPricingRuleResponses[keyof DeleteAdminPricingRuleResponses];
+
 export type BulkImportAdminPricingRulesData = {
     body: BulkPricingRuleImportRequest | Array<CreatePricingRuleRequest>;
     path?: never;

@@ -247,4 +247,5 @@ type Store interface {
 	ExpireUserSubscription(ctx context.Context, id int, now time.Time) (UserSubscription, bool, error)
 	CreatePricingRule(ctx context.Context, input PricingRule) (PricingRule, error)
 	ListPricingRules(ctx context.Context) ([]PricingRule, error)
+	DeletePricingRule(ctx context.Context, id int) error
 }

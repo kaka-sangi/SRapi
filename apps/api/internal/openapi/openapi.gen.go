@@ -16505,6 +16505,9 @@ type ServerInterface interface {
 	// Create a decimal-safe pricing rule.
 	// (POST /api/v1/admin/pricing-rules)
 	CreateAdminPricingRule(w http.ResponseWriter, r *http.Request)
+	// Delete a pricing rule.
+	// (DELETE /api/v1/admin/pricing-rules/{id})
+	DeleteAdminPricingRule(w http.ResponseWriter, r *http.Request, id Id)
 	// Bulk import decimal-safe pricing rules.
 	// (POST /api/v1/admin/pricing-rules:bulk)
 	BulkImportAdminPricingRules(w http.ResponseWriter, r *http.Request, params BulkImportAdminPricingRulesParams)
@@ -22248,6 +22251,40 @@ func (siw *ServerInterfaceWrapper) CreateAdminPricingRule(w http.ResponseWriter,
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAdminPricingRule(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminPricingRule operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminPricingRule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminPricingRule(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -28425,6 +28462,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/providers/{id}/test", wrapper.TestAdminPaymentProvider)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.ListAdminPricingRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.CreateAdminPricingRule)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/pricing-rules/{id}", wrapper.DeleteAdminPricingRule)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules:bulk", wrapper.BulkImportAdminPricingRules)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/promo-codes", wrapper.ListAdminPromoCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/promo-codes", wrapper.CreateAdminPromoCode)

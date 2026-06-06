@@ -83,6 +83,7 @@ import {
   deleteAdminOpsAlertSilence,
   createAdminPaymentProvider,
   createAdminPricingRule,
+  deleteAdminPricingRule,
   createAdminPromoCode,
   createAdminProvider,
   createAdminProxy,
@@ -918,6 +919,10 @@ export const adminApi = {
 
   createPricingRule(body: CreateAdminPricingRuleData["body"]): Promise<PricingRule> {
     return unwrapData(() => createAdminPricingRule({ body, throwOnError: true }));
+  },
+
+  deletePricingRule(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminPricingRule({ path: { id }, throwOnError: true }));
   },
 
   bulkImportPricingRules(

@@ -1638,6 +1638,8 @@ export const en = {
     bulkImport: "Bulk import",
     bulkImportHint: "Paste a JSON array of pricing rules to upsert in one batch.",
     importResult: "Imported {count} rules",
+    deleteTitle: "Delete this pricing rule?",
+    deleteBody: "Usage for this model/provider will fall back to the next matching rule (or be uncharged if none). This cannot be undone.",
   },
   account: {
     title: "Account",

@@ -1643,6 +1643,8 @@ export const zh: Messages = {
     bulkImport: "批量导入",
     bulkImportHint: "粘贴定价规则的 JSON 数组，一次性 upsert。",
     importResult: "已导入 {count} 条规则",
+    deleteTitle: "删除此定价规则？",
+    deleteBody: "该模型/服务商的用量将回退到下一条匹配规则（若无则不计费）。此操作不可撤销。",
   },
   account: {
     title: "账户",

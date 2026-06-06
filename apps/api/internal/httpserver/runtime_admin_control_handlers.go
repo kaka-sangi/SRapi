@@ -584,6 +584,37 @@ func (s *Server) handleCreateAdminPricingRule(w http.ResponseWriter, r *http.Req
 	})
 }
 
+func (s *Server) handleDeleteAdminPricingRule(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	ruleID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || ruleID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid pricing rule id", requestID)
+		return
+	}
+	if err := s.runtime.subscriptions.DeletePricingRule(r.Context(), ruleID); err != nil {
+		if errors.Is(err, subscriptioncontract.ErrNotFound) {
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "pricing rule not found", requestID)
+			return
+		}
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete pricing rule", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "pricing_rule.delete", "pricing_rule", strconv.Itoa(ruleID), nil, nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       map[string]any{"id": ruleID, "deleted": true},
+		"request_id": requestID,
+	})
+}
+
 func (s *Server) handleBulkImportAdminPricingRules(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)

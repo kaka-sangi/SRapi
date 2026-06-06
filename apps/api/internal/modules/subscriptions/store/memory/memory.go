@@ -306,6 +306,16 @@ func (s *Store) CreatePricingRule(_ context.Context, input contract.PricingRule)
 	return clonePricingRule(rule), nil
 }
 
+func (s *Store) DeletePricingRule(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.pricingRules[id]; !ok {
+		return contract.ErrNotFound
+	}
+	delete(s.pricingRules, id)
+	return nil
+}
+
 func (s *Store) ListPricingRules(_ context.Context) ([]contract.PricingRule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

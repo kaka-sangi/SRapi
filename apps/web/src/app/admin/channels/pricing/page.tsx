@@ -6,6 +6,8 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
+import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useAdminList } from "@/hooks/use-admin-list";
 import {
   useAdminPricingRules,
@@ -13,6 +15,7 @@ import {
   useAdminProviders,
   useCreatePricingRule,
   useBulkImportPricingRules,
+  useDeletePricingRule,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -52,7 +55,9 @@ function PricingContent() {
   const providers = useAdminProviders();
   const createMut = useCreatePricingRule();
   const bulkImportMut = useBulkImportPricingRules();
+  const deleteMut = useDeletePricingRule();
   const [creating, setCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<PricingRule | null>(null);
   const [importing, setImporting] = useState(false);
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
@@ -180,6 +185,12 @@ function PricingContent() {
         emptyTitle={t("adminPricing.emptyTitle")}
         emptyBody={t("adminPricing.emptyBody")}
         minWidth={520}
+        rowActions={(r) => {
+          const actions: RowAction[] = [
+            { label: t("common.delete"), destructive: true, onSelect: () => setDeleteTarget(r) },
+          ];
+          return <RowActionsMenu actions={actions} />;
+        }}
         sort={list.sort}
         onSort={list.toggleSort}
         pagination={{
@@ -203,6 +214,21 @@ function PricingContent() {
           isPending={createMut.isPending}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title={t("adminPricing.deleteTitle")}
+        body={t("adminPricing.deleteBody")}
+        confirmLabel={t("common.delete")}
+        successMessage={t("feedback.deleted")}
+        isPending={deleteMut.isPending}
+        onConfirm={async () => {
+          if (deleteTarget) await deleteMut.mutateAsync(deleteTarget.id);
+        }}
+      />
 
       <Dialog open={importing} onOpenChange={openImport}>
         <DialogContent>

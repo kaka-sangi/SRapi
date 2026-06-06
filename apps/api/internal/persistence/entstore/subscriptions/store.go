@@ -363,6 +363,16 @@ func (s *Store) ListPricingRules(ctx context.Context) ([]contract.PricingRule, e
 	return out, nil
 }
 
+func (s *Store) DeletePricingRule(ctx context.Context, id int) error {
+	if err := s.client.PricingRule.DeleteOneID(id).Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return contract.ErrNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 func toPlan(row *ent.SubscriptionPlan) contract.SubscriptionPlan {
 	return contract.SubscriptionPlan{
 		ID:           row.ID,

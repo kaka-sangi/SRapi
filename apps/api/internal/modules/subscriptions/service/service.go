@@ -289,6 +289,13 @@ func (s *Service) ValidatePricingRule(req contract.CreatePricingRuleRequest) err
 	return err
 }
 
+func (s *Service) DeletePricingRule(ctx context.Context, id int) error {
+	if id <= 0 {
+		return ErrInvalidInput
+	}
+	return s.store.DeletePricingRule(ctx, id)
+}
+
 func pricingRuleFromRequest(req contract.CreatePricingRuleRequest) (contract.PricingRule, error) {
 	if req.ModelID <= 0 || req.ProviderID < 0 {
 		return contract.PricingRule{}, ErrInvalidInput

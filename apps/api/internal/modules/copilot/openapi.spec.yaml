@@ -5573,6 +5573,43 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/pricing-rules/{id}:
+    delete:
+      tags:
+        - AdminSubscriptions
+      operationId: deleteAdminPricingRule
+      summary: Delete a pricing rule.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Pricing rule deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/pricing-rules:bulk:
     post:
       tags:

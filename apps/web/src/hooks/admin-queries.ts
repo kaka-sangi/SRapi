@@ -1133,6 +1133,12 @@ export function useBulkImportPricingRules() {
     ["admin", "pricing-rules"],
   );
 }
+export function useDeletePricingRule() {
+  return useAdminMutation(
+    (id: string) => adminApi.deletePricingRule(id),
+    ["admin", "pricing-rules"],
+  );
+}
 
 // Payment orders & providers
 export function useRefundPaymentOrder() {
