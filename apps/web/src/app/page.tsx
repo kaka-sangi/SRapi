@@ -1,6 +1,5 @@
 "use client";
 
-import { Suspense } from "react";
 import type { CSSProperties } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { AmbientCanvas } from "@/components/visual/ambient-canvas";
@@ -71,9 +70,7 @@ export default function LandingPage() {
           {/* right — the one job of this page */}
           <div className="anim-rise w-full lg:justify-self-end" style={rise(2)}>
             <div className="mx-auto w-full max-w-sm">
-              <Suspense>
-                <LoginForm />
-              </Suspense>
+              <LoginForm />
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { apiService } from "@/lib/api";
 import type { EnabledOAuthProvider } from "@/lib/sdk-types";
@@ -26,7 +26,6 @@ function startOAuthHref(provider: string, providerKey: string): string {
 
 export function LoginForm() {
   const router = useRouter();
-  const params = useSearchParams();
   const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,7 +49,12 @@ export function LoginForm() {
   }, []);
 
   function goHome(role: string) {
-    const from = params.get("from");
+    // Read ?from directly off the URL instead of next/navigation's
+    // useSearchParams(): that hook marks the component as dynamic and bails the
+    // server render out to client-side rendering, which Next 16 + Turbopack
+    // fails to recover — leaving the sign-in page blank. goHome only runs after
+    // a submit handler (browser-only), so window is always defined here.
+    const from = new URLSearchParams(window.location.search).get("from");
     const home = role === "admin" ? ADMIN_HOME_ROUTE : USER_HOME_ROUTE;
     router.replace(from && from.startsWith("/") ? from : home);
   }

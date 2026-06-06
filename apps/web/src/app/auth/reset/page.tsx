@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { apiService } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
@@ -34,9 +34,7 @@ export default function ResetPasswordPage() {
       </header>
       <main className="mx-auto flex w-full max-w-6xl flex-1 items-center justify-center px-6 py-10">
         <div className="animate-bloom w-full max-w-sm">
-          <Suspense fallback={null}>
-            <ResetForm />
-          </Suspense>
+          <ResetForm />
           <p className="mt-4 text-center font-mono text-2xs text-srapi-text-tertiary">
             {t("authReset.eyebrow")}
           </p>
@@ -49,8 +47,17 @@ export default function ResetPasswordPage() {
 function ResetForm() {
   const { t } = useLanguage();
   const router = useRouter();
-  const params = useSearchParams();
-  const token = params.get("token") ?? "";
+  // Read ?token off the URL rather than via useSearchParams(): that hook bails
+  // the server render out to client-side rendering, which Next 16 + Turbopack
+  // fails to recover, leaving the page blank. useSyncExternalStore yields "" for
+  // the server + first client render (request mode, so hydration matches), then
+  // re-renders with the real query string, flipping to confirm mode.
+  const search = useSyncExternalStore(
+    () => () => {},
+    () => window.location.search,
+    () => "",
+  );
+  const token = new URLSearchParams(search).get("token") ?? "";
   const isConfirm = token.length > 0;
 
   const [email, setEmail] = useState("");

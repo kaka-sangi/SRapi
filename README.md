@@ -191,6 +191,12 @@ docker compose -f deploy/docker-compose.yml up --build
 - Health: `GET /livez`, `GET /readyz`, `GET /api/v1/health`; metrics: `GET /metrics`
 - Optional monitoring stack: append `--profile observability` (Prometheus :9090, Alertmanager :9093)
 
+> **Behind a reverse proxy:** point the public front door at the **console on :3000**
+> (which forwards `/api` and `/v1` to the API), not at the API on :8080 — otherwise no
+> UI is served. See [`deploy/nginx.example.conf`](deploy/nginx.example.conf). To publish on a
+> custom origin, set `SRAPI_API_PROXY_TARGET` (it is baked into the web image at build time,
+> so rebuild the `web` image after changing it).
+
 ### Option B — Local development
 
 ```bash
@@ -203,6 +209,18 @@ make web-dev             # start the console (Next.js dev server)
 Sign in to the console with `BOOTSTRAP_ADMIN_EMAIL` from your `.env`. `make bootstrap-env` generates
 a strong admin password and does not print it; if you instead use the raw `.env.example` placeholder,
 the credentials are the documented local defaults. Change them before exposing the service.
+
+> The bootstrap admin is seeded **only on first start** (when that email does not yet exist).
+> Changing `BOOTSTRAP_ADMIN_PASSWORD` in `.env` and restarting does **not** re-hash an existing
+> admin — login will keep failing with the old password. To reset, either change
+> `BOOTSTRAP_ADMIN_EMAIL` to a fresh address (a new admin is seeded with the current password),
+> or delete the row and let bootstrap recreate it on the next restart:
+>
+> ```bash
+> docker compose -f deploy/docker-compose.yml exec postgres \
+>   psql -U srapi -d srapi -c "DELETE FROM users WHERE email='admin@srapi.local';"
+> docker compose -f deploy/docker-compose.yml restart api
+> ```
 
 ### First request
 

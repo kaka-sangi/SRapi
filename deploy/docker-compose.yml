@@ -87,11 +87,15 @@ services:
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
+      args:
+        # Baked into Next's route manifest at build time — must match the runtime
+        # value below, otherwise the /api and /v1 proxy falls back to 127.0.0.1.
+        SRAPI_API_PROXY_TARGET: ${SRAPI_API_PROXY_TARGET:-http://api:8080}
     environment:
       NODE_ENV: production
       PORT: 3000
       # Same-origin proxy: the console forwards /api and /v1 to the API service.
-      SRAPI_API_PROXY_TARGET: http://api:8080
+      SRAPI_API_PROXY_TARGET: ${SRAPI_API_PROXY_TARGET:-http://api:8080}
     ports:
       - "${WEB_PORT:-3000}:3000"
     depends_on:
