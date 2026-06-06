@@ -43,6 +43,7 @@ import (
 	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	scheduledtestscontract "github.com/srapi/srapi/apps/api/internal/modules/scheduled_tests/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
+	sessionaffinitycontract "github.com/srapi/srapi/apps/api/internal/modules/sessionaffinity/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	tlsprofilescontract "github.com/srapi/srapi/apps/api/internal/modules/tls_profiles/contract"
 	totpcontract "github.com/srapi/srapi/apps/api/internal/modules/totp/contract"
@@ -94,6 +95,7 @@ type runtimeOptions struct {
 	realtime           realtimecontract.Store
 	rateLimiter        *ratelimit.Limiter
 	scheduler          schedulercontract.Store
+	sessionAffinity    sessionaffinitycontract.Store
 	subscriptions      subscriptioncontract.Store
 	totp               totpcontract.Store
 	usage              usagecontract.Store
@@ -294,6 +296,12 @@ func WithRateLimitRedis(client *redis.Client) Option {
 func WithSchedulerStore(store schedulercontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.scheduler = store
+	}
+}
+
+func WithSessionAffinityStore(store sessionaffinitycontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.sessionAffinity = store
 	}
 }
 

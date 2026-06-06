@@ -23,6 +23,7 @@ import (
 const (
 	adminAccountTestModeDefault          = "default"
 	adminAccountTestModeResponsesCompact = "responses_compact"
+	adminAccountTestModeLive             = "live"
 	upstreamCapabilityUnsupportedStatus  = 501
 )
 
@@ -96,7 +97,87 @@ func (rt *runtimeState) testAccount(ctx context.Context, provider providercontra
 	if opts.Mode == adminAccountTestModeResponsesCompact {
 		return rt.testAccountResponsesCompact(ctx, provider, account, credential, startedAt, opts, checks)
 	}
-	return adminTestResult(true, "provider account is testable", startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
+	if opts.Mode == adminAccountTestModeLive {
+		return rt.testAccountLiveProbe(ctx, provider, account, credential, startedAt, opts, checks)
+	}
+	// Default mode is a cheap structural check only. For OAuth/reverse-proxy
+	// runtimes it cannot verify the credential actually works upstream, so say
+	// so plainly rather than implying a verified connection (run mode "live" for
+	// a real upstream round-trip).
+	checks["live_probe"] = "not_run"
+	message := "provider account passed structural checks"
+	if account.RuntimeClass != accountcontract.RuntimeClassAPIKey {
+		message = "provider account passed structural checks (credential not verified upstream; run a live test)"
+	}
+	return adminTestResult(true, message, startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
+}
+
+// testAccountLiveProbe issues a real minimal chat-completions round-trip through
+// the same adapter the gateway uses, so OAuth/reverse-proxy/api_key accounts are
+// verified against the real upstream (closing the "fake green light" gap where
+// the default test only inspected fields). The model comes from opts.Model or an
+// account/provider probe-model hint; without one the probe is skipped.
+func (rt *runtimeState) testAccountLiveProbe(ctx context.Context, provider providercontract.Provider, account accountcontract.ProviderAccount, credential map[string]any, startedAt time.Time, opts adminAccountTestOptions, checks map[string]any) apiopenapi.AdminTestResult {
+	checks["mode"] = adminAccountTestModeLive
+	model := responsesCompactProbeModel(opts.Model, account, provider)
+	if model == "" {
+		checks["live_probe"] = "skipped_no_model"
+		checks["missing_requirements"] = []string{"model"}
+		return adminTestResult(false, "live account test requires a model (pass \"model\" or set account metadata test_model)", startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
+	}
+	checks["probe_model"] = model
+
+	raw, err := json.Marshal(map[string]any{
+		"model":    model,
+		"messages": []map[string]any{{"role": "user", "content": "Reply with OK."}},
+	})
+	if err != nil {
+		checks["error"] = "live_probe_payload_failed"
+		return adminTestResult(false, "live account test failed", startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
+	}
+	resp, err := rt.adapters.InvokeConversation(ctx, provideradaptercontract.ConversationRequest{
+		RequestID:      fmt.Sprintf("admin_account_%d_live_test", account.ID),
+		SourceProtocol: string(gatewaycontract.ProtocolOpenAICompatible),
+		SourceEndpoint: string(gatewaycontract.EndpointChatCompletions),
+		TargetProtocol: provider.Protocol,
+		Model:          model,
+		InputParts:     []provideradaptercontract.ContentPart{{Kind: provideradaptercontract.ContentPartText, Text: "Reply with OK."}},
+		RawBody:        raw,
+		Provider:       provider,
+		Account:        account,
+		Mapping:        responsesCompactProbeMapping(model),
+		Credential:     credential,
+	})
+	if err == nil {
+		statusCode := resp.StatusCode
+		if statusCode <= 0 {
+			statusCode = http.StatusOK
+		}
+		checks["live_probe"] = "ok"
+		checks["upstream_reachable"] = true
+		checks["upstream_status"] = statusCode
+		return adminTestResult(true, "provider account verified against upstream", startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
+	}
+
+	var providerErr provideradaptercontract.ProviderError
+	statusCode := http.StatusBadGateway
+	errorClass := "provider_probe_failed"
+	errorMessage := err.Error()
+	if errors.As(err, &providerErr) {
+		if providerErr.StatusCode > 0 {
+			statusCode = providerErr.StatusCode
+		}
+		if strings.TrimSpace(providerErr.Class) != "" {
+			errorClass = strings.TrimSpace(providerErr.Class)
+		}
+		errorMessage = providerErr.Error()
+	}
+	checks["live_probe"] = "failed"
+	checks["upstream_reachable"] = false
+	checks["upstream_status"] = statusCode
+	checks["error_class"] = errorClass
+	checks["error_message"] = truncateAdminTestMessage(errorMessage, 512)
+	return adminTestResult(false, "live account test failed: "+errorClass, startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
 }
 
 func (rt *runtimeState) testAccountResponsesCompact(ctx context.Context, provider providercontract.Provider, account accountcontract.ProviderAccount, credential map[string]any, startedAt time.Time, opts adminAccountTestOptions, checks map[string]any) apiopenapi.AdminTestResult {

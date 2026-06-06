@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"math"
 	"sort"
 	"strconv"
@@ -379,12 +380,20 @@ func (s *Service) evaluateSchedule(req contract.ScheduleRequest, strategy contra
 
 	scores := make([]candidateScore, 0, len(req.Candidates))
 	rejectReasons := map[string]any{}
+	eligible := make([]contract.Candidate, 0, len(req.Candidates))
 	for _, candidate := range req.Candidates {
 		reason := rejectReason(candidate, req)
 		if reason != "" {
 			rejectReasons[accountKey(candidate.Account.ID)] = reason
 			continue
 		}
+		eligible = append(eligible, candidate)
+	}
+	selectedTier, deferredTier := filterByPriorityTier(eligible, req.StickyAccountID)
+	for _, candidate := range deferredTier {
+		rejectReasons[accountKey(candidate.Account.ID)] = "lower_priority_tier"
+	}
+	for _, candidate := range selectedTier {
 		scores = append(scores, candidateScore{
 			Candidate: candidate,
 			Score:     scoreCandidate(candidate, req, strategy),
@@ -404,14 +413,18 @@ func (s *Service) evaluateSchedule(req contract.ScheduleRequest, strategy contra
 		scorePayload[accountKey(score.Candidate.Account.ID)] = score.Score
 	}
 	frontier := paretoFrontier(scores)
-	sortCandidateScores(frontier)
-	sortCandidateScores(scores)
+	sortCandidateScores(frontier, req.RequestID)
+	sortCandidateScores(scores, req.RequestID)
 	scorePayload["pareto"] = map[string]any{
 		"objective":            "cost_latency_quality",
 		"frontier_account_ids": paretoFrontierAccountIDs(frontier),
 	}
 	selected := frontier[0].Candidate
-	candidatesByRank := rankedCandidates(frontier, scores)
+	// Rank the selected priority tier, then append the deferred lower tiers so the
+	// candidate list still reflects every eligible account. The winner stays in
+	// the top tier, but the gateway failover loop can see (and, after excluding a
+	// failed top-tier account, re-schedule onto) the lower tiers.
+	candidatesByRank := append(rankedCandidates(frontier, scores), deferredTier...)
 	return scheduleEvaluation{
 		decision:         s.buildDecision(req, strategy, &selected, len(req.Candidates), len(rejectReasons), scorePayload, rejectReasons),
 		selected:         selected,
@@ -526,6 +539,44 @@ func (s *Service) ListStrategies(ctx context.Context) ([]contract.StrategyDescri
 
 func (s *Service) ListLeases(ctx context.Context) ([]contract.Lease, error) {
 	return s.store.ListLeases(ctx)
+}
+
+// AccountConcurrency returns the live number of in-flight scheduler leases for
+// an account, or 0 when the backing store cannot report it (e.g. the in-memory
+// store or an unavailable cache). The gateway uses it to populate
+// Candidate.RuntimeState.CurrentConcurrency so load-aware scoring reflects real
+// traffic. Best-effort: errors degrade to 0 rather than failing scheduling.
+func (s *Service) AccountConcurrency(ctx context.Context, accountID int) int {
+	if s == nil || accountID <= 0 {
+		return 0
+	}
+	counter, ok := s.store.(contract.AccountConcurrencyCounter)
+	if !ok {
+		return 0
+	}
+	count, err := counter.CountAccountConcurrency(ctx, accountID)
+	if err != nil || count < 0 {
+		return 0
+	}
+	return count
+}
+
+// AccountLastUsed returns when an account was last selected (epoch ms), or 0
+// when the backing store cannot report it. Used as a least-recently-used
+// scheduling tie-breaker so equally-scored accounts share load.
+func (s *Service) AccountLastUsed(ctx context.Context, accountID int) int64 {
+	if s == nil || accountID <= 0 {
+		return 0
+	}
+	reporter, ok := s.store.(contract.AccountLastUsedReporter)
+	if !ok {
+		return 0
+	}
+	last, err := reporter.AccountLastUsed(ctx, accountID)
+	if err != nil || last < 0 {
+		return 0
+	}
+	return last
 }
 
 func (s *Service) acquireLease(ctx context.Context, req contract.ScheduleRequest, attemptNo int, selected contract.Candidate) (contract.Lease, error) {
@@ -935,13 +986,37 @@ type candidateScore struct {
 	Score     scoreBreakdown
 }
 
-func sortCandidateScores(scores []candidateScore) {
+func sortCandidateScores(scores []candidateScore, requestID string) {
 	sort.SliceStable(scores, func(i, j int) bool {
-		if scores[i].Score.Final == scores[j].Score.Final {
-			return scores[i].Candidate.Account.ID < scores[j].Candidate.Account.ID
+		a, b := scores[i], scores[j]
+		if a.Score.Final != b.Score.Final {
+			return a.Score.Final > b.Score.Final
 		}
-		return scores[i].Score.Final > scores[j].Score.Final
+		// Equal score: rotate load instead of always picking the same account.
+		// 1) least-recently-used first (0 = never used within the window = oldest).
+		la, lb := a.Candidate.RuntimeState.LastUsedUnixMs, b.Candidate.RuntimeState.LastUsedUnixMs
+		if la != lb {
+			return la < lb
+		}
+		// 2) request-seeded hash so a cold pool (all last-used 0) still spreads
+		//    uniformly across requests while staying deterministic per request
+		//    (replay-safe: requestID is part of the persisted snapshot).
+		ha, hb := tieBreakHash(requestID, a.Candidate.Account.ID), tieBreakHash(requestID, b.Candidate.Account.ID)
+		if ha != hb {
+			return ha < hb
+		}
+		return a.Candidate.Account.ID < b.Candidate.Account.ID
 	})
+}
+
+// tieBreakHash deterministically maps (requestID, accountID) to a value used to
+// rotate selection among otherwise-tied candidates.
+func tieBreakHash(requestID string, accountID int) uint64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(requestID))
+	_, _ = h.Write([]byte{':'})
+	_, _ = h.Write([]byte(strconv.Itoa(accountID)))
+	return h.Sum64()
 }
 
 func rankedCandidates(frontier []candidateScore, scores []candidateScore) []contract.Candidate {
@@ -1011,6 +1086,36 @@ func scoreCandidate(candidate contract.Candidate, req contract.ScheduleRequest, 
 		RiskPenalty:        riskPenalty,
 		SaturationPenalty:  saturationPenalty,
 	}
+}
+
+// filterByPriorityTier keeps only the highest-priority (lowest Priority number)
+// tier of eligible accounts so a primary pool is used exclusively until it is
+// exhausted/unhealthy before any backup tier receives traffic. This makes
+// Account.Priority a hard scheduling tier (sub2api filterByMinPriority parity)
+// rather than a soft scoring nudge, which is what operators expect when they set
+// a primary account to priority 0 and a backup to priority 100.
+//
+// A sticky/affinity account is always retained even when it sits in a lower
+// tier, so an established session is not torn off its account just because a
+// higher-priority account also exists; the soft sticky score still lets it win.
+func filterByPriorityTier(candidates []contract.Candidate, stickyAccountID *int) (selected []contract.Candidate, deferred []contract.Candidate) {
+	if len(candidates) <= 1 {
+		return candidates, nil
+	}
+	minPriority := candidates[0].Account.Priority
+	for _, candidate := range candidates[1:] {
+		if candidate.Account.Priority < minPriority {
+			minPriority = candidate.Account.Priority
+		}
+	}
+	for _, candidate := range candidates {
+		if candidate.Account.Priority == minPriority || (stickyAccountID != nil && candidate.Account.ID == *stickyAccountID) {
+			selected = append(selected, candidate)
+			continue
+		}
+		deferred = append(deferred, candidate)
+	}
+	return selected, deferred
 }
 
 func rejectReason(candidate contract.Candidate, req contract.ScheduleRequest) string {

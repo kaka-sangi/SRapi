@@ -126,6 +126,11 @@ type RuntimeState struct {
 	CurrentConcurrency  int
 	RPMUsed             int
 	TPMUsed             int
+	// LastUsedUnixMs is when this account was last selected (epoch ms; 0 = never
+	// within the tracking window). It is a least-recently-used tie-breaker so
+	// equally-scored accounts share load instead of always picking the same one.
+	// It is snapshotted per candidate, so scheduler replay stays deterministic.
+	LastUsedUnixMs int64
 }
 
 type RuntimeLimits struct {
@@ -373,6 +378,24 @@ type RecordFeedbackRequest struct {
 	CachedTokens int
 	ActualCost   string
 	Currency     string
+}
+
+// AccountLastUsedReporter is an optional capability of a Store (and the lease
+// store it wraps) that reports when an account was last selected (epoch ms),
+// used as a least-recently-used scheduling tie-breaker. Stores that cannot
+// report it (e.g. the in-memory store) simply do not implement it.
+type AccountLastUsedReporter interface {
+	AccountLastUsed(ctx context.Context, accountID int) (int64, error)
+}
+
+// AccountConcurrencyCounter is an optional capability of a Store (and of the
+// lease store it wraps) that reports the live number of in-flight leases for an
+// account. The gateway uses it to feed Candidate.RuntimeState.CurrentConcurrency
+// so load-aware scheduler scoring (saturation penalty, concurrency-full reject)
+// reflects real traffic instead of always seeing zero. Stores that cannot
+// report live concurrency (e.g. the in-memory store) simply do not implement it.
+type AccountConcurrencyCounter interface {
+	CountAccountConcurrency(ctx context.Context, accountID int) (int, error)
 }
 
 type Store interface {

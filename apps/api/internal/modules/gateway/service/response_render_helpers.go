@@ -931,6 +931,10 @@ func outputGeminiParts(blocks []gatewaycontract.ContentBlock) []apiopenapi.Gemin
 
 func outputGeminiPartProperties(block gatewaycontract.ContentBlock) map[string]any {
 	props := outputBlockProperties(block)
+	// srapi_type is an internal canonical marker; Gemini parts are typed
+	// structurally (text/functionCall/functionResponse/...), so it must never
+	// leak into the wire format. (The OpenAI Responses renderer strips it too.)
+	delete(props, "srapi_type")
 	if signature := firstNonEmpty(mapStringAny(block.Metadata, "thoughtSignature"), mapStringAny(block.Metadata, "signature")); signature != "" {
 		props["thoughtSignature"] = signature
 	}

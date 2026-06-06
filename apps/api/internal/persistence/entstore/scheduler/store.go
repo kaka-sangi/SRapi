@@ -435,6 +435,33 @@ func (s *Store) UpdateLeaseStatus(ctx context.Context, requestID string, attempt
 	return lease, nil
 }
 
+// CountAccountConcurrency forwards to the lease store when it can report live
+// concurrency (the Redis lease store), otherwise returns 0. Implements
+// contract.AccountConcurrencyCounter.
+func (s *Store) CountAccountConcurrency(ctx context.Context, accountID int) (int, error) {
+	if s.leaseStore == nil {
+		return 0, nil
+	}
+	counter, ok := s.leaseStore.(contract.AccountConcurrencyCounter)
+	if !ok {
+		return 0, nil
+	}
+	return counter.CountAccountConcurrency(ctx, accountID)
+}
+
+// AccountLastUsed forwards to the lease store when it can report it (the Redis
+// lease store), otherwise returns 0. Implements contract.AccountLastUsedReporter.
+func (s *Store) AccountLastUsed(ctx context.Context, accountID int) (int64, error) {
+	if s.leaseStore == nil {
+		return 0, nil
+	}
+	reporter, ok := s.leaseStore.(contract.AccountLastUsedReporter)
+	if !ok {
+		return 0, nil
+	}
+	return reporter.AccountLastUsed(ctx, accountID)
+}
+
 func (s *Store) ListLeases(ctx context.Context) ([]contract.Lease, error) {
 	if s.leaseStore != nil {
 		return s.leaseStore.ListLeases(ctx)

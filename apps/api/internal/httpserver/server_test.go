@@ -5263,7 +5263,13 @@ func TestGatewayResponsesInputItemsAliasReplaysRawUpstreamJSON(t *testing.T) {
 	openaiProvider := mustFindProviderByName(t, handler, sessionCookie, "openai-compatible")
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"input-items-alias-model","display_name":"Input Items Alias Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"input-items-upstream-model","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(openaiProvider.Id)+`","name":"input-items-alias-account","runtime_class":"api_key","credential":{"api_key":"input-items-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	// Priority 200 puts this account in a lower (fallback) tier than the seeded
+	// "openai-compatible-seed" account (priority 100), which has no base_url and
+	// fails with configuration_error. With Account.Priority enforced as a hard
+	// tier, attempt 1 deterministically selects the priority-100 seed (fails),
+	// then fails over to this priority-200 account (succeeds) — exercising the
+	// input_items failover path explicitly rather than relying on scoring luck.
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(openaiProvider.Id)+`","name":"input-items-alias-account","runtime_class":"api_key","credential":{"api_key":"input-items-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":200}`)
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 
 	rec := mustGatewayRequest(t, handler, apiKey, http.MethodGet, "/api/provider/openai-compatible/v1/responses/resp_input_items/input_items?model=input-items-alias-model&after=item_1&limit=2&order=asc&include=file_search_call.results&include=reasoning.encrypted_content&before=drop", "")

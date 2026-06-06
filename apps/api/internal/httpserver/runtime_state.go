@@ -87,6 +87,7 @@ import (
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
+	sessionaffinitycontract "github.com/srapi/srapi/apps/api/internal/modules/sessionaffinity/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
@@ -189,6 +190,7 @@ type runtimeState struct {
 	realtimeStore           realtimecontract.Store
 	rateLimiter             *ratelimit.Limiter
 	schedulerStore          schedulercontract.Store
+	sessionAffinity         sessionaffinitycontract.Store
 	subscriptionStore       subscriptioncontract.Store
 	totpStore               totpcontract.Store
 	usageStore              usagecontract.Store
@@ -889,6 +891,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		realtimeStore:        opts.realtime,
 		rateLimiter:          opts.rateLimiter,
 		schedulerStore:       assembly.schedulerStore,
+		sessionAffinity:      opts.sessionAffinity,
 		subscriptionStore:    assembly.subscriptionStore,
 		totpStore:            assembly.totpStore,
 		usageStore:           assembly.usageStore,

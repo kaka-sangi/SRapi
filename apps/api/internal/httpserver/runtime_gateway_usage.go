@@ -144,6 +144,40 @@ type gatewayErrorCooldownRule struct {
 
 const maxGatewayConfiguredCooldownWindow = 2 * time.Hour
 
+const (
+	// cooldownStrikeResetAfter resets the consecutive-failure counter once an
+	// account has gone this long without a new cooldown (i.e. it recovered).
+	cooldownStrikeResetAfter = 15 * time.Minute
+	// maxCooldownStrikeShift caps the geometric backoff exponent (also bounded by
+	// maxGatewayConfiguredCooldownWindow).
+	maxCooldownStrikeShift = 6
+)
+
+// escalateCooldownWindow grows the cooldown window geometrically for consecutive
+// failures (capped at maxGatewayConfiguredCooldownWindow), and resets the strike
+// count when failures stop being recent. It returns the window to apply and the
+// strike count to persist.
+func escalateCooldownWindow(base time.Duration, strikes int, lastCooldownAt *time.Time, now time.Time) (time.Duration, int) {
+	if base <= 0 {
+		base = rateLimitCooldownWindow
+	}
+	if strikes < 0 {
+		strikes = 0
+	}
+	if lastCooldownAt != nil && now.Sub(*lastCooldownAt) > cooldownStrikeResetAfter {
+		strikes = 0
+	}
+	shift := strikes
+	if shift > maxCooldownStrikeShift {
+		shift = maxCooldownStrikeShift
+	}
+	window := base << uint(shift)
+	if window <= 0 || window > maxGatewayConfiguredCooldownWindow {
+		window = maxGatewayConfiguredCooldownWindow
+	}
+	return window, strikes + 1
+}
+
 func (rt *runtimeState) applyProviderAccountCooldown(ctx context.Context, rec gatewayUsageRecord) {
 	if rec.AccountID == nil || *rec.AccountID <= 0 || rec.ErrorClass == nil {
 		return
@@ -160,7 +194,13 @@ func (rt *runtimeState) applyProviderAccountCooldown(ctx context.Context, rec ga
 	if !ok {
 		return
 	}
-	cooldownUntil := time.Now().UTC().Add(decision.Window)
+	now := time.Now().UTC()
+	// Escalate the window for consecutive failures so a persistently-failing
+	// account is backed off harder, while a one-off blip recovers quickly.
+	strikes := metadataInt(account.Metadata, "cooldown_strikes")
+	window, nextStrikes := escalateCooldownWindow(decision.Window, strikes, metadataOptionalTime(account.Metadata, "cooldown_last_at"), now)
+	cooldownUntil := now.Add(window)
+	// An explicit provider Retry-After/reset still wins when it is later.
 	if decision.RetryAfter != nil && decision.RetryAfter.After(cooldownUntil) {
 		cooldownUntil = decision.RetryAfter.UTC()
 	}
@@ -168,6 +208,8 @@ func (rt *runtimeState) applyProviderAccountCooldown(ctx context.Context, rec ga
 	metadata["cooldown_active"] = true
 	metadata["cooldown_reason"] = decision.Reason
 	metadata["cooldown_until"] = cooldownUntil.Format(time.RFC3339)
+	metadata["cooldown_strikes"] = nextStrikes
+	metadata["cooldown_last_at"] = now.Format(time.RFC3339)
 	metadata["last_error_class"] = decision.LastErrorClass
 	before := accountAuditSnapshot(account)
 	updated, err := rt.accounts.Update(ctx, *rec.AccountID, accountcontract.UpdateRequest{Metadata: &metadata})
@@ -578,6 +620,29 @@ func accountRuntimeQuotaWindow(metadata map[string]any) time.Duration {
 		seconds = 60
 	}
 	return time.Duration(seconds) * time.Second
+}
+
+// recordAccountRecoverySnapshot writes a fresh healthy snapshot (circuit closed,
+// no cooldown) so a manual recover/clear-error actually re-enables an account for
+// scheduling. accountSchedulerRuntimeState OR-s the latest snapshot's
+// circuit/cooldown into runtime state, so without this the stale "open" snapshot
+// from the failure keeps the account parked even after the account row is healed.
+func (rt *runtimeState) recordAccountRecoverySnapshot(ctx context.Context, account accountcontract.ProviderAccount) {
+	if account.Status != accountcontract.StatusActive {
+		return
+	}
+	if _, err := rt.accounts.RecordHealthSnapshot(ctx, accountcontract.AccountHealthSnapshot{
+		AccountID:     account.ID,
+		ProviderID:    account.ProviderID,
+		Status:        "healthy",
+		SuccessRate:   1,
+		ErrorRate:     0,
+		CircuitState:  "closed",
+		SnapshotAt:    time.Now().UTC(),
+		CooldownUntil: nil,
+	}); err != nil {
+		rt.logger.Warn("failed to record account recovery health snapshot", "error", err, "account_id", account.ID)
+	}
 }
 
 func (rt *runtimeState) recordAccountTestHealthSnapshot(ctx context.Context, account accountcontract.ProviderAccount, result apiopenapi.AdminTestResult) {

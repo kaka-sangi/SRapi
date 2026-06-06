@@ -86,6 +86,9 @@ func (s *Store) AcquireLease(ctx context.Context, input contract.Lease, maxConcu
 	code, value := scriptResult(result)
 	switch code {
 	case "ok", "exists":
+		// Mark this account least-recently-used "now" so the scheduler rotates
+		// load across equally-scored accounts. Best-effort; never fails acquire.
+		_ = s.client.Set(ctx, s.accountLastUsedKey(lease.AccountID), now.UnixMilli(), lastUsedRetention).Err()
 		return s.findLeaseByID(ctx, value)
 	case "full":
 		return contract.Lease{}, ErrConcurrencyFull
@@ -207,6 +210,56 @@ func (s *Store) accountLeasesKey(accountID int) string {
 
 func (s *Store) accountConcurrencyKey(accountID int) string {
 	return accountKeyPrefix + strconv.Itoa(accountID) + ":concurrency"
+}
+
+func (s *Store) accountLastUsedKey(accountID int) string {
+	return accountKeyPrefix + strconv.Itoa(accountID) + ":last_used"
+}
+
+// lastUsedRetention keeps the least-recently-used marker alive well beyond a
+// single lease so LRU ordering survives idle gaps between requests.
+const lastUsedRetention = time.Hour
+
+// AccountLastUsed returns when an account was last selected (epoch ms), or 0 if
+// no marker exists. Implements contract.AccountLastUsedReporter.
+func (s *Store) AccountLastUsed(ctx context.Context, accountID int) (int64, error) {
+	if s == nil || s.client == nil || accountID <= 0 {
+		return 0, nil
+	}
+	raw, err := s.client.Get(ctx, s.accountLastUsedKey(accountID)).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || value < 0 {
+		return 0, nil
+	}
+	return value, nil
+}
+
+// CountAccountConcurrency returns the live in-flight lease count for an account,
+// maintained by AcquireLease as the ZCARD of the account's active lease set. A
+// missing key means no active leases (0). Implements
+// contract.AccountConcurrencyCounter.
+func (s *Store) CountAccountConcurrency(ctx context.Context, accountID int) (int, error) {
+	if s == nil || s.client == nil || accountID <= 0 {
+		return 0, nil
+	}
+	raw, err := s.client.Get(ctx, s.accountConcurrencyKey(accountID)).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 {
+		return 0, nil
+	}
+	return value, nil
 }
 
 func ttlMillis(value time.Duration) int64 {

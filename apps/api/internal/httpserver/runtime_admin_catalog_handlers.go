@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -1298,6 +1299,7 @@ func (s *Server) handleRecoverAdminAccount(w http.ResponseWriter, r *http.Reques
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to recover account", requestID)
 		return
 	}
+	s.runtime.recordAccountRecoverySnapshot(r.Context(), account)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.recover", "provider_account", strconv.Itoa(account.ID), accountAuditSnapshot(before), accountAuditSnapshot(account)))
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountResponse{
 		Data:      s.apiAccount(r.Context(), account),
@@ -1330,6 +1332,7 @@ func (s *Server) handleClearAdminAccountError(w http.ResponseWriter, r *http.Req
 		writeAccountServiceError(w, err, requestID)
 		return
 	}
+	s.runtime.recordAccountRecoverySnapshot(r.Context(), account)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.clear_error", "provider_account", strconv.Itoa(account.ID), accountAuditSnapshot(before), accountAuditSnapshot(account)))
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountResponse{
 		Data:      s.apiAccount(r.Context(), account),
@@ -1363,8 +1366,25 @@ func (s *Server) handleTestAdminAccount(w http.ResponseWriter, r *http.Request) 
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "provider not found", requestID)
 		return
 	}
+	opts := adminAccountTestOptions{}
+	if r.Body != nil {
+		var body struct {
+			Mode  string `json:"mode"`
+			Model string `json:"model"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+			opts.Mode = strings.TrimSpace(body.Mode)
+			opts.Model = strings.TrimSpace(body.Model)
+		}
+	}
+	if opts.Mode == "" {
+		opts.Mode = strings.TrimSpace(r.URL.Query().Get("mode"))
+	}
+	if opts.Model == "" {
+		opts.Model = strings.TrimSpace(r.URL.Query().Get("model"))
+	}
 	startedAt := time.Now()
-	result := s.runtime.testAccount(r.Context(), provider, account, startedAt, adminAccountTestOptions{})
+	result := s.runtime.testAccount(r.Context(), provider, account, startedAt, opts)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.test", "provider_account", strconv.Itoa(account.ID), nil, map[string]any{
 		"ok":     result.Ok,
 		"status": result.Status,

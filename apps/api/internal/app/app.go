@@ -10,10 +10,13 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/config"
 	"github.com/srapi/srapi/apps/api/internal/httpserver"
+	sessionaffinitycontract "github.com/srapi/srapi/apps/api/internal/modules/sessionaffinity/contract"
+	sessionaffinitymemory "github.com/srapi/srapi/apps/api/internal/modules/sessionaffinity/store/memory"
 	"github.com/srapi/srapi/apps/api/internal/persistence/entstore"
 	entschedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/scheduler"
 	redisrealtimestore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/realtime"
 	redisschedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/scheduler"
+	redissessionaffinitystore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/sessionaffinity"
 	platformdb "github.com/srapi/srapi/apps/api/internal/platform/db"
 	platformotel "github.com/srapi/srapi/apps/api/internal/platform/otel"
 	platformredis "github.com/srapi/srapi/apps/api/internal/platform/redis"
@@ -183,6 +186,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	if realtimeStore != nil {
 		options = append(options, httpserver.WithRealtimeStore(realtimeStore))
 	}
+	options = append(options, httpserver.WithSessionAffinityStore(sessionAffinityStore(context.Background(), cfg, logger, redisClient)))
 	rateLimiterOption, err := gatewayRateLimiterOption(context.Background(), cfg, logger, redisClient)
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
@@ -361,6 +365,30 @@ func schedulerLeaseStore(ctx context.Context, cfg config.Config, logger *slog.Lo
 		return nil, nil
 	}
 	return redisschedulerstore.New(redisClient.Raw())
+}
+
+// sessionAffinityStore returns a Redis-backed session→account binding store
+// when Redis is reachable so stickiness ("会话粘度") is shared cluster-wide,
+// otherwise an in-memory per-instance store. Stickiness is best-effort, so
+// unlike scheduler leases it never hard-fails when Redis is absent.
+func sessionAffinityStore(ctx context.Context, cfg config.Config, logger *slog.Logger, redisClient *platformredis.Client) sessionaffinitycontract.Store {
+	if redisClient != nil && redisClient.Raw() != nil {
+		pingCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+		err := redisClient.Ping(pingCtx)
+		cancel()
+		if err == nil {
+			if store, serr := redissessionaffinitystore.New(redisClient.Raw()); serr == nil {
+				return store
+			} else {
+				logger.Warn("failed to build redis session affinity store; using in-memory", "error", serr)
+			}
+		} else if cfg.Server.Mode == "release" {
+			logger.Warn("redis unavailable; session affinity (stickiness) will be per-instance in-memory — set REDIS_URL for cluster-wide stickiness", "error", err)
+		} else {
+			logger.Warn("redis unavailable; using in-memory session affinity", "error", err)
+		}
+	}
+	return sessionaffinitymemory.New()
 }
 
 func realtimeSlotStore(ctx context.Context, cfg config.Config, logger *slog.Logger, redisClient *platformredis.Client) (*redisrealtimestore.Store, error) {

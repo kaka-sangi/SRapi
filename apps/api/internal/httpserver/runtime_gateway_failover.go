@@ -394,6 +394,7 @@ func invokeGatewayCandidateWithFailover[T any](
 	startedAt time.Time,
 	invoke gatewayCandidateInvoker[T],
 ) gatewayFailoverResult[T] {
+	ctx = withGatewayInboundClient(ctx, r)
 	retrySettings := s.runtime.resolveGatewayRetrySettings(ctx)
 	initialExcluded := append([]int(nil), scheduleReq.ExcludedAccountIDs...)
 	excluded := append([]int(nil), initialExcluded...)
@@ -407,7 +408,16 @@ NextCandidate:
 		attemptReq.FallbackFromDecisionID = cloneIntPtr(fallbackFromDecisionID)
 		attemptReq.ExcludedAccountIDs = append([]int(nil), excluded...)
 
-		result, err := s.runtime.scheduleGatewayRequest(ctx, attemptReq, modelID, forcedProviderKey, authed.Key)
+		// The first selection waits briefly for a concurrency slot when every
+		// account is saturated; failover attempts (after a real failure) schedule
+		// immediately so total added latency stays bounded.
+		var result schedulercontract.ScheduleResult
+		var err error
+		if attemptNo == 1 {
+			result, err = s.runtime.scheduleGatewayRequestWaitingForSlot(ctx, attemptReq, modelID, forcedProviderKey, authed.Key)
+		} else {
+			result, err = s.runtime.scheduleGatewayRequest(ctx, attemptReq, modelID, forcedProviderKey, authed.Key)
+		}
 		if err != nil {
 			if lastFailure.Err != nil {
 				return lastFailure
@@ -435,6 +445,11 @@ NextCandidate:
 		for sameCandidateRetries := 0; ; {
 			response, err := invoke(ctx, result.Candidate)
 			if err == nil {
+				// Pin this session to the account that just succeeded so the next
+				// turn reuses it (prompt-cache affinity). If an earlier sticky
+				// account failed and we failed over, this overwrites the stale
+				// binding to the now-healthy account.
+				s.runtime.bindGatewaySessionAffinity(ctx, scheduleReq.APIKeyID, scheduleReq.SessionAffinityKey, result.Candidate.Account.ID)
 				return gatewayFailoverResult[T]{Response: response, ScheduleResult: result}
 			}
 
