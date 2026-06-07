@@ -93,7 +93,7 @@ export function AccountTestDialog({
         </DialogHeader>
 
         {/* Result panel — mono, status-tinted */}
-        <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-3.5 font-mono text-xs">
+        <div className="overflow-hidden rounded-lg border border-srapi-border bg-srapi-card-muted p-3.5 font-mono text-xs">
           <div className="flex items-center gap-2">
             {loading ? (
               <>
@@ -122,17 +122,17 @@ export function AccountTestDialog({
           </div>
 
           {!loading && (error || result?.message) ? (
-            <p className="mt-2 break-words text-srapi-text-secondary">{error || result?.message}</p>
+            <p className="mt-2 text-srapi-text-secondary [overflow-wrap:anywhere]">{error || result?.message}</p>
           ) : null}
 
           {!loading && checks && Object.keys(checks).length > 0 ? (
             <dl className="mt-2.5 space-y-1 border-t border-srapi-border pt-2.5">
               {Object.entries(checks).map(([k, v]) => (
                 <div key={k} className="flex items-baseline justify-between gap-3">
-                  <dt className="text-srapi-text-tertiary">{k}</dt>
+                  <dt className="shrink-0 text-srapi-text-tertiary">{k}</dt>
                   <dd
                     className={cn(
-                      "tabular text-right",
+                      "min-w-0 tabular text-right [overflow-wrap:anywhere]",
                       v === true
                         ? "text-srapi-success"
                         : v === false

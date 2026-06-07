@@ -143,7 +143,7 @@ function CheckRow({ result }: { result: ChannelMonitorCheckResult }) {
       </span>
       <span className="flex shrink-0 items-center gap-2">
         {result.error_class ? (
-          <span className="text-srapi-error">{result.error_class}</span>
+          <span className="max-w-[10rem] truncate text-srapi-error">{result.error_class}</span>
         ) : null}
         <span
           className={cn(

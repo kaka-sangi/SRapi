@@ -77,6 +77,7 @@ export type {
   OpsSystemLogCleanupResult,
   ModelRateLimit,
   AccountGroupRateLimit,
+  AccountHealthSnapshot,
   AdminTestResult,
   AdminSendTestEmailRequest,
   EnabledOAuthProvider,

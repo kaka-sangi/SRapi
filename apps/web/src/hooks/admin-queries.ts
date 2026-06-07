@@ -120,6 +120,15 @@ export function useTestAccount() {
   });
 }
 
+export function useAccountsHealthSummary() {
+  return useQuery({
+    queryKey: queryKeys.admin.accountsHealthSummary(),
+    queryFn: () => adminApi.getAccountsHealthSummary(),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
 // Per-account diagnostics — fetched on demand (when a detail view opens) so the
 // list stays cheap; `enabled` gates each query behind a selected account id.
 export function useAccountHealth(id: string | null) {

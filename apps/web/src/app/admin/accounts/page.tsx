@@ -29,6 +29,7 @@ import {
   useDeleteAccount,
   useDiscoverAccountModels,
   useExportAccounts,
+  useAccountsHealthSummary,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -42,7 +43,8 @@ import {
   type AccountBatchAction,
 } from "@/lib/admin-account-form";
 import { AccountImportDialog } from "@/components/admin/account-import-dialog";
-import type { ProviderAccount } from "@/lib/sdk-types";
+import type { ProviderAccount, AccountHealthSnapshot } from "@/lib/sdk-types";
+import { cn } from "@/lib/cn";
 
 export default function AdminAccountsPage() {
   return (
@@ -91,6 +93,10 @@ function AccountsContent() {
   const deleteMut = useDeleteAccount();
   const discover = useDiscoverAccountModels();
   const exportMut = useExportAccounts();
+  const healthSummary = useAccountsHealthSummary();
+  const healthById = new Map(
+    (healthSummary.data ?? []).map((h) => [h.account_id, h] as const),
+  );
 
   const [formTarget, setFormTarget] = useState<ProviderAccount | "new" | null>(null);
   const [proxyTarget, setProxyTarget] = useState<ProviderAccount | null>(null);
@@ -210,6 +216,20 @@ function AccountsContent() {
       key: "status",
       header: t("common.active"),
       render: (a) => <QuietBadge status={quietStatusFor(a.status)} label={statusLabel(t, a.status)} />,
+    },
+    {
+      key: "health",
+      header: t("adminAccounts.healthTitle"),
+      hideOnMobile: true,
+      sortValue: (a) => healthById.get(a.id)?.success_rate ?? -1,
+      render: (a) => <AccountHealthCell health={healthById.get(a.id)} />,
+    },
+    {
+      key: "quota",
+      header: t("adminAccounts.quotaTitle"),
+      hideOnMobile: true,
+      sortValue: (a) => healthById.get(a.id)?.quota_remaining_ratio ?? -1,
+      render: (a) => <AccountQuotaCell health={healthById.get(a.id)} />,
     },
   ];
 
@@ -477,5 +497,55 @@ function AccountsContent() {
         />
       ) : null}
     </>
+  );
+}
+
+function AccountHealthCell({ health }: { health?: AccountHealthSnapshot }) {
+  if (!health) return <span className="text-2xs text-srapi-text-tertiary">—</span>;
+  const rate = health.success_rate;
+  const circuit = health.circuit_state;
+  const isOpen = circuit === "open";
+  const isHalfOpen = circuit === "half-open";
+  return (
+    <span className="flex items-center gap-1.5">
+      <span
+        className={cn(
+          "inline-block size-1.5 rounded-full",
+          isOpen ? "bg-srapi-error" : isHalfOpen ? "bg-srapi-warning" : rate >= 0.95 ? "bg-srapi-success" : rate >= 0.8 ? "bg-srapi-warning" : "bg-srapi-error",
+        )}
+      />
+      <span className="font-mono text-2xs tabular text-srapi-text-secondary">
+        {Math.round(rate * 100)}%
+      </span>
+      {health.error_class ? (
+        <span className="max-w-[6rem] truncate text-2xs text-srapi-error">{health.error_class}</span>
+      ) : null}
+    </span>
+  );
+}
+
+function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot }) {
+  if (!health) return <span className="text-2xs text-srapi-text-tertiary">—</span>;
+  const ratio = health.quota_remaining_ratio;
+  const exhausted = health.quota_exhausted;
+  const pct = Math.round(ratio * 100);
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="relative h-1.5 w-12 overflow-hidden rounded-full bg-srapi-border">
+        <span
+          className={cn(
+            "absolute inset-y-0 left-0 rounded-full transition-all",
+            exhausted ? "bg-srapi-error" : ratio <= 0.2 ? "bg-srapi-warning" : "bg-srapi-success",
+          )}
+          style={{ width: `${Math.max(pct, 2)}%` }}
+        />
+      </span>
+      <span className={cn(
+        "font-mono text-2xs tabular",
+        exhausted ? "text-srapi-error" : ratio <= 0.2 ? "text-srapi-warning" : "text-srapi-text-secondary",
+      )}>
+        {pct}%
+      </span>
+    </span>
   );
 }

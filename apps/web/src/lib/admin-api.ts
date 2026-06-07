@@ -765,6 +765,18 @@ export const adminApi = {
     return unwrapData(() => getAdminAccountProxyQuality({ path: { id }, throwOnError: true }));
   },
 
+  async getAccountsHealthSummary(): Promise<AccountHealthSnapshot[]> {
+    configureAdminClient();
+    const base = configuredApiBaseUrl();
+    const res = await fetch(`${base}/api/v1/admin/accounts/health-summary`, {
+      credentials: "include",
+      headers: { "X-CSRF-Token": getStoredCSRFToken() ?? "" },
+    });
+    if (!res.ok) throw new Error("Failed to fetch accounts health summary");
+    const json = (await res.json()) as { data: AccountHealthSnapshot[] };
+    return json.data;
+  },
+
   getAccountHealth(id: Id): Promise<AccountHealthSnapshot> {
     return unwrapData(() => getAdminAccountHealth({ path: { id }, throwOnError: true }));
   },

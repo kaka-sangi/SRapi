@@ -1775,6 +1775,40 @@ func writeAccountServiceError(w http.ResponseWriter, err error, requestID string
 	}
 }
 
+func (s *Server) handleAdminAccountsHealthSummary(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	accounts, err := s.runtime.accountStore.List(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list accounts", requestID)
+		return
+	}
+	usageLogs, err := s.runtime.usage.List(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list usage logs", requestID)
+		return
+	}
+	now := time.Now().UTC()
+	snapshots := make([]apiopenapi.AccountHealthSnapshot, 0, len(accounts))
+	for _, account := range accounts {
+		snap := buildAccountHealthSnapshot(account, usageLogsForAccount(usageLogs, account.ID), now)
+		if latest, err := s.runtime.accounts.LatestHealthSnapshotByAccount(r.Context(), account.ID); err == nil {
+			overlayAccountHealthSnapshot(&snap, latest)
+		}
+		if quotas, err := s.runtime.accounts.ListQuotaSnapshotsByAccount(r.Context(), account.ID, 1); err == nil && len(quotas) > 0 {
+			overlayAccountQuotaOnHealth(&snap, quotas[0])
+		}
+		snapshots = append(snapshots, snap)
+	}
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       snapshots,
+		"request_id": requestID,
+	})
+}
+
 func (s *Server) handleAdminAccountHealth(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {

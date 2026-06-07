@@ -455,6 +455,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/enable", server.handleEnableAdminAccount)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/recover", server.handleRecoverAdminAccount)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/clear-error", server.handleClearAdminAccountError)
+	mux.HandleFunc("GET /api/v1/admin/accounts/health-summary", server.handleAdminAccountsHealthSummary)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/health", server.handleAdminAccountHealth)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/quota", server.handleAdminAccountQuota)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/rpm-status", server.handleAdminAccountRpmStatus)
