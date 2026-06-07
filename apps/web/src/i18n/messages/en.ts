@@ -1597,6 +1597,7 @@ export const en = {
     ok: "OK",
     failed: "Failed",
     stepProgress: "Step {step} / {max}",
+    stepProgressOpen: "Step {step}",
     toolRunning: "Running…",
     copy: "Copy",
     copied: "Copied",

@@ -688,19 +688,6 @@ function CopilotTab({
           </div>
         )}
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="copilot-max-steps">{t("copilot.fieldMaxSteps")}</Label>
-            <Input
-              id="copilot-max-steps"
-              type="number"
-              min={1}
-              max={20}
-              value={String(value.max_steps)}
-              onChange={(e) => onField("max_steps", e.target.value === "" ? 1 : Number(e.target.value))}
-            />
-          </div>
-        </div>
 
         <div className="space-y-4 border-t border-srapi-border pt-4">
           <div className="flex items-center justify-between gap-4">

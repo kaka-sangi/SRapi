@@ -82,7 +82,7 @@ func runWebSearch(ctx context.Context, search SearchFunc, argsJSON string) (stri
 	if err != nil {
 		return "failed to encode results: " + err.Error(), true
 	}
-	return truncate(string(out), maxToolResultBytes), false
+	return string(out), false
 }
 
 // NewTavilySearch returns a SearchFunc backed by the Tavily Search API

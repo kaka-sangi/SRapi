@@ -1597,6 +1597,7 @@ export const zh: Messages = {
     ok: "成功",
     failed: "失败",
     stepProgress: "第 {step} / {max} 步",
+    stepProgressOpen: "第 {step} 步",
     toolRunning: "执行中…",
     copy: "复制",
     copied: "已复制",

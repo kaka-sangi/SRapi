@@ -57,6 +57,27 @@ func toolUseResponse(id, name, args string) provideradaptercontract.Conversation
 	}
 }
 
+func TestSystemPromptIncludesOperationalGuidance(t *testing.T) {
+	cat := mustCatalog(t)
+	prompt := SystemPrompt(cat, true, false)
+	for _, want := range []string{
+		"get_operation_detail",
+		"Resolve every reference",
+		"Add an upstream provider account",
+		"GET the resource",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("system prompt missing operational guidance %q", want)
+		}
+	}
+	if strings.Contains(prompt, "web_search tool") {
+		t.Fatalf("web_search guidance must be absent when search is disabled")
+	}
+	if !strings.Contains(SystemPrompt(cat, true, true), "web_search tool") {
+		t.Fatalf("web_search guidance must appear when search is enabled")
+	}
+}
+
 func collectTypes(events []Event) []string {
 	out := make([]string, 0, len(events))
 	for _, e := range events {

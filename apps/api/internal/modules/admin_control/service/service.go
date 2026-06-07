@@ -1093,7 +1093,7 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 			Source:            "account",
 			Models:            []string{},
 			DedicatedProtocol: "openai-compatible",
-			MaxSteps:          8,
+			MaxSteps:          0, // vestigial: the copilot loop no longer enforces a per-turn step limit
 			OwnerOnly:         false,
 			AutoRunReads:      true,
 		},
@@ -1211,12 +1211,8 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	if settings.Copilot.ProviderAccountID < 0 {
 		settings.Copilot.ProviderAccountID = 0
 	}
-	if settings.Copilot.MaxSteps <= 0 {
-		settings.Copilot.MaxSteps = 8
-	}
-	if settings.Copilot.MaxSteps > 20 {
-		settings.Copilot.MaxSteps = 20
-	}
+	// MaxSteps is vestigial: the copilot loop no longer enforces a per-turn step
+	// limit (only an internal runaway guard), so the value is left as-is.
 	return settings, nil
 }
 

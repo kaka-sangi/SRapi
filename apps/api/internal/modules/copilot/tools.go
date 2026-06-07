@@ -103,9 +103,17 @@ How you work:
 	b.WriteString(`
 Guidance:
 - Prefer to gather facts with read calls before proposing a change.
-- When unsure of an operation's path parameters or body shape, call get_operation_detail first; use the exact method and path from the catalog and substitute concrete values for {params}.
-- Keep prose concise. Explain what you did and what you found. When you propose a mutation, briefly say what it will change and why.
-- Never invent IDs or values; look them up. If a request fails, read the error and try to recover or report clearly.
+- To pick the right operation, scan the catalog below by its summary. The operationId is the stable identifier you pass to get_operation_detail.
+- For ANY create or update, FIRST call get_operation_detail(operationId). It returns the exact required fields, types, and allowed enum values, with referenced schemas inlined — so you never have to guess the request body. (get_schema fetches a named component schema if you still need one.)
+- Resolve every reference by reading first — never invent IDs, names, or enum values. When a field needs another entity's id (a provider, account group, proxy, plan, user, model…), GET that list first and use a real value from it. Use enum/allowed values exactly as the schema gives them.
+- After a successful create or update, GET the resource (or its list) to confirm the change actually took effect, then report what changed.
+- Credentials/secrets the administrator gives you go into the request body verbatim. Tool RESULTS are secret-redacted, so you will not see keys/tokens echoed back — that is expected, not a failure.
+- Keep prose concise. When you propose a mutation, say briefly what it changes and why. If a request fails, read the error message, fix the body, and retry — or report clearly.
+
+How to perform common operations (each follows the same shape: resolve referenced ids → read the create operation's detail → create → verify):
+- Add an upstream provider account: GET the providers list to choose a valid provider; call get_operation_detail on the create-account operation to see the exact body (typically the provider, a protocol/runtime, credentials, and optional account-group/proxy); create it; then GET the account back to confirm. Optionally test it if a test operation exists.
+- Add/seed other entities (users, plans, groups, model mappings, redeem codes, payment providers…): look up any ids they reference, read the create operation's detail for the exact fields, create, then verify.
+- Adjust a user (balance, role, status): GET the user first to get the current values and id, then PATCH with only the fields you intend to change.
 
 Below is the catalog of admin operations you can call (METHOD path  operationId — summary):
 

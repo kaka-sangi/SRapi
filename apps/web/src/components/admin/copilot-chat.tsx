@@ -162,7 +162,10 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
                   {t("copilot.thinking")}
                   {step ? (
                     <span className="text-2xs text-srapi-text-tertiary">
-                      · {t("copilot.stepProgress", { step: step.step, max: step.max })}
+                      ·{" "}
+                      {step.max > 0
+                        ? t("copilot.stepProgress", { step: step.step, max: step.max })
+                        : t("copilot.stepProgressOpen", { step: step.step })}
                     </span>
                   ) : null}
                 </div>

@@ -9,12 +9,14 @@ import (
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 )
 
-// hardStepCeiling bounds the agent loop regardless of configured MaxSteps.
-const hardStepCeiling = 20
-
-// maxToolResultBytes caps how much of a tool result is fed back to the model, to
-// bound token cost and memory.
-const maxToolResultBytes = 8000
+// runawayStepGuard is a safety backstop on the agentic loop: it only stops a
+// runaway (looping) model from spinning forever — it is NOT a per-turn feature
+// limit, and no real task approaches it. A turn otherwise runs until the model
+// stops calling tools, or the admin hits Stop (which cancels the context).
+//
+// Tool results and catalog schemas are fed to the model in full (no byte cap):
+// completeness beats token thrift for an operator assistant.
+const runawayStepGuard = 100
 
 // LLMFunc invokes the configured model with the system prompt, conversation, and
 // tools. It streams content/reasoning fragments via onDelta (kind is "content"
@@ -46,10 +48,6 @@ func (e *Engine) Run(ctx context.Context, settings Settings, history []Message, 
 	if search != nil {
 		tools = append(tools, webSearchToolSchema())
 	}
-	maxSteps := settings.MaxSteps
-	if maxSteps <= 0 || maxSteps > hardStepCeiling {
-		maxSteps = hardStepCeiling
-	}
 	steps := 0
 
 	for {
@@ -58,12 +56,12 @@ func (e *Engine) Run(ctx context.Context, settings Settings, history []Message, 
 		}
 		pending, hasPending := unansweredToolCalls(history)
 		if !hasPending {
-			if steps >= maxSteps {
-				emit(Event{Type: EventError, Data: ErrorData{Message: fmt.Sprintf("reached the %d-step limit for this turn", maxSteps)}})
+			if steps >= runawayStepGuard {
+				emit(Event{Type: EventError, Data: ErrorData{Message: "stopped after too many steps — the model may be looping; try rephrasing the request"}})
 				return history, nil
 			}
 			steps++
-			emit(Event{Type: EventStep, Data: StepData{Step: steps, MaxSteps: maxSteps}})
+			emit(Event{Type: EventStep, Data: StepData{Step: steps}})
 			// Stream content/reasoning fragments to the client as they arrive.
 			onDelta := func(kind, text string) {
 				if text == "" {
@@ -169,7 +167,7 @@ func (e *Engine) execute(ctx context.Context, dispatch DispatchFunc, method, pat
 	if text == "" {
 		text = "(empty response)"
 	}
-	formatted := fmt.Sprintf("HTTP %d\n%s", status, truncate(text, maxToolResultBytes))
+	formatted := fmt.Sprintf("HTTP %d\n%s", status, text)
 	return status, formatted, status >= 400
 }
 
@@ -360,12 +358,14 @@ func orEmptyJSON(s string) string {
 	return s
 }
 
+// marshalJSON renders a catalog lookup (operation detail / schema) for the model
+// in full, so no required field is ever hidden by truncation.
 func marshalJSON(v any) string {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return fmt.Sprintf("failed to encode: %v", err)
 	}
-	return truncate(string(b), maxToolResultBytes)
+	return string(b)
 }
 
 func llmErrorMessage(err error) string {
