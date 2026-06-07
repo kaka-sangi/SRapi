@@ -12,10 +12,12 @@ import {
   Loader2,
   Plus,
 } from "lucide-react";
+import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Markdown } from "@/components/ui/markdown";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
 import { Composer } from "@/components/chat/composer";
 import { ReasoningBlock } from "@/components/chat/reasoning-block";
 import type { ReasoningEffort } from "@/components/chat/types";
@@ -25,7 +27,14 @@ import {
   type CopilotEvent,
   type CopilotImage,
 } from "@/lib/copilot-client";
-import { fileToImagePart, imagePartToDataUrl } from "@/lib/image-utils";
+import {
+  fileToImagePart,
+  imagePartToDataUrl,
+  fileToTextPart,
+  isImageFile,
+  isTextFile,
+  type CopilotFilePart,
+} from "@/lib/image-utils";
 
 interface PendingAction {
   tool_call_id: string;
@@ -67,6 +76,8 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
   const [model, setModel] = useState(defaultModel || models[0] || "");
   const [effort, setEffort] = useState<ReasoningEffort>("off");
   const [images, setImages] = useState<CopilotImage[]>([]);
+  const [files, setFiles] = useState<CopilotFilePart[]>([]);
+  const { toast } = useToast();
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -196,13 +207,15 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
 
   function send(text?: string) {
     const content = (text ?? input).trim();
-    if ((!content && images.length === 0) || running) return;
+    if ((!content && images.length === 0 && files.length === 0) || running) return;
     const userMsg: CopilotMessage = { role: "user", content };
     if (images.length) userMsg.images = images;
+    if (files.length) userMsg.files = files;
     const next = [...messages, userMsg];
     setMessages(next);
     setInput("");
     setImages([]);
+    setFiles([]);
     void runTurn(next);
   }
 
@@ -221,12 +234,38 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
     setPending(null);
     setError(null);
     setImages([]);
+    setFiles([]);
   }
 
-  async function onPickFiles(files: FileList | null) {
-    if (!files?.length) return;
-    const parts = await Promise.all(Array.from(files).map(fileToImagePart));
-    setImages((prev) => [...prev, ...parts]);
+  async function onPickFiles(picked: FileList | null) {
+    if (!picked?.length) return;
+    const list = Array.from(picked);
+    const imageFiles = list.filter(isImageFile);
+    const textFiles = list.filter((f) => !isImageFile(f) && isTextFile(f));
+    const rejected = list.filter((f) => !isImageFile(f) && !isTextFile(f));
+
+    try {
+      if (imageFiles.length) {
+        const parts = await Promise.all(imageFiles.map(fileToImagePart));
+        setImages((prev) => [...prev, ...parts]);
+      }
+      if (textFiles.length) {
+        const settled = await Promise.allSettled(textFiles.map(fileToTextPart));
+        const ok = settled.filter((r) => r.status === "fulfilled").map((r) => r.value);
+        if (ok.length) setFiles((prev) => [...prev, ...ok]);
+        if (settled.some((r) => r.status === "rejected")) {
+          toast({ title: t("copilot.fileReadFailed"), tone: "error" });
+        }
+      }
+    } catch {
+      toast({ title: t("copilot.fileReadFailed"), tone: "error" });
+    }
+    if (rejected.length) {
+      toast({
+        title: t("copilot.fileUnsupported", { name: rejected[0].name }),
+        tone: "error",
+      });
+    }
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -283,13 +322,15 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
           setEffort={setEffort}
           images={images}
           removeImage={(idx) => setImages((prev) => prev.filter((_, i) => i !== idx))}
+          files={files}
+          removeFile={(idx) => setFiles((prev) => prev.filter((_, i) => i !== idx))}
           onAttach={() => fileRef.current?.click()}
           placeholder={t("copilot.placeholder")}
         />
         <input
           ref={fileRef}
           type="file"
-          accept="image/*"
+          accept="image/*,text/*,.txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.ndjson,.yaml,.yml,.xml,.html,.log,.ini,.conf,.cfg,.toml,.env,.sql,.sh,.bash,.ps1,.js,.mjs,.cjs,.jsx,.ts,.tsx,.go,.py,.rb,.rs,.c,.h,.cc,.cpp,.hpp,.cs,.java,.kt,.php,.css,.scss,.vue,.svelte,.graphql,.proto,.diff,.patch,.tf,.hcl,.dockerfile,.gradle"
           multiple
           hidden
           onChange={(e) => void onPickFiles(e.currentTarget.files)}
@@ -351,6 +392,20 @@ function MessageRow({
                   alt=""
                   className="size-20 rounded-lg border border-srapi-border object-cover"
                 />
+              ))}
+            </div>
+          ) : null}
+          {message.files?.length ? (
+            <div className="flex flex-wrap justify-end gap-1.5">
+              {message.files.map((file, i) => (
+                <span
+                  key={i}
+                  title={file.name}
+                  className="flex max-w-52 items-center gap-1.5 rounded-lg border border-srapi-border bg-srapi-card-muted px-2 py-1 text-2xs text-srapi-text-secondary"
+                >
+                  <FileText className="size-3.5 shrink-0 text-srapi-text-tertiary" />
+                  <span className="min-w-0 truncate">{file.name}</span>
+                </span>
               ))}
             </div>
           ) : null}

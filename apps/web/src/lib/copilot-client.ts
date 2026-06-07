@@ -24,6 +24,14 @@ export interface CopilotImage {
   data: string;
 }
 
+/** A text-file attachment. Frontend-only: folded into `content` on send (the
+ * backend has no `files` field), so it works with any model. */
+export interface CopilotFile {
+  name: string;
+  content: string;
+  truncated?: boolean;
+}
+
 export type ReasoningEffort = "off" | "low" | "medium" | "high";
 
 export interface CopilotMessage {
@@ -31,8 +39,24 @@ export interface CopilotMessage {
   content?: string;
   reasoning?: string;
   images?: CopilotImage[];
+  files?: CopilotFile[];
   tool_calls?: CopilotToolCall[];
   tool_results?: CopilotToolResult[];
+}
+
+/** Folds a message's text-file attachments into its content and drops the
+ * frontend-only `files` field, so the wire payload matches the backend schema
+ * (which rejects unknown fields). Images stay as native `images` parts. */
+function foldFileAttachments(message: CopilotMessage): CopilotMessage {
+  if (!message.files?.length) return message;
+  const { files, ...rest } = message;
+  const blocks = files
+    .map(
+      (f) =>
+        `\n\n[Attached file: ${f.name}]${f.truncated ? " (truncated)" : ""}\n\`\`\`\n${f.content}\n\`\`\``,
+    )
+    .join("");
+  return { ...rest, content: `${message.content ?? ""}${blocks}`.trim() };
 }
 
 export interface CopilotApproval {
@@ -96,7 +120,7 @@ export async function streamCopilotChat(options: StreamCopilotChatOptions): Prom
         ...(csrf ? { "X-CSRF-Token": csrf } : {}),
       },
       body: JSON.stringify({
-        messages: options.messages,
+        messages: options.messages.map(foldFileAttachments),
         approval: options.approval,
         model: options.model || undefined,
         reasoning_effort: options.reasoningEffort && options.reasoningEffort !== "off" ? options.reasoningEffort : undefined,

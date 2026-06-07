@@ -1548,7 +1548,9 @@ export const en = {
     effortMedium: "Standard thinking",
     effortHigh: "Deep thinking",
     attachImage: "Attach image",
+    attach: "Attach image or file",
     removeImage: "Remove image",
+    removeFile: "Remove file",
     stop: "Stop",
     send: "Send",
     reasoning: "Thinking",
@@ -1583,6 +1585,8 @@ export const en = {
     removeImage: "Remove image",
     egressWarning:
       "Messages, fetched data, and results are sent to the configured model. Avoid pasting secrets.",
+    fileReadFailed: "Couldn't read that file (it may be too large or not a text file).",
+    fileUnsupported: "“{name}” isn't a supported attachment — upload an image or a text file (.txt, .csv, .json, .log, .md, code…).",
     emptyHint: "Ask in plain language. The copilot reads data freely and asks before making any change.",
     example1: "List disabled accounts",
     example2: "Show today's usage",
