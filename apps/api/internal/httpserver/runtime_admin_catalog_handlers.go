@@ -760,6 +760,150 @@ func (s *Server) handleCreateAdminModelMapping(w http.ResponseWriter, r *http.Re
 	})
 }
 
+func (s *Server) handleListAdminModelAliases(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	modelID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || modelID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
+		return
+	}
+	aliases, err := s.runtime.models.ListAliasesByModel(r.Context(), modelID)
+	if err != nil {
+		switch {
+		case errors.Is(err, modelservice.ErrModelNotFound):
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "model not found", requestID)
+		case errors.Is(err, modelservice.ErrInvalidInput):
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
+		default:
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list model aliases", requestID)
+		}
+		return
+	}
+	data := make([]apiopenapi.ModelAlias, 0, len(aliases))
+	for _, alias := range aliases {
+		data = append(data, toAPIModelAlias(alias))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.ModelAliasListResponse{
+		Data:      data,
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleDeleteAdminModelAlias(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	modelID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || modelID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
+		return
+	}
+	aliasID, err := strconv.Atoi(r.PathValue("aliasId"))
+	if err != nil || aliasID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model alias id", requestID)
+		return
+	}
+	if err := s.runtime.models.DeleteAlias(r.Context(), modelID, aliasID); err != nil {
+		switch {
+		case errors.Is(err, modelservice.ErrAliasNotFound):
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "model alias not found", requestID)
+		case errors.Is(err, modelservice.ErrInvalidInput):
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model alias id", requestID)
+		default:
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete model alias", requestID)
+		}
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model_alias.delete", "model_alias", strconv.Itoa(aliasID), map[string]any{"model_id": modelID}, nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       map[string]any{"id": aliasID, "deleted": true},
+		"request_id": requestID,
+	})
+}
+
+func (s *Server) handleListAdminModelMappings(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	modelID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || modelID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
+		return
+	}
+	mappings, err := s.runtime.models.ListMappingsByModel(r.Context(), modelID)
+	if err != nil {
+		switch {
+		case errors.Is(err, modelservice.ErrModelNotFound):
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "model not found", requestID)
+		case errors.Is(err, modelservice.ErrInvalidInput):
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
+		default:
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list model mappings", requestID)
+		}
+		return
+	}
+	data := make([]apiopenapi.ModelProviderMapping, 0, len(mappings))
+	for _, mapping := range mappings {
+		data = append(data, toAPIModelProviderMapping(mapping))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.ModelProviderMappingListResponse{
+		Data:      data,
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleDeleteAdminModelMapping(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	modelID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || modelID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
+		return
+	}
+	mappingID, err := strconv.Atoi(r.PathValue("mappingId"))
+	if err != nil || mappingID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model mapping id", requestID)
+		return
+	}
+	if err := s.runtime.models.DeleteMapping(r.Context(), modelID, mappingID); err != nil {
+		switch {
+		case errors.Is(err, modelservice.ErrMappingNotFound):
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "model provider mapping not found", requestID)
+		case errors.Is(err, modelservice.ErrInvalidInput):
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model mapping id", requestID)
+		default:
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete model mapping", requestID)
+		}
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model_provider_mapping.delete", "model_provider_mapping", strconv.Itoa(mappingID), map[string]any{"model_id": modelID}, nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       map[string]any{"id": mappingID, "deleted": true},
+		"request_id": requestID,
+	})
+}
+
 func (s *Server) handleListAdminAccounts(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {

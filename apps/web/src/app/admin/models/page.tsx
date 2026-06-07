@@ -27,6 +27,7 @@ import {
   useDeleteModelRateLimit,
 } from "@/hooks/admin-queries";
 import { RateLimitDialog } from "@/components/admin/rate-limit-dialog";
+import { ModelDetailDialog } from "@/components/admin/model-detail-dialog";
 import { useLanguage } from "@/context/LanguageContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
@@ -81,12 +82,14 @@ function ModelsContent() {
     value: p.id,
     label: p.display_name || p.name,
   }));
+  const providerLabels = new Map(providerOptions.map((o) => [o.value, o.label]));
   const isFiltered = Boolean(statusFilter || list.search);
 
   const [formTarget, setFormTarget] = useState<Model | "new" | null>(null);
   const [rateLimitTarget, setRateLimitTarget] = useState<Model | null>(null);
   const [aliasTarget, setAliasTarget] = useState<Model | null>(null);
   const [mappingTarget, setMappingTarget] = useState<Model | null>(null);
+  const [detailTarget, setDetailTarget] = useState<Model | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Model | null>(null);
   const rateLimitByModel = new Map<number, ModelRateLimit>(
     (rateLimits.data?.data ?? []).map((rl) => [rl.model_id, rl]),
@@ -291,8 +294,7 @@ function ModelsContent() {
             actions={[
               { label: t("common.edit"), onSelect: () => setFormTarget(m) },
               { label: t("adminRateLimit.action"), onSelect: () => setRateLimitTarget(m) },
-              { label: t("adminModels.addAlias"), onSelect: () => setAliasTarget(m) },
-              { label: t("adminModels.addMapping"), onSelect: () => setMappingTarget(m) },
+              { label: t("adminModels.manageRouting"), onSelect: () => setDetailTarget(m) },
               { label: t("common.delete"), destructive: true, onSelect: () => setDeleteTarget(m) },
             ]}
           />
@@ -396,6 +398,24 @@ function ModelsContent() {
           submit={(body) => mappingMut.mutateAsync({ id: mappingTarget.id, body })}
           successMessage={t("feedback.created")}
           isPending={mappingMut.isPending}
+        />
+      ) : null}
+
+      {detailTarget ? (
+        <ModelDetailDialog
+          model={detailTarget}
+          providerLabels={providerLabels}
+          onClose={() => setDetailTarget(null)}
+          onAddAlias={() => {
+            const m = detailTarget;
+            setDetailTarget(null);
+            setAliasTarget(m);
+          }}
+          onAddMapping={() => {
+            const m = detailTarget;
+            setDetailTarget(null);
+            setMappingTarget(m);
+          }}
         />
       ) : null}
     </>

@@ -170,6 +170,35 @@ func (s *memoryStore) ListAliasesByModel(_ context.Context, modelID int) ([]cont
 	return out, nil
 }
 
+func (s *memoryStore) FindAliasByID(_ context.Context, id int) (contract.ModelAlias, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	alias, ok := s.aliasesByID[id]
+	if !ok {
+		return contract.ModelAlias{}, errors.New("model alias not found")
+	}
+	return alias, nil
+}
+
+func (s *memoryStore) DeleteAlias(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	alias, ok := s.aliasesByID[id]
+	if !ok {
+		return errors.New("model alias not found")
+	}
+	delete(s.aliasByName, strings.ToLower(strings.TrimSpace(alias.Alias)))
+	delete(s.aliasesByID, id)
+	remaining := make([]int, 0, len(s.aliasIDsByModel[alias.ModelID]))
+	for _, existing := range s.aliasIDsByModel[alias.ModelID] {
+		if existing != id {
+			remaining = append(remaining, existing)
+		}
+	}
+	s.aliasIDsByModel[alias.ModelID] = remaining
+	return nil
+}
+
 func (s *memoryStore) FindMapping(_ context.Context, modelID int, providerID int, upstreamModelName string) (contract.ModelProviderMapping, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -218,6 +247,35 @@ func (s *memoryStore) ListMappingsByModel(_ context.Context, modelID int) ([]con
 		out = append(out, s.mappingsByID[id])
 	}
 	return out, nil
+}
+
+func (s *memoryStore) FindMappingByID(_ context.Context, id int) (contract.ModelProviderMapping, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	mapping, ok := s.mappingsByID[id]
+	if !ok {
+		return contract.ModelProviderMapping{}, errors.New("model provider mapping not found")
+	}
+	return mapping, nil
+}
+
+func (s *memoryStore) DeleteMapping(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	mapping, ok := s.mappingsByID[id]
+	if !ok {
+		return errors.New("model provider mapping not found")
+	}
+	delete(s.mappingByKey, mappingKey(mapping.ModelID, mapping.ProviderID, mapping.UpstreamModelName))
+	delete(s.mappingsByID, id)
+	remaining := make([]int, 0, len(s.mappingIDsByModel[mapping.ModelID]))
+	for _, existing := range s.mappingIDsByModel[mapping.ModelID] {
+		if existing != id {
+			remaining = append(remaining, existing)
+		}
+	}
+	s.mappingIDsByModel[mapping.ModelID] = remaining
+	return nil
 }
 
 func (s *memoryStore) List(_ context.Context) ([]contract.Model, error) {

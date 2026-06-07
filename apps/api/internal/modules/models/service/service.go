@@ -218,6 +218,17 @@ func (s *Service) ListAliasesByModel(ctx context.Context, modelID int) ([]contra
 	return s.store.ListAliasesByModel(ctx, modelID)
 }
 
+func (s *Service) DeleteAlias(ctx context.Context, modelID int, aliasID int) error {
+	if modelID <= 0 || aliasID <= 0 {
+		return ErrInvalidInput
+	}
+	alias, err := s.store.FindAliasByID(ctx, aliasID)
+	if err != nil || alias.ModelID != modelID {
+		return ErrAliasNotFound
+	}
+	return s.store.DeleteAlias(ctx, aliasID)
+}
+
 func (s *Service) CreateMapping(ctx context.Context, modelID int, req contract.CreateMappingRequest) (contract.ModelProviderMapping, error) {
 	upstreamModelName := strings.TrimSpace(req.UpstreamModelName)
 	if modelID <= 0 || req.ProviderID <= 0 || upstreamModelName == "" {
@@ -259,6 +270,17 @@ func (s *Service) ListMappingsByModel(ctx context.Context, modelID int) ([]contr
 		return nil, ErrModelNotFound
 	}
 	return s.store.ListMappingsByModel(ctx, modelID)
+}
+
+func (s *Service) DeleteMapping(ctx context.Context, modelID int, mappingID int) error {
+	if modelID <= 0 || mappingID <= 0 {
+		return ErrInvalidInput
+	}
+	mapping, err := s.store.FindMappingByID(ctx, mappingID)
+	if err != nil || mapping.ModelID != modelID {
+		return ErrMappingNotFound
+	}
+	return s.store.DeleteMapping(ctx, mappingID)
 }
 
 func cloneString(value *string) *string {

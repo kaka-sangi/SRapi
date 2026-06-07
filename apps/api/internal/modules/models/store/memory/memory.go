@@ -176,6 +176,33 @@ func (s *Store) ListAliasesByModel(_ context.Context, modelID int) ([]contract.M
 	return out, nil
 }
 
+func (s *Store) FindAliasByID(_ context.Context, id int) (contract.ModelAlias, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	alias, ok := s.aliasesByID[id]
+	if !ok {
+		return contract.ModelAlias{}, errors.New("model alias not found")
+	}
+	return cloneAlias(alias), nil
+}
+
+func (s *Store) DeleteAlias(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	alias, ok := s.aliasesByID[id]
+	if !ok {
+		return errors.New("model alias not found")
+	}
+	delete(s.aliasByName, aliasKey(alias.Alias))
+	delete(s.aliasesByID, id)
+	if remaining := removeID(s.aliasIDsByModel[alias.ModelID], id); len(remaining) == 0 {
+		delete(s.aliasIDsByModel, alias.ModelID)
+	} else {
+		s.aliasIDsByModel[alias.ModelID] = remaining
+	}
+	return nil
+}
+
 func (s *Store) FindMapping(_ context.Context, modelID int, providerID int, upstreamModelName string) (contract.ModelProviderMapping, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -225,6 +252,43 @@ func (s *Store) ListMappingsByModel(_ context.Context, modelID int) ([]contract.
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
+}
+
+func (s *Store) FindMappingByID(_ context.Context, id int) (contract.ModelProviderMapping, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	mapping, ok := s.mappingsByID[id]
+	if !ok {
+		return contract.ModelProviderMapping{}, errors.New("model provider mapping not found")
+	}
+	return cloneMapping(mapping), nil
+}
+
+func (s *Store) DeleteMapping(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	mapping, ok := s.mappingsByID[id]
+	if !ok {
+		return errors.New("model provider mapping not found")
+	}
+	delete(s.mappingByKey, mappingKey(mapping.ModelID, mapping.ProviderID, mapping.UpstreamModelName))
+	delete(s.mappingsByID, id)
+	if remaining := removeID(s.mappingIDsByModel[mapping.ModelID], id); len(remaining) == 0 {
+		delete(s.mappingIDsByModel, mapping.ModelID)
+	} else {
+		s.mappingIDsByModel[mapping.ModelID] = remaining
+	}
+	return nil
+}
+
+func removeID(ids []int, id int) []int {
+	out := make([]int, 0, len(ids))
+	for _, existing := range ids {
+		if existing != id {
+			out = append(out, existing)
+		}
+	}
+	return out
 }
 
 func (s *Store) List(_ context.Context) ([]contract.Model, error) {

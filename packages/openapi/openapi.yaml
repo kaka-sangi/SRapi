@@ -3346,6 +3346,41 @@ paths:
           $ref: "#/components/responses/StandardError"
 
   /api/v1/admin/models/{id}/aliases:
+    get:
+      tags:
+        - AdminModels
+      operationId: listAdminModelAliases
+      summary: List a model's aliases.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Model alias list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelAliasListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
     post:
       tags:
         - AdminModels
@@ -3392,7 +3427,84 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/models/{id}/aliases/{aliasId}:
+    delete:
+      tags:
+        - AdminModels
+      operationId: deleteAdminModelAlias
+      summary: Delete a model alias.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: aliasId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Model alias deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/models/{id}/mappings:
+    get:
+      tags:
+        - AdminModels
+      operationId: listAdminModelMappings
+      summary: List a model's provider mappings.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Model provider mapping list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelProviderMappingListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
     post:
       tags:
         - AdminModels
@@ -3436,6 +3548,48 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/models/{id}/mappings/{mappingId}:
+    delete:
+      tags:
+        - AdminModels
+      operationId: deleteAdminModelMapping
+      summary: Delete a model provider mapping.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: mappingId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Model provider mapping deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -16320,6 +16474,19 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    ModelAliasListResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelAlias"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     ModelProviderMapping:
       type: object
       required:
@@ -16381,6 +16548,19 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/ModelProviderMapping"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ModelProviderMappingListResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelProviderMapping"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

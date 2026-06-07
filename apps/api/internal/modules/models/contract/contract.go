@@ -131,9 +131,13 @@ type Store interface {
 	FindByAlias(ctx context.Context, alias string) (ModelAlias, error)
 	CreateAlias(ctx context.Context, input CreateStoredAlias) (ModelAlias, error)
 	ListAliasesByModel(ctx context.Context, modelID int) ([]ModelAlias, error)
+	FindAliasByID(ctx context.Context, id int) (ModelAlias, error)
+	DeleteAlias(ctx context.Context, id int) error
 	FindMapping(ctx context.Context, modelID int, providerID int, upstreamModelName string) (ModelProviderMapping, error)
 	CreateMapping(ctx context.Context, input CreateStoredMapping) (ModelProviderMapping, error)
 	ListMappingsByModel(ctx context.Context, modelID int) ([]ModelProviderMapping, error)
+	FindMappingByID(ctx context.Context, id int) (ModelProviderMapping, error)
+	DeleteMapping(ctx context.Context, id int) error
 	List(ctx context.Context) ([]Model, error)
 	// Delete removes a model and cascades its aliases and provider mappings so a
 	// removed model can't still be resolved via a lingering alias/mapping.

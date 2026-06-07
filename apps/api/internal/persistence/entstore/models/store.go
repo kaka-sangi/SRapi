@@ -161,6 +161,18 @@ func (s *Store) ListAliasesByModel(ctx context.Context, modelID int) ([]contract
 	return out, nil
 }
 
+func (s *Store) FindAliasByID(ctx context.Context, id int) (contract.ModelAlias, error) {
+	found, err := s.client.ModelAlias.Get(ctx, id)
+	if err != nil {
+		return contract.ModelAlias{}, err
+	}
+	return toAlias(found), nil
+}
+
+func (s *Store) DeleteAlias(ctx context.Context, id int) error {
+	return s.client.ModelAlias.DeleteOneID(id).Exec(ctx)
+}
+
 func (s *Store) FindMapping(ctx context.Context, modelID int, providerID int, upstreamModelName string) (contract.ModelProviderMapping, error) {
 	found, err := s.client.ModelProviderMapping.Query().
 		Where(
@@ -203,6 +215,18 @@ func (s *Store) ListMappingsByModel(ctx context.Context, modelID int) ([]contrac
 		out = append(out, toMapping(row))
 	}
 	return out, nil
+}
+
+func (s *Store) FindMappingByID(ctx context.Context, id int) (contract.ModelProviderMapping, error) {
+	found, err := s.client.ModelProviderMapping.Get(ctx, id)
+	if err != nil {
+		return contract.ModelProviderMapping{}, err
+	}
+	return toMapping(found), nil
+}
+
+func (s *Store) DeleteMapping(ctx context.Context, id int) error {
+	return s.client.ModelProviderMapping.DeleteOneID(id).Exec(ctx)
 }
 
 func (s *Store) List(ctx context.Context) ([]contract.Model, error) {

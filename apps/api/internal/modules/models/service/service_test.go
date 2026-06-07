@@ -166,6 +166,70 @@ func TestCreateMappingAndListByModel(t *testing.T) {
 	}
 }
 
+func TestDeleteAliasAndMapping(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	model, err := svc.Create(ctx, contract.CreateRequest{CanonicalName: "gpt-4o-mini", DisplayName: "GPT-4o mini"})
+	if err != nil {
+		t.Fatalf("create model: %v", err)
+	}
+	other, err := svc.Create(ctx, contract.CreateRequest{CanonicalName: "claude-3-5", DisplayName: "Claude 3.5"})
+	if err != nil {
+		t.Fatalf("create other model: %v", err)
+	}
+
+	alias, err := svc.CreateAlias(ctx, model.ID, contract.CreateAliasRequest{Alias: "4o-mini"})
+	if err != nil {
+		t.Fatalf("create alias: %v", err)
+	}
+	mapping, err := svc.CreateMapping(ctx, model.ID, contract.CreateMappingRequest{ProviderID: 10, UpstreamModelName: "openai/gpt-4o-mini"})
+	if err != nil {
+		t.Fatalf("create mapping: %v", err)
+	}
+
+	// An alias cannot be deleted via the wrong model (cross-model isolation).
+	if err := svc.DeleteAlias(ctx, other.ID, alias.ID); !errors.Is(err, ErrAliasNotFound) {
+		t.Fatalf("expected ErrAliasNotFound deleting alias under wrong model, got %v", err)
+	}
+	if err := svc.DeleteMapping(ctx, other.ID, mapping.ID); !errors.Is(err, ErrMappingNotFound) {
+		t.Fatalf("expected ErrMappingNotFound deleting mapping under wrong model, got %v", err)
+	}
+
+	if err := svc.DeleteAlias(ctx, model.ID, alias.ID); err != nil {
+		t.Fatalf("delete alias: %v", err)
+	}
+	if err := svc.DeleteMapping(ctx, model.ID, mapping.ID); err != nil {
+		t.Fatalf("delete mapping: %v", err)
+	}
+
+	aliases, err := svc.ListAliasesByModel(ctx, model.ID)
+	if err != nil {
+		t.Fatalf("list aliases: %v", err)
+	}
+	if len(aliases) != 0 {
+		t.Fatalf("expected no aliases after delete, got %d", len(aliases))
+	}
+	mappings, err := svc.ListMappingsByModel(ctx, model.ID)
+	if err != nil {
+		t.Fatalf("list mappings: %v", err)
+	}
+	if len(mappings) != 0 {
+		t.Fatalf("expected no mappings after delete, got %d", len(mappings))
+	}
+	// The freed alias name can be recreated.
+	if _, err := svc.CreateAlias(ctx, model.ID, contract.CreateAliasRequest{Alias: "4o-mini"}); err != nil {
+		t.Fatalf("recreate alias after delete: %v", err)
+	}
+	// Re-deleting the original alias is a not-found.
+	if err := svc.DeleteAlias(ctx, model.ID, alias.ID); !errors.Is(err, ErrAliasNotFound) {
+		t.Fatalf("expected ErrAliasNotFound re-deleting alias, got %v", err)
+	}
+}
+
 func TestCreateMappingRejectsUnknownCapabilityOverride(t *testing.T) {
 	store := newMemoryStore()
 	svc, err := New(store, nil)

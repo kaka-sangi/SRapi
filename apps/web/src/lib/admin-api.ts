@@ -143,7 +143,11 @@ import {
   listAdminModels,
   createAdminModel,
   createAdminModelAlias,
+  listAdminModelAliases,
+  deleteAdminModelAlias,
   createAdminModelMapping,
+  listAdminModelMappings,
+  deleteAdminModelMapping,
   updateAdminModel,
   deleteAdminModel,
   listAdminOpsAlertEvents,
@@ -615,6 +619,18 @@ export const adminApi = {
     body: Parameters<typeof createAdminModelMapping>[0]["body"],
   ): Promise<ModelProviderMapping> {
     return unwrapData(() => createAdminModelMapping({ path: { id }, body, throwOnError: true }));
+  },
+  listModelAliases(id: Id): Promise<AdminListResult<ModelAlias>> {
+    return unwrapList(() => listAdminModelAliases({ path: { id }, throwOnError: true }));
+  },
+  deleteModelAlias(id: Id, aliasId: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminModelAlias({ path: { id, aliasId }, throwOnError: true }));
+  },
+  listModelMappings(id: Id): Promise<AdminListResult<ModelProviderMapping>> {
+    return unwrapList(() => listAdminModelMappings({ path: { id }, throwOnError: true }));
+  },
+  deleteModelMapping(id: Id, mappingId: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminModelMapping({ path: { id, mappingId }, throwOnError: true }));
   },
 
   listAccounts(query?: ListAdminAccountsData["query"]): Promise<AdminListResult<ProviderAccount>> {

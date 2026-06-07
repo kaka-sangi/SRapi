@@ -13,6 +13,8 @@ export type {
   PlatformFamily,
   RuntimeClass,
   Model,
+  ModelAlias,
+  ModelProviderMapping,
   ProviderAccount,
   AccountGroup,
   ProxyDefinition,

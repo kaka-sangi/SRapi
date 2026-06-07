@@ -821,6 +821,35 @@ export function useCreateModelMapping() {
     ["admin", "models"],
   );
 }
+// Aliases/mappings of one model — fetched on demand (manage dialog). Keyed under
+// the models prefix so create/delete mutations (which invalidate ["admin","models"])
+// refetch them.
+export function useModelAliases(modelId: string | null) {
+  return useQuery({
+    queryKey: ["admin", "models", modelId ?? "", "aliases"],
+    queryFn: () => adminApi.listModelAliases(modelId as string),
+    enabled: Boolean(modelId),
+  });
+}
+export function useModelMappings(modelId: string | null) {
+  return useQuery({
+    queryKey: ["admin", "models", modelId ?? "", "mappings"],
+    queryFn: () => adminApi.listModelMappings(modelId as string),
+    enabled: Boolean(modelId),
+  });
+}
+export function useDeleteModelAlias() {
+  return useAdminMutation(
+    (vars: { id: string; aliasId: string }) => adminApi.deleteModelAlias(vars.id, vars.aliasId),
+    ["admin", "models"],
+  );
+}
+export function useDeleteModelMapping() {
+  return useAdminMutation(
+    (vars: { id: string; mappingId: string }) => adminApi.deleteModelMapping(vars.id, vars.mappingId),
+    ["admin", "models"],
+  );
+}
 
 // Account groups
 export function useCreateGroup() {

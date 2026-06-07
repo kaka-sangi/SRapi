@@ -1240,6 +1240,11 @@ export type ModelAliasResponse = {
     request_id: RequestId;
 };
 
+export type ModelAliasListResponse = {
+    data: Array<ModelAlias>;
+    request_id: RequestId;
+};
+
 export type ModelProviderMapping = {
     id: Id;
     model_id: Id;
@@ -1261,6 +1266,11 @@ export type CreateModelProviderMappingRequest = {
 
 export type ModelProviderMappingResponse = {
     data: ModelProviderMapping;
+    request_id: RequestId;
+};
+
+export type ModelProviderMappingListResponse = {
+    data: Array<ModelProviderMapping>;
     request_id: RequestId;
 };
 
@@ -8770,6 +8780,45 @@ export type UpdateAdminModelResponses = {
 
 export type UpdateAdminModelResponse = UpdateAdminModelResponses[keyof UpdateAdminModelResponses];
 
+export type ListAdminModelAliasesData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/models/{id}/aliases';
+};
+
+export type ListAdminModelAliasesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminModelAliasesError = ListAdminModelAliasesErrors[keyof ListAdminModelAliasesErrors];
+
+export type ListAdminModelAliasesResponses = {
+    /**
+     * Model alias list.
+     */
+    200: ModelAliasListResponse;
+};
+
+export type ListAdminModelAliasesResponse = ListAdminModelAliasesResponses[keyof ListAdminModelAliasesResponses];
+
 export type CreateAdminModelAliasData = {
     body: CreateModelAliasRequest;
     path: {
@@ -8817,6 +8866,85 @@ export type CreateAdminModelAliasResponses = {
 
 export type CreateAdminModelAliasResponse = CreateAdminModelAliasResponses[keyof CreateAdminModelAliasResponses];
 
+export type DeleteAdminModelAliasData = {
+    body?: never;
+    path: {
+        id: Id;
+        aliasId: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/models/{id}/aliases/{aliasId}';
+};
+
+export type DeleteAdminModelAliasErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminModelAliasError = DeleteAdminModelAliasErrors[keyof DeleteAdminModelAliasErrors];
+
+export type DeleteAdminModelAliasResponses = {
+    /**
+     * Model alias deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminModelAliasResponse = DeleteAdminModelAliasResponses[keyof DeleteAdminModelAliasResponses];
+
+export type ListAdminModelMappingsData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/models/{id}/mappings';
+};
+
+export type ListAdminModelMappingsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminModelMappingsError = ListAdminModelMappingsErrors[keyof ListAdminModelMappingsErrors];
+
+export type ListAdminModelMappingsResponses = {
+    /**
+     * Model provider mapping list.
+     */
+    200: ModelProviderMappingListResponse;
+};
+
+export type ListAdminModelMappingsResponse = ListAdminModelMappingsResponses[keyof ListAdminModelMappingsResponses];
+
 export type CreateAdminModelMappingData = {
     body: CreateModelProviderMappingRequest;
     path: {
@@ -8863,6 +8991,46 @@ export type CreateAdminModelMappingResponses = {
 };
 
 export type CreateAdminModelMappingResponse = CreateAdminModelMappingResponses[keyof CreateAdminModelMappingResponses];
+
+export type DeleteAdminModelMappingData = {
+    body?: never;
+    path: {
+        id: Id;
+        mappingId: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/models/{id}/mappings/{mappingId}';
+};
+
+export type DeleteAdminModelMappingErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminModelMappingError = DeleteAdminModelMappingErrors[keyof DeleteAdminModelMappingErrors];
+
+export type DeleteAdminModelMappingResponses = {
+    /**
+     * Model provider mapping deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminModelMappingResponse = DeleteAdminModelMappingResponses[keyof DeleteAdminModelMappingResponses];
 
 export type ListAdminAccountsData = {
     body?: never;
