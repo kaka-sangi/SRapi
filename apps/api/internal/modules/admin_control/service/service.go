@@ -407,6 +407,24 @@ func (s *Service) RedeemCodeStats(ctx context.Context) (admincontrol.RedeemCodeS
 	return stats, nil
 }
 
+func (s *Service) DeleteRedeemCode(ctx context.Context, id int, actorUserID int) (admincontrol.RedeemCode, error) {
+	var collection redeemCodeCollection
+	if err := s.loadTyped(ctx, settingsKeyRedeemCodes, &collection); err != nil {
+		return admincontrol.RedeemCode{}, err
+	}
+	for idx, item := range collection.Items {
+		if item.ID != id {
+			continue
+		}
+		collection.Items = append(collection.Items[:idx], collection.Items[idx+1:]...)
+		if err := s.saveTyped(ctx, settingsKeyRedeemCodes, collection, actorUserID); err != nil {
+			return admincontrol.RedeemCode{}, err
+		}
+		return item, nil
+	}
+	return admincontrol.RedeemCode{}, admincontrol.ErrNotFound
+}
+
 func (s *Service) RedeemCode(ctx context.Context, user userscontract.User, req admincontrol.RedeemCodeRedemptionRequest) (admincontrol.RedeemCodeRedemptionResult, error) {
 	if user.ID <= 0 {
 		return admincontrol.RedeemCodeRedemptionResult{}, admincontrol.ErrInvalidInput

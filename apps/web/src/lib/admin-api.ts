@@ -93,6 +93,7 @@ import {
   createAdminProxy,
   deleteAdminProxy,
   createAdminRedeemCode,
+  deleteAdminRedeemCode,
   createAdminSubscriptionPlan,
   deleteAdminSubscriptionPlan,
   updateAdminSubscriptionPlan,
@@ -1329,6 +1330,10 @@ export const adminApi = {
 
   batchDisableRedeemCodes(ids: Id[]): Promise<unknown> {
     return unwrapData(() => batchDisableAdminRedeemCodes({ body: { ids }, throwOnError: true }));
+  },
+
+  deleteRedeemCode(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminRedeemCode({ path: { id }, throwOnError: true }));
   },
 
   getRedeemStats(): Promise<RedeemCodeStats> {

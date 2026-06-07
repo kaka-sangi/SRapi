@@ -298,6 +298,30 @@ func (s *Server) handleAdminRedeemCodeStats(w http.ResponseWriter, r *http.Reque
 	writeJSONAny(w, http.StatusOK, apiopenapi.RedeemCodeStatsResponse{Data: toAPIRedeemCodeStats(stats), RequestId: requestID})
 }
 
+func (s *Server) handleDeleteAdminRedeemCode(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	id, ok := pathID(w, r, requestID)
+	if !ok {
+		return
+	}
+	deleted, err := s.runtime.adminControl.DeleteRedeemCode(r.Context(), id, session.User.ID)
+	if err != nil {
+		writeAdminControlError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "redeem_code.delete", "redeem_code", strconv.Itoa(deleted.ID), adminControlAuditSnapshot(deleted), nil))
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
+}
+
 func (s *Server) handleListAdminPromoCodes(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {

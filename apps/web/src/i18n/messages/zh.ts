@@ -853,6 +853,8 @@ export const zh: Messages = {
     usagesTime: "时间",
     usagesEmpty: "暂无使用记录。",
     createRedeem: "新建兑换码",
+    deleteRedeemTitle: "删除兑换码",
+    deleteRedeemBody: "确定要删除兑换码「{code}」吗？该兑换码记录将被彻底移除（已发生的兑换入账不受影响）。此操作不可撤销。",
     batchGenerate: "批量生成",
     maxRedemptions: "可兑换次数",
     generatedTitle: "已生成兑换码",

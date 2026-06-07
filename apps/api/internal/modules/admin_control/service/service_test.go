@@ -366,6 +366,46 @@ func TestUpdateAdminSettingsNormalizesGatewayRetryKnobs(t *testing.T) {
 	}
 }
 
+func TestDeleteRedeemCode(t *testing.T) {
+	now := time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	code, err := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code:           "CLEANUP1",
+		Type:           admincontrol.RedeemCodeTypeBalance,
+		Value:          "5",
+		Currency:       "USD",
+		MaxRedemptions: 1,
+	}, 1)
+	if err != nil {
+		t.Fatalf("create redeem code: %v", err)
+	}
+
+	deleted, err := svc.DeleteRedeemCode(context.Background(), code.ID, 1)
+	if err != nil {
+		t.Fatalf("delete redeem code: %v", err)
+	}
+	if deleted.ID != code.ID {
+		t.Fatalf("unexpected deleted code: %+v", deleted)
+	}
+
+	list, err := svc.ListRedeemCodes(context.Background(), admincontrol.ListOptions{})
+	if err != nil {
+		t.Fatalf("list redeem codes: %v", err)
+	}
+	if list.Total != 0 {
+		t.Fatalf("expected no redeem codes after delete, got %d", list.Total)
+	}
+
+	// Re-deleting an already-removed code is a not-found, not a crash.
+	if _, err := svc.DeleteRedeemCode(context.Background(), code.ID, 1); !errors.Is(err, admincontrol.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound re-deleting, got %v", err)
+	}
+}
+
 func TestRedeemCodeCreditsBalanceOnce(t *testing.T) {
 	now := time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)
 	users := usermemory.New()

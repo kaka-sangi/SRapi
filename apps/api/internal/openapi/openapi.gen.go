@@ -16607,6 +16607,9 @@ type ServerInterface interface {
 	// Get redeem code statistics.
 	// (GET /api/v1/admin/redeem-codes/stats)
 	GetAdminRedeemCodeStats(w http.ResponseWriter, r *http.Request)
+	// Delete a redeem code.
+	// (DELETE /api/v1/admin/redeem-codes/{id})
+	DeleteAdminRedeemCode(w http.ResponseWriter, r *http.Request, id Id)
 	// Get risk-control configuration.
 	// (GET /api/v1/admin/risk-control/config)
 	GetAdminRiskControlConfig(w http.ResponseWriter, r *http.Request)
@@ -23386,6 +23389,40 @@ func (siw *ServerInterfaceWrapper) GetAdminRedeemCodeStats(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteAdminRedeemCode operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminRedeemCode(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminRedeemCode(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAdminRiskControlConfig operation middleware
 func (siw *ServerInterfaceWrapper) GetAdminRiskControlConfig(w http.ResponseWriter, r *http.Request) {
 
@@ -28962,6 +28999,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-disable", wrapper.BatchDisableAdminRedeemCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-generate", wrapper.BatchGenerateAdminRedeemCodes)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/redeem-codes/stats", wrapper.GetAdminRedeemCodeStats)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/redeem-codes/{id}", wrapper.DeleteAdminRedeemCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/risk-control/config", wrapper.GetAdminRiskControlConfig)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/risk-control/config", wrapper.UpdateAdminRiskControlConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/risk-control/logs", wrapper.ListAdminRiskControlLogs)

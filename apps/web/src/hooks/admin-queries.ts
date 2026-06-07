@@ -1133,6 +1133,9 @@ export function useBatchDisableRedeemCodes() {
     ["admin", "redeem-codes"],
   );
 }
+export function useDeleteRedeemCode() {
+  return useAdminMutation((id: string) => adminApi.deleteRedeemCode(id), ["admin", "redeem-codes"]);
+}
 export function useRedeemStats() {
   return useQuery({
     queryKey: queryKeys.admin.redeemStats(),

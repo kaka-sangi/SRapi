@@ -860,6 +860,9 @@ export const en = {
     usagesTime: "Time",
     usagesEmpty: "No redemptions yet.",
     createRedeem: "New redeem code",
+    deleteRedeemTitle: "Delete redeem code",
+    deleteRedeemBody:
+      "Delete redeem code “{code}”? The code record is removed for good (redemptions already credited are unaffected). This cannot be undone.",
     batchGenerate: "Batch generate",
     maxRedemptions: "Max redemptions",
     generatedTitle: "Generated redeem codes",

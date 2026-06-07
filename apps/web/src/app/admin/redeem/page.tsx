@@ -28,6 +28,7 @@ import {
   useCreateRedeemCode,
   useBatchGenerateRedeemCodes,
   useBatchDisableRedeemCodes,
+  useDeleteRedeemCode,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -87,10 +88,12 @@ function RedeemContent() {
   const stats = useRedeemStats();
   const createMut = useCreateRedeemCode();
   const disableMut = useBatchDisableRedeemCodes();
+  const deleteMut = useDeleteRedeemCode();
 
   const [creating, setCreating] = useState(false);
   const [batching, setBatching] = useState(false);
   const [disableTarget, setDisableTarget] = useState<RedeemCode | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RedeemCode | null>(null);
   const [bulkDisabling, setBulkDisabling] = useState(false);
 
   // Disable only ACTIVE selected codes — never re-disable redeemed/expired ones.
@@ -239,19 +242,21 @@ function RedeemContent() {
             </Button>
           ),
         }}
-        rowActions={(c) =>
-          c.status === "active" ? (
-            <RowActionsMenu
-              actions={[
-                {
-                  label: t("adminPromos.disable"),
-                  destructive: true,
-                  onSelect: () => setDisableTarget(c),
-                },
-              ]}
-            />
-          ) : null
-        }
+        rowActions={(c) => (
+          <RowActionsMenu
+            actions={[
+              ...(c.status === "active"
+                ? [
+                    {
+                      label: t("adminPromos.disable"),
+                      onSelect: () => setDisableTarget(c),
+                    },
+                  ]
+                : []),
+              { label: t("common.delete"), destructive: true, onSelect: () => setDeleteTarget(c) },
+            ]}
+          />
+        )}
       />
 
       {creating ? (
@@ -297,6 +302,21 @@ function RedeemContent() {
           confirmLabel={t("adminPromos.disableSelected")}
           onConfirm={confirmBulkDisable}
           isPending={disableMut.isPending}
+        />
+      ) : null}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setDeleteTarget(null);
+          }}
+          title={t("adminPromos.deleteRedeemTitle")}
+          body={t("adminPromos.deleteRedeemBody", { code: deleteTarget.code })}
+          confirmLabel={t("common.delete")}
+          successMessage={t("feedback.deleted")}
+          isPending={deleteMut.isPending}
+          onConfirm={() => deleteMut.mutateAsync(deleteTarget.id)}
         />
       ) : null}
     </>

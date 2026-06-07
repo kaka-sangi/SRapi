@@ -13186,6 +13186,45 @@ export type CreateAdminRedeemCodeResponses = {
 
 export type CreateAdminRedeemCodeResponse = CreateAdminRedeemCodeResponses[keyof CreateAdminRedeemCodeResponses];
 
+export type DeleteAdminRedeemCodeData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/redeem-codes/{id}';
+};
+
+export type DeleteAdminRedeemCodeErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminRedeemCodeError = DeleteAdminRedeemCodeErrors[keyof DeleteAdminRedeemCodeErrors];
+
+export type DeleteAdminRedeemCodeResponses = {
+    /**
+     * Redeem code deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminRedeemCodeResponse = DeleteAdminRedeemCodeResponses[keyof DeleteAdminRedeemCodeResponses];
+
 export type BatchGenerateAdminRedeemCodesData = {
     body: BatchGenerateRedeemCodesRequest;
     path?: never;
