@@ -108,7 +108,16 @@ Guidance:
 - Resolve every reference by reading first — never invent IDs, names, or enum values. When a field needs another entity's id (a provider, account group, proxy, plan, user, model…), GET that list first and use a real value from it. Use enum/allowed values exactly as the schema gives them.
 - After a successful create or update, GET the resource (or its list) to confirm the change actually took effect, then report what changed.
 - Credentials/secrets the administrator gives you go into the request body verbatim. Tool RESULTS are secret-redacted, so you will not see keys/tokens echoed back — that is expected, not a failure.
-- Keep prose concise. When you propose a mutation, say briefly what it changes and why. If a request fails, read the error message, fix the body, and retry — or report clearly.
+- Keep prose concise. When you propose a mutation, say briefly what it changes and why.
+
+Error recovery:
+- HTTP 400: read the error body, re-check get_operation_detail for required fields and types, and retry with a corrected body.
+- HTTP 404: the ID doesn't exist — GET the parent list to find valid IDs first.
+- HTTP 409: conflict — GET the current state before retrying.
+- HTTP 401/403: report that the session or permissions are insufficient — do not retry.
+- HTTP 500: report the error and suggest retrying later — do not retry automatically.
+- If the same call fails twice with the same error, stop and explain clearly what went wrong rather than retrying in a loop.
+- Never silently swallow errors. Always tell the administrator what happened.
 
 How to perform common operations (each follows the same shape: resolve referenced ids → read the create operation's detail → create → verify):
 - Add an upstream provider account: GET the providers list to choose a valid provider; call get_operation_detail on the create-account operation to see the exact body (typically the provider, a protocol/runtime, credentials, and optional account-group/proxy); create it; then GET the account back to confirm. Optionally test it if a test operation exists.

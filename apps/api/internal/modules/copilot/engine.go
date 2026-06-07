@@ -369,5 +369,22 @@ func marshalJSON(v any) string {
 }
 
 func llmErrorMessage(err error) string {
-	return "the copilot model call failed: " + err.Error()
+	msg := err.Error()
+	lower := strings.ToLower(msg)
+	switch {
+	case strings.Contains(lower, "rate limit") || strings.Contains(lower, "429") || strings.Contains(lower, "too many requests"):
+		return "Rate limited by the model provider — retry in a moment"
+	case strings.Contains(lower, "context length") || (strings.Contains(lower, "maximum") && strings.Contains(lower, "token")) || strings.Contains(lower, "too long"):
+		return "Conversation too long for the model — start a new conversation"
+	case strings.Contains(lower, "unauthorized") || strings.Contains(lower, "401") || (strings.Contains(lower, "invalid") && strings.Contains(lower, "key")) || strings.Contains(lower, "authentication"):
+		return "Model authentication failed — check the copilot API key in settings"
+	case strings.Contains(lower, "model") && (strings.Contains(lower, "not found") || strings.Contains(lower, "not exist") || strings.Contains(lower, "not available")):
+		return "The selected model is not available — change it in copilot settings"
+	case strings.Contains(lower, "timeout") || strings.Contains(lower, "deadline exceeded"):
+		return "Model call timed out — retry or try a smaller request"
+	case strings.Contains(lower, "connection refused") || strings.Contains(lower, "no such host") || strings.Contains(lower, "dns"):
+		return "Cannot reach the model provider — check network and base URL"
+	default:
+		return "Model call failed: " + msg
+	}
 }

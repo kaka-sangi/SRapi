@@ -34,7 +34,6 @@ interface CopilotSessionValue {
   running: boolean;
   pending: PendingAction | null;
   error: string | null;
-  step: { step: number; max: number } | null;
   usage: TurnUsage | null;
   activeId: number | null;
   model: string;
@@ -79,7 +78,6 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
   const [running, setRunning] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<{ step: number; max: number } | null>(null);
   const [usage, setUsage] = useState<TurnUsage | null>(null);
   const [activeId, setActiveId] = useState<number | null>(stored.activeId);
   const [model, setModel] = useState("");
@@ -128,7 +126,6 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
     setRunning(true);
     setError(null);
     setPending(null);
-    setStep(null);
     setUsage(null);
     const controller = new AbortController();
     abortRef.current = controller;
@@ -136,6 +133,7 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
     let assistantIdx = -1;
     let turnInput = 0;
     let turnOutput = 0;
+    let receivedTerminal = false;
 
     const ensureAssistant = () => {
       if (assistantIdx < 0) {
@@ -146,9 +144,6 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
 
     const onEvent = (event: CopilotEvent) => {
       switch (event.type) {
-        case "step":
-          setStep({ step: event.data.step, max: event.data.max_steps });
-          break;
         case "usage":
           turnInput += event.data.input_tokens;
           turnOutput += event.data.output_tokens;
@@ -196,14 +191,18 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
           setMessages([...working]);
           break;
         case "pending_action":
+          receivedTerminal = true;
+          persistSession([...working], activeIdRef.current);
           setPending(event.data);
           break;
         case "done":
+          receivedTerminal = true;
           persistSession(event.data.messages, activeIdRef.current);
           setPending(null);
           void saveToServer(event.data.messages);
           break;
         case "error":
+          receivedTerminal = true;
           setError(event.data.message);
           break;
       }
@@ -218,6 +217,10 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
         signal: controller.signal,
         onEvent,
       });
+      if (!receivedTerminal) {
+        setError("Connection lost — the response may be incomplete");
+        if (working.length > history.length) persistSession([...working], activeIdRef.current);
+      }
     } catch (err) {
       if ((err as Error)?.name !== "AbortError") setError((err as Error)?.message ?? "Stream error");
     } finally {
@@ -267,7 +270,6 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
     persistSession([], null);
     setPending(null);
     setError(null);
-    setStep(null);
     setUsage(null);
   }
 
@@ -275,7 +277,6 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
     abortRef.current?.abort();
     setPending(null);
     setError(null);
-    setStep(null);
     setUsage(null);
     try {
       const conv = await getCopilotConversation(id);
@@ -299,7 +300,6 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
     running,
     pending,
     error,
-    step,
     usage,
     activeId,
     model,

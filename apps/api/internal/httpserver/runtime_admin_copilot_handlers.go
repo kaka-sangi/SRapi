@@ -117,7 +117,11 @@ func (s *Server) handleAdminCopilotChat(w http.ResponseWriter, r *http.Request) 
 	emit := func(ev copilot.Event) {
 		data, mErr := json.Marshal(ev.Data)
 		if mErr != nil {
-			data = []byte("{}")
+			fmt.Fprintf(w, "event: error\ndata: {\"message\":\"internal encoding error\"}\n\n")
+			if flusher != nil {
+				flusher.Flush()
+			}
+			return
 		}
 		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", ev.Type, data)
 		if flusher != nil {
@@ -225,7 +229,7 @@ func (s *Server) buildCopilotLLM(settings copilot.Settings, ciphertext, override
 		streamReq.Stream = true
 		if streamResp, err := s.runtime.adapters.StreamConversation(ctx, streamReq); err == nil && streamResp.StreamBody != nil {
 			defer func() { _ = streamResp.StreamBody.Close() }()
-			raw, content, reasoning := consumeCopilotStream(streamResp.StreamBody, onDelta)
+			raw, content, reasoning, streamToolCalls := consumeCopilotStream(streamResp.StreamBody, onDelta)
 			status := streamResp.StatusCode
 			if status == 0 {
 				status = http.StatusOK
@@ -235,14 +239,14 @@ func (s *Server) buildCopilotLLM(settings copilot.Settings, ciphertext, override
 					return final, nil
 				}
 			}
-			// Stream parsed loosely (non-OpenAI shape): return what we accumulated.
-			parts := make([]provideradaptercontract.ContentPart, 0, 2)
+			parts := make([]provideradaptercontract.ContentPart, 0, 2+len(streamToolCalls))
 			if reasoning != "" {
 				parts = append(parts, provideradaptercontract.ContentPart{Kind: provideradaptercontract.ContentPartThinking, Text: reasoning})
 			}
 			if content != "" {
 				parts = append(parts, provideradaptercontract.ContentPart{Kind: provideradaptercontract.ContentPartText, Text: content})
 			}
+			parts = append(parts, streamToolCalls...)
 			return provideradaptercontract.ConversationResponse{Parts: parts, StopReason: provideradaptercontract.StopReasonEndTurn, StatusCode: status}, nil
 		} else if err != nil && !errors.Is(err, provideradaptercontract.ErrStreamingUnsupported) {
 			return provideradaptercontract.ConversationResponse{}, err
@@ -268,10 +272,17 @@ func (s *Server) buildCopilotLLM(settings copilot.Settings, ciphertext, override
 
 // consumeCopilotStream reads an OpenAI-style SSE stream, forwarding content and
 // reasoning_content deltas via onDelta as they arrive, and returns the raw bytes
-// (for StreamParse) plus the accumulated content/reasoning.
-func consumeCopilotStream(body io.Reader, onDelta func(kind, text string)) (raw []byte, content, reasoning string) {
+// (for StreamParse), the accumulated content/reasoning, and any tool calls
+// parsed from delta.tool_calls chunks.
+func consumeCopilotStream(body io.Reader, onDelta func(kind, text string)) (raw []byte, content, reasoning string, toolCalls []provideradaptercontract.ContentPart) {
+	type streamToolCall struct {
+		id   string
+		name string
+		args strings.Builder
+	}
 	var rawBuf bytes.Buffer
 	var contentBuf, reasoningBuf strings.Builder
+	toolCallsByIdx := map[int]*streamToolCall{}
 	scanner := bufio.NewScanner(io.TeeReader(body, &rawBuf))
 	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
 	for scanner.Scan() {
@@ -288,6 +299,14 @@ func consumeCopilotStream(body io.Reader, onDelta func(kind, text string)) (raw 
 				Delta struct {
 					Content          string `json:"content"`
 					ReasoningContent string `json:"reasoning_content"`
+					ToolCalls        []struct {
+						Index    int    `json:"index"`
+						ID       string `json:"id"`
+						Function struct {
+							Name      string `json:"name"`
+							Arguments string `json:"arguments"`
+						} `json:"function"`
+					} `json:"tool_calls"`
 				} `json:"delta"`
 			} `json:"choices"`
 		}
@@ -302,8 +321,42 @@ func consumeCopilotStream(body io.Reader, onDelta func(kind, text string)) (raw 
 			contentBuf.WriteString(cc)
 			onDelta("content", cc)
 		}
+		for _, tc := range chunk.Choices[0].Delta.ToolCalls {
+			stc, ok := toolCallsByIdx[tc.Index]
+			if !ok {
+				stc = &streamToolCall{}
+				toolCallsByIdx[tc.Index] = stc
+			}
+			if tc.ID != "" {
+				stc.id = tc.ID
+			}
+			if tc.Function.Name != "" {
+				stc.name = tc.Function.Name
+			}
+			stc.args.WriteString(tc.Function.Arguments)
+		}
 	}
-	return rawBuf.Bytes(), contentBuf.String(), reasoningBuf.String()
+	if len(toolCallsByIdx) > 0 {
+		maxIdx := 0
+		for idx := range toolCallsByIdx {
+			if idx > maxIdx {
+				maxIdx = idx
+			}
+		}
+		for i := 0; i <= maxIdx; i++ {
+			stc, ok := toolCallsByIdx[i]
+			if !ok {
+				continue
+			}
+			toolCalls = append(toolCalls, provideradaptercontract.ContentPart{
+				Kind:              provideradaptercontract.ContentPartToolUse,
+				ToolCallID:        stc.id,
+				ToolName:          stc.name,
+				ToolArgumentsJSON: stc.args.String(),
+			})
+		}
+	}
+	return rawBuf.Bytes(), contentBuf.String(), reasoningBuf.String(), toolCalls
 }
 
 // copilotEffortBudget maps a thinking-effort level to an Anthropic/Gemini

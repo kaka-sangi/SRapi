@@ -51,7 +51,6 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
     running,
     pending,
     error,
-    step,
     usage,
     model,
     effort,
@@ -160,14 +159,6 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
                 <div className="flex items-center gap-2 pl-9 text-sm text-srapi-text-tertiary">
                   <Loader2 className="size-4 animate-spin" />
                   {t("copilot.thinking")}
-                  {step ? (
-                    <span className="text-2xs text-srapi-text-tertiary">
-                      ·{" "}
-                      {step.max > 0
-                        ? t("copilot.stepProgress", { step: step.step, max: step.max })
-                        : t("copilot.stepProgressOpen", { step: step.step })}
-                    </span>
-                  ) : null}
                 </div>
               ) : null}
               {pending ? <PendingActionBanner action={pending} onResolve={resolvePending} disabled={running} /> : null}
