@@ -468,6 +468,41 @@ func (s *Server) handleUpdateAdminSubscriptionPlan(w http.ResponseWriter, r *htt
 	})
 }
 
+func (s *Server) handleDeleteAdminSubscriptionPlan(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	planID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || planID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid plan id", requestID)
+		return
+	}
+	var beforeSnapshot map[string]any
+	if existing, findErr := s.runtime.subscriptions.FindPlanByID(r.Context(), planID); findErr == nil {
+		beforeSnapshot = subscriptionPlanAuditSnapshot(existing)
+	}
+	if err := s.runtime.subscriptions.DeletePlan(r.Context(), planID); err != nil {
+		if errors.Is(err, subscriptioncontract.ErrNotFound) {
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "subscription plan not found", requestID)
+			return
+		}
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete subscription plan", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "subscription_plan.delete", "subscription_plan", strconv.Itoa(planID), beforeSnapshot, nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       map[string]any{"id": planID, "deleted": true},
+		"request_id": requestID,
+	})
+}
+
 func (s *Server) handleListAdminUserSubscriptions(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {

@@ -97,6 +97,20 @@ func (s *Store) ListPlans(ctx context.Context) ([]contract.SubscriptionPlan, err
 	return out, nil
 }
 
+func (s *Store) DeletePlan(ctx context.Context, id int) error {
+	affected, err := s.client.SubscriptionPlan.Update().
+		Where(entsubscriptionplan.IDEQ(id), entsubscriptionplan.DeletedAtIsNil()).
+		SetDeletedAt(time.Now().UTC()).
+		Save(ctx)
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return contract.ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) CreateUserSubscription(ctx context.Context, input contract.CreateStoredSubscription) (contract.UserSubscription, error) {
 	tx, err := s.client.Tx(ctx)
 	if err != nil {

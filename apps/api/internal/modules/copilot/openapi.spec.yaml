@@ -5778,6 +5778,44 @@ paths:
           $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminSubscriptions
+      operationId: deleteAdminSubscriptionPlan
+      summary: Delete a subscription plan.
+      description: >-
+        Soft-deletes the plan so it is no longer offered. Existing user
+        subscriptions keep their entitlements snapshot and are unaffected.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Subscription plan deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
 
   /api/v1/admin/user-subscriptions:
     get:

@@ -160,6 +160,16 @@ func (s *Service) FindPlanByID(ctx context.Context, id int) (contract.Subscripti
 	return s.store.FindPlanByID(ctx, id)
 }
 
+// DeletePlan soft-deletes a plan so it stops being offered. Existing user
+// subscriptions are unaffected: they carry their own entitlements snapshot, so a
+// removed plan never strips access already granted.
+func (s *Service) DeletePlan(ctx context.Context, id int) error {
+	if id <= 0 {
+		return ErrInvalidInput
+	}
+	return s.store.DeletePlan(ctx, id)
+}
+
 func (s *Service) CreateUserSubscription(ctx context.Context, req contract.CreateSubscriptionRequest) (contract.UserSubscription, error) {
 	if req.UserID <= 0 || req.PlanID <= 0 {
 		return contract.UserSubscription{}, ErrInvalidInput

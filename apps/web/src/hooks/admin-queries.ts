@@ -1154,6 +1154,12 @@ export function useUpdateSubscriptionPlan() {
     ["admin", "subscription-plans"],
   );
 }
+export function useDeleteSubscriptionPlan() {
+  return useAdminMutation(
+    (id: string) => adminApi.deleteSubscriptionPlan(id),
+    ["admin", "subscription-plans"],
+  );
+}
 export function useCreateUserSubscription() {
   return useAdminMutation(
     (body: P<typeof adminApi.createUserSubscription>) => adminApi.createUserSubscription(body),

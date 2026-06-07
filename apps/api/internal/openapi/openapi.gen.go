@@ -16679,6 +16679,9 @@ type ServerInterface interface {
 	// Create a subscription plan.
 	// (POST /api/v1/admin/subscription-plans)
 	CreateAdminSubscriptionPlan(w http.ResponseWriter, r *http.Request)
+	// Delete a subscription plan.
+	// (DELETE /api/v1/admin/subscription-plans/{id})
+	DeleteAdminSubscriptionPlan(w http.ResponseWriter, r *http.Request, id Id)
 	// Update a subscription plan.
 	// (PATCH /api/v1/admin/subscription-plans/{id})
 	UpdateAdminSubscriptionPlan(w http.ResponseWriter, r *http.Request, id Id)
@@ -24170,6 +24173,40 @@ func (siw *ServerInterfaceWrapper) CreateAdminSubscriptionPlan(w http.ResponseWr
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteAdminSubscriptionPlan operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminSubscriptionPlan(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminSubscriptionPlan(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // UpdateAdminSubscriptionPlan operation middleware
 func (siw *ServerInterfaceWrapper) UpdateAdminSubscriptionPlan(w http.ResponseWriter, r *http.Request) {
 
@@ -28949,6 +28986,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/settings/send-test-email", wrapper.SendAdminTestEmail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/subscription-plans", wrapper.ListAdminSubscriptionPlans)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/subscription-plans", wrapper.CreateAdminSubscriptionPlan)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/subscription-plans/{id}", wrapper.DeleteAdminSubscriptionPlan)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/subscription-plans/{id}", wrapper.UpdateAdminSubscriptionPlan)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/tls-profiles", wrapper.ListAdminTLSProfiles)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/tls-profiles", wrapper.CreateAdminTLSProfile)

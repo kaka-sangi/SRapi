@@ -6,6 +6,7 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -15,6 +16,7 @@ import {
   useAdminSubscriptionPlans,
   useCreateSubscriptionPlan,
   useUpdateSubscriptionPlan,
+  useDeleteSubscriptionPlan,
   useAdminModels,
   useAdminGroups,
 } from "@/hooks/admin-queries";
@@ -48,8 +50,10 @@ function PlansContent() {
   const groups = useAdminGroups();
   const createMut = useCreateSubscriptionPlan();
   const updateMut = useUpdateSubscriptionPlan();
+  const deleteMut = useDeleteSubscriptionPlan();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<SubscriptionPlan | null>(null);
+  const [toDelete, setToDelete] = useState<SubscriptionPlan | null>(null);
 
   // Options for the structured "allowed models" / "account group scope" pickers,
   // sourced live so an admin chooses real models/groups instead of typing keys.
@@ -188,8 +192,28 @@ function PlansContent() {
         }
         minWidth={480}
         rowActions={(p) => (
-          <RowActionsMenu actions={[{ label: t("common.edit"), onSelect: () => setEditing(p) }]} />
+          <RowActionsMenu
+            actions={[
+              { label: t("common.edit"), onSelect: () => setEditing(p) },
+              { label: t("common.delete"), destructive: true, onSelect: () => setToDelete(p) },
+            ]}
+          />
         )}
+      />
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setToDelete(null);
+        }}
+        title={t("adminSubscriptions.deletePlanTitle")}
+        body={t("adminSubscriptions.deletePlanBody", { name: toDelete?.name ?? "" })}
+        confirmLabel={t("common.delete")}
+        successMessage={t("feedback.deleted")}
+        isPending={deleteMut.isPending}
+        onConfirm={async () => {
+          if (toDelete) await deleteMut.mutateAsync(toDelete.id);
+        }}
       />
 
       {creating ? (

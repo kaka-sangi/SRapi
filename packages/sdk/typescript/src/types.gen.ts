@@ -11215,6 +11215,45 @@ export type CreateAdminSubscriptionPlanResponses = {
 
 export type CreateAdminSubscriptionPlanResponse = CreateAdminSubscriptionPlanResponses[keyof CreateAdminSubscriptionPlanResponses];
 
+export type DeleteAdminSubscriptionPlanData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/subscription-plans/{id}';
+};
+
+export type DeleteAdminSubscriptionPlanErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminSubscriptionPlanError = DeleteAdminSubscriptionPlanErrors[keyof DeleteAdminSubscriptionPlanErrors];
+
+export type DeleteAdminSubscriptionPlanResponses = {
+    /**
+     * Subscription plan deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminSubscriptionPlanResponse = DeleteAdminSubscriptionPlanResponses[keyof DeleteAdminSubscriptionPlanResponses];
+
 export type UpdateAdminSubscriptionPlanData = {
     body: UpdateSubscriptionPlanRequest;
     path: {

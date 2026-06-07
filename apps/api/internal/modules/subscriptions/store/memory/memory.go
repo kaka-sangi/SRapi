@@ -103,7 +103,7 @@ func (s *Store) FindPlanByID(_ context.Context, id int) (contract.SubscriptionPl
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	plan, ok := s.plans[id]
-	if !ok {
+	if !ok || plan.DeletedAt != nil {
 		return contract.SubscriptionPlan{}, errors.New("subscription plan not found")
 	}
 	return clonePlan(plan), nil
@@ -114,6 +114,9 @@ func (s *Store) ListPlans(_ context.Context) ([]contract.SubscriptionPlan, error
 	defer s.mu.Unlock()
 	out := make([]contract.SubscriptionPlan, 0, len(s.plans))
 	for _, plan := range s.plans {
+		if plan.DeletedAt != nil {
+			continue
+		}
 		out = append(out, clonePlan(plan))
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -123,6 +126,20 @@ func (s *Store) ListPlans(_ context.Context) ([]contract.SubscriptionPlan, error
 		return out[i].SortOrder < out[j].SortOrder
 	})
 	return out, nil
+}
+
+func (s *Store) DeletePlan(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	plan, ok := s.plans[id]
+	if !ok || plan.DeletedAt != nil {
+		return errors.New("subscription plan not found")
+	}
+	now := time.Now().UTC()
+	plan.DeletedAt = &now
+	plan.UpdatedAt = now
+	s.plans[id] = plan
+	return nil
 }
 
 func (s *Store) CreateUserSubscription(_ context.Context, input contract.CreateStoredSubscription) (contract.UserSubscription, error) {

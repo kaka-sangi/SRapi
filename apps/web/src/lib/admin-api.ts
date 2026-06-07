@@ -94,6 +94,7 @@ import {
   deleteAdminProxy,
   createAdminRedeemCode,
   createAdminSubscriptionPlan,
+  deleteAdminSubscriptionPlan,
   updateAdminSubscriptionPlan,
   createAdminUser,
   createAdminUserSubscription,
@@ -943,6 +944,9 @@ export const adminApi = {
     body: Parameters<typeof updateAdminSubscriptionPlan>[0]["body"],
   ): Promise<SubscriptionPlan> {
     return unwrapData(() => updateAdminSubscriptionPlan({ path: { id }, body, throwOnError: true }));
+  },
+  deleteSubscriptionPlan(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminSubscriptionPlan({ path: { id }, throwOnError: true }));
   },
 
   listUserSubscriptions(

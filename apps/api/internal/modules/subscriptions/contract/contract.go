@@ -236,6 +236,7 @@ type Store interface {
 	UpdatePlan(ctx context.Context, id int, input UpdateStoredPlan) (SubscriptionPlan, error)
 	FindPlanByID(ctx context.Context, id int) (SubscriptionPlan, error)
 	ListPlans(ctx context.Context) ([]SubscriptionPlan, error)
+	DeletePlan(ctx context.Context, id int) error
 	CreateUserSubscription(ctx context.Context, input CreateStoredSubscription) (UserSubscription, error)
 	FindUserSubscriptionBySource(ctx context.Context, sourceType string, sourceID string) (UserSubscription, error)
 	ListUserSubscriptions(ctx context.Context) ([]UserSubscription, error)

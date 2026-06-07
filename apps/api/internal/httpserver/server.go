@@ -475,6 +475,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/subscription-plans", server.handleListAdminSubscriptionPlans)
 	mux.HandleFunc("POST /api/v1/admin/subscription-plans", server.handleCreateAdminSubscriptionPlan)
 	mux.HandleFunc("PATCH /api/v1/admin/subscription-plans/{id}", server.handleUpdateAdminSubscriptionPlan)
+	mux.HandleFunc("DELETE /api/v1/admin/subscription-plans/{id}", server.handleDeleteAdminSubscriptionPlan)
 	mux.HandleFunc("GET /api/v1/admin/user-subscriptions", server.handleListAdminUserSubscriptions)
 	mux.HandleFunc("POST /api/v1/admin/user-subscriptions", server.handleCreateAdminUserSubscription)
 	mux.HandleFunc("DELETE /api/v1/admin/user-subscriptions/{id}", server.handleDeleteAdminUserSubscription)

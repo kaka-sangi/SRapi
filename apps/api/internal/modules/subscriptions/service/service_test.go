@@ -12,6 +12,62 @@ import (
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
 )
 
+func TestDeletePlanSoftDeletesAndPreservesExistingSubscriptions(t *testing.T) {
+	clock := fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
+	store := subscriptionmemory.New()
+	svc, err := service.New(store, clock)
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+
+	plan, err := svc.CreatePlan(t.Context(), contract.CreatePlanRequest{
+		Name:         "pro",
+		Price:        "9.99",
+		Currency:     "usd",
+		ValidityDays: 30,
+		Entitlements: map[string]any{"allowed_models": []any{"allowed-model"}},
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	if _, err := svc.CreateUserSubscription(t.Context(), contract.CreateSubscriptionRequest{UserID: 1, PlanID: plan.ID}); err != nil {
+		t.Fatalf("create user subscription: %v", err)
+	}
+
+	if err := svc.DeletePlan(t.Context(), plan.ID); err != nil {
+		t.Fatalf("delete plan: %v", err)
+	}
+
+	// The plan is gone from lookup and listing.
+	if _, err := svc.FindPlanByID(t.Context(), plan.ID); err == nil {
+		t.Fatalf("expected deleted plan to be unfindable")
+	}
+	plans, err := svc.ListPlans(t.Context())
+	if err != nil {
+		t.Fatalf("list plans: %v", err)
+	}
+	for _, p := range plans {
+		if p.ID == plan.ID {
+			t.Fatalf("deleted plan must not appear in listing: %+v", p)
+		}
+	}
+
+	// The existing subscriber keeps their entitlements — they were snapshotted at
+	// subscription time, so deleting the plan never strips access already granted.
+	cached, err := store.ListActiveEntitlements(t.Context(), 1, clock.now)
+	if err != nil {
+		t.Fatalf("list active entitlements: %v", err)
+	}
+	if len(cached) == 0 {
+		t.Fatalf("deleting a plan must not revoke an existing subscriber's entitlements")
+	}
+
+	// Re-deleting is a not-found, not a crash.
+	if err := svc.DeletePlan(t.Context(), plan.ID); err == nil {
+		t.Fatalf("expected error deleting an already-deleted plan")
+	}
+}
+
 func TestCheckEntitlementRejectsBeforeSchedulingAndCarriesRoutingPolicy(t *testing.T) {
 	clock := fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
 	store := subscriptionmemory.New()

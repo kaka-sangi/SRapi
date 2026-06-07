@@ -774,6 +774,8 @@ export const zh: Messages = {
     deleteSubBody: "该订阅及其权益将从用户移除。此操作不可撤销。",
     createPlan: "新建套餐",
     editPlan: "编辑套餐",
+    deletePlanTitle: "删除套餐",
+    deletePlanBody: "确定要删除套餐「{name}」吗？该套餐将不再可售；已订阅的用户不受影响——权益在订阅时已快照保存。此操作不可撤销。",
     validityDays: "有效天数",
     entitlements: "权益",
     allowedModels: "可用模型",
