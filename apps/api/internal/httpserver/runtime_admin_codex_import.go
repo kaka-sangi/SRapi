@@ -261,12 +261,17 @@ func (s *Server) applyCodexUpdate(ctx context.Context, result *apiopenapi.CodexS
 // the account status. Refresh-token-less sessions require a valid (non-expired)
 // access token and are marked for auto-pause-on-expiry.
 func (s *Server) resolveCodexImportTarget(item *codexImportAccount, requestStatus *accountcontract.Status) (map[string]any, map[string]any, *accountcontract.Status, error) {
-	credential := map[string]any{"access_token": item.accessToken}
+	// Keep the imported access token when present so the import never depends on a
+	// blocking/failing OAuth refresh at import time: an unreachable codex auth
+	// endpoint would otherwise make every account fail ("oauth refresh failed").
+	// The runtime refreshes lazily via the refresh_token when the access token
+	// nears expiry, which is the normal OauthRefresh behavior.
+	credential := map[string]any{}
+	if item.accessToken != "" {
+		credential["access_token"] = item.accessToken
+	}
 	if item.refreshToken != "" {
 		credential["refresh_token"] = item.refreshToken
-		// Send refresh-token-only so refreshImportCredential mints a fresh
-		// access token via the codex_cli reverse-proxy.
-		delete(credential, "access_token")
 	}
 	if item.idToken != "" {
 		credential["id_token"] = item.idToken

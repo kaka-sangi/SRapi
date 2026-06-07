@@ -103,8 +103,10 @@ func TestAdminImportCodexSessionFromFullSessionJSON(t *testing.T) {
 	if resp.Data.Total != 1 || resp.Data.Created != 1 || resp.Data.Updated != 0 || resp.Data.Failed != 0 || resp.Data.Skipped != 0 {
 		t.Fatalf("unexpected counts: %+v", resp.Data)
 	}
-	if tokenCalls != 1 {
-		t.Fatalf("expected one token mint during create, got %d", tokenCalls)
+	// With an access token present, import must NOT block on (or fail from) an
+	// eager OAuth refresh — the runtime refreshes lazily later.
+	if tokenCalls != 0 {
+		t.Fatalf("import must not mint a token eagerly when an access token is present, got %d", tokenCalls)
 	}
 	if strings.Contains(raw, "session-refresh") || strings.Contains(raw, "minted-access") || strings.Contains(raw, accessJWT) {
 		t.Fatalf("codex import response leaked credential: %s", raw)
