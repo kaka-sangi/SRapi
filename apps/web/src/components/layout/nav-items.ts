@@ -181,7 +181,7 @@ export const ADMIN_SECTIONS: NavSection[] = [
 
 export function navSectionsForRole(role: "admin" | "user"): NavSection[] {
   if (role === "admin") {
-    return [...ADMIN_SECTIONS, GATEWAY_SECTION];
+    return [...ADMIN_SECTIONS, GATEWAY_SECTION, WORKSPACE_SECTION, ACCOUNT_SECTION];
   }
   return [WORKSPACE_SECTION, ACCOUNT_SECTION];
 }

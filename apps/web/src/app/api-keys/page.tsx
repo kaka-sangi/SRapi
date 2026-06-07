@@ -5,7 +5,7 @@ import { KeyRound, MoreHorizontal } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
-import { useApiKeys, useToggleApiKey } from "@/hooks/queries";
+import { useApiKeys, useToggleApiKey, useDeleteApiKey } from "@/hooks/queries";
 import type { ApiKeySummary } from "@/lib/srapi-types";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -45,6 +45,7 @@ function ApiKeysContent() {
   const { toast } = useToast();
   const apiKeys = useApiKeys();
   const toggle = useToggleApiKey();
+  const deleteKey = useDeleteApiKey();
   const [editKey, setEditKey] = useState<ApiKeySummary | null>(null);
   const [usageKey, setUsageKey] = useState<ApiKeySummary | null>(null);
 
@@ -52,6 +53,15 @@ function ApiKeysContent() {
     try {
       await toggle.mutateAsync({ id, status });
       toast({ title: t("feedback.saved"), tone: "success" });
+    } catch {
+      toast({ title: t("feedback.failed"), tone: "error" });
+    }
+  }
+
+  async function runDelete(id: string) {
+    try {
+      await deleteKey.mutateAsync(id);
+      toast({ title: t("feedback.deleted"), tone: "success" });
     } catch {
       toast({ title: t("feedback.failed"), tone: "error" });
     }
@@ -130,6 +140,13 @@ function ApiKeysContent() {
                                 onClick={() => void runToggle(key.id, key.status)}
                               >
                                 {key.status === "active" ? t("common.disable") : t("common.enable")}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={deleteKey.isPending}
+                                onClick={() => void runDelete(key.id)}
+                                className="text-srapi-error focus:text-srapi-error"
+                              >
+                                {t("common.delete")}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

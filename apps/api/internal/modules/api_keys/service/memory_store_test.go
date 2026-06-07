@@ -72,6 +72,18 @@ func (s *memoryStore) Update(_ context.Context, key contract.APIKey) (contract.A
 	return key, nil
 }
 
+func (s *memoryStore) Delete(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, ok := s.byID[id]
+	if !ok {
+		return contract.ErrKeyNotFound
+	}
+	delete(s.byPrefix, key.Prefix)
+	delete(s.byID, id)
+	return nil
+}
+
 func (s *memoryStore) FindByPrefix(_ context.Context, prefix string) (contract.APIKey, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

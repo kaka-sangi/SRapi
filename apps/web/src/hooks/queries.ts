@@ -109,6 +109,14 @@ export function useUpdateApiKey() {
   });
 }
 
+export function useDeleteApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiService.deleteApiKey(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.apiKeys() }),
+  });
+}
+
 export function useApiKeyUsage(id: string | null, days: number, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.apiKeyUsage(id ?? "", days),

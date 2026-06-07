@@ -1325,6 +1325,49 @@ func (s *Server) handleUpdateApiKey(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleDeleteApiKey(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+
+	keyID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid api key id", requestID)
+		return
+	}
+
+	before, err := s.apiKeyByUser(r.Context(), session.User.ID, keyID)
+	if err != nil {
+		switch {
+		case errors.Is(err, apikeyservice.ErrKeyNotFound):
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "api key not found", requestID)
+		default:
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to load api key", requestID)
+		}
+		return
+	}
+
+	if err := s.runtime.apiKeys.Delete(r.Context(), session.User.ID, keyID); err != nil {
+		switch {
+		case errors.Is(err, apikeyservice.ErrKeyNotFound):
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "api key not found", requestID)
+		default:
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete api key", requestID)
+		}
+		return
+	}
+
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "api_key.delete", "api_key", strconv.Itoa(before.ID), apiKeyAuditSnapshot(before), nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{"ok": true, "request_id": requestID})
+}
+
 func currentUserAvatarUploadFile(w http.ResponseWriter, r *http.Request) ([]byte, error) {
 	contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
 	if !strings.HasPrefix(contentType, "multipart/form-data") {

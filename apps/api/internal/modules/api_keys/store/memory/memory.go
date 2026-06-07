@@ -86,6 +86,18 @@ func (s *Store) Update(_ context.Context, key contract.APIKey) (contract.APIKey,
 	return key, nil
 }
 
+func (s *Store) Delete(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, ok := s.byID[id]
+	if !ok {
+		return contract.ErrKeyNotFound
+	}
+	delete(s.byPrefix, key.Prefix)
+	delete(s.byID, id)
+	return nil
+}
+
 func (s *Store) FindByPrefix(_ context.Context, prefix string) (contract.APIKey, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

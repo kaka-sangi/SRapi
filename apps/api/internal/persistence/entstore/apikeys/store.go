@@ -132,6 +132,21 @@ func (s *Store) Update(ctx context.Context, key contract.APIKey) (contract.APIKe
 	return s.FindByPrefix(ctx, stored.Prefix)
 }
 
+func (s *Store) Delete(ctx context.Context, id int) error {
+	now := time.Now().UTC()
+	n, err := s.client.APIKey.Update().
+		Where(entapikey.IDEQ(id), entapikey.DeletedAtIsNil()).
+		SetDeletedAt(now).
+		Save(ctx)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return contract.ErrKeyNotFound
+	}
+	return nil
+}
+
 func (s *Store) FindByPrefix(ctx context.Context, prefix string) (contract.APIKey, error) {
 	found, err := s.client.APIKey.Query().
 		Where(entapikey.PrefixEQ(prefix), entapikey.DeletedAtIsNil()).

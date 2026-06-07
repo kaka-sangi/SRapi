@@ -291,7 +291,10 @@ func toAdapterMessages(history []Message) []provideradaptercontract.Conversation
 			}
 			out = append(out, provideradaptercontract.ConversationMessage{Role: "user", Parts: parts})
 		case RoleAssistant:
-			parts := make([]provideradaptercontract.ContentPart, 0, len(m.ToolCalls)+1)
+			parts := make([]provideradaptercontract.ContentPart, 0, len(m.ToolCalls)+2)
+			if strings.TrimSpace(m.Reasoning) != "" {
+				parts = append(parts, provideradaptercontract.ContentPart{Kind: provideradaptercontract.ContentPartThinking, Text: m.Reasoning})
+			}
 			if strings.TrimSpace(m.Content) != "" {
 				parts = append(parts, provideradaptercontract.ContentPart{Kind: provideradaptercontract.ContentPartText, Text: m.Content})
 			}

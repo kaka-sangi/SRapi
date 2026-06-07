@@ -397,6 +397,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/api-keys", server.handleListApiKeys)
 	mux.HandleFunc("POST /api/v1/api-keys", server.handleCreateApiKey)
 	mux.HandleFunc("PATCH /api/v1/api-keys/{id}", server.handleUpdateApiKey)
+	mux.HandleFunc("DELETE /api/v1/api-keys/{id}", server.handleDeleteApiKey)
 	mux.HandleFunc("GET /api/v1/api-keys/{id}/usage", server.handleCurrentUserApiKeyUsage)
 	mux.HandleFunc("GET /api/v1/admin/overview", server.handleAdminOverview)
 	mux.HandleFunc("GET /api/v1/admin/dashboard", server.handleAdminDashboard)

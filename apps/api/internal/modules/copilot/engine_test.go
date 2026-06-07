@@ -62,18 +62,17 @@ func TestSystemPromptIncludesOperationalGuidance(t *testing.T) {
 	prompt := SystemPrompt(cat, true, false)
 	for _, want := range []string{
 		"get_operation_detail",
-		"Resolve every reference",
-		"Add an upstream provider account",
+		"Never invent IDs",
 		"GET the resource",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("system prompt missing operational guidance %q", want)
 		}
 	}
-	if strings.Contains(prompt, "web_search tool") {
+	if strings.Contains(prompt, "web_search") {
 		t.Fatalf("web_search guidance must be absent when search is disabled")
 	}
-	if !strings.Contains(SystemPrompt(cat, true, true), "web_search tool") {
+	if !strings.Contains(SystemPrompt(cat, true, true), "web_search") {
 		t.Fatalf("web_search guidance must appear when search is enabled")
 	}
 }

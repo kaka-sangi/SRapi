@@ -92,7 +92,7 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
   }, [messages]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    endRef.current?.scrollIntoView({ behavior: running ? "instant" : "smooth", block: "end" });
   }, [messages, pending, running]);
 
   function doSend(text?: string) {

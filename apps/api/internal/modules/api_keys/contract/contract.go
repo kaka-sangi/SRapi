@@ -90,6 +90,7 @@ type AuthResult struct {
 type Store interface {
 	Create(ctx context.Context, input CreateStoredKey) (APIKey, error)
 	Update(ctx context.Context, key APIKey) (APIKey, error)
+	Delete(ctx context.Context, id int) error
 	FindByPrefix(ctx context.Context, prefix string) (APIKey, error)
 	FindByID(ctx context.Context, id int) (APIKey, error)
 	List(ctx context.Context) ([]APIKey, error)

@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useSyncExternalStore } from "reac
 import { useRouter } from "next/navigation";
 import { apiService } from "@/lib/api";
 import type { CurrentUser } from "@/lib/srapi-types";
-import { ADMIN_HOME_ROUTE, SIGN_IN_ROUTE, USER_HOME_ROUTE } from "@/lib/routes";
+import { SIGN_IN_ROUTE, USER_HOME_ROUTE } from "@/lib/routes";
 import { Spinner } from "@/components/ui/spinner";
 
 const USER_STORAGE_KEY = "srapi_user";
@@ -87,12 +87,12 @@ export function AuthGate({
       router.replace(SIGN_IN_ROUTE);
       return;
     }
-    if (allowedRole && current.role !== allowedRole) {
-      router.replace(current.role === "admin" ? ADMIN_HOME_ROUTE : USER_HOME_ROUTE);
+    if (allowedRole === "admin" && current.role !== "admin") {
+      router.replace(USER_HOME_ROUTE);
     }
   }, [user, allowedRole, router]);
 
-  if (!user || (allowedRole && user.role !== allowedRole)) {
+  if (!user || (allowedRole === "admin" && user.role !== "admin")) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
         <Spinner className="size-5" />

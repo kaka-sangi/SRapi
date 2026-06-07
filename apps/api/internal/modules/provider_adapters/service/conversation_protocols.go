@@ -608,8 +608,13 @@ func openAIChatMessagesFromParts(role string, parts []contract.ContentPart) []op
 	ordinaryParts := make([]contract.ContentPart, 0, len(parts))
 	toolCalls := make([]openAIToolCall, 0)
 	toolMessages := make([]openAIChatMessage, 0)
+	var reasoningParts []string
 	for _, part := range parts {
 		switch part.Kind {
+		case contract.ContentPartThinking:
+			if text := strings.TrimSpace(part.Text); text != "" {
+				reasoningParts = append(reasoningParts, text)
+			}
 		case contract.ContentPartToolUse:
 			if toolCall, ok := openAIToolCallFromPart(part); ok {
 				toolCalls = append(toolCalls, toolCall)
@@ -627,8 +632,11 @@ func openAIChatMessagesFromParts(role string, parts []contract.ContentPart) []op
 	}
 
 	out := make([]openAIChatMessage, 0, 1+len(toolMessages))
-	if len(ordinaryParts) > 0 || len(toolCalls) > 0 {
+	if len(ordinaryParts) > 0 || len(toolCalls) > 0 || len(reasoningParts) > 0 {
 		message := openAIChatMessage{Role: role}
+		if len(reasoningParts) > 0 {
+			message.ReasoningContent = strings.Join(reasoningParts, "\n")
+		}
 		if len(ordinaryParts) > 0 {
 			message.Content = openAIContentFromParts(ordinaryParts)
 		} else {

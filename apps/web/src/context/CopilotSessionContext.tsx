@@ -84,6 +84,7 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
   const [effort, setEffort] = useState<ReasoningEffort>("off");
 
   const abortRef = useRef<AbortController | null>(null);
+  const flushRef = useRef<number>(0);
   // Refs the streaming "done" handler reads (avoids stale closures).
   const activeIdRef = useRef<number | null>(stored.activeId);
   const titleRef = useRef<string>("");
@@ -142,6 +143,21 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    const scheduleFlush = () => {
+      if (flushRef.current) return;
+      flushRef.current = requestAnimationFrame(() => {
+        flushRef.current = 0;
+        setMessages([...working]);
+      });
+    };
+
+    const cancelFlush = () => {
+      if (flushRef.current) {
+        cancelAnimationFrame(flushRef.current);
+        flushRef.current = 0;
+      }
+    };
+
     const onEvent = (event: CopilotEvent) => {
       switch (event.type) {
         case "usage":
@@ -155,7 +171,7 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
             ...working[assistantIdx],
             reasoning: (working[assistantIdx].reasoning ?? "") + event.data.text,
           };
-          setMessages([...working]);
+          scheduleFlush();
           break;
         case "assistant_delta":
           ensureAssistant();
@@ -163,13 +179,10 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
             ...working[assistantIdx],
             content: (working[assistantIdx].content ?? "") + event.data.text,
           };
-          setMessages([...working]);
+          scheduleFlush();
           break;
         case "tool_call": {
-          if (assistantIdx < 0) {
-            working.push({ role: "assistant", content: "", tool_calls: [] });
-            assistantIdx = working.length - 1;
-          }
+          ensureAssistant();
           const current = working[assistantIdx];
           working[assistantIdx] = {
             ...current,
@@ -192,17 +205,20 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
           break;
         case "pending_action":
           receivedTerminal = true;
+          cancelFlush();
           persistSession([...working], activeIdRef.current);
           setPending(event.data);
           break;
         case "done":
           receivedTerminal = true;
+          cancelFlush();
           persistSession(event.data.messages, activeIdRef.current);
           setPending(null);
           void saveToServer(event.data.messages);
           break;
         case "error":
           receivedTerminal = true;
+          cancelFlush();
           setError(event.data.message);
           break;
       }
@@ -224,6 +240,7 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       if ((err as Error)?.name !== "AbortError") setError((err as Error)?.message ?? "Stream error");
     } finally {
+      cancelFlush();
       setRunning(false);
       abortRef.current = null;
     }

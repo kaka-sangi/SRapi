@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { AuthGate, useAuthUser } from "./auth-gate";
 import { SidebarNav, SidebarBrand } from "./sidebar-nav";
 import { TopNav } from "./top-nav";
@@ -29,6 +30,7 @@ export function AppShell({
 
 function ShellInner({ children }: { children: React.ReactNode }) {
   const user = useAuthUser();
+  const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
   const runtime = useRuntimeStatus();
   const live = runtime.data?.connected ?? false;
@@ -66,8 +68,8 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       <CommandPaletteProvider role={user.role}>
         <div className="flex min-w-0 flex-1 flex-col">
           <TopNav user={user} onOpenNav={() => setNavOpen(true)} live={live} />
-          <main className="anim-page flex-1">
-            <div className="mx-auto w-full max-w-[1280px] space-y-6 p-5 sm:p-7">{children}</div>
+          <main className="flex-1">
+            <div key={pathname} className="anim-page mx-auto w-full max-w-[1280px] space-y-6 p-5 sm:p-7">{children}</div>
           </main>
         </div>
       </CommandPaletteProvider>

@@ -92,6 +92,27 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 	return contract.CreatedKey{Key: withoutHash(stored), PlaintextKey: plaintext}, nil
 }
 
+func (s *Service) Delete(ctx context.Context, userID, keyID int) error {
+	if userID <= 0 || keyID <= 0 {
+		return ErrInvalidInput
+	}
+	keys, err := s.store.ListByUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+	found := false
+	for _, key := range keys {
+		if key.ID == keyID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ErrKeyNotFound
+	}
+	return s.store.Delete(ctx, keyID)
+}
+
 func (s *Service) ListByUser(ctx context.Context, userID int) ([]contract.APIKey, error) {
 	if userID <= 0 {
 		return nil, ErrInvalidInput

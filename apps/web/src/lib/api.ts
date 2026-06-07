@@ -728,6 +728,18 @@ export const apiService = {
     });
   },
 
+  async deleteApiKey(id: string): Promise<void> {
+    const headers: Record<string, string> = {};
+    const csrf = localStorage.getItem(CSRF_STORAGE_KEY);
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+    const res = await fetch(`/api/v1/api-keys/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers,
+    });
+    if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+  },
+
   async getApiKeyUsage(id: string, days: number): Promise<GatewayUsageResponse> {
     const response = await sdkGetApiKeyUsage({ path: { id }, query: { days }, throwOnError: true });
     if (!response.data) {
