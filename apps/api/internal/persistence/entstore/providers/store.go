@@ -93,6 +93,21 @@ func (s *Store) List(ctx context.Context) ([]contract.Provider, error) {
 	return out, nil
 }
 
+func (s *Store) SoftDelete(ctx context.Context, id int) error {
+	affected, err := s.client.Provider.Update().
+		Where(entprovider.IDEQ(id), entprovider.DeletedAtIsNil()).
+		SetDeletedAt(time.Now().UTC()).
+		SetStatus(string(contract.StatusArchived)).
+		Save(ctx)
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return errors.New("provider not found")
+	}
+	return nil
+}
+
 func toProvider(row *ent.Provider) contract.Provider {
 	return contract.Provider{
 		ID:           row.ID,

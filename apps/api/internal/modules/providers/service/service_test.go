@@ -38,6 +38,51 @@ func TestCreateProviderAndList(t *testing.T) {
 	}
 }
 
+func TestDeleteProviderSoftDeletesAndHides(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+
+	created, err := svc.Create(ctx, contract.CreateRequest{
+		Name:        "openai-compatible",
+		DisplayName: "OpenAI Compatible",
+		AdapterType: "openai-compatible",
+		Protocol:    "openai-compatible",
+	})
+	if err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+
+	if err := svc.Delete(ctx, created.ID); err != nil {
+		t.Fatalf("delete provider: %v", err)
+	}
+
+	// The soft-deleted provider is hidden from lookup and listing, and its name
+	// is freed for reuse.
+	if _, err := svc.FindByID(ctx, created.ID); err == nil {
+		t.Fatalf("expected deleted provider to be unfindable")
+	}
+	items, err := svc.List(ctx)
+	if err != nil {
+		t.Fatalf("list providers: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("expected deleted provider excluded from listing, got %d", len(items))
+	}
+
+	// Re-deleting is a not-found, not a crash.
+	if err := svc.Delete(ctx, created.ID); err == nil {
+		t.Fatalf("expected error deleting an already-deleted provider")
+	}
+	// Invalid id is rejected.
+	if err := svc.Delete(ctx, 0); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput for id 0, got %v", err)
+	}
+}
+
 func TestCreateProviderNormalizesConvenienceCapabilityKeys(t *testing.T) {
 	store := newMemoryStore()
 	svc, err := New(store, nil)

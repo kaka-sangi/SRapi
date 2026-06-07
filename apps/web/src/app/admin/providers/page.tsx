@@ -6,6 +6,7 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import {
@@ -18,6 +19,7 @@ import {
   useCreateProvider,
   useUpdateProvider,
   useTestProvider,
+  useDeleteProvider,
   useInstallProviderPresets,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -59,9 +61,11 @@ function ProvidersContent() {
   const createMut = useCreateProvider();
   const updateMut = useUpdateProvider();
   const testMut = useTestProvider();
+  const deleteMut = useDeleteProvider();
   const installMut = useInstallProviderPresets();
 
   const [formTarget, setFormTarget] = useState<Provider | "new" | null>(null);
+  const [toDelete, setToDelete] = useState<Provider | null>(null);
 
   async function runInstallPresets() {
     try {
@@ -252,12 +256,27 @@ function ProvidersContent() {
               { label: t("adminProviders.test"), onSelect: () => void runTest(p.id) },
               {
                 label: p.status === "disabled" ? t("common.enable") : t("common.disable"),
-                destructive: p.status !== "disabled",
                 onSelect: () => void toggleStatus(p),
               },
+              { label: t("common.delete"), destructive: true, onSelect: () => setToDelete(p) },
             ]}
           />
         )}
+      />
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setToDelete(null);
+        }}
+        title={t("adminProviders.deleteTitle")}
+        body={t("adminProviders.deleteBody", { name: toDelete?.display_name || toDelete?.name || "" })}
+        confirmLabel={t("common.delete")}
+        successMessage={t("feedback.deleted")}
+        isPending={deleteMut.isPending}
+        onConfirm={async () => {
+          if (toDelete) await deleteMut.mutateAsync(toDelete.id);
+        }}
       />
 
       {formTarget === "new" ? (

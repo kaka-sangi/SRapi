@@ -773,6 +773,9 @@ export function useUpdateProvider() {
     ["admin", "providers"],
   );
 }
+export function useDeleteProvider() {
+  return useAdminMutation((id: string) => adminApi.deleteProvider(id), ["admin", "providers"]);
+}
 export function useTestProvider() {
   const qc = useQueryClient();
   return useMutation({

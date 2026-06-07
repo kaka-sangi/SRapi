@@ -675,6 +675,8 @@ export const zh: Messages = {
     configSchema: "配置 Schema",
     create: "新建供应商",
     edit: "编辑供应商",
+    deleteTitle: "删除供应商",
+    deleteBody: "确定要删除供应商「{name}」吗？若仍有上游账号属于它，需先归档或删除这些账号，否则无法删除。此操作不可撤销。",
     test: "测试连通性",
     installPresets: "安装预设",
     installingPresets: "安装中…",

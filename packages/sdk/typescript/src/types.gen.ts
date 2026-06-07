@@ -7665,6 +7665,49 @@ export type InstallAdminProviderPresetsResponses = {
 
 export type InstallAdminProviderPresetsResponse = InstallAdminProviderPresetsResponses[keyof InstallAdminProviderPresetsResponses];
 
+export type DeleteAdminProviderData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/providers/{id}';
+};
+
+export type DeleteAdminProviderErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminProviderError = DeleteAdminProviderErrors[keyof DeleteAdminProviderErrors];
+
+export type DeleteAdminProviderResponses = {
+    /**
+     * Provider deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminProviderResponse = DeleteAdminProviderResponses[keyof DeleteAdminProviderResponses];
+
 export type UpdateAdminProviderData = {
     body: UpdateProviderRequest;
     path: {

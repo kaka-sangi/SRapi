@@ -679,6 +679,9 @@ export const en = {
     configSchema: "Config schema",
     create: "New provider",
     edit: "Edit provider",
+    deleteTitle: "Delete provider",
+    deleteBody:
+      "Delete provider “{name}”? If upstream accounts still belong to it, archive or remove those accounts first — otherwise the delete is rejected. This cannot be undone.",
     test: "Test connectivity",
     installPresets: "Install presets",
     installingPresets: "Installing…",

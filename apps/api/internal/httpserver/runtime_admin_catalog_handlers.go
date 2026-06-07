@@ -279,6 +279,61 @@ func (s *Server) handleUpdateAdminProvider(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+func (s *Server) handleDeleteAdminProvider(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	providerID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || providerID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid provider id", requestID)
+		return
+	}
+	before, err := s.runtime.providers.FindByID(r.Context(), providerID)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "provider not found", requestID)
+		return
+	}
+	// Guard: refuse to delete a provider that still has live upstream accounts.
+	// Those accounts are the scheduler's candidates; deleting the provider would
+	// orphan them. The operator must archive/remove the accounts first.
+	accounts, err := s.runtime.accounts.List(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to check provider accounts", requestID)
+		return
+	}
+	inUse := 0
+	for _, account := range accounts {
+		if account.ProviderID == providerID && account.Status != accountcontract.StatusArchived {
+			inUse++
+		}
+	}
+	if inUse > 0 {
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "provider still has accounts; remove or archive them first", requestID)
+		return
+	}
+	if err := s.runtime.providers.Delete(r.Context(), providerID); err != nil {
+		switch {
+		case errors.Is(err, providerservice.ErrInvalidInput):
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid provider id", requestID)
+		default:
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete provider", requestID)
+		}
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider.delete", "provider", strconv.Itoa(providerID), providerAuditSnapshot(before), nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       map[string]any{"id": providerID, "deleted": true},
+		"request_id": requestID,
+	})
+}
+
 func providerPresetCreateRequest(preset providerpreset.Preset, status providercontract.Status) providercontract.CreateRequest {
 	return providercontract.CreateRequest{
 		Name:         preset.ProviderKey,

@@ -415,6 +415,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/providers", server.handleCreateAdminProvider)
 	mux.HandleFunc("POST /api/v1/admin/providers/preset/install", server.handleInstallAdminProviderPresets)
 	mux.HandleFunc("PATCH /api/v1/admin/providers/{id}", server.handleUpdateAdminProvider)
+	mux.HandleFunc("DELETE /api/v1/admin/providers/{id}", server.handleDeleteAdminProvider)
 	mux.HandleFunc("POST /api/v1/admin/providers/{id}/test", server.handleTestAdminProvider)
 	mux.HandleFunc("GET /api/v1/admin/models", server.handleListAdminModels)
 	mux.HandleFunc("POST /api/v1/admin/models", server.handleCreateAdminModel)
