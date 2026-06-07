@@ -26,6 +26,7 @@ import {
   useClearAccountError,
   useRecoverAccount,
   useBatchActionAccounts,
+  useDeleteAccount,
   useDiscoverAccountModels,
   useExportAccounts,
 } from "@/hooks/admin-queries";
@@ -87,6 +88,7 @@ function AccountsContent() {
   const clearErr = useClearAccountError();
   const recover = useRecoverAccount();
   const batchAction = useBatchActionAccounts();
+  const deleteMut = useDeleteAccount();
   const discover = useDiscoverAccountModels();
   const exportMut = useExportAccounts();
 
@@ -95,7 +97,7 @@ function AccountsContent() {
   const [detailTarget, setDetailTarget] = useState<ProviderAccount | null>(null);
   const [testTarget, setTestTarget] = useState<ProviderAccount | null>(null);
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
-  const [archiveTarget, setArchiveTarget] = useState<ProviderAccount | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProviderAccount | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [codexImportOpen, setCodexImportOpen] = useState(false);
 
@@ -366,9 +368,9 @@ function AccountsContent() {
               ),
           });
           actions.push({
-            label: t("adminAccounts.archive"),
+            label: t("common.delete"),
             destructive: true,
-            onSelect: () => setArchiveTarget(a),
+            onSelect: () => setDeleteTarget(a),
           });
           return <RowActionsMenu actions={actions} />;
         }}
@@ -450,17 +452,17 @@ function AccountsContent() {
       />
 
       <ConfirmDialog
-        open={archiveTarget !== null}
+        open={deleteTarget !== null}
         onOpenChange={(open) => {
-          if (!open) setArchiveTarget(null);
+          if (!open) setDeleteTarget(null);
         }}
-        title={t("adminAccounts.archiveTitle")}
-        body={t("adminAccounts.archiveBody")}
-        confirmLabel={t("adminAccounts.archive")}
-        successMessage={t("feedback.saved")}
-        isPending={setStatus.isPending}
+        title={t("adminAccounts.deleteTitle")}
+        body={t("adminAccounts.deleteBody")}
+        confirmLabel={t("common.delete")}
+        successMessage={t("feedback.deleted")}
+        isPending={deleteMut.isPending}
         onConfirm={async () => {
-          if (archiveTarget) await setStatus.mutateAsync({ id: archiveTarget.id, status: "archived" });
+          if (deleteTarget) await deleteMut.mutateAsync(deleteTarget.id);
         }}
       />
 

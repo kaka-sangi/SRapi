@@ -9581,6 +9581,45 @@ export type BatchActionAdminAccountsResponses = {
 
 export type BatchActionAdminAccountsResponse = BatchActionAdminAccountsResponses[keyof BatchActionAdminAccountsResponses];
 
+export type DeleteAdminAccountData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}';
+};
+
+export type DeleteAdminAccountErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminAccountError = DeleteAdminAccountErrors[keyof DeleteAdminAccountErrors];
+
+export type DeleteAdminAccountResponses = {
+    /**
+     * Provider account deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminAccountResponse = DeleteAdminAccountResponses[keyof DeleteAdminAccountResponses];
+
 export type GetAdminAccountData = {
     body?: never;
     path: {

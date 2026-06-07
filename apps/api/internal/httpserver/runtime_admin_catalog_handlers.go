@@ -1466,6 +1466,43 @@ func normalizeAccountErrorPolicyMetadata(metadata map[string]any, credential map
 	return metadata, changed
 }
 
+func (s *Server) handleDeleteAdminAccount(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	accountID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || accountID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account id", requestID)
+		return
+	}
+	before, err := s.runtime.accounts.FindByID(r.Context(), accountID)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "account not found", requestID)
+		return
+	}
+	if err := s.runtime.accounts.Delete(r.Context(), accountID); err != nil {
+		switch {
+		case errors.Is(err, accountservice.ErrInvalidInput):
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account id", requestID)
+		default:
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete account", requestID)
+		}
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account.delete", "account", strconv.Itoa(accountID), accountAuditSnapshot(before), nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       map[string]any{"id": accountID, "deleted": true},
+		"request_id": requestID,
+	})
+}
+
 func (s *Server) handleBindAdminAccountProxy(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)

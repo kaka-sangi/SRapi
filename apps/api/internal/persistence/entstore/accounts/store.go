@@ -405,6 +405,25 @@ func (s *Store) ListQuotaSnapshotsByAccount(ctx context.Context, accountID int, 
 	return out, nil
 }
 
+func (s *Store) Delete(ctx context.Context, id int) error {
+	if _, err := s.client.AccountHealthSnapshot.Delete().
+		Where(entaccounthealthsnapshot.AccountIDEQ(id)).
+		Exec(ctx); err != nil {
+		return err
+	}
+	if _, err := s.client.AccountQuotaSnapshot.Delete().
+		Where(entaccountquotasnapshot.AccountIDEQ(id)).
+		Exec(ctx); err != nil {
+		return err
+	}
+	if _, err := s.client.AccountGroupMember.Delete().
+		Where(entaccountgroupmember.AccountIDEQ(id)).
+		Exec(ctx); err != nil {
+		return err
+	}
+	return s.client.ProviderAccount.DeleteOneID(id).Exec(ctx)
+}
+
 func toAccount(row *ent.ProviderAccount) contract.ProviderAccount {
 	return contract.ProviderAccount{
 		ID:                   row.ID,

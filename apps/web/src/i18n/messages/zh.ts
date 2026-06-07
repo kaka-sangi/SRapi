@@ -545,6 +545,8 @@ export const zh: Messages = {
     archive: "归档",
     archiveTitle: "归档此账号？",
     archiveBody: "账号将从列表隐藏并停止参与调度，但历史用量与审计记录会保留。可在管理员副驾驶或将状态改回启用来恢复。",
+    deleteTitle: "删除此账号？",
+    deleteBody: "账号及其健康/配额历史将被永久删除，此操作不可撤销。",
     testOk: "连接正常",
     testFailed: "连接失败",
     export: "导出",

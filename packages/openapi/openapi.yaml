@@ -4150,6 +4150,44 @@ paths:
           $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminAccounts
+      operationId: deleteAdminAccount
+      summary: Delete a provider account.
+      description: >-
+        Permanently deletes the provider account and its associated health
+        snapshots, quota snapshots, and group memberships. This cannot be undone.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Provider account deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
 
   /api/v1/admin/accounts/{id}/proxy:
     patch:

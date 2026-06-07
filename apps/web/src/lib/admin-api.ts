@@ -89,6 +89,7 @@ import {
   deleteAdminPricingRule,
   createAdminPromoCode,
   createAdminProvider,
+  deleteAdminAccount,
   deleteAdminProvider,
   createAdminProxy,
   deleteAdminProxy,
@@ -712,6 +713,10 @@ export const adminApi = {
 
   updateAccount(id: Id, body: UpdateAdminAccountData["body"]): Promise<ProviderAccount> {
     return unwrapData(() => updateAdminAccount({ path: { id }, body, throwOnError: true }));
+  },
+
+  deleteAccount(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminAccount({ path: { id }, throwOnError: true }));
   },
 
   setAccountStatus(id: Id, status: ProviderAccountStatus): Promise<ProviderAccount> {

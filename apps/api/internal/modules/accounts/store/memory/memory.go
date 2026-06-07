@@ -127,6 +127,33 @@ func (s *Store) ListGroupIDsByAccount(_ context.Context, accountID int) ([]int, 
 	return out, nil
 }
 
+func (s *Store) Delete(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	account, ok := s.byID[id]
+	if !ok {
+		return errors.New("account not found")
+	}
+	delete(s.byID, id)
+	delete(s.byName, strings.ToLower(account.Name))
+	for memberID, member := range s.groupMembersByID {
+		if member.AccountID == id {
+			delete(s.groupMembersByID, memberID)
+		}
+	}
+	for snapID, snap := range s.healthSnapshotsByID {
+		if snap.AccountID == id {
+			delete(s.healthSnapshotsByID, snapID)
+		}
+	}
+	for snapID, snap := range s.quotaSnapshotsByID {
+		if snap.AccountID == id {
+			delete(s.quotaSnapshotsByID, snapID)
+		}
+	}
+	return nil
+}
+
 func (s *Store) CreateProxy(_ context.Context, input contract.CreateStoredProxy) (contract.ProxyDefinition, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

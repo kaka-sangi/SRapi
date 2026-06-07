@@ -546,6 +546,8 @@ export const en = {
     archive: "Archive",
     archiveTitle: "Archive this account?",
     archiveBody: "The account is hidden from the list and excluded from scheduling, but its usage and audit history are kept. Restore it by setting the status back to active.",
+    deleteTitle: "Delete this account?",
+    deleteBody: "The account and its health/quota history are permanently removed. This cannot be undone.",
     testOk: "Connection OK",
     testFailed: "Connection failed",
     export: "Export",

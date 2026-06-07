@@ -224,6 +224,16 @@ func (s *Service) DeleteProxy(ctx context.Context, id int) error {
 	return s.store.SoftDeleteProxy(ctx, id)
 }
 
+func (s *Service) Delete(ctx context.Context, id int) error {
+	if id <= 0 {
+		return ErrInvalidInput
+	}
+	if _, err := s.store.FindByID(ctx, id); err != nil {
+		return err
+	}
+	return s.store.Delete(ctx, id)
+}
+
 func (s *Service) ListProxies(ctx context.Context) ([]contract.ProxyDefinition, error) {
 	proxies, err := s.store.ListProxies(ctx)
 	if err != nil {

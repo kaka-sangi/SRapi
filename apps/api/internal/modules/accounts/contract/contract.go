@@ -299,4 +299,5 @@ type Store interface {
 	ListHealthSnapshotsByAccount(ctx context.Context, accountID int, limit int) ([]AccountHealthSnapshot, error)
 	RecordQuotaSnapshot(ctx context.Context, snapshot AccountQuotaSnapshot) (AccountQuotaSnapshot, error)
 	ListQuotaSnapshotsByAccount(ctx context.Context, accountID int, limit int) ([]AccountQuotaSnapshot, error)
+	Delete(ctx context.Context, id int) error
 }

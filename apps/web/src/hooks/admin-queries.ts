@@ -691,6 +691,9 @@ export function useUpdateAccount() {
     ["admin", "accounts"],
   );
 }
+export function useDeleteAccount() {
+  return useAdminMutation((id: string) => adminApi.deleteAccount(id), ["admin", "accounts"]);
+}
 export function useBindAccountProxy() {
   return useAdminMutation(
     (vars: { id: string; proxyId: string | null }) =>
