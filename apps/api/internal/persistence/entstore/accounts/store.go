@@ -239,6 +239,15 @@ func (s *Store) ListGroups(ctx context.Context) ([]contract.AccountGroup, error)
 	return out, nil
 }
 
+func (s *Store) DeleteGroup(ctx context.Context, id int) error {
+	if _, err := s.client.AccountGroupMember.Delete().
+		Where(entaccountgroupmember.AccountGroupIDEQ(id)).
+		Exec(ctx); err != nil {
+		return err
+	}
+	return s.client.AccountGroup.DeleteOneID(id).Exec(ctx)
+}
+
 func (s *Store) AddAccountToGroup(ctx context.Context, accountID int, groupID int) (contract.AccountGroupMember, error) {
 	found, err := s.client.AccountGroupMember.Query().
 		Where(

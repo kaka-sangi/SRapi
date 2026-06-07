@@ -288,6 +288,7 @@ type Store interface {
 	UpdateGroup(ctx context.Context, group AccountGroup) (AccountGroup, error)
 	FindGroupByID(ctx context.Context, id int) (AccountGroup, error)
 	ListGroups(ctx context.Context) ([]AccountGroup, error)
+	DeleteGroup(ctx context.Context, id int) error
 	AddAccountToGroup(ctx context.Context, accountID int, groupID int) (AccountGroupMember, error)
 	RemoveAccountFromGroup(ctx context.Context, accountID int, groupID int) error
 	ListGroupMembers(ctx context.Context, groupID int) ([]AccountGroupMember, error)

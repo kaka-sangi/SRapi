@@ -245,6 +245,23 @@ func (s *Store) ListGroups(_ context.Context) ([]contract.AccountGroup, error) {
 	return out, nil
 }
 
+func (s *Store) DeleteGroup(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	group, ok := s.groupsByID[id]
+	if !ok {
+		return errors.New("account group not found")
+	}
+	delete(s.groupsByID, id)
+	delete(s.groupsByName, strings.ToLower(group.Name))
+	for memberID, member := range s.groupMembersByID {
+		if member.AccountGroupID == id {
+			delete(s.groupMembersByID, memberID)
+		}
+	}
+	return nil
+}
+
 func (s *Store) AddAccountToGroup(_ context.Context, accountID int, groupID int) (contract.AccountGroupMember, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

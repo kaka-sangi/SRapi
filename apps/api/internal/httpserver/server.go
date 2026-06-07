@@ -446,6 +446,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/account-groups", server.handleListAdminAccountGroups)
 	mux.HandleFunc("POST /api/v1/admin/account-groups", server.handleCreateAdminAccountGroup)
 	mux.HandleFunc("PATCH /api/v1/admin/account-groups/{id}", server.handleUpdateAdminAccountGroup)
+	mux.HandleFunc("DELETE /api/v1/admin/account-groups/{id}", server.handleDeleteAdminAccountGroup)
 	mux.HandleFunc("GET /api/v1/admin/account-groups/{id}/accounts", server.handleListAdminAccountGroupMembers)
 	mux.HandleFunc("POST /api/v1/admin/account-groups/{id}/accounts/{account_id}", server.handleAddAdminAccountGroupMember)
 	mux.HandleFunc("DELETE /api/v1/admin/account-groups/{id}/accounts/{account_id}", server.handleRemoveAdminAccountGroupMember)

@@ -26,6 +26,7 @@ import {
   startAdminAccountOAuthDeviceCode,
   pollAdminAccountOAuthDeviceCode,
   createAdminAccountGroup,
+  deleteAdminAccountGroup,
   createAdminAnnouncement,
   createAdminErrorPassthroughRule,
   deleteAdminErrorPassthroughRule,
@@ -773,6 +774,10 @@ export const adminApi = {
 
   updateAccountGroup(id: Id, body: UpdateAccountGroupRequest): Promise<AccountGroup> {
     return unwrapData(() => updateAdminAccountGroup({ path: { id }, body, throwOnError: true }));
+  },
+
+  deleteAccountGroup(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminAccountGroup({ path: { id }, throwOnError: true }));
   },
 
   addAccountToGroup(accountId: Id, groupId: Id): Promise<AccountGroupMember> {

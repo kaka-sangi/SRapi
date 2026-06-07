@@ -830,6 +830,9 @@ export function useUpdateGroup() {
     ["admin", "account-groups"],
   );
 }
+export function useDeleteGroup() {
+  return useAdminMutation((id: string) => adminApi.deleteAccountGroup(id), ["admin", "account-groups"]);
+}
 export function useAddGroupMember() {
   return useAdminMutation(
     (vars: { accountId: string; groupId: string }) =>

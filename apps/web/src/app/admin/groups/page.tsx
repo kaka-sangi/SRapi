@@ -6,6 +6,7 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useAdminList } from "@/hooks/use-admin-list";
 import {
   Dialog,
@@ -20,6 +21,7 @@ import {
   useAdminModels,
   useCreateGroup,
   useUpdateGroup,
+  useDeleteGroup,
   useGroupRateLimits,
   useUpsertGroupRateLimit,
   useDeleteGroupRateLimit,
@@ -73,6 +75,8 @@ function GroupsContent() {
   const [formTarget, setFormTarget] = useState<AccountGroup | "new" | null>(null);
   const [membersTarget, setMembersTarget] = useState<AccountGroup | null>(null);
   const [rateLimitTarget, setRateLimitTarget] = useState<AccountGroup | null>(null);
+  const [groupToDelete, setGroupToDelete] = useState<AccountGroup | null>(null);
+  const deleteGroup = useDeleteGroup();
   const rateLimits = useGroupRateLimits();
   const upsertRl = useUpsertGroupRateLimit();
   const deleteRl = useDeleteGroupRateLimit();
@@ -155,9 +159,25 @@ function GroupsContent() {
               { label: t("common.edit"), onSelect: () => setFormTarget(g) },
               { label: t("adminGroups.manageMembers"), onSelect: () => setMembersTarget(g) },
               { label: t("adminRateLimit.action"), onSelect: () => setRateLimitTarget(g) },
+              { label: t("common.delete"), destructive: true, onSelect: () => setGroupToDelete(g) },
             ]}
           />
         )}
+      />
+
+      <ConfirmDialog
+        open={groupToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setGroupToDelete(null);
+        }}
+        title={t("adminGroups.deleteTitle")}
+        body={t("adminGroups.deleteBody", { name: groupToDelete?.name ?? "" })}
+        confirmLabel={t("common.delete")}
+        successMessage={t("feedback.deleted")}
+        isPending={deleteGroup.isPending}
+        onConfirm={async () => {
+          if (groupToDelete) await deleteGroup.mutateAsync(groupToDelete.id);
+        }}
       />
 
       {formTarget ? (

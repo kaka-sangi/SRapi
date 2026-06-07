@@ -12,6 +12,7 @@ import (
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	accountservice "github.com/srapi/srapi/apps/api/internal/modules/accounts/service"
+	groupratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/group_rate_limits/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	modelservice "github.com/srapi/srapi/apps/api/internal/modules/models/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
@@ -1715,6 +1716,48 @@ func (s *Server) handleUpdateAdminAccountGroup(w http.ResponseWriter, r *http.Re
 	writeJSONAny(w, http.StatusOK, apiopenapi.AccountGroupResponse{
 		Data:      toAPIAccountGroup(group),
 		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleDeleteAdminAccountGroup(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	groupID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || groupID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account group id", requestID)
+		return
+	}
+	before, err := s.runtime.accounts.FindGroupByID(r.Context(), groupID)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "account group not found", requestID)
+		return
+	}
+	if err := s.runtime.accounts.DeleteGroup(r.Context(), groupID); err != nil {
+		switch {
+		case errors.Is(err, accountservice.ErrInvalidInput):
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account group id", requestID)
+		default:
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete account group", requestID)
+		}
+		return
+	}
+	// Cascade the group's rate-limit policy (cross-module). A group with no rate
+	// limit configured is the common case, so a not-found result is not an error.
+	if err := s.runtime.groupRateLimits.DeleteLimit(r.Context(), groupID); err != nil && !errors.Is(err, groupratelimitscontract.ErrNotFound) {
+		s.logger.Warn("failed to clear group rate limit on group delete", "group_id", groupID, "error", err)
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account_group.delete", "account_group", strconv.Itoa(groupID), accountGroupAuditSnapshot(before), nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       map[string]any{"id": groupID, "deleted": true},
+		"request_id": requestID,
 	})
 }
 

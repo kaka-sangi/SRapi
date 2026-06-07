@@ -650,6 +650,9 @@ export const en = {
     emptyBody: "Create a group to pool provider accounts together.",
     create: "New group",
     edit: "Edit group",
+    deleteTitle: "Delete account group",
+    deleteBody:
+      "Delete account group “{name}”? Its memberships and rate-limit policy are removed too; the provider accounts inside it are not affected. This cannot be undone.",
     strategy: "Strategy",
     providerScope: "Provider scope",
     modelScope: "Model scope",

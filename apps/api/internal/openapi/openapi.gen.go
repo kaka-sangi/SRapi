@@ -16145,6 +16145,9 @@ type ServerInterface interface {
 	// Create a provider account group.
 	// (POST /api/v1/admin/account-groups)
 	CreateAdminAccountGroup(w http.ResponseWriter, r *http.Request)
+	// Delete a provider account group (cascades members and rate limits).
+	// (DELETE /api/v1/admin/account-groups/{id})
+	DeleteAdminAccountGroup(w http.ResponseWriter, r *http.Request, id Id)
 	// Update a provider account group.
 	// (PATCH /api/v1/admin/account-groups/{id})
 	UpdateAdminAccountGroup(w http.ResponseWriter, r *http.Request, id Id)
@@ -17744,6 +17747,40 @@ func (siw *ServerInterfaceWrapper) CreateAdminAccountGroup(w http.ResponseWriter
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAdminAccountGroup(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminAccountGroup operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminAccountGroup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminAccountGroup(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -28453,6 +28490,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/rerank-compatible/v1/rerank", wrapper.CreateRerankCompatibleRerankAlias)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.ListAdminAccountGroups)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.CreateAdminAccountGroup)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}", wrapper.DeleteAdminAccountGroup)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}", wrapper.UpdateAdminAccountGroup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}/accounts", wrapper.ListAdminAccountGroupMembers)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}/accounts/{account_id}", wrapper.RemoveAdminAccountGroupMember)

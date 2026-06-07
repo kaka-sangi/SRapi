@@ -10030,6 +10030,45 @@ export type CreateAdminAccountGroupResponses = {
 
 export type CreateAdminAccountGroupResponse = CreateAdminAccountGroupResponses[keyof CreateAdminAccountGroupResponses];
 
+export type DeleteAdminAccountGroupData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/account-groups/{id}';
+};
+
+export type DeleteAdminAccountGroupErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminAccountGroupError = DeleteAdminAccountGroupErrors[keyof DeleteAdminAccountGroupErrors];
+
+export type DeleteAdminAccountGroupResponses = {
+    /**
+     * Account group deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminAccountGroupResponse = DeleteAdminAccountGroupResponses[keyof DeleteAdminAccountGroupResponses];
+
 export type UpdateAdminAccountGroupData = {
     body: UpdateAccountGroupRequest;
     path: {

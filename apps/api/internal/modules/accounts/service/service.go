@@ -305,6 +305,16 @@ func (s *Service) ListGroups(ctx context.Context) ([]contract.AccountGroup, erro
 	return s.store.ListGroups(ctx)
 }
 
+func (s *Service) DeleteGroup(ctx context.Context, id int) error {
+	if id <= 0 {
+		return ErrInvalidInput
+	}
+	if _, err := s.store.FindGroupByID(ctx, id); err != nil {
+		return err
+	}
+	return s.store.DeleteGroup(ctx, id)
+}
+
 func (s *Service) AddAccountToGroup(ctx context.Context, accountID int, groupID int) (contract.AccountGroupMember, error) {
 	if accountID <= 0 || groupID <= 0 {
 		return contract.AccountGroupMember{}, ErrInvalidInput

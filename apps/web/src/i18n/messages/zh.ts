@@ -647,6 +647,8 @@ export const zh: Messages = {
     emptyBody: "创建一个组即可把多个上游账号汇集在一起。",
     create: "新建账号组",
     edit: "编辑账号组",
+    deleteTitle: "删除账号组",
+    deleteBody: "确定要删除账号组「{name}」吗？组内成员关系和限速策略会一并清除，组内的上游账号本身不受影响。此操作不可撤销。",
     strategy: "调度策略",
     providerScope: "服务商范围",
     modelScope: "模型范围",
