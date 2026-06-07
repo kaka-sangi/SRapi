@@ -24,6 +24,25 @@ func New(client *ent.Client) (*Store, error) {
 }
 
 func (s *Store) Create(ctx context.Context, input contract.CreateStoredProvider) (contract.Provider, error) {
+	tombstone, _ := s.client.Provider.Query().
+		Where(entprovider.NameEqualFold(input.Name), entprovider.DeletedAtNotNil()).
+		Only(ctx)
+	if tombstone != nil {
+		restored, err := s.client.Provider.UpdateOneID(tombstone.ID).
+			ClearDeletedAt().
+			SetDisplayName(input.DisplayName).
+			SetAdapterType(input.AdapterType).
+			SetProtocol(input.Protocol).
+			SetStatus(string(input.Status)).
+			SetCapabilitiesJSON(cloneMap(input.Capabilities)).
+			SetConfigSchemaJSON(cloneMap(input.ConfigSchema)).
+			Save(ctx)
+		if err != nil {
+			return contract.Provider{}, err
+		}
+		return toProvider(restored), nil
+	}
+
 	created, err := s.client.Provider.Create().
 		SetName(input.Name).
 		SetDisplayName(input.DisplayName).

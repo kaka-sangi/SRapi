@@ -28,6 +28,26 @@ func New(client *ent.Client) (*Store, error) {
 }
 
 func (s *Store) Create(ctx context.Context, input contract.CreateStoredModel) (contract.Model, error) {
+	tombstone, _ := s.client.ModelRegistry.Query().
+		Where(entmodel.CanonicalNameEqualFold(input.CanonicalName), entmodel.DeletedAtNotNil()).
+		Only(ctx)
+	if tombstone != nil {
+		restored, err := s.client.ModelRegistry.UpdateOneID(tombstone.ID).
+			ClearDeletedAt().
+			SetDisplayName(input.DisplayName).
+			SetNillableFamily(input.Family).
+			SetNillableContextWindow(input.ContextWindow).
+			SetNillableMaxOutputTokens(input.MaxOutputTokens).
+			SetNillableQualityTier(input.QualityTier).
+			SetStatus(string(input.Status)).
+			SetCapabilitiesJSON(descriptorsToMaps(input.Capabilities)).
+			Save(ctx)
+		if err != nil {
+			return contract.Model{}, err
+		}
+		return toModel(restored), nil
+	}
+
 	created, err := s.client.ModelRegistry.Create().
 		SetCanonicalName(input.CanonicalName).
 		SetDisplayName(input.DisplayName).
