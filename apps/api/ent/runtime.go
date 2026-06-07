@@ -19,6 +19,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/authsession"
 	"github.com/srapi/srapi/apps/api/ent/billingledger"
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
+	"github.com/srapi/srapi/apps/api/ent/copilotconversation"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsoutbox"
 	"github.com/srapi/srapi/apps/api/ent/emailverificationtoken"
@@ -521,6 +522,29 @@ func init() {
 	capabilitydefinitionDescDescription := capabilitydefinitionFields[4].Descriptor()
 	// capabilitydefinition.DefaultDescription holds the default value on creation for the description field.
 	capabilitydefinition.DefaultDescription = capabilitydefinitionDescDescription.Default.(string)
+	copilotconversationMixin := schema.CopilotConversation{}.Mixin()
+	copilotconversationMixinFields0 := copilotconversationMixin[0].Fields()
+	_ = copilotconversationMixinFields0
+	copilotconversationFields := schema.CopilotConversation{}.Fields()
+	_ = copilotconversationFields
+	// copilotconversationDescCreatedAt is the schema descriptor for created_at field.
+	copilotconversationDescCreatedAt := copilotconversationMixinFields0[0].Descriptor()
+	// copilotconversation.DefaultCreatedAt holds the default value on creation for the created_at field.
+	copilotconversation.DefaultCreatedAt = copilotconversationDescCreatedAt.Default.(func() time.Time)
+	// copilotconversationDescUpdatedAt is the schema descriptor for updated_at field.
+	copilotconversationDescUpdatedAt := copilotconversationMixinFields0[1].Descriptor()
+	// copilotconversation.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	copilotconversation.DefaultUpdatedAt = copilotconversationDescUpdatedAt.Default.(func() time.Time)
+	// copilotconversation.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	copilotconversation.UpdateDefaultUpdatedAt = copilotconversationDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// copilotconversationDescTitle is the schema descriptor for title field.
+	copilotconversationDescTitle := copilotconversationFields[1].Descriptor()
+	// copilotconversation.DefaultTitle holds the default value on creation for the title field.
+	copilotconversation.DefaultTitle = copilotconversationDescTitle.Default.(string)
+	// copilotconversationDescMessagesJSON is the schema descriptor for messages_json field.
+	copilotconversationDescMessagesJSON := copilotconversationFields[2].Descriptor()
+	// copilotconversation.DefaultMessagesJSON holds the default value on creation for the messages_json field.
+	copilotconversation.DefaultMessagesJSON = copilotconversationDescMessagesJSON.Default.(string)
 	domaineventsinboxMixin := schema.DomainEventsInbox{}.Mixin()
 	domaineventsinboxMixinFields0 := domaineventsinboxMixin[0].Fields()
 	_ = domaineventsinboxMixinFields0

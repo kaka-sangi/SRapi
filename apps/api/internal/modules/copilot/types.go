@@ -18,6 +18,13 @@ type Settings struct {
 	MaxSteps          int
 	OwnerOnly         bool
 	AutoRunReads      bool
+
+	// Web search (optional): when enabled + a key is configured, the engine gains
+	// a web_search tool. WebSearchAPIKeyCiphertext is decrypted by the handler.
+	WebSearchEnabled          bool
+	WebSearchProvider         string // "tavily" | "brave"
+	WebSearchBaseURL          string
+	WebSearchAPIKeyCiphertext string
 }
 
 // Role identifies the author of a conversation message.
@@ -66,11 +73,13 @@ type Approval struct {
 
 // Event types streamed to the client over SSE.
 const (
+	EventStep               = "step"
 	EventAssistantReasoning = "assistant_reasoning"
 	EventAssistantDelta     = "assistant_delta"
 	EventToolCall           = "tool_call"
 	EventToolResult         = "tool_result"
 	EventPendingAction      = "pending_action"
+	EventUsage              = "usage"
 	EventDone               = "done"
 	EventError              = "error"
 )
@@ -94,6 +103,20 @@ type PendingActionData struct {
 	// Danger marks destructive actions (DELETE) so the UI demands a stronger,
 	// typed confirmation.
 	Danger bool `json:"danger,omitempty"`
+}
+
+// StepData announces the start of an agent step (LLM call) so the UI can show
+// live "step N / M" progress through the agentic loop.
+type StepData struct {
+	Step     int `json:"step"`
+	MaxSteps int `json:"max_steps"`
+}
+
+// UsageData reports the token usage of one LLM step; the client accumulates it
+// across a turn.
+type UsageData struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
 }
 
 // AssistantReasoningData carries the model's chain-of-thought for a step.

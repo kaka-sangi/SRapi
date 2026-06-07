@@ -26,6 +26,7 @@ import (
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	channelmonitorscontract "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/contract"
+	copilotconvcontract "github.com/srapi/srapi/apps/api/internal/modules/copilot/contract"
 	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
@@ -109,6 +110,7 @@ type runtimeOptions struct {
 	payloadRules       payloadrulescontract.Store
 	scheduledTests     scheduledtestscontract.Store
 	channelMonitors    channelmonitorscontract.Store
+	copilotConvs       copilotconvcontract.ConversationStore
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -258,6 +260,12 @@ func WithScheduledTestsStore(store scheduledtestscontract.Store) Option {
 func WithChannelMonitorsStore(store channelmonitorscontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.channelMonitors = store
+	}
+}
+
+func WithCopilotConversationStore(store copilotconvcontract.ConversationStore) Option {
+	return func(opts *runtimeOptions) {
+		opts.copilotConvs = store
 	}
 }
 
@@ -490,6 +498,12 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/settings/send-test-email", server.handleSendAdminTestEmail)
 	mux.HandleFunc("GET /api/v1/admin/copilot/config", server.handleAdminCopilotConfig)
 	mux.HandleFunc("POST /api/v1/admin/copilot/chat", server.handleAdminCopilotChat)
+	mux.HandleFunc("GET /api/v1/admin/copilot/conversations", server.handleListAdminCopilotConversations)
+	mux.HandleFunc("POST /api/v1/admin/copilot/conversations", server.handleCreateAdminCopilotConversation)
+	mux.HandleFunc("GET /api/v1/admin/copilot/conversations/{id}", server.handleGetAdminCopilotConversation)
+	mux.HandleFunc("PUT /api/v1/admin/copilot/conversations/{id}", server.handleUpdateAdminCopilotConversation)
+	mux.HandleFunc("PATCH /api/v1/admin/copilot/conversations/{id}", server.handleRenameAdminCopilotConversation)
+	mux.HandleFunc("DELETE /api/v1/admin/copilot/conversations/{id}", server.handleDeleteAdminCopilotConversation)
 	mux.HandleFunc("GET /api/v1/admin/notifications/email-templates", server.handleListAdminNotificationEmailTemplates)
 	mux.HandleFunc("POST /api/v1/admin/notifications/email-template-preview", server.handlePreviewAdminNotificationEmailTemplate)
 	mux.HandleFunc("GET /api/v1/admin/notifications/email-templates/{event}", server.handleGetAdminNotificationEmailTemplate)

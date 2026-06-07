@@ -16,11 +16,13 @@ var specYAML []byte
 // gateway, and current-user surfaces are intentionally out of reach.
 const adminPathPrefix = "/api/v1/admin/"
 
-// copilotChatPath and copilotConfigPath are the copilot's own routes; they are
-// excluded from the catalog so the model can't recurse into itself.
+// copilotPathPrefix covers the copilot's own routes (chat, config, conversation
+// history); all are excluded from the catalog so the model can't recurse into
+// itself or manage its own saved conversations.
 const (
 	copilotChatPath   = "/api/v1/admin/copilot/chat"
 	copilotConfigPath = "/api/v1/admin/copilot/config"
+	copilotPathPrefix = "/api/v1/admin/copilot/"
 )
 
 var httpMethods = []string{"get", "post", "put", "patch", "delete"}
@@ -65,7 +67,7 @@ func LoadCatalog() (*Catalog, error) {
 		if !ok || !strings.HasPrefix(path, adminPathPrefix) {
 			continue
 		}
-		if path == copilotChatPath || path == copilotConfigPath {
+		if strings.HasPrefix(path, copilotPathPrefix) {
 			continue
 		}
 		item, ok := rawItem.(map[string]any)

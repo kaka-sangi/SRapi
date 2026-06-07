@@ -498,6 +498,28 @@ var (
 			},
 		},
 	}
+	// CopilotConversationsColumns holds the columns for the "copilot_conversations" table.
+	CopilotConversationsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "admin_user_id", Type: field.TypeInt},
+		{Name: "title", Type: field.TypeString, Default: ""},
+		{Name: "messages_json", Type: field.TypeString, Size: 2147483647, Default: "[]"},
+	}
+	// CopilotConversationsTable holds the schema information for the "copilot_conversations" table.
+	CopilotConversationsTable = &schema.Table{
+		Name:       "copilot_conversations",
+		Columns:    CopilotConversationsColumns,
+		PrimaryKey: []*schema.Column{CopilotConversationsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "copilotconversation_admin_user_id_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{CopilotConversationsColumns[3], CopilotConversationsColumns[2]},
+			},
+		},
+	}
 	// DomainEventsInboxesColumns holds the columns for the "domain_events_inboxes" table.
 	DomainEventsInboxesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -2621,6 +2643,7 @@ var (
 		AuthSessionsTable,
 		BillingLedgersTable,
 		CapabilityDefinitionsTable,
+		CopilotConversationsTable,
 		DomainEventsInboxesTable,
 		DomainEventsOutboxesTable,
 		EmailVerificationTokensTable,

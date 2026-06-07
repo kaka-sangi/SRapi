@@ -63,6 +63,14 @@ type AdminSettingsCopilot struct {
 	MaxSteps                  int      `json:"max_steps"`
 	OwnerOnly                 bool     `json:"owner_only"`
 	AutoRunReads              bool     `json:"auto_run_reads"`
+
+	// Web search lets the copilot look things up on the public web. Like the
+	// dedicated key, WebSearchAPIKeyCiphertext is encrypted at rest and never
+	// crosses the API boundary (only a "configured" indicator is exposed).
+	WebSearchEnabled          bool   `json:"web_search_enabled"`
+	WebSearchProvider         string `json:"web_search_provider"`
+	WebSearchBaseURL          string `json:"web_search_base_url"`
+	WebSearchAPIKeyCiphertext string `json:"web_search_api_key_ciphertext,omitempty"`
 }
 type AdminSettingsGeneral struct {
 	SiteName     string           `json:"site_name"`

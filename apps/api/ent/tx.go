@@ -40,6 +40,8 @@ type Tx struct {
 	BillingLedger *BillingLedgerClient
 	// CapabilityDefinition is the client for interacting with the CapabilityDefinition builders.
 	CapabilityDefinition *CapabilityDefinitionClient
+	// CopilotConversation is the client for interacting with the CopilotConversation builders.
+	CopilotConversation *CopilotConversationClient
 	// DomainEventsInbox is the client for interacting with the DomainEventsInbox builders.
 	DomainEventsInbox *DomainEventsInboxClient
 	// DomainEventsOutbox is the client for interacting with the DomainEventsOutbox builders.
@@ -295,6 +297,7 @@ func (tx *Tx) init() {
 	tx.AuthSession = NewAuthSessionClient(tx.config)
 	tx.BillingLedger = NewBillingLedgerClient(tx.config)
 	tx.CapabilityDefinition = NewCapabilityDefinitionClient(tx.config)
+	tx.CopilotConversation = NewCopilotConversationClient(tx.config)
 	tx.DomainEventsInbox = NewDomainEventsInboxClient(tx.config)
 	tx.DomainEventsOutbox = NewDomainEventsOutboxClient(tx.config)
 	tx.EmailVerificationToken = NewEmailVerificationTokenClient(tx.config)

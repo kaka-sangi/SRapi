@@ -26,6 +26,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/authsession"
 	"github.com/srapi/srapi/apps/api/ent/billingledger"
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
+	"github.com/srapi/srapi/apps/api/ent/copilotconversation"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsoutbox"
 	"github.com/srapi/srapi/apps/api/ent/emailverificationtoken"
@@ -155,6 +156,7 @@ func checkColumn(t, c string) error {
 			authsession.Table:               authsession.ValidColumn,
 			billingledger.Table:             billingledger.ValidColumn,
 			capabilitydefinition.Table:      capabilitydefinition.ValidColumn,
+			copilotconversation.Table:       copilotconversation.ValidColumn,
 			domaineventsinbox.Table:         domaineventsinbox.ValidColumn,
 			domaineventsoutbox.Table:        domaineventsoutbox.ValidColumn,
 			emailverificationtoken.Table:    emailverificationtoken.ValidColumn,

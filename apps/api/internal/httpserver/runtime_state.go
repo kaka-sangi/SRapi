@@ -40,6 +40,8 @@ import (
 	channelmonitorsmemory "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/store/memory"
 	contentsafetyservice "github.com/srapi/srapi/apps/api/internal/modules/content_safety/service"
 	"github.com/srapi/srapi/apps/api/internal/modules/copilot"
+	copilotconvcontract "github.com/srapi/srapi/apps/api/internal/modules/copilot/contract"
+	copilotconvmemory "github.com/srapi/srapi/apps/api/internal/modules/copilot/store/memory"
 	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
 	errorpassthroughservice "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/service"
 	errorpassthroughmemory "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/store/memory"
@@ -205,6 +207,7 @@ type runtimeState struct {
 	payloadRulesStore       payloadrulescontract.Store
 	scheduledTestsStore     scheduledtestscontract.Store
 	channelMonitorsStore    channelmonitorscontract.Store
+	copilotConvsStore       copilotconvcontract.ConversationStore
 	capabilities            []capabilitiescontract.Definition
 	databaseProbe           dependencyPinger
 	redisProbe              dependencyPinger
@@ -584,6 +587,15 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 		return err
 	}
 	rt.channelMonitors = channelMonitorsSvc
+
+	copilotConvsStore := opts.copilotConvs
+	if copilotConvsStore == nil {
+		if !allowMemoryStores {
+			return missingRuntimeStoreError("copilot conversations")
+		}
+		copilotConvsStore = copilotconvmemory.New()
+	}
+	rt.copilotConvsStore = copilotConvsStore
 
 	// The admin copilot loads its tool catalog from the embedded OpenAPI spec. A
 	// parse failure disables the copilot (handlers return 503) but must not block

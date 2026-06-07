@@ -705,6 +705,65 @@ function CopilotTab({
         <div className="space-y-4 border-t border-srapi-border pt-4">
           <div className="flex items-center justify-between gap-4">
             <div>
+              <Label htmlFor="copilot-websearch" className="mb-0">
+                {t("copilot.fieldWebSearch")}
+              </Label>
+              <p className="mt-0.5 text-2xs text-srapi-text-tertiary">{t("copilot.fieldWebSearchHint")}</p>
+            </div>
+            <Switch
+              id="copilot-websearch"
+              checked={value.web_search_enabled}
+              onCheckedChange={(checked) => onField("web_search_enabled", checked)}
+            />
+          </div>
+          {value.web_search_enabled ? (
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <Label>{t("copilot.fieldWebSearchProvider")}</Label>
+                <Select
+                  value={value.web_search_provider || "tavily"}
+                  onValueChange={(v) => onField("web_search_provider", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tavily">Tavily</SelectItem>
+                    <SelectItem value="brave">Brave</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="copilot-websearch-url">{t("copilot.fieldWebSearchBaseUrl")}</Label>
+                <Input
+                  id="copilot-websearch-url"
+                  value={value.web_search_base_url}
+                  placeholder="https://api.tavily.com"
+                  onChange={(e) => onField("web_search_base_url", e.target.value)}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="copilot-websearch-key">{t("copilot.fieldWebSearchKey")}</Label>
+                <Input
+                  id="copilot-websearch-key"
+                  type="password"
+                  autoComplete="off"
+                  value={value.web_search_api_key ?? ""}
+                  placeholder={
+                    value.web_search_api_key_configured
+                      ? t("copilot.keyConfigured")
+                      : t("copilot.keyPlaceholder")
+                  }
+                  onChange={(e) => onField("web_search_api_key", e.target.value)}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="space-y-4 border-t border-srapi-border pt-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
               <Label htmlFor="copilot-autorun" className="mb-0">
                 {t("copilot.fieldAutoRunReads")}
               </Label>

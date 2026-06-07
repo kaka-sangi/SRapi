@@ -13,9 +13,6 @@ const SECURITY_HEADERS = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
-// rewrites proxy /api and /v1 to the backend (Next same-origin proxy)
-const proxyTarget = process.env.SRAPI_API_PROXY_TARGET ?? "http://127.0.0.1:8080";
-
 const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === "1" });
 
 const nextConfig: NextConfig = {
@@ -35,12 +32,11 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  async rewrites() {
-    return [
-      { source: "/api/:path*", destination: `${proxyTarget}/api/:path*` },
-      { source: "/v1/:path*", destination: `${proxyTarget}/v1/:path*` },
-    ];
-  },
+  // NOTE: /api and /v1 are proxied to the backend by the catch-all App Router
+  // route handlers in src/app/api/[...path]/route.ts and src/app/v1/[...path]/
+  // route.ts (via src/lib/backend-proxy.ts), NOT by rewrites(). rewrites()
+  // buffers text/event-stream responses (vercel/next.js #45048), which broke
+  // token-by-token SSE streaming; a route handler streams the body through.
 };
 
 export default withBundleAnalyzer(nextConfig);

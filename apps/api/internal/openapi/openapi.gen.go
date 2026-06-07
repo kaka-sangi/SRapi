@@ -3332,6 +3332,12 @@ type AdminCopilotConfig struct {
 	// Protocol Wire protocol of the configured source (hints model capabilities).
 	Protocol string                   `json:"protocol"`
 	Source   AdminCopilotConfigSource `json:"source"`
+
+	// WebSearchConfigured True when the copilot's web search tool is enabled and has a usable key.
+	WebSearchConfigured bool `json:"web_search_configured"`
+
+	// WebSearchProvider Configured web search backend (empty when disabled).
+	WebSearchProvider string `json:"web_search_provider"`
 }
 
 // AdminCopilotConfigSource defines model for AdminCopilotConfig.Source.
@@ -3559,6 +3565,21 @@ type AdminSettingsCopilot struct {
 
 	// Source Where the copilot's LLM credentials come from. "account" reuses an existing provider account; "dedicated" uses a standalone key.
 	Source AdminSettingsCopilotSource `json:"source"`
+
+	// WebSearchApiKey API key for the search provider. Write-only; supplied to set or rotate the key and never returned. Omit to keep the stored key.
+	WebSearchApiKey *string `json:"web_search_api_key,omitempty"`
+
+	// WebSearchApiKeyConfigured True when a search-provider API key is stored.
+	WebSearchApiKeyConfigured bool `json:"web_search_api_key_configured"`
+
+	// WebSearchBaseUrl Optional override base URL for the search provider.
+	WebSearchBaseUrl string `json:"web_search_base_url"`
+
+	// WebSearchEnabled Enable the copilot's public-web search tool (works with any model).
+	WebSearchEnabled bool `json:"web_search_enabled"`
+
+	// WebSearchProvider Search backend for the web_search tool (tavily or brave).
+	WebSearchProvider string `json:"web_search_provider"`
 }
 
 // AdminSettingsCopilotSource Where the copilot's LLM credentials come from. "account" reuses an existing provider account; "dedicated" uses a standalone key.
@@ -4683,6 +4704,48 @@ type ContentBlock struct {
 
 // ContentBlockType defines model for ContentBlock.Type.
 type ContentBlockType string
+
+// CopilotConversation A saved copilot conversation with its full transcript.
+type CopilotConversation struct {
+	CreatedAt time.Time             `json:"created_at"`
+	Id        int                   `json:"id"`
+	Messages  []AdminCopilotMessage `json:"messages"`
+	Title     string                `json:"title"`
+	UpdatedAt time.Time             `json:"updated_at"`
+}
+
+// CopilotConversationCreateRequest defines model for CopilotConversationCreateRequest.
+type CopilotConversationCreateRequest struct {
+	Messages []AdminCopilotMessage `json:"messages"`
+
+	// Title Optional; auto-derived from the first user message when blank.
+	Title *string `json:"title,omitempty"`
+}
+
+// CopilotConversationListResponse defines model for CopilotConversationListResponse.
+type CopilotConversationListResponse struct {
+	Data      []CopilotConversationSummary `json:"data"`
+	RequestId RequestId                    `json:"request_id"`
+}
+
+// CopilotConversationRenameRequest defines model for CopilotConversationRenameRequest.
+type CopilotConversationRenameRequest struct {
+	Title string `json:"title"`
+}
+
+// CopilotConversationResponse defines model for CopilotConversationResponse.
+type CopilotConversationResponse struct {
+	// Data A saved copilot conversation with its full transcript.
+	Data      CopilotConversation `json:"data"`
+	RequestId RequestId           `json:"request_id"`
+}
+
+// CopilotConversationSummary A saved copilot conversation as shown in the sidebar list.
+type CopilotConversationSummary struct {
+	Id        int       `json:"id"`
+	Title     string    `json:"title"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
 
 // CreateAccountGroupRequest defines model for CreateAccountGroupRequest.
 type CreateAccountGroupRequest struct {
@@ -9495,6 +9558,15 @@ type ImportAdminConfigSnapshotJSONRequestBody = ConfigImportRequest
 
 // CreateAdminCopilotChatJSONRequestBody defines body for CreateAdminCopilotChat for application/json ContentType.
 type CreateAdminCopilotChatJSONRequestBody = AdminCopilotChatRequest
+
+// CreateAdminCopilotConversationJSONRequestBody defines body for CreateAdminCopilotConversation for application/json ContentType.
+type CreateAdminCopilotConversationJSONRequestBody = CopilotConversationCreateRequest
+
+// RenameAdminCopilotConversationJSONRequestBody defines body for RenameAdminCopilotConversation for application/json ContentType.
+type RenameAdminCopilotConversationJSONRequestBody = CopilotConversationRenameRequest
+
+// UpdateAdminCopilotConversationJSONRequestBody defines body for UpdateAdminCopilotConversation for application/json ContentType.
+type UpdateAdminCopilotConversationJSONRequestBody = CopilotConversationCreateRequest
 
 // CreateAdminErrorPassthroughRuleJSONRequestBody defines body for CreateAdminErrorPassthroughRule for application/json ContentType.
 type CreateAdminErrorPassthroughRuleJSONRequestBody = CreateErrorPassthroughRuleRequest
@@ -16343,6 +16415,24 @@ type ServerInterface interface {
 	// Get the admin AI copilot runtime configuration.
 	// (GET /api/v1/admin/copilot/config)
 	GetAdminCopilotConfig(w http.ResponseWriter, r *http.Request)
+	// List the signed-in admin's saved copilot conversations (most-recent first).
+	// (GET /api/v1/admin/copilot/conversations)
+	ListAdminCopilotConversations(w http.ResponseWriter, r *http.Request)
+	// Save a new copilot conversation for the signed-in admin.
+	// (POST /api/v1/admin/copilot/conversations)
+	CreateAdminCopilotConversation(w http.ResponseWriter, r *http.Request)
+	// Delete a saved conversation.
+	// (DELETE /api/v1/admin/copilot/conversations/{id})
+	DeleteAdminCopilotConversation(w http.ResponseWriter, r *http.Request, id int)
+	// Fetch one saved copilot conversation with its full transcript.
+	// (GET /api/v1/admin/copilot/conversations/{id})
+	GetAdminCopilotConversation(w http.ResponseWriter, r *http.Request, id int)
+	// Rename a saved conversation.
+	// (PATCH /api/v1/admin/copilot/conversations/{id})
+	RenameAdminCopilotConversation(w http.ResponseWriter, r *http.Request, id int)
+	// Replace a saved conversation's title and transcript (autosave).
+	// (PUT /api/v1/admin/copilot/conversations/{id})
+	UpdateAdminCopilotConversation(w http.ResponseWriter, r *http.Request, id int)
 	// Get admin dashboard statistics.
 	// (GET /api/v1/admin/dashboard)
 	GetAdminDashboard(w http.ResponseWriter, r *http.Request)
@@ -20055,6 +20145,182 @@ func (siw *ServerInterfaceWrapper) GetAdminCopilotConfig(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAdminCopilotConfig(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminCopilotConversations operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminCopilotConversations(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminCopilotConversations(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminCopilotConversation operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminCopilotConversation(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminCopilotConversation(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminCopilotConversation operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminCopilotConversation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminCopilotConversation(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminCopilotConversation operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminCopilotConversation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminCopilotConversation(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RenameAdminCopilotConversation operation middleware
+func (siw *ServerInterfaceWrapper) RenameAdminCopilotConversation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RenameAdminCopilotConversation(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminCopilotConversation operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminCopilotConversation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminCopilotConversation(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -28911,6 +29177,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/config-snapshot/import", wrapper.ImportAdminConfigSnapshot)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/copilot/chat", wrapper.CreateAdminCopilotChat)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/copilot/config", wrapper.GetAdminCopilotConfig)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/copilot/conversations", wrapper.ListAdminCopilotConversations)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/copilot/conversations", wrapper.CreateAdminCopilotConversation)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/copilot/conversations/{id}", wrapper.DeleteAdminCopilotConversation)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/copilot/conversations/{id}", wrapper.GetAdminCopilotConversation)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/copilot/conversations/{id}", wrapper.RenameAdminCopilotConversation)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/copilot/conversations/{id}", wrapper.UpdateAdminCopilotConversation)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/dashboard", wrapper.GetAdminDashboard)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/dashboard/snapshot", wrapper.GetAdminDashboardSnapshot)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules", wrapper.ListAdminErrorPassthroughRules)

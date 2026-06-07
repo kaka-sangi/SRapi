@@ -7170,6 +7170,189 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/copilot/conversations:
+    get:
+      tags:
+        - AdminCopilot
+      operationId: listAdminCopilotConversations
+      summary: List the signed-in admin's saved copilot conversations (most-recent first).
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      responses:
+        "200":
+          description: Conversation summaries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CopilotConversationListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminCopilot
+      operationId: createAdminCopilotConversation
+      summary: Save a new copilot conversation for the signed-in admin.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CopilotConversationCreateRequest"
+      responses:
+        "201":
+          description: The created conversation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CopilotConversationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/copilot/conversations/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags:
+        - AdminCopilot
+      operationId: getAdminCopilotConversation
+      summary: Fetch one saved copilot conversation with its full transcript.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      responses:
+        "200":
+          description: The conversation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CopilotConversationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    put:
+      tags:
+        - AdminCopilot
+      operationId: updateAdminCopilotConversation
+      summary: Replace a saved conversation's title and transcript (autosave).
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CopilotConversationCreateRequest"
+      responses:
+        "200":
+          description: The updated conversation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CopilotConversationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    patch:
+      tags:
+        - AdminCopilot
+      operationId: renameAdminCopilotConversation
+      summary: Rename a saved conversation.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CopilotConversationRenameRequest"
+      responses:
+        "200":
+          description: The renamed conversation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CopilotConversationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminCopilot
+      operationId: deleteAdminCopilotConversation
+      summary: Delete a saved conversation.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      responses:
+        "204":
+          description: Conversation deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/notifications/email-templates:
     get:
       tags:
@@ -19078,6 +19261,10 @@ components:
         - max_steps
         - owner_only
         - auto_run_reads
+        - web_search_enabled
+        - web_search_provider
+        - web_search_base_url
+        - web_search_api_key_configured
       properties:
         enabled:
           type: boolean
@@ -19133,6 +19320,24 @@ components:
         auto_run_reads:
           type: boolean
           description: Auto-execute read-only (GET) tool calls without confirmation.
+        web_search_enabled:
+          type: boolean
+          description: Enable the copilot's public-web search tool (works with any model).
+        web_search_provider:
+          type: string
+          description: Search backend for the web_search tool (tavily or brave).
+        web_search_base_url:
+          type: string
+          description: Optional override base URL for the search provider.
+        web_search_api_key:
+          type: string
+          writeOnly: true
+          description: >-
+            API key for the search provider. Write-only; supplied to set or
+            rotate the key and never returned. Omit to keep the stored key.
+        web_search_api_key_configured:
+          type: boolean
+          description: True when a search-provider API key is stored.
 
     AdminSettingsResponse:
       type: object
@@ -19155,6 +19360,8 @@ components:
         - protocol
         - owner_only
         - configured
+        - web_search_configured
+        - web_search_provider
       properties:
         enabled:
           type: boolean
@@ -19180,6 +19387,12 @@ components:
         configured:
           type: boolean
           description: True when the selected source has usable credentials.
+        web_search_configured:
+          type: boolean
+          description: True when the copilot's web search tool is enabled and has a usable key.
+        web_search_provider:
+          type: string
+          description: Configured web search backend (empty when disabled).
 
     AdminCopilotConfigResponse:
       type: object
@@ -19189,6 +19402,92 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/AdminCopilotConfig"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    CopilotConversationSummary:
+      type: object
+      description: A saved copilot conversation as shown in the sidebar list.
+      required:
+        - id
+        - title
+        - updated_at
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+
+    CopilotConversation:
+      type: object
+      description: A saved copilot conversation with its full transcript.
+      required:
+        - id
+        - title
+        - messages
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminCopilotMessage"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CopilotConversationCreateRequest:
+      type: object
+      required:
+        - messages
+      properties:
+        title:
+          type: string
+          description: Optional; auto-derived from the first user message when blank.
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminCopilotMessage"
+
+    CopilotConversationRenameRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+
+    CopilotConversationListResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CopilotConversationSummary"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    CopilotConversationResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/CopilotConversation"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

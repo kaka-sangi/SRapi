@@ -43,13 +43,15 @@ func (s *Server) handleAdminCopilotConfig(w http.ResponseWriter, r *http.Request
 	models, protocol := s.copilotModelList(r.Context(), settings)
 	writeJSONAny(w, http.StatusOK, apiopenapi.AdminCopilotConfigResponse{
 		Data: apiopenapi.AdminCopilotConfig{
-			Enabled:    settings.Enabled,
-			Source:     apiopenapi.AdminCopilotConfigSource(settings.Source),
-			Model:      settings.Model,
-			Models:     models,
-			Protocol:   protocol,
-			OwnerOnly:  settings.OwnerOnly,
-			Configured: copilotConfigError(settings, ciphertext) == "",
+			Enabled:             settings.Enabled,
+			Source:              apiopenapi.AdminCopilotConfigSource(settings.Source),
+			Model:               settings.Model,
+			Models:              models,
+			Protocol:            protocol,
+			OwnerOnly:           settings.OwnerOnly,
+			Configured:          copilotConfigError(settings, ciphertext) == "",
+			WebSearchConfigured: settings.WebSearchEnabled && strings.TrimSpace(settings.WebSearchAPIKeyCiphertext) != "",
+			WebSearchProvider:   settings.WebSearchProvider,
 		},
 		RequestId: requestID,
 	})
@@ -125,7 +127,27 @@ func (s *Server) handleAdminCopilotChat(w http.ResponseWriter, r *http.Request) 
 
 	llm := s.buildCopilotLLM(settings, ciphertext, overrideModel, effort)
 	dispatch := s.buildCopilotDispatcher(r, session.User.ID, r.Header.Get("Cookie"), r.Header.Get(csrfHeaderName))
-	_, _ = s.runtime.copilotEngine.Run(r.Context(), settings, history, approval, llm, dispatch, emit)
+	search := s.buildCopilotSearch(settings)
+	_, _ = s.runtime.copilotEngine.Run(r.Context(), settings, history, approval, llm, dispatch, search, emit)
+}
+
+// buildCopilotSearch returns a web-search backend bound to the configured
+// provider + decrypted key, or nil when web search is disabled/unconfigured (in
+// which case the engine offers no web_search tool). Works with any model.
+func (s *Server) buildCopilotSearch(settings copilot.Settings) copilot.SearchFunc {
+	if !settings.WebSearchEnabled || strings.TrimSpace(settings.WebSearchAPIKeyCiphertext) == "" {
+		return nil
+	}
+	key, err := s.decryptCopilotSecret(settings.WebSearchAPIKeyCiphertext)
+	if err != nil || strings.TrimSpace(key) == "" {
+		return nil
+	}
+	switch strings.ToLower(strings.TrimSpace(settings.WebSearchProvider)) {
+	case "brave":
+		return copilot.NewBraveSearch(key, settings.WebSearchBaseURL)
+	default: // tavily is the default
+		return copilot.NewTavilySearch(key, settings.WebSearchBaseURL)
+	}
 }
 
 // buildCopilotLLM returns an invoker bound to the configured source (an existing
@@ -430,6 +452,11 @@ func (s *Server) copilotSettings(ctx context.Context) (copilot.Settings, string,
 		MaxSteps:          c.MaxSteps,
 		OwnerOnly:         c.OwnerOnly,
 		AutoRunReads:      c.AutoRunReads,
+
+		WebSearchEnabled:          c.WebSearchEnabled,
+		WebSearchProvider:         c.WebSearchProvider,
+		WebSearchBaseURL:          c.WebSearchBaseURL,
+		WebSearchAPIKeyCiphertext: c.WebSearchAPIKeyCiphertext,
 	}, c.DedicatedAPIKeyCiphertext, nil
 }
 

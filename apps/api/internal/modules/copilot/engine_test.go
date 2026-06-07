@@ -86,7 +86,7 @@ func TestEngineReadFlowAutoRuns(t *testing.T) {
 	var events []Event
 	emit := func(e Event) { events = append(events, e) }
 
-	_, err := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true, MaxSteps: 8}, []Message{{Role: RoleUser, Content: "list users"}}, nil, llm, dispatch, emit)
+	_, err := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true, MaxSteps: 8}, []Message{{Role: RoleUser, Content: "list users"}}, nil, llm, dispatch, nil, emit)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -94,6 +94,7 @@ func TestEngineReadFlowAutoRuns(t *testing.T) {
 		t.Fatalf("expected the read call to auto-dispatch")
 	}
 	types := collectTypes(events)
+	wantContains(t, types, EventStep)
 	wantContains(t, types, EventToolCall)
 	wantContains(t, types, EventToolResult)
 	wantContains(t, types, EventDone)
@@ -117,7 +118,7 @@ func TestEngineWriteFlowRequiresApproval(t *testing.T) {
 	emit := func(e Event) { events = append(events, e) }
 
 	settings := Settings{Enabled: true, AutoRunReads: true, MaxSteps: 8}
-	history, err := eng.Run(context.Background(), settings, []Message{{Role: RoleUser, Content: "create user"}}, nil, llm, dispatch, emit)
+	history, err := eng.Run(context.Background(), settings, []Message{{Role: RoleUser, Content: "create user"}}, nil, llm, dispatch, nil, emit)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -147,7 +148,7 @@ func TestEngineWriteFlowRequiresApproval(t *testing.T) {
 	}
 	var events2 []Event
 	emit2 := func(e Event) { events2 = append(events2, e) }
-	_, err = eng.Run(context.Background(), settings, history, &Approval{ToolCallID: "w1", Approved: true}, llm2, dispatch2, emit2)
+	_, err = eng.Run(context.Background(), settings, history, &Approval{ToolCallID: "w1", Approved: true}, llm2, dispatch2, nil, emit2)
 	if err != nil {
 		t.Fatalf("resume Run: %v", err)
 	}
@@ -167,7 +168,7 @@ func TestEngineWriteFlowDenied(t *testing.T) {
 		func(_ context.Context, _, _ string, _ []byte) (int, []byte, error) {
 			t.Fatal("must not dispatch")
 			return 0, nil, nil
-		}, func(Event) {})
+		}, nil, func(Event) {})
 
 	denyDispatched := false
 	llm2 := func(_ context.Context, _ string, _ []provideradaptercontract.ConversationMessage, _ []map[string]any, _ func(string, string)) (provideradaptercontract.ConversationResponse, error) {
@@ -179,6 +180,7 @@ func TestEngineWriteFlowDenied(t *testing.T) {
 			denyDispatched = true
 			return 0, nil, nil
 		},
+		nil,
 		func(e Event) { events = append(events, e) })
 	if err != nil {
 		t.Fatalf("resume Run: %v", err)

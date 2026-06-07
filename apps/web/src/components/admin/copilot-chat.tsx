@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bot,
   User as UserIcon,
@@ -11,6 +12,11 @@ import {
   AlertTriangle,
   Loader2,
   Plus,
+  Copy,
+  RefreshCw,
+  MessageSquare,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,14 +24,16 @@ import { Badge } from "@/components/ui/badge";
 import { Markdown } from "@/components/ui/markdown";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
+import { useCopilotSession, type PendingAction } from "@/context/CopilotSessionContext";
 import { Composer } from "@/components/chat/composer";
 import { ReasoningBlock } from "@/components/chat/reasoning-block";
-import type { ReasoningEffort } from "@/components/chat/types";
 import {
-  streamCopilotChat,
+  listCopilotConversations,
+  renameCopilotConversation,
+  deleteCopilotConversation,
   type CopilotMessage,
-  type CopilotEvent,
   type CopilotImage,
+  type CopilotConversationSummary,
 } from "@/lib/copilot-client";
 import {
   fileToImagePart,
@@ -36,51 +44,36 @@ import {
   type CopilotFilePart,
 } from "@/lib/image-utils";
 
-interface PendingAction {
-  tool_call_id: string;
-  name: string;
-  method: string;
-  path: string;
-  body?: string;
-  summary?: string;
-  danger?: boolean;
-}
-
-// The copilot is intentionally stateless server-side (transcripts can carry user
-// PII and are never persisted to the backend). To avoid losing an in-progress
-// conversation on an accidental refresh, mirror it to sessionStorage — same-tab,
-// cleared when the tab closes, never sent anywhere.
-const CONVERSATION_STORAGE_KEY = "srapi.copilot.conversation";
-
-function loadStoredConversation(): CopilotMessage[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.sessionStorage.getItem(CONVERSATION_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
-    return Array.isArray(parsed) ? (parsed as CopilotMessage[]) : [];
-  } catch {
-    return [];
-  }
-}
-
 export function CopilotChat({ models, defaultModel }: { models: string[]; defaultModel: string }) {
+  const session = useCopilotSession();
+  const {
+    messages,
+    running,
+    pending,
+    error,
+    step,
+    usage,
+    model,
+    effort,
+    setModel,
+    setEffort,
+    send,
+    resolvePending,
+    stop,
+    regenerate,
+  } = session;
   const { t } = useLanguage();
-  // Lazily restore from sessionStorage. Safe as a lazy initializer because this
-  // component only ever mounts client-side (it renders behind PageQueryState
-  // once the config query resolves), so there is no SSR/hydration mismatch.
-  const [messages, setMessages] = useState<CopilotMessage[]>(loadStoredConversation);
   const [input, setInput] = useState("");
-  const [running, setRunning] = useState(false);
-  const [pending, setPending] = useState<PendingAction | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [model, setModel] = useState(defaultModel || models[0] || "");
-  const [effort, setEffort] = useState<ReasoningEffort>("off");
   const [images, setImages] = useState<CopilotImage[]>([]);
   const [files, setFiles] = useState<CopilotFilePart[]>([]);
   const { toast } = useToast();
-  const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  // Seed the per-turn model from the configured default once.
+  useEffect(() => {
+    if (!model) setModel(defaultModel || models[0] || "");
+  }, [model, defaultModel, models, setModel]);
 
   const resultsById = useMemo(() => {
     const map = new Map<string, { content: string; is_error?: boolean }>();
@@ -92,147 +85,22 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
     return map;
   }, [messages]);
 
+  const lastAssistantIdx = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") return i;
+    }
+    return -1;
+  }, [messages]);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, pending, running]);
 
-  // Persist the conversation so a refresh doesn't lose it; "新对话" (reset → []) clears it.
-  useEffect(() => {
-    try {
-      if (messages.length === 0) {
-        window.sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
-      } else {
-        window.sessionStorage.setItem(CONVERSATION_STORAGE_KEY, JSON.stringify(messages));
-      }
-    } catch {
-      // sessionStorage unavailable or over quota (e.g. large inline images) — the
-      // in-memory conversation still works, it just won't survive a refresh.
-    }
-  }, [messages]);
-
-  const runTurn = useCallback(
-    async (history: CopilotMessage[], approval?: { tool_call_id: string; approved: boolean }) => {
-      setRunning(true);
-      setError(null);
-      setPending(null);
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const working: CopilotMessage[] = [...history];
-      let assistantIdx = -1;
-
-      const ensureAssistant = () => {
-        if (assistantIdx < 0) {
-          working.push({ role: "assistant", content: "", tool_calls: [] });
-          assistantIdx = working.length - 1;
-        }
-      };
-
-      const onEvent = (event: CopilotEvent) => {
-        switch (event.type) {
-          case "assistant_reasoning": {
-            ensureAssistant();
-            working[assistantIdx] = {
-              ...working[assistantIdx],
-              reasoning: (working[assistantIdx].reasoning ?? "") + event.data.text,
-            };
-            setMessages([...working]);
-            break;
-          }
-          case "assistant_delta": {
-            ensureAssistant();
-            working[assistantIdx] = {
-              ...working[assistantIdx],
-              content: (working[assistantIdx].content ?? "") + event.data.text,
-            };
-            setMessages([...working]);
-            break;
-          }
-          case "tool_call": {
-            if (assistantIdx < 0) {
-              working.push({ role: "assistant", content: "", tool_calls: [] });
-              assistantIdx = working.length - 1;
-            }
-            const current = working[assistantIdx];
-            working[assistantIdx] = {
-              ...current,
-              tool_calls: [
-                ...(current.tool_calls ?? []),
-                { id: event.data.tool_call_id, name: event.data.name, arguments: event.data.arguments },
-              ],
-            };
-            setMessages([...working]);
-            break;
-          }
-          case "tool_result": {
-            working.push({
-              role: "tool",
-              tool_results: [
-                { tool_call_id: event.data.tool_call_id, content: event.data.content, is_error: event.data.is_error },
-              ],
-            });
-            setMessages([...working]);
-            break;
-          }
-          case "pending_action":
-            setPending(event.data);
-            break;
-          case "done":
-            setMessages(event.data.messages);
-            setPending(null);
-            break;
-          case "error":
-            setError(event.data.message);
-            break;
-        }
-      };
-
-      try {
-        await streamCopilotChat({
-          messages: history,
-          approval,
-          model: model || undefined,
-          reasoningEffort: effort,
-          signal: controller.signal,
-          onEvent,
-        });
-      } catch (err) {
-        if ((err as Error)?.name !== "AbortError") setError((err as Error)?.message ?? "Stream error");
-      } finally {
-        setRunning(false);
-        abortRef.current = null;
-      }
-    },
-    [model, effort],
-  );
-
-  function send(text?: string) {
+  function doSend(text?: string) {
     const content = (text ?? input).trim();
     if ((!content && images.length === 0 && files.length === 0) || running) return;
-    const userMsg: CopilotMessage = { role: "user", content };
-    if (images.length) userMsg.images = images;
-    if (files.length) userMsg.files = files;
-    const next = [...messages, userMsg];
-    setMessages(next);
+    send(content, images, files);
     setInput("");
-    setImages([]);
-    setFiles([]);
-    void runTurn(next);
-  }
-
-  function resolvePending(approved: boolean) {
-    if (!pending) return;
-    void runTurn(messages, { tool_call_id: pending.tool_call_id, approved });
-  }
-
-  function stop() {
-    abortRef.current?.abort();
-  }
-
-  function reset() {
-    abortRef.current?.abort();
-    setMessages([]);
-    setPending(null);
-    setError(null);
     setImages([]);
     setFiles([]);
   }
@@ -261,10 +129,7 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
       toast({ title: t("copilot.fileReadFailed"), tone: "error" });
     }
     if (rejected.length) {
-      toast({
-        title: t("copilot.fileUnsupported", { name: rejected[0].name }),
-        tone: "error",
-      });
+      toast({ title: t("copilot.fileUnsupported", { name: rejected[0].name }), tone: "error" });
     }
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -272,70 +137,204 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
   const empty = messages.length === 0 && !running;
 
   return (
-    <div className="relative flex h-[calc(100vh-9rem)] min-h-[30rem] flex-col">
-      {!empty ? (
-        <div className="pointer-events-none absolute right-0 top-0 z-10">
-          <Button variant="ghost" size="sm" className="pointer-events-auto" onClick={reset}>
-            <Plus className="size-4" />
-            {t("copilot.newChat")}
-          </Button>
+    <div className="flex h-[calc(100vh-9rem)] min-h-[30rem] gap-4">
+      <ConversationSidebar />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex-1 overflow-y-auto px-1 pb-4">
+          {empty ? (
+            <EmptyState onPick={(s) => doSend(s)} />
+          ) : (
+            <div className="mx-auto max-w-3xl space-y-5 py-4">
+              {messages.map((message, i) => (
+                <MessageRow
+                  key={i}
+                  message={message}
+                  resultsById={resultsById}
+                  isLast={i === lastAssistantIdx}
+                  running={running}
+                  onRegenerate={regenerate}
+                />
+              ))}
+              {running && !pending ? (
+                <div className="flex items-center gap-2 pl-9 text-sm text-srapi-text-tertiary">
+                  <Loader2 className="size-4 animate-spin" />
+                  {t("copilot.thinking")}
+                  {step ? (
+                    <span className="text-2xs text-srapi-text-tertiary">
+                      · {t("copilot.stepProgress", { step: step.step, max: step.max })}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              {pending ? <PendingActionBanner action={pending} onResolve={resolvePending} disabled={running} /> : null}
+              {error ? (
+                <div className="ml-9 flex items-start gap-2 rounded-xl border border-srapi-error/30 bg-srapi-error/5 px-3 py-2 text-sm text-srapi-error">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <span className="flex-1">{error}</span>
+                  <button
+                    type="button"
+                    onClick={regenerate}
+                    disabled={running}
+                    className="flex shrink-0 items-center gap-1 text-xs font-medium transition-colors hover:text-srapi-error/80 disabled:opacity-50"
+                  >
+                    <RefreshCw className="size-3.5" />
+                    {t("copilot.retry")}
+                  </button>
+                </div>
+              ) : null}
+              {usage ? (
+                <div className="pl-9 text-2xs text-srapi-text-tertiary">
+                  {t("copilot.usageTokens", { input: usage.input, output: usage.output })}
+                </div>
+              ) : null}
+              <div ref={endRef} />
+            </div>
+          )}
         </div>
-      ) : null}
 
-      <div className="flex-1 overflow-y-auto px-1 pb-4">
-        {empty ? (
-          <EmptyState onPick={(s) => send(s)} />
-        ) : (
-          <div className="mx-auto max-w-3xl space-y-5 py-4">
-            {messages.map((message, i) => (
-              <MessageRow key={i} message={message} resultsById={resultsById} />
-            ))}
-            {running && !pending ? (
-              <div className="flex items-center gap-2 pl-9 text-sm text-srapi-text-tertiary">
-                <Loader2 className="size-4 animate-spin" />
-                {t("copilot.thinking")}
-              </div>
-            ) : null}
-            {pending ? <PendingActionBanner action={pending} onResolve={resolvePending} disabled={running} /> : null}
-            {error ? (
-              <div className="ml-9 flex items-start gap-2 rounded-xl border border-srapi-error/30 bg-srapi-error/5 px-3 py-2 text-sm text-srapi-error">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            ) : null}
-            <div ref={endRef} />
-          </div>
-        )}
+        <div className="mx-auto w-full max-w-3xl">
+          <Composer
+            input={input}
+            setInput={setInput}
+            onSend={() => doSend()}
+            onStop={stop}
+            running={running}
+            models={models}
+            model={model}
+            setModel={setModel}
+            effort={effort}
+            setEffort={setEffort}
+            images={images}
+            removeImage={(idx) => setImages((prev) => prev.filter((_, i) => i !== idx))}
+            files={files}
+            removeFile={(idx) => setFiles((prev) => prev.filter((_, i) => i !== idx))}
+            onAttach={() => fileRef.current?.click()}
+            placeholder={t("copilot.placeholder")}
+          />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,text/*,.txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.ndjson,.yaml,.yml,.xml,.html,.log,.ini,.conf,.cfg,.toml,.env,.sql,.sh,.bash,.ps1,.js,.mjs,.cjs,.jsx,.ts,.tsx,.go,.py,.rb,.rs,.c,.h,.cc,.cpp,.hpp,.cs,.java,.kt,.php,.css,.scss,.vue,.svelte,.graphql,.proto,.diff,.patch,.tf,.hcl,.dockerfile,.gradle"
+            multiple
+            hidden
+            onChange={(e) => void onPickFiles(e.currentTarget.files)}
+          />
+          <p className="mt-1.5 px-1 text-center text-2xs text-srapi-text-tertiary">{t("copilot.egressWarning")}</p>
+        </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="mx-auto w-full max-w-3xl">
-        <Composer
-          input={input}
-          setInput={setInput}
-          onSend={() => send()}
-          onStop={stop}
-          running={running}
-          models={models}
-          model={model}
-          setModel={setModel}
-          effort={effort}
-          setEffort={setEffort}
-          images={images}
-          removeImage={(idx) => setImages((prev) => prev.filter((_, i) => i !== idx))}
-          files={files}
-          removeFile={(idx) => setFiles((prev) => prev.filter((_, i) => i !== idx))}
-          onAttach={() => fileRef.current?.click()}
-          placeholder={t("copilot.placeholder")}
-        />
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*,text/*,.txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.ndjson,.yaml,.yml,.xml,.html,.log,.ini,.conf,.cfg,.toml,.env,.sql,.sh,.bash,.ps1,.js,.mjs,.cjs,.jsx,.ts,.tsx,.go,.py,.rb,.rs,.c,.h,.cc,.cpp,.hpp,.cs,.java,.kt,.php,.css,.scss,.vue,.svelte,.graphql,.proto,.diff,.patch,.tf,.hcl,.dockerfile,.gradle"
-          multiple
-          hidden
-          onChange={(e) => void onPickFiles(e.currentTarget.files)}
-        />
-        <p className="mt-1.5 px-1 text-center text-2xs text-srapi-text-tertiary">{t("copilot.egressWarning")}</p>
+/** Left rail listing the admin's saved conversations, with reopen / rename /
+ * delete. Backed by the DB so conversations survive reloads and sessions. */
+function ConversationSidebar() {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { activeId, loadConversation, newConversation, setActiveTitle, onActiveDeleted } = useCopilotSession();
+  const [editing, setEditing] = useState<{ id: number; value: string } | null>(null);
+
+  const list = useQuery({
+    queryKey: ["copilot-conversations"],
+    queryFn: listCopilotConversations,
+  });
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["copilot-conversations"] });
+
+  async function commitRename(item: CopilotConversationSummary) {
+    if (!editing) return;
+    const value = editing.value.trim();
+    setEditing(null);
+    if (!value || value === item.title) return;
+    try {
+      await renameCopilotConversation(item.id, value);
+      setActiveTitle(item.id, value);
+      invalidate();
+    } catch {
+      toast({ title: t("copilot.saveFailed"), tone: "error" });
+    }
+  }
+
+  async function remove(item: CopilotConversationSummary) {
+    if (!window.confirm(t("copilot.deleteConfirm", { title: item.title }))) return;
+    try {
+      await deleteCopilotConversation(item.id);
+      onActiveDeleted(item.id);
+      invalidate();
+    } catch {
+      toast({ title: t("copilot.saveFailed"), tone: "error" });
+    }
+  }
+
+  const items = list.data ?? [];
+
+  return (
+    <div className="hidden w-60 shrink-0 flex-col rounded-2xl border border-srapi-border bg-srapi-card/40 md:flex">
+      <div className="p-2">
+        <Button variant="outline" size="sm" className="w-full justify-start" onClick={newConversation}>
+          <Plus className="size-4" />
+          {t("copilot.newChat")}
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+        {items.length === 0 ? (
+          <p className="px-2 py-6 text-center text-2xs text-srapi-text-tertiary">{t("copilot.noConversations")}</p>
+        ) : (
+          <ul className="space-y-0.5">
+            {items.map((item) => (
+              <li key={item.id} className="group relative">
+                {editing?.id === item.id ? (
+                  <input
+                    autoFocus
+                    value={editing.value}
+                    onChange={(e) => setEditing({ id: item.id, value: e.target.value })}
+                    onBlur={() => void commitRename(item)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void commitRename(item);
+                      if (e.key === "Escape") setEditing(null);
+                    }}
+                    className="w-full rounded-md border border-srapi-primary/40 bg-srapi-bg px-2 py-1.5 text-xs text-srapi-text-primary outline-none"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void loadConversation(item.id)}
+                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                      activeId === item.id
+                        ? "bg-srapi-card-muted text-srapi-text-primary"
+                        : "text-srapi-text-secondary hover:bg-srapi-card-muted/60"
+                    }`}
+                  >
+                    <MessageSquare className="size-3.5 shrink-0 text-srapi-text-tertiary" />
+                    <span className="min-w-0 flex-1 truncate">{item.title || t("copilot.untitled")}</span>
+                  </button>
+                )}
+                {editing?.id !== item.id ? (
+                  <div className="absolute right-1 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 group-hover:flex">
+                    <button
+                      type="button"
+                      aria-label={t("copilot.rename")}
+                      onClick={() => setEditing({ id: item.id, value: item.title })}
+                      className="rounded p-1 text-srapi-text-tertiary hover:bg-srapi-card hover:text-srapi-text-primary"
+                    >
+                      <Pencil className="size-3" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={t("copilot.delete")}
+                      onClick={() => void remove(item)}
+                      className="rounded p-1 text-srapi-text-tertiary hover:bg-srapi-card hover:text-srapi-error"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -372,9 +371,15 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
 function MessageRow({
   message,
   resultsById,
+  isLast,
+  running,
+  onRegenerate,
 }: {
   message: CopilotMessage;
   resultsById: Map<string, { content: string; is_error?: boolean }>;
+  isLast?: boolean;
+  running?: boolean;
+  onRegenerate?: () => void;
 }) {
   if (message.role === "tool") return null;
 
@@ -433,7 +438,58 @@ function MessageRow({
         {(message.tool_calls ?? []).map((call) => (
           <ToolCallCard key={call.id} call={call} result={resultsById.get(call.id)} />
         ))}
+        {message.content ? (
+          <MessageActions
+            text={message.content}
+            canRegenerate={!!isLast && !running && !!onRegenerate}
+            onRegenerate={onRegenerate}
+          />
+        ) : null}
       </div>
+    </div>
+  );
+}
+
+/** Copy / regenerate actions shown under an assistant message. */
+function MessageActions({
+  text,
+  canRegenerate,
+  onRegenerate,
+}: {
+  text: string;
+  canRegenerate?: boolean;
+  onRegenerate?: () => void;
+}) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    void navigator.clipboard?.writeText(text).then(() => {
+      setCopied(true);
+      toast({ title: t("copilot.copied") });
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <div className="flex items-center gap-3 pt-0.5 text-srapi-text-tertiary">
+      <button
+        type="button"
+        onClick={copy}
+        className="flex items-center gap-1 text-2xs transition-colors hover:text-srapi-text-secondary"
+      >
+        {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+        {t("copilot.copy")}
+      </button>
+      {canRegenerate && onRegenerate ? (
+        <button
+          type="button"
+          onClick={onRegenerate}
+          className="flex items-center gap-1 text-2xs transition-colors hover:text-srapi-text-secondary"
+        >
+          <RefreshCw className="size-3" />
+          {t("copilot.regenerate")}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -474,7 +530,10 @@ function ToolCallCard({
             </Badge>
           )
         ) : (
-          <Loader2 className="size-3.5 animate-spin text-srapi-text-tertiary" />
+          <span className="flex shrink-0 items-center gap-1 text-2xs text-srapi-text-tertiary">
+            <Loader2 className="size-3.5 animate-spin" />
+            {t("copilot.toolRunning")}
+          </span>
         )}
         <ChevronDown className={`size-3.5 shrink-0 text-srapi-text-tertiary transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -488,13 +547,64 @@ function ToolCallCard({
           </div>
           {result ? (
             <div>
-              <div className="mb-1 text-2xs uppercase tracking-wide text-srapi-text-tertiary">{t("copilot.result")}</div>
-              <ToolResultView content={result.content} />
+              <div className="mb-1 text-2xs uppercase tracking-wide text-srapi-text-tertiary">
+                {call.name === "web_search" ? t("copilot.sources") : t("copilot.result")}
+              </div>
+              {call.name === "web_search" ? (
+                <SearchResults content={result.content} />
+              ) : (
+                <ToolResultView content={result.content} />
+              )}
             </div>
           ) : null}
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Renders web_search results as a clickable sources list (title → url +
+ * snippet). Falls back to raw text for error messages. */
+function SearchResults({ content }: { content: string }) {
+  const { t } = useLanguage();
+  const items = useMemo(() => {
+    try {
+      const parsed = JSON.parse(content) as {
+        data?: Array<{ title?: string; url?: string; snippet?: string }>;
+      };
+      return Array.isArray(parsed.data) ? parsed.data : null;
+    } catch {
+      return null;
+    }
+  }, [content]);
+
+  if (items === null) {
+    return (
+      <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-2xs text-srapi-text-secondary">
+        {content}
+      </pre>
+    );
+  }
+  if (items.length === 0) {
+    return <p className="text-2xs text-srapi-text-tertiary">{t("adminCommon.noResults")}</p>;
+  }
+  return (
+    <ul className="space-y-2">
+      {items.map((it, i) => (
+        <li key={i} className="rounded-lg border border-srapi-border bg-srapi-card-muted/30 p-2">
+          <a
+            href={it.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs font-medium text-srapi-primary underline underline-offset-2"
+          >
+            {it.title || it.url}
+          </a>
+          {it.url ? <div className="truncate text-2xs text-srapi-text-tertiary">{it.url}</div> : null}
+          {it.snippet ? <p className="mt-1 text-2xs text-srapi-text-secondary">{it.snippet}</p> : null}
+        </li>
+      ))}
+    </ul>
   );
 }
 

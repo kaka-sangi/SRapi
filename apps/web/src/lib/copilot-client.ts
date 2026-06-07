@@ -64,7 +64,25 @@ export interface CopilotApproval {
   approved: boolean;
 }
 
+/** A saved conversation as shown in the sidebar list. */
+export interface CopilotConversationSummary {
+  id: number;
+  title: string;
+  updated_at: string;
+}
+
+/** A saved conversation with its full transcript. */
+export interface CopilotConversationDetail {
+  id: number;
+  title: string;
+  messages: CopilotMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
 export type CopilotEvent =
+  | { type: "step"; data: { step: number; max_steps: number } }
+  | { type: "usage"; data: { input_tokens: number; output_tokens: number } }
   | { type: "assistant_reasoning"; data: { text: string } }
   | { type: "assistant_delta"; data: { text: string } }
   | { type: "tool_call"; data: { tool_call_id: string; name: string; arguments: string } }
@@ -179,4 +197,63 @@ async function errorMessage(response: Response): Promise<string> {
   } catch {
     return `Request failed (${response.status})`;
   }
+}
+
+/** Same-origin JSON call to the copilot conversation API, carrying the session
+ * cookie + CSRF token. Returns the response `data`, or undefined for 204. */
+async function copilotApi<T>(path: string, init?: RequestInit): Promise<T> {
+  const csrf = csrfToken();
+  const res = await fetch(`${apiBaseUrl()}/api/v1/admin/copilot/${path}`, {
+    ...init,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+      ...(init?.headers ?? {}),
+    },
+  });
+  if (!res.ok) throw new Error(await errorMessage(res));
+  if (res.status === 204) return undefined as T;
+  const body = (await res.json()) as { data: T };
+  return body.data;
+}
+
+export function listCopilotConversations(): Promise<CopilotConversationSummary[]> {
+  return copilotApi<CopilotConversationSummary[]>("conversations");
+}
+
+export function getCopilotConversation(id: number): Promise<CopilotConversationDetail> {
+  return copilotApi<CopilotConversationDetail>(`conversations/${id}`);
+}
+
+export function createCopilotConversation(
+  title: string,
+  messages: CopilotMessage[],
+): Promise<CopilotConversationDetail> {
+  return copilotApi<CopilotConversationDetail>("conversations", {
+    method: "POST",
+    body: JSON.stringify({ title, messages: messages.map(foldFileAttachments) }),
+  });
+}
+
+export function updateCopilotConversation(
+  id: number,
+  title: string,
+  messages: CopilotMessage[],
+): Promise<CopilotConversationDetail> {
+  return copilotApi<CopilotConversationDetail>(`conversations/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ title, messages: messages.map(foldFileAttachments) }),
+  });
+}
+
+export function renameCopilotConversation(id: number, title: string): Promise<CopilotConversationDetail> {
+  return copilotApi<CopilotConversationDetail>(`conversations/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ title }),
+  });
+}
+
+export function deleteCopilotConversation(id: number): Promise<void> {
+  return copilotApi<void>(`conversations/${id}`, { method: "DELETE" });
 }

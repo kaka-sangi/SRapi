@@ -25,6 +25,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/authsession"
 	"github.com/srapi/srapi/apps/api/ent/billingledger"
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
+	"github.com/srapi/srapi/apps/api/ent/copilotconversation"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsoutbox"
 	"github.com/srapi/srapi/apps/api/ent/emailverificationtoken"
@@ -106,6 +107,7 @@ const (
 	TypeAuthSession               = "AuthSession"
 	TypeBillingLedger             = "BillingLedger"
 	TypeCapabilityDefinition      = "CapabilityDefinition"
+	TypeCopilotConversation       = "CopilotConversation"
 	TypeDomainEventsInbox         = "DomainEventsInbox"
 	TypeDomainEventsOutbox        = "DomainEventsOutbox"
 	TypeEmailVerificationToken    = "EmailVerificationToken"
@@ -13725,6 +13727,584 @@ func (m *CapabilityDefinitionMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *CapabilityDefinitionMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown CapabilityDefinition edge %s", name)
+}
+
+// CopilotConversationMutation represents an operation that mutates the CopilotConversation nodes in the graph.
+type CopilotConversationMutation struct {
+	config
+	op               Op
+	typ              string
+	id               *int
+	created_at       *time.Time
+	updated_at       *time.Time
+	admin_user_id    *int
+	addadmin_user_id *int
+	title            *string
+	messages_json    *string
+	clearedFields    map[string]struct{}
+	done             bool
+	oldValue         func(context.Context) (*CopilotConversation, error)
+	predicates       []predicate.CopilotConversation
+}
+
+var _ ent.Mutation = (*CopilotConversationMutation)(nil)
+
+// copilotconversationOption allows management of the mutation configuration using functional options.
+type copilotconversationOption func(*CopilotConversationMutation)
+
+// newCopilotConversationMutation creates new mutation for the CopilotConversation entity.
+func newCopilotConversationMutation(c config, op Op, opts ...copilotconversationOption) *CopilotConversationMutation {
+	m := &CopilotConversationMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeCopilotConversation,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withCopilotConversationID sets the ID field of the mutation.
+func withCopilotConversationID(id int) copilotconversationOption {
+	return func(m *CopilotConversationMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *CopilotConversation
+		)
+		m.oldValue = func(ctx context.Context) (*CopilotConversation, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().CopilotConversation.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withCopilotConversation sets the old CopilotConversation of the mutation.
+func withCopilotConversation(node *CopilotConversation) copilotconversationOption {
+	return func(m *CopilotConversationMutation) {
+		m.oldValue = func(context.Context) (*CopilotConversation, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m CopilotConversationMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m CopilotConversationMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *CopilotConversationMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *CopilotConversationMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().CopilotConversation.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *CopilotConversationMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *CopilotConversationMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the CopilotConversation entity.
+// If the CopilotConversation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CopilotConversationMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *CopilotConversationMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *CopilotConversationMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *CopilotConversationMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the CopilotConversation entity.
+// If the CopilotConversation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CopilotConversationMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *CopilotConversationMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetAdminUserID sets the "admin_user_id" field.
+func (m *CopilotConversationMutation) SetAdminUserID(i int) {
+	m.admin_user_id = &i
+	m.addadmin_user_id = nil
+}
+
+// AdminUserID returns the value of the "admin_user_id" field in the mutation.
+func (m *CopilotConversationMutation) AdminUserID() (r int, exists bool) {
+	v := m.admin_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAdminUserID returns the old "admin_user_id" field's value of the CopilotConversation entity.
+// If the CopilotConversation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CopilotConversationMutation) OldAdminUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAdminUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAdminUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAdminUserID: %w", err)
+	}
+	return oldValue.AdminUserID, nil
+}
+
+// AddAdminUserID adds i to the "admin_user_id" field.
+func (m *CopilotConversationMutation) AddAdminUserID(i int) {
+	if m.addadmin_user_id != nil {
+		*m.addadmin_user_id += i
+	} else {
+		m.addadmin_user_id = &i
+	}
+}
+
+// AddedAdminUserID returns the value that was added to the "admin_user_id" field in this mutation.
+func (m *CopilotConversationMutation) AddedAdminUserID() (r int, exists bool) {
+	v := m.addadmin_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAdminUserID resets all changes to the "admin_user_id" field.
+func (m *CopilotConversationMutation) ResetAdminUserID() {
+	m.admin_user_id = nil
+	m.addadmin_user_id = nil
+}
+
+// SetTitle sets the "title" field.
+func (m *CopilotConversationMutation) SetTitle(s string) {
+	m.title = &s
+}
+
+// Title returns the value of the "title" field in the mutation.
+func (m *CopilotConversationMutation) Title() (r string, exists bool) {
+	v := m.title
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTitle returns the old "title" field's value of the CopilotConversation entity.
+// If the CopilotConversation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CopilotConversationMutation) OldTitle(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTitle is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTitle requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTitle: %w", err)
+	}
+	return oldValue.Title, nil
+}
+
+// ResetTitle resets all changes to the "title" field.
+func (m *CopilotConversationMutation) ResetTitle() {
+	m.title = nil
+}
+
+// SetMessagesJSON sets the "messages_json" field.
+func (m *CopilotConversationMutation) SetMessagesJSON(s string) {
+	m.messages_json = &s
+}
+
+// MessagesJSON returns the value of the "messages_json" field in the mutation.
+func (m *CopilotConversationMutation) MessagesJSON() (r string, exists bool) {
+	v := m.messages_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMessagesJSON returns the old "messages_json" field's value of the CopilotConversation entity.
+// If the CopilotConversation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CopilotConversationMutation) OldMessagesJSON(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMessagesJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMessagesJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMessagesJSON: %w", err)
+	}
+	return oldValue.MessagesJSON, nil
+}
+
+// ResetMessagesJSON resets all changes to the "messages_json" field.
+func (m *CopilotConversationMutation) ResetMessagesJSON() {
+	m.messages_json = nil
+}
+
+// Where appends a list predicates to the CopilotConversationMutation builder.
+func (m *CopilotConversationMutation) Where(ps ...predicate.CopilotConversation) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the CopilotConversationMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *CopilotConversationMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.CopilotConversation, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *CopilotConversationMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *CopilotConversationMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (CopilotConversation).
+func (m *CopilotConversationMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *CopilotConversationMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.created_at != nil {
+		fields = append(fields, copilotconversation.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, copilotconversation.FieldUpdatedAt)
+	}
+	if m.admin_user_id != nil {
+		fields = append(fields, copilotconversation.FieldAdminUserID)
+	}
+	if m.title != nil {
+		fields = append(fields, copilotconversation.FieldTitle)
+	}
+	if m.messages_json != nil {
+		fields = append(fields, copilotconversation.FieldMessagesJSON)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *CopilotConversationMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case copilotconversation.FieldCreatedAt:
+		return m.CreatedAt()
+	case copilotconversation.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case copilotconversation.FieldAdminUserID:
+		return m.AdminUserID()
+	case copilotconversation.FieldTitle:
+		return m.Title()
+	case copilotconversation.FieldMessagesJSON:
+		return m.MessagesJSON()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *CopilotConversationMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case copilotconversation.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case copilotconversation.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case copilotconversation.FieldAdminUserID:
+		return m.OldAdminUserID(ctx)
+	case copilotconversation.FieldTitle:
+		return m.OldTitle(ctx)
+	case copilotconversation.FieldMessagesJSON:
+		return m.OldMessagesJSON(ctx)
+	}
+	return nil, fmt.Errorf("unknown CopilotConversation field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *CopilotConversationMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case copilotconversation.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case copilotconversation.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case copilotconversation.FieldAdminUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAdminUserID(v)
+		return nil
+	case copilotconversation.FieldTitle:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTitle(v)
+		return nil
+	case copilotconversation.FieldMessagesJSON:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMessagesJSON(v)
+		return nil
+	}
+	return fmt.Errorf("unknown CopilotConversation field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *CopilotConversationMutation) AddedFields() []string {
+	var fields []string
+	if m.addadmin_user_id != nil {
+		fields = append(fields, copilotconversation.FieldAdminUserID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *CopilotConversationMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case copilotconversation.FieldAdminUserID:
+		return m.AddedAdminUserID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *CopilotConversationMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case copilotconversation.FieldAdminUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAdminUserID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown CopilotConversation numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *CopilotConversationMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *CopilotConversationMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *CopilotConversationMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown CopilotConversation nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *CopilotConversationMutation) ResetField(name string) error {
+	switch name {
+	case copilotconversation.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case copilotconversation.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case copilotconversation.FieldAdminUserID:
+		m.ResetAdminUserID()
+		return nil
+	case copilotconversation.FieldTitle:
+		m.ResetTitle()
+		return nil
+	case copilotconversation.FieldMessagesJSON:
+		m.ResetMessagesJSON()
+		return nil
+	}
+	return fmt.Errorf("unknown CopilotConversation field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *CopilotConversationMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *CopilotConversationMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *CopilotConversationMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *CopilotConversationMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *CopilotConversationMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *CopilotConversationMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *CopilotConversationMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown CopilotConversation unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *CopilotConversationMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown CopilotConversation edge %s", name)
 }
 
 // DomainEventsInboxMutation represents an operation that mutates the DomainEventsInbox nodes in the graph.

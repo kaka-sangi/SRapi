@@ -48,6 +48,9 @@ type BillingLedger func(*sql.Selector)
 // CapabilityDefinition is the predicate function for capabilitydefinition builders.
 type CapabilityDefinition func(*sql.Selector)
 
+// CopilotConversation is the predicate function for copilotconversation builders.
+type CopilotConversation func(*sql.Selector)
+
 // DomainEventsInbox is the predicate function for domaineventsinbox builders.
 type DomainEventsInbox func(*sql.Selector)
 

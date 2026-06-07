@@ -2289,6 +2289,22 @@ export type AdminSettingsCopilot = {
      * Auto-execute read-only (GET) tool calls without confirmation.
      */
     auto_run_reads: boolean;
+    /**
+     * Enable the copilot's public-web search tool (works with any model).
+     */
+    web_search_enabled: boolean;
+    /**
+     * Search backend for the web_search tool (tavily or brave).
+     */
+    web_search_provider: string;
+    /**
+     * Optional override base URL for the search provider.
+     */
+    web_search_base_url: string;
+    /**
+     * True when a search-provider API key is stored.
+     */
+    web_search_api_key_configured: boolean;
 };
 
 export type AdminSettingsResponse = {
@@ -2316,10 +2332,60 @@ export type AdminCopilotConfig = {
      * True when the selected source has usable credentials.
      */
     configured: boolean;
+    /**
+     * True when the copilot's web search tool is enabled and has a usable key.
+     */
+    web_search_configured: boolean;
+    /**
+     * Configured web search backend (empty when disabled).
+     */
+    web_search_provider: string;
 };
 
 export type AdminCopilotConfigResponse = {
     data: AdminCopilotConfig;
+    request_id: RequestId;
+};
+
+/**
+ * A saved copilot conversation as shown in the sidebar list.
+ */
+export type CopilotConversationSummary = {
+    id: number;
+    title: string;
+    updated_at: string;
+};
+
+/**
+ * A saved copilot conversation with its full transcript.
+ */
+export type CopilotConversation = {
+    id: number;
+    title: string;
+    messages: Array<AdminCopilotMessage>;
+    created_at: string;
+    updated_at: string;
+};
+
+export type CopilotConversationCreateRequest = {
+    /**
+     * Optional; auto-derived from the first user message when blank.
+     */
+    title?: string;
+    messages: Array<AdminCopilotMessage>;
+};
+
+export type CopilotConversationRenameRequest = {
+    title: string;
+};
+
+export type CopilotConversationListResponse = {
+    data: Array<CopilotConversationSummary>;
+    request_id: RequestId;
+};
+
+export type CopilotConversationResponse = {
+    data: CopilotConversation;
     request_id: RequestId;
 };
 
@@ -5138,6 +5204,26 @@ export type AdminSettingsCopilotWritable = {
      * Auto-execute read-only (GET) tool calls without confirmation.
      */
     auto_run_reads: boolean;
+    /**
+     * Enable the copilot's public-web search tool (works with any model).
+     */
+    web_search_enabled: boolean;
+    /**
+     * Search backend for the web_search tool (tavily or brave).
+     */
+    web_search_provider: string;
+    /**
+     * Optional override base URL for the search provider.
+     */
+    web_search_base_url: string;
+    /**
+     * API key for the search provider. Write-only; supplied to set or rotate the key and never returned. Omit to keep the stored key.
+     */
+    web_search_api_key?: string;
+    /**
+     * True when a search-provider API key is stored.
+     */
+    web_search_api_key_configured: boolean;
 };
 
 export type AdminSettingsResponseWritable = {
@@ -12721,6 +12807,240 @@ export type CreateAdminCopilotChatResponses = {
 };
 
 export type CreateAdminCopilotChatResponse = CreateAdminCopilotChatResponses[keyof CreateAdminCopilotChatResponses];
+
+export type ListAdminCopilotConversationsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/copilot/conversations';
+};
+
+export type ListAdminCopilotConversationsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminCopilotConversationsError = ListAdminCopilotConversationsErrors[keyof ListAdminCopilotConversationsErrors];
+
+export type ListAdminCopilotConversationsResponses = {
+    /**
+     * Conversation summaries.
+     */
+    200: CopilotConversationListResponse;
+};
+
+export type ListAdminCopilotConversationsResponse = ListAdminCopilotConversationsResponses[keyof ListAdminCopilotConversationsResponses];
+
+export type CreateAdminCopilotConversationData = {
+    body: CopilotConversationCreateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/copilot/conversations';
+};
+
+export type CreateAdminCopilotConversationErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminCopilotConversationError = CreateAdminCopilotConversationErrors[keyof CreateAdminCopilotConversationErrors];
+
+export type CreateAdminCopilotConversationResponses = {
+    /**
+     * The created conversation.
+     */
+    201: CopilotConversationResponse;
+};
+
+export type CreateAdminCopilotConversationResponse = CreateAdminCopilotConversationResponses[keyof CreateAdminCopilotConversationResponses];
+
+export type DeleteAdminCopilotConversationData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/api/v1/admin/copilot/conversations/{id}';
+};
+
+export type DeleteAdminCopilotConversationErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminCopilotConversationError = DeleteAdminCopilotConversationErrors[keyof DeleteAdminCopilotConversationErrors];
+
+export type DeleteAdminCopilotConversationResponses = {
+    /**
+     * Conversation deleted.
+     */
+    204: void;
+};
+
+export type DeleteAdminCopilotConversationResponse = DeleteAdminCopilotConversationResponses[keyof DeleteAdminCopilotConversationResponses];
+
+export type GetAdminCopilotConversationData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/api/v1/admin/copilot/conversations/{id}';
+};
+
+export type GetAdminCopilotConversationErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminCopilotConversationError = GetAdminCopilotConversationErrors[keyof GetAdminCopilotConversationErrors];
+
+export type GetAdminCopilotConversationResponses = {
+    /**
+     * The conversation.
+     */
+    200: CopilotConversationResponse;
+};
+
+export type GetAdminCopilotConversationResponse = GetAdminCopilotConversationResponses[keyof GetAdminCopilotConversationResponses];
+
+export type RenameAdminCopilotConversationData = {
+    body: CopilotConversationRenameRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/api/v1/admin/copilot/conversations/{id}';
+};
+
+export type RenameAdminCopilotConversationErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RenameAdminCopilotConversationError = RenameAdminCopilotConversationErrors[keyof RenameAdminCopilotConversationErrors];
+
+export type RenameAdminCopilotConversationResponses = {
+    /**
+     * The renamed conversation.
+     */
+    200: CopilotConversationResponse;
+};
+
+export type RenameAdminCopilotConversationResponse = RenameAdminCopilotConversationResponses[keyof RenameAdminCopilotConversationResponses];
+
+export type UpdateAdminCopilotConversationData = {
+    body: CopilotConversationCreateRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/api/v1/admin/copilot/conversations/{id}';
+};
+
+export type UpdateAdminCopilotConversationErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminCopilotConversationError = UpdateAdminCopilotConversationErrors[keyof UpdateAdminCopilotConversationErrors];
+
+export type UpdateAdminCopilotConversationResponses = {
+    /**
+     * The updated conversation.
+     */
+    200: CopilotConversationResponse;
+};
+
+export type UpdateAdminCopilotConversationResponse = UpdateAdminCopilotConversationResponses[keyof UpdateAdminCopilotConversationResponses];
 
 export type ListAdminNotificationEmailTemplatesData = {
     body?: never;

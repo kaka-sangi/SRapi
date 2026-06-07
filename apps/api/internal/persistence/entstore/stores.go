@@ -12,6 +12,7 @@ import (
 	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	channelmonitorscontract "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/contract"
+	copilotconvcontract "github.com/srapi/srapi/apps/api/internal/modules/copilot/contract"
 	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	groupratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/group_rate_limits/contract"
@@ -41,6 +42,7 @@ import (
 	authstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/auth"
 	billingstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/billing"
 	channelmonitorsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/channelmonitors"
+	copilotconvstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/copilotconv"
 	errorpassthroughstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/errorpassthrough"
 	eventsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/events"
 	groupratelimitsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/groupratelimits"
@@ -97,6 +99,7 @@ type Stores struct {
 	PayloadRules       payloadrulescontract.Store
 	ScheduledTests     scheduledtestscontract.Store
 	ChannelMonitors    channelmonitorscontract.Store
+	CopilotConvs       copilotconvcontract.ConversationStore
 }
 
 func New(client *ent.Client) (Stores, error) {
@@ -216,6 +219,10 @@ func New(client *ent.Client) (Stores, error) {
 	if err != nil {
 		return Stores{}, err
 	}
+	copilotConvs, err := copilotconvstore.New(client)
+	if err != nil {
+		return Stores{}, err
+	}
 	return Stores{
 		AdminControl:       adminControl,
 		Users:              users,
@@ -247,5 +254,6 @@ func New(client *ent.Client) (Stores, error) {
 		PayloadRules:       payloadRules,
 		ScheduledTests:     scheduledTests,
 		ChannelMonitors:    channelMonitors,
+		CopilotConvs:       copilotConvs,
 	}, nil
 }

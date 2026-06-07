@@ -68,6 +68,7 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"auth_sessions",
 		"billing_ledgers",
 		"capability_definitions",
+		"copilot_conversations",
 		"domain_events_inboxes",
 		"domain_events_outboxes",
 		"email_verification_tokens",

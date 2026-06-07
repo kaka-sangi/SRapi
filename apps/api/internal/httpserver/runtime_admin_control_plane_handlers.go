@@ -58,6 +58,18 @@ func (s *Server) handleUpdateAdminSettings(w http.ResponseWriter, r *http.Reques
 	} else {
 		mapped.Copilot.DedicatedAPIKeyCiphertext = before.Copilot.DedicatedAPIKeyCiphertext
 	}
+	// The web-search API key is write-only too: encrypt a freshly supplied key,
+	// otherwise carry over the stored ciphertext so a save never wipes it.
+	if body.Copilot.WebSearchApiKey != nil && strings.TrimSpace(*body.Copilot.WebSearchApiKey) != "" {
+		ciphertext, encErr := s.encryptCopilotSecret(strings.TrimSpace(*body.Copilot.WebSearchApiKey))
+		if encErr != nil {
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to secure web search key", requestID)
+			return
+		}
+		mapped.Copilot.WebSearchAPIKeyCiphertext = ciphertext
+	} else {
+		mapped.Copilot.WebSearchAPIKeyCiphertext = before.Copilot.WebSearchAPIKeyCiphertext
+	}
 	updated, err := s.runtime.adminControl.UpdateAdminSettings(r.Context(), mapped, session.User.ID)
 	if err != nil {
 		writeAdminControlError(w, err, requestID)
@@ -644,6 +656,10 @@ func toAPIAdminSettings(in admincontrol.AdminSettings) apiopenapi.AdminSettings 
 			MaxSteps:                  in.Copilot.MaxSteps,
 			OwnerOnly:                 in.Copilot.OwnerOnly,
 			AutoRunReads:              in.Copilot.AutoRunReads,
+			WebSearchEnabled:          in.Copilot.WebSearchEnabled,
+			WebSearchProvider:         in.Copilot.WebSearchProvider,
+			WebSearchBaseUrl:          in.Copilot.WebSearchBaseURL,
+			WebSearchApiKeyConfigured: strings.TrimSpace(in.Copilot.WebSearchAPIKeyCiphertext) != "",
 		},
 	}
 }
@@ -741,8 +757,11 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 			MaxSteps:          in.Copilot.MaxSteps,
 			OwnerOnly:         in.Copilot.OwnerOnly,
 			AutoRunReads:      in.Copilot.AutoRunReads,
-			// DedicatedAPIKeyCiphertext is set by the handler (encrypt-new or
-			// preserve-existing); never derived from the request body here.
+			WebSearchEnabled:  in.Copilot.WebSearchEnabled,
+			WebSearchProvider: in.Copilot.WebSearchProvider,
+			WebSearchBaseURL:  in.Copilot.WebSearchBaseUrl,
+			// DedicatedAPIKeyCiphertext and WebSearchAPIKeyCiphertext are set by the
+			// handler (encrypt-new or preserve-existing); never from the body here.
 		},
 	}
 }

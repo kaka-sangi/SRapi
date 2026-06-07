@@ -8,6 +8,7 @@ const (
 	toolGetOperationDetail = "get_operation_detail"
 	toolGetSchema          = "get_schema"
 	toolCallAdminAPI       = "call_admin_api"
+	toolWebSearch          = "web_search"
 )
 
 // MetaToolSchemas returns the OpenAI-function-shaped tool definitions handed to
@@ -79,7 +80,9 @@ func MetaToolSchemas() []map[string]any {
 }
 
 // SystemPrompt builds the instructions, embedding the compact operation catalog.
-func SystemPrompt(catalog *Catalog, autoRunReads bool) string {
+// webSearch enables guidance for the web_search tool (only offered when a search
+// backend is configured for the turn).
+func SystemPrompt(catalog *Catalog, autoRunReads, webSearch bool) string {
 	var b strings.Builder
 	b.WriteString(`You are the SRapi Admin Copilot, an AI operator embedded in the SRapi admin console.
 You help a signed-in administrator operate the system by calling the admin HTTP API on their behalf.
@@ -93,8 +96,11 @@ How you work:
 	} else {
 		b.WriteString("are shown to the administrator for approval. ")
 	}
-	b.WriteString(`Mutating calls (POST/PUT/PATCH/DELETE) are ALWAYS shown to the administrator for explicit approval before they run; if approval is denied, adapt and explain.
-
+	b.WriteString("Mutating calls (POST/PUT/PATCH/DELETE) are ALWAYS shown to the administrator for explicit approval before they run; if approval is denied, adapt and explain.\n")
+	if webSearch {
+		b.WriteString("- You also have a web_search tool for public-web lookups (current events, external docs, pricing). Use it when the answer needs up-to-date or external information, and cite the source URLs in your reply.\n")
+	}
+	b.WriteString(`
 Guidance:
 - Prefer to gather facts with read calls before proposing a change.
 - When unsure of an operation's path parameters or body shape, call get_operation_detail first; use the exact method and path from the catalog and substitute concrete values for {params}.

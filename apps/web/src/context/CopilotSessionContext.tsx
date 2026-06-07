@@ -1,0 +1,326 @@
+"use client";
+
+import { createContext, useContext, useRef, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  streamCopilotChat,
+  createCopilotConversation,
+  updateCopilotConversation,
+  getCopilotConversation,
+  type CopilotMessage,
+  type CopilotEvent,
+  type CopilotImage,
+} from "@/lib/copilot-client";
+import type { ReasoningEffort } from "@/components/chat/types";
+import type { CopilotFilePart } from "@/lib/image-utils";
+
+export interface PendingAction {
+  tool_call_id: string;
+  name: string;
+  method: string;
+  path: string;
+  body?: string;
+  summary?: string;
+  danger?: boolean;
+}
+
+export interface TurnUsage {
+  input: number;
+  output: number;
+}
+
+interface CopilotSessionValue {
+  messages: CopilotMessage[];
+  running: boolean;
+  pending: PendingAction | null;
+  error: string | null;
+  step: { step: number; max: number } | null;
+  usage: TurnUsage | null;
+  activeId: number | null;
+  model: string;
+  effort: ReasoningEffort;
+  setModel: (m: string) => void;
+  setEffort: (e: ReasoningEffort) => void;
+  send: (text: string, images: CopilotImage[], files: CopilotFilePart[]) => void;
+  resolvePending: (approved: boolean) => void;
+  stop: () => void;
+  newConversation: () => void;
+  regenerate: () => void;
+  loadConversation: (id: number) => Promise<void>;
+  setActiveTitle: (id: number, title: string) => void;
+  onActiveDeleted: (id: number) => void;
+}
+
+const CopilotSessionContext = createContext<CopilotSessionValue | null>(null);
+
+// sessionStorage mirrors the active conversation so a hard reload restores it
+// instantly (the live stream itself survives only client-side navigation, which
+// keeps this provider mounted). Stored per-tab, cleared on tab close.
+const STORAGE_KEY = "srapi.copilot.session";
+
+function loadStored(): { messages: CopilotMessage[]; activeId: number | null } {
+  if (typeof window === "undefined") return { messages: [], activeId: null };
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as { messages?: CopilotMessage[]; activeId?: number | null }) : null;
+    return {
+      messages: Array.isArray(parsed?.messages) ? parsed!.messages! : [],
+      activeId: typeof parsed?.activeId === "number" ? parsed!.activeId! : null,
+    };
+  } catch {
+    return { messages: [], activeId: null };
+  }
+}
+
+export function CopilotSessionProvider({ children }: { children: ReactNode }) {
+  const stored = loadStored();
+  const queryClient = useQueryClient();
+  const [messages, setMessages] = useState<CopilotMessage[]>(stored.messages);
+  const [running, setRunning] = useState(false);
+  const [pending, setPending] = useState<PendingAction | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<{ step: number; max: number } | null>(null);
+  const [usage, setUsage] = useState<TurnUsage | null>(null);
+  const [activeId, setActiveId] = useState<number | null>(stored.activeId);
+  const [model, setModel] = useState("");
+  const [effort, setEffort] = useState<ReasoningEffort>("off");
+
+  const abortRef = useRef<AbortController | null>(null);
+  // Refs the streaming "done" handler reads (avoids stale closures).
+  const activeIdRef = useRef<number | null>(stored.activeId);
+  const titleRef = useRef<string>("");
+
+  function persistSession(msgs: CopilotMessage[], id: number | null) {
+    activeIdRef.current = id;
+    setActiveId(id);
+    setMessages(msgs);
+    try {
+      if (msgs.length === 0) window.sessionStorage.removeItem(STORAGE_KEY);
+      else window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ messages: msgs, activeId: id }));
+    } catch {
+      // sessionStorage unavailable/over quota — in-memory state still works.
+    }
+  }
+
+  async function saveToServer(msgs: CopilotMessage[]) {
+    if (msgs.length === 0) return;
+    try {
+      if (activeIdRef.current == null) {
+        const created = await createCopilotConversation("", msgs);
+        activeIdRef.current = created.id;
+        titleRef.current = created.title;
+        setActiveId(created.id);
+        try {
+          window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ messages: msgs, activeId: created.id }));
+        } catch {
+          // ignore
+        }
+      } else {
+        await updateCopilotConversation(activeIdRef.current, titleRef.current, msgs);
+      }
+      void queryClient.invalidateQueries({ queryKey: ["copilot-conversations"] });
+    } catch {
+      // Saving is best-effort: the chat keeps working even if persistence fails.
+    }
+  }
+
+  async function runTurn(history: CopilotMessage[], approval?: { tool_call_id: string; approved: boolean }) {
+    setRunning(true);
+    setError(null);
+    setPending(null);
+    setStep(null);
+    setUsage(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const working: CopilotMessage[] = [...history];
+    let assistantIdx = -1;
+    let turnInput = 0;
+    let turnOutput = 0;
+
+    const ensureAssistant = () => {
+      if (assistantIdx < 0) {
+        working.push({ role: "assistant", content: "", tool_calls: [] });
+        assistantIdx = working.length - 1;
+      }
+    };
+
+    const onEvent = (event: CopilotEvent) => {
+      switch (event.type) {
+        case "step":
+          setStep({ step: event.data.step, max: event.data.max_steps });
+          break;
+        case "usage":
+          turnInput += event.data.input_tokens;
+          turnOutput += event.data.output_tokens;
+          setUsage({ input: turnInput, output: turnOutput });
+          break;
+        case "assistant_reasoning":
+          ensureAssistant();
+          working[assistantIdx] = {
+            ...working[assistantIdx],
+            reasoning: (working[assistantIdx].reasoning ?? "") + event.data.text,
+          };
+          setMessages([...working]);
+          break;
+        case "assistant_delta":
+          ensureAssistant();
+          working[assistantIdx] = {
+            ...working[assistantIdx],
+            content: (working[assistantIdx].content ?? "") + event.data.text,
+          };
+          setMessages([...working]);
+          break;
+        case "tool_call": {
+          if (assistantIdx < 0) {
+            working.push({ role: "assistant", content: "", tool_calls: [] });
+            assistantIdx = working.length - 1;
+          }
+          const current = working[assistantIdx];
+          working[assistantIdx] = {
+            ...current,
+            tool_calls: [
+              ...(current.tool_calls ?? []),
+              { id: event.data.tool_call_id, name: event.data.name, arguments: event.data.arguments },
+            ],
+          };
+          setMessages([...working]);
+          break;
+        }
+        case "tool_result":
+          working.push({
+            role: "tool",
+            tool_results: [
+              { tool_call_id: event.data.tool_call_id, content: event.data.content, is_error: event.data.is_error },
+            ],
+          });
+          setMessages([...working]);
+          break;
+        case "pending_action":
+          setPending(event.data);
+          break;
+        case "done":
+          persistSession(event.data.messages, activeIdRef.current);
+          setPending(null);
+          void saveToServer(event.data.messages);
+          break;
+        case "error":
+          setError(event.data.message);
+          break;
+      }
+    };
+
+    try {
+      await streamCopilotChat({
+        messages: history,
+        approval,
+        model: model || undefined,
+        reasoningEffort: effort,
+        signal: controller.signal,
+        onEvent,
+      });
+    } catch (err) {
+      if ((err as Error)?.name !== "AbortError") setError((err as Error)?.message ?? "Stream error");
+    } finally {
+      setRunning(false);
+      abortRef.current = null;
+    }
+  }
+
+  function send(text: string, images: CopilotImage[], files: CopilotFilePart[]) {
+    const content = text.trim();
+    if ((!content && images.length === 0 && files.length === 0) || running) return;
+    const userMsg: CopilotMessage = { role: "user", content };
+    if (images.length) userMsg.images = images;
+    if (files.length) userMsg.files = files;
+    const next = [...messages, userMsg];
+    persistSession(next, activeIdRef.current);
+    void runTurn(next);
+  }
+
+  function resolvePending(approved: boolean) {
+    if (!pending) return;
+    void runTurn(messages, { tool_call_id: pending.tool_call_id, approved });
+  }
+
+  function regenerate() {
+    if (running) return;
+    let lastUser = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        lastUser = i;
+        break;
+      }
+    }
+    if (lastUser < 0) return;
+    const history = messages.slice(0, lastUser + 1);
+    persistSession(history, activeIdRef.current);
+    void runTurn(history);
+  }
+
+  function stop() {
+    abortRef.current?.abort();
+  }
+
+  function newConversation() {
+    abortRef.current?.abort();
+    titleRef.current = "";
+    persistSession([], null);
+    setPending(null);
+    setError(null);
+    setStep(null);
+    setUsage(null);
+  }
+
+  async function loadConversation(id: number) {
+    abortRef.current?.abort();
+    setPending(null);
+    setError(null);
+    setStep(null);
+    setUsage(null);
+    try {
+      const conv = await getCopilotConversation(id);
+      titleRef.current = conv.title;
+      persistSession(conv.messages ?? [], conv.id);
+    } catch (err) {
+      setError((err as Error)?.message ?? "Failed to load conversation");
+    }
+  }
+
+  function setActiveTitle(id: number, title: string) {
+    if (activeIdRef.current === id) titleRef.current = title;
+  }
+
+  function onActiveDeleted(id: number) {
+    if (activeIdRef.current === id) newConversation();
+  }
+
+  const value: CopilotSessionValue = {
+    messages,
+    running,
+    pending,
+    error,
+    step,
+    usage,
+    activeId,
+    model,
+    effort,
+    setModel,
+    setEffort,
+    send,
+    resolvePending,
+    stop,
+    newConversation,
+    regenerate,
+    loadConversation,
+    setActiveTitle,
+    onActiveDeleted,
+  };
+
+  return <CopilotSessionContext.Provider value={value}>{children}</CopilotSessionContext.Provider>;
+}
+
+export function useCopilotSession(): CopilotSessionValue {
+  const ctx = useContext(CopilotSessionContext);
+  if (!ctx) throw new Error("useCopilotSession must be used within CopilotSessionProvider");
+  return ctx;
+}

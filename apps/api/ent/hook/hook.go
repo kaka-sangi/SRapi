@@ -177,6 +177,18 @@ func (f CapabilityDefinitionFunc) Mutate(ctx context.Context, m ent.Mutation) (e
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CapabilityDefinitionMutation", m)
 }
 
+// The CopilotConversationFunc type is an adapter to allow the use of ordinary
+// function as CopilotConversation mutator.
+type CopilotConversationFunc func(context.Context, *ent.CopilotConversationMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CopilotConversationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CopilotConversationMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CopilotConversationMutation", m)
+}
+
 // The DomainEventsInboxFunc type is an adapter to allow the use of ordinary
 // function as DomainEventsInbox mutator.
 type DomainEventsInboxFunc func(context.Context, *ent.DomainEventsInboxMutation) (ent.Value, error)

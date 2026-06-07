@@ -40,9 +40,12 @@ func NewEngine(catalog *Catalog) *Engine { return &Engine{catalog: catalog} }
 // updated history. When a mutation needs approval it emits a pending_action and
 // returns without a done event; the caller's client resumes by re-sending the
 // history plus an Approval.
-func (e *Engine) Run(ctx context.Context, settings Settings, history []Message, approval *Approval, llm LLMFunc, dispatch DispatchFunc, emit func(Event)) ([]Message, error) {
-	system := SystemPrompt(e.catalog, settings.AutoRunReads)
+func (e *Engine) Run(ctx context.Context, settings Settings, history []Message, approval *Approval, llm LLMFunc, dispatch DispatchFunc, search SearchFunc, emit func(Event)) ([]Message, error) {
+	system := SystemPrompt(e.catalog, settings.AutoRunReads, search != nil)
 	tools := MetaToolSchemas()
+	if search != nil {
+		tools = append(tools, webSearchToolSchema())
+	}
 	maxSteps := settings.MaxSteps
 	if maxSteps <= 0 || maxSteps > hardStepCeiling {
 		maxSteps = hardStepCeiling
@@ -60,6 +63,7 @@ func (e *Engine) Run(ctx context.Context, settings Settings, history []Message, 
 				return history, nil
 			}
 			steps++
+			emit(Event{Type: EventStep, Data: StepData{Step: steps, MaxSteps: maxSteps}})
 			// Stream content/reasoning fragments to the client as they arrive.
 			onDelta := func(kind, text string) {
 				if text == "" {
@@ -76,6 +80,9 @@ func (e *Engine) Run(ctx context.Context, settings Settings, history []Message, 
 			if err != nil {
 				emit(Event{Type: EventError, Data: ErrorData{Message: llmErrorMessage(err)}})
 				return history, nil
+			}
+			if resp.Usage.InputTokens > 0 || resp.Usage.OutputTokens > 0 {
+				emit(Event{Type: EventUsage, Data: UsageData{InputTokens: resp.Usage.InputTokens, OutputTokens: resp.Usage.OutputTokens}})
 			}
 			assistant := assistantFromResponse(resp)
 			history = append(history, assistant)
@@ -95,6 +102,15 @@ func (e *Engine) Run(ctx context.Context, settings Settings, history []Message, 
 			switch tc.Name {
 			case toolGetOperationDetail, toolGetSchema:
 				content, isErr := e.executeLocalTool(tc)
+				history = appendToolResult(history, tc, 0, content, isErr)
+				emit(Event{Type: EventToolResult, Data: ToolResultData{ToolCallID: tc.ID, Name: tc.Name, Content: content, IsError: isErr}})
+			case toolWebSearch:
+				// Read-only external lookup: runs immediately, no approval.
+				content := "web search is not configured"
+				isErr := true
+				if search != nil {
+					content, isErr = runWebSearch(ctx, search, tc.ArgumentsJSON)
+				}
 				history = appendToolResult(history, tc, 0, content, isErr)
 				emit(Event{Type: EventToolResult, Data: ToolResultData{ToolCallID: tc.ID, Name: tc.Name, Content: content, IsError: isErr}})
 			case toolCallAdminAPI:
