@@ -12,11 +12,13 @@ import {
   type FieldConfig,
 } from "@/components/admin/resource-form-dialog";
 import { RowActionsMenu } from "@/components/admin/row-actions";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import {
   useAdminPaymentProviders,
   useCreatePaymentProvider,
   useUpdatePaymentProvider,
   useTestPaymentProvider,
+  useDeletePaymentProvider,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -52,8 +54,10 @@ function PaymentProvidersContent() {
   const createMut = useCreatePaymentProvider();
   const updateMut = useUpdatePaymentProvider();
   const testMut = useTestPaymentProvider();
+  const deleteMut = useDeletePaymentProvider();
 
   const [formTarget, setFormTarget] = useState<PaymentProviderInstance | "new" | null>(null);
+  const [toDelete, setToDelete] = useState<PaymentProviderInstance | null>(null);
 
   async function runTest(id: string) {
     try {
@@ -177,9 +181,25 @@ function PaymentProvidersContent() {
             actions={[
               { label: t("adminPayments.edit"), onSelect: () => setFormTarget(p) },
               { label: t("adminPayments.test"), onSelect: () => void runTest(p.id) },
+              { label: t("common.delete"), destructive: true, onSelect: () => setToDelete(p) },
             ]}
           />
         )}
+      />
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setToDelete(null);
+        }}
+        title={t("adminPayments.deleteTitle")}
+        body={t("adminPayments.deleteBody", { name: toDelete?.name ?? "" })}
+        confirmLabel={t("common.delete")}
+        successMessage={t("feedback.deleted")}
+        isPending={deleteMut.isPending}
+        onConfirm={async () => {
+          if (toDelete) await deleteMut.mutateAsync(toDelete.id);
+        }}
       />
 
       {formTarget === "new" ? (

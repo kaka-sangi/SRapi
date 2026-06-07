@@ -224,6 +224,7 @@ type Store interface {
 	ListProviderInstances(ctx context.Context) ([]PaymentProviderInstance, error)
 	FindProviderInstanceByID(ctx context.Context, id int) (PaymentProviderInstance, error)
 	UpdateProviderInstance(ctx context.Context, input PaymentProviderInstance) (PaymentProviderInstance, error)
+	SoftDeleteProviderInstance(ctx context.Context, id int) error
 	PreviewPromoCode(ctx context.Context, input PromoCodePreviewInput) (PromoCodeApplication, error)
 	CreateOrder(ctx context.Context, input CreateStoredOrder) (PaymentOrder, error)
 	UpdateOrder(ctx context.Context, input PaymentOrder) (PaymentOrder, error)

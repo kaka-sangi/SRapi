@@ -213,6 +213,38 @@ func (s *Server) handleUpdateAdminPaymentProvider(w http.ResponseWriter, r *http
 	})
 }
 
+func (s *Server) handleDeleteAdminPaymentProvider(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	providerID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || providerID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment provider id", requestID)
+		return
+	}
+	before, err := s.runtime.payments.FindProviderInstanceByID(r.Context(), providerID)
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	if err := s.runtime.payments.DeleteProviderInstance(r.Context(), providerID); err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "payment_provider.delete", "payment_provider", strconv.Itoa(providerID), paymentProviderAuditSnapshot(before), nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       map[string]any{"id": providerID, "deleted": true},
+		"request_id": requestID,
+	})
+}
+
 func (s *Server) handleTestAdminPaymentProvider(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)

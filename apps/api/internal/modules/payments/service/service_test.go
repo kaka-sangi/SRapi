@@ -1159,6 +1159,69 @@ func TestExpirePendingOrdersMarksExpiredOrdersAndWritesAudit(t *testing.T) {
 	}
 }
 
+func TestDeleteProviderInstanceSoftDeletesAndGuardsInProgressOrders(t *testing.T) {
+	h := newHarness(t)
+
+	provider, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "primary",
+		Config:           easypayTestConfig("provider-signing-secret"),
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "USD", "min_amount": "1.00", "max_amount": "100.00"},
+	})
+	if err != nil {
+		t.Fatalf("create provider instance: %v", err)
+	}
+
+	order, err := h.store.CreateOrder(t.Context(), contract.CreateStoredOrder{
+		UserID:             1,
+		OrderNo:            "pay_pending_1",
+		ProviderInstanceID: provider.ID,
+		Amount:             "19.99000000",
+		Currency:           "USD",
+		Status:             contract.OrderStatusPending,
+		ProductType:        contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create stored order: %v", err)
+	}
+
+	// An in-progress (pending) order must block deletion so an active payment
+	// flow is never orphaned.
+	if err := h.payments.DeleteProviderInstance(t.Context(), provider.ID); !errors.Is(err, contract.ErrConflict) {
+		t.Fatalf("expected ErrConflict while a pending order references the provider, got %v", err)
+	}
+
+	// Settle the order to a terminal state; deletion then succeeds.
+	order.Status = contract.OrderStatusFulfilled
+	if _, err := h.store.UpdateOrder(t.Context(), order); err != nil {
+		t.Fatalf("settle order: %v", err)
+	}
+	if err := h.payments.DeleteProviderInstance(t.Context(), provider.ID); err != nil {
+		t.Fatalf("delete provider instance: %v", err)
+	}
+
+	// The soft-deleted provider is excluded from lookups and listings, but its
+	// order/audit history (the row itself) is retained.
+	if _, err := h.payments.FindProviderInstanceByID(t.Context(), provider.ID); !errors.Is(err, contract.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound for deleted provider, got %v", err)
+	}
+	list, err := h.payments.ListProviderInstances(t.Context())
+	if err != nil {
+		t.Fatalf("list provider instances: %v", err)
+	}
+	for _, p := range list {
+		if p.ID == provider.ID {
+			t.Fatalf("deleted provider must not appear in listing: %+v", p)
+		}
+	}
+
+	// Deleting again is a no-op not-found (idempotent), not a 500.
+	if err := h.payments.DeleteProviderInstance(t.Context(), provider.ID); !errors.Is(err, contract.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound deleting an already-deleted provider, got %v", err)
+	}
+}
+
 type harness struct {
 	store         *paymentmemory.Store
 	payments      *Service

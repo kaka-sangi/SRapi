@@ -1180,6 +1180,12 @@ export function useTestPaymentProvider() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "payment-providers"] }),
   });
 }
+export function useDeletePaymentProvider() {
+  return useAdminMutation(
+    (id: string) => adminApi.deletePaymentProvider(id),
+    ["admin", "payment-providers"],
+  );
+}
 
 // Risk control
 export function useUpdateRiskConfig() {

@@ -1620,6 +1620,8 @@ export const zh: Messages = {
     create: "新建支付渠道",
     edit: "编辑支付渠道",
     test: "测试配置",
+    deleteTitle: "删除支付渠道",
+    deleteBody: "确定要删除支付渠道「{name}」吗？历史订单与审计记录会保留，但该渠道将停用且不再可选。若仍有进行中的订单引用它，将无法删除。",
     name: "名称",
     channel: "渠道",
     channelHint: "网关类型，如 stripe、alipay、wechat。",

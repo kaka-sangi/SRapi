@@ -462,6 +462,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/payments/providers", server.handleListAdminPaymentProviders)
 	mux.HandleFunc("POST /api/v1/admin/payments/providers", server.handleCreateAdminPaymentProvider)
 	mux.HandleFunc("PATCH /api/v1/admin/payments/providers/{id}", server.handleUpdateAdminPaymentProvider)
+	mux.HandleFunc("DELETE /api/v1/admin/payments/providers/{id}", server.handleDeleteAdminPaymentProvider)
 	mux.HandleFunc("POST /api/v1/admin/payments/providers/{id}/test", server.handleTestAdminPaymentProvider)
 	mux.HandleFunc("GET /api/v1/admin/payments/orders", server.handleListAdminPaymentOrders)
 	mux.HandleFunc("POST /api/v1/admin/payments/orders/{id}/refund", server.handleRefundAdminPaymentOrder)

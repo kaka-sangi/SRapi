@@ -232,6 +232,26 @@ func (s *Service) UpdateProviderInstance(ctx context.Context, id int, req contra
 	return s.store.UpdateProviderInstance(ctx, provider)
 }
 
+// DeleteProviderInstance soft-deletes a payment provider instance. The row is
+// retained (its orders and audit logs still reference it) but excluded from
+// listings and lookups. Refused when in-progress orders still depend on it.
+func (s *Service) DeleteProviderInstance(ctx context.Context, id int) error {
+	if id <= 0 {
+		return ErrInvalidInput
+	}
+	if _, err := s.store.FindProviderInstanceByID(ctx, id); err != nil {
+		return err
+	}
+	count, err := s.store.CountInProgressOrdersByProviderInstance(ctx, id)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return contract.ErrConflict
+	}
+	return s.store.SoftDeleteProviderInstance(ctx, id)
+}
+
 func (s *Service) validateProviderUpdateInProgressOrderSafety(ctx context.Context, current contract.PaymentProviderInstance, next contract.PaymentProviderInstance, configReplaced bool) error {
 	if !providerUpdateNeedsInProgressOrderGuard(current, next, configReplaced) {
 		return nil

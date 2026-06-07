@@ -107,6 +107,21 @@ func (s *Store) UpdateProviderInstance(ctx context.Context, input contract.Payme
 	return toProvider(updated), nil
 }
 
+func (s *Store) SoftDeleteProviderInstance(ctx context.Context, id int) error {
+	affected, err := s.client.PaymentProviderInstance.Update().
+		Where(entpaymentproviderinstance.IDEQ(id), entpaymentproviderinstance.DeletedAtIsNil()).
+		SetDeletedAt(time.Now().UTC()).
+		SetStatus(string(contract.ProviderStatusDisabled)).
+		Save(ctx)
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return contract.ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) PreviewPromoCode(ctx context.Context, input contract.PromoCodePreviewInput) (contract.PromoCodeApplication, error) {
 	application, err := admincontrolstore.PreviewPromoCodeWithClient(ctx, s.client, admincontrolcontract.PromoCodePreviewInput{
 		UserID:   input.UserID,

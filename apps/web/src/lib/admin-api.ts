@@ -84,6 +84,7 @@ import {
   createAdminOpsAlertSilence,
   deleteAdminOpsAlertSilence,
   createAdminPaymentProvider,
+  deleteAdminPaymentProvider,
   createAdminPricingRule,
   deleteAdminPricingRule,
   createAdminPromoCode,
@@ -884,6 +885,9 @@ export const adminApi = {
   },
   testPaymentProvider(id: Id): Promise<AdminTestResult> {
     return unwrapData(() => testAdminPaymentProvider({ path: { id }, throwOnError: true }));
+  },
+  deletePaymentProvider(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminPaymentProvider({ path: { id }, throwOnError: true }));
   },
 
   listPaymentOrders(

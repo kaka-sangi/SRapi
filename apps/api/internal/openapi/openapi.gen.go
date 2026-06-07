@@ -16502,6 +16502,9 @@ type ServerInterface interface {
 	// Create an encrypted payment provider instance.
 	// (POST /api/v1/admin/payments/providers)
 	CreateAdminPaymentProvider(w http.ResponseWriter, r *http.Request)
+	// Soft-delete a payment provider instance.
+	// (DELETE /api/v1/admin/payments/providers/{id})
+	DeleteAdminPaymentProvider(w http.ResponseWriter, r *http.Request, id Id)
 	// Update an encrypted payment provider instance.
 	// (PATCH /api/v1/admin/payments/providers/{id})
 	UpdateAdminPaymentProvider(w http.ResponseWriter, r *http.Request, id Id)
@@ -22223,6 +22226,40 @@ func (siw *ServerInterfaceWrapper) CreateAdminPaymentProvider(w http.ResponseWri
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAdminPaymentProvider(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminPaymentProvider operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminPaymentProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminPaymentProvider(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -28609,6 +28646,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/orders/{id}/refund", wrapper.RefundAdminPaymentOrder)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/providers", wrapper.ListAdminPaymentProviders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/providers", wrapper.CreateAdminPaymentProvider)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/payments/providers/{id}", wrapper.DeleteAdminPaymentProvider)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/payments/providers/{id}", wrapper.UpdateAdminPaymentProvider)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/providers/{id}/test", wrapper.TestAdminPaymentProvider)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.ListAdminPricingRules)

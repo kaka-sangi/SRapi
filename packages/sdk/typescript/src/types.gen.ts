@@ -10686,6 +10686,49 @@ export type CreateAdminPaymentProviderResponses = {
 
 export type CreateAdminPaymentProviderResponse = CreateAdminPaymentProviderResponses[keyof CreateAdminPaymentProviderResponses];
 
+export type DeleteAdminPaymentProviderData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/payments/providers/{id}';
+};
+
+export type DeleteAdminPaymentProviderErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminPaymentProviderError = DeleteAdminPaymentProviderErrors[keyof DeleteAdminPaymentProviderErrors];
+
+export type DeleteAdminPaymentProviderResponses = {
+    /**
+     * Payment provider instance deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminPaymentProviderResponse = DeleteAdminPaymentProviderResponses[keyof DeleteAdminPaymentProviderResponses];
+
 export type UpdateAdminPaymentProviderData = {
     body: UpdatePaymentProviderInstanceRequest;
     path: {

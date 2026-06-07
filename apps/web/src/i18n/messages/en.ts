@@ -1616,6 +1616,9 @@ export const en = {
     create: "New payment provider",
     edit: "Edit payment provider",
     test: "Test configuration",
+    deleteTitle: "Delete payment provider",
+    deleteBody:
+      "Delete payment provider “{name}”? Historical orders and audit records are kept, but the channel is disabled and no longer selectable. It can’t be deleted while in-progress orders still reference it.",
     name: "Name",
     channel: "Channel",
     channelHint: "Gateway type, e.g. stripe, alipay, wechat.",

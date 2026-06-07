@@ -70,6 +70,9 @@ func (s *Store) ListProviderInstances(_ context.Context) ([]contract.PaymentProv
 	defer s.mu.Unlock()
 	out := make([]contract.PaymentProviderInstance, 0, len(s.providers))
 	for _, provider := range s.providers {
+		if provider.DeletedAt != nil {
+			continue
+		}
 		out = append(out, cloneProvider(provider))
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -85,10 +88,25 @@ func (s *Store) FindProviderInstanceByID(_ context.Context, id int) (contract.Pa
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	provider, ok := s.providers[id]
-	if !ok {
+	if !ok || provider.DeletedAt != nil {
 		return contract.PaymentProviderInstance{}, contract.ErrNotFound
 	}
 	return cloneProvider(provider), nil
+}
+
+func (s *Store) SoftDeleteProviderInstance(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	provider, ok := s.providers[id]
+	if !ok || provider.DeletedAt != nil {
+		return contract.ErrNotFound
+	}
+	now := time.Now().UTC()
+	provider.DeletedAt = &now
+	provider.Status = contract.ProviderStatusDisabled
+	provider.UpdatedAt = now
+	s.providers[id] = provider
+	return nil
 }
 
 func (s *Store) UpdateProviderInstance(_ context.Context, input contract.PaymentProviderInstance) (contract.PaymentProviderInstance, error) {
