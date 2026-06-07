@@ -112,6 +112,69 @@ func TestProxyRegistryEncryptsURLAndResolvesRuntimeURL(t *testing.T) {
 	}
 }
 
+func TestDeleteProxySoftDeletesAndUnbindsAccounts(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name: "egress",
+		Type: contract.ProxyTypeHTTPS,
+		URL:  "https://proxy-user:proxy-pass@example.invalid:8443",
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+	id := strconv.Itoa(proxy.ID)
+	account, err := svc.Create(ctx, contract.CreateRequest{
+		ProviderID:   1,
+		Name:         "proxied",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret-value"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	if _, err := svc.BindProxy(ctx, account.ID, &id); err != nil {
+		t.Fatalf("bind proxy: %v", err)
+	}
+
+	if err := svc.DeleteProxy(ctx, proxy.ID); err != nil {
+		t.Fatalf("delete proxy: %v", err)
+	}
+
+	// The proxy is gone from lookup and listing.
+	if _, err := svc.FindProxyByID(ctx, proxy.ID); err == nil {
+		t.Fatalf("expected deleted proxy to be unfindable")
+	}
+	list, err := svc.ListProxies(ctx)
+	if err != nil {
+		t.Fatalf("list proxies: %v", err)
+	}
+	for _, p := range list {
+		if p.ID == proxy.ID {
+			t.Fatalf("deleted proxy must not appear in listing: %+v", p)
+		}
+	}
+
+	// The account that routed through it falls back to a direct connection.
+	got, err := svc.FindByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("find account: %v", err)
+	}
+	if got.ProxyID != nil {
+		t.Fatalf("expected account proxy binding cleared, got %q", *got.ProxyID)
+	}
+
+	// Re-deleting an already-deleted proxy is a not-found, not a crash.
+	if err := svc.DeleteProxy(ctx, proxy.ID); err == nil {
+		t.Fatalf("expected error deleting an already-deleted proxy")
+	}
+}
+
 func TestProxyRegistryRejectsMismatchedScheme(t *testing.T) {
 	svc, err := New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -175,6 +176,32 @@ func (s *Store) FindProxyByID(_ context.Context, id int) (contract.ProxyDefiniti
 		return contract.ProxyDefinition{}, errors.New("proxy not found")
 	}
 	return cloneProxy(proxy), nil
+}
+
+func (s *Store) SoftDeleteProxy(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	proxy, ok := s.proxiesByID[id]
+	if !ok || proxy.DeletedAt != nil {
+		return errors.New("proxy not found")
+	}
+	now := time.Now().UTC()
+	proxy.DeletedAt = &now
+	proxy.Status = contract.ProxyStatusDisabled
+	proxy.UpdatedAt = now
+	s.proxiesByID[id] = proxy
+	delete(s.proxiesByName, strings.ToLower(proxy.Name))
+	// Clear bindings: accounts whose proxy_id points at this proxy by id fall
+	// back to a direct connection (raw-URL proxy_id values are left intact).
+	target := strconv.Itoa(id)
+	for accountID, account := range s.byID {
+		if account.ProxyID != nil && *account.ProxyID == target {
+			account.ProxyID = nil
+			account.UpdatedAt = now
+			s.byID[accountID] = account
+		}
+	}
+	return nil
 }
 
 func (s *Store) ListProxies(_ context.Context) ([]contract.ProxyDefinition, error) {

@@ -9487,6 +9487,45 @@ export type CreateAdminProxyResponses = {
 
 export type CreateAdminProxyResponse = CreateAdminProxyResponses[keyof CreateAdminProxyResponses];
 
+export type DeleteAdminProxyData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/proxies/{id}';
+};
+
+export type DeleteAdminProxyErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminProxyError = DeleteAdminProxyErrors[keyof DeleteAdminProxyErrors];
+
+export type DeleteAdminProxyResponses = {
+    /**
+     * Proxy definition deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminProxyResponse = DeleteAdminProxyResponses[keyof DeleteAdminProxyResponses];
+
 export type UpdateAdminProxyData = {
     body: UpdateProxyDefinitionRequestWritable;
     path: {

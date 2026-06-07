@@ -16559,6 +16559,9 @@ type ServerInterface interface {
 	// Create an encrypted egress proxy definition.
 	// (POST /api/v1/admin/proxies)
 	CreateAdminProxy(w http.ResponseWriter, r *http.Request)
+	// Delete an egress proxy definition.
+	// (DELETE /api/v1/admin/proxies/{id})
+	DeleteAdminProxy(w http.ResponseWriter, r *http.Request, id Id)
 	// Update an encrypted egress proxy definition.
 	// (PATCH /api/v1/admin/proxies/{id})
 	UpdateAdminProxy(w http.ResponseWriter, r *http.Request, id Id)
@@ -22950,6 +22953,40 @@ func (siw *ServerInterfaceWrapper) CreateAdminProxy(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteAdminProxy operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminProxy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminProxy(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // UpdateAdminProxy operation middleware
 func (siw *ServerInterfaceWrapper) UpdateAdminProxy(w http.ResponseWriter, r *http.Request) {
 
@@ -28665,6 +28702,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/providers/{id}/test", wrapper.TestAdminProvider)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/proxies", wrapper.ListAdminProxies)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/proxies", wrapper.CreateAdminProxy)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/proxies/{id}", wrapper.DeleteAdminProxy)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/proxies/{id}", wrapper.UpdateAdminProxy)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/redeem-codes", wrapper.ListAdminRedeemCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes", wrapper.CreateAdminRedeemCode)

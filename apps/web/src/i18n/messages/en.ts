@@ -734,6 +734,9 @@ export const en = {
     create: "New proxy",
     edit: "Edit proxy",
     urlEditHint: "Leave blank to keep the existing URL.",
+    deleteTitle: "Delete proxy",
+    deleteBody:
+      "Delete proxy “{name}”? Provider accounts bound to it by id are unbound and fall back to a direct connection. This cannot be undone.",
   },
   adminRateLimit: {
     title: "{name} · Rate limit",

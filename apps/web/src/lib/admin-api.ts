@@ -90,6 +90,7 @@ import {
   createAdminPromoCode,
   createAdminProvider,
   createAdminProxy,
+  deleteAdminProxy,
   createAdminRedeemCode,
   createAdminSubscriptionPlan,
   updateAdminSubscriptionPlan,
@@ -763,6 +764,10 @@ export const adminApi = {
 
   updateProxy(id: Id, body: UpdateAdminProxyData["body"]): Promise<ProxyDefinition> {
     return unwrapData(() => updateAdminProxy({ path: { id }, body, throwOnError: true }));
+  },
+
+  deleteProxy(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminProxy({ path: { id }, throwOnError: true }));
   },
 
   listAccountGroups(): Promise<AdminListResult<AccountGroup>> {

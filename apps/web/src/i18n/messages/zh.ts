@@ -730,6 +730,8 @@ export const zh: Messages = {
     create: "新建代理",
     edit: "编辑代理",
     urlEditHint: "留空则保持现有 URL 不变。",
+    deleteTitle: "删除代理",
+    deleteBody: "确定要删除代理「{name}」吗？通过 ID 绑定该代理的上游账号会自动解绑、改为直连。此操作不可撤销。",
   },
   adminRateLimit: {
     title: "{name} · 限流",

@@ -6,6 +6,7 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import {
@@ -13,7 +14,12 @@ import {
   enumOptions,
   type FieldConfig,
 } from "@/components/admin/resource-form-dialog";
-import { useAdminProxies, useCreateProxy, useUpdateProxy } from "@/hooks/admin-queries";
+import {
+  useAdminProxies,
+  useCreateProxy,
+  useUpdateProxy,
+  useDeleteProxy,
+} from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
@@ -48,8 +54,10 @@ function ProxiesContent() {
   });
   const createMut = useCreateProxy();
   const updateMut = useUpdateProxy();
+  const deleteMut = useDeleteProxy();
 
   const [formTarget, setFormTarget] = useState<ProxyDefinition | "new" | null>(null);
+  const [toDelete, setToDelete] = useState<ProxyDefinition | null>(null);
   const isNew = formTarget === "new";
 
   const fields: FieldConfig<ProxyFormState>[] = [
@@ -158,8 +166,28 @@ function ProxiesContent() {
           onPageChange: list.setPage,
         }}
         rowActions={(p) => (
-          <RowActionsMenu actions={[{ label: t("common.edit"), onSelect: () => setFormTarget(p) }]} />
+          <RowActionsMenu
+            actions={[
+              { label: t("common.edit"), onSelect: () => setFormTarget(p) },
+              { label: t("common.delete"), destructive: true, onSelect: () => setToDelete(p) },
+            ]}
+          />
         )}
+      />
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setToDelete(null);
+        }}
+        title={t("adminProxies.deleteTitle")}
+        body={t("adminProxies.deleteBody", { name: toDelete?.name ?? "" })}
+        confirmLabel={t("common.delete")}
+        successMessage={t("feedback.deleted")}
+        isPending={deleteMut.isPending}
+        onConfirm={async () => {
+          if (toDelete) await deleteMut.mutateAsync(toDelete.id);
+        }}
       />
 
       {formTarget === "new" ? (

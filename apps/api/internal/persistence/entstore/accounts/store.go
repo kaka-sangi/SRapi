@@ -182,6 +182,29 @@ func (s *Store) ListProxies(ctx context.Context) ([]contract.ProxyDefinition, er
 	return out, nil
 }
 
+func (s *Store) SoftDeleteProxy(ctx context.Context, id int) error {
+	affected, err := s.client.Proxy.Update().
+		Where(entproxy.IDEQ(id), entproxy.DeletedAtIsNil()).
+		SetDeletedAt(time.Now().UTC()).
+		SetStatus(string(contract.ProxyStatusDisabled)).
+		Save(ctx)
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return errors.New("proxy not found")
+	}
+	// Clear bindings: accounts referencing this proxy by id fall back to a direct
+	// connection (raw-URL proxy_id values won't match the numeric id).
+	if _, err := s.client.ProviderAccount.Update().
+		Where(entaccount.ProxyIDEQ(strconv.Itoa(id))).
+		ClearProxyID().
+		Save(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Store) CreateGroup(ctx context.Context, input contract.CreateStoredAccountGroup) (contract.AccountGroup, error) {
 	created, err := s.client.AccountGroup.Create().
 		SetName(input.Name).

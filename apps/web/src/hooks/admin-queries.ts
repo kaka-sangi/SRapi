@@ -755,6 +755,9 @@ export function useUpdateProxy() {
     ["admin", "proxies"],
   );
 }
+export function useDeleteProxy() {
+  return useAdminMutation((id: string) => adminApi.deleteProxy(id), ["admin", "proxies"]);
+}
 
 // Providers (upstream platform registry)
 export function useCreateProvider() {

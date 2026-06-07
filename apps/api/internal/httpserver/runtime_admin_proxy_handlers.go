@@ -111,3 +111,35 @@ func (s *Server) handleUpdateAdminProxy(w http.ResponseWriter, r *http.Request) 
 		RequestId: requestID,
 	})
 }
+
+func (s *Server) handleDeleteAdminProxy(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid proxy id", requestID)
+		return
+	}
+	before, err := s.runtime.accounts.FindProxyByID(r.Context(), id)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "proxy not found", requestID)
+		return
+	}
+	if err := s.runtime.accounts.DeleteProxy(r.Context(), id); err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete proxy", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "proxy.delete", "proxy", strconv.Itoa(id), proxyAuditSnapshot(before), nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       map[string]any{"id": id, "deleted": true},
+		"request_id": requestID,
+	})
+}

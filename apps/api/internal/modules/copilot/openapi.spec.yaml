@@ -4116,6 +4116,44 @@ paths:
           $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminProxies
+      operationId: deleteAdminProxy
+      summary: Delete an egress proxy definition.
+      description: >-
+        Soft-deletes the proxy and unbinds any accounts that route through it by
+        id; those accounts fall back to a direct connection.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Proxy definition deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
 
   /api/v1/admin/accounts/{id}/test:
     post:
