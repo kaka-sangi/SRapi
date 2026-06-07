@@ -137,7 +137,7 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
   const empty = messages.length === 0 && !running;
 
   return (
-    <div className="flex h-[calc(100vh-9rem)] min-h-[30rem] gap-4">
+    <div className="flex h-full min-h-0 gap-4">
       <ConversationSidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">

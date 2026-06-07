@@ -6,6 +6,7 @@ import { SidebarNav, SidebarBrand } from "./sidebar-nav";
 import { TopNav } from "./top-nav";
 import { CommandPaletteProvider } from "./command-palette";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { CopilotPet } from "@/components/admin/copilot-pet";
 import { useRuntimeStatus } from "@/hooks/queries";
 
 /**
@@ -70,6 +71,9 @@ function ShellInner({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </CommandPaletteProvider>
+
+      {/* 小r — the floating AI copilot pet (admin only). */}
+      {user.role === "admin" ? <CopilotPet /> : null}
     </div>
   );
 }

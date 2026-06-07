@@ -1652,6 +1652,10 @@ export const zh: Messages = {
     delete: "删除",
     deleteConfirm: "删除对话“{title}”？",
     saveFailed: "保存失败，请重试。",
+    petName: "小r",
+    petOpen: "打开小r",
+    petClose: "收起",
+    petOpenFull: "整页打开",
   },
   adminPayments: {
     title: "支付渠道",

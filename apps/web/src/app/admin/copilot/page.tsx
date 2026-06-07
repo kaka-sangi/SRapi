@@ -26,7 +26,9 @@ function CopilotContent() {
     <PageQueryState query={config} skeleton={<Skeleton className="h-[70vh] rounded-2xl" />}>
       {(data) =>
         data.enabled && data.configured ? (
-          <CopilotChat models={data.models ?? []} defaultModel={data.model ?? ""} />
+          <div className="h-[calc(100vh-9rem)] min-h-[30rem]">
+            <CopilotChat models={data.models ?? []} defaultModel={data.model ?? ""} />
+          </div>
         ) : (
           <DisabledNotice reason={!data.enabled ? "disabled" : "unconfigured"} />
         )

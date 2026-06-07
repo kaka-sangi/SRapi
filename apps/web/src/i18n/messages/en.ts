@@ -1652,6 +1652,10 @@ export const en = {
     delete: "Delete",
     deleteConfirm: "Delete conversation “{title}”?",
     saveFailed: "Couldn't save — please try again.",
+    petName: "小r",
+    petOpen: "Open 小r",
+    petClose: "Collapse",
+    petOpenFull: "Full page",
   },
   adminPayments: {
     title: "Payment providers",

@@ -156,7 +156,8 @@ const ADMIN_OPS_SECTION: NavSection = {
 const ADMIN_SYSTEM_SECTION: NavSection = {
   titleKey: "nav.sectionAdminSystem",
   items: [
-    { href: ADMIN_ROUTES.copilot, labelKey: "nav.adminCopilot", icon: Bot },
+    // The AI copilot is reached via the floating 小r pet (components/admin/
+    // copilot-pet.tsx), not a sidebar entry.
     { href: ADMIN_ROUTES.roles, labelKey: "nav.adminRoles", icon: ShieldCheck },
     { href: ADMIN_ROUTES.apiKeys, labelKey: "nav.adminApiKeys", icon: KeyRound },
     { href: ADMIN_ROUTES.userAttributes, labelKey: "nav.adminUserAttributes", icon: Tags },
