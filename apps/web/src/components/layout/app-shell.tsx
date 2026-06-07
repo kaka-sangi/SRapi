@@ -33,8 +33,8 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const live = runtime.data?.connected ?? false;
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[1500px]">
-      {/* Desktop sidebar */}
+    <div className="flex min-h-dvh w-full">
+      {/* Desktop sidebar — pinned flush to the left edge */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-srapi-border bg-srapi-card-muted p-4 lg:flex">
         <SidebarBrand />
         <div className="mt-2 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -65,7 +65,9 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       <CommandPaletteProvider role={user.role}>
         <div className="flex min-w-0 flex-1 flex-col">
           <TopNav user={user} onOpenNav={() => setNavOpen(true)} live={live} />
-          <main className="anim-page flex-1 space-y-6 p-5 sm:p-7">{children}</main>
+          <main className="anim-page flex-1">
+            <div className="mx-auto w-full max-w-[1280px] space-y-6 p-5 sm:p-7">{children}</div>
+          </main>
         </div>
       </CommandPaletteProvider>
     </div>
