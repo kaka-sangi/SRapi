@@ -455,18 +455,26 @@ func singleValueHeaders(headers http.Header) map[string]string {
 	return out
 }
 
+// setSSEResponseHeaders sets the standard Server-Sent-Events headers. The
+// X-Accel-Buffering: no header is the important one: without it nginx (and many
+// ingress/CDN proxies) buffer the whole response before flushing, which turns
+// real token-by-token streaming into a single all-at-once delivery downstream.
+func setSSEResponseHeaders(w http.ResponseWriter) {
+	h := w.Header()
+	h.Set("Content-Type", "text/event-stream")
+	h.Set("Cache-Control", "no-cache")
+	h.Set("Connection", "keep-alive")
+	h.Set("X-Accel-Buffering", "no")
+}
+
 func writeSSEJSON(w http.ResponseWriter, payload any) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+	setSSEResponseHeaders(w)
 	writeSSEJSONAny(w, payload)
 	writeSSEDone(w)
 }
 
 func writeSSEJSONChunks(w http.ResponseWriter, payloads []map[string]any) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+	setSSEResponseHeaders(w)
 	for _, payload := range payloads {
 		writeSSEJSONAny(w, payload)
 	}
@@ -474,9 +482,7 @@ func writeSSEJSONChunks(w http.ResponseWriter, payloads []map[string]any) {
 }
 
 func writeSSEEvents(w http.ResponseWriter, events []gatewayservice.StreamEvent) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+	setSSEResponseHeaders(w)
 	for _, event := range events {
 		if name := strings.TrimSpace(event.Event); name != "" {
 			_, _ = fmt.Fprintf(w, "event: %s\n", name)
@@ -487,9 +493,7 @@ func writeSSEEvents(w http.ResponseWriter, events []gatewayservice.StreamEvent) 
 }
 
 func writeRawSSEResponse(w http.ResponseWriter, raw []byte) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+	setSSEResponseHeaders(w)
 	_, _ = w.Write(raw)
 	if flusher, ok := w.(http.Flusher); ok {
 		flusher.Flush()

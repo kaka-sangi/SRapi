@@ -96,6 +96,11 @@ func TestGatewayChatCompletionsStreamsSameProtocolSSEIncrementally(t *testing.T)
 	if got := rec.header.Get("Content-Type"); got != "text/event-stream" {
 		t.Fatalf("expected text/event-stream content type, got %q", got)
 	}
+	// X-Accel-Buffering: no keeps nginx/ingress from buffering the stream and
+	// collapsing it into one all-at-once delivery downstream.
+	if got := rec.header.Get("X-Accel-Buffering"); got != "no" {
+		t.Fatalf("expected X-Accel-Buffering: no on the SSE response, got %q", got)
+	}
 	if rec.body.String() != full {
 		t.Fatalf("expected full SSE passthrough\nexpected:\n%s\nactual:\n%s", full, rec.body.String())
 	}

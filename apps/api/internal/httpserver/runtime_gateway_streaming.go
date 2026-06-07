@@ -66,10 +66,11 @@ func (s *Server) writeConversationStreamPassthrough(
 ) {
 	defer func() { _ = providerResp.StreamBody.Close() }()
 
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+	setSSEResponseHeaders(w)
 	forwardUpstreamResponseHeaders(w, providerResp.Headers, s.gatewayPassthroughHeaderConfig(r.Context()))
+	// Re-assert after forwarding upstream headers so an upstream that omits (or
+	// contradicts) it can't re-enable proxy buffering on our hop.
+	w.Header().Set("X-Accel-Buffering", "no")
 	flusher, _ := w.(http.Flusher)
 
 	// Idle-timeout enforcement: read the upstream in a goroutine so the main loop

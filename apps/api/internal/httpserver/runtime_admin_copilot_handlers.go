@@ -108,9 +108,7 @@ func (s *Server) handleAdminCopilotChat(w http.ResponseWriter, r *http.Request) 
 		effort = string(*body.ReasoningEffort)
 	}
 
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+	setSSEResponseHeaders(w)
 	w.Header().Set("X-Request-ID", requestID)
 	w.WriteHeader(http.StatusOK)
 	flusher, _ := w.(http.Flusher)
@@ -159,7 +157,14 @@ func (s *Server) buildCopilotLLM(settings copilot.Settings, ciphertext, override
 			if err != nil {
 				return provideradaptercontract.ConversationResponse{}, fmt.Errorf("decrypt dedicated key: %w", err)
 			}
+			// Default an unset protocol to OpenAI-compatible (the dominant dedicated
+			// case, e.g. DeepSeek). An empty protocol would make source != target
+			// fail the same-protocol check and silently drop to the buffered,
+			// non-streaming path.
 			protocol := strings.TrimSpace(settings.DedicatedProtocol)
+			if protocol == "" {
+				protocol = "openai-compatible"
+			}
 			req.SourceProtocol = protocol
 			req.TargetProtocol = protocol
 			req.Provider = providercontract.Provider{
