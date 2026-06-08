@@ -15,6 +15,7 @@ export const USER_ROUTES = {
 export const ADMIN_ROUTES = {
   dashboard: "/admin/dashboard",
   users: "/admin/users",
+  quickSetup: "/admin/quick-setup",
   providers: "/admin/providers",
   models: "/admin/models",
   accounts: "/admin/accounts",

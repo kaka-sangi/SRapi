@@ -1279,7 +1279,7 @@ export type RuntimeClass = 'api_key' | 'oauth_refresh' | 'oauth_device_code' | '
 /**
  * Upstream protocol/platform family a provider preset belongs to.
  */
-export type PlatformFamily = 'openai_compatible' | 'anthropic_compatible' | 'bedrock_anthropic' | 'reverse_proxy_antigravity' | 'rerank_compatible';
+export type PlatformFamily = 'openai_compatible' | 'anthropic_compatible' | 'bedrock_anthropic' | 'reverse_proxy_antigravity' | 'rerank_compatible' | 'codex_cli';
 
 export type ProviderAccountStatus = 'active' | 'disabled' | 'needs_reauth' | 'suspended' | 'dead' | 'archived';
 

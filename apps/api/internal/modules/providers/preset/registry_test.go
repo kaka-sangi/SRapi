@@ -21,6 +21,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		"anyrouter",
 		"bedrock",
 		"cerebras",
+		"codex-cli",
 		"deepseek",
 		"deepseek-anthropic",
 		"grok",
@@ -198,6 +199,35 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 	if !rerankPreset.MatchesPath("/api/provider/rerank-compatible/v1/rerank") {
 		t.Fatalf("expected rerank-compatible route alias to match path")
+	}
+
+	codexPreset, ok := registry.Lookup("codex-cli")
+	if !ok {
+		t.Fatalf("missing codex-cli preset")
+	}
+	if codexPreset.PlatformFamily != PlatformFamilyCodexCLI {
+		t.Fatalf("expected codex_cli platform family, got %s", codexPreset.PlatformFamily)
+	}
+	if codexPreset.DefaultBaseURL != "https://chatgpt.com/backend-api/codex" {
+		t.Fatalf("unexpected codex-cli base url: %s", codexPreset.DefaultBaseURL)
+	}
+	if containsRuntimeClass(codexPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassAPIKey) {
+		t.Fatalf("expected codex-cli to exclude api_key runtime class")
+	}
+	if !containsRuntimeClass(codexPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) {
+		t.Fatalf("expected codex-cli to include oauth_refresh runtime class")
+	}
+	if !codexPreset.Capabilities["responses"] || !codexPreset.Capabilities["responses_compact"] || !codexPreset.Capabilities["streaming"] {
+		t.Fatalf("unexpected codex-cli capabilities: %+v", codexPreset.Capabilities)
+	}
+	if codexPreset.AccountTemplate == nil {
+		t.Fatalf("expected codex-cli to have an account template")
+	}
+	if codexPreset.AccountTemplate.UpstreamClient != "codex_cli" {
+		t.Fatalf("expected codex-cli template upstream_client=codex_cli, got %s", codexPreset.AccountTemplate.UpstreamClient)
+	}
+	if len(codexPreset.AccountTemplate.ModelCatalog) == 0 {
+		t.Fatalf("expected codex-cli template to have a model catalog")
 	}
 }
 

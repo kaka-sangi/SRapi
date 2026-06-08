@@ -38,6 +38,7 @@ import {
   Gauge,
   Bot,
   Webhook,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { ADMIN_ROUTES, USER_ROUTES, USER_HOME_ROUTE } from "@/lib/routes";
@@ -101,6 +102,7 @@ const ADMIN_OVERVIEW_SECTION: NavSection = {
 const ADMIN_GATEWAY_SECTION: NavSection = {
   titleKey: "nav.sectionAdminGateway",
   items: [
+    { href: ADMIN_ROUTES.quickSetup, labelKey: "nav.adminQuickSetup", icon: Zap },
     { href: ADMIN_ROUTES.providers, labelKey: "nav.adminProviders", icon: Plug },
     { href: ADMIN_ROUTES.models, labelKey: "nav.adminModels", icon: Cpu },
     { href: ADMIN_ROUTES.accounts, labelKey: "nav.adminAccounts", icon: Server },

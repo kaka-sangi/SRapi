@@ -43,8 +43,14 @@ import {
   type AccountBatchAction,
 } from "@/lib/admin-account-form";
 import { AccountImportDialog } from "@/components/admin/account-import-dialog";
-import type { ProviderAccount, AccountHealthSnapshot } from "@/lib/sdk-types";
+import type { Provider, ProviderAccount, AccountHealthSnapshot } from "@/lib/sdk-types";
 import { cn } from "@/lib/cn";
+
+function extractAccountTemplate(p: Provider) {
+  const schema = p.config_schema as Record<string, unknown> | undefined;
+  const tpl = schema?.account_template;
+  return tpl && typeof tpl === "object" ? (tpl as Record<string, unknown>) : null;
+}
 
 export default function AdminAccountsPage() {
   return (
@@ -112,6 +118,8 @@ function AccountsContent() {
     label: p.display_name || p.name,
     platformFamily: p.platform_family ?? null,
     authMethods: p.auth_methods ?? null,
+    adapterType: p.adapter_type,
+    accountTemplate: extractAccountTemplate(p),
   }));
   const providerNameById = new Map(
     (providers.data?.data ?? []).map((p) => [String(p.id), p.display_name || p.name] as const),

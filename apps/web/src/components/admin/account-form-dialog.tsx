@@ -51,6 +51,15 @@ export interface AccountProviderOption {
   label: string;
   platformFamily?: PlatformFamily | null;
   authMethods?: RuntimeClass[] | null;
+  adapterType?: string;
+  accountTemplate?: AccountTemplate | null;
+}
+
+interface AccountTemplate {
+  upstream_client?: string;
+  default_metadata?: Record<string, unknown>;
+  model_catalog?: string[];
+  metadata_hints?: Record<string, string>;
 }
 
 /**
@@ -63,8 +72,26 @@ const PLATFORM_FAMILY_ORDER: PlatformFamily[] = [
   "openai_compatible",
   "bedrock_anthropic",
   "reverse_proxy_antigravity",
+  "codex_cli",
   "rerank_compatible",
 ];
+
+const CODEX_FALLBACK_TEMPLATE: AccountTemplate = {
+  upstream_client: "codex_cli",
+  default_metadata: { base_url: "https://chatgpt.com/backend-api/codex" },
+  model_catalog: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest"],
+  metadata_hints: { base_url: "Codex upstream (adapter appends /responses)", chatgpt_account_id: "From session JWT (optional)" },
+};
+
+function getProviderTemplate(
+  providerOptions: AccountProviderOption[],
+  providerId: string,
+): AccountTemplate | null {
+  const p = providerOptions.find((o) => o.value === providerId);
+  if (p?.accountTemplate) return p.accountTemplate;
+  if (p?.adapterType === "reverse-proxy-codex-cli") return CODEX_FALLBACK_TEMPLATE;
+  return null;
+}
 
 type RuntimeClass = AdminAccountFormState["runtimeClass"];
 
@@ -248,6 +275,11 @@ export function AccountFormDialog({
   const [submitting, setSubmitting] = useState(false);
   const [oauthWizardOpen, setOauthWizardOpen] = useState(false);
 
+  const template = useMemo(
+    () => getProviderTemplate(providerOptions, providerId),
+    [providerOptions, providerId],
+  );
+
   // Map the OAuth runtime class to its provisioning flow: refresh-token runtimes
   // run the redirect/PKCE authorization-code flow; device-code runtimes run the
   // RFC 8628 device flow.
@@ -333,6 +365,21 @@ export function AccountFormDialog({
     const methods = allowedFor(id);
     if (!methods.includes(runtimeClass)) {
       changeRuntime(methods[0] ?? "api_key");
+    }
+    // Auto-fill from provider template when creating a new account.
+    const template = getProviderTemplate(providerOptions, id);
+    if (template && mode === "create") {
+      if (template.upstream_client) setUpstreamClient(template.upstream_client);
+      if (template.default_metadata) {
+        setMetadata((prev) => {
+          const next = { ...prev };
+          for (const [k, v] of Object.entries(template.default_metadata!)) {
+            if (!(k in next)) next[k] = v;
+          }
+          return next;
+        });
+      }
+      setAdvancedOpen(true);
     }
   }
 
@@ -438,6 +485,11 @@ export function AccountFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {template ? (
+                  <p className="mt-1.5 text-2xs text-srapi-text-tertiary">
+                    {t("adminAccounts.templateApplied")}
+                  </p>
+                ) : null}
               </div>
             ) : null}
 
@@ -684,6 +736,23 @@ export function AccountFormDialog({
                         placeholder={t("adminAccounts.supportedModelsPlaceholder")}
                       />
                     </div>
+                    {template?.model_catalog?.length ? (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {template.model_catalog
+                          .filter((m) => !supportedModels.includes(m))
+                          .map((m) => (
+                            <button
+                              key={m}
+                              type="button"
+                              className="rounded-md border border-srapi-border px-2 py-0.5 text-2xs text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:text-srapi-text-primary"
+                              disabled={busy}
+                              onClick={() => updateStringListKey(supportedModelsKey, [...supportedModels, m])}
+                            >
+                              + {m}
+                            </button>
+                          ))}
+                      </div>
+                    ) : null}
                   </div>
                   <div>
                     <Label>{t("adminAccounts.excludedModels")}</Label>

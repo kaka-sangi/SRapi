@@ -16,6 +16,7 @@ const (
 	PlatformFamilyBedrockAnthropic        PlatformFamily = "bedrock_anthropic"
 	PlatformFamilyReverseProxyAntigravity PlatformFamily = "reverse_proxy_antigravity"
 	PlatformFamilyRerankCompatible        PlatformFamily = "rerank_compatible"
+	PlatformFamilyCodexCLI                PlatformFamily = "codex_cli"
 )
 
 type AuthMode string
@@ -26,6 +27,16 @@ const (
 	AuthModeAPIKeyQuery  AuthMode = "api_key_query"
 	AuthModeCustomHeader AuthMode = "custom_header"
 )
+
+// AccountTemplate carries provider-specific defaults that the Quick Setup
+// wizard and the account form use to auto-fill fields. Serialized into the
+// provider's config_schema.account_template so the frontend can read it.
+type AccountTemplate struct {
+	UpstreamClient  string            `json:"upstream_client,omitempty"`
+	DefaultMetadata map[string]any    `json:"default_metadata,omitempty"`
+	ModelCatalog    []string          `json:"model_catalog,omitempty"`
+	MetadataHints   map[string]string `json:"metadata_hints,omitempty"`
+}
 
 type Preset struct {
 	ProviderKey        string
@@ -44,6 +55,8 @@ type Preset struct {
 	// manually-created providers that carry no preset metadata.
 	RuntimeClassAllowlist []accountscontract.RuntimeClass
 	Capabilities          map[string]bool
+	AccountTemplate       *AccountTemplate
+	QuotaConfig           map[string]string
 }
 
 func (p Preset) MatchesPath(path string) bool {
@@ -71,6 +84,7 @@ func Default() *Registry {
 		anthropicPreset("anthropic-compatible", "Anthropic Compatible", "https://api.anthropic.com/v1", []string{"/api/provider/anthropic-compatible", "/api/provider/anthropic-compatible/v1", "/api/provider/claude-compatible", "/api/provider/claude-compatible/v1"}),
 		antigravityPreset(),
 		bedrockPreset(),
+		codexCLIPreset(),
 		anthropicPreset("deepseek-anthropic", "DeepSeek Anthropic Compatible", "https://api.deepseek.com/anthropic", providerAliases("deepseek-anthropic")),
 		anthropicPreset("moonshot-anthropic", "Moonshot Anthropic Compatible", "https://api.moonshot.ai/anthropic", providerAliases("moonshot-anthropic")),
 		anthropicPreset("zai-anthropic", "Z.AI Anthropic Compatible", "https://api.z.ai/api/anthropic", providerAliases("zai-anthropic")),
@@ -101,23 +115,55 @@ func openAIPreset(providerKey string, displayName string, defaultBaseURL string,
 	}
 	preset := compatiblePreset(providerKey, PlatformFamilyOpenAICompatible, displayName, defaultBaseURL, routeAliases, capabilities)
 	if providerKey == "openai" {
-		// First-party OpenAI: the ChatGPT/Codex account flows authenticate via
-		// OAuth in addition to plain API keys.
 		preset.RuntimeClassAllowlist = []accountscontract.RuntimeClass{
 			accountscontract.RuntimeClassAPIKey,
 			accountscontract.RuntimeClassOauthRefresh,
 			accountscontract.RuntimeClassOauthDeviceCode,
 			accountscontract.RuntimeClassCustomReverseProxy,
 		}
+		preset.AccountTemplate = &AccountTemplate{
+			ModelCatalog: []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "o4-mini", "o3", "o3-pro"},
+		}
 	}
 	return preset
+}
+
+func codexCLIPreset() Preset {
+	return Preset{
+		ProviderKey:    "codex-cli",
+		PlatformFamily: PlatformFamilyCodexCLI,
+		DisplayName:    "Codex CLI",
+		RouteAliases:   []string{"/api/provider/codex-cli", "/api/provider/codex-cli/v1", "/backend-api/codex"},
+		DefaultBaseURL: "https://chatgpt.com/backend-api/codex",
+		AuthModes:      []AuthMode{AuthModeBearer},
+		RuntimeClassAllowlist: []accountscontract.RuntimeClass{
+			accountscontract.RuntimeClassOauthRefresh,
+			accountscontract.RuntimeClassOauthDeviceCode,
+			accountscontract.RuntimeClassCustomReverseProxy,
+		},
+		Capabilities: codexCLICapabilities(),
+		AccountTemplate: &AccountTemplate{
+			UpstreamClient:  "codex_cli",
+			DefaultMetadata: map[string]any{"base_url": "https://chatgpt.com/backend-api/codex"},
+			ModelCatalog:    []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest"},
+			MetadataHints: map[string]string{
+				"base_url":           "Codex upstream (adapter appends /responses)",
+				"chatgpt_account_id": "From session JWT (optional)",
+			},
+		},
+		QuotaConfig: map[string]string{
+			"quota_url":                    "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27",
+			"quota_plan_path":              "account_plan.account_plan_id",
+			"quota_credits_remaining_path": "account_plan.subscription_plan.allowance",
+			"quota_credits_used_path":      "account_plan.subscription_plan.usage",
+			"quota_credits_limit_path":     "account_plan.subscription_plan.limit",
+		},
+	}
 }
 
 func anthropicPreset(providerKey string, displayName string, defaultBaseURL string, routeAliases []string) Preset {
 	preset := compatiblePreset(providerKey, PlatformFamilyAnthropicCompatible, displayName, defaultBaseURL, routeAliases, anthropicCapabilities())
 	if providerKey == "anthropic" {
-		// First-party Anthropic: Claude Code (OAuth), Claude setup-token (CLI),
-		// Vertex service accounts, plus plain API keys.
 		preset.RuntimeClassAllowlist = []accountscontract.RuntimeClass{
 			accountscontract.RuntimeClassAPIKey,
 			accountscontract.RuntimeClassOauthRefresh,
@@ -125,6 +171,9 @@ func anthropicPreset(providerKey string, displayName string, defaultBaseURL stri
 			accountscontract.RuntimeClassCliClientToken,
 			accountscontract.RuntimeClassServiceAccountJSON,
 			accountscontract.RuntimeClassCustomReverseProxy,
+		}
+		preset.AccountTemplate = &AccountTemplate{
+			ModelCatalog: []string{"claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"},
 		}
 	}
 	return preset
@@ -252,6 +301,18 @@ func antigravityCapabilities() map[string]bool {
 		capabilitiescontract.KeyToolCalling:      true,
 		capabilitiescontract.KeyStructuredOutput: true,
 		capabilitiescontract.KeyVisionInput:      true,
+	}
+}
+
+func codexCLICapabilities() map[string]bool {
+	return map[string]bool{
+		capabilitiescontract.KeyResponses:        true,
+		capabilitiescontract.KeyResponsesCompact: true,
+		capabilitiescontract.KeyStreaming:         true,
+		capabilitiescontract.KeyToolCalling:       true,
+		capabilitiescontract.KeyStructuredOutput:  true,
+		capabilitiescontract.KeyVisionInput:       true,
+		capabilitiescontract.KeyReasoningControl:  true,
 	}
 }
 

@@ -133,7 +133,7 @@ func (s *Server) persistQuotaSignals(r *http.Request, account accountcontract.Pr
 		}); err != nil {
 			// Persisting snapshots is best-effort; the report is still returned.
 			_ = err
-			return
+			continue
 		}
 	}
 }

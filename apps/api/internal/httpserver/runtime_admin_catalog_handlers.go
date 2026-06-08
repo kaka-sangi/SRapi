@@ -188,7 +188,6 @@ func (s *Server) handleInstallAdminProviderPresets(w http.ResponseWriter, r *htt
 		return
 	}
 
-	status := providercontract.StatusDisabled
 	presets := providerpreset.Default().List()
 	result := apiopenapi.BatchOperationResult{
 		Requested: len(presets),
@@ -197,6 +196,12 @@ func (s *Server) handleInstallAdminProviderPresets(w http.ResponseWriter, r *htt
 	for _, preset := range presets {
 		if _, err := s.runtime.providers.FindByName(r.Context(), preset.ProviderKey); err == nil {
 			continue
+		}
+		// Activate providers that have a known upstream URL — they are
+		// ready to use immediately once credentials are added.
+		status := providercontract.StatusDisabled
+		if preset.DefaultBaseURL != "" {
+			status = providercontract.StatusActive
 		}
 		provider, err := s.runtime.providers.Create(r.Context(), providerPresetCreateRequest(preset, status))
 		if err != nil {
@@ -354,6 +359,8 @@ func presetAdapterType(preset providerpreset.Preset) string {
 		return "reverse-proxy-antigravity"
 	case providerpreset.PlatformFamilyRerankCompatible:
 		return "rerank-compatible"
+	case providerpreset.PlatformFamilyCodexCLI:
+		return "reverse-proxy-codex-cli"
 	default:
 		return "openai-compatible"
 	}
@@ -379,7 +386,7 @@ func presetCapabilityMap(preset providerpreset.Preset) map[string]any {
 }
 
 func presetConfigSchema(preset providerpreset.Preset) map[string]any {
-	return map[string]any{
+	schema := map[string]any{
 		"provider_key":         preset.ProviderKey,
 		"platform_family":      string(preset.PlatformFamily),
 		"default_base_url":     preset.DefaultBaseURL,
@@ -390,6 +397,23 @@ func presetConfigSchema(preset providerpreset.Preset) map[string]any {
 		"auth_methods":         runtimeClassesAny(preset.RuntimeClassAllowlist),
 		"installed_from":       "provider_preset",
 	}
+	// Expose base_url at the provider level so upstreamBaseURL() resolves it
+	// without requiring per-account metadata.
+	if preset.DefaultBaseURL != "" {
+		schema["base_url"] = preset.DefaultBaseURL
+	}
+	if preset.AccountTemplate != nil {
+		schema["account_template"] = map[string]any{
+			"upstream_client":  preset.AccountTemplate.UpstreamClient,
+			"default_metadata": preset.AccountTemplate.DefaultMetadata,
+			"model_catalog":    preset.AccountTemplate.ModelCatalog,
+			"metadata_hints":   preset.AccountTemplate.MetadataHints,
+		}
+	}
+	for k, v := range preset.QuotaConfig {
+		schema[k] = v
+	}
+	return schema
 }
 
 func stringSliceAny(values []string) []any {
