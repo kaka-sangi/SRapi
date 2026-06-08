@@ -363,6 +363,22 @@ func (r *Registry) Lookup(providerKey string) (Preset, bool) {
 	return clonePreset(preset), true
 }
 
+func (r *Registry) CapabilitiesForPlatformFamily(family PlatformFamily) map[string]bool {
+	if r == nil {
+		return nil
+	}
+	for _, preset := range r.presets {
+		if preset.PlatformFamily == family {
+			out := make(map[string]bool, len(preset.Capabilities))
+			for k, v := range preset.Capabilities {
+				out[k] = v
+			}
+			return out
+		}
+	}
+	return nil
+}
+
 func (r *Registry) List() []Preset {
 	if r == nil {
 		return nil

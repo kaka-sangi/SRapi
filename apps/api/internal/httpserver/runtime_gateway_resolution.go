@@ -12,6 +12,7 @@ import (
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
+	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 )
 
@@ -38,7 +39,11 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 			providerScoped[normalized.Key] = normalized
 		}
 	}
-	for key, value := range provider.Capabilities {
+	providerCaps := provider.Capabilities
+	if len(providerCaps) == 0 {
+		providerCaps = presetCapabilitiesForAdapter(provider.AdapterType)
+	}
+	for key, value := range providerCaps {
 		capabilityKey, ok := capabilitiescontract.CanonicalKeyFromConvenience(key)
 		if ok && boolValue(value) {
 			merged[capabilityKey] = capabilityRequirement(capabilityKey)
@@ -73,6 +78,39 @@ func capabilityRequirement(key string) capabilitiescontract.Descriptor {
 		Level:   capabilitiescontract.DescriptorLevelRequired,
 		Status:  capabilitiescontract.DescriptorStatusStable,
 		Version: "v1",
+	}
+}
+
+func presetCapabilitiesForAdapter(adapterType string) map[string]any {
+	family := adapterTypeToPlatformFamily(adapterType)
+	if family == "" {
+		return nil
+	}
+	caps := providerpreset.Default().CapabilitiesForPlatformFamily(family)
+	if len(caps) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(caps))
+	for k, v := range caps {
+		out[k] = v
+	}
+	return out
+}
+
+func adapterTypeToPlatformFamily(adapterType string) providerpreset.PlatformFamily {
+	switch adapterType {
+	case "anthropic-compatible":
+		return providerpreset.PlatformFamilyAnthropicCompatible
+	case "reverse-proxy-antigravity":
+		return providerpreset.PlatformFamilyReverseProxyAntigravity
+	case "rerank-compatible":
+		return providerpreset.PlatformFamilyRerankCompatible
+	case "reverse-proxy-codex-cli":
+		return providerpreset.PlatformFamilyCodexCLI
+	case "openai-compatible":
+		return providerpreset.PlatformFamilyOpenAICompatible
+	default:
+		return ""
 	}
 }
 

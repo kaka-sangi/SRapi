@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +28,31 @@ const defaultGatewayFailoverAttempts = 3
 const defaultGatewayMaxRetryIntervalMS = 2000
 
 const maxGatewayProviderErrorMessageLength = 300
+
+func gatewayNoAccountMessage(decision schedulercontract.Decision) string {
+	if len(decision.RejectReasons) == 0 {
+		return "no available account"
+	}
+	counts := map[string]int{}
+	for _, reason := range decision.RejectReasons {
+		if s, ok := reason.(string); ok {
+			counts[s]++
+		}
+	}
+	if len(counts) == 0 {
+		return "no available account"
+	}
+	keys := make([]string, 0, len(counts))
+	for k := range counts {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s(%d)", k, counts[k]))
+	}
+	return fmt.Sprintf("no available account: %d candidate(s) rejected [%s]", decision.CandidateCount, strings.Join(parts, ", "))
+}
 
 // gatewayRetrySettings is the resolved, per-request snapshot of the
 // operator-tunable failover/retry policy. It is read once at the top of the
@@ -158,7 +185,7 @@ func (s *Server) writeGatewayFailoverFailure(
 ) {
 	if !failureRecorded {
 		s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
-		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
+		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, gatewayNoAccountMessage(result.Decision), "no_available_account")
 		return
 	}
 	s.writeProviderGatewayErrorForCandidate(w, err, gatewayFailureCandidate(result))
@@ -177,7 +204,7 @@ func (s *Server) writeGeminiGatewayFailoverFailure(
 ) {
 	if !failureRecorded {
 		s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
-		writeGeminiGatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE", "no available account")
+		writeGeminiGatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE", gatewayNoAccountMessage(result.Decision))
 		return
 	}
 	s.writeGeminiProviderGatewayErrorForCandidate(w, err, gatewayFailureCandidate(result))
