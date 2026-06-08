@@ -1371,6 +1371,17 @@ func (rt *runtimeState) invokeProviderConversation(ctx context.Context, req prov
 			return streamed, nil
 		}
 		if !errors.Is(streamErr, provideradaptercontract.ErrStreamingUnsupported) {
+			if refreshed, retried := rt.retryAfterAuthRefresh(ctx, req.Account, dispatch.credential, streamErr); retried {
+				req.Credential = refreshed
+				if streamed2, streamErr2 := rt.adapters.StreamConversation(ctx, req); streamErr2 == nil {
+					leases := dispatch.concurrencyLeases
+					streamed2.StreamBody = newStreamLeaseCloser(streamed2.StreamBody, func() {
+						rt.releaseGatewayConcurrency(leases)
+					})
+					releaseLeases = false
+					return streamed2, nil
+				}
+			}
 			rt.applyProviderAccountProtection(ctx, req.Account, streamErr)
 			return provideradaptercontract.ConversationResponse{}, streamErr
 		}
@@ -1379,6 +1390,12 @@ func (rt *runtimeState) invokeProviderConversation(ctx context.Context, req prov
 	}
 	resp, err := rt.adapters.InvokeConversation(ctx, req)
 	if err != nil {
+		if refreshed, retried := rt.retryAfterAuthRefresh(ctx, req.Account, dispatch.credential, err); retried {
+			req.Credential = refreshed
+			if resp2, err2 := rt.adapters.InvokeConversation(ctx, req); err2 == nil {
+				return resp2, nil
+			}
+		}
 		rt.applyProviderAccountProtection(ctx, req.Account, err)
 		return provideradaptercontract.ConversationResponse{}, err
 	}
@@ -1547,10 +1564,18 @@ func (rt *runtimeState) materializeProviderProxy(ctx context.Context, account *a
 	return nil
 }
 
+func (rt *runtimeState) forceRefreshReverseProxyCredential(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any) (map[string]any, bool, error) {
+	return rt.doRefreshReverseProxyCredential(ctx, account, credential)
+}
+
 func (rt *runtimeState) refreshReverseProxyCredential(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any) (map[string]any, bool, error) {
 	if !shouldRefreshCredential(account, credential) {
 		return credential, false, nil
 	}
+	return rt.doRefreshReverseProxyCredential(ctx, account, credential)
+}
+
+func (rt *runtimeState) doRefreshReverseProxyCredential(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any) (map[string]any, bool, error) {
 	before, err := rt.accounts.FindByID(ctx, account.ID)
 	if err != nil {
 		rt.logger.Warn("failed to load provider account before refresh", "error", err, "account_id", account.ID)
@@ -1594,6 +1619,30 @@ func (rt *runtimeState) refreshReverseProxyCredential(ctx context.Context, accou
 		TraceID: requestIDFromContext(ctx),
 	})
 	return refreshed, true, nil
+}
+
+// retryAfterAuthRefresh attempts an OAuth token refresh when the upstream
+// rejects the current credential with a session/auth error. Returns the
+// refreshed credential and true if a refresh succeeded; the caller should
+// retry the request once. Returns (nil, false) for non-OAuth accounts or
+// non-auth error classes.
+func (rt *runtimeState) retryAfterAuthRefresh(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any, upstreamErr error) (map[string]any, bool) {
+	if account.RuntimeClass != accountcontract.RuntimeClassOauthRefresh && account.RuntimeClass != accountcontract.RuntimeClassOauthDeviceCode {
+		return nil, false
+	}
+	class := errorClassName(upstreamErr)
+	if class != "session_invalid" && class != "auth_failed" && class != "auth_error" {
+		return nil, false
+	}
+	if mapString(credential, "refresh_token") == "" {
+		return nil, false
+	}
+	rt.logger.Info("attempting OAuth refresh after upstream auth rejection", "account_id", account.ID, "error_class", class)
+	refreshed, ok, err := rt.forceRefreshReverseProxyCredential(ctx, account, credential)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return refreshed, true
 }
 
 func shouldRefreshCredential(account accountcontract.ProviderAccount, credential map[string]any) bool {
