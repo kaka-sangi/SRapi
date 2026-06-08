@@ -1622,6 +1622,29 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/me/platform-quotas:
+    get:
+      tags:
+        - CurrentUser
+      operationId: listCurrentUserPlatformQuotas
+      summary: List platform spend quotas for the current console user.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user platform quota list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPlatformQuotaListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/me/playground/models:
     get:
       tags:

@@ -76,6 +76,68 @@ func TestGatewayEnforcesUserPlatformSpendQuota(t *testing.T) {
 	}
 }
 
+func TestCurrentUserPlatformQuotasListsOwnQuotas(t *testing.T) {
+	quotaStore := userplatformquotasmemory.New()
+	handler := New(config.Load(), nil, WithUserPlatformQuotasStore(quotaStore))
+
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	adminUserID, err := strconv.Atoi(loginResp.Data.User.Id)
+	if err != nil {
+		t.Fatalf("parse admin user id %q: %v", loginResp.Data.User.Id, err)
+	}
+
+	daily := "3.00000000"
+	if _, err := quotaStore.UpsertQuota(context.Background(), userplatformquotascontract.UpsertQuota{
+		UserID:     adminUserID,
+		Platform:   "anthropic-compatible",
+		DailyLimit: &daily,
+		Currency:   "USD",
+		Enabled:    true,
+	}); err != nil {
+		t.Fatalf("seed current user platform quota: %v", err)
+	}
+	if _, err := quotaStore.UpsertQuota(context.Background(), userplatformquotascontract.UpsertQuota{
+		UserID:   adminUserID + 1,
+		Platform: "openai-compatible",
+		Currency: "USD",
+		Enabled:  true,
+	}); err != nil {
+		t.Fatalf("seed other user platform quota: %v", err)
+	}
+
+	unauthReq := httptest.NewRequest(http.MethodGet, "/api/v1/me/platform-quotas", nil)
+	unauthRec := httptest.NewRecorder()
+	handler.ServeHTTP(unauthRec, unauthReq)
+	if unauthRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthenticated platform quotas 401, got %d body=%s", unauthRec.Code, unauthRec.Body.String())
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/me/platform-quotas", nil)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected platform quotas 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.UserPlatformQuotaListResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode platform quotas: %v", err)
+	}
+	if len(resp.Data) != 1 {
+		t.Fatalf("expected one current-user quota, got %+v", resp.Data)
+	}
+	quota := resp.Data[0]
+	if quota.UserId != int64(adminUserID) || quota.Platform != "anthropic-compatible" {
+		t.Fatalf("unexpected current-user quota: %+v", quota)
+	}
+	if quota.DailyLimit == nil || *quota.DailyLimit != daily {
+		t.Fatalf("expected daily limit %q, got %+v", daily, quota.DailyLimit)
+	}
+	if resp.Pagination.Total != 1 {
+		t.Fatalf("expected pagination total 1, got %+v", resp.Pagination)
+	}
+}
+
 func seededProviderID(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, name string) int {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/providers", nil)

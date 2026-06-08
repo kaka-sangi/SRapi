@@ -39,3 +39,18 @@ Evidence:
 
 Next:
 - Stage 4: add GET /api/v1/me/platform-quotas via OpenAPI-first flow.
+
+Stage 4 complete - current user platform quota endpoint
+- Added GET /api/v1/me/platform-quotas to the OpenAPI contract and regenerated Go OpenAPI types, Copilot spec, and TypeScript SDK.
+- Added a current-user handler that requires a console session and returns only quotas for the logged-in user.
+- Added a focused HTTP test for anonymous 401 and current-user-only quota listing.
+
+Evidence:
+- cd apps/api && go test ./internal/httpserver -run 'TestCurrentUserPlatformQuotasListsOwnQuotas': ok.
+- make openapi-lint: valid with the existing 3 public-endpoint 4xx warnings.
+- make openapi-codegen-check: ok.
+- make openapi-ts-codegen-check: ok.
+- make sdk-ts-typecheck: ok.
+
+Next:
+- Stage 5: frontend IA regrouping, /admin/channels/[id] aggregate tabs, and dashboard balance/platform quota cards.

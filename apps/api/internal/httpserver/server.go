@@ -691,6 +691,7 @@ func (s *Server) registerCurrentUserRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/me/totp/enable", s.handleCurrentUserTOTPEnable)
 	mux.HandleFunc("POST /api/v1/me/totp/disable", s.handleCurrentUserTOTPDisable)
 	mux.HandleFunc("GET /api/v1/me/balance", s.handleCurrentUserBalance)
+	mux.HandleFunc("GET /api/v1/me/platform-quotas", s.handleListCurrentUserPlatformQuotas)
 	mux.HandleFunc("POST /api/v1/me/redeem-codes/redeem", s.handleRedeemCurrentUserRedeemCode)
 	mux.HandleFunc("GET /api/v1/me/affiliate", s.handleCurrentUserAffiliate)
 	mux.HandleFunc("GET /api/v1/me/affiliate/ledger", s.handleCurrentUserAffiliateLedger)

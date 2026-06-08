@@ -4959,17 +4959,6 @@ type CreatePricingRuleRequest struct {
 	ProviderId                      Id         `json:"provider_id"`
 }
 
-// UpdatePricingRuleRequest defines model for UpdatePricingRuleRequest.
-type UpdatePricingRuleRequest struct {
-	CacheReadPricePerMillionTokens  *string    `json:"cache_read_price_per_million_tokens,omitempty"`
-	CacheWritePricePerMillionTokens *string    `json:"cache_write_price_per_million_tokens,omitempty"`
-	Currency                        *string    `json:"currency,omitempty"`
-	EffectiveFrom                   *time.Time `json:"effective_from,omitempty"`
-	EffectiveTo                     *time.Time `json:"effective_to,omitempty"`
-	InputPricePerMillionTokens      *string    `json:"input_price_per_million_tokens,omitempty"`
-	OutputPricePerMillionTokens     *string    `json:"output_price_per_million_tokens,omitempty"`
-}
-
 // CreatePromoCodeRequest defines model for CreatePromoCodeRequest.
 type CreatePromoCodeRequest struct {
 	Code          string            `json:"code"`
@@ -8278,6 +8267,17 @@ type UpdatePaymentProviderInstanceRequest struct {
 	SupportedMethods *[]string              `json:"supported_methods,omitempty"`
 }
 
+// UpdatePricingRuleRequest defines model for UpdatePricingRuleRequest.
+type UpdatePricingRuleRequest struct {
+	CacheReadPricePerMillionTokens  *string    `json:"cache_read_price_per_million_tokens,omitempty"`
+	CacheWritePricePerMillionTokens *string    `json:"cache_write_price_per_million_tokens,omitempty"`
+	Currency                        *string    `json:"currency,omitempty"`
+	EffectiveFrom                   *time.Time `json:"effective_from,omitempty"`
+	EffectiveTo                     *time.Time `json:"effective_to,omitempty"`
+	InputPricePerMillionTokens      *string    `json:"input_price_per_million_tokens,omitempty"`
+	OutputPricePerMillionTokens     *string    `json:"output_price_per_million_tokens,omitempty"`
+}
+
 // UpdatePromoCodeRequest defines model for UpdatePromoCodeRequest.
 type UpdatePromoCodeRequest = CreatePromoCodeRequest
 
@@ -9647,6 +9647,9 @@ type UpdateAdminPaymentProviderJSONRequestBody = UpdatePaymentProviderInstanceRe
 
 // CreateAdminPricingRuleJSONRequestBody defines body for CreateAdminPricingRule for application/json ContentType.
 type CreateAdminPricingRuleJSONRequestBody = CreatePricingRuleRequest
+
+// UpdateAdminPricingRuleJSONRequestBody defines body for UpdateAdminPricingRule for application/json ContentType.
+type UpdateAdminPricingRuleJSONRequestBody = UpdatePricingRuleRequest
 
 // BulkImportAdminPricingRulesJSONRequestBody defines body for BulkImportAdminPricingRules for application/json ContentType.
 type BulkImportAdminPricingRulesJSONRequestBody BulkImportAdminPricingRulesJSONBody
@@ -16294,6 +16297,9 @@ type ServerInterface interface {
 	// Get the status of a pending OAuth provisioning session.
 	// (GET /api/v1/admin/accounts/oauth/pending/{id})
 	GetAdminAccountOAuthPending(w http.ResponseWriter, r *http.Request, id string)
+	// Delete a provider account.
+	// (DELETE /api/v1/admin/accounts/{id})
+	DeleteAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
 	// Get a provider account.
 	// (GET /api/v1/admin/accounts/{id})
 	GetAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
@@ -16645,6 +16651,9 @@ type ServerInterface interface {
 	// Delete a pricing rule.
 	// (DELETE /api/v1/admin/pricing-rules/{id})
 	DeleteAdminPricingRule(w http.ResponseWriter, r *http.Request, id Id)
+	// Update a pricing rule.
+	// (PATCH /api/v1/admin/pricing-rules/{id})
+	UpdateAdminPricingRule(w http.ResponseWriter, r *http.Request, id Id)
 	// Bulk import decimal-safe pricing rules.
 	// (POST /api/v1/admin/pricing-rules:bulk)
 	BulkImportAdminPricingRules(w http.ResponseWriter, r *http.Request, params BulkImportAdminPricingRulesParams)
@@ -17014,6 +17023,9 @@ type ServerInterface interface {
 	// Change current console user password.
 	// (POST /api/v1/me/password)
 	ChangeCurrentUserPassword(w http.ResponseWriter, r *http.Request)
+	// List platform spend quotas for the current console user.
+	// (GET /api/v1/me/platform-quotas)
+	ListCurrentUserPlatformQuotas(w http.ResponseWriter, r *http.Request)
 	// Stream a billed playground chat completion (SSE) for the current user.
 	// (POST /api/v1/me/playground/chat)
 	CreateMePlaygroundChat(w http.ResponseWriter, r *http.Request)
@@ -18440,6 +18452,40 @@ func (siw *ServerInterfaceWrapper) GetAdminAccountOAuthPending(w http.ResponseWr
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAdminAccountOAuthPending(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminAccount operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminAccount(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -22908,6 +22954,40 @@ func (siw *ServerInterfaceWrapper) DeleteAdminPricingRule(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// UpdateAdminPricingRule operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminPricingRule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminPricingRule(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // BulkImportAdminPricingRules operation middleware
 func (siw *ServerInterfaceWrapper) BulkImportAdminPricingRules(w http.ResponseWriter, r *http.Request) {
 
@@ -26887,6 +26967,26 @@ func (siw *ServerInterfaceWrapper) ChangeCurrentUserPassword(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
+// ListCurrentUserPlatformQuotas operation middleware
+func (siw *ServerInterfaceWrapper) ListCurrentUserPlatformQuotas(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCurrentUserPlatformQuotas(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateMePlaygroundChat operation middleware
 func (siw *ServerInterfaceWrapper) CreateMePlaygroundChat(w http.ResponseWriter, r *http.Request) {
 
@@ -29144,6 +29244,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/device-code/start", wrapper.StartAdminAccountOAuthDeviceCode)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/exchange", wrapper.ExchangeAdminAccountOAuthCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/pending/{id}", wrapper.GetAdminAccountOAuthPending)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.DeleteAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.GetAdminAccount)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.UpdateAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/availability", wrapper.GetAdminAccountAvailability)
@@ -29261,6 +29362,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.ListAdminPricingRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.CreateAdminPricingRule)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/pricing-rules/{id}", wrapper.DeleteAdminPricingRule)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/pricing-rules/{id}", wrapper.UpdateAdminPricingRule)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules:bulk", wrapper.BulkImportAdminPricingRules)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/promo-codes", wrapper.ListAdminPromoCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/promo-codes", wrapper.CreateAdminPromoCode)
@@ -29384,6 +29486,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/notification-preferences", wrapper.GetCurrentUserNotificationPreferences)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/me/notification-preferences", wrapper.UpdateCurrentUserNotificationPreferences)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/password", wrapper.ChangeCurrentUserPassword)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/platform-quotas", wrapper.ListCurrentUserPlatformQuotas)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/playground/chat", wrapper.CreateMePlaygroundChat)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/playground/models", wrapper.ListMePlaygroundModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/redeem-codes/redeem", wrapper.RedeemCurrentUserRedeemCode)

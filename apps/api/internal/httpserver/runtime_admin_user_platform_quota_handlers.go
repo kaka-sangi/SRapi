@@ -74,6 +74,29 @@ func (s *Server) handleListAdminUserPlatformQuotas(w http.ResponseWriter, r *htt
 	})
 }
 
+func (s *Server) handleListCurrentUserPlatformQuotas(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	quotas, err := s.runtime.userPlatformQuotas.ListByUser(r.Context(), session.User.ID)
+	if err != nil {
+		s.writeUserPlatformQuotaError(w, err, requestID)
+		return
+	}
+	data := make([]userPlatformQuotaPayload, 0, len(quotas))
+	for _, quota := range quotas {
+		data = append(data, toUserPlatformQuotaPayload(quota))
+	}
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       data,
+		"pagination": pagination(len(data)),
+		"request_id": requestID,
+	})
+}
+
 func (s *Server) handleUpsertAdminUserPlatformQuota(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)

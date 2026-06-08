@@ -7008,6 +7008,35 @@ export type GetCurrentUserBalanceResponses = {
 
 export type GetCurrentUserBalanceResponse = GetCurrentUserBalanceResponses[keyof GetCurrentUserBalanceResponses];
 
+export type ListCurrentUserPlatformQuotasData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/platform-quotas';
+};
+
+export type ListCurrentUserPlatformQuotasErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListCurrentUserPlatformQuotasError = ListCurrentUserPlatformQuotasErrors[keyof ListCurrentUserPlatformQuotasErrors];
+
+export type ListCurrentUserPlatformQuotasResponses = {
+    /**
+     * Current user platform quota list.
+     */
+    200: UserPlatformQuotaListResponse;
+};
+
+export type ListCurrentUserPlatformQuotasResponse = ListCurrentUserPlatformQuotasResponses[keyof ListCurrentUserPlatformQuotasResponses];
+
 export type ListMePlaygroundModelsData = {
     body?: never;
     path?: never;
