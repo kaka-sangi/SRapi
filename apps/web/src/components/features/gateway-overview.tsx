@@ -7,11 +7,12 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useUsageLogs } from "@/hooks/queries";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
-import { StatCard } from "@/components/ui/stat-card";
+import { StatCard, StatCardSkeleton } from "@/components/ui/stat-card";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { UsageLogSummary } from "@/lib/srapi-types";
 
@@ -96,7 +97,7 @@ export function GatewayOverview() {
       {usage.isLoading ? (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-32 w-full rounded-xl" />
+            <StatCardSkeleton key={i} />
           ))}
         </div>
       ) : (
@@ -152,11 +153,7 @@ export function GatewayOverview() {
         <PageQueryState
           query={usage}
           skeleton={
-            <div className="space-y-2 p-5">
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-9 w-2/3" />
-            </div>
+            <DialogListSkeleton rows={3} className="p-5" />
           }
         >
           {(rows) =>

@@ -4,6 +4,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import {
   useAccountHealth,
   useAccountQuota,
@@ -53,7 +54,7 @@ function Section<T>({
         {action}
       </div>
       {query.isLoading ? (
-        <Skeleton className="h-16 w-full" />
+        <DialogListSkeleton rows={2} />
       ) : query.data === undefined ? (
         <p className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>
       ) : (

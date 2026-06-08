@@ -9,6 +9,8 @@ import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { enumOptions } from "@/components/admin/resource-form-dialog";
 import { AccountFormDialog } from "@/components/admin/account-form-dialog";
 import { CodexSessionImportDialog } from "@/components/admin/codex-session-import-dialog";
@@ -80,6 +82,7 @@ function AccountsContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-accounts", ["created_at", "updated_at", "notes"]);
   const statusFilter = (list.filters.status as ProviderAccount["status"]) || undefined;
   const providerFilter = list.filters.providerId || undefined;
   const accounts = useAdminAccounts({
@@ -136,11 +139,14 @@ function AccountsContent() {
       ids.map((id) => setStatus.mutateAsync({ id, status })),
     );
     const failed = results.filter((r) => r.status === "rejected").length;
+    const succeeded = ids.length - failed;
     list.clearSelection();
-    if (failed > 0) {
-      toast({ title: t("feedback.failed"), description: `${failed}/${ids.length}`, tone: "error" });
+    if (failed > 0 && succeeded > 0) {
+      toast({ title: t("feedback.batchPartial", { succeeded, failed }), tone: "warning" });
+    } else if (failed > 0) {
+      toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
     } else {
-      toast({ title: t("adminAccounts.bulkDone", { count: ids.length }), tone: "success" });
+      toast({ title: t("feedback.batchAllSucceeded", { count: ids.length }), tone: "success" });
     }
   }
 
@@ -151,14 +157,17 @@ function AccountsContent() {
     try {
       const result = await batchAction.mutateAsync(buildBatchAccountActionBody({ accountIds: ids, action }));
       list.clearSelection();
-      if (result.errors.length > 0) {
+      const failedCount = result.errors.length;
+      const succeededCount = result.updated_count;
+      if (failedCount > 0 && succeededCount > 0) {
         toast({
-          title: t("feedback.failed"),
-          description: `${result.errors.length}/${ids.length}`,
-          tone: "error",
+          title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
+          tone: "warning",
         });
+      } else if (failedCount > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
       } else {
-        toast({ title: t("adminAccounts.bulkDone", { count: result.updated_count }), tone: "success" });
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
       }
     } catch (err) {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
@@ -200,6 +209,7 @@ function AccountsContent() {
     {
       key: "name",
       header: t("adminAccounts.name"),
+      pinned: true,
       sortValue: (a) => a.name,
       render: (a) => <span className="text-srapi-text-primary">{a.name}</span>,
     },
@@ -276,6 +286,7 @@ function AccountsContent() {
       <AdminListView
         query={accounts}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(a) => a.id}
         emptyIcon={Server}
         emptyTitle={t("adminAccounts.emptyTitle")}
@@ -311,6 +322,10 @@ function AccountsContent() {
                 allLabel={t("adminAccounts.allProviders")}
               />
             ) : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
           </ListToolbar>
         }
         pagination={{

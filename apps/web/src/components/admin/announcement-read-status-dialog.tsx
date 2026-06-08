@@ -16,6 +16,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { useAnnouncementReadStatus } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -47,7 +48,7 @@ export function AnnouncementReadStatusDialog({
         <div className="mt-3 max-h-[60vh] overflow-y-auto">
           <PageQueryState
             query={query}
-            skeleton={<Skeleton className="h-24 rounded-xl" />}
+            skeleton={<DialogListSkeleton rows={3} />}
             isEmpty={(d) => d.readers.length === 0}
             emptyTitle={t("adminAnnouncements.readStatusEmpty")}
           >

@@ -575,7 +575,7 @@ function CredentialsForm({
     : apiKey.trim().length > 0;
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="space-y-6">
       {/* Back link */}
       <button
         type="button"
@@ -586,231 +586,243 @@ function CredentialsForm({
         {platform.name}
       </button>
 
-      {/* Auth type selector (only when multiple options) */}
-      {hasMultipleAuth && (
-        <div>
-          <Label>{t("adminQuickSetup.credentials")}</Label>
-          <div className="flex gap-2">
-            {platform.authTypes.map((a) => (
-              <button
-                key={a}
-                type="button"
-                onClick={() => onAuthTypeChange(a)}
-                className={cn(
-                  "rounded-lg border px-3 py-1.5 font-mono text-xs transition-colors",
-                  a === authType
-                    ? "border-srapi-text-secondary bg-srapi-bg-muted text-srapi-text-primary"
-                    : "border-srapi-border bg-srapi-card text-srapi-text-tertiary hover:border-srapi-text-tertiary",
-                )}
-              >
-                {a}
-              </button>
-            ))}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+        {/* ── Left column: credentials ── */}
+        <div className="space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-srapi-bg-muted font-mono text-xs font-bold tracking-tight text-srapi-text-secondary">
+              {PLATFORM_ICONS[platform.key] ?? platform.key.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <div className="text-sm font-medium text-srapi-text-primary">{platform.name}</div>
+              <div className="text-xs text-srapi-text-tertiary">{platform.description}</div>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Credential inputs */}
-      {isOAuth ? (
-        <div className="space-y-4">
+          {/* Auth type selector */}
+          {hasMultipleAuth && (
+            <div>
+              <Label>{t("adminQuickSetup.credentials")}</Label>
+              <div className="flex gap-2">
+                {platform.authTypes.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => onAuthTypeChange(a)}
+                    className={cn(
+                      "rounded-lg border px-3 py-1.5 font-mono text-xs transition-colors",
+                      a === authType
+                        ? "border-srapi-text-secondary bg-srapi-bg-muted text-srapi-text-primary"
+                        : "border-srapi-border bg-srapi-card text-srapi-text-tertiary hover:border-srapi-text-tertiary",
+                    )}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Credential inputs */}
+          {isOAuth ? (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="qs-access">access_token</Label>
+                <Input
+                  id="qs-access"
+                  type="password"
+                  autoComplete="off"
+                  value={accessToken}
+                  onChange={(e) => onAccessTokenChange(e.target.value)}
+                  placeholder="eyJ..."
+                />
+              </div>
+              <div>
+                <Label htmlFor="qs-refresh">refresh_token</Label>
+                <Input
+                  id="qs-refresh"
+                  type="password"
+                  autoComplete="off"
+                  value={refreshToken}
+                  onChange={(e) => onRefreshTokenChange(e.target.value)}
+                  placeholder="eyJ..."
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <Label htmlFor="qs-apikey">{t("adminQuickSetup.apiKeyLabel")}</Label>
+              <Input
+                id="qs-apikey"
+                type="password"
+                autoComplete="off"
+                value={apiKey}
+                onChange={(e) => onApiKeyChange(e.target.value)}
+                placeholder="sk-..."
+              />
+            </div>
+          )}
+
+          {/* Account name */}
           <div>
-            <Label htmlFor="qs-access">access_token</Label>
+            <Label htmlFor="qs-name">{t("adminQuickSetup.accountName")}</Label>
             <Input
-              id="qs-access"
-              type="password"
-              autoComplete="off"
-              value={accessToken}
-              onChange={(e) => onAccessTokenChange(e.target.value)}
-              placeholder="eyJ..."
+              id="qs-name"
+              value={accountName}
+              onChange={(e) => onAccountNameChange(e.target.value)}
+              placeholder={t("adminQuickSetup.accountNamePlaceholder")}
             />
           </div>
-          <div>
-            <Label htmlFor="qs-refresh">refresh_token</Label>
-            <Input
-              id="qs-refresh"
-              type="password"
-              autoComplete="off"
-              value={refreshToken}
-              onChange={(e) => onRefreshTokenChange(e.target.value)}
-              placeholder="eyJ..."
-            />
-          </div>
-        </div>
-      ) : (
-        <div>
-          <Label htmlFor="qs-apikey">{t("adminQuickSetup.apiKeyLabel")}</Label>
-          <Input
-            id="qs-apikey"
-            type="password"
-            autoComplete="off"
-            value={apiKey}
-            onChange={(e) => onApiKeyChange(e.target.value)}
-            placeholder="sk-..."
-          />
-        </div>
-      )}
 
-      {/* Account name */}
-      <div>
-        <Label htmlFor="qs-name">{t("adminQuickSetup.accountName")}</Label>
-        <Input
-          id="qs-name"
-          value={accountName}
-          onChange={(e) => onAccountNameChange(e.target.value)}
-          placeholder={t("adminQuickSetup.accountNamePlaceholder")}
-        />
+          {/* Advanced settings toggle */}
+          <button
+            type="button"
+            onClick={onToggleAdvanced}
+            className="flex w-full items-center gap-2 rounded-lg border border-srapi-border bg-srapi-card px-4 py-3 text-left transition-colors hover:bg-srapi-card-muted"
+          >
+            <Settings2 className="size-4 text-srapi-text-tertiary" />
+            <span className="flex-1 text-sm text-srapi-text-secondary">
+              {t("adminQuickSetup.advanced")}
+            </span>
+            <ChevronDown
+              className={cn(
+                "size-4 text-srapi-text-tertiary transition-transform",
+                showAdvanced && "rotate-180",
+              )}
+            />
+          </button>
+
+          {showAdvanced && (
+            <div className="space-y-4 rounded-lg border border-srapi-border bg-srapi-card p-4">
+              <div>
+                <Label>{t("adminQuickSetup.proxy")}</Label>
+                <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
+                  {t("adminQuickSetup.proxyHint")}
+                </p>
+                <Select value={proxyId} onValueChange={onProxyIdChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("adminQuickSetup.proxyNone")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">
+                      {t("adminQuickSetup.proxyNone")}
+                    </SelectItem>
+                    {activeProxies.map((px) => (
+                      <SelectItem key={px.id} value={String(px.id)}>
+                        {px.name}{" "}
+                        <span className="text-srapi-text-tertiary">({px.type})</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="qs-priority">{t("adminQuickSetup.priority")}</Label>
+                  <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
+                    {t("adminQuickSetup.priorityHint")}
+                  </p>
+                  <Input
+                    id="qs-priority"
+                    type="number"
+                    min={0}
+                    value={priority}
+                    onChange={(e) => onPriorityChange(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="qs-weight">{t("adminQuickSetup.weight")}</Label>
+                  <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
+                    {t("adminQuickSetup.weightHint")}
+                  </p>
+                  <Input
+                    id="qs-weight"
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={weight}
+                    onChange={(e) => onWeightChange(e.target.value)}
+                    placeholder="1.0"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Right column: model catalog ── */}
+        <div className="space-y-5">
+          {platform.defaultModels.length > 0 && (
+            <div className="rounded-xl border border-srapi-border bg-srapi-card p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <Label className="mb-0">{t("adminQuickSetup.modelCatalog")}</Label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={onSelectAll}
+                    className="text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+                  >
+                    {t("adminQuickSetup.selectAll")}
+                  </button>
+                  <span className="text-2xs text-srapi-border">|</span>
+                  <button
+                    type="button"
+                    onClick={onClearModels}
+                    className="text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+                  >
+                    {t("adminQuickSetup.selectNone")}
+                  </button>
+                </div>
+              </div>
+              <p className="mb-3 text-2xs text-srapi-text-tertiary">
+                {t("adminQuickSetup.modelCatalogHint")}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {platform.defaultModels.map((m) => {
+                  const selected = selectedModels.has(m);
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => onToggleModel(m)}
+                      className={cn(
+                        "rounded-lg border px-2.5 py-1 font-mono text-xs transition-colors",
+                        selected
+                          ? "border-srapi-text-secondary bg-srapi-bg-muted text-srapi-text-primary"
+                          : "border-srapi-border bg-srapi-card text-srapi-text-tertiary hover:border-srapi-text-tertiary",
+                      )}
+                    >
+                      {m}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedModels.size > 0 && (
+                <p className="mt-3 text-2xs text-srapi-text-tertiary">
+                  {selectedModels.size} / {platform.defaultModels.length}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Model catalog */}
-      {platform.defaultModels.length > 0 && (
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <Label className="mb-0">{t("adminQuickSetup.modelCatalog")}</Label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onSelectAll}
-                className="text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
-              >
-                {t("adminQuickSetup.selectAll")}
-              </button>
-              <span className="text-2xs text-srapi-border">|</span>
-              <button
-                type="button"
-                onClick={onClearModels}
-                className="text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
-              >
-                {t("adminQuickSetup.selectNone")}
-              </button>
-            </div>
-          </div>
-          <p className="mb-2 text-2xs text-srapi-text-tertiary">
-            {t("adminQuickSetup.modelCatalogHint")}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {platform.defaultModels.map((m) => {
-              const selected = selectedModels.has(m);
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => onToggleModel(m)}
-                  className={cn(
-                    "rounded-lg border px-2.5 py-1 font-mono text-xs transition-colors",
-                    selected
-                      ? "border-srapi-text-secondary bg-srapi-bg-muted text-srapi-text-primary"
-                      : "border-srapi-border bg-srapi-card text-srapi-text-tertiary hover:border-srapi-text-tertiary",
-                  )}
-                >
-                  {m}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Advanced settings toggle */}
-      <button
-        type="button"
-        onClick={onToggleAdvanced}
-        className="flex w-full items-center gap-2 rounded-lg border border-srapi-border bg-srapi-card px-4 py-3 text-left transition-colors hover:bg-srapi-card-muted"
-      >
-        <Settings2 className="size-4 text-srapi-text-tertiary" />
-        <span className="flex-1 text-sm text-srapi-text-secondary">
-          {t("adminQuickSetup.advanced")}
-        </span>
-        <ChevronDown
-          className={cn(
-            "size-4 text-srapi-text-tertiary transition-transform",
-            showAdvanced && "rotate-180",
-          )}
-        />
-      </button>
-
-      {/* Advanced fields */}
-      {showAdvanced && (
-        <div className="space-y-4 rounded-lg border border-srapi-border bg-srapi-card p-4">
-          {/* Proxy selector */}
-          <div>
-            <Label>{t("adminQuickSetup.proxy")}</Label>
-            <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
-              {t("adminQuickSetup.proxyHint")}
-            </p>
-            <Select value={proxyId} onValueChange={onProxyIdChange}>
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={t("adminQuickSetup.proxyNone")}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">
-                  {t("adminQuickSetup.proxyNone")}
-                </SelectItem>
-                {activeProxies.map((px) => (
-                  <SelectItem key={px.id} value={String(px.id)}>
-                    {px.name}{" "}
-                    <span className="text-srapi-text-tertiary">
-                      ({px.type})
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Priority + Weight on one row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="qs-priority">
-                {t("adminQuickSetup.priority")}
-              </Label>
-              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
-                {t("adminQuickSetup.priorityHint")}
-              </p>
-              <Input
-                id="qs-priority"
-                type="number"
-                min={0}
-                value={priority}
-                onChange={(e) => onPriorityChange(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <Label htmlFor="qs-weight">
-                {t("adminQuickSetup.weight")}
-              </Label>
-              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
-                {t("adminQuickSetup.weightHint")}
-              </p>
-              <Input
-                id="qs-weight"
-                type="number"
-                min={0}
-                step={0.1}
-                value={weight}
-                onChange={(e) => onWeightChange(e.target.value)}
-                placeholder="1.0"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Submit */}
-      <Button
-        variant="primary"
-        size="lg"
-        className="w-full"
-        disabled={!canSubmit}
-        loading={isPending}
-        onClick={onSubmit}
-      >
-        {isPending
-          ? t("adminQuickSetup.submitting")
-          : t("adminQuickSetup.submit")}
-      </Button>
+      {/* Submit — full width below both columns */}
+      <div className="max-w-sm">
+        <Button
+          variant="primary"
+          size="lg"
+          className="w-full"
+          disabled={!canSubmit}
+          loading={isPending}
+          onClick={onSubmit}
+        >
+          {isPending
+            ? t("adminQuickSetup.submitting")
+            : t("adminQuickSetup.submit")}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -843,7 +855,7 @@ function ResultView({
     (result.account as { name?: string })?.name || "—";
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="space-y-6">
       {/* Success header */}
       <div className="flex items-start gap-3 rounded-xl border border-srapi-success/20 bg-srapi-success/5 p-5">
         <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-srapi-success" />
@@ -859,49 +871,54 @@ function ResultView({
         </div>
       </div>
 
-      {/* Details */}
-      <div className="rounded-xl border border-srapi-border bg-srapi-card p-5">
-        <dl className="space-y-3 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-srapi-text-tertiary">
-              {t("adminQuickSetup.resultProvider")}
-            </dt>
-            <dd className="font-medium text-srapi-text-primary">
-              {providerName}
-            </dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-srapi-text-tertiary">
-              {t("adminQuickSetup.resultAccount")}
-            </dt>
-            <dd className="font-medium text-srapi-text-primary">
-              {accountName}
-            </dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-srapi-text-tertiary">
-              {t("adminQuickSetup.resultModels")}
-            </dt>
-            <dd className="font-medium text-srapi-text-primary">
-              {result.models_created} / {result.mappings_created}
-            </dd>
-          </div>
-        </dl>
-      </div>
-
-      {/* Model names */}
-      {result.model_names && result.model_names.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {result.model_names.map((m) => (
-            <span
-              key={m}
-              className="rounded-md bg-srapi-bg-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-secondary"
-            >
-              {m}
-            </span>
-          ))}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Details */}
+        <div className="rounded-xl border border-srapi-border bg-srapi-card p-5">
+          <dl className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-srapi-text-tertiary">
+                {t("adminQuickSetup.resultProvider")}
+              </dt>
+              <dd className="font-medium text-srapi-text-primary">
+                {providerName}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-srapi-text-tertiary">
+                {t("adminQuickSetup.resultAccount")}
+              </dt>
+              <dd className="font-medium text-srapi-text-primary">
+                {accountName}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-srapi-text-tertiary">
+                {t("adminQuickSetup.resultModels")}
+              </dt>
+              <dd className="font-medium text-srapi-text-primary">
+                {result.models_created} / {result.mappings_created}
+              </dd>
+            </div>
+          </dl>
         </div>
-      )}
+
+        {/* Model names */}
+        {result.model_names && result.model_names.length > 0 && (
+          <div className="rounded-xl border border-srapi-border bg-srapi-card p-5">
+            <Label className="mb-3">{t("adminQuickSetup.resultModels")}</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {result.model_names.map((m) => (
+                <span
+                  key={m}
+                  className="rounded-md bg-srapi-bg-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-secondary"
+                >
+                  {m}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Warnings */}
       {result.warnings && result.warnings.length > 0 && (

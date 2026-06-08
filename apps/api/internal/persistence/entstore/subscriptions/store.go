@@ -373,6 +373,48 @@ func (s *Store) CreatePricingRule(ctx context.Context, input contract.PricingRul
 	return toPricingRule(created), nil
 }
 
+func (s *Store) UpdatePricingRule(ctx context.Context, id int, input contract.UpdatePricingRuleRequest) (contract.PricingRule, error) {
+	update := s.client.PricingRule.UpdateOneID(id).
+		SetNillableInputPricePerMillion(input.InputPricePerMillionTokens).
+		SetNillableOutputPricePerMillion(input.OutputPricePerMillionTokens).
+		SetNillableCacheReadPricePerMillion(input.CacheReadPricePerMillionTokens).
+		SetNillableCacheWritePricePerMillion(input.CacheWritePricePerMillionTokens).
+		SetNillableCurrency(input.Currency)
+	if input.EffectiveFrom != nil {
+		if *input.EffectiveFrom == nil {
+			update = update.ClearEffectiveFrom()
+		} else {
+			update = update.SetEffectiveFrom(**input.EffectiveFrom)
+		}
+	}
+	if input.EffectiveTo != nil {
+		if *input.EffectiveTo == nil {
+			update = update.ClearEffectiveTo()
+		} else {
+			update = update.SetEffectiveTo(**input.EffectiveTo)
+		}
+	}
+	updated, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.PricingRule{}, contract.ErrNotFound
+		}
+		return contract.PricingRule{}, err
+	}
+	return toPricingRule(updated), nil
+}
+
+func (s *Store) FindPricingRuleByID(ctx context.Context, id int) (contract.PricingRule, error) {
+	found, err := s.client.PricingRule.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.PricingRule{}, contract.ErrNotFound
+		}
+		return contract.PricingRule{}, err
+	}
+	return toPricingRule(found), nil
+}
+
 func (s *Store) ListPricingRules(ctx context.Context) ([]contract.PricingRule, error) {
 	rows, err := s.client.PricingRule.Query().
 		Order(entpricingrule.ByID()).

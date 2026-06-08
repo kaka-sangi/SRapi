@@ -33,9 +33,10 @@ export function PageQueryState<T>({
       <>
         {skeleton ?? (
           <div className="space-y-3">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-2/3" />
+            <Skeleton className="h-3.5 w-28" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-2/3" />
           </div>
         )}
       </>

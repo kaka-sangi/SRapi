@@ -19,6 +19,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import {
   useScheduledTestPlans,
@@ -76,6 +78,7 @@ function ScheduledTestsContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-scheduled-tests", ["lastRun"]);
   const all = useScheduledTestPlans();
   const { query, total } = useClientPagedList(all, list, { match: planMatch, compare: planCompare });
 
@@ -151,6 +154,7 @@ function ScheduledTestsContent() {
     {
       key: "name",
       header: t("adminScheduledTests.name"),
+      pinned: true,
       render: (p) => <span className="text-srapi-text-primary">{p.name}</span>,
     },
     {
@@ -222,6 +226,10 @@ function ScheduledTestsContent() {
         actions={
           <div className="flex items-center gap-3">
             {all.data ? <ListCount total={total} /> : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminScheduledTests.create")}
             </Button>
@@ -231,6 +239,7 @@ function ScheduledTestsContent() {
       <AdminListView
         query={query}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(p) => String(p.id)}
         emptyIcon={CalendarClock}
         emptyTitle={t("adminScheduledTests.emptyTitle")}

@@ -6,6 +6,8 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -46,6 +48,7 @@ export default function AdminPaymentProvidersPage() {
 function PaymentProvidersContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-payment-providers", []);
   const providers = useAdminPaymentProviders({
     page: list.page,
     page_size: list.pageSize,
@@ -110,6 +113,7 @@ function PaymentProvidersContent() {
     {
       key: "name",
       header: t("adminPayments.name"),
+      pinned: true,
       sortValue: (p) => p.name,
       render: (p) => <span className="text-srapi-text-primary">{p.name}</span>,
     },
@@ -149,6 +153,10 @@ function PaymentProvidersContent() {
             {providers.data ? (
               <ListCount total={providers.data.pagination?.total ?? providers.data.data.length} />
             ) : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminPayments.create")}
             </Button>
@@ -158,6 +166,7 @@ function PaymentProvidersContent() {
       <AdminListView
         query={providers}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(p) => p.id}
         emptyIcon={Landmark}
         emptyTitle={t("adminPayments.emptyTitle")}

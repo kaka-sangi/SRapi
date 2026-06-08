@@ -8,6 +8,8 @@ import { AdminListView, ListCount, type Column } from "@/components/admin/admin-
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   Dialog,
   DialogContent,
@@ -56,6 +58,7 @@ const ORDER_STATUSES: PaymentOrder["status"][] = [
 function OrdersContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-orders", ["created_at"]);
   // translate() returns the key path on a miss, so fall back to a humanized
   // token rather than leaking the dotted key into the UI.
   const labelOr = (key: string, fallback: string) => {
@@ -78,6 +81,7 @@ function OrdersContent() {
     {
       key: "order",
       header: t("adminOrders.order"),
+      pinned: true,
       sortValue: (o) => o.order_no,
       render: (o) => (
         <span className="font-mono text-2xs text-srapi-text-secondary">{o.order_no}</span>
@@ -130,6 +134,7 @@ function OrdersContent() {
       <AdminListView
         query={orders}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(o) => o.id}
         emptyIcon={ShoppingCart}
         emptyTitle={t("adminOrders.emptyTitle")}
@@ -146,6 +151,10 @@ function OrdersContent() {
               onChange={(v) => list.setFilter("status", v)}
               options={statusOptions}
               allLabel={t("adminCommon.allStatuses")}
+            />
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
             />
           </ListToolbar>
         }

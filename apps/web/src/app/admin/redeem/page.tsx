@@ -8,6 +8,8 @@ import { AdminListView, ListCount, type Column } from "@/components/admin/admin-
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -79,6 +81,7 @@ function RedeemContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-redeem", []);
   const statusFilter = (list.filters.status as RedeemCode["status"]) || undefined;
   const codes = useAdminRedeemCodes({
     page: list.page,
@@ -104,7 +107,7 @@ function RedeemContent() {
   async function confirmBulkDisable() {
     try {
       await disableMut.mutateAsync(selectedActive.ids);
-      toast({ title: t("feedback.saved"), tone: "success" });
+      toast({ title: t("feedback.batchAllSucceeded", { count: selectedActive.ids.length }), tone: "success" });
       list.clearSelection();
     } catch (err) {
       toast({ title: t("feedback.failed"), tone: "error" });
@@ -130,6 +133,7 @@ function RedeemContent() {
     {
       key: "code",
       header: t("adminPromos.code"),
+      pinned: true,
       sortValue: (c) => c.code,
       render: (c) => <span className="font-mono text-srapi-text-primary">{c.code}</span>,
     },
@@ -172,6 +176,10 @@ function RedeemContent() {
             {codes.data ? (
               <ListCount total={codes.data.pagination?.total ?? codes.data.data.length} />
             ) : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="outline" size="sm" onClick={() => setBatching(true)}>
               {t("adminPromos.batchGenerate")}
             </Button>
@@ -195,6 +203,7 @@ function RedeemContent() {
       <AdminListView
         query={codes}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(c) => c.id}
         emptyIcon={Gift}
         emptyTitle={t("adminPromos.emptyRedeem")}

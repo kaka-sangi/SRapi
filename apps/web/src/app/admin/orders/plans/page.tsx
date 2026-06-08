@@ -12,6 +12,8 @@ import {
   enumOptions,
   type FieldConfig,
 } from "@/components/admin/resource-form-dialog";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   useAdminSubscriptionPlans,
   useCreateSubscriptionPlan,
@@ -45,6 +47,7 @@ export default function OrderPlansPage() {
 
 function PlansContent() {
   const { t } = useLanguage();
+  const colVis = useColumnVisibility("admin-orders-plans", []);
   const plans = useAdminSubscriptionPlans();
   const models = useAdminModels();
   const groups = useAdminGroups();
@@ -108,6 +111,7 @@ function PlansContent() {
     {
       name: "schedulerStrategy",
       label: t("adminSubscriptions.schedulerStrategy"),
+      help: t("adminSubscriptions.schedulerStrategyHelp"),
       type: "select",
       options: SCHEDULER_STRATEGIES.map((v) => ({
         value: v,
@@ -128,8 +132,8 @@ function PlansContent() {
       advanced: true,
       hint: t("adminSubscriptions.extraEntitlementsHint"),
     },
-    { name: "forSale", label: t("adminSubscriptions.forSale"), type: "switch" },
-    { name: "sortOrder", label: t("adminSubscriptions.sortOrder"), type: "number" },
+    { name: "forSale", label: t("adminSubscriptions.forSale"), help: t("adminSubscriptions.forSaleHelp"), type: "switch" },
+    { name: "sortOrder", label: t("adminSubscriptions.sortOrder"), help: t("adminSubscriptions.sortOrderHelp"), type: "number" },
     {
       name: "status",
       label: t("adminCommon.status"),
@@ -142,6 +146,7 @@ function PlansContent() {
     {
       key: "name",
       header: t("adminSubscriptions.plan"),
+      pinned: true,
       render: (p) => <span className="text-srapi-text-primary">{p.name}</span>,
     },
     {
@@ -172,6 +177,10 @@ function PlansContent() {
             {plans.data ? (
               <ListCount total={plans.data.pagination?.total ?? plans.data.data.length} />
             ) : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
               ＋ {t("adminSubscriptions.createPlan")}
             </Button>
@@ -181,6 +190,7 @@ function PlansContent() {
       <AdminListView
         query={plans}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(p) => p.id}
         emptyIcon={CreditCard}
         emptyTitle={t("adminSubscriptions.emptyPlans")}

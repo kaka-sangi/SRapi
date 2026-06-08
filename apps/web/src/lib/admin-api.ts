@@ -86,6 +86,7 @@ import {
   createAdminPaymentProvider,
   deleteAdminPaymentProvider,
   createAdminPricingRule,
+  updateAdminPricingRule,
   deleteAdminPricingRule,
   createAdminPromoCode,
   createAdminProvider,
@@ -271,6 +272,7 @@ import type {
   CreateAdminPaymentProviderData,
   UpdateAdminPaymentProviderData,
   CreateAdminPricingRuleData,
+  UpdateAdminPricingRuleData,
   CreateAdminProxyData,
   CreateAdminSubscriptionPlanData,
   CreateAdminUserSubscriptionData,
@@ -987,6 +989,13 @@ export const adminApi = {
 
   createPricingRule(body: CreateAdminPricingRuleData["body"]): Promise<PricingRule> {
     return unwrapData(() => createAdminPricingRule({ body, throwOnError: true }));
+  },
+
+  updatePricingRule(
+    id: Id,
+    body: UpdateAdminPricingRuleData["body"],
+  ): Promise<PricingRule> {
+    return unwrapData(() => updateAdminPricingRule({ path: { id }, body, throwOnError: true }));
   },
 
   deletePricingRule(id: Id): Promise<{ deleted: boolean }> {

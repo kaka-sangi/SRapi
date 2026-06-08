@@ -6,8 +6,11 @@ import { CreditCard, Layers } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
+import { ListToolbar } from "@/components/admin/list-toolbar";
 import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -44,6 +47,7 @@ export default function AdminSubscriptionsPage() {
 
 function SubscriptionsContent() {
   const { t } = useLanguage();
+  const colVis = useColumnVisibility("admin-subscriptions", []);
   const plans = useAdminSubscriptionPlans();
   const subs = useAdminSubscriptions();
   const users = useAdminUsers();
@@ -79,11 +83,13 @@ function SubscriptionsContent() {
     {
       key: "user",
       header: t("adminSubscriptions.user"),
+      pinned: true,
       render: (s) => <span className="font-mono text-2xs text-srapi-text-secondary">{s.user_id}</span>,
     },
     {
       key: "plan",
       header: t("adminSubscriptions.plan"),
+      pinned: true,
       render: (s) => <span className="font-mono text-2xs text-srapi-text-secondary">{s.plan_id}</span>,
     },
     {
@@ -126,11 +132,20 @@ function SubscriptionsContent() {
       <AdminListView
         query={subs}
         columns={subColumns}
+        columnVisibility={colVis}
         getRowId={(s) => s.id}
         emptyIcon={CreditCard}
         emptyTitle={t("adminSubscriptions.emptySubs")}
         emptyBody={t("adminSubscriptions.emptySubsBody")}
         minWidth={560}
+        toolbar={
+          <ListToolbar>
+            <ColumnToggle
+              columns={subColumns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
+          </ListToolbar>
+        }
         rowActions={(s) => {
           const actions: RowAction[] = [
             { label: t("common.delete"), destructive: true, onSelect: () => setSubToDelete(s) },

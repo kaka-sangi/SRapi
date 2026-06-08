@@ -27,6 +27,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FormSkeleton } from "@/components/charts/chart-skeleton";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { meErrorMessage } from "@/lib/me-api";
 import type { User } from "@/lib/sdk-types";
@@ -57,7 +58,7 @@ function AccountContent() {
           <TabsTrigger value="notifications">{t("account.tabNotifications")}</TabsTrigger>
         </TabsList>
         <TabsContent value="profile">
-          <PageQueryState query={profile} skeleton={<Skeleton className="h-48 rounded-xl" />}>
+          <PageQueryState query={profile} skeleton={<FormSkeleton rows={3} className="p-5" />}>
             {(user) => <ProfileForm user={user} />}
           </PageQueryState>
         </TabsContent>

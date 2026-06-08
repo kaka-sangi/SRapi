@@ -333,6 +333,49 @@ func (s *Store) CreatePricingRule(_ context.Context, input contract.PricingRule)
 	return clonePricingRule(rule), nil
 }
 
+func (s *Store) UpdatePricingRule(_ context.Context, id int, input contract.UpdatePricingRuleRequest) (contract.PricingRule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rule, ok := s.pricingRules[id]
+	if !ok {
+		return contract.PricingRule{}, contract.ErrNotFound
+	}
+	if input.InputPricePerMillionTokens != nil {
+		rule.InputPricePerMillionTokens = *input.InputPricePerMillionTokens
+	}
+	if input.OutputPricePerMillionTokens != nil {
+		rule.OutputPricePerMillionTokens = *input.OutputPricePerMillionTokens
+	}
+	if input.CacheReadPricePerMillionTokens != nil {
+		rule.CacheReadPricePerMillionTokens = *input.CacheReadPricePerMillionTokens
+	}
+	if input.CacheWritePricePerMillionTokens != nil {
+		rule.CacheWritePricePerMillionTokens = *input.CacheWritePricePerMillionTokens
+	}
+	if input.Currency != nil {
+		rule.Currency = *input.Currency
+	}
+	if input.EffectiveFrom != nil {
+		rule.EffectiveFrom = cloneTime(*input.EffectiveFrom)
+	}
+	if input.EffectiveTo != nil {
+		rule.EffectiveTo = cloneTime(*input.EffectiveTo)
+	}
+	rule.UpdatedAt = time.Now().UTC()
+	s.pricingRules[id] = rule
+	return clonePricingRule(rule), nil
+}
+
+func (s *Store) FindPricingRuleByID(_ context.Context, id int) (contract.PricingRule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rule, ok := s.pricingRules[id]
+	if !ok {
+		return contract.PricingRule{}, contract.ErrNotFound
+	}
+	return clonePricingRule(rule), nil
+}
+
 func (s *Store) DeletePricingRule(_ context.Context, id int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

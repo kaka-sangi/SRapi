@@ -53,6 +53,16 @@ function useCountUp(target: number, enabled: boolean, duration = 750): number {
   return n;
 }
 
+export function StatCardSkeleton({ className }: { className?: string }) {
+  return (
+    <Card className={cn("flex flex-col p-5", className)}>
+      <div className="skeleton-shimmer h-3 w-20 rounded bg-srapi-card-muted" />
+      <div className="mt-4 skeleton-shimmer h-8 w-24 rounded bg-srapi-card-muted" />
+      <div className="mt-3 skeleton-shimmer h-2.5 w-16 rounded bg-srapi-card-muted" />
+    </Card>
+  );
+}
+
 export function StatCard({
   label,
   value,

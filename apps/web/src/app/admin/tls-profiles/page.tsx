@@ -12,6 +12,8 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import {
   useTlsProfiles,
@@ -52,6 +54,7 @@ export default function AdminTlsProfilesPage() {
 function TlsProfilesContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-tls-profiles", []);
   const all = useTlsProfiles();
   const { query, total } = useClientPagedList(all, list, { match: profileMatch, compare: profileCompare });
 
@@ -69,12 +72,14 @@ function TlsProfilesContent() {
     {
       name: "tls_template",
       label: t("adminTlsProfiles.template"),
+      help: t("adminTlsProfiles.templateHelp"),
       type: "select",
       options: TLS_TEMPLATES.map((value) => ({ value, label: value })),
     },
     {
       name: "http_version_policy",
       label: t("adminTlsProfiles.httpPolicy"),
+      help: t("adminTlsProfiles.httpPolicyHelp"),
       type: "select",
       options: HTTP_VERSION_POLICIES.map((value) => ({ value, label: value })),
     },
@@ -84,13 +89,14 @@ function TlsProfilesContent() {
       hint: t("adminTlsProfiles.userAgentHint"),
     },
     { name: "enabled", label: t("adminTlsProfiles.enabled"), type: "switch" },
-    { name: "extra_headers", label: t("adminTlsProfiles.extraHeaders"), type: "keyvalue", advanced: true },
+    { name: "extra_headers", label: t("adminTlsProfiles.extraHeaders"), help: t("adminTlsProfiles.extraHeadersHelp"), type: "keyvalue", advanced: true },
   ];
 
   const columns: Column<TlsProfile>[] = [
     {
       key: "name",
       header: t("adminTlsProfiles.name"),
+      pinned: true,
       render: (p) => <span className="text-srapi-text-primary">{p.name}</span>,
     },
     {
@@ -144,6 +150,10 @@ function TlsProfilesContent() {
         actions={
           <div className="flex items-center gap-3">
             {all.data ? <ListCount total={total} /> : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminTlsProfiles.create")}
             </Button>
@@ -153,6 +163,7 @@ function TlsProfilesContent() {
       <AdminListView
         query={query}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(p) => String(p.id)}
         emptyIcon={Fingerprint}
         emptyTitle={t("adminTlsProfiles.emptyTitle")}

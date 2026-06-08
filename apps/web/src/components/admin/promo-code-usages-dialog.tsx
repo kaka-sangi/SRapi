@@ -16,6 +16,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { useAdminPromoCodeUsages } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -47,7 +48,7 @@ export function PromoCodeUsagesDialog({
         <div className="mt-3 max-h-[60vh] overflow-y-auto">
           <PageQueryState
             query={query}
-            skeleton={<Skeleton className="h-32 rounded-xl" />}
+            skeleton={<DialogListSkeleton rows={4} />}
             isEmpty={(d) => d.data.length === 0}
             emptyTitle={t("adminPromos.usagesEmpty")}
           >

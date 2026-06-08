@@ -9,8 +9,10 @@ import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { enumOptions } from "@/components/admin/resource-form-dialog";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useAdminApiKeys, useUpdateAdminApiKey } from "@/hooks/admin-queries";
 import { ApiKeyUsageDialog } from "@/components/features/api-key-usage-dialog";
 import { useLanguage } from "@/context/LanguageContext";
@@ -40,6 +42,7 @@ function ApiKeysContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-api-keys", ["created_at"]);
   const statusFilter = (list.filters.status as ApiKey["status"]) || undefined;
   const keys = useAdminApiKeys({
     page: list.page,
@@ -63,6 +66,7 @@ function ApiKeysContent() {
     {
       key: "key",
       header: t("adminApiKeys.key"),
+      pinned: true,
       render: (k) => (
         <div className="min-w-0">
           <div className="truncate text-srapi-text-primary">{k.name}</div>
@@ -124,6 +128,7 @@ function ApiKeysContent() {
       <AdminListView
         query={keys}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(k) => String(k.id)}
         emptyIcon={KeyRound}
         emptyTitle={t("adminApiKeys.emptyTitle")}
@@ -141,6 +146,10 @@ function ApiKeysContent() {
               onChange={(v) => list.setFilter("status", v)}
               options={enumOptions(API_KEY_STATUSES)}
               allLabel={t("adminCommon.allStatuses")}
+            />
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
             />
           </ListToolbar>
         }

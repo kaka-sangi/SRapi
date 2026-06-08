@@ -306,6 +306,49 @@ func (s *Service) ValidatePricingRule(req contract.CreatePricingRuleRequest) err
 	return err
 }
 
+func (s *Service) UpdatePricingRule(ctx context.Context, id int, req contract.UpdatePricingRuleRequest) (contract.PricingRule, error) {
+	if id <= 0 {
+		return contract.PricingRule{}, ErrInvalidInput
+	}
+	if req.InputPricePerMillionTokens != nil {
+		v, ok := normalizeMoney(*req.InputPricePerMillionTokens)
+		if !ok {
+			return contract.PricingRule{}, ErrInvalidInput
+		}
+		req.InputPricePerMillionTokens = &v
+	}
+	if req.OutputPricePerMillionTokens != nil {
+		v, ok := normalizeMoney(*req.OutputPricePerMillionTokens)
+		if !ok {
+			return contract.PricingRule{}, ErrInvalidInput
+		}
+		req.OutputPricePerMillionTokens = &v
+	}
+	if req.CacheReadPricePerMillionTokens != nil {
+		v, ok := normalizeMoney(*req.CacheReadPricePerMillionTokens)
+		if !ok {
+			return contract.PricingRule{}, ErrInvalidInput
+		}
+		req.CacheReadPricePerMillionTokens = &v
+	}
+	if req.CacheWritePricePerMillionTokens != nil {
+		v, ok := normalizeMoney(*req.CacheWritePricePerMillionTokens)
+		if !ok {
+			return contract.PricingRule{}, ErrInvalidInput
+		}
+		req.CacheWritePricePerMillionTokens = &v
+	}
+	if req.Currency != nil {
+		v := normalizeCurrency(*req.Currency)
+		req.Currency = &v
+	}
+	return s.store.UpdatePricingRule(ctx, id, req)
+}
+
+func (s *Service) FindPricingRuleByID(ctx context.Context, id int) (contract.PricingRule, error) {
+	return s.store.FindPricingRuleByID(ctx, id)
+}
+
 func (s *Service) DeletePricingRule(ctx context.Context, id int) error {
 	if id <= 0 {
 		return ErrInvalidInput

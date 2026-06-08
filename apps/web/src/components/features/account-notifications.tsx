@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import type { NotificationContact, NotificationPreference } from "@/lib/sdk-types";
@@ -78,7 +79,7 @@ function NotificationPreferencesCard() {
         </div>
         <PageQueryState
           query={prefs}
-          skeleton={<Skeleton className="h-24 rounded-xl" />}
+          skeleton={<DialogListSkeleton rows={3} />}
           isEmpty={(d) => d.data.length === 0}
           emptyTitle={t("account.notifyPrefsEmpty")}
         >
@@ -180,7 +181,7 @@ function NotificationContactsCard() {
 
         <PageQueryState
           query={contacts}
-          skeleton={<Skeleton className="h-16 rounded-xl" />}
+          skeleton={<DialogListSkeleton rows={2} />}
           isEmpty={(d) => d.data.length === 0}
           emptyTitle={t("account.notifyContactEmpty")}
         >

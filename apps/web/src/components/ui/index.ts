@@ -62,6 +62,8 @@ export {
   DropdownMenuLabel,
 } from "./dropdown-menu";
 export { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "./tooltip";
+export { HelpTooltip, LabelWithHelp } from "./help-tooltip";
+export { ColumnToggle, type ColumnDef } from "./column-toggle";
 export {
   ToastProvider,
   ToastViewport,

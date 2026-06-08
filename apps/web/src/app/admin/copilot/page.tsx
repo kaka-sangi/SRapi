@@ -6,7 +6,7 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { CopilotChat } from "@/components/admin/copilot-chat";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ChatSkeleton } from "@/components/charts/chart-skeleton";
 import { useAdminCopilotConfig } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { ADMIN_ROUTES } from "@/lib/routes";
@@ -23,7 +23,7 @@ function CopilotContent() {
   const config = useAdminCopilotConfig();
 
   return (
-    <PageQueryState query={config} skeleton={<Skeleton className="h-[70vh] rounded-2xl" />}>
+    <PageQueryState query={config} skeleton={<ChatSkeleton />}>
       {(data) =>
         data.enabled && data.configured ? (
           <div className="h-[calc(100vh-9rem)] min-h-[30rem]">

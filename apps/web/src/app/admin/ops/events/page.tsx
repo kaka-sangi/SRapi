@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useOutboxEvents } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, safeJson } from "@/lib/admin-format";
@@ -42,6 +44,7 @@ export default function AdminOutboxPage() {
 function OutboxContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-ops-events", []);
   const statusFilter = (list.filters.status as DomainEventOutbox["status"]) || undefined;
   const events = useOutboxEvents({
     page: list.page,
@@ -54,6 +57,7 @@ function OutboxContent() {
     {
       key: "time",
       header: t("adminOutbox.time"),
+      pinned: true,
       render: (e) => (
         <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
           {formatDateTime(e.created_at)}
@@ -105,14 +109,21 @@ function OutboxContent() {
         title={t("adminOutbox.title")}
         description={t("adminOutbox.subtitle")}
         actions={
-          events.data ? (
-            <ListCount total={events.data.pagination?.total ?? events.data.data.length} />
-          ) : undefined
+          <div className="flex items-center gap-3">
+            {events.data ? (
+              <ListCount total={events.data.pagination?.total ?? events.data.data.length} />
+            ) : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
+          </div>
         }
       />
       <AdminListView
         query={events}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(e) => e.id}
         emptyIcon={Webhook}
         emptyTitle={t("adminOutbox.emptyTitle")}

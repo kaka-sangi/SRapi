@@ -495,6 +495,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/pricing-rules", server.handleListAdminPricingRules)
 	mux.HandleFunc("POST /api/v1/admin/pricing-rules", server.handleCreateAdminPricingRule)
 	mux.HandleFunc("POST /api/v1/admin/pricing-rules:bulk", server.handleBulkImportAdminPricingRules)
+	mux.HandleFunc("PATCH /api/v1/admin/pricing-rules/{id}", server.handleUpdateAdminPricingRule)
 	mux.HandleFunc("DELETE /api/v1/admin/pricing-rules/{id}", server.handleDeleteAdminPricingRule)
 	server.registerAdminOpsRoutes(mux)
 	server.registerAlertRulesRoutes(mux)

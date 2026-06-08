@@ -8,7 +8,9 @@ import { AdminListView, ListCount, type Column } from "@/components/admin/admin-
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -61,6 +63,7 @@ export default function AdminModelsPage() {
 function ModelsContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-models", []);
   const statusFilter = (list.filters.status as Model["status"]) || undefined;
   const models = useAdminModels({
     page: list.page,
@@ -97,9 +100,9 @@ function ModelsContent() {
 
   const sharedFields: FieldConfig<ModelFormState>[] = [
     { name: "displayName", label: t("adminModels.displayName") },
-    { name: "family", label: t("adminModels.family"), placeholder: "gpt, claude, gemini" },
-    { name: "contextWindow", label: t("adminModels.contextWindow"), type: "number", placeholder: "128000" },
-    { name: "maxOutputTokens", label: t("adminModels.maxOutput"), type: "number", placeholder: "16384" },
+    { name: "family", label: t("adminModels.family"), help: t("adminModels.familyHelp"), placeholder: "gpt, claude, gemini" },
+    { name: "contextWindow", label: t("adminModels.contextWindow"), help: t("adminModels.contextWindowHelp"), type: "number", placeholder: "128000" },
+    { name: "maxOutputTokens", label: t("adminModels.maxOutput"), help: t("adminModels.maxOutputHelp"), type: "number", placeholder: "16384" },
     {
       name: "capabilities",
       label: t("adminModels.capabilities"),
@@ -107,7 +110,7 @@ function ModelsContent() {
       options: MODEL_CAPABILITY_OPTIONS,
       hint: t("adminModels.capabilitiesHint"),
     },
-    { name: "qualityTier", label: t("adminModels.qualityTier"), placeholder: "premium, standard", advanced: true },
+    { name: "qualityTier", label: t("adminModels.qualityTier"), help: t("adminModels.qualityTierHelp"), placeholder: "premium, standard", advanced: true },
     { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(MODEL_STATUSES) },
   ];
 
@@ -182,6 +185,7 @@ function ModelsContent() {
     {
       key: "name",
       header: t("adminModels.canonicalName"),
+      pinned: true,
       sortValue: (m) => m.canonical_name,
       render: (m) => (
         <div className="min-w-0">
@@ -233,6 +237,10 @@ function ModelsContent() {
     },
   ];
 
+  const toggleColumns = columns
+    .filter((c) => !c.pinned)
+    .map((c) => ({ key: c.key, label: c.header }));
+
   return (
     <>
       <PageHeader
@@ -253,6 +261,7 @@ function ModelsContent() {
       <AdminListView
         query={models}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(m) => m.id}
         emptyIcon={Cpu}
         emptyTitle={t("adminModels.emptyTitle")}
@@ -281,6 +290,7 @@ function ModelsContent() {
               options={enumOptions(MODEL_STATUSES)}
               allLabel={t("adminCommon.allStatuses")}
             />
+            <ColumnToggle columns={toggleColumns} visibility={colVis} />
           </ListToolbar>
         }
         pagination={{

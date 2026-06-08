@@ -11,6 +11,8 @@ import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import {
   useAdminRoles,
@@ -51,6 +53,7 @@ export default function AdminRolesPage() {
 function RolesContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-roles", ["created"]);
   const all = useAdminRoles();
   const { query, total } = useClientPagedList(all, list, { match: roleMatch, compare: roleCompare });
   const createMut = useCreateAdminRole();
@@ -90,6 +93,7 @@ function RolesContent() {
     {
       key: "name",
       header: t("adminRoles.name"),
+      pinned: true,
       render: (r) => (
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-srapi-text-primary">{r.name}</span>
@@ -163,6 +167,10 @@ function RolesContent() {
         actions={
           <div className="flex items-center gap-3">
             {all.data ? <ListCount total={total} /> : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
               ＋ {t("adminRoles.create")}
             </Button>
@@ -172,6 +180,7 @@ function RolesContent() {
       <AdminListView
         query={query}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(r) => String(r.id)}
         emptyIcon={ShieldCheck}
         emptyTitle={t("adminRoles.emptyTitle")}

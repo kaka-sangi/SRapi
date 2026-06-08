@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, BellRing, BellOff, Pencil, Trash2 } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Activity, BellRing, BellOff, Maximize2, Minimize2, Pencil, Trash2 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
@@ -39,6 +40,7 @@ import { QuotaNotchRail } from "@/components/ui/quota-notch-rail";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SloCardSkeleton } from "@/components/charts/chart-skeleton";
 import { Button } from "@/components/ui/button";
 import { quietStatusFor } from "@/lib/status-badge";
 import { formatDateTime } from "@/lib/admin-format";
@@ -46,20 +48,51 @@ import { formatDateTime } from "@/lib/admin-format";
 export default function AdminOpsPage() {
   return (
     <AdminShell>
-      <OpsContent />
+      <OpsWrapper />
     </AdminShell>
   );
+}
+
+function OpsWrapper() {
+  const searchParams = useSearchParams();
+  const fullscreen = searchParams.get("fullscreen") === "1";
+
+  if (fullscreen) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-srapi-bg p-6">
+        <div className="mx-auto max-w-7xl space-y-6">
+          <OpsContent />
+        </div>
+      </div>
+    );
+  }
+
+  return <OpsContent />;
 }
 
 function OpsContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const fullscreen = searchParams.get("fullscreen") === "1";
   const slos = useOpsSlos();
   const alerts = useOpsAlerts();
   const ackMut = useAcknowledgeAlert();
   const settingsMut = useUpdateOpsSettings();
   const [showCleanup, setShowCleanup] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+
+  function toggleFullscreen() {
+    const params = new URLSearchParams(searchParams.toString());
+    if (fullscreen) {
+      params.delete("fullscreen");
+    } else {
+      params.set("fullscreen", "1");
+    }
+    const qs = params.toString();
+    router.replace(`/admin/ops${qs ? `?${qs}` : ""}`, { scroll: false });
+  }
 
   const settingsFields: FieldConfig<OpsSettingsFormState>[] = [
     { name: "autoRefreshEnabled", label: t("adminOpsSettings.autoRefresh"), type: "switch" },
@@ -111,6 +144,9 @@ function OpsContent() {
         description={t("adminOps.subtitle")}
         actions={
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={toggleFullscreen}>
+              {fullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setShowCleanup(true)}>
               {t("adminOpsCleanup.action")}
             </Button>
@@ -155,7 +191,7 @@ function OpsContent() {
         skeleton={
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-36 rounded-xl" />
+              <SloCardSkeleton key={i} />
             ))}
           </div>
         }

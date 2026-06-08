@@ -1,8 +1,10 @@
 import type {
   CreateAdminPricingRuleData,
+  UpdateAdminPricingRuleData,
   CreateAdminSubscriptionPlanData,
   CreateAdminUserSubscriptionData,
   Id,
+  PricingRule,
   SubscriptionPlan,
   SubscriptionPlanStatus,
   UserSubscriptionStatus,
@@ -253,6 +255,54 @@ export function buildCreatePricingRuleBody(
   return {
     model_id: requiredText(form.modelId, "Model"),
     provider_id: requiredText(form.providerId, "Provider"),
+    input_price_per_million_tokens: parseDecimalString(
+      form.inputPricePerMillionTokens,
+      "Input price",
+    ),
+    output_price_per_million_tokens: parseDecimalString(
+      form.outputPricePerMillionTokens,
+      "Output price",
+    ),
+    cache_read_price_per_million_tokens: parseDecimalString(
+      form.cacheReadPricePerMillionTokens,
+      "Cache read price",
+    ),
+    cache_write_price_per_million_tokens: parseDecimalString(
+      form.cacheWritePricePerMillionTokens,
+      "Cache write price",
+    ),
+    currency: requiredText(form.currency, "Currency").toUpperCase(),
+    effective_from: localDateTimeToIso(form.effectiveFromLocal, "Effective from"),
+    effective_to: localDateTimeToIso(form.effectiveToLocal, "Effective to"),
+  };
+}
+
+function isoToLocal(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function pricingRuleFormFromRule(rule: PricingRule): PricingRuleFormState {
+  return {
+    modelId: String(rule.model_id),
+    providerId: String(rule.provider_id),
+    inputPricePerMillionTokens: rule.input_price_per_million_tokens,
+    outputPricePerMillionTokens: rule.output_price_per_million_tokens,
+    cacheReadPricePerMillionTokens: rule.cache_read_price_per_million_tokens,
+    cacheWritePricePerMillionTokens: rule.cache_write_price_per_million_tokens,
+    currency: rule.currency,
+    effectiveFromLocal: isoToLocal(rule.effective_from),
+    effectiveToLocal: isoToLocal(rule.effective_to),
+  };
+}
+
+export function buildUpdatePricingRuleBody(
+  form: PricingRuleFormState,
+): UpdateAdminPricingRuleData["body"] {
+  return {
     input_price_per_million_tokens: parseDecimalString(
       form.inputPricePerMillionTokens,
       "Input price",

@@ -1,18 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { CSSProperties } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { LineChart } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
-import { StatCard } from "@/components/ui/stat-card";
+import { StatCard, StatCardSkeleton } from "@/components/ui/stat-card";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarSeries } from "@/components/charts/bar-series";
 import { TrendChart } from "@/components/charts/trend-chart";
 import { TokenBreakdown } from "@/components/charts/token-breakdown";
 import { ChartEmpty } from "@/components/charts/chart-empty";
+import { TrendChartSkeleton, BarChartSkeleton } from "@/components/charts/chart-skeleton";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { useAdminDashboard } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -54,7 +56,19 @@ export default function AdminDashboardPage() {
 
 function DashboardContent() {
   const { t } = useLanguage();
-  const [range, setRange] = useState<RangeKey>("7d");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const rangeParam = searchParams.get("range");
+  const range: RangeKey = RANGE_PRESETS.some((p) => p.key === rangeParam)
+    ? (rangeParam as RangeKey)
+    : "7d";
+  function setRange(key: RangeKey) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (key === "7d") params.delete("range");
+    else params.set("range", key);
+    const qs = params.toString();
+    router.replace(`/admin/dashboard${qs ? `?${qs}` : ""}`, { scroll: false });
+  }
   const { start, end } = useMemo(() => rangeWindow(range), [range]);
   const dashboard = useAdminDashboard({ start, end });
 
@@ -98,13 +112,28 @@ function DashboardContent() {
           <div className="space-y-5">
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-32 w-full rounded-xl" />
+                <StatCardSkeleton key={i} />
               ))}
             </div>
-            <Skeleton className="h-56 w-full rounded-xl" />
+            <Card className="overflow-hidden p-5">
+              <Skeleton className="h-3 w-28" />
+              <div className="mt-3">
+                <TrendChartSkeleton height={132} />
+              </div>
+            </Card>
             <div className="grid gap-4 md:grid-cols-2">
-              <Skeleton className="h-48 w-full rounded-xl" />
-              <Skeleton className="h-48 w-full rounded-xl" />
+              <Card className="p-5">
+                <Skeleton className="h-4 w-32" />
+                <div className="mt-4">
+                  <BarChartSkeleton rows={5} />
+                </div>
+              </Card>
+              <Card className="p-5">
+                <Skeleton className="h-4 w-28" />
+                <div className="mt-4">
+                  <BarChartSkeleton rows={5} />
+                </div>
+              </Card>
             </div>
           </div>
         }

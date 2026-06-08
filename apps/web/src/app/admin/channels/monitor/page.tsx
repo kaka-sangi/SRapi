@@ -27,6 +27,8 @@ import {
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import {
   useAccountsAvailability,
@@ -129,6 +131,7 @@ function MonitorsTab() {
   const updateMut = useUpdateChannelMonitor();
   const deleteMut = useDeleteChannelMonitor();
 
+  const colVis = useColumnVisibility("admin-channel-monitors", []);
   const [formTarget, setFormTarget] = useState<ChannelMonitor | "new" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ChannelMonitor | null>(null);
   const [runTarget, setRunTarget] = useState<ChannelMonitor | null>(null);
@@ -207,6 +210,7 @@ function MonitorsTab() {
     {
       key: "name",
       header: t("adminMonitor.name"),
+      pinned: true,
       render: (r) => <span className="text-srapi-text-primary">{r.name}</span>,
     },
     {
@@ -278,12 +282,14 @@ function MonitorsTab() {
             />
             <div className="ml-auto flex items-center gap-3">
               {all.data ? <ListCount total={total} /> : null}
+              <ColumnToggle columns={columns} visibility={colVis} />
               <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
                 ＋ {t("adminMonitor.create")}
               </Button>
             </div>
           </ListToolbar>
         }
+        columnVisibility={colVis}
         pagination={{
           page: list.page,
           pageSize: list.pageSize,
@@ -375,6 +381,7 @@ function TemplatesTab() {
   const deleteMut = useDeleteChannelMonitorTemplate();
   const applyMut = useApplyChannelMonitorTemplate();
 
+  const colVis = useColumnVisibility("admin-channel-templates", []);
   const [formTarget, setFormTarget] = useState<ChannelMonitorTemplate | "new" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ChannelMonitorTemplate | null>(null);
   const [applyTarget, setApplyTarget] = useState<ChannelMonitorTemplate | null>(null);
@@ -413,6 +420,7 @@ function TemplatesTab() {
     {
       key: "name",
       header: t("adminMonitor.templateName"),
+      pinned: true,
       render: (r) => <span className="text-srapi-text-primary">{r.name}</span>,
     },
     {
@@ -460,12 +468,14 @@ function TemplatesTab() {
             />
             <div className="ml-auto flex items-center gap-3">
               {all.data ? <ListCount total={total} /> : null}
+              <ColumnToggle columns={columns} visibility={colVis} />
               <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
                 ＋ {t("adminMonitor.createTemplate")}
               </Button>
             </div>
           </ListToolbar>
         }
+        columnVisibility={colVis}
         pagination={{
           page: list.page,
           pageSize: list.pageSize,
@@ -630,6 +640,7 @@ const availabilityCompare = (a: AccountAvailabilitySummary, b: AccountAvailabili
 function AvailabilityTab() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-channel-availability", []);
   const [days, setDays] = useState(7);
   const all = useAccountsAvailability(days);
   const { query, total } = useClientPagedList(all, list, {
@@ -641,6 +652,7 @@ function AvailabilityTab() {
     {
       key: "account",
       header: t("adminMonitor.account"),
+      pinned: true,
       render: (r) => <span className="text-srapi-text-primary">{r.account_name}</span>,
     },
     {
@@ -685,6 +697,7 @@ function AvailabilityTab() {
       emptyTitle={t("adminMonitor.emptyTitle")}
       emptyBody={t("adminMonitor.emptyBody")}
       minWidth={640}
+      columnVisibility={colVis}
       isFiltered={Boolean(list.search)}
       onClearFilters={list.clearFilters}
       toolbar={
@@ -696,6 +709,7 @@ function AvailabilityTab() {
           />
           <div className="ml-auto flex items-center gap-3">
             {all.data ? <ListCount total={total} /> : null}
+            <ColumnToggle columns={columns} visibility={colVis} />
             <Select
               value={String(days)}
               onValueChange={(v) => {

@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FormSkeleton } from "@/components/charts/chart-skeleton";
 import { TagInput } from "@/components/ui/tag-input";
 import { MultiSelect, type MultiSelectOption } from "@/components/ui/multi-select";
 import { KeyValueEditor } from "@/components/ui/key-value-editor";
@@ -123,7 +124,7 @@ function SettingsContent() {
       />
       <PageQueryState
         query={settings}
-        skeleton={<Skeleton className="h-96 rounded-xl" />}
+        skeleton={<FormSkeleton rows={6} className="p-5" />}
       >
         {(data) => <SettingsEditor initial={data} />}
       </PageQueryState>

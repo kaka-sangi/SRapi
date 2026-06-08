@@ -7,6 +7,7 @@ import { meErrorMessage } from "@/lib/me-api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import type { CurrentUserAuthIdentity } from "@/lib/sdk-types";
 
@@ -46,7 +47,7 @@ export function LinkedSignInsCard() {
         </div>
         <PageQueryState
           query={identities}
-          skeleton={<Skeleton className="h-16 rounded-xl" />}
+          skeleton={<DialogListSkeleton rows={2} />}
           isEmpty={(d) => d.data.length === 0}
           emptyTitle={t("account.linkedEmpty")}
         >

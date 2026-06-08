@@ -9,11 +9,14 @@ import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resourc
 import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   useAdminPricingRules,
   useAdminModels,
   useAdminProviders,
   useCreatePricingRule,
+  useUpdatePricingRule,
   useBulkImportPricingRules,
   useDeletePricingRule,
 } from "@/hooks/admin-queries";
@@ -33,7 +36,9 @@ import { adminErrorMessage } from "@/lib/admin-api";
 import { formatMoney } from "@/lib/admin-format";
 import {
   emptyPricingRuleForm,
+  pricingRuleFormFromRule,
   buildCreatePricingRuleBody,
+  buildUpdatePricingRuleBody,
   type PricingRuleFormState,
 } from "@/lib/admin-subscription-form";
 import type { PricingRule } from "@/lib/sdk-types";
@@ -50,13 +55,16 @@ function PricingContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-channel-pricing", []);
   const rules = useAdminPricingRules({ page: list.page, page_size: list.pageSize });
   const models = useAdminModels();
   const providers = useAdminProviders();
   const createMut = useCreatePricingRule();
+  const updateMut = useUpdatePricingRule();
   const bulkImportMut = useBulkImportPricingRules();
   const deleteMut = useDeletePricingRule();
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<PricingRule | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PricingRule | null>(null);
   const [importing, setImporting] = useState(false);
   const [importText, setImportText] = useState("");
@@ -95,43 +103,60 @@ function PricingContent() {
     }
   }
 
-  const modelOptions = (models.data?.data ?? []).map((m) => ({
+  const modelList = models.data?.data ?? [];
+  const providerList = providers.data?.data ?? [];
+  const modelMap = new Map(modelList.map((m) => [String(m.id), m.canonical_name ?? m.id]));
+  const providerMap = new Map(providerList.map((p) => [String(p.id), p.display_name ?? p.id]));
+  const modelOptions = modelList.map((m) => ({
     value: m.id,
     label: m.canonical_name ?? m.id,
   }));
-  const providerOptions = (providers.data?.data ?? []).map((p) => ({
+  const providerOptions = providerList.map((p) => ({
     value: p.id,
     label: p.display_name ?? p.id,
   }));
 
+  const priceFields: FieldConfig<PricingRuleFormState>[] = [
+    { name: "inputPricePerMillionTokens", label: t("adminPricing.inputPrice"), help: t("adminPricing.inputPriceHelp") },
+    { name: "outputPricePerMillionTokens", label: t("adminPricing.outputPrice"), help: t("adminPricing.outputPriceHelp") },
+    { name: "cacheReadPricePerMillionTokens", label: t("adminPricing.cacheReadPrice"), help: t("adminPricing.cacheReadPriceHelp") },
+    { name: "cacheWritePricePerMillionTokens", label: t("adminPricing.cacheWritePrice"), help: t("adminPricing.cacheWritePriceHelp") },
+    { name: "currency", label: t("adminCommon.currency") },
+    { name: "effectiveFromLocal", label: t("adminPricing.effectiveFrom"), help: t("adminPricing.effectiveFromHelp"), type: "datetime" },
+    { name: "effectiveToLocal", label: t("adminPricing.effectiveTo"), help: t("adminPricing.effectiveToHelp"), type: "datetime" },
+  ];
+
   const fields: FieldConfig<PricingRuleFormState>[] = [
     { name: "modelId", label: t("adminPricing.model"), type: "select", options: modelOptions },
     { name: "providerId", label: t("adminPricing.provider"), type: "select", options: providerOptions },
-    { name: "inputPricePerMillionTokens", label: t("adminPricing.inputPrice") },
-    { name: "outputPricePerMillionTokens", label: t("adminPricing.outputPrice") },
-    { name: "cacheReadPricePerMillionTokens", label: t("adminPricing.cacheReadPrice") },
-    { name: "cacheWritePricePerMillionTokens", label: t("adminPricing.cacheWritePrice") },
-    { name: "currency", label: t("adminCommon.currency") },
-    { name: "effectiveFromLocal", label: t("adminPricing.effectiveFrom"), type: "datetime" },
-    { name: "effectiveToLocal", label: t("adminPricing.effectiveTo"), type: "datetime" },
+    ...priceFields,
   ];
+
+  const editFields: FieldConfig<PricingRuleFormState>[] = priceFields;
 
   const columns: Column<PricingRule>[] = [
     {
       key: "model",
       header: t("adminPricing.model"),
-      sortValue: (r) => r.model_id,
+      pinned: true,
+      sortValue: (r) => modelMap.get(String(r.model_id)) ?? String(r.model_id),
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-primary">{r.model_id}</span>
+        <span className="text-2xs text-srapi-text-primary">
+          {modelMap.get(String(r.model_id)) ?? r.model_id}
+        </span>
       ),
     },
     {
       key: "provider",
       header: t("adminPricing.provider"),
       hideOnMobile: true,
-      sortValue: (r) => r.provider_id,
+      sortValue: (r) => providerMap.get(String(r.provider_id)) ?? String(r.provider_id),
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-secondary">{r.provider_id}</span>
+        <span className="text-2xs text-srapi-text-secondary">
+          {String(r.provider_id) === "0"
+            ? t("adminPricing.anyProvider")
+            : providerMap.get(String(r.provider_id)) ?? r.provider_id}
+        </span>
       ),
     },
     {
@@ -168,6 +193,10 @@ function PricingContent() {
             {rules.data ? (
               <ListCount total={rules.data.pagination?.total ?? rules.data.data.length} />
             ) : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="outline" size="sm" onClick={() => openImport(true)}>
               {t("adminPricing.bulkImport")}
             </Button>
@@ -180,6 +209,7 @@ function PricingContent() {
       <AdminListView
         query={rules}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(r) => r.id}
         emptyIcon={Tag}
         emptyTitle={t("adminPricing.emptyTitle")}
@@ -187,6 +217,7 @@ function PricingContent() {
         minWidth={520}
         rowActions={(r) => {
           const actions: RowAction[] = [
+            { label: t("common.edit"), onSelect: () => setEditing(r) },
             { label: t("common.delete"), destructive: true, onSelect: () => setDeleteTarget(r) },
           ];
           return <RowActionsMenu actions={actions} />;
@@ -212,6 +243,20 @@ function PricingContent() {
           submit={(body) => createMut.mutateAsync(body)}
           successMessage={t("feedback.created")}
           isPending={createMut.isPending}
+        />
+      ) : null}
+
+      {editing ? (
+        <ResourceFormDialog
+          open
+          onOpenChange={(open) => { if (!open) setEditing(null); }}
+          title={t("adminPricing.edit")}
+          fields={editFields}
+          initial={pricingRuleFormFromRule(editing)}
+          buildBody={buildUpdatePricingRuleBody}
+          submit={(body) => updateMut.mutateAsync({ id: editing.id, body })}
+          successMessage={t("feedback.updated")}
+          isPending={updateMut.isPending}
         />
       ) : null}
 

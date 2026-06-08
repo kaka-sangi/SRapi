@@ -11,9 +11,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 
-// Interval choices in seconds; 0 = off. Kept short so live dashboards stay fresh
-// without hammering the API.
-const OPTIONS = [0, 15, 30, 60] as const;
+const OPTIONS = [0, 5, 10, 15, 30, 60] as const;
 
 function readStored(storageKey: string | undefined, fallback: number): number {
   if (!storageKey || typeof window === "undefined") return fallback;
@@ -23,13 +21,11 @@ function readStored(storageKey: string | undefined, fallback: number): number {
   return (OPTIONS as readonly number[]).includes(n) ? n : fallback;
 }
 
-/**
- * AutoRefreshControl — a manual refresh button plus an interval picker that
- * re-runs `onRefresh` on a visible countdown. It owns the timer (so the
- * countdown is accurate) and pauses while the tab is hidden. Pages that adopt
- * it should drop any hardcoded react-query `refetchInterval` so polling has a
- * single source of truth.
- */
+function hasOpenOverlay(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.querySelector("[role='dialog'][data-state='open'], [role='alertdialog'][data-state='open'], [data-radix-popper-content-wrapper]") !== null;
+}
+
 export function AutoRefreshControl({
   onRefresh,
   isRefreshing,
@@ -46,9 +42,7 @@ export function AutoRefreshControl({
   const { t } = useLanguage();
   const [intervalSec, setIntervalSec] = useState(() => readStored(storageKey, defaultSec));
   const [secondsLeft, setSecondsLeft] = useState(intervalSec);
-  // Keep the latest onRefresh in a ref so the ticking interval doesn't reset on
-  // every parent render (pages pass an inline arrow). Updated via effect, never
-  // mutated during render.
+  const [paused, setPaused] = useState(false);
   const onRefreshRef = useRef(onRefresh);
   useEffect(() => {
     onRefreshRef.current = onRefresh;
@@ -56,13 +50,21 @@ export function AutoRefreshControl({
 
   const fire = useCallback(() => {
     void onRefreshRef.current();
-    setSecondsLeft(intervalSec); // reset the countdown after a manual refresh
+    setSecondsLeft(intervalSec);
   }, [intervalSec]);
 
   useEffect(() => {
     if (!intervalSec) return;
     const id = window.setInterval(() => {
-      if (typeof document !== "undefined" && document.hidden) return; // pause when hidden
+      if (typeof document !== "undefined" && document.hidden) {
+        setPaused(true);
+        return;
+      }
+      if (hasOpenOverlay()) {
+        setPaused(true);
+        return;
+      }
+      setPaused(false);
       setSecondsLeft((s) => {
         if (s <= 1) {
           void onRefreshRef.current();
@@ -83,6 +85,7 @@ export function AutoRefreshControl({
   }
 
   const optionLabel = (sec: number) => (sec === 0 ? t("common.off") : `${sec}s`);
+  const progress = intervalSec ? secondsLeft / intervalSec : 0;
 
   return (
     <div className={cn("flex items-center gap-1.5", className)}>
@@ -100,14 +103,26 @@ export function AutoRefreshControl({
             type="button"
             aria-label={t("common.autoRefresh")}
             className={cn(
-              "flex h-8 items-center gap-1.5 rounded-lg border px-2.5 font-mono text-2xs transition-colors",
+              "relative flex h-8 items-center gap-1.5 overflow-hidden rounded-lg border px-2.5 font-mono text-2xs transition-colors",
               intervalSec
                 ? "border-srapi-primary/30 bg-srapi-primary/5 text-srapi-primary"
                 : "border-srapi-border bg-srapi-card text-srapi-text-tertiary hover:text-srapi-text-secondary",
             )}
           >
-            <span className="tabular">{intervalSec ? `${secondsLeft}s` : t("common.off")}</span>
-            <ChevronDown className="size-3" />
+            {intervalSec ? (
+              <span
+                className="absolute inset-y-0 left-0 bg-srapi-primary/10 transition-[width] duration-1000 ease-linear"
+                style={{ width: `${progress * 100}%` }}
+              />
+            ) : null}
+            <span className="relative tabular">
+              {intervalSec
+                ? paused
+                  ? `⏸ ${secondsLeft}s`
+                  : `${secondsLeft}s`
+                : t("common.off")}
+            </span>
+            <ChevronDown className="relative size-3" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-[8rem]">

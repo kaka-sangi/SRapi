@@ -22,6 +22,7 @@ import {
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -184,11 +185,5 @@ function ApiKeysContent() {
 }
 
 function TableSkeleton() {
-  return (
-    <div className="space-y-2 p-5">
-      <Skeleton className="h-9" />
-      <Skeleton className="h-9" />
-      <Skeleton className="h-9 w-2/3" />
-    </div>
-  );
+  return <DialogListSkeleton rows={3} className="p-5" />;
 }

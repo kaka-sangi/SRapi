@@ -1056,6 +1056,16 @@ export type CreatePricingRuleRequest = {
     effective_to?: string | null;
 };
 
+export type UpdatePricingRuleRequest = {
+    input_price_per_million_tokens?: string;
+    output_price_per_million_tokens?: string;
+    cache_read_price_per_million_tokens?: string;
+    cache_write_price_per_million_tokens?: string;
+    currency?: string;
+    effective_from?: string | null;
+    effective_to?: string | null;
+};
+
 export type PricingRuleResponse = {
     data: PricingRule;
     request_id: RequestId;
@@ -1279,7 +1289,7 @@ export type RuntimeClass = 'api_key' | 'oauth_refresh' | 'oauth_device_code' | '
 /**
  * Upstream protocol/platform family a provider preset belongs to.
  */
-export type PlatformFamily = 'openai_compatible' | 'anthropic_compatible' | 'bedrock_anthropic' | 'reverse_proxy_antigravity' | 'rerank_compatible' | 'codex_cli';
+export type PlatformFamily = 'openai_compatible' | 'anthropic_compatible' | 'bedrock_anthropic' | 'reverse_proxy_antigravity' | 'rerank_compatible';
 
 export type ProviderAccountStatus = 'active' | 'disabled' | 'needs_reauth' | 'suspended' | 'dead' | 'archived';
 
@@ -11646,6 +11656,49 @@ export type DeleteAdminPricingRuleResponses = {
 };
 
 export type DeleteAdminPricingRuleResponse = DeleteAdminPricingRuleResponses[keyof DeleteAdminPricingRuleResponses];
+
+export type UpdateAdminPricingRuleData = {
+    body: UpdatePricingRuleRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/pricing-rules/{id}';
+};
+
+export type UpdateAdminPricingRuleErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminPricingRuleError = UpdateAdminPricingRuleErrors[keyof UpdateAdminPricingRuleErrors];
+
+export type UpdateAdminPricingRuleResponses = {
+    /**
+     * Pricing rule updated.
+     */
+    200: PricingRuleResponse;
+};
+
+export type UpdateAdminPricingRuleResponse = UpdateAdminPricingRuleResponses[keyof UpdateAdminPricingRuleResponses];
 
 export type BulkImportAdminPricingRulesData = {
     body: BulkPricingRuleImportRequest | Array<CreatePricingRuleRequest>;

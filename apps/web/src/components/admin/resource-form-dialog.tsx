@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { LabelWithHelp } from "@/components/ui/help-tooltip";
 import {
   Select,
   SelectTrigger,
@@ -55,6 +56,8 @@ export interface FieldConfig<TDraft> {
   type?: FieldType;
   placeholder?: string;
   hint?: string;
+  /** Contextual help shown in a tooltip icon next to the label */
+  help?: string;
   /** options for select / multiselect / combobox fields */
   options?: { value: string; label: string }[];
   /** combobox/tags: let the admin commit a typed value not in `options` */
@@ -302,23 +305,23 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
   );
 }
 
-/** Inline field footer: a red error takes priority over the muted hint. */
+/** Inline field footer: shows error AND hint together so context isn't lost. */
 function FieldMessage({ id, error, hint }: { id: string; error?: string; hint?: string }) {
-  if (error) {
-    return (
-      <p id={id} role="alert" className="mt-1 text-2xs text-srapi-error">
-        {error}
-      </p>
-    );
-  }
-  if (hint) {
-    return (
-      <p id={id} className="mt-1 text-2xs text-srapi-text-tertiary">
-        {hint}
-      </p>
-    );
-  }
-  return null;
+  if (!error && !hint) return null;
+  return (
+    <div id={id} className="mt-1 space-y-0.5">
+      {error && (
+        <p role="alert" className="text-2xs text-srapi-error">
+          {error}
+        </p>
+      )}
+      {hint && (
+        <p className={error ? "text-2xs text-srapi-text-tertiary/60" : "text-2xs text-srapi-text-tertiary"}>
+          {hint}
+        </p>
+      )}
+    </div>
+  );
 }
 
 function FieldRow<TDraft extends object>({
@@ -343,13 +346,29 @@ function FieldRow<TDraft extends object>({
   const invalid = error ? true : undefined;
   const describedBy = error || field.hint ? msgId : undefined;
 
+  const requiredMark = field.required ? (
+    <span className="ml-0.5 text-srapi-error" aria-hidden="true">*</span>
+  ) : null;
+
+  const FieldLabel = field.help
+    ? ({ htmlFor: hf, children: ch }: { htmlFor?: string; children: React.ReactNode }) => (
+        <LabelWithHelp htmlFor={hf} help={field.help}>
+          {ch}{requiredMark}
+        </LabelWithHelp>
+      )
+    : ({ htmlFor: hf, children: ch, ...rest }: { htmlFor?: string; children: React.ReactNode; className?: string }) => (
+        <Label htmlFor={hf} {...rest}>
+          {ch}{requiredMark}
+        </Label>
+      );
+
   if (type === "switch") {
     return (
       <div className="flex items-center justify-between gap-4">
         <div>
-          <Label htmlFor={id} className="mb-0">
+          <FieldLabel htmlFor={id}>
             {field.label}
-          </Label>
+          </FieldLabel>
           <FieldMessage id={msgId} error={error} hint={field.hint} />
         </div>
         <Switch
@@ -369,7 +388,7 @@ function FieldRow<TDraft extends object>({
         : {};
     return (
       <div>
-        <Label>{field.label}</Label>
+        <FieldLabel>{field.label}</FieldLabel>
         <div className="mt-1.5">
           <KeyValueEditor
             value={object}
@@ -389,7 +408,7 @@ function FieldRow<TDraft extends object>({
       onChange(selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]);
     return (
       <div>
-        <Label>{field.label}</Label>
+        <FieldLabel>{field.label}</FieldLabel>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {(field.options ?? []).map((opt) => {
             const on = selected.includes(opt.value);
@@ -421,7 +440,7 @@ function FieldRow<TDraft extends object>({
     const tags = Array.isArray(value) ? (value as string[]) : [];
     return (
       <div>
-        <Label htmlFor={id}>{field.label}</Label>
+        <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
         <div className="mt-1.5">
           <TagInput
             id={id}
@@ -440,7 +459,7 @@ function FieldRow<TDraft extends object>({
     const selected = Array.isArray(value) ? (value as string[]) : [];
     return (
       <div>
-        <Label htmlFor={id}>{field.label}</Label>
+        <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
         <div className="mt-1.5">
           <MultiSelect
             id={id}
@@ -463,7 +482,7 @@ function FieldRow<TDraft extends object>({
   if (type === "select") {
     return (
       <div>
-        <Label htmlFor={id}>{field.label}</Label>
+        <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
         <Select value={asString} onValueChange={(next) => onChange(next)} disabled={disabled}>
           <SelectTrigger id={id} aria-invalid={invalid} aria-describedby={describedBy}>
             <SelectValue placeholder={field.placeholder} />
@@ -484,7 +503,7 @@ function FieldRow<TDraft extends object>({
   if (type === "textarea" || type === "json") {
     return (
       <div>
-        <Label htmlFor={id}>{field.label}</Label>
+        <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
         <Textarea
           id={id}
           placeholder={field.placeholder}
@@ -512,7 +531,7 @@ function FieldRow<TDraft extends object>({
 
   return (
     <div>
-      <Label htmlFor={id}>{field.label}</Label>
+      <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
       <Input
         id={id}
         type={inputType}

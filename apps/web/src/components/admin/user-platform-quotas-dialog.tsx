@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import {
   useUserPlatformQuotas,
   useUpsertUserPlatformQuota,
@@ -107,7 +108,7 @@ export function UserPlatformQuotasDialog({
           <DialogDescription>{t("adminUserQuota.subtitle", { user: userLabel })}</DialogDescription>
         </DialogHeader>
         <div className="mt-2 max-h-[64vh] space-y-4 overflow-y-auto pr-1">
-          <PageQueryState query={query} skeleton={<Skeleton className="h-20" />}>
+          <PageQueryState query={query} skeleton={<DialogListSkeleton rows={2} />}>
             {(list) =>
               list.data.length === 0 ? (
                 <p className="text-sm text-srapi-text-tertiary">{t("adminUserQuota.empty")}</p>

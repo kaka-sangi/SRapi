@@ -8,6 +8,8 @@ import { AdminListView, ListCount, type Column } from "@/components/admin/admin-
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   Dialog,
   DialogContent,
@@ -72,6 +74,7 @@ function GroupsContent() {
   const { t } = useLanguage();
   const groups = useAdminGroups();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-groups", []);
   const [formTarget, setFormTarget] = useState<AccountGroup | "new" | null>(null);
   const [membersTarget, setMembersTarget] = useState<AccountGroup | null>(null);
   const [rateLimitTarget, setRateLimitTarget] = useState<AccountGroup | null>(null);
@@ -88,6 +91,7 @@ function GroupsContent() {
     {
       key: "name",
       header: t("adminGroups.name"),
+      pinned: true,
       sortValue: (g) => g.name,
       render: (g) => <span className="text-srapi-text-primary">{g.name}</span>,
     },
@@ -132,6 +136,10 @@ function GroupsContent() {
             {groups.data ? (
               <ListCount total={groups.data.pagination?.total ?? groups.data.data.length} />
             ) : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminGroups.create")}
             </Button>
@@ -141,6 +149,7 @@ function GroupsContent() {
       <AdminListView
         query={groups}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(g) => g.id}
         emptyIcon={Boxes}
         emptyTitle={t("adminGroups.emptyTitle")}

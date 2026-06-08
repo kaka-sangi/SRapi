@@ -12,6 +12,8 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import {
   usePayloadRules,
@@ -60,6 +62,7 @@ export default function AdminPayloadRulesPage() {
 function PayloadRulesContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-payload-rules", []);
   const all = usePayloadRules();
   const { query, total } = useClientPagedList(all, list, { match: ruleMatch, compare: ruleCompare });
 
@@ -95,7 +98,7 @@ function PayloadRulesContent() {
       placeholder: "openai-compatible",
       hint: t("adminPayloadRules.matchProtocolHint"),
     },
-    { name: "priority", label: t("adminPayloadRules.priority"), type: "number" },
+    { name: "priority", label: t("adminPayloadRules.priority"), help: t("adminPayloadRules.priorityHelp"), type: "number" },
     { name: "enabled", label: t("adminPayloadRules.enabled"), type: "switch" },
     {
       name: "params",
@@ -109,6 +112,7 @@ function PayloadRulesContent() {
     {
       key: "name",
       header: t("adminPayloadRules.name"),
+      pinned: true,
       render: (r) => <span className="text-srapi-text-primary">{r.name}</span>,
     },
     {
@@ -163,6 +167,10 @@ function PayloadRulesContent() {
         actions={
           <div className="flex items-center gap-3">
             {all.data ? <ListCount total={total} /> : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminPayloadRules.create")}
             </Button>
@@ -172,6 +180,7 @@ function PayloadRulesContent() {
       <AdminListView
         query={query}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(r) => String(r.id)}
         emptyIcon={SlidersHorizontal}
         emptyTitle={t("adminPayloadRules.emptyTitle")}

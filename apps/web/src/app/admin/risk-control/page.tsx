@@ -7,11 +7,14 @@ import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
 import { useRiskStatus, useRiskLogs, useRiskConfig, useUpdateRiskConfig } from "@/hooks/admin-queries";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useLanguage } from "@/context/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { formatDateTime, formatInteger } from "@/lib/admin-format";
 import {
@@ -32,6 +35,7 @@ export default function AdminRiskControlPage() {
 
 function RiskContent() {
   const { t, language } = useLanguage();
+  const colVis = useColumnVisibility("admin-risk-control", []);
   const status = useRiskStatus();
   const logs = useRiskLogs();
   const config = useRiskConfig();
@@ -50,9 +54,9 @@ function RiskContent() {
       ],
       hint: t("adminRisk.modeHint"),
     },
-    { name: "maxFailedRequestsPerMinute", label: t("adminRisk.maxFailed"), type: "number" },
-    { name: "maxCostPerDay", label: t("adminRisk.maxCostPerDay") },
-    { name: "cooldownSeconds", label: t("adminRisk.cooldown"), type: "number" },
+    { name: "maxFailedRequestsPerMinute", label: t("adminRisk.maxFailed"), help: t("adminRisk.maxFailedHelp"), type: "number" },
+    { name: "maxCostPerDay", label: t("adminRisk.maxCostPerDay"), help: t("adminRisk.maxCostPerDayHelp") },
+    { name: "cooldownSeconds", label: t("adminRisk.cooldown"), help: t("adminRisk.cooldownHelp"), type: "number" },
     {
       name: "blockedCountries",
       label: t("adminRisk.blockedCountries"),
@@ -78,6 +82,7 @@ function RiskContent() {
     {
       key: "time",
       header: t("adminRisk.time"),
+      pinned: true,
       render: (r) => (
         <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
           {formatDateTime(r.created_at)}
@@ -109,20 +114,32 @@ function RiskContent() {
         title={t("adminRisk.title")}
         description={t("adminRisk.subtitle")}
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!config.data}
-            onClick={() => setEditing(true)}
-          >
-            {t("adminRisk.editConfig")}
-          </Button>
+          <div className="flex items-center gap-3">
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!config.data}
+              onClick={() => setEditing(true)}
+            >
+              {t("adminRisk.editConfig")}
+            </Button>
+          </div>
         }
       />
 
       {/* current risk gauge */}
       {status.isLoading ? (
-        <Skeleton className="h-24 rounded-xl" />
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-x-12 gap-y-4">
+            <DialogListSkeleton rows={1} />
+            <Skeleton className="h-8 w-12" />
+            <Skeleton className="h-8 w-12" />
+          </CardContent>
+        </Card>
       ) : status.data ? (
         <Card>
           <CardContent className="flex flex-wrap items-center gap-x-12 gap-y-4">
@@ -165,6 +182,7 @@ function RiskContent() {
       <AdminListView
         query={logs}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(r) => r.id}
         emptyIcon={ShieldAlert}
         emptyTitle={t("adminRisk.emptyTitle")}

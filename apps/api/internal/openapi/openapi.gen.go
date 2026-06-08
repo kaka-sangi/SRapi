@@ -4959,6 +4959,17 @@ type CreatePricingRuleRequest struct {
 	ProviderId                      Id         `json:"provider_id"`
 }
 
+// UpdatePricingRuleRequest defines model for UpdatePricingRuleRequest.
+type UpdatePricingRuleRequest struct {
+	CacheReadPricePerMillionTokens  *string    `json:"cache_read_price_per_million_tokens,omitempty"`
+	CacheWritePricePerMillionTokens *string    `json:"cache_write_price_per_million_tokens,omitempty"`
+	Currency                        *string    `json:"currency,omitempty"`
+	EffectiveFrom                   *time.Time `json:"effective_from,omitempty"`
+	EffectiveTo                     *time.Time `json:"effective_to,omitempty"`
+	InputPricePerMillionTokens      *string    `json:"input_price_per_million_tokens,omitempty"`
+	OutputPricePerMillionTokens     *string    `json:"output_price_per_million_tokens,omitempty"`
+}
+
 // CreatePromoCodeRequest defines model for CreatePromoCodeRequest.
 type CreatePromoCodeRequest struct {
 	Code          string            `json:"code"`

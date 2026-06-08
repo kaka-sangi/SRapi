@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { useApiKeyUsage } from "@/hooks/queries";
 import { useAdminApiKeyUsage } from "@/hooks/admin-queries";
@@ -73,7 +74,7 @@ export function ApiKeyUsageDialog({
         </div>
 
         <div className="mt-3 max-h-[60vh] overflow-y-auto">
-          <PageQueryState query={query} skeleton={<Skeleton className="h-40 rounded-xl" />}>
+          <PageQueryState query={query} skeleton={<DialogListSkeleton rows={5} />}>
             {(usage) => <UsageBody usage={usage} />}
           </PageQueryState>
         </div>

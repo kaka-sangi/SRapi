@@ -17,6 +17,8 @@ import {
   useAdminUsers,
 } from "@/hooks/admin-queries";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { useLanguage } from "@/context/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +27,7 @@ import { TrendChart } from "@/components/charts/trend-chart";
 import { BarSeries, type BarDatum } from "@/components/charts/bar-series";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BarChartSkeleton } from "@/components/charts/chart-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatMoney, formatDateTime, formatInteger } from "@/lib/admin-format";
 import type { UsageLog } from "@/lib/sdk-types";
@@ -59,6 +62,7 @@ function formatLatency(ms: number): string {
 function UsageContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-usage", ["latency"]);
   const [cleanupOpen, setCleanupOpen] = useState(false);
   const modelFilter = list.filters.model || undefined;
   const userFilter = list.filters.user || undefined;
@@ -93,6 +97,7 @@ function UsageContent() {
     {
       key: "time",
       header: t("adminUsage.time"),
+      pinned: true,
       render: (u) => (
         <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
           {formatDateTime(u.created_at)}
@@ -180,6 +185,10 @@ function UsageContent() {
         actions={
           <div className="flex items-center gap-3">
             {usage.data ? <ListCount total={total} /> : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="outline" size="sm" onClick={() => setCleanupOpen(true)}>
               <Trash2 />
               {t("adminUsageCleanup.action")}
@@ -220,6 +229,7 @@ function UsageContent() {
       <AdminListView
         query={usage}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(u) => u.id ?? u.request_id ?? ""}
         emptyIcon={BarChart3}
         emptyTitle={t("adminUsage.emptyTitle")}
@@ -279,11 +289,7 @@ function UsageBreakdown() {
         <PageQueryState
           query={aggregates}
           skeleton={
-            <div className="space-y-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-2.5 w-full rounded-full" />
-              ))}
-            </div>
+            <BarChartSkeleton rows={6} />
           }
         >
           {(result) => {

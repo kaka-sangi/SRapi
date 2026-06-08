@@ -8,6 +8,8 @@ import { AdminListView, ListCount, type Column } from "@/components/admin/admin-
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -46,6 +48,7 @@ export default function AdminPromoCodesPage() {
 function PromoContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-promo-codes", []);
   const statusFilter = (list.filters.status as PromoCode["status"]) || undefined;
   const promos = useAdminPromoCodes({
     page: list.page,
@@ -86,6 +89,7 @@ function PromoContent() {
     {
       key: "code",
       header: t("adminPromos.code"),
+      pinned: true,
       sortValue: (p) => p.code,
       render: (p) => <span className="font-mono text-srapi-text-primary">{p.code}</span>,
     },
@@ -128,6 +132,10 @@ function PromoContent() {
             {promos.data ? (
               <ListCount total={promos.data.pagination?.total ?? promos.data.data.length} />
             ) : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminPromos.createPromo")}
             </Button>
@@ -137,6 +145,7 @@ function PromoContent() {
       <AdminListView
         query={promos}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(p) => p.id}
         emptyIcon={Ticket}
         emptyTitle={t("adminPromos.emptyPromo")}

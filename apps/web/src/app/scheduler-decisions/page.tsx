@@ -13,6 +13,7 @@ import { QuietBadge } from "@/components/ui/quiet-badge";
 import { SchedulerDecisionStream } from "@/components/ui/scheduler-decision-stream";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { decisionToLines } from "@/lib/format-decision";
 import type { SchedulerDecisionSummary } from "@/lib/srapi-types";
 
@@ -46,7 +47,7 @@ function SchedulerContent() {
       <PageQueryState
         query={decisions}
         isEmpty={(d) => d.length === 0}
-        skeleton={<Skeleton className="h-96 rounded-xl" />}
+        skeleton={<DialogListSkeleton rows={10} />}
       >
         {(data) =>
           data.length === 0 ? (

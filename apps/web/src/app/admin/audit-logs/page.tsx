@@ -15,6 +15,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import { useAuditLogs } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -53,6 +55,7 @@ export default function AdminAuditLogsPage() {
 function AuditLogsContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-audit-logs", []);
   const all = useAuditLogs();
   const { query, total } = useClientPagedList(all, list, {
     match: auditMatch,
@@ -69,6 +72,7 @@ function AuditLogsContent() {
     {
       key: "time",
       header: t("adminAudit.time"),
+      pinned: true,
       render: (a) => (
         <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
           {formatDateTime(a.created_at)}
@@ -114,11 +118,20 @@ function AuditLogsContent() {
         eyebrow={t("nav.sectionAdmin")}
         title={t("adminAudit.title")}
         description={t("adminAudit.subtitle")}
-        actions={all.data ? <ListCount total={total} /> : undefined}
+        actions={
+          <div className="flex items-center gap-3">
+            {all.data ? <ListCount total={total} /> : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
+          </div>
+        }
       />
       <AdminListView
         query={query}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(a) => a.id}
         emptyIcon={ScrollText}
         emptyTitle={t("adminAudit.emptyTitle")}

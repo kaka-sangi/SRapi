@@ -682,6 +682,60 @@ func (s *Server) handleCreateAdminPricingRule(w http.ResponseWriter, r *http.Req
 	})
 }
 
+func (s *Server) handleUpdateAdminPricingRule(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	ruleID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || ruleID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid pricing rule id", requestID)
+		return
+	}
+	var beforeSnapshot map[string]any
+	if existing, findErr := s.runtime.subscriptions.FindPricingRuleByID(r.Context(), ruleID); findErr == nil {
+		beforeSnapshot = pricingRuleAuditSnapshot(existing)
+	}
+	var body apiopenapi.UpdatePricingRuleRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid pricing rule request", requestID)
+		return
+	}
+	req := subscriptioncontract.UpdatePricingRuleRequest{
+		InputPricePerMillionTokens:      body.InputPricePerMillionTokens,
+		OutputPricePerMillionTokens:     body.OutputPricePerMillionTokens,
+		CacheReadPricePerMillionTokens:  body.CacheReadPricePerMillionTokens,
+		CacheWritePricePerMillionTokens: body.CacheWritePricePerMillionTokens,
+		Currency:                        body.Currency,
+	}
+	if body.EffectiveFrom != nil {
+		req.EffectiveFrom = &body.EffectiveFrom
+	}
+	if body.EffectiveTo != nil {
+		req.EffectiveTo = &body.EffectiveTo
+	}
+	rule, err := s.runtime.subscriptions.UpdatePricingRule(r.Context(), ruleID, req)
+	if err != nil {
+		if errors.Is(err, subscriptioncontract.ErrNotFound) {
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "pricing rule not found", requestID)
+			return
+		}
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid pricing rule request", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "pricing_rule.update", "pricing_rule", strconv.Itoa(rule.ID), beforeSnapshot, pricingRuleAuditSnapshot(rule)))
+	writeJSONAny(w, http.StatusOK, apiopenapi.PricingRuleResponse{
+		Data:      toAPIPricingRule(rule),
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleDeleteAdminPricingRule(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)

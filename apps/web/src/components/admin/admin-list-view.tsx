@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/cn";
 import type { AdminListResult } from "@/lib/admin-api";
 import type { SortState } from "@/hooks/use-admin-list";
+import type { ColumnVisibility } from "@/hooks/use-column-visibility";
 
 export interface Column<T> {
   key: string;
@@ -34,6 +35,8 @@ export interface Column<T> {
   className?: string;
   /** Provide a comparable value to enable click-to-sort on this column. */
   sortValue?: (row: T) => string | number | null | undefined;
+  /** If true, column is always visible and cannot be hidden by the user. */
+  pinned?: boolean;
 }
 
 export interface ListSelection {
@@ -85,6 +88,7 @@ export function AdminListView<T>({
   noResultsTitle,
   noResultsBody,
   onClearFilters,
+  columnVisibility,
 }: {
   query: UseQueryResult<AdminListResult<T>>;
   columns: Column<T>[];
@@ -92,26 +96,26 @@ export function AdminListView<T>({
   emptyIcon?: LucideIcon;
   emptyTitle: string;
   emptyBody?: string;
-  /** Optional onboarding CTA rendered inside the (unfiltered) empty state. */
   emptyAction?: React.ReactNode;
   minWidth?: number;
   rowActions?: (row: T) => React.ReactNode;
   dimRow?: (row: T) => boolean;
-  /** Toolbar slot (search box + filter selects). Stays visible across states. */
   toolbar?: React.ReactNode;
-  /** Current client-side sort; pair with sortable columns + `onSort`. */
   sort?: SortState;
   onSort?: (key: string) => void;
   selection?: ListSelection;
   pagination?: ListPagination;
-  /** When the empty result is due to an active search/filter, show neutral copy. */
   isFiltered?: boolean;
   noResultsTitle?: string;
   noResultsBody?: string;
-  /** Pass `list.clearFilters` to offer a one-click reset from the no-results state. */
   onClearFilters?: () => void;
+  columnVisibility?: ColumnVisibility;
 }) {
   const { t } = useLanguage();
+
+  const visibleColumns = columnVisibility
+    ? columns.filter((c) => c.pinned || columnVisibility.isVisible(c.key))
+    : columns;
 
   return (
     <Card className="anim-rise-sm overflow-hidden">
@@ -152,8 +156,8 @@ export function AdminListView<T>({
             )
           ) : (
             <ListTable
-              rows={sortRows(data.data, columns, sort)}
-              columns={columns}
+              rows={sortRows(data.data, visibleColumns, sort)}
+              columns={visibleColumns}
               getRowId={getRowId}
               minWidth={minWidth}
               rowActions={rowActions}
@@ -349,13 +353,23 @@ function BulkBar({
 
 function ListSkeleton() {
   return (
-    <div className="min-h-[55vh] space-y-2 p-5">
-      <Skeleton className="h-9" />
-      <Skeleton className="h-9" />
-      <Skeleton className="h-9" />
-      <Skeleton className="h-9 w-2/3" />
-      <Skeleton className="h-9 w-5/6" />
-      <Skeleton className="h-9 w-1/2" />
+    <div className="min-h-[55vh] p-0">
+      {/* header row */}
+      <div className="flex gap-4 border-b border-srapi-border px-4 py-3">
+        <Skeleton className="h-3.5 w-28" />
+        <Skeleton className="hidden h-3.5 w-24 sm:block" />
+        <Skeleton className="hidden h-3.5 w-20 sm:block" />
+        <Skeleton className="ml-auto h-3.5 w-14" />
+      </div>
+      {/* data rows */}
+      {["w-36", "w-28", "w-32", "w-24", "w-30", "w-20"].map((w, i) => (
+        <div key={i} className="flex items-center gap-4 border-b border-srapi-border/50 px-4 py-3.5">
+          <Skeleton className={`h-4 ${w}`} />
+          <Skeleton className="hidden h-4 w-20 sm:block" />
+          <Skeleton className="hidden h-4 w-16 sm:block" />
+          <Skeleton className="ml-auto h-4 w-10" />
+        </div>
+      ))}
     </div>
   );
 }

@@ -8,6 +8,8 @@ import { AdminListView, ListCount, type Column } from "@/components/admin/admin-
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   ResourceFormDialog,
   type FieldConfig,
@@ -48,6 +50,7 @@ export default function AdminAnnouncementsPage() {
 function AnnouncementsContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-announcements", []);
   const statusFilter = (list.filters.status as Announcement["status"]) || undefined;
   const items = useAdminAnnouncements({
     page: list.page,
@@ -111,6 +114,7 @@ function AnnouncementsContent() {
     {
       key: "title",
       header: t("adminAnnouncements.headline"),
+      pinned: true,
       sortValue: (a) => a.title,
       render: (a) => <span className="text-srapi-text-primary">{a.title}</span>,
     },
@@ -142,6 +146,10 @@ function AnnouncementsContent() {
             {items.data ? (
               <ListCount total={items.data.pagination?.total ?? items.data.data.length} />
             ) : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminAnnouncements.create")}
             </Button>
@@ -151,6 +159,7 @@ function AnnouncementsContent() {
       <AdminListView
         query={items}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(a) => a.id}
         emptyIcon={Megaphone}
         emptyTitle={t("adminAnnouncements.emptyTitle")}

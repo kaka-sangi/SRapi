@@ -8,7 +8,9 @@ import { AdminListView, ListCount, type Column } from "@/components/admin/admin-
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { UserPlatformQuotasDialog } from "@/components/admin/user-platform-quotas-dialog";
 import { ListToolbar, SearchInput, FilterSelect } from "@/components/admin/list-toolbar";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -57,6 +59,7 @@ function UsersContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-users", ["created_at", "updated_at"]);
   const statusFilter = list.filters.status as UserStatus | undefined;
   const users = useAdminUsers({
     page: list.page,
@@ -127,6 +130,7 @@ function UsersContent() {
     {
       key: "email",
       header: t("adminUsers.email"),
+      pinned: true,
       sortValue: (u) => u.email,
       render: (u) => (
         <div className="min-w-0">
@@ -181,6 +185,7 @@ function UsersContent() {
       <AdminListView
         query={users}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(u) => u.id}
         emptyIcon={Users}
         emptyTitle={t("adminUsers.emptyTitle")}
@@ -207,6 +212,10 @@ function UsersContent() {
               onChange={(v) => list.setFilter("status", v)}
               options={enumOptions(USER_STATUSES)}
               allLabel={t("adminCommon.allStatuses")}
+            />
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
             />
           </ListToolbar>
         }

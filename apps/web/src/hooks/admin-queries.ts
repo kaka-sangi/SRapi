@@ -1195,6 +1195,13 @@ export function useCreatePricingRule() {
     ["admin", "pricing-rules"],
   );
 }
+export function useUpdatePricingRule() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updatePricingRule> }) =>
+      adminApi.updatePricingRule(vars.id, vars.body),
+    ["admin", "pricing-rules"],
+  );
+}
 export function useBulkImportPricingRules() {
   return useAdminMutation(
     (body: P<typeof adminApi.bulkImportPricingRules>) => adminApi.bulkImportPricingRules(body),

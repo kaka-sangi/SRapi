@@ -242,6 +242,9 @@ textarea:focus-visible,
 .srapi-anim-toast[data-swipe="cancel"] { transform: translateX(0); transition: transform 200ms ease-out }
 .srapi-anim-toast[data-swipe="end"] { animation: srapi-toast-out 200ms ease-out }
 
+/* Toast progress bar countdown */
+@keyframes toast-progress { from { transform: scaleX(1) } to { transform: scaleX(0) } }
+
 /* 小r 宠物：浮层从右下角弹出 / 收回；待机呼吸 + 眨眼 */
 @keyframes srapi-pet-in {
   from { opacity: 0; transform: translateY(14px) scale(0.82) }

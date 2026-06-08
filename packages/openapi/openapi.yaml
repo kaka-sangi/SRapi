@@ -6029,6 +6029,49 @@ paths:
           $ref: "#/components/responses/StandardError"
 
   /api/v1/admin/pricing-rules/{id}:
+    patch:
+      tags:
+        - AdminSubscriptions
+      operationId: updateAdminPricingRule
+      summary: Update a pricing rule.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePricingRuleRequest"
+      responses:
+        "200":
+          description: Pricing rule updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingRuleResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
     delete:
       tags:
         - AdminSubscriptions
@@ -16242,6 +16285,35 @@ components:
           $ref: "#/components/schemas/Id"
         provider_id:
           $ref: "#/components/schemas/Id"
+        input_price_per_million_tokens:
+          type: string
+          example: "1.25000000"
+        output_price_per_million_tokens:
+          type: string
+          example: "2.50000000"
+        cache_read_price_per_million_tokens:
+          type: string
+          example: "0.10000000"
+        cache_write_price_per_million_tokens:
+          type: string
+          example: "0.20000000"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 12
+          example: USD
+        effective_from:
+          type: string
+          format: date-time
+          nullable: true
+        effective_to:
+          type: string
+          format: date-time
+          nullable: true
+
+    UpdatePricingRuleRequest:
+      type: object
+      properties:
         input_price_per_million_tokens:
           type: string
           example: "1.25000000"

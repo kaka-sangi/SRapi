@@ -4,6 +4,8 @@ import { UserPlus } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useAffiliateInvites } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime } from "@/lib/admin-format";
@@ -20,11 +22,13 @@ export default function AffiliateInvitesPage() {
 function InvitesContent() {
   const { t } = useLanguage();
   const invites = useAffiliateInvites();
+  const colVis = useColumnVisibility("admin-affiliate-invites", []);
 
   const columns: Column<AffiliateInviteRecord>[] = [
     {
       key: "inviter",
       header: t("adminAffiliates.inviter"),
+      pinned: true,
       render: (r) => (
         <span className="font-mono text-2xs text-srapi-text-secondary">{r.inviter_user_id}</span>
       ),
@@ -57,14 +61,21 @@ function InvitesContent() {
         title={t("adminAffiliates.invitesTitle")}
         description={t("adminAffiliates.invitesSubtitle")}
         actions={
-          invites.data ? (
-            <ListCount total={invites.data.pagination?.total ?? invites.data.data.length} />
-          ) : undefined
+          <div className="flex items-center gap-3">
+            {invites.data ? (
+              <ListCount total={invites.data.pagination?.total ?? invites.data.data.length} />
+            ) : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
+          </div>
         }
       />
       <AdminListView
         query={invites}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(r) => r.id}
         emptyIcon={UserPlus}
         emptyTitle={t("adminAffiliates.emptyTitle")}

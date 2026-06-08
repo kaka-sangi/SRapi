@@ -12,6 +12,8 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import {
   useUserAttributeDefinitions,
@@ -53,6 +55,7 @@ export default function AdminUserAttributesPage() {
 function UserAttributesContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-user-attributes", []);
   const all = useUserAttributeDefinitions();
   const { query, total } = useClientPagedList(all, list, {
     match: definitionMatch,
@@ -95,6 +98,7 @@ function UserAttributesContent() {
     {
       key: "key",
       header: t("adminUserAttributes.key"),
+      pinned: true,
       render: (d) => <span className="font-mono text-xs text-srapi-text-secondary">{d.key}</span>,
     },
     {
@@ -150,6 +154,10 @@ function UserAttributesContent() {
         actions={
           <div className="flex items-center gap-3">
             {all.data ? <ListCount total={total} /> : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminUserAttributes.create")}
             </Button>
@@ -159,6 +167,7 @@ function UserAttributesContent() {
       <AdminListView
         query={query}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(d) => String(d.id)}
         emptyIcon={Tags}
         emptyTitle={t("adminUserAttributes.emptyTitle")}

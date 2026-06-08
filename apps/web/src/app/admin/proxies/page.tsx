@@ -9,6 +9,8 @@ import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -46,6 +48,7 @@ export default function AdminProxiesPage() {
 function ProxiesContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-proxies", []);
   const statusFilter = (list.filters.status as ProxyDefinition["status"]) || undefined;
   const proxies = useAdminProxies({
     page: list.page,
@@ -81,13 +84,14 @@ function ProxiesContent() {
       options: enumOptions(PROXY_STATUSES),
       advanced: true,
     },
-    { name: "metadata", label: t("adminCommon.metadata"), type: "keyvalue", advanced: true },
+    { name: "metadata", label: t("adminCommon.metadata"), help: t("adminCommon.metadataHelp"), type: "keyvalue", advanced: true },
   ];
 
   const columns: Column<ProxyDefinition>[] = [
     {
       key: "name",
       header: t("adminProxies.name"),
+      pinned: true,
       sortValue: (p) => p.name,
       render: (p) => <span className="text-srapi-text-primary">{p.name}</span>,
     },
@@ -126,6 +130,10 @@ function ProxiesContent() {
             {proxies.data ? (
               <ListCount total={proxies.data.pagination?.total ?? proxies.data.data.length} />
             ) : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminProxies.create")}
             </Button>
@@ -135,6 +143,7 @@ function ProxiesContent() {
       <AdminListView
         query={proxies}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(p) => p.id}
         emptyIcon={Network}
         emptyTitle={t("adminProxies.emptyTitle")}

@@ -8,6 +8,8 @@ import { AdminListView, ListCount, type Column } from "@/components/admin/admin-
 import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import { useBillingLedger } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -74,6 +76,7 @@ export default function AdminBillingLedgerPage() {
 function BillingLedgerContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-billing-ledger", ["reference"]);
   const all = useBillingLedger();
   const { query, total } = useClientPagedList(all, list, {
     match: ledgerMatch,
@@ -88,6 +91,7 @@ function BillingLedgerContent() {
     {
       key: "time",
       header: t("adminBillingLedger.time"),
+      pinned: true,
       render: (r) => (
         <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
           {formatDateTime(r.created_at)}
@@ -154,11 +158,20 @@ function BillingLedgerContent() {
         eyebrow={t("nav.sectionAdmin")}
         title={t("adminBillingLedger.title")}
         description={t("adminBillingLedger.subtitle")}
-        actions={all.data ? <ListCount total={total} /> : undefined}
+        actions={
+          <div className="flex items-center gap-3">
+            {all.data ? <ListCount total={total} /> : null}
+            <ColumnToggle
+              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
+            />
+          </div>
+        }
       />
       <AdminListView
         query={query}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(r) => r.id}
         emptyIcon={Receipt}
         emptyTitle={t("adminBillingLedger.emptyTitle")}

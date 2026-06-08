@@ -9,6 +9,8 @@ import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -52,6 +54,7 @@ function ProvidersContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const list = useAdminList();
+  const colVis = useColumnVisibility("admin-providers", []);
   const statusFilter = (list.filters.status as Provider["status"]) || undefined;
   const providers = useAdminProviders({
     page: list.page,
@@ -129,6 +132,7 @@ function ProvidersContent() {
     {
       name: "protocol",
       label: t("adminProviders.protocol"),
+      help: t("adminProviders.protocolHelp"),
       type: "select",
       options: enumOptions(PROVIDER_PROTOCOLS),
     },
@@ -138,8 +142,8 @@ function ProvidersContent() {
       type: "select",
       options: enumOptions(RESOURCE_STATUSES),
     },
-    { name: "capabilities", label: t("adminProviders.capabilities"), type: "keyvalue", advanced: true },
-    { name: "configSchema", label: t("adminProviders.configSchema"), type: "keyvalue", advanced: true },
+    { name: "capabilities", label: t("adminProviders.capabilities"), help: t("adminProviders.capabilitiesHelp"), type: "keyvalue", advanced: true },
+    { name: "configSchema", label: t("adminProviders.configSchema"), help: t("adminProviders.configSchemaHelp"), type: "keyvalue", advanced: true },
   ];
 
   const createFields: FieldConfig<ProviderFormState>[] = [
@@ -156,6 +160,7 @@ function ProvidersContent() {
     {
       key: "name",
       header: t("adminProviders.name"),
+      pinned: true,
       sortValue: (p) => p.display_name || p.name,
       render: (p) => (
         <div className="min-w-0">
@@ -218,6 +223,7 @@ function ProvidersContent() {
       <AdminListView
         query={providers}
         columns={columns}
+        columnVisibility={colVis}
         getRowId={(p) => p.id}
         emptyIcon={Plug}
         emptyTitle={t("adminProviders.emptyTitle")}
@@ -240,6 +246,10 @@ function ProvidersContent() {
               onChange={(v) => list.setFilter("status", v)}
               options={enumOptions(RESOURCE_STATUSES)}
               allLabel={t("adminCommon.allStatuses")}
+            />
+            <ColumnToggle
+              columns={columns.map((c) => ({ key: c.key, label: c.header }))}
+              visibility={colVis}
             />
           </ListToolbar>
         }

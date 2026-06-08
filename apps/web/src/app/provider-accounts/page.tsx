@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { CopyableValue } from "@/components/ui/copy-button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SloCardSkeleton } from "@/components/charts/chart-skeleton";
 import { AccountTestDialog } from "@/components/features/account-test-dialog";
 import type { ProviderAccountSummary } from "@/lib/srapi-types";
 
@@ -42,7 +43,7 @@ function ProviderAccountsContent() {
         skeleton={
           <div className="grid gap-4 md:grid-cols-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-44 rounded-xl" />
+              <SloCardSkeleton key={i} />
             ))}
           </div>
         }

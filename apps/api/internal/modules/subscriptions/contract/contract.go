@@ -171,6 +171,19 @@ type CreatePricingRuleRequest struct {
 	EffectiveTo                     *time.Time
 }
 
+// UpdatePricingRuleRequest carries a partial pricing-rule edit: nil pointer
+// means "leave unchanged". Mirrors the PATCH semantics of
+// /admin/pricing-rules/{id}.
+type UpdatePricingRuleRequest struct {
+	InputPricePerMillionTokens      *string
+	OutputPricePerMillionTokens     *string
+	CacheReadPricePerMillionTokens  *string
+	CacheWritePricePerMillionTokens *string
+	Currency                        *string
+	EffectiveFrom                   **time.Time
+	EffectiveTo                     **time.Time
+}
+
 type EntitlementCheckRequest struct {
 	UserID             int
 	ModelReferences    []string
@@ -248,6 +261,8 @@ type Store interface {
 	ExpireUserSubscription(ctx context.Context, id int, now time.Time) (UserSubscription, bool, error)
 	DeleteUserSubscription(ctx context.Context, id int) error
 	CreatePricingRule(ctx context.Context, input PricingRule) (PricingRule, error)
+	UpdatePricingRule(ctx context.Context, id int, input UpdatePricingRuleRequest) (PricingRule, error)
+	FindPricingRuleByID(ctx context.Context, id int) (PricingRule, error)
 	ListPricingRules(ctx context.Context) ([]PricingRule, error)
 	DeletePricingRule(ctx context.Context, id int) error
 }

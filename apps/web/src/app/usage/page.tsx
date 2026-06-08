@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Inbox, SearchX } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
@@ -10,7 +11,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { StatCard } from "@/components/ui/stat-card";
+import { StatCard, StatCardSkeleton } from "@/components/ui/stat-card";
 import {
   Table,
   TableScroll,
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import {
   Select,
   SelectTrigger,
@@ -43,8 +45,19 @@ export default function UsagePage() {
 function UsageContent() {
   const { t } = useLanguage();
   const usage = useUsageLogs();
-  const [model, setModel] = useState("all");
-  const [status, setStatus] = useState("all");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const model = searchParams.get("model") ?? "all";
+  const status = searchParams.get("status") ?? "all";
+  function setFilter(key: string, value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "all") params.delete(key);
+    else params.set(key, value);
+    const qs = params.toString();
+    router.replace(`/usage${qs ? `?${qs}` : ""}`, { scroll: false });
+  }
+  const setModel = (v: string) => setFilter("model", v);
+  const setStatus = (v: string) => setFilter("status", v);
 
   return (
     <>
@@ -106,9 +119,9 @@ function UsageBody({
   return (
     <>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label={t("usage.requests")} value={totals.requests.toLocaleString()} />
-        <StatCard label={t("usage.successRate")} value={`${totals.successRate.toFixed(1)}%`} />
-        <StatCard label={t("usage.totalTokens")} value={totals.tokens.toLocaleString()} />
+        <StatCard label={t("usage.requests")} value={totals.requests} format={(n) => Math.round(n).toLocaleString()} />
+        <StatCard label={t("usage.successRate")} value={totals.successRate} format={(n) => `${n.toFixed(1)}%`} />
+        <StatCard label={t("usage.totalTokens")} value={totals.tokens} format={(n) => Math.round(n).toLocaleString()} />
         <StatCard label={t("usage.cost")} value={formatMoney(totals.cost, totals.currency)} />
       </div>
 
@@ -215,10 +228,10 @@ function UsageSkeleton() {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-28 rounded-xl" />
+          <StatCardSkeleton key={i} />
         ))}
       </div>
-      <Skeleton className="h-64 rounded-xl" />
+      <DialogListSkeleton rows={8} />
     </div>
   );
 }

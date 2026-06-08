@@ -19,6 +19,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import {
@@ -122,10 +123,7 @@ export function GroupMembersDialog({
               {t("adminGroups.members")}
             </div>
             {members.isLoading ? (
-              <div className="space-y-2 p-3">
-                <Skeleton className="h-8" />
-                <Skeleton className="h-8" />
-              </div>
+              <DialogListSkeleton rows={2} className="p-3" />
             ) : memberRows.length === 0 ? (
               <p className="px-3 py-6 text-center text-2xs text-srapi-text-tertiary">
                 {t("adminGroups.membersEmpty")}
