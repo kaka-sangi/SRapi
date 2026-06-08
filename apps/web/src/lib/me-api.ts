@@ -11,6 +11,7 @@ import {
   enableCurrentUserTotp,
   disableCurrentUserTotp,
   getCurrentUserBalance,
+  listCurrentUserPlatformQuotas,
   getCurrentUserSubscriptions,
   redeemCurrentUserRedeemCode,
   listPaymentMethods,
@@ -52,6 +53,7 @@ import type {
   NotificationContactConfirmRequest,
   UpdateNotificationContactRequest,
   UserAnnouncement,
+  UserPlatformQuota,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
 const CSRF_STORAGE_KEY = "srapi_csrf_token";
@@ -160,6 +162,9 @@ export const meApi = {
   // ---- Billing ----
   getBalance() {
     return unwrapData(() => getCurrentUserBalance({ throwOnError: true }));
+  },
+  listPlatformQuotas(): Promise<MeListResult<UserPlatformQuota>> {
+    return unwrapList(() => listCurrentUserPlatformQuotas({ throwOnError: true }));
   },
   getPlaygroundModels(): Promise<PlaygroundModel[]> {
     return unwrapData(() => listMePlaygroundModels({ throwOnError: true }));

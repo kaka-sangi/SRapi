@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import {
   Dialog,
@@ -350,25 +350,28 @@ function FieldRow<TDraft extends object>({
     <span className="ml-0.5 text-srapi-error" aria-hidden="true">*</span>
   ) : null;
 
-  const FieldLabel = field.help
-    ? ({ htmlFor: hf, children: ch }: { htmlFor?: string; children: React.ReactNode }) => (
-        <LabelWithHelp htmlFor={hf} help={field.help}>
-          {ch}{requiredMark}
+  const renderFieldLabel = (children: ReactNode, htmlFor?: string, className?: string) => {
+    if (field.help) {
+      return (
+        <LabelWithHelp htmlFor={htmlFor} help={field.help}>
+          {children}
+          {requiredMark}
         </LabelWithHelp>
-      )
-    : ({ htmlFor: hf, children: ch, ...rest }: { htmlFor?: string; children: React.ReactNode; className?: string }) => (
-        <Label htmlFor={hf} {...rest}>
-          {ch}{requiredMark}
-        </Label>
       );
+    }
+    return (
+      <Label htmlFor={htmlFor} className={className}>
+        {children}
+        {requiredMark}
+      </Label>
+    );
+  };
 
   if (type === "switch") {
     return (
       <div className="flex items-center justify-between gap-4">
         <div>
-          <FieldLabel htmlFor={id}>
-            {field.label}
-          </FieldLabel>
+          {renderFieldLabel(field.label, id)}
           <FieldMessage id={msgId} error={error} hint={field.hint} />
         </div>
         <Switch
@@ -388,7 +391,7 @@ function FieldRow<TDraft extends object>({
         : {};
     return (
       <div>
-        <FieldLabel>{field.label}</FieldLabel>
+        {renderFieldLabel(field.label)}
         <div className="mt-1.5">
           <KeyValueEditor
             value={object}
@@ -408,7 +411,7 @@ function FieldRow<TDraft extends object>({
       onChange(selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]);
     return (
       <div>
-        <FieldLabel>{field.label}</FieldLabel>
+        {renderFieldLabel(field.label)}
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {(field.options ?? []).map((opt) => {
             const on = selected.includes(opt.value);
@@ -440,7 +443,7 @@ function FieldRow<TDraft extends object>({
     const tags = Array.isArray(value) ? (value as string[]) : [];
     return (
       <div>
-        <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
+        {renderFieldLabel(field.label, id)}
         <div className="mt-1.5">
           <TagInput
             id={id}
@@ -459,7 +462,7 @@ function FieldRow<TDraft extends object>({
     const selected = Array.isArray(value) ? (value as string[]) : [];
     return (
       <div>
-        <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
+        {renderFieldLabel(field.label, id)}
         <div className="mt-1.5">
           <MultiSelect
             id={id}
@@ -482,7 +485,7 @@ function FieldRow<TDraft extends object>({
   if (type === "select") {
     return (
       <div>
-        <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
+        {renderFieldLabel(field.label, id)}
         <Select value={asString} onValueChange={(next) => onChange(next)} disabled={disabled}>
           <SelectTrigger id={id} aria-invalid={invalid} aria-describedby={describedBy}>
             <SelectValue placeholder={field.placeholder} />
@@ -503,7 +506,7 @@ function FieldRow<TDraft extends object>({
   if (type === "textarea" || type === "json") {
     return (
       <div>
-        <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
+        {renderFieldLabel(field.label, id)}
         <Textarea
           id={id}
           placeholder={field.placeholder}
@@ -531,7 +534,7 @@ function FieldRow<TDraft extends object>({
 
   return (
     <div>
-      <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
+      {renderFieldLabel(field.label, id)}
       <Input
         id={id}
         type={inputType}

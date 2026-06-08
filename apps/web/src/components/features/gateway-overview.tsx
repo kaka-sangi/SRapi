@@ -2,18 +2,20 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { KeyRound, Activity, ArrowUpRight } from "lucide-react";
+import { KeyRound, Activity, ArrowUpRight, Gauge, Wallet } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
-import { useUsageLogs } from "@/hooks/queries";
+import { useBalance, usePlatformQuotas, useUsageLogs } from "@/hooks/queries";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { StatCard, StatCardSkeleton } from "@/components/ui/stat-card";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { formatMoney } from "@/lib/admin-format";
+import type { UserPlatformQuota } from "@/lib/sdk-types";
 import type { UsageLogSummary } from "@/lib/srapi-types";
 
 const rise = (i: number) => ({ "--stagger-index": i }) as CSSProperties;
@@ -38,6 +40,10 @@ function fmtCost(n: number, currency?: string): string {
   const sym = cur === "USD" ? "$" : cur === "CNY" ? "¥" : "";
   const v = n < 1 ? n.toFixed(4) : n.toFixed(2);
   return sym ? `${sym}${v}` : `${v} ${cur}`;
+}
+
+function quotaLimit(quota: UserPlatformQuota): string | null {
+  return quota.daily_limit ?? quota.weekly_limit ?? quota.monthly_limit ?? null;
 }
 
 /** Time-bucket request counts for a sparkline. Empty (no shape) when too sparse to be honest. */
@@ -66,6 +72,8 @@ function bucketRequests(logs: UsageLogSummary[], buckets = 14): number[] {
  */
 export function GatewayOverview() {
   const { t } = useLanguage();
+  const balance = useBalance();
+  const platformQuotas = usePlatformQuotas();
   const usage = useUsageLogs();
 
   // Derived, honest metrics from the user's own usage logs.
@@ -78,6 +86,8 @@ export function GatewayOverview() {
   const totalCost = logs.reduce((s, l) => s + l.cost, 0);
   const currency = logs.find((l) => l.currency)?.currency;
   const reqSpark = bucketRequests(logs);
+  const quotaRows = platformQuotas.data?.data ?? [];
+  const enabledQuotas = quotaRows.filter((q) => q.enabled);
 
   return (
     <>
@@ -91,6 +101,76 @@ export function GatewayOverview() {
             </Button>
           }
         />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="anim-rise-sm h-full" style={rise(1)}>
+          <CardContent className="flex h-full items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 font-mono text-2xs uppercase text-srapi-text-tertiary">
+                <Wallet className="size-3.5" />
+                {t("dashboard.balance")}
+              </div>
+              {balance.isLoading ? (
+                <Skeleton className="mt-3 h-9 w-36" />
+              ) : (
+                <div className="mt-2 truncate font-serif text-3xl text-srapi-text-primary tabular">
+                  {balance.data
+                    ? formatMoney(balance.data.balance, balance.data.currency)
+                    : "—"}
+                </div>
+              )}
+            </div>
+            <Button asChild variant="outline" size="sm" className="shrink-0">
+              <Link href="/billing">
+                {t("nav.billing")}
+                <ArrowUpRight className="size-3.5" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="anim-rise-sm h-full" style={rise(2)}>
+          <CardContent className="flex h-full items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 font-mono text-2xs uppercase text-srapi-text-tertiary">
+                <Gauge className="size-3.5" />
+                {t("dashboard.platformQuotas")}
+              </div>
+              {platformQuotas.isLoading ? (
+                <Skeleton className="mt-3 h-9 w-40" />
+              ) : (
+                <>
+                  <div className="mt-2 font-serif text-3xl text-srapi-text-primary tabular">
+                    {enabledQuotas.length}
+                    <span className="ml-1.5 text-sm font-sans text-srapi-text-tertiary">
+                      {t("dashboard.quotaPlatforms")}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
+                    {enabledQuotas.slice(0, 3).map((quota) => {
+                      const limit = quotaLimit(quota);
+                      return (
+                        <span
+                          key={quota.platform}
+                          className="max-w-full truncate rounded-md border border-srapi-border bg-srapi-card-muted px-2 py-1 font-mono text-2xs text-srapi-text-secondary"
+                        >
+                          {quota.platform}
+                          {limit ? ` · ${formatMoney(limit, quota.currency)}` : ""}
+                        </span>
+                      );
+                    })}
+                    {enabledQuotas.length === 0 ? (
+                      <span className="text-sm text-srapi-text-tertiary">
+                        {t("dashboard.noPlatformQuotas")}
+                      </span>
+                    ) : null}
+                  </div>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* KPI row — the user's own request/token/cost footprint. */}

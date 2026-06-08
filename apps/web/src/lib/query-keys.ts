@@ -16,6 +16,7 @@ export const queryKeys = {
     profile: () => ["me", "profile"] as const,
     totpStatus: () => ["me", "totp-status"] as const,
     balance: () => ["me", "balance"] as const,
+    platformQuotas: () => ["me", "platform-quotas"] as const,
     orders: (params?: unknown) => ["me", "orders", params ?? {}] as const,
     paymentMethods: () => ["me", "payment-methods"] as const,
     subscriptions: () => ["me", "subscriptions"] as const,

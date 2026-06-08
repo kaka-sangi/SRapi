@@ -303,6 +303,12 @@ export function useUnbindAuthIdentity() {
 export function useBalance() {
   return useQuery({ queryKey: queryKeys.me.balance(), queryFn: () => meApi.getBalance() });
 }
+export function usePlatformQuotas() {
+  return useQuery({
+    queryKey: queryKeys.me.platformQuotas(),
+    queryFn: () => meApi.listPlatformQuotas(),
+  });
+}
 
 // ---- Playground (交界地) ----
 export function usePlaygroundModels() {

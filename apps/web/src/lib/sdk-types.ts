@@ -9,6 +9,7 @@ export type {
   Id,
   User,
   UserStatus,
+  UserBalance,
   Provider,
   PlatformFamily,
   RuntimeClass,

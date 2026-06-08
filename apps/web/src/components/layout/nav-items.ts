@@ -9,7 +9,6 @@ import {
   Boxes,
   Network,
   Plug,
-  Cpu,
   CreditCard,
   ShoppingCart,
   Activity,
@@ -26,10 +25,7 @@ import {
   Coins,
   ArrowLeftRight,
   Shield,
-  ShieldAlert,
   ShieldCheck,
-  Fingerprint,
-  SlidersHorizontal,
   Megaphone,
   ScrollText,
   Receipt,
@@ -104,13 +100,9 @@ const ADMIN_GATEWAY_SECTION: NavSection = {
   items: [
     { href: ADMIN_ROUTES.quickSetup, labelKey: "nav.adminQuickSetup", icon: Zap },
     { href: ADMIN_ROUTES.providers, labelKey: "nav.adminProviders", icon: Plug },
-    { href: ADMIN_ROUTES.models, labelKey: "nav.adminModels", icon: Cpu },
+    { href: ADMIN_ROUTES.channelsPricing, labelKey: "nav.adminChannelsPricing", icon: Tag },
     { href: ADMIN_ROUTES.accounts, labelKey: "nav.adminAccounts", icon: Server },
     { href: ADMIN_ROUTES.groups, labelKey: "nav.adminGroups", icon: Boxes },
-    { href: ADMIN_ROUTES.proxies, labelKey: "nav.adminProxies", icon: Network },
-    { href: ADMIN_ROUTES.errorPassthrough, labelKey: "nav.adminErrorPassthrough", icon: ShieldAlert },
-    { href: ADMIN_ROUTES.tlsProfiles, labelKey: "nav.adminTlsProfiles", icon: Fingerprint },
-    { href: ADMIN_ROUTES.payloadRules, labelKey: "nav.adminPayloadRules", icon: SlidersHorizontal },
   ],
 };
 
@@ -120,7 +112,6 @@ const ADMIN_COMMERCE_SECTION: NavSection = {
     { href: ADMIN_ROUTES.subscriptions, labelKey: "nav.adminSubscriptions", icon: CreditCard },
     { href: ADMIN_ROUTES.ordersPlans, labelKey: "nav.adminOrdersPlans", icon: Layers },
     { href: ADMIN_ROUTES.orders, labelKey: "nav.adminOrders", icon: ShoppingCart },
-    { href: ADMIN_ROUTES.channelsPricing, labelKey: "nav.adminChannelsPricing", icon: Tag },
     { href: ADMIN_ROUTES.paymentProviders, labelKey: "nav.adminPaymentProviders", icon: Landmark },
     { href: ADMIN_ROUTES.promoCodes, labelKey: "nav.adminPromoCodes", icon: Ticket },
     { href: ADMIN_ROUTES.redeem, labelKey: "nav.adminRedeem", icon: Gift },
@@ -160,6 +151,7 @@ const ADMIN_SYSTEM_SECTION: NavSection = {
   items: [
     // The AI copilot is reached via the floating 小r pet (components/admin/
     // copilot-pet.tsx), not a sidebar entry.
+    { href: ADMIN_ROUTES.proxies, labelKey: "nav.adminProxies", icon: Network },
     { href: ADMIN_ROUTES.roles, labelKey: "nav.adminRoles", icon: ShieldCheck },
     { href: ADMIN_ROUTES.apiKeys, labelKey: "nav.adminApiKeys", icon: KeyRound },
     { href: ADMIN_ROUTES.userAttributes, labelKey: "nav.adminUserAttributes", icon: Tags },

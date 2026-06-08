@@ -72,7 +72,6 @@ const PLATFORM_FAMILY_ORDER: PlatformFamily[] = [
   "openai_compatible",
   "bedrock_anthropic",
   "reverse_proxy_antigravity",
-  "codex_cli",
   "rerank_compatible",
 ];
 

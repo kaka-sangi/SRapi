@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 const PREFIX = "srapi_cols_";
 
@@ -32,12 +32,9 @@ export function useColumnVisibility(
   storageKey: string,
   defaultHidden: string[] = [],
 ): ColumnVisibility {
-  const [hidden, setHidden] = useState<Set<string>>(() => new Set(defaultHidden));
-
-  useEffect(() => {
-    const stored = readStored(storageKey, defaultHidden);
-    setHidden(stored);
-  }, [storageKey]);
+  const [hidden, setHidden] = useState<Set<string>>(() =>
+    readStored(storageKey, defaultHidden),
+  );
 
   const toggle = useCallback(
     (key: string) => {

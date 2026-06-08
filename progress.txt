@@ -54,3 +54,18 @@ Evidence:
 
 Next:
 - Stage 5: frontend IA regrouping, /admin/channels/[id] aggregate tabs, and dashboard balance/platform quota cards.
+
+Stage 5 complete - frontend IA and user quota cards
+- Regrouped admin nav: ADMIN_GATEWAY_SECTION is now 5 items, channelsPricing moved into Gateway, and channelsPricing is no longer in Commerce.
+- Added /admin/channels/[id] as a provider/channel aggregate page with tabs for pricing, model mappings, model limits, payload rules, error passthrough, and TLS fingerprints.
+- Wired GET /api/v1/me/platform-quotas into the TypeScript meApi/query layer.
+- Added dashboard top cards for current balance and enabled platform quotas, above the usage KPI row.
+- Fixed two React compiler/typecheck blockers found by the frontend quality gate: resource form inline label components and the invalid codex_cli PlatformFamily entry.
+
+Evidence:
+- cd apps/web && npm run lint: exit 0, with existing unused Skeleton warnings only.
+- cd apps/web && npx tsc --noEmit: exit 0.
+- cd apps/web && npm test -- --run tests/unit/messages.test.ts tests/unit/i18n-translate.test.ts: 5 tests passed.
+
+Next:
+- Stage 6: run broad backend/frontend gates, start local app, and capture browser evidence for channel tabs and dashboard balance card.
