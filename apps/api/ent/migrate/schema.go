@@ -129,6 +129,7 @@ var (
 		{Name: "provider_scope_json", Type: field.TypeJSON, Nullable: true},
 		{Name: "model_scope_json", Type: field.TypeJSON, Nullable: true},
 		{Name: "strategy_hint", Type: field.TypeString, Default: "balanced"},
+		{Name: "rate_multiplier", Type: field.TypeString, Default: "1.00000000"},
 		{Name: "status", Type: field.TypeString, Default: "active"},
 	}
 	// AccountGroupsTable holds the schema information for the "account_groups" table.
@@ -145,7 +146,7 @@ var (
 			{
 				Name:    "accountgroup_status",
 				Unique:  false,
-				Columns: []*schema.Column{AccountGroupsColumns[8]},
+				Columns: []*schema.Column{AccountGroupsColumns[9]},
 			},
 		},
 	}
@@ -2141,6 +2142,8 @@ var (
 		{Name: "success", Type: field.TypeBool, Default: false},
 		{Name: "error_class", Type: field.TypeString, Nullable: true},
 		{Name: "cost", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "actual_cost", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "rate_multiplier", Type: field.TypeString, Default: "1.00000000"},
 		{Name: "billable_cost", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "currency", Type: field.TypeString, Default: "USD"},
 		{Name: "charged_at", Type: field.TypeTime, Nullable: true},
@@ -2165,7 +2168,7 @@ var (
 			{
 				Name:    "usagelog_charged_at_success_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[25], UsageLogsColumns[20], UsageLogsColumns[1]},
+				Columns: []*schema.Column{UsageLogsColumns[27], UsageLogsColumns[20], UsageLogsColumns[1]},
 			},
 			{
 				Name:    "usagelog_api_key_id_created_at",

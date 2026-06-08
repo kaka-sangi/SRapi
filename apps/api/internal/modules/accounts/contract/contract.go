@@ -94,6 +94,7 @@ type AccountGroup struct {
 	ProviderScope map[string]any
 	ModelScope    map[string]any
 	StrategyHint  string
+	RateMultiplier string
 	Status        GroupStatus
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
@@ -215,6 +216,7 @@ type CreateGroupRequest struct {
 	ProviderScope map[string]any
 	ModelScope    map[string]any
 	StrategyHint  *string
+	RateMultiplier *string
 	Status        *GroupStatus
 }
 
@@ -224,6 +226,7 @@ type UpdateGroupRequest struct {
 	ProviderScope *map[string]any
 	ModelScope    *map[string]any
 	StrategyHint  *string
+	RateMultiplier *string
 	Status        *GroupStatus
 }
 
@@ -272,6 +275,7 @@ type CreateStoredAccountGroup struct {
 	ProviderScope map[string]any
 	ModelScope    map[string]any
 	StrategyHint  string
+	RateMultiplier string
 	Status        GroupStatus
 }
 

@@ -79,6 +79,11 @@ func StrategyHint(v string) predicate.AccountGroup {
 	return predicate.AccountGroup(sql.FieldEQ(FieldStrategyHint, v))
 }
 
+// RateMultiplier applies equality check predicate on the "rate_multiplier" field. It's identical to RateMultiplierEQ.
+func RateMultiplier(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldEQ(FieldRateMultiplier, v))
+}
+
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.AccountGroup {
 	return predicate.AccountGroup(sql.FieldEQ(FieldStatus, v))
@@ -377,6 +382,71 @@ func StrategyHintEqualFold(v string) predicate.AccountGroup {
 // StrategyHintContainsFold applies the ContainsFold predicate on the "strategy_hint" field.
 func StrategyHintContainsFold(v string) predicate.AccountGroup {
 	return predicate.AccountGroup(sql.FieldContainsFold(FieldStrategyHint, v))
+}
+
+// RateMultiplierEQ applies the EQ predicate on the "rate_multiplier" field.
+func RateMultiplierEQ(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldEQ(FieldRateMultiplier, v))
+}
+
+// RateMultiplierNEQ applies the NEQ predicate on the "rate_multiplier" field.
+func RateMultiplierNEQ(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldNEQ(FieldRateMultiplier, v))
+}
+
+// RateMultiplierIn applies the In predicate on the "rate_multiplier" field.
+func RateMultiplierIn(vs ...string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldIn(FieldRateMultiplier, vs...))
+}
+
+// RateMultiplierNotIn applies the NotIn predicate on the "rate_multiplier" field.
+func RateMultiplierNotIn(vs ...string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldNotIn(FieldRateMultiplier, vs...))
+}
+
+// RateMultiplierGT applies the GT predicate on the "rate_multiplier" field.
+func RateMultiplierGT(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldGT(FieldRateMultiplier, v))
+}
+
+// RateMultiplierGTE applies the GTE predicate on the "rate_multiplier" field.
+func RateMultiplierGTE(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldGTE(FieldRateMultiplier, v))
+}
+
+// RateMultiplierLT applies the LT predicate on the "rate_multiplier" field.
+func RateMultiplierLT(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldLT(FieldRateMultiplier, v))
+}
+
+// RateMultiplierLTE applies the LTE predicate on the "rate_multiplier" field.
+func RateMultiplierLTE(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldLTE(FieldRateMultiplier, v))
+}
+
+// RateMultiplierContains applies the Contains predicate on the "rate_multiplier" field.
+func RateMultiplierContains(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldContains(FieldRateMultiplier, v))
+}
+
+// RateMultiplierHasPrefix applies the HasPrefix predicate on the "rate_multiplier" field.
+func RateMultiplierHasPrefix(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldHasPrefix(FieldRateMultiplier, v))
+}
+
+// RateMultiplierHasSuffix applies the HasSuffix predicate on the "rate_multiplier" field.
+func RateMultiplierHasSuffix(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldHasSuffix(FieldRateMultiplier, v))
+}
+
+// RateMultiplierEqualFold applies the EqualFold predicate on the "rate_multiplier" field.
+func RateMultiplierEqualFold(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldEqualFold(FieldRateMultiplier, v))
+}
+
+// RateMultiplierContainsFold applies the ContainsFold predicate on the "rate_multiplier" field.
+func RateMultiplierContainsFold(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldContainsFold(FieldRateMultiplier, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

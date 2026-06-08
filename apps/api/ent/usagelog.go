@@ -62,6 +62,10 @@ type UsageLog struct {
 	ErrorClass *string `json:"error_class,omitempty"`
 	// Cost holds the value of the "cost" field.
 	Cost string `json:"cost,omitempty"`
+	// ActualCost holds the value of the "actual_cost" field.
+	ActualCost string `json:"actual_cost,omitempty"`
+	// RateMultiplier holds the value of the "rate_multiplier" field.
+	RateMultiplier string `json:"rate_multiplier,omitempty"`
 	// BillableCost holds the value of the "billable_cost" field.
 	BillableCost string `json:"billable_cost,omitempty"`
 	// Currency holds the value of the "currency" field.
@@ -84,7 +88,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case usagelog.FieldID, usagelog.FieldAttemptNo, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldProviderID, usagelog.FieldAccountID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldTotalTokens, usagelog.FieldLatencyMs:
 			values[i] = new(sql.NullInt64)
-		case usagelog.FieldRequestID, usagelog.FieldSourceProtocol, usagelog.FieldSourceEndpoint, usagelog.FieldTargetProtocol, usagelog.FieldModel, usagelog.FieldErrorClass, usagelog.FieldCost, usagelog.FieldBillableCost, usagelog.FieldCurrency:
+		case usagelog.FieldRequestID, usagelog.FieldSourceProtocol, usagelog.FieldSourceEndpoint, usagelog.FieldTargetProtocol, usagelog.FieldModel, usagelog.FieldErrorClass, usagelog.FieldCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier, usagelog.FieldBillableCost, usagelog.FieldCurrency:
 			values[i] = new(sql.NullString)
 		case usagelog.FieldCreatedAt, usagelog.FieldUpdatedAt, usagelog.FieldChargedAt:
 			values[i] = new(sql.NullTime)
@@ -244,6 +248,18 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Cost = value.String
 			}
+		case usagelog.FieldActualCost:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field actual_cost", values[i])
+			} else if value.Valid {
+				_m.ActualCost = value.String
+			}
+		case usagelog.FieldRateMultiplier:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_multiplier", values[i])
+			} else if value.Valid {
+				_m.RateMultiplier = value.String
+			}
 		case usagelog.FieldBillableCost:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field billable_cost", values[i])
@@ -378,6 +394,12 @@ func (_m *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("cost=")
 	builder.WriteString(_m.Cost)
+	builder.WriteString(", ")
+	builder.WriteString("actual_cost=")
+	builder.WriteString(_m.ActualCost)
+	builder.WriteString(", ")
+	builder.WriteString("rate_multiplier=")
+	builder.WriteString(_m.RateMultiplier)
 	builder.WriteString(", ")
 	builder.WriteString("billable_cost=")
 	builder.WriteString(_m.BillableCost)

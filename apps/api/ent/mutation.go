@@ -3765,6 +3765,7 @@ type AccountGroupMutation struct {
 	provider_scope_json *map[string]interface{}
 	model_scope_json    *map[string]interface{}
 	strategy_hint       *string
+	rate_multiplier     *string
 	status              *string
 	clearedFields       map[string]struct{}
 	done                bool
@@ -4148,6 +4149,42 @@ func (m *AccountGroupMutation) ResetStrategyHint() {
 	m.strategy_hint = nil
 }
 
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (m *AccountGroupMutation) SetRateMultiplier(s string) {
+	m.rate_multiplier = &s
+}
+
+// RateMultiplier returns the value of the "rate_multiplier" field in the mutation.
+func (m *AccountGroupMutation) RateMultiplier() (r string, exists bool) {
+	v := m.rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRateMultiplier returns the old "rate_multiplier" field's value of the AccountGroup entity.
+// If the AccountGroup object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountGroupMutation) OldRateMultiplier(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRateMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRateMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRateMultiplier: %w", err)
+	}
+	return oldValue.RateMultiplier, nil
+}
+
+// ResetRateMultiplier resets all changes to the "rate_multiplier" field.
+func (m *AccountGroupMutation) ResetRateMultiplier() {
+	m.rate_multiplier = nil
+}
+
 // SetStatus sets the "status" field.
 func (m *AccountGroupMutation) SetStatus(s string) {
 	m.status = &s
@@ -4218,7 +4255,7 @@ func (m *AccountGroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountGroupMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 9)
 	if m.created_at != nil {
 		fields = append(fields, accountgroup.FieldCreatedAt)
 	}
@@ -4239,6 +4276,9 @@ func (m *AccountGroupMutation) Fields() []string {
 	}
 	if m.strategy_hint != nil {
 		fields = append(fields, accountgroup.FieldStrategyHint)
+	}
+	if m.rate_multiplier != nil {
+		fields = append(fields, accountgroup.FieldRateMultiplier)
 	}
 	if m.status != nil {
 		fields = append(fields, accountgroup.FieldStatus)
@@ -4265,6 +4305,8 @@ func (m *AccountGroupMutation) Field(name string) (ent.Value, bool) {
 		return m.ModelScopeJSON()
 	case accountgroup.FieldStrategyHint:
 		return m.StrategyHint()
+	case accountgroup.FieldRateMultiplier:
+		return m.RateMultiplier()
 	case accountgroup.FieldStatus:
 		return m.Status()
 	}
@@ -4290,6 +4332,8 @@ func (m *AccountGroupMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldModelScopeJSON(ctx)
 	case accountgroup.FieldStrategyHint:
 		return m.OldStrategyHint(ctx)
+	case accountgroup.FieldRateMultiplier:
+		return m.OldRateMultiplier(ctx)
 	case accountgroup.FieldStatus:
 		return m.OldStatus(ctx)
 	}
@@ -4349,6 +4393,13 @@ func (m *AccountGroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStrategyHint(v)
+		return nil
+	case accountgroup.FieldRateMultiplier:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRateMultiplier(v)
 		return nil
 	case accountgroup.FieldStatus:
 		v, ok := value.(string)
@@ -4441,6 +4492,9 @@ func (m *AccountGroupMutation) ResetField(name string) error {
 		return nil
 	case accountgroup.FieldStrategyHint:
 		m.ResetStrategyHint()
+		return nil
+	case accountgroup.FieldRateMultiplier:
+		m.ResetRateMultiplier()
 		return nil
 	case accountgroup.FieldStatus:
 		m.ResetStatus()
@@ -56984,6 +57038,8 @@ type UsageLogMutation struct {
 	success                           *bool
 	error_class                       *string
 	cost                              *string
+	actual_cost                       *string
+	rate_multiplier                   *string
 	billable_cost                     *string
 	currency                          *string
 	charged_at                        *time.Time
@@ -58146,6 +58202,78 @@ func (m *UsageLogMutation) ResetCost() {
 	m.cost = nil
 }
 
+// SetActualCost sets the "actual_cost" field.
+func (m *UsageLogMutation) SetActualCost(s string) {
+	m.actual_cost = &s
+}
+
+// ActualCost returns the value of the "actual_cost" field in the mutation.
+func (m *UsageLogMutation) ActualCost() (r string, exists bool) {
+	v := m.actual_cost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActualCost returns the old "actual_cost" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldActualCost(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActualCost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActualCost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActualCost: %w", err)
+	}
+	return oldValue.ActualCost, nil
+}
+
+// ResetActualCost resets all changes to the "actual_cost" field.
+func (m *UsageLogMutation) ResetActualCost() {
+	m.actual_cost = nil
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (m *UsageLogMutation) SetRateMultiplier(s string) {
+	m.rate_multiplier = &s
+}
+
+// RateMultiplier returns the value of the "rate_multiplier" field in the mutation.
+func (m *UsageLogMutation) RateMultiplier() (r string, exists bool) {
+	v := m.rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRateMultiplier returns the old "rate_multiplier" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldRateMultiplier(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRateMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRateMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRateMultiplier: %w", err)
+	}
+	return oldValue.RateMultiplier, nil
+}
+
+// ResetRateMultiplier resets all changes to the "rate_multiplier" field.
+func (m *UsageLogMutation) ResetRateMultiplier() {
+	m.rate_multiplier = nil
+}
+
 // SetBillableCost sets the "billable_cost" field.
 func (m *UsageLogMutation) SetBillableCost(s string) {
 	m.billable_cost = &s
@@ -58366,7 +58494,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 26)
+	fields := make([]string, 0, 28)
 	if m.created_at != nil {
 		fields = append(fields, usagelog.FieldCreatedAt)
 	}
@@ -58433,6 +58561,12 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.cost != nil {
 		fields = append(fields, usagelog.FieldCost)
 	}
+	if m.actual_cost != nil {
+		fields = append(fields, usagelog.FieldActualCost)
+	}
+	if m.rate_multiplier != nil {
+		fields = append(fields, usagelog.FieldRateMultiplier)
+	}
 	if m.billable_cost != nil {
 		fields = append(fields, usagelog.FieldBillableCost)
 	}
@@ -58497,6 +58631,10 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.ErrorClass()
 	case usagelog.FieldCost:
 		return m.Cost()
+	case usagelog.FieldActualCost:
+		return m.ActualCost()
+	case usagelog.FieldRateMultiplier:
+		return m.RateMultiplier()
 	case usagelog.FieldBillableCost:
 		return m.BillableCost()
 	case usagelog.FieldCurrency:
@@ -58558,6 +58696,10 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldErrorClass(ctx)
 	case usagelog.FieldCost:
 		return m.OldCost(ctx)
+	case usagelog.FieldActualCost:
+		return m.OldActualCost(ctx)
+	case usagelog.FieldRateMultiplier:
+		return m.OldRateMultiplier(ctx)
 	case usagelog.FieldBillableCost:
 		return m.OldBillableCost(ctx)
 	case usagelog.FieldCurrency:
@@ -58728,6 +58870,20 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCost(v)
+		return nil
+	case usagelog.FieldActualCost:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActualCost(v)
+		return nil
+	case usagelog.FieldRateMultiplier:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRateMultiplier(v)
 		return nil
 	case usagelog.FieldBillableCost:
 		v, ok := value.(string)
@@ -59039,6 +59195,12 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldCost:
 		m.ResetCost()
+		return nil
+	case usagelog.FieldActualCost:
+		m.ResetActualCost()
+		return nil
+	case usagelog.FieldRateMultiplier:
+		m.ResetRateMultiplier()
 		return nil
 	case usagelog.FieldBillableCost:
 		m.ResetBillableCost()

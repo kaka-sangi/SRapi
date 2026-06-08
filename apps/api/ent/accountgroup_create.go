@@ -94,6 +94,20 @@ func (_c *AccountGroupCreate) SetNillableStrategyHint(v *string) *AccountGroupCr
 	return _c
 }
 
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (_c *AccountGroupCreate) SetRateMultiplier(v string) *AccountGroupCreate {
+	_c.mutation.SetRateMultiplier(v)
+	return _c
+}
+
+// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
+func (_c *AccountGroupCreate) SetNillableRateMultiplier(v *string) *AccountGroupCreate {
+	if v != nil {
+		_c.SetRateMultiplier(*v)
+	}
+	return _c
+}
+
 // SetStatus sets the "status" field.
 func (_c *AccountGroupCreate) SetStatus(v string) *AccountGroupCreate {
 	_c.mutation.SetStatus(v)
@@ -159,6 +173,10 @@ func (_c *AccountGroupCreate) defaults() {
 		v := accountgroup.DefaultStrategyHint
 		_c.mutation.SetStrategyHint(v)
 	}
+	if _, ok := _c.mutation.RateMultiplier(); !ok {
+		v := accountgroup.DefaultRateMultiplier
+		_c.mutation.SetRateMultiplier(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := accountgroup.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -186,6 +204,9 @@ func (_c *AccountGroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.StrategyHint(); !ok {
 		return &ValidationError{Name: "strategy_hint", err: errors.New(`ent: missing required field "AccountGroup.strategy_hint"`)}
+	}
+	if _, ok := _c.mutation.RateMultiplier(); !ok {
+		return &ValidationError{Name: "rate_multiplier", err: errors.New(`ent: missing required field "AccountGroup.rate_multiplier"`)}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "AccountGroup.status"`)}
@@ -243,6 +264,10 @@ func (_c *AccountGroupCreate) createSpec() (*AccountGroup, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.StrategyHint(); ok {
 		_spec.SetField(accountgroup.FieldStrategyHint, field.TypeString, value)
 		_node.StrategyHint = value
+	}
+	if value, ok := _c.mutation.RateMultiplier(); ok {
+		_spec.SetField(accountgroup.FieldRateMultiplier, field.TypeString, value)
+		_node.RateMultiplier = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(accountgroup.FieldStatus, field.TypeString, value)

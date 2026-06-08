@@ -34,6 +34,15 @@ func (s *Store) Create(_ context.Context, input contract.UsageLog) (contract.Usa
 	if log.CreatedAt.IsZero() {
 		log.CreatedAt = time.Now().UTC()
 	}
+	if strings.TrimSpace(log.ActualCost) == "" {
+		log.ActualCost = log.Cost
+	}
+	if strings.TrimSpace(log.RateMultiplier) == "" {
+		log.RateMultiplier = "1.00000000"
+	}
+	if strings.TrimSpace(log.BillableCost) == "" {
+		log.BillableCost = log.ActualCost
+	}
 	s.byID[log.ID] = log
 	s.nextID++
 	return cloneLog(log), nil

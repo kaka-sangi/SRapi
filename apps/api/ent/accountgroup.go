@@ -32,6 +32,8 @@ type AccountGroup struct {
 	ModelScopeJSON map[string]interface{} `json:"model_scope_json,omitempty"`
 	// StrategyHint holds the value of the "strategy_hint" field.
 	StrategyHint string `json:"strategy_hint,omitempty"`
+	// RateMultiplier holds the value of the "rate_multiplier" field.
+	RateMultiplier string `json:"rate_multiplier,omitempty"`
 	// Status holds the value of the "status" field.
 	Status       string `json:"status,omitempty"`
 	selectValues sql.SelectValues
@@ -46,7 +48,7 @@ func (*AccountGroup) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case accountgroup.FieldID:
 			values[i] = new(sql.NullInt64)
-		case accountgroup.FieldName, accountgroup.FieldDescription, accountgroup.FieldStrategyHint, accountgroup.FieldStatus:
+		case accountgroup.FieldName, accountgroup.FieldDescription, accountgroup.FieldStrategyHint, accountgroup.FieldRateMultiplier, accountgroup.FieldStatus:
 			values[i] = new(sql.NullString)
 		case accountgroup.FieldCreatedAt, accountgroup.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -117,6 +119,12 @@ func (_m *AccountGroup) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.StrategyHint = value.String
 			}
+		case accountgroup.FieldRateMultiplier:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_multiplier", values[i])
+			} else if value.Valid {
+				_m.RateMultiplier = value.String
+			}
 		case accountgroup.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
@@ -179,6 +187,9 @@ func (_m *AccountGroup) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("strategy_hint=")
 	builder.WriteString(_m.StrategyHint)
+	builder.WriteString(", ")
+	builder.WriteString("rate_multiplier=")
+	builder.WriteString(_m.RateMultiplier)
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)

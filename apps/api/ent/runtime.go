@@ -186,8 +186,12 @@ func init() {
 	accountgroupDescStrategyHint := accountgroupFields[4].Descriptor()
 	// accountgroup.DefaultStrategyHint holds the default value on creation for the strategy_hint field.
 	accountgroup.DefaultStrategyHint = accountgroupDescStrategyHint.Default.(string)
+	// accountgroupDescRateMultiplier is the schema descriptor for rate_multiplier field.
+	accountgroupDescRateMultiplier := accountgroupFields[5].Descriptor()
+	// accountgroup.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
+	accountgroup.DefaultRateMultiplier = accountgroupDescRateMultiplier.Default.(string)
 	// accountgroupDescStatus is the schema descriptor for status field.
-	accountgroupDescStatus := accountgroupFields[5].Descriptor()
+	accountgroupDescStatus := accountgroupFields[6].Descriptor()
 	// accountgroup.DefaultStatus holds the default value on creation for the status field.
 	accountgroup.DefaultStatus = accountgroupDescStatus.Default.(string)
 	accountgroupmemberMixin := schema.AccountGroupMember{}.Mixin()
@@ -2173,12 +2177,20 @@ func init() {
 	usagelogDescCost := usagelogFields[19].Descriptor()
 	// usagelog.DefaultCost holds the default value on creation for the cost field.
 	usagelog.DefaultCost = usagelogDescCost.Default.(string)
+	// usagelogDescActualCost is the schema descriptor for actual_cost field.
+	usagelogDescActualCost := usagelogFields[20].Descriptor()
+	// usagelog.DefaultActualCost holds the default value on creation for the actual_cost field.
+	usagelog.DefaultActualCost = usagelogDescActualCost.Default.(string)
+	// usagelogDescRateMultiplier is the schema descriptor for rate_multiplier field.
+	usagelogDescRateMultiplier := usagelogFields[21].Descriptor()
+	// usagelog.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
+	usagelog.DefaultRateMultiplier = usagelogDescRateMultiplier.Default.(string)
 	// usagelogDescBillableCost is the schema descriptor for billable_cost field.
-	usagelogDescBillableCost := usagelogFields[20].Descriptor()
+	usagelogDescBillableCost := usagelogFields[22].Descriptor()
 	// usagelog.DefaultBillableCost holds the default value on creation for the billable_cost field.
 	usagelog.DefaultBillableCost = usagelogDescBillableCost.Default.(string)
 	// usagelogDescCurrency is the schema descriptor for currency field.
-	usagelogDescCurrency := usagelogFields[21].Descriptor()
+	usagelogDescCurrency := usagelogFields[23].Descriptor()
 	// usagelog.DefaultCurrency holds the default value on creation for the currency field.
 	usagelog.DefaultCurrency = usagelogDescCurrency.Default.(string)
 	userMixin := schema.User{}.Mixin()

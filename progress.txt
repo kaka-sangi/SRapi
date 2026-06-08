@@ -1,0 +1,14 @@
+SRapi sub2api parity batch1 progress
+
+Stage 1 complete - data layer foundation
+- Added AccountGroup.rate_multiplier as an 8-place decimal string with default 1.00000000.
+- Added UsageLog.actual_cost and UsageLog.rate_multiplier as 8-place decimal strings; migration backfills actual_cost from existing cost.
+- Regenerated Ent code and refreshed Atlas migration hash.
+- Synchronized account/usage contracts, memory stores, and Ent stores with backward-compatible defaults.
+
+Evidence:
+- make migration-check: ok github.com/srapi/srapi/apps/api/internal/platform/db 0.130s
+- cd apps/api && go test ./internal/modules/accounts/... ./internal/modules/usage/... ./internal/persistence/entstore/accounts ./internal/persistence/entstore/usage ./internal/platform/db: all packages passed.
+
+Next:
+- Stage 2: pricing family fallback and rate_multiplier actual_cost billing logic with focused tests.

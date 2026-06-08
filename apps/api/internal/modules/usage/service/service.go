@@ -46,6 +46,18 @@ func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contr
 	if cost == "" {
 		cost = "0.00000000"
 	}
+	actualCost := strings.TrimSpace(req.ActualCost)
+	if actualCost == "" {
+		actualCost = cost
+	}
+	rateMultiplier := strings.TrimSpace(req.RateMultiplier)
+	if rateMultiplier == "" {
+		rateMultiplier = "1.00000000"
+	}
+	billableCost := strings.TrimSpace(req.BillableCost)
+	if billableCost == "" {
+		billableCost = actualCost
+	}
 	sourceProtocol := strings.TrimSpace(req.SourceProtocol)
 	if sourceProtocol == "" {
 		sourceProtocol = "openai-compatible"
@@ -76,6 +88,9 @@ func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contr
 		Success:               req.Success,
 		ErrorClass:            req.ErrorClass,
 		Cost:                  cost,
+		ActualCost:            actualCost,
+		RateMultiplier:        rateMultiplier,
+		BillableCost:          billableCost,
 		Currency:              currency,
 		ChargedAt:             req.ChargedAt,
 		CompatibilityWarnings: cloneStrings(req.CompatibilityWarnings),

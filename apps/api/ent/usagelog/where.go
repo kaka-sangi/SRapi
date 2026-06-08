@@ -164,6 +164,16 @@ func Cost(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCost, v))
 }
 
+// ActualCost applies equality check predicate on the "actual_cost" field. It's identical to ActualCostEQ.
+func ActualCost(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldActualCost, v))
+}
+
+// RateMultiplier applies equality check predicate on the "rate_multiplier" field. It's identical to RateMultiplierEQ.
+func RateMultiplier(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldRateMultiplier, v))
+}
+
 // BillableCost applies equality check predicate on the "billable_cost" field. It's identical to BillableCostEQ.
 func BillableCost(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldBillableCost, v))
@@ -1202,6 +1212,136 @@ func CostEqualFold(v string) predicate.UsageLog {
 // CostContainsFold applies the ContainsFold predicate on the "cost" field.
 func CostContainsFold(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldContainsFold(FieldCost, v))
+}
+
+// ActualCostEQ applies the EQ predicate on the "actual_cost" field.
+func ActualCostEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldActualCost, v))
+}
+
+// ActualCostNEQ applies the NEQ predicate on the "actual_cost" field.
+func ActualCostNEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldActualCost, v))
+}
+
+// ActualCostIn applies the In predicate on the "actual_cost" field.
+func ActualCostIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldActualCost, vs...))
+}
+
+// ActualCostNotIn applies the NotIn predicate on the "actual_cost" field.
+func ActualCostNotIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldActualCost, vs...))
+}
+
+// ActualCostGT applies the GT predicate on the "actual_cost" field.
+func ActualCostGT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldActualCost, v))
+}
+
+// ActualCostGTE applies the GTE predicate on the "actual_cost" field.
+func ActualCostGTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldActualCost, v))
+}
+
+// ActualCostLT applies the LT predicate on the "actual_cost" field.
+func ActualCostLT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldActualCost, v))
+}
+
+// ActualCostLTE applies the LTE predicate on the "actual_cost" field.
+func ActualCostLTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldActualCost, v))
+}
+
+// ActualCostContains applies the Contains predicate on the "actual_cost" field.
+func ActualCostContains(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContains(FieldActualCost, v))
+}
+
+// ActualCostHasPrefix applies the HasPrefix predicate on the "actual_cost" field.
+func ActualCostHasPrefix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasPrefix(FieldActualCost, v))
+}
+
+// ActualCostHasSuffix applies the HasSuffix predicate on the "actual_cost" field.
+func ActualCostHasSuffix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasSuffix(FieldActualCost, v))
+}
+
+// ActualCostEqualFold applies the EqualFold predicate on the "actual_cost" field.
+func ActualCostEqualFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEqualFold(FieldActualCost, v))
+}
+
+// ActualCostContainsFold applies the ContainsFold predicate on the "actual_cost" field.
+func ActualCostContainsFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContainsFold(FieldActualCost, v))
+}
+
+// RateMultiplierEQ applies the EQ predicate on the "rate_multiplier" field.
+func RateMultiplierEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldRateMultiplier, v))
+}
+
+// RateMultiplierNEQ applies the NEQ predicate on the "rate_multiplier" field.
+func RateMultiplierNEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldRateMultiplier, v))
+}
+
+// RateMultiplierIn applies the In predicate on the "rate_multiplier" field.
+func RateMultiplierIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldRateMultiplier, vs...))
+}
+
+// RateMultiplierNotIn applies the NotIn predicate on the "rate_multiplier" field.
+func RateMultiplierNotIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldRateMultiplier, vs...))
+}
+
+// RateMultiplierGT applies the GT predicate on the "rate_multiplier" field.
+func RateMultiplierGT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldRateMultiplier, v))
+}
+
+// RateMultiplierGTE applies the GTE predicate on the "rate_multiplier" field.
+func RateMultiplierGTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldRateMultiplier, v))
+}
+
+// RateMultiplierLT applies the LT predicate on the "rate_multiplier" field.
+func RateMultiplierLT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldRateMultiplier, v))
+}
+
+// RateMultiplierLTE applies the LTE predicate on the "rate_multiplier" field.
+func RateMultiplierLTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldRateMultiplier, v))
+}
+
+// RateMultiplierContains applies the Contains predicate on the "rate_multiplier" field.
+func RateMultiplierContains(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContains(FieldRateMultiplier, v))
+}
+
+// RateMultiplierHasPrefix applies the HasPrefix predicate on the "rate_multiplier" field.
+func RateMultiplierHasPrefix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasPrefix(FieldRateMultiplier, v))
+}
+
+// RateMultiplierHasSuffix applies the HasSuffix predicate on the "rate_multiplier" field.
+func RateMultiplierHasSuffix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasSuffix(FieldRateMultiplier, v))
+}
+
+// RateMultiplierEqualFold applies the EqualFold predicate on the "rate_multiplier" field.
+func RateMultiplierEqualFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEqualFold(FieldRateMultiplier, v))
+}
+
+// RateMultiplierContainsFold applies the ContainsFold predicate on the "rate_multiplier" field.
+func RateMultiplierContainsFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContainsFold(FieldRateMultiplier, v))
 }
 
 // BillableCostEQ applies the EQ predicate on the "billable_cost" field.

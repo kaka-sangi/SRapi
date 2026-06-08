@@ -47,7 +47,9 @@ func (s *Store) Create(ctx context.Context, input contract.UsageLog) (contract.U
 		SetSuccess(input.Success).
 		SetNillableErrorClass(input.ErrorClass).
 		SetCost(input.Cost).
-		SetBillableCost(billableCostOrCost(input.BillableCost, input.Cost)).
+		SetActualCost(actualCostOrCost(input.ActualCost, input.Cost)).
+		SetRateMultiplier(rateMultiplierOrDefault(input.RateMultiplier)).
+		SetBillableCost(billableCostOrActualCost(input.BillableCost, input.ActualCost, input.Cost)).
 		SetCurrency(input.Currency).
 		SetNillableChargedAt(input.ChargedAt).
 		SetCompatibilityWarningsJSON(cloneStrings(input.CompatibilityWarnings))
@@ -167,6 +169,8 @@ func toUsageLog(row *ent.UsageLog) contract.UsageLog {
 		Success:               row.Success,
 		ErrorClass:            cloneString(row.ErrorClass),
 		Cost:                  row.Cost,
+		ActualCost:            row.ActualCost,
+		RateMultiplier:        row.RateMultiplier,
 		BillableCost:          row.BillableCost,
 		Currency:              row.Currency,
 		ChargedAt:             cloneTime(row.ChargedAt),
@@ -175,13 +179,30 @@ func toUsageLog(row *ent.UsageLog) contract.UsageLog {
 	}
 }
 
-// billableCostOrCost falls back to the full cost when no billable amount is set,
-// preserving the pre-WP-1180 behavior for callers that do not compute coverage.
-func billableCostOrCost(billable, cost string) string {
-	if strings.TrimSpace(billable) == "" {
+func actualCostOrCost(actualCost, cost string) string {
+	if strings.TrimSpace(actualCost) == "" {
 		return cost
 	}
-	return billable
+	return actualCost
+}
+
+func rateMultiplierOrDefault(rateMultiplier string) string {
+	if strings.TrimSpace(rateMultiplier) == "" {
+		return "1.00000000"
+	}
+	return rateMultiplier
+}
+
+// billableCostOrActualCost falls back to actual_cost, then cost, preserving the
+// pre-multiplier behavior for callers that do not compute subscription coverage.
+func billableCostOrActualCost(billable, actualCost, cost string) string {
+	if strings.TrimSpace(billable) != "" {
+		return billable
+	}
+	if strings.TrimSpace(actualCost) != "" {
+		return actualCost
+	}
+	return cost
 }
 
 func cloneInt(value *int) *int {

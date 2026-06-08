@@ -100,6 +100,20 @@ func (_u *AccountGroupUpdate) SetNillableStrategyHint(v *string) *AccountGroupUp
 	return _u
 }
 
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (_u *AccountGroupUpdate) SetRateMultiplier(v string) *AccountGroupUpdate {
+	_u.mutation.SetRateMultiplier(v)
+	return _u
+}
+
+// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
+func (_u *AccountGroupUpdate) SetNillableRateMultiplier(v *string) *AccountGroupUpdate {
+	if v != nil {
+		_u.SetRateMultiplier(*v)
+	}
+	return _u
+}
+
 // SetStatus sets the "status" field.
 func (_u *AccountGroupUpdate) SetStatus(v string) *AccountGroupUpdate {
 	_u.mutation.SetStatus(v)
@@ -201,6 +215,9 @@ func (_u *AccountGroupUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if value, ok := _u.mutation.StrategyHint(); ok {
 		_spec.SetField(accountgroup.FieldStrategyHint, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.RateMultiplier(); ok {
+		_spec.SetField(accountgroup.FieldRateMultiplier, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(accountgroup.FieldStatus, field.TypeString, value)
 	}
@@ -292,6 +309,20 @@ func (_u *AccountGroupUpdateOne) SetStrategyHint(v string) *AccountGroupUpdateOn
 func (_u *AccountGroupUpdateOne) SetNillableStrategyHint(v *string) *AccountGroupUpdateOne {
 	if v != nil {
 		_u.SetStrategyHint(*v)
+	}
+	return _u
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (_u *AccountGroupUpdateOne) SetRateMultiplier(v string) *AccountGroupUpdateOne {
+	_u.mutation.SetRateMultiplier(v)
+	return _u
+}
+
+// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
+func (_u *AccountGroupUpdateOne) SetNillableRateMultiplier(v *string) *AccountGroupUpdateOne {
+	if v != nil {
+		_u.SetRateMultiplier(*v)
 	}
 	return _u
 }
@@ -426,6 +457,9 @@ func (_u *AccountGroupUpdateOne) sqlSave(ctx context.Context) (_node *AccountGro
 	}
 	if value, ok := _u.mutation.StrategyHint(); ok {
 		_spec.SetField(accountgroup.FieldStrategyHint, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RateMultiplier(); ok {
+		_spec.SetField(accountgroup.FieldRateMultiplier, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(accountgroup.FieldStatus, field.TypeString, value)

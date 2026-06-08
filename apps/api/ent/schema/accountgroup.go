@@ -21,6 +21,7 @@ func (AccountGroup) Fields() []ent.Field {
 		field.JSON("provider_scope_json", map[string]any{}).Optional(),
 		field.JSON("model_scope_json", map[string]any{}).Optional(),
 		field.String("strategy_hint").Default("balanced"),
+		field.String("rate_multiplier").Default("1.00000000"),
 		field.String("status").Default("active"),
 	}
 }

@@ -1,4 +1,4 @@
-h1:lXiMZF/cTgccV0QqXBGapIybfBXyQGNn0iLpvl8Kdro=
+h1:Rrow1/nViyj123QnPbFwbS03fEFEnOllgLiwlESWZSg=
 000001_initial_schema.sql h1:cyZ0pax3l7J4onSmEmgqPwpoJYXPXuJYXeTAGUOEHs4=
 000002_auth_sessions.sql h1:zJ6uEWQDpw4sa3JpABmlbbFR2Sy3JCceNl4UnBtcX9c=
 000003_api_key_concurrency_limit.sql h1:j/8OE2iF7+LUa5XCsyYSC4dvN1Vh2cihbc41rySg4OQ=
@@ -33,3 +33,4 @@ h1:lXiMZF/cTgccV0QqXBGapIybfBXyQGNn0iLpvl8Kdro=
 000032_observability_alerts_and_scheduled_tests.sql h1:KseV++akoj8GhFTQQ4OnvKQKvk5DfDoDHVezgWVqob4=
 000033_channel_monitors.sql h1:T+lcXaQET9lZAQfYHPELSOJQInRHGgCqPMwqO0QUEXo=
 000034_copilot_conversations.sql h1:4lZweUC/sHbxnj0s+5oOStZONMo9QBaeVPdOmSl9YlE=
+000035_usage_actual_cost_and_group_rate_multiplier.sql h1:WgLEMP42OfufpfsacIGDFAugvPUvzgrhCuNNFIVsGs4=

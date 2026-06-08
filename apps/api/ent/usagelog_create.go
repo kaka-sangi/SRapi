@@ -304,6 +304,34 @@ func (_c *UsageLogCreate) SetNillableCost(v *string) *UsageLogCreate {
 	return _c
 }
 
+// SetActualCost sets the "actual_cost" field.
+func (_c *UsageLogCreate) SetActualCost(v string) *UsageLogCreate {
+	_c.mutation.SetActualCost(v)
+	return _c
+}
+
+// SetNillableActualCost sets the "actual_cost" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableActualCost(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetActualCost(*v)
+	}
+	return _c
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (_c *UsageLogCreate) SetRateMultiplier(v string) *UsageLogCreate {
+	_c.mutation.SetRateMultiplier(v)
+	return _c
+}
+
+// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableRateMultiplier(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetRateMultiplier(*v)
+	}
+	return _c
+}
+
 // SetBillableCost sets the "billable_cost" field.
 func (_c *UsageLogCreate) SetBillableCost(v string) *UsageLogCreate {
 	_c.mutation.SetBillableCost(v)
@@ -451,6 +479,14 @@ func (_c *UsageLogCreate) defaults() {
 		v := usagelog.DefaultCost
 		_c.mutation.SetCost(v)
 	}
+	if _, ok := _c.mutation.ActualCost(); !ok {
+		v := usagelog.DefaultActualCost
+		_c.mutation.SetActualCost(v)
+	}
+	if _, ok := _c.mutation.RateMultiplier(); !ok {
+		v := usagelog.DefaultRateMultiplier
+		_c.mutation.SetRateMultiplier(v)
+	}
 	if _, ok := _c.mutation.BillableCost(); !ok {
 		v := usagelog.DefaultBillableCost
 		_c.mutation.SetBillableCost(v)
@@ -524,6 +560,12 @@ func (_c *UsageLogCreate) check() error {
 	}
 	if _, ok := _c.mutation.Cost(); !ok {
 		return &ValidationError{Name: "cost", err: errors.New(`ent: missing required field "UsageLog.cost"`)}
+	}
+	if _, ok := _c.mutation.ActualCost(); !ok {
+		return &ValidationError{Name: "actual_cost", err: errors.New(`ent: missing required field "UsageLog.actual_cost"`)}
+	}
+	if _, ok := _c.mutation.RateMultiplier(); !ok {
+		return &ValidationError{Name: "rate_multiplier", err: errors.New(`ent: missing required field "UsageLog.rate_multiplier"`)}
 	}
 	if _, ok := _c.mutation.BillableCost(); !ok {
 		return &ValidationError{Name: "billable_cost", err: errors.New(`ent: missing required field "UsageLog.billable_cost"`)}
@@ -644,6 +686,14 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Cost(); ok {
 		_spec.SetField(usagelog.FieldCost, field.TypeString, value)
 		_node.Cost = value
+	}
+	if value, ok := _c.mutation.ActualCost(); ok {
+		_spec.SetField(usagelog.FieldActualCost, field.TypeString, value)
+		_node.ActualCost = value
+	}
+	if value, ok := _c.mutation.RateMultiplier(); ok {
+		_spec.SetField(usagelog.FieldRateMultiplier, field.TypeString, value)
+		_node.RateMultiplier = value
 	}
 	if value, ok := _c.mutation.BillableCost(); ok {
 		_spec.SetField(usagelog.FieldBillableCost, field.TypeString, value)

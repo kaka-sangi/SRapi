@@ -256,6 +256,7 @@ func (s *Store) CreateGroup(_ context.Context, input contract.CreateStoredAccoun
 		ProviderScope: cloneMap(input.ProviderScope),
 		ModelScope:    cloneMap(input.ModelScope),
 		StrategyHint:  input.StrategyHint,
+		RateMultiplier: input.RateMultiplier,
 		Status:        input.Status,
 		CreatedAt:     now,
 		UpdatedAt:     now,

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/url"
 	"sort"
 	"strconv"
@@ -265,13 +266,18 @@ func (s *Service) CreateGroup(ctx context.Context, req contract.CreateGroupReque
 		}
 		status = *req.Status
 	}
+	rateMultiplier, ok := normalizeRateMultiplier(req.RateMultiplier)
+	if !ok {
+		return contract.AccountGroup{}, ErrInvalidInput
+	}
 	return s.store.CreateGroup(ctx, contract.CreateStoredAccountGroup{
-		Name:          name,
-		Description:   strings.TrimSpace(req.Description),
-		ProviderScope: cloneMap(req.ProviderScope),
-		ModelScope:    cloneMap(req.ModelScope),
-		StrategyHint:  strategy,
-		Status:        status,
+		Name:           name,
+		Description:    strings.TrimSpace(req.Description),
+		ProviderScope:  cloneMap(req.ProviderScope),
+		ModelScope:     cloneMap(req.ModelScope),
+		StrategyHint:   strategy,
+		RateMultiplier: rateMultiplier,
+		Status:         status,
 	})
 }
 
@@ -305,6 +311,13 @@ func (s *Service) UpdateGroup(ctx context.Context, id int, req contract.UpdateGr
 			return contract.AccountGroup{}, ErrInvalidInput
 		}
 		group.StrategyHint = strategy
+	}
+	if req.RateMultiplier != nil {
+		rateMultiplier, ok := normalizeRateMultiplier(req.RateMultiplier)
+		if !ok {
+			return contract.AccountGroup{}, ErrInvalidInput
+		}
+		group.RateMultiplier = rateMultiplier
 	}
 	if req.Status != nil {
 		if !validGroupStatus(*req.Status) {
@@ -912,6 +925,21 @@ func validGroupStatus(status contract.GroupStatus) bool {
 	default:
 		return false
 	}
+}
+
+func normalizeRateMultiplier(value *string) (string, bool) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return "1.00000000", true
+	}
+	trimmed := strings.TrimSpace(*value)
+	if strings.ContainsAny(trimmed, "eE") {
+		return "", false
+	}
+	rat, ok := new(big.Rat).SetString(trimmed)
+	if !ok || rat.Sign() < 0 {
+		return "", false
+	}
+	return rat.FloatString(8), true
 }
 
 func validAccountStatus(status contract.Status) bool {

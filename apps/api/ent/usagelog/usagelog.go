@@ -57,6 +57,10 @@ const (
 	FieldErrorClass = "error_class"
 	// FieldCost holds the string denoting the cost field in the database.
 	FieldCost = "cost"
+	// FieldActualCost holds the string denoting the actual_cost field in the database.
+	FieldActualCost = "actual_cost"
+	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
+	FieldRateMultiplier = "rate_multiplier"
 	// FieldBillableCost holds the string denoting the billable_cost field in the database.
 	FieldBillableCost = "billable_cost"
 	// FieldCurrency holds the string denoting the currency field in the database.
@@ -94,6 +98,8 @@ var Columns = []string{
 	FieldSuccess,
 	FieldErrorClass,
 	FieldCost,
+	FieldActualCost,
+	FieldRateMultiplier,
 	FieldBillableCost,
 	FieldCurrency,
 	FieldChargedAt,
@@ -147,6 +153,10 @@ var (
 	DefaultSuccess bool
 	// DefaultCost holds the default value on creation for the "cost" field.
 	DefaultCost string
+	// DefaultActualCost holds the default value on creation for the "actual_cost" field.
+	DefaultActualCost string
+	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
+	DefaultRateMultiplier string
 	// DefaultBillableCost holds the default value on creation for the "billable_cost" field.
 	DefaultBillableCost string
 	// DefaultCurrency holds the default value on creation for the "currency" field.
@@ -269,6 +279,16 @@ func ByErrorClass(opts ...sql.OrderTermOption) OrderOption {
 // ByCost orders the results by the cost field.
 func ByCost(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCost, opts...).ToFunc()
+}
+
+// ByActualCost orders the results by the actual_cost field.
+func ByActualCost(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldActualCost, opts...).ToFunc()
+}
+
+// ByRateMultiplier orders the results by the rate_multiplier field.
+func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateMultiplier, opts...).ToFunc()
 }
 
 // ByBillableCost orders the results by the billable_cost field.

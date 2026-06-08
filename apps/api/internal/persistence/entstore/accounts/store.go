@@ -212,6 +212,7 @@ func (s *Store) CreateGroup(ctx context.Context, input contract.CreateStoredAcco
 		SetProviderScopeJSON(cloneMap(input.ProviderScope)).
 		SetModelScopeJSON(cloneMap(input.ModelScope)).
 		SetStrategyHint(input.StrategyHint).
+		SetRateMultiplier(input.RateMultiplier).
 		SetStatus(string(input.Status)).
 		Save(ctx)
 	if err != nil {
@@ -227,6 +228,7 @@ func (s *Store) UpdateGroup(ctx context.Context, group contract.AccountGroup) (c
 		SetProviderScopeJSON(cloneMap(group.ProviderScope)).
 		SetModelScopeJSON(cloneMap(group.ModelScope)).
 		SetStrategyHint(group.StrategyHint).
+		SetRateMultiplier(group.RateMultiplier).
 		SetStatus(string(group.Status))
 	if !group.UpdatedAt.IsZero() {
 		update.SetUpdatedAt(group.UpdatedAt)
@@ -468,6 +470,7 @@ func toGroup(row *ent.AccountGroup) contract.AccountGroup {
 		ProviderScope: cloneMap(row.ProviderScopeJSON),
 		ModelScope:    cloneMap(row.ModelScopeJSON),
 		StrategyHint:  row.StrategyHint,
+		RateMultiplier: row.RateMultiplier,
 		Status:        contract.GroupStatus(row.Status),
 		CreatedAt:     row.CreatedAt,
 		UpdatedAt:     row.UpdatedAt,

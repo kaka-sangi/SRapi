@@ -27,6 +27,8 @@ const (
 	FieldModelScopeJSON = "model_scope_json"
 	// FieldStrategyHint holds the string denoting the strategy_hint field in the database.
 	FieldStrategyHint = "strategy_hint"
+	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
+	FieldRateMultiplier = "rate_multiplier"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// Table holds the table name of the accountgroup in the database.
@@ -43,6 +45,7 @@ var Columns = []string{
 	FieldProviderScopeJSON,
 	FieldModelScopeJSON,
 	FieldStrategyHint,
+	FieldRateMultiplier,
 	FieldStatus,
 }
 
@@ -69,6 +72,8 @@ var (
 	DefaultDescription string
 	// DefaultStrategyHint holds the default value on creation for the "strategy_hint" field.
 	DefaultStrategyHint string
+	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
+	DefaultRateMultiplier string
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 )
@@ -104,6 +109,11 @@ func ByDescription(opts ...sql.OrderTermOption) OrderOption {
 // ByStrategyHint orders the results by the strategy_hint field.
 func ByStrategyHint(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStrategyHint, opts...).ToFunc()
+}
+
+// ByRateMultiplier orders the results by the rate_multiplier field.
+func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateMultiplier, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

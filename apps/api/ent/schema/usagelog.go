@@ -36,6 +36,8 @@ func (UsageLog) Fields() []ent.Field {
 		field.Bool("success").Default(false),
 		field.String("error_class").Optional().Nillable(),
 		field.String("cost").Default("0.00000000"),
+		field.String("actual_cost").Default("0.00000000"),
+		field.String("rate_multiplier").Default("1.00000000"),
 		// billable_cost is the portion of cost charged to the user's balance after
 		// subscription allowance coverage. Equals cost unless a subscription in
 		// allowance mode covered part/all of the request (WP-1180).

@@ -410,6 +410,34 @@ func (_u *UsageLogUpdate) SetNillableCost(v *string) *UsageLogUpdate {
 	return _u
 }
 
+// SetActualCost sets the "actual_cost" field.
+func (_u *UsageLogUpdate) SetActualCost(v string) *UsageLogUpdate {
+	_u.mutation.SetActualCost(v)
+	return _u
+}
+
+// SetNillableActualCost sets the "actual_cost" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableActualCost(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetActualCost(*v)
+	}
+	return _u
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (_u *UsageLogUpdate) SetRateMultiplier(v string) *UsageLogUpdate {
+	_u.mutation.SetRateMultiplier(v)
+	return _u
+}
+
+// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableRateMultiplier(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetRateMultiplier(*v)
+	}
+	return _u
+}
+
 // SetBillableCost sets the "billable_cost" field.
 func (_u *UsageLogUpdate) SetBillableCost(v string) *UsageLogUpdate {
 	_u.mutation.SetBillableCost(v)
@@ -643,6 +671,12 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Cost(); ok {
 		_spec.SetField(usagelog.FieldCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ActualCost(); ok {
+		_spec.SetField(usagelog.FieldActualCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RateMultiplier(); ok {
+		_spec.SetField(usagelog.FieldRateMultiplier, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.BillableCost(); ok {
 		_spec.SetField(usagelog.FieldBillableCost, field.TypeString, value)
@@ -1068,6 +1102,34 @@ func (_u *UsageLogUpdateOne) SetNillableCost(v *string) *UsageLogUpdateOne {
 	return _u
 }
 
+// SetActualCost sets the "actual_cost" field.
+func (_u *UsageLogUpdateOne) SetActualCost(v string) *UsageLogUpdateOne {
+	_u.mutation.SetActualCost(v)
+	return _u
+}
+
+// SetNillableActualCost sets the "actual_cost" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableActualCost(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetActualCost(*v)
+	}
+	return _u
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (_u *UsageLogUpdateOne) SetRateMultiplier(v string) *UsageLogUpdateOne {
+	_u.mutation.SetRateMultiplier(v)
+	return _u
+}
+
+// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableRateMultiplier(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetRateMultiplier(*v)
+	}
+	return _u
+}
+
 // SetBillableCost sets the "billable_cost" field.
 func (_u *UsageLogUpdateOne) SetBillableCost(v string) *UsageLogUpdateOne {
 	_u.mutation.SetBillableCost(v)
@@ -1331,6 +1393,12 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if value, ok := _u.mutation.Cost(); ok {
 		_spec.SetField(usagelog.FieldCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ActualCost(); ok {
+		_spec.SetField(usagelog.FieldActualCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RateMultiplier(); ok {
+		_spec.SetField(usagelog.FieldRateMultiplier, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.BillableCost(); ok {
 		_spec.SetField(usagelog.FieldBillableCost, field.TypeString, value)
