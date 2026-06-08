@@ -125,6 +125,24 @@ func openAIPreset(providerKey string, displayName string, defaultBaseURL string,
 			ModelCatalog: []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "o4-mini", "o3", "o3-pro"},
 		}
 	}
+	switch providerKey {
+	case "deepseek":
+		preset.AccountTemplate = &AccountTemplate{
+			ModelCatalog: []string{"deepseek-r1", "deepseek-v3-0324", "deepseek-chat", "deepseek-reasoner"},
+		}
+	case "groq":
+		preset.AccountTemplate = &AccountTemplate{
+			ModelCatalog: []string{"llama-4-scout-17b-16e-instruct", "llama-4-maverick-17b-128e-instruct", "qwen-qwq-32b", "deepseek-r1-distill-llama-70b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"},
+		}
+	case "mistral":
+		preset.AccountTemplate = &AccountTemplate{
+			ModelCatalog: []string{"mistral-large-latest", "mistral-medium-latest", "mistral-small-latest", "codestral-latest", "open-mistral-nemo"},
+		}
+	case "openrouter":
+		preset.AccountTemplate = &AccountTemplate{
+			ModelCatalog: []string{"openai/gpt-4.1", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro", "deepseek/deepseek-r1", "meta-llama/llama-4-scout"},
+		}
+	}
 	return preset
 }
 

@@ -35,6 +35,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { ADMIN_ROUTES } from "@/lib/routes";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { adminErrorMessage } from "@/lib/admin-api";
 import {
@@ -280,9 +281,14 @@ function AccountsContent() {
         emptyTitle={t("adminAccounts.emptyTitle")}
         emptyBody={t("adminAccounts.emptyBody")}
         emptyAction={
-          <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
-            ＋ {t("adminAccounts.create")}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
+              ＋ {t("adminAccounts.create")}
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <a href={ADMIN_ROUTES.quickSetup}>{t("adminAccounts.emptyQuickSetup")}</a>
+            </Button>
+          </div>
         }
         dimRow={(a) => a.status === "disabled"}
         isFiltered={isFiltered}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { FileDropZone } from "@/components/ui/file-drop-zone";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -53,12 +54,20 @@ export function CodexSessionImportDialog({
   const [updateExisting, setUpdateExisting] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CodexSessionImportResult | null>(null);
+  const [fileNames, setFileNames] = useState<string[]>([]);
+
+  const handleFiles = useCallback(async (files: File[]) => {
+    const texts = await Promise.all(files.map((f) => f.text()));
+    setContent((prev) => (prev ? prev + "\n" : "") + texts.join("\n"));
+    setFileNames((prev) => [...prev, ...files.map((f) => f.name)]);
+  }, []);
 
   function reset() {
     setContent("");
     setName("");
     setError(null);
     setResult(null);
+    setFileNames([]);
   }
 
   async function submit() {
@@ -128,6 +137,16 @@ export function CodexSessionImportDialog({
 
           <div>
             <Label htmlFor="codex-import-content">{t("codexImport.content")}</Label>
+            <FileDropZone
+              accept=".json,.txt,.ndjson"
+              multiple
+              disabled={importMut.isPending}
+              hint={t("codexImport.dropHint")}
+              onFiles={(files) => void handleFiles(files)}
+              fileNames={fileNames}
+              onClearFiles={() => { setFileNames([]); setContent(""); }}
+              className="mb-2"
+            />
             <Textarea
               id="codex-import-content"
               rows={8}

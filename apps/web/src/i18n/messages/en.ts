@@ -484,6 +484,7 @@ export const en = {
     test: "Test",
     emptyTitle: "No provider accounts",
     emptyBody: "Add a provider account to start routing requests.",
+    emptyQuickSetup: "Quick Setup",
     create: "New account",
     edit: "Edit account",
     credential: "Credential (JSON)",
@@ -563,6 +564,7 @@ export const en = {
     importJson: "Accounts JSON",
     importSubmit: "Import accounts",
     importDone: "Imported {created} accounts, skipped {skipped}",
+    importDropHint: "Drop an exported .json here, or click to browse",
     importErrorsTitle: "Some accounts were not imported",
     runtime: {
       api_key: "API Key",
@@ -609,6 +611,7 @@ export const en = {
     namePlaceholder: "Defaults to the session email or account id",
     updateExisting: "Update matching accounts",
     updateExistingHint: "Refresh the credential of an existing account instead of skipping it.",
+    dropHint: "Drop .json files here, or click to browse",
     submit: "Import",
     done: "Codex import complete",
     doneSummary: "Created {created} · Updated {updated} · Skipped {skipped} · Failed {failed}",
@@ -708,6 +711,9 @@ export const en = {
     resultAccount: "Account",
     resultModels: "Models mapped",
     warnings: "Warnings",
+    discoverModels: "Discover models",
+    discoverDone: "Models discovered from upstream",
+    discoverFailed: "Model discovery failed",
   },
   adminProviders: {
     title: "Providers",

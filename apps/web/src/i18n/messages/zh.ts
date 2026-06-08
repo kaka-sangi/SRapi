@@ -484,6 +484,7 @@ export const zh: Messages = {
     test: "测试",
     emptyTitle: "暂无上游账号",
     emptyBody: "添加一个上游账号即可开始分发请求。",
+    emptyQuickSetup: "快速设置",
     create: "新建账号",
     edit: "编辑账号",
     credential: "凭证 (JSON)",
@@ -562,6 +563,7 @@ export const zh: Messages = {
     importJson: "账号 JSON",
     importSubmit: "导入账号",
     importDone: "已导入 {created} 个账号，跳过 {skipped} 个",
+    importDropHint: "将导出的 .json 文件拖放至此，或点击浏览",
     importErrorsTitle: "部分账号未能导入",
     runtime: {
       api_key: "API Key",
@@ -606,6 +608,7 @@ export const zh: Messages = {
     namePlaceholder: "默认使用会话中的邮箱或账号 ID",
     updateExisting: "更新已存在的账号",
     updateExistingHint: "命中已有账号时刷新其凭证，而不是跳过。",
+    dropHint: "将 .json 文件拖放至此，或点击浏览",
     submit: "导入",
     done: "Codex 导入完成",
     doneSummary: "新建 {created} · 更新 {updated} · 跳过 {skipped} · 失败 {failed}",
@@ -704,6 +707,9 @@ export const zh: Messages = {
     resultAccount: "账号",
     resultModels: "已映射模型",
     warnings: "警告",
+    discoverModels: "发现模型",
+    discoverDone: "已从上游发现模型",
+    discoverFailed: "模型发现失败",
   },
   adminProviders: {
     title: "供应商",

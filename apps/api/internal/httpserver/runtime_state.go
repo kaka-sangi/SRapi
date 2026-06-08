@@ -1025,26 +1025,6 @@ func (rt *runtimeState) bootstrapGatewayCatalog(ctx context.Context) error {
 		}
 	}
 
-	accounts, err := rt.accountStore.List(ctx)
-	if err != nil {
-		return err
-	}
-	for _, account := range accounts {
-		if strings.EqualFold(account.Name, "openai-compatible-seed") {
-			return nil
-		}
-	}
-	if _, err := rt.accounts.Create(ctx, accountcontract.CreateRequest{
-		ProviderID:   provider.ID,
-		Name:         "openai-compatible-seed",
-		RuntimeClass: accountcontract.RuntimeClassAPIKey,
-		Credential:   map[string]any{"api_key": "seed-openai-compatible"},
-		Status:       ptrAccountStatus(accountcontract.StatusActive),
-		Priority:     ptrInt(100),
-		Weight:       ptrFloat32(1.0),
-	}); err != nil {
-		return err
-	}
 	return nil
 }
 

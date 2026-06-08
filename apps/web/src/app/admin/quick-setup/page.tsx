@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAdminProxies } from "@/hooks/admin-queries";
+import { useAdminProxies, useDiscoverAccountModels } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { cn } from "@/lib/cn";
@@ -110,28 +110,28 @@ const PLATFORMS: PlatformPreset[] = [
     name: "DeepSeek",
     description: "DeepSeek R1 / V3 / Coder",
     authTypes: ["api_key"],
-    defaultModels: [],
+    defaultModels: ["deepseek-r1", "deepseek-v3-0324", "deepseek-chat", "deepseek-reasoner"],
   },
   {
     key: "groq",
     name: "Groq",
     description: "Ultra-fast inference via Groq Cloud",
     authTypes: ["api_key"],
-    defaultModels: [],
+    defaultModels: ["llama-4-scout-17b-16e-instruct", "llama-4-maverick-17b-128e-instruct", "qwen-qwq-32b", "deepseek-r1-distill-llama-70b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
   },
   {
     key: "mistral",
     name: "Mistral",
     description: "Mistral Large / Medium / Small",
     authTypes: ["api_key"],
-    defaultModels: [],
+    defaultModels: ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest", "codestral-latest", "open-mistral-nemo"],
   },
   {
     key: "openrouter",
     name: "OpenRouter",
     description: "Multi-provider aggregator",
     authTypes: ["api_key"],
-    defaultModels: [],
+    defaultModels: ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro", "deepseek/deepseek-r1", "meta-llama/llama-4-scout"],
   },
 ];
 
@@ -828,6 +828,12 @@ function ResultView({
   onReset: () => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
+  const { toast } = useToast();
+  const discoverMut = useDiscoverAccountModels();
+  const accountId = String(
+    (result.account as { id?: string | number })?.id ?? "",
+  );
+
   const providerName =
     (result.provider as { display_name?: string; name?: string })
       ?.display_name ||
@@ -913,7 +919,7 @@ function ResultView({
       )}
 
       {/* Actions */}
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <Button variant="primary" size="md" onClick={onReset}>
           {t("adminQuickSetup.backToSetup")}
         </Button>
@@ -922,6 +928,32 @@ function ResultView({
             {t("adminQuickSetup.goToAccounts")}
           </a>
         </Button>
+        {accountId && (
+          <Button
+            variant="outline"
+            size="md"
+            loading={discoverMut.isPending}
+            onClick={() =>
+              discoverMut.mutate(
+                { id: accountId },
+                {
+                  onSuccess: () =>
+                    toast({
+                      title: t("adminQuickSetup.discoverDone"),
+                      tone: "success",
+                    }),
+                  onError: () =>
+                    toast({
+                      title: t("adminQuickSetup.discoverFailed"),
+                      tone: "error",
+                    }),
+                },
+              )
+            }
+          >
+            {t("adminQuickSetup.discoverModels")}
+          </Button>
+        )}
       </div>
     </div>
   );

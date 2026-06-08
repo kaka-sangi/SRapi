@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { FileDropZone } from "@/components/ui/file-drop-zone";
 import { useImportAccounts } from "@/hooks/admin-queries";
 import { buildImportAccountsBody } from "@/lib/admin-account-form";
 import { adminErrorMessage } from "@/lib/admin-api";
@@ -32,11 +33,20 @@ export function AccountImportDialog({
   const [json, setJson] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProviderAccountImportResult | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+
+  const handleFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+    const text = await files[0].text();
+    setJson(text);
+    setFileName(files[0].name);
+  }, []);
 
   function reset() {
     setJson("");
     setError(null);
     setResult(null);
+    setFileName(null);
   }
 
   async function submit() {
@@ -79,6 +89,15 @@ export function AccountImportDialog({
         <div className="mt-4 space-y-3">
           <div>
             <Label htmlFor="import-json">{t("adminAccounts.importJson")}</Label>
+            <FileDropZone
+              accept=".json"
+              disabled={importMut.isPending}
+              hint={t("adminAccounts.importDropHint")}
+              onFiles={(files) => void handleFiles(files)}
+              fileNames={fileName ? [fileName] : undefined}
+              onClearFiles={() => { setFileName(null); setJson(""); }}
+              className="mb-2"
+            />
             <Textarea
               id="import-json"
               rows={10}
