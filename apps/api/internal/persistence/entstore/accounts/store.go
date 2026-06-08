@@ -464,16 +464,16 @@ func toProxy(row *ent.Proxy) contract.ProxyDefinition {
 
 func toGroup(row *ent.AccountGroup) contract.AccountGroup {
 	return contract.AccountGroup{
-		ID:            row.ID,
-		Name:          row.Name,
-		Description:   row.Description,
-		ProviderScope: cloneMap(row.ProviderScopeJSON),
-		ModelScope:    cloneMap(row.ModelScopeJSON),
-		StrategyHint:  row.StrategyHint,
+		ID:             row.ID,
+		Name:           row.Name,
+		Description:    row.Description,
+		ProviderScope:  cloneMap(row.ProviderScopeJSON),
+		ModelScope:     cloneMap(row.ModelScopeJSON),
+		StrategyHint:   row.StrategyHint,
 		RateMultiplier: row.RateMultiplier,
-		Status:        contract.GroupStatus(row.Status),
-		CreatedAt:     row.CreatedAt,
-		UpdatedAt:     row.UpdatedAt,
+		Status:         contract.GroupStatus(row.Status),
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
 	}
 }
 

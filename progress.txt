@@ -12,3 +12,15 @@ Evidence:
 
 Next:
 - Stage 2: pricing family fallback and rate_multiplier actual_cost billing logic with focused tests.
+
+Stage 2 complete - pricing fallback and multiplier billing
+- EstimatePrice now falls back to active PricingRule rows whose model family fuzzily matches the requested model family when no exact model rule exists.
+- Ent subscription store enriches pricing rules with model family from model_registry for fallback matching.
+- Gateway usage recording applies active account-group rate multipliers to actual_cost and stores the rate_multiplier snapshot on UsageLog while preserving standard cost.
+
+Evidence:
+- cd apps/api && go test ./internal/modules/subscriptions/service -run 'TestEstimatePrice(FallsBackToModelFamilyRule|UsesDecimalSafeProviderSpecificRulesAndOverrides)': ok.
+- cd apps/api && go test ./internal/httpserver -run 'TestRecordGatewayUsageAppliesAccountGroupRateMultiplier': ok.
+
+Next:
+- Stage 3: separate synthetic quota snapshots from real provider quota signals for scheduler and alert reads.

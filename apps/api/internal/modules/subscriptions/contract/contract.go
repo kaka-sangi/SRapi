@@ -73,6 +73,7 @@ type Entitlement struct {
 type PricingRule struct {
 	ID                              int
 	ModelID                         int
+	ModelFamily                     string
 	ProviderID                      int
 	InputPricePerMillionTokens      string
 	OutputPricePerMillionTokens     string
@@ -217,6 +218,7 @@ type CostAllowance struct {
 
 type PricingRequest struct {
 	ModelID          int
+	ModelFamily      string
 	ProviderID       int
 	InputTokens      int
 	OutputTokens     int

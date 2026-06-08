@@ -250,16 +250,16 @@ func (s *Store) CreateGroup(_ context.Context, input contract.CreateStoredAccoun
 	defer s.mu.Unlock()
 	now := time.Now().UTC()
 	group := contract.AccountGroup{
-		ID:            s.nextGroupID,
-		Name:          input.Name,
-		Description:   input.Description,
-		ProviderScope: cloneMap(input.ProviderScope),
-		ModelScope:    cloneMap(input.ModelScope),
-		StrategyHint:  input.StrategyHint,
+		ID:             s.nextGroupID,
+		Name:           input.Name,
+		Description:    input.Description,
+		ProviderScope:  cloneMap(input.ProviderScope),
+		ModelScope:     cloneMap(input.ModelScope),
+		StrategyHint:   input.StrategyHint,
 		RateMultiplier: input.RateMultiplier,
-		Status:        input.Status,
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		Status:         input.Status,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 	s.groupsByID[group.ID] = group
 	s.groupsByName[strings.ToLower(group.Name)] = group.ID

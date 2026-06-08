@@ -64,6 +64,7 @@ type Candidate struct {
 	Account               accountcontract.ProviderAccount
 	Provider              providercontract.Provider
 	Mapping               modelcontract.ModelProviderMapping
+	ModelFamily           string
 	EffectiveCapabilities []capabilitiescontract.Descriptor
 	RuntimeState          RuntimeState
 	Limits                RuntimeLimits

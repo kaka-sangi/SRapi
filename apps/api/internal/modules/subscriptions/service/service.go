@@ -532,7 +532,10 @@ func (s *Service) EstimatePrice(ctx context.Context, req contract.PricingRequest
 	}
 	rule, ok := selectPricingRule(rules, req.ModelID, req.ProviderID, at)
 	if !ok {
-		return contract.PricingResult{Amount: "0.00000000", Currency: defaultCurrency}, nil
+		rule, ok = selectFamilyPricingRule(rules, req.ModelFamily, req.ProviderID, at)
+		if !ok {
+			return contract.PricingResult{Amount: "0.00000000", Currency: defaultCurrency}, nil
+		}
 	}
 	ruleID := rule.ID
 	return priceFromRule(rule, req, &ruleID), nil
@@ -670,6 +673,43 @@ func selectPricingRule(rules []contract.PricingRule, modelID int, providerID int
 		}
 	}
 	return selected, found
+}
+
+func selectFamilyPricingRule(rules []contract.PricingRule, modelFamily string, providerID int, at time.Time) (contract.PricingRule, bool) {
+	modelFamily = normalizePricingFamily(modelFamily)
+	if modelFamily == "" {
+		return contract.PricingRule{}, false
+	}
+	var selected contract.PricingRule
+	found := false
+	for _, rule := range rules {
+		if !pricingFamilyMatches(modelFamily, rule.ModelFamily) {
+			continue
+		}
+		if rule.ProviderID != providerID && rule.ProviderID != 0 {
+			continue
+		}
+		if !pricingRuleActive(rule, at) {
+			continue
+		}
+		if !found || moreSpecificPricingRule(rule, selected) {
+			selected = rule
+			found = true
+		}
+	}
+	return selected, found
+}
+
+func pricingFamilyMatches(requestFamily string, ruleFamily string) bool {
+	ruleFamily = normalizePricingFamily(ruleFamily)
+	if requestFamily == "" || ruleFamily == "" {
+		return false
+	}
+	return requestFamily == ruleFamily || strings.Contains(requestFamily, ruleFamily) || strings.Contains(ruleFamily, requestFamily)
+}
+
+func normalizePricingFamily(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
 }
 
 func pricingRuleActive(rule contract.PricingRule, at time.Time) bool {

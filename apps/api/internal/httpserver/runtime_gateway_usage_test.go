@@ -287,3 +287,70 @@ func TestRecordGatewayUsagePersistsProviderQuotaSignals(t *testing.T) {
 		t.Fatalf("unexpected codex reset time: %+v", codexQuota.ResetAt)
 	}
 }
+
+func TestRecordGatewayUsageAppliesAccountGroupRateMultiplier(t *testing.T) {
+	ctx := context.Background()
+	accounts, err := accountservice.New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new account service: %v", err)
+	}
+	account, err := accounts.Create(ctx, accountcontract.CreateRequest{
+		ProviderID:   21,
+		Name:         "discount-account",
+		RuntimeClass: accountcontract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	rateMultiplier := "0.80000000"
+	group, err := accounts.CreateGroup(ctx, accountcontract.CreateGroupRequest{
+		Name:           "discount-group",
+		RateMultiplier: &rateMultiplier,
+	})
+	if err != nil {
+		t.Fatalf("create account group: %v", err)
+	}
+	if _, err := accounts.AddAccountToGroup(ctx, account.ID, group.ID); err != nil {
+		t.Fatalf("add account to group: %v", err)
+	}
+	usageStore := usagememory.New()
+	usage, err := usageservice.New(usageStore, nil)
+	if err != nil {
+		t.Fatalf("new usage service: %v", err)
+	}
+	events, err := eventsservice.New(eventsmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	rt := &runtimeState{
+		logger:   slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		accounts: accounts,
+		usage:    usage,
+		events:   events,
+	}
+
+	rt.recordGatewayUsage(ctx, gatewayUsageRecord{
+		RequestID:      "req_group_multiplier",
+		Authed:         apikeycontract.AuthResult{UserID: 1, Key: apikeycontract.APIKey{ID: 2}},
+		ProviderID:     ptrInt(account.ProviderID),
+		AccountID:      ptrInt(account.ID),
+		SourceEndpoint: "/v1/chat/completions",
+		TargetProtocol: "openai-compatible",
+		Model:          "claude-opus-test",
+		Success:        true,
+		Pricing:        gatewayPricingEvidence{Amount: "0.01000000", Currency: "USD", PricingSource: "pricing_rule"},
+	})
+
+	logs, err := usageStore.List(ctx)
+	if err != nil {
+		t.Fatalf("list usage logs: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("expected one usage log, got %+v", logs)
+	}
+	log := logs[0]
+	if log.Cost != "0.01000000" || log.ActualCost != "0.00800000" || log.BillableCost != "0.00800000" || log.RateMultiplier != "0.80000000" {
+		t.Fatalf("expected multiplier snapshot and actual cost, got %+v", log)
+	}
+}

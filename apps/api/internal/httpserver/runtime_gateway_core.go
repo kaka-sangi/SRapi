@@ -180,6 +180,7 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 	estimatedUsage := estimateGatewayRequestUsage(*canonical)
 	pricing := rt.gatewayPricing(ctx, subscriptioncontract.PricingRequest{
 		ModelID:      modelID,
+		ModelFamily:  optionalStringValue(resolution.Model.Family),
 		ProviderID:   0,
 		InputTokens:  estimatedUsage.InputTokens,
 		OutputTokens: estimatedUsage.OutputTokens,
@@ -575,6 +576,7 @@ func (rt *runtimeState) gatewayPricing(ctx context.Context, req subscriptioncont
 func gatewayPricingRequest(modelID int, candidate schedulercontract.Candidate, usage gatewaycontract.Usage) subscriptioncontract.PricingRequest {
 	return subscriptioncontract.PricingRequest{
 		ModelID:          modelID,
+		ModelFamily:      candidate.ModelFamily,
 		ProviderID:       candidate.Provider.ID,
 		InputTokens:      usage.InputTokens,
 		OutputTokens:     usage.OutputTokens,
@@ -1165,6 +1167,7 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 				Account:               account,
 				Provider:              provider,
 				Mapping:               mapping,
+				ModelFamily:           optionalStringValue(model.Family),
 				EffectiveCapabilities: effectiveCapabilities(model, mapping, provider, account),
 				RuntimeState:          runtimeState,
 				Limits:                schedulerRuntimeLimits(account.Metadata),

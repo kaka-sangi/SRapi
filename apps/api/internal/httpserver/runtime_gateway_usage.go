@@ -24,7 +24,9 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	}
 	pricing := rec.Pricing.withDefaults()
 	rt.warnDefaultZeroGatewayPricing(rec, model, pricing)
-	billableCost := rt.gatewayBillableCost(ctx, rec, pricing.Amount)
+	rateMultiplier := rt.gatewayAccountRateMultiplier(ctx, rec.AccountID)
+	actualCost := applyRateMultiplier(pricing.Amount, rateMultiplier)
+	billableCost := rt.gatewayBillableCost(ctx, rec, actualCost)
 	usageLog, usageErr := rt.usage.Record(ctx, usagecontract.RecordRequest{
 		RequestID:             rec.RequestID,
 		AttemptNo:             rec.AttemptNo,
@@ -45,6 +47,8 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		Success:               rec.Success,
 		ErrorClass:            rec.ErrorClass,
 		Cost:                  pricing.Amount,
+		ActualCost:            actualCost,
+		RateMultiplier:        rateMultiplier,
 		BillableCost:          billableCost,
 		Currency:              pricing.Currency,
 		CompatibilityWarnings: rec.CompatibilityWarnings,
@@ -72,7 +76,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		InputTokens:  rec.InputTokens,
 		OutputTokens: rec.OutputTokens,
 		CachedTokens: rec.CachedTokens,
-		ActualCost:   pricing.Amount,
+		ActualCost:   actualCost,
 		Currency:     pricing.Currency,
 	})
 	if feedbackErr != nil {
@@ -110,6 +114,58 @@ func (rt *runtimeState) gatewayBillableCost(ctx context.Context, rec gatewayUsag
 		return cost
 	}
 	return subscriptionservice.BillableOverage(cost, usedCost, *allowance.Quota)
+}
+
+func (rt *runtimeState) gatewayAccountRateMultiplier(ctx context.Context, accountID *int) string {
+	if rt == nil || rt.accounts == nil || accountID == nil || *accountID <= 0 {
+		return "1.00000000"
+	}
+	groupIDs, err := rt.accounts.ListGroupIDsByAccount(ctx, *accountID)
+	if err != nil || len(groupIDs) == 0 {
+		return "1.00000000"
+	}
+	multiplier := big.NewRat(1, 1)
+	found := false
+	for _, groupID := range groupIDs {
+		group, err := rt.accounts.FindGroupByID(ctx, groupID)
+		if err != nil || group.Status != accountcontract.GroupStatusActive {
+			continue
+		}
+		rate, ok := decimalRatString(group.RateMultiplier)
+		if !ok || rate.Sign() < 0 {
+			if rt.logger != nil {
+				rt.logger.Warn("invalid account group rate multiplier", "account_id", *accountID, "group_id", groupID, "rate_multiplier", group.RateMultiplier)
+			}
+			continue
+		}
+		multiplier.Mul(multiplier, rate)
+		found = true
+	}
+	if !found {
+		return "1.00000000"
+	}
+	return multiplier.FloatString(8)
+}
+
+func applyRateMultiplier(cost string, rateMultiplier string) string {
+	costRat, ok := decimalRatString(cost)
+	if !ok {
+		return cost
+	}
+	rateRat, ok := decimalRatString(rateMultiplier)
+	if !ok || rateRat.Sign() < 0 {
+		rateRat = big.NewRat(1, 1)
+	}
+	return costRat.Mul(costRat, rateRat).FloatString(8)
+}
+
+func decimalRatString(value string) (*big.Rat, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.ContainsAny(value, "eE") {
+		return nil, false
+	}
+	rat, ok := new(big.Rat).SetString(value)
+	return rat, ok
 }
 
 func (rt *runtimeState) warnDefaultZeroGatewayPricing(rec gatewayUsageRecord, model string, pricing gatewayPricingEvidence) {

@@ -242,6 +242,44 @@ func TestEstimatePriceUsesDecimalSafeProviderSpecificRulesAndOverrides(t *testin
 	}
 }
 
+func TestEstimatePriceFallsBackToModelFamilyRule(t *testing.T) {
+	store := subscriptionmemory.New()
+	svc, err := service.New(store, nil)
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+	rule, err := store.CreatePricingRule(t.Context(), contract.PricingRule{
+		ModelID:                         10,
+		ModelFamily:                     "opus",
+		ProviderID:                      0,
+		InputPricePerMillionTokens:      "15.00000000",
+		OutputPricePerMillionTokens:     "75.00000000",
+		CacheReadPricePerMillionTokens:  "1.50000000",
+		CacheWritePricePerMillionTokens: "15.00000000",
+		Currency:                        "USD",
+	})
+	if err != nil {
+		t.Fatalf("create family fallback pricing rule: %v", err)
+	}
+
+	estimated, err := svc.EstimatePrice(t.Context(), contract.PricingRequest{
+		ModelID:      99,
+		ModelFamily:  "opus",
+		ProviderID:   7,
+		InputTokens:  1000,
+		OutputTokens: 1000,
+	})
+	if err != nil {
+		t.Fatalf("estimate family fallback price: %v", err)
+	}
+	if estimated.Amount != "0.09000000" || estimated.Currency != "USD" {
+		t.Fatalf("expected non-zero opus family fallback price, got %+v", estimated)
+	}
+	if estimated.PricingRuleID == nil || *estimated.PricingRuleID != rule.ID {
+		t.Fatalf("expected fallback rule id %d, got %+v", rule.ID, estimated.PricingRuleID)
+	}
+}
+
 func TestValidatePricingRuleDoesNotPersist(t *testing.T) {
 	svc, err := service.New(subscriptionmemory.New(), nil)
 	if err != nil {

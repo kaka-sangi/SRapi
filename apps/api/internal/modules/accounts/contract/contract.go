@@ -88,16 +88,16 @@ type ProxyDefinition struct {
 }
 
 type AccountGroup struct {
-	ID            int
-	Name          string
-	Description   string
-	ProviderScope map[string]any
-	ModelScope    map[string]any
-	StrategyHint  string
+	ID             int
+	Name           string
+	Description    string
+	ProviderScope  map[string]any
+	ModelScope     map[string]any
+	StrategyHint   string
 	RateMultiplier string
-	Status        GroupStatus
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	Status         GroupStatus
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type AccountGroupMember struct {
@@ -211,23 +211,23 @@ type UpdateRequest struct {
 }
 
 type CreateGroupRequest struct {
-	Name          string
-	Description   string
-	ProviderScope map[string]any
-	ModelScope    map[string]any
-	StrategyHint  *string
+	Name           string
+	Description    string
+	ProviderScope  map[string]any
+	ModelScope     map[string]any
+	StrategyHint   *string
 	RateMultiplier *string
-	Status        *GroupStatus
+	Status         *GroupStatus
 }
 
 type UpdateGroupRequest struct {
-	Name          *string
-	Description   *string
-	ProviderScope *map[string]any
-	ModelScope    *map[string]any
-	StrategyHint  *string
+	Name           *string
+	Description    *string
+	ProviderScope  *map[string]any
+	ModelScope     *map[string]any
+	StrategyHint   *string
 	RateMultiplier *string
-	Status        *GroupStatus
+	Status         *GroupStatus
 }
 
 type CreateProxyRequest struct {
@@ -270,13 +270,13 @@ type CreateStoredProxy struct {
 }
 
 type CreateStoredAccountGroup struct {
-	Name          string
-	Description   string
-	ProviderScope map[string]any
-	ModelScope    map[string]any
-	StrategyHint  string
+	Name           string
+	Description    string
+	ProviderScope  map[string]any
+	ModelScope     map[string]any
+	StrategyHint   string
 	RateMultiplier string
-	Status        GroupStatus
+	Status         GroupStatus
 }
 
 type Store interface {

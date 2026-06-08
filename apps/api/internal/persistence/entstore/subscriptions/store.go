@@ -9,6 +9,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/ent"
 	ententitlement "github.com/srapi/srapi/apps/api/ent/entitlement"
+	entmodelregistry "github.com/srapi/srapi/apps/api/ent/modelregistry"
 	entpricingrule "github.com/srapi/srapi/apps/api/ent/pricingrule"
 	entsubscriptionplan "github.com/srapi/srapi/apps/api/ent/subscriptionplan"
 	entusersubscription "github.com/srapi/srapi/apps/api/ent/usersubscription"
@@ -422,9 +423,42 @@ func (s *Store) ListPricingRules(ctx context.Context) ([]contract.PricingRule, e
 	if err != nil {
 		return nil, err
 	}
+	families, err := s.pricingRuleModelFamilies(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]contract.PricingRule, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, toPricingRule(row))
+		out = append(out, toPricingRuleWithFamily(row, families[row.ModelID]))
+	}
+	return out, nil
+}
+
+func (s *Store) pricingRuleModelFamilies(ctx context.Context, rows []*ent.PricingRule) (map[int]string, error) {
+	ids := make([]int, 0, len(rows))
+	seen := map[int]struct{}{}
+	for _, row := range rows {
+		if row.ModelID <= 0 {
+			continue
+		}
+		if _, ok := seen[row.ModelID]; ok {
+			continue
+		}
+		seen[row.ModelID] = struct{}{}
+		ids = append(ids, row.ModelID)
+	}
+	if len(ids) == 0 {
+		return map[int]string{}, nil
+	}
+	models, err := s.client.ModelRegistry.Query().
+		Where(entmodelregistry.IDIn(ids...), entmodelregistry.DeletedAtIsNil()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int]string, len(models))
+	for _, model := range models {
+		out[model.ID] = model.Family
 	}
 	return out, nil
 }
@@ -490,9 +524,14 @@ func toEntitlement(row *ent.Entitlement) contract.Entitlement {
 }
 
 func toPricingRule(row *ent.PricingRule) contract.PricingRule {
+	return toPricingRuleWithFamily(row, "")
+}
+
+func toPricingRuleWithFamily(row *ent.PricingRule, modelFamily string) contract.PricingRule {
 	return contract.PricingRule{
 		ID:                              row.ID,
 		ModelID:                         row.ModelID,
+		ModelFamily:                     modelFamily,
 		ProviderID:                      row.ProviderID,
 		InputPricePerMillionTokens:      row.InputPricePerMillion,
 		OutputPricePerMillionTokens:     row.OutputPricePerMillion,
