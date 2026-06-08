@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"entgo.io/ent/dialect"
 	"github.com/srapi/srapi/apps/api/ent/enttest"
@@ -160,6 +161,61 @@ func TestStoreCreatesUpdatesAndListsProxies(t *testing.T) {
 	}
 	if len(items) != 1 || items[0].ID != created.ID {
 		t.Fatalf("unexpected proxies list: %+v", items)
+	}
+}
+
+func TestStoreListsLatestQuotaSnapshotPerType(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+	account, err := store.Create(ctx, contract.CreateStoredAccount{
+		ProviderID:           9,
+		Name:                 "quota-bucketed",
+		RuntimeClass:         contract.RuntimeClassAPIKey,
+		CredentialCiphertext: "ciphertext",
+		CredentialVersion:    "v1",
+		Status:               contract.StatusActive,
+		Priority:             1,
+		Weight:               1,
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	now := time.Date(2026, 6, 8, 12, 0, 0, 0, time.UTC)
+	snapshots := []contract.AccountQuotaSnapshot{
+		{QuotaType: "codex_5h_percent", Remaining: "80", RemainingRatio: 0.80, SnapshotAt: now.Add(-3 * time.Minute)},
+		{QuotaType: "codex_5h_percent", Remaining: "40", RemainingRatio: 0.40, SnapshotAt: now.Add(-time.Minute)},
+		{QuotaType: "codex_7d_percent", Remaining: "90", RemainingRatio: 0.90, SnapshotAt: now.Add(-2 * time.Minute)},
+		{QuotaType: "codex_7d_percent", Remaining: "70", RemainingRatio: 0.70, SnapshotAt: now.Add(-30 * time.Second)},
+	}
+	for _, snapshot := range snapshots {
+		snapshot.AccountID = account.ID
+		snapshot.ProviderID = account.ProviderID
+		snapshot.QuotaLimit = "100"
+		if _, err := store.RecordQuotaSnapshot(ctx, snapshot); err != nil {
+			t.Fatalf("record quota %s: %v", snapshot.QuotaType, err)
+		}
+	}
+
+	latest, err := store.ListQuotaSnapshotsByAccount(ctx, account.ID, 1)
+	if err != nil {
+		t.Fatalf("list quota snapshots: %v", err)
+	}
+	if len(latest) != 2 {
+		t.Fatalf("expected one latest snapshot per quota type, got %+v", latest)
+	}
+	got := map[string]float32{}
+	for _, snapshot := range latest {
+		got[snapshot.QuotaType] = snapshot.RemainingRatio
+	}
+	if got["codex_5h_percent"] != 0.40 || got["codex_7d_percent"] != 0.70 {
+		t.Fatalf("expected latest ratio per quota type, got %+v", latest)
 	}
 }
 

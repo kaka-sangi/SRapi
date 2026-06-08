@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"math"
 	"net/http"
 	"strings"
 	"testing"
@@ -285,6 +286,57 @@ func TestRecordGatewayUsagePersistsProviderQuotaSignals(t *testing.T) {
 	}
 	if codexQuota.ResetAt == nil || !codexQuota.ResetAt.Equal(resetAt) {
 		t.Fatalf("unexpected codex reset time: %+v", codexQuota.ResetAt)
+	}
+}
+
+func TestAccountSchedulerRuntimeStateIgnoresSyntheticQuotaSnapshots(t *testing.T) {
+	ctx := context.Background()
+	accounts, err := accountservice.New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new account service: %v", err)
+	}
+	account, err := accounts.Create(ctx, accountcontract.CreateRequest{
+		ProviderID:   12,
+		Name:         "real-quota-account",
+		RuntimeClass: accountcontract.RuntimeClassCliClientToken,
+		Credential:   map[string]any{"cli_client_token": "secret"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	now := time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC)
+	if _, err := accounts.RecordQuotaSnapshot(ctx, accountcontract.AccountQuotaSnapshot{
+		AccountID:      account.ID,
+		ProviderID:     account.ProviderID,
+		QuotaType:      "codex_5h_percent",
+		Remaining:      "42",
+		Used:           "58",
+		QuotaLimit:     "100",
+		RemainingRatio: 0.42,
+		SnapshotAt:     now.Add(-time.Minute),
+	}); err != nil {
+		t.Fatalf("record real quota: %v", err)
+	}
+	if _, err := accounts.RecordQuotaSnapshot(ctx, accountcontract.AccountQuotaSnapshot{
+		AccountID:      account.ID,
+		ProviderID:     account.ProviderID,
+		QuotaType:      accountcontract.QuotaTypeSyntheticMonthlyTokens,
+		Remaining:      "unlimited",
+		Used:           "1",
+		QuotaLimit:     "unlimited",
+		RemainingRatio: 1,
+		SnapshotAt:     now,
+	}); err != nil {
+		t.Fatalf("record synthetic quota: %v", err)
+	}
+	rt := &runtimeState{accounts: accounts}
+
+	state := rt.accountSchedulerRuntimeState(ctx, account)
+	if state.QuotaRemainingRatio == nil || math.Abs(*state.QuotaRemainingRatio-0.42) > 0.000001 {
+		t.Fatalf("expected scheduler to use real quota ratio 0.42, got %+v", state.QuotaRemainingRatio)
+	}
+	if state.QuotaExhausted {
+		t.Fatalf("did not expect real quota to be exhausted: %+v", state)
 	}
 }
 

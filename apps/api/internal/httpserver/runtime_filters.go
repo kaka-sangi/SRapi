@@ -255,7 +255,7 @@ func buildAccountQuotaSnapshot(account accountcontract.ProviderAccount, logs []u
 		AccountId:      apiopenapi.Id(strconv.Itoa(account.ID)),
 		ProviderId:     apiopenapi.Id(strconv.Itoa(account.ProviderID)),
 		QuotaLimit:     "unlimited",
-		QuotaType:      "monthly_tokens",
+		QuotaType:      accountcontract.QuotaTypeSyntheticMonthlyTokens,
 		Remaining:      "unlimited",
 		RemainingRatio: 1,
 		SnapshotAt:     now,

@@ -228,6 +228,9 @@ func (w *Worker) enqueueAccountQuotaAlerts(ctx context.Context, account accountc
 	latestByType := map[string]accountcontract.AccountQuotaSnapshot{}
 	previousByType := map[string]accountcontract.AccountQuotaSnapshot{}
 	for _, snapshot := range snapshots {
+		if accountcontract.IsSyntheticQuotaSnapshot(snapshot) {
+			continue
+		}
 		quotaType := strings.TrimSpace(snapshot.QuotaType)
 		if quotaType == "" {
 			continue

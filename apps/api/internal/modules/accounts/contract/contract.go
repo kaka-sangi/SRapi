@@ -2,6 +2,7 @@ package contract
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -159,6 +160,14 @@ type AccountQuotaSnapshot struct {
 	RemainingRatio float32
 	ResetAt        *time.Time
 	SnapshotAt     time.Time
+}
+
+const QuotaTypeSyntheticMonthlyTokens = "synthetic_monthly_tokens"
+
+// IsSyntheticQuotaSnapshot reports whether a quota snapshot is locally derived
+// by SRapi rather than read from an upstream provider quota signal.
+func IsSyntheticQuotaSnapshot(snapshot AccountQuotaSnapshot) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(snapshot.QuotaType)), "synthetic_")
 }
 
 type BatchUpdateResult struct {

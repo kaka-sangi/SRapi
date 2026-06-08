@@ -393,9 +393,6 @@ func (s *Store) ListQuotaSnapshotsByAccount(ctx context.Context, accountID int, 
 	query := s.client.AccountQuotaSnapshot.Query().
 		Where(entaccountquotasnapshot.AccountIDEQ(accountID)).
 		Order(ent.Desc(entaccountquotasnapshot.FieldSnapshotAt), ent.Desc(entaccountquotasnapshot.FieldID))
-	if limit > 0 {
-		query.Limit(limit)
-	}
 	rows, err := query.All(ctx)
 	if err != nil {
 		return nil, err
@@ -404,7 +401,24 @@ func (s *Store) ListQuotaSnapshotsByAccount(ctx context.Context, accountID int, 
 	for _, row := range rows {
 		out = append(out, toQuotaSnapshot(row))
 	}
-	return out, nil
+	return limitQuotaSnapshotsByType(out, limit), nil
+}
+
+func limitQuotaSnapshotsByType(snapshots []contract.AccountQuotaSnapshot, limit int) []contract.AccountQuotaSnapshot {
+	if limit <= 0 {
+		return snapshots
+	}
+	countByType := map[string]int{}
+	out := make([]contract.AccountQuotaSnapshot, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		quotaType := strings.TrimSpace(snapshot.QuotaType)
+		if countByType[quotaType] >= limit {
+			continue
+		}
+		countByType[quotaType]++
+		out = append(out, snapshot)
+	}
+	return out
 }
 
 func (s *Store) Delete(ctx context.Context, id int) error {

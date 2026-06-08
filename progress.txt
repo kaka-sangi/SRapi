@@ -24,3 +24,18 @@ Evidence:
 
 Next:
 - Stage 3: separate synthetic quota snapshots from real provider quota signals for scheduler and alert reads.
+
+Stage 3 complete - real quota signals separated from synthetic snapshots
+- Synthetic usage-derived quota snapshots now use quota_type=synthetic_monthly_tokens.
+- Added a migration that renames existing local synthetic monthly_tokens/unlimited rows to synthetic_monthly_tokens; no legacy runtime compatibility path remains.
+- Account quota listing now applies limit per quota_type, so one synthetic or noisy quota type cannot crowd out other quota signals.
+- Scheduler runtime state, admin health quota overlay, and quota-alert worker ignore synthetic quota snapshots and use only real upstream quota signals.
+
+Evidence:
+- cd apps/api && go test ./internal/httpserver -run 'Test(AccountSchedulerRuntimeStateIgnoresSyntheticQuotaSnapshots|RecordGatewayUsagePersistsProviderQuotaSignals)': ok.
+- cd apps/api && go test ./internal/workers/account_quota_alert -run 'TestRunOnce(IgnoresSyntheticQuotaSnapshots|EnqueuesQuotaAlertOnRemainingRatioCrossing)': ok.
+- cd apps/api && go test ./internal/persistence/entstore/accounts -run 'TestStoreListsLatestQuotaSnapshotPerType': ok.
+- make migration-check: ok github.com/srapi/srapi/apps/api/internal/platform/db 0.131s.
+
+Next:
+- Stage 4: add GET /api/v1/me/platform-quotas via OpenAPI-first flow.

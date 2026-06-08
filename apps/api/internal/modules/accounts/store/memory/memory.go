@@ -460,10 +460,24 @@ func (s *Store) ListQuotaSnapshotsByAccount(_ context.Context, accountID int, li
 		}
 		return out[i].SnapshotAt.After(out[j].SnapshotAt)
 	})
-	if limit > 0 && len(out) > limit {
-		out = out[:limit]
+	return limitQuotaSnapshotsByType(out, limit), nil
+}
+
+func limitQuotaSnapshotsByType(snapshots []contract.AccountQuotaSnapshot, limit int) []contract.AccountQuotaSnapshot {
+	if limit <= 0 {
+		return snapshots
 	}
-	return out, nil
+	countByType := map[string]int{}
+	out := make([]contract.AccountQuotaSnapshot, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		quotaType := strings.TrimSpace(snapshot.QuotaType)
+		if countByType[quotaType] >= limit {
+			continue
+		}
+		countByType[quotaType]++
+		out = append(out, snapshot)
+	}
+	return out
 }
 
 func cloneAccount(value contract.ProviderAccount) contract.ProviderAccount {

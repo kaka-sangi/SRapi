@@ -106,6 +106,61 @@ func TestRunOnceEnqueuesQuotaAlertOnRemainingRatioCrossing(t *testing.T) {
 	}
 }
 
+func TestRunOnceIgnoresSyntheticQuotaSnapshots(t *testing.T) {
+	accounts := accountmemory.New()
+	account := mustCreateAccount(t, accounts)
+	now := time.Date(2026, 5, 29, 12, 0, 0, 0, time.UTC)
+	for _, snapshot := range []accountcontract.AccountQuotaSnapshot{
+		{
+			QuotaType:      accountcontract.QuotaTypeSyntheticMonthlyTokens,
+			Remaining:      "unlimited",
+			Used:           "1",
+			QuotaLimit:     "unlimited",
+			RemainingRatio: 1,
+			SnapshotAt:     now,
+		},
+		{
+			QuotaType:      "codex_5h_percent",
+			Remaining:      "30",
+			Used:           "70",
+			QuotaLimit:     "100",
+			RemainingRatio: 0.30,
+			SnapshotAt:     now.Add(-time.Minute),
+		},
+		{
+			QuotaType:      "codex_5h_percent",
+			Remaining:      "15",
+			Used:           "85",
+			QuotaLimit:     "100",
+			RemainingRatio: 0.15,
+			SnapshotAt:     now.Add(-30 * time.Second),
+		},
+	} {
+		snapshot.AccountID = account.ID
+		snapshot.ProviderID = account.ProviderID
+		if _, err := accounts.RecordQuotaSnapshot(t.Context(), snapshot); err != nil {
+			t.Fatalf("record quota: %v", err)
+		}
+	}
+	events := eventsmemory.New()
+	worker, err := New(accounts, discardLogger(), Config{
+		MasterKey: testMasterKey,
+		Clock:     fixedClock{now: now.Add(time.Second)},
+		Events:    events,
+	})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+
+	result, err := worker.RunOnce(t.Context())
+	if err != nil {
+		t.Fatalf("run worker once: %v", err)
+	}
+	if result.Checked != 1 || result.Enqueued != 1 {
+		t.Fatalf("expected synthetic quota to be ignored and real crossing to alert, got %+v", result)
+	}
+}
+
 func TestRunOnceSkipsQuotaAlertWhenDisabled(t *testing.T) {
 	accounts := accountmemory.New()
 	account := mustCreateAccount(t, accounts)

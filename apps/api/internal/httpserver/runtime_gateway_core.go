@@ -1188,9 +1188,11 @@ func (rt *runtimeState) accountSchedulerRuntimeState(ctx context.Context, accoun
 		state.CooldownActive = state.CooldownActive || (latest.CooldownUntil != nil && latest.CooldownUntil.After(time.Now().UTC()))
 	}
 	if quotas, err := rt.accounts.ListQuotaSnapshotsByAccount(ctx, account.ID, 1); err == nil && len(quotas) > 0 {
-		remainingRatio := float64(quotas[0].RemainingRatio)
-		state.QuotaRemainingRatio = &remainingRatio
-		state.QuotaExhausted = state.QuotaExhausted || quotas[0].RemainingRatio <= 0
+		if latest, ok := latestRealQuotaSnapshot(quotas); ok {
+			remainingRatio := float64(latest.RemainingRatio)
+			state.QuotaRemainingRatio = &remainingRatio
+			state.QuotaExhausted = state.QuotaExhausted || latest.RemainingRatio <= 0
+		}
 	}
 	// Live in-flight concurrency makes load-aware scoring (saturation penalty,
 	// concurrency-full reject) reflect real traffic instead of always seeing 0,

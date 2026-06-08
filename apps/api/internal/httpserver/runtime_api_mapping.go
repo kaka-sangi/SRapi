@@ -514,6 +514,15 @@ func overlayAccountQuotaOnHealth(target *apiopenapi.AccountHealthSnapshot, lates
 	target.QuotaExhausted = latest.RemainingRatio <= 0
 }
 
+func latestRealQuotaSnapshot(snapshots []accountcontract.AccountQuotaSnapshot) (accountcontract.AccountQuotaSnapshot, bool) {
+	for _, snapshot := range snapshots {
+		if !accountcontract.IsSyntheticQuotaSnapshot(snapshot) {
+			return snapshot, true
+		}
+	}
+	return accountcontract.AccountQuotaSnapshot{}, false
+}
+
 func toAPIUsageLog(log usagecontract.UsageLog) apiopenapi.UsageLog {
 	return apiopenapi.UsageLog{
 		AccountId:             optionalIDString(log.AccountID),

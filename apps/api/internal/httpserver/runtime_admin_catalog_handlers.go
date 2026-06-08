@@ -1823,7 +1823,9 @@ func (s *Server) handleAdminAccountsHealthSummary(w http.ResponseWriter, r *http
 			overlayAccountHealthSnapshot(&snap, latest)
 		}
 		if quotas, err := s.runtime.accounts.ListQuotaSnapshotsByAccount(r.Context(), account.ID, 1); err == nil && len(quotas) > 0 {
-			overlayAccountQuotaOnHealth(&snap, quotas[0])
+			if latest, ok := latestRealQuotaSnapshot(quotas); ok {
+				overlayAccountQuotaOnHealth(&snap, latest)
+			}
 		}
 		snapshots = append(snapshots, snap)
 	}
@@ -1859,7 +1861,9 @@ func (s *Server) handleAdminAccountHealth(w http.ResponseWriter, r *http.Request
 		overlayAccountHealthSnapshot(&snapshot, latest)
 	}
 	if quotas, err := s.runtime.accounts.ListQuotaSnapshotsByAccount(r.Context(), account.ID, 1); err == nil && len(quotas) > 0 {
-		overlayAccountQuotaOnHealth(&snapshot, quotas[0])
+		if latest, ok := latestRealQuotaSnapshot(quotas); ok {
+			overlayAccountQuotaOnHealth(&snapshot, latest)
+		}
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.AccountHealthResponse{
 		Data:      snapshot,
