@@ -1668,6 +1668,33 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/me/available-models:
+    get:
+      tags:
+        - CurrentUser
+      operationId: listCurrentUserAvailableModels
+      summary: List model/channel availability and pricing for the current user.
+      description: >-
+        Returns the console user's visible model catalog with channel status and
+        current pricing metadata. Gateway API key model listing remains available
+        at /v1/models and is not changed by this endpoint.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user model availability.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailableModelListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/me/playground/chat:
     post:
       tags:
@@ -2397,6 +2424,44 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/providers/{id}/oauth-config:
+    get:
+      tags:
+        - AdminProviders
+      operationId: getAdminProviderOAuthConfig
+      summary: Get preset OAuth configuration for a provider.
+      description: Returns non-secret OAuth defaults from the provider preset so account provisioning can start without manual endpoint entry. Client secrets are never returned.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Provider OAuth config.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderOAuthConfigResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -4798,6 +4863,45 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccountQuotaListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/{id}/reset-quota:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: resetAdminAccountQuota
+      summary: Clear quota error state for a provider account.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Account quota state reset.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderAccountResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -15446,6 +15550,42 @@ components:
           nullable: true
           minimum: 0
           description: Max requests allowed per 7-day window for this key.
+        cost_quota:
+          type: string
+          nullable: true
+          description: Lifetime USD spend quota for this key. Empty means uncapped.
+          example: "10.00000000"
+        cost_used:
+          type: string
+          description: Lifetime billable USD spend recorded for this key.
+          example: "1.25000000"
+        cost_limit_5h:
+          type: string
+          nullable: true
+          description: Max billable USD spend allowed per 5-hour window.
+          example: "2.00000000"
+        cost_used_5h:
+          type: string
+          description: Billable USD spend recorded in the current 5-hour window.
+          example: "0.50000000"
+        cost_limit_1d:
+          type: string
+          nullable: true
+          description: Max billable USD spend allowed per 1-day window.
+          example: "5.00000000"
+        cost_used_1d:
+          type: string
+          description: Billable USD spend recorded in the current 1-day window.
+          example: "1.00000000"
+        cost_limit_7d:
+          type: string
+          nullable: true
+          description: Max billable USD spend allowed per 7-day window.
+          example: "20.00000000"
+        cost_used_7d:
+          type: string
+          description: Billable USD spend recorded in the current 7-day window.
+          example: "4.50000000"
         allowed_ips:
           type: array
           items:
@@ -15524,6 +15664,22 @@ components:
           type: integer
           nullable: true
           minimum: 0
+        cost_quota:
+          type: string
+          nullable: true
+          description: Lifetime USD spend quota for this key. Empty means uncapped.
+        cost_limit_5h:
+          type: string
+          nullable: true
+          description: Max billable USD spend allowed per 5-hour window.
+        cost_limit_1d:
+          type: string
+          nullable: true
+          description: Max billable USD spend allowed per 1-day window.
+        cost_limit_7d:
+          type: string
+          nullable: true
+          description: Max billable USD spend allowed per 7-day window.
         allowed_ips:
           type: array
           items:
@@ -15546,6 +15702,18 @@ components:
       properties:
         status:
           $ref: "#/components/schemas/ApiKeyStatus"
+        cost_quota:
+          type: string
+          nullable: true
+        cost_limit_5h:
+          type: string
+          nullable: true
+        cost_limit_1d:
+          type: string
+          nullable: true
+        cost_limit_7d:
+          type: string
+          nullable: true
 
     UpdateApiKeyRequest:
       type: object
@@ -15593,6 +15761,18 @@ components:
           type: integer
           nullable: true
           minimum: 0
+        cost_quota:
+          type: string
+          nullable: true
+        cost_limit_5h:
+          type: string
+          nullable: true
+        cost_limit_1d:
+          type: string
+          nullable: true
+        cost_limit_7d:
+          type: string
+          nullable: true
         allowed_ips:
           type: array
           items:
@@ -16165,6 +16345,12 @@ components:
         - starts_at
         - expires_at
         - entitlements_snapshot
+        - daily_usage_usd
+        - daily_usage_window_start
+        - weekly_usage_usd
+        - weekly_usage_window_start
+        - monthly_usage_usd
+        - monthly_usage_window_start
         - source_type
         - source_id
         - created_at
@@ -16184,6 +16370,33 @@ components:
           $ref: "#/components/schemas/Timestamp"
         entitlements_snapshot:
           $ref: "#/components/schemas/JsonObject"
+        daily_usage_usd:
+          type: string
+          description: Materialized billable USD usage in the current UTC day window.
+          example: "0.25000000"
+        daily_usage_window_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: UTC start timestamp for the materialized daily usage window.
+        weekly_usage_usd:
+          type: string
+          description: Materialized billable USD usage in the current UTC week window.
+          example: "1.50000000"
+        weekly_usage_window_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: UTC start timestamp for the materialized weekly usage window.
+        monthly_usage_usd:
+          type: string
+          description: Materialized billable USD usage in the current UTC month window.
+          example: "5.00000000"
+        monthly_usage_window_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: UTC start timestamp for the materialized monthly usage window.
         source_type:
           type: string
         source_id:
@@ -16249,10 +16462,13 @@ components:
         - id
         - model_id
         - provider_id
+        - billing_mode
         - input_price_per_million_tokens
         - output_price_per_million_tokens
         - cache_read_price_per_million_tokens
         - cache_write_price_per_million_tokens
+        - per_request_price
+        - intervals
         - currency
         - created_at
         - updated_at
@@ -16263,6 +16479,8 @@ components:
           $ref: "#/components/schemas/Id"
         provider_id:
           $ref: "#/components/schemas/Id"
+        billing_mode:
+          $ref: "#/components/schemas/BillingMode"
         input_price_per_million_tokens:
           type: string
           example: "1.25000000"
@@ -16275,6 +16493,14 @@ components:
         cache_write_price_per_million_tokens:
           type: string
           example: "0.20000000"
+        per_request_price:
+          type: string
+          example: "0.05000000"
+        intervals:
+          type: array
+          items:
+            $ref: "#/components/schemas/PricingInterval"
+          default: []
         currency:
           type: string
           minLength: 3
@@ -16308,6 +16534,8 @@ components:
           $ref: "#/components/schemas/Id"
         provider_id:
           $ref: "#/components/schemas/Id"
+        billing_mode:
+          $ref: "#/components/schemas/BillingMode"
         input_price_per_million_tokens:
           type: string
           example: "1.25000000"
@@ -16320,6 +16548,14 @@ components:
         cache_write_price_per_million_tokens:
           type: string
           example: "0.20000000"
+        per_request_price:
+          type: string
+          example: "0.05000000"
+        intervals:
+          type: array
+          items:
+            $ref: "#/components/schemas/PricingIntervalInput"
+          default: []
         currency:
           type: string
           minLength: 3
@@ -16337,6 +16573,8 @@ components:
     UpdatePricingRuleRequest:
       type: object
       properties:
+        billing_mode:
+          $ref: "#/components/schemas/BillingMode"
         input_price_per_million_tokens:
           type: string
           example: "1.25000000"
@@ -16349,6 +16587,13 @@ components:
         cache_write_price_per_million_tokens:
           type: string
           example: "0.20000000"
+        per_request_price:
+          type: string
+          example: "0.05000000"
+        intervals:
+          type: array
+          items:
+            $ref: "#/components/schemas/PricingIntervalInput"
         currency:
           type: string
           minLength: 3
@@ -16362,6 +16607,87 @@ components:
           type: string
           format: date-time
           nullable: true
+
+    BillingMode:
+      type: string
+      enum:
+        - token
+        - per_request
+        - image
+
+    PricingInterval:
+      type: object
+      required:
+        - min_tokens
+        - tier_label
+        - image_size
+        - input_price_per_million_tokens
+        - output_price_per_million_tokens
+        - cache_read_price_per_million_tokens
+        - cache_write_price_per_million_tokens
+        - per_image_price
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        min_tokens:
+          type: integer
+          minimum: 0
+        max_tokens:
+          type: integer
+          minimum: 0
+          nullable: true
+        tier_label:
+          type: string
+        image_size:
+          type: string
+          example: "1024x1024"
+        input_price_per_million_tokens:
+          type: string
+          example: "2.50000000"
+        output_price_per_million_tokens:
+          type: string
+          example: "5.00000000"
+        cache_read_price_per_million_tokens:
+          type: string
+          example: "0.50000000"
+        cache_write_price_per_million_tokens:
+          type: string
+          example: "2.50000000"
+        per_image_price:
+          type: string
+          example: "0.04000000"
+
+    PricingIntervalInput:
+      type: object
+      properties:
+        min_tokens:
+          type: integer
+          minimum: 0
+          default: 0
+        max_tokens:
+          type: integer
+          minimum: 0
+          nullable: true
+        tier_label:
+          type: string
+        image_size:
+          type: string
+          example: "1024x1024"
+        input_price_per_million_tokens:
+          type: string
+          example: "2.50000000"
+        output_price_per_million_tokens:
+          type: string
+          example: "5.00000000"
+        cache_read_price_per_million_tokens:
+          type: string
+          example: "0.50000000"
+        cache_write_price_per_million_tokens:
+          type: string
+          example: "2.50000000"
+        per_image_price:
+          type: string
+          example: "0.04000000"
 
     PricingRuleResponse:
       type: object
@@ -16593,6 +16919,31 @@ components:
             $ref: "#/components/schemas/Provider"
         pagination:
           $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ProviderOAuthConfig:
+      type: object
+      required:
+        - provider_id
+        - provider_name
+        - config
+      properties:
+        provider_id:
+          $ref: "#/components/schemas/Id"
+        provider_name:
+          type: string
+        config:
+          $ref: "#/components/schemas/AccountOAuthProviderConfig"
+
+    ProviderOAuthConfigResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/ProviderOAuthConfig"
         request_id:
           $ref: "#/components/schemas/RequestId"
 
@@ -16974,6 +17325,7 @@ components:
       enum:
         - openai_compatible
         - anthropic_compatible
+        - gemini_compatible
         - bedrock_anthropic
         - reverse_proxy_antigravity
         - rerank_compatible
@@ -17491,20 +17843,53 @@ components:
       type: object
       required:
         - created_count
+        - updated_count
         - skipped_count
+        - failed_count
+        - total_count
         - created_ids
+        - updated_ids
+        - items
+        - warnings
         - errors
       properties:
         created_count:
           type: integer
           minimum: 0
+        updated_count:
+          type: integer
+          minimum: 0
+          default: 0
         skipped_count:
           type: integer
           minimum: 0
+        failed_count:
+          type: integer
+          minimum: 0
+          default: 0
+        total_count:
+          type: integer
+          minimum: 0
+          default: 0
         created_ids:
           type: array
           items:
             $ref: "#/components/schemas/Id"
+        updated_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+          default: []
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CodexSessionImportItem"
+          default: []
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/CodexSessionImportMessage"
+          default: []
         errors:
           type: array
           items:
@@ -19813,6 +20198,129 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    AvailableModelStatus:
+      type: string
+      enum:
+        - available
+        - limited
+        - unavailable
+
+    AvailableModelPricing:
+      type: object
+      required:
+        - billing_mode
+        - currency
+        - input_price_per_million_tokens
+        - output_price_per_million_tokens
+        - cache_read_price_per_million_tokens
+        - cache_write_price_per_million_tokens
+        - per_request_price
+        - source
+      properties:
+        billing_mode:
+          $ref: "#/components/schemas/BillingMode"
+        currency:
+          type: string
+        input_price_per_million_tokens:
+          type: string
+        output_price_per_million_tokens:
+          type: string
+        cache_read_price_per_million_tokens:
+          type: string
+        cache_write_price_per_million_tokens:
+          type: string
+        per_request_price:
+          type: string
+        source:
+          type: string
+          enum:
+            - pricing_rule
+            - mapping_override
+            - default_zero
+
+    AvailableModelChannel:
+      type: object
+      required:
+        - provider_id
+        - provider_name
+        - provider_display_name
+        - adapter_type
+        - protocol
+        - upstream_model
+        - status
+        - active_account_count
+        - total_account_count
+        - pricing
+      properties:
+        provider_id:
+          $ref: "#/components/schemas/Id"
+        provider_name:
+          type: string
+        provider_display_name:
+          type: string
+        adapter_type:
+          type: string
+        protocol:
+          type: string
+        upstream_model:
+          type: string
+        status:
+          $ref: "#/components/schemas/AvailableModelStatus"
+        active_account_count:
+          type: integer
+          minimum: 0
+        total_account_count:
+          type: integer
+          minimum: 0
+        pricing:
+          $ref: "#/components/schemas/AvailableModelPricing"
+
+    AvailableModel:
+      type: object
+      required:
+        - id
+        - name
+        - status
+        - channels
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        family:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/AvailableModelStatus"
+        context_window:
+          type: integer
+          nullable: true
+        max_output_tokens:
+          type: integer
+          nullable: true
+        channels:
+          type: array
+          items:
+            $ref: "#/components/schemas/AvailableModelChannel"
+          default: []
+
+    AvailableModelListResponse:
+      type: object
+      required:
+        - data
+        - generated_at
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AvailableModel"
+          default: []
+        generated_at:
+          $ref: "#/components/schemas/Timestamp"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     NotificationEmailTemplateEventName:
       type: string
       enum:
@@ -21173,6 +21681,26 @@ components:
           nullable: true
         cost:
           type: string
+        actual_cost:
+          type: string
+        billable_cost:
+          type: string
+        rate_multiplier:
+          type: string
+        input_cost:
+          type: string
+        output_cost:
+          type: string
+        cache_read_cost:
+          type: string
+        cache_write_cost:
+          type: string
+        requested_model:
+          type: string
+        upstream_model:
+          type: string
+        billing_mode:
+          $ref: "#/components/schemas/BillingMode"
         currency:
           type: string
         compatibility_warnings:

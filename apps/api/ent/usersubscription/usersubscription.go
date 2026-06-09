@@ -33,6 +33,18 @@ const (
 	FieldSourceType = "source_type"
 	// FieldSourceID holds the string denoting the source_id field in the database.
 	FieldSourceID = "source_id"
+	// FieldDailyUsageUsd holds the string denoting the daily_usage_usd field in the database.
+	FieldDailyUsageUsd = "daily_usage_usd"
+	// FieldDailyUsageWindowStart holds the string denoting the daily_usage_window_start field in the database.
+	FieldDailyUsageWindowStart = "daily_usage_window_start"
+	// FieldWeeklyUsageUsd holds the string denoting the weekly_usage_usd field in the database.
+	FieldWeeklyUsageUsd = "weekly_usage_usd"
+	// FieldWeeklyUsageWindowStart holds the string denoting the weekly_usage_window_start field in the database.
+	FieldWeeklyUsageWindowStart = "weekly_usage_window_start"
+	// FieldMonthlyUsageUsd holds the string denoting the monthly_usage_usd field in the database.
+	FieldMonthlyUsageUsd = "monthly_usage_usd"
+	// FieldMonthlyUsageWindowStart holds the string denoting the monthly_usage_window_start field in the database.
+	FieldMonthlyUsageWindowStart = "monthly_usage_window_start"
 	// Table holds the table name of the usersubscription in the database.
 	Table = "user_subscriptions"
 )
@@ -50,6 +62,12 @@ var Columns = []string{
 	FieldEntitlementsSnapshotJSON,
 	FieldSourceType,
 	FieldSourceID,
+	FieldDailyUsageUsd,
+	FieldDailyUsageWindowStart,
+	FieldWeeklyUsageUsd,
+	FieldWeeklyUsageWindowStart,
+	FieldMonthlyUsageUsd,
+	FieldMonthlyUsageWindowStart,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -75,6 +93,12 @@ var (
 	DefaultSourceType string
 	// DefaultSourceID holds the default value on creation for the "source_id" field.
 	DefaultSourceID string
+	// DefaultDailyUsageUsd holds the default value on creation for the "daily_usage_usd" field.
+	DefaultDailyUsageUsd string
+	// DefaultWeeklyUsageUsd holds the default value on creation for the "weekly_usage_usd" field.
+	DefaultWeeklyUsageUsd string
+	// DefaultMonthlyUsageUsd holds the default value on creation for the "monthly_usage_usd" field.
+	DefaultMonthlyUsageUsd string
 )
 
 // OrderOption defines the ordering options for the UserSubscription queries.
@@ -128,4 +152,34 @@ func BySourceType(opts ...sql.OrderTermOption) OrderOption {
 // BySourceID orders the results by the source_id field.
 func BySourceID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSourceID, opts...).ToFunc()
+}
+
+// ByDailyUsageUsd orders the results by the daily_usage_usd field.
+func ByDailyUsageUsd(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDailyUsageUsd, opts...).ToFunc()
+}
+
+// ByDailyUsageWindowStart orders the results by the daily_usage_window_start field.
+func ByDailyUsageWindowStart(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDailyUsageWindowStart, opts...).ToFunc()
+}
+
+// ByWeeklyUsageUsd orders the results by the weekly_usage_usd field.
+func ByWeeklyUsageUsd(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWeeklyUsageUsd, opts...).ToFunc()
+}
+
+// ByWeeklyUsageWindowStart orders the results by the weekly_usage_window_start field.
+func ByWeeklyUsageWindowStart(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWeeklyUsageWindowStart, opts...).ToFunc()
+}
+
+// ByMonthlyUsageUsd orders the results by the monthly_usage_usd field.
+func ByMonthlyUsageUsd(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMonthlyUsageUsd, opts...).ToFunc()
+}
+
+// ByMonthlyUsageWindowStart orders the results by the monthly_usage_window_start field.
+func ByMonthlyUsageWindowStart(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMonthlyUsageWindowStart, opts...).ToFunc()
 }

@@ -9,11 +9,10 @@ import (
 
 	"github.com/srapi/srapi/apps/api/ent"
 	ententitlement "github.com/srapi/srapi/apps/api/ent/entitlement"
-	entmodelregistry "github.com/srapi/srapi/apps/api/ent/modelregistry"
-	entpricingrule "github.com/srapi/srapi/apps/api/ent/pricingrule"
 	entsubscriptionplan "github.com/srapi/srapi/apps/api/ent/subscriptionplan"
 	entusersubscription "github.com/srapi/srapi/apps/api/ent/usersubscription"
 	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 var ErrInvalidStore = errors.New("invalid subscriptions ent store")
@@ -223,6 +222,56 @@ func (s *Store) ListActiveUserSubscriptions(ctx context.Context, userID int, at 
 	return out, nil
 }
 
+func (s *Store) MaterializedUsageForUser(ctx context.Context, userID int, at time.Time) (contract.MaterializedUsage, error) {
+	at = at.UTC()
+	tx, err := s.client.Tx(ctx)
+	if err != nil {
+		return contract.MaterializedUsage{}, err
+	}
+	row, err := activeSubscriptionForUser(ctx, tx, userID, at)
+	if err != nil {
+		_ = tx.Rollback()
+		if ent.IsNotFound(err) {
+			return contract.MaterializedUsage{}, nil
+		}
+		return contract.MaterializedUsage{}, err
+	}
+	subscription := resetExpiredUsage(toSubscription(row), at)
+	if _, err := updateSubscriptionUsage(ctx, tx, subscription); err != nil {
+		_ = tx.Rollback()
+		return contract.MaterializedUsage{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return contract.MaterializedUsage{}, err
+	}
+	return materializedUsageFromSubscription(subscription, at), nil
+}
+
+func (s *Store) IncrementMaterializedUsage(ctx context.Context, delta contract.UsageDelta) (contract.MaterializedUsage, error) {
+	at := delta.OccurredAt.UTC()
+	tx, err := s.client.Tx(ctx)
+	if err != nil {
+		return contract.MaterializedUsage{}, err
+	}
+	row, err := activeSubscriptionForUser(ctx, tx, delta.UserID, at)
+	if err != nil {
+		_ = tx.Rollback()
+		if ent.IsNotFound(err) {
+			return contract.MaterializedUsage{}, nil
+		}
+		return contract.MaterializedUsage{}, err
+	}
+	updated := applyUsageDelta(toSubscription(row), delta)
+	if _, err := updateSubscriptionUsage(ctx, tx, updated); err != nil {
+		_ = tx.Rollback()
+		return contract.MaterializedUsage{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return contract.MaterializedUsage{}, err
+	}
+	return materializedUsageFromSubscription(updated, at), nil
+}
+
 func (s *Store) ListActiveEntitlements(ctx context.Context, userID int, at time.Time) ([]contract.Entitlement, error) {
 	at = at.UTC()
 	rows, err := s.client.Entitlement.Query().
@@ -248,6 +297,96 @@ func (s *Store) ListActiveEntitlements(ctx context.Context, userID int, at time.
 		out = append(out, toEntitlement(row))
 	}
 	return out, nil
+}
+
+func activeSubscriptionForUser(ctx context.Context, tx *ent.Tx, userID int, at time.Time) (*ent.UserSubscription, error) {
+	return tx.UserSubscription.Query().
+		Where(
+			entusersubscription.UserIDEQ(userID),
+			entusersubscription.StatusEQ(string(contract.SubscriptionStatusActive)),
+			entusersubscription.StartsAtLTE(at),
+			entusersubscription.ExpiresAtGT(at),
+		).
+		Order(ent.Desc(entusersubscription.FieldStartsAt), ent.Desc(entusersubscription.FieldID)).
+		First(ctx)
+}
+
+func updateSubscriptionUsage(ctx context.Context, tx *ent.Tx, subscription contract.UserSubscription) (*ent.UserSubscription, error) {
+	return tx.UserSubscription.UpdateOneID(subscription.ID).
+		SetDailyUsageUsd(money.NormalizeAmount(subscription.DailyUsageUSD)).
+		SetNillableDailyUsageWindowStart(subscription.DailyWindowStart).
+		SetWeeklyUsageUsd(money.NormalizeAmount(subscription.WeeklyUsageUSD)).
+		SetNillableWeeklyUsageWindowStart(subscription.WeeklyWindowStart).
+		SetMonthlyUsageUsd(money.NormalizeAmount(subscription.MonthlyUsageUSD)).
+		SetNillableMonthlyUsageWindowStart(subscription.MonthlyWindowStart).
+		SetUpdatedAt(time.Now().UTC()).
+		Save(ctx)
+}
+
+func materializedUsageFromSubscription(subscription contract.UserSubscription, at time.Time) contract.MaterializedUsage {
+	updated := resetExpiredUsage(subscription, at)
+	return contract.MaterializedUsage{
+		SubscriptionID:     updated.ID,
+		UserID:             updated.UserID,
+		DailyUsageUSD:      money.NormalizeAmount(updated.DailyUsageUSD),
+		DailyWindowStart:   cloneTime(updated.DailyWindowStart),
+		WeeklyUsageUSD:     money.NormalizeAmount(updated.WeeklyUsageUSD),
+		WeeklyWindowStart:  cloneTime(updated.WeeklyWindowStart),
+		MonthlyUsageUSD:    money.NormalizeAmount(updated.MonthlyUsageUSD),
+		MonthlyWindowStart: cloneTime(updated.MonthlyWindowStart),
+	}
+}
+
+func applyUsageDelta(subscription contract.UserSubscription, delta contract.UsageDelta) contract.UserSubscription {
+	updated := resetExpiredUsage(subscription, delta.OccurredAt)
+	cost := money.NormalizeAmount(delta.BillableCost)
+	updated.DailyUsageUSD = money.AddMoney(updated.DailyUsageUSD, cost)
+	updated.WeeklyUsageUSD = money.AddMoney(updated.WeeklyUsageUSD, cost)
+	updated.MonthlyUsageUSD = money.AddMoney(updated.MonthlyUsageUSD, cost)
+	return updated
+}
+
+func resetExpiredUsage(subscription contract.UserSubscription, at time.Time) contract.UserSubscription {
+	at = at.UTC()
+	dayStart := startOfDayUTC(at)
+	weekStart := startOfWeekUTC(at)
+	monthStart := startOfMonthUTC(at)
+	if subscription.DailyWindowStart == nil || isExpiredWindow(*subscription.DailyWindowStart, dayStart) {
+		subscription.DailyUsageUSD = money.ZeroAmount
+		subscription.DailyWindowStart = &dayStart
+	}
+	if subscription.WeeklyWindowStart == nil || isExpiredWindow(*subscription.WeeklyWindowStart, weekStart) {
+		subscription.WeeklyUsageUSD = money.ZeroAmount
+		subscription.WeeklyWindowStart = &weekStart
+	}
+	if subscription.MonthlyWindowStart == nil || isExpiredWindow(*subscription.MonthlyWindowStart, monthStart) {
+		subscription.MonthlyUsageUSD = money.ZeroAmount
+		subscription.MonthlyWindowStart = &monthStart
+	}
+	subscription.DailyUsageUSD = money.NormalizeAmount(subscription.DailyUsageUSD)
+	subscription.WeeklyUsageUSD = money.NormalizeAmount(subscription.WeeklyUsageUSD)
+	subscription.MonthlyUsageUSD = money.NormalizeAmount(subscription.MonthlyUsageUSD)
+	return subscription
+}
+
+func startOfDayUTC(value time.Time) time.Time {
+	value = value.UTC()
+	return time.Date(value.Year(), value.Month(), value.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+func startOfWeekUTC(value time.Time) time.Time {
+	dayStart := startOfDayUTC(value)
+	offset := (int(dayStart.Weekday()) + 6) % 7
+	return dayStart.AddDate(0, 0, -offset)
+}
+
+func startOfMonthUTC(value time.Time) time.Time {
+	value = value.UTC()
+	return time.Date(value.Year(), value.Month(), 1, 0, 0, 0, 0, time.UTC)
+}
+
+func isExpiredWindow(storedStart, expectedStart time.Time) bool {
+	return !storedStart.UTC().Equal(expectedStart.UTC())
 }
 
 func (s *Store) activeSubscriptionIDs(ctx context.Context, rows []*ent.Entitlement, at time.Time) (map[int]bool, error) {
@@ -353,126 +492,6 @@ func (s *Store) DeleteUserSubscription(ctx context.Context, id int) error {
 	return nil
 }
 
-func (s *Store) CreatePricingRule(ctx context.Context, input contract.PricingRule) (contract.PricingRule, error) {
-	create := s.client.PricingRule.Create().
-		SetModelID(input.ModelID).
-		SetProviderID(input.ProviderID).
-		SetInputPricePerMillion(input.InputPricePerMillionTokens).
-		SetOutputPricePerMillion(input.OutputPricePerMillionTokens).
-		SetCacheReadPricePerMillion(input.CacheReadPricePerMillionTokens).
-		SetCacheWritePricePerMillion(input.CacheWritePricePerMillionTokens).
-		SetCurrency(input.Currency).
-		SetNillableEffectiveFrom(input.EffectiveFrom).
-		SetNillableEffectiveTo(input.EffectiveTo)
-	if !input.CreatedAt.IsZero() {
-		create.SetCreatedAt(input.CreatedAt).SetUpdatedAt(input.CreatedAt)
-	}
-	created, err := create.Save(ctx)
-	if err != nil {
-		return contract.PricingRule{}, err
-	}
-	return toPricingRule(created), nil
-}
-
-func (s *Store) UpdatePricingRule(ctx context.Context, id int, input contract.UpdatePricingRuleRequest) (contract.PricingRule, error) {
-	update := s.client.PricingRule.UpdateOneID(id).
-		SetNillableInputPricePerMillion(input.InputPricePerMillionTokens).
-		SetNillableOutputPricePerMillion(input.OutputPricePerMillionTokens).
-		SetNillableCacheReadPricePerMillion(input.CacheReadPricePerMillionTokens).
-		SetNillableCacheWritePricePerMillion(input.CacheWritePricePerMillionTokens).
-		SetNillableCurrency(input.Currency)
-	if input.EffectiveFrom != nil {
-		if *input.EffectiveFrom == nil {
-			update = update.ClearEffectiveFrom()
-		} else {
-			update = update.SetEffectiveFrom(**input.EffectiveFrom)
-		}
-	}
-	if input.EffectiveTo != nil {
-		if *input.EffectiveTo == nil {
-			update = update.ClearEffectiveTo()
-		} else {
-			update = update.SetEffectiveTo(**input.EffectiveTo)
-		}
-	}
-	updated, err := update.Save(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return contract.PricingRule{}, contract.ErrNotFound
-		}
-		return contract.PricingRule{}, err
-	}
-	return toPricingRule(updated), nil
-}
-
-func (s *Store) FindPricingRuleByID(ctx context.Context, id int) (contract.PricingRule, error) {
-	found, err := s.client.PricingRule.Get(ctx, id)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return contract.PricingRule{}, contract.ErrNotFound
-		}
-		return contract.PricingRule{}, err
-	}
-	return toPricingRule(found), nil
-}
-
-func (s *Store) ListPricingRules(ctx context.Context) ([]contract.PricingRule, error) {
-	rows, err := s.client.PricingRule.Query().
-		Order(entpricingrule.ByID()).
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	families, err := s.pricingRuleModelFamilies(ctx, rows)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]contract.PricingRule, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, toPricingRuleWithFamily(row, families[row.ModelID]))
-	}
-	return out, nil
-}
-
-func (s *Store) pricingRuleModelFamilies(ctx context.Context, rows []*ent.PricingRule) (map[int]string, error) {
-	ids := make([]int, 0, len(rows))
-	seen := map[int]struct{}{}
-	for _, row := range rows {
-		if row.ModelID <= 0 {
-			continue
-		}
-		if _, ok := seen[row.ModelID]; ok {
-			continue
-		}
-		seen[row.ModelID] = struct{}{}
-		ids = append(ids, row.ModelID)
-	}
-	if len(ids) == 0 {
-		return map[int]string{}, nil
-	}
-	models, err := s.client.ModelRegistry.Query().
-		Where(entmodelregistry.IDIn(ids...), entmodelregistry.DeletedAtIsNil()).
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[int]string, len(models))
-	for _, model := range models {
-		out[model.ID] = model.Family
-	}
-	return out, nil
-}
-
-func (s *Store) DeletePricingRule(ctx context.Context, id int) error {
-	if err := s.client.PricingRule.DeleteOneID(id).Exec(ctx); err != nil {
-		if ent.IsNotFound(err) {
-			return contract.ErrNotFound
-		}
-		return err
-	}
-	return nil
-}
-
 func toPlan(row *ent.SubscriptionPlan) contract.SubscriptionPlan {
 	return contract.SubscriptionPlan{
 		ID:           row.ID,
@@ -502,6 +521,12 @@ func toSubscription(row *ent.UserSubscription) contract.UserSubscription {
 		EntitlementsSnapshot: cloneMap(row.EntitlementsSnapshotJSON),
 		SourceType:           row.SourceType,
 		SourceID:             row.SourceID,
+		DailyUsageUSD:        money.NormalizeAmount(row.DailyUsageUsd),
+		DailyWindowStart:     cloneTime(row.DailyUsageWindowStart),
+		WeeklyUsageUSD:       money.NormalizeAmount(row.WeeklyUsageUsd),
+		WeeklyWindowStart:    cloneTime(row.WeeklyUsageWindowStart),
+		MonthlyUsageUSD:      money.NormalizeAmount(row.MonthlyUsageUsd),
+		MonthlyWindowStart:   cloneTime(row.MonthlyUsageWindowStart),
 		CreatedAt:            row.CreatedAt,
 		UpdatedAt:            row.UpdatedAt,
 	}
@@ -520,28 +545,6 @@ func toEntitlement(row *ent.Entitlement) contract.Entitlement {
 		SourceSubscriptionID: row.SourceSubscriptionID,
 		CreatedAt:            row.CreatedAt,
 		UpdatedAt:            row.UpdatedAt,
-	}
-}
-
-func toPricingRule(row *ent.PricingRule) contract.PricingRule {
-	return toPricingRuleWithFamily(row, "")
-}
-
-func toPricingRuleWithFamily(row *ent.PricingRule, modelFamily string) contract.PricingRule {
-	return contract.PricingRule{
-		ID:                              row.ID,
-		ModelID:                         row.ModelID,
-		ModelFamily:                     modelFamily,
-		ProviderID:                      row.ProviderID,
-		InputPricePerMillionTokens:      row.InputPricePerMillion,
-		OutputPricePerMillionTokens:     row.OutputPricePerMillion,
-		CacheReadPricePerMillionTokens:  row.CacheReadPricePerMillion,
-		CacheWritePricePerMillionTokens: row.CacheWritePricePerMillion,
-		Currency:                        row.Currency,
-		EffectiveFrom:                   cloneTime(row.EffectiveFrom),
-		EffectiveTo:                     cloneTime(row.EffectiveTo),
-		CreatedAt:                       row.CreatedAt,
-		UpdatedAt:                       row.UpdatedAt,
 	}
 }
 

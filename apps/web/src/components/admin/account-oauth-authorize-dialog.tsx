@@ -55,11 +55,13 @@ export function AccountOAuthAuthorizeDialog({
   open,
   onOpenChange,
   mode,
+  providerId,
   onProvisioned,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: AccountOAuthFlowMode;
+  providerId?: string;
   onProvisioned: (tokens: ProvisionedTokens) => void;
 }) {
   const { t } = useLanguage();
@@ -87,6 +89,7 @@ export function AccountOAuthAuthorizeDialog({
   const [error, setError] = useState<string | null>(null);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollCount = useRef(0);
+  const prefillKey = useRef("");
   // Holds the latest pollDevice so the self-scheduling setTimeout recursion
   // doesn't reference the callback before its own declaration.
   const pollDeviceRef = useRef<((sessionId: string) => Promise<void>) | null>(null);
@@ -119,6 +122,32 @@ export function AccountOAuthAuthorizeDialog({
   }, [open, resetAll]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
+
+  useEffect(() => {
+    if (!open || !providerId) return;
+    const key = `${providerId}:${mode}`;
+    if (prefillKey.current === key) return;
+    let canceled = false;
+    prefillKey.current = key;
+    void adminApi
+      .getProviderOAuthConfig(providerId)
+      .then((result) => {
+        if (canceled) return;
+        const config = result.config;
+        setClientId(config.client_id ?? "");
+        setAuthorizeUrl(config.authorize_url ?? "");
+        setTokenUrl(config.token_url ?? "");
+        setDeviceAuthorizeUrl(config.device_authorize_url ?? "");
+        setRedirectUri(config.redirect_uri ?? "");
+        setScopes((config.scopes ?? []).join(" "));
+      })
+      .catch(() => {
+        // Providers without preset OAuth metadata still support manual entry.
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [mode, open, providerId]);
 
   function buildConfig(): AccountOAuthProviderConfig {
     const scopeList = scopes

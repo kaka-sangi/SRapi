@@ -8,6 +8,8 @@ import (
 	"time"
 
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
+	apikeydomain "github.com/srapi/srapi/apps/api/internal/modules/api_keys/domain"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 )
 
@@ -94,4 +96,36 @@ func gatewayAPIKeyWindowChecks(key apikeycontract.APIKey) []ratelimit.Check {
 
 func apiKeyWindowRateLimitKey(keyID int, window string) string {
 	return "apikey:" + strconv.Itoa(keyID) + ":" + window
+}
+
+func gatewayAPIKeyCostLimitExceeded(key apikeycontract.APIKey, estimatedBillableCost string, now time.Time) string {
+	cost := money.NormalizeAmount(estimatedBillableCost)
+	if strings.TrimSpace(cost) == "" || cost == "0.00000000" || cost == "0" {
+		return ""
+	}
+	key = apikeydomain.ResetExpiredCostWindows(key, now.UTC())
+	if exceedsMoneyLimit(key.CostUsed, cost, key.CostQuota) {
+		return "rate_limit_exceeded"
+	}
+	windows := []struct {
+		used  string
+		limit *string
+	}{
+		{used: key.CostUsed5h, limit: key.CostLimit5h},
+		{used: key.CostUsed1d, limit: key.CostLimit1d},
+		{used: key.CostUsed7d, limit: key.CostLimit7d},
+	}
+	for _, window := range windows {
+		if exceedsMoneyLimit(window.used, cost, window.limit) {
+			return "rate_limit_exceeded"
+		}
+	}
+	return ""
+}
+
+func exceedsMoneyLimit(used string, delta string, limit *string) bool {
+	if limit == nil || strings.TrimSpace(*limit) == "" {
+		return false
+	}
+	return compareMoney(money.AddMoney(used, delta), *limit) > 0
 }

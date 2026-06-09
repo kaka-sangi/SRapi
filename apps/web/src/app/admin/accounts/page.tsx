@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Server } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
@@ -13,7 +14,6 @@ import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { enumOptions } from "@/components/admin/resource-form-dialog";
 import { AccountFormDialog } from "@/components/admin/account-form-dialog";
-import { CodexSessionImportDialog } from "@/components/admin/codex-session-import-dialog";
 import { BindProxyDialog } from "@/components/admin/bind-proxy-dialog";
 import { AccountDetailSheet } from "@/components/admin/account-detail-sheet";
 import { AccountTestDialog } from "@/components/features/account-test-dialog";
@@ -27,6 +27,7 @@ import {
   useUpdateAccount,
   useClearAccountError,
   useRecoverAccount,
+  useResetAccountQuota,
   useBatchActionAccounts,
   useDeleteAccount,
   useDiscoverAccountModels,
@@ -82,8 +83,11 @@ function AccountsContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const list = useAdminList();
+  const searchParams = useSearchParams();
+  const readOnlyHealthView = searchParams.get("view") === "health";
   const colVis = useColumnVisibility("admin-accounts", ["created_at", "updated_at", "notes"]);
-  const statusFilter = (list.filters.status as ProviderAccount["status"]) || undefined;
+  const statusFilter =
+    (list.filters.status as ProviderAccount["status"]) || (readOnlyHealthView ? "active" : undefined);
   const providerFilter = list.filters.providerId || undefined;
   const accounts = useAdminAccounts({
     page: list.page,
@@ -99,6 +103,7 @@ function AccountsContent() {
   const updateMut = useUpdateAccount();
   const clearErr = useClearAccountError();
   const recover = useRecoverAccount();
+  const resetQuota = useResetAccountQuota();
   const batchAction = useBatchActionAccounts();
   const deleteMut = useDeleteAccount();
   const discover = useDiscoverAccountModels();
@@ -115,7 +120,6 @@ function AccountsContent() {
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProviderAccount | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [codexImportOpen, setCodexImportOpen] = useState(false);
 
   const providerOptions = (providers.data?.data ?? []).map((p) => ({
     value: p.id,
@@ -234,7 +238,7 @@ function AccountsContent() {
     {
       key: "status",
       header: t("common.active"),
-      render: (a) => <QuietBadge status={quietStatusFor(a.status)} label={statusLabel(t, a.status)} />,
+      render: (a) => <AccountStatusCell account={a} />,
     },
     {
       key: "health",
@@ -257,29 +261,32 @@ function AccountsContent() {
       <PageHeader
         eyebrow={t("nav.sectionAdmin")}
         title={t("adminAccounts.title")}
-        description={t("adminAccounts.subtitle")}
+        description={readOnlyHealthView ? t("adminAccounts.healthViewSubtitle") : t("adminAccounts.subtitle")}
         actions={
           <div className="flex items-center gap-3">
             {accounts.data ? (
               <ListCount total={accounts.data.pagination?.total ?? accounts.data.data.length} />
             ) : null}
-            <Button
-              variant="outline"
-              size="sm"
-              loading={exportMut.isPending}
-              onClick={() => void runExport()}
-            >
-              {t("adminAccounts.export")}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-              {t("adminAccounts.importAction")}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setCodexImportOpen(true)}>
-              {t("codexImport.action")}
-            </Button>
-            <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
-              ＋ {t("adminAccounts.create")}
-            </Button>
+            {readOnlyHealthView ? (
+              <QuietBadge status="active" label={t("adminAccounts.healthView")} />
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={exportMut.isPending}
+                  onClick={() => void runExport()}
+                >
+                  {t("adminAccounts.export")}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+                  {t("adminAccounts.importAction")}
+                </Button>
+                <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
+                  + {t("adminAccounts.create")}
+                </Button>
+              </>
+            )}
           </div>
         }
       />
@@ -292,9 +299,10 @@ function AccountsContent() {
         emptyTitle={t("adminAccounts.emptyTitle")}
         emptyBody={t("adminAccounts.emptyBody")}
         emptyAction={
+          readOnlyHealthView ? undefined :
           <div className="flex gap-2">
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
-              ＋ {t("adminAccounts.create")}
+              + {t("adminAccounts.create")}
             </Button>
             <Button variant="outline" size="sm" asChild>
               <a href={ADMIN_ROUTES.quickSetup}>{t("adminAccounts.emptyQuickSetup")}</a>
@@ -334,51 +342,54 @@ function AccountsContent() {
           total: accounts.data?.pagination?.total ?? accounts.data?.data.length ?? 0,
           onPageChange: list.setPage,
         }}
-        selection={{
-          selected: list.selected,
-          onToggle: list.toggle,
-          onTogglePage: list.togglePage,
-          bulkActions: (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                loading={setStatus.isPending}
-                onClick={() => void applyBulkStatus("active")}
-              >
-                {t("common.enable")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                loading={setStatus.isPending}
-                onClick={() => setBulkDisableOpen(true)}
-              >
-                {t("common.disable")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                loading={batchAction.isPending}
-                onClick={() => void applyBulkAction("clear_error")}
-              >
-                {t("adminAccounts.clearError")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                loading={batchAction.isPending}
-                onClick={() => void applyBulkAction("recover")}
-              >
-                {t("adminAccounts.recover")}
-              </Button>
-            </>
-          ),
-        }}
+        selection={
+          readOnlyHealthView
+            ? undefined
+            : {
+                selected: list.selected,
+                onToggle: list.toggle,
+                onTogglePage: list.togglePage,
+                bulkActions: (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      loading={setStatus.isPending}
+                      onClick={() => void applyBulkStatus("active")}
+                    >
+                      {t("common.enable")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      loading={setStatus.isPending}
+                      onClick={() => setBulkDisableOpen(true)}
+                    >
+                      {t("common.disable")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      loading={batchAction.isPending}
+                      onClick={() => void applyBulkAction("clear_error")}
+                    >
+                      {t("adminAccounts.clearError")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      loading={batchAction.isPending}
+                      onClick={() => void applyBulkAction("recover")}
+                    >
+                      {t("adminAccounts.recover")}
+                    </Button>
+                  </>
+                ),
+              }
+        }
         rowActions={(a) => {
           const actions: RowAction[] = [
             { label: t("adminAccounts.details"), onSelect: () => setDetailTarget(a) },
-            { label: t("adminAccounts.edit"), onSelect: () => setFormTarget(a) },
             {
               label: t("adminAccounts.test"),
               onSelect: () => {
@@ -386,9 +397,15 @@ function AccountsContent() {
                 test.mutate(a.id);
               },
             },
+          ];
+          if (readOnlyHealthView) {
+            return <RowActionsMenu actions={actions} />;
+          }
+          actions.splice(1, 0, { label: t("adminAccounts.edit"), onSelect: () => setFormTarget(a) });
+          actions.push(
             { label: t("adminAccounts.discoverModels"), onSelect: () => void runDiscover(a.id) },
             { label: t("adminAccounts.bindProxy"), onSelect: () => setProxyTarget(a) },
-          ];
+          );
           if (isRecoverable(a.status)) {
             actions.push(
               {
@@ -402,6 +419,13 @@ function AccountsContent() {
                   void runAction(() => recover.mutateAsync(a.id), t("feedback.saved")),
               },
             );
+          }
+          if (hasQuotaError(a)) {
+            actions.push({
+              label: t("adminAccounts.quotaReset"),
+              onSelect: () =>
+                void runAction(() => resetQuota.mutateAsync(a.id), t("adminAccounts.quotaResetDone")),
+            });
           }
           actions.push({
             label: a.status === "disabled" ? t("common.enable") : t("common.disable"),
@@ -515,16 +539,12 @@ function AccountsContent() {
         }}
       />
 
-      <AccountImportDialog open={importOpen} onOpenChange={setImportOpen} />
-
-      {codexImportOpen ? (
-        <CodexSessionImportDialog
-          open
-          onOpenChange={setCodexImportOpen}
-          providerOptions={providerOptions.map((o) => ({ value: o.value, label: o.label }))}
-          defaultProviderId={providers.data?.data?.[0]?.id ?? ""}
-        />
-      ) : null}
+      <AccountImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        providerOptions={providerOptions.map((o) => ({ value: o.value, label: o.label }))}
+        defaultProviderId={providers.data?.data?.[0]?.id ?? ""}
+      />
     </>
   );
 }
@@ -548,6 +568,33 @@ function AccountHealthCell({ health }: { health?: AccountHealthSnapshot }) {
       </span>
       {health.error_class ? (
         <span className="max-w-[6rem] truncate text-2xs text-srapi-error">{health.error_class}</span>
+      ) : null}
+    </span>
+  );
+}
+
+function AccountStatusCell({ account }: { account: ProviderAccount }) {
+  const { t } = useLanguage();
+  const quotaClass = metadataString(account.metadata, "last_quota_error_class");
+  const validationURL = metadataString(account.metadata, "validation_url");
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      <QuietBadge status={quietStatusFor(account.status)} label={statusLabel(t, account.status)} />
+      {quotaClass ? (
+        <QuietBadge
+          status={quotaClass === "validation_required" ? "limited" : "error"}
+          label={quotaClass === "validation_required" ? t("adminAccounts.validationRequired") : quotaClass}
+        />
+      ) : null}
+      {validationURL ? (
+        <a
+          href={validationURL}
+          target="_blank"
+          rel="noreferrer"
+          className="text-2xs text-srapi-primary hover:underline"
+        >
+          {t("adminAccounts.validationLink")}
+        </a>
       ) : null}
     </span>
   );
@@ -577,4 +624,13 @@ function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot }) {
       </span>
     </span>
   );
+}
+
+function hasQuotaError(account: ProviderAccount): boolean {
+  return Boolean(metadataString(account.metadata, "last_quota_error_class"));
+}
+
+function metadataString(metadata: ProviderAccount["metadata"], key: string): string {
+  const value = metadata?.[key];
+  return typeof value === "string" ? value.trim() : "";
 }

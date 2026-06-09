@@ -38,6 +38,10 @@ export function useCreateApiKey() {
       requestLimit5h,
       requestLimit1d,
       requestLimit7d,
+      costQuota,
+      costLimit5h,
+      costLimit1d,
+      costLimit7d,
       rpmLimit,
       tpmLimit,
       concurrencyLimit,
@@ -51,6 +55,10 @@ export function useCreateApiKey() {
       requestLimit5h?: number;
       requestLimit1d?: number;
       requestLimit7d?: number;
+      costQuota?: string;
+      costLimit5h?: string;
+      costLimit1d?: string;
+      costLimit7d?: string;
       rpmLimit?: number;
       tpmLimit?: number;
       concurrencyLimit?: number;
@@ -62,6 +70,10 @@ export function useCreateApiKey() {
         requestLimit5h,
         requestLimit1d,
         requestLimit7d,
+        costQuota,
+        costLimit5h,
+        costLimit1d,
+        costLimit7d,
         rpmLimit,
         tpmLimit,
         concurrencyLimit,
@@ -129,6 +141,13 @@ export function useUsageLogs() {
   return useQuery({
     queryKey: queryKeys.usageLogs(),
     queryFn: () => apiService.listUsageLogs(),
+  });
+}
+
+export function useAvailableModels() {
+  return useQuery({
+    queryKey: queryKeys.me.availableModels(),
+    queryFn: () => apiService.listAvailableModels(),
   });
 }
 

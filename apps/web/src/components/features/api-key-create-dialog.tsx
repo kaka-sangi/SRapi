@@ -7,7 +7,7 @@ import {
   updateApiKeySchema,
   type CreateApiKeyValues,
 } from "@/lib/schemas/api-key";
-import { useCreateApiKey, useUpdateApiKey } from "@/hooks/queries";
+import { useAvailableModels, useCreateApiKey, useUpdateApiKey } from "@/hooks/queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import {
@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TagInput } from "@/components/ui/tag-input";
+import { formatMoney } from "@/lib/admin-format";
 import type { ApiKeySummary } from "@/lib/srapi-types";
 
 /** Create entry point used by the page header. */
@@ -32,6 +33,12 @@ export function ApiKeyCreateDialog() {
 
 function limitToInput(value?: number | null): string {
   return value && value > 0 ? String(value) : "";
+}
+
+function moneyToInput(value?: string | null): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed || /^0(?:\.0+)?$/.test(trimmed)) return "";
+  return trimmed;
 }
 
 // ISO timestamp → value accepted by <input type="datetime-local"> (local time,
@@ -76,6 +83,10 @@ export function ApiKeyFormDialog({
   const [limit5h, setLimit5h] = useState(() => limitToInput(editKey?.request_limit_5h));
   const [limit1d, setLimit1d] = useState(() => limitToInput(editKey?.request_limit_1d));
   const [limit7d, setLimit7d] = useState(() => limitToInput(editKey?.request_limit_7d));
+  const [costQuota, setCostQuota] = useState(() => moneyToInput(editKey?.cost_quota));
+  const [costLimit5h, setCostLimit5h] = useState(() => moneyToInput(editKey?.cost_limit_5h));
+  const [costLimit1d, setCostLimit1d] = useState(() => moneyToInput(editKey?.cost_limit_1d));
+  const [costLimit7d, setCostLimit7d] = useState(() => moneyToInput(editKey?.cost_limit_7d));
   const [rpmLimit, setRpmLimit] = useState(() => limitToInput(editKey?.rpm_limit));
   const [tpmLimit, setTpmLimit] = useState(() => limitToInput(editKey?.tpm_limit));
   const [concurrencyLimit, setConcurrencyLimit] = useState(() =>
@@ -85,12 +96,18 @@ export function ApiKeyFormDialog({
   const [error, setError] = useState<string | null>(null);
   const createKey = useCreateApiKey();
   const updateKey = useUpdateApiKey();
+  const availableModels = useAvailableModels();
   const pending = isEdit ? updateKey.isPending : createKey.isPending;
 
   function parseLimit(value: string): number | undefined {
     const trimmed = value.trim();
     if (trimmed === "") return undefined;
     return Number(trimmed);
+  }
+
+  function parseMoneyLimit(value: string): string | undefined {
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
   }
 
   function isoOrUndefined(value?: string): string | undefined {
@@ -111,6 +128,10 @@ export function ApiKeyFormDialog({
       requestLimit5h: parseLimit(limit5h),
       requestLimit1d: parseLimit(limit1d),
       requestLimit7d: parseLimit(limit7d),
+      costQuota: parseMoneyLimit(costQuota),
+      costLimit5h: parseMoneyLimit(costLimit5h),
+      costLimit1d: parseMoneyLimit(costLimit1d),
+      costLimit7d: parseMoneyLimit(costLimit7d),
       rpmLimit: parseLimit(rpmLimit),
       tpmLimit: parseLimit(tpmLimit),
       concurrencyLimit: parseLimit(concurrencyLimit),
@@ -130,6 +151,10 @@ export function ApiKeyFormDialog({
       requestLimit5h: parsed.data.requestLimit5h,
       requestLimit1d: parsed.data.requestLimit1d,
       requestLimit7d: parsed.data.requestLimit7d,
+      costQuota: parsed.data.costQuota,
+      costLimit5h: parsed.data.costLimit5h,
+      costLimit1d: parsed.data.costLimit1d,
+      costLimit7d: parsed.data.costLimit7d,
       rpmLimit: parsed.data.rpmLimit,
       tpmLimit: parsed.data.tpmLimit,
       concurrencyLimit: parsed.data.concurrencyLimit,
@@ -168,6 +193,10 @@ export function ApiKeyFormDialog({
       setLimit5h("");
       setLimit1d("");
       setLimit7d("");
+      setCostQuota("");
+      setCostLimit5h("");
+      setCostLimit1d("");
+      setCostLimit7d("");
       setRpmLimit("");
       setTpmLimit("");
       setConcurrencyLimit("");
@@ -222,8 +251,30 @@ export function ApiKeyFormDialog({
                   value={allowedModels}
                   onChange={setAllowedModels}
                   disabled={pending}
-                  placeholder="claude-3-7-sonnet, gpt-4o"
+                  placeholder={availableModels.data?.[0]?.id ?? "claude-3-7-sonnet, gpt-4o"}
                 />
+                {availableModels.data && availableModels.data.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {availableModels.data.slice(0, 8).map((model) => (
+                      <Button
+                        key={model.id}
+                        type="button"
+                        variant={allowedModels.includes(model.id) ? "primary" : "outline"}
+                        size="sm"
+                        disabled={pending}
+                        onClick={() => {
+                          setAllowedModels(
+                            allowedModels.includes(model.id)
+                              ? allowedModels.filter((id) => id !== model.id)
+                              : [...allowedModels, model.id],
+                          );
+                        }}
+                      >
+                        {model.id}
+                      </Button>
+                    ))}
+                  </div>
+                ) : null}
                 <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.modelsHint")}</p>
               </div>
               <div>
@@ -301,6 +352,52 @@ export function ApiKeyFormDialog({
                 <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.windowLimitsHint")}</p>
               </div>
               <div>
+                <Label>{t("apiKeys.costLimits")}</Label>
+                <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <Input
+                    inputMode="decimal"
+                    aria-label={t("apiKeys.costQuota")}
+                    placeholder={t("apiKeys.costQuota")}
+                    value={costQuota}
+                    onChange={(e) => setCostQuota(e.target.value)}
+                    disabled={pending}
+                  />
+                  <Input
+                    inputMode="decimal"
+                    aria-label={t("apiKeys.costLimit5h")}
+                    placeholder={t("apiKeys.costLimit5h")}
+                    value={costLimit5h}
+                    onChange={(e) => setCostLimit5h(e.target.value)}
+                    disabled={pending}
+                  />
+                  <Input
+                    inputMode="decimal"
+                    aria-label={t("apiKeys.costLimit1d")}
+                    placeholder={t("apiKeys.costLimit1d")}
+                    value={costLimit1d}
+                    onChange={(e) => setCostLimit1d(e.target.value)}
+                    disabled={pending}
+                  />
+                  <Input
+                    inputMode="decimal"
+                    aria-label={t("apiKeys.costLimit7d")}
+                    placeholder={t("apiKeys.costLimit7d")}
+                    value={costLimit7d}
+                    onChange={(e) => setCostLimit7d(e.target.value)}
+                    disabled={pending}
+                  />
+                </div>
+                <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.costLimitsHint")}</p>
+              </div>
+              {isEdit && editKey ? (
+                <div className="grid grid-cols-2 gap-2 text-2xs text-srapi-text-secondary sm:grid-cols-4">
+                  <CostUsed label={t("apiKeys.costUsed")} value={editKey.cost_used} />
+                  <CostUsed label={t("apiKeys.costUsed5h")} value={editKey.cost_used_5h} />
+                  <CostUsed label={t("apiKeys.costUsed1d")} value={editKey.cost_used_1d} />
+                  <CostUsed label={t("apiKeys.costUsed7d")} value={editKey.cost_used_7d} />
+                </div>
+              ) : null}
+              <div>
                 <Label>{t("apiKeys.throughputLimits")}</Label>
                 <div className="mt-1 grid grid-cols-3 gap-2">
                   <Input
@@ -367,5 +464,14 @@ export function ApiKeyFormDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function CostUsed({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted px-2.5 py-2">
+      <div className="text-srapi-text-tertiary">{label}</div>
+      <div className="mt-0.5 font-mono text-srapi-text-primary">{formatMoney(value ?? "0.00000000", "USD")}</div>
+    </div>
   );
 }

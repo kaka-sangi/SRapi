@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+const (
+	CodexOAuthTokenURL       = "https://auth.openai.com/oauth/token"
+	CodexOAuthClientID       = "app_EMoamEEZ73f0CkXaXp7hrann"
+	CodexOAuthRefreshScope   = "openid profile email"
+	ClaudeCodeOAuthTokenURL  = "https://api.anthropic.com/v1/oauth/token"
+	ClaudeCodeOAuthClientID  = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+	AntigravityOAuthTokenURL = "https://oauth2.googleapis.com/token"
+	AntigravityOAuthClientID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
+)
+
 type AccountRuntime struct {
 	AccountID      int
 	RuntimeClass   string

@@ -136,7 +136,7 @@ func TestAggregateAndExportUsage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aggregate usage: %v", err)
 	}
-	if len(aggregates) != 1 || aggregates[0].AggregateID != "gpt-4o-mini" || aggregates[0].RequestCount != 2 || aggregates[0].SuccessCount != 1 || aggregates[0].ErrorCount != 1 || aggregates[0].TotalTokens != 18 || aggregates[0].TotalCost != "0.30000000" {
+	if len(aggregates) != 1 || aggregates[0].Key != "gpt-4o-mini" || aggregates[0].RequestCount != 2 || aggregates[0].SuccessCount != 1 || aggregates[0].ErrorCount != 1 || aggregates[0].TotalTokens != 18 || aggregates[0].TotalCost != "0.30000000" {
 		t.Fatalf("unexpected aggregate: %+v", aggregates)
 	}
 
@@ -230,7 +230,7 @@ func TestSummarizeAPIKeyIsScopedAndAggregated(t *testing.T) {
 	if summary.Today.RequestCount != 2 || summary.Today.TotalTokens != 19 {
 		t.Fatalf("unexpected today summary: %+v", summary.Today)
 	}
-	if len(summary.ModelStats) != 2 || summary.ModelStats[0].Model != "gpt-4o" || summary.ModelStats[0].TotalTokens != 11 {
+	if len(summary.ModelStats) != 2 || summary.ModelStats[0].Key != "gpt-4o" || summary.ModelStats[0].TotalTokens != 11 {
 		t.Fatalf("unexpected model stats: %+v", summary.ModelStats)
 	}
 	if len(summary.RecentLogs) != 2 || summary.RecentLogs[0].RequestID != "req_key_2_other_model" || summary.RecentLogs[1].RequestID != "req_key_2_today" {

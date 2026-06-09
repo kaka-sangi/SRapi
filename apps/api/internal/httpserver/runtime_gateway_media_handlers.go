@@ -149,7 +149,7 @@ func (s *Server) handleCreateImageGeneration(w http.ResponseWriter, r *http.Requ
 	providerResp := failover.Response
 	usage := gatewayUsageFromImageProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalImageGenerationResponse(canonical, gatewayImagesFromProvider(providerResp), providerResp.Created, usage)
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -161,6 +161,8 @@ func (s *Server) handleCreateImageGeneration(w http.ResponseWriter, r *http.Requ
 		SourceEndpoint:        canonical.SourceEndpoint,
 		TargetProtocol:        result.Candidate.Provider.Protocol,
 		Model:                 canonical.CanonicalModel,
+		RequestedModel:        gatewayUsageRequestedSnapshot(canonical, result.Candidate),
+		UpstreamModel:         gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
 		Success:               true,
 		StatusCode:            ptrInt(http.StatusOK),
 		LatencyMS:             elapsedMillis(startedAt),
@@ -305,7 +307,7 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 	providerResp := failover.Response
 	usage := gatewayUsageFromImageProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalImageGenerationResponse(canonical, gatewayImagesFromProvider(providerResp), providerResp.Created, usage)
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -317,6 +319,8 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 		SourceEndpoint:        canonical.SourceEndpoint,
 		TargetProtocol:        result.Candidate.Provider.Protocol,
 		Model:                 canonical.CanonicalModel,
+		RequestedModel:        gatewayUsageRequestedSnapshot(canonical, result.Candidate),
+		UpstreamModel:         gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
 		Success:               true,
 		StatusCode:            ptrInt(http.StatusOK),
 		LatencyMS:             elapsedMillis(startedAt),
@@ -468,7 +472,7 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 	providerResp := failover.Response
 	usage := gatewayUsageFromImageProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalImageGenerationResponse(canonical, gatewayImagesFromProvider(providerResp), providerResp.Created, usage)
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -480,6 +484,8 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 		SourceEndpoint:        canonical.SourceEndpoint,
 		TargetProtocol:        result.Candidate.Provider.Protocol,
 		Model:                 canonical.CanonicalModel,
+		RequestedModel:        gatewayUsageRequestedSnapshot(canonical, result.Candidate),
+		UpstreamModel:         gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
 		Success:               true,
 		StatusCode:            ptrInt(http.StatusOK),
 		LatencyMS:             elapsedMillis(startedAt),
@@ -1103,7 +1109,7 @@ func (s *Server) handleCreateModeration(w http.ResponseWriter, r *http.Request) 
 	providerResp := failover.Response
 	usage := gatewayUsageFromModerationProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalModerationResponse(canonical, providerResp.ID, gatewayModerationResultsFromProvider(providerResp), usage)
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -1115,6 +1121,8 @@ func (s *Server) handleCreateModeration(w http.ResponseWriter, r *http.Request) 
 		SourceEndpoint:        canonical.SourceEndpoint,
 		TargetProtocol:        result.Candidate.Provider.Protocol,
 		Model:                 canonical.CanonicalModel,
+		RequestedModel:        gatewayUsageRequestedSnapshot(canonical, result.Candidate),
+		UpstreamModel:         gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
 		Success:               true,
 		StatusCode:            ptrInt(http.StatusOK),
 		LatencyMS:             elapsedMillis(startedAt),
@@ -1258,7 +1266,7 @@ func (s *Server) handleCreateRerank(w http.ResponseWriter, r *http.Request) {
 	providerResp := failover.Response
 	usage := gatewayUsageFromRerankProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalRerankResponse(canonical, providerResp.ID, gatewayRerankResultsFromProvider(providerResp), usage)
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -1270,6 +1278,8 @@ func (s *Server) handleCreateRerank(w http.ResponseWriter, r *http.Request) {
 		SourceEndpoint:        canonical.SourceEndpoint,
 		TargetProtocol:        result.Candidate.Provider.Protocol,
 		Model:                 canonical.CanonicalModel,
+		RequestedModel:        gatewayUsageRequestedSnapshot(canonical, result.Candidate),
+		UpstreamModel:         gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
 		Success:               true,
 		StatusCode:            ptrInt(http.StatusOK),
 		LatencyMS:             elapsedMillis(startedAt),

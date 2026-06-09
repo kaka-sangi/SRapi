@@ -55,6 +55,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/paymentorder"
 	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
 	"github.com/srapi/srapi/apps/api/ent/pendingoauthsession"
+	"github.com/srapi/srapi/apps/api/ent/pricinginterval"
 	"github.com/srapi/srapi/apps/api/ent/pricingrule"
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
@@ -173,6 +174,8 @@ type Client struct {
 	PaymentProviderInstance *PaymentProviderInstanceClient
 	// PendingOAuthSession is the client for interacting with the PendingOAuthSession builders.
 	PendingOAuthSession *PendingOAuthSessionClient
+	// PricingInterval is the client for interacting with the PricingInterval builders.
+	PricingInterval *PricingIntervalClient
 	// PricingRule is the client for interacting with the PricingRule builders.
 	PricingRule *PricingRuleClient
 	// Provider is the client for interacting with the Provider builders.
@@ -283,6 +286,7 @@ func (c *Client) init() {
 	c.PaymentOrder = NewPaymentOrderClient(c.config)
 	c.PaymentProviderInstance = NewPaymentProviderInstanceClient(c.config)
 	c.PendingOAuthSession = NewPendingOAuthSessionClient(c.config)
+	c.PricingInterval = NewPricingIntervalClient(c.config)
 	c.PricingRule = NewPricingRuleClient(c.config)
 	c.Provider = NewProviderClient(c.config)
 	c.ProviderAccount = NewProviderAccountClient(c.config)
@@ -445,6 +449,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PaymentOrder:              NewPaymentOrderClient(cfg),
 		PaymentProviderInstance:   NewPaymentProviderInstanceClient(cfg),
 		PendingOAuthSession:       NewPendingOAuthSessionClient(cfg),
+		PricingInterval:           NewPricingIntervalClient(cfg),
 		PricingRule:               NewPricingRuleClient(cfg),
 		Provider:                  NewProviderClient(cfg),
 		ProviderAccount:           NewProviderAccountClient(cfg),
@@ -534,6 +539,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PaymentOrder:              NewPaymentOrderClient(cfg),
 		PaymentProviderInstance:   NewPaymentProviderInstanceClient(cfg),
 		PendingOAuthSession:       NewPendingOAuthSessionClient(cfg),
+		PricingInterval:           NewPricingIntervalClient(cfg),
 		PricingRule:               NewPricingRuleClient(cfg),
 		Provider:                  NewProviderClient(cfg),
 		ProviderAccount:           NewProviderAccountClient(cfg),
@@ -603,14 +609,15 @@ func (c *Client) Use(hooks ...Hook) {
 		c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule, c.ObsAlertSilence,
 		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PayloadRule,
 		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
-		c.PendingOAuthSession, c.PricingRule, c.Provider, c.ProviderAccount, c.Proxy,
-		c.QualityEvalSample, c.QualityEvaluation, c.Role, c.ScheduledTestPlan,
-		c.ScheduledTestPlanRun, c.SchedulerDecision, c.SchedulerFeedback,
-		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
-		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
-		c.UserPlatformQuota, c.UserPromoCodeApplication, c.UserRedeemCodeRedemption,
-		c.UserRole, c.UserSubscription, c.UserTOTPSecret, c.Workspace,
+		c.PendingOAuthSession, c.PricingInterval, c.PricingRule, c.Provider,
+		c.ProviderAccount, c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role,
+		c.ScheduledTestPlan, c.ScheduledTestPlanRun, c.SchedulerDecision,
+		c.SchedulerFeedback, c.SchedulerRequestSnapshot, c.SchedulerStrategy,
+		c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageLog, c.User,
+		c.UserAnnouncementRead, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.UserAuthIdentity, c.UserPlatformQuota, c.UserPromoCodeApplication,
+		c.UserRedeemCodeRedemption, c.UserRole, c.UserSubscription, c.UserTOTPSecret,
+		c.Workspace,
 	} {
 		n.Use(hooks...)
 	}
@@ -631,14 +638,15 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule, c.ObsAlertSilence,
 		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PayloadRule,
 		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
-		c.PendingOAuthSession, c.PricingRule, c.Provider, c.ProviderAccount, c.Proxy,
-		c.QualityEvalSample, c.QualityEvaluation, c.Role, c.ScheduledTestPlan,
-		c.ScheduledTestPlanRun, c.SchedulerDecision, c.SchedulerFeedback,
-		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
-		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
-		c.UserPlatformQuota, c.UserPromoCodeApplication, c.UserRedeemCodeRedemption,
-		c.UserRole, c.UserSubscription, c.UserTOTPSecret, c.Workspace,
+		c.PendingOAuthSession, c.PricingInterval, c.PricingRule, c.Provider,
+		c.ProviderAccount, c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role,
+		c.ScheduledTestPlan, c.ScheduledTestPlanRun, c.SchedulerDecision,
+		c.SchedulerFeedback, c.SchedulerRequestSnapshot, c.SchedulerStrategy,
+		c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageLog, c.User,
+		c.UserAnnouncementRead, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.UserAuthIdentity, c.UserPlatformQuota, c.UserPromoCodeApplication,
+		c.UserRedeemCodeRedemption, c.UserRole, c.UserSubscription, c.UserTOTPSecret,
+		c.Workspace,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -729,6 +737,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PaymentProviderInstance.mutate(ctx, m)
 	case *PendingOAuthSessionMutation:
 		return c.PendingOAuthSession.mutate(ctx, m)
+	case *PricingIntervalMutation:
+		return c.PricingInterval.mutate(ctx, m)
 	case *PricingRuleMutation:
 		return c.PricingRule.mutate(ctx, m)
 	case *ProviderMutation:
@@ -6245,6 +6255,139 @@ func (c *PendingOAuthSessionClient) mutate(ctx context.Context, m *PendingOAuthS
 	}
 }
 
+// PricingIntervalClient is a client for the PricingInterval schema.
+type PricingIntervalClient struct {
+	config
+}
+
+// NewPricingIntervalClient returns a client for the PricingInterval from the given config.
+func NewPricingIntervalClient(c config) *PricingIntervalClient {
+	return &PricingIntervalClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `pricinginterval.Hooks(f(g(h())))`.
+func (c *PricingIntervalClient) Use(hooks ...Hook) {
+	c.hooks.PricingInterval = append(c.hooks.PricingInterval, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `pricinginterval.Intercept(f(g(h())))`.
+func (c *PricingIntervalClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PricingInterval = append(c.inters.PricingInterval, interceptors...)
+}
+
+// Create returns a builder for creating a PricingInterval entity.
+func (c *PricingIntervalClient) Create() *PricingIntervalCreate {
+	mutation := newPricingIntervalMutation(c.config, OpCreate)
+	return &PricingIntervalCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PricingInterval entities.
+func (c *PricingIntervalClient) CreateBulk(builders ...*PricingIntervalCreate) *PricingIntervalCreateBulk {
+	return &PricingIntervalCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PricingIntervalClient) MapCreateBulk(slice any, setFunc func(*PricingIntervalCreate, int)) *PricingIntervalCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PricingIntervalCreateBulk{err: fmt.Errorf("calling to PricingIntervalClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PricingIntervalCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PricingIntervalCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PricingInterval.
+func (c *PricingIntervalClient) Update() *PricingIntervalUpdate {
+	mutation := newPricingIntervalMutation(c.config, OpUpdate)
+	return &PricingIntervalUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PricingIntervalClient) UpdateOne(_m *PricingInterval) *PricingIntervalUpdateOne {
+	mutation := newPricingIntervalMutation(c.config, OpUpdateOne, withPricingInterval(_m))
+	return &PricingIntervalUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PricingIntervalClient) UpdateOneID(id int) *PricingIntervalUpdateOne {
+	mutation := newPricingIntervalMutation(c.config, OpUpdateOne, withPricingIntervalID(id))
+	return &PricingIntervalUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PricingInterval.
+func (c *PricingIntervalClient) Delete() *PricingIntervalDelete {
+	mutation := newPricingIntervalMutation(c.config, OpDelete)
+	return &PricingIntervalDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PricingIntervalClient) DeleteOne(_m *PricingInterval) *PricingIntervalDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PricingIntervalClient) DeleteOneID(id int) *PricingIntervalDeleteOne {
+	builder := c.Delete().Where(pricinginterval.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PricingIntervalDeleteOne{builder}
+}
+
+// Query returns a query builder for PricingInterval.
+func (c *PricingIntervalClient) Query() *PricingIntervalQuery {
+	return &PricingIntervalQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePricingInterval},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PricingInterval entity by its id.
+func (c *PricingIntervalClient) Get(ctx context.Context, id int) (*PricingInterval, error) {
+	return c.Query().Where(pricinginterval.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PricingIntervalClient) GetX(ctx context.Context, id int) *PricingInterval {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PricingIntervalClient) Hooks() []Hook {
+	return c.hooks.PricingInterval
+}
+
+// Interceptors returns the client interceptors.
+func (c *PricingIntervalClient) Interceptors() []Interceptor {
+	return c.inters.PricingInterval
+}
+
+func (c *PricingIntervalClient) mutate(ctx context.Context, m *PricingIntervalMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PricingIntervalCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PricingIntervalUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PricingIntervalUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PricingIntervalDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PricingInterval mutation op: %q", m.Op())
+	}
+}
+
 // PricingRuleClient is a client for the PricingRule schema.
 type PricingRuleClient struct {
 	config
@@ -10115,8 +10258,8 @@ type (
 		MonitorRequestTemplate, MonitorRunResult, ObsAlertEvent, ObsAlertRule,
 		ObsAlertSilence, ObsSLODefinition, OpsSystemLog, PasswordResetToken,
 		PayloadRule, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
-		PendingOAuthSession, PricingRule, Provider, ProviderAccount, Proxy,
-		QualityEvalSample, QualityEvaluation, Role, ScheduledTestPlan,
+		PendingOAuthSession, PricingInterval, PricingRule, Provider, ProviderAccount,
+		Proxy, QualityEvalSample, QualityEvaluation, Role, ScheduledTestPlan,
 		ScheduledTestPlanRun, SchedulerDecision, SchedulerFeedback,
 		SchedulerRequestSnapshot, SchedulerStrategy, Setting, SubscriptionPlan,
 		TLSFingerprintProfile, UsageLog, User, UserAnnouncementRead,
@@ -10135,8 +10278,8 @@ type (
 		MonitorRequestTemplate, MonitorRunResult, ObsAlertEvent, ObsAlertRule,
 		ObsAlertSilence, ObsSLODefinition, OpsSystemLog, PasswordResetToken,
 		PayloadRule, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
-		PendingOAuthSession, PricingRule, Provider, ProviderAccount, Proxy,
-		QualityEvalSample, QualityEvaluation, Role, ScheduledTestPlan,
+		PendingOAuthSession, PricingInterval, PricingRule, Provider, ProviderAccount,
+		Proxy, QualityEvalSample, QualityEvaluation, Role, ScheduledTestPlan,
 		ScheduledTestPlanRun, SchedulerDecision, SchedulerFeedback,
 		SchedulerRequestSnapshot, SchedulerStrategy, Setting, SubscriptionPlan,
 		TLSFingerprintProfile, UsageLog, User, UserAnnouncementRead,

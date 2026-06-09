@@ -17,27 +17,38 @@ const (
 )
 
 type APIKey struct {
-	ID               int
-	UserID           int
-	WorkspaceID      *int
-	Name             string
-	Prefix           string
-	Hash             string
-	Status           Status
-	Scopes           []string
-	AllowedModels    []string
-	GroupIDs         []int
-	RPMLimit         *int
-	TPMLimit         *int
-	ConcurrencyLimit *int
-	RequestLimit5h   *int
-	RequestLimit1d   *int
-	RequestLimit7d   *int
-	AllowedIPs       []string
-	DeniedIPs        []string
-	ExpiresAt        *time.Time
-	LastUsedAt       *time.Time
-	CreatedAt        time.Time
+	ID                int
+	UserID            int
+	WorkspaceID       *int
+	Name              string
+	Prefix            string
+	Hash              string
+	Status            Status
+	Scopes            []string
+	AllowedModels     []string
+	GroupIDs          []int
+	RPMLimit          *int
+	TPMLimit          *int
+	ConcurrencyLimit  *int
+	RequestLimit5h    *int
+	RequestLimit1d    *int
+	RequestLimit7d    *int
+	CostQuota         *string
+	CostUsed          string
+	CostLimit5h       *string
+	CostUsed5h        string
+	CostWindowStart5h *time.Time
+	CostLimit1d       *string
+	CostUsed1d        string
+	CostWindowStart1d *time.Time
+	CostLimit7d       *string
+	CostUsed7d        string
+	CostWindowStart7d *time.Time
+	AllowedIPs        []string
+	DeniedIPs         []string
+	ExpiresAt         *time.Time
+	LastUsedAt        *time.Time
+	CreatedAt         time.Time
 }
 
 type CreateRequest struct {
@@ -53,6 +64,10 @@ type CreateRequest struct {
 	RequestLimit5h   *int
 	RequestLimit1d   *int
 	RequestLimit7d   *int
+	CostQuota        *string
+	CostLimit5h      *string
+	CostLimit1d      *string
+	CostLimit7d      *string
 	AllowedIPs       []string
 	DeniedIPs        []string
 	ExpiresAt        *time.Time
@@ -72,6 +87,10 @@ type UpdateRequest struct {
 	RequestLimit5h   *int
 	RequestLimit1d   *int
 	RequestLimit7d   *int
+	CostQuota        *string
+	CostLimit5h      *string
+	CostLimit1d      *string
+	CostLimit7d      *string
 	AllowedIPs       *[]string
 	DeniedIPs        *[]string
 	ExpiresAt        *time.Time
@@ -96,6 +115,7 @@ type Store interface {
 	List(ctx context.Context) ([]APIKey, error)
 	ListByUser(ctx context.Context, userID int) ([]APIKey, error)
 	TouchLastUsed(ctx context.Context, id int, usedAt time.Time) error
+	ApplyCostUsage(ctx context.Context, input CostUsageUpdate) (APIKey, error)
 }
 
 type CreateStoredKey struct {
@@ -114,7 +134,19 @@ type CreateStoredKey struct {
 	RequestLimit5h   *int
 	RequestLimit1d   *int
 	RequestLimit7d   *int
+	CostQuota        *string
+	CostLimit5h      *string
+	CostLimit1d      *string
+	CostLimit7d      *string
 	AllowedIPs       []string
 	DeniedIPs        []string
 	ExpiresAt        *time.Time
+}
+
+// CostUsageUpdate appends a successful gateway request's billable USD cost to
+// an API key's materialized spend counters.
+type CostUsageUpdate struct {
+	KeyID        int
+	BillableCost string
+	OccurredAt   time.Time
 }

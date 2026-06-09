@@ -14,6 +14,7 @@ import (
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 type Store struct {
@@ -576,17 +577,17 @@ func (s *Store) fulfillBalanceRedeemCode(ctx context.Context, userID int, code a
 	if user.Status != userscontract.StatusActive {
 		return admincontrol.RedeemCodeRedemption{}, admincontrol.ErrConflict
 	}
-	amount, ok := decimalRat(code.Value)
+	amount, ok := money.RequiredDecimalRat(code.Value)
 	if !ok || amount.Sign() <= 0 {
 		return admincontrol.RedeemCodeRedemption{}, admincontrol.ErrInvalidInput
 	}
-	before, ok := decimalRat(user.Balance)
+	before, ok := money.RequiredDecimalRat(user.Balance)
 	if !ok {
 		return admincontrol.RedeemCodeRedemption{}, admincontrol.ErrInvalidInput
 	}
 	after := new(big.Rat).Add(before, amount)
-	balanceBefore := formatRatFixed(before, 8)
-	balanceAfter := formatRatFixed(after, 8)
+	balanceBefore := money.FormatRatFixed(before, 8)
+	balanceAfter := money.FormatRatFixed(after, 8)
 	currency := normalizeCurrency(code.Currency)
 	_, err = s.users.Update(ctx, userID, userscontract.UpdateStoredUser{
 		Balance:  &balanceAfter,
@@ -600,7 +601,7 @@ func (s *Store) fulfillBalanceRedeemCode(ctx context.Context, userID int, code a
 		ledger, err := s.billing.Create(ctx, billingcontract.LedgerEntry{
 			UserID:        userID,
 			Type:          billingcontract.LedgerTypeRedeemCodeCredit,
-			Amount:        formatRatFixed(amount, 8),
+			Amount:        money.FormatRatFixed(amount, 8),
 			Currency:      currency,
 			BalanceBefore: balanceBefore,
 			BalanceAfter:  balanceAfter,
@@ -616,7 +617,7 @@ func (s *Store) fulfillBalanceRedeemCode(ctx context.Context, userID int, code a
 		}
 		ledgerID = &ledger.ID
 	}
-	return s.newRedemption(userID, code, formatRatFixed(amount, 8), currency, balanceBefore, balanceAfter, ledgerID, nil, now), nil
+	return s.newRedemption(userID, code, money.FormatRatFixed(amount, 8), currency, balanceBefore, balanceAfter, ledgerID, nil, now), nil
 }
 
 func (s *Store) fulfillSubscriptionRedeemCode(ctx context.Context, userID int, code admincontrol.RedeemCode, now time.Time) (admincontrol.RedeemCodeRedemption, error) {
@@ -717,7 +718,7 @@ func previewPromoCode(item admincontrol.PromoCode, userID int, amount string, cu
 	if item.StartsAt != nil && item.StartsAt.After(now) {
 		return admincontrol.PromoCodeApplication{}, admincontrol.ErrConflict
 	}
-	inputAmount, ok := decimalRat(amount)
+	inputAmount, ok := money.RequiredDecimalRat(amount)
 	if !ok || inputAmount.Sign() <= 0 {
 		return admincontrol.PromoCodeApplication{}, admincontrol.ErrInvalidInput
 	}
@@ -736,9 +737,9 @@ func previewPromoCode(item admincontrol.PromoCode, userID int, amount string, cu
 	return admincontrol.PromoCodeApplication{
 		UserID:         userID,
 		PromoCodeID:    item.ID,
-		OriginalAmount: formatRatFixed(inputAmount, 8),
-		DiscountAmount: formatRatFixed(discount, 8),
-		FinalAmount:    formatRatFixed(finalAmount, 8),
+		OriginalAmount: money.FormatRatFixed(inputAmount, 8),
+		DiscountAmount: money.FormatRatFixed(discount, 8),
+		FinalAmount:    money.FormatRatFixed(finalAmount, 8),
 		Currency:       normalizedCurrency,
 		DiscountType:   item.DiscountType,
 		AppliedAt:      now,
@@ -746,7 +747,7 @@ func previewPromoCode(item admincontrol.PromoCode, userID int, amount string, cu
 }
 
 func promoDiscountAmount(item admincontrol.PromoCode, amount *big.Rat) (*big.Rat, error) {
-	value, ok := decimalRat(item.DiscountValue)
+	value, ok := money.RequiredDecimalRat(item.DiscountValue)
 	if !ok || value.Sign() <= 0 {
 		return nil, admincontrol.ErrInvalidInput
 	}
@@ -764,39 +765,19 @@ func promoDiscountAmount(item admincontrol.PromoCode, amount *big.Rat) (*big.Rat
 }
 
 func formatInputMoney(value string) string {
-	rat, ok := decimalRat(value)
+	rat, ok := money.RequiredDecimalRat(value)
 	if !ok {
 		return ""
 	}
-	return formatRatFixed(rat, 8)
+	return money.FormatRatFixed(rat, 8)
 }
 
 func normalizeCurrency(value string) string {
-	currency := strings.ToUpper(strings.TrimSpace(value))
-	if currency == "" {
-		return "USD"
-	}
-	return currency
+	return money.NormalizeCurrency(value)
 }
 
 func normalizeCode(value string) string {
 	return strings.ToUpper(strings.TrimSpace(value))
-}
-
-func decimalRat(value string) (*big.Rat, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" || strings.ContainsAny(value, "eE") {
-		return nil, false
-	}
-	rat, ok := new(big.Rat).SetString(value)
-	return rat, ok
-}
-
-func formatRatFixed(value *big.Rat, places int) string {
-	if value == nil {
-		value = new(big.Rat)
-	}
-	return value.FloatString(places)
 }
 
 func cloneInt(value *int) *int {

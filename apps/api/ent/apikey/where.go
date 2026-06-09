@@ -129,6 +129,61 @@ func RequestLimit7d(v int) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldRequestLimit7d, v))
 }
 
+// CostQuota applies equality check predicate on the "cost_quota" field. It's identical to CostQuotaEQ.
+func CostQuota(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostQuota, v))
+}
+
+// CostUsed applies equality check predicate on the "cost_used" field. It's identical to CostUsedEQ.
+func CostUsed(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostUsed, v))
+}
+
+// CostLimit5h applies equality check predicate on the "cost_limit_5h" field. It's identical to CostLimit5hEQ.
+func CostLimit5h(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostLimit5h, v))
+}
+
+// CostUsed5h applies equality check predicate on the "cost_used_5h" field. It's identical to CostUsed5hEQ.
+func CostUsed5h(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostUsed5h, v))
+}
+
+// CostWindowStart5h applies equality check predicate on the "cost_window_start_5h" field. It's identical to CostWindowStart5hEQ.
+func CostWindowStart5h(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostWindowStart5h, v))
+}
+
+// CostLimit1d applies equality check predicate on the "cost_limit_1d" field. It's identical to CostLimit1dEQ.
+func CostLimit1d(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostLimit1d, v))
+}
+
+// CostUsed1d applies equality check predicate on the "cost_used_1d" field. It's identical to CostUsed1dEQ.
+func CostUsed1d(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostUsed1d, v))
+}
+
+// CostWindowStart1d applies equality check predicate on the "cost_window_start_1d" field. It's identical to CostWindowStart1dEQ.
+func CostWindowStart1d(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostWindowStart1d, v))
+}
+
+// CostLimit7d applies equality check predicate on the "cost_limit_7d" field. It's identical to CostLimit7dEQ.
+func CostLimit7d(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostLimit7d, v))
+}
+
+// CostUsed7d applies equality check predicate on the "cost_used_7d" field. It's identical to CostUsed7dEQ.
+func CostUsed7d(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostUsed7d, v))
+}
+
+// CostWindowStart7d applies equality check predicate on the "cost_window_start_7d" field. It's identical to CostWindowStart7dEQ.
+func CostWindowStart7d(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostWindowStart7d, v))
+}
+
 // ExpiresAt applies equality check predicate on the "expires_at" field. It's identical to ExpiresAtEQ.
 func ExpiresAt(v time.Time) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldExpiresAt, v))
@@ -937,6 +992,716 @@ func RequestLimit7dIsNil() predicate.APIKey {
 // RequestLimit7dNotNil applies the NotNil predicate on the "request_limit_7d" field.
 func RequestLimit7dNotNil() predicate.APIKey {
 	return predicate.APIKey(sql.FieldNotNull(FieldRequestLimit7d))
+}
+
+// CostQuotaEQ applies the EQ predicate on the "cost_quota" field.
+func CostQuotaEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostQuota, v))
+}
+
+// CostQuotaNEQ applies the NEQ predicate on the "cost_quota" field.
+func CostQuotaNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldCostQuota, v))
+}
+
+// CostQuotaIn applies the In predicate on the "cost_quota" field.
+func CostQuotaIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldCostQuota, vs...))
+}
+
+// CostQuotaNotIn applies the NotIn predicate on the "cost_quota" field.
+func CostQuotaNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldCostQuota, vs...))
+}
+
+// CostQuotaGT applies the GT predicate on the "cost_quota" field.
+func CostQuotaGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldCostQuota, v))
+}
+
+// CostQuotaGTE applies the GTE predicate on the "cost_quota" field.
+func CostQuotaGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldCostQuota, v))
+}
+
+// CostQuotaLT applies the LT predicate on the "cost_quota" field.
+func CostQuotaLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldCostQuota, v))
+}
+
+// CostQuotaLTE applies the LTE predicate on the "cost_quota" field.
+func CostQuotaLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldCostQuota, v))
+}
+
+// CostQuotaContains applies the Contains predicate on the "cost_quota" field.
+func CostQuotaContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldCostQuota, v))
+}
+
+// CostQuotaHasPrefix applies the HasPrefix predicate on the "cost_quota" field.
+func CostQuotaHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldCostQuota, v))
+}
+
+// CostQuotaHasSuffix applies the HasSuffix predicate on the "cost_quota" field.
+func CostQuotaHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldCostQuota, v))
+}
+
+// CostQuotaIsNil applies the IsNil predicate on the "cost_quota" field.
+func CostQuotaIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldCostQuota))
+}
+
+// CostQuotaNotNil applies the NotNil predicate on the "cost_quota" field.
+func CostQuotaNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldCostQuota))
+}
+
+// CostQuotaEqualFold applies the EqualFold predicate on the "cost_quota" field.
+func CostQuotaEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldCostQuota, v))
+}
+
+// CostQuotaContainsFold applies the ContainsFold predicate on the "cost_quota" field.
+func CostQuotaContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldCostQuota, v))
+}
+
+// CostUsedEQ applies the EQ predicate on the "cost_used" field.
+func CostUsedEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostUsed, v))
+}
+
+// CostUsedNEQ applies the NEQ predicate on the "cost_used" field.
+func CostUsedNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldCostUsed, v))
+}
+
+// CostUsedIn applies the In predicate on the "cost_used" field.
+func CostUsedIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldCostUsed, vs...))
+}
+
+// CostUsedNotIn applies the NotIn predicate on the "cost_used" field.
+func CostUsedNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldCostUsed, vs...))
+}
+
+// CostUsedGT applies the GT predicate on the "cost_used" field.
+func CostUsedGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldCostUsed, v))
+}
+
+// CostUsedGTE applies the GTE predicate on the "cost_used" field.
+func CostUsedGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldCostUsed, v))
+}
+
+// CostUsedLT applies the LT predicate on the "cost_used" field.
+func CostUsedLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldCostUsed, v))
+}
+
+// CostUsedLTE applies the LTE predicate on the "cost_used" field.
+func CostUsedLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldCostUsed, v))
+}
+
+// CostUsedContains applies the Contains predicate on the "cost_used" field.
+func CostUsedContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldCostUsed, v))
+}
+
+// CostUsedHasPrefix applies the HasPrefix predicate on the "cost_used" field.
+func CostUsedHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldCostUsed, v))
+}
+
+// CostUsedHasSuffix applies the HasSuffix predicate on the "cost_used" field.
+func CostUsedHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldCostUsed, v))
+}
+
+// CostUsedEqualFold applies the EqualFold predicate on the "cost_used" field.
+func CostUsedEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldCostUsed, v))
+}
+
+// CostUsedContainsFold applies the ContainsFold predicate on the "cost_used" field.
+func CostUsedContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldCostUsed, v))
+}
+
+// CostLimit5hEQ applies the EQ predicate on the "cost_limit_5h" field.
+func CostLimit5hEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostLimit5h, v))
+}
+
+// CostLimit5hNEQ applies the NEQ predicate on the "cost_limit_5h" field.
+func CostLimit5hNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldCostLimit5h, v))
+}
+
+// CostLimit5hIn applies the In predicate on the "cost_limit_5h" field.
+func CostLimit5hIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldCostLimit5h, vs...))
+}
+
+// CostLimit5hNotIn applies the NotIn predicate on the "cost_limit_5h" field.
+func CostLimit5hNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldCostLimit5h, vs...))
+}
+
+// CostLimit5hGT applies the GT predicate on the "cost_limit_5h" field.
+func CostLimit5hGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldCostLimit5h, v))
+}
+
+// CostLimit5hGTE applies the GTE predicate on the "cost_limit_5h" field.
+func CostLimit5hGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldCostLimit5h, v))
+}
+
+// CostLimit5hLT applies the LT predicate on the "cost_limit_5h" field.
+func CostLimit5hLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldCostLimit5h, v))
+}
+
+// CostLimit5hLTE applies the LTE predicate on the "cost_limit_5h" field.
+func CostLimit5hLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldCostLimit5h, v))
+}
+
+// CostLimit5hContains applies the Contains predicate on the "cost_limit_5h" field.
+func CostLimit5hContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldCostLimit5h, v))
+}
+
+// CostLimit5hHasPrefix applies the HasPrefix predicate on the "cost_limit_5h" field.
+func CostLimit5hHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldCostLimit5h, v))
+}
+
+// CostLimit5hHasSuffix applies the HasSuffix predicate on the "cost_limit_5h" field.
+func CostLimit5hHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldCostLimit5h, v))
+}
+
+// CostLimit5hIsNil applies the IsNil predicate on the "cost_limit_5h" field.
+func CostLimit5hIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldCostLimit5h))
+}
+
+// CostLimit5hNotNil applies the NotNil predicate on the "cost_limit_5h" field.
+func CostLimit5hNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldCostLimit5h))
+}
+
+// CostLimit5hEqualFold applies the EqualFold predicate on the "cost_limit_5h" field.
+func CostLimit5hEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldCostLimit5h, v))
+}
+
+// CostLimit5hContainsFold applies the ContainsFold predicate on the "cost_limit_5h" field.
+func CostLimit5hContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldCostLimit5h, v))
+}
+
+// CostUsed5hEQ applies the EQ predicate on the "cost_used_5h" field.
+func CostUsed5hEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostUsed5h, v))
+}
+
+// CostUsed5hNEQ applies the NEQ predicate on the "cost_used_5h" field.
+func CostUsed5hNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldCostUsed5h, v))
+}
+
+// CostUsed5hIn applies the In predicate on the "cost_used_5h" field.
+func CostUsed5hIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldCostUsed5h, vs...))
+}
+
+// CostUsed5hNotIn applies the NotIn predicate on the "cost_used_5h" field.
+func CostUsed5hNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldCostUsed5h, vs...))
+}
+
+// CostUsed5hGT applies the GT predicate on the "cost_used_5h" field.
+func CostUsed5hGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldCostUsed5h, v))
+}
+
+// CostUsed5hGTE applies the GTE predicate on the "cost_used_5h" field.
+func CostUsed5hGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldCostUsed5h, v))
+}
+
+// CostUsed5hLT applies the LT predicate on the "cost_used_5h" field.
+func CostUsed5hLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldCostUsed5h, v))
+}
+
+// CostUsed5hLTE applies the LTE predicate on the "cost_used_5h" field.
+func CostUsed5hLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldCostUsed5h, v))
+}
+
+// CostUsed5hContains applies the Contains predicate on the "cost_used_5h" field.
+func CostUsed5hContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldCostUsed5h, v))
+}
+
+// CostUsed5hHasPrefix applies the HasPrefix predicate on the "cost_used_5h" field.
+func CostUsed5hHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldCostUsed5h, v))
+}
+
+// CostUsed5hHasSuffix applies the HasSuffix predicate on the "cost_used_5h" field.
+func CostUsed5hHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldCostUsed5h, v))
+}
+
+// CostUsed5hEqualFold applies the EqualFold predicate on the "cost_used_5h" field.
+func CostUsed5hEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldCostUsed5h, v))
+}
+
+// CostUsed5hContainsFold applies the ContainsFold predicate on the "cost_used_5h" field.
+func CostUsed5hContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldCostUsed5h, v))
+}
+
+// CostWindowStart5hEQ applies the EQ predicate on the "cost_window_start_5h" field.
+func CostWindowStart5hEQ(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostWindowStart5h, v))
+}
+
+// CostWindowStart5hNEQ applies the NEQ predicate on the "cost_window_start_5h" field.
+func CostWindowStart5hNEQ(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldCostWindowStart5h, v))
+}
+
+// CostWindowStart5hIn applies the In predicate on the "cost_window_start_5h" field.
+func CostWindowStart5hIn(vs ...time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldCostWindowStart5h, vs...))
+}
+
+// CostWindowStart5hNotIn applies the NotIn predicate on the "cost_window_start_5h" field.
+func CostWindowStart5hNotIn(vs ...time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldCostWindowStart5h, vs...))
+}
+
+// CostWindowStart5hGT applies the GT predicate on the "cost_window_start_5h" field.
+func CostWindowStart5hGT(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldCostWindowStart5h, v))
+}
+
+// CostWindowStart5hGTE applies the GTE predicate on the "cost_window_start_5h" field.
+func CostWindowStart5hGTE(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldCostWindowStart5h, v))
+}
+
+// CostWindowStart5hLT applies the LT predicate on the "cost_window_start_5h" field.
+func CostWindowStart5hLT(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldCostWindowStart5h, v))
+}
+
+// CostWindowStart5hLTE applies the LTE predicate on the "cost_window_start_5h" field.
+func CostWindowStart5hLTE(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldCostWindowStart5h, v))
+}
+
+// CostWindowStart5hIsNil applies the IsNil predicate on the "cost_window_start_5h" field.
+func CostWindowStart5hIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldCostWindowStart5h))
+}
+
+// CostWindowStart5hNotNil applies the NotNil predicate on the "cost_window_start_5h" field.
+func CostWindowStart5hNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldCostWindowStart5h))
+}
+
+// CostLimit1dEQ applies the EQ predicate on the "cost_limit_1d" field.
+func CostLimit1dEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostLimit1d, v))
+}
+
+// CostLimit1dNEQ applies the NEQ predicate on the "cost_limit_1d" field.
+func CostLimit1dNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldCostLimit1d, v))
+}
+
+// CostLimit1dIn applies the In predicate on the "cost_limit_1d" field.
+func CostLimit1dIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldCostLimit1d, vs...))
+}
+
+// CostLimit1dNotIn applies the NotIn predicate on the "cost_limit_1d" field.
+func CostLimit1dNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldCostLimit1d, vs...))
+}
+
+// CostLimit1dGT applies the GT predicate on the "cost_limit_1d" field.
+func CostLimit1dGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldCostLimit1d, v))
+}
+
+// CostLimit1dGTE applies the GTE predicate on the "cost_limit_1d" field.
+func CostLimit1dGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldCostLimit1d, v))
+}
+
+// CostLimit1dLT applies the LT predicate on the "cost_limit_1d" field.
+func CostLimit1dLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldCostLimit1d, v))
+}
+
+// CostLimit1dLTE applies the LTE predicate on the "cost_limit_1d" field.
+func CostLimit1dLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldCostLimit1d, v))
+}
+
+// CostLimit1dContains applies the Contains predicate on the "cost_limit_1d" field.
+func CostLimit1dContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldCostLimit1d, v))
+}
+
+// CostLimit1dHasPrefix applies the HasPrefix predicate on the "cost_limit_1d" field.
+func CostLimit1dHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldCostLimit1d, v))
+}
+
+// CostLimit1dHasSuffix applies the HasSuffix predicate on the "cost_limit_1d" field.
+func CostLimit1dHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldCostLimit1d, v))
+}
+
+// CostLimit1dIsNil applies the IsNil predicate on the "cost_limit_1d" field.
+func CostLimit1dIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldCostLimit1d))
+}
+
+// CostLimit1dNotNil applies the NotNil predicate on the "cost_limit_1d" field.
+func CostLimit1dNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldCostLimit1d))
+}
+
+// CostLimit1dEqualFold applies the EqualFold predicate on the "cost_limit_1d" field.
+func CostLimit1dEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldCostLimit1d, v))
+}
+
+// CostLimit1dContainsFold applies the ContainsFold predicate on the "cost_limit_1d" field.
+func CostLimit1dContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldCostLimit1d, v))
+}
+
+// CostUsed1dEQ applies the EQ predicate on the "cost_used_1d" field.
+func CostUsed1dEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostUsed1d, v))
+}
+
+// CostUsed1dNEQ applies the NEQ predicate on the "cost_used_1d" field.
+func CostUsed1dNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldCostUsed1d, v))
+}
+
+// CostUsed1dIn applies the In predicate on the "cost_used_1d" field.
+func CostUsed1dIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldCostUsed1d, vs...))
+}
+
+// CostUsed1dNotIn applies the NotIn predicate on the "cost_used_1d" field.
+func CostUsed1dNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldCostUsed1d, vs...))
+}
+
+// CostUsed1dGT applies the GT predicate on the "cost_used_1d" field.
+func CostUsed1dGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldCostUsed1d, v))
+}
+
+// CostUsed1dGTE applies the GTE predicate on the "cost_used_1d" field.
+func CostUsed1dGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldCostUsed1d, v))
+}
+
+// CostUsed1dLT applies the LT predicate on the "cost_used_1d" field.
+func CostUsed1dLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldCostUsed1d, v))
+}
+
+// CostUsed1dLTE applies the LTE predicate on the "cost_used_1d" field.
+func CostUsed1dLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldCostUsed1d, v))
+}
+
+// CostUsed1dContains applies the Contains predicate on the "cost_used_1d" field.
+func CostUsed1dContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldCostUsed1d, v))
+}
+
+// CostUsed1dHasPrefix applies the HasPrefix predicate on the "cost_used_1d" field.
+func CostUsed1dHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldCostUsed1d, v))
+}
+
+// CostUsed1dHasSuffix applies the HasSuffix predicate on the "cost_used_1d" field.
+func CostUsed1dHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldCostUsed1d, v))
+}
+
+// CostUsed1dEqualFold applies the EqualFold predicate on the "cost_used_1d" field.
+func CostUsed1dEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldCostUsed1d, v))
+}
+
+// CostUsed1dContainsFold applies the ContainsFold predicate on the "cost_used_1d" field.
+func CostUsed1dContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldCostUsed1d, v))
+}
+
+// CostWindowStart1dEQ applies the EQ predicate on the "cost_window_start_1d" field.
+func CostWindowStart1dEQ(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostWindowStart1d, v))
+}
+
+// CostWindowStart1dNEQ applies the NEQ predicate on the "cost_window_start_1d" field.
+func CostWindowStart1dNEQ(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldCostWindowStart1d, v))
+}
+
+// CostWindowStart1dIn applies the In predicate on the "cost_window_start_1d" field.
+func CostWindowStart1dIn(vs ...time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldCostWindowStart1d, vs...))
+}
+
+// CostWindowStart1dNotIn applies the NotIn predicate on the "cost_window_start_1d" field.
+func CostWindowStart1dNotIn(vs ...time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldCostWindowStart1d, vs...))
+}
+
+// CostWindowStart1dGT applies the GT predicate on the "cost_window_start_1d" field.
+func CostWindowStart1dGT(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldCostWindowStart1d, v))
+}
+
+// CostWindowStart1dGTE applies the GTE predicate on the "cost_window_start_1d" field.
+func CostWindowStart1dGTE(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldCostWindowStart1d, v))
+}
+
+// CostWindowStart1dLT applies the LT predicate on the "cost_window_start_1d" field.
+func CostWindowStart1dLT(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldCostWindowStart1d, v))
+}
+
+// CostWindowStart1dLTE applies the LTE predicate on the "cost_window_start_1d" field.
+func CostWindowStart1dLTE(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldCostWindowStart1d, v))
+}
+
+// CostWindowStart1dIsNil applies the IsNil predicate on the "cost_window_start_1d" field.
+func CostWindowStart1dIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldCostWindowStart1d))
+}
+
+// CostWindowStart1dNotNil applies the NotNil predicate on the "cost_window_start_1d" field.
+func CostWindowStart1dNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldCostWindowStart1d))
+}
+
+// CostLimit7dEQ applies the EQ predicate on the "cost_limit_7d" field.
+func CostLimit7dEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostLimit7d, v))
+}
+
+// CostLimit7dNEQ applies the NEQ predicate on the "cost_limit_7d" field.
+func CostLimit7dNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldCostLimit7d, v))
+}
+
+// CostLimit7dIn applies the In predicate on the "cost_limit_7d" field.
+func CostLimit7dIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldCostLimit7d, vs...))
+}
+
+// CostLimit7dNotIn applies the NotIn predicate on the "cost_limit_7d" field.
+func CostLimit7dNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldCostLimit7d, vs...))
+}
+
+// CostLimit7dGT applies the GT predicate on the "cost_limit_7d" field.
+func CostLimit7dGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldCostLimit7d, v))
+}
+
+// CostLimit7dGTE applies the GTE predicate on the "cost_limit_7d" field.
+func CostLimit7dGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldCostLimit7d, v))
+}
+
+// CostLimit7dLT applies the LT predicate on the "cost_limit_7d" field.
+func CostLimit7dLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldCostLimit7d, v))
+}
+
+// CostLimit7dLTE applies the LTE predicate on the "cost_limit_7d" field.
+func CostLimit7dLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldCostLimit7d, v))
+}
+
+// CostLimit7dContains applies the Contains predicate on the "cost_limit_7d" field.
+func CostLimit7dContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldCostLimit7d, v))
+}
+
+// CostLimit7dHasPrefix applies the HasPrefix predicate on the "cost_limit_7d" field.
+func CostLimit7dHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldCostLimit7d, v))
+}
+
+// CostLimit7dHasSuffix applies the HasSuffix predicate on the "cost_limit_7d" field.
+func CostLimit7dHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldCostLimit7d, v))
+}
+
+// CostLimit7dIsNil applies the IsNil predicate on the "cost_limit_7d" field.
+func CostLimit7dIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldCostLimit7d))
+}
+
+// CostLimit7dNotNil applies the NotNil predicate on the "cost_limit_7d" field.
+func CostLimit7dNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldCostLimit7d))
+}
+
+// CostLimit7dEqualFold applies the EqualFold predicate on the "cost_limit_7d" field.
+func CostLimit7dEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldCostLimit7d, v))
+}
+
+// CostLimit7dContainsFold applies the ContainsFold predicate on the "cost_limit_7d" field.
+func CostLimit7dContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldCostLimit7d, v))
+}
+
+// CostUsed7dEQ applies the EQ predicate on the "cost_used_7d" field.
+func CostUsed7dEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostUsed7d, v))
+}
+
+// CostUsed7dNEQ applies the NEQ predicate on the "cost_used_7d" field.
+func CostUsed7dNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldCostUsed7d, v))
+}
+
+// CostUsed7dIn applies the In predicate on the "cost_used_7d" field.
+func CostUsed7dIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldCostUsed7d, vs...))
+}
+
+// CostUsed7dNotIn applies the NotIn predicate on the "cost_used_7d" field.
+func CostUsed7dNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldCostUsed7d, vs...))
+}
+
+// CostUsed7dGT applies the GT predicate on the "cost_used_7d" field.
+func CostUsed7dGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldCostUsed7d, v))
+}
+
+// CostUsed7dGTE applies the GTE predicate on the "cost_used_7d" field.
+func CostUsed7dGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldCostUsed7d, v))
+}
+
+// CostUsed7dLT applies the LT predicate on the "cost_used_7d" field.
+func CostUsed7dLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldCostUsed7d, v))
+}
+
+// CostUsed7dLTE applies the LTE predicate on the "cost_used_7d" field.
+func CostUsed7dLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldCostUsed7d, v))
+}
+
+// CostUsed7dContains applies the Contains predicate on the "cost_used_7d" field.
+func CostUsed7dContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldCostUsed7d, v))
+}
+
+// CostUsed7dHasPrefix applies the HasPrefix predicate on the "cost_used_7d" field.
+func CostUsed7dHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldCostUsed7d, v))
+}
+
+// CostUsed7dHasSuffix applies the HasSuffix predicate on the "cost_used_7d" field.
+func CostUsed7dHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldCostUsed7d, v))
+}
+
+// CostUsed7dEqualFold applies the EqualFold predicate on the "cost_used_7d" field.
+func CostUsed7dEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldCostUsed7d, v))
+}
+
+// CostUsed7dContainsFold applies the ContainsFold predicate on the "cost_used_7d" field.
+func CostUsed7dContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldCostUsed7d, v))
+}
+
+// CostWindowStart7dEQ applies the EQ predicate on the "cost_window_start_7d" field.
+func CostWindowStart7dEQ(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldCostWindowStart7d, v))
+}
+
+// CostWindowStart7dNEQ applies the NEQ predicate on the "cost_window_start_7d" field.
+func CostWindowStart7dNEQ(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldCostWindowStart7d, v))
+}
+
+// CostWindowStart7dIn applies the In predicate on the "cost_window_start_7d" field.
+func CostWindowStart7dIn(vs ...time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldCostWindowStart7d, vs...))
+}
+
+// CostWindowStart7dNotIn applies the NotIn predicate on the "cost_window_start_7d" field.
+func CostWindowStart7dNotIn(vs ...time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldCostWindowStart7d, vs...))
+}
+
+// CostWindowStart7dGT applies the GT predicate on the "cost_window_start_7d" field.
+func CostWindowStart7dGT(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldCostWindowStart7d, v))
+}
+
+// CostWindowStart7dGTE applies the GTE predicate on the "cost_window_start_7d" field.
+func CostWindowStart7dGTE(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldCostWindowStart7d, v))
+}
+
+// CostWindowStart7dLT applies the LT predicate on the "cost_window_start_7d" field.
+func CostWindowStart7dLT(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldCostWindowStart7d, v))
+}
+
+// CostWindowStart7dLTE applies the LTE predicate on the "cost_window_start_7d" field.
+func CostWindowStart7dLTE(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldCostWindowStart7d, v))
+}
+
+// CostWindowStart7dIsNil applies the IsNil predicate on the "cost_window_start_7d" field.
+func CostWindowStart7dIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldCostWindowStart7d))
+}
+
+// CostWindowStart7dNotNil applies the NotNil predicate on the "cost_window_start_7d" field.
+func CostWindowStart7dNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldCostWindowStart7d))
 }
 
 // AllowedIpsJSONIsNil applies the IsNil predicate on the "allowed_ips_json" field.

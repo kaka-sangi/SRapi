@@ -166,7 +166,7 @@ readLoop:
 		}
 	}
 
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(modelID, result.Candidate, usage), usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(modelID, result.Candidate, canonical, usage), usage.Estimated)
 
 	record := gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
@@ -179,6 +179,8 @@ readLoop:
 		SourceEndpoint:        canonical.SourceEndpoint,
 		TargetProtocol:        result.Candidate.Provider.Protocol,
 		Model:                 canonical.CanonicalModel,
+		RequestedModel:        gatewayUsageRequestedSnapshot(canonical, result.Candidate),
+		UpstreamModel:         gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
 		Success:               !interrupted,
 		StatusCode:            ptrInt(http.StatusOK),
 		LatencyMS:             elapsedMillis(startedAt),

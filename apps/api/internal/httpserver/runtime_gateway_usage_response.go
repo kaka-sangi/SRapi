@@ -68,12 +68,12 @@ func gatewayUsageTotals(summary usagecontract.APIKeyUsageSummary) apiopenapi.Gat
 	}
 }
 
-func gatewayUsageWindow(summary usagecontract.UsageWindowSummary) apiopenapi.GatewayUsageWindow {
+func gatewayUsageWindow(summary usagecontract.UsageAggregate) apiopenapi.GatewayUsageWindow {
 	return apiopenapi.GatewayUsageWindow{
 		CachedTokens: summary.CachedTokens,
 		Cost:         summary.TotalCost,
 		Currency:     normalizeGatewayUsageCurrency(summary.Currency),
-		Date:         gatewayUsageDate(summary.Date),
+		Date:         gatewayUsageDate(summary.Key),
 		ErrorCount:   summary.ErrorCount,
 		InputTokens:  summary.InputTokens,
 		OutputTokens: summary.OutputTokens,
@@ -83,15 +83,15 @@ func gatewayUsageWindow(summary usagecontract.UsageWindowSummary) apiopenapi.Gat
 	}
 }
 
-func gatewayUsageDaily(values []usagecontract.UsageDailySummary) []apiopenapi.GatewayUsageWindow {
+func gatewayUsageDaily(values []usagecontract.UsageAggregate) []apiopenapi.GatewayUsageWindow {
 	out := make([]apiopenapi.GatewayUsageWindow, 0, len(values))
 	for _, item := range values {
-		out = append(out, gatewayUsageWindow(usagecontract.UsageWindowSummary(item)))
+		out = append(out, gatewayUsageWindow(item))
 	}
 	return out
 }
 
-func gatewayUsageModels(values []usagecontract.UsageModelSummary) []apiopenapi.GatewayUsageModel {
+func gatewayUsageModels(values []usagecontract.UsageAggregate) []apiopenapi.GatewayUsageModel {
 	out := make([]apiopenapi.GatewayUsageModel, 0, len(values))
 	for _, item := range values {
 		out = append(out, apiopenapi.GatewayUsageModel{
@@ -100,7 +100,7 @@ func gatewayUsageModels(values []usagecontract.UsageModelSummary) []apiopenapi.G
 			Currency:     normalizeGatewayUsageCurrency(item.Currency),
 			ErrorCount:   item.ErrorCount,
 			InputTokens:  item.InputTokens,
-			Model:        item.Model,
+			Model:        item.Key,
 			OutputTokens: item.OutputTokens,
 			Requests:     item.RequestCount,
 			SuccessCount: item.SuccessCount,

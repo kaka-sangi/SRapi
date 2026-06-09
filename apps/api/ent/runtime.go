@@ -46,6 +46,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/paymentorder"
 	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
 	"github.com/srapi/srapi/apps/api/ent/pendingoauthsession"
+	"github.com/srapi/srapi/apps/api/ent/pricinginterval"
 	"github.com/srapi/srapi/apps/api/ent/pricingrule"
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
@@ -109,6 +110,22 @@ func init() {
 	apikeyDescStatus := apikeyFields[5].Descriptor()
 	// apikey.DefaultStatus holds the default value on creation for the status field.
 	apikey.DefaultStatus = apikeyDescStatus.Default.(string)
+	// apikeyDescCostUsed is the schema descriptor for cost_used field.
+	apikeyDescCostUsed := apikeyFields[15].Descriptor()
+	// apikey.DefaultCostUsed holds the default value on creation for the cost_used field.
+	apikey.DefaultCostUsed = apikeyDescCostUsed.Default.(string)
+	// apikeyDescCostUsed5h is the schema descriptor for cost_used_5h field.
+	apikeyDescCostUsed5h := apikeyFields[17].Descriptor()
+	// apikey.DefaultCostUsed5h holds the default value on creation for the cost_used_5h field.
+	apikey.DefaultCostUsed5h = apikeyDescCostUsed5h.Default.(string)
+	// apikeyDescCostUsed1d is the schema descriptor for cost_used_1d field.
+	apikeyDescCostUsed1d := apikeyFields[20].Descriptor()
+	// apikey.DefaultCostUsed1d holds the default value on creation for the cost_used_1d field.
+	apikey.DefaultCostUsed1d = apikeyDescCostUsed1d.Default.(string)
+	// apikeyDescCostUsed7d is the schema descriptor for cost_used_7d field.
+	apikeyDescCostUsed7d := apikeyFields[23].Descriptor()
+	// apikey.DefaultCostUsed7d holds the default value on creation for the cost_used_7d field.
+	apikey.DefaultCostUsed7d = apikeyDescCostUsed7d.Default.(string)
 	apikeygroupMixin := schema.APIKeyGroup{}.Mixin()
 	apikeygroupMixinFields0 := apikeygroupMixin[0].Fields()
 	_ = apikeygroupMixinFields0
@@ -1451,6 +1468,53 @@ func init() {
 	pendingoauthsessionDescAvatarURL := pendingoauthsessionFields[11].Descriptor()
 	// pendingoauthsession.DefaultAvatarURL holds the default value on creation for the avatar_url field.
 	pendingoauthsession.DefaultAvatarURL = pendingoauthsessionDescAvatarURL.Default.(string)
+	pricingintervalMixin := schema.PricingInterval{}.Mixin()
+	pricingintervalMixinFields0 := pricingintervalMixin[0].Fields()
+	_ = pricingintervalMixinFields0
+	pricingintervalFields := schema.PricingInterval{}.Fields()
+	_ = pricingintervalFields
+	// pricingintervalDescCreatedAt is the schema descriptor for created_at field.
+	pricingintervalDescCreatedAt := pricingintervalMixinFields0[0].Descriptor()
+	// pricinginterval.DefaultCreatedAt holds the default value on creation for the created_at field.
+	pricinginterval.DefaultCreatedAt = pricingintervalDescCreatedAt.Default.(func() time.Time)
+	// pricingintervalDescUpdatedAt is the schema descriptor for updated_at field.
+	pricingintervalDescUpdatedAt := pricingintervalMixinFields0[1].Descriptor()
+	// pricinginterval.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	pricinginterval.DefaultUpdatedAt = pricingintervalDescUpdatedAt.Default.(func() time.Time)
+	// pricinginterval.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	pricinginterval.UpdateDefaultUpdatedAt = pricingintervalDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// pricingintervalDescMinTokens is the schema descriptor for min_tokens field.
+	pricingintervalDescMinTokens := pricingintervalFields[1].Descriptor()
+	// pricinginterval.DefaultMinTokens holds the default value on creation for the min_tokens field.
+	pricinginterval.DefaultMinTokens = pricingintervalDescMinTokens.Default.(int)
+	// pricingintervalDescTierLabel is the schema descriptor for tier_label field.
+	pricingintervalDescTierLabel := pricingintervalFields[3].Descriptor()
+	// pricinginterval.DefaultTierLabel holds the default value on creation for the tier_label field.
+	pricinginterval.DefaultTierLabel = pricingintervalDescTierLabel.Default.(string)
+	// pricingintervalDescImageSize is the schema descriptor for image_size field.
+	pricingintervalDescImageSize := pricingintervalFields[4].Descriptor()
+	// pricinginterval.DefaultImageSize holds the default value on creation for the image_size field.
+	pricinginterval.DefaultImageSize = pricingintervalDescImageSize.Default.(string)
+	// pricingintervalDescInputPricePerMillion is the schema descriptor for input_price_per_million field.
+	pricingintervalDescInputPricePerMillion := pricingintervalFields[5].Descriptor()
+	// pricinginterval.DefaultInputPricePerMillion holds the default value on creation for the input_price_per_million field.
+	pricinginterval.DefaultInputPricePerMillion = pricingintervalDescInputPricePerMillion.Default.(string)
+	// pricingintervalDescOutputPricePerMillion is the schema descriptor for output_price_per_million field.
+	pricingintervalDescOutputPricePerMillion := pricingintervalFields[6].Descriptor()
+	// pricinginterval.DefaultOutputPricePerMillion holds the default value on creation for the output_price_per_million field.
+	pricinginterval.DefaultOutputPricePerMillion = pricingintervalDescOutputPricePerMillion.Default.(string)
+	// pricingintervalDescCacheReadPricePerMillion is the schema descriptor for cache_read_price_per_million field.
+	pricingintervalDescCacheReadPricePerMillion := pricingintervalFields[7].Descriptor()
+	// pricinginterval.DefaultCacheReadPricePerMillion holds the default value on creation for the cache_read_price_per_million field.
+	pricinginterval.DefaultCacheReadPricePerMillion = pricingintervalDescCacheReadPricePerMillion.Default.(string)
+	// pricingintervalDescCacheWritePricePerMillion is the schema descriptor for cache_write_price_per_million field.
+	pricingintervalDescCacheWritePricePerMillion := pricingintervalFields[8].Descriptor()
+	// pricinginterval.DefaultCacheWritePricePerMillion holds the default value on creation for the cache_write_price_per_million field.
+	pricinginterval.DefaultCacheWritePricePerMillion = pricingintervalDescCacheWritePricePerMillion.Default.(string)
+	// pricingintervalDescPerImagePrice is the schema descriptor for per_image_price field.
+	pricingintervalDescPerImagePrice := pricingintervalFields[9].Descriptor()
+	// pricinginterval.DefaultPerImagePrice holds the default value on creation for the per_image_price field.
+	pricinginterval.DefaultPerImagePrice = pricingintervalDescPerImagePrice.Default.(string)
 	pricingruleMixin := schema.PricingRule{}.Mixin()
 	pricingruleMixinFields0 := pricingruleMixin[0].Fields()
 	_ = pricingruleMixinFields0
@@ -1466,24 +1530,32 @@ func init() {
 	pricingrule.DefaultUpdatedAt = pricingruleDescUpdatedAt.Default.(func() time.Time)
 	// pricingrule.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	pricingrule.UpdateDefaultUpdatedAt = pricingruleDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// pricingruleDescBillingMode is the schema descriptor for billing_mode field.
+	pricingruleDescBillingMode := pricingruleFields[2].Descriptor()
+	// pricingrule.DefaultBillingMode holds the default value on creation for the billing_mode field.
+	pricingrule.DefaultBillingMode = pricingruleDescBillingMode.Default.(string)
 	// pricingruleDescInputPricePerMillion is the schema descriptor for input_price_per_million field.
-	pricingruleDescInputPricePerMillion := pricingruleFields[2].Descriptor()
+	pricingruleDescInputPricePerMillion := pricingruleFields[3].Descriptor()
 	// pricingrule.DefaultInputPricePerMillion holds the default value on creation for the input_price_per_million field.
 	pricingrule.DefaultInputPricePerMillion = pricingruleDescInputPricePerMillion.Default.(string)
 	// pricingruleDescOutputPricePerMillion is the schema descriptor for output_price_per_million field.
-	pricingruleDescOutputPricePerMillion := pricingruleFields[3].Descriptor()
+	pricingruleDescOutputPricePerMillion := pricingruleFields[4].Descriptor()
 	// pricingrule.DefaultOutputPricePerMillion holds the default value on creation for the output_price_per_million field.
 	pricingrule.DefaultOutputPricePerMillion = pricingruleDescOutputPricePerMillion.Default.(string)
 	// pricingruleDescCacheReadPricePerMillion is the schema descriptor for cache_read_price_per_million field.
-	pricingruleDescCacheReadPricePerMillion := pricingruleFields[4].Descriptor()
+	pricingruleDescCacheReadPricePerMillion := pricingruleFields[5].Descriptor()
 	// pricingrule.DefaultCacheReadPricePerMillion holds the default value on creation for the cache_read_price_per_million field.
 	pricingrule.DefaultCacheReadPricePerMillion = pricingruleDescCacheReadPricePerMillion.Default.(string)
 	// pricingruleDescCacheWritePricePerMillion is the schema descriptor for cache_write_price_per_million field.
-	pricingruleDescCacheWritePricePerMillion := pricingruleFields[5].Descriptor()
+	pricingruleDescCacheWritePricePerMillion := pricingruleFields[6].Descriptor()
 	// pricingrule.DefaultCacheWritePricePerMillion holds the default value on creation for the cache_write_price_per_million field.
 	pricingrule.DefaultCacheWritePricePerMillion = pricingruleDescCacheWritePricePerMillion.Default.(string)
+	// pricingruleDescPerRequestPrice is the schema descriptor for per_request_price field.
+	pricingruleDescPerRequestPrice := pricingruleFields[7].Descriptor()
+	// pricingrule.DefaultPerRequestPrice holds the default value on creation for the per_request_price field.
+	pricingrule.DefaultPerRequestPrice = pricingruleDescPerRequestPrice.Default.(string)
 	// pricingruleDescCurrency is the schema descriptor for currency field.
-	pricingruleDescCurrency := pricingruleFields[6].Descriptor()
+	pricingruleDescCurrency := pricingruleFields[8].Descriptor()
 	// pricingrule.DefaultCurrency holds the default value on creation for the currency field.
 	pricingrule.DefaultCurrency = pricingruleDescCurrency.Default.(string)
 	providerMixin := schema.Provider{}.Mixin()
@@ -2189,8 +2261,36 @@ func init() {
 	usagelogDescBillableCost := usagelogFields[22].Descriptor()
 	// usagelog.DefaultBillableCost holds the default value on creation for the billable_cost field.
 	usagelog.DefaultBillableCost = usagelogDescBillableCost.Default.(string)
+	// usagelogDescInputCost is the schema descriptor for input_cost field.
+	usagelogDescInputCost := usagelogFields[23].Descriptor()
+	// usagelog.DefaultInputCost holds the default value on creation for the input_cost field.
+	usagelog.DefaultInputCost = usagelogDescInputCost.Default.(string)
+	// usagelogDescOutputCost is the schema descriptor for output_cost field.
+	usagelogDescOutputCost := usagelogFields[24].Descriptor()
+	// usagelog.DefaultOutputCost holds the default value on creation for the output_cost field.
+	usagelog.DefaultOutputCost = usagelogDescOutputCost.Default.(string)
+	// usagelogDescCacheReadCost is the schema descriptor for cache_read_cost field.
+	usagelogDescCacheReadCost := usagelogFields[25].Descriptor()
+	// usagelog.DefaultCacheReadCost holds the default value on creation for the cache_read_cost field.
+	usagelog.DefaultCacheReadCost = usagelogDescCacheReadCost.Default.(string)
+	// usagelogDescCacheWriteCost is the schema descriptor for cache_write_cost field.
+	usagelogDescCacheWriteCost := usagelogFields[26].Descriptor()
+	// usagelog.DefaultCacheWriteCost holds the default value on creation for the cache_write_cost field.
+	usagelog.DefaultCacheWriteCost = usagelogDescCacheWriteCost.Default.(string)
+	// usagelogDescRequestedModel is the schema descriptor for requested_model field.
+	usagelogDescRequestedModel := usagelogFields[27].Descriptor()
+	// usagelog.DefaultRequestedModel holds the default value on creation for the requested_model field.
+	usagelog.DefaultRequestedModel = usagelogDescRequestedModel.Default.(string)
+	// usagelogDescUpstreamModel is the schema descriptor for upstream_model field.
+	usagelogDescUpstreamModel := usagelogFields[28].Descriptor()
+	// usagelog.DefaultUpstreamModel holds the default value on creation for the upstream_model field.
+	usagelog.DefaultUpstreamModel = usagelogDescUpstreamModel.Default.(string)
+	// usagelogDescBillingMode is the schema descriptor for billing_mode field.
+	usagelogDescBillingMode := usagelogFields[29].Descriptor()
+	// usagelog.DefaultBillingMode holds the default value on creation for the billing_mode field.
+	usagelog.DefaultBillingMode = usagelogDescBillingMode.Default.(string)
 	// usagelogDescCurrency is the schema descriptor for currency field.
-	usagelogDescCurrency := usagelogFields[23].Descriptor()
+	usagelogDescCurrency := usagelogFields[30].Descriptor()
 	// usagelog.DefaultCurrency holds the default value on creation for the currency field.
 	usagelog.DefaultCurrency = usagelogDescCurrency.Default.(string)
 	userMixin := schema.User{}.Mixin()
@@ -2499,6 +2599,18 @@ func init() {
 	usersubscriptionDescSourceID := usersubscriptionFields[7].Descriptor()
 	// usersubscription.DefaultSourceID holds the default value on creation for the source_id field.
 	usersubscription.DefaultSourceID = usersubscriptionDescSourceID.Default.(string)
+	// usersubscriptionDescDailyUsageUsd is the schema descriptor for daily_usage_usd field.
+	usersubscriptionDescDailyUsageUsd := usersubscriptionFields[8].Descriptor()
+	// usersubscription.DefaultDailyUsageUsd holds the default value on creation for the daily_usage_usd field.
+	usersubscription.DefaultDailyUsageUsd = usersubscriptionDescDailyUsageUsd.Default.(string)
+	// usersubscriptionDescWeeklyUsageUsd is the schema descriptor for weekly_usage_usd field.
+	usersubscriptionDescWeeklyUsageUsd := usersubscriptionFields[10].Descriptor()
+	// usersubscription.DefaultWeeklyUsageUsd holds the default value on creation for the weekly_usage_usd field.
+	usersubscription.DefaultWeeklyUsageUsd = usersubscriptionDescWeeklyUsageUsd.Default.(string)
+	// usersubscriptionDescMonthlyUsageUsd is the schema descriptor for monthly_usage_usd field.
+	usersubscriptionDescMonthlyUsageUsd := usersubscriptionFields[12].Descriptor()
+	// usersubscription.DefaultMonthlyUsageUsd holds the default value on creation for the monthly_usage_usd field.
+	usersubscription.DefaultMonthlyUsageUsd = usersubscriptionDescMonthlyUsageUsd.Default.(string)
 	usertotpsecretMixin := schema.UserTOTPSecret{}.Mixin()
 	usertotpsecretMixinFields0 := usertotpsecretMixin[0].Fields()
 	_ = usertotpsecretMixinFields0

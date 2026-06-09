@@ -76,6 +76,20 @@ func (_u *PricingRuleUpdate) AddProviderID(v int) *PricingRuleUpdate {
 	return _u
 }
 
+// SetBillingMode sets the "billing_mode" field.
+func (_u *PricingRuleUpdate) SetBillingMode(v string) *PricingRuleUpdate {
+	_u.mutation.SetBillingMode(v)
+	return _u
+}
+
+// SetNillableBillingMode sets the "billing_mode" field if the given value is not nil.
+func (_u *PricingRuleUpdate) SetNillableBillingMode(v *string) *PricingRuleUpdate {
+	if v != nil {
+		_u.SetBillingMode(*v)
+	}
+	return _u
+}
+
 // SetInputPricePerMillion sets the "input_price_per_million" field.
 func (_u *PricingRuleUpdate) SetInputPricePerMillion(v string) *PricingRuleUpdate {
 	_u.mutation.SetInputPricePerMillion(v)
@@ -128,6 +142,20 @@ func (_u *PricingRuleUpdate) SetCacheWritePricePerMillion(v string) *PricingRule
 func (_u *PricingRuleUpdate) SetNillableCacheWritePricePerMillion(v *string) *PricingRuleUpdate {
 	if v != nil {
 		_u.SetCacheWritePricePerMillion(*v)
+	}
+	return _u
+}
+
+// SetPerRequestPrice sets the "per_request_price" field.
+func (_u *PricingRuleUpdate) SetPerRequestPrice(v string) *PricingRuleUpdate {
+	_u.mutation.SetPerRequestPrice(v)
+	return _u
+}
+
+// SetNillablePerRequestPrice sets the "per_request_price" field if the given value is not nil.
+func (_u *PricingRuleUpdate) SetNillablePerRequestPrice(v *string) *PricingRuleUpdate {
+	if v != nil {
+		_u.SetPerRequestPrice(*v)
 	}
 	return _u
 }
@@ -251,6 +279,9 @@ func (_u *PricingRuleUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	if value, ok := _u.mutation.AddedProviderID(); ok {
 		_spec.AddField(pricingrule.FieldProviderID, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.BillingMode(); ok {
+		_spec.SetField(pricingrule.FieldBillingMode, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.InputPricePerMillion(); ok {
 		_spec.SetField(pricingrule.FieldInputPricePerMillion, field.TypeString, value)
 	}
@@ -262,6 +293,9 @@ func (_u *PricingRuleUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	}
 	if value, ok := _u.mutation.CacheWritePricePerMillion(); ok {
 		_spec.SetField(pricingrule.FieldCacheWritePricePerMillion, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.PerRequestPrice(); ok {
+		_spec.SetField(pricingrule.FieldPerRequestPrice, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(pricingrule.FieldCurrency, field.TypeString, value)
@@ -346,6 +380,20 @@ func (_u *PricingRuleUpdateOne) AddProviderID(v int) *PricingRuleUpdateOne {
 	return _u
 }
 
+// SetBillingMode sets the "billing_mode" field.
+func (_u *PricingRuleUpdateOne) SetBillingMode(v string) *PricingRuleUpdateOne {
+	_u.mutation.SetBillingMode(v)
+	return _u
+}
+
+// SetNillableBillingMode sets the "billing_mode" field if the given value is not nil.
+func (_u *PricingRuleUpdateOne) SetNillableBillingMode(v *string) *PricingRuleUpdateOne {
+	if v != nil {
+		_u.SetBillingMode(*v)
+	}
+	return _u
+}
+
 // SetInputPricePerMillion sets the "input_price_per_million" field.
 func (_u *PricingRuleUpdateOne) SetInputPricePerMillion(v string) *PricingRuleUpdateOne {
 	_u.mutation.SetInputPricePerMillion(v)
@@ -398,6 +446,20 @@ func (_u *PricingRuleUpdateOne) SetCacheWritePricePerMillion(v string) *PricingR
 func (_u *PricingRuleUpdateOne) SetNillableCacheWritePricePerMillion(v *string) *PricingRuleUpdateOne {
 	if v != nil {
 		_u.SetCacheWritePricePerMillion(*v)
+	}
+	return _u
+}
+
+// SetPerRequestPrice sets the "per_request_price" field.
+func (_u *PricingRuleUpdateOne) SetPerRequestPrice(v string) *PricingRuleUpdateOne {
+	_u.mutation.SetPerRequestPrice(v)
+	return _u
+}
+
+// SetNillablePerRequestPrice sets the "per_request_price" field if the given value is not nil.
+func (_u *PricingRuleUpdateOne) SetNillablePerRequestPrice(v *string) *PricingRuleUpdateOne {
+	if v != nil {
+		_u.SetPerRequestPrice(*v)
 	}
 	return _u
 }
@@ -551,6 +613,9 @@ func (_u *PricingRuleUpdateOne) sqlSave(ctx context.Context) (_node *PricingRule
 	if value, ok := _u.mutation.AddedProviderID(); ok {
 		_spec.AddField(pricingrule.FieldProviderID, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.BillingMode(); ok {
+		_spec.SetField(pricingrule.FieldBillingMode, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.InputPricePerMillion(); ok {
 		_spec.SetField(pricingrule.FieldInputPricePerMillion, field.TypeString, value)
 	}
@@ -562,6 +627,9 @@ func (_u *PricingRuleUpdateOne) sqlSave(ctx context.Context) (_node *PricingRule
 	}
 	if value, ok := _u.mutation.CacheWritePricePerMillion(); ok {
 		_spec.SetField(pricingrule.FieldCacheWritePricePerMillion, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.PerRequestPrice(); ok {
+		_spec.SetField(pricingrule.FieldPerRequestPrice, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(pricingrule.FieldCurrency, field.TypeString, value)

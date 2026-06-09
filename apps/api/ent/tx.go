@@ -94,6 +94,8 @@ type Tx struct {
 	PaymentProviderInstance *PaymentProviderInstanceClient
 	// PendingOAuthSession is the client for interacting with the PendingOAuthSession builders.
 	PendingOAuthSession *PendingOAuthSessionClient
+	// PricingInterval is the client for interacting with the PricingInterval builders.
+	PricingInterval *PricingIntervalClient
 	// PricingRule is the client for interacting with the PricingRule builders.
 	PricingRule *PricingRuleClient
 	// Provider is the client for interacting with the Provider builders.
@@ -324,6 +326,7 @@ func (tx *Tx) init() {
 	tx.PaymentOrder = NewPaymentOrderClient(tx.config)
 	tx.PaymentProviderInstance = NewPaymentProviderInstanceClient(tx.config)
 	tx.PendingOAuthSession = NewPendingOAuthSessionClient(tx.config)
+	tx.PricingInterval = NewPricingIntervalClient(tx.config)
 	tx.PricingRule = NewPricingRuleClient(tx.config)
 	tx.Provider = NewProviderClient(tx.config)
 	tx.ProviderAccount = NewProviderAccountClient(tx.config)

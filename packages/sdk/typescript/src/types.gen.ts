@@ -717,6 +717,38 @@ export type ApiKey = {
      */
     request_limit_7d?: number | null;
     /**
+     * Lifetime USD spend quota for this key. Empty means uncapped.
+     */
+    cost_quota?: string | null;
+    /**
+     * Lifetime billable USD spend recorded for this key.
+     */
+    cost_used?: string;
+    /**
+     * Max billable USD spend allowed per 5-hour window.
+     */
+    cost_limit_5h?: string | null;
+    /**
+     * Billable USD spend recorded in the current 5-hour window.
+     */
+    cost_used_5h?: string;
+    /**
+     * Max billable USD spend allowed per 1-day window.
+     */
+    cost_limit_1d?: string | null;
+    /**
+     * Billable USD spend recorded in the current 1-day window.
+     */
+    cost_used_1d?: string;
+    /**
+     * Max billable USD spend allowed per 7-day window.
+     */
+    cost_limit_7d?: string | null;
+    /**
+     * Billable USD spend recorded in the current 7-day window.
+     */
+    cost_used_7d?: string;
+    /**
      * Client IPs or CIDRs permitted to use this key. Empty means all IPs are allowed. Enforced against the request client IP; requires a trusted reverse proxy that overwrites X-Forwarded-For.
      */
     allowed_ips: Array<string>;
@@ -745,6 +777,22 @@ export type CreateApiKeyRequest = {
     request_limit_5h?: number | null;
     request_limit_1d?: number | null;
     request_limit_7d?: number | null;
+    /**
+     * Lifetime USD spend quota for this key. Empty means uncapped.
+     */
+    cost_quota?: string | null;
+    /**
+     * Max billable USD spend allowed per 5-hour window.
+     */
+    cost_limit_5h?: string | null;
+    /**
+     * Max billable USD spend allowed per 1-day window.
+     */
+    cost_limit_1d?: string | null;
+    /**
+     * Max billable USD spend allowed per 7-day window.
+     */
+    cost_limit_7d?: string | null;
     allowed_ips?: Array<string>;
     denied_ips?: Array<string>;
     expires_at?: string | null;
@@ -752,6 +800,10 @@ export type CreateApiKeyRequest = {
 
 export type AdminUpdateApiKeyRequest = {
     status: ApiKeyStatus;
+    cost_quota?: string | null;
+    cost_limit_5h?: string | null;
+    cost_limit_1d?: string | null;
+    cost_limit_7d?: string | null;
 };
 
 export type UpdateApiKeyRequest = {
@@ -766,6 +818,10 @@ export type UpdateApiKeyRequest = {
     request_limit_5h?: number | null;
     request_limit_1d?: number | null;
     request_limit_7d?: number | null;
+    cost_quota?: string | null;
+    cost_limit_5h?: string | null;
+    cost_limit_1d?: string | null;
+    cost_limit_7d?: string | null;
     allowed_ips?: Array<string>;
     denied_ips?: Array<string>;
     /**
@@ -1002,6 +1058,30 @@ export type UserSubscription = {
     starts_at: Timestamp;
     expires_at: Timestamp;
     entitlements_snapshot: JsonObject;
+    /**
+     * Materialized billable USD usage in the current UTC day window.
+     */
+    daily_usage_usd: string;
+    /**
+     * UTC start timestamp for the materialized daily usage window.
+     */
+    daily_usage_window_start: string | null;
+    /**
+     * Materialized billable USD usage in the current UTC week window.
+     */
+    weekly_usage_usd: string;
+    /**
+     * UTC start timestamp for the materialized weekly usage window.
+     */
+    weekly_usage_window_start: string | null;
+    /**
+     * Materialized billable USD usage in the current UTC month window.
+     */
+    monthly_usage_usd: string;
+    /**
+     * UTC start timestamp for the materialized monthly usage window.
+     */
+    monthly_usage_window_start: string | null;
     source_type: string;
     source_id: string;
     created_at: Timestamp;
@@ -1033,10 +1113,13 @@ export type PricingRule = {
     id: Id;
     model_id: Id;
     provider_id: Id;
+    billing_mode: BillingMode;
     input_price_per_million_tokens: string;
     output_price_per_million_tokens: string;
     cache_read_price_per_million_tokens: string;
     cache_write_price_per_million_tokens: string;
+    per_request_price: string;
+    intervals: Array<PricingInterval>;
     currency: string;
     effective_from?: string | null;
     effective_to?: string | null;
@@ -1047,23 +1130,56 @@ export type PricingRule = {
 export type CreatePricingRuleRequest = {
     model_id: Id;
     provider_id: Id;
+    billing_mode?: BillingMode;
     input_price_per_million_tokens: string;
     output_price_per_million_tokens: string;
     cache_read_price_per_million_tokens: string;
     cache_write_price_per_million_tokens: string;
+    per_request_price?: string;
+    intervals?: Array<PricingIntervalInput>;
     currency: string;
     effective_from?: string | null;
     effective_to?: string | null;
 };
 
 export type UpdatePricingRuleRequest = {
+    billing_mode?: BillingMode;
     input_price_per_million_tokens?: string;
     output_price_per_million_tokens?: string;
     cache_read_price_per_million_tokens?: string;
     cache_write_price_per_million_tokens?: string;
+    per_request_price?: string;
+    intervals?: Array<PricingIntervalInput>;
     currency?: string;
     effective_from?: string | null;
     effective_to?: string | null;
+};
+
+export type BillingMode = 'token' | 'per_request' | 'image';
+
+export type PricingInterval = {
+    id?: Id;
+    min_tokens: number;
+    max_tokens?: number | null;
+    tier_label: string;
+    image_size: string;
+    input_price_per_million_tokens: string;
+    output_price_per_million_tokens: string;
+    cache_read_price_per_million_tokens: string;
+    cache_write_price_per_million_tokens: string;
+    per_image_price: string;
+};
+
+export type PricingIntervalInput = {
+    min_tokens?: number;
+    max_tokens?: number | null;
+    tier_label?: string;
+    image_size?: string;
+    input_price_per_million_tokens?: string;
+    output_price_per_million_tokens?: string;
+    cache_read_price_per_million_tokens?: string;
+    cache_write_price_per_million_tokens?: string;
+    per_image_price?: string;
 };
 
 export type PricingRuleResponse = {
@@ -1149,6 +1265,17 @@ export type ProviderResponse = {
 export type ProviderListResponse = {
     data: Array<Provider>;
     pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type ProviderOAuthConfig = {
+    provider_id: Id;
+    provider_name: string;
+    config: AccountOAuthProviderConfig;
+};
+
+export type ProviderOAuthConfigResponse = {
+    data: ProviderOAuthConfig;
     request_id: RequestId;
 };
 
@@ -1289,7 +1416,7 @@ export type RuntimeClass = 'api_key' | 'oauth_refresh' | 'oauth_device_code' | '
 /**
  * Upstream protocol/platform family a provider preset belongs to.
  */
-export type PlatformFamily = 'openai_compatible' | 'anthropic_compatible' | 'bedrock_anthropic' | 'reverse_proxy_antigravity' | 'rerank_compatible';
+export type PlatformFamily = 'openai_compatible' | 'anthropic_compatible' | 'gemini_compatible' | 'bedrock_anthropic' | 'reverse_proxy_antigravity' | 'rerank_compatible';
 
 export type ProviderAccountStatus = 'active' | 'disabled' | 'needs_reauth' | 'suspended' | 'dead' | 'archived';
 
@@ -1485,8 +1612,14 @@ export type ProviderAccountImportRequest = {
 
 export type ProviderAccountImportResult = {
     created_count: number;
+    updated_count: number;
     skipped_count: number;
+    failed_count: number;
+    total_count: number;
     created_ids: Array<Id>;
+    updated_ids: Array<Id>;
+    items: Array<CodexSessionImportItem>;
+    warnings: Array<CodexSessionImportMessage>;
     errors: Array<string>;
 };
 
@@ -2488,6 +2621,48 @@ export type PlaygroundModelsResponse = {
     request_id: RequestId;
 };
 
+export type AvailableModelStatus = 'available' | 'limited' | 'unavailable';
+
+export type AvailableModelPricing = {
+    billing_mode: BillingMode;
+    currency: string;
+    input_price_per_million_tokens: string;
+    output_price_per_million_tokens: string;
+    cache_read_price_per_million_tokens: string;
+    cache_write_price_per_million_tokens: string;
+    per_request_price: string;
+    source: 'pricing_rule' | 'mapping_override' | 'default_zero';
+};
+
+export type AvailableModelChannel = {
+    provider_id: Id;
+    provider_name: string;
+    provider_display_name: string;
+    adapter_type: string;
+    protocol: string;
+    upstream_model: string;
+    status: AvailableModelStatus;
+    active_account_count: number;
+    total_account_count: number;
+    pricing: AvailableModelPricing;
+};
+
+export type AvailableModel = {
+    id: string;
+    name: string;
+    family?: string | null;
+    status: AvailableModelStatus;
+    context_window?: number | null;
+    max_output_tokens?: number | null;
+    channels: Array<AvailableModelChannel>;
+};
+
+export type AvailableModelListResponse = {
+    data: Array<AvailableModel>;
+    generated_at: Timestamp;
+    request_id: RequestId;
+};
+
 export type NotificationEmailTemplateEventName = 'auth.password_reset' | 'auth.email_verification' | 'auth.oauth_pending_email_completion' | 'notification.contact_verification' | 'balance.low' | 'subscription.expiry_reminder' | 'account.quota_alert';
 
 export type NotificationEmailTemplateEvent = {
@@ -3015,6 +3190,16 @@ export type UsageLog = {
     success: boolean;
     error_class?: string | null;
     cost: string;
+    actual_cost?: string;
+    billable_cost?: string;
+    rate_multiplier?: string;
+    input_cost?: string;
+    output_cost?: string;
+    cache_read_cost?: string;
+    cache_write_cost?: string;
+    requested_model?: string;
+    upstream_model?: string;
+    billing_mode?: BillingMode;
     currency: string;
     compatibility_warnings: Array<string>;
     created_at: Timestamp;
@@ -7066,6 +7251,35 @@ export type ListMePlaygroundModelsResponses = {
 
 export type ListMePlaygroundModelsResponse = ListMePlaygroundModelsResponses[keyof ListMePlaygroundModelsResponses];
 
+export type ListCurrentUserAvailableModelsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/available-models';
+};
+
+export type ListCurrentUserAvailableModelsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListCurrentUserAvailableModelsError = ListCurrentUserAvailableModelsErrors[keyof ListCurrentUserAvailableModelsErrors];
+
+export type ListCurrentUserAvailableModelsResponses = {
+    /**
+     * Current user model availability.
+     */
+    200: AvailableModelListResponse;
+};
+
+export type ListCurrentUserAvailableModelsResponse = ListCurrentUserAvailableModelsResponses[keyof ListCurrentUserAvailableModelsResponses];
+
 export type CreateMePlaygroundChatData = {
     body: PlaygroundChatRequest;
     path?: never;
@@ -7885,6 +8099,45 @@ export type UpdateAdminProviderResponses = {
 };
 
 export type UpdateAdminProviderResponse = UpdateAdminProviderResponses[keyof UpdateAdminProviderResponses];
+
+export type GetAdminProviderOAuthConfigData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/providers/{id}/oauth-config';
+};
+
+export type GetAdminProviderOAuthConfigErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminProviderOAuthConfigError = GetAdminProviderOAuthConfigErrors[keyof GetAdminProviderOAuthConfigErrors];
+
+export type GetAdminProviderOAuthConfigResponses = {
+    /**
+     * Provider OAuth config.
+     */
+    200: ProviderOAuthConfigResponse;
+};
+
+export type GetAdminProviderOAuthConfigResponse = GetAdminProviderOAuthConfigResponses[keyof GetAdminProviderOAuthConfigResponses];
 
 export type TestAdminProviderData = {
     body?: never;
@@ -10373,6 +10626,49 @@ export type GetAdminAccountQuotaResponses = {
 };
 
 export type GetAdminAccountQuotaResponse = GetAdminAccountQuotaResponses[keyof GetAdminAccountQuotaResponses];
+
+export type ResetAdminAccountQuotaData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}/reset-quota';
+};
+
+export type ResetAdminAccountQuotaErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ResetAdminAccountQuotaError = ResetAdminAccountQuotaErrors[keyof ResetAdminAccountQuotaErrors];
+
+export type ResetAdminAccountQuotaResponses = {
+    /**
+     * Account quota state reset.
+     */
+    200: ProviderAccountResponse;
+};
+
+export type ResetAdminAccountQuotaResponse = ResetAdminAccountQuotaResponses[keyof ResetAdminAccountQuotaResponses];
 
 export type ListAdminAccountGroupsData = {
     body?: never;

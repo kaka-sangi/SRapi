@@ -80,6 +80,7 @@ type Stores struct {
 	AuthSessions       authcontract.Store
 	Billing            billingcontract.Store
 	UsageCharges       billingcontract.UsageChargeStore
+	Pricing            billingcontract.PricingStore
 	Events             eventscontract.Store
 	Idempotency        idempotencycontract.Store
 	Operations         operationscontract.Store
@@ -235,6 +236,7 @@ func New(client *ent.Client) (Stores, error) {
 		AuthSessions:       authSessions,
 		Billing:            billing,
 		UsageCharges:       billing,
+		Pricing:            billing,
 		Events:             events,
 		Idempotency:        idempotency,
 		Operations:         operations,

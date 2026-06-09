@@ -218,7 +218,7 @@ export function CodexSessionImportDialog({
   );
 }
 
-function CodexImportResultPanel({ result }: { result: CodexSessionImportResult }) {
+export function CodexImportResultPanel({ result }: { result: CodexSessionImportResult }) {
   const { t } = useLanguage();
   return (
     <div className="space-y-3 rounded-md border border-srapi-border bg-srapi-card-muted p-3">

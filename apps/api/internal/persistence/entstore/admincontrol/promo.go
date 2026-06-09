@@ -11,6 +11,7 @@ import (
 	entsetting "github.com/srapi/srapi/apps/api/ent/setting"
 	entuserpromocodeapplication "github.com/srapi/srapi/apps/api/ent/userpromocodeapplication"
 	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 const settingsKeyPromoCodes = "admin_control.promo_codes"
@@ -204,7 +205,7 @@ func previewPromoCode(item admincontrolcontract.PromoCode, userID int, amount st
 	if item.StartsAt != nil && item.StartsAt.After(now) {
 		return admincontrolcontract.PromoCodeApplication{}, admincontrolcontract.ErrConflict
 	}
-	inputAmount, ok := decimalRat(amount)
+	inputAmount, ok := money.RequiredDecimalRat(amount)
 	if !ok || inputAmount.Sign() <= 0 {
 		return admincontrolcontract.PromoCodeApplication{}, admincontrolcontract.ErrInvalidInput
 	}
@@ -223,9 +224,9 @@ func previewPromoCode(item admincontrolcontract.PromoCode, userID int, amount st
 	return admincontrolcontract.PromoCodeApplication{
 		UserID:         userID,
 		PromoCodeID:    item.ID,
-		OriginalAmount: formatRatFixed(inputAmount, 8),
-		DiscountAmount: formatRatFixed(discount, 8),
-		FinalAmount:    formatRatFixed(finalAmount, 8),
+		OriginalAmount: money.FormatRatFixed(inputAmount, 8),
+		DiscountAmount: money.FormatRatFixed(discount, 8),
+		FinalAmount:    money.FormatRatFixed(finalAmount, 8),
 		Currency:       normalizedCurrency,
 		DiscountType:   item.DiscountType,
 		AppliedAt:      now,
@@ -233,7 +234,7 @@ func previewPromoCode(item admincontrolcontract.PromoCode, userID int, amount st
 }
 
 func promoDiscountAmount(item admincontrolcontract.PromoCode, amount *big.Rat) (*big.Rat, error) {
-	value, ok := decimalRat(item.DiscountValue)
+	value, ok := money.RequiredDecimalRat(item.DiscountValue)
 	if !ok || value.Sign() <= 0 {
 		return nil, admincontrolcontract.ErrInvalidInput
 	}
@@ -261,11 +262,11 @@ func promoCodeWithDerivedStatus(item admincontrolcontract.PromoCode, now time.Ti
 }
 
 func formatInputMoney(value string) string {
-	rat, ok := decimalRat(value)
+	rat, ok := money.RequiredDecimalRat(value)
 	if !ok {
 		return ""
 	}
-	return formatRatFixed(rat, 8)
+	return money.FormatRatFixed(rat, 8)
 }
 
 // ToPromoCodeApplication converts the generated Ent row into the module contract.

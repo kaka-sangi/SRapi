@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -14,13 +15,21 @@ import (
 	accountservice "github.com/srapi/srapi/apps/api/internal/modules/accounts/service"
 	accountmemory "github.com/srapi/srapi/apps/api/internal/modules/accounts/store/memory"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
+	apikeyservice "github.com/srapi/srapi/apps/api/internal/modules/api_keys/service"
+	apikeymemory "github.com/srapi/srapi/apps/api/internal/modules/api_keys/store/memory"
+	billingservice "github.com/srapi/srapi/apps/api/internal/modules/billing/service"
+	billingmemory "github.com/srapi/srapi/apps/api/internal/modules/billing/store/memory"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
+	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
+	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
 	usageservice "github.com/srapi/srapi/apps/api/internal/modules/usage/service"
 	usagememory "github.com/srapi/srapi/apps/api/internal/modules/usage/store/memory"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 func TestWarnDefaultZeroGatewayPricing(t *testing.T) {
@@ -405,4 +414,155 @@ func TestRecordGatewayUsageAppliesAccountGroupRateMultiplier(t *testing.T) {
 	if log.Cost != "0.01000000" || log.ActualCost != "0.00800000" || log.BillableCost != "0.00800000" || log.RateMultiplier != "0.80000000" {
 		t.Fatalf("expected multiplier snapshot and actual cost, got %+v", log)
 	}
+}
+
+func TestRecordGatewayUsagePersistsCostBreakdownAndModelSnapshots(t *testing.T) {
+	ctx := context.Background()
+	usageStore := usagememory.New()
+	usage, err := usageservice.New(usageStore, nil)
+	if err != nil {
+		t.Fatalf("new usage service: %v", err)
+	}
+	events, err := eventsservice.New(eventsmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	rt := &runtimeState{
+		logger: slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		usage:  usage,
+		events: events,
+	}
+
+	rt.recordGatewayUsage(ctx, gatewayUsageRecord{
+		RequestID:      "req_breakdown_snapshot",
+		Authed:         apikeycontract.AuthResult{UserID: 1, Key: apikeycontract.APIKey{ID: 2}},
+		SourceEndpoint: "/v1/images/generations",
+		Model:          "canonical-image-model",
+		RequestedModel: "public-image-alias",
+		UpstreamModel:  "upstream-image-model",
+		Success:        true,
+		Pricing: gatewayPricingEvidence{
+			Amount:         "0.12000000",
+			Currency:       "USD",
+			BillingMode:    "image",
+			InputCost:      "0.01000000",
+			OutputCost:     "0.10000000",
+			CacheReadCost:  "0.00500000",
+			CacheWriteCost: "0.00500000",
+			PricingSource:  "pricing_rule",
+		},
+	})
+
+	logs, err := usageStore.List(ctx)
+	if err != nil {
+		t.Fatalf("list usage logs: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("expected one usage log, got %+v", logs)
+	}
+	log := logs[0]
+	sum := addUsageCostBreakdown(log.InputCost, log.OutputCost, log.CacheReadCost, log.CacheWriteCost)
+	if sum != log.Cost {
+		t.Fatalf("expected breakdown sum %s to equal total %s in %+v", sum, log.Cost, log)
+	}
+	if log.RequestedModel != "public-image-alias" || log.UpstreamModel != "upstream-image-model" || log.BillingMode != "image" {
+		t.Fatalf("expected model and billing snapshots, got %+v", log)
+	}
+}
+
+func TestRecordGatewayUsageMaterializedCostMatchesUsageLogBillableSum(t *testing.T) {
+	ctx := context.Background()
+	usageStore := usagememory.New()
+	usage, err := usageservice.New(usageStore, nil)
+	if err != nil {
+		t.Fatalf("new usage service: %v", err)
+	}
+	events, err := eventsservice.New(eventsmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	billing, err := billingservice.New(billingmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new billing service: %v", err)
+	}
+	subscriptions, err := subscriptionservice.New(subscriptionmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+	apiKeys, err := apikeyservice.New(apikeymemory.New(), strings.Repeat("k", 32), nil)
+	if err != nil {
+		t.Fatalf("new api key service: %v", err)
+	}
+	plan, err := subscriptions.CreatePlan(ctx, subscriptioncontract.CreatePlanRequest{
+		Name:         "materialized-pro",
+		Price:        "9.99",
+		Currency:     "USD",
+		ValidityDays: 30,
+		Entitlements: map[string]any{"monthly_cost_quota": "1.00000000"},
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	if _, err := subscriptions.CreateUserSubscription(ctx, subscriptioncontract.CreateSubscriptionRequest{
+		UserID: 1,
+		PlanID: plan.ID,
+	}); err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+	createdKey, err := apiKeys.Create(ctx, apikeycontract.CreateRequest{UserID: 1, Name: "materialized-key"})
+	if err != nil {
+		t.Fatalf("create api key: %v", err)
+	}
+	rt := &runtimeState{
+		logger:        slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		usage:         usage,
+		events:        events,
+		billing:       billing,
+		subscriptions: subscriptions,
+		apiKeys:       apiKeys,
+	}
+	for i, amount := range []string{"0.01000000", "0.02500000", "0.00500000"} {
+		rt.recordGatewayUsage(ctx, gatewayUsageRecord{
+			RequestID:      "req_materialized_" + strconv.Itoa(i+1),
+			Authed:         apikeycontract.AuthResult{UserID: 1, Key: createdKey.Key},
+			SourceEndpoint: "/v1/chat/completions",
+			TargetProtocol: "openai-compatible",
+			Model:          "materialized-model",
+			Success:        true,
+			Pricing:        gatewayPricingEvidence{Amount: amount, Currency: "USD", PricingSource: "pricing_rule"},
+		})
+	}
+
+	logs, err := usageStore.List(ctx)
+	if err != nil {
+		t.Fatalf("list usage logs: %v", err)
+	}
+	sum := "0.00000000"
+	for _, log := range logs {
+		sum = money.AddMoney(sum, log.BillableCost)
+	}
+	if sum != "0.04000000" {
+		t.Fatalf("unexpected billable cost sum %s from logs %+v", sum, logs)
+	}
+	materialized, err := subscriptions.MaterializedUsageForUser(ctx, 1, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("read materialized usage: %v", err)
+	}
+	if materialized.MonthlyUsageUSD != sum || materialized.DailyUsageUSD != sum || materialized.WeeklyUsageUSD != sum {
+		t.Fatalf("expected materialized usage to match log sum %s, got %+v", sum, materialized)
+	}
+	key, err := apiKeys.GetByID(ctx, createdKey.Key.ID)
+	if err != nil {
+		t.Fatalf("find api key: %v", err)
+	}
+	if key.CostUsed != sum || key.CostUsed5h != sum || key.CostUsed1d != sum || key.CostUsed7d != sum {
+		t.Fatalf("expected api key materialized cost to match log sum %s, got %+v", sum, key)
+	}
+}
+
+func addUsageCostBreakdown(input, output, cacheRead, cacheWrite string) string {
+	sum := money.AddMoney(input, output)
+	sum = money.AddMoney(sum, cacheRead)
+	sum = money.AddMoney(sum, cacheWrite)
+	return sum
 }

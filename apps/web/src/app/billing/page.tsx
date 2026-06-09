@@ -33,6 +33,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { formatMoney, formatDate } from "@/lib/admin-format";
+import {
+  SubscriptionUsageBars,
+  type SubscriptionUsageLabels,
+} from "@/components/features/subscription-usage-bars";
 import { meErrorMessage } from "@/lib/me-api";
 import type { PaymentOrder, UserSubscription } from "@/lib/sdk-types";
 
@@ -273,6 +277,12 @@ function SubscriptionsTab() {
       ),
     },
     {
+      key: "usage",
+      header: t("billing.usage"),
+      hideOnMobile: true,
+      render: (s) => <SubscriptionUsageBars subscription={s} labels={subscriptionUsageLabels(t)} />,
+    },
+    {
       key: "status",
       header: t("billing.status"),
       render: (s) => <QuietBadge status={quietStatusFor(s.status)} label={statusLabel(t, s.status)} />,
@@ -290,4 +300,13 @@ function SubscriptionsTab() {
       minWidth={480}
     />
   );
+}
+
+function subscriptionUsageLabels(t: ReturnType<typeof useLanguage>["t"]): SubscriptionUsageLabels {
+  return {
+    daily: t("billing.dailyUsage"),
+    weekly: t("billing.weeklyUsage"),
+    monthly: t("billing.monthlyUsage"),
+    noQuota: t("billing.noCostQuota"),
+  };
 }

@@ -28,6 +28,17 @@ var (
 		{Name: "request_limit_5h", Type: field.TypeInt, Nullable: true},
 		{Name: "request_limit_1d", Type: field.TypeInt, Nullable: true},
 		{Name: "request_limit_7d", Type: field.TypeInt, Nullable: true},
+		{Name: "cost_quota", Type: field.TypeString, Nullable: true},
+		{Name: "cost_used", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "cost_limit_5h", Type: field.TypeString, Nullable: true},
+		{Name: "cost_used_5h", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "cost_window_start_5h", Type: field.TypeTime, Nullable: true},
+		{Name: "cost_limit_1d", Type: field.TypeString, Nullable: true},
+		{Name: "cost_used_1d", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "cost_window_start_1d", Type: field.TypeTime, Nullable: true},
+		{Name: "cost_limit_7d", Type: field.TypeString, Nullable: true},
+		{Name: "cost_used_7d", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "cost_window_start_7d", Type: field.TypeTime, Nullable: true},
 		{Name: "allowed_ips_json", Type: field.TypeJSON, Nullable: true},
 		{Name: "denied_ips_json", Type: field.TypeJSON, Nullable: true},
 		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
@@ -57,7 +68,7 @@ var (
 			{
 				Name:    "apikey_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[20]},
+				Columns: []*schema.Column{APIKeysColumns[31]},
 			},
 		},
 	}
@@ -1494,6 +1505,45 @@ var (
 			},
 		},
 	}
+	// PricingIntervalsColumns holds the columns for the "pricing_intervals" table.
+	PricingIntervalsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "pricing_rule_id", Type: field.TypeInt},
+		{Name: "min_tokens", Type: field.TypeInt, Default: 0},
+		{Name: "max_tokens", Type: field.TypeInt, Nullable: true},
+		{Name: "tier_label", Type: field.TypeString, Default: ""},
+		{Name: "image_size", Type: field.TypeString, Default: ""},
+		{Name: "input_price_per_million", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "output_price_per_million", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "cache_read_price_per_million", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "cache_write_price_per_million", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "per_image_price", Type: field.TypeString, Default: "0.00000000"},
+	}
+	// PricingIntervalsTable holds the schema information for the "pricing_intervals" table.
+	PricingIntervalsTable = &schema.Table{
+		Name:       "pricing_intervals",
+		Columns:    PricingIntervalsColumns,
+		PrimaryKey: []*schema.Column{PricingIntervalsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "pricinginterval_pricing_rule_id",
+				Unique:  false,
+				Columns: []*schema.Column{PricingIntervalsColumns[3]},
+			},
+			{
+				Name:    "pricinginterval_pricing_rule_id_min_tokens_max_tokens",
+				Unique:  false,
+				Columns: []*schema.Column{PricingIntervalsColumns[3], PricingIntervalsColumns[4], PricingIntervalsColumns[5]},
+			},
+			{
+				Name:    "pricinginterval_pricing_rule_id_image_size",
+				Unique:  false,
+				Columns: []*schema.Column{PricingIntervalsColumns[3], PricingIntervalsColumns[7]},
+			},
+		},
+	}
 	// PricingRulesColumns holds the columns for the "pricing_rules" table.
 	PricingRulesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1501,10 +1551,12 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "model_id", Type: field.TypeInt},
 		{Name: "provider_id", Type: field.TypeInt},
+		{Name: "billing_mode", Type: field.TypeString, Default: "token"},
 		{Name: "input_price_per_million", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "output_price_per_million", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "cache_read_price_per_million", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "cache_write_price_per_million", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "per_request_price", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "currency", Type: field.TypeString, Default: "USD"},
 		{Name: "effective_from", Type: field.TypeTime, Nullable: true},
 		{Name: "effective_to", Type: field.TypeTime, Nullable: true},
@@ -1521,9 +1573,14 @@ var (
 				Columns: []*schema.Column{PricingRulesColumns[3], PricingRulesColumns[4]},
 			},
 			{
+				Name:    "pricingrule_billing_mode",
+				Unique:  false,
+				Columns: []*schema.Column{PricingRulesColumns[5]},
+			},
+			{
 				Name:    "pricingrule_effective_from_effective_to",
 				Unique:  false,
-				Columns: []*schema.Column{PricingRulesColumns[10], PricingRulesColumns[11]},
+				Columns: []*schema.Column{PricingRulesColumns[12], PricingRulesColumns[13]},
 			},
 		},
 	}
@@ -2145,6 +2202,13 @@ var (
 		{Name: "actual_cost", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "rate_multiplier", Type: field.TypeString, Default: "1.00000000"},
 		{Name: "billable_cost", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "input_cost", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "output_cost", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "cache_read_cost", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "cache_write_cost", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "requested_model", Type: field.TypeString, Default: ""},
+		{Name: "upstream_model", Type: field.TypeString, Default: ""},
+		{Name: "billing_mode", Type: field.TypeString, Default: "token"},
 		{Name: "currency", Type: field.TypeString, Default: "USD"},
 		{Name: "charged_at", Type: field.TypeTime, Nullable: true},
 		{Name: "compatibility_warnings_json", Type: field.TypeJSON, Nullable: true},
@@ -2168,7 +2232,7 @@ var (
 			{
 				Name:    "usagelog_charged_at_success_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[27], UsageLogsColumns[20], UsageLogsColumns[1]},
+				Columns: []*schema.Column{UsageLogsColumns[34], UsageLogsColumns[20], UsageLogsColumns[1]},
 			},
 			{
 				Name:    "usagelog_api_key_id_created_at",
@@ -2540,6 +2604,12 @@ var (
 		{Name: "entitlements_snapshot_json", Type: field.TypeJSON, Nullable: true},
 		{Name: "source_type", Type: field.TypeString, Default: ""},
 		{Name: "source_id", Type: field.TypeString, Default: ""},
+		{Name: "daily_usage_usd", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "daily_usage_window_start", Type: field.TypeTime, Nullable: true},
+		{Name: "weekly_usage_usd", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "weekly_usage_window_start", Type: field.TypeTime, Nullable: true},
+		{Name: "monthly_usage_usd", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "monthly_usage_window_start", Type: field.TypeTime, Nullable: true},
 	}
 	// UserSubscriptionsTable holds the schema information for the "user_subscriptions" table.
 	UserSubscriptionsTable = &schema.Table{
@@ -2673,6 +2743,7 @@ var (
 		PaymentOrdersTable,
 		PaymentProviderInstancesTable,
 		PendingOauthSessionsTable,
+		PricingIntervalsTable,
 		PricingRulesTable,
 		ProvidersTable,
 		ProviderAccountsTable,

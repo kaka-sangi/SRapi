@@ -74,7 +74,7 @@ export default function AdminScheduledTestsPage() {
   );
 }
 
-function ScheduledTestsContent() {
+export function ScheduledTestsContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const list = useAdminList();

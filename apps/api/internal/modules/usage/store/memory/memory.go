@@ -2,12 +2,14 @@ package memory
 
 import (
 	"context"
+	"math/big"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 type Store struct {
@@ -43,6 +45,24 @@ func (s *Store) Create(_ context.Context, input contract.UsageLog) (contract.Usa
 	if strings.TrimSpace(log.BillableCost) == "" {
 		log.BillableCost = log.ActualCost
 	}
+	if strings.TrimSpace(log.InputCost) == "" {
+		log.InputCost = "0.00000000"
+	}
+	if strings.TrimSpace(log.OutputCost) == "" {
+		log.OutputCost = "0.00000000"
+	}
+	if strings.TrimSpace(log.CacheReadCost) == "" {
+		log.CacheReadCost = "0.00000000"
+	}
+	if strings.TrimSpace(log.CacheWriteCost) == "" {
+		log.CacheWriteCost = "0.00000000"
+	}
+	if strings.TrimSpace(log.RequestedModel) == "" {
+		log.RequestedModel = log.Model
+	}
+	if strings.TrimSpace(log.BillingMode) == "" {
+		log.BillingMode = "token"
+	}
 	s.byID[log.ID] = log
 	s.nextID++
 	return cloneLog(log), nil
@@ -70,6 +90,37 @@ func (s *Store) ListByUser(_ context.Context, userID int) ([]contract.UsageLog, 
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
+}
+
+func (s *Store) SummarizeUserWindow(_ context.Context, filter contract.UserWindowFilter) (contract.UserWindowSummary, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	totalCost := new(big.Rat)
+	summary := contract.UserWindowSummary{
+		UserID:       filter.UserID,
+		ProviderID:   cloneInt(filter.ProviderID),
+		Start:        filter.Start.UTC(),
+		End:          filter.End.UTC(),
+		SuccessOnly:  filter.SuccessOnly,
+		BillableCost: "0.00000000",
+	}
+	for _, log := range s.byID {
+		if log.UserID != filter.UserID || log.CreatedAt.Before(summary.Start) || !log.CreatedAt.Before(summary.End) {
+			continue
+		}
+		if filter.ProviderID != nil && (log.ProviderID == nil || *log.ProviderID != *filter.ProviderID) {
+			continue
+		}
+		if filter.SuccessOnly && !log.Success {
+			continue
+		}
+		summary.TotalTokens += log.TotalTokens
+		if cost, ok := money.DecimalRat(log.BillableCost); ok {
+			totalCost.Add(totalCost, cost)
+		}
+	}
+	summary.BillableCost = money.FormatRatFixed(totalCost, 8)
+	return summary, nil
 }
 
 // CleanupLogs deletes the records matching filter, oldest first, capped at
@@ -127,6 +178,14 @@ func cloneLog(value contract.UsageLog) contract.UsageLog {
 		value.ChargedAt = &cloned
 	}
 	return value
+}
+
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 func cloneStrings(values []string) []string {

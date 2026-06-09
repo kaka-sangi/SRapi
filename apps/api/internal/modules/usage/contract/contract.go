@@ -30,6 +30,13 @@ type UsageLog struct {
 	ActualCost            string
 	RateMultiplier        string
 	BillableCost          string
+	InputCost             string
+	OutputCost            string
+	CacheReadCost         string
+	CacheWriteCost        string
+	RequestedModel        string
+	UpstreamModel         string
+	BillingMode           string
 	Currency              string
 	ChargedAt             *time.Time
 	CompatibilityWarnings []string
@@ -59,6 +66,13 @@ type RecordRequest struct {
 	ActualCost            string
 	RateMultiplier        string
 	BillableCost          string
+	InputCost             string
+	OutputCost            string
+	CacheReadCost         string
+	CacheWriteCost        string
+	RequestedModel        string
+	UpstreamModel         string
+	BillingMode           string
 	Currency              string
 	ChargedAt             *time.Time
 	CompatibilityWarnings []string
@@ -76,6 +90,27 @@ const (
 type QueryFilter struct {
 	Start *time.Time
 	End   *time.Time
+}
+
+// UserWindowFilter bounds a hot-path user quota summary. Stores must apply the
+// user and time predicates before materializing rows.
+type UserWindowFilter struct {
+	UserID      int
+	ProviderID  *int
+	Start       time.Time
+	End         time.Time
+	SuccessOnly bool
+}
+
+// UserWindowSummary contains bounded usage totals for one user.
+type UserWindowSummary struct {
+	UserID       int
+	ProviderID   *int
+	Start        time.Time
+	End          time.Time
+	SuccessOnly  bool
+	TotalTokens  int
+	BillableCost string
 }
 
 // CleanupFilter bounds an operator on-demand deletion of usage records. It
@@ -116,67 +151,26 @@ type APIKeyUsageSummary struct {
 	TotalTokens  int
 	TotalCost    string
 	Currency     string
-	Today        UsageWindowSummary
-	ModelStats   []UsageModelSummary
-	DailyUsage   []UsageDailySummary
+	Today        UsageAggregate
+	ModelStats   []UsageAggregate
+	DailyUsage   []UsageAggregate
 	RecentLogs   []UsageLog
 	GeneratedAt  time.Time
 }
 
-// UsageWindowSummary contains usage totals for one UTC date window.
-type UsageWindowSummary struct {
-	Date         string
-	RequestCount int
-	SuccessCount int
-	ErrorCount   int
-	InputTokens  int
-	OutputTokens int
-	CachedTokens int
-	TotalTokens  int
-	TotalCost    string
-	Currency     string
-}
-
-// UsageModelSummary contains usage totals grouped by canonical model name.
-type UsageModelSummary struct {
-	Model        string
-	RequestCount int
-	SuccessCount int
-	ErrorCount   int
-	InputTokens  int
-	OutputTokens int
-	CachedTokens int
-	TotalTokens  int
-	TotalCost    string
-	Currency     string
-}
-
-// UsageDailySummary contains usage totals grouped by UTC date.
-type UsageDailySummary struct {
-	Date         string
-	RequestCount int
-	SuccessCount int
-	ErrorCount   int
-	InputTokens  int
-	OutputTokens int
-	CachedTokens int
-	TotalTokens  int
-	TotalCost    string
-	Currency     string
-}
-
+// UsageAggregate contains usage totals for one aggregation key and dimension.
 type UsageAggregate struct {
-	AggregateID   string
-	AggregateType AggregateDimension
-	RequestCount  int
-	SuccessCount  int
-	ErrorCount    int
-	InputTokens   int
-	OutputTokens  int
-	CachedTokens  int
-	TotalTokens   int
-	TotalCost     string
-	Currency      string
+	Key          string
+	Type         AggregateDimension
+	RequestCount int
+	SuccessCount int
+	ErrorCount   int
+	InputTokens  int
+	OutputTokens int
+	CachedTokens int
+	TotalTokens  int
+	TotalCost    string
+	Currency     string
 }
 
 type UsageExport struct {
@@ -192,6 +186,7 @@ type Store interface {
 	Create(ctx context.Context, input UsageLog) (UsageLog, error)
 	List(ctx context.Context) ([]UsageLog, error)
 	ListByUser(ctx context.Context, userID int) ([]UsageLog, error)
+	SummarizeUserWindow(ctx context.Context, filter UserWindowFilter) (UserWindowSummary, error)
 	// CleanupLogs performs a bounded delete of usage records matching filter.
 	// Implementations must honor filter.MaxDelete and filter.DryRun and return
 	// the matched/deleted counts so the caller can report whether the cap was hit.

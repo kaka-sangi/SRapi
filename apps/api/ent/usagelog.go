@@ -68,6 +68,20 @@ type UsageLog struct {
 	RateMultiplier string `json:"rate_multiplier,omitempty"`
 	// BillableCost holds the value of the "billable_cost" field.
 	BillableCost string `json:"billable_cost,omitempty"`
+	// InputCost holds the value of the "input_cost" field.
+	InputCost string `json:"input_cost,omitempty"`
+	// OutputCost holds the value of the "output_cost" field.
+	OutputCost string `json:"output_cost,omitempty"`
+	// CacheReadCost holds the value of the "cache_read_cost" field.
+	CacheReadCost string `json:"cache_read_cost,omitempty"`
+	// CacheWriteCost holds the value of the "cache_write_cost" field.
+	CacheWriteCost string `json:"cache_write_cost,omitempty"`
+	// RequestedModel holds the value of the "requested_model" field.
+	RequestedModel string `json:"requested_model,omitempty"`
+	// UpstreamModel holds the value of the "upstream_model" field.
+	UpstreamModel string `json:"upstream_model,omitempty"`
+	// BillingMode holds the value of the "billing_mode" field.
+	BillingMode string `json:"billing_mode,omitempty"`
 	// Currency holds the value of the "currency" field.
 	Currency string `json:"currency,omitempty"`
 	// ChargedAt holds the value of the "charged_at" field.
@@ -88,7 +102,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case usagelog.FieldID, usagelog.FieldAttemptNo, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldProviderID, usagelog.FieldAccountID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldTotalTokens, usagelog.FieldLatencyMs:
 			values[i] = new(sql.NullInt64)
-		case usagelog.FieldRequestID, usagelog.FieldSourceProtocol, usagelog.FieldSourceEndpoint, usagelog.FieldTargetProtocol, usagelog.FieldModel, usagelog.FieldErrorClass, usagelog.FieldCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier, usagelog.FieldBillableCost, usagelog.FieldCurrency:
+		case usagelog.FieldRequestID, usagelog.FieldSourceProtocol, usagelog.FieldSourceEndpoint, usagelog.FieldTargetProtocol, usagelog.FieldModel, usagelog.FieldErrorClass, usagelog.FieldCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier, usagelog.FieldBillableCost, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCacheReadCost, usagelog.FieldCacheWriteCost, usagelog.FieldRequestedModel, usagelog.FieldUpstreamModel, usagelog.FieldBillingMode, usagelog.FieldCurrency:
 			values[i] = new(sql.NullString)
 		case usagelog.FieldCreatedAt, usagelog.FieldUpdatedAt, usagelog.FieldChargedAt:
 			values[i] = new(sql.NullTime)
@@ -266,6 +280,48 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.BillableCost = value.String
 			}
+		case usagelog.FieldInputCost:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field input_cost", values[i])
+			} else if value.Valid {
+				_m.InputCost = value.String
+			}
+		case usagelog.FieldOutputCost:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field output_cost", values[i])
+			} else if value.Valid {
+				_m.OutputCost = value.String
+			}
+		case usagelog.FieldCacheReadCost:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cache_read_cost", values[i])
+			} else if value.Valid {
+				_m.CacheReadCost = value.String
+			}
+		case usagelog.FieldCacheWriteCost:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cache_write_cost", values[i])
+			} else if value.Valid {
+				_m.CacheWriteCost = value.String
+			}
+		case usagelog.FieldRequestedModel:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field requested_model", values[i])
+			} else if value.Valid {
+				_m.RequestedModel = value.String
+			}
+		case usagelog.FieldUpstreamModel:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field upstream_model", values[i])
+			} else if value.Valid {
+				_m.UpstreamModel = value.String
+			}
+		case usagelog.FieldBillingMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field billing_mode", values[i])
+			} else if value.Valid {
+				_m.BillingMode = value.String
+			}
 		case usagelog.FieldCurrency:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field currency", values[i])
@@ -403,6 +459,27 @@ func (_m *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("billable_cost=")
 	builder.WriteString(_m.BillableCost)
+	builder.WriteString(", ")
+	builder.WriteString("input_cost=")
+	builder.WriteString(_m.InputCost)
+	builder.WriteString(", ")
+	builder.WriteString("output_cost=")
+	builder.WriteString(_m.OutputCost)
+	builder.WriteString(", ")
+	builder.WriteString("cache_read_cost=")
+	builder.WriteString(_m.CacheReadCost)
+	builder.WriteString(", ")
+	builder.WriteString("cache_write_cost=")
+	builder.WriteString(_m.CacheWriteCost)
+	builder.WriteString(", ")
+	builder.WriteString("requested_model=")
+	builder.WriteString(_m.RequestedModel)
+	builder.WriteString(", ")
+	builder.WriteString("upstream_model=")
+	builder.WriteString(_m.UpstreamModel)
+	builder.WriteString(", ")
+	builder.WriteString("billing_mode=")
+	builder.WriteString(_m.BillingMode)
 	builder.WriteString(", ")
 	builder.WriteString("currency=")
 	builder.WriteString(_m.Currency)

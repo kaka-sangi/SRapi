@@ -24,6 +24,12 @@ const ipWindowLimit = z
   .min(0, { message: "Limit cannot be negative." })
   .optional();
 
+const moneyLimit = z
+  .string()
+  .trim()
+  .regex(/^\d+(\.\d{1,8})?$/, { message: "Use a non-negative USD amount with up to 8 decimals." })
+  .optional();
+
 export const createApiKeySchema = z.object({
   name: z
     .string()
@@ -51,6 +57,10 @@ export const createApiKeySchema = z.object({
   requestLimit5h: ipWindowLimit,
   requestLimit1d: ipWindowLimit,
   requestLimit7d: ipWindowLimit,
+  costQuota: moneyLimit,
+  costLimit5h: moneyLimit,
+  costLimit1d: moneyLimit,
+  costLimit7d: moneyLimit,
   // Per-key throughput ceilings (0/empty = unlimited) and an optional expiry.
   rpmLimit: ipWindowLimit,
   tpmLimit: ipWindowLimit,

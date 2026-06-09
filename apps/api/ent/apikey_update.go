@@ -357,6 +357,202 @@ func (_u *APIKeyUpdate) ClearRequestLimit7d() *APIKeyUpdate {
 	return _u
 }
 
+// SetCostQuota sets the "cost_quota" field.
+func (_u *APIKeyUpdate) SetCostQuota(v string) *APIKeyUpdate {
+	_u.mutation.SetCostQuota(v)
+	return _u
+}
+
+// SetNillableCostQuota sets the "cost_quota" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableCostQuota(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetCostQuota(*v)
+	}
+	return _u
+}
+
+// ClearCostQuota clears the value of the "cost_quota" field.
+func (_u *APIKeyUpdate) ClearCostQuota() *APIKeyUpdate {
+	_u.mutation.ClearCostQuota()
+	return _u
+}
+
+// SetCostUsed sets the "cost_used" field.
+func (_u *APIKeyUpdate) SetCostUsed(v string) *APIKeyUpdate {
+	_u.mutation.SetCostUsed(v)
+	return _u
+}
+
+// SetNillableCostUsed sets the "cost_used" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableCostUsed(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetCostUsed(*v)
+	}
+	return _u
+}
+
+// SetCostLimit5h sets the "cost_limit_5h" field.
+func (_u *APIKeyUpdate) SetCostLimit5h(v string) *APIKeyUpdate {
+	_u.mutation.SetCostLimit5h(v)
+	return _u
+}
+
+// SetNillableCostLimit5h sets the "cost_limit_5h" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableCostLimit5h(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetCostLimit5h(*v)
+	}
+	return _u
+}
+
+// ClearCostLimit5h clears the value of the "cost_limit_5h" field.
+func (_u *APIKeyUpdate) ClearCostLimit5h() *APIKeyUpdate {
+	_u.mutation.ClearCostLimit5h()
+	return _u
+}
+
+// SetCostUsed5h sets the "cost_used_5h" field.
+func (_u *APIKeyUpdate) SetCostUsed5h(v string) *APIKeyUpdate {
+	_u.mutation.SetCostUsed5h(v)
+	return _u
+}
+
+// SetNillableCostUsed5h sets the "cost_used_5h" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableCostUsed5h(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetCostUsed5h(*v)
+	}
+	return _u
+}
+
+// SetCostWindowStart5h sets the "cost_window_start_5h" field.
+func (_u *APIKeyUpdate) SetCostWindowStart5h(v time.Time) *APIKeyUpdate {
+	_u.mutation.SetCostWindowStart5h(v)
+	return _u
+}
+
+// SetNillableCostWindowStart5h sets the "cost_window_start_5h" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableCostWindowStart5h(v *time.Time) *APIKeyUpdate {
+	if v != nil {
+		_u.SetCostWindowStart5h(*v)
+	}
+	return _u
+}
+
+// ClearCostWindowStart5h clears the value of the "cost_window_start_5h" field.
+func (_u *APIKeyUpdate) ClearCostWindowStart5h() *APIKeyUpdate {
+	_u.mutation.ClearCostWindowStart5h()
+	return _u
+}
+
+// SetCostLimit1d sets the "cost_limit_1d" field.
+func (_u *APIKeyUpdate) SetCostLimit1d(v string) *APIKeyUpdate {
+	_u.mutation.SetCostLimit1d(v)
+	return _u
+}
+
+// SetNillableCostLimit1d sets the "cost_limit_1d" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableCostLimit1d(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetCostLimit1d(*v)
+	}
+	return _u
+}
+
+// ClearCostLimit1d clears the value of the "cost_limit_1d" field.
+func (_u *APIKeyUpdate) ClearCostLimit1d() *APIKeyUpdate {
+	_u.mutation.ClearCostLimit1d()
+	return _u
+}
+
+// SetCostUsed1d sets the "cost_used_1d" field.
+func (_u *APIKeyUpdate) SetCostUsed1d(v string) *APIKeyUpdate {
+	_u.mutation.SetCostUsed1d(v)
+	return _u
+}
+
+// SetNillableCostUsed1d sets the "cost_used_1d" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableCostUsed1d(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetCostUsed1d(*v)
+	}
+	return _u
+}
+
+// SetCostWindowStart1d sets the "cost_window_start_1d" field.
+func (_u *APIKeyUpdate) SetCostWindowStart1d(v time.Time) *APIKeyUpdate {
+	_u.mutation.SetCostWindowStart1d(v)
+	return _u
+}
+
+// SetNillableCostWindowStart1d sets the "cost_window_start_1d" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableCostWindowStart1d(v *time.Time) *APIKeyUpdate {
+	if v != nil {
+		_u.SetCostWindowStart1d(*v)
+	}
+	return _u
+}
+
+// ClearCostWindowStart1d clears the value of the "cost_window_start_1d" field.
+func (_u *APIKeyUpdate) ClearCostWindowStart1d() *APIKeyUpdate {
+	_u.mutation.ClearCostWindowStart1d()
+	return _u
+}
+
+// SetCostLimit7d sets the "cost_limit_7d" field.
+func (_u *APIKeyUpdate) SetCostLimit7d(v string) *APIKeyUpdate {
+	_u.mutation.SetCostLimit7d(v)
+	return _u
+}
+
+// SetNillableCostLimit7d sets the "cost_limit_7d" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableCostLimit7d(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetCostLimit7d(*v)
+	}
+	return _u
+}
+
+// ClearCostLimit7d clears the value of the "cost_limit_7d" field.
+func (_u *APIKeyUpdate) ClearCostLimit7d() *APIKeyUpdate {
+	_u.mutation.ClearCostLimit7d()
+	return _u
+}
+
+// SetCostUsed7d sets the "cost_used_7d" field.
+func (_u *APIKeyUpdate) SetCostUsed7d(v string) *APIKeyUpdate {
+	_u.mutation.SetCostUsed7d(v)
+	return _u
+}
+
+// SetNillableCostUsed7d sets the "cost_used_7d" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableCostUsed7d(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetCostUsed7d(*v)
+	}
+	return _u
+}
+
+// SetCostWindowStart7d sets the "cost_window_start_7d" field.
+func (_u *APIKeyUpdate) SetCostWindowStart7d(v time.Time) *APIKeyUpdate {
+	_u.mutation.SetCostWindowStart7d(v)
+	return _u
+}
+
+// SetNillableCostWindowStart7d sets the "cost_window_start_7d" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableCostWindowStart7d(v *time.Time) *APIKeyUpdate {
+	if v != nil {
+		_u.SetCostWindowStart7d(*v)
+	}
+	return _u
+}
+
+// ClearCostWindowStart7d clears the value of the "cost_window_start_7d" field.
+func (_u *APIKeyUpdate) ClearCostWindowStart7d() *APIKeyUpdate {
+	_u.mutation.ClearCostWindowStart7d()
+	return _u
+}
+
 // SetAllowedIpsJSON sets the "allowed_ips_json" field.
 func (_u *APIKeyUpdate) SetAllowedIpsJSON(v []string) *APIKeyUpdate {
 	_u.mutation.SetAllowedIpsJSON(v)
@@ -612,6 +808,60 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.RequestLimit7dCleared() {
 		_spec.ClearField(apikey.FieldRequestLimit7d, field.TypeInt)
+	}
+	if value, ok := _u.mutation.CostQuota(); ok {
+		_spec.SetField(apikey.FieldCostQuota, field.TypeString, value)
+	}
+	if _u.mutation.CostQuotaCleared() {
+		_spec.ClearField(apikey.FieldCostQuota, field.TypeString)
+	}
+	if value, ok := _u.mutation.CostUsed(); ok {
+		_spec.SetField(apikey.FieldCostUsed, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CostLimit5h(); ok {
+		_spec.SetField(apikey.FieldCostLimit5h, field.TypeString, value)
+	}
+	if _u.mutation.CostLimit5hCleared() {
+		_spec.ClearField(apikey.FieldCostLimit5h, field.TypeString)
+	}
+	if value, ok := _u.mutation.CostUsed5h(); ok {
+		_spec.SetField(apikey.FieldCostUsed5h, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CostWindowStart5h(); ok {
+		_spec.SetField(apikey.FieldCostWindowStart5h, field.TypeTime, value)
+	}
+	if _u.mutation.CostWindowStart5hCleared() {
+		_spec.ClearField(apikey.FieldCostWindowStart5h, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CostLimit1d(); ok {
+		_spec.SetField(apikey.FieldCostLimit1d, field.TypeString, value)
+	}
+	if _u.mutation.CostLimit1dCleared() {
+		_spec.ClearField(apikey.FieldCostLimit1d, field.TypeString)
+	}
+	if value, ok := _u.mutation.CostUsed1d(); ok {
+		_spec.SetField(apikey.FieldCostUsed1d, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CostWindowStart1d(); ok {
+		_spec.SetField(apikey.FieldCostWindowStart1d, field.TypeTime, value)
+	}
+	if _u.mutation.CostWindowStart1dCleared() {
+		_spec.ClearField(apikey.FieldCostWindowStart1d, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CostLimit7d(); ok {
+		_spec.SetField(apikey.FieldCostLimit7d, field.TypeString, value)
+	}
+	if _u.mutation.CostLimit7dCleared() {
+		_spec.ClearField(apikey.FieldCostLimit7d, field.TypeString)
+	}
+	if value, ok := _u.mutation.CostUsed7d(); ok {
+		_spec.SetField(apikey.FieldCostUsed7d, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CostWindowStart7d(); ok {
+		_spec.SetField(apikey.FieldCostWindowStart7d, field.TypeTime, value)
+	}
+	if _u.mutation.CostWindowStart7dCleared() {
+		_spec.ClearField(apikey.FieldCostWindowStart7d, field.TypeTime)
 	}
 	if value, ok := _u.mutation.AllowedIpsJSON(); ok {
 		_spec.SetField(apikey.FieldAllowedIpsJSON, field.TypeJSON, value)
@@ -995,6 +1245,202 @@ func (_u *APIKeyUpdateOne) ClearRequestLimit7d() *APIKeyUpdateOne {
 	return _u
 }
 
+// SetCostQuota sets the "cost_quota" field.
+func (_u *APIKeyUpdateOne) SetCostQuota(v string) *APIKeyUpdateOne {
+	_u.mutation.SetCostQuota(v)
+	return _u
+}
+
+// SetNillableCostQuota sets the "cost_quota" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableCostQuota(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetCostQuota(*v)
+	}
+	return _u
+}
+
+// ClearCostQuota clears the value of the "cost_quota" field.
+func (_u *APIKeyUpdateOne) ClearCostQuota() *APIKeyUpdateOne {
+	_u.mutation.ClearCostQuota()
+	return _u
+}
+
+// SetCostUsed sets the "cost_used" field.
+func (_u *APIKeyUpdateOne) SetCostUsed(v string) *APIKeyUpdateOne {
+	_u.mutation.SetCostUsed(v)
+	return _u
+}
+
+// SetNillableCostUsed sets the "cost_used" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableCostUsed(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetCostUsed(*v)
+	}
+	return _u
+}
+
+// SetCostLimit5h sets the "cost_limit_5h" field.
+func (_u *APIKeyUpdateOne) SetCostLimit5h(v string) *APIKeyUpdateOne {
+	_u.mutation.SetCostLimit5h(v)
+	return _u
+}
+
+// SetNillableCostLimit5h sets the "cost_limit_5h" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableCostLimit5h(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetCostLimit5h(*v)
+	}
+	return _u
+}
+
+// ClearCostLimit5h clears the value of the "cost_limit_5h" field.
+func (_u *APIKeyUpdateOne) ClearCostLimit5h() *APIKeyUpdateOne {
+	_u.mutation.ClearCostLimit5h()
+	return _u
+}
+
+// SetCostUsed5h sets the "cost_used_5h" field.
+func (_u *APIKeyUpdateOne) SetCostUsed5h(v string) *APIKeyUpdateOne {
+	_u.mutation.SetCostUsed5h(v)
+	return _u
+}
+
+// SetNillableCostUsed5h sets the "cost_used_5h" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableCostUsed5h(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetCostUsed5h(*v)
+	}
+	return _u
+}
+
+// SetCostWindowStart5h sets the "cost_window_start_5h" field.
+func (_u *APIKeyUpdateOne) SetCostWindowStart5h(v time.Time) *APIKeyUpdateOne {
+	_u.mutation.SetCostWindowStart5h(v)
+	return _u
+}
+
+// SetNillableCostWindowStart5h sets the "cost_window_start_5h" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableCostWindowStart5h(v *time.Time) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetCostWindowStart5h(*v)
+	}
+	return _u
+}
+
+// ClearCostWindowStart5h clears the value of the "cost_window_start_5h" field.
+func (_u *APIKeyUpdateOne) ClearCostWindowStart5h() *APIKeyUpdateOne {
+	_u.mutation.ClearCostWindowStart5h()
+	return _u
+}
+
+// SetCostLimit1d sets the "cost_limit_1d" field.
+func (_u *APIKeyUpdateOne) SetCostLimit1d(v string) *APIKeyUpdateOne {
+	_u.mutation.SetCostLimit1d(v)
+	return _u
+}
+
+// SetNillableCostLimit1d sets the "cost_limit_1d" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableCostLimit1d(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetCostLimit1d(*v)
+	}
+	return _u
+}
+
+// ClearCostLimit1d clears the value of the "cost_limit_1d" field.
+func (_u *APIKeyUpdateOne) ClearCostLimit1d() *APIKeyUpdateOne {
+	_u.mutation.ClearCostLimit1d()
+	return _u
+}
+
+// SetCostUsed1d sets the "cost_used_1d" field.
+func (_u *APIKeyUpdateOne) SetCostUsed1d(v string) *APIKeyUpdateOne {
+	_u.mutation.SetCostUsed1d(v)
+	return _u
+}
+
+// SetNillableCostUsed1d sets the "cost_used_1d" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableCostUsed1d(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetCostUsed1d(*v)
+	}
+	return _u
+}
+
+// SetCostWindowStart1d sets the "cost_window_start_1d" field.
+func (_u *APIKeyUpdateOne) SetCostWindowStart1d(v time.Time) *APIKeyUpdateOne {
+	_u.mutation.SetCostWindowStart1d(v)
+	return _u
+}
+
+// SetNillableCostWindowStart1d sets the "cost_window_start_1d" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableCostWindowStart1d(v *time.Time) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetCostWindowStart1d(*v)
+	}
+	return _u
+}
+
+// ClearCostWindowStart1d clears the value of the "cost_window_start_1d" field.
+func (_u *APIKeyUpdateOne) ClearCostWindowStart1d() *APIKeyUpdateOne {
+	_u.mutation.ClearCostWindowStart1d()
+	return _u
+}
+
+// SetCostLimit7d sets the "cost_limit_7d" field.
+func (_u *APIKeyUpdateOne) SetCostLimit7d(v string) *APIKeyUpdateOne {
+	_u.mutation.SetCostLimit7d(v)
+	return _u
+}
+
+// SetNillableCostLimit7d sets the "cost_limit_7d" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableCostLimit7d(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetCostLimit7d(*v)
+	}
+	return _u
+}
+
+// ClearCostLimit7d clears the value of the "cost_limit_7d" field.
+func (_u *APIKeyUpdateOne) ClearCostLimit7d() *APIKeyUpdateOne {
+	_u.mutation.ClearCostLimit7d()
+	return _u
+}
+
+// SetCostUsed7d sets the "cost_used_7d" field.
+func (_u *APIKeyUpdateOne) SetCostUsed7d(v string) *APIKeyUpdateOne {
+	_u.mutation.SetCostUsed7d(v)
+	return _u
+}
+
+// SetNillableCostUsed7d sets the "cost_used_7d" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableCostUsed7d(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetCostUsed7d(*v)
+	}
+	return _u
+}
+
+// SetCostWindowStart7d sets the "cost_window_start_7d" field.
+func (_u *APIKeyUpdateOne) SetCostWindowStart7d(v time.Time) *APIKeyUpdateOne {
+	_u.mutation.SetCostWindowStart7d(v)
+	return _u
+}
+
+// SetNillableCostWindowStart7d sets the "cost_window_start_7d" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableCostWindowStart7d(v *time.Time) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetCostWindowStart7d(*v)
+	}
+	return _u
+}
+
+// ClearCostWindowStart7d clears the value of the "cost_window_start_7d" field.
+func (_u *APIKeyUpdateOne) ClearCostWindowStart7d() *APIKeyUpdateOne {
+	_u.mutation.ClearCostWindowStart7d()
+	return _u
+}
+
 // SetAllowedIpsJSON sets the "allowed_ips_json" field.
 func (_u *APIKeyUpdateOne) SetAllowedIpsJSON(v []string) *APIKeyUpdateOne {
 	_u.mutation.SetAllowedIpsJSON(v)
@@ -1280,6 +1726,60 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if _u.mutation.RequestLimit7dCleared() {
 		_spec.ClearField(apikey.FieldRequestLimit7d, field.TypeInt)
+	}
+	if value, ok := _u.mutation.CostQuota(); ok {
+		_spec.SetField(apikey.FieldCostQuota, field.TypeString, value)
+	}
+	if _u.mutation.CostQuotaCleared() {
+		_spec.ClearField(apikey.FieldCostQuota, field.TypeString)
+	}
+	if value, ok := _u.mutation.CostUsed(); ok {
+		_spec.SetField(apikey.FieldCostUsed, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CostLimit5h(); ok {
+		_spec.SetField(apikey.FieldCostLimit5h, field.TypeString, value)
+	}
+	if _u.mutation.CostLimit5hCleared() {
+		_spec.ClearField(apikey.FieldCostLimit5h, field.TypeString)
+	}
+	if value, ok := _u.mutation.CostUsed5h(); ok {
+		_spec.SetField(apikey.FieldCostUsed5h, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CostWindowStart5h(); ok {
+		_spec.SetField(apikey.FieldCostWindowStart5h, field.TypeTime, value)
+	}
+	if _u.mutation.CostWindowStart5hCleared() {
+		_spec.ClearField(apikey.FieldCostWindowStart5h, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CostLimit1d(); ok {
+		_spec.SetField(apikey.FieldCostLimit1d, field.TypeString, value)
+	}
+	if _u.mutation.CostLimit1dCleared() {
+		_spec.ClearField(apikey.FieldCostLimit1d, field.TypeString)
+	}
+	if value, ok := _u.mutation.CostUsed1d(); ok {
+		_spec.SetField(apikey.FieldCostUsed1d, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CostWindowStart1d(); ok {
+		_spec.SetField(apikey.FieldCostWindowStart1d, field.TypeTime, value)
+	}
+	if _u.mutation.CostWindowStart1dCleared() {
+		_spec.ClearField(apikey.FieldCostWindowStart1d, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CostLimit7d(); ok {
+		_spec.SetField(apikey.FieldCostLimit7d, field.TypeString, value)
+	}
+	if _u.mutation.CostLimit7dCleared() {
+		_spec.ClearField(apikey.FieldCostLimit7d, field.TypeString)
+	}
+	if value, ok := _u.mutation.CostUsed7d(); ok {
+		_spec.SetField(apikey.FieldCostUsed7d, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CostWindowStart7d(); ok {
+		_spec.SetField(apikey.FieldCostWindowStart7d, field.TypeTime, value)
+	}
+	if _u.mutation.CostWindowStart7dCleared() {
+		_spec.ClearField(apikey.FieldCostWindowStart7d, field.TypeTime)
 	}
 	if value, ok := _u.mutation.AllowedIpsJSON(); ok {
 		_spec.SetField(apikey.FieldAllowedIpsJSON, field.TypeJSON, value)

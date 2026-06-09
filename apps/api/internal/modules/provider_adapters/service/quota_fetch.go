@@ -5,9 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"hash/crc32"
 	"io"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -23,6 +27,9 @@ func (s *Service) FetchAccountQuota(ctx context.Context, req contract.ProbeReque
 	if req.Account.ID <= 0 || req.Provider.ID <= 0 {
 		return contract.QuotaReport{}, ErrInvalidInput
 	}
+	if s.quotaCache == nil {
+		s.quotaCache = newQuotaFetchCache()
+	}
 	now := time.Now().UTC()
 	report := contract.QuotaReport{
 		Provider:  req.Provider.Name,
@@ -34,7 +41,17 @@ func (s *Service) FetchAccountQuota(ctx context.Context, req contract.ProbeReque
 	if endpoint == "" {
 		return report, nil
 	}
-	headers, err := probeHeaders(req, &endpoint)
+	cacheKey := quotaCacheKey(req, endpoint)
+	if cached, ok := s.quotaCache.get(cacheKey, now); ok {
+		return cached.report, cached.err
+	}
+	return s.quotaCache.do(cacheKey, func() (contract.QuotaReport, error) {
+		return s.fetchAccountQuotaUncached(ctx, req, report, endpoint, now)
+	})
+}
+
+func (s *Service) fetchAccountQuotaUncached(ctx context.Context, req contract.ProbeRequest, report contract.QuotaReport, endpoint string, now time.Time) (contract.QuotaReport, error) {
+	headers, err := quotaHeaders(req, &endpoint)
 	if err != nil {
 		return report, contract.ProviderError{Class: "auth_failed", StatusCode: http.StatusUnauthorized, Message: "quota fetch auth failed"}
 	}
@@ -48,7 +65,7 @@ func (s *Service) FetchAccountQuota(ctx context.Context, req contract.ProbeReque
 	}
 	report.StatusCode = status
 	if status < 200 || status >= 300 {
-		providerErr := classifyProviderHTTPError(status, body)
+		providerErr := classifyProviderHTTPErrorWithHeaders(status, respHeaders, body)
 		return report, providerErr
 	}
 	report.Supported = true
@@ -67,6 +84,7 @@ func (s *Service) FetchAccountQuota(ctx context.Context, req contract.ProbeReque
 	// Fold in provider header signals (e.g. Codex rate-limit windows) so the
 	// report carries the same QuotaSignals the gateway records in-band.
 	report.QuotaSignals = codexQuotaSignalsFromHeaders(respHeaders, now)
+	report.QuotaSignals = append(report.QuotaSignals, anthropicQuotaSignalsFromUsageBody(parsed, now)...)
 	return report, nil
 }
 
@@ -97,6 +115,23 @@ func (s *Service) QuotaConfigured(req contract.ProbeRequest) bool {
 	return quotaEndpoint(req) != ""
 }
 
+func quotaHeaders(req contract.ProbeRequest, endpoint *string) (http.Header, error) {
+	if probeSource(req) == "anthropic" {
+		accessToken := firstCredentialString(req.Credential, "access_token", "oauth_access_token")
+		if accessToken != "" {
+			headers := http.Header{"Accept": {"application/json"}}
+			headers.Set("Authorization", "Bearer "+accessToken)
+			version := firstMapString(append([]map[string]any{req.Credential}, quotaConfigMaps(req)...), "anthropic_version", "anthropic-version")
+			if version == "" {
+				version = "2023-06-01"
+			}
+			headers.Set("anthropic-version", version)
+			return headers, nil
+		}
+	}
+	return probeHeaders(req, endpoint)
+}
+
 func quotaConfigMaps(req contract.ProbeRequest) []map[string]any {
 	return []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities}
 }
@@ -123,4 +158,208 @@ func decodeQuotaJSON(body []byte) any {
 		return nil
 	}
 	return parsed
+}
+
+type quotaFetchCache struct {
+	mu       sync.Mutex
+	entries  map[string]quotaFetchCacheEntry
+	inflight map[string]*quotaFetchCall
+}
+
+type quotaFetchCacheEntry struct {
+	report    contract.QuotaReport
+	err       error
+	expiresAt time.Time
+}
+
+type quotaFetchCall struct {
+	done   chan struct{}
+	report contract.QuotaReport
+	err    error
+}
+
+func newQuotaFetchCache() *quotaFetchCache {
+	return &quotaFetchCache{
+		entries:  map[string]quotaFetchCacheEntry{},
+		inflight: map[string]*quotaFetchCall{},
+	}
+}
+
+func (c *quotaFetchCache) get(key string, now time.Time) (quotaFetchCacheEntry, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry, ok := c.entries[key]
+	if !ok || !entry.expiresAt.After(now) {
+		return quotaFetchCacheEntry{}, false
+	}
+	return entry, true
+}
+
+func (c *quotaFetchCache) do(key string, fn func() (contract.QuotaReport, error)) (contract.QuotaReport, error) {
+	c.mu.Lock()
+	if call, ok := c.inflight[key]; ok {
+		c.mu.Unlock()
+		<-call.done
+		return call.report, call.err
+	}
+	call := &quotaFetchCall{done: make(chan struct{})}
+	c.inflight[key] = call
+	c.mu.Unlock()
+
+	call.report, call.err = fn()
+	ttl := successfulQuotaCacheTTL
+	if call.err != nil {
+		ttl = failedQuotaCacheTTL
+	}
+	c.mu.Lock()
+	c.entries[key] = quotaFetchCacheEntry{report: call.report, err: call.err, expiresAt: time.Now().UTC().Add(quotaCacheTTL(key, ttl))}
+	delete(c.inflight, key)
+	close(call.done)
+	c.mu.Unlock()
+	return call.report, call.err
+}
+
+const (
+	successfulQuotaCacheTTL = 30 * time.Second
+	failedQuotaCacheTTL     = 10 * time.Second
+)
+
+func quotaCacheKey(req contract.ProbeRequest, endpoint string) string {
+	return strconv.Itoa(req.Provider.ID) + ":" + strconv.Itoa(req.Account.ID) + ":" + strings.ToUpper(quotaMethod(req)) + ":" + endpoint
+}
+
+func quotaMethod(req contract.ProbeRequest) string {
+	method := strings.ToUpper(firstMapString(quotaConfigMaps(req), "quota_method", "subscription_method"))
+	if method == "" {
+		return http.MethodGet
+	}
+	return method
+}
+
+func quotaCacheTTL(key string, base time.Duration) time.Duration {
+	jitterWindow := base / 5
+	if jitterWindow <= 0 {
+		return base
+	}
+	jitter := time.Duration(crc32.ChecksumIEEE([]byte(key)) % uint32(jitterWindow))
+	return base + jitter
+}
+
+func anthropicQuotaSignalsFromUsageBody(parsed any, now time.Time) []contract.QuotaSignal {
+	if parsed == nil {
+		return nil
+	}
+	windows := []struct {
+		quotaType string
+		keys      []string
+	}{
+		{quotaType: "anthropic_5h", keys: []string{"five_hour", "5h", "fiveHour"}},
+		{quotaType: "anthropic_7d", keys: []string{"seven_day", "7d", "sevenDay"}},
+		{quotaType: "anthropic_7d_sonnet", keys: []string{"seven_day_sonnet", "7d_sonnet", "sevenDaySonnet"}},
+	}
+	signals := make([]contract.QuotaSignal, 0, len(windows))
+	for _, window := range windows {
+		value, ok := nestedMapAny(parsed, window.keys...)
+		if !ok {
+			continue
+		}
+		signal, ok := anthropicQuotaSignalFromWindow(window.quotaType, value, now)
+		if ok {
+			signals = append(signals, signal)
+		}
+	}
+	return signals
+}
+
+func anthropicQuotaSignalFromWindow(quotaType string, value any, now time.Time) (contract.QuotaSignal, bool) {
+	utilization, ok := numericField(value, "utilization", "used_ratio", "usage_ratio")
+	if !ok {
+		used, usedOK := numericField(value, "used", "usage", "consumed")
+		limit, limitOK := numericField(value, "limit", "quota", "quota_limit")
+		if usedOK && limitOK && limit > 0 {
+			utilization = used / limit
+			ok = true
+		}
+	}
+	if !ok || math.IsNaN(utilization) || math.IsInf(utilization, 0) {
+		return contract.QuotaSignal{}, false
+	}
+	usedRatio := clampFloat(utilization, 0, 1)
+	remainingRatio := 1 - usedRatio
+	resetAt := optionalTimeField(value, "resets_at", "reset_at", "resetAt")
+	return contract.QuotaSignal{
+		QuotaType:      quotaType,
+		Remaining:      formatPercentQuotaValue(remainingRatio * 100),
+		Used:           formatPercentQuotaValue(usedRatio * 100),
+		QuotaLimit:     "100",
+		RemainingRatio: float32(remainingRatio),
+		ResetAt:        resetAt,
+		SnapshotAt:     now.UTC(),
+	}, true
+}
+
+func nestedMapAny(value any, keys ...string) (any, bool) {
+	root, ok := value.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	for _, key := range keys {
+		if raw, ok := root[key]; ok {
+			return raw, true
+		}
+	}
+	for _, raw := range root {
+		if found, ok := nestedMapAny(raw, keys...); ok {
+			return found, true
+		}
+	}
+	return nil, false
+}
+
+func numericField(value any, keys ...string) (float64, bool) {
+	object, ok := value.(map[string]any)
+	if !ok {
+		return 0, false
+	}
+	for _, key := range keys {
+		if raw, ok := object[key]; ok {
+			switch typed := raw.(type) {
+			case float64:
+				return typed, true
+			case int:
+				return float64(typed), true
+			case json.Number:
+				parsed, err := typed.Float64()
+				return parsed, err == nil
+			case string:
+				parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
+				return parsed, err == nil
+			}
+		}
+	}
+	return 0, false
+}
+
+func optionalTimeField(value any, keys ...string) *time.Time {
+	object, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	for _, key := range keys {
+		raw, ok := object[key]
+		if !ok {
+			continue
+		}
+		text, ok := raw.(string)
+		if !ok || strings.TrimSpace(text) == "" {
+			continue
+		}
+		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(text))
+		if err != nil {
+			continue
+		}
+		parsed = parsed.UTC()
+		return &parsed
+	}
+	return nil
 }

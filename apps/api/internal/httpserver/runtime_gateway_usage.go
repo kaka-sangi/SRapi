@@ -8,13 +8,16 @@ import (
 	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
+	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
-	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
+	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsageRecord) {
@@ -25,8 +28,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	pricing := rec.Pricing.withDefaults()
 	rt.warnDefaultZeroGatewayPricing(rec, model, pricing)
 	rateMultiplier := rt.gatewayAccountRateMultiplier(ctx, rec.AccountID)
-	actualCost := applyRateMultiplier(pricing.Amount, rateMultiplier)
-	billableCost := rt.gatewayBillableCost(ctx, rec, actualCost)
+	pricing = rt.gatewayUsageCost(ctx, rec, pricing, rateMultiplier)
 	usageLog, usageErr := rt.usage.Record(ctx, usagecontract.RecordRequest{
 		RequestID:             rec.RequestID,
 		AttemptNo:             rec.AttemptNo,
@@ -47,9 +49,16 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		Success:               rec.Success,
 		ErrorClass:            rec.ErrorClass,
 		Cost:                  pricing.Amount,
-		ActualCost:            actualCost,
+		ActualCost:            pricing.ActualCost,
 		RateMultiplier:        rateMultiplier,
-		BillableCost:          billableCost,
+		BillableCost:          pricing.BillableCost,
+		InputCost:             pricing.InputCost,
+		OutputCost:            pricing.OutputCost,
+		CacheReadCost:         pricing.CacheReadCost,
+		CacheWriteCost:        pricing.CacheWriteCost,
+		RequestedModel:        gatewayUsageRequestedModel(rec, model),
+		UpstreamModel:         strings.TrimSpace(rec.UpstreamModel),
+		BillingMode:           string(pricing.BillingMode),
 		Currency:              pricing.Currency,
 		CompatibilityWarnings: rec.CompatibilityWarnings,
 	})
@@ -58,6 +67,9 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		rt.enqueueGatewayUsageFailureEvent(ctx, rec, model)
 	} else {
 		rt.enqueueGatewayUsageEvent(ctx, usageLog)
+	}
+	if rec.Success {
+		rt.recordGatewayMaterializedCosts(ctx, rec, pricing.BillableCost)
 	}
 	if rec.DecisionID <= 0 || rec.AccountID == nil || rec.ProviderID == nil {
 		return
@@ -76,7 +88,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		InputTokens:  rec.InputTokens,
 		OutputTokens: rec.OutputTokens,
 		CachedTokens: rec.CachedTokens,
-		ActualCost:   actualCost,
+		ActualCost:   pricing.ActualCost,
 		Currency:     pricing.Currency,
 	})
 	if feedbackErr != nil {
@@ -91,29 +103,91 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	rt.recordGatewayAccountSnapshots(ctx, rec)
 }
 
-// gatewayBillableCost splits the request cost into the portion billed to balance
-// vs covered by an active subscription cost allowance (WP-1180). It returns the
-// full cost unless the user has an allowance-mode subscription whose monthly
-// cost allowance covers part or all of this request. Only successful, priced
-// requests are evaluated (these are the only ones the charger bills).
-func (rt *runtimeState) gatewayBillableCost(ctx context.Context, rec gatewayUsageRecord, cost string) string {
+func gatewayUsageRequestedModel(rec gatewayUsageRecord, recordedModel string) string {
+	if model := strings.TrimSpace(rec.RequestedModel); model != "" {
+		return model
+	}
+	return fallbackModelName(recordedModel)
+}
+
+func (rt *runtimeState) gatewayUsageCost(ctx context.Context, rec gatewayUsageRecord, pricing gatewayPricingEvidence, rateMultiplier string) gatewayPricingEvidence {
+	mode, quota, usedCost := rt.gatewayAllowanceCostInputs(ctx, rec, pricing.Amount)
+	result := rt.billing.PriceGatewayCost(billingcontract.GatewayCostRequest{
+		Amount:         pricing.Amount,
+		Currency:       pricing.Currency,
+		PricingRuleID:  pricing.PricingRuleID,
+		BillingMode:    pricing.BillingMode,
+		InputCost:      pricing.InputCost,
+		OutputCost:     pricing.OutputCost,
+		CacheReadCost:  pricing.CacheReadCost,
+		CacheWriteCost: pricing.CacheWriteCost,
+		Source:         pricing.PricingSource,
+		Estimated:      pricing.PricingEstimated,
+		RateMultiplier: rateMultiplier,
+		Success:        rec.Success,
+		AllowanceMode:  mode,
+		AllowanceQuota: quota,
+		UsedCost:       usedCost,
+	})
+	return gatewayPricingEvidence{
+		Amount:           result.Amount,
+		Currency:         result.Currency,
+		PricingRuleID:    cloneIntPtr(result.PricingRuleID),
+		BillingMode:      result.BillingMode,
+		InputCost:        result.InputCost,
+		OutputCost:       result.OutputCost,
+		CacheReadCost:    result.CacheReadCost,
+		CacheWriteCost:   result.CacheWriteCost,
+		PricingSource:    result.Source,
+		PricingEstimated: result.Estimated,
+		ActualCost:       result.ActualCost,
+		BillableCost:     result.BillableCost,
+	}.withDefaults()
+}
+
+func (rt *runtimeState) gatewayAllowanceCostInputs(ctx context.Context, rec gatewayUsageRecord, cost string) (string, *string, string) {
 	if rt.subscriptions == nil || !rec.Success || rec.Authed.UserID <= 0 {
-		return cost
+		return "", nil, ""
 	}
 	trimmed := strings.TrimSpace(cost)
 	if trimmed == "" || trimmed == "0.00000000" || trimmed == "0" {
-		return cost
+		return "", nil, ""
 	}
 	now := time.Now().UTC()
 	allowance, err := rt.subscriptions.CostAllowance(ctx, rec.Authed.UserID, now)
 	if err != nil || allowance.Mode != "allowance" || allowance.Quota == nil {
-		return cost
+		return "", nil, ""
 	}
-	_, usedCost, err := rt.gatewayUserPeriodUsage(ctx, rec.Authed.UserID, now)
+	periodUsage, err := rt.gatewayUserPeriodUsage(ctx, rec.Authed.UserID, now)
 	if err != nil {
-		return cost
+		return "", nil, ""
 	}
-	return subscriptionservice.BillableOverage(cost, usedCost, *allowance.Quota)
+	return allowance.Mode, allowance.Quota, periodUsage.BillableCost
+}
+
+func (rt *runtimeState) recordGatewayMaterializedCosts(ctx context.Context, rec gatewayUsageRecord, billableCost string) {
+	if strings.TrimSpace(billableCost) == "" {
+		return
+	}
+	now := time.Now().UTC()
+	if rt.subscriptions != nil && rec.Authed.UserID > 0 {
+		if _, err := rt.subscriptions.IncrementMaterializedUsage(ctx, subscriptioncontract.UsageDelta{
+			UserID:       rec.Authed.UserID,
+			BillableCost: billableCost,
+			OccurredAt:   now,
+		}); err != nil {
+			rt.logger.Warn("failed to update subscription materialized usage", "error", err, "request_id", rec.RequestID)
+		}
+	}
+	if rt.apiKeys != nil && rec.Authed.Key.ID > 0 {
+		if _, err := rt.apiKeys.ApplyCostUsage(ctx, apikeycontract.CostUsageUpdate{
+			KeyID:        rec.Authed.Key.ID,
+			BillableCost: billableCost,
+			OccurredAt:   now,
+		}); err != nil {
+			rt.logger.Warn("failed to update api key cost usage", "error", err, "request_id", rec.RequestID)
+		}
+	}
 }
 
 func (rt *runtimeState) gatewayAccountRateMultiplier(ctx context.Context, accountID *int) string {
@@ -131,7 +205,7 @@ func (rt *runtimeState) gatewayAccountRateMultiplier(ctx context.Context, accoun
 		if err != nil || group.Status != accountcontract.GroupStatusActive {
 			continue
 		}
-		rate, ok := decimalRatString(group.RateMultiplier)
+		rate, ok := money.DecimalRat(group.RateMultiplier)
 		if !ok || rate.Sign() < 0 {
 			if rt.logger != nil {
 				rt.logger.Warn("invalid account group rate multiplier", "account_id", *accountID, "group_id", groupID, "rate_multiplier", group.RateMultiplier)
@@ -144,28 +218,7 @@ func (rt *runtimeState) gatewayAccountRateMultiplier(ctx context.Context, accoun
 	if !found {
 		return "1.00000000"
 	}
-	return multiplier.FloatString(8)
-}
-
-func applyRateMultiplier(cost string, rateMultiplier string) string {
-	costRat, ok := decimalRatString(cost)
-	if !ok {
-		return cost
-	}
-	rateRat, ok := decimalRatString(rateMultiplier)
-	if !ok || rateRat.Sign() < 0 {
-		rateRat = big.NewRat(1, 1)
-	}
-	return costRat.Mul(costRat, rateRat).FloatString(8)
-}
-
-func decimalRatString(value string) (*big.Rat, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" || strings.ContainsAny(value, "eE") {
-		return nil, false
-	}
-	rat, ok := new(big.Rat).SetString(value)
-	return rat, ok
+	return money.FormatRatFixed(multiplier, 8)
 }
 
 func (rt *runtimeState) warnDefaultZeroGatewayPricing(rec gatewayUsageRecord, model string, pricing gatewayPricingEvidence) {
@@ -177,7 +230,7 @@ func (rt *runtimeState) warnDefaultZeroGatewayPricing(rec gatewayUsageRecord, mo
 
 func gatewayErrorClassUsesCooldown(errorClass string) bool {
 	switch errorClass {
-	case "rate_limit", "overloaded", "auth_failed":
+	case "rate_limit", "overloaded", "auth_failed", "forbidden", "validation_required", "policy_violation":
 		return true
 	default:
 		return false
@@ -296,6 +349,14 @@ func gatewayCooldownDecisionForFailure(metadata map[string]any, errorClass strin
 	if !gatewayErrorClassUsesCooldown(errorClass) {
 		return gatewayCooldownDecision{}, false
 	}
+	if errorClass == "forbidden" {
+		return gatewayCooldownDecision{
+			Reason:         "auth_failed",
+			LastErrorClass: "auth_failed",
+			Window:         authFailureCooldownWindow,
+			RetryAfter:     retryAfter,
+		}, true
+	}
 	return gatewayCooldownDecision{
 		Reason:         errorClass,
 		LastErrorClass: errorClass,
@@ -403,7 +464,7 @@ func gatewayCooldownWindow(errorClass string) time.Duration {
 	switch errorClass {
 	case "overloaded":
 		return overloadCooldownWindow
-	case "auth_failed":
+	case "auth_failed", "forbidden", "validation_required", "policy_violation":
 		return authFailureCooldownWindow
 	default:
 		return rateLimitCooldownWindow
@@ -670,7 +731,7 @@ func (rt *runtimeState) updateAccountRuntimeQuotaMetadata(ctx context.Context, a
 		if amount == "" {
 			amount = strings.TrimSpace(log.Cost)
 		}
-		if parsed, ok := new(big.Rat).SetString(amount); ok {
+		if parsed, ok := money.DecimalRat(amount); ok {
 			costUsed.Add(costUsed, parsed)
 		}
 	}
@@ -684,7 +745,7 @@ func (rt *runtimeState) updateAccountRuntimeQuotaMetadata(ctx context.Context, a
 	metadata["tpm_window_seconds"] = windowSeconds
 	metadata["rpm_reset_at"] = resetAt
 	metadata["tpm_reset_at"] = resetAt
-	metadata["cost_window_used"] = costUsed.FloatString(8)
+	metadata["cost_window_used"] = money.FormatRatFixed(costUsed, 8)
 	metadata["cost_window_seconds"] = int(costWindow / time.Second)
 	metadata["cost_window_reset_at"] = now.Add(costWindow).Format(time.RFC3339)
 	metadata["runtime_quota_updated_at"] = now.Format(time.RFC3339)

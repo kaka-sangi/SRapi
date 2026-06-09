@@ -53,6 +53,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/paymentorder"
 	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
 	"github.com/srapi/srapi/apps/api/ent/pendingoauthsession"
+	"github.com/srapi/srapi/apps/api/ent/pricinginterval"
 	"github.com/srapi/srapi/apps/api/ent/pricingrule"
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
@@ -183,6 +184,7 @@ func checkColumn(t, c string) error {
 			paymentorder.Table:              paymentorder.ValidColumn,
 			paymentproviderinstance.Table:   paymentproviderinstance.ValidColumn,
 			pendingoauthsession.Table:       pendingoauthsession.ValidColumn,
+			pricinginterval.Table:           pricinginterval.ValidColumn,
 			pricingrule.Table:               pricingrule.ValidColumn,
 			provider.Table:                  provider.ValidColumn,
 			provideraccount.Table:           provideraccount.ValidColumn,

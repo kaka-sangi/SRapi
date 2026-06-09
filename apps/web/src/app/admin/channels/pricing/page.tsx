@@ -115,12 +115,20 @@ function PricingContent() {
     value: p.id,
     label: p.display_name ?? p.id,
   }));
+  const billingModeOptions = [
+    { value: "token", label: t("adminPricing.billingModeToken") },
+    { value: "per_request", label: t("adminPricing.billingModePerRequest") },
+    { value: "image", label: t("adminPricing.billingModeImage") },
+  ];
 
   const priceFields: FieldConfig<PricingRuleFormState>[] = [
+    { name: "billingMode", label: t("adminPricing.billingMode"), type: "select", options: billingModeOptions },
     { name: "inputPricePerMillionTokens", label: t("adminPricing.inputPrice"), help: t("adminPricing.inputPriceHelp") },
     { name: "outputPricePerMillionTokens", label: t("adminPricing.outputPrice"), help: t("adminPricing.outputPriceHelp") },
     { name: "cacheReadPricePerMillionTokens", label: t("adminPricing.cacheReadPrice"), help: t("adminPricing.cacheReadPriceHelp") },
     { name: "cacheWritePricePerMillionTokens", label: t("adminPricing.cacheWritePrice"), help: t("adminPricing.cacheWritePriceHelp") },
+    { name: "perRequestPrice", label: t("adminPricing.perRequestPrice"), help: t("adminPricing.perRequestPriceHelp") },
+    { name: "intervalsJson", label: t("adminPricing.intervals"), type: "textarea", help: t("adminPricing.intervalsHelp") },
     { name: "currency", label: t("adminCommon.currency") },
     { name: "effectiveFromLocal", label: t("adminPricing.effectiveFrom"), help: t("adminPricing.effectiveFromHelp"), type: "datetime" },
     { name: "effectiveToLocal", label: t("adminPricing.effectiveTo"), help: t("adminPricing.effectiveToHelp"), type: "datetime" },
@@ -160,6 +168,17 @@ function PricingContent() {
       ),
     },
     {
+      key: "mode",
+      header: t("adminPricing.billingMode"),
+      hideOnMobile: true,
+      sortValue: (r) => r.billing_mode,
+      render: (r) => (
+        <span className="text-2xs text-srapi-text-secondary">
+          {formatBillingMode(r.billing_mode, t)}
+        </span>
+      ),
+    },
+    {
       key: "input",
       header: t("adminPricing.inputPrice"),
       align: "right",
@@ -177,6 +196,17 @@ function PricingContent() {
       render: (r) => (
         <span className="font-mono text-srapi-text-secondary tabular">
           {formatMoney(r.output_price_per_million_tokens, r.currency)}
+        </span>
+      ),
+    },
+    {
+      key: "intervals",
+      header: t("adminPricing.intervals"),
+      align: "right",
+      hideOnMobile: true,
+      render: (r) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {r.intervals.length}
         </span>
       ),
     },
@@ -310,4 +340,10 @@ function PricingContent() {
       </Dialog>
     </>
   );
+}
+
+function formatBillingMode(mode: PricingRule["billing_mode"], t: (key: string) => string): string {
+  if (mode === "per_request") return t("adminPricing.billingModePerRequest");
+  if (mode === "image") return t("adminPricing.billingModeImage");
+  return t("adminPricing.billingModeToken");
 }

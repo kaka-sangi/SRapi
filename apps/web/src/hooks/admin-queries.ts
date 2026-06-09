@@ -716,6 +716,17 @@ export function useClearAccountError() {
 export function useRecoverAccount() {
   return useAdminMutation((id: string) => adminApi.recoverAccount(id), ["admin", "accounts"]);
 }
+export function useResetAccountQuota() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminApi.resetAccountQuota(id),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ["admin", "accounts"] });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.accountQuota(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.accountsHealthSummary() });
+    },
+  });
+}
 export function useDiscoverAccountModels() {
   return useAdminMutation(
     (vars: { id: string; body?: B<typeof adminApi.discoverAccountModels> }) =>

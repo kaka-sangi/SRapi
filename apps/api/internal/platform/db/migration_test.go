@@ -95,6 +95,7 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"payment_orders",
 		"payment_provider_instances",
 		"pending_oauth_sessions",
+		"pricing_intervals",
 		"pricing_rules",
 		"provider_accounts",
 		"providers",

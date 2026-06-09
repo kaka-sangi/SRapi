@@ -63,6 +63,20 @@ const (
 	FieldRateMultiplier = "rate_multiplier"
 	// FieldBillableCost holds the string denoting the billable_cost field in the database.
 	FieldBillableCost = "billable_cost"
+	// FieldInputCost holds the string denoting the input_cost field in the database.
+	FieldInputCost = "input_cost"
+	// FieldOutputCost holds the string denoting the output_cost field in the database.
+	FieldOutputCost = "output_cost"
+	// FieldCacheReadCost holds the string denoting the cache_read_cost field in the database.
+	FieldCacheReadCost = "cache_read_cost"
+	// FieldCacheWriteCost holds the string denoting the cache_write_cost field in the database.
+	FieldCacheWriteCost = "cache_write_cost"
+	// FieldRequestedModel holds the string denoting the requested_model field in the database.
+	FieldRequestedModel = "requested_model"
+	// FieldUpstreamModel holds the string denoting the upstream_model field in the database.
+	FieldUpstreamModel = "upstream_model"
+	// FieldBillingMode holds the string denoting the billing_mode field in the database.
+	FieldBillingMode = "billing_mode"
 	// FieldCurrency holds the string denoting the currency field in the database.
 	FieldCurrency = "currency"
 	// FieldChargedAt holds the string denoting the charged_at field in the database.
@@ -101,6 +115,13 @@ var Columns = []string{
 	FieldActualCost,
 	FieldRateMultiplier,
 	FieldBillableCost,
+	FieldInputCost,
+	FieldOutputCost,
+	FieldCacheReadCost,
+	FieldCacheWriteCost,
+	FieldRequestedModel,
+	FieldUpstreamModel,
+	FieldBillingMode,
 	FieldCurrency,
 	FieldChargedAt,
 	FieldCompatibilityWarningsJSON,
@@ -159,6 +180,20 @@ var (
 	DefaultRateMultiplier string
 	// DefaultBillableCost holds the default value on creation for the "billable_cost" field.
 	DefaultBillableCost string
+	// DefaultInputCost holds the default value on creation for the "input_cost" field.
+	DefaultInputCost string
+	// DefaultOutputCost holds the default value on creation for the "output_cost" field.
+	DefaultOutputCost string
+	// DefaultCacheReadCost holds the default value on creation for the "cache_read_cost" field.
+	DefaultCacheReadCost string
+	// DefaultCacheWriteCost holds the default value on creation for the "cache_write_cost" field.
+	DefaultCacheWriteCost string
+	// DefaultRequestedModel holds the default value on creation for the "requested_model" field.
+	DefaultRequestedModel string
+	// DefaultUpstreamModel holds the default value on creation for the "upstream_model" field.
+	DefaultUpstreamModel string
+	// DefaultBillingMode holds the default value on creation for the "billing_mode" field.
+	DefaultBillingMode string
 	// DefaultCurrency holds the default value on creation for the "currency" field.
 	DefaultCurrency string
 )
@@ -294,6 +329,41 @@ func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
 // ByBillableCost orders the results by the billable_cost field.
 func ByBillableCost(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldBillableCost, opts...).ToFunc()
+}
+
+// ByInputCost orders the results by the input_cost field.
+func ByInputCost(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldInputCost, opts...).ToFunc()
+}
+
+// ByOutputCost orders the results by the output_cost field.
+func ByOutputCost(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOutputCost, opts...).ToFunc()
+}
+
+// ByCacheReadCost orders the results by the cache_read_cost field.
+func ByCacheReadCost(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheReadCost, opts...).ToFunc()
+}
+
+// ByCacheWriteCost orders the results by the cache_write_cost field.
+func ByCacheWriteCost(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheWriteCost, opts...).ToFunc()
+}
+
+// ByRequestedModel orders the results by the requested_model field.
+func ByRequestedModel(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequestedModel, opts...).ToFunc()
+}
+
+// ByUpstreamModel orders the results by the upstream_model field.
+func ByUpstreamModel(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUpstreamModel, opts...).ToFunc()
+}
+
+// ByBillingMode orders the results by the billing_mode field.
+func ByBillingMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBillingMode, opts...).ToFunc()
 }
 
 // ByCurrency orders the results by the currency field.

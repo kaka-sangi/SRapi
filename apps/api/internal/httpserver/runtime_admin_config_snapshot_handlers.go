@@ -59,7 +59,7 @@ func (s *Server) handleAdminConfigSnapshot(w http.ResponseWriter, r *http.Reques
 		s.writeConfigSnapshotError(w, requestID)
 		return
 	}
-	pricingRules, err := snapshotSection(ctx, s.runtime.subscriptions.ListPricingRules, toAPIPricingRule)
+	pricingRules, err := snapshotSection(ctx, s.runtime.billing.ListPricingRules, toAPIPricingRule)
 	if err != nil {
 		s.writeConfigSnapshotError(w, requestID)
 		return

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,7 +15,6 @@ import (
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	modelservice "github.com/srapi/srapi/apps/api/internal/modules/models/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
-	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
@@ -176,64 +174,6 @@ func (s *Server) handleCreateAdminProvider(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-func (s *Server) handleInstallAdminProviderPresets(w http.ResponseWriter, r *http.Request) {
-	requestID := requestIDFromContext(r.Context())
-	session, err := s.requireAdminSession(r)
-	if err != nil {
-		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
-		return
-	}
-	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
-		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
-		return
-	}
-
-	presets := providerpreset.Default().List()
-	result := apiopenapi.BatchOperationResult{
-		Requested: len(presets),
-	}
-	installedNames := []string{}
-	for _, preset := range presets {
-		if _, err := s.runtime.providers.FindByName(r.Context(), preset.ProviderKey); err == nil {
-			continue
-		}
-		// Activate providers that have a known upstream URL — they are
-		// ready to use immediately once credentials are added.
-		status := providercontract.StatusDisabled
-		if preset.DefaultBaseURL != "" {
-			status = providercontract.StatusActive
-		}
-		provider, err := s.runtime.providers.Create(r.Context(), providerPresetCreateRequest(preset, status))
-		if err != nil {
-			if errors.Is(err, providerservice.ErrProviderExists) {
-				continue
-			}
-			result.Failed++
-			failedIDs := []apiopenapi.Id{apiopenapi.Id(preset.ProviderKey)}
-			if result.FailedIds != nil {
-				failedIDs = append(*result.FailedIds, failedIDs...)
-			}
-			result.FailedIds = &failedIDs
-			s.logger.Warn("failed to install provider preset", "provider_key", preset.ProviderKey, "error", err)
-			continue
-		}
-		result.Succeeded++
-		installedNames = append(installedNames, provider.Name)
-	}
-	skipped := result.Requested - result.Succeeded - result.Failed
-
-	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_preset.install", "provider", "bulk", nil, map[string]any{
-		"installed_count": result.Succeeded,
-		"skipped_count":   skipped,
-		"failed_count":    result.Failed,
-		"installed_names": installedNames,
-	}))
-	writeJSONAny(w, http.StatusOK, apiopenapi.BatchOperationResponse{
-		Data:      result,
-		RequestId: requestID,
-	})
-}
-
 func (s *Server) handleUpdateAdminProvider(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)
@@ -337,140 +277,6 @@ func (s *Server) handleDeleteAdminProvider(w http.ResponseWriter, r *http.Reques
 		"data":       map[string]any{"id": providerID, "deleted": true},
 		"request_id": requestID,
 	})
-}
-
-func providerPresetCreateRequest(preset providerpreset.Preset, status providercontract.Status) providercontract.CreateRequest {
-	return providercontract.CreateRequest{
-		Name:         preset.ProviderKey,
-		DisplayName:  preset.DisplayName,
-		AdapterType:  presetAdapterType(preset),
-		Protocol:     presetProtocol(preset),
-		Status:       &status,
-		Capabilities: presetCapabilityMap(preset),
-		ConfigSchema: presetConfigSchema(preset),
-	}
-}
-
-func presetAdapterType(preset providerpreset.Preset) string {
-	switch preset.PlatformFamily {
-	case providerpreset.PlatformFamilyAnthropicCompatible:
-		return "anthropic-compatible"
-	case providerpreset.PlatformFamilyReverseProxyAntigravity:
-		return "reverse-proxy-antigravity"
-	case providerpreset.PlatformFamilyRerankCompatible:
-		return "rerank-compatible"
-	case providerpreset.PlatformFamilyCodexCLI:
-		return "reverse-proxy-codex-cli"
-	default:
-		return "openai-compatible"
-	}
-}
-
-func presetProtocol(preset providerpreset.Preset) string {
-	switch preset.PlatformFamily {
-	case providerpreset.PlatformFamilyAnthropicCompatible:
-		return "anthropic-compatible"
-	case providerpreset.PlatformFamilyRerankCompatible:
-		return "rerank-compatible"
-	default:
-		return "openai-compatible"
-	}
-}
-
-func presetCapabilityMap(preset providerpreset.Preset) map[string]any {
-	out := make(map[string]any, len(preset.Capabilities))
-	for key, value := range preset.Capabilities {
-		out[key] = value
-	}
-	return out
-}
-
-func presetConfigSchema(preset providerpreset.Preset) map[string]any {
-	schema := map[string]any{
-		"provider_key":         preset.ProviderKey,
-		"platform_family":      string(preset.PlatformFamily),
-		"default_base_url":     preset.DefaultBaseURL,
-		"route_aliases":        stringSliceAny(preset.RouteAliases),
-		"gemini_route_aliases": stringSliceAny(preset.GeminiRouteAliases),
-		"auth_modes":           authModesAny(preset.AuthModes),
-		"model_catalog_owner":  preset.ModelCatalogOwner,
-		"auth_methods":         runtimeClassesAny(preset.RuntimeClassAllowlist),
-		"installed_from":       "provider_preset",
-	}
-	// Expose base_url at the provider level so upstreamBaseURL() resolves it
-	// without requiring per-account metadata.
-	if preset.DefaultBaseURL != "" {
-		schema["base_url"] = preset.DefaultBaseURL
-	}
-	if preset.AccountTemplate != nil {
-		schema["account_template"] = map[string]any{
-			"upstream_client":  preset.AccountTemplate.UpstreamClient,
-			"default_metadata": preset.AccountTemplate.DefaultMetadata,
-			"model_catalog":    preset.AccountTemplate.ModelCatalog,
-			"metadata_hints":   preset.AccountTemplate.MetadataHints,
-		}
-	}
-	for k, v := range preset.QuotaConfig {
-		schema[k] = v
-	}
-	return schema
-}
-
-func stringSliceAny(values []string) []any {
-	out := make([]any, 0, len(values))
-	for _, value := range values {
-		out = append(out, value)
-	}
-	return out
-}
-
-func authModesAny(values []providerpreset.AuthMode) []any {
-	out := make([]any, 0, len(values))
-	for _, value := range values {
-		out = append(out, string(value))
-	}
-	return out
-}
-
-func runtimeClassesAny(values []accountcontract.RuntimeClass) []any {
-	out := make([]any, 0, len(values))
-	for _, value := range values {
-		out = append(out, string(value))
-	}
-	return out
-}
-
-// accountRuntimeClassAllowed reports whether runtimeClass may be attached to a
-// provider whose preset declared the given auth_methods allowlist (read from
-// config_schema). An empty allowlist means "no restriction" — this keeps legacy
-// and manually-created providers, which carry no preset metadata, working.
-func accountRuntimeClassAllowed(configSchema map[string]any, runtimeClass accountcontract.RuntimeClass) bool {
-	allowed := providerAuthMethodStrings(configSchema)
-	if len(allowed) == 0 {
-		return true
-	}
-	for _, method := range allowed {
-		if method == string(runtimeClass) {
-			return true
-		}
-	}
-	return false
-}
-
-// providerAuthMethodStrings reads the auth_methods allowlist a provider preset
-// stored in its config_schema. An empty result means "no restriction".
-func providerAuthMethodStrings(configSchema map[string]any) []string {
-	raw, ok := configSchema["auth_methods"].([]any)
-	if !ok {
-		return nil
-	}
-	out := make([]string, 0, len(raw))
-	for _, value := range raw {
-		if s, ok := value.(string); ok && s != "" {
-			out = append(out, s)
-		}
-	}
-	return out
 }
 
 func (s *Server) handleTestAdminProvider(w http.ResponseWriter, r *http.Request) {
@@ -1133,95 +939,6 @@ func (s *Server) handleExportAdminAccounts(w http.ResponseWriter, r *http.Reques
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountExportResponse{
 		Data:      data,
-		RequestId: requestID,
-	})
-}
-
-func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Request) {
-	requestID := requestIDFromContext(r.Context())
-	session, err := s.requireAdminSession(r)
-	if err != nil {
-		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
-		return
-	}
-	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
-		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
-		return
-	}
-	var body apiopenapi.ProviderAccountImportRequest
-	if err := s.decodeJSONBody(w, r, &body); err != nil {
-		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid account import request", requestID)
-		return
-	}
-	createdIDs := make([]apiopenapi.Id, 0)
-	importErrors := make([]string, 0)
-	skipped := 0
-	for idx, item := range body.Accounts {
-		providerID, err := strconv.Atoi(string(item.ProviderId))
-		if err != nil || providerID <= 0 {
-			skipped++
-			importErrors = append(importErrors, fmt.Sprintf("accounts[%d].provider_id invalid", idx))
-			continue
-		}
-		if _, err := s.runtime.providers.FindByID(r.Context(), providerID); err != nil {
-			skipped++
-			importErrors = append(importErrors, fmt.Sprintf("accounts[%d].provider_id not found", idx))
-			continue
-		}
-		credential := derefMap(item.Credential)
-		if len(credential) == 0 {
-			skipped++
-			importErrors = append(importErrors, fmt.Sprintf("accounts[%d].credential required", idx))
-			continue
-		}
-		metadata := jsonObjectToMap(item.Metadata)
-		credential, err = s.refreshImportCredential(r.Context(), accountcontract.RuntimeClass(item.RuntimeClass), item.UpstreamClient, metadata, item.ProxyId, credential)
-		if err != nil {
-			skipped++
-			importErrors = append(importErrors, fmt.Sprintf("accounts[%d] oauth refresh failed", idx))
-			continue
-		}
-		account, err := s.runtime.accounts.Create(r.Context(), accountcontract.CreateRequest{
-			ProviderID:     providerID,
-			Name:           item.Name,
-			RuntimeClass:   accountcontract.RuntimeClass(item.RuntimeClass),
-			Credential:     credential,
-			Metadata:       metadata,
-			ProxyID:        item.ProxyId,
-			Status:         toAccountStatusPtr(item.Status),
-			Priority:       item.Priority,
-			Weight:         item.Weight,
-			UpstreamClient: item.UpstreamClient,
-		})
-		if err != nil {
-			skipped++
-			importErrors = append(importErrors, fmt.Sprintf("accounts[%d] create failed", idx))
-			continue
-		}
-		createdIDs = append(createdIDs, apiopenapi.Id(strconv.Itoa(account.ID)))
-		groupIDs, err := apiIDsToInts(item.GroupIds)
-		if err != nil {
-			importErrors = append(importErrors, fmt.Sprintf("accounts[%d].group_ids invalid", idx))
-			continue
-		}
-		for _, groupID := range groupIDs {
-			if _, err := s.runtime.accounts.AddAccountToGroup(r.Context(), account.ID, groupID); err != nil {
-				importErrors = append(importErrors, fmt.Sprintf("accounts[%d].group_ids[%d] add failed", idx, groupID))
-			}
-		}
-	}
-	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.import", "provider_account", "bulk", nil, map[string]any{
-		"created_count": len(createdIDs),
-		"skipped_count": skipped,
-		"error_count":   len(importErrors),
-	}))
-	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountImportResponse{
-		Data: apiopenapi.ProviderAccountImportResult{
-			CreatedCount: len(createdIDs),
-			CreatedIds:   createdIDs,
-			Errors:       importErrors,
-			SkippedCount: skipped,
-		},
 		RequestId: requestID,
 	})
 }

@@ -3,7 +3,7 @@ package service
 import (
 	"testing"
 
-	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	"github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 )
 
 func TestPriceFromRuleBillsCacheWriteAtWriteRate(t *testing.T) {

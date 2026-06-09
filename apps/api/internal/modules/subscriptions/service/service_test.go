@@ -174,149 +174,6 @@ func TestCheckEntitlementRejectsBeforeSchedulingAndCarriesRoutingPolicy(t *testi
 	}
 }
 
-func TestEstimatePriceUsesDecimalSafeProviderSpecificRulesAndOverrides(t *testing.T) {
-	svc, err := service.New(subscriptionmemory.New(), nil)
-	if err != nil {
-		t.Fatalf("new subscription service: %v", err)
-	}
-
-	generic, err := svc.CreatePricingRule(t.Context(), contract.CreatePricingRuleRequest{
-		ModelID:                         1,
-		ProviderID:                      0,
-		InputPricePerMillionTokens:      "9",
-		OutputPricePerMillionTokens:     "9",
-		CacheReadPricePerMillionTokens:  "9",
-		CacheWritePricePerMillionTokens: "9",
-		Currency:                        "usd",
-	})
-	if err != nil {
-		t.Fatalf("create generic pricing rule: %v", err)
-	}
-	specific, err := svc.CreatePricingRule(t.Context(), contract.CreatePricingRuleRequest{
-		ModelID:                         1,
-		ProviderID:                      7,
-		InputPricePerMillionTokens:      "1.5",
-		OutputPricePerMillionTokens:     "2.5",
-		CacheReadPricePerMillionTokens:  "0.5",
-		CacheWritePricePerMillionTokens: "0.25",
-		Currency:                        "usd",
-	})
-	if err != nil {
-		t.Fatalf("create provider pricing rule: %v", err)
-	}
-
-	estimated, err := svc.EstimatePrice(t.Context(), contract.PricingRequest{
-		ModelID:          1,
-		ProviderID:       7,
-		InputTokens:      1000,
-		OutputTokens:     2000,
-		CacheReadTokens:  3000,
-		CacheWriteTokens: 4000,
-	})
-	if err != nil {
-		t.Fatalf("estimate provider-specific price: %v", err)
-	}
-	if estimated.Amount != "0.00900000" || estimated.Currency != "USD" {
-		t.Fatalf("expected decimal-safe provider-specific amount, got %+v", estimated)
-	}
-	if estimated.PricingRuleID == nil || *estimated.PricingRuleID != specific.ID || *estimated.PricingRuleID == generic.ID {
-		t.Fatalf("expected provider-specific rule id %d, got %+v", specific.ID, estimated.PricingRuleID)
-	}
-
-	override, err := svc.EstimatePrice(t.Context(), contract.PricingRequest{
-		ModelID:      1,
-		ProviderID:   7,
-		InputTokens:  1000,
-		OutputTokens: 1000,
-		PricingOverride: map[string]any{
-			"input_price_per_million_tokens":  "3.0",
-			"output_price_per_million_tokens": "4.0",
-			"currency":                        "eur",
-		},
-	})
-	if err != nil {
-		t.Fatalf("estimate override price: %v", err)
-	}
-	if override.Amount != "0.00700000" || override.Currency != "EUR" || override.PricingRuleID != nil {
-		t.Fatalf("expected mapping override to take precedence without rule id, got %+v", override)
-	}
-}
-
-func TestEstimatePriceFallsBackToModelFamilyRule(t *testing.T) {
-	store := subscriptionmemory.New()
-	svc, err := service.New(store, nil)
-	if err != nil {
-		t.Fatalf("new subscription service: %v", err)
-	}
-	rule, err := store.CreatePricingRule(t.Context(), contract.PricingRule{
-		ModelID:                         10,
-		ModelFamily:                     "opus",
-		ProviderID:                      0,
-		InputPricePerMillionTokens:      "15.00000000",
-		OutputPricePerMillionTokens:     "75.00000000",
-		CacheReadPricePerMillionTokens:  "1.50000000",
-		CacheWritePricePerMillionTokens: "15.00000000",
-		Currency:                        "USD",
-	})
-	if err != nil {
-		t.Fatalf("create family fallback pricing rule: %v", err)
-	}
-
-	estimated, err := svc.EstimatePrice(t.Context(), contract.PricingRequest{
-		ModelID:      99,
-		ModelFamily:  "opus",
-		ProviderID:   7,
-		InputTokens:  1000,
-		OutputTokens: 1000,
-	})
-	if err != nil {
-		t.Fatalf("estimate family fallback price: %v", err)
-	}
-	if estimated.Amount != "0.09000000" || estimated.Currency != "USD" {
-		t.Fatalf("expected non-zero opus family fallback price, got %+v", estimated)
-	}
-	if estimated.PricingRuleID == nil || *estimated.PricingRuleID != rule.ID {
-		t.Fatalf("expected fallback rule id %d, got %+v", rule.ID, estimated.PricingRuleID)
-	}
-}
-
-func TestValidatePricingRuleDoesNotPersist(t *testing.T) {
-	svc, err := service.New(subscriptionmemory.New(), nil)
-	if err != nil {
-		t.Fatalf("new subscription service: %v", err)
-	}
-
-	if err := svc.ValidatePricingRule(contract.CreatePricingRuleRequest{
-		ModelID:                         1,
-		ProviderID:                      0,
-		InputPricePerMillionTokens:      "1.25",
-		OutputPricePerMillionTokens:     "2.50",
-		CacheReadPricePerMillionTokens:  "0",
-		CacheWritePricePerMillionTokens: "0",
-		Currency:                        "usd",
-	}); err != nil {
-		t.Fatalf("validate pricing rule: %v", err)
-	}
-	rules, err := svc.ListPricingRules(t.Context())
-	if err != nil {
-		t.Fatalf("list pricing rules: %v", err)
-	}
-	if len(rules) != 0 {
-		t.Fatalf("validation should not persist pricing rules, got %+v", rules)
-	}
-	if err := svc.ValidatePricingRule(contract.CreatePricingRuleRequest{
-		ModelID:                         1,
-		ProviderID:                      0,
-		InputPricePerMillionTokens:      "not-money",
-		OutputPricePerMillionTokens:     "2.50",
-		CacheReadPricePerMillionTokens:  "0",
-		CacheWritePricePerMillionTokens: "0",
-		Currency:                        "usd",
-	}); err == nil {
-		t.Fatal("expected invalid pricing rule to be rejected")
-	}
-}
-
 func TestCreateUserSubscriptionIsIdempotentBySource(t *testing.T) {
 	clock := fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
 	svc, err := service.New(subscriptionmemory.New(), clock)
@@ -359,6 +216,48 @@ func TestCreateUserSubscriptionIsIdempotentBySource(t *testing.T) {
 	}
 	if len(subscriptions) != 1 {
 		t.Fatalf("expected one subscription after duplicate source, got %+v", subscriptions)
+	}
+}
+
+func TestMaterializedUsageAccumulatesAndResetsWindows(t *testing.T) {
+	clock := fixedClock{now: time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)}
+	store := subscriptionmemory.New()
+	svc, err := service.New(store, clock)
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+	plan, err := svc.CreatePlan(t.Context(), contract.CreatePlanRequest{
+		Name:         "pro",
+		Price:        "9.99",
+		Currency:     "USD",
+		ValidityDays: 30,
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	if _, err := svc.CreateUserSubscription(t.Context(), contract.CreateSubscriptionRequest{UserID: 1, PlanID: plan.ID}); err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+
+	firstAt := time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
+	if _, err := svc.IncrementMaterializedUsage(t.Context(), contract.UsageDelta{UserID: 1, BillableCost: "0.01000000", OccurredAt: firstAt}); err != nil {
+		t.Fatalf("increment first: %v", err)
+	}
+	usage, err := svc.IncrementMaterializedUsage(t.Context(), contract.UsageDelta{UserID: 1, BillableCost: "0.02000000", OccurredAt: firstAt.Add(time.Hour)})
+	if err != nil {
+		t.Fatalf("increment second: %v", err)
+	}
+	if usage.MonthlyUsageUSD != "0.03000000" || usage.WeeklyUsageUSD != "0.03000000" || usage.DailyUsageUSD != "0.03000000" {
+		t.Fatalf("expected two increments summed, got %+v", usage)
+	}
+
+	nextMonth := time.Date(2026, 7, 1, 1, 0, 0, 0, time.UTC)
+	usage, err = svc.MaterializedUsageForUser(t.Context(), 1, nextMonth)
+	if err != nil {
+		t.Fatalf("read next month usage: %v", err)
+	}
+	if usage.MonthlyUsageUSD != "0.00000000" || usage.DailyUsageUSD != "0.00000000" {
+		t.Fatalf("expected expired windows reset, got %+v", usage)
 	}
 }
 

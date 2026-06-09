@@ -74,6 +74,11 @@ func ProviderID(v int) predicate.PricingRule {
 	return predicate.PricingRule(sql.FieldEQ(FieldProviderID, v))
 }
 
+// BillingMode applies equality check predicate on the "billing_mode" field. It's identical to BillingModeEQ.
+func BillingMode(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldBillingMode, v))
+}
+
 // InputPricePerMillion applies equality check predicate on the "input_price_per_million" field. It's identical to InputPricePerMillionEQ.
 func InputPricePerMillion(v string) predicate.PricingRule {
 	return predicate.PricingRule(sql.FieldEQ(FieldInputPricePerMillion, v))
@@ -92,6 +97,11 @@ func CacheReadPricePerMillion(v string) predicate.PricingRule {
 // CacheWritePricePerMillion applies equality check predicate on the "cache_write_price_per_million" field. It's identical to CacheWritePricePerMillionEQ.
 func CacheWritePricePerMillion(v string) predicate.PricingRule {
 	return predicate.PricingRule(sql.FieldEQ(FieldCacheWritePricePerMillion, v))
+}
+
+// PerRequestPrice applies equality check predicate on the "per_request_price" field. It's identical to PerRequestPriceEQ.
+func PerRequestPrice(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldPerRequestPrice, v))
 }
 
 // Currency applies equality check predicate on the "currency" field. It's identical to CurrencyEQ.
@@ -267,6 +277,71 @@ func ProviderIDLT(v int) predicate.PricingRule {
 // ProviderIDLTE applies the LTE predicate on the "provider_id" field.
 func ProviderIDLTE(v int) predicate.PricingRule {
 	return predicate.PricingRule(sql.FieldLTE(FieldProviderID, v))
+}
+
+// BillingModeEQ applies the EQ predicate on the "billing_mode" field.
+func BillingModeEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldBillingMode, v))
+}
+
+// BillingModeNEQ applies the NEQ predicate on the "billing_mode" field.
+func BillingModeNEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNEQ(FieldBillingMode, v))
+}
+
+// BillingModeIn applies the In predicate on the "billing_mode" field.
+func BillingModeIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldIn(FieldBillingMode, vs...))
+}
+
+// BillingModeNotIn applies the NotIn predicate on the "billing_mode" field.
+func BillingModeNotIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNotIn(FieldBillingMode, vs...))
+}
+
+// BillingModeGT applies the GT predicate on the "billing_mode" field.
+func BillingModeGT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGT(FieldBillingMode, v))
+}
+
+// BillingModeGTE applies the GTE predicate on the "billing_mode" field.
+func BillingModeGTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGTE(FieldBillingMode, v))
+}
+
+// BillingModeLT applies the LT predicate on the "billing_mode" field.
+func BillingModeLT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLT(FieldBillingMode, v))
+}
+
+// BillingModeLTE applies the LTE predicate on the "billing_mode" field.
+func BillingModeLTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLTE(FieldBillingMode, v))
+}
+
+// BillingModeContains applies the Contains predicate on the "billing_mode" field.
+func BillingModeContains(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContains(FieldBillingMode, v))
+}
+
+// BillingModeHasPrefix applies the HasPrefix predicate on the "billing_mode" field.
+func BillingModeHasPrefix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasPrefix(FieldBillingMode, v))
+}
+
+// BillingModeHasSuffix applies the HasSuffix predicate on the "billing_mode" field.
+func BillingModeHasSuffix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasSuffix(FieldBillingMode, v))
+}
+
+// BillingModeEqualFold applies the EqualFold predicate on the "billing_mode" field.
+func BillingModeEqualFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEqualFold(FieldBillingMode, v))
+}
+
+// BillingModeContainsFold applies the ContainsFold predicate on the "billing_mode" field.
+func BillingModeContainsFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContainsFold(FieldBillingMode, v))
 }
 
 // InputPricePerMillionEQ applies the EQ predicate on the "input_price_per_million" field.
@@ -527,6 +602,71 @@ func CacheWritePricePerMillionEqualFold(v string) predicate.PricingRule {
 // CacheWritePricePerMillionContainsFold applies the ContainsFold predicate on the "cache_write_price_per_million" field.
 func CacheWritePricePerMillionContainsFold(v string) predicate.PricingRule {
 	return predicate.PricingRule(sql.FieldContainsFold(FieldCacheWritePricePerMillion, v))
+}
+
+// PerRequestPriceEQ applies the EQ predicate on the "per_request_price" field.
+func PerRequestPriceEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldPerRequestPrice, v))
+}
+
+// PerRequestPriceNEQ applies the NEQ predicate on the "per_request_price" field.
+func PerRequestPriceNEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNEQ(FieldPerRequestPrice, v))
+}
+
+// PerRequestPriceIn applies the In predicate on the "per_request_price" field.
+func PerRequestPriceIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldIn(FieldPerRequestPrice, vs...))
+}
+
+// PerRequestPriceNotIn applies the NotIn predicate on the "per_request_price" field.
+func PerRequestPriceNotIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNotIn(FieldPerRequestPrice, vs...))
+}
+
+// PerRequestPriceGT applies the GT predicate on the "per_request_price" field.
+func PerRequestPriceGT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGT(FieldPerRequestPrice, v))
+}
+
+// PerRequestPriceGTE applies the GTE predicate on the "per_request_price" field.
+func PerRequestPriceGTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGTE(FieldPerRequestPrice, v))
+}
+
+// PerRequestPriceLT applies the LT predicate on the "per_request_price" field.
+func PerRequestPriceLT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLT(FieldPerRequestPrice, v))
+}
+
+// PerRequestPriceLTE applies the LTE predicate on the "per_request_price" field.
+func PerRequestPriceLTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLTE(FieldPerRequestPrice, v))
+}
+
+// PerRequestPriceContains applies the Contains predicate on the "per_request_price" field.
+func PerRequestPriceContains(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContains(FieldPerRequestPrice, v))
+}
+
+// PerRequestPriceHasPrefix applies the HasPrefix predicate on the "per_request_price" field.
+func PerRequestPriceHasPrefix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasPrefix(FieldPerRequestPrice, v))
+}
+
+// PerRequestPriceHasSuffix applies the HasSuffix predicate on the "per_request_price" field.
+func PerRequestPriceHasSuffix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasSuffix(FieldPerRequestPrice, v))
+}
+
+// PerRequestPriceEqualFold applies the EqualFold predicate on the "per_request_price" field.
+func PerRequestPriceEqualFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEqualFold(FieldPerRequestPrice, v))
+}
+
+// PerRequestPriceContainsFold applies the ContainsFold predicate on the "per_request_price" field.
+func PerRequestPriceContainsFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContainsFold(FieldPerRequestPrice, v))
 }
 
 // CurrencyEQ applies the EQ predicate on the "currency" field.

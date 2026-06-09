@@ -185,6 +185,39 @@ func TestAdminAccountManagementEnhancements(t *testing.T) {
 	}
 }
 
+func TestAdminAccountResetQuotaClearsQuotaErrorMetadata(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"quota-reset-provider","display_name":"Quota Reset","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"quota-reset-account","runtime_class":"api_key","credential":{"api_key":"secret"},"metadata":{"last_quota_error_class":"validation_required","last_quota_error_status_code":403,"last_quota_error_message":"validate account","last_quota_error_at":"2026-01-01T00:00:00Z","validation_url":"https://console.example/validate","provider_error_kind":"validation_required","quota_exhausted":true,"cooldown_active":true,"last_error_class":"quota_exhausted","last_error_message":"quota blocked"},"status":"suspended"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/reset-quota", nil)
+	req.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected reset quota 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resetResp apiopenapi.ProviderAccountResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resetResp); err != nil {
+		t.Fatalf("decode reset quota: %v", err)
+	}
+	if resetResp.Data.Status != apiopenapi.ProviderAccountStatusActive {
+		t.Fatalf("expected active status after reset, got %s", resetResp.Data.Status)
+	}
+	metadata := resetResp.Data.Metadata
+	if metadata == nil ||
+		(*metadata)["last_quota_error_class"] != nil ||
+		(*metadata)["validation_url"] != nil ||
+		(*metadata)["quota_exhausted"] != nil ||
+		(*metadata)["cooldown_active"] != nil ||
+		(*metadata)["last_error_class"] != nil ||
+		(*metadata)["last_quota_reset_at"] == nil {
+		t.Fatalf("expected reset quota metadata, got %+v", metadata)
+	}
+}
+
 func TestAdminAccountBatchActions(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

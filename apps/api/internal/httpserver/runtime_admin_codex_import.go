@@ -2,9 +2,7 @@ package httpserver
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -158,7 +156,7 @@ func (s *Server) importCodexSessions(ctx context.Context, providerID int, body a
 			})
 		}
 
-		if dup, ok := firstSeenCodexIdentity(seen, item.identityKeys); ok {
+		if dup, ok := firstSeenImportIdentity(seen, item.identityKeys); ok {
 			message := fmt.Sprintf("duplicate of import entry #%d; skipped", dup)
 			result.Skipped++
 			result.Items = append(result.Items, apiopenapi.CodexSessionImportItem{
@@ -169,7 +167,7 @@ func (s *Server) importCodexSessions(ctx context.Context, providerID int, body a
 			})
 			continue
 		}
-		markCodexIdentitySeen(seen, item.identityKeys, entry.index)
+		markImportIdentitySeen(seen, item.identityKeys, entry.index)
 
 		credential, metadata, status, expiryErr := s.resolveCodexImportTarget(item, requestStatus)
 		if expiryErr != nil {
@@ -597,51 +595,12 @@ func buildCodexCreateAccountName(base string, item *codexImportAccount, index, t
 	return base
 }
 
-func buildCodexIdentityKeys(accountID, userID, email, accessToken string) []string {
-	keys := make([]string, 0, 4)
-	accountID = strings.TrimSpace(accountID)
-	userID = strings.TrimSpace(userID)
-	if accountID != "" {
-		keys = append(keys, "account:"+accountID)
-	}
-	if userID != "" {
-		keys = append(keys, "user:"+userID)
-	}
-	if accountID == "" && userID == "" {
-		if email = strings.ToLower(strings.TrimSpace(email)); email != "" {
-			keys = append(keys, "email:"+email)
-		}
-	}
-	if accessToken = strings.TrimSpace(accessToken); accessToken != "" {
-		sum := sha256.Sum256([]byte(accessToken))
-		keys = append(keys, "access:"+hex.EncodeToString(sum[:]))
-	}
-	return keys
-}
-
-func firstSeenCodexIdentity(seen map[string]int, keys []string) (int, bool) {
-	for _, key := range keys {
-		if index, ok := seen[key]; ok {
-			return index, true
-		}
-	}
-	return 0, false
-}
-
-func markCodexIdentitySeen(seen map[string]int, keys []string, index int) {
-	for _, key := range keys {
-		seen[key] = index
-	}
-}
-
 // --- existing-account index (plaintext metadata only) ----------------------
 
-type codexAccountIndex struct {
-	byKey map[string]int
-}
+type codexAccountIndex = importIdentityIndex
 
 func (s *Server) buildCodexAccountIndex(ctx context.Context, providerID int) *codexAccountIndex {
-	index := &codexAccountIndex{byKey: map[string]int{}}
+	index := newImportIdentityIndex()
 	accounts, err := s.runtime.accounts.List(ctx)
 	if err != nil {
 		return index
@@ -659,35 +618,6 @@ func (s *Server) buildCodexAccountIndex(ctx context.Context, providerID int) *co
 		index.add(account.ID, keys)
 	}
 	return index
-}
-
-func (i *codexAccountIndex) add(accountID int, keys []string) {
-	if i == nil || i.byKey == nil {
-		return
-	}
-	for _, key := range keys {
-		// Access-token fingerprint keys are not derivable from existing
-		// (encrypted) credentials, so they never match a stored account.
-		if strings.HasPrefix(key, "access:") {
-			continue
-		}
-		i.byKey[key] = accountID
-	}
-}
-
-func (i *codexAccountIndex) find(keys []string) (int, bool) {
-	if i == nil {
-		return 0, false
-	}
-	for _, key := range keys {
-		if strings.HasPrefix(key, "access:") {
-			continue
-		}
-		if id, ok := i.byKey[key]; ok {
-			return id, true
-		}
-	}
-	return 0, false
 }
 
 // --- small helpers ---------------------------------------------------------

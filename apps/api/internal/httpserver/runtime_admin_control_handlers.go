@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
@@ -633,7 +634,7 @@ func (s *Server) handleListAdminPricingRules(w http.ResponseWriter, r *http.Requ
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	items, err := s.runtime.subscriptions.ListPricingRules(r.Context())
+	items, err := s.runtime.billing.ListPricingRules(r.Context())
 	if err != nil {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list pricing rules", requestID)
 		return
@@ -670,7 +671,7 @@ func (s *Server) handleCreateAdminPricingRule(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, message, requestID)
 		return
 	}
-	rule, err := s.runtime.subscriptions.CreatePricingRule(r.Context(), pricingReq)
+	rule, err := s.runtime.billing.CreatePricingRule(r.Context(), pricingReq)
 	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid pricing rule request", requestID)
 		return
@@ -699,7 +700,7 @@ func (s *Server) handleUpdateAdminPricingRule(w http.ResponseWriter, r *http.Req
 		return
 	}
 	var beforeSnapshot map[string]any
-	if existing, findErr := s.runtime.subscriptions.FindPricingRuleByID(r.Context(), ruleID); findErr == nil {
+	if existing, findErr := s.runtime.billing.FindPricingRuleByID(r.Context(), ruleID); findErr == nil {
 		beforeSnapshot = pricingRuleAuditSnapshot(existing)
 	}
 	var body apiopenapi.UpdatePricingRuleRequest
@@ -707,12 +708,18 @@ func (s *Server) handleUpdateAdminPricingRule(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid pricing rule request", requestID)
 		return
 	}
-	req := subscriptioncontract.UpdatePricingRuleRequest{
+	req := billingcontract.UpdatePricingRuleRequest{
+		BillingMode:                     optionalBillingModeFromAPI(body.BillingMode),
 		InputPricePerMillionTokens:      body.InputPricePerMillionTokens,
 		OutputPricePerMillionTokens:     body.OutputPricePerMillionTokens,
 		CacheReadPricePerMillionTokens:  body.CacheReadPricePerMillionTokens,
 		CacheWritePricePerMillionTokens: body.CacheWritePricePerMillionTokens,
+		PerRequestPrice:                 body.PerRequestPrice,
 		Currency:                        body.Currency,
+	}
+	if body.Intervals != nil {
+		intervals := pricingIntervalsFromAPI(*body.Intervals)
+		req.Intervals = &intervals
 	}
 	if body.EffectiveFrom != nil {
 		req.EffectiveFrom = &body.EffectiveFrom
@@ -720,9 +727,9 @@ func (s *Server) handleUpdateAdminPricingRule(w http.ResponseWriter, r *http.Req
 	if body.EffectiveTo != nil {
 		req.EffectiveTo = &body.EffectiveTo
 	}
-	rule, err := s.runtime.subscriptions.UpdatePricingRule(r.Context(), ruleID, req)
+	rule, err := s.runtime.billing.UpdatePricingRule(r.Context(), ruleID, req)
 	if err != nil {
-		if errors.Is(err, subscriptioncontract.ErrNotFound) {
+		if errors.Is(err, billingcontract.ErrNotFound) {
 			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "pricing rule not found", requestID)
 			return
 		}
@@ -752,8 +759,8 @@ func (s *Server) handleDeleteAdminPricingRule(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid pricing rule id", requestID)
 		return
 	}
-	if err := s.runtime.subscriptions.DeletePricingRule(r.Context(), ruleID); err != nil {
-		if errors.Is(err, subscriptioncontract.ErrNotFound) {
+	if err := s.runtime.billing.DeletePricingRule(r.Context(), ruleID); err != nil {
+		if errors.Is(err, billingcontract.ErrNotFound) {
 			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "pricing rule not found", requestID)
 			return
 		}
@@ -795,7 +802,7 @@ func (s *Server) handleBulkImportAdminPricingRules(w http.ResponseWriter, r *htt
 	for idx, item := range body.Items {
 		pricingReq, message := s.pricingRuleRequestFromAPI(r.Context(), item)
 		if message == "" {
-			if err := s.runtime.subscriptions.ValidatePricingRule(pricingReq); err != nil {
+			if err := s.runtime.billing.ValidatePricingRule(pricingReq); err != nil {
 				message = "invalid pricing rule request"
 			}
 		}
@@ -807,7 +814,7 @@ func (s *Server) handleBulkImportAdminPricingRules(w http.ResponseWriter, r *htt
 		if dryRun {
 			continue
 		}
-		rule, err := s.runtime.subscriptions.CreatePricingRule(r.Context(), pricingReq)
+		rule, err := s.runtime.billing.CreatePricingRule(r.Context(), pricingReq)
 		if err != nil {
 			errorsOut = append(errorsOut, apiopenapi.BulkPricingRuleImportError{Index: idx, Message: "invalid pricing rule request"})
 			continue
@@ -877,30 +884,33 @@ func decodeStrictJSON(payload []byte, dst any) error {
 	return decoder.Decode(dst)
 }
 
-func (s *Server) pricingRuleRequestFromAPI(ctx context.Context, body apiopenapi.CreatePricingRuleRequest) (subscriptioncontract.CreatePricingRuleRequest, string) {
+func (s *Server) pricingRuleRequestFromAPI(ctx context.Context, body apiopenapi.CreatePricingRuleRequest) (billingcontract.CreatePricingRuleRequest, string) {
 	modelID, err := strconv.Atoi(string(body.ModelId))
 	if err != nil || modelID <= 0 {
-		return subscriptioncontract.CreatePricingRuleRequest{}, "invalid model id"
+		return billingcontract.CreatePricingRuleRequest{}, "invalid model id"
 	}
 	providerID, err := strconv.Atoi(string(body.ProviderId))
 	if err != nil || providerID < 0 {
-		return subscriptioncontract.CreatePricingRuleRequest{}, "invalid provider id"
+		return billingcontract.CreatePricingRuleRequest{}, "invalid provider id"
 	}
 	if _, err := s.runtime.models.FindByID(ctx, modelID); err != nil {
-		return subscriptioncontract.CreatePricingRuleRequest{}, "model not found"
+		return billingcontract.CreatePricingRuleRequest{}, "model not found"
 	}
 	if providerID > 0 {
 		if _, err := s.runtime.providers.FindByID(ctx, providerID); err != nil {
-			return subscriptioncontract.CreatePricingRuleRequest{}, "provider not found"
+			return billingcontract.CreatePricingRuleRequest{}, "provider not found"
 		}
 	}
-	return subscriptioncontract.CreatePricingRuleRequest{
+	return billingcontract.CreatePricingRuleRequest{
 		ModelID:                         modelID,
 		ProviderID:                      providerID,
+		BillingMode:                     billingModeFromAPI(body.BillingMode),
 		InputPricePerMillionTokens:      body.InputPricePerMillionTokens,
 		OutputPricePerMillionTokens:     body.OutputPricePerMillionTokens,
 		CacheReadPricePerMillionTokens:  body.CacheReadPricePerMillionTokens,
 		CacheWritePricePerMillionTokens: body.CacheWritePricePerMillionTokens,
+		PerRequestPrice:                 optionalStringValue(body.PerRequestPrice),
+		Intervals:                       pricingIntervalsFromAPIPtr(body.Intervals),
 		Currency:                        body.Currency,
 		EffectiveFrom:                   body.EffectiveFrom,
 		EffectiveTo:                     body.EffectiveTo,
@@ -952,10 +962,58 @@ func pricingRuleFromCSVRecord(columns map[string]int, record []string) (apiopena
 		OutputPricePerMillionTokens:     csvValue(columns, record, "output_price_per_million_tokens"),
 		CacheReadPricePerMillionTokens:  csvValue(columns, record, "cache_read_price_per_million_tokens"),
 		CacheWritePricePerMillionTokens: csvValue(columns, record, "cache_write_price_per_million_tokens"),
+		PerRequestPrice:                 ptrStringValue(csvValue(columns, record, "per_request_price")),
 		Currency:                        csvValue(columns, record, "currency"),
 		EffectiveFrom:                   effectiveFrom,
 		EffectiveTo:                     effectiveTo,
 	}, nil
+}
+
+func pricingIntervalsFromAPI(values []apiopenapi.PricingIntervalInput) []billingcontract.PricingInterval {
+	out := make([]billingcontract.PricingInterval, 0, len(values))
+	for _, value := range values {
+		out = append(out, billingcontract.PricingInterval{
+			MinTokens:                       optionalIntValue(value.MinTokens),
+			MaxTokens:                       value.MaxTokens,
+			TierLabel:                       optionalStringValue(value.TierLabel),
+			ImageSize:                       optionalStringValue(value.ImageSize),
+			InputPricePerMillionTokens:      optionalStringValue(value.InputPricePerMillionTokens),
+			OutputPricePerMillionTokens:     optionalStringValue(value.OutputPricePerMillionTokens),
+			CacheReadPricePerMillionTokens:  optionalStringValue(value.CacheReadPricePerMillionTokens),
+			CacheWritePricePerMillionTokens: optionalStringValue(value.CacheWritePricePerMillionTokens),
+			PerImagePrice:                   optionalStringValue(value.PerImagePrice),
+		})
+	}
+	return out
+}
+
+func pricingIntervalsFromAPIPtr(values *[]apiopenapi.PricingIntervalInput) []billingcontract.PricingInterval {
+	if values == nil {
+		return nil
+	}
+	return pricingIntervalsFromAPI(*values)
+}
+
+func billingModeFromAPI(value *apiopenapi.BillingMode) billingcontract.BillingMode {
+	if value == nil {
+		return ""
+	}
+	return billingcontract.BillingMode(*value)
+}
+
+func optionalBillingModeFromAPI(value *apiopenapi.BillingMode) *billingcontract.BillingMode {
+	if value == nil {
+		return nil
+	}
+	mode := billingcontract.BillingMode(*value)
+	return &mode
+}
+
+func optionalIntValue(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func csvValue(columns map[string]int, record []string, name string) string {

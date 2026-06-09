@@ -37,8 +37,20 @@ type UserSubscription struct {
 	// SourceType holds the value of the "source_type" field.
 	SourceType string `json:"source_type,omitempty"`
 	// SourceID holds the value of the "source_id" field.
-	SourceID     string `json:"source_id,omitempty"`
-	selectValues sql.SelectValues
+	SourceID string `json:"source_id,omitempty"`
+	// DailyUsageUsd holds the value of the "daily_usage_usd" field.
+	DailyUsageUsd string `json:"daily_usage_usd,omitempty"`
+	// DailyUsageWindowStart holds the value of the "daily_usage_window_start" field.
+	DailyUsageWindowStart *time.Time `json:"daily_usage_window_start,omitempty"`
+	// WeeklyUsageUsd holds the value of the "weekly_usage_usd" field.
+	WeeklyUsageUsd string `json:"weekly_usage_usd,omitempty"`
+	// WeeklyUsageWindowStart holds the value of the "weekly_usage_window_start" field.
+	WeeklyUsageWindowStart *time.Time `json:"weekly_usage_window_start,omitempty"`
+	// MonthlyUsageUsd holds the value of the "monthly_usage_usd" field.
+	MonthlyUsageUsd string `json:"monthly_usage_usd,omitempty"`
+	// MonthlyUsageWindowStart holds the value of the "monthly_usage_window_start" field.
+	MonthlyUsageWindowStart *time.Time `json:"monthly_usage_window_start,omitempty"`
+	selectValues            sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -50,9 +62,9 @@ func (*UserSubscription) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case usersubscription.FieldID, usersubscription.FieldUserID, usersubscription.FieldPlanID:
 			values[i] = new(sql.NullInt64)
-		case usersubscription.FieldStatus, usersubscription.FieldSourceType, usersubscription.FieldSourceID:
+		case usersubscription.FieldStatus, usersubscription.FieldSourceType, usersubscription.FieldSourceID, usersubscription.FieldDailyUsageUsd, usersubscription.FieldWeeklyUsageUsd, usersubscription.FieldMonthlyUsageUsd:
 			values[i] = new(sql.NullString)
-		case usersubscription.FieldCreatedAt, usersubscription.FieldUpdatedAt, usersubscription.FieldStartsAt, usersubscription.FieldExpiresAt:
+		case usersubscription.FieldCreatedAt, usersubscription.FieldUpdatedAt, usersubscription.FieldStartsAt, usersubscription.FieldExpiresAt, usersubscription.FieldDailyUsageWindowStart, usersubscription.FieldWeeklyUsageWindowStart, usersubscription.FieldMonthlyUsageWindowStart:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -137,6 +149,45 @@ func (_m *UserSubscription) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.SourceID = value.String
 			}
+		case usersubscription.FieldDailyUsageUsd:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field daily_usage_usd", values[i])
+			} else if value.Valid {
+				_m.DailyUsageUsd = value.String
+			}
+		case usersubscription.FieldDailyUsageWindowStart:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field daily_usage_window_start", values[i])
+			} else if value.Valid {
+				_m.DailyUsageWindowStart = new(time.Time)
+				*_m.DailyUsageWindowStart = value.Time
+			}
+		case usersubscription.FieldWeeklyUsageUsd:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field weekly_usage_usd", values[i])
+			} else if value.Valid {
+				_m.WeeklyUsageUsd = value.String
+			}
+		case usersubscription.FieldWeeklyUsageWindowStart:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field weekly_usage_window_start", values[i])
+			} else if value.Valid {
+				_m.WeeklyUsageWindowStart = new(time.Time)
+				*_m.WeeklyUsageWindowStart = value.Time
+			}
+		case usersubscription.FieldMonthlyUsageUsd:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field monthly_usage_usd", values[i])
+			} else if value.Valid {
+				_m.MonthlyUsageUsd = value.String
+			}
+		case usersubscription.FieldMonthlyUsageWindowStart:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field monthly_usage_window_start", values[i])
+			} else if value.Valid {
+				_m.MonthlyUsageWindowStart = new(time.Time)
+				*_m.MonthlyUsageWindowStart = value.Time
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -202,6 +253,30 @@ func (_m *UserSubscription) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("source_id=")
 	builder.WriteString(_m.SourceID)
+	builder.WriteString(", ")
+	builder.WriteString("daily_usage_usd=")
+	builder.WriteString(_m.DailyUsageUsd)
+	builder.WriteString(", ")
+	if v := _m.DailyUsageWindowStart; v != nil {
+		builder.WriteString("daily_usage_window_start=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("weekly_usage_usd=")
+	builder.WriteString(_m.WeeklyUsageUsd)
+	builder.WriteString(", ")
+	if v := _m.WeeklyUsageWindowStart; v != nil {
+		builder.WriteString("weekly_usage_window_start=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("monthly_usage_usd=")
+	builder.WriteString(_m.MonthlyUsageUsd)
+	builder.WriteString(", ")
+	if v := _m.MonthlyUsageWindowStart; v != nil {
+		builder.WriteString("monthly_usage_window_start=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

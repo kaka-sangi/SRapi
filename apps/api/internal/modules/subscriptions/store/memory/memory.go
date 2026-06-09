@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/domain"
 )
 
 type Store struct {
@@ -17,11 +18,9 @@ type Store struct {
 	nextPlanID        int
 	nextSubID         int
 	nextEntitlementID int
-	nextPricingID     int
 	plans             map[int]contract.SubscriptionPlan
 	subscriptions     map[int]contract.UserSubscription
 	entitlements      map[int]contract.Entitlement
-	pricingRules      map[int]contract.PricingRule
 }
 
 func New() *Store {
@@ -29,11 +28,9 @@ func New() *Store {
 		nextPlanID:        1,
 		nextSubID:         1,
 		nextEntitlementID: 1,
-		nextPricingID:     1,
 		plans:             map[int]contract.SubscriptionPlan{},
 		subscriptions:     map[int]contract.UserSubscription{},
 		entitlements:      map[int]contract.Entitlement{},
-		pricingRules:      map[int]contract.PricingRule{},
 	}
 }
 
@@ -159,6 +156,9 @@ func (s *Store) CreateUserSubscription(_ context.Context, input contract.CreateS
 		EntitlementsSnapshot: cloneMap(input.EntitlementsSnapshot),
 		SourceType:           input.SourceType,
 		SourceID:             input.SourceID,
+		DailyUsageUSD:        "0.00000000",
+		WeeklyUsageUSD:       "0.00000000",
+		MonthlyUsageUSD:      "0.00000000",
 		CreatedAt:            now,
 		UpdatedAt:            now,
 	}
@@ -224,6 +224,32 @@ func (s *Store) ListActiveUserSubscriptions(_ context.Context, userID int, at ti
 	return out, nil
 }
 
+func (s *Store) MaterializedUsageForUser(_ context.Context, userID int, at time.Time) (contract.MaterializedUsage, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	subscription, ok := s.activeSubscriptionForUserLocked(userID, at.UTC())
+	if !ok {
+		return contract.MaterializedUsage{}, nil
+	}
+	reset := domain.ResetExpiredUsage(subscription, at.UTC())
+	reset.UpdatedAt = time.Now().UTC()
+	s.subscriptions[reset.ID] = reset
+	return domain.MaterializedUsageFromSubscription(reset, at.UTC()), nil
+}
+
+func (s *Store) IncrementMaterializedUsage(_ context.Context, delta contract.UsageDelta) (contract.MaterializedUsage, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	subscription, ok := s.activeSubscriptionForUserLocked(delta.UserID, delta.OccurredAt.UTC())
+	if !ok {
+		return contract.MaterializedUsage{}, nil
+	}
+	updated := domain.ApplyUsageDelta(subscription, delta)
+	updated.UpdatedAt = time.Now().UTC()
+	s.subscriptions[updated.ID] = updated
+	return domain.MaterializedUsageFromSubscription(updated, delta.OccurredAt.UTC()), nil
+}
+
 func (s *Store) ListActiveEntitlements(_ context.Context, userID int, at time.Time) ([]contract.Entitlement, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -252,6 +278,25 @@ func (s *Store) ListActiveEntitlements(_ context.Context, userID int, at time.Ti
 		return out[i].SourceSubscriptionID < out[j].SourceSubscriptionID
 	})
 	return out, nil
+}
+
+func (s *Store) activeSubscriptionForUserLocked(userID int, at time.Time) (contract.UserSubscription, bool) {
+	at = at.UTC()
+	var selected contract.UserSubscription
+	found := false
+	for _, subscription := range s.subscriptions {
+		if subscription.UserID != userID || subscription.Status != contract.SubscriptionStatusActive {
+			continue
+		}
+		if at.Before(subscription.StartsAt) || !at.Before(subscription.ExpiresAt) {
+			continue
+		}
+		if !found || subscription.StartsAt.After(selected.StartsAt) || (subscription.StartsAt.Equal(selected.StartsAt) && subscription.ID > selected.ID) {
+			selected = subscription
+			found = true
+		}
+	}
+	return selected, found
 }
 
 func (s *Store) ListExpiredActiveUserSubscriptions(_ context.Context, now time.Time) ([]contract.UserSubscription, error) {
@@ -320,83 +365,6 @@ func (s *Store) DeleteUserSubscription(_ context.Context, id int) error {
 	return nil
 }
 
-func (s *Store) CreatePricingRule(_ context.Context, input contract.PricingRule) (contract.PricingRule, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now().UTC()
-	rule := clonePricingRule(input)
-	rule.ID = s.nextPricingID
-	rule.CreatedAt = now
-	rule.UpdatedAt = now
-	s.pricingRules[rule.ID] = rule
-	s.nextPricingID++
-	return clonePricingRule(rule), nil
-}
-
-func (s *Store) UpdatePricingRule(_ context.Context, id int, input contract.UpdatePricingRuleRequest) (contract.PricingRule, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	rule, ok := s.pricingRules[id]
-	if !ok {
-		return contract.PricingRule{}, contract.ErrNotFound
-	}
-	if input.InputPricePerMillionTokens != nil {
-		rule.InputPricePerMillionTokens = *input.InputPricePerMillionTokens
-	}
-	if input.OutputPricePerMillionTokens != nil {
-		rule.OutputPricePerMillionTokens = *input.OutputPricePerMillionTokens
-	}
-	if input.CacheReadPricePerMillionTokens != nil {
-		rule.CacheReadPricePerMillionTokens = *input.CacheReadPricePerMillionTokens
-	}
-	if input.CacheWritePricePerMillionTokens != nil {
-		rule.CacheWritePricePerMillionTokens = *input.CacheWritePricePerMillionTokens
-	}
-	if input.Currency != nil {
-		rule.Currency = *input.Currency
-	}
-	if input.EffectiveFrom != nil {
-		rule.EffectiveFrom = cloneTime(*input.EffectiveFrom)
-	}
-	if input.EffectiveTo != nil {
-		rule.EffectiveTo = cloneTime(*input.EffectiveTo)
-	}
-	rule.UpdatedAt = time.Now().UTC()
-	s.pricingRules[id] = rule
-	return clonePricingRule(rule), nil
-}
-
-func (s *Store) FindPricingRuleByID(_ context.Context, id int) (contract.PricingRule, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	rule, ok := s.pricingRules[id]
-	if !ok {
-		return contract.PricingRule{}, contract.ErrNotFound
-	}
-	return clonePricingRule(rule), nil
-}
-
-func (s *Store) DeletePricingRule(_ context.Context, id int) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, ok := s.pricingRules[id]; !ok {
-		return contract.ErrNotFound
-	}
-	delete(s.pricingRules, id)
-	return nil
-}
-
-func (s *Store) ListPricingRules(_ context.Context) ([]contract.PricingRule, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	out := make([]contract.PricingRule, 0, len(s.pricingRules))
-	for _, rule := range s.pricingRules {
-		out = append(out, clonePricingRule(rule))
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out, nil
-}
-
 func clonePlan(value contract.SubscriptionPlan) contract.SubscriptionPlan {
 	value.Entitlements = cloneMap(value.Entitlements)
 	value.DeletedAt = cloneTime(value.DeletedAt)
@@ -405,18 +373,15 @@ func clonePlan(value contract.SubscriptionPlan) contract.SubscriptionPlan {
 
 func cloneSubscription(value contract.UserSubscription) contract.UserSubscription {
 	value.EntitlementsSnapshot = cloneMap(value.EntitlementsSnapshot)
+	value.DailyWindowStart = cloneTime(value.DailyWindowStart)
+	value.WeeklyWindowStart = cloneTime(value.WeeklyWindowStart)
+	value.MonthlyWindowStart = cloneTime(value.MonthlyWindowStart)
 	return value
 }
 
 func cloneEntitlement(value contract.Entitlement) contract.Entitlement {
 	value.Value = cloneMap(value.Value)
 	value.QuotaLimit = cloneString(value.QuotaLimit)
-	return value
-}
-
-func clonePricingRule(value contract.PricingRule) contract.PricingRule {
-	value.EffectiveFrom = cloneTime(value.EffectiveFrom)
-	value.EffectiveTo = cloneTime(value.EffectiveTo)
 	return value
 }
 

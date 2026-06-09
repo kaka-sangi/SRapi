@@ -14,7 +14,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func TestStorePersistsPlansSubscriptionsAndPricingRules(t *testing.T) {
+func TestStorePersistsPlansAndSubscriptions(t *testing.T) {
 	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
 	defer client.Close()
 
@@ -88,6 +88,16 @@ func TestStorePersistsPlansSubscriptionsAndPricingRules(t *testing.T) {
 	if len(active) != 1 || active[0].ID != subscription.ID || active[0].EntitlementsSnapshot["allowed_models"] == nil {
 		t.Fatalf("expected only active subscription with snapshot, got %+v", active)
 	}
+	if _, err := store.IncrementMaterializedUsage(ctx, contract.UsageDelta{UserID: 1, BillableCost: "0.04000000", OccurredAt: now}); err != nil {
+		t.Fatalf("increment materialized usage: %v", err)
+	}
+	usage, err := store.IncrementMaterializedUsage(ctx, contract.UsageDelta{UserID: 1, BillableCost: "0.01000000", OccurredAt: now.Add(time.Minute)})
+	if err != nil {
+		t.Fatalf("increment materialized usage again: %v", err)
+	}
+	if usage.MonthlyUsageUSD != "0.05000000" || usage.DailyUsageUSD != "0.05000000" {
+		t.Fatalf("expected persisted materialized usage, got %+v", usage)
+	}
 	entitlements, err := store.ListActiveEntitlements(ctx, 1, now)
 	if err != nil {
 		t.Fatalf("list active entitlements: %v", err)
@@ -125,29 +135,6 @@ func TestStorePersistsPlansSubscriptionsAndPricingRules(t *testing.T) {
 		t.Fatal("expected second expiration to be a no-op")
 	}
 
-	from := now.Add(-time.Hour)
-	to := now.Add(time.Hour)
-	rule, err := store.CreatePricingRule(ctx, contract.PricingRule{
-		ModelID:                         11,
-		ProviderID:                      22,
-		InputPricePerMillionTokens:      "1.25000000",
-		OutputPricePerMillionTokens:     "2.50000000",
-		CacheReadPricePerMillionTokens:  "0.10000000",
-		CacheWritePricePerMillionTokens: "0.20000000",
-		Currency:                        "USD",
-		EffectiveFrom:                   &from,
-		EffectiveTo:                     &to,
-	})
-	if err != nil {
-		t.Fatalf("create pricing rule: %v", err)
-	}
-	rules, err := store.ListPricingRules(ctx)
-	if err != nil {
-		t.Fatalf("list pricing rules: %v", err)
-	}
-	if len(rules) != 1 || rules[0].ID != rule.ID || rules[0].EffectiveFrom == nil || rules[0].EffectiveTo == nil {
-		t.Fatalf("expected persisted pricing rule with effectivity, got %+v", rules)
-	}
 }
 
 func TestStoreUpdatePlanPartialAndNotFound(t *testing.T) {

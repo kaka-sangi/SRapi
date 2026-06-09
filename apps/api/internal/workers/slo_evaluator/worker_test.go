@@ -127,6 +127,16 @@ func (s *captureStore) ListSLOs(context.Context) ([]contract.SLODefinition, erro
 	return append([]contract.SLODefinition(nil), s.slos...), nil
 }
 
+func (s *captureStore) DeleteSLO(_ context.Context, id int) error {
+	for idx := range s.slos {
+		if s.slos[idx].ID == id {
+			s.slos = append(s.slos[:idx], s.slos[idx+1:]...)
+			return nil
+		}
+	}
+	return contract.ErrNotFound
+}
+
 func (s *captureStore) CreateAlert(_ context.Context, input contract.AlertEvent) (contract.AlertEvent, error) {
 	input.ID = s.nextAlertID
 	s.nextAlertID++

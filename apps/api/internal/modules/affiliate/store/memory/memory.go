@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 type Store struct {
@@ -220,7 +221,7 @@ func (s *Store) TransferToBalance(_ context.Context, input contract.TransferToBa
 	if id, ok := s.ledgerByReference[input.ReferenceID]; ok {
 		return transferResultFromLedger(s.ledgers[id]), false, nil
 	}
-	amount, ok := decimalRat(input.Amount)
+	amount, ok := money.RequiredDecimalRat(input.Amount)
 	if !ok || amount.Sign() <= 0 {
 		return contract.TransferToBalanceResult{}, false, contract.ErrInsufficientBalance
 	}
@@ -234,12 +235,12 @@ func (s *Store) TransferToBalance(_ context.Context, input contract.TransferToBa
 		createdAt = now
 	}
 	balanceBefore := s.userBalance(input.UserID, input.Currency)
-	balanceBeforeRat, ok := decimalRat(balanceBefore)
+	balanceBeforeRat, ok := money.DecimalRat(balanceBefore)
 	if !ok {
 		balanceBeforeRat = new(big.Rat)
 	}
 	balanceAfterRat := new(big.Rat).Add(balanceBeforeRat, amount)
-	balanceAfter := formatRatFixed(balanceAfterRat, 8)
+	balanceAfter := money.FormatRatFixed(balanceAfterRat, 8)
 	billingLedgerID := s.nextBillingLedgerID
 	s.nextBillingLedgerID++
 
@@ -299,7 +300,7 @@ func (s *Store) availableAffiliateBalance(userID int, currency string) *big.Rat 
 		if row.UserID != userID || row.Currency != currency || row.Status == contract.LedgerStatusCanceled {
 			continue
 		}
-		amount, ok := decimalRat(row.Amount)
+		amount, ok := money.RequiredDecimalRat(row.Amount)
 		if !ok {
 			continue
 		}
@@ -391,21 +392,6 @@ func cloneInt(value *int) *int {
 	}
 	cloned := *value
 	return &cloned
-}
-
-func decimalRat(value string) (*big.Rat, bool) {
-	rat, ok := new(big.Rat).SetString(value)
-	if !ok {
-		return nil, false
-	}
-	return rat, true
-}
-
-func formatRatFixed(value *big.Rat, places int) string {
-	if value == nil {
-		value = new(big.Rat)
-	}
-	return value.FloatString(places)
 }
 
 func transferResultFromLedger(ledger contract.AffiliateLedger) contract.TransferToBalanceResult {

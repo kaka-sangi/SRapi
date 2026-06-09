@@ -27,18 +27,22 @@ func TestGatewayEnforcesUserPlatformSpendQuota(t *testing.T) {
 	handler := New(config.Load(), nil, WithUsageStore(usageStore), WithUserPlatformQuotasStore(quotaStore))
 
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateOpenAIChatGatewayTarget(t, handler, sessionCookie, loginResp.Data.CsrfToken, "platform-quota-provider", "platform-quota-model")
 	adminUserID, err := strconv.Atoi(loginResp.Data.User.Id)
 	if err != nil {
 		t.Fatalf("parse admin user id %q: %v", loginResp.Data.User.Id, err)
 	}
-	providerID := seededProviderID(t, handler, sessionCookie, "openai-compatible")
+	providerID, err := strconv.Atoi(string(providerResp.Data.Id))
+	if err != nil {
+		t.Fatalf("parse provider id %q: %v", providerResp.Data.Id, err)
+	}
 
 	// $10 of prior successful spend today on the platform.
 	if _, err := usageStore.Create(context.Background(), usagecontract.UsageLog{
 		RequestID:  "seed-platform-spend",
 		UserID:     adminUserID,
 		ProviderID: &providerID,
-		Model:      "gpt-4o-mini",
+		Model:      "platform-quota-model",
 		Success:    true,
 		Cost:       "10.00000000",
 		Currency:   "USD",
@@ -51,7 +55,7 @@ func TestGatewayEnforcesUserPlatformSpendQuota(t *testing.T) {
 	daily := "1.00000000"
 	if _, err := quotaStore.UpsertQuota(context.Background(), userplatformquotascontract.UpsertQuota{
 		UserID:     adminUserID,
-		Platform:   "openai-compatible",
+		Platform:   providerResp.Data.Name,
 		DailyLimit: &daily,
 		Currency:   "USD",
 		Enabled:    true,
@@ -62,7 +66,7 @@ func TestGatewayEnforcesUserPlatformSpendQuota(t *testing.T) {
 	keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"platform-quota-gateway","scopes":["gateway:invoke"]}`)
 	apiKey := keyResp.Data.PlaintextKey
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gpt-4o-mini","messages":[{"role":"user","content":"over the platform cap"}]}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"platform-quota-model","messages":[{"role":"user","content":"over the platform cap"}]}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	rec := httptest.NewRecorder()
@@ -136,30 +140,4 @@ func TestCurrentUserPlatformQuotasListsOwnQuotas(t *testing.T) {
 	if resp.Pagination.Total != 1 {
 		t.Fatalf("expected pagination total 1, got %+v", resp.Pagination)
 	}
-}
-
-func seededProviderID(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, name string) int {
-	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/providers", nil)
-	req.AddCookie(sessionCookie)
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("list providers: %d body=%s", rec.Code, rec.Body.String())
-	}
-	var resp apiopenapi.ProviderListResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode providers: %v", err)
-	}
-	for _, provider := range resp.Data {
-		if provider.Name == name {
-			id, err := strconv.Atoi(provider.Id)
-			if err != nil {
-				t.Fatalf("parse provider id %q: %v", provider.Id, err)
-			}
-			return id
-		}
-	}
-	t.Fatalf("seeded provider %q not found", name)
-	return 0
 }

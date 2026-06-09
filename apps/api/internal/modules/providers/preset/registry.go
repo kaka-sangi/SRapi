@@ -6,6 +6,7 @@ import (
 
 	accountscontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
+	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 )
 
 type PlatformFamily string
@@ -13,6 +14,7 @@ type PlatformFamily string
 const (
 	PlatformFamilyOpenAICompatible        PlatformFamily = "openai_compatible"
 	PlatformFamilyAnthropicCompatible     PlatformFamily = "anthropic_compatible"
+	PlatformFamilyGeminiCompatible        PlatformFamily = "gemini_compatible"
 	PlatformFamilyBedrockAnthropic        PlatformFamily = "bedrock_anthropic"
 	PlatformFamilyReverseProxyAntigravity PlatformFamily = "reverse_proxy_antigravity"
 	PlatformFamilyRerankCompatible        PlatformFamily = "rerank_compatible"
@@ -38,6 +40,18 @@ type AccountTemplate struct {
 	MetadataHints   map[string]string `json:"metadata_hints,omitempty"`
 }
 
+// OAuthConfig carries non-secret OAuth defaults for interactive upstream-account
+// provisioning. Client secrets are intentionally not part of provider presets.
+type OAuthConfig struct {
+	ClientID           string
+	AuthorizeURL       string
+	TokenURL           string
+	DeviceAuthorizeURL string
+	RedirectURI        string
+	Scopes             []string
+	UsePKCE            bool
+}
+
 type Preset struct {
 	ProviderKey        string
 	PlatformFamily     PlatformFamily
@@ -57,6 +71,7 @@ type Preset struct {
 	Capabilities          map[string]bool
 	AccountTemplate       *AccountTemplate
 	QuotaConfig           map[string]string
+	OAuthConfig           *OAuthConfig
 }
 
 func (p Preset) MatchesPath(path string) bool {
@@ -84,7 +99,9 @@ func Default() *Registry {
 		anthropicPreset("anthropic-compatible", "Anthropic Compatible", "https://api.anthropic.com/v1", []string{"/api/provider/anthropic-compatible", "/api/provider/anthropic-compatible/v1", "/api/provider/claude-compatible", "/api/provider/claude-compatible/v1"}),
 		antigravityPreset(),
 		bedrockPreset(),
+		chatGPTWebPreset(),
 		codexCLIPreset(),
+		geminiPreset(),
 		anthropicPreset("deepseek-anthropic", "DeepSeek Anthropic Compatible", "https://api.deepseek.com/anthropic", providerAliases("deepseek-anthropic")),
 		anthropicPreset("moonshot-anthropic", "Moonshot Anthropic Compatible", "https://api.moonshot.ai/anthropic", providerAliases("moonshot-anthropic")),
 		anthropicPreset("zai-anthropic", "Z.AI Anthropic Compatible", "https://api.z.ai/api/anthropic", providerAliases("zai-anthropic")),
@@ -117,8 +134,6 @@ func openAIPreset(providerKey string, displayName string, defaultBaseURL string,
 	if providerKey == "openai" {
 		preset.RuntimeClassAllowlist = []accountscontract.RuntimeClass{
 			accountscontract.RuntimeClassAPIKey,
-			accountscontract.RuntimeClassOauthRefresh,
-			accountscontract.RuntimeClassOauthDeviceCode,
 			accountscontract.RuntimeClassCustomReverseProxy,
 		}
 		preset.AccountTemplate = &AccountTemplate{
@@ -176,6 +191,14 @@ func codexCLIPreset() Preset {
 			"quota_credits_used_path":      "account_plan.subscription_plan.usage",
 			"quota_credits_limit_path":     "account_plan.subscription_plan.limit",
 		},
+		OAuthConfig: &OAuthConfig{
+			ClientID:           reverseproxycontract.CodexOAuthClientID,
+			AuthorizeURL:       "https://auth.openai.com/oauth/authorize",
+			TokenURL:           reverseproxycontract.CodexOAuthTokenURL,
+			DeviceAuthorizeURL: "https://auth.openai.com/oauth/device/code",
+			Scopes:             strings.Fields(reverseproxycontract.CodexOAuthRefreshScope),
+			UsePKCE:            true,
+		},
 	}
 }
 
@@ -187,14 +210,45 @@ func anthropicPreset(providerKey string, displayName string, defaultBaseURL stri
 			accountscontract.RuntimeClassOauthRefresh,
 			accountscontract.RuntimeClassOauthDeviceCode,
 			accountscontract.RuntimeClassCliClientToken,
-			accountscontract.RuntimeClassServiceAccountJSON,
 			accountscontract.RuntimeClassCustomReverseProxy,
 		}
 		preset.AccountTemplate = &AccountTemplate{
-			ModelCatalog: []string{"claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"},
+			UpstreamClient: "claude_code_cli",
+			ModelCatalog:   []string{"claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"},
+		}
+		preset.QuotaConfig = map[string]string{
+			"quota_url": "https://api.anthropic.com/api/oauth/usage",
+		}
+		preset.OAuthConfig = &OAuthConfig{
+			ClientID:           reverseproxycontract.ClaudeCodeOAuthClientID,
+			AuthorizeURL:       "https://console.anthropic.com/oauth/authorize",
+			TokenURL:           reverseproxycontract.ClaudeCodeOAuthTokenURL,
+			DeviceAuthorizeURL: "https://console.anthropic.com/oauth/device/code",
+			Scopes:             []string{"org:create_api_key", "user:profile"},
+			UsePKCE:            true,
 		}
 	}
 	return preset
+}
+
+func geminiPreset() Preset {
+	return Preset{
+		ProviderKey:       "gemini",
+		PlatformFamily:    PlatformFamilyGeminiCompatible,
+		DisplayName:       "Gemini",
+		RouteAliases:      []string{"/gemini/v1beta", "/api/provider/gemini/v1beta"},
+		DefaultBaseURL:    "https://generativelanguage.googleapis.com/v1beta",
+		AuthModes:         []AuthMode{AuthModeAPIKeyQuery, AuthModeBearer, AuthModeCustomHeader},
+		ModelCatalogOwner: "gemini",
+		RuntimeClassAllowlist: []accountscontract.RuntimeClass{
+			accountscontract.RuntimeClassAPIKey,
+			accountscontract.RuntimeClassCustomReverseProxy,
+		},
+		Capabilities: geminiCapabilities(),
+		AccountTemplate: &AccountTemplate{
+			ModelCatalog: []string{"gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"},
+		},
+	}
 }
 
 func rerankPreset(providerKey string, displayName string, defaultBaseURL string, routeAliases []string) Preset {
@@ -213,12 +267,60 @@ func antigravityPreset() Preset {
 	preset.GeminiRouteAliases = []string{"/antigravity/v1beta", "/api/provider/antigravity/v1beta"}
 	preset.AuthModes = []AuthMode{AuthModeBearer, AuthModeCustomHeader}
 	preset.RuntimeClassAllowlist = []accountscontract.RuntimeClass{
-		accountscontract.RuntimeClassDesktopClientToken,
-		accountscontract.RuntimeClassIdePluginToken,
 		accountscontract.RuntimeClassOauthRefresh,
 		accountscontract.RuntimeClassCustomReverseProxy,
 	}
+	preset.AccountTemplate = &AccountTemplate{
+		UpstreamClient: "antigravity_desktop",
+		DefaultMetadata: map[string]any{
+			"project_id": "",
+		},
+		ModelCatalog: []string{"gemini-3-pro-preview", "claude-sonnet-4-6"},
+		MetadataHints: map[string]string{
+			"base_url":   "Antigravity / Google Cloud Code upstream URL",
+			"project_id": "Google Cloud project id for Antigravity requests",
+		},
+	}
+	preset.OAuthConfig = googleOAuthConfig()
 	return preset
+}
+
+func chatGPTWebPreset() Preset {
+	return Preset{
+		ProviderKey:    "chatgpt-web",
+		PlatformFamily: PlatformFamilyOpenAICompatible,
+		DisplayName:    "ChatGPT Web",
+		RouteAliases:   []string{"/chatgpt-web/v1", "/api/provider/chatgpt-web", "/api/provider/chatgpt-web/v1"},
+		DefaultBaseURL: "https://chatgpt.com",
+		AuthModes:      []AuthMode{AuthModeBearer, AuthModeCustomHeader},
+		RuntimeClassAllowlist: []accountscontract.RuntimeClass{
+			accountscontract.RuntimeClassWebSessionCookie,
+			accountscontract.RuntimeClassCustomReverseProxy,
+		},
+		Capabilities: openAICapabilities(),
+		AccountTemplate: &AccountTemplate{
+			UpstreamClient: "chatgpt_web",
+			DefaultMetadata: map[string]any{
+				"base_url": "https://chatgpt.com",
+			},
+			ModelCatalog: []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini"},
+			MetadataHints: map[string]string{
+				"chatgpt_requirements_token": "OpenAI Sentinel chat requirements token, or enable requirements_auto",
+				"user_agent":                 "Browser user agent for ChatGPT web requests",
+			},
+		},
+	}
+}
+
+func googleOAuthConfig() *OAuthConfig {
+	return &OAuthConfig{
+		ClientID:           reverseproxycontract.AntigravityOAuthClientID,
+		AuthorizeURL:       "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:           reverseproxycontract.AntigravityOAuthTokenURL,
+		DeviceAuthorizeURL: "https://oauth2.googleapis.com/device/code",
+		Scopes:             []string{"openid", "email", "profile", "https://www.googleapis.com/auth/cloud-platform"},
+		UsePKCE:            true,
+	}
 }
 
 func bedrockPreset() Preset {
@@ -232,7 +334,6 @@ func bedrockPreset() Preset {
 		ModelCatalogOwner: "bedrock",
 		RuntimeClassAllowlist: []accountscontract.RuntimeClass{
 			accountscontract.RuntimeClassAPIKey,
-			accountscontract.RuntimeClassServiceAccountJSON,
 		},
 		Capabilities: anthropicCapabilities(),
 	}
@@ -322,15 +423,24 @@ func antigravityCapabilities() map[string]bool {
 	}
 }
 
+func geminiCapabilities() map[string]bool {
+	return map[string]bool{
+		capabilitiescontract.KeyStreaming:     true,
+		capabilitiescontract.KeyTokenCounting: true,
+		capabilitiescontract.KeyToolCalling:   true,
+		capabilitiescontract.KeyVisionInput:   true,
+	}
+}
+
 func codexCLICapabilities() map[string]bool {
 	return map[string]bool{
 		capabilitiescontract.KeyResponses:        true,
 		capabilitiescontract.KeyResponsesCompact: true,
-		capabilitiescontract.KeyStreaming:         true,
-		capabilitiescontract.KeyToolCalling:       true,
-		capabilitiescontract.KeyStructuredOutput:  true,
-		capabilitiescontract.KeyVisionInput:       true,
-		capabilitiescontract.KeyReasoningControl:  true,
+		capabilitiescontract.KeyStreaming:        true,
+		capabilitiescontract.KeyToolCalling:      true,
+		capabilitiescontract.KeyStructuredOutput: true,
+		capabilitiescontract.KeyVisionInput:      true,
+		capabilitiescontract.KeyReasoningControl: true,
 	}
 }
 
@@ -401,6 +511,11 @@ func clonePreset(preset Preset) Preset {
 		for key, value := range preset.Capabilities {
 			cloned.Capabilities[key] = value
 		}
+	}
+	if preset.OAuthConfig != nil {
+		oauthConfig := *preset.OAuthConfig
+		oauthConfig.Scopes = append([]string(nil), preset.OAuthConfig.Scopes...)
+		cloned.OAuthConfig = &oauthConfig
 	}
 	return cloned
 }

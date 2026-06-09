@@ -2,6 +2,7 @@ package preset
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	accountscontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -21,9 +22,11 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		"anyrouter",
 		"bedrock",
 		"cerebras",
+		"chatgpt-web",
 		"codex-cli",
 		"deepseek",
 		"deepseek-anthropic",
+		"gemini",
 		"grok",
 		"groq",
 		"kimi",
@@ -78,6 +81,10 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !rootOpenAIPreset.MatchesPath("/openai/v1/chat/completions") {
 		t.Fatalf("expected root OpenAI legacy route alias to match path")
 	}
+	if containsRuntimeClass(rootOpenAIPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) ||
+		containsRuntimeClass(rootOpenAIPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthDeviceCode) {
+		t.Fatalf("expected root OpenAI preset to exclude unsupported OAuth runtimes")
+	}
 
 	anthropicPreset, ok := registry.Lookup("anthropic-compatible")
 	if !ok {
@@ -100,6 +107,12 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !rootAnthropicPreset.MatchesPath("/anthropic/v1/messages") {
 		t.Fatalf("expected root Anthropic legacy route alias to match path")
 	}
+	if containsRuntimeClass(rootAnthropicPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassServiceAccountJSON) {
+		t.Fatalf("expected root Anthropic preset to exclude service_account_json")
+	}
+	if rootAnthropicPreset.AccountTemplate == nil || rootAnthropicPreset.AccountTemplate.UpstreamClient != "claude_code_cli" {
+		t.Fatalf("expected root Anthropic template upstream_client=claude_code_cli, got %+v", rootAnthropicPreset.AccountTemplate)
+	}
 
 	antigravityPreset, ok := registry.Lookup("antigravity")
 	if !ok {
@@ -117,8 +130,15 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !reflect.DeepEqual(antigravityPreset.GeminiRouteAliases, []string{"/antigravity/v1beta", "/api/provider/antigravity/v1beta"}) {
 		t.Fatalf("unexpected antigravity Gemini aliases: %v", antigravityPreset.GeminiRouteAliases)
 	}
-	if !containsRuntimeClass(antigravityPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassDesktopClientToken) || !containsRuntimeClass(antigravityPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassIdePluginToken) {
-		t.Fatalf("expected antigravity allowlist to include desktop and IDE token accounts")
+	if containsRuntimeClass(antigravityPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassDesktopClientToken) ||
+		containsRuntimeClass(antigravityPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassIdePluginToken) {
+		t.Fatalf("expected antigravity allowlist to merge desktop/IDE token accounts into oauth_refresh")
+	}
+	if !containsRuntimeClass(antigravityPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) {
+		t.Fatalf("expected antigravity allowlist to include oauth_refresh")
+	}
+	if antigravityPreset.AccountTemplate == nil || antigravityPreset.AccountTemplate.UpstreamClient != "antigravity_desktop" {
+		t.Fatalf("expected antigravity template upstream_client=antigravity_desktop, got %+v", antigravityPreset.AccountTemplate)
 	}
 	if !antigravityPreset.Capabilities["chat_completions"] || !antigravityPreset.Capabilities["messages"] || antigravityPreset.Capabilities["embeddings"] {
 		t.Fatalf("unexpected antigravity capabilities: %+v", antigravityPreset.Capabilities)
@@ -139,6 +159,26 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 	if !containsRuntimeClass(bedrockPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassAPIKey) || !bedrockPreset.Capabilities["messages"] || !bedrockPreset.Capabilities["streaming"] {
 		t.Fatalf("unexpected bedrock capabilities: %+v", bedrockPreset)
+	}
+	if containsRuntimeClass(bedrockPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassServiceAccountJSON) {
+		t.Fatalf("expected bedrock preset to exclude service_account_json")
+	}
+
+	chatGPTWebPreset, ok := registry.Lookup("chatgpt-web")
+	if !ok {
+		t.Fatalf("missing chatgpt-web preset")
+	}
+	if chatGPTWebPreset.PlatformFamily != PlatformFamilyOpenAICompatible || chatGPTWebPreset.DefaultBaseURL != "https://chatgpt.com" {
+		t.Fatalf("unexpected chatgpt-web preset: %+v", chatGPTWebPreset)
+	}
+	if !chatGPTWebPreset.MatchesPath("/api/provider/chatgpt-web/v1/chat/completions") {
+		t.Fatalf("expected chatgpt-web route alias to match path")
+	}
+	if !containsRuntimeClass(chatGPTWebPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassWebSessionCookie) ||
+		containsRuntimeClass(chatGPTWebPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) ||
+		chatGPTWebPreset.AccountTemplate == nil ||
+		chatGPTWebPreset.AccountTemplate.UpstreamClient != "chatgpt_web" {
+		t.Fatalf("unexpected chatgpt-web auth/template preset: %+v", chatGPTWebPreset)
 	}
 
 	deepseekPreset, ok := registry.Lookup("deepseek")
@@ -228,6 +268,74 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 	if len(codexPreset.AccountTemplate.ModelCatalog) == 0 {
 		t.Fatalf("expected codex-cli template to have a model catalog")
+	}
+	if codexPreset.OAuthConfig == nil || codexPreset.OAuthConfig.ClientID == "" || codexPreset.OAuthConfig.TokenURL == "" {
+		t.Fatalf("expected codex-cli to include OAuth defaults")
+	}
+
+	geminiPreset, ok := registry.Lookup("gemini")
+	if !ok {
+		t.Fatalf("missing gemini preset")
+	}
+	if geminiPreset.PlatformFamily != PlatformFamilyGeminiCompatible || geminiPreset.DefaultBaseURL != "https://generativelanguage.googleapis.com/v1beta" {
+		t.Fatalf("unexpected gemini preset: %+v", geminiPreset)
+	}
+	if containsRuntimeClass(geminiPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) ||
+		containsRuntimeClass(geminiPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthDeviceCode) ||
+		geminiPreset.OAuthConfig != nil {
+		t.Fatalf("expected gemini preset to exclude unsupported OAuth runtimes")
+	}
+}
+
+func TestPresetRuntimeAllowlistsOnlyExposeSignableAuthMethods(t *testing.T) {
+	signable := map[accountscontract.RuntimeClass]string{
+		accountscontract.RuntimeClassAPIKey:             "native adapter signs API keys",
+		accountscontract.RuntimeClassOauthRefresh:       "reverse proxy injects bearer tokens and supports refresh for wired upstream clients",
+		accountscontract.RuntimeClassOauthDeviceCode:    "device-code provisioning mints the same refreshable OAuth credential",
+		accountscontract.RuntimeClassWebSessionCookie:   "reverse proxy injects session cookies",
+		accountscontract.RuntimeClassCliClientToken:     "reverse proxy injects CLI bearer tokens",
+		accountscontract.RuntimeClassCustomReverseProxy: "reverse proxy injects custom bearer tokens",
+	}
+
+	for _, preset := range Default().List() {
+		for _, runtimeClass := range preset.RuntimeClassAllowlist {
+			if _, ok := signable[runtimeClass]; !ok {
+				t.Fatalf("preset %s exposes unsupported runtime_class %s", preset.ProviderKey, runtimeClass)
+			}
+			if runtimeClass == accountscontract.RuntimeClassOauthRefresh || runtimeClass == accountscontract.RuntimeClassOauthDeviceCode {
+				if !oauthConfigHasProvisioningDefaults(preset.OAuthConfig, runtimeClass) {
+					t.Fatalf("preset %s exposes %s without complete provisioning OAuth defaults", preset.ProviderKey, runtimeClass)
+				}
+				if !presetUsesRefreshableUpstreamClient(preset) {
+					t.Fatalf("preset %s exposes %s without a built-in refreshable upstream_client", preset.ProviderKey, runtimeClass)
+				}
+			}
+		}
+	}
+}
+
+func oauthConfigHasProvisioningDefaults(config *OAuthConfig, runtimeClass accountscontract.RuntimeClass) bool {
+	if config == nil {
+		return false
+	}
+	if strings.TrimSpace(config.ClientID) == "" || strings.TrimSpace(config.TokenURL) == "" || len(config.Scopes) == 0 {
+		return false
+	}
+	if runtimeClass == accountscontract.RuntimeClassOauthDeviceCode && strings.TrimSpace(config.DeviceAuthorizeURL) == "" {
+		return false
+	}
+	return true
+}
+
+func presetUsesRefreshableUpstreamClient(preset Preset) bool {
+	if preset.AccountTemplate == nil {
+		return false
+	}
+	switch preset.AccountTemplate.UpstreamClient {
+	case "codex_cli", "claude_code_cli", "antigravity_desktop", "antigravity":
+		return true
+	default:
+		return false
 	}
 }
 

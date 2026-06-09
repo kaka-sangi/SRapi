@@ -15,6 +15,7 @@ import (
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
+	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	contentsafetycontract "github.com/srapi/srapi/apps/api/internal/modules/content_safety/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
@@ -23,7 +24,10 @@ import (
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
+	"github.com/srapi/srapi/apps/api/internal/pkg/usagewindow"
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 )
 
@@ -48,6 +52,8 @@ type gatewayUsageRecord struct {
 	CacheCreationTokens   int
 	UsageEstimated        bool
 	Pricing               gatewayPricingEvidence
+	RequestedModel        string
+	UpstreamModel         string
 	CompatibilityWarnings []string
 	ProviderQuotaSignals  []provideradaptercontract.QuotaSignal
 	ProviderRetryAfter    *time.Time
@@ -68,8 +74,15 @@ type gatewayPricingEvidence struct {
 	Amount           string
 	Currency         string
 	PricingRuleID    *int
+	BillingMode      billingcontract.BillingMode
+	InputCost        string
+	OutputCost       string
+	CacheReadCost    string
+	CacheWriteCost   string
 	PricingSource    string
 	PricingEstimated bool
+	ActualCost       string
+	BillableCost     string
 }
 
 type providerDispatchState struct {
@@ -86,6 +99,27 @@ func (e gatewayPricingEvidence) withDefaults() gatewayPricingEvidence {
 	}
 	if strings.TrimSpace(e.PricingSource) == "" {
 		e.PricingSource = "default_zero"
+	}
+	if e.BillingMode == "" {
+		e.BillingMode = billingcontract.BillingModeToken
+	}
+	if strings.TrimSpace(e.InputCost) == "" {
+		e.InputCost = "0.00000000"
+	}
+	if strings.TrimSpace(e.OutputCost) == "" {
+		e.OutputCost = "0.00000000"
+	}
+	if strings.TrimSpace(e.CacheReadCost) == "" {
+		e.CacheReadCost = "0.00000000"
+	}
+	if strings.TrimSpace(e.CacheWriteCost) == "" {
+		e.CacheWriteCost = "0.00000000"
+	}
+	if strings.TrimSpace(e.ActualCost) == "" {
+		e.ActualCost = e.Amount
+	}
+	if strings.TrimSpace(e.BillableCost) == "" {
+		e.BillableCost = e.ActualCost
 	}
 	return e
 }
@@ -178,7 +212,7 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 		*canonical = rt.applyGatewayContentSafety(ctx, *canonical)
 	}
 	estimatedUsage := estimateGatewayRequestUsage(*canonical)
-	pricing := rt.gatewayPricing(ctx, subscriptioncontract.PricingRequest{
+	pricing := rt.gatewayPricing(ctx, billingcontract.PricingRequest{
 		ModelID:      modelID,
 		ModelFamily:  optionalStringValue(resolution.Model.Family),
 		ProviderID:   0,
@@ -186,7 +220,8 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 		OutputTokens: estimatedUsage.OutputTokens,
 		At:           time.Now().UTC(),
 	}, true)
-	tokensUsed, costUsed, err := rt.gatewayUserPeriodUsage(ctx, canonical.UserID, time.Now().UTC())
+	now := time.Now().UTC()
+	periodUsage, err := rt.gatewayUserPeriodUsage(ctx, canonical.UserID, now)
 	if err != nil {
 		return gatewayAdmission{}, err
 	}
@@ -195,9 +230,10 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 		ModelReferences:    gatewayModelReferences(*canonical, resolution),
 		EstimatedTokens:    estimatedUsage.InputTokens + estimatedUsage.OutputTokens + estimatedUsage.CachedTokens,
 		EstimatedCost:      pricing.Amount,
-		TokensUsedInPeriod: tokensUsed,
-		CostUsedInPeriod:   costUsed,
-		RequestTime:        time.Now().UTC(),
+		TokensUsedInPeriod: periodUsage.TotalTokens,
+		CostUsedInPeriod:   periodUsage.BillableCost,
+		MaterializedUsage:  &periodUsage.SubscriptionUsage,
+		RequestTime:        now,
 	})
 	if err != nil {
 		return gatewayAdmission{}, err
@@ -213,6 +249,15 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 	if denied {
 		admission.Entitlement.Allowed = false
 		admission.Entitlement.Reason = "insufficient_balance"
+		return admission, nil
+	}
+	apiKey, err := rt.apiKeyByID(ctx, canonical.UserID, canonical.APIKeyID)
+	if err != nil {
+		return gatewayAdmission{}, err
+	}
+	if reason := gatewayAPIKeyCostLimitExceeded(apiKey, pricing.BillableCost, now); reason != "" {
+		admission.Entitlement.Allowed = false
+		admission.Entitlement.Reason = reason
 		return admission, nil
 	}
 	rateLimit, err := rt.checkGatewayRateLimit(ctx, *canonical, estimatedUsage, modelID)
@@ -552,92 +597,88 @@ func (rt *runtimeState) filterCandidatesByAccountGroupScope(ctx context.Context,
 	return out, nil
 }
 
-func (rt *runtimeState) gatewayPricing(ctx context.Context, req subscriptioncontract.PricingRequest, estimated bool) gatewayPricingEvidence {
-	result, err := rt.subscriptions.EstimatePrice(ctx, req)
+func (rt *runtimeState) gatewayPricing(ctx context.Context, req billingcontract.PricingRequest, estimated bool) gatewayPricingEvidence {
+	gatewayReq := contractGatewayPricingRequest(req, estimated)
+	result, err := rt.billing.PriceGatewayUsage(ctx, gatewayReq)
 	if err != nil {
 		rt.logger.Warn("failed to estimate gateway price", "error", err, "model_id", req.ModelID, "provider_id", req.ProviderID)
 		return gatewayPricingEvidence{Amount: "0.00000000", Currency: "USD", PricingSource: "pricing_error", PricingEstimated: estimated}
-	}
-	source := "default_zero"
-	if len(req.PricingOverride) > 0 {
-		source = "mapping_override"
-	} else if result.PricingRuleID != nil {
-		source = "pricing_rule"
 	}
 	return gatewayPricingEvidence{
 		Amount:           result.Amount,
 		Currency:         result.Currency,
 		PricingRuleID:    cloneIntPtr(result.PricingRuleID),
-		PricingSource:    source,
-		PricingEstimated: estimated,
+		BillingMode:      result.BillingMode,
+		InputCost:        result.InputCost,
+		OutputCost:       result.OutputCost,
+		CacheReadCost:    result.CacheReadCost,
+		CacheWriteCost:   result.CacheWriteCost,
+		PricingSource:    result.Source,
+		PricingEstimated: result.Estimated,
+		ActualCost:       result.ActualCost,
+		BillableCost:     result.BillableCost,
 	}.withDefaults()
 }
 
-func gatewayPricingRequest(modelID int, candidate schedulercontract.Candidate, usage gatewaycontract.Usage) subscriptioncontract.PricingRequest {
-	return subscriptioncontract.PricingRequest{
-		ModelID:          modelID,
-		ModelFamily:      candidate.ModelFamily,
-		ProviderID:       candidate.Provider.ID,
-		InputTokens:      usage.InputTokens,
-		OutputTokens:     usage.OutputTokens,
-		CacheReadTokens:  usage.CachedTokens,
-		CacheWriteTokens: usage.CacheCreationTokens,
-		At:               time.Now().UTC(),
-		PricingOverride:  cloneAnyMap(candidate.Mapping.PricingOverride),
-	}
+type gatewayPeriodUsage struct {
+	TotalTokens       int
+	BillableCost      string
+	SubscriptionUsage subscriptioncontract.MaterializedUsage
 }
 
-func (rt *runtimeState) gatewayUserPeriodUsage(ctx context.Context, userID int, now time.Time) (int, string, error) {
-	logs, err := rt.usage.ListByUser(ctx, userID)
+func (rt *runtimeState) gatewayUserPeriodUsage(ctx context.Context, userID int, now time.Time) (gatewayPeriodUsage, error) {
+	start := usagewindow.StartOfMonthUTC(now)
+	summary, err := rt.usage.SummarizeUserWindow(ctx, usagecontract.UserWindowFilter{
+		UserID:      userID,
+		Start:       start,
+		End:         now.UTC().Add(time.Nanosecond),
+		SuccessOnly: true,
+	})
 	if err != nil {
-		return 0, "", err
+		return gatewayPeriodUsage{}, err
 	}
-	start := time.Date(now.UTC().Year(), now.UTC().Month(), 1, 0, 0, 0, 0, time.UTC)
-	tokens := 0
-	cost := "0.00000000"
-	for _, log := range logs {
-		if !log.Success || log.CreatedAt.Before(start) {
-			continue
-		}
-		tokens += log.TotalTokens
-		cost = addDecimalMoney(cost, log.Cost)
+	usage, err := rt.subscriptions.MaterializedUsageForUser(ctx, userID, now.UTC())
+	if err != nil {
+		return gatewayPeriodUsage{}, err
 	}
-	return tokens, cost, nil
+	cost := money.NormalizeAmount(summary.BillableCost)
+	if strings.TrimSpace(usage.MonthlyUsageUSD) != "" {
+		cost = money.NormalizeAmount(usage.MonthlyUsageUSD)
+	}
+	return gatewayPeriodUsage{
+		TotalTokens:       summary.TotalTokens,
+		BillableCost:      cost,
+		SubscriptionUsage: usage,
+	}, nil
 }
 
-// gatewayUserPlatformSpend sums the user's successful spend on a single platform
-// (one provider) across the daily / weekly / monthly windows, reusing the same
-// ListByUser scan the entitlement period-usage check uses. Day and month windows
-// are UTC-calendar-aligned (month start matches the monthly cost entitlement);
-// the week window is a rolling trailing 7 days.
+// gatewayUserPlatformSpend sums successful billable spend on a single platform
+// with bounded store summaries. Day and month are UTC-calendar-aligned; week is
+// the sub2api-compatible rolling trailing 7-day window.
 func (rt *runtimeState) gatewayUserPlatformSpend(ctx context.Context, userID, providerID int, now time.Time) (string, string, string) {
 	daily, weekly, monthly := "0.00000000", "0.00000000", "0.00000000"
 	if rt.usage == nil || userID <= 0 || providerID <= 0 {
 		return daily, weekly, monthly
 	}
-	logs, err := rt.usage.ListByUser(ctx, userID)
-	if err != nil {
-		return daily, weekly, monthly
-	}
-	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	weekStart := now.Add(-7 * 24 * time.Hour)
-	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	for _, log := range logs {
-		if !log.Success || log.ProviderID == nil || *log.ProviderID != providerID {
-			continue
-		}
-		created := log.CreatedAt.UTC()
-		if !created.Before(monthStart) {
-			monthly = addDecimalMoney(monthly, log.Cost)
-		}
-		if !created.Before(weekStart) {
-			weekly = addDecimalMoney(weekly, log.Cost)
-		}
-		if !created.Before(dayStart) {
-			daily = addDecimalMoney(daily, log.Cost)
-		}
-	}
+	end := now.UTC().Add(time.Nanosecond)
+	daily = rt.gatewayUserProviderWindowSpend(ctx, userID, providerID, usagewindow.StartOfDayUTC(now), end)
+	weekly = rt.gatewayUserProviderWindowSpend(ctx, userID, providerID, usagewindow.RollingStartUTC(now, 7*24*time.Hour), end)
+	monthly = rt.gatewayUserProviderWindowSpend(ctx, userID, providerID, usagewindow.StartOfMonthUTC(now), end)
 	return daily, weekly, monthly
+}
+
+func (rt *runtimeState) gatewayUserProviderWindowSpend(ctx context.Context, userID, providerID int, start, end time.Time) string {
+	summary, err := rt.usage.SummarizeUserWindow(ctx, usagecontract.UserWindowFilter{
+		UserID:      userID,
+		ProviderID:  &providerID,
+		Start:       start,
+		End:         end,
+		SuccessOnly: true,
+	})
+	if err != nil {
+		return "0.00000000"
+	}
+	return money.NormalizeAmount(summary.BillableCost)
 }
 
 // effectivePlatformLimits resolves the daily/weekly/monthly USD caps for a user
@@ -718,7 +759,7 @@ func (rt *runtimeState) enforceUserPlatformQuota(ctx context.Context, userID, pr
 		if window.limit == nil {
 			continue
 		}
-		if compareDecimalMoney(addDecimalMoney(window.spent, estimated), *window.limit) > 0 {
+		if compareMoney(money.AddMoney(window.spent, estimated), *window.limit) > 0 {
 			return provideradaptercontract.ProviderError{
 				Class:      "platform_quota_exceeded",
 				StatusCode: http.StatusPaymentRequired,
@@ -807,61 +848,16 @@ func uniqueNonEmptyStrings(values []string) []string {
 	return out
 }
 
-func addDecimalMoney(left string, right string) string {
-	leftRat, ok := new(big.Rat).SetString(defaultDecimalMoney(left))
+func compareMoney(left string, right string) int {
+	leftRat, ok := money.DecimalRat(money.NormalizeAmount(left))
 	if !ok {
 		leftRat = new(big.Rat)
 	}
-	rightRat, ok := new(big.Rat).SetString(defaultDecimalMoney(right))
-	if !ok {
-		rightRat = new(big.Rat)
-	}
-	return formatDecimalFixed(leftRat.Add(leftRat, rightRat), 8)
-}
-
-// compareDecimalMoney returns -1, 0 or 1 for left < / == / > right, parsing the
-// same fixed-decimal money strings addDecimalMoney produces.
-func compareDecimalMoney(left string, right string) int {
-	leftRat, ok := new(big.Rat).SetString(defaultDecimalMoney(left))
-	if !ok {
-		leftRat = new(big.Rat)
-	}
-	rightRat, ok := new(big.Rat).SetString(defaultDecimalMoney(right))
+	rightRat, ok := money.DecimalRat(money.NormalizeAmount(right))
 	if !ok {
 		rightRat = new(big.Rat)
 	}
 	return leftRat.Cmp(rightRat)
-}
-
-func defaultDecimalMoney(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return "0.00000000"
-	}
-	return value
-}
-
-func formatDecimalFixed(value *big.Rat, scale int) string {
-	if value == nil {
-		value = new(big.Rat)
-	}
-	multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(scale)), nil)
-	scaled := new(big.Rat).Mul(value, new(big.Rat).SetInt(multiplier))
-	numerator := new(big.Int).Set(scaled.Num())
-	denominator := new(big.Int).Set(scaled.Denom())
-	quotient, remainder := new(big.Int).QuoRem(numerator, denominator, new(big.Int))
-	doubleRemainder := new(big.Int).Mul(remainder, big.NewInt(2))
-	if doubleRemainder.Cmp(denominator) >= 0 {
-		quotient.Add(quotient, big.NewInt(1))
-	}
-	raw := quotient.String()
-	if scale == 0 {
-		return raw
-	}
-	for len(raw) <= scale {
-		raw = "0" + raw
-	}
-	return raw[:len(raw)-scale] + "." + raw[len(raw)-scale:]
 }
 
 func gatewayScheduleRequest(r *http.Request, canonical gatewaycontract.CanonicalRequest, resolution modelcontract.ModelResolution) schedulercontract.ScheduleRequest {
@@ -1731,31 +1727,6 @@ func reverseProxyAccountFailureStatus(class string) (accountcontract.Status, boo
 	default:
 		return "", false
 	}
-}
-
-func gatewayTokenCountFromProvider(resp provideradaptercontract.TokenCountResponse) gatewaycontract.TokenCountResponse {
-	return gatewaycontract.TokenCountResponse{
-		TotalTokens:             resp.TotalTokens,
-		CachedContentTokenCount: cloneIntPtr(resp.CachedContentTokenCount),
-		PromptTokensDetails:     gatewayModalityTokenCountsFromProvider(resp.PromptTokensDetails),
-		CacheTokensDetails:      gatewayModalityTokenCountsFromProvider(resp.CacheTokensDetails),
-		Metadata:                cloneAnyMap(resp.Metadata),
-	}
-}
-
-func gatewayModalityTokenCountsFromProvider(values []provideradaptercontract.ModalityTokenCount) []gatewaycontract.ModalityTokenCount {
-	if len(values) == 0 {
-		return nil
-	}
-	out := make([]gatewaycontract.ModalityTokenCount, 0, len(values))
-	for _, value := range values {
-		out = append(out, gatewaycontract.ModalityTokenCount{
-			Modality:   value.Modality,
-			TokenCount: value.TokenCount,
-			Metadata:   cloneAnyMap(value.Metadata),
-		})
-	}
-	return out
 }
 
 func gatewayContentBlocksFromProvider(parts []provideradaptercontract.ContentPart) []gatewaycontract.ContentBlock {

@@ -29,12 +29,12 @@ type quickSetupRequest struct {
 }
 
 type quickSetupResponse struct {
-	Provider       any      `json:"provider"`
-	Account        any      `json:"account"`
-	ModelsCreated  int      `json:"models_created"`
-	MappingsCreated int     `json:"mappings_created"`
-	ModelNames     []string `json:"model_names,omitempty"`
-	Warnings       []string `json:"warnings,omitempty"`
+	Provider        any      `json:"provider"`
+	Account         any      `json:"account"`
+	ModelsCreated   int      `json:"models_created"`
+	MappingsCreated int      `json:"mappings_created"`
+	ModelNames      []string `json:"model_names,omitempty"`
+	Warnings        []string `json:"warnings,omitempty"`
 }
 
 func (s *Server) handleAdminQuickSetup(w http.ResponseWriter, r *http.Request) {
@@ -219,9 +219,9 @@ func (s *Server) handleAdminQuickMapModels(w http.ResponseWriter, r *http.Reques
 
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"models_created":  created,
+			"models_created":   created,
 			"mappings_created": mapped,
-			"warnings":        warnings,
+			"warnings":         warnings,
 		},
 		"request_id": requestID,
 	})

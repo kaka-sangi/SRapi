@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
+	"github.com/srapi/srapi/apps/api/internal/modules/api_keys/domain"
 )
 
 type memoryStore struct {
@@ -40,6 +41,14 @@ func (s *memoryStore) Create(_ context.Context, input contract.CreateStoredKey) 
 		GroupIDs:      append([]int(nil), input.GroupIDs...),
 		RPMLimit:      input.RPMLimit,
 		TPMLimit:      input.TPMLimit,
+		CostQuota:     cloneString(input.CostQuota),
+		CostUsed:      "0.00000000",
+		CostLimit5h:   cloneString(input.CostLimit5h),
+		CostUsed5h:    "0.00000000",
+		CostLimit1d:   cloneString(input.CostLimit1d),
+		CostUsed1d:    "0.00000000",
+		CostLimit7d:   cloneString(input.CostLimit7d),
+		CostUsed7d:    "0.00000000",
 		ExpiresAt:     input.ExpiresAt,
 		CreatedAt:     now,
 	}
@@ -63,6 +72,13 @@ func (s *memoryStore) Update(_ context.Context, key contract.APIKey) (contract.A
 	key.CreatedAt = stored.CreatedAt
 	key.RPMLimit = stored.RPMLimit
 	key.TPMLimit = stored.TPMLimit
+	key.CostUsed = stored.CostUsed
+	key.CostUsed5h = stored.CostUsed5h
+	key.CostWindowStart5h = stored.CostWindowStart5h
+	key.CostUsed1d = stored.CostUsed1d
+	key.CostWindowStart1d = stored.CostWindowStart1d
+	key.CostUsed7d = stored.CostUsed7d
+	key.CostWindowStart7d = stored.CostWindowStart7d
 	// ExpiresAt is editable via Update; keep whatever the service passes through.
 	key.LastUsedAt = stored.LastUsedAt
 	key.Scopes = append([]string(nil), key.Scopes...)
@@ -138,6 +154,18 @@ func (s *memoryStore) TouchLastUsed(_ context.Context, id int, usedAt time.Time)
 	return nil
 }
 
+func (s *memoryStore) ApplyCostUsage(_ context.Context, input contract.CostUsageUpdate) (contract.APIKey, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, ok := s.byID[input.KeyID]
+	if !ok {
+		return contract.APIKey{}, ErrKeyNotFound
+	}
+	key = domain.ApplyCostUsage(key, input)
+	s.byID[key.ID] = key
+	return key, nil
+}
+
 func (s *memoryStore) setStatus(prefix string, status contract.Status) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -156,6 +184,14 @@ func (c fixedClock) Now() time.Time {
 }
 
 func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func cloneString(value *string) *string {
 	if value == nil {
 		return nil
 	}

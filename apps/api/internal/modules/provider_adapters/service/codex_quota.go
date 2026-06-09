@@ -134,6 +134,52 @@ func percentQuotaPrecision(value float64) int {
 	return 6
 }
 
+func parseQuotaHeaderFields(value string) map[string]string {
+	fields := map[string]string{}
+	for _, part := range strings.FieldsFunc(value, func(r rune) bool {
+		return r == ';' || r == ','
+	}) {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		key, raw, ok := strings.Cut(part, "=")
+		if !ok {
+			key, raw, ok = strings.Cut(part, ":")
+		}
+		if !ok {
+			continue
+		}
+		key = strings.ToLower(strings.TrimSpace(key))
+		raw = strings.Trim(strings.TrimSpace(raw), `"`)
+		if key != "" && raw != "" {
+			fields[key] = raw
+		}
+	}
+	return fields
+}
+
+func quotaFieldFloat(fields map[string]string, keys ...string) (float64, bool) {
+	for _, key := range keys {
+		raw := strings.TrimSpace(fields[key])
+		if raw == "" {
+			continue
+		}
+		value, err := strconv.ParseFloat(raw, 64)
+		if err == nil && !math.IsNaN(value) && !math.IsInf(value, 0) {
+			return value, true
+		}
+	}
+	return 0, false
+}
+
+func normalizeQuotaPercent(value float64) float64 {
+	if value > 1 {
+		return value / 100
+	}
+	return value
+}
+
 func withCodexQuotaSignals(resp contract.ConversationResponse, headers http.Header) contract.ConversationResponse {
 	resp.QuotaSignals = codexQuotaSignalsFromHeaders(headers, time.Now())
 	return resp

@@ -21,6 +21,8 @@ const (
 	FieldModelID = "model_id"
 	// FieldProviderID holds the string denoting the provider_id field in the database.
 	FieldProviderID = "provider_id"
+	// FieldBillingMode holds the string denoting the billing_mode field in the database.
+	FieldBillingMode = "billing_mode"
 	// FieldInputPricePerMillion holds the string denoting the input_price_per_million field in the database.
 	FieldInputPricePerMillion = "input_price_per_million"
 	// FieldOutputPricePerMillion holds the string denoting the output_price_per_million field in the database.
@@ -29,6 +31,8 @@ const (
 	FieldCacheReadPricePerMillion = "cache_read_price_per_million"
 	// FieldCacheWritePricePerMillion holds the string denoting the cache_write_price_per_million field in the database.
 	FieldCacheWritePricePerMillion = "cache_write_price_per_million"
+	// FieldPerRequestPrice holds the string denoting the per_request_price field in the database.
+	FieldPerRequestPrice = "per_request_price"
 	// FieldCurrency holds the string denoting the currency field in the database.
 	FieldCurrency = "currency"
 	// FieldEffectiveFrom holds the string denoting the effective_from field in the database.
@@ -46,10 +50,12 @@ var Columns = []string{
 	FieldUpdatedAt,
 	FieldModelID,
 	FieldProviderID,
+	FieldBillingMode,
 	FieldInputPricePerMillion,
 	FieldOutputPricePerMillion,
 	FieldCacheReadPricePerMillion,
 	FieldCacheWritePricePerMillion,
+	FieldPerRequestPrice,
 	FieldCurrency,
 	FieldEffectiveFrom,
 	FieldEffectiveTo,
@@ -72,6 +78,8 @@ var (
 	DefaultUpdatedAt func() time.Time
 	// UpdateDefaultUpdatedAt holds the default value on update for the "updated_at" field.
 	UpdateDefaultUpdatedAt func() time.Time
+	// DefaultBillingMode holds the default value on creation for the "billing_mode" field.
+	DefaultBillingMode string
 	// DefaultInputPricePerMillion holds the default value on creation for the "input_price_per_million" field.
 	DefaultInputPricePerMillion string
 	// DefaultOutputPricePerMillion holds the default value on creation for the "output_price_per_million" field.
@@ -80,6 +88,8 @@ var (
 	DefaultCacheReadPricePerMillion string
 	// DefaultCacheWritePricePerMillion holds the default value on creation for the "cache_write_price_per_million" field.
 	DefaultCacheWritePricePerMillion string
+	// DefaultPerRequestPrice holds the default value on creation for the "per_request_price" field.
+	DefaultPerRequestPrice string
 	// DefaultCurrency holds the default value on creation for the "currency" field.
 	DefaultCurrency string
 )
@@ -112,6 +122,11 @@ func ByProviderID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProviderID, opts...).ToFunc()
 }
 
+// ByBillingMode orders the results by the billing_mode field.
+func ByBillingMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBillingMode, opts...).ToFunc()
+}
+
 // ByInputPricePerMillion orders the results by the input_price_per_million field.
 func ByInputPricePerMillion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldInputPricePerMillion, opts...).ToFunc()
@@ -130,6 +145,11 @@ func ByCacheReadPricePerMillion(opts ...sql.OrderTermOption) OrderOption {
 // ByCacheWritePricePerMillion orders the results by the cache_write_price_per_million field.
 func ByCacheWritePricePerMillion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCacheWritePricePerMillion, opts...).ToFunc()
+}
+
+// ByPerRequestPrice orders the results by the per_request_price field.
+func ByPerRequestPrice(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPerRequestPrice, opts...).ToFunc()
 }
 
 // ByCurrency orders the results by the currency field.

@@ -84,8 +84,8 @@ const PLATFORMS: PlatformPreset[] = [
   {
     key: "openai",
     name: "OpenAI",
-    description: "GPT / o-series via API key or OAuth",
-    authTypes: ["api_key", "oauth_refresh"],
+    description: "GPT / o-series via API key",
+    authTypes: ["api_key"],
     defaultModels: [
       "gpt-5.5",
       "gpt-5.4",

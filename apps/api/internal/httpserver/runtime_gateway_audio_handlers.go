@@ -144,7 +144,7 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 	providerResp := failover.Response
 	usage := gatewayUsageFromAudioTranscriptionProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalAudioTranscriptionResponse(canonical, providerResp.ID, providerResp.Text, providerResp.Task, providerResp.Language, providerResp.Duration, gatewayAudioTranscriptionSegmentsFromProvider(providerResp), usage)
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -156,6 +156,8 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 		SourceEndpoint:        canonical.SourceEndpoint,
 		TargetProtocol:        result.Candidate.Provider.Protocol,
 		Model:                 canonical.CanonicalModel,
+		RequestedModel:        gatewayUsageRequestedSnapshot(canonical, result.Candidate),
+		UpstreamModel:         gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
 		Success:               true,
 		StatusCode:            ptrInt(http.StatusOK),
 		LatencyMS:             elapsedMillis(startedAt),
@@ -412,7 +414,7 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 	providerResp := failover.Response
 	usage := gatewayUsageFromAudioSpeechProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalAudioSpeechResponse(canonical, providerResp.ID, providerResp.Audio, providerResp.ContentType, usage)
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -424,6 +426,8 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 		SourceEndpoint:        canonical.SourceEndpoint,
 		TargetProtocol:        result.Candidate.Provider.Protocol,
 		Model:                 canonical.CanonicalModel,
+		RequestedModel:        gatewayUsageRequestedSnapshot(canonical, result.Candidate),
+		UpstreamModel:         gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
 		Success:               true,
 		StatusCode:            ptrInt(http.StatusOK),
 		LatencyMS:             elapsedMillis(startedAt),

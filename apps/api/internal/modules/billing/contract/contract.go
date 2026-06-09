@@ -2,7 +2,18 @@ package contract
 
 import (
 	"context"
+	"errors"
 	"time"
+)
+
+var ErrNotFound = errors.New("billing resource not found")
+
+type BillingMode string
+
+const (
+	BillingModeToken      BillingMode = "token"
+	BillingModePerRequest BillingMode = "per_request"
+	BillingModeImage      BillingMode = "image"
 )
 
 type LedgerType string
@@ -29,6 +40,139 @@ type LedgerEntry struct {
 	ReferenceID   string
 	Metadata      map[string]any
 	CreatedAt     time.Time
+}
+
+type PricingRule struct {
+	ID                              int
+	ModelID                         int
+	ModelFamily                     string
+	ProviderID                      int
+	BillingMode                     BillingMode
+	InputPricePerMillionTokens      string
+	OutputPricePerMillionTokens     string
+	CacheReadPricePerMillionTokens  string
+	CacheWritePricePerMillionTokens string
+	PerRequestPrice                 string
+	Intervals                       []PricingInterval
+	Currency                        string
+	EffectiveFrom                   *time.Time
+	EffectiveTo                     *time.Time
+	CreatedAt                       time.Time
+	UpdatedAt                       time.Time
+}
+
+type PricingInterval struct {
+	ID                              int
+	PricingRuleID                   int
+	MinTokens                       int
+	MaxTokens                       *int
+	TierLabel                       string
+	ImageSize                       string
+	InputPricePerMillionTokens      string
+	OutputPricePerMillionTokens     string
+	CacheReadPricePerMillionTokens  string
+	CacheWritePricePerMillionTokens string
+	PerImagePrice                   string
+	CreatedAt                       time.Time
+	UpdatedAt                       time.Time
+}
+
+type CreatePricingRuleRequest struct {
+	ModelID                         int
+	ProviderID                      int
+	BillingMode                     BillingMode
+	InputPricePerMillionTokens      string
+	OutputPricePerMillionTokens     string
+	CacheReadPricePerMillionTokens  string
+	CacheWritePricePerMillionTokens string
+	PerRequestPrice                 string
+	Intervals                       []PricingInterval
+	Currency                        string
+	EffectiveFrom                   *time.Time
+	EffectiveTo                     *time.Time
+}
+
+// UpdatePricingRuleRequest carries a partial pricing-rule edit: nil pointer
+// means "leave unchanged".
+type UpdatePricingRuleRequest struct {
+	BillingMode                     *BillingMode
+	InputPricePerMillionTokens      *string
+	OutputPricePerMillionTokens     *string
+	CacheReadPricePerMillionTokens  *string
+	CacheWritePricePerMillionTokens *string
+	PerRequestPrice                 *string
+	Intervals                       *[]PricingInterval
+	Currency                        *string
+	EffectiveFrom                   **time.Time
+	EffectiveTo                     **time.Time
+}
+
+type PricingRequest struct {
+	ModelID          int
+	ModelFamily      string
+	ProviderID       int
+	InputTokens      int
+	OutputTokens     int
+	CacheReadTokens  int
+	CacheWriteTokens int
+	ImageCount       int
+	ImageSize        string
+	At               time.Time
+	PricingOverride  map[string]any
+}
+
+type PricingResult struct {
+	Amount         string
+	Currency       string
+	PricingRuleID  *int
+	BillingMode    BillingMode
+	InputCost      string
+	OutputCost     string
+	CacheReadCost  string
+	CacheWriteCost string
+}
+
+type GatewayPricingRequest struct {
+	PricingRequest
+	RateMultiplier string
+	Success        bool
+	AllowanceMode  string
+	AllowanceQuota *string
+	UsedCost       string
+	Estimated      bool
+}
+
+type GatewayCostRequest struct {
+	Amount         string
+	Currency       string
+	PricingRuleID  *int
+	BillingMode    BillingMode
+	InputCost      string
+	OutputCost     string
+	CacheReadCost  string
+	CacheWriteCost string
+	Source         string
+	Estimated      bool
+	RateMultiplier string
+	Success        bool
+	AllowanceMode  string
+	AllowanceQuota *string
+	UsedCost       string
+}
+
+type GatewayPricingResult struct {
+	Amount         string
+	Currency       string
+	PricingRuleID  *int
+	BillingMode    BillingMode
+	InputCost      string
+	OutputCost     string
+	CacheReadCost  string
+	CacheWriteCost string
+	Source         string
+	Estimated      bool
+	ActualCost     string
+	BillableCost   string
 }
 
 type RecordRequest struct {
@@ -90,4 +234,12 @@ type Store interface {
 type UsageChargeStore interface {
 	ListPendingUsageCharges(ctx context.Context, limit int) ([]PendingUsageCharge, error)
 	ChargeUsage(ctx context.Context, req ChargeUsageRequest) (ChargeUsageResult, error)
+}
+
+type PricingStore interface {
+	CreatePricingRule(ctx context.Context, input PricingRule) (PricingRule, error)
+	UpdatePricingRule(ctx context.Context, id int, input UpdatePricingRuleRequest) (PricingRule, error)
+	FindPricingRuleByID(ctx context.Context, id int) (PricingRule, error)
+	ListPricingRules(ctx context.Context) ([]PricingRule, error)
+	DeletePricingRule(ctx context.Context, id int) error
 }

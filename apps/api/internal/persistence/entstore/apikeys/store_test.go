@@ -70,6 +70,14 @@ func TestStoreCreatesAndLoadsAPIKey(t *testing.T) {
 	if found.LastUsedAt == nil || !found.LastUsedAt.Equal(usedAt) {
 		t.Fatalf("expected last used %s, got %v", usedAt, found.LastUsedAt)
 	}
+	at := time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
+	updated, err := store.ApplyCostUsage(ctx, contract.CostUsageUpdate{KeyID: created.ID, BillableCost: "0.02500000", OccurredAt: at})
+	if err != nil {
+		t.Fatalf("apply cost usage: %v", err)
+	}
+	if updated.CostUsed != "0.02500000" || updated.CostUsed5h != "0.02500000" || updated.CostUsed1d != "0.02500000" || updated.CostUsed7d != "0.02500000" {
+		t.Fatalf("expected cost usage persisted, got %+v", updated)
+	}
 }
 
 func TestStoreListByUser(t *testing.T) {

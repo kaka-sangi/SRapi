@@ -3,6 +3,7 @@ package usage
 import (
 	"context"
 	"errors"
+	"math/big"
 	"strings"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/predicate"
 	entusagelog "github.com/srapi/srapi/apps/api/ent/usagelog"
 	"github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 var ErrInvalidStore = errors.New("invalid usage ent store")
@@ -50,6 +52,13 @@ func (s *Store) Create(ctx context.Context, input contract.UsageLog) (contract.U
 		SetActualCost(actualCostOrCost(input.ActualCost, input.Cost)).
 		SetRateMultiplier(rateMultiplierOrDefault(input.RateMultiplier)).
 		SetBillableCost(billableCostOrActualCost(input.BillableCost, input.ActualCost, input.Cost)).
+		SetInputCost(moneyOrZero(input.InputCost)).
+		SetOutputCost(moneyOrZero(input.OutputCost)).
+		SetCacheReadCost(moneyOrZero(input.CacheReadCost)).
+		SetCacheWriteCost(moneyOrZero(input.CacheWriteCost)).
+		SetRequestedModel(requestedModelOrModel(input.RequestedModel, input.Model)).
+		SetUpstreamModel(strings.TrimSpace(input.UpstreamModel)).
+		SetBillingMode(billingModeOrToken(input.BillingMode)).
 		SetCurrency(input.Currency).
 		SetNillableChargedAt(input.ChargedAt).
 		SetCompatibilityWarningsJSON(cloneStrings(input.CompatibilityWarnings))
@@ -82,6 +91,43 @@ func (s *Store) ListByUser(ctx context.Context, userID int) ([]contract.UsageLog
 		return nil, err
 	}
 	return toUsageLogs(rows), nil
+}
+
+func (s *Store) SummarizeUserWindow(ctx context.Context, filter contract.UserWindowFilter) (contract.UserWindowSummary, error) {
+	predicates := []predicate.UsageLog{
+		entusagelog.UserIDEQ(filter.UserID),
+		entusagelog.CreatedAtGTE(filter.Start.UTC()),
+		entusagelog.CreatedAtLT(filter.End.UTC()),
+	}
+	if filter.SuccessOnly {
+		predicates = append(predicates, entusagelog.SuccessEQ(true))
+	}
+	if filter.ProviderID != nil {
+		predicates = append(predicates, entusagelog.ProviderIDEQ(*filter.ProviderID))
+	}
+	rows, err := s.client.UsageLog.Query().
+		Where(predicates...).
+		Select(entusagelog.FieldTotalTokens, entusagelog.FieldBillableCost).
+		All(ctx)
+	if err != nil {
+		return contract.UserWindowSummary{}, err
+	}
+	totalCost := new(big.Rat)
+	summary := contract.UserWindowSummary{
+		UserID:      filter.UserID,
+		ProviderID:  cloneInt(filter.ProviderID),
+		Start:       filter.Start.UTC(),
+		End:         filter.End.UTC(),
+		SuccessOnly: filter.SuccessOnly,
+	}
+	for _, row := range rows {
+		summary.TotalTokens += row.TotalTokens
+		if cost, ok := money.DecimalRat(row.BillableCost); ok {
+			totalCost.Add(totalCost, cost)
+		}
+	}
+	summary.BillableCost = money.FormatRatFixed(totalCost, 8)
+	return summary, nil
 }
 
 // CleanupLogs counts the matching records and deletes the oldest up to
@@ -172,6 +218,13 @@ func toUsageLog(row *ent.UsageLog) contract.UsageLog {
 		ActualCost:            row.ActualCost,
 		RateMultiplier:        row.RateMultiplier,
 		BillableCost:          row.BillableCost,
+		InputCost:             row.InputCost,
+		OutputCost:            row.OutputCost,
+		CacheReadCost:         row.CacheReadCost,
+		CacheWriteCost:        row.CacheWriteCost,
+		RequestedModel:        row.RequestedModel,
+		UpstreamModel:         row.UpstreamModel,
+		BillingMode:           row.BillingMode,
 		Currency:              row.Currency,
 		ChargedAt:             cloneTime(row.ChargedAt),
 		CompatibilityWarnings: cloneStrings(row.CompatibilityWarningsJSON),
@@ -203,6 +256,29 @@ func billableCostOrActualCost(billable, actualCost, cost string) string {
 		return actualCost
 	}
 	return cost
+}
+
+func moneyOrZero(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "0.00000000"
+	}
+	return value
+}
+
+func requestedModelOrModel(requestedModel, model string) string {
+	requestedModel = strings.TrimSpace(requestedModel)
+	if requestedModel == "" {
+		return strings.TrimSpace(model)
+	}
+	return requestedModel
+}
+
+func billingModeOrToken(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "token"
+	}
+	return value
 }
 
 func cloneInt(value *int) *int {

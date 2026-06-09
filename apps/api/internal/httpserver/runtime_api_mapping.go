@@ -267,6 +267,14 @@ func optionalIdentityID(id int) *apiopenapi.Id {
 	return &value
 }
 
+func optionalStringValuePtr(value string) *string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	cloned := value
+	return &cloned
+}
+
 func toAPIRole(role userscontract.RoleDefinition) apiopenapi.Role {
 	return apiopenapi.Role{
 		CreatedAt:   role.CreatedAt,
@@ -288,6 +296,14 @@ func toAPIKey(key apikeycontract.APIKey) apiopenapi.ApiKey {
 		AllowedIps:       append([]string{}, key.AllowedIPs...),
 		DeniedIps:        append([]string{}, key.DeniedIPs...),
 		CreatedAt:        key.CreatedAt,
+		CostLimit1d:      key.CostLimit1d,
+		CostLimit5h:      key.CostLimit5h,
+		CostLimit7d:      key.CostLimit7d,
+		CostQuota:        key.CostQuota,
+		CostUsed:         optionalStringValuePtr(key.CostUsed),
+		CostUsed1d:       optionalStringValuePtr(key.CostUsed1d),
+		CostUsed5h:       optionalStringValuePtr(key.CostUsed5h),
+		CostUsed7d:       optionalStringValuePtr(key.CostUsed7d),
 		ExpiresAt:        key.ExpiresAt,
 		GroupIds:         groupIDs,
 		Id:               apiopenapi.Id(strconv.Itoa(key.ID)),
@@ -532,6 +548,13 @@ func toAPIUsageLog(log usagecontract.UsageLog) apiopenapi.UsageLog {
 		CacheCreationTokens:   ptrInt(log.CacheCreationTokens),
 		CompatibilityWarnings: nonNilStrings(log.CompatibilityWarnings),
 		Cost:                  log.Cost,
+		ActualCost:            &log.ActualCost,
+		BillableCost:          &log.BillableCost,
+		RateMultiplier:        &log.RateMultiplier,
+		InputCost:             &log.InputCost,
+		OutputCost:            &log.OutputCost,
+		CacheReadCost:         &log.CacheReadCost,
+		CacheWriteCost:        &log.CacheWriteCost,
 		CreatedAt:             log.CreatedAt,
 		Currency:              log.Currency,
 		ErrorClass:            log.ErrorClass,
@@ -541,12 +564,15 @@ func toAPIUsageLog(log usagecontract.UsageLog) apiopenapi.UsageLog {
 		Model:                 log.Model,
 		OutputTokens:          log.OutputTokens,
 		ProviderId:            optionalIDString(log.ProviderID),
+		RequestedModel:        &log.RequestedModel,
 		RequestId:             log.RequestID,
 		SourceEndpoint:        log.SourceEndpoint,
 		SourceProtocol:        log.SourceProtocol,
 		Success:               log.Success,
 		TargetProtocol:        optionalString(log.TargetProtocol),
 		TotalTokens:           log.TotalTokens,
+		BillingMode:           (*apiopenapi.BillingMode)(&log.BillingMode),
+		UpstreamModel:         &log.UpstreamModel,
 		UsageEstimated:        log.UsageEstimated,
 		UserId:                apiopenapi.Id(strconv.Itoa(log.UserID)),
 	}
@@ -554,8 +580,8 @@ func toAPIUsageLog(log usagecontract.UsageLog) apiopenapi.UsageLog {
 
 func toAPIUsageAggregate(aggregate usagecontract.UsageAggregate) apiopenapi.UsageAggregate {
 	return apiopenapi.UsageAggregate{
-		AggregateId:   aggregate.AggregateID,
-		AggregateType: apiopenapi.UsageAggregateDimension(aggregate.AggregateType),
+		AggregateId:   aggregate.Key,
+		AggregateType: apiopenapi.UsageAggregateDimension(aggregate.Type),
 		CachedTokens:  aggregate.CachedTokens,
 		Currency:      aggregate.Currency,
 		ErrorCount:    aggregate.ErrorCount,
@@ -756,22 +782,29 @@ func toAPISubscriptionPlan(plan subscriptioncontract.SubscriptionPlan) apiopenap
 
 func toAPIUserSubscription(subscription subscriptioncontract.UserSubscription) apiopenapi.UserSubscription {
 	return apiopenapi.UserSubscription{
-		CreatedAt:            subscription.CreatedAt,
-		EntitlementsSnapshot: jsonObject(subscription.EntitlementsSnapshot),
-		ExpiresAt:            subscription.ExpiresAt,
-		Id:                   apiopenapi.Id(strconv.Itoa(subscription.ID)),
-		PlanId:               apiopenapi.Id(strconv.Itoa(subscription.PlanID)),
-		SourceId:             subscription.SourceID,
-		SourceType:           subscription.SourceType,
-		StartsAt:             subscription.StartsAt,
-		Status:               apiopenapi.UserSubscriptionStatus(subscription.Status),
-		UpdatedAt:            subscription.UpdatedAt,
-		UserId:               apiopenapi.Id(strconv.Itoa(subscription.UserID)),
+		CreatedAt:               subscription.CreatedAt,
+		DailyUsageUsd:           subscription.DailyUsageUSD,
+		DailyUsageWindowStart:   cloneTimePtr(subscription.DailyWindowStart),
+		EntitlementsSnapshot:    jsonObject(subscription.EntitlementsSnapshot),
+		ExpiresAt:               subscription.ExpiresAt,
+		Id:                      apiopenapi.Id(strconv.Itoa(subscription.ID)),
+		MonthlyUsageUsd:         subscription.MonthlyUsageUSD,
+		MonthlyUsageWindowStart: cloneTimePtr(subscription.MonthlyWindowStart),
+		PlanId:                  apiopenapi.Id(strconv.Itoa(subscription.PlanID)),
+		SourceId:                subscription.SourceID,
+		SourceType:              subscription.SourceType,
+		StartsAt:                subscription.StartsAt,
+		Status:                  apiopenapi.UserSubscriptionStatus(subscription.Status),
+		UpdatedAt:               subscription.UpdatedAt,
+		UserId:                  apiopenapi.Id(strconv.Itoa(subscription.UserID)),
+		WeeklyUsageUsd:          subscription.WeeklyUsageUSD,
+		WeeklyUsageWindowStart:  cloneTimePtr(subscription.WeeklyWindowStart),
 	}
 }
 
-func toAPIPricingRule(rule subscriptioncontract.PricingRule) apiopenapi.PricingRule {
+func toAPIPricingRule(rule billingcontract.PricingRule) apiopenapi.PricingRule {
 	return apiopenapi.PricingRule{
+		BillingMode:                     apiopenapi.BillingMode(rule.BillingMode),
 		CacheReadPricePerMillionTokens:  rule.CacheReadPricePerMillionTokens,
 		CacheWritePricePerMillionTokens: rule.CacheWritePricePerMillionTokens,
 		CreatedAt:                       rule.CreatedAt,
@@ -780,11 +813,32 @@ func toAPIPricingRule(rule subscriptioncontract.PricingRule) apiopenapi.PricingR
 		EffectiveTo:                     cloneTimePtr(rule.EffectiveTo),
 		Id:                              apiopenapi.Id(strconv.Itoa(rule.ID)),
 		InputPricePerMillionTokens:      rule.InputPricePerMillionTokens,
+		Intervals:                       toAPIPricingIntervals(rule.Intervals),
 		ModelId:                         apiopenapi.Id(strconv.Itoa(rule.ModelID)),
 		OutputPricePerMillionTokens:     rule.OutputPricePerMillionTokens,
+		PerRequestPrice:                 rule.PerRequestPrice,
 		ProviderId:                      apiopenapi.Id(strconv.Itoa(rule.ProviderID)),
 		UpdatedAt:                       rule.UpdatedAt,
 	}
+}
+
+func toAPIPricingIntervals(intervals []billingcontract.PricingInterval) []apiopenapi.PricingInterval {
+	out := make([]apiopenapi.PricingInterval, 0, len(intervals))
+	for _, interval := range intervals {
+		out = append(out, apiopenapi.PricingInterval{
+			CacheReadPricePerMillionTokens:  interval.CacheReadPricePerMillionTokens,
+			CacheWritePricePerMillionTokens: interval.CacheWritePricePerMillionTokens,
+			Id:                              optionalAPIID(&interval.ID),
+			ImageSize:                       interval.ImageSize,
+			InputPricePerMillionTokens:      interval.InputPricePerMillionTokens,
+			MaxTokens:                       interval.MaxTokens,
+			MinTokens:                       interval.MinTokens,
+			OutputPricePerMillionTokens:     interval.OutputPricePerMillionTokens,
+			PerImagePrice:                   interval.PerImagePrice,
+			TierLabel:                       interval.TierLabel,
+		})
+	}
+	return out
 }
 
 func toAPIDomainEventOutbox(event eventscontract.OutboxEvent) apiopenapi.DomainEventOutbox {

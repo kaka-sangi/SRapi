@@ -52,6 +52,28 @@ type APIKey struct {
 	RequestLimit1d *int `json:"request_limit_1d,omitempty"`
 	// RequestLimit7d holds the value of the "request_limit_7d" field.
 	RequestLimit7d *int `json:"request_limit_7d,omitempty"`
+	// CostQuota holds the value of the "cost_quota" field.
+	CostQuota *string `json:"cost_quota,omitempty"`
+	// CostUsed holds the value of the "cost_used" field.
+	CostUsed string `json:"cost_used,omitempty"`
+	// CostLimit5h holds the value of the "cost_limit_5h" field.
+	CostLimit5h *string `json:"cost_limit_5h,omitempty"`
+	// CostUsed5h holds the value of the "cost_used_5h" field.
+	CostUsed5h string `json:"cost_used_5h,omitempty"`
+	// CostWindowStart5h holds the value of the "cost_window_start_5h" field.
+	CostWindowStart5h *time.Time `json:"cost_window_start_5h,omitempty"`
+	// CostLimit1d holds the value of the "cost_limit_1d" field.
+	CostLimit1d *string `json:"cost_limit_1d,omitempty"`
+	// CostUsed1d holds the value of the "cost_used_1d" field.
+	CostUsed1d string `json:"cost_used_1d,omitempty"`
+	// CostWindowStart1d holds the value of the "cost_window_start_1d" field.
+	CostWindowStart1d *time.Time `json:"cost_window_start_1d,omitempty"`
+	// CostLimit7d holds the value of the "cost_limit_7d" field.
+	CostLimit7d *string `json:"cost_limit_7d,omitempty"`
+	// CostUsed7d holds the value of the "cost_used_7d" field.
+	CostUsed7d string `json:"cost_used_7d,omitempty"`
+	// CostWindowStart7d holds the value of the "cost_window_start_7d" field.
+	CostWindowStart7d *time.Time `json:"cost_window_start_7d,omitempty"`
 	// AllowedIpsJSON holds the value of the "allowed_ips_json" field.
 	AllowedIpsJSON []string `json:"allowed_ips_json,omitempty"`
 	// DeniedIpsJSON holds the value of the "denied_ips_json" field.
@@ -72,9 +94,9 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case apikey.FieldID, apikey.FieldUserID, apikey.FieldWorkspaceID, apikey.FieldRpmLimit, apikey.FieldTpmLimit, apikey.FieldConcurrencyLimit, apikey.FieldRequestLimit5h, apikey.FieldRequestLimit1d, apikey.FieldRequestLimit7d:
 			values[i] = new(sql.NullInt64)
-		case apikey.FieldName, apikey.FieldPrefix, apikey.FieldHash, apikey.FieldStatus:
+		case apikey.FieldName, apikey.FieldPrefix, apikey.FieldHash, apikey.FieldStatus, apikey.FieldCostQuota, apikey.FieldCostUsed, apikey.FieldCostLimit5h, apikey.FieldCostUsed5h, apikey.FieldCostLimit1d, apikey.FieldCostUsed1d, apikey.FieldCostLimit7d, apikey.FieldCostUsed7d:
 			values[i] = new(sql.NullString)
-		case apikey.FieldCreatedAt, apikey.FieldUpdatedAt, apikey.FieldDeletedAt, apikey.FieldExpiresAt, apikey.FieldLastUsedAt:
+		case apikey.FieldCreatedAt, apikey.FieldUpdatedAt, apikey.FieldDeletedAt, apikey.FieldCostWindowStart5h, apikey.FieldCostWindowStart1d, apikey.FieldCostWindowStart7d, apikey.FieldExpiresAt, apikey.FieldLastUsedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -211,6 +233,79 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				_m.RequestLimit7d = new(int)
 				*_m.RequestLimit7d = int(value.Int64)
 			}
+		case apikey.FieldCostQuota:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cost_quota", values[i])
+			} else if value.Valid {
+				_m.CostQuota = new(string)
+				*_m.CostQuota = value.String
+			}
+		case apikey.FieldCostUsed:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cost_used", values[i])
+			} else if value.Valid {
+				_m.CostUsed = value.String
+			}
+		case apikey.FieldCostLimit5h:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cost_limit_5h", values[i])
+			} else if value.Valid {
+				_m.CostLimit5h = new(string)
+				*_m.CostLimit5h = value.String
+			}
+		case apikey.FieldCostUsed5h:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cost_used_5h", values[i])
+			} else if value.Valid {
+				_m.CostUsed5h = value.String
+			}
+		case apikey.FieldCostWindowStart5h:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field cost_window_start_5h", values[i])
+			} else if value.Valid {
+				_m.CostWindowStart5h = new(time.Time)
+				*_m.CostWindowStart5h = value.Time
+			}
+		case apikey.FieldCostLimit1d:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cost_limit_1d", values[i])
+			} else if value.Valid {
+				_m.CostLimit1d = new(string)
+				*_m.CostLimit1d = value.String
+			}
+		case apikey.FieldCostUsed1d:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cost_used_1d", values[i])
+			} else if value.Valid {
+				_m.CostUsed1d = value.String
+			}
+		case apikey.FieldCostWindowStart1d:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field cost_window_start_1d", values[i])
+			} else if value.Valid {
+				_m.CostWindowStart1d = new(time.Time)
+				*_m.CostWindowStart1d = value.Time
+			}
+		case apikey.FieldCostLimit7d:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cost_limit_7d", values[i])
+			} else if value.Valid {
+				_m.CostLimit7d = new(string)
+				*_m.CostLimit7d = value.String
+			}
+		case apikey.FieldCostUsed7d:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cost_used_7d", values[i])
+			} else if value.Valid {
+				_m.CostUsed7d = value.String
+			}
+		case apikey.FieldCostWindowStart7d:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field cost_window_start_7d", values[i])
+			} else if value.Valid {
+				_m.CostWindowStart7d = new(time.Time)
+				*_m.CostWindowStart7d = value.Time
+			}
 		case apikey.FieldAllowedIpsJSON:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field allowed_ips_json", values[i])
@@ -341,6 +436,53 @@ func (_m *APIKey) String() string {
 	if v := _m.RequestLimit7d; v != nil {
 		builder.WriteString("request_limit_7d=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.CostQuota; v != nil {
+		builder.WriteString("cost_quota=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("cost_used=")
+	builder.WriteString(_m.CostUsed)
+	builder.WriteString(", ")
+	if v := _m.CostLimit5h; v != nil {
+		builder.WriteString("cost_limit_5h=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("cost_used_5h=")
+	builder.WriteString(_m.CostUsed5h)
+	builder.WriteString(", ")
+	if v := _m.CostWindowStart5h; v != nil {
+		builder.WriteString("cost_window_start_5h=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.CostLimit1d; v != nil {
+		builder.WriteString("cost_limit_1d=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("cost_used_1d=")
+	builder.WriteString(_m.CostUsed1d)
+	builder.WriteString(", ")
+	if v := _m.CostWindowStart1d; v != nil {
+		builder.WriteString("cost_window_start_1d=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.CostLimit7d; v != nil {
+		builder.WriteString("cost_limit_7d=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("cost_used_7d=")
+	builder.WriteString(_m.CostUsed7d)
+	builder.WriteString(", ")
+	if v := _m.CostWindowStart7d; v != nil {
+		builder.WriteString("cost_window_start_7d=")
+		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")
 	builder.WriteString("allowed_ips_json=")

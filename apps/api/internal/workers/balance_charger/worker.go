@@ -23,6 +23,7 @@ import (
 	notificationscontract "github.com/srapi/srapi/apps/api/internal/modules/notifications/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	usersservice "github.com/srapi/srapi/apps/api/internal/modules/users/service"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 const (
@@ -310,7 +311,7 @@ func (w *Worker) enqueueBalanceLowNotifications(ctx context.Context, batches []b
 				"recipient_email_hash": notificationEmailHash(user.Email),
 				"balance_before":       batch.BalanceBefore,
 				"balance_after":        batch.BalanceAfter,
-				"threshold":            settings.threshold.FloatString(8),
+				"threshold":            money.FormatRatFixed(settings.threshold, 8),
 				"currency":             user.Currency,
 				"ledger_entry_id":      batch.LedgerEntry.ID,
 				"usage_log_ids":        batch.ChargedUsageLogIDs,
@@ -347,7 +348,7 @@ func (w *Worker) balanceLowNotificationSettings(ctx context.Context) balanceLowN
 	if adminSettings.Email.BalanceLowNotifyEnabled != nil {
 		settings.enabled = *adminSettings.Email.BalanceLowNotifyEnabled
 	}
-	if threshold, ok := parseMoneyRat(adminSettings.Email.BalanceLowNotifyThreshold); ok {
+	if threshold, ok := money.ParseMoneyRat(adminSettings.Email.BalanceLowNotifyThreshold); ok {
 		settings.threshold = threshold
 	}
 	settings.rechargeURL = adminSettings.Email.BalanceLowNotifyRechargeURL
@@ -358,23 +359,15 @@ func crossedBalanceThreshold(before, after string, threshold *big.Rat) bool {
 	if threshold == nil || threshold.Sign() <= 0 {
 		return false
 	}
-	beforeRat, ok := parseMoneyRat(before)
+	beforeRat, ok := money.ParseMoneyRat(before)
 	if !ok {
 		return false
 	}
-	afterRat, ok := parseMoneyRat(after)
+	afterRat, ok := money.ParseMoneyRat(after)
 	if !ok {
 		return false
 	}
 	return beforeRat.Cmp(threshold) >= 0 && afterRat.Cmp(threshold) < 0
-}
-
-func parseMoneyRat(value string) (*big.Rat, bool) {
-	rat, ok := new(big.Rat).SetString(value)
-	if !ok {
-		return nil, false
-	}
-	return rat, true
 }
 
 func notificationEmailHash(email string) string {

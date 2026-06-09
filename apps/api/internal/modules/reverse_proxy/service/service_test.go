@@ -818,7 +818,7 @@ func TestRuntimeRefreshUsesPerAccountLockAndDoesNotOverwriteOnFailure(t *testing
 	}
 	if !strings.Contains(gotBody, "grant_type=refresh_token") ||
 		!strings.Contains(gotBody, "refresh_token=refresh-token") ||
-		!strings.Contains(gotBody, "client_id="+url.QueryEscape(codexOAuthClientID)) {
+		!strings.Contains(gotBody, "client_id="+url.QueryEscape(contract.CodexOAuthClientID)) {
 		t.Fatalf("unexpected refresh body %q", gotBody)
 	}
 	if gotUserAgent != "codex-cli/test" {
@@ -870,7 +870,7 @@ func TestClaudeRefreshUsesJSONTokenRequest(t *testing.T) {
 	}
 	if gotPayload["grant_type"] != "refresh_token" ||
 		gotPayload["refresh_token"] != "claude-refresh" ||
-		gotPayload["client_id"] != claudeCodeOAuthClientID {
+		gotPayload["client_id"] != contract.ClaudeCodeOAuthClientID {
 		t.Fatalf("unexpected Claude refresh payload: %+v", gotPayload)
 	}
 	if gotUserAgent != "claude-cli/test" {
@@ -914,7 +914,7 @@ func TestAntigravityRefreshUsesClientSecretFormTokenRequest(t *testing.T) {
 	}
 	if gotForm.Get("grant_type") != "refresh_token" ||
 		gotForm.Get("refresh_token") != "antigravity-refresh" ||
-		gotForm.Get("client_id") != antigravityOAuthClientID ||
+		gotForm.Get("client_id") != contract.AntigravityOAuthClientID ||
 		gotForm.Get("client_secret") != "antigravity-secret" {
 		t.Fatalf("unexpected Antigravity refresh form: %v", gotForm)
 	}

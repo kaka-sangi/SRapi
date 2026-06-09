@@ -91,3 +91,42 @@ func TestFindByPrefixReturnsDefensiveCopy(t *testing.T) {
 		t.Fatalf("stored rpm limit was mutated through returned key: %v", foundAgain.RPMLimit)
 	}
 }
+
+func TestApplyCostUsageAccumulatesAndResetsWindows(t *testing.T) {
+	store := New()
+	ctx := context.Background()
+	costQuota := "0.10000000"
+	costLimit5h := "0.05000000"
+	created, err := store.Create(ctx, contract.CreateStoredKey{
+		UserID:      7,
+		Name:        "gateway",
+		Prefix:      "sk_cost",
+		Hash:        "hmac-sha256:hash",
+		Status:      contract.StatusActive,
+		CostQuota:   &costQuota,
+		CostLimit5h: &costLimit5h,
+	})
+	if err != nil {
+		t.Fatalf("create key: %v", err)
+	}
+
+	at := time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
+	if _, err := store.ApplyCostUsage(ctx, contract.CostUsageUpdate{KeyID: created.ID, BillableCost: "0.01000000", OccurredAt: at}); err != nil {
+		t.Fatalf("apply first usage: %v", err)
+	}
+	updated, err := store.ApplyCostUsage(ctx, contract.CostUsageUpdate{KeyID: created.ID, BillableCost: "0.02000000", OccurredAt: at.Add(time.Hour)})
+	if err != nil {
+		t.Fatalf("apply second usage: %v", err)
+	}
+	if updated.CostUsed != "0.03000000" || updated.CostUsed5h != "0.03000000" || updated.CostUsed1d != "0.03000000" || updated.CostUsed7d != "0.03000000" {
+		t.Fatalf("expected accumulated cost usage, got %+v", updated)
+	}
+
+	updated, err = store.ApplyCostUsage(ctx, contract.CostUsageUpdate{KeyID: created.ID, BillableCost: "0.01000000", OccurredAt: at.Add(6 * time.Hour)})
+	if err != nil {
+		t.Fatalf("apply reset-window usage: %v", err)
+	}
+	if updated.CostUsed != "0.04000000" || updated.CostUsed5h != "0.01000000" {
+		t.Fatalf("expected lifetime kept and 5h window reset, got %+v", updated)
+	}
+}

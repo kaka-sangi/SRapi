@@ -35,29 +35,20 @@ func channelMonitorDo(t *testing.T, handler http.Handler, method, path, csrf str
 	return rec
 }
 
-func firstSeedAccountID(t *testing.T, handler http.Handler, cookie *http.Cookie) (int, int) {
+func mustCreateChannelMonitorAccount(t *testing.T, handler http.Handler, cookie *http.Cookie, csrf string) (int, int) {
 	t.Helper()
-	rec := channelMonitorDo(t, handler, http.MethodGet, "/api/v1/admin/accounts", "", cookie, "")
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected accounts list 200, got %d body=%s", rec.Code, rec.Body.String())
-	}
-	var resp struct {
-		Data []struct {
-			ID         string `json:"id"`
-			ProviderID string `json:"provider_id"`
-		} `json:"data"`
-	}
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode accounts: %v", err)
-	}
-	if len(resp.Data) == 0 {
-		t.Fatal("expected at least one seed account")
-	}
-	accountID, err := strconv.Atoi(resp.Data[0].ID)
+	providerResp := mustCreateProvider(t, handler, cookie, csrf, `{"name":"channel-monitor-provider","display_name":"Channel Monitor Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, cookie, csrf, `{"canonical_name":"channel-monitor-model","display_name":"Channel Monitor Model","status":"active"}`)
+	mustCreateMapping(t, handler, cookie, csrf, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"channel-monitor-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, cookie, csrf, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"channel-monitor-account","runtime_class":"api_key","credential":{"api_key":"channel-monitor-secret"},"metadata":{"base_url":"https://example.invalid/v1"},"status":"active"}`)
+	accountID, err := strconv.Atoi(string(accountResp.Data.Id))
 	if err != nil {
-		t.Fatalf("parse account id %q: %v", resp.Data[0].ID, err)
+		t.Fatalf("parse account id %q: %v", accountResp.Data.Id, err)
 	}
-	providerID, _ := strconv.Atoi(resp.Data[0].ProviderID)
+	providerID, err := strconv.Atoi(string(providerResp.Data.Id))
+	if err != nil {
+		t.Fatalf("parse provider id %q: %v", providerResp.Data.Id, err)
+	}
 	return accountID, providerID
 }
 
@@ -65,7 +56,12 @@ func TestChannelMonitorCRUDAndRun(t *testing.T) {
 	handler := New(config.Load(), nil)
 	login, cookie := mustLoginAdmin(t, handler)
 	csrf := login.Data.CsrfToken
-	accountID, _ := firstSeedAccountID(t, handler, cookie)
+	accountID, _ := mustCreateChannelMonitorAccount(t, handler, cookie, csrf)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"gpt-4o-mini"}]}`))
+	}))
+	defer upstream.Close()
 
 	// Create a monitor scoped to the seed account with a custom request.
 	createBody := fmt.Sprintf(`{
@@ -73,9 +69,9 @@ func TestChannelMonitorCRUDAndRun(t *testing.T) {
 		"scope":"account",
 		"scope_ref":"%d",
 		"interval_seconds":120,
-		"model":"gpt-4o-mini",
-		"request":{"method":"GET","expected_status_codes":[200,401],"response_contains":"data"}
-	}`, accountID)
+		"model":"channel-monitor-model",
+		"request":{"method":"GET","url":"%s/models","expected_status_codes":[200,401],"response_contains":"data"}
+	}`, accountID, upstream.URL)
 	createRec := channelMonitorDo(t, handler, http.MethodPost, "/api/v1/admin/channel-monitors", csrf, cookie, createBody)
 	if createRec.Code != http.StatusCreated {
 		t.Fatalf("expected monitor create 201, got %d body=%s", createRec.Code, createRec.Body.String())
@@ -130,7 +126,7 @@ func TestChannelMonitorCRUDAndRun(t *testing.T) {
 	if runResp.Data.CheckedCount != 1 || len(runResp.Data.Results) != 1 {
 		t.Fatalf("expected one per-model result, got checked=%d results=%d", runResp.Data.CheckedCount, len(runResp.Data.Results))
 	}
-	if runResp.Data.Results[0].AccountID != accountID || runResp.Data.Results[0].Model != "gpt-4o-mini" {
+	if runResp.Data.Results[0].AccountID != accountID || runResp.Data.Results[0].Model != "channel-monitor-model" {
 		t.Fatalf("unexpected check result: %+v", runResp.Data.Results[0])
 	}
 
@@ -162,7 +158,7 @@ func TestChannelMonitorTemplateApply(t *testing.T) {
 	handler := New(config.Load(), nil)
 	login, cookie := mustLoginAdmin(t, handler)
 	csrf := login.Data.CsrfToken
-	accountID, _ := firstSeedAccountID(t, handler, cookie)
+	accountID, _ := mustCreateChannelMonitorAccount(t, handler, cookie, csrf)
 
 	// Create two monitors.
 	makeMonitor := func(name string) int {

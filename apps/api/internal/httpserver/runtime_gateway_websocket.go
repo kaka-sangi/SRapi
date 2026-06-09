@@ -806,6 +806,7 @@ func responsesWebSocketUsageRecord(authed apikeycontract.AuthResult, canonical g
 		SourceProtocol:        string(canonical.SourceProtocol),
 		SourceEndpoint:        canonical.SourceEndpoint,
 		Model:                 canonical.CanonicalModel,
+		RequestedModel:        gatewayRequestedModel(canonical),
 		Success:               success,
 		StatusCode:            ptrInt(statusCode),
 		LatencyMS:             latencyMS,
@@ -824,6 +825,7 @@ func responsesWebSocketUsageRecord(authed apikeycontract.AuthResult, canonical g
 		rec.ProviderID = ptrInt(candidate.Provider.ID)
 		rec.AccountID = ptrInt(candidate.Account.ID)
 		rec.TargetProtocol = candidate.Provider.Protocol
+		rec.RequestedModel, rec.UpstreamModel = gatewayUsageModelSnapshot(canonical, *candidate)
 	}
 	return rec
 }

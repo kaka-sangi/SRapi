@@ -501,6 +501,18 @@ func (f PendingOAuthSessionFunc) Mutate(ctx context.Context, m ent.Mutation) (en
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PendingOAuthSessionMutation", m)
 }
 
+// The PricingIntervalFunc type is an adapter to allow the use of ordinary
+// function as PricingInterval mutator.
+type PricingIntervalFunc func(context.Context, *ent.PricingIntervalMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PricingIntervalFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PricingIntervalMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PricingIntervalMutation", m)
+}
+
 // The PricingRuleFunc type is an adapter to allow the use of ordinary
 // function as PricingRule mutator.
 type PricingRuleFunc func(context.Context, *ent.PricingRuleMutation) (ent.Value, error)

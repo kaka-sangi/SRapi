@@ -170,6 +170,49 @@ func TestChargeUsageRejectsCurrencyMismatch(t *testing.T) {
 	}
 }
 
+func TestStorePersistsPricingRules(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new billing store: %v", err)
+	}
+
+	ctx := context.Background()
+	from := time.Date(2026, 5, 22, 11, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 5, 22, 13, 0, 0, 0, time.UTC)
+	rule, err := store.CreatePricingRule(ctx, contract.PricingRule{
+		ModelID:                         11,
+		ProviderID:                      22,
+		BillingMode:                     contract.BillingModeImage,
+		InputPricePerMillionTokens:      "1.25000000",
+		OutputPricePerMillionTokens:     "2.50000000",
+		CacheReadPricePerMillionTokens:  "0.10000000",
+		CacheWritePricePerMillionTokens: "0.20000000",
+		PerRequestPrice:                 "0.03000000",
+		Intervals: []contract.PricingInterval{
+			{ImageSize: "1024x1024", PerImagePrice: "0.04000000"},
+		},
+		Currency:      "USD",
+		EffectiveFrom: &from,
+		EffectiveTo:   &to,
+	})
+	if err != nil {
+		t.Fatalf("create pricing rule: %v", err)
+	}
+	rules, err := store.ListPricingRules(ctx)
+	if err != nil {
+		t.Fatalf("list pricing rules: %v", err)
+	}
+	if len(rules) != 1 || rules[0].ID != rule.ID || rules[0].EffectiveFrom == nil || rules[0].EffectiveTo == nil {
+		t.Fatalf("expected persisted pricing rule with effectivity, got %+v", rules)
+	}
+	if rules[0].BillingMode != contract.BillingModeImage || rules[0].PerRequestPrice != "0.03000000" || len(rules[0].Intervals) != 1 || rules[0].Intervals[0].PerImagePrice != "0.04000000" {
+		t.Fatalf("expected persisted billing mode and interval, got %+v", rules[0])
+	}
+}
+
 func createUser(t *testing.T, client *ent.Client, email, balance string) int {
 	t.Helper()
 	user, err := client.User.Create().

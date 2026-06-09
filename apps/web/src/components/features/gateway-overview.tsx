@@ -5,6 +5,7 @@ import Link from "next/link";
 import { KeyRound, Activity, ArrowUpRight, Gauge, Wallet } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useBalance, usePlatformQuotas, useUsageLogs } from "@/hooks/queries";
+import { useUsageTotals } from "@/hooks/use-usage-totals";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { StatCard, StatCardSkeleton } from "@/components/ui/stat-card";
@@ -78,13 +79,7 @@ export function GatewayOverview() {
 
   // Derived, honest metrics from the user's own usage logs.
   const logs = usage.data ?? [];
-  const requests = logs.length;
-  const successRate = logs.length
-    ? Math.round((logs.filter((l) => l.success).length / logs.length) * 100)
-    : null;
-  const totalTokens = logs.reduce((s, l) => s + l.total_tokens, 0);
-  const totalCost = logs.reduce((s, l) => s + l.cost, 0);
-  const currency = logs.find((l) => l.currency)?.currency;
+  const totals = useUsageTotals(logs);
   const reqSpark = bucketRequests(logs);
   const quotaRows = platformQuotas.data?.data ?? [];
   const enabledQuotas = quotaRows.filter((q) => q.enabled);
@@ -186,7 +181,7 @@ export function GatewayOverview() {
             <StatCard
               className="card-interactive h-full"
               label={t("dashboard.requests")}
-              value={requests}
+              value={totals.requests}
               format={compact}
               spark={reqSpark}
             />
@@ -195,7 +190,7 @@ export function GatewayOverview() {
             <StatCard
               className="card-interactive h-full"
               label={t("dashboard.successRate")}
-              value={successRate != null ? successRate : "—"}
+              value={totals.requests > 0 ? totals.successRate : "—"}
               format={(n) => `${Math.round(n)}%`}
             />
           </div>
@@ -203,7 +198,7 @@ export function GatewayOverview() {
             <StatCard
               className="card-interactive h-full"
               label={t("dashboard.totalTokens")}
-              value={totalTokens}
+              value={totals.totalTokens}
               format={compact}
             />
           </div>
@@ -211,8 +206,8 @@ export function GatewayOverview() {
             <StatCard
               className="card-interactive h-full"
               label={t("dashboard.cost")}
-              value={totalCost}
-              format={(n) => fmtCost(n, currency)}
+              value={totals.totalCost}
+              format={(n) => fmtCost(n, totals.currency)}
             />
           </div>
         </div>

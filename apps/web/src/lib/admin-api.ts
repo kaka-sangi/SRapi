@@ -116,6 +116,7 @@ import {
   fetchAdminAccountQuota,
   getAdminAccountQuota,
   getAdminAccountRpmStatus,
+  getAdminProviderOAuthConfig,
   getAdminConfigSnapshot,
   importAdminConfigSnapshot,
   getAdminDashboardSnapshot,
@@ -179,6 +180,7 @@ import {
   removeAdminAccountGroupMember,
   replaySchedulerStrategy,
   recoverAdminAccount,
+  resetAdminAccountQuota,
   sendAdminTestEmail,
   testAdminAccount,
   testAdminPaymentProvider,
@@ -269,6 +271,7 @@ import type {
   AccountOAuthCredential,
   AccountOAuthDeviceCode,
   AccountOAuthPending,
+  ProviderOAuthConfig,
   CreateAdminPaymentProviderData,
   UpdateAdminPaymentProviderData,
   CreateAdminPricingRuleData,
@@ -598,6 +601,10 @@ export const adminApi = {
     return unwrapData(() => installAdminProviderPresets({ throwOnError: true }));
   },
 
+  getProviderOAuthConfig(id: Id): Promise<ProviderOAuthConfig> {
+    return unwrapData(() => getAdminProviderOAuthConfig({ path: { id }, throwOnError: true }));
+  },
+
   listModels(query?: ListAdminModelsData["query"]): Promise<AdminListResult<Model>> {
     return unwrapList(() => listAdminModels({ query, throwOnError: true }));
   },
@@ -751,6 +758,10 @@ export const adminApi = {
 
   recoverAccount(id: Id): Promise<ProviderAccount> {
     return unwrapData(() => recoverAdminAccount({ path: { id }, throwOnError: true }));
+  },
+
+  resetAccountQuota(id: Id): Promise<ProviderAccount> {
+    return unwrapData(() => resetAdminAccountQuota({ path: { id }, throwOnError: true }));
   },
 
   bindAccountProxy(id: Id, proxyId: string | null): Promise<ProviderAccount> {

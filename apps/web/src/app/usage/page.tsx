@@ -6,7 +6,8 @@ import { Inbox, SearchX } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
-import { useUsageLogs } from "@/hooks/queries";
+import { useAvailableModels, useUsageLogs } from "@/hooks/queries";
+import { useUsageTotals } from "@/hooks/use-usage-totals";
 import { useLanguage } from "@/context/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,7 +23,6 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { QuietBadge } from "@/components/ui/quiet-badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import {
   Select,
@@ -88,8 +88,12 @@ function UsageBody({
   setStatus: (v: string) => void;
 }) {
   const { t } = useLanguage();
+  const availableModels = useAvailableModels();
 
-  const models = useMemo(() => Array.from(new Set(logs.map((l) => l.model))).sort(), [logs]);
+  const models = useMemo(
+    () => (availableModels.data ?? []).map((m) => m.id).sort(),
+    [availableModels.data],
+  );
 
   const filtered = useMemo(
     () =>
@@ -101,28 +105,15 @@ function UsageBody({
     [logs, model, status],
   );
 
-  const totals = useMemo(() => {
-    const requests = logs.length;
-    const success = logs.filter((l) => l.success).length;
-    const tokens = logs.reduce((sum, l) => sum + l.total_tokens, 0);
-    const cost = logs.reduce((sum, l) => sum + l.cost, 0);
-    return {
-      requests,
-      successRate: requests === 0 ? 0 : (success / requests) * 100,
-      tokens,
-      cost,
-      // Costs share a currency per deployment; use the first row as the label.
-      currency: logs[0]?.currency ?? "USD",
-    };
-  }, [logs]);
+  const totals = useUsageTotals(logs);
 
   return (
     <>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label={t("usage.requests")} value={totals.requests} format={(n) => Math.round(n).toLocaleString()} />
         <StatCard label={t("usage.successRate")} value={totals.successRate} format={(n) => `${n.toFixed(1)}%`} />
-        <StatCard label={t("usage.totalTokens")} value={totals.tokens} format={(n) => Math.round(n).toLocaleString()} />
-        <StatCard label={t("usage.cost")} value={formatMoney(totals.cost, totals.currency)} />
+        <StatCard label={t("usage.totalTokens")} value={totals.totalTokens} format={(n) => Math.round(n).toLocaleString()} />
+        <StatCard label={t("usage.cost")} value={formatMoney(totals.totalCost, totals.currency)} />
       </div>
 
       <Card>
@@ -210,7 +201,10 @@ function UsageBody({
                       {log.total_tokens.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right font-mono text-srapi-text-secondary tabular">
-                      {formatMoney(log.cost, log.currency)}
+                      <div>{formatMoney(log.cost, log.currency)}</div>
+                      <div className="mt-1 text-2xs text-srapi-text-tertiary">
+                        {usageCostBreakdown(log)}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -221,6 +215,15 @@ function UsageBody({
       </Card>
     </>
   );
+}
+
+function usageCostBreakdown(log: UsageLogSummary): string {
+  return [
+    `in ${formatMoney(log.input_cost, log.currency)}`,
+    `out ${formatMoney(log.output_cost, log.currency)}`,
+    `cache r ${formatMoney(log.cache_read_cost, log.currency)}`,
+    `cache w ${formatMoney(log.cache_write_cost, log.currency)}`,
+  ].join(" / ");
 }
 
 function UsageSkeleton() {

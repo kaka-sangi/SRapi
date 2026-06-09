@@ -149,11 +149,16 @@ func (s *Service) streamDirectAnthropicCompatible(ctx context.Context, req contr
 		return contract.ConversationResponse{}, err
 	}
 	httpReq.Header = headers
-	return s.egressStreamConversation(ctx, req, httpReq,
-		func(status int, _ http.Header, body []byte) error {
-			return classifyAnthropicProviderHTTPError(status, body)
+	streamResp, err := s.egressStreamConversation(ctx, req, httpReq,
+		func(status int, header http.Header, body []byte) error {
+			return classifyProviderHTTPErrorWithHeaders(status, header, body)
 		},
 		parseAnthropicCompatibleStream)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	streamResp.StreamParse = anthropicStreamParserWithHeaders(streamResp.Headers)
+	return streamResp, nil
 }
 
 func (s *Service) streamDirectGeminiCompatible(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
@@ -276,7 +281,7 @@ func (s *Service) streamReverseProxyAnthropicCompatible(ctx context.Context, str
 	if err != nil {
 		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
-	return streamConversationResponse(resp, parseAnthropicCompatibleStream), nil
+	return anthropicStreamConversationResponse(resp), nil
 }
 
 func (s *Service) streamReverseProxyGeminiCompatible(ctx context.Context, streamer reverseproxycontract.StreamRuntime, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {

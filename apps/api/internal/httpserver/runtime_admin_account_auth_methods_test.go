@@ -58,11 +58,17 @@ func TestAdminAccountAuthMethodAllowlistScopesRuntimeClass(t *testing.T) {
 		t.Fatalf("expected 400 rejecting web_session_cookie update on scoped provider, got %d body=%s", rec.Code, rec.Body.String())
 	}
 
-	// Antigravity-style allowlist accepts desktop_client_token.
+	// Antigravity-style allowlist accepts oauth_refresh; desktop/IDE token
+	// runtime classes are not preset auth methods anymore.
 	antigravity := mustCreateProvider(t, handler, sessionCookie, csrf,
-		`{"name":"antigravity-scoped","display_name":"Antigravity Scoped","adapter_type":"reverse-proxy-antigravity","protocol":"openai-compatible","status":"active","config_schema":{"auth_methods":["desktop_client_token","ide_plugin_token","oauth_refresh","custom_reverse_proxy"]}}`)
+		`{"name":"antigravity-scoped","display_name":"Antigravity Scoped","adapter_type":"reverse-proxy-antigravity","protocol":"openai-compatible","status":"active","config_schema":{"auth_methods":["oauth_refresh","custom_reverse_proxy"]}}`)
 	mustCreateAccount(t, handler, sessionCookie, csrf,
+		`{"provider_id":"`+string(antigravity.Data.Id)+`","name":"antigravity-oauth","runtime_class":"oauth_refresh","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token","refresh_token":"refresh-token","oauth_client_secret":"client-secret"},"metadata":{"base_url":"https://example.test","project_id":"p1"},"status":"active"}`)
+	rec = adminAccountMutation(t, handler, sessionCookie, csrf, http.MethodPost, "/api/v1/admin/accounts",
 		`{"provider_id":"`+string(antigravity.Data.Id)+`","name":"antigravity-desktop","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"https://example.test","project_id":"p1"},"status":"active"}`)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 rejecting desktop_client_token on antigravity-scoped provider, got %d body=%s", rec.Code, rec.Body.String())
+	}
 	// And rejects api_key, which is not in its allowlist.
 	rec = adminAccountMutation(t, handler, sessionCookie, csrf, http.MethodPost, "/api/v1/admin/accounts",
 		`{"provider_id":"`+string(antigravity.Data.Id)+`","name":"antigravity-apikey","runtime_class":"api_key","credential":{"api_key":"secret"},"status":"active"}`)

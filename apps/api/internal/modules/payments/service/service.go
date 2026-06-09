@@ -25,6 +25,7 @@ import (
 	checkoutprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/checkout"
 	stripeprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/stripe"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 	platformcrypto "github.com/srapi/srapi/apps/api/internal/platform/crypto"
 	platformotel "github.com/srapi/srapi/apps/api/internal/platform/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -33,7 +34,6 @@ import (
 const (
 	configVersionV1       = 1
 	configCiphertextV1    = "v1"
-	defaultCurrency       = "USD"
 	defaultOrderExpiresIn = 30 * time.Minute
 )
 
@@ -1247,14 +1247,14 @@ func normalizeMoney(value string) (string, bool) {
 	if value == "" {
 		return "", false
 	}
-	rat, ok := decimalRat(value)
+	rat, ok := money.RequiredDecimalRat(value)
 	if !ok {
 		return "", false
 	}
 	if rat.Sign() < 0 {
 		return "", false
 	}
-	return formatRatFixed(rat, 8), true
+	return money.FormatRatFixed(rat, 8), true
 }
 
 func normalizePromoCode(value string) string {
@@ -1277,31 +1277,12 @@ func cloneInt(value *int) *int {
 	return &cloned
 }
 
-func decimalRat(value string) (*big.Rat, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" || strings.ContainsAny(value, "eE") {
-		return nil, false
-	}
-	rat := new(big.Rat)
-	if _, ok := rat.SetString(value); !ok {
-		return nil, false
-	}
-	return rat, true
-}
-
-func formatRatFixed(value *big.Rat, places int) string {
-	if value == nil {
-		value = new(big.Rat)
-	}
-	return value.FloatString(places)
-}
-
 func compareMoney(left string, right string) int {
-	leftRat, ok := decimalRat(defaultMoney(left))
+	leftRat, ok := money.DecimalRat(defaultMoney(left))
 	if !ok {
 		leftRat = new(big.Rat)
 	}
-	rightRat, ok := decimalRat(defaultMoney(right))
+	rightRat, ok := money.DecimalRat(defaultMoney(right))
 	if !ok {
 		rightRat = new(big.Rat)
 	}
@@ -1309,11 +1290,7 @@ func compareMoney(left string, right string) int {
 }
 
 func normalizeCurrency(value string) string {
-	value = strings.ToUpper(strings.TrimSpace(value))
-	if value == "" {
-		return defaultCurrency
-	}
-	return value
+	return money.NormalizeCurrency(value)
 }
 
 func newOrderNo() string {

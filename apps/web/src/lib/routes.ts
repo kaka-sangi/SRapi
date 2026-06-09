@@ -9,6 +9,7 @@ export const USER_ROUTES = {
   redeem: "/redeem",
   affiliate: "/affiliate",
   playground: "/playground",
+  availableChannels: "/available-channels",
 } as const;
 
 /** Canonical admin route paths, referenced by the sidebar nav + pages. */
@@ -36,7 +37,10 @@ export const ADMIN_ROUTES = {
   affiliatesTransfers: "/admin/affiliates/transfers",
   announcements: "/admin/announcements",
   ops: "/admin/ops",
-  opsStrategy: "/admin/ops/strategy",
+  opsStrategy: "/admin/ops?tab=strategy",
+  opsChannelMonitor: "/admin/ops?tab=channel-monitor",
+  opsScheduledTests: "/admin/ops?tab=scheduled-tests",
+  opsSchedulerDecisions: "/admin/ops?tab=scheduler-decisions",
   eventsOutbox: "/admin/ops/events",
   riskControl: "/admin/risk-control",
   auditLogs: "/admin/audit-logs",

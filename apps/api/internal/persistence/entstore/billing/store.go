@@ -13,9 +13,13 @@ import (
 
 	"github.com/srapi/srapi/apps/api/ent"
 	entbillingledger "github.com/srapi/srapi/apps/api/ent/billingledger"
+	entmodelregistry "github.com/srapi/srapi/apps/api/ent/modelregistry"
+	entpricinginterval "github.com/srapi/srapi/apps/api/ent/pricinginterval"
+	entpricingrule "github.com/srapi/srapi/apps/api/ent/pricingrule"
 	entusagelog "github.com/srapi/srapi/apps/api/ent/usagelog"
 	entuser "github.com/srapi/srapi/apps/api/ent/user"
 	"github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 var ErrInvalidStore = errors.New("invalid billing ent store")
@@ -107,9 +111,7 @@ func (s *Store) ChargeUsage(ctx context.Context, req contract.ChargeUsageRequest
 	if req.UserID <= 0 || len(req.UsageLogIDs) == 0 {
 		return contract.ChargeUsageResult{}, ErrInvalidStore
 	}
-	if strings.TrimSpace(req.Currency) == "" {
-		req.Currency = "USD"
-	}
+	req.Currency = money.NormalizeCurrency(req.Currency)
 	if strings.TrimSpace(req.ReferenceType) == "" {
 		req.ReferenceType = "usage_log_batch"
 	}
@@ -138,7 +140,7 @@ func (s *Store) ChargeUsage(ctx context.Context, req contract.ChargeUsageRequest
 			entusagelog.IDIn(usageLogIDs...),
 			entusagelog.UserIDEQ(req.UserID),
 			entusagelog.SuccessEQ(true),
-			entusagelog.CurrencyEQ(normalizeCurrency(req.Currency)),
+			entusagelog.CurrencyEQ(money.NormalizeCurrency(req.Currency)),
 			entusagelog.ChargedAtIsNil(),
 		).
 		Order(entusagelog.ByID()).
@@ -169,12 +171,12 @@ func (s *Store) ChargeUsage(ctx context.Context, req contract.ChargeUsageRequest
 		_ = tx.Rollback()
 		return contract.ChargeUsageResult{}, err
 	}
-	balanceBefore, ok := decimalRat(user.Balance)
+	balanceBefore, ok := money.DecimalRat(user.Balance)
 	if !ok {
 		_ = tx.Rollback()
 		return contract.ChargeUsageResult{}, ErrInvalidStore
 	}
-	amountRat, ok := decimalRat(amount)
+	amountRat, ok := money.DecimalRat(amount)
 	if !ok {
 		_ = tx.Rollback()
 		return contract.ChargeUsageResult{}, ErrInvalidStore
@@ -182,10 +184,10 @@ func (s *Store) ChargeUsage(ctx context.Context, req contract.ChargeUsageRequest
 	balanceAfter := new(big.Rat).Sub(balanceBefore, amountRat)
 	disabled := balanceAfter.Sign() < 0
 
-	normalizedCurrency := normalizeCurrency(req.Currency)
+	normalizedCurrency := money.NormalizeCurrency(req.Currency)
 	_, err = tx.User.UpdateOneID(user.ID).
 		Where(entuser.DeletedAtIsNil()).
-		SetBalance(formatRatFixed(balanceAfter, 8)).
+		SetBalance(money.FormatRatFixed(balanceAfter, 8)).
 		SetCurrency(normalizedCurrency).
 		Save(ctx)
 	if err != nil {
@@ -203,8 +205,8 @@ func (s *Store) ChargeUsage(ctx context.Context, req contract.ChargeUsageRequest
 		SetType(string(contract.LedgerTypeUsageCharge)).
 		SetAmount(amount).
 		SetCurrency(normalizedCurrency).
-		SetBalanceBefore(formatRatFixed(balanceBefore, 8)).
-		SetBalanceAfter(formatRatFixed(balanceAfter, 8)).
+		SetBalanceBefore(money.FormatRatFixed(balanceBefore, 8)).
+		SetBalanceAfter(money.FormatRatFixed(balanceAfter, 8)).
 		SetReferenceType(strings.TrimSpace(req.ReferenceType)).
 		SetReferenceID(strings.TrimSpace(req.ReferenceID)).
 		SetMetadataJSON(ledgerMetadata).
@@ -234,8 +236,8 @@ func (s *Store) ChargeUsage(ctx context.Context, req contract.ChargeUsageRequest
 		UserID:             user.ID,
 		LedgerEntry:        toLedgerEntry(ledger),
 		ChargedUsageLogIDs: usageLogIDs,
-		BalanceBefore:      formatRatFixed(balanceBefore, 8),
-		BalanceAfter:       formatRatFixed(balanceAfter, 8),
+		BalanceBefore:      money.FormatRatFixed(balanceBefore, 8),
+		BalanceAfter:       money.FormatRatFixed(balanceAfter, 8),
 		UserDisabled:       disabled,
 	}, nil
 }
@@ -256,30 +258,6 @@ func toLedgerEntry(row *ent.BillingLedger) contract.LedgerEntry {
 	}
 }
 
-func normalizeCurrency(value string) string {
-	value = strings.ToUpper(strings.TrimSpace(value))
-	if value == "" {
-		return "USD"
-	}
-	return value
-}
-
-func decimalRat(value string) (*big.Rat, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" || strings.ContainsAny(value, "eE") {
-		return nil, false
-	}
-	rat, ok := new(big.Rat).SetString(value)
-	return rat, ok
-}
-
-func formatRatFixed(value *big.Rat, places int) string {
-	if value == nil {
-		value = new(big.Rat)
-	}
-	return value.FloatString(places)
-}
-
 func sumUsageCosts(rows []*ent.UsageLog) (string, error) {
 	total := new(big.Rat)
 	for _, row := range rows {
@@ -289,13 +267,321 @@ func sumUsageCosts(rows []*ent.UsageLog) (string, error) {
 		if strings.TrimSpace(value) == "" {
 			value = row.Cost
 		}
-		amount, ok := decimalRat(value)
+		amount, ok := money.DecimalRat(value)
 		if !ok {
 			return "", ErrInvalidStore
 		}
 		total.Add(total, amount)
 	}
-	return formatRatFixed(total, 8), nil
+	return money.FormatRatFixed(total, 8), nil
+}
+
+func (s *Store) CreatePricingRule(ctx context.Context, input contract.PricingRule) (contract.PricingRule, error) {
+	tx, err := s.client.Tx(ctx)
+	if err != nil {
+		return contract.PricingRule{}, err
+	}
+	create := tx.PricingRule.Create().
+		SetModelID(input.ModelID).
+		SetProviderID(input.ProviderID).
+		SetBillingMode(billingModeOrToken(input.BillingMode)).
+		SetInputPricePerMillion(moneyOrZero(input.InputPricePerMillionTokens)).
+		SetOutputPricePerMillion(moneyOrZero(input.OutputPricePerMillionTokens)).
+		SetCacheReadPricePerMillion(moneyOrZero(input.CacheReadPricePerMillionTokens)).
+		SetCacheWritePricePerMillion(moneyOrZero(input.CacheWritePricePerMillionTokens)).
+		SetPerRequestPrice(moneyOrZero(input.PerRequestPrice)).
+		SetCurrency(money.NormalizeCurrency(input.Currency)).
+		SetNillableEffectiveFrom(input.EffectiveFrom).
+		SetNillableEffectiveTo(input.EffectiveTo)
+	if !input.CreatedAt.IsZero() {
+		create.SetCreatedAt(input.CreatedAt).SetUpdatedAt(input.CreatedAt)
+	}
+	created, err := create.Save(ctx)
+	if err != nil {
+		_ = tx.Rollback()
+		return contract.PricingRule{}, err
+	}
+	if err := replacePricingIntervals(ctx, tx, created.ID, input.Intervals); err != nil {
+		_ = tx.Rollback()
+		return contract.PricingRule{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return contract.PricingRule{}, err
+	}
+	return s.FindPricingRuleByID(ctx, created.ID)
+}
+
+func (s *Store) UpdatePricingRule(ctx context.Context, id int, input contract.UpdatePricingRuleRequest) (contract.PricingRule, error) {
+	tx, err := s.client.Tx(ctx)
+	if err != nil {
+		return contract.PricingRule{}, err
+	}
+	update := tx.PricingRule.UpdateOneID(id).
+		SetNillableInputPricePerMillion(input.InputPricePerMillionTokens).
+		SetNillableOutputPricePerMillion(input.OutputPricePerMillionTokens).
+		SetNillableCacheReadPricePerMillion(input.CacheReadPricePerMillionTokens).
+		SetNillableCacheWritePricePerMillion(input.CacheWritePricePerMillionTokens).
+		SetNillablePerRequestPrice(input.PerRequestPrice).
+		SetNillableCurrency(input.Currency)
+	if input.BillingMode != nil {
+		update = update.SetBillingMode(billingModeOrToken(*input.BillingMode))
+	}
+	if input.EffectiveFrom != nil {
+		if *input.EffectiveFrom == nil {
+			update = update.ClearEffectiveFrom()
+		} else {
+			update = update.SetEffectiveFrom(**input.EffectiveFrom)
+		}
+	}
+	if input.EffectiveTo != nil {
+		if *input.EffectiveTo == nil {
+			update = update.ClearEffectiveTo()
+		} else {
+			update = update.SetEffectiveTo(**input.EffectiveTo)
+		}
+	}
+	updated, err := update.Save(ctx)
+	if err != nil {
+		_ = tx.Rollback()
+		if ent.IsNotFound(err) {
+			return contract.PricingRule{}, contract.ErrNotFound
+		}
+		return contract.PricingRule{}, err
+	}
+	if input.Intervals != nil {
+		if err := replacePricingIntervals(ctx, tx, id, *input.Intervals); err != nil {
+			_ = tx.Rollback()
+			return contract.PricingRule{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return contract.PricingRule{}, err
+	}
+	return s.FindPricingRuleByID(ctx, updated.ID)
+}
+
+func (s *Store) FindPricingRuleByID(ctx context.Context, id int) (contract.PricingRule, error) {
+	found, err := s.client.PricingRule.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.PricingRule{}, contract.ErrNotFound
+		}
+		return contract.PricingRule{}, err
+	}
+	intervals, err := s.pricingIntervals(ctx, []int{found.ID})
+	if err != nil {
+		return contract.PricingRule{}, err
+	}
+	return toPricingRuleWithFamily(found, "", intervals[found.ID]), nil
+}
+
+func (s *Store) ListPricingRules(ctx context.Context) ([]contract.PricingRule, error) {
+	rows, err := s.client.PricingRule.Query().
+		Order(entpricingrule.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	families, err := s.pricingRuleModelFamilies(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	intervals, err := s.pricingIntervals(ctx, pricingRuleIDs(rows))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.PricingRule, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toPricingRuleWithFamily(row, families[row.ModelID], intervals[row.ID]))
+	}
+	return out, nil
+}
+
+func pricingRuleIDs(rows []*ent.PricingRule) []int {
+	ids := make([]int, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ID)
+	}
+	return ids
+}
+
+func (s *Store) pricingRuleModelFamilies(ctx context.Context, rows []*ent.PricingRule) (map[int]string, error) {
+	ids := make([]int, 0, len(rows))
+	seen := map[int]struct{}{}
+	for _, row := range rows {
+		if row.ModelID <= 0 {
+			continue
+		}
+		if _, ok := seen[row.ModelID]; ok {
+			continue
+		}
+		seen[row.ModelID] = struct{}{}
+		ids = append(ids, row.ModelID)
+	}
+	if len(ids) == 0 {
+		return map[int]string{}, nil
+	}
+	models, err := s.client.ModelRegistry.Query().
+		Where(entmodelregistry.IDIn(ids...), entmodelregistry.DeletedAtIsNil()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int]string, len(models))
+	for _, model := range models {
+		out[model.ID] = model.Family
+	}
+	return out, nil
+}
+
+func (s *Store) DeletePricingRule(ctx context.Context, id int) error {
+	tx, err := s.client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.PricingInterval.Delete().Where(entpricinginterval.PricingRuleIDEQ(id)).Exec(ctx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := tx.PricingRule.DeleteOneID(id).Exec(ctx); err != nil {
+		_ = tx.Rollback()
+		if ent.IsNotFound(err) {
+			return contract.ErrNotFound
+		}
+		return err
+	}
+	return tx.Commit()
+}
+
+func toPricingRule(row *ent.PricingRule) contract.PricingRule {
+	return toPricingRuleWithFamily(row, "", nil)
+}
+
+func toPricingRuleWithFamily(row *ent.PricingRule, modelFamily string, intervals []contract.PricingInterval) contract.PricingRule {
+	return contract.PricingRule{
+		ID:                              row.ID,
+		ModelID:                         row.ModelID,
+		ModelFamily:                     modelFamily,
+		ProviderID:                      row.ProviderID,
+		BillingMode:                     contract.BillingMode(row.BillingMode),
+		InputPricePerMillionTokens:      row.InputPricePerMillion,
+		OutputPricePerMillionTokens:     row.OutputPricePerMillion,
+		CacheReadPricePerMillionTokens:  row.CacheReadPricePerMillion,
+		CacheWritePricePerMillionTokens: row.CacheWritePricePerMillion,
+		PerRequestPrice:                 row.PerRequestPrice,
+		Intervals:                       clonePricingIntervals(intervals),
+		Currency:                        row.Currency,
+		EffectiveFrom:                   cloneTime(row.EffectiveFrom),
+		EffectiveTo:                     cloneTime(row.EffectiveTo),
+		CreatedAt:                       row.CreatedAt,
+		UpdatedAt:                       row.UpdatedAt,
+	}
+}
+
+func (s *Store) pricingIntervals(ctx context.Context, ruleIDs []int) (map[int][]contract.PricingInterval, error) {
+	if len(ruleIDs) == 0 {
+		return map[int][]contract.PricingInterval{}, nil
+	}
+	rows, err := s.client.PricingInterval.Query().
+		Where(entpricinginterval.PricingRuleIDIn(ruleIDs...)).
+		Order(entpricinginterval.ByPricingRuleID(), entpricinginterval.ByMinTokens(), entpricinginterval.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int][]contract.PricingInterval, len(ruleIDs))
+	for _, row := range rows {
+		out[row.PricingRuleID] = append(out[row.PricingRuleID], toPricingInterval(row))
+	}
+	return out, nil
+}
+
+func replacePricingIntervals(ctx context.Context, tx *ent.Tx, pricingRuleID int, intervals []contract.PricingInterval) error {
+	if _, err := tx.PricingInterval.Delete().Where(entpricinginterval.PricingRuleIDEQ(pricingRuleID)).Exec(ctx); err != nil {
+		return err
+	}
+	for _, interval := range intervals {
+		create := tx.PricingInterval.Create().
+			SetPricingRuleID(pricingRuleID).
+			SetMinTokens(interval.MinTokens).
+			SetNillableMaxTokens(interval.MaxTokens).
+			SetTierLabel(interval.TierLabel).
+			SetImageSize(interval.ImageSize).
+			SetInputPricePerMillion(moneyOrZero(interval.InputPricePerMillionTokens)).
+			SetOutputPricePerMillion(moneyOrZero(interval.OutputPricePerMillionTokens)).
+			SetCacheReadPricePerMillion(moneyOrZero(interval.CacheReadPricePerMillionTokens)).
+			SetCacheWritePricePerMillion(moneyOrZero(interval.CacheWritePricePerMillionTokens)).
+			SetPerImagePrice(moneyOrZero(interval.PerImagePrice))
+		if !interval.CreatedAt.IsZero() {
+			create.SetCreatedAt(interval.CreatedAt).SetUpdatedAt(interval.CreatedAt)
+		}
+		if _, err := create.Save(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func toPricingInterval(row *ent.PricingInterval) contract.PricingInterval {
+	return contract.PricingInterval{
+		ID:                              row.ID,
+		PricingRuleID:                   row.PricingRuleID,
+		MinTokens:                       row.MinTokens,
+		MaxTokens:                       cloneInt(row.MaxTokens),
+		TierLabel:                       row.TierLabel,
+		ImageSize:                       row.ImageSize,
+		InputPricePerMillionTokens:      row.InputPricePerMillion,
+		OutputPricePerMillionTokens:     row.OutputPricePerMillion,
+		CacheReadPricePerMillionTokens:  row.CacheReadPricePerMillion,
+		CacheWritePricePerMillionTokens: row.CacheWritePricePerMillion,
+		PerImagePrice:                   row.PerImagePrice,
+		CreatedAt:                       row.CreatedAt,
+		UpdatedAt:                       row.UpdatedAt,
+	}
+}
+
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func clonePricingIntervals(values []contract.PricingInterval) []contract.PricingInterval {
+	if values == nil {
+		return nil
+	}
+	out := make([]contract.PricingInterval, len(values))
+	copy(out, values)
+	for idx := range out {
+		out[idx].MaxTokens = cloneInt(out[idx].MaxTokens)
+	}
+	return out
+}
+
+func billingModeOrToken(value contract.BillingMode) string {
+	switch value {
+	case contract.BillingModePerRequest, contract.BillingModeImage:
+		return string(value)
+	default:
+		return string(contract.BillingModeToken)
+	}
+}
+
+func moneyOrZero(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return money.ZeroAmount
+	}
+	return value
+}
+
+func cloneTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	cloned := value.UTC()
+	return &cloned
 }
 
 func uniqueSortedIDs(ids []int) []int {

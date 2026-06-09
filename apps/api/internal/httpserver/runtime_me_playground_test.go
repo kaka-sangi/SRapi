@@ -76,6 +76,63 @@ func TestMePlaygroundChatBillsUser(t *testing.T) {
 	}
 }
 
+func TestCurrentUserAvailableModelsReturnsChannelStatusAndPricing(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	csrf := loginResp.Data.CsrfToken
+
+	providerResp := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"available-provider","display_name":"Available Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, csrf, `{"canonical_name":"available-model","display_name":"Available Model","family":"available-family","status":"active","context_window":128000,"max_output_tokens":4096}`)
+	mustCreateMapping(t, handler, sessionCookie, csrf, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"available-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, csrf, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"available-account","runtime_class":"api_key","credential":{"api_key":"secret"},"status":"active"}`)
+	mustCreatePricingRule(t, handler, sessionCookie, csrf, `{"model_id":"`+string(modelResp.Data.Id)+`","provider_id":"`+string(providerResp.Data.Id)+`","input_price_per_million_tokens":"1.25","output_price_per_million_tokens":"2.50","cache_read_price_per_million_tokens":"0.10","cache_write_price_per_million_tokens":"0.20","currency":"usd"}`)
+
+	disabledModelResp := mustCreateModel(t, handler, sessionCookie, csrf, `{"canonical_name":"hidden-disabled-model","display_name":"Hidden Disabled","status":"disabled"}`)
+	mustCreateMapping(t, handler, sessionCookie, csrf, string(disabledModelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"hidden-upstream","status":"active"}`)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/me/available-models", nil)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("available models: expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.AvailableModelListResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode available models: %v", err)
+	}
+	var found *apiopenapi.AvailableModel
+	for i := range resp.Data {
+		if resp.Data[i].Id == "hidden-disabled-model" {
+			t.Fatalf("disabled model should not be listed: %+v", resp.Data[i])
+		}
+		if resp.Data[i].Id == "available-model" {
+			found = &resp.Data[i]
+		}
+	}
+	if found == nil {
+		t.Fatalf("expected available-model in response, got %+v", resp.Data)
+	}
+	if found.Status != apiopenapi.AvailableModelStatusAvailable || len(found.Channels) != 1 {
+		t.Fatalf("unexpected model availability: %+v", *found)
+	}
+	channel := found.Channels[0]
+	if channel.Status != apiopenapi.AvailableModelStatusAvailable || channel.ActiveAccountCount != 1 || channel.TotalAccountCount != 1 {
+		t.Fatalf("unexpected channel status/counts: %+v", channel)
+	}
+	if channel.ProviderName != "available-provider" || channel.UpstreamModel != "available-upstream" {
+		t.Fatalf("unexpected channel identity: %+v", channel)
+	}
+	if channel.Pricing.Source != apiopenapi.AvailableModelPricingSourcePricingRule ||
+		channel.Pricing.Currency != "USD" ||
+		channel.Pricing.InputPricePerMillionTokens != "1.25000000" ||
+		channel.Pricing.OutputPricePerMillionTokens != "2.50000000" ||
+		channel.Pricing.CacheReadPricePerMillionTokens != "0.10000000" ||
+		channel.Pricing.CacheWritePricePerMillionTokens != "0.20000000" {
+		t.Fatalf("unexpected pricing: %+v", channel.Pricing)
+	}
+}
+
 // TestMePlaygroundChatRequiresAuth confirms the endpoint is session-gated.
 func TestMePlaygroundChatRequiresAuth(t *testing.T) {
 	handler := New(config.Load(), nil)

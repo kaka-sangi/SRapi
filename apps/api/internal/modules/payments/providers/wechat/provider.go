@@ -26,6 +26,7 @@ import (
 	"github.com/wechatpay-apiv3/wechatpay-go/utils"
 
 	checkoutprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/checkout"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 const (
@@ -408,7 +409,7 @@ func nativeSceneInfo(payerClientIP string) *native.SceneInfo {
 }
 
 func minorAmount(amount string) (int64, bool) {
-	rat, ok := decimalRat(amount)
+	rat, ok := money.RequiredDecimalRat(amount)
 	if !ok || rat.Sign() <= 0 {
 		return 0, false
 	}
@@ -427,18 +428,6 @@ func amountFromMinor(amount int64) string {
 	whole := amount / 100
 	fraction := amount % 100
 	return strconv.FormatInt(whole, 10) + "." + leftPad(strconv.FormatInt(fraction, 10), 2) + "000000"
-}
-
-func decimalRat(value string) (*big.Rat, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" || strings.ContainsAny(value, "eE") {
-		return nil, false
-	}
-	rat := new(big.Rat)
-	if _, ok := rat.SetString(value); !ok {
-		return nil, false
-	}
-	return rat, true
 }
 
 func configString(values map[string]any, keys ...string) string {

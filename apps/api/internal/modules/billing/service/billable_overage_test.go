@@ -3,7 +3,7 @@ package service_test
 import (
 	"testing"
 
-	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
+	"github.com/srapi/srapi/apps/api/internal/modules/billing/service"
 )
 
 func TestBillableOverage(t *testing.T) {

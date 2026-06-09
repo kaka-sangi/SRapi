@@ -548,6 +548,38 @@ type ProviderError struct {
 	StatusCode int
 	Message    string
 	RetryAfter *time.Time
+	Metadata   map[string]any
+}
+
+// QuotaErrorMetadata returns account metadata fields that preserve a structured
+// quota fetch error for operators and scheduler decisions.
+func QuotaErrorMetadata(current map[string]any, providerErr ProviderError, now time.Time) map[string]any {
+	metadata := make(map[string]any, len(current)+len(providerErr.Metadata)+4)
+	for key, value := range current {
+		metadata[key] = value
+	}
+	metadata["last_quota_error_class"] = providerErr.Class
+	metadata["last_quota_error_status_code"] = providerErr.StatusCode
+	metadata["last_quota_error_message"] = providerErr.Message
+	metadata["last_quota_error_at"] = now.UTC().Format(time.RFC3339)
+	for key, value := range providerErr.Metadata {
+		if key == "" {
+			continue
+		}
+		metadata[key] = value
+	}
+	return metadata
+}
+
+// QuotaErrorClassRequiresOperatorAction reports whether a quota error class
+// should stop active scheduling until an operator resets the account state.
+func QuotaErrorClassRequiresOperatorAction(class string) bool {
+	switch class {
+	case "validation_required", "policy_violation", "forbidden":
+		return true
+	default:
+		return false
+	}
 }
 
 func (e ProviderError) Error() string {

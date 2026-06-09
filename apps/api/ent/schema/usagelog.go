@@ -42,6 +42,13 @@ func (UsageLog) Fields() []ent.Field {
 		// subscription allowance coverage. Equals cost unless a subscription in
 		// allowance mode covered part/all of the request (WP-1180).
 		field.String("billable_cost").Default("0.00000000"),
+		field.String("input_cost").Default("0.00000000"),
+		field.String("output_cost").Default("0.00000000"),
+		field.String("cache_read_cost").Default("0.00000000"),
+		field.String("cache_write_cost").Default("0.00000000"),
+		field.String("requested_model").Default(""),
+		field.String("upstream_model").Default(""),
+		field.String("billing_mode").Default("token"),
 		field.String("currency").Default("USD"),
 		field.Time("charged_at").Optional().Nillable(),
 		field.JSON("compatibility_warnings_json", []string{}).Optional(),

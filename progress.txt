@@ -69,3 +69,287 @@ Evidence:
 
 Next:
 - Stage 6: run broad backend/frontend gates, start local app, and capture browser evidence for channel tabs and dashboard balance card.
+
+Stage 6 partial - broad quality gates
+- Removed remaining seed-data assumptions in affected httpserver tests after the seed mock account removal: gateway/API-key limit tests, metrics, admin catalog overview/quota assertions, provider alias route tests, and provider preset install status expectations now create or expect explicit test-local state.
+- Split token-count and Anthropic usage helpers out of oversized runtime/provider files while keeping behavior unchanged.
+- Confirmed provider-scoped vision capability is part of gateway capability filtering.
+
+Evidence:
+- cd apps/api && go build ./...: exit 0.
+- cd apps/api && go vet ./...: exit 0.
+- cd apps/api && go test ./...: exit 0; internal/httpserver passed in 190.286s.
+- cd apps/web && npm run lint: exit 0, with existing unused Skeleton warnings only.
+- cd apps/web && npx tsc --noEmit: exit 0.
+
+Next:
+- Start the local app and capture browser evidence for /admin/channels/[id] tab switching and dashboard balance/platform quota cards.
+
+SRapi sub2api parity batch2 progress
+
+Stage 1 complete - shared money package
+- Added apps/api/internal/pkg/money as the single decimal money helper package with DefaultCurrency, ZeroAmount, DecimalRat, RequiredDecimalRat, ParseMoneyRat, FormatRatFixed, AddMoney, NormalizeAmount, and NormalizeCurrency.
+- Added money tests for blank/invalid parse handling, 8-place formatting, half-away rounding including negatives, invalid operand handling, and currency normalization.
+
+Stage 2 complete - duplicate money helpers removed
+- Replaced duplicated decimalRat/formatRatFixed/addMoney/parse helpers across usage, subscriptions, billing, httpserver gateway, balance_charger, affiliate, admin_control, users, and payments/provider code.
+- Kept mandatory-input semantics through money.RequiredDecimalRat where old code rejected blanks.
+
+Stage 3 complete - pricing moved to billing domain
+- Moved PricingRule contract types and PricingStore to billing contract.
+- Moved EstimatePrice, selectPricingRule, priceFromRule, cacheWriteRateOrInput, rule validation, and pricing CRUD orchestration to apps/api/internal/modules/billing/service/pricing.go.
+- Billing memory and Ent stores now implement PricingStore; subscriptions store/service/contract no longer expose pricing APIs.
+- HTTP admin pricing endpoints, config snapshot, audit mapping, and gateway pricing use runtime.billing.
+
+Stage 4 complete - gateway billing orchestration
+- Added billing Service.PriceGatewayUsage and PriceGatewayCost to centralize EstimatePrice, pricing source selection, account rate multiplier application, and subscription allowance billable-cost split.
+- HTTP runtime now records cost/actual_cost/billable_cost from billing service output while still collecting subscription allowance inputs from the subscriptions service.
+
+Evidence:
+- cd apps/api && go build ./...: exit 0.
+- cd apps/api && go vet ./...: exit 0.
+- cd apps/api && go test ./...: exit 0; internal/httpserver passed in 226.093s.
+- grep definitions: rg -n "func (addMoney|formatRatFixed|decimalRat)\b|type decimalRat|func parseMoneyRat" apps/api/internal apps/api/cmd returns only apps/api/internal/pkg/money/money.go.
+- pricing location grep: selectPricingRule, priceFromRule, cacheWriteRateOrInput, PriceGatewayUsage, and PriceGatewayCost appear only under billing service plus HTTP call sites; subscriptions has no pricing API or implementation hits.
+
+Next:
+- Batch3: continue with the next goal document. Browser validation remains skipped per user instruction.
+
+SRapi sub2api parity batch3 progress
+
+Stage 1 complete - billing mode data model
+- Added PricingRule billing_mode and per_request_price fields.
+- Added PricingInterval rows for tiered pricing intervals.
+- Added UsageLog cost breakdown, requested/upstream model snapshots, and billing_mode snapshots.
+- Regenerated Ent code and refreshed Atlas migration hash.
+
+Stage 2 complete - pricing modes and cost breakdown
+- Billing EstimatePrice now supports token, per_request, and image billing modes.
+- Token mode can use pricing intervals and falls back to flat rule pricing when no interval matches.
+- Per-request mode bills zero-token requests from per_request_price.
+- Image mode bills image counts from image tiers or per_request_price fallback.
+- Gateway pricing results now expose input, output, cache-read, and cache-write cost components.
+
+Stage 3 complete - gateway usage snapshots
+- Gateway usage recording persists requested_model, upstream_model, billing_mode, and cost breakdown snapshots.
+- Gateway rate multiplier and allowance billing preserve the component breakdown.
+- Usage service, memory store, and Ent store apply backward-compatible defaults for older callers.
+
+Stage 4 complete - admin pricing and usage UI
+- OpenAPI PricingRule create/update/list schemas now expose billing_mode, per_request_price, and intervals.
+- Generated Go OpenAPI types, Copilot spec, and TypeScript SDK are in sync.
+- Admin pricing forms support selecting billing mode and editing intervals.
+- Usage UI shows total cost with input/output/cache cost breakdown.
+
+Stage 5 complete - non-browser quality gates
+- Browser validation was skipped per user instruction.
+
+Evidence:
+- make migration-check: ok.
+- make ent-generate-check: ok.
+- make openapi-codegen-check: ok.
+- make openapi-ts-codegen-check: ok.
+- make openapi-lint: valid with the existing 3 public-endpoint 4xx warnings.
+- cd apps/api && go build ./...: exit 0.
+- cd apps/api && go vet ./...: exit 0.
+- cd apps/api && go test ./...: exit 0; internal/httpserver passed in 199.018s.
+- cd apps/web && npm run lint: exit 0, with existing unused Skeleton warnings only.
+- cd apps/web && npx tsc --noEmit: exit 0.
+- cd apps/api && go test ./internal/modules/billing/service: ok.
+- cd apps/api && go test ./internal/httpserver -run 'TestRecordGatewayUsage(PersistsCostBreakdownAndModelSnapshots|AppliesAccountGroupRateMultiplier)': ok.
+- cd apps/api && go test ./internal/persistence/entstore/billing -run TestStorePersistsPricingRules: ok.
+
+Next:
+- Batch4: continue with the next goal document. Browser validation remains skipped per user instruction.
+
+SRapi sub2api parity batch4 progress
+
+Stage 1 complete - shared usage window helper
+- Added apps/api/internal/pkg/usagewindow for UTC day/week/month starts, rolling 5h/1d/7d starts, and reset/expiry decisions.
+- Added unit tests for UTC calendar boundaries, rolling windows, and rolling counter expiry semantics.
+
+Stage 2 complete - materialized usage and API key cost schema
+- Added UserSubscription daily/weekly/monthly USD materialized usage counters plus independent window_start fields.
+- Added APIKey lifetime cost_quota/cost_used plus 5h/1d/7d cost limits, used counters, and window starts.
+- Added migration 000038_materialized_usage_and_key_cost_quotas with down migration and refreshed atlas.sum.
+- Regenerated Ent code and OpenAPI Go/TypeScript clients after exposing API key cost fields and subscription materialized usage fields.
+
+Stage 3 complete - billable-cost materialization
+- Successful gateway billing now increments active subscription daily/weekly/monthly usage with billable_cost.
+- Successful gateway billing now increments API key lifetime and 5h/1d/7d materialized cost counters with billable_cost.
+- Subscription and API key reads lazily reset expired windows.
+- Added correctness coverage proving repeated successful billing makes materialized subscription/API-key counters match the sum of persisted UsageLog.billable_cost.
+
+Stage 4 complete - bounded hot-path quota reads and key cost rejection
+- gatewayUserPeriodUsage now reads monthly tokens via usage.SummarizeUserWindow and subscription monthly cost via MaterializedUsageForUser instead of rescanning all user logs.
+- gatewayUserPlatformSpend now uses provider-scoped SummarizeUserWindow queries for daily/rolling-7d/monthly spend instead of rt.usage.ListByUser.
+- API key admission rejects requests that would exceed cost_quota or 5h/1d/7d cost windows with rate_limit_exceeded.
+- Existing request/rpm/tpm/concurrency limit behavior remains unchanged.
+
+Stage 5 complete - frontend materialized usage and cost quota UI
+- API key create/edit dialog now accepts lifetime USD cost quota and 5h/1d/7d cost limits.
+- API key edit dialog displays lifetime/5h/1d/7d cost used values.
+- Admin subscriptions and user billing subscriptions show daily/weekly/monthly materialized USD usage bars.
+- Monthly subscription usage bar uses monthly_cost_quota when present; daily/weekly show materialized values without inventing non-existent daily/weekly plan caps.
+
+Stage 6 complete - non-browser quality gates
+- Browser validation was skipped per user instruction.
+- Git status remains dirty because batch1-batch4 changes are cumulative and uncommitted in the shared worktree.
+
+Evidence:
+- cd apps/api && go test ./internal/pkg/usagewindow ./internal/modules/api_keys/... ./internal/modules/subscriptions/... ./internal/modules/usage/... ./internal/persistence/entstore/apikeys ./internal/persistence/entstore/subscriptions ./internal/persistence/entstore/usage ./internal/httpserver -run 'Test(GatewayEnforcesAPIKeyWindowLimit|GatewayEnforcesAPIKeyCostQuota|GatewayEnforcesAPIKeyCostWindowLimit|GatewayKeyIPAllowed|RecordGatewayUsagePersistsCostBreakdownAndModelSnapshots|RecordGatewayUsageAppliesAccountGroupRateMultiplier|RecordGatewayUsageMaterializedCostMatchesUsageLogBillableSum|MaterializedUsage|StorePersistsPlansAndSubscriptions|StoreCreatesAndLoadsAPIKey|ApplyCostUsage)': exit 0.
+- cd apps/api && go test ./internal/architecture ./internal/codequality: exit 0.
+- make ent-generate-check: exit 0.
+- make migration-check: ok github.com/srapi/srapi/apps/api/internal/platform/db.
+- make openapi-lint: valid with the existing 3 public-endpoint 4xx warnings.
+- make openapi-codegen-check: exit 0.
+- make openapi-ts-codegen-check: exit 0.
+- cd apps/api && go build ./...: exit 0.
+- cd apps/api && go vet ./...: exit 0.
+- cd apps/api && go test ./...: exit 0; internal/httpserver passed in 187.858s.
+- cd apps/web && npm run lint: exit 0, with existing unused Skeleton warnings only.
+- cd apps/web && npx tsc --noEmit: exit 0.
+- Hot-path scan check: rg shows gatewayUserPeriodUsage and gatewayUserPlatformSpend calling SummarizeUserWindow; no rt.usage.ListByUser remains in the gateway period/platform spend paths.
+
+Next:
+- Batch5: continue with the next goal document. Browser validation remains skipped per user instruction.
+
+SRapi sub2api parity batch5 progress
+
+Stage 1 complete - quota fetch hardening and forbidden classification
+- Provider quota fetches now use a short in-memory cache with failure caching and singleflight coalescing.
+- 403 responses are classified into validation_required, policy_violation, or forbidden and preserve validation_url/operator metadata when present.
+- Gateway account cooldown remains compatible with legacy auth_failed behavior while accepting the new 403 classes.
+
+Stage 2 complete - Anthropic quota signals
+- Anthropic OAuth quota fetch maps five-hour, seven-day, and seven-day Sonnet usage into real QuotaSignal entries.
+- Anthropic-compatible gateway responses passively sample unified 5h/7d quota headers into quota signals.
+- Quota refresh worker persists structured provider errors and suspends accounts when operator action is required.
+
+Stage 3 complete - provider OAuth presets
+- Provider presets include OAuth configuration for Codex, Anthropic, Antigravity, and Gemini-compatible flows.
+- Added GET /api/v1/admin/providers/{id}/oauth-config and generated OpenAPI/TypeScript clients.
+- The account OAuth dialog can prefill provider OAuth fields from the selected provider.
+
+Stage 4 complete - unified account import
+- Standard JSON import and Codex session import now share provider-agnostic import identity keys.
+- Standard account import returns the unified created/updated/skipped/failed result shape with item-level warnings.
+- The admin import dialog now groups JSON import, Codex session import, and OAuth account authorization behind one entry point.
+
+Stage 5 complete - quota reset and frontend badges
+- Added POST /api/v1/admin/accounts/{id}/reset-quota to clear quota error metadata and reactivate blocked accounts.
+- Admin accounts list shows quota/validation badges and exposes reset quota when quota error metadata exists.
+- HTTP/catalog and provider adapter service code was split into smaller focused files to satisfy architecture/codequality file-size gates.
+
+Stage 6 complete - non-browser quality gates
+- Browser validation was skipped per user instruction.
+- Git status remains dirty because batch1-batch5 changes are cumulative and uncommitted in the shared worktree.
+
+Evidence:
+- cd apps/api && go build ./...: exit 0.
+- cd apps/api && go vet ./...: exit 0.
+- cd apps/api && go test ./internal/architecture ./internal/codequality -count=1: exit 0.
+- cd apps/api && go test ./internal/httpserver -count=1: ok, internal/httpserver passed in 183.948s.
+- cd apps/api && go test ./internal/modules/provider_adapters/service ./internal/workers/quota_refresh -count=1: exit 0.
+- cd apps/api && go test ./...: exit 0, internal/httpserver passed in 185.819s.
+- make openapi-lint: valid with the existing 3 public-endpoint 4xx warnings.
+- make openapi-codegen-check: exit 0.
+- make openapi-ts-codegen-check: exit 0.
+- cd apps/web && npx tsc --noEmit: exit 0.
+- cd apps/web && npm run lint: exit 0, with existing unused Skeleton warnings only.
+- git diff --check: exit 0.
+
+Next:
+- Batch6: continue with available-models, available-channels, usage aggregate cleanup, and ops/account navigation consolidation. Browser validation remains skipped per user instruction.
+
+SRapi sub2api parity batch6 progress
+
+Stage 1 complete - current-user available models API
+- Added GET /api/v1/me/available-models to expose static user model visibility, channel status, and effective pricing.
+- The handler uses console session auth, subscription allowed_models entitlement, active model/provider/account state, and billing pricing rules.
+- Generated Go OpenAPI types, Copilot spec, and TypeScript SDK are in sync.
+
+Stage 2 complete - usage aggregate cleanup
+- Replaced separate usage window/model/daily summary DTOs with the shared UsageAggregate contract.
+- HTTP response mapping preserves the existing public aggregate_id/aggregate_type OpenAPI shape.
+- Gateway and API-key usage summaries now share the same aggregate accumulator and sorting logic.
+
+Stage 3 complete - self-service frontend model availability
+- Added the Available channels workspace page backed by /api/v1/me/available-models.
+- API key creation now offers current available models as allow-list shortcuts.
+- Usage model filtering now comes from the available model list instead of deriving options only from existing logs.
+
+Stage 4 complete - shared usage totals and cost breakdown UI
+- Added a shared useUsageTotals hook for user usage and gateway overview totals.
+- Usage rows show input/output/cache cost breakdown alongside total cost.
+
+Stage 5 complete - admin navigation consolidation
+- Consolidated channel monitor, scheduled tests, strategy replay, and scheduler decisions into /admin/ops tabs.
+- Provider account health entry now redirects to a read-only health view under /admin/accounts.
+- Removed the old duplicated gateway nav section while keeping gateway resources reachable in admin navigation.
+
+Stage 6 complete - non-browser quality gates
+- Browser validation was skipped per user instruction.
+- Git status remains dirty because batch1-batch6 changes are cumulative and uncommitted in the shared worktree.
+
+Evidence:
+- cd apps/api && go build ./...: exit 0.
+- cd apps/api && go vet ./...: exit 0.
+- cd apps/api && go test ./...: exit 0; internal/httpserver passed in 249.515s.
+- cd apps/api && go test ./internal/modules/usage/service ./internal/httpserver -run 'TestCurrentUserAvailableModelsReturnsChannelStatusAndPricing|TestSummarizeAPIKey|TestAggregate|Test.*Usage' -count=1: exit 0.
+- make openapi-lint: valid with the existing 3 public-endpoint 4xx warnings.
+- make openapi-codegen-check: exit 0.
+- make openapi-ts-codegen-check: exit 0.
+- make sdk-ts-typecheck: exit 0.
+- cd apps/web && npx tsc --noEmit: exit 0.
+- cd apps/web && npm test -- --run tests/unit/messages.test.ts tests/unit/i18n-translate.test.ts: 5 tests passed.
+- cd apps/web && npm run lint: exit 0, with 12 existing unused Skeleton warnings outside the files changed in the final cleanup.
+- git diff --check: exit 0.
+
+Next:
+- Batch6 is complete. Browser validation remains skipped per user instruction.
+
+SRapi sub2api parity batch7 progress
+
+Stage 1 complete - auth allowlist guard
+- Added `TestPresetRuntimeAllowlistsOnlyExposeSignableAuthMethods` in the provider preset registry tests.
+- The guard asserts every preset `RuntimeClassAllowlist` entry is inside the real signable runtime set; OAuth preset entries must also carry complete provisioning OAuth defaults.
+- The guard also asserts OAuth preset entries template a built-in refreshable `upstream_client` (`codex_cli`, `claude_code_cli`, or `antigravity_desktop`), matching Reverse Proxy Runtime refresh settings.
+- This would fail on the previous preset state because `service_account_json`, `desktop_client_token`, and `ide_plugin_token` were exposed by default presets but are outside the signable set.
+
+Stage 2 complete - P0 auth method cleanup
+- Removed `service_account_json` from the Anthropic and Bedrock provider presets; the runtime enum remains for legacy stored accounts, with no default UI exposure.
+- Removed unsupported first-party OpenAI and Gemini OAuth runtimes from their presets and OAuth metadata.
+- Added provider-adapter `not_supported` handling for manually configured first-party OpenAI/Gemini OAuth accounts.
+
+Stage 3 complete - P1 auth method cleanup
+- Merged Antigravity default desktop/IDE token exposure into `oauth_refresh`; the preset now templates `upstream_client=antigravity_desktop` so built-in refresh settings resolve.
+- Added `chatgpt-web` provider preset installed as `reverse-proxy-chatgpt-web`, exposing `web_session_cookie` and `custom_reverse_proxy`.
+- Removed `desktop_client_token`, `ide_plugin_token`, and `service_account_json` from the frontend account-create fallback runtime list; legacy account edit still preserves the existing runtime class.
+- Removed OpenAI OAuth from Quick Setup's static preset list.
+
+Stage 4 complete - regression, docs, and broad gates
+- Added `docs/PROVIDER_AUTH_MATRIX.md` as the provider x auth method baseline.
+- Updated the sub2api parity README, compatible provider registry spec, and gateway route matrix to match the new auth preset state.
+- Added targeted regressions for ChatGPT Web cookie auth, Antigravity OAuth runtime identity, OpenAI/Gemini OAuth not_supported, and provider preset installation auth_methods.
+- Anthropic OAuth preset accounts now template `upstream_client=claude_code_cli`; Antigravity templates `upstream_client=antigravity_desktop`.
+- `chatgpt-web` is the default web-cookie preset. `reverse-proxy-claude-web` remains roadmap/manual and is not exposed as a default preset.
+
+Final auth class disposition:
+- `service_account_json`: kept as legacy runtime enum only; removed from Anthropic/Bedrock preset allowlists and account-create fallback UI.
+- `oauth_refresh` / `oauth_device_code`: retained only for presets with provisioning defaults and built-in refresh paths; first-party OpenAI/Gemini presets exclude OAuth and manual OAuth accounts return `not_supported`.
+- `desktop_client_token` / `ide_plugin_token`: kept as legacy runtime enums only; removed from Antigravity preset allowlist and fallback UI, with Antigravity defaulting to `oauth_refresh`.
+- `web_session_cookie`: preset-reachable through `chatgpt-web` installed as `reverse-proxy-chatgpt-web`; fallback/manual account editing still preserves existing runtime classes.
+- `custom_reverse_proxy`, `api_key`, `cli_client_token`: unchanged where already wired.
+
+Evidence:
+- cd apps/api && go test ./internal/modules/providers/preset ./internal/modules/reverse_proxy/service ./internal/modules/provider_adapters/service ./internal/httpserver -run 'Test(DefaultRegistrySeedsCompatiblePresets|PresetRuntimeAllowlistsOnlyExposeSignableAuthMethods|RuntimeSanitizesHeadersAndInjectsAccountContext|RuntimeInjectsCliClientTokenAndDefaultClientUserAgent|RuntimeDoesNotInjectAPIKeyRuntimeCredentials|AntigravityRefreshUsesClientSecretFormTokenRequest|ClaudeRefreshUsesJSONTokenRequest|AdminAccountAuthMethodAllowlistScopesRuntimeClass|AdminInstallProviderPresetsIsIdempotent|GatewayChatGPTWebPresetAcceptsWebSessionCookie|GatewayAntigravityReverseProxyUsesOAuthRuntimeIdentity|OpenAIPresetOAuthRuntimeIsNotSupported|GeminiPresetOAuthRuntimeIsNotSupported)': exit 0.
+- cd apps/api && go build ./... && go vet ./... && go test ./...: exit 0 after guard tightening; internal/httpserver cached, provider preset package passed in 0.006s.
+- cd apps/web && npm run lint: exit 0, with 12 existing unused Skeleton warnings only.
+- cd apps/web && npx tsc --noEmit: exit 0.
+- git diff --check: exit 0.
+- Grep/code evidence: `registry.go` OpenAI allowlist only `api_key/custom_reverse_proxy`; Gemini allowlist only `api_key/custom_reverse_proxy`; Anthropic and Bedrock preset allowlists do not include `service_account_json`; Antigravity allowlist is `oauth_refresh/custom_reverse_proxy`; `chatgpt-web` allowlist includes `web_session_cookie/custom_reverse_proxy`; fallback UI runtime list excludes `service_account_json`, `desktop_client_token`, and `ide_plugin_token`.
+- Guard red-before explanation: `TestPresetRuntimeAllowlistsOnlyExposeSignableAuthMethods` would fail against the previous preset state because `service_account_json`, `desktop_client_token`, and `ide_plugin_token` are not in the signable set and because OAuth preset entries must carry complete provisioning OAuth defaults plus a built-in refreshable `upstream_client`; after the cleanup it passes.
+
+Next:
+- Batch7 behavior is implemented and verified. Per-stage commits and a clean `git status` were not produced because the shared worktree already contains cumulative batch1-batch6 dirty changes plus untracked generated files; committing only batch7 would mix unrelated prior changes in files touched across batches.

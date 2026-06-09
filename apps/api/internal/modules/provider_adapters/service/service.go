@@ -20,6 +20,7 @@ import (
 type Service struct {
 	client       *http.Client
 	reverseProxy reverseproxycontract.Runtime
+	quotaCache   *quotaFetchCache
 	// allowLocalStub permits synthesizing a fake local response when an account
 	// has no upstream base_url. It MUST stay false outside local/dev mode so a
 	// misconfigured account can never bill a customer for counterfeit output.
@@ -43,7 +44,7 @@ func NewWithReverseProxy(client *http.Client, runtime reverseproxycontract.Runti
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
-	svc := &Service{client: client, reverseProxy: runtime}
+	svc := &Service{client: client, reverseProxy: runtime, quotaCache: newQuotaFetchCache()}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(svc)
@@ -74,6 +75,9 @@ func (s *Service) InvokeConversation(ctx context.Context, req contract.Conversat
 	if baseURL := upstreamBaseURL(req); baseURL != "" {
 		if isBedrockCompatible(req) {
 			return s.invokeBedrockAnthropic(ctx, req)
+		}
+		if err := unsupportedPresetOAuthRuntime(req); err != nil {
+			return contract.ConversationResponse{}, err
 		}
 		if isGenericReverseProxy(req) {
 			return s.invokeGenericReverseProxyText(ctx, req, baseURL)
@@ -487,13 +491,21 @@ func (s *Service) invokeAnthropicCompatible(ctx context.Context, req contract.Co
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.ConversationResponse{}, classifyAnthropicProviderHTTPError(resp.StatusCode, body)
+		return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
 	if req.Stream {
-		return parseAnthropicCompatibleStream(body, resp.StatusCode)
+		parsed, err := parseAnthropicCompatibleStream(body, resp.StatusCode)
+		if err != nil {
+			return contract.ConversationResponse{}, err
+		}
+		return withAnthropicQuotaSignals(parsed, resp.Header), nil
 	}
 
-	return parseAnthropicCompatibleJSON(body, resp.StatusCode)
+	parsed, err := parseAnthropicCompatibleJSON(body, resp.StatusCode)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	return withAnthropicQuotaSignals(parsed, resp.Header), nil
 }
 
 func (s *Service) invokeOpenAICompatible(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
@@ -759,9 +771,17 @@ func (s *Service) invokeReverseProxyAnthropicCompatible(ctx context.Context, req
 		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if req.Stream {
-		return parseAnthropicCompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
+		parsed, err := parseAnthropicCompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
+		if err != nil {
+			return contract.ConversationResponse{}, err
+		}
+		return withAnthropicQuotaSignals(parsed, runtimeResp.Headers), nil
 	}
-	return parseAnthropicCompatibleJSON(runtimeResp.Body, runtimeResp.StatusCode)
+	parsed, err := parseAnthropicCompatibleJSON(runtimeResp.Body, runtimeResp.StatusCode)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	return withAnthropicQuotaSignals(parsed, runtimeResp.Headers), nil
 }
 
 func (s *Service) invokeReverseProxyOpenAICompatible(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
@@ -1297,6 +1317,23 @@ func isBedrockCompatible(req contract.ConversationRequest) bool {
 	return false
 }
 
+func unsupportedPresetOAuthRuntime(req contract.ConversationRequest) error {
+	runtimeClass := strings.ToLower(strings.TrimSpace(string(req.Account.RuntimeClass)))
+	if runtimeClass != string(accountcontract.RuntimeClassOauthRefresh) && runtimeClass != string(accountcontract.RuntimeClassOauthDeviceCode) {
+		return nil
+	}
+	switch strings.ToLower(strings.TrimSpace(req.Provider.Name)) {
+	case "openai", "gemini":
+		return contract.ProviderError{
+			Class:      "not_supported",
+			StatusCode: http.StatusBadRequest,
+			Message:    req.Provider.Name + " OAuth account runtime is not supported by SRapi presets",
+		}
+	default:
+		return nil
+	}
+}
+
 func isCodexReverseProxy(req contract.ConversationRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-codex-cli")
 }
@@ -1809,147 +1846,6 @@ func mapBool(values map[string]any, key string) bool {
 	default:
 		return false
 	}
-}
-
-func classifyProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
-	return classifyProviderHTTPErrorWithHeaders(statusCode, nil, body)
-}
-
-func classifyProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, body []byte) contract.ProviderError {
-	message := strings.TrimSpace(string(body))
-	if message == "" {
-		message = http.StatusText(statusCode)
-	}
-	return contract.ProviderError{Class: providerClassForHTTPStatus(statusCode), StatusCode: statusCode, Message: message, RetryAfter: providerRetryAfter(headers, body, time.Now())}
-}
-
-func classifyAnthropicProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
-	var decoded struct {
-		Error struct {
-			Type    string `json:"type"`
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	message := strings.TrimSpace(string(body))
-	class := providerClassForHTTPStatus(statusCode)
-	if err := json.Unmarshal(body, &decoded); err == nil {
-		if decoded.Error.Message != "" {
-			message = strings.TrimSpace(decoded.Error.Message)
-		}
-		if decoded.Error.Type != "" {
-			class = providerClassForAnthropicError(decoded.Error.Type, statusCode)
-		}
-	}
-	if message == "" {
-		message = http.StatusText(statusCode)
-	}
-	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message}
-}
-
-func classifyGeminiProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
-	return classifyGeminiProviderHTTPErrorWithHeaders(statusCode, nil, body)
-}
-
-func classifyGeminiProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, body []byte) contract.ProviderError {
-	var decoded struct {
-		Error struct {
-			Status  string `json:"status"`
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	message := strings.TrimSpace(string(body))
-	class := providerClassForHTTPStatus(statusCode)
-	if err := json.Unmarshal(body, &decoded); err == nil {
-		if decoded.Error.Message != "" {
-			message = strings.TrimSpace(decoded.Error.Message)
-		}
-		if decoded.Error.Status != "" {
-			class = providerClassForGeminiStatus(decoded.Error.Status, statusCode)
-		}
-	}
-	if message == "" {
-		message = http.StatusText(statusCode)
-	}
-	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, RetryAfter: providerRetryAfter(headers, body, time.Now())}
-}
-
-func providerClassForGeminiStatus(status string, statusCode int) string {
-	switch strings.ToUpper(strings.TrimSpace(status)) {
-	case "INVALID_ARGUMENT", "FAILED_PRECONDITION", "OUT_OF_RANGE":
-		return "invalid_request"
-	case "UNAUTHENTICATED", "PERMISSION_DENIED":
-		return "auth_failed"
-	case "RESOURCE_EXHAUSTED":
-		return "rate_limit"
-	case "NOT_FOUND":
-		return "model_unavailable"
-	case "DEADLINE_EXCEEDED":
-		return "timeout"
-	case "UNAVAILABLE", "INTERNAL", "UNKNOWN":
-		return "provider_5xx"
-	}
-	return providerClassForHTTPStatus(statusCode)
-}
-
-func providerClassForAnthropicError(errorType string, statusCode int) string {
-	switch strings.ToLower(strings.TrimSpace(errorType)) {
-	case "authentication_error", "permission_error":
-		return "auth_failed"
-	case "rate_limit_error":
-		return "rate_limit"
-	case "invalid_request_error":
-		return "invalid_request"
-	case "not_found_error":
-		return "model_unavailable"
-	case "overloaded_error", "api_error":
-		return "provider_5xx"
-	}
-	return providerClassForHTTPStatus(statusCode)
-}
-
-func providerClassForHTTPStatus(statusCode int) string {
-	switch statusCode {
-	case http.StatusBadRequest, http.StatusUnprocessableEntity:
-		return "invalid_request"
-	case http.StatusUnauthorized, http.StatusForbidden:
-		return "auth_failed"
-	case http.StatusNotFound:
-		return "model_unavailable"
-	case http.StatusTooManyRequests:
-		return "rate_limit"
-	case 529:
-		return "overloaded"
-	case http.StatusRequestTimeout, http.StatusGatewayTimeout:
-		return "timeout"
-	default:
-		if statusCode >= 500 {
-			return "provider_5xx"
-		}
-	}
-	return "unknown"
-}
-
-func providerErrorFromReverseProxy(err error) error {
-	var runtimeErr reverseproxycontract.RuntimeError
-	if errors.As(err, &runtimeErr) {
-		statusCode := runtimeErr.StatusCode
-		if statusCode == 0 {
-			statusCode = http.StatusBadGateway
-		}
-		class := strings.TrimSpace(runtimeErr.Class)
-		if class == "" {
-			class = "unknown"
-		}
-		if class == "upstream_error" {
-			class = providerClassForHTTPStatus(statusCode)
-		}
-		message := strings.TrimSpace(runtimeErr.Message)
-		if message == "" {
-			message = runtimeErr.Error()
-		}
-		return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message}
-	}
-	return contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy request failed"}
 }
 
 func synthesizeLocalText(model, prompt string) string {

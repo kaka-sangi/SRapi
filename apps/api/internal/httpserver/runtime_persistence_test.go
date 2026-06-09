@@ -150,7 +150,7 @@ func TestInjectedPersistentStoresSurviveRuntimeRebuild(t *testing.T) {
 			t.Fatalf("decode accounts list: %v", err)
 		}
 		return len(resp.Data)
-	}, 2)
+	}, 1)
 	assertListCount(t, restarted, restartedSessionCookie, "/api/v1/admin/usage-logs?model=persist-model", func(payload []byte) int {
 		var resp apiopenapi.UsageLogListResponse
 		if err := json.Unmarshal(payload, &resp); err != nil {

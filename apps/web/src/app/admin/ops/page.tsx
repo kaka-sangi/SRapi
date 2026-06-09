@@ -39,11 +39,15 @@ import { Sparkline } from "@/components/charts/sparkline";
 import { QuotaNotchRail } from "@/components/ui/quota-notch-rail";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Skeleton } from "@/components/ui/skeleton";
 import { SloCardSkeleton } from "@/components/charts/chart-skeleton";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { quietStatusFor } from "@/lib/status-badge";
 import { formatDateTime } from "@/lib/admin-format";
+import { MonitorContent } from "@/app/admin/channels/monitor/page";
+import { ScheduledTestsContent } from "@/app/admin/scheduled-tests/page";
+import { StrategyContent } from "@/app/admin/ops/strategy/page";
+import { SchedulerDecisionsPanel } from "@/components/features/scheduler-decisions-panel";
 
 export default function AdminOpsPage() {
   return (
@@ -71,6 +75,30 @@ function OpsWrapper() {
 }
 
 function OpsContent() {
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("tab") ?? "overview";
+
+  if (tab !== "overview") {
+    return (
+      <>
+        <OpsTabs value={tab} />
+        {tab === "channel-monitor" ? <MonitorContent /> : null}
+        {tab === "scheduled-tests" ? <ScheduledTestsContent /> : null}
+        {tab === "strategy" ? <StrategyContent /> : null}
+        {tab === "scheduler-decisions" ? <SchedulerDecisionsPanel /> : null}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <OpsTabs value="overview" />
+      <OpsOverviewContent />
+    </>
+  );
+}
+
+function OpsOverviewContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const router = useRouter();
@@ -521,5 +549,31 @@ function OpsContent() {
         />
       ) : null}
     </>
+  );
+}
+
+function OpsTabs({ value }: { value: string }) {
+  const { t } = useLanguage();
+  const router = useRouter();
+
+  function setTab(next: string) {
+    const params = new URLSearchParams();
+    if (next !== "overview") {
+      params.set("tab", next);
+    }
+    const qs = params.toString();
+    router.replace(`/admin/ops${qs ? `?${qs}` : ""}`, { scroll: false });
+  }
+
+  return (
+    <Tabs value={value} onValueChange={setTab}>
+      <TabsList className="flex flex-wrap">
+        <TabsTrigger value="overview">{t("adminOps.tabs.overview")}</TabsTrigger>
+        <TabsTrigger value="channel-monitor">{t("adminOps.tabs.channelMonitor")}</TabsTrigger>
+        <TabsTrigger value="scheduled-tests">{t("adminOps.tabs.scheduledTests")}</TabsTrigger>
+        <TabsTrigger value="strategy">{t("adminOps.tabs.strategy")}</TabsTrigger>
+        <TabsTrigger value="scheduler-decisions">{t("adminOps.tabs.schedulerDecisions")}</TabsTrigger>
+      </TabsList>
+    </Tabs>
   );
 }

@@ -24,6 +24,12 @@ func (UserSubscription) Fields() []ent.Field {
 		field.JSON("entitlements_snapshot_json", map[string]any{}).Optional(),
 		field.String("source_type").Default(""),
 		field.String("source_id").Default(""),
+		field.String("daily_usage_usd").Default("0.00000000"),
+		field.Time("daily_usage_window_start").Optional().Nillable(),
+		field.String("weekly_usage_usd").Default("0.00000000"),
+		field.Time("weekly_usage_window_start").Optional().Nillable(),
+		field.String("monthly_usage_usd").Default("0.00000000"),
+		field.Time("monthly_usage_window_start").Optional().Nillable(),
 	}
 }
 

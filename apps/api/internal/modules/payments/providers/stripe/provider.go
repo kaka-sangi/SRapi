@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	checkoutprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/checkout"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 	stripe "github.com/stripe/stripe-go/v78"
 	stripesession "github.com/stripe/stripe-go/v78/checkout/session"
 )
@@ -112,7 +113,7 @@ func (p Provider) createCheckoutSession(req CheckoutSessionRequest) (CheckoutSes
 }
 
 func MinorAmount(amount string, currency string) (int64, bool) {
-	rat, ok := decimalRat(amount)
+	rat, ok := money.RequiredDecimalRat(amount)
 	if !ok || rat.Sign() < 0 {
 		return 0, false
 	}
@@ -172,18 +173,6 @@ func stripeValueString(value any) string {
 	default:
 		return ""
 	}
-}
-
-func decimalRat(value string) (*big.Rat, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" || strings.ContainsAny(value, "eE") {
-		return nil, false
-	}
-	rat := new(big.Rat)
-	if _, ok := rat.SetString(value); !ok {
-		return nil, false
-	}
-	return rat, true
 }
 
 func ZeroDecimalCurrency(currency string) bool {

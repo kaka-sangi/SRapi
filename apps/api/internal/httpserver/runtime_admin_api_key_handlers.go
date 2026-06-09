@@ -104,9 +104,13 @@ func (s *Server) handleUpdateAdminApiKey(w http.ResponseWriter, r *http.Request)
 	}
 	status := body.Status
 	updated, err := s.runtime.apiKeys.Update(r.Context(), apikeycontract.UpdateRequest{
-		UserID: existing.UserID,
-		KeyID:  keyID,
-		Status: toAPIKeyStatusPtr(&status),
+		UserID:      existing.UserID,
+		KeyID:       keyID,
+		Status:      toAPIKeyStatusPtr(&status),
+		CostQuota:   body.CostQuota,
+		CostLimit5h: body.CostLimit5h,
+		CostLimit1d: body.CostLimit1d,
+		CostLimit7d: body.CostLimit7d,
 	})
 	if err != nil {
 		s.writeAdminApiKeyError(w, err, requestID)

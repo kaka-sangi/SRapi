@@ -452,6 +452,104 @@ func (_u *UsageLogUpdate) SetNillableBillableCost(v *string) *UsageLogUpdate {
 	return _u
 }
 
+// SetInputCost sets the "input_cost" field.
+func (_u *UsageLogUpdate) SetInputCost(v string) *UsageLogUpdate {
+	_u.mutation.SetInputCost(v)
+	return _u
+}
+
+// SetNillableInputCost sets the "input_cost" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableInputCost(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetInputCost(*v)
+	}
+	return _u
+}
+
+// SetOutputCost sets the "output_cost" field.
+func (_u *UsageLogUpdate) SetOutputCost(v string) *UsageLogUpdate {
+	_u.mutation.SetOutputCost(v)
+	return _u
+}
+
+// SetNillableOutputCost sets the "output_cost" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableOutputCost(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetOutputCost(*v)
+	}
+	return _u
+}
+
+// SetCacheReadCost sets the "cache_read_cost" field.
+func (_u *UsageLogUpdate) SetCacheReadCost(v string) *UsageLogUpdate {
+	_u.mutation.SetCacheReadCost(v)
+	return _u
+}
+
+// SetNillableCacheReadCost sets the "cache_read_cost" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableCacheReadCost(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetCacheReadCost(*v)
+	}
+	return _u
+}
+
+// SetCacheWriteCost sets the "cache_write_cost" field.
+func (_u *UsageLogUpdate) SetCacheWriteCost(v string) *UsageLogUpdate {
+	_u.mutation.SetCacheWriteCost(v)
+	return _u
+}
+
+// SetNillableCacheWriteCost sets the "cache_write_cost" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableCacheWriteCost(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetCacheWriteCost(*v)
+	}
+	return _u
+}
+
+// SetRequestedModel sets the "requested_model" field.
+func (_u *UsageLogUpdate) SetRequestedModel(v string) *UsageLogUpdate {
+	_u.mutation.SetRequestedModel(v)
+	return _u
+}
+
+// SetNillableRequestedModel sets the "requested_model" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableRequestedModel(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetRequestedModel(*v)
+	}
+	return _u
+}
+
+// SetUpstreamModel sets the "upstream_model" field.
+func (_u *UsageLogUpdate) SetUpstreamModel(v string) *UsageLogUpdate {
+	_u.mutation.SetUpstreamModel(v)
+	return _u
+}
+
+// SetNillableUpstreamModel sets the "upstream_model" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableUpstreamModel(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetUpstreamModel(*v)
+	}
+	return _u
+}
+
+// SetBillingMode sets the "billing_mode" field.
+func (_u *UsageLogUpdate) SetBillingMode(v string) *UsageLogUpdate {
+	_u.mutation.SetBillingMode(v)
+	return _u
+}
+
+// SetNillableBillingMode sets the "billing_mode" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableBillingMode(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetBillingMode(*v)
+	}
+	return _u
+}
+
 // SetCurrency sets the "currency" field.
 func (_u *UsageLogUpdate) SetCurrency(v string) *UsageLogUpdate {
 	_u.mutation.SetCurrency(v)
@@ -680,6 +778,27 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.BillableCost(); ok {
 		_spec.SetField(usagelog.FieldBillableCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.InputCost(); ok {
+		_spec.SetField(usagelog.FieldInputCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.OutputCost(); ok {
+		_spec.SetField(usagelog.FieldOutputCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CacheReadCost(); ok {
+		_spec.SetField(usagelog.FieldCacheReadCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CacheWriteCost(); ok {
+		_spec.SetField(usagelog.FieldCacheWriteCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RequestedModel(); ok {
+		_spec.SetField(usagelog.FieldRequestedModel, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.UpstreamModel(); ok {
+		_spec.SetField(usagelog.FieldUpstreamModel, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.BillingMode(); ok {
+		_spec.SetField(usagelog.FieldBillingMode, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(usagelog.FieldCurrency, field.TypeString, value)
@@ -1144,6 +1263,104 @@ func (_u *UsageLogUpdateOne) SetNillableBillableCost(v *string) *UsageLogUpdateO
 	return _u
 }
 
+// SetInputCost sets the "input_cost" field.
+func (_u *UsageLogUpdateOne) SetInputCost(v string) *UsageLogUpdateOne {
+	_u.mutation.SetInputCost(v)
+	return _u
+}
+
+// SetNillableInputCost sets the "input_cost" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableInputCost(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetInputCost(*v)
+	}
+	return _u
+}
+
+// SetOutputCost sets the "output_cost" field.
+func (_u *UsageLogUpdateOne) SetOutputCost(v string) *UsageLogUpdateOne {
+	_u.mutation.SetOutputCost(v)
+	return _u
+}
+
+// SetNillableOutputCost sets the "output_cost" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableOutputCost(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetOutputCost(*v)
+	}
+	return _u
+}
+
+// SetCacheReadCost sets the "cache_read_cost" field.
+func (_u *UsageLogUpdateOne) SetCacheReadCost(v string) *UsageLogUpdateOne {
+	_u.mutation.SetCacheReadCost(v)
+	return _u
+}
+
+// SetNillableCacheReadCost sets the "cache_read_cost" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableCacheReadCost(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetCacheReadCost(*v)
+	}
+	return _u
+}
+
+// SetCacheWriteCost sets the "cache_write_cost" field.
+func (_u *UsageLogUpdateOne) SetCacheWriteCost(v string) *UsageLogUpdateOne {
+	_u.mutation.SetCacheWriteCost(v)
+	return _u
+}
+
+// SetNillableCacheWriteCost sets the "cache_write_cost" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableCacheWriteCost(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetCacheWriteCost(*v)
+	}
+	return _u
+}
+
+// SetRequestedModel sets the "requested_model" field.
+func (_u *UsageLogUpdateOne) SetRequestedModel(v string) *UsageLogUpdateOne {
+	_u.mutation.SetRequestedModel(v)
+	return _u
+}
+
+// SetNillableRequestedModel sets the "requested_model" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableRequestedModel(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetRequestedModel(*v)
+	}
+	return _u
+}
+
+// SetUpstreamModel sets the "upstream_model" field.
+func (_u *UsageLogUpdateOne) SetUpstreamModel(v string) *UsageLogUpdateOne {
+	_u.mutation.SetUpstreamModel(v)
+	return _u
+}
+
+// SetNillableUpstreamModel sets the "upstream_model" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableUpstreamModel(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetUpstreamModel(*v)
+	}
+	return _u
+}
+
+// SetBillingMode sets the "billing_mode" field.
+func (_u *UsageLogUpdateOne) SetBillingMode(v string) *UsageLogUpdateOne {
+	_u.mutation.SetBillingMode(v)
+	return _u
+}
+
+// SetNillableBillingMode sets the "billing_mode" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableBillingMode(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetBillingMode(*v)
+	}
+	return _u
+}
+
 // SetCurrency sets the "currency" field.
 func (_u *UsageLogUpdateOne) SetCurrency(v string) *UsageLogUpdateOne {
 	_u.mutation.SetCurrency(v)
@@ -1402,6 +1619,27 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if value, ok := _u.mutation.BillableCost(); ok {
 		_spec.SetField(usagelog.FieldBillableCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.InputCost(); ok {
+		_spec.SetField(usagelog.FieldInputCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.OutputCost(); ok {
+		_spec.SetField(usagelog.FieldOutputCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CacheReadCost(); ok {
+		_spec.SetField(usagelog.FieldCacheReadCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CacheWriteCost(); ok {
+		_spec.SetField(usagelog.FieldCacheWriteCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RequestedModel(); ok {
+		_spec.SetField(usagelog.FieldRequestedModel, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.UpstreamModel(); ok {
+		_spec.SetField(usagelog.FieldUpstreamModel, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.BillingMode(); ok {
+		_spec.SetField(usagelog.FieldBillingMode, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(usagelog.FieldCurrency, field.TypeString, value)

@@ -120,6 +120,90 @@ func (_c *UserSubscriptionCreate) SetNillableSourceID(v *string) *UserSubscripti
 	return _c
 }
 
+// SetDailyUsageUsd sets the "daily_usage_usd" field.
+func (_c *UserSubscriptionCreate) SetDailyUsageUsd(v string) *UserSubscriptionCreate {
+	_c.mutation.SetDailyUsageUsd(v)
+	return _c
+}
+
+// SetNillableDailyUsageUsd sets the "daily_usage_usd" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableDailyUsageUsd(v *string) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetDailyUsageUsd(*v)
+	}
+	return _c
+}
+
+// SetDailyUsageWindowStart sets the "daily_usage_window_start" field.
+func (_c *UserSubscriptionCreate) SetDailyUsageWindowStart(v time.Time) *UserSubscriptionCreate {
+	_c.mutation.SetDailyUsageWindowStart(v)
+	return _c
+}
+
+// SetNillableDailyUsageWindowStart sets the "daily_usage_window_start" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableDailyUsageWindowStart(v *time.Time) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetDailyUsageWindowStart(*v)
+	}
+	return _c
+}
+
+// SetWeeklyUsageUsd sets the "weekly_usage_usd" field.
+func (_c *UserSubscriptionCreate) SetWeeklyUsageUsd(v string) *UserSubscriptionCreate {
+	_c.mutation.SetWeeklyUsageUsd(v)
+	return _c
+}
+
+// SetNillableWeeklyUsageUsd sets the "weekly_usage_usd" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableWeeklyUsageUsd(v *string) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetWeeklyUsageUsd(*v)
+	}
+	return _c
+}
+
+// SetWeeklyUsageWindowStart sets the "weekly_usage_window_start" field.
+func (_c *UserSubscriptionCreate) SetWeeklyUsageWindowStart(v time.Time) *UserSubscriptionCreate {
+	_c.mutation.SetWeeklyUsageWindowStart(v)
+	return _c
+}
+
+// SetNillableWeeklyUsageWindowStart sets the "weekly_usage_window_start" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableWeeklyUsageWindowStart(v *time.Time) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetWeeklyUsageWindowStart(*v)
+	}
+	return _c
+}
+
+// SetMonthlyUsageUsd sets the "monthly_usage_usd" field.
+func (_c *UserSubscriptionCreate) SetMonthlyUsageUsd(v string) *UserSubscriptionCreate {
+	_c.mutation.SetMonthlyUsageUsd(v)
+	return _c
+}
+
+// SetNillableMonthlyUsageUsd sets the "monthly_usage_usd" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableMonthlyUsageUsd(v *string) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetMonthlyUsageUsd(*v)
+	}
+	return _c
+}
+
+// SetMonthlyUsageWindowStart sets the "monthly_usage_window_start" field.
+func (_c *UserSubscriptionCreate) SetMonthlyUsageWindowStart(v time.Time) *UserSubscriptionCreate {
+	_c.mutation.SetMonthlyUsageWindowStart(v)
+	return _c
+}
+
+// SetNillableMonthlyUsageWindowStart sets the "monthly_usage_window_start" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableMonthlyUsageWindowStart(v *time.Time) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetMonthlyUsageWindowStart(*v)
+	}
+	return _c
+}
+
 // Mutation returns the UserSubscriptionMutation object of the builder.
 func (_c *UserSubscriptionCreate) Mutation() *UserSubscriptionMutation {
 	return _c.mutation
@@ -175,6 +259,18 @@ func (_c *UserSubscriptionCreate) defaults() {
 		v := usersubscription.DefaultSourceID
 		_c.mutation.SetSourceID(v)
 	}
+	if _, ok := _c.mutation.DailyUsageUsd(); !ok {
+		v := usersubscription.DefaultDailyUsageUsd
+		_c.mutation.SetDailyUsageUsd(v)
+	}
+	if _, ok := _c.mutation.WeeklyUsageUsd(); !ok {
+		v := usersubscription.DefaultWeeklyUsageUsd
+		_c.mutation.SetWeeklyUsageUsd(v)
+	}
+	if _, ok := _c.mutation.MonthlyUsageUsd(); !ok {
+		v := usersubscription.DefaultMonthlyUsageUsd
+		_c.mutation.SetMonthlyUsageUsd(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -205,6 +301,15 @@ func (_c *UserSubscriptionCreate) check() error {
 	}
 	if _, ok := _c.mutation.SourceID(); !ok {
 		return &ValidationError{Name: "source_id", err: errors.New(`ent: missing required field "UserSubscription.source_id"`)}
+	}
+	if _, ok := _c.mutation.DailyUsageUsd(); !ok {
+		return &ValidationError{Name: "daily_usage_usd", err: errors.New(`ent: missing required field "UserSubscription.daily_usage_usd"`)}
+	}
+	if _, ok := _c.mutation.WeeklyUsageUsd(); !ok {
+		return &ValidationError{Name: "weekly_usage_usd", err: errors.New(`ent: missing required field "UserSubscription.weekly_usage_usd"`)}
+	}
+	if _, ok := _c.mutation.MonthlyUsageUsd(); !ok {
+		return &ValidationError{Name: "monthly_usage_usd", err: errors.New(`ent: missing required field "UserSubscription.monthly_usage_usd"`)}
 	}
 	return nil
 }
@@ -271,6 +376,30 @@ func (_c *UserSubscriptionCreate) createSpec() (*UserSubscription, *sqlgraph.Cre
 	if value, ok := _c.mutation.SourceID(); ok {
 		_spec.SetField(usersubscription.FieldSourceID, field.TypeString, value)
 		_node.SourceID = value
+	}
+	if value, ok := _c.mutation.DailyUsageUsd(); ok {
+		_spec.SetField(usersubscription.FieldDailyUsageUsd, field.TypeString, value)
+		_node.DailyUsageUsd = value
+	}
+	if value, ok := _c.mutation.DailyUsageWindowStart(); ok {
+		_spec.SetField(usersubscription.FieldDailyUsageWindowStart, field.TypeTime, value)
+		_node.DailyUsageWindowStart = &value
+	}
+	if value, ok := _c.mutation.WeeklyUsageUsd(); ok {
+		_spec.SetField(usersubscription.FieldWeeklyUsageUsd, field.TypeString, value)
+		_node.WeeklyUsageUsd = value
+	}
+	if value, ok := _c.mutation.WeeklyUsageWindowStart(); ok {
+		_spec.SetField(usersubscription.FieldWeeklyUsageWindowStart, field.TypeTime, value)
+		_node.WeeklyUsageWindowStart = &value
+	}
+	if value, ok := _c.mutation.MonthlyUsageUsd(); ok {
+		_spec.SetField(usersubscription.FieldMonthlyUsageUsd, field.TypeString, value)
+		_node.MonthlyUsageUsd = value
+	}
+	if value, ok := _c.mutation.MonthlyUsageWindowStart(); ok {
+		_spec.SetField(usersubscription.FieldMonthlyUsageWindowStart, field.TypeTime, value)
+		_node.MonthlyUsageWindowStart = &value
 	}
 	return _node, _spec
 }

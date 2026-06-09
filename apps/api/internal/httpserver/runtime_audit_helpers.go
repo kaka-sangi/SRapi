@@ -9,6 +9,7 @@ import (
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
+	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
@@ -216,6 +217,10 @@ func apiKeyAuditSnapshot(key apikeycontract.APIKey) map[string]any {
 		"scopes":         append([]string(nil), key.Scopes...),
 		"allowed_models": append([]string(nil), key.AllowedModels...),
 		"group_ids":      append([]int(nil), key.GroupIDs...),
+		"cost_quota":     key.CostQuota,
+		"cost_limit_5h":  key.CostLimit5h,
+		"cost_limit_1d":  key.CostLimit1d,
+		"cost_limit_7d":  key.CostLimit7d,
 	}
 }
 
@@ -246,14 +251,17 @@ func userSubscriptionAuditSnapshot(subscription subscriptioncontract.UserSubscri
 	}
 }
 
-func pricingRuleAuditSnapshot(rule subscriptioncontract.PricingRule) map[string]any {
+func pricingRuleAuditSnapshot(rule billingcontract.PricingRule) map[string]any {
 	return map[string]any{
 		"model_id":                             rule.ModelID,
 		"provider_id":                          rule.ProviderID,
+		"billing_mode":                         rule.BillingMode,
 		"input_price_per_million_tokens":       rule.InputPricePerMillionTokens,
 		"output_price_per_million_tokens":      rule.OutputPricePerMillionTokens,
 		"cache_read_price_per_million_tokens":  rule.CacheReadPricePerMillionTokens,
 		"cache_write_price_per_million_tokens": rule.CacheWritePricePerMillionTokens,
+		"per_request_price":                    rule.PerRequestPrice,
+		"intervals":                            rule.Intervals,
 		"currency":                             rule.Currency,
 		"effective_from":                       rule.EffectiveFrom,
 		"effective_to":                         rule.EffectiveTo,

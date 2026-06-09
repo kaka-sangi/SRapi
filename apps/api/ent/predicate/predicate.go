@@ -129,6 +129,9 @@ type PaymentProviderInstance func(*sql.Selector)
 // PendingOAuthSession is the predicate function for pendingoauthsession builders.
 type PendingOAuthSession func(*sql.Selector)
 
+// PricingInterval is the predicate function for pricinginterval builders.
+type PricingInterval func(*sql.Selector)
+
 // PricingRule is the predicate function for pricingrule builders.
 type PricingRule func(*sql.Selector)
 

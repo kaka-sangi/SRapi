@@ -1,6 +1,13 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { KeyRound } from "lucide-react";
+import {
+  AccountOAuthAuthorizeDialog,
+  type AccountOAuthFlowMode,
+  type ProvisionedTokens,
+} from "@/components/admin/account-oauth-authorize-dialog";
+import { CodexImportResultPanel } from "@/components/admin/codex-session-import-dialog";
 import {
   Dialog,
   DialogContent,
@@ -13,27 +20,59 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { FileDropZone } from "@/components/ui/file-drop-zone";
-import { useImportAccounts } from "@/hooks/admin-queries";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCreateAccount, useImportAccounts, useImportCodexSession } from "@/hooks/admin-queries";
 import { buildImportAccountsBody } from "@/lib/admin-account-form";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
-import type { ProviderAccountImportResult } from "@/lib/sdk-types";
+import type {
+  CodexSessionImportResult,
+  Id,
+  ProviderAccountImportResult,
+  RuntimeClass,
+} from "@/lib/sdk-types";
 
 export function AccountImportDialog({
   open,
   onOpenChange,
+  providerOptions,
+  defaultProviderId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  providerOptions: { value: string; label: string }[];
+  defaultProviderId: string;
 }) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const importMut = useImportAccounts();
+  const codexImportMut = useImportCodexSession();
+  const createAccountMut = useCreateAccount();
+  const [tab, setTab] = useState<"json" | "codex" | "oauth">("json");
   const [json, setJson] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProviderAccountImportResult | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [codexProviderId, setCodexProviderId] = useState<string>(defaultProviderId);
+  const [codexContent, setCodexContent] = useState("");
+  const [codexName, setCodexName] = useState("");
+  const [codexUpdateExisting, setCodexUpdateExisting] = useState(true);
+  const [codexResult, setCodexResult] = useState<CodexSessionImportResult | null>(null);
+  const [codexFileNames, setCodexFileNames] = useState<string[]>([]);
+  const [oauthProviderId, setOAuthProviderId] = useState<string>(defaultProviderId);
+  const [oauthName, setOAuthName] = useState("");
+  const [oauthMode, setOAuthMode] = useState<AccountOAuthFlowMode>("authorization_code");
+  const [oauthWizardOpen, setOAuthWizardOpen] = useState(false);
 
   const handleFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
@@ -42,14 +81,31 @@ export function AccountImportDialog({
     setFileName(files[0].name);
   }, []);
 
+  const handleCodexFiles = useCallback(async (files: File[]) => {
+    const texts = await Promise.all(files.map((f) => f.text()));
+    setCodexContent((prev) => (prev ? prev + "\n" : "") + texts.join("\n"));
+    setCodexFileNames((prev) => [...prev, ...files.map((f) => f.name)]);
+  }, []);
+
   function reset() {
+    setTab("json");
     setJson("");
     setError(null);
     setResult(null);
     setFileName(null);
+    setCodexProviderId(defaultProviderId);
+    setCodexContent("");
+    setCodexName("");
+    setCodexUpdateExisting(true);
+    setCodexResult(null);
+    setCodexFileNames([]);
+    setOAuthProviderId(defaultProviderId);
+    setOAuthName("");
+    setOAuthMode("authorization_code");
+    setOAuthWizardOpen(false);
   }
 
-  async function submit() {
+  async function submitJson() {
     setError(null);
     let body: ReturnType<typeof buildImportAccountsBody>;
     try {
@@ -73,75 +129,353 @@ export function AccountImportDialog({
     }
   }
 
+  async function submitCodex() {
+    setError(null);
+    if (!codexProviderId) {
+      setError(t("codexImport.providerRequired"));
+      return;
+    }
+    if (!codexContent.trim()) {
+      setError(t("codexImport.contentRequired"));
+      return;
+    }
+    try {
+      const data = await codexImportMut.mutateAsync({
+        provider_id: codexProviderId as Id,
+        content: codexContent,
+        name: codexName.trim() ? codexName.trim() : undefined,
+        update_existing: codexUpdateExisting,
+      });
+      setCodexResult(data);
+      toast({
+        title: t("codexImport.done"),
+        description: t("codexImport.doneSummary", {
+          created: data.created,
+          updated: data.updated,
+          skipped: data.skipped,
+          failed: data.failed,
+        }),
+        tone: data.failed > 0 ? "error" : "success",
+      });
+    } catch (err) {
+      setError(adminErrorMessage(err));
+    }
+  }
+
+  async function applyProvisionedTokens(tokens: ProvisionedTokens) {
+    setError(null);
+    if (!oauthProviderId) {
+      setError(t("codexImport.providerRequired"));
+      return;
+    }
+    const credential: Record<string, string> = {};
+    if (tokens.accessToken) credential.access_token = tokens.accessToken;
+    if (tokens.refreshToken) credential.refresh_token = tokens.refreshToken;
+    try {
+      await createAccountMut.mutateAsync({
+        provider_id: oauthProviderId as Id,
+        name: oauthName.trim() || `OAuth account ${new Date().toISOString()}`,
+        runtime_class: (oauthMode === "authorization_code"
+          ? "oauth_refresh"
+          : "oauth_device_code") as RuntimeClass,
+        credential,
+        status: "active",
+      });
+      toast({ title: t("feedback.created"), tone: "success" });
+      onOpenChange(false);
+    } catch (err) {
+      setError(adminErrorMessage(err));
+    }
+  }
+
+  const busy =
+    importMut.isPending || codexImportMut.isPending || createAccountMut.isPending;
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        onOpenChange(next);
-        if (!next) reset();
-      }}
-    >
-      <DialogContent>
+    <>
+      <AccountOAuthAuthorizeDialog
+        open={oauthWizardOpen}
+        onOpenChange={setOAuthWizardOpen}
+        mode={oauthMode}
+        providerId={oauthProviderId}
+        onProvisioned={(tokens) => void applyProvisionedTokens(tokens)}
+      />
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          onOpenChange(next);
+          if (!next) reset();
+        }}
+      >
+      <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>{t("adminAccounts.importTitle")}</DialogTitle>
           <DialogDescription>{t("adminAccounts.importHint")}</DialogDescription>
         </DialogHeader>
-        <div className="mt-4 space-y-3">
-          <div>
-            <Label htmlFor="import-json">{t("adminAccounts.importJson")}</Label>
-            <FileDropZone
-              accept=".json"
-              disabled={importMut.isPending}
-              hint={t("adminAccounts.importDropHint")}
-              onFiles={(files) => void handleFiles(files)}
-              fileNames={fileName ? [fileName] : undefined}
-              onClearFiles={() => { setFileName(null); setJson(""); }}
-              className="mb-2"
-            />
-            <Textarea
-              id="import-json"
-              rows={10}
-              spellCheck={false}
-              className="font-mono text-xs"
-              value={json}
-              onChange={(e) => setJson(e.target.value)}
-              placeholder={'{ "accounts": [ { "name": "...", "provider_id": "...", "runtime_class": "...", "credential": { } } ] }'}
-              disabled={importMut.isPending}
-            />
-          </div>
-          {error ? (
-            <p role="alert" className="text-sm text-srapi-error">
-              {error}
-            </p>
-          ) : null}
-          {result && result.errors.length > 0 ? (
-            <div className="rounded-xl border border-srapi-border bg-srapi-card-muted p-3">
-              <p className="text-2xs font-medium text-srapi-text-secondary">
-                {t("adminAccounts.importErrorsTitle")}
-              </p>
-              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-2xs text-srapi-text-tertiary">
-                {result.errors.map((message, idx) => (
-                  <li key={idx}>{message}</li>
-                ))}
-              </ul>
+
+        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+          <TabsList className="mt-4 flex-wrap">
+            <TabsTrigger value="json">{t("adminAccounts.importJson")}</TabsTrigger>
+            <TabsTrigger value="codex">{t("codexImport.action")}</TabsTrigger>
+            <TabsTrigger value="oauth">{t("accountOAuth.authorizeAccount")}</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="json">
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="import-json">{t("adminAccounts.importJson")}</Label>
+                <FileDropZone
+                  accept=".json"
+                  disabled={busy}
+                  hint={t("adminAccounts.importDropHint")}
+                  onFiles={(files) => void handleFiles(files)}
+                  fileNames={fileName ? [fileName] : undefined}
+                  onClearFiles={() => {
+                    setFileName(null);
+                    setJson("");
+                  }}
+                  className="mb-2"
+                />
+                <Textarea
+                  id="import-json"
+                  rows={10}
+                  spellCheck={false}
+                  className="font-mono text-xs"
+                  value={json}
+                  onChange={(e) => setJson(e.target.value)}
+                  placeholder={'{ "accounts": [ { "name": "...", "provider_id": "...", "runtime_class": "...", "credential": { } } ] }'}
+                  disabled={busy}
+                />
+              </div>
+              {result ? <ProviderImportResultPanel result={result} /> : null}
             </div>
-          ) : null}
-        </div>
+          </TabsContent>
+
+          <TabsContent value="codex">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="codex-import-provider">{t("codexImport.provider")}</Label>
+                <Select value={codexProviderId} onValueChange={setCodexProviderId} disabled={busy}>
+                  <SelectTrigger id="codex-import-provider">
+                    <SelectValue placeholder={t("codexImport.providerPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {providerOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="codex-import-content">{t("codexImport.content")}</Label>
+                <FileDropZone
+                  accept=".json,.txt,.ndjson"
+                  multiple
+                  disabled={busy}
+                  hint={t("codexImport.dropHint")}
+                  onFiles={(files) => void handleCodexFiles(files)}
+                  fileNames={codexFileNames}
+                  onClearFiles={() => {
+                    setCodexFileNames([]);
+                    setCodexContent("");
+                  }}
+                  className="mb-2"
+                />
+                <Textarea
+                  id="codex-import-content"
+                  rows={8}
+                  spellCheck={false}
+                  className="font-mono text-xs"
+                  placeholder={t("codexImport.contentPlaceholder")}
+                  value={codexContent}
+                  onChange={(e) => setCodexContent(e.target.value)}
+                  disabled={busy}
+                />
+                <p className="mt-1 text-xs text-srapi-text-tertiary">{t("codexImport.contentHint")}</p>
+              </div>
+              <div>
+                <Label htmlFor="codex-import-name">{t("codexImport.name")}</Label>
+                <Input
+                  id="codex-import-name"
+                  placeholder={t("codexImport.namePlaceholder")}
+                  value={codexName}
+                  onChange={(e) => setCodexName(e.target.value)}
+                  disabled={busy}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-md border border-srapi-border px-3 py-2">
+                <div>
+                  <Label htmlFor="codex-import-update" className="cursor-pointer">
+                    {t("codexImport.updateExisting")}
+                  </Label>
+                  <p className="text-xs text-srapi-text-tertiary">{t("codexImport.updateExistingHint")}</p>
+                </div>
+                <Switch
+                  id="codex-import-update"
+                  checked={codexUpdateExisting}
+                  onCheckedChange={setCodexUpdateExisting}
+                  disabled={busy}
+                />
+              </div>
+              {codexResult ? <CodexImportResultPanel result={codexResult} /> : null}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="oauth">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="oauth-import-provider">{t("codexImport.provider")}</Label>
+                <Select value={oauthProviderId} onValueChange={setOAuthProviderId} disabled={busy}>
+                  <SelectTrigger id="oauth-import-provider">
+                    <SelectValue placeholder={t("codexImport.providerPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {providerOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="oauth-import-name">{t("codexImport.name")}</Label>
+                <Input
+                  id="oauth-import-name"
+                  placeholder={t("codexImport.namePlaceholder")}
+                  value={oauthName}
+                  onChange={(e) => setOAuthName(e.target.value)}
+                  disabled={busy}
+                />
+              </div>
+              <div>
+                <Label htmlFor="oauth-import-mode">{t("adminAccounts.authType")}</Label>
+                <Select
+                  value={oauthMode}
+                  onValueChange={(value) => setOAuthMode(value as AccountOAuthFlowMode)}
+                  disabled={busy}
+                >
+                  <SelectTrigger id="oauth-import-mode">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="authorization_code">
+                      {t("adminAccounts.runtime.oauth_refresh")}
+                    </SelectItem>
+                    <SelectItem value="device_code">
+                      {t("adminAccounts.runtime.oauth_device_code")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!oauthProviderId || busy}
+                onClick={() => setOAuthWizardOpen(true)}
+              >
+                <KeyRound className="size-3.5" />
+                {t("accountOAuth.authorizeAccount")}
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {error ? (
+          <p role="alert" className="mt-3 text-sm text-srapi-error">
+            {error}
+          </p>
+        ) : null}
+
         <DialogFooter className="mt-6">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             {t("common.close")}
           </Button>
-          <Button
-            type="button"
-            variant="primary"
-            loading={importMut.isPending}
-            disabled={!json.trim()}
-            onClick={submit}
-          >
-            {t("adminAccounts.importSubmit")}
-          </Button>
+          {tab === "json" ? (
+            <Button
+              type="button"
+              variant="primary"
+              loading={importMut.isPending}
+              disabled={!json.trim() || busy}
+              onClick={() => void submitJson()}
+            >
+              {t("adminAccounts.importSubmit")}
+            </Button>
+          ) : tab === "codex" ? (
+            <Button
+              type="button"
+              variant="primary"
+              loading={codexImportMut.isPending}
+              disabled={!codexContent.trim() || !codexProviderId || busy}
+              onClick={() => void submitCodex()}
+            >
+              {t("codexImport.submit")}
+            </Button>
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
+  );
+}
+
+function ProviderImportResultPanel({ result }: { result: ProviderAccountImportResult }) {
+  const { t } = useLanguage();
+  return (
+    <div className="space-y-3 rounded-md border border-srapi-border bg-srapi-card-muted p-3">
+      <div className="grid grid-cols-4 gap-2 text-center">
+        <ImportStat label={t("codexImport.created")} value={result.created_count} tone="success" />
+        <ImportStat label={t("codexImport.updated")} value={result.updated_count} />
+        <ImportStat label={t("codexImport.skipped")} value={result.skipped_count} />
+        <ImportStat label={t("codexImport.failed")} value={result.failed_count} tone="error" />
+      </div>
+      {result.errors.length > 0 ? (
+        <div>
+          <p className="text-2xs font-medium text-srapi-text-secondary">
+            {t("adminAccounts.importErrorsTitle")}
+          </p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-2xs text-srapi-error">
+            {result.errors.map((message, idx) => (
+              <li key={idx}>{message}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {result.warnings.length > 0 ? (
+        <ul className="space-y-1 text-xs text-srapi-text-tertiary">
+          {result.warnings.map((msg, idx) => (
+            <li key={`warn-${idx}`}>
+              #{msg.index}
+              {msg.name ? ` ${msg.name}` : ""}: {msg.message}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function ImportStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: "success" | "error";
+}) {
+  const toneClass =
+    tone === "success"
+      ? "text-srapi-success"
+      : tone === "error"
+        ? "text-srapi-error"
+        : "text-srapi-text-primary";
+  return (
+    <div>
+      <div className={`text-lg font-semibold ${toneClass}`}>{value}</div>
+      <div className="text-xs text-srapi-text-tertiary">{label}</div>
+    </div>
   );
 }

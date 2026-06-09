@@ -158,6 +158,108 @@ func (_u *UserSubscriptionUpdate) SetNillableSourceID(v *string) *UserSubscripti
 	return _u
 }
 
+// SetDailyUsageUsd sets the "daily_usage_usd" field.
+func (_u *UserSubscriptionUpdate) SetDailyUsageUsd(v string) *UserSubscriptionUpdate {
+	_u.mutation.SetDailyUsageUsd(v)
+	return _u
+}
+
+// SetNillableDailyUsageUsd sets the "daily_usage_usd" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillableDailyUsageUsd(v *string) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetDailyUsageUsd(*v)
+	}
+	return _u
+}
+
+// SetDailyUsageWindowStart sets the "daily_usage_window_start" field.
+func (_u *UserSubscriptionUpdate) SetDailyUsageWindowStart(v time.Time) *UserSubscriptionUpdate {
+	_u.mutation.SetDailyUsageWindowStart(v)
+	return _u
+}
+
+// SetNillableDailyUsageWindowStart sets the "daily_usage_window_start" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillableDailyUsageWindowStart(v *time.Time) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetDailyUsageWindowStart(*v)
+	}
+	return _u
+}
+
+// ClearDailyUsageWindowStart clears the value of the "daily_usage_window_start" field.
+func (_u *UserSubscriptionUpdate) ClearDailyUsageWindowStart() *UserSubscriptionUpdate {
+	_u.mutation.ClearDailyUsageWindowStart()
+	return _u
+}
+
+// SetWeeklyUsageUsd sets the "weekly_usage_usd" field.
+func (_u *UserSubscriptionUpdate) SetWeeklyUsageUsd(v string) *UserSubscriptionUpdate {
+	_u.mutation.SetWeeklyUsageUsd(v)
+	return _u
+}
+
+// SetNillableWeeklyUsageUsd sets the "weekly_usage_usd" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillableWeeklyUsageUsd(v *string) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetWeeklyUsageUsd(*v)
+	}
+	return _u
+}
+
+// SetWeeklyUsageWindowStart sets the "weekly_usage_window_start" field.
+func (_u *UserSubscriptionUpdate) SetWeeklyUsageWindowStart(v time.Time) *UserSubscriptionUpdate {
+	_u.mutation.SetWeeklyUsageWindowStart(v)
+	return _u
+}
+
+// SetNillableWeeklyUsageWindowStart sets the "weekly_usage_window_start" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillableWeeklyUsageWindowStart(v *time.Time) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetWeeklyUsageWindowStart(*v)
+	}
+	return _u
+}
+
+// ClearWeeklyUsageWindowStart clears the value of the "weekly_usage_window_start" field.
+func (_u *UserSubscriptionUpdate) ClearWeeklyUsageWindowStart() *UserSubscriptionUpdate {
+	_u.mutation.ClearWeeklyUsageWindowStart()
+	return _u
+}
+
+// SetMonthlyUsageUsd sets the "monthly_usage_usd" field.
+func (_u *UserSubscriptionUpdate) SetMonthlyUsageUsd(v string) *UserSubscriptionUpdate {
+	_u.mutation.SetMonthlyUsageUsd(v)
+	return _u
+}
+
+// SetNillableMonthlyUsageUsd sets the "monthly_usage_usd" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillableMonthlyUsageUsd(v *string) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetMonthlyUsageUsd(*v)
+	}
+	return _u
+}
+
+// SetMonthlyUsageWindowStart sets the "monthly_usage_window_start" field.
+func (_u *UserSubscriptionUpdate) SetMonthlyUsageWindowStart(v time.Time) *UserSubscriptionUpdate {
+	_u.mutation.SetMonthlyUsageWindowStart(v)
+	return _u
+}
+
+// SetNillableMonthlyUsageWindowStart sets the "monthly_usage_window_start" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillableMonthlyUsageWindowStart(v *time.Time) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetMonthlyUsageWindowStart(*v)
+	}
+	return _u
+}
+
+// ClearMonthlyUsageWindowStart clears the value of the "monthly_usage_window_start" field.
+func (_u *UserSubscriptionUpdate) ClearMonthlyUsageWindowStart() *UserSubscriptionUpdate {
+	_u.mutation.ClearMonthlyUsageWindowStart()
+	return _u
+}
+
 // Mutation returns the UserSubscriptionMutation object of the builder.
 func (_u *UserSubscriptionUpdate) Mutation() *UserSubscriptionMutation {
 	return _u.mutation
@@ -243,6 +345,33 @@ func (_u *UserSubscriptionUpdate) sqlSave(ctx context.Context) (_node int, err e
 	}
 	if value, ok := _u.mutation.SourceID(); ok {
 		_spec.SetField(usersubscription.FieldSourceID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DailyUsageUsd(); ok {
+		_spec.SetField(usersubscription.FieldDailyUsageUsd, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DailyUsageWindowStart(); ok {
+		_spec.SetField(usersubscription.FieldDailyUsageWindowStart, field.TypeTime, value)
+	}
+	if _u.mutation.DailyUsageWindowStartCleared() {
+		_spec.ClearField(usersubscription.FieldDailyUsageWindowStart, field.TypeTime)
+	}
+	if value, ok := _u.mutation.WeeklyUsageUsd(); ok {
+		_spec.SetField(usersubscription.FieldWeeklyUsageUsd, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.WeeklyUsageWindowStart(); ok {
+		_spec.SetField(usersubscription.FieldWeeklyUsageWindowStart, field.TypeTime, value)
+	}
+	if _u.mutation.WeeklyUsageWindowStartCleared() {
+		_spec.ClearField(usersubscription.FieldWeeklyUsageWindowStart, field.TypeTime)
+	}
+	if value, ok := _u.mutation.MonthlyUsageUsd(); ok {
+		_spec.SetField(usersubscription.FieldMonthlyUsageUsd, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.MonthlyUsageWindowStart(); ok {
+		_spec.SetField(usersubscription.FieldMonthlyUsageWindowStart, field.TypeTime, value)
+	}
+	if _u.mutation.MonthlyUsageWindowStartCleared() {
+		_spec.ClearField(usersubscription.FieldMonthlyUsageWindowStart, field.TypeTime)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -394,6 +523,108 @@ func (_u *UserSubscriptionUpdateOne) SetNillableSourceID(v *string) *UserSubscri
 	return _u
 }
 
+// SetDailyUsageUsd sets the "daily_usage_usd" field.
+func (_u *UserSubscriptionUpdateOne) SetDailyUsageUsd(v string) *UserSubscriptionUpdateOne {
+	_u.mutation.SetDailyUsageUsd(v)
+	return _u
+}
+
+// SetNillableDailyUsageUsd sets the "daily_usage_usd" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillableDailyUsageUsd(v *string) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetDailyUsageUsd(*v)
+	}
+	return _u
+}
+
+// SetDailyUsageWindowStart sets the "daily_usage_window_start" field.
+func (_u *UserSubscriptionUpdateOne) SetDailyUsageWindowStart(v time.Time) *UserSubscriptionUpdateOne {
+	_u.mutation.SetDailyUsageWindowStart(v)
+	return _u
+}
+
+// SetNillableDailyUsageWindowStart sets the "daily_usage_window_start" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillableDailyUsageWindowStart(v *time.Time) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetDailyUsageWindowStart(*v)
+	}
+	return _u
+}
+
+// ClearDailyUsageWindowStart clears the value of the "daily_usage_window_start" field.
+func (_u *UserSubscriptionUpdateOne) ClearDailyUsageWindowStart() *UserSubscriptionUpdateOne {
+	_u.mutation.ClearDailyUsageWindowStart()
+	return _u
+}
+
+// SetWeeklyUsageUsd sets the "weekly_usage_usd" field.
+func (_u *UserSubscriptionUpdateOne) SetWeeklyUsageUsd(v string) *UserSubscriptionUpdateOne {
+	_u.mutation.SetWeeklyUsageUsd(v)
+	return _u
+}
+
+// SetNillableWeeklyUsageUsd sets the "weekly_usage_usd" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillableWeeklyUsageUsd(v *string) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetWeeklyUsageUsd(*v)
+	}
+	return _u
+}
+
+// SetWeeklyUsageWindowStart sets the "weekly_usage_window_start" field.
+func (_u *UserSubscriptionUpdateOne) SetWeeklyUsageWindowStart(v time.Time) *UserSubscriptionUpdateOne {
+	_u.mutation.SetWeeklyUsageWindowStart(v)
+	return _u
+}
+
+// SetNillableWeeklyUsageWindowStart sets the "weekly_usage_window_start" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillableWeeklyUsageWindowStart(v *time.Time) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetWeeklyUsageWindowStart(*v)
+	}
+	return _u
+}
+
+// ClearWeeklyUsageWindowStart clears the value of the "weekly_usage_window_start" field.
+func (_u *UserSubscriptionUpdateOne) ClearWeeklyUsageWindowStart() *UserSubscriptionUpdateOne {
+	_u.mutation.ClearWeeklyUsageWindowStart()
+	return _u
+}
+
+// SetMonthlyUsageUsd sets the "monthly_usage_usd" field.
+func (_u *UserSubscriptionUpdateOne) SetMonthlyUsageUsd(v string) *UserSubscriptionUpdateOne {
+	_u.mutation.SetMonthlyUsageUsd(v)
+	return _u
+}
+
+// SetNillableMonthlyUsageUsd sets the "monthly_usage_usd" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillableMonthlyUsageUsd(v *string) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetMonthlyUsageUsd(*v)
+	}
+	return _u
+}
+
+// SetMonthlyUsageWindowStart sets the "monthly_usage_window_start" field.
+func (_u *UserSubscriptionUpdateOne) SetMonthlyUsageWindowStart(v time.Time) *UserSubscriptionUpdateOne {
+	_u.mutation.SetMonthlyUsageWindowStart(v)
+	return _u
+}
+
+// SetNillableMonthlyUsageWindowStart sets the "monthly_usage_window_start" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillableMonthlyUsageWindowStart(v *time.Time) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetMonthlyUsageWindowStart(*v)
+	}
+	return _u
+}
+
+// ClearMonthlyUsageWindowStart clears the value of the "monthly_usage_window_start" field.
+func (_u *UserSubscriptionUpdateOne) ClearMonthlyUsageWindowStart() *UserSubscriptionUpdateOne {
+	_u.mutation.ClearMonthlyUsageWindowStart()
+	return _u
+}
+
 // Mutation returns the UserSubscriptionMutation object of the builder.
 func (_u *UserSubscriptionUpdateOne) Mutation() *UserSubscriptionMutation {
 	return _u.mutation
@@ -509,6 +740,33 @@ func (_u *UserSubscriptionUpdateOne) sqlSave(ctx context.Context) (_node *UserSu
 	}
 	if value, ok := _u.mutation.SourceID(); ok {
 		_spec.SetField(usersubscription.FieldSourceID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DailyUsageUsd(); ok {
+		_spec.SetField(usersubscription.FieldDailyUsageUsd, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DailyUsageWindowStart(); ok {
+		_spec.SetField(usersubscription.FieldDailyUsageWindowStart, field.TypeTime, value)
+	}
+	if _u.mutation.DailyUsageWindowStartCleared() {
+		_spec.ClearField(usersubscription.FieldDailyUsageWindowStart, field.TypeTime)
+	}
+	if value, ok := _u.mutation.WeeklyUsageUsd(); ok {
+		_spec.SetField(usersubscription.FieldWeeklyUsageUsd, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.WeeklyUsageWindowStart(); ok {
+		_spec.SetField(usersubscription.FieldWeeklyUsageWindowStart, field.TypeTime, value)
+	}
+	if _u.mutation.WeeklyUsageWindowStartCleared() {
+		_spec.ClearField(usersubscription.FieldWeeklyUsageWindowStart, field.TypeTime)
+	}
+	if value, ok := _u.mutation.MonthlyUsageUsd(); ok {
+		_spec.SetField(usersubscription.FieldMonthlyUsageUsd, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.MonthlyUsageWindowStart(); ok {
+		_spec.SetField(usersubscription.FieldMonthlyUsageWindowStart, field.TypeTime, value)
+	}
+	if _u.mutation.MonthlyUsageWindowStartCleared() {
+		_spec.ClearField(usersubscription.FieldMonthlyUsageWindowStart, field.TypeTime)
 	}
 	_node = &UserSubscription{config: _u.config}
 	_spec.Assign = _node.assignValues

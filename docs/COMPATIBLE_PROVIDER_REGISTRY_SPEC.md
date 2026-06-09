@@ -34,7 +34,7 @@ Provider preset 的目标是减少硬编码分叉：
 | provider_key | 默认用途 | default_base_url |
 | --- | --- | --- |
 | `openai-compatible` | 通用自定义 OpenAI-compatible 上游 | `https://api.openai.com/v1` |
-| `openai` | 官方 API Key 或 ChatGPT/Codex OAuth runtime | `https://api.openai.com/v1` |
+| `openai` | 官方 API Key 上游 | `https://api.openai.com/v1` |
 | `groq` | Groq OpenAI-compatible | `https://api.groq.com/openai/v1` |
 | `cerebras` | Cerebras OpenAI-compatible | `https://api.cerebras.ai/v1` |
 | `deepseek` | DeepSeek Chat / Reasoner | `https://api.deepseek.com` |
@@ -56,8 +56,10 @@ api_key
 custom_reverse_proxy
 ```
 
-`openai` 一级 preset 额外放开 ChatGPT/Codex OAuth runtime（`oauth_refresh`、`oauth_device_code`）。
-第三方 OpenAI-compatible preset 不得进入 ChatGPT Web OAuth、Codex CLI 等 `openai` 反代专用 runtime。
+`openai` 一级 preset 仅暴露官方 API Key 与 `custom_reverse_proxy`。ChatGPT Web session
+cookie 和 Codex CLI OAuth 分别由 `chatgpt-web`、`codex-cli` 专用 preset 承载；OpenAI /
+Gemini OAuth account runtime 在 provider adapter 中显式返回 `not_supported`。
+第三方 OpenAI-compatible preset 不得进入 ChatGPT Web、Codex CLI 等专用反代 runtime。
 
 ## 4. Anthropic-compatible preset
 
@@ -72,7 +74,7 @@ custom_reverse_proxy
 | `zhipu-anthropic` | Zhipu Anthropic-compatible | `https://open.bigmodel.cn/api/anthropic` |
 | `zai-anthropic` | Z.AI Anthropic-compatible | `https://api.z.ai/api/anthropic` |
 
-`anthropic` 一级 preset 额外放开 Claude Code / Claude CLI / Vertex service-account runtime（`oauth_refresh`、`oauth_device_code`、`cli_client_token`、`service_account_json`）。
+`anthropic` 一级 preset 额外放开 Claude Code / Claude CLI runtime（`oauth_refresh`、`oauth_device_code`、`cli_client_token`）。`service_account_json` 在 Vertex/GCP SA 接入前不得出现在默认 allowlist。
 第三方 Anthropic-compatible preset 不得进入 Claude Web / Claude Code OAuth mimicry runtime。`claude-compatible` 只能作为历史兼容 route alias（注册在 `anthropic-compatible` preset 下），不能作为新的 adapter_type 或 provider.protocol。
 
 ## 5. Rerank-compatible preset
@@ -120,17 +122,27 @@ registry 为 Antigravity 暴露 text alias：
 允许的 runtime class：
 
 ```txt
-desktop_client_token
-ide_plugin_token
 oauth_refresh
 custom_reverse_proxy
 ```
 
-`antigravity` preset 不提供通用 `default_base_url`；管理员必须在 Provider Account
-metadata 中配置实际 `base_url`。Gemini model-action aliases 只复用标准 Gemini Gateway
+`desktop_client_token` / `ide_plugin_token` 仅作为 legacy runtime enum 保留，默认 preset 已并入
+`oauth_refresh`。`antigravity` preset 不提供通用 `default_base_url`；管理员必须在
+Provider Account metadata 中配置实际 `base_url`。Gemini model-action aliases 只复用标准 Gemini Gateway
 handler，并保留 alias source endpoint 作为 usage log 与 scheduler decision 证据。
 
-## 6a. Bedrock Anthropic preset
+## 6a. ChatGPT Web reverse-proxy preset
+
+内置（platform_family `openai_compatible`，adapter_type `reverse-proxy-chatgpt-web`）：
+
+| provider_key | 默认用途 | default_base_url |
+| --- | --- | --- |
+| `chatgpt-web` | ChatGPT Web session/cookie reverse proxy | `https://chatgpt.com` |
+
+允许的 runtime class 为 `web_session_cookie` 与 `custom_reverse_proxy`。route alias：
+`/chatgpt-web/v1`、`/api/provider/chatgpt-web`、`/api/provider/chatgpt-web/v1`。
+
+## 6b. Bedrock Anthropic preset
 
 内置（platform_family `bedrock_anthropic`）：
 
@@ -139,7 +151,7 @@ handler，并保留 alias source endpoint 作为 usage log 与 scheduler decisio
 | `bedrock` | Amazon Bedrock 上的 Anthropic Messages 上游 | `https://bedrock-runtime.us-east-1.amazonaws.com` |
 
 `bedrock` 复用 Anthropic capability 集合，auth mode 为 `custom_header`（SigV4 header），允许的
-runtime class 为 `api_key` 与 `service_account_json`。route alias：`/bedrock/v1`、
+runtime class 为 `api_key`。route alias：`/bedrock/v1`、
 `/api/provider/bedrock`、`/api/provider/bedrock/v1`。
 
 ## 7. Preset Schema

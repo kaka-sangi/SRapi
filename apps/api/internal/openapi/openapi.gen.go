@@ -533,6 +533,48 @@ func (e AuthIdentityProvider) Valid() bool {
 	}
 }
 
+// Defines values for AvailableModelPricingSource.
+const (
+	AvailableModelPricingSourceDefaultZero     AvailableModelPricingSource = "default_zero"
+	AvailableModelPricingSourceMappingOverride AvailableModelPricingSource = "mapping_override"
+	AvailableModelPricingSourcePricingRule     AvailableModelPricingSource = "pricing_rule"
+)
+
+// Valid indicates whether the value is a known member of the AvailableModelPricingSource enum.
+func (e AvailableModelPricingSource) Valid() bool {
+	switch e {
+	case AvailableModelPricingSourceDefaultZero:
+		return true
+	case AvailableModelPricingSourceMappingOverride:
+		return true
+	case AvailableModelPricingSourcePricingRule:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AvailableModelStatus.
+const (
+	AvailableModelStatusAvailable   AvailableModelStatus = "available"
+	AvailableModelStatusLimited     AvailableModelStatus = "limited"
+	AvailableModelStatusUnavailable AvailableModelStatus = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the AvailableModelStatus enum.
+func (e AvailableModelStatus) Valid() bool {
+	switch e {
+	case AvailableModelStatusAvailable:
+		return true
+	case AvailableModelStatusLimited:
+		return true
+	case AvailableModelStatusUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BatchAccountActionRequestAction.
 const (
 	ClearError BatchAccountActionRequestAction = "clear_error"
@@ -578,6 +620,27 @@ func (e BillingLedgerEntryType) Valid() bool {
 	case Refund:
 		return true
 	case UsageCharge:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BillingMode.
+const (
+	Image      BillingMode = "image"
+	PerRequest BillingMode = "per_request"
+	Token      BillingMode = "token"
+)
+
+// Valid indicates whether the value is a known member of the BillingMode enum.
+func (e BillingMode) Valid() bool {
+	switch e {
+	case Image:
+		return true
+	case PerRequest:
+		return true
+	case Token:
 		return true
 	default:
 		return false
@@ -1845,6 +1908,7 @@ func (e PendingOAuthIntent) Valid() bool {
 const (
 	PlatformFamilyAnthropicCompatible     PlatformFamily = "anthropic_compatible"
 	PlatformFamilyBedrockAnthropic        PlatformFamily = "bedrock_anthropic"
+	PlatformFamilyGeminiCompatible        PlatformFamily = "gemini_compatible"
 	PlatformFamilyOpenaiCompatible        PlatformFamily = "openai_compatible"
 	PlatformFamilyRerankCompatible        PlatformFamily = "rerank_compatible"
 	PlatformFamilyReverseProxyAntigravity PlatformFamily = "reverse_proxy_antigravity"
@@ -1856,6 +1920,8 @@ func (e PlatformFamily) Valid() bool {
 	case PlatformFamilyAnthropicCompatible:
 		return true
 	case PlatformFamilyBedrockAnthropic:
+		return true
+	case PlatformFamilyGeminiCompatible:
 		return true
 	case PlatformFamilyOpenaiCompatible:
 		return true
@@ -2350,19 +2416,19 @@ func (e ScheduledTestPlanScopeType) Valid() bool {
 
 // Defines values for ScheduledTestPlanRunStatus.
 const (
-	Failed  ScheduledTestPlanRunStatus = "failed"
-	Ok      ScheduledTestPlanRunStatus = "ok"
-	Partial ScheduledTestPlanRunStatus = "partial"
+	ScheduledTestPlanRunStatusFailed  ScheduledTestPlanRunStatus = "failed"
+	ScheduledTestPlanRunStatusOk      ScheduledTestPlanRunStatus = "ok"
+	ScheduledTestPlanRunStatusPartial ScheduledTestPlanRunStatus = "partial"
 )
 
 // Valid indicates whether the value is a known member of the ScheduledTestPlanRunStatus enum.
 func (e ScheduledTestPlanRunStatus) Valid() bool {
 	switch e {
-	case Failed:
+	case ScheduledTestPlanRunStatusFailed:
 		return true
-	case Ok:
+	case ScheduledTestPlanRunStatusOk:
 		return true
-	case Partial:
+	case ScheduledTestPlanRunStatusPartial:
 		return true
 	default:
 		return false
@@ -3731,7 +3797,11 @@ type AdminTestResultResponse struct {
 
 // AdminUpdateApiKeyRequest defines model for AdminUpdateApiKeyRequest.
 type AdminUpdateApiKeyRequest struct {
-	Status ApiKeyStatus `json:"status"`
+	CostLimit1d *string      `json:"cost_limit_1d,omitempty"`
+	CostLimit5h *string      `json:"cost_limit_5h,omitempty"`
+	CostLimit7d *string      `json:"cost_limit_7d,omitempty"`
+	CostQuota   *string      `json:"cost_quota,omitempty"`
+	Status      ApiKeyStatus `json:"status"`
 }
 
 // AffiliateCurrencySummary defines model for AffiliateCurrencySummary.
@@ -4022,10 +4092,34 @@ type AnthropicUsage struct {
 // ApiKey defines model for ApiKey.
 type ApiKey struct {
 	// AllowedIps Client IPs or CIDRs permitted to use this key. Empty means all IPs are allowed. Enforced against the request client IP; requires a trusted reverse proxy that overwrites X-Forwarded-For.
-	AllowedIps       []string  `json:"allowed_ips"`
-	AllowedModels    []string  `json:"allowed_models"`
-	ConcurrencyLimit *int      `json:"concurrency_limit,omitempty"`
-	CreatedAt        Timestamp `json:"created_at"`
+	AllowedIps       []string `json:"allowed_ips"`
+	AllowedModels    []string `json:"allowed_models"`
+	ConcurrencyLimit *int     `json:"concurrency_limit,omitempty"`
+
+	// CostLimit1d Max billable USD spend allowed per 1-day window.
+	CostLimit1d *string `json:"cost_limit_1d,omitempty"`
+
+	// CostLimit5h Max billable USD spend allowed per 5-hour window.
+	CostLimit5h *string `json:"cost_limit_5h,omitempty"`
+
+	// CostLimit7d Max billable USD spend allowed per 7-day window.
+	CostLimit7d *string `json:"cost_limit_7d,omitempty"`
+
+	// CostQuota Lifetime USD spend quota for this key. Empty means uncapped.
+	CostQuota *string `json:"cost_quota,omitempty"`
+
+	// CostUsed Lifetime billable USD spend recorded for this key.
+	CostUsed *string `json:"cost_used,omitempty"`
+
+	// CostUsed1d Billable USD spend recorded in the current 1-day window.
+	CostUsed1d *string `json:"cost_used_1d,omitempty"`
+
+	// CostUsed5h Billable USD spend recorded in the current 5-hour window.
+	CostUsed5h *string `json:"cost_used_5h,omitempty"`
+
+	// CostUsed7d Billable USD spend recorded in the current 7-day window.
+	CostUsed7d *string   `json:"cost_used_7d,omitempty"`
+	CreatedAt  Timestamp `json:"created_at"`
 
 	// DeniedIps Client IPs or CIDRs blocked from using this key. Takes precedence over allowed_ips.
 	DeniedIps  []string   `json:"denied_ips"`
@@ -4174,6 +4268,56 @@ type AuditLogListResponse struct {
 // AuthIdentityProvider defines model for AuthIdentityProvider.
 type AuthIdentityProvider string
 
+// AvailableModel defines model for AvailableModel.
+type AvailableModel struct {
+	Channels        []AvailableModelChannel `json:"channels"`
+	ContextWindow   *int                    `json:"context_window,omitempty"`
+	Family          *string                 `json:"family,omitempty"`
+	Id              string                  `json:"id"`
+	MaxOutputTokens *int                    `json:"max_output_tokens,omitempty"`
+	Name            string                  `json:"name"`
+	Status          AvailableModelStatus    `json:"status"`
+}
+
+// AvailableModelChannel defines model for AvailableModelChannel.
+type AvailableModelChannel struct {
+	ActiveAccountCount  int                   `json:"active_account_count"`
+	AdapterType         string                `json:"adapter_type"`
+	Pricing             AvailableModelPricing `json:"pricing"`
+	Protocol            string                `json:"protocol"`
+	ProviderDisplayName string                `json:"provider_display_name"`
+	ProviderId          Id                    `json:"provider_id"`
+	ProviderName        string                `json:"provider_name"`
+	Status              AvailableModelStatus  `json:"status"`
+	TotalAccountCount   int                   `json:"total_account_count"`
+	UpstreamModel       string                `json:"upstream_model"`
+}
+
+// AvailableModelListResponse defines model for AvailableModelListResponse.
+type AvailableModelListResponse struct {
+	Data        []AvailableModel `json:"data"`
+	GeneratedAt Timestamp        `json:"generated_at"`
+	RequestId   RequestId        `json:"request_id"`
+}
+
+// AvailableModelPricing defines model for AvailableModelPricing.
+type AvailableModelPricing struct {
+	BillingMode                     BillingMode                 `json:"billing_mode"`
+	CacheReadPricePerMillionTokens  string                      `json:"cache_read_price_per_million_tokens"`
+	CacheWritePricePerMillionTokens string                      `json:"cache_write_price_per_million_tokens"`
+	Currency                        string                      `json:"currency"`
+	InputPricePerMillionTokens      string                      `json:"input_price_per_million_tokens"`
+	OutputPricePerMillionTokens     string                      `json:"output_price_per_million_tokens"`
+	PerRequestPrice                 string                      `json:"per_request_price"`
+	Source                          AvailableModelPricingSource `json:"source"`
+}
+
+// AvailableModelPricingSource defines model for AvailableModelPricing.Source.
+type AvailableModelPricingSource string
+
+// AvailableModelStatus defines model for AvailableModelStatus.
+type AvailableModelStatus string
+
 // BatchAccountActionRequest defines model for BatchAccountActionRequest.
 type BatchAccountActionRequest struct {
 	AccountIds []Id `json:"account_ids"`
@@ -4281,6 +4425,9 @@ type BillingLedgerListResponse struct {
 	Pagination Pagination           `json:"pagination"`
 	RequestId  RequestId            `json:"request_id"`
 }
+
+// BillingMode defines model for BillingMode.
+type BillingMode string
 
 // BindProviderAccountProxyRequest defines model for BindProviderAccountProxyRequest.
 type BindProviderAccountProxyRequest struct {
@@ -4785,19 +4932,31 @@ type CreateAnnouncementRequest struct {
 
 // CreateApiKeyRequest defines model for CreateApiKeyRequest.
 type CreateApiKeyRequest struct {
-	AllowedIps       *[]string  `json:"allowed_ips,omitempty"`
-	AllowedModels    *[]string  `json:"allowed_models,omitempty"`
-	ConcurrencyLimit *int       `json:"concurrency_limit,omitempty"`
-	DeniedIps        *[]string  `json:"denied_ips,omitempty"`
-	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
-	GroupIds         *[]Id      `json:"group_ids,omitempty"`
-	Name             string     `json:"name"`
-	RequestLimit1d   *int       `json:"request_limit_1d,omitempty"`
-	RequestLimit5h   *int       `json:"request_limit_5h,omitempty"`
-	RequestLimit7d   *int       `json:"request_limit_7d,omitempty"`
-	RpmLimit         *int       `json:"rpm_limit,omitempty"`
-	Scopes           *[]string  `json:"scopes,omitempty"`
-	TpmLimit         *int       `json:"tpm_limit,omitempty"`
+	AllowedIps       *[]string `json:"allowed_ips,omitempty"`
+	AllowedModels    *[]string `json:"allowed_models,omitempty"`
+	ConcurrencyLimit *int      `json:"concurrency_limit,omitempty"`
+
+	// CostLimit1d Max billable USD spend allowed per 1-day window.
+	CostLimit1d *string `json:"cost_limit_1d,omitempty"`
+
+	// CostLimit5h Max billable USD spend allowed per 5-hour window.
+	CostLimit5h *string `json:"cost_limit_5h,omitempty"`
+
+	// CostLimit7d Max billable USD spend allowed per 7-day window.
+	CostLimit7d *string `json:"cost_limit_7d,omitempty"`
+
+	// CostQuota Lifetime USD spend quota for this key. Empty means uncapped.
+	CostQuota      *string    `json:"cost_quota,omitempty"`
+	DeniedIps      *[]string  `json:"denied_ips,omitempty"`
+	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
+	GroupIds       *[]Id      `json:"group_ids,omitempty"`
+	Name           string     `json:"name"`
+	RequestLimit1d *int       `json:"request_limit_1d,omitempty"`
+	RequestLimit5h *int       `json:"request_limit_5h,omitempty"`
+	RequestLimit7d *int       `json:"request_limit_7d,omitempty"`
+	RpmLimit       *int       `json:"rpm_limit,omitempty"`
+	Scopes         *[]string  `json:"scopes,omitempty"`
+	TpmLimit       *int       `json:"tpm_limit,omitempty"`
 }
 
 // CreateApiKeyResponse defines model for CreateApiKeyResponse.
@@ -4948,15 +5107,18 @@ type CreatePaymentProviderInstanceRequest struct {
 
 // CreatePricingRuleRequest defines model for CreatePricingRuleRequest.
 type CreatePricingRuleRequest struct {
-	CacheReadPricePerMillionTokens  string     `json:"cache_read_price_per_million_tokens"`
-	CacheWritePricePerMillionTokens string     `json:"cache_write_price_per_million_tokens"`
-	Currency                        string     `json:"currency"`
-	EffectiveFrom                   *time.Time `json:"effective_from,omitempty"`
-	EffectiveTo                     *time.Time `json:"effective_to,omitempty"`
-	InputPricePerMillionTokens      string     `json:"input_price_per_million_tokens"`
-	ModelId                         Id         `json:"model_id"`
-	OutputPricePerMillionTokens     string     `json:"output_price_per_million_tokens"`
-	ProviderId                      Id         `json:"provider_id"`
+	BillingMode                     *BillingMode            `json:"billing_mode,omitempty"`
+	CacheReadPricePerMillionTokens  string                  `json:"cache_read_price_per_million_tokens"`
+	CacheWritePricePerMillionTokens string                  `json:"cache_write_price_per_million_tokens"`
+	Currency                        string                  `json:"currency"`
+	EffectiveFrom                   *time.Time              `json:"effective_from,omitempty"`
+	EffectiveTo                     *time.Time              `json:"effective_to,omitempty"`
+	InputPricePerMillionTokens      string                  `json:"input_price_per_million_tokens"`
+	Intervals                       *[]PricingIntervalInput `json:"intervals,omitempty"`
+	ModelId                         Id                      `json:"model_id"`
+	OutputPricePerMillionTokens     string                  `json:"output_price_per_million_tokens"`
+	PerRequestPrice                 *string                 `json:"per_request_price,omitempty"`
+	ProviderId                      Id                      `json:"provider_id"`
 }
 
 // CreatePromoCodeRequest defines model for CreatePromoCodeRequest.
@@ -6919,20 +7081,50 @@ type PreviewNotificationEmailTemplateRequest struct {
 	Variables *map[string]string `json:"variables,omitempty"`
 }
 
+// PricingInterval defines model for PricingInterval.
+type PricingInterval struct {
+	CacheReadPricePerMillionTokens  string `json:"cache_read_price_per_million_tokens"`
+	CacheWritePricePerMillionTokens string `json:"cache_write_price_per_million_tokens"`
+	Id                              *Id    `json:"id,omitempty"`
+	ImageSize                       string `json:"image_size"`
+	InputPricePerMillionTokens      string `json:"input_price_per_million_tokens"`
+	MaxTokens                       *int   `json:"max_tokens,omitempty"`
+	MinTokens                       int    `json:"min_tokens"`
+	OutputPricePerMillionTokens     string `json:"output_price_per_million_tokens"`
+	PerImagePrice                   string `json:"per_image_price"`
+	TierLabel                       string `json:"tier_label"`
+}
+
+// PricingIntervalInput defines model for PricingIntervalInput.
+type PricingIntervalInput struct {
+	CacheReadPricePerMillionTokens  *string `json:"cache_read_price_per_million_tokens,omitempty"`
+	CacheWritePricePerMillionTokens *string `json:"cache_write_price_per_million_tokens,omitempty"`
+	ImageSize                       *string `json:"image_size,omitempty"`
+	InputPricePerMillionTokens      *string `json:"input_price_per_million_tokens,omitempty"`
+	MaxTokens                       *int    `json:"max_tokens,omitempty"`
+	MinTokens                       *int    `json:"min_tokens,omitempty"`
+	OutputPricePerMillionTokens     *string `json:"output_price_per_million_tokens,omitempty"`
+	PerImagePrice                   *string `json:"per_image_price,omitempty"`
+	TierLabel                       *string `json:"tier_label,omitempty"`
+}
+
 // PricingRule defines model for PricingRule.
 type PricingRule struct {
-	CacheReadPricePerMillionTokens  string     `json:"cache_read_price_per_million_tokens"`
-	CacheWritePricePerMillionTokens string     `json:"cache_write_price_per_million_tokens"`
-	CreatedAt                       Timestamp  `json:"created_at"`
-	Currency                        string     `json:"currency"`
-	EffectiveFrom                   *time.Time `json:"effective_from,omitempty"`
-	EffectiveTo                     *time.Time `json:"effective_to,omitempty"`
-	Id                              Id         `json:"id"`
-	InputPricePerMillionTokens      string     `json:"input_price_per_million_tokens"`
-	ModelId                         Id         `json:"model_id"`
-	OutputPricePerMillionTokens     string     `json:"output_price_per_million_tokens"`
-	ProviderId                      Id         `json:"provider_id"`
-	UpdatedAt                       Timestamp  `json:"updated_at"`
+	BillingMode                     BillingMode       `json:"billing_mode"`
+	CacheReadPricePerMillionTokens  string            `json:"cache_read_price_per_million_tokens"`
+	CacheWritePricePerMillionTokens string            `json:"cache_write_price_per_million_tokens"`
+	CreatedAt                       Timestamp         `json:"created_at"`
+	Currency                        string            `json:"currency"`
+	EffectiveFrom                   *time.Time        `json:"effective_from,omitempty"`
+	EffectiveTo                     *time.Time        `json:"effective_to,omitempty"`
+	Id                              Id                `json:"id"`
+	InputPricePerMillionTokens      string            `json:"input_price_per_million_tokens"`
+	Intervals                       []PricingInterval `json:"intervals"`
+	ModelId                         Id                `json:"model_id"`
+	OutputPricePerMillionTokens     string            `json:"output_price_per_million_tokens"`
+	PerRequestPrice                 string            `json:"per_request_price"`
+	ProviderId                      Id                `json:"provider_id"`
+	UpdatedAt                       Timestamp         `json:"updated_at"`
 }
 
 // PricingRuleListResponse defines model for PricingRuleListResponse.
@@ -7092,10 +7284,16 @@ type ProviderAccountImportResponse struct {
 
 // ProviderAccountImportResult defines model for ProviderAccountImportResult.
 type ProviderAccountImportResult struct {
-	CreatedCount int      `json:"created_count"`
-	CreatedIds   []Id     `json:"created_ids"`
-	Errors       []string `json:"errors"`
-	SkippedCount int      `json:"skipped_count"`
+	CreatedCount int                         `json:"created_count"`
+	CreatedIds   []Id                        `json:"created_ids"`
+	Errors       []string                    `json:"errors"`
+	FailedCount  int                         `json:"failed_count"`
+	Items        []CodexSessionImportItem    `json:"items"`
+	SkippedCount int                         `json:"skipped_count"`
+	TotalCount   int                         `json:"total_count"`
+	UpdatedCount int                         `json:"updated_count"`
+	UpdatedIds   []Id                        `json:"updated_ids"`
+	Warnings     []CodexSessionImportMessage `json:"warnings"`
 }
 
 // ProviderAccountListResponse defines model for ProviderAccountListResponse.
@@ -7122,6 +7320,20 @@ type ProviderListResponse struct {
 	Data       []Provider `json:"data"`
 	Pagination Pagination `json:"pagination"`
 	RequestId  RequestId  `json:"request_id"`
+}
+
+// ProviderOAuthConfig defines model for ProviderOAuthConfig.
+type ProviderOAuthConfig struct {
+	// Config Config-driven description of an upstream provider's OAuth endpoints used to provision an account credential interactively. Secrets are write-only.
+	Config       AccountOAuthProviderConfig `json:"config"`
+	ProviderId   Id                         `json:"provider_id"`
+	ProviderName string                     `json:"provider_name"`
+}
+
+// ProviderOAuthConfigResponse defines model for ProviderOAuthConfigResponse.
+type ProviderOAuthConfigResponse struct {
+	Data      ProviderOAuthConfig `json:"data"`
+	RequestId RequestId           `json:"request_id"`
 }
 
 // ProviderProtocol defines model for ProviderProtocol.
@@ -8130,6 +8342,10 @@ type UpdateApiKeyRequest struct {
 	AllowedIps       *[]string `json:"allowed_ips,omitempty"`
 	AllowedModels    *[]string `json:"allowed_models,omitempty"`
 	ConcurrencyLimit *int      `json:"concurrency_limit,omitempty"`
+	CostLimit1d      *string   `json:"cost_limit_1d,omitempty"`
+	CostLimit5h      *string   `json:"cost_limit_5h,omitempty"`
+	CostLimit7d      *string   `json:"cost_limit_7d,omitempty"`
+	CostQuota        *string   `json:"cost_quota,omitempty"`
 	DeniedIps        *[]string `json:"denied_ips,omitempty"`
 
 	// ExpiresAt New expiry timestamp. When present the key expiry is updated; omit to leave the current expiry unchanged.
@@ -8269,13 +8485,16 @@ type UpdatePaymentProviderInstanceRequest struct {
 
 // UpdatePricingRuleRequest defines model for UpdatePricingRuleRequest.
 type UpdatePricingRuleRequest struct {
-	CacheReadPricePerMillionTokens  *string    `json:"cache_read_price_per_million_tokens,omitempty"`
-	CacheWritePricePerMillionTokens *string    `json:"cache_write_price_per_million_tokens,omitempty"`
-	Currency                        *string    `json:"currency,omitempty"`
-	EffectiveFrom                   *time.Time `json:"effective_from,omitempty"`
-	EffectiveTo                     *time.Time `json:"effective_to,omitempty"`
-	InputPricePerMillionTokens      *string    `json:"input_price_per_million_tokens,omitempty"`
-	OutputPricePerMillionTokens     *string    `json:"output_price_per_million_tokens,omitempty"`
+	BillingMode                     *BillingMode            `json:"billing_mode,omitempty"`
+	CacheReadPricePerMillionTokens  *string                 `json:"cache_read_price_per_million_tokens,omitempty"`
+	CacheWritePricePerMillionTokens *string                 `json:"cache_write_price_per_million_tokens,omitempty"`
+	Currency                        *string                 `json:"currency,omitempty"`
+	EffectiveFrom                   *time.Time              `json:"effective_from,omitempty"`
+	EffectiveTo                     *time.Time              `json:"effective_to,omitempty"`
+	InputPricePerMillionTokens      *string                 `json:"input_price_per_million_tokens,omitempty"`
+	Intervals                       *[]PricingIntervalInput `json:"intervals,omitempty"`
+	OutputPricePerMillionTokens     *string                 `json:"output_price_per_million_tokens,omitempty"`
+	PerRequestPrice                 *string                 `json:"per_request_price,omitempty"`
 }
 
 // UpdatePromoCodeRequest defines model for UpdatePromoCodeRequest.
@@ -8489,12 +8708,17 @@ type UsageExportResponse struct {
 
 // UsageLog defines model for UsageLog.
 type UsageLog struct {
-	AccountId *string `json:"account_id,omitempty"`
-	ApiKeyId  Id      `json:"api_key_id"`
-	AttemptNo int     `json:"attempt_no"`
+	AccountId    *string      `json:"account_id,omitempty"`
+	ActualCost   *string      `json:"actual_cost,omitempty"`
+	ApiKeyId     Id           `json:"api_key_id"`
+	AttemptNo    int          `json:"attempt_no"`
+	BillableCost *string      `json:"billable_cost,omitempty"`
+	BillingMode  *BillingMode `json:"billing_mode,omitempty"`
 
 	// CacheCreationTokens Prompt-cache write (creation) tokens, billed at the cache-write rate.
 	CacheCreationTokens   *int      `json:"cache_creation_tokens,omitempty"`
+	CacheReadCost         *string   `json:"cache_read_cost,omitempty"`
+	CacheWriteCost        *string   `json:"cache_write_cost,omitempty"`
 	CachedTokens          int       `json:"cached_tokens"`
 	CompatibilityWarnings []string  `json:"compatibility_warnings"`
 	Cost                  string    `json:"cost"`
@@ -8502,17 +8726,22 @@ type UsageLog struct {
 	Currency              string    `json:"currency"`
 	ErrorClass            *string   `json:"error_class,omitempty"`
 	Id                    Id        `json:"id"`
+	InputCost             *string   `json:"input_cost,omitempty"`
 	InputTokens           int       `json:"input_tokens"`
 	LatencyMs             int       `json:"latency_ms"`
 	Model                 string    `json:"model"`
+	OutputCost            *string   `json:"output_cost,omitempty"`
 	OutputTokens          int       `json:"output_tokens"`
 	ProviderId            *string   `json:"provider_id,omitempty"`
+	RateMultiplier        *string   `json:"rate_multiplier,omitempty"`
 	RequestId             RequestId `json:"request_id"`
+	RequestedModel        *string   `json:"requested_model,omitempty"`
 	SourceEndpoint        string    `json:"source_endpoint"`
 	SourceProtocol        string    `json:"source_protocol"`
 	Success               bool      `json:"success"`
 	TargetProtocol        *string   `json:"target_protocol,omitempty"`
 	TotalTokens           int       `json:"total_tokens"`
+	UpstreamModel         *string   `json:"upstream_model,omitempty"`
 	UsageEstimated        bool      `json:"usage_estimated"`
 	UserId                Id        `json:"user_id"`
 }
@@ -8705,17 +8934,35 @@ type UserStatus string
 
 // UserSubscription defines model for UserSubscription.
 type UserSubscription struct {
-	CreatedAt            Timestamp              `json:"created_at"`
-	EntitlementsSnapshot JsonObject             `json:"entitlements_snapshot"`
-	ExpiresAt            Timestamp              `json:"expires_at"`
-	Id                   Id                     `json:"id"`
-	PlanId               Id                     `json:"plan_id"`
-	SourceId             string                 `json:"source_id"`
-	SourceType           string                 `json:"source_type"`
-	StartsAt             Timestamp              `json:"starts_at"`
-	Status               UserSubscriptionStatus `json:"status"`
-	UpdatedAt            Timestamp              `json:"updated_at"`
-	UserId               Id                     `json:"user_id"`
+	CreatedAt Timestamp `json:"created_at"`
+
+	// DailyUsageUsd Materialized billable USD usage in the current UTC day window.
+	DailyUsageUsd string `json:"daily_usage_usd"`
+
+	// DailyUsageWindowStart UTC start timestamp for the materialized daily usage window.
+	DailyUsageWindowStart *time.Time `json:"daily_usage_window_start"`
+	EntitlementsSnapshot  JsonObject `json:"entitlements_snapshot"`
+	ExpiresAt             Timestamp  `json:"expires_at"`
+	Id                    Id         `json:"id"`
+
+	// MonthlyUsageUsd Materialized billable USD usage in the current UTC month window.
+	MonthlyUsageUsd string `json:"monthly_usage_usd"`
+
+	// MonthlyUsageWindowStart UTC start timestamp for the materialized monthly usage window.
+	MonthlyUsageWindowStart *time.Time             `json:"monthly_usage_window_start"`
+	PlanId                  Id                     `json:"plan_id"`
+	SourceId                string                 `json:"source_id"`
+	SourceType              string                 `json:"source_type"`
+	StartsAt                Timestamp              `json:"starts_at"`
+	Status                  UserSubscriptionStatus `json:"status"`
+	UpdatedAt               Timestamp              `json:"updated_at"`
+	UserId                  Id                     `json:"user_id"`
+
+	// WeeklyUsageUsd Materialized billable USD usage in the current UTC week window.
+	WeeklyUsageUsd string `json:"weekly_usage_usd"`
+
+	// WeeklyUsageWindowStart UTC start timestamp for the materialized weekly usage window.
+	WeeklyUsageWindowStart *time.Time `json:"weekly_usage_window_start"`
 }
 
 // UserSubscriptionListResponse defines model for UserSubscriptionListResponse.
@@ -16339,6 +16586,9 @@ type ServerInterface interface {
 	// Recover a protected provider account after operator remediation.
 	// (POST /api/v1/admin/accounts/{id}/recover)
 	RecoverAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
+	// Clear quota error state for a provider account.
+	// (POST /api/v1/admin/accounts/{id}/reset-quota)
+	ResetAdminAccountQuota(w http.ResponseWriter, r *http.Request, id Id)
 	// Get provider account RPM runtime status.
 	// (GET /api/v1/admin/accounts/{id}/rpm-status)
 	GetAdminAccountRpmStatus(w http.ResponseWriter, r *http.Request, id Id)
@@ -16687,6 +16937,9 @@ type ServerInterface interface {
 	// Update a provider.
 	// (PATCH /api/v1/admin/providers/{id})
 	UpdateAdminProvider(w http.ResponseWriter, r *http.Request, id Id)
+	// Get preset OAuth configuration for a provider.
+	// (GET /api/v1/admin/providers/{id}/oauth-config)
+	GetAdminProviderOAuthConfig(w http.ResponseWriter, r *http.Request, id Id)
 	// Test provider configuration.
 	// (POST /api/v1/admin/providers/{id}/test)
 	TestAdminProvider(w http.ResponseWriter, r *http.Request, id Id)
@@ -16990,6 +17243,9 @@ type ServerInterface interface {
 	// Unbind a current console user external sign-in identity.
 	// (DELETE /api/v1/me/auth-identities/{id})
 	UnbindCurrentUserAuthIdentity(w http.ResponseWriter, r *http.Request, id Id)
+	// List model/channel availability and pricing for the current user.
+	// (GET /api/v1/me/available-models)
+	ListCurrentUserAvailableModels(w http.ResponseWriter, r *http.Request)
 	// Delete current console user avatar.
 	// (DELETE /api/v1/me/avatar)
 	DeleteCurrentUserAvatar(w http.ResponseWriter, r *http.Request)
@@ -18934,6 +19190,40 @@ func (siw *ServerInterfaceWrapper) RecoverAdminAccount(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RecoverAdminAccount(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResetAdminAccountQuota operation middleware
+func (siw *ServerInterfaceWrapper) ResetAdminAccountQuota(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResetAdminAccountQuota(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -23406,6 +23696,38 @@ func (siw *ServerInterfaceWrapper) UpdateAdminProvider(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminProviderOAuthConfig operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminProviderOAuthConfig(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminProviderOAuthConfig(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // TestAdminProvider operation middleware
 func (siw *ServerInterfaceWrapper) TestAdminProvider(w http.ResponseWriter, r *http.Request) {
 
@@ -26707,6 +27029,26 @@ func (siw *ServerInterfaceWrapper) UnbindCurrentUserAuthIdentity(w http.Response
 	handler.ServeHTTP(w, r)
 }
 
+// ListCurrentUserAvailableModels operation middleware
+func (siw *ServerInterfaceWrapper) ListCurrentUserAvailableModels(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCurrentUserAvailableModels(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteCurrentUserAvatar operation middleware
 func (siw *ServerInterfaceWrapper) DeleteCurrentUserAvatar(w http.ResponseWriter, r *http.Request) {
 
@@ -29258,6 +29600,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/quota", wrapper.GetAdminAccountQuota)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/quota-fetch", wrapper.FetchAdminAccountQuota)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/recover", wrapper.RecoverAdminAccount)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/reset-quota", wrapper.ResetAdminAccountQuota)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/rpm-status", wrapper.GetAdminAccountRpmStatus)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/test", wrapper.TestAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliates/invites", wrapper.ListAdminAffiliateInvites)
@@ -29374,6 +29717,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/providers/preset/install", wrapper.InstallAdminProviderPresets)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/providers/{id}", wrapper.DeleteAdminProvider)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/providers/{id}", wrapper.UpdateAdminProvider)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/providers/{id}/oauth-config", wrapper.GetAdminProviderOAuthConfig)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/providers/{id}/test", wrapper.TestAdminProvider)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/proxies", wrapper.ListAdminProxies)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/proxies", wrapper.CreateAdminProxy)
@@ -29475,6 +29819,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/announcements/{id}/read", wrapper.MarkCurrentUserAnnouncementRead)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/auth-identities", wrapper.ListCurrentUserAuthIdentities)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/me/auth-identities/{id}", wrapper.UnbindCurrentUserAuthIdentity)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/available-models", wrapper.ListCurrentUserAvailableModels)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/me/avatar", wrapper.DeleteCurrentUserAvatar)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/me/avatar", wrapper.UploadCurrentUserAvatar)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/balance", wrapper.GetCurrentUserBalance)

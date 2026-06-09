@@ -77,7 +77,7 @@ export default function AdminMonitorPage() {
   );
 }
 
-function MonitorContent() {
+export function MonitorContent() {
   const { t } = useLanguage();
   return (
     <>

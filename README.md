@@ -288,6 +288,7 @@ make openapi-codegen     # regenerate Go types + server interface from the contr
 make openapi-ts-codegen  # regenerate the TypeScript SDK
 make ent-generate        # regenerate the Ent client
 make migration-diff      # generate the next versioned migration
+make deploy-preflight    # verify local env, deploy files, alerts, and host tooling before Compose
 make api-run             # run the API alone
 make smoke-release       # pre-release smoke test (livez/readyz/metrics + gateway)
 ```

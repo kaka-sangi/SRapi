@@ -15,6 +15,7 @@ import (
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	notificationscontract "github.com/srapi/srapi/apps/api/internal/modules/notifications/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 const defaultCurrency = "USD"
@@ -237,6 +238,36 @@ func (s *Service) ListUserSubscriptionsByUser(ctx context.Context, userID int) (
 	return s.store.ListUserSubscriptionsByUser(ctx, userID)
 }
 
+// MaterializedUsageForUser returns the active subscription's persisted usage
+// counters after lazily resetting any expired cost windows.
+func (s *Service) MaterializedUsageForUser(ctx context.Context, userID int, at time.Time) (contract.MaterializedUsage, error) {
+	if userID <= 0 {
+		return contract.MaterializedUsage{}, ErrInvalidInput
+	}
+	if at.IsZero() {
+		at = s.clock.Now()
+	}
+	return s.store.MaterializedUsageForUser(ctx, userID, at.UTC())
+}
+
+// IncrementMaterializedUsage adds a successful request's billable USD cost to
+// the active subscription's persisted usage counters.
+func (s *Service) IncrementMaterializedUsage(ctx context.Context, delta contract.UsageDelta) (contract.MaterializedUsage, error) {
+	if delta.UserID <= 0 {
+		return contract.MaterializedUsage{}, ErrInvalidInput
+	}
+	cost, ok := normalizeMoney(delta.BillableCost)
+	if !ok {
+		return contract.MaterializedUsage{}, ErrInvalidInput
+	}
+	if delta.OccurredAt.IsZero() {
+		delta.OccurredAt = s.clock.Now()
+	}
+	delta.BillableCost = cost
+	delta.OccurredAt = delta.OccurredAt.UTC()
+	return s.store.IncrementMaterializedUsage(ctx, delta)
+}
+
 func (s *Service) ExpireActiveUserSubscriptions(ctx context.Context, now time.Time) (contract.ExpireSubscriptionsResult, error) {
 	if now.IsZero() {
 		now = s.clock.Now()
@@ -292,110 +323,6 @@ func (s *Service) EnqueueSubscriptionExpiryReminders(ctx context.Context, now ti
 	return result, nil
 }
 
-func (s *Service) CreatePricingRule(ctx context.Context, req contract.CreatePricingRuleRequest) (contract.PricingRule, error) {
-	rule, err := pricingRuleFromRequest(req)
-	if err != nil {
-		return contract.PricingRule{}, err
-	}
-	return s.store.CreatePricingRule(ctx, rule)
-}
-
-// ValidatePricingRule validates a pricing-rule request without persisting it.
-func (s *Service) ValidatePricingRule(req contract.CreatePricingRuleRequest) error {
-	_, err := pricingRuleFromRequest(req)
-	return err
-}
-
-func (s *Service) UpdatePricingRule(ctx context.Context, id int, req contract.UpdatePricingRuleRequest) (contract.PricingRule, error) {
-	if id <= 0 {
-		return contract.PricingRule{}, ErrInvalidInput
-	}
-	if req.InputPricePerMillionTokens != nil {
-		v, ok := normalizeMoney(*req.InputPricePerMillionTokens)
-		if !ok {
-			return contract.PricingRule{}, ErrInvalidInput
-		}
-		req.InputPricePerMillionTokens = &v
-	}
-	if req.OutputPricePerMillionTokens != nil {
-		v, ok := normalizeMoney(*req.OutputPricePerMillionTokens)
-		if !ok {
-			return contract.PricingRule{}, ErrInvalidInput
-		}
-		req.OutputPricePerMillionTokens = &v
-	}
-	if req.CacheReadPricePerMillionTokens != nil {
-		v, ok := normalizeMoney(*req.CacheReadPricePerMillionTokens)
-		if !ok {
-			return contract.PricingRule{}, ErrInvalidInput
-		}
-		req.CacheReadPricePerMillionTokens = &v
-	}
-	if req.CacheWritePricePerMillionTokens != nil {
-		v, ok := normalizeMoney(*req.CacheWritePricePerMillionTokens)
-		if !ok {
-			return contract.PricingRule{}, ErrInvalidInput
-		}
-		req.CacheWritePricePerMillionTokens = &v
-	}
-	if req.Currency != nil {
-		v := normalizeCurrency(*req.Currency)
-		req.Currency = &v
-	}
-	return s.store.UpdatePricingRule(ctx, id, req)
-}
-
-func (s *Service) FindPricingRuleByID(ctx context.Context, id int) (contract.PricingRule, error) {
-	return s.store.FindPricingRuleByID(ctx, id)
-}
-
-func (s *Service) DeletePricingRule(ctx context.Context, id int) error {
-	if id <= 0 {
-		return ErrInvalidInput
-	}
-	return s.store.DeletePricingRule(ctx, id)
-}
-
-func pricingRuleFromRequest(req contract.CreatePricingRuleRequest) (contract.PricingRule, error) {
-	if req.ModelID <= 0 || req.ProviderID < 0 {
-		return contract.PricingRule{}, ErrInvalidInput
-	}
-	input, ok := normalizeMoney(req.InputPricePerMillionTokens)
-	if !ok {
-		return contract.PricingRule{}, ErrInvalidInput
-	}
-	output, ok := normalizeMoney(req.OutputPricePerMillionTokens)
-	if !ok {
-		return contract.PricingRule{}, ErrInvalidInput
-	}
-	cacheRead, ok := normalizeMoney(req.CacheReadPricePerMillionTokens)
-	if !ok {
-		return contract.PricingRule{}, ErrInvalidInput
-	}
-	cacheWrite, ok := normalizeMoney(req.CacheWritePricePerMillionTokens)
-	if !ok {
-		return contract.PricingRule{}, ErrInvalidInput
-	}
-	if req.EffectiveFrom != nil && req.EffectiveTo != nil && !req.EffectiveTo.After(*req.EffectiveFrom) {
-		return contract.PricingRule{}, ErrInvalidInput
-	}
-	return contract.PricingRule{
-		ModelID:                         req.ModelID,
-		ProviderID:                      req.ProviderID,
-		InputPricePerMillionTokens:      input,
-		OutputPricePerMillionTokens:     output,
-		CacheReadPricePerMillionTokens:  cacheRead,
-		CacheWritePricePerMillionTokens: cacheWrite,
-		Currency:                        normalizeCurrency(req.Currency),
-		EffectiveFrom:                   cloneTime(req.EffectiveFrom),
-		EffectiveTo:                     cloneTime(req.EffectiveTo),
-	}, nil
-}
-
-func (s *Service) ListPricingRules(ctx context.Context) ([]contract.PricingRule, error) {
-	return s.store.ListPricingRules(ctx)
-}
-
 func (s *Service) CheckEntitlement(ctx context.Context, req contract.EntitlementCheckRequest) (contract.EntitlementDecision, error) {
 	if req.UserID <= 0 {
 		return contract.EntitlementDecision{}, ErrInvalidInput
@@ -440,7 +367,11 @@ func (s *Service) CheckEntitlement(ctx context.Context, req contract.Entitlement
 	// mode the quota is an included allowance: the request is allowed and the
 	// overage is billed to balance downstream (WP-1180).
 	if decision.MonthlyCostQuota != nil && decision.CostQuotaMode != costQuotaModeAllowance {
-		totalCost := addMoney(req.CostUsedInPeriod, req.EstimatedCost)
+		costUsed := req.CostUsedInPeriod
+		if req.MaterializedUsage != nil {
+			costUsed = req.MaterializedUsage.MonthlyUsageUSD
+		}
+		totalCost := money.AddMoney(costUsed, req.EstimatedCost)
 		if compareMoney(totalCost, *decision.MonthlyCostQuota) > 0 {
 			decision.Allowed = false
 			decision.Reason = "monthly_cost_quota_exceeded"
@@ -483,62 +414,6 @@ func (s *Service) CostAllowance(ctx context.Context, userID int, now time.Time) 
 		Mode:  normalizeCostQuotaMode(entitlementString(entitlements, "cost_quota_mode")),
 		Quota: entitlementOptionalMoney(entitlements, "monthly_cost_quota"),
 	}, nil
-}
-
-// BillableOverage returns the portion of cost billed to balance given the cost
-// already spent this period and the included allowance ceiling. The covered
-// portion (cost - billable) is absorbed by the subscription allowance. It is
-// pure and clamps the result to [0, cost].
-func BillableOverage(cost, usedBefore, allowance string) string {
-	costRat, ok := decimalRat(cost)
-	if !ok || costRat.Sign() <= 0 {
-		return cost
-	}
-	allowRat, ok := decimalRat(allowance)
-	if !ok {
-		return cost
-	}
-	usedRat, ok := decimalRat(usedBefore)
-	if !ok {
-		usedRat = new(big.Rat)
-	}
-	overage := new(big.Rat).Sub(new(big.Rat).Add(usedRat, costRat), allowRat)
-	if overage.Sign() <= 0 {
-		return formatRatFixed(new(big.Rat), 8)
-	}
-	if overage.Cmp(costRat) >= 0 {
-		return cost
-	}
-	return formatRatFixed(overage, 8)
-}
-
-func (s *Service) EstimatePrice(ctx context.Context, req contract.PricingRequest) (contract.PricingResult, error) {
-	if req.ModelID <= 0 || req.ProviderID < 0 {
-		return contract.PricingResult{}, ErrInvalidInput
-	}
-	at := req.At
-	if at.IsZero() {
-		at = s.clock.Now()
-	}
-	if len(req.PricingOverride) > 0 {
-		result, ok := priceFromPayload(req.PricingOverride, req, nil)
-		if ok {
-			return result, nil
-		}
-	}
-	rules, err := s.store.ListPricingRules(ctx)
-	if err != nil {
-		return contract.PricingResult{}, err
-	}
-	rule, ok := selectPricingRule(rules, req.ModelID, req.ProviderID, at)
-	if !ok {
-		rule, ok = selectFamilyPricingRule(rules, req.ModelFamily, req.ProviderID, at)
-		if !ok {
-			return contract.PricingResult{Amount: "0.00000000", Currency: defaultCurrency}, nil
-		}
-	}
-	ruleID := rule.ID
-	return priceFromRule(rule, req, &ruleID), nil
 }
 
 func (s *Service) enqueueSubscriptionExpired(ctx context.Context, subscription contract.UserSubscription, expiredAt time.Time) {
@@ -654,151 +529,12 @@ func mergeEntitlementRows(entitlements []contract.Entitlement) map[string]any {
 	return merged
 }
 
-func selectPricingRule(rules []contract.PricingRule, modelID int, providerID int, at time.Time) (contract.PricingRule, bool) {
-	var selected contract.PricingRule
-	found := false
-	for _, rule := range rules {
-		if rule.ModelID != modelID {
-			continue
-		}
-		if rule.ProviderID != providerID && rule.ProviderID != 0 {
-			continue
-		}
-		if !pricingRuleActive(rule, at) {
-			continue
-		}
-		if !found || moreSpecificPricingRule(rule, selected) {
-			selected = rule
-			found = true
-		}
-	}
-	return selected, found
-}
-
-func selectFamilyPricingRule(rules []contract.PricingRule, modelFamily string, providerID int, at time.Time) (contract.PricingRule, bool) {
-	modelFamily = normalizePricingFamily(modelFamily)
-	if modelFamily == "" {
-		return contract.PricingRule{}, false
-	}
-	var selected contract.PricingRule
-	found := false
-	for _, rule := range rules {
-		if !pricingFamilyMatches(modelFamily, rule.ModelFamily) {
-			continue
-		}
-		if rule.ProviderID != providerID && rule.ProviderID != 0 {
-			continue
-		}
-		if !pricingRuleActive(rule, at) {
-			continue
-		}
-		if !found || moreSpecificPricingRule(rule, selected) {
-			selected = rule
-			found = true
-		}
-	}
-	return selected, found
-}
-
-func pricingFamilyMatches(requestFamily string, ruleFamily string) bool {
-	ruleFamily = normalizePricingFamily(ruleFamily)
-	if requestFamily == "" || ruleFamily == "" {
-		return false
-	}
-	return requestFamily == ruleFamily || strings.Contains(requestFamily, ruleFamily) || strings.Contains(ruleFamily, requestFamily)
-}
-
-func normalizePricingFamily(value string) string {
-	return strings.ToLower(strings.TrimSpace(value))
-}
-
-func pricingRuleActive(rule contract.PricingRule, at time.Time) bool {
-	if rule.EffectiveFrom != nil && at.Before(*rule.EffectiveFrom) {
-		return false
-	}
-	if rule.EffectiveTo != nil && !at.Before(*rule.EffectiveTo) {
-		return false
-	}
-	return true
-}
-
-func moreSpecificPricingRule(candidate contract.PricingRule, current contract.PricingRule) bool {
-	if candidate.ProviderID != 0 && current.ProviderID == 0 {
-		return true
-	}
-	if candidate.ProviderID == current.ProviderID && candidate.ID > current.ID {
-		return true
-	}
-	return false
-}
-
-func priceFromRule(rule contract.PricingRule, req contract.PricingRequest, ruleID *int) contract.PricingResult {
-	amount := usagePrice(req.InputTokens, rule.InputPricePerMillionTokens)
-	amount = addMoney(amount, usagePrice(req.OutputTokens, rule.OutputPricePerMillionTokens))
-	amount = addMoney(amount, usagePrice(req.CacheReadTokens, rule.CacheReadPricePerMillionTokens))
-	amount = addMoney(amount, usagePrice(req.CacheWriteTokens, cacheWriteRateOrInput(rule)))
-	return contract.PricingResult{Amount: amount, Currency: normalizeCurrency(rule.Currency), PricingRuleID: ruleID}
-}
-
-// cacheWriteRateOrInput returns the configured cache-write rate, falling back to
-// the input rate when no positive cache-write rate is set. Prompt-cache writes
-// cost at least as much as normal input tokens, so an unset write rate must not
-// bill them at zero (a revenue leak); it bills them at the input rate instead.
-func cacheWriteRateOrInput(rule contract.PricingRule) string {
-	if rate, ok := decimalRat(rule.CacheWritePricePerMillionTokens); ok && rate.Sign() > 0 {
-		return rule.CacheWritePricePerMillionTokens
-	}
-	return rule.InputPricePerMillionTokens
-}
-
-func priceFromPayload(payload map[string]any, req contract.PricingRequest, ruleID *int) (contract.PricingResult, bool) {
-	input := payloadMoney(payload, "input_price_per_million_tokens", "input_price_per_million")
-	output := payloadMoney(payload, "output_price_per_million_tokens", "output_price_per_million")
-	cacheRead := payloadMoney(payload, "cache_read_price_per_million_tokens", "cache_read_price_per_million")
-	cacheWrite := payloadMoney(payload, "cache_write_price_per_million_tokens", "cache_write_price_per_million")
-	if input == "" && output == "" && cacheRead == "" && cacheWrite == "" {
-		return contract.PricingResult{}, false
-	}
-	rule := contract.PricingRule{
-		InputPricePerMillionTokens:      defaultMoney(input),
-		OutputPricePerMillionTokens:     defaultMoney(output),
-		CacheReadPricePerMillionTokens:  defaultMoney(cacheRead),
-		CacheWritePricePerMillionTokens: defaultMoney(cacheWrite),
-		Currency:                        payloadString(payload, "currency"),
-	}
-	return priceFromRule(rule, req, ruleID), true
-}
-
-func usagePrice(tokens int, pricePerMillion string) string {
-	if tokens <= 0 {
-		return "0.00000000"
-	}
-	price, ok := decimalRat(pricePerMillion)
-	if !ok {
-		return "0.00000000"
-	}
-	price.Mul(price, big.NewRat(int64(tokens), 1000000))
-	return formatRatFixed(price, 8)
-}
-
-func addMoney(left string, right string) string {
-	leftRat, ok := decimalRat(defaultMoney(left))
-	if !ok {
-		leftRat = new(big.Rat)
-	}
-	rightRat, ok := decimalRat(defaultMoney(right))
-	if !ok {
-		rightRat = new(big.Rat)
-	}
-	return formatRatFixed(leftRat.Add(leftRat, rightRat), 8)
-}
-
 func compareMoney(left string, right string) int {
-	leftRat, ok := decimalRat(defaultMoney(left))
+	leftRat, ok := money.DecimalRat(money.NormalizeAmount(left))
 	if !ok {
 		leftRat = new(big.Rat)
 	}
-	rightRat, ok := decimalRat(defaultMoney(right))
+	rightRat, ok := money.DecimalRat(money.NormalizeAmount(right))
 	if !ok {
 		rightRat = new(big.Rat)
 	}
@@ -806,59 +542,15 @@ func compareMoney(left string, right string) int {
 }
 
 func normalizeMoney(value string) (string, bool) {
-	rat, ok := decimalRat(defaultMoney(value))
+	rat, ok := money.DecimalRat(money.NormalizeAmount(value))
 	if !ok || rat.Sign() < 0 {
 		return "", false
 	}
-	return formatRatFixed(rat, 8), true
-}
-
-func defaultMoney(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return "0.00000000"
-	}
-	return value
-}
-
-func decimalRat(value string) (*big.Rat, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return big.NewRat(0, 1), true
-	}
-	rat, ok := new(big.Rat).SetString(value)
-	return rat, ok
-}
-
-func formatRatFixed(value *big.Rat, scale int) string {
-	if value == nil {
-		value = new(big.Rat)
-	}
-	multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(scale)), nil)
-	scaled := new(big.Rat).Mul(value, new(big.Rat).SetInt(multiplier))
-	numerator := new(big.Int).Set(scaled.Num())
-	denominator := new(big.Int).Set(scaled.Denom())
-	quotient, remainder := new(big.Int).QuoRem(numerator, denominator, new(big.Int))
-	doubleRemainder := new(big.Int).Mul(remainder, big.NewInt(2))
-	if doubleRemainder.Cmp(denominator) >= 0 {
-		quotient.Add(quotient, big.NewInt(1))
-	}
-	raw := quotient.String()
-	if scale == 0 {
-		return raw
-	}
-	for len(raw) <= scale {
-		raw = "0" + raw
-	}
-	return raw[:len(raw)-scale] + "." + raw[len(raw)-scale:]
+	return money.FormatRatFixed(rat, 8), true
 }
 
 func normalizeCurrency(value string) string {
-	value = strings.ToUpper(strings.TrimSpace(value))
-	if value == "" {
-		return defaultCurrency
-	}
-	return value
+	return money.NormalizeCurrency(value)
 }
 
 func validPlanStatus(status contract.PlanStatus) bool {

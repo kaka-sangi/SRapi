@@ -16,10 +16,7 @@ export const ACCOUNT_RUNTIME_CLASSES: RuntimeClass[] = [
   "oauth_refresh",
   "oauth_device_code",
   "web_session_cookie",
-  "desktop_client_token",
   "cli_client_token",
-  "ide_plugin_token",
-  "service_account_json",
   "custom_reverse_proxy",
 ];
 

@@ -69,6 +69,7 @@ interface AccountTemplate {
  */
 const PLATFORM_FAMILY_ORDER: PlatformFamily[] = [
   "anthropic_compatible",
+  "gemini_compatible",
   "openai_compatible",
   "bedrock_anthropic",
   "reverse_proxy_antigravity",
@@ -446,6 +447,7 @@ export function AccountFormDialog({
           open={oauthWizardOpen}
           onOpenChange={setOauthWizardOpen}
           mode={oauthFlowMode}
+          providerId={providerId}
           onProvisioned={applyProvisionedTokens}
         />
       ) : null}

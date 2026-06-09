@@ -620,6 +620,33 @@ func TestNativeOpenAIAdapterNormalizesCanonicalResponsesImageGenerationToolAlias
 	}
 }
 
+func TestOpenAIPresetOAuthRuntimeIsNotSupported(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("unsupported OpenAI OAuth runtime should not call upstream")
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_openai_oauth_not_supported",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/chat/completions",
+		Model:          "gpt-local",
+		Messages:       []contract.ConversationMessage{{Role: "user", Parts: textParts("hello")}},
+		Provider:       providercontract.Provider{Name: "openai", AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account: accountcontract.ProviderAccount{
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Metadata:     map[string]any{"base_url": upstream.URL + "/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"access_token": "access-token", "refresh_token": "refresh-token"},
+	})
+	assertProviderError(t, err, "not_supported", http.StatusBadRequest)
+}
+
 func TestNativeOpenAIAdapterNormalizesResponsesImageOnlyModelWhenMainModelConfigured(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload map[string]any
@@ -2439,6 +2466,34 @@ func TestGeminiCompatibleAdapterInvokesGenerateContentUpstream(t *testing.T) {
 	}
 }
 
+func TestGeminiPresetOAuthRuntimeIsNotSupported(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("unsupported Gemini OAuth runtime should not call upstream")
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_gemini_oauth_not_supported",
+		SourceProtocol: "gemini-compatible",
+		SourceEndpoint: "/v1beta/models/gemini-local:generateContent",
+		TargetProtocol: "gemini-compatible",
+		Model:          "gemini-local",
+		InputParts:     textParts("hello"),
+		Provider:       providercontract.Provider{Name: "gemini", AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account: accountcontract.ProviderAccount{
+			RuntimeClass: accountcontract.RuntimeClassOauthDeviceCode,
+			Metadata:     map[string]any{"base_url": upstream.URL + "/v1beta"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"access_token": "access-token", "refresh_token": "refresh-token"},
+	})
+	assertProviderError(t, err, "not_supported", http.StatusBadRequest)
+}
+
 func TestGeminiCompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload map[string]any
@@ -3587,6 +3642,8 @@ func TestAnthropicCompatibleAdapterInvokesMessagesUpstream(t *testing.T) {
 			t.Fatalf("expected Anthropic tool_choice, got %+v", payload.ToolChoice)
 		}
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("anthropic-ratelimit-unified-5h", "remaining=75; limit=100; reset_after_seconds=300")
+		w.Header().Set("anthropic-ratelimit-unified-7d", "used=40; limit=100; reset_after_seconds=600")
 		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"anthropic says hi"}],"usage":{"input_tokens":6,"output_tokens":7,"cache_read_input_tokens":2}}`))
 	}))
 	defer upstream.Close()
@@ -3635,6 +3692,11 @@ func TestAnthropicCompatibleAdapterInvokesMessagesUpstream(t *testing.T) {
 	if conversationResponseText(resp) != "anthropic says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 6 || resp.Usage.OutputTokens != 7 || resp.Usage.CachedTokens != 2 {
 		t.Fatalf("unexpected anthropic adapter response: %+v", resp)
 	}
+	if len(resp.QuotaSignals) != 2 {
+		t.Fatalf("expected passive Anthropic quota signals, got %+v", resp.QuotaSignals)
+	}
+	assertQuotaSignal(t, resp.QuotaSignals, "anthropic_5h", "25", "75", "100", 0.75)
+	assertQuotaSignal(t, resp.QuotaSignals, "anthropic_7d", "40", "60", "100", 0.6)
 }
 
 func TestAnthropicCompatibleAdapterRendersBlockContentToUpstream(t *testing.T) {

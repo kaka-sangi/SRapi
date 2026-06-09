@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 const (
@@ -59,6 +60,22 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 	if err := validateIPEntries(req.DeniedIPs); err != nil {
 		return contract.CreatedKey{}, err
 	}
+	costQuota, ok := optionalMoney(req.CostQuota)
+	if !ok {
+		return contract.CreatedKey{}, ErrInvalidInput
+	}
+	costLimit5h, ok := optionalMoney(req.CostLimit5h)
+	if !ok {
+		return contract.CreatedKey{}, ErrInvalidInput
+	}
+	costLimit1d, ok := optionalMoney(req.CostLimit1d)
+	if !ok {
+		return contract.CreatedKey{}, ErrInvalidInput
+	}
+	costLimit7d, ok := optionalMoney(req.CostLimit7d)
+	if !ok {
+		return contract.CreatedKey{}, ErrInvalidInput
+	}
 	plaintext, prefix, err := GeneratePlaintextKey()
 	if err != nil {
 		return contract.CreatedKey{}, err
@@ -81,6 +98,10 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 		RequestLimit5h:   cloneIntPointer(req.RequestLimit5h),
 		RequestLimit1d:   cloneIntPointer(req.RequestLimit1d),
 		RequestLimit7d:   cloneIntPointer(req.RequestLimit7d),
+		CostQuota:        cloneStringPointer(costQuota),
+		CostLimit5h:      cloneStringPointer(costLimit5h),
+		CostLimit1d:      cloneStringPointer(costLimit1d),
+		CostLimit7d:      cloneStringPointer(costLimit7d),
 		AllowedIPs:       cloneStrings(req.AllowedIPs),
 		DeniedIPs:        cloneStrings(req.DeniedIPs),
 		ExpiresAt:        cloneTimePointer(req.ExpiresAt),
@@ -213,6 +234,34 @@ func (s *Service) Update(ctx context.Context, req contract.UpdateRequest) (contr
 	if req.RequestLimit7d != nil {
 		key.RequestLimit7d = cloneIntPointer(req.RequestLimit7d)
 	}
+	if req.CostQuota != nil {
+		costQuota, ok := optionalMoney(req.CostQuota)
+		if !ok {
+			return contract.APIKey{}, ErrInvalidInput
+		}
+		key.CostQuota = cloneStringPointer(costQuota)
+	}
+	if req.CostLimit5h != nil {
+		costLimit, ok := optionalMoney(req.CostLimit5h)
+		if !ok {
+			return contract.APIKey{}, ErrInvalidInput
+		}
+		key.CostLimit5h = cloneStringPointer(costLimit)
+	}
+	if req.CostLimit1d != nil {
+		costLimit, ok := optionalMoney(req.CostLimit1d)
+		if !ok {
+			return contract.APIKey{}, ErrInvalidInput
+		}
+		key.CostLimit1d = cloneStringPointer(costLimit)
+	}
+	if req.CostLimit7d != nil {
+		costLimit, ok := optionalMoney(req.CostLimit7d)
+		if !ok {
+			return contract.APIKey{}, ErrInvalidInput
+		}
+		key.CostLimit7d = cloneStringPointer(costLimit)
+	}
 	if req.AllowedIPs != nil {
 		if err := validateIPEntries(*req.AllowedIPs); err != nil {
 			return contract.APIKey{}, err
@@ -231,6 +280,31 @@ func (s *Service) Update(ctx context.Context, req contract.UpdateRequest) (contr
 		key.ExpiresAt = cloneTimePointer(req.ExpiresAt)
 	}
 	updated, err := s.store.Update(ctx, key)
+	if err != nil {
+		if errors.Is(err, contract.ErrKeyNotFound) {
+			return contract.APIKey{}, ErrKeyNotFound
+		}
+		return contract.APIKey{}, err
+	}
+	return withoutHash(updated), nil
+}
+
+// ApplyCostUsage persists a successful request's billable USD cost to the key's
+// materialized lifetime and rolling-window cost counters.
+func (s *Service) ApplyCostUsage(ctx context.Context, input contract.CostUsageUpdate) (contract.APIKey, error) {
+	if input.KeyID <= 0 {
+		return contract.APIKey{}, ErrInvalidInput
+	}
+	cost, ok := optionalMoney(&input.BillableCost)
+	if !ok || cost == nil {
+		return contract.APIKey{}, ErrInvalidInput
+	}
+	if input.OccurredAt.IsZero() {
+		input.OccurredAt = s.clock.Now()
+	}
+	input.BillableCost = *cost
+	input.OccurredAt = input.OccurredAt.UTC()
+	updated, err := s.store.ApplyCostUsage(ctx, input)
 	if err != nil {
 		if errors.Is(err, contract.ErrKeyNotFound) {
 			return contract.APIKey{}, ErrKeyNotFound
@@ -378,6 +452,30 @@ func cloneInts(values []int) []int {
 }
 
 func cloneIntPointer(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func optionalMoney(value *string) (*string, bool) {
+	if value == nil {
+		return nil, true
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil, true
+	}
+	rat, ok := money.DecimalRat(money.NormalizeAmount(trimmed))
+	if !ok || rat.Sign() < 0 {
+		return nil, false
+	}
+	normalized := money.FormatRatFixed(rat, 8)
+	return &normalized, true
+}
+
+func cloneStringPointer(value *string) *string {
 	if value == nil {
 		return nil
 	}

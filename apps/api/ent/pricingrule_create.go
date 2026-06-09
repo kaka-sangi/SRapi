@@ -60,6 +60,20 @@ func (_c *PricingRuleCreate) SetProviderID(v int) *PricingRuleCreate {
 	return _c
 }
 
+// SetBillingMode sets the "billing_mode" field.
+func (_c *PricingRuleCreate) SetBillingMode(v string) *PricingRuleCreate {
+	_c.mutation.SetBillingMode(v)
+	return _c
+}
+
+// SetNillableBillingMode sets the "billing_mode" field if the given value is not nil.
+func (_c *PricingRuleCreate) SetNillableBillingMode(v *string) *PricingRuleCreate {
+	if v != nil {
+		_c.SetBillingMode(*v)
+	}
+	return _c
+}
+
 // SetInputPricePerMillion sets the "input_price_per_million" field.
 func (_c *PricingRuleCreate) SetInputPricePerMillion(v string) *PricingRuleCreate {
 	_c.mutation.SetInputPricePerMillion(v)
@@ -112,6 +126,20 @@ func (_c *PricingRuleCreate) SetCacheWritePricePerMillion(v string) *PricingRule
 func (_c *PricingRuleCreate) SetNillableCacheWritePricePerMillion(v *string) *PricingRuleCreate {
 	if v != nil {
 		_c.SetCacheWritePricePerMillion(*v)
+	}
+	return _c
+}
+
+// SetPerRequestPrice sets the "per_request_price" field.
+func (_c *PricingRuleCreate) SetPerRequestPrice(v string) *PricingRuleCreate {
+	_c.mutation.SetPerRequestPrice(v)
+	return _c
+}
+
+// SetNillablePerRequestPrice sets the "per_request_price" field if the given value is not nil.
+func (_c *PricingRuleCreate) SetNillablePerRequestPrice(v *string) *PricingRuleCreate {
+	if v != nil {
+		_c.SetPerRequestPrice(*v)
 	}
 	return _c
 }
@@ -201,6 +229,10 @@ func (_c *PricingRuleCreate) defaults() {
 		v := pricingrule.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.BillingMode(); !ok {
+		v := pricingrule.DefaultBillingMode
+		_c.mutation.SetBillingMode(v)
+	}
 	if _, ok := _c.mutation.InputPricePerMillion(); !ok {
 		v := pricingrule.DefaultInputPricePerMillion
 		_c.mutation.SetInputPricePerMillion(v)
@@ -216,6 +248,10 @@ func (_c *PricingRuleCreate) defaults() {
 	if _, ok := _c.mutation.CacheWritePricePerMillion(); !ok {
 		v := pricingrule.DefaultCacheWritePricePerMillion
 		_c.mutation.SetCacheWritePricePerMillion(v)
+	}
+	if _, ok := _c.mutation.PerRequestPrice(); !ok {
+		v := pricingrule.DefaultPerRequestPrice
+		_c.mutation.SetPerRequestPrice(v)
 	}
 	if _, ok := _c.mutation.Currency(); !ok {
 		v := pricingrule.DefaultCurrency
@@ -237,6 +273,9 @@ func (_c *PricingRuleCreate) check() error {
 	if _, ok := _c.mutation.ProviderID(); !ok {
 		return &ValidationError{Name: "provider_id", err: errors.New(`ent: missing required field "PricingRule.provider_id"`)}
 	}
+	if _, ok := _c.mutation.BillingMode(); !ok {
+		return &ValidationError{Name: "billing_mode", err: errors.New(`ent: missing required field "PricingRule.billing_mode"`)}
+	}
 	if _, ok := _c.mutation.InputPricePerMillion(); !ok {
 		return &ValidationError{Name: "input_price_per_million", err: errors.New(`ent: missing required field "PricingRule.input_price_per_million"`)}
 	}
@@ -248,6 +287,9 @@ func (_c *PricingRuleCreate) check() error {
 	}
 	if _, ok := _c.mutation.CacheWritePricePerMillion(); !ok {
 		return &ValidationError{Name: "cache_write_price_per_million", err: errors.New(`ent: missing required field "PricingRule.cache_write_price_per_million"`)}
+	}
+	if _, ok := _c.mutation.PerRequestPrice(); !ok {
+		return &ValidationError{Name: "per_request_price", err: errors.New(`ent: missing required field "PricingRule.per_request_price"`)}
 	}
 	if _, ok := _c.mutation.Currency(); !ok {
 		return &ValidationError{Name: "currency", err: errors.New(`ent: missing required field "PricingRule.currency"`)}
@@ -294,6 +336,10 @@ func (_c *PricingRuleCreate) createSpec() (*PricingRule, *sqlgraph.CreateSpec) {
 		_spec.SetField(pricingrule.FieldProviderID, field.TypeInt, value)
 		_node.ProviderID = value
 	}
+	if value, ok := _c.mutation.BillingMode(); ok {
+		_spec.SetField(pricingrule.FieldBillingMode, field.TypeString, value)
+		_node.BillingMode = value
+	}
 	if value, ok := _c.mutation.InputPricePerMillion(); ok {
 		_spec.SetField(pricingrule.FieldInputPricePerMillion, field.TypeString, value)
 		_node.InputPricePerMillion = value
@@ -309,6 +355,10 @@ func (_c *PricingRuleCreate) createSpec() (*PricingRule, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.CacheWritePricePerMillion(); ok {
 		_spec.SetField(pricingrule.FieldCacheWritePricePerMillion, field.TypeString, value)
 		_node.CacheWritePricePerMillion = value
+	}
+	if value, ok := _c.mutation.PerRequestPrice(); ok {
+		_spec.SetField(pricingrule.FieldPerRequestPrice, field.TypeString, value)
+		_node.PerRequestPrice = value
 	}
 	if value, ok := _c.mutation.Currency(); ok {
 		_spec.SetField(pricingrule.FieldCurrency, field.TypeString, value)

@@ -19,6 +19,7 @@ import {
   getAuthCaptchaConfig as sdkGetAuthCaptchaConfig,
   getCurrentUser as sdkGetCurrentUser,
   getCurrentUserUsage as sdkGetCurrentUserUsage,
+  listCurrentUserAvailableModels as sdkListCurrentUserAvailableModels,
   listApiKeys as sdkListApiKeys,
   createApiKey as sdkCreateApiKey,
   updateApiKey as sdkUpdateApiKey,
@@ -39,6 +40,7 @@ import {
   type SloSummary,
   type SmokeChecklist,
   type UsageLogSummary,
+  type AvailableModelSummary,
 } from './srapi-types';
 import type { AdminTestResult, EnabledOAuthProvider, OAuthPendingSession, GatewayUsageResponse } from '../../../../packages/sdk/typescript/src/types.gen';
 import { setSessionPresenceCookie, clearSessionPresenceCookie } from './session-cookie';
@@ -89,6 +91,14 @@ type LiveApiKey = {
   request_limit_5h?: number | null;
   request_limit_1d?: number | null;
   request_limit_7d?: number | null;
+  cost_quota?: string | null;
+  cost_used?: string | null;
+  cost_limit_5h?: string | null;
+  cost_used_5h?: string | null;
+  cost_limit_1d?: string | null;
+  cost_used_1d?: string | null;
+  cost_limit_7d?: string | null;
+  cost_used_7d?: string | null;
   rpm_limit?: number | null;
   tpm_limit?: number | null;
   concurrency_limit?: number | null;
@@ -122,6 +132,13 @@ type LiveUsageLog = {
   success: boolean;
   total_tokens?: number;
   cost?: string | number;
+  input_cost?: string | number;
+  output_cost?: string | number;
+  cache_read_cost?: string | number;
+  cache_write_cost?: string | number;
+  requested_model?: string;
+  upstream_model?: string;
+  billing_mode?: 'token' | 'per_request' | 'image';
   currency?: string;
 };
 
@@ -141,6 +158,11 @@ type LiveSchedulerDecision = {
   warnings?: string[];
   logs?: string[];
 };
+
+function parseMoneyValue(value: string | number | undefined): number {
+  if (typeof value === 'number') return value;
+  return parseFloat(value || '0');
+}
 
 type LiveSlo = Partial<SloSummary> & {
   definition?: {
@@ -602,6 +624,14 @@ export const apiService = {
         request_limit_5h: key.request_limit_5h ?? null,
         request_limit_1d: key.request_limit_1d ?? null,
         request_limit_7d: key.request_limit_7d ?? null,
+        cost_quota: key.cost_quota ?? null,
+        cost_used: key.cost_used ?? null,
+        cost_limit_5h: key.cost_limit_5h ?? null,
+        cost_used_5h: key.cost_used_5h ?? null,
+        cost_limit_1d: key.cost_limit_1d ?? null,
+        cost_used_1d: key.cost_used_1d ?? null,
+        cost_limit_7d: key.cost_limit_7d ?? null,
+        cost_used_7d: key.cost_used_7d ?? null,
         rpm_limit: key.rpm_limit ?? null,
         tpm_limit: key.tpm_limit ?? null,
         concurrency_limit: key.concurrency_limit ?? null,
@@ -621,6 +651,10 @@ export const apiService = {
       requestLimit5h?: number;
       requestLimit1d?: number;
       requestLimit7d?: number;
+      costQuota?: string;
+      costLimit5h?: string;
+      costLimit1d?: string;
+      costLimit7d?: string;
       rpmLimit?: number;
       tpmLimit?: number;
       concurrencyLimit?: number;
@@ -638,6 +672,10 @@ export const apiService = {
         ...(options?.requestLimit5h != null ? { request_limit_5h: options.requestLimit5h } : {}),
         ...(options?.requestLimit1d != null ? { request_limit_1d: options.requestLimit1d } : {}),
         ...(options?.requestLimit7d != null ? { request_limit_7d: options.requestLimit7d } : {}),
+        ...(options?.costQuota ? { cost_quota: options.costQuota } : {}),
+        ...(options?.costLimit5h ? { cost_limit_5h: options.costLimit5h } : {}),
+        ...(options?.costLimit1d ? { cost_limit_1d: options.costLimit1d } : {}),
+        ...(options?.costLimit7d ? { cost_limit_7d: options.costLimit7d } : {}),
         ...(options?.rpmLimit != null ? { rpm_limit: options.rpmLimit } : {}),
         ...(options?.tpmLimit != null ? { tpm_limit: options.tpmLimit } : {}),
         ...(options?.concurrencyLimit != null ? { concurrency_limit: options.concurrencyLimit } : {}),
@@ -656,7 +694,24 @@ export const apiService = {
         status: key.status === 'active' ? 'active' : 'disabled',
         created_at: key.created_at || new Date().toISOString(),
         allowed_models: key.allowed_models || allowedModels,
-        group_ids: key.group_ids || groupIds
+        group_ids: key.group_ids || groupIds,
+        allowed_ips: key.allowed_ips || [],
+        denied_ips: key.denied_ips || [],
+        request_limit_5h: key.request_limit_5h ?? null,
+        request_limit_1d: key.request_limit_1d ?? null,
+        request_limit_7d: key.request_limit_7d ?? null,
+        cost_quota: key.cost_quota ?? null,
+        cost_used: key.cost_used ?? null,
+        cost_limit_5h: key.cost_limit_5h ?? null,
+        cost_used_5h: key.cost_used_5h ?? null,
+        cost_limit_1d: key.cost_limit_1d ?? null,
+        cost_used_1d: key.cost_used_1d ?? null,
+        cost_limit_7d: key.cost_limit_7d ?? null,
+        cost_used_7d: key.cost_used_7d ?? null,
+        rpm_limit: key.rpm_limit ?? null,
+        tpm_limit: key.tpm_limit ?? null,
+        concurrency_limit: key.concurrency_limit ?? null,
+        expires_at: key.expires_at ?? null
       };
     }
     throw new Error('API key creation returned an empty response.');
@@ -679,7 +734,24 @@ export const apiService = {
         status: (key.status === 'active' ? 'active' : 'disabled') as 'active' | 'disabled',
         created_at: key.created_at,
         allowed_models: key.allowed_models || [],
-        group_ids: key.group_ids || []
+        group_ids: key.group_ids || [],
+        allowed_ips: key.allowed_ips || [],
+        denied_ips: key.denied_ips || [],
+        request_limit_5h: key.request_limit_5h ?? null,
+        request_limit_1d: key.request_limit_1d ?? null,
+        request_limit_7d: key.request_limit_7d ?? null,
+        cost_quota: key.cost_quota ?? null,
+        cost_used: key.cost_used ?? null,
+        cost_limit_5h: key.cost_limit_5h ?? null,
+        cost_used_5h: key.cost_used_5h ?? null,
+        cost_limit_1d: key.cost_limit_1d ?? null,
+        cost_used_1d: key.cost_used_1d ?? null,
+        cost_limit_7d: key.cost_limit_7d ?? null,
+        cost_used_7d: key.cost_used_7d ?? null,
+        rpm_limit: key.rpm_limit ?? null,
+        tpm_limit: key.tpm_limit ?? null,
+        concurrency_limit: key.concurrency_limit ?? null,
+        expires_at: key.expires_at ?? null
       };
     }
     throw new Error('API key update returned an empty response.');
@@ -699,6 +771,10 @@ export const apiService = {
       requestLimit5h?: number;
       requestLimit1d?: number;
       requestLimit7d?: number;
+      costQuota?: string;
+      costLimit5h?: string;
+      costLimit1d?: string;
+      costLimit7d?: string;
       rpmLimit?: number;
       tpmLimit?: number;
       concurrencyLimit?: number;
@@ -722,6 +798,10 @@ export const apiService = {
         request_limit_5h: policy.requestLimit5h ?? 0,
         request_limit_1d: policy.requestLimit1d ?? 0,
         request_limit_7d: policy.requestLimit7d ?? 0,
+        cost_quota: policy.costQuota ?? null,
+        cost_limit_5h: policy.costLimit5h ?? null,
+        cost_limit_1d: policy.costLimit1d ?? null,
+        cost_limit_7d: policy.costLimit7d ?? null,
         ...(policy.expiresAt ? { expires_at: policy.expiresAt } : {})
       },
       throwOnError: true
@@ -789,10 +869,51 @@ export const apiService = {
         success: log.success,
         total_tokens: log.total_tokens || 0,
         cost: typeof log.cost === 'number' ? log.cost : parseFloat(log.cost || '0'),
+        input_cost: parseMoneyValue(log.input_cost),
+        output_cost: parseMoneyValue(log.output_cost),
+        cache_read_cost: parseMoneyValue(log.cache_read_cost),
+        cache_write_cost: parseMoneyValue(log.cache_write_cost),
+        requested_model: log.requested_model,
+        upstream_model: log.upstream_model,
+        billing_mode: log.billing_mode,
         currency: log.currency || 'USD'
       }));
     }
     return [];
+  },
+
+  async listAvailableModels(): Promise<AvailableModelSummary[]> {
+    configureSDKClient();
+    const response = await sdkListCurrentUserAvailableModels({ throwOnError: true });
+    return (response.data?.data ?? []).map((model) => ({
+      id: model.id,
+      name: model.name,
+      family: model.family ?? null,
+      status: model.status,
+      context_window: model.context_window ?? null,
+      max_output_tokens: model.max_output_tokens ?? null,
+      channels: (model.channels ?? []).map((channel) => ({
+        provider_id: channel.provider_id,
+        provider_name: channel.provider_name,
+        provider_display_name: channel.provider_display_name,
+        adapter_type: channel.adapter_type,
+        protocol: channel.protocol,
+        upstream_model: channel.upstream_model,
+        status: channel.status,
+        active_account_count: channel.active_account_count,
+        total_account_count: channel.total_account_count,
+        pricing: {
+          billing_mode: channel.pricing.billing_mode,
+          currency: channel.pricing.currency,
+          input_price_per_million_tokens: channel.pricing.input_price_per_million_tokens,
+          output_price_per_million_tokens: channel.pricing.output_price_per_million_tokens,
+          cache_read_price_per_million_tokens: channel.pricing.cache_read_price_per_million_tokens,
+          cache_write_price_per_million_tokens: channel.pricing.cache_write_price_per_million_tokens,
+          per_request_price: channel.pricing.per_request_price,
+          source: channel.pricing.source,
+        },
+      })),
+    }));
   },
 
   async listSchedulerDecisions(): Promise<SchedulerDecisionSummary[]> {

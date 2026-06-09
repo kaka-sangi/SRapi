@@ -11,6 +11,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/users/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 const defaultBcryptCost = 12
@@ -525,7 +526,7 @@ func (s *Service) UpdateBalance(ctx context.Context, id int, req BalanceUpdateRe
 	if id <= 0 {
 		return contract.StoredUser{}, ErrInvalidInput
 	}
-	amount, ok := decimalRat(req.Amount)
+	amount, ok := money.RequiredDecimalRat(req.Amount)
 	if !ok || amount.Sign() < 0 {
 		return contract.StoredUser{}, ErrInvalidInput
 	}
@@ -536,7 +537,7 @@ func (s *Service) UpdateBalance(ctx context.Context, id int, req BalanceUpdateRe
 		}
 		return contract.StoredUser{}, err
 	}
-	balance, ok := decimalRat(user.Balance)
+	balance, ok := money.RequiredDecimalRat(user.Balance)
 	if !ok {
 		return contract.StoredUser{}, ErrInvalidInput
 	}
@@ -553,7 +554,7 @@ func (s *Service) UpdateBalance(ctx context.Context, id int, req BalanceUpdateRe
 	if balance.Sign() < 0 {
 		return contract.StoredUser{}, ErrInvalidInput
 	}
-	normalizedBalance := formatRatFixed(balance, 8)
+	normalizedBalance := money.FormatRatFixed(balance, 8)
 	currency := normalizeCurrency(user.Currency)
 	if strings.TrimSpace(req.Currency) != "" {
 		currency = normalizeCurrency(req.Currency)
@@ -909,35 +910,15 @@ func canUnbindExternalIdentity(user contract.User, externalCount int) bool {
 }
 
 func normalizeCurrency(value string) string {
-	value = strings.ToUpper(strings.TrimSpace(value))
-	if value == "" {
-		return "USD"
-	}
-	return value
+	return money.NormalizeCurrency(value)
 }
 
 func normalizeMoney(value string) (string, bool) {
-	rat, ok := decimalRat(value)
+	rat, ok := money.RequiredDecimalRat(value)
 	if !ok || rat.Sign() < 0 {
 		return "", false
 	}
-	return formatRatFixed(rat, 8), true
-}
-
-func decimalRat(value string) (*big.Rat, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" || strings.ContainsAny(value, "eE") {
-		return nil, false
-	}
-	rat, ok := new(big.Rat).SetString(value)
-	return rat, ok
-}
-
-func formatRatFixed(value *big.Rat, places int) string {
-	if value == nil {
-		value = new(big.Rat)
-	}
-	return value.FloatString(places)
+	return money.FormatRatFixed(rat, 8), true
 }
 
 func cloneInt(value *int) *int {

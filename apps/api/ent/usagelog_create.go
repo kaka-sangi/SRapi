@@ -346,6 +346,104 @@ func (_c *UsageLogCreate) SetNillableBillableCost(v *string) *UsageLogCreate {
 	return _c
 }
 
+// SetInputCost sets the "input_cost" field.
+func (_c *UsageLogCreate) SetInputCost(v string) *UsageLogCreate {
+	_c.mutation.SetInputCost(v)
+	return _c
+}
+
+// SetNillableInputCost sets the "input_cost" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableInputCost(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetInputCost(*v)
+	}
+	return _c
+}
+
+// SetOutputCost sets the "output_cost" field.
+func (_c *UsageLogCreate) SetOutputCost(v string) *UsageLogCreate {
+	_c.mutation.SetOutputCost(v)
+	return _c
+}
+
+// SetNillableOutputCost sets the "output_cost" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableOutputCost(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetOutputCost(*v)
+	}
+	return _c
+}
+
+// SetCacheReadCost sets the "cache_read_cost" field.
+func (_c *UsageLogCreate) SetCacheReadCost(v string) *UsageLogCreate {
+	_c.mutation.SetCacheReadCost(v)
+	return _c
+}
+
+// SetNillableCacheReadCost sets the "cache_read_cost" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableCacheReadCost(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetCacheReadCost(*v)
+	}
+	return _c
+}
+
+// SetCacheWriteCost sets the "cache_write_cost" field.
+func (_c *UsageLogCreate) SetCacheWriteCost(v string) *UsageLogCreate {
+	_c.mutation.SetCacheWriteCost(v)
+	return _c
+}
+
+// SetNillableCacheWriteCost sets the "cache_write_cost" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableCacheWriteCost(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetCacheWriteCost(*v)
+	}
+	return _c
+}
+
+// SetRequestedModel sets the "requested_model" field.
+func (_c *UsageLogCreate) SetRequestedModel(v string) *UsageLogCreate {
+	_c.mutation.SetRequestedModel(v)
+	return _c
+}
+
+// SetNillableRequestedModel sets the "requested_model" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableRequestedModel(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetRequestedModel(*v)
+	}
+	return _c
+}
+
+// SetUpstreamModel sets the "upstream_model" field.
+func (_c *UsageLogCreate) SetUpstreamModel(v string) *UsageLogCreate {
+	_c.mutation.SetUpstreamModel(v)
+	return _c
+}
+
+// SetNillableUpstreamModel sets the "upstream_model" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableUpstreamModel(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetUpstreamModel(*v)
+	}
+	return _c
+}
+
+// SetBillingMode sets the "billing_mode" field.
+func (_c *UsageLogCreate) SetBillingMode(v string) *UsageLogCreate {
+	_c.mutation.SetBillingMode(v)
+	return _c
+}
+
+// SetNillableBillingMode sets the "billing_mode" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableBillingMode(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetBillingMode(*v)
+	}
+	return _c
+}
+
 // SetCurrency sets the "currency" field.
 func (_c *UsageLogCreate) SetCurrency(v string) *UsageLogCreate {
 	_c.mutation.SetCurrency(v)
@@ -491,6 +589,34 @@ func (_c *UsageLogCreate) defaults() {
 		v := usagelog.DefaultBillableCost
 		_c.mutation.SetBillableCost(v)
 	}
+	if _, ok := _c.mutation.InputCost(); !ok {
+		v := usagelog.DefaultInputCost
+		_c.mutation.SetInputCost(v)
+	}
+	if _, ok := _c.mutation.OutputCost(); !ok {
+		v := usagelog.DefaultOutputCost
+		_c.mutation.SetOutputCost(v)
+	}
+	if _, ok := _c.mutation.CacheReadCost(); !ok {
+		v := usagelog.DefaultCacheReadCost
+		_c.mutation.SetCacheReadCost(v)
+	}
+	if _, ok := _c.mutation.CacheWriteCost(); !ok {
+		v := usagelog.DefaultCacheWriteCost
+		_c.mutation.SetCacheWriteCost(v)
+	}
+	if _, ok := _c.mutation.RequestedModel(); !ok {
+		v := usagelog.DefaultRequestedModel
+		_c.mutation.SetRequestedModel(v)
+	}
+	if _, ok := _c.mutation.UpstreamModel(); !ok {
+		v := usagelog.DefaultUpstreamModel
+		_c.mutation.SetUpstreamModel(v)
+	}
+	if _, ok := _c.mutation.BillingMode(); !ok {
+		v := usagelog.DefaultBillingMode
+		_c.mutation.SetBillingMode(v)
+	}
 	if _, ok := _c.mutation.Currency(); !ok {
 		v := usagelog.DefaultCurrency
 		_c.mutation.SetCurrency(v)
@@ -569,6 +695,27 @@ func (_c *UsageLogCreate) check() error {
 	}
 	if _, ok := _c.mutation.BillableCost(); !ok {
 		return &ValidationError{Name: "billable_cost", err: errors.New(`ent: missing required field "UsageLog.billable_cost"`)}
+	}
+	if _, ok := _c.mutation.InputCost(); !ok {
+		return &ValidationError{Name: "input_cost", err: errors.New(`ent: missing required field "UsageLog.input_cost"`)}
+	}
+	if _, ok := _c.mutation.OutputCost(); !ok {
+		return &ValidationError{Name: "output_cost", err: errors.New(`ent: missing required field "UsageLog.output_cost"`)}
+	}
+	if _, ok := _c.mutation.CacheReadCost(); !ok {
+		return &ValidationError{Name: "cache_read_cost", err: errors.New(`ent: missing required field "UsageLog.cache_read_cost"`)}
+	}
+	if _, ok := _c.mutation.CacheWriteCost(); !ok {
+		return &ValidationError{Name: "cache_write_cost", err: errors.New(`ent: missing required field "UsageLog.cache_write_cost"`)}
+	}
+	if _, ok := _c.mutation.RequestedModel(); !ok {
+		return &ValidationError{Name: "requested_model", err: errors.New(`ent: missing required field "UsageLog.requested_model"`)}
+	}
+	if _, ok := _c.mutation.UpstreamModel(); !ok {
+		return &ValidationError{Name: "upstream_model", err: errors.New(`ent: missing required field "UsageLog.upstream_model"`)}
+	}
+	if _, ok := _c.mutation.BillingMode(); !ok {
+		return &ValidationError{Name: "billing_mode", err: errors.New(`ent: missing required field "UsageLog.billing_mode"`)}
 	}
 	if _, ok := _c.mutation.Currency(); !ok {
 		return &ValidationError{Name: "currency", err: errors.New(`ent: missing required field "UsageLog.currency"`)}
@@ -698,6 +845,34 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.BillableCost(); ok {
 		_spec.SetField(usagelog.FieldBillableCost, field.TypeString, value)
 		_node.BillableCost = value
+	}
+	if value, ok := _c.mutation.InputCost(); ok {
+		_spec.SetField(usagelog.FieldInputCost, field.TypeString, value)
+		_node.InputCost = value
+	}
+	if value, ok := _c.mutation.OutputCost(); ok {
+		_spec.SetField(usagelog.FieldOutputCost, field.TypeString, value)
+		_node.OutputCost = value
+	}
+	if value, ok := _c.mutation.CacheReadCost(); ok {
+		_spec.SetField(usagelog.FieldCacheReadCost, field.TypeString, value)
+		_node.CacheReadCost = value
+	}
+	if value, ok := _c.mutation.CacheWriteCost(); ok {
+		_spec.SetField(usagelog.FieldCacheWriteCost, field.TypeString, value)
+		_node.CacheWriteCost = value
+	}
+	if value, ok := _c.mutation.RequestedModel(); ok {
+		_spec.SetField(usagelog.FieldRequestedModel, field.TypeString, value)
+		_node.RequestedModel = value
+	}
+	if value, ok := _c.mutation.UpstreamModel(); ok {
+		_spec.SetField(usagelog.FieldUpstreamModel, field.TypeString, value)
+		_node.UpstreamModel = value
+	}
+	if value, ok := _c.mutation.BillingMode(); ok {
+		_spec.SetField(usagelog.FieldBillingMode, field.TypeString, value)
+		_node.BillingMode = value
 	}
 	if value, ok := _c.mutation.Currency(); ok {
 		_spec.SetField(usagelog.FieldCurrency, field.TypeString, value)

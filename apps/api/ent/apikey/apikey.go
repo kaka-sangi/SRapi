@@ -47,6 +47,28 @@ const (
 	FieldRequestLimit1d = "request_limit_1d"
 	// FieldRequestLimit7d holds the string denoting the request_limit_7d field in the database.
 	FieldRequestLimit7d = "request_limit_7d"
+	// FieldCostQuota holds the string denoting the cost_quota field in the database.
+	FieldCostQuota = "cost_quota"
+	// FieldCostUsed holds the string denoting the cost_used field in the database.
+	FieldCostUsed = "cost_used"
+	// FieldCostLimit5h holds the string denoting the cost_limit_5h field in the database.
+	FieldCostLimit5h = "cost_limit_5h"
+	// FieldCostUsed5h holds the string denoting the cost_used_5h field in the database.
+	FieldCostUsed5h = "cost_used_5h"
+	// FieldCostWindowStart5h holds the string denoting the cost_window_start_5h field in the database.
+	FieldCostWindowStart5h = "cost_window_start_5h"
+	// FieldCostLimit1d holds the string denoting the cost_limit_1d field in the database.
+	FieldCostLimit1d = "cost_limit_1d"
+	// FieldCostUsed1d holds the string denoting the cost_used_1d field in the database.
+	FieldCostUsed1d = "cost_used_1d"
+	// FieldCostWindowStart1d holds the string denoting the cost_window_start_1d field in the database.
+	FieldCostWindowStart1d = "cost_window_start_1d"
+	// FieldCostLimit7d holds the string denoting the cost_limit_7d field in the database.
+	FieldCostLimit7d = "cost_limit_7d"
+	// FieldCostUsed7d holds the string denoting the cost_used_7d field in the database.
+	FieldCostUsed7d = "cost_used_7d"
+	// FieldCostWindowStart7d holds the string denoting the cost_window_start_7d field in the database.
+	FieldCostWindowStart7d = "cost_window_start_7d"
 	// FieldAllowedIpsJSON holds the string denoting the allowed_ips_json field in the database.
 	FieldAllowedIpsJSON = "allowed_ips_json"
 	// FieldDeniedIpsJSON holds the string denoting the denied_ips_json field in the database.
@@ -79,6 +101,17 @@ var Columns = []string{
 	FieldRequestLimit5h,
 	FieldRequestLimit1d,
 	FieldRequestLimit7d,
+	FieldCostQuota,
+	FieldCostUsed,
+	FieldCostLimit5h,
+	FieldCostUsed5h,
+	FieldCostWindowStart5h,
+	FieldCostLimit1d,
+	FieldCostUsed1d,
+	FieldCostWindowStart1d,
+	FieldCostLimit7d,
+	FieldCostUsed7d,
+	FieldCostWindowStart7d,
 	FieldAllowedIpsJSON,
 	FieldDeniedIpsJSON,
 	FieldExpiresAt,
@@ -108,6 +141,14 @@ var (
 	PrefixValidator func(string) error
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
+	// DefaultCostUsed holds the default value on creation for the "cost_used" field.
+	DefaultCostUsed string
+	// DefaultCostUsed5h holds the default value on creation for the "cost_used_5h" field.
+	DefaultCostUsed5h string
+	// DefaultCostUsed1d holds the default value on creation for the "cost_used_1d" field.
+	DefaultCostUsed1d string
+	// DefaultCostUsed7d holds the default value on creation for the "cost_used_7d" field.
+	DefaultCostUsed7d string
 )
 
 // OrderOption defines the ordering options for the APIKey queries.
@@ -191,6 +232,61 @@ func ByRequestLimit1d(opts ...sql.OrderTermOption) OrderOption {
 // ByRequestLimit7d orders the results by the request_limit_7d field.
 func ByRequestLimit7d(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRequestLimit7d, opts...).ToFunc()
+}
+
+// ByCostQuota orders the results by the cost_quota field.
+func ByCostQuota(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCostQuota, opts...).ToFunc()
+}
+
+// ByCostUsed orders the results by the cost_used field.
+func ByCostUsed(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCostUsed, opts...).ToFunc()
+}
+
+// ByCostLimit5h orders the results by the cost_limit_5h field.
+func ByCostLimit5h(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCostLimit5h, opts...).ToFunc()
+}
+
+// ByCostUsed5h orders the results by the cost_used_5h field.
+func ByCostUsed5h(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCostUsed5h, opts...).ToFunc()
+}
+
+// ByCostWindowStart5h orders the results by the cost_window_start_5h field.
+func ByCostWindowStart5h(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCostWindowStart5h, opts...).ToFunc()
+}
+
+// ByCostLimit1d orders the results by the cost_limit_1d field.
+func ByCostLimit1d(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCostLimit1d, opts...).ToFunc()
+}
+
+// ByCostUsed1d orders the results by the cost_used_1d field.
+func ByCostUsed1d(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCostUsed1d, opts...).ToFunc()
+}
+
+// ByCostWindowStart1d orders the results by the cost_window_start_1d field.
+func ByCostWindowStart1d(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCostWindowStart1d, opts...).ToFunc()
+}
+
+// ByCostLimit7d orders the results by the cost_limit_7d field.
+func ByCostLimit7d(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCostLimit7d, opts...).ToFunc()
+}
+
+// ByCostUsed7d orders the results by the cost_used_7d field.
+func ByCostUsed7d(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCostUsed7d, opts...).ToFunc()
+}
+
+// ByCostWindowStart7d orders the results by the cost_window_start_7d field.
+func ByCostWindowStart7d(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCostWindowStart7d, opts...).ToFunc()
 }
 
 // ByExpiresAt orders the results by the expires_at field.

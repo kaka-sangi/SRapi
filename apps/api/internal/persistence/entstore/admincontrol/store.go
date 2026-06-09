@@ -26,6 +26,7 @@ import (
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 var ErrInvalidStore = errors.New("invalid admin control ent store")
@@ -479,18 +480,18 @@ func fulfillBalanceRedeemCode(ctx context.Context, client *ent.Client, userID in
 	if userscontract.Status(user.Status) != userscontract.StatusActive {
 		return admincontrolcontract.RedeemCodeRedemption{}, admincontrolcontract.ErrConflict
 	}
-	amount, ok := decimalRat(code.Value)
+	amount, ok := money.RequiredDecimalRat(code.Value)
 	if !ok || amount.Sign() <= 0 {
 		return admincontrolcontract.RedeemCodeRedemption{}, admincontrolcontract.ErrInvalidInput
 	}
-	before, ok := decimalRat(user.Balance)
+	before, ok := money.RequiredDecimalRat(user.Balance)
 	if !ok {
 		return admincontrolcontract.RedeemCodeRedemption{}, admincontrolcontract.ErrInvalidInput
 	}
 	after := new(big.Rat).Add(before, amount)
-	balanceBefore := formatRatFixed(before, 8)
-	balanceAfter := formatRatFixed(after, 8)
-	normalizedAmount := formatRatFixed(amount, 8)
+	balanceBefore := money.FormatRatFixed(before, 8)
+	balanceAfter := money.FormatRatFixed(after, 8)
+	normalizedAmount := money.FormatRatFixed(amount, 8)
 	currency := normalizeCurrency(code.Currency)
 	if _, err := client.User.UpdateOneID(user.ID).
 		Where(entuser.DeletedAtIsNil()).
@@ -674,27 +675,7 @@ func normalizeCode(value string) string {
 }
 
 func normalizeCurrency(value string) string {
-	currency := strings.ToUpper(strings.TrimSpace(value))
-	if currency == "" {
-		return "USD"
-	}
-	return currency
-}
-
-func decimalRat(value string) (*big.Rat, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" || strings.ContainsAny(value, "eE") {
-		return nil, false
-	}
-	rat, ok := new(big.Rat).SetString(value)
-	return rat, ok
-}
-
-func formatRatFixed(value *big.Rat, places int) string {
-	if value == nil {
-		value = new(big.Rat)
-	}
-	return value.FloatString(places)
+	return money.NormalizeCurrency(value)
 }
 
 func entitlementValue(value any) map[string]any {

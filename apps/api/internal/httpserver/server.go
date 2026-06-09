@@ -425,6 +425,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/providers/preset/install", server.handleInstallAdminProviderPresets)
 	mux.HandleFunc("POST /api/v1/admin/quick-setup", server.handleAdminQuickSetup)
 	mux.HandleFunc("POST /api/v1/admin/models/quick-map", server.handleAdminQuickMapModels)
+	mux.HandleFunc("GET /api/v1/admin/providers/{id}/oauth-config", server.handleGetAdminProviderOAuthConfig)
 	mux.HandleFunc("PATCH /api/v1/admin/providers/{id}", server.handleUpdateAdminProvider)
 	mux.HandleFunc("DELETE /api/v1/admin/providers/{id}", server.handleDeleteAdminProvider)
 	mux.HandleFunc("POST /api/v1/admin/providers/{id}/test", server.handleTestAdminProvider)
@@ -460,6 +461,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/accounts/health-summary", server.handleAdminAccountsHealthSummary)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/health", server.handleAdminAccountHealth)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/quota", server.handleAdminAccountQuota)
+	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/reset-quota", server.handleAdminAccountResetQuota)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/rpm-status", server.handleAdminAccountRpmStatus)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/proxy-quality", server.handleAdminAccountProxyQuality)
 	mux.HandleFunc("GET /api/v1/admin/account-groups", server.handleListAdminAccountGroups)
@@ -699,6 +701,7 @@ func (s *Server) registerCurrentUserRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/me/usage", s.handleCurrentUserUsage)
 	mux.HandleFunc("GET /api/v1/me/subscriptions", s.handleCurrentUserSubscriptions)
 	mux.HandleFunc("GET /api/v1/me/playground/models", s.handleMePlaygroundModels)
+	mux.HandleFunc("GET /api/v1/me/available-models", s.handleCurrentUserAvailableModels)
 	mux.HandleFunc("POST /api/v1/me/playground/chat", s.handleMePlaygroundChat)
 }
 

@@ -210,6 +210,160 @@ func (_c *APIKeyCreate) SetNillableRequestLimit7d(v *int) *APIKeyCreate {
 	return _c
 }
 
+// SetCostQuota sets the "cost_quota" field.
+func (_c *APIKeyCreate) SetCostQuota(v string) *APIKeyCreate {
+	_c.mutation.SetCostQuota(v)
+	return _c
+}
+
+// SetNillableCostQuota sets the "cost_quota" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableCostQuota(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetCostQuota(*v)
+	}
+	return _c
+}
+
+// SetCostUsed sets the "cost_used" field.
+func (_c *APIKeyCreate) SetCostUsed(v string) *APIKeyCreate {
+	_c.mutation.SetCostUsed(v)
+	return _c
+}
+
+// SetNillableCostUsed sets the "cost_used" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableCostUsed(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetCostUsed(*v)
+	}
+	return _c
+}
+
+// SetCostLimit5h sets the "cost_limit_5h" field.
+func (_c *APIKeyCreate) SetCostLimit5h(v string) *APIKeyCreate {
+	_c.mutation.SetCostLimit5h(v)
+	return _c
+}
+
+// SetNillableCostLimit5h sets the "cost_limit_5h" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableCostLimit5h(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetCostLimit5h(*v)
+	}
+	return _c
+}
+
+// SetCostUsed5h sets the "cost_used_5h" field.
+func (_c *APIKeyCreate) SetCostUsed5h(v string) *APIKeyCreate {
+	_c.mutation.SetCostUsed5h(v)
+	return _c
+}
+
+// SetNillableCostUsed5h sets the "cost_used_5h" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableCostUsed5h(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetCostUsed5h(*v)
+	}
+	return _c
+}
+
+// SetCostWindowStart5h sets the "cost_window_start_5h" field.
+func (_c *APIKeyCreate) SetCostWindowStart5h(v time.Time) *APIKeyCreate {
+	_c.mutation.SetCostWindowStart5h(v)
+	return _c
+}
+
+// SetNillableCostWindowStart5h sets the "cost_window_start_5h" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableCostWindowStart5h(v *time.Time) *APIKeyCreate {
+	if v != nil {
+		_c.SetCostWindowStart5h(*v)
+	}
+	return _c
+}
+
+// SetCostLimit1d sets the "cost_limit_1d" field.
+func (_c *APIKeyCreate) SetCostLimit1d(v string) *APIKeyCreate {
+	_c.mutation.SetCostLimit1d(v)
+	return _c
+}
+
+// SetNillableCostLimit1d sets the "cost_limit_1d" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableCostLimit1d(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetCostLimit1d(*v)
+	}
+	return _c
+}
+
+// SetCostUsed1d sets the "cost_used_1d" field.
+func (_c *APIKeyCreate) SetCostUsed1d(v string) *APIKeyCreate {
+	_c.mutation.SetCostUsed1d(v)
+	return _c
+}
+
+// SetNillableCostUsed1d sets the "cost_used_1d" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableCostUsed1d(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetCostUsed1d(*v)
+	}
+	return _c
+}
+
+// SetCostWindowStart1d sets the "cost_window_start_1d" field.
+func (_c *APIKeyCreate) SetCostWindowStart1d(v time.Time) *APIKeyCreate {
+	_c.mutation.SetCostWindowStart1d(v)
+	return _c
+}
+
+// SetNillableCostWindowStart1d sets the "cost_window_start_1d" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableCostWindowStart1d(v *time.Time) *APIKeyCreate {
+	if v != nil {
+		_c.SetCostWindowStart1d(*v)
+	}
+	return _c
+}
+
+// SetCostLimit7d sets the "cost_limit_7d" field.
+func (_c *APIKeyCreate) SetCostLimit7d(v string) *APIKeyCreate {
+	_c.mutation.SetCostLimit7d(v)
+	return _c
+}
+
+// SetNillableCostLimit7d sets the "cost_limit_7d" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableCostLimit7d(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetCostLimit7d(*v)
+	}
+	return _c
+}
+
+// SetCostUsed7d sets the "cost_used_7d" field.
+func (_c *APIKeyCreate) SetCostUsed7d(v string) *APIKeyCreate {
+	_c.mutation.SetCostUsed7d(v)
+	return _c
+}
+
+// SetNillableCostUsed7d sets the "cost_used_7d" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableCostUsed7d(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetCostUsed7d(*v)
+	}
+	return _c
+}
+
+// SetCostWindowStart7d sets the "cost_window_start_7d" field.
+func (_c *APIKeyCreate) SetCostWindowStart7d(v time.Time) *APIKeyCreate {
+	_c.mutation.SetCostWindowStart7d(v)
+	return _c
+}
+
+// SetNillableCostWindowStart7d sets the "cost_window_start_7d" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableCostWindowStart7d(v *time.Time) *APIKeyCreate {
+	if v != nil {
+		_c.SetCostWindowStart7d(*v)
+	}
+	return _c
+}
+
 // SetAllowedIpsJSON sets the "allowed_ips_json" field.
 func (_c *APIKeyCreate) SetAllowedIpsJSON(v []string) *APIKeyCreate {
 	_c.mutation.SetAllowedIpsJSON(v)
@@ -297,6 +451,22 @@ func (_c *APIKeyCreate) defaults() {
 		v := apikey.DefaultStatus
 		_c.mutation.SetStatus(v)
 	}
+	if _, ok := _c.mutation.CostUsed(); !ok {
+		v := apikey.DefaultCostUsed
+		_c.mutation.SetCostUsed(v)
+	}
+	if _, ok := _c.mutation.CostUsed5h(); !ok {
+		v := apikey.DefaultCostUsed5h
+		_c.mutation.SetCostUsed5h(v)
+	}
+	if _, ok := _c.mutation.CostUsed1d(); !ok {
+		v := apikey.DefaultCostUsed1d
+		_c.mutation.SetCostUsed1d(v)
+	}
+	if _, ok := _c.mutation.CostUsed7d(); !ok {
+		v := apikey.DefaultCostUsed7d
+		_c.mutation.SetCostUsed7d(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -331,6 +501,18 @@ func (_c *APIKeyCreate) check() error {
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "APIKey.status"`)}
+	}
+	if _, ok := _c.mutation.CostUsed(); !ok {
+		return &ValidationError{Name: "cost_used", err: errors.New(`ent: missing required field "APIKey.cost_used"`)}
+	}
+	if _, ok := _c.mutation.CostUsed5h(); !ok {
+		return &ValidationError{Name: "cost_used_5h", err: errors.New(`ent: missing required field "APIKey.cost_used_5h"`)}
+	}
+	if _, ok := _c.mutation.CostUsed1d(); !ok {
+		return &ValidationError{Name: "cost_used_1d", err: errors.New(`ent: missing required field "APIKey.cost_used_1d"`)}
+	}
+	if _, ok := _c.mutation.CostUsed7d(); !ok {
+		return &ValidationError{Name: "cost_used_7d", err: errors.New(`ent: missing required field "APIKey.cost_used_7d"`)}
 	}
 	return nil
 }
@@ -425,6 +607,50 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.RequestLimit7d(); ok {
 		_spec.SetField(apikey.FieldRequestLimit7d, field.TypeInt, value)
 		_node.RequestLimit7d = &value
+	}
+	if value, ok := _c.mutation.CostQuota(); ok {
+		_spec.SetField(apikey.FieldCostQuota, field.TypeString, value)
+		_node.CostQuota = &value
+	}
+	if value, ok := _c.mutation.CostUsed(); ok {
+		_spec.SetField(apikey.FieldCostUsed, field.TypeString, value)
+		_node.CostUsed = value
+	}
+	if value, ok := _c.mutation.CostLimit5h(); ok {
+		_spec.SetField(apikey.FieldCostLimit5h, field.TypeString, value)
+		_node.CostLimit5h = &value
+	}
+	if value, ok := _c.mutation.CostUsed5h(); ok {
+		_spec.SetField(apikey.FieldCostUsed5h, field.TypeString, value)
+		_node.CostUsed5h = value
+	}
+	if value, ok := _c.mutation.CostWindowStart5h(); ok {
+		_spec.SetField(apikey.FieldCostWindowStart5h, field.TypeTime, value)
+		_node.CostWindowStart5h = &value
+	}
+	if value, ok := _c.mutation.CostLimit1d(); ok {
+		_spec.SetField(apikey.FieldCostLimit1d, field.TypeString, value)
+		_node.CostLimit1d = &value
+	}
+	if value, ok := _c.mutation.CostUsed1d(); ok {
+		_spec.SetField(apikey.FieldCostUsed1d, field.TypeString, value)
+		_node.CostUsed1d = value
+	}
+	if value, ok := _c.mutation.CostWindowStart1d(); ok {
+		_spec.SetField(apikey.FieldCostWindowStart1d, field.TypeTime, value)
+		_node.CostWindowStart1d = &value
+	}
+	if value, ok := _c.mutation.CostLimit7d(); ok {
+		_spec.SetField(apikey.FieldCostLimit7d, field.TypeString, value)
+		_node.CostLimit7d = &value
+	}
+	if value, ok := _c.mutation.CostUsed7d(); ok {
+		_spec.SetField(apikey.FieldCostUsed7d, field.TypeString, value)
+		_node.CostUsed7d = value
+	}
+	if value, ok := _c.mutation.CostWindowStart7d(); ok {
+		_spec.SetField(apikey.FieldCostWindowStart7d, field.TypeTime, value)
+		_node.CostWindowStart7d = &value
 	}
 	if value, ok := _c.mutation.AllowedIpsJSON(); ok {
 		_spec.SetField(apikey.FieldAllowedIpsJSON, field.TypeJSON, value)

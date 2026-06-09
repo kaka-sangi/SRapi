@@ -51,8 +51,35 @@ type UserSubscription struct {
 	EntitlementsSnapshot map[string]any
 	SourceType           string
 	SourceID             string
+	DailyUsageUSD        string
+	DailyWindowStart     *time.Time
+	WeeklyUsageUSD       string
+	WeeklyWindowStart    *time.Time
+	MonthlyUsageUSD      string
+	MonthlyWindowStart   *time.Time
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
+}
+
+// MaterializedUsage tracks subscription spend persisted on the active
+// subscription row, avoiding hot-path usage-log rescans for allowance checks.
+type MaterializedUsage struct {
+	SubscriptionID     int
+	UserID             int
+	DailyUsageUSD      string
+	DailyWindowStart   *time.Time
+	WeeklyUsageUSD     string
+	WeeklyWindowStart  *time.Time
+	MonthlyUsageUSD    string
+	MonthlyWindowStart *time.Time
+}
+
+// UsageDelta is the cost snapshot appended to active subscriptions after a
+// successful gateway request has been priced.
+type UsageDelta struct {
+	UserID       int
+	BillableCost string
+	OccurredAt   time.Time
 }
 
 // Entitlement is the active query-cache row derived from a subscription snapshot.
@@ -68,22 +95,6 @@ type Entitlement struct {
 	SourceSubscriptionID int
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
-}
-
-type PricingRule struct {
-	ID                              int
-	ModelID                         int
-	ModelFamily                     string
-	ProviderID                      int
-	InputPricePerMillionTokens      string
-	OutputPricePerMillionTokens     string
-	CacheReadPricePerMillionTokens  string
-	CacheWritePricePerMillionTokens string
-	Currency                        string
-	EffectiveFrom                   *time.Time
-	EffectiveTo                     *time.Time
-	CreatedAt                       time.Time
-	UpdatedAt                       time.Time
 }
 
 type CreatePlanRequest struct {
@@ -160,31 +171,6 @@ type CreateStoredSubscription struct {
 	SourceID             string
 }
 
-type CreatePricingRuleRequest struct {
-	ModelID                         int
-	ProviderID                      int
-	InputPricePerMillionTokens      string
-	OutputPricePerMillionTokens     string
-	CacheReadPricePerMillionTokens  string
-	CacheWritePricePerMillionTokens string
-	Currency                        string
-	EffectiveFrom                   *time.Time
-	EffectiveTo                     *time.Time
-}
-
-// UpdatePricingRuleRequest carries a partial pricing-rule edit: nil pointer
-// means "leave unchanged". Mirrors the PATCH semantics of
-// /admin/pricing-rules/{id}.
-type UpdatePricingRuleRequest struct {
-	InputPricePerMillionTokens      *string
-	OutputPricePerMillionTokens     *string
-	CacheReadPricePerMillionTokens  *string
-	CacheWritePricePerMillionTokens *string
-	Currency                        *string
-	EffectiveFrom                   **time.Time
-	EffectiveTo                     **time.Time
-}
-
 type EntitlementCheckRequest struct {
 	UserID             int
 	ModelReferences    []string
@@ -192,6 +178,7 @@ type EntitlementCheckRequest struct {
 	EstimatedCost      string
 	TokensUsedInPeriod int
 	CostUsedInPeriod   string
+	MaterializedUsage  *MaterializedUsage
 	RequestTime        time.Time
 }
 
@@ -214,24 +201,6 @@ type EntitlementDecision struct {
 type CostAllowance struct {
 	Mode  string  // "" / "hard_cap" / "allowance"
 	Quota *string // monthly cost quota (allowance ceiling), nil when unset
-}
-
-type PricingRequest struct {
-	ModelID          int
-	ModelFamily      string
-	ProviderID       int
-	InputTokens      int
-	OutputTokens     int
-	CacheReadTokens  int
-	CacheWriteTokens int
-	At               time.Time
-	PricingOverride  map[string]any
-}
-
-type PricingResult struct {
-	Amount        string
-	Currency      string
-	PricingRuleID *int
 }
 
 // ExpireSubscriptionsResult reports the outcome of a subscription expiration pass.
@@ -257,14 +226,11 @@ type Store interface {
 	ListUserSubscriptions(ctx context.Context) ([]UserSubscription, error)
 	ListUserSubscriptionsByUser(ctx context.Context, userID int) ([]UserSubscription, error)
 	ListActiveUserSubscriptions(ctx context.Context, userID int, at time.Time) ([]UserSubscription, error)
+	MaterializedUsageForUser(ctx context.Context, userID int, at time.Time) (MaterializedUsage, error)
+	IncrementMaterializedUsage(ctx context.Context, delta UsageDelta) (MaterializedUsage, error)
 	ListActiveEntitlements(ctx context.Context, userID int, at time.Time) ([]Entitlement, error)
 	ListExpiredActiveUserSubscriptions(ctx context.Context, now time.Time) ([]UserSubscription, error)
 	ListActiveUserSubscriptionsExpiringBetween(ctx context.Context, from time.Time, until time.Time) ([]UserSubscription, error)
 	ExpireUserSubscription(ctx context.Context, id int, now time.Time) (UserSubscription, bool, error)
 	DeleteUserSubscription(ctx context.Context, id int) error
-	CreatePricingRule(ctx context.Context, input PricingRule) (PricingRule, error)
-	UpdatePricingRule(ctx context.Context, id int, input UpdatePricingRuleRequest) (PricingRule, error)
-	FindPricingRuleByID(ctx context.Context, id int) (PricingRule, error)
-	ListPricingRules(ctx context.Context) ([]PricingRule, error)
-	DeletePricingRule(ctx context.Context, id int) error
 }

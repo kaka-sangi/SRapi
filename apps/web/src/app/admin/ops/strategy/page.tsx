@@ -41,7 +41,7 @@ export default function OpsStrategyPage() {
   );
 }
 
-function StrategyContent() {
+export function StrategyContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const replayMut = useReplaySchedulerStrategy();

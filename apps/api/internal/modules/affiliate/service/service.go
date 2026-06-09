@@ -13,9 +13,8 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
-
-const defaultCurrency = "USD"
 
 type Clock interface {
 	Now() time.Time
@@ -245,7 +244,7 @@ func (s *Service) CompensateRefund(ctx context.Context, req contract.CompensateR
 		case contract.LedgerTypeRefundCompensation:
 			originalID := metadataInt(ledger.Metadata, "original_ledger_id")
 			if originalID > 0 {
-				amount, amountOK := decimalRat(ledger.Amount)
+				amount, amountOK := money.RequiredDecimalRat(ledger.Amount)
 				if amountOK {
 					if compensatedByOriginal[originalID] == nil {
 						compensatedByOriginal[originalID] = new(big.Rat)
@@ -439,39 +438,39 @@ func (s *Service) enqueueCompensated(ctx context.Context, ledger contract.Affili
 }
 
 func calculateRebate(paymentAmount string, rule contract.AffiliateRule) (string, bool) {
-	payment, ok := decimalRat(paymentAmount)
+	payment, ok := money.RequiredDecimalRat(paymentAmount)
 	if !ok {
 		return "", false
 	}
-	rate, ok := decimalRat(rule.Rate)
+	rate, ok := money.RequiredDecimalRat(rule.Rate)
 	if !ok {
 		return "", false
 	}
-	fixed, ok := decimalRat(rule.FixedAmount)
+	fixed, ok := money.RequiredDecimalRat(rule.FixedAmount)
 	if !ok {
 		return "", false
 	}
 	rebate := new(big.Rat).Mul(payment, rate)
 	rebate.Add(rebate, fixed)
-	if max, ok := decimalRat(rule.MaxRebateAmount); ok && max.Sign() > 0 && rebate.Cmp(max) > 0 {
+	if max, ok := money.RequiredDecimalRat(rule.MaxRebateAmount); ok && max.Sign() > 0 && rebate.Cmp(max) > 0 {
 		rebate = max
 	}
 	if rebate.Sign() < 0 {
 		return "", false
 	}
-	return formatRatFixed(rebate, 8), true
+	return money.FormatRatFixed(rebate, 8), true
 }
 
 func calculateCompensation(originalAmount string, paymentAmount string, refundAmount string, alreadyCompensated *big.Rat) (string, bool) {
-	original, ok := decimalRat(originalAmount)
+	original, ok := money.RequiredDecimalRat(originalAmount)
 	if !ok || original.Sign() <= 0 {
 		return "", false
 	}
-	payment, ok := decimalRat(paymentAmount)
+	payment, ok := money.RequiredDecimalRat(paymentAmount)
 	if !ok || payment.Sign() <= 0 {
 		return "", false
 	}
-	refund, ok := decimalRat(refundAmount)
+	refund, ok := money.RequiredDecimalRat(refundAmount)
 	if !ok || refund.Sign() <= 0 {
 		return "", false
 	}
@@ -487,7 +486,7 @@ func calculateCompensation(originalAmount string, paymentAmount string, refundAm
 	if compensation.Cmp(remaining) > 0 {
 		compensation = remaining
 	}
-	return formatRatFixed(compensation, 8), true
+	return money.FormatRatFixed(compensation, 8), true
 }
 
 func accrueReference(orderNo string) string {
@@ -507,47 +506,24 @@ func normalizeMoney(value string) (string, bool) {
 	if value == "" {
 		return "", false
 	}
-	rat, ok := decimalRat(value)
+	rat, ok := money.RequiredDecimalRat(value)
 	if !ok || rat.Sign() < 0 {
 		return "", false
 	}
-	return formatRatFixed(rat, 8), true
+	return money.FormatRatFixed(rat, 8), true
 }
 
 func compareMoney(left string, right string) int {
-	leftRat, leftOK := decimalRat(left)
-	rightRat, rightOK := decimalRat(right)
+	leftRat, leftOK := money.RequiredDecimalRat(left)
+	rightRat, rightOK := money.RequiredDecimalRat(right)
 	if !leftOK || !rightOK {
 		return strings.Compare(left, right)
 	}
 	return leftRat.Cmp(rightRat)
 }
 
-func decimalRat(value string) (*big.Rat, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return nil, false
-	}
-	rat, ok := new(big.Rat).SetString(value)
-	if !ok {
-		return nil, false
-	}
-	return rat, true
-}
-
-func formatRatFixed(value *big.Rat, places int) string {
-	if value == nil {
-		value = new(big.Rat)
-	}
-	return value.FloatString(places)
-}
-
 func normalizeCurrency(value string) string {
-	value = strings.TrimSpace(strings.ToUpper(value))
-	if value == "" {
-		return defaultCurrency
-	}
-	return value
+	return money.NormalizeCurrency(value)
 }
 
 func validRuleStatus(status contract.RuleStatus) bool {
@@ -587,7 +563,7 @@ func affiliateCurrencySummaries(ledgers []contract.AffiliateLedger) []contract.A
 		if ledger.Status == contract.LedgerStatusCanceled {
 			continue
 		}
-		amount, ok := decimalRat(ledger.Amount)
+		amount, ok := money.RequiredDecimalRat(ledger.Amount)
 		if !ok {
 			continue
 		}
@@ -624,13 +600,13 @@ func affiliateCurrencySummaries(ledgers []contract.AffiliateLedger) []contract.A
 		accumulator := accumulators[currency]
 		out = append(out, contract.AffiliateCurrencySummary{
 			Currency:                   currency,
-			AvailableBalance:           formatRatFixed(accumulator.available, 8),
-			AccruedAmount:              formatRatFixed(accumulator.accrued, 8),
-			RefundCompensatedAmount:    formatRatFixed(accumulator.refundCompensated, 8),
-			TransferredToBalanceAmount: formatRatFixed(accumulator.transferredToBalance, 8),
-			SettledAmount:              formatRatFixed(accumulator.settled, 8),
-			WithdrawnAmount:            formatRatFixed(accumulator.withdrawn, 8),
-			ManualAdjustmentAmount:     formatRatFixed(accumulator.manualAdjustment, 8),
+			AvailableBalance:           money.FormatRatFixed(accumulator.available, 8),
+			AccruedAmount:              money.FormatRatFixed(accumulator.accrued, 8),
+			RefundCompensatedAmount:    money.FormatRatFixed(accumulator.refundCompensated, 8),
+			TransferredToBalanceAmount: money.FormatRatFixed(accumulator.transferredToBalance, 8),
+			SettledAmount:              money.FormatRatFixed(accumulator.settled, 8),
+			WithdrawnAmount:            money.FormatRatFixed(accumulator.withdrawn, 8),
+			ManualAdjustmentAmount:     money.FormatRatFixed(accumulator.manualAdjustment, 8),
 		})
 	}
 	return out

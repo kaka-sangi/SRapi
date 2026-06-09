@@ -1,10 +1,10 @@
 import {
   LayoutGrid,
   KeyRound,
-  CalendarClock,
   BarChart3,
   Server,
   GitBranch,
+  ListChecks,
   Users,
   Boxes,
   Network,
@@ -31,7 +31,6 @@ import {
   Receipt,
   Tags,
   Mail,
-  Gauge,
   Bot,
   Webhook,
   Zap,
@@ -56,6 +55,7 @@ export const WORKSPACE_SECTION: NavSection = {
   items: [
     { href: USER_HOME_ROUTE, labelKey: "nav.dashboard", icon: LayoutGrid },
     { href: USER_ROUTES.playground, labelKey: "nav.playground", icon: Bot },
+    { href: USER_ROUTES.availableChannels, labelKey: "nav.availableChannels", icon: ListChecks },
     { href: "/api-keys", labelKey: "nav.apiKeys", icon: KeyRound },
     { href: "/usage", labelKey: "nav.usage", icon: BarChart3 },
   ],
@@ -69,17 +69,6 @@ export const ACCOUNT_SECTION: NavSection = {
     { href: USER_ROUTES.billing, labelKey: "nav.billing", icon: Wallet },
     { href: USER_ROUTES.redeem, labelKey: "nav.redeem", icon: Gift },
     { href: USER_ROUTES.affiliate, labelKey: "nav.affiliate", icon: Share2 },
-  ],
-};
-
-// Operator view of gateway internals (account health, scheduler decisions).
-// Both pages are admin-gated (no `/me` endpoint exists for this data), so this
-// section is shown to admins only — never in the regular user workspace.
-export const GATEWAY_SECTION: NavSection = {
-  titleKey: "nav.sectionGateway",
-  items: [
-    { href: "/provider-accounts", labelKey: "nav.providerAccounts", icon: Server },
-    { href: "/scheduler-decisions", labelKey: "nav.schedulerDecisions", icon: GitBranch },
   ],
 };
 
@@ -136,12 +125,9 @@ const ADMIN_OPS_SECTION: NavSection = {
   titleKey: "nav.sectionAdminOps",
   items: [
     { href: ADMIN_ROUTES.ops, labelKey: "nav.adminOps", icon: Activity },
-    { href: ADMIN_ROUTES.channelsMonitor, labelKey: "nav.adminMonitor", icon: Gauge },
-    { href: ADMIN_ROUTES.scheduledTests, labelKey: "nav.adminScheduledTests", icon: CalendarClock },
     { href: ADMIN_ROUTES.opsStrategy, labelKey: "nav.adminOpsStrategy", icon: GitBranch },
     { href: ADMIN_ROUTES.riskControl, labelKey: "nav.adminRiskControl", icon: Shield },
     { href: ADMIN_ROUTES.announcements, labelKey: "nav.adminAnnouncements", icon: Megaphone },
-    { href: ADMIN_ROUTES.auditLogs, labelKey: "nav.adminAuditLogs", icon: ScrollText },
     { href: ADMIN_ROUTES.eventsOutbox, labelKey: "nav.adminOutbox", icon: Webhook },
   ],
 };
@@ -154,6 +140,7 @@ const ADMIN_SYSTEM_SECTION: NavSection = {
     { href: ADMIN_ROUTES.proxies, labelKey: "nav.adminProxies", icon: Network },
     { href: ADMIN_ROUTES.roles, labelKey: "nav.adminRoles", icon: ShieldCheck },
     { href: ADMIN_ROUTES.apiKeys, labelKey: "nav.adminApiKeys", icon: KeyRound },
+    { href: ADMIN_ROUTES.auditLogs, labelKey: "nav.adminAuditLogs", icon: ScrollText },
     { href: ADMIN_ROUTES.userAttributes, labelKey: "nav.adminUserAttributes", icon: Tags },
     {
       href: ADMIN_ROUTES.notificationTemplates,
@@ -175,7 +162,7 @@ export const ADMIN_SECTIONS: NavSection[] = [
 
 export function navSectionsForRole(role: "admin" | "user"): NavSection[] {
   if (role === "admin") {
-    return [...ADMIN_SECTIONS, GATEWAY_SECTION, WORKSPACE_SECTION, ACCOUNT_SECTION];
+    return [...ADMIN_SECTIONS, WORKSPACE_SECTION, ACCOUNT_SECTION];
   }
   return [WORKSPACE_SECTION, ACCOUNT_SECTION];
 }

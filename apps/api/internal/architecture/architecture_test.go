@@ -374,6 +374,8 @@ func TestEntStoresOnlyDependOnContractsAndEnt(t *testing.T) {
 				continue
 			case strings.HasPrefix(imported, "github.com/srapi/srapi/apps/api/internal/persistence/entstore"):
 				continue
+			case imported == "github.com/srapi/srapi/apps/api/internal/pkg/money":
+				continue
 			case strings.HasPrefix(imported, moduleImportPrefix):
 				importedModule, importedLayer := importedModuleLayer(imported)
 				if importedModule == "" || importedLayer != "contract" {

@@ -4,7 +4,9 @@ import type {
   CreateAdminSubscriptionPlanData,
   CreateAdminUserSubscriptionData,
   Id,
+  BillingMode,
   PricingRule,
+  PricingInterval,
   SubscriptionPlan,
   SubscriptionPlanStatus,
   UserSubscriptionStatus,
@@ -47,10 +49,13 @@ export interface UserSubscriptionFormState {
 export interface PricingRuleFormState {
   modelId: Id;
   providerId: Id;
+  billingMode: BillingMode;
   inputPricePerMillionTokens: string;
   outputPricePerMillionTokens: string;
   cacheReadPricePerMillionTokens: string;
   cacheWritePricePerMillionTokens: string;
+  perRequestPrice: string;
+  intervalsJson: string;
   currency: string;
   effectiveFromLocal: string;
   effectiveToLocal: string;
@@ -167,10 +172,13 @@ export function emptyPricingRuleForm(modelId = "", providerId = ""): PricingRule
   return {
     modelId,
     providerId,
+    billingMode: "token",
     inputPricePerMillionTokens: "0",
     outputPricePerMillionTokens: "0",
     cacheReadPricePerMillionTokens: "0",
     cacheWritePricePerMillionTokens: "0",
+    perRequestPrice: "0",
+    intervalsJson: "[]",
     currency: "USD",
     effectiveFromLocal: "",
     effectiveToLocal: "",
@@ -255,6 +263,7 @@ export function buildCreatePricingRuleBody(
   return {
     model_id: requiredText(form.modelId, "Model"),
     provider_id: requiredText(form.providerId, "Provider"),
+    billing_mode: form.billingMode,
     input_price_per_million_tokens: parseDecimalString(
       form.inputPricePerMillionTokens,
       "Input price",
@@ -271,6 +280,8 @@ export function buildCreatePricingRuleBody(
       form.cacheWritePricePerMillionTokens,
       "Cache write price",
     ),
+    per_request_price: parseDecimalString(form.perRequestPrice, "Per request price"),
+    intervals: parsePricingIntervals(form.intervalsJson),
     currency: requiredText(form.currency, "Currency").toUpperCase(),
     effective_from: localDateTimeToIso(form.effectiveFromLocal, "Effective from"),
     effective_to: localDateTimeToIso(form.effectiveToLocal, "Effective to"),
@@ -289,10 +300,13 @@ export function pricingRuleFormFromRule(rule: PricingRule): PricingRuleFormState
   return {
     modelId: String(rule.model_id),
     providerId: String(rule.provider_id),
+    billingMode: rule.billing_mode,
     inputPricePerMillionTokens: rule.input_price_per_million_tokens,
     outputPricePerMillionTokens: rule.output_price_per_million_tokens,
     cacheReadPricePerMillionTokens: rule.cache_read_price_per_million_tokens,
     cacheWritePricePerMillionTokens: rule.cache_write_price_per_million_tokens,
+    perRequestPrice: rule.per_request_price,
+    intervalsJson: JSON.stringify(pricingIntervalsForForm(rule.intervals), null, 2),
     currency: rule.currency,
     effectiveFromLocal: isoToLocal(rule.effective_from),
     effectiveToLocal: isoToLocal(rule.effective_to),
@@ -303,6 +317,7 @@ export function buildUpdatePricingRuleBody(
   form: PricingRuleFormState,
 ): UpdateAdminPricingRuleData["body"] {
   return {
+    billing_mode: form.billingMode,
     input_price_per_million_tokens: parseDecimalString(
       form.inputPricePerMillionTokens,
       "Input price",
@@ -319,10 +334,66 @@ export function buildUpdatePricingRuleBody(
       form.cacheWritePricePerMillionTokens,
       "Cache write price",
     ),
+    per_request_price: parseDecimalString(form.perRequestPrice, "Per request price"),
+    intervals: parsePricingIntervals(form.intervalsJson),
     currency: requiredText(form.currency, "Currency").toUpperCase(),
     effective_from: localDateTimeToIso(form.effectiveFromLocal, "Effective from"),
     effective_to: localDateTimeToIso(form.effectiveToLocal, "Effective to"),
   };
+}
+
+function parsePricingIntervals(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    throw new Error("Pricing intervals must be valid JSON.");
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error("Pricing intervals must be a JSON array.");
+  }
+  return parsed.map((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error(`Pricing interval ${index + 1} must be an object.`);
+    }
+    const obj = entry as Record<string, unknown>;
+    return {
+      min_tokens: optionalIntegerValue(obj.min_tokens, `Interval ${index + 1} min_tokens`),
+      max_tokens: optionalNullableIntegerValue(obj.max_tokens, `Interval ${index + 1} max_tokens`),
+      tier_label: optionalStringValue(obj.tier_label),
+      image_size: optionalStringValue(obj.image_size),
+      input_price_per_million_tokens: optionalDecimalString(obj.input_price_per_million_tokens),
+      output_price_per_million_tokens: optionalDecimalString(obj.output_price_per_million_tokens),
+      cache_read_price_per_million_tokens: optionalDecimalString(obj.cache_read_price_per_million_tokens),
+      cache_write_price_per_million_tokens: optionalDecimalString(obj.cache_write_price_per_million_tokens),
+      per_image_price: optionalDecimalString(obj.per_image_price),
+    };
+  });
+}
+
+function pricingIntervalsForForm(intervals: PricingInterval[]) {
+  return intervals.map(({ id: _id, ...interval }) => interval);
+}
+
+function optionalStringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function optionalDecimalString(value: unknown): string | undefined {
+  if (value == null || value === "") return undefined;
+  return parseDecimalString(String(value), "Interval price");
+}
+
+function optionalIntegerValue(value: unknown, fieldName: string): number | undefined {
+  if (value == null || value === "") return undefined;
+  return parseInteger(String(value), fieldName);
+}
+
+function optionalNullableIntegerValue(value: unknown, fieldName: string): number | null | undefined {
+  if (value === null) return null;
+  return optionalIntegerValue(value, fieldName);
 }
 
 export function createPricingRuleConfirmation({

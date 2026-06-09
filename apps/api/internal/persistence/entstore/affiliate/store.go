@@ -17,6 +17,7 @@ import (
 	entuser "github.com/srapi/srapi/apps/api/ent/user"
 	"github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 var ErrInvalidStore = errors.New("invalid affiliate ent store")
@@ -237,7 +238,7 @@ func (s *Store) TransferToBalance(ctx context.Context, input contract.TransferTo
 		return contract.TransferToBalanceResult{}, false, err
 	}
 
-	amount, ok := decimalRat(input.Amount)
+	amount, ok := money.RequiredDecimalRat(input.Amount)
 	if !ok || amount.Sign() <= 0 {
 		return contract.TransferToBalanceResult{}, false, contract.ErrInsufficientBalance
 	}
@@ -259,11 +260,11 @@ func (s *Store) TransferToBalance(ctx context.Context, input contract.TransferTo
 	if balanceBefore == "" {
 		balanceBefore = "0.00000000"
 	}
-	balanceBeforeRat, ok := decimalRat(balanceBefore)
+	balanceBeforeRat, ok := money.DecimalRat(balanceBefore)
 	if !ok {
 		balanceBeforeRat = new(big.Rat)
 	}
-	balanceAfter := formatRatFixed(new(big.Rat).Add(balanceBeforeRat, amount), 8)
+	balanceAfter := money.FormatRatFixed(new(big.Rat).Add(balanceBeforeRat, amount), 8)
 
 	createdAt := input.CreatedAt.UTC()
 	if createdAt.IsZero() {
@@ -410,7 +411,7 @@ func availableAffiliateBalance(ctx context.Context, client *ent.Client, userID i
 	}
 	total := new(big.Rat)
 	for _, row := range rows {
-		amount, ok := decimalRat(row.Amount)
+		amount, ok := money.RequiredDecimalRat(row.Amount)
 		if !ok {
 			continue
 		}
@@ -510,21 +511,6 @@ func cloneInt(value *int) *int {
 	}
 	cloned := *value
 	return &cloned
-}
-
-func decimalRat(value string) (*big.Rat, bool) {
-	rat, ok := new(big.Rat).SetString(value)
-	if !ok {
-		return nil, false
-	}
-	return rat, true
-}
-
-func formatRatFixed(value *big.Rat, places int) string {
-	if value == nil {
-		value = new(big.Rat)
-	}
-	return value.FloatString(places)
 }
 
 func transferResultFromLedger(ledger contract.AffiliateLedger) contract.TransferToBalanceResult {

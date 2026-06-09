@@ -254,6 +254,7 @@ func (w *Worker) refreshOne(parent context.Context, account accountcontract.Prov
 		Credential: credential,
 	})
 	if err != nil {
+		w.persistQuotaProviderError(ctx, account, err)
 		mu.Lock()
 		result.Failed++
 		*firstErr = errors.Join(*firstErr, err)
@@ -288,6 +289,24 @@ func (w *Worker) refreshOne(parent context.Context, account accountcontract.Prov
 	result.Refreshed++
 	result.Signals += signals
 	mu.Unlock()
+}
+
+func (w *Worker) persistQuotaProviderError(ctx context.Context, account accountcontract.ProviderAccount, err error) {
+	var providerErr provideradaptercontract.ProviderError
+	if !errors.As(err, &providerErr) {
+		return
+	}
+	if providerErr.StatusCode != http.StatusForbidden {
+		return
+	}
+	metadata := provideradaptercontract.QuotaErrorMetadata(account.Metadata, providerErr, time.Now().UTC())
+	status := account.Status
+	if provideradaptercontract.QuotaErrorClassRequiresOperatorAction(providerErr.Class) {
+		status = accountcontract.StatusSuspended
+	}
+	if _, updateErr := w.accounts.Update(ctx, account.ID, accountcontract.UpdateRequest{Metadata: &metadata, Status: &status}); updateErr != nil {
+		w.logger.Warn("failed to persist account quota error metadata", "account_id", account.ID, "error", updateErr)
+	}
 }
 
 func durationOrDefault(value time.Duration, fallback time.Duration) time.Duration {

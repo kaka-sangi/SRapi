@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 type Clock interface {
@@ -22,6 +23,7 @@ func (SystemClock) Now() time.Time { return time.Now().UTC() }
 type Service struct {
 	store        contract.Store
 	usageCharges contract.UsageChargeStore
+	pricing      contract.PricingStore
 	clock        Clock
 }
 
@@ -32,7 +34,11 @@ func New(store contract.Store, clock Clock) (*Service, error) {
 	if clock == nil {
 		clock = SystemClock{}
 	}
-	return &Service{store: store, clock: clock}, nil
+	svc := &Service{store: store, clock: clock}
+	if pricing, ok := store.(contract.PricingStore); ok {
+		svc.pricing = pricing
+	}
+	return svc, nil
 }
 
 func NewUsageCharger(store contract.UsageChargeStore, clock Clock) (*Service, error) {
@@ -45,6 +51,24 @@ func NewUsageCharger(store contract.UsageChargeStore, clock Clock) (*Service, er
 	return &Service{usageCharges: store, clock: clock}, nil
 }
 
+func NewPricing(store contract.PricingStore, clock Clock) (*Service, error) {
+	if store == nil {
+		return nil, ErrInvalidInput
+	}
+	if clock == nil {
+		clock = SystemClock{}
+	}
+	return &Service{pricing: store, clock: clock}, nil
+}
+
+func (s *Service) WithPricingStore(store contract.PricingStore) (*Service, error) {
+	if s == nil || store == nil {
+		return nil, ErrInvalidInput
+	}
+	s.pricing = store
+	return s, nil
+}
+
 func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contract.LedgerEntry, error) {
 	if s == nil || s.store == nil {
 		return contract.LedgerEntry{}, ErrInvalidInput
@@ -52,18 +76,13 @@ func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contr
 	if req.UserID <= 0 || strings.TrimSpace(string(req.Type)) == "" {
 		return contract.LedgerEntry{}, ErrInvalidInput
 	}
-	amount := defaultMoney(req.Amount)
-	currency := strings.TrimSpace(req.Currency)
-	if currency == "" {
-		currency = "USD"
-	}
 	return s.store.Create(ctx, contract.LedgerEntry{
 		UserID:        req.UserID,
 		Type:          req.Type,
-		Amount:        amount,
-		Currency:      currency,
-		BalanceBefore: defaultMoney(req.BalanceBefore),
-		BalanceAfter:  defaultMoney(req.BalanceAfter),
+		Amount:        money.NormalizeAmount(req.Amount),
+		Currency:      money.NormalizeCurrency(req.Currency),
+		BalanceBefore: money.NormalizeAmount(req.BalanceBefore),
+		BalanceAfter:  money.NormalizeAmount(req.BalanceAfter),
 		ReferenceType: strings.TrimSpace(req.ReferenceType),
 		ReferenceID:   strings.TrimSpace(req.ReferenceID),
 		Metadata:      cloneMap(req.Metadata),
@@ -143,9 +162,7 @@ func (s *Service) ChargeUsage(ctx context.Context, req contract.ChargeUsageReque
 	if req.UserID <= 0 || len(req.UsageLogIDs) == 0 {
 		return contract.ChargeUsageResult{}, ErrInvalidInput
 	}
-	if strings.TrimSpace(req.Currency) == "" {
-		req.Currency = "USD"
-	}
+	req.Currency = money.NormalizeCurrency(req.Currency)
 	if strings.TrimSpace(req.ReferenceType) == "" {
 		req.ReferenceType = "usage_log_batch"
 	}
@@ -156,14 +173,6 @@ func (s *Service) ChargeUsage(ctx context.Context, req contract.ChargeUsageReque
 		req.ChargedAt = s.clock.Now()
 	}
 	return s.usageCharges.ChargeUsage(ctx, req)
-}
-
-func defaultMoney(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return "0.00000000"
-	}
-	return value
 }
 
 func cloneMap(value map[string]any) map[string]any {

@@ -25,6 +25,14 @@ export interface ApiKeySummary {
   request_limit_5h?: number | null;
   request_limit_1d?: number | null;
   request_limit_7d?: number | null;
+  cost_quota?: string | null;
+  cost_used?: string | null;
+  cost_limit_5h?: string | null;
+  cost_used_5h?: string | null;
+  cost_limit_1d?: string | null;
+  cost_used_1d?: string | null;
+  cost_limit_7d?: string | null;
+  cost_used_7d?: string | null;
   rpm_limit?: number | null;
   tpm_limit?: number | null;
   concurrency_limit?: number | null;
@@ -52,7 +60,48 @@ export interface UsageLogSummary {
   success: boolean;
   total_tokens: number;
   cost: number;
+  input_cost: number;
+  output_cost: number;
+  cache_read_cost: number;
+  cache_write_cost: number;
+  requested_model?: string;
+  upstream_model?: string;
+  billing_mode?: "token" | "per_request" | "image";
   currency: string;
+}
+
+export interface AvailableModelPricingSummary {
+  billing_mode: "token" | "per_request" | "image";
+  currency: string;
+  input_price_per_million_tokens: string;
+  output_price_per_million_tokens: string;
+  cache_read_price_per_million_tokens: string;
+  cache_write_price_per_million_tokens: string;
+  per_request_price: string;
+  source: "pricing_rule" | "mapping_override" | "default_zero";
+}
+
+export interface AvailableModelChannelSummary {
+  provider_id: string;
+  provider_name: string;
+  provider_display_name: string;
+  adapter_type: string;
+  protocol: string;
+  upstream_model: string;
+  status: "available" | "limited" | "unavailable";
+  active_account_count: number;
+  total_account_count: number;
+  pricing: AvailableModelPricingSummary;
+}
+
+export interface AvailableModelSummary {
+  id: string;
+  name: string;
+  family?: string | null;
+  status: "available" | "limited" | "unavailable";
+  context_window?: number | null;
+  max_output_tokens?: number | null;
+  channels: AvailableModelChannelSummary[];
 }
 
 export interface SchedulerDecisionSummary {

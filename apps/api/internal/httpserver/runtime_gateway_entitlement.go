@@ -2,12 +2,12 @@ package httpserver
 
 import (
 	"context"
-	"math/big"
 	"net/http"
 	"strings"
 
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 // gatewayBalanceGate enforces a synchronous positive-balance requirement for
@@ -51,7 +51,7 @@ func gatewayEntitlementBalanceBilled(decision subscriptioncontract.EntitlementDe
 // least that estimate. A zero or negative balance never covers a balance-billed
 // request.
 func gatewayBalanceCoversRequest(balance string, estimatedCost string) bool {
-	balanceRat, ok := new(big.Rat).SetString(defaultDecimalMoney(balance))
+	balanceRat, ok := money.DecimalRat(money.NormalizeAmount(balance))
 	if !ok {
 		// Unparseable balance is treated as covering the request so a data
 		// anomaly never hard-blocks traffic; the deferred charger remains the
@@ -61,7 +61,7 @@ func gatewayBalanceCoversRequest(balance string, estimatedCost string) bool {
 	if balanceRat.Sign() <= 0 {
 		return false
 	}
-	costRat, ok := new(big.Rat).SetString(defaultDecimalMoney(estimatedCost))
+	costRat, ok := money.DecimalRat(money.NormalizeAmount(estimatedCost))
 	if !ok || costRat.Sign() <= 0 {
 		return true
 	}

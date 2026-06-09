@@ -107,7 +107,7 @@ func adapterTypeToPlatformFamily(adapterType string) providerpreset.PlatformFami
 		return providerpreset.PlatformFamilyRerankCompatible
 	case "reverse-proxy-codex-cli":
 		return providerpreset.PlatformFamilyCodexCLI
-	case "openai-compatible":
+	case "openai-compatible", "reverse-proxy-chatgpt-web":
 		return providerpreset.PlatformFamilyOpenAICompatible
 	default:
 		return ""
@@ -125,6 +125,7 @@ func providerScopedCapabilityKeys() []string {
 		capabilitiescontract.KeyRealtimeWebSocket,
 		capabilitiescontract.KeyResponsesCompact,
 		capabilitiescontract.KeyTokenCounting,
+		capabilitiescontract.KeyVisionInput,
 	}
 }
 

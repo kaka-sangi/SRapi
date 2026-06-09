@@ -30,6 +30,10 @@ import { Button } from "@/components/ui/button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { formatDate } from "@/lib/admin-format";
 import {
+  SubscriptionUsageBars,
+  type SubscriptionUsageLabels,
+} from "@/components/features/subscription-usage-bars";
+import {
   USER_SUBSCRIPTION_STATUSES,
   emptyUserSubscriptionForm,
   buildCreateUserSubscriptionBody,
@@ -101,6 +105,12 @@ function SubscriptionsContent() {
           {formatDate(s.starts_at)} – {formatDate(s.expires_at)}
         </span>
       ),
+    },
+    {
+      key: "usage",
+      header: t("adminSubscriptions.usage"),
+      hideOnMobile: true,
+      render: (s) => <SubscriptionUsageBars subscription={s} labels={subscriptionUsageLabels(t)} />,
     },
     {
       key: "status",
@@ -184,4 +194,13 @@ function SubscriptionsContent() {
       ) : null}
     </>
   );
+}
+
+function subscriptionUsageLabels(t: ReturnType<typeof useLanguage>["t"]): SubscriptionUsageLabels {
+  return {
+    daily: t("adminSubscriptions.dailyUsage"),
+    weekly: t("adminSubscriptions.weeklyUsage"),
+    monthly: t("adminSubscriptions.monthlyUsage"),
+    noQuota: t("adminSubscriptions.noCostQuota"),
+  };
 }

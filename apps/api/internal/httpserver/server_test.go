@@ -763,9 +763,10 @@ func TestReadyzUsesInjectedDependencyProbes(t *testing.T) {
 func TestMetricsExposeBaselineSRapiSignals(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustCreateOpenAIChatGatewayTarget(t, handler, sessionCookie, loginResp.Data.CsrfToken, "metrics-provider", "metrics-model")
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 
-	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gpt-4o-mini","messages":[{"role":"user","content":"metrics smoke"}]}`))
+	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"metrics-model","messages":[{"role":"user","content":"metrics smoke"}]}`))
 	chatReq.Header.Set("Content-Type", "application/json")
 	chatReq.Header.Set("Authorization", "Bearer "+apiKey)
 	chatRec := httptest.NewRecorder()
@@ -800,18 +801,18 @@ func TestMetricsExposeBaselineSRapiSignals(t *testing.T) {
 			t.Fatalf("expected metrics body to contain %s, got:\n%s", metric, body)
 		}
 	}
-	if !strings.Contains(body, `srapi_gateway_requests_total{endpoint_family="chat_completions",model="gpt-4o-mini",provider_protocol="openai-compatible",result="success"} 1`) {
+	if !strings.Contains(body, `srapi_gateway_requests_total{endpoint_family="chat_completions",model="metrics-model",provider_protocol="openai-compatible",result="success"} 1`) {
 		t.Fatalf("expected gateway request metric, got:\n%s", body)
 	}
 	for _, bucket := range []string{`le="0.05"`, `le="0.1"`, `le="0.25"`, `le="0.5"`, `le="1"`, `le="2.5"`, `le="5"`, `le="10"`, `le="+Inf"`} {
-		if !strings.Contains(body, `srapi_gateway_request_duration_seconds_bucket{endpoint_family="chat_completions",model="gpt-4o-mini",provider_protocol="openai-compatible",result="success",`+bucket+`}`) {
+		if !strings.Contains(body, `srapi_gateway_request_duration_seconds_bucket{endpoint_family="chat_completions",model="metrics-model",provider_protocol="openai-compatible",result="success",`+bucket+`}`) {
 			t.Fatalf("expected gateway duration bucket %s, got:\n%s", bucket, body)
 		}
 		if !strings.Contains(body, `srapi_provider_probe_latency_seconds_bucket{provider_protocol="openai-compatible",status="healthy",`+bucket+`}`) {
 			t.Fatalf("expected provider probe latency bucket %s, got:\n%s", bucket, body)
 		}
 	}
-	if !strings.Contains(body, `srapi_usage_tokens_total{model="gpt-4o-mini",provider_protocol="openai-compatible",token_kind="input"}`) {
+	if !strings.Contains(body, `srapi_usage_tokens_total{model="metrics-model",provider_protocol="openai-compatible",token_kind="input"}`) {
 		t.Fatalf("expected usage token metric, got:\n%s", body)
 	}
 }
@@ -827,10 +828,11 @@ func TestGatewayEnforcesAPIKeyRPMLimit(t *testing.T) {
 
 	handler := New(config.Load(), nil, WithRateLimiter(limiter))
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustCreateOpenAIChatGatewayTarget(t, handler, sessionCookie, loginResp.Data.CsrfToken, "rpm-limited-provider", "rpm-limited-model")
 	keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"limited-gateway","scopes":["gateway:invoke"],"rpm_limit":1}`)
 	apiKey := keyResp.Data.PlaintextKey
 
-	firstReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gpt-4o-mini","messages":[{"role":"user","content":"first limited request"}]}`))
+	firstReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"rpm-limited-model","messages":[{"role":"user","content":"first limited request"}]}`))
 	firstReq.Header.Set("Content-Type", "application/json")
 	firstReq.Header.Set("Authorization", "Bearer "+apiKey)
 	firstRec := httptest.NewRecorder()
@@ -839,7 +841,7 @@ func TestGatewayEnforcesAPIKeyRPMLimit(t *testing.T) {
 		t.Fatalf("expected first gateway request 200, got %d body=%s", firstRec.Code, firstRec.Body.String())
 	}
 
-	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gpt-4o-mini","messages":[{"role":"user","content":"second limited request"}]}`))
+	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"rpm-limited-model","messages":[{"role":"user","content":"second limited request"}]}`))
 	secondReq.Header.Set("Content-Type", "application/json")
 	secondReq.Header.Set("Authorization", "Bearer "+apiKey)
 	secondRec := httptest.NewRecorder()
@@ -3032,7 +3034,7 @@ func TestAdminCatalogFlow(t *testing.T) {
 			t.Fatalf("decode accounts list: %v", err)
 		}
 		return len(resp.Data)
-	}, 2)
+	}, 1)
 
 	capabilitiesReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/capabilities", nil)
 	capabilitiesReq.AddCookie(sessionCookie)
@@ -3226,7 +3228,7 @@ func TestAdminCatalogFlow(t *testing.T) {
 	if err := json.NewDecoder(adminOverviewRec.Body).Decode(&adminOverviewResp); err != nil {
 		t.Fatalf("decode admin overview: %v", err)
 	}
-	if adminOverviewResp.Data.ProviderCount != 2 || adminOverviewResp.Data.ModelCount != 2 || adminOverviewResp.Data.ActiveAccountCount != 2 {
+	if adminOverviewResp.Data.ProviderCount != 2 || adminOverviewResp.Data.ModelCount != 2 || adminOverviewResp.Data.ActiveAccountCount != 1 {
 		t.Fatalf("unexpected admin overview: %+v", adminOverviewResp.Data)
 	}
 	if adminOverviewResp.Data.UsageLogCount < 6 || adminOverviewResp.Data.SchedulerDecisionCount < 6 {
@@ -3274,7 +3276,7 @@ func TestAdminCatalogFlow(t *testing.T) {
 	if err := json.NewDecoder(accountQuotaRec.Body).Decode(&accountQuotaResp); err != nil {
 		t.Fatalf("decode account quota: %v", err)
 	}
-	if len(accountQuotaResp.Data) == 0 || accountQuotaResp.Data[0].QuotaType != "monthly_tokens" || accountQuotaResp.Data[0].Used == "0" {
+	if len(accountQuotaResp.Data) == 0 || accountQuotaResp.Data[0].QuotaType != "synthetic_monthly_tokens" || accountQuotaResp.Data[0].Used == "0" {
 		t.Fatalf("unexpected account quota: %+v", accountQuotaResp.Data)
 	}
 
@@ -4443,7 +4445,7 @@ func TestGatewayAnthropicCountTokensSchedulesAnthropicCompatibleUpstream(t *test
 func TestGatewayAnthropicCountTokensRequiresProviderScopedCapability(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"anthropic-count-missing-cap-provider","display_name":"Anthropic Missing Count Capability","adapter_type":"anthropic-compatible","protocol":"anthropic-compatible","status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"anthropic-count-missing-cap-provider","display_name":"Anthropic Missing Count Capability","adapter_type":"anthropic-compatible","protocol":"anthropic-compatible","status":"active","capabilities":{"messages":true}}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"anthropic-count-missing-cap-model","display_name":"Anthropic Missing Count Capability Model","status":"active","capabilities":[{"key":"token_counting","level":"required","status":"stable","version":"v1"}]}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"claude-count-upstream","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"anthropic-count-missing-cap-account","runtime_class":"api_key","credential":{"api_key":"anthropic-count-secret"},"metadata":{"base_url":"https://api.anthropic.com/v1"},"status":"active"}`)
@@ -5092,6 +5094,7 @@ func TestGatewayProviderAliasForcesProviderContext(t *testing.T) {
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-upstream","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-upstream","status":"active"}`)
+	mustCreateOpenAIAliasAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, openaiProvider.Id, "openai-compatible-alias-chat")
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	req := httptest.NewRequest(http.MethodPost, "/api/provider/openai-compatible/v1/chat/completions", strings.NewReader(`{"model":"alias-model","messages":[{"role":"user","content":"alias route"}]}`))
@@ -5892,8 +5895,8 @@ func TestAdminInstallProviderPresetsIsIdempotent(t *testing.T) {
 		if !ok {
 			t.Fatalf("expected installed provider preset %s in %+v", name, providersByName)
 		}
-		if provider.Status != apiopenapi.ResourceStatusDisabled {
-			t.Fatalf("expected installed provider %s to default disabled, got %s", name, provider.Status)
+		if provider.Status != apiopenapi.ResourceStatusActive {
+			t.Fatalf("expected installed provider %s to default active, got %s", name, provider.Status)
 		}
 	}
 	deepseekSchema := providersByName["deepseek"].ConfigSchema
@@ -5903,6 +5906,45 @@ func TestAdminInstallProviderPresetsIsIdempotent(t *testing.T) {
 	togetherSchema := providersByName["together"].ConfigSchema
 	if togetherSchema == nil || (*togetherSchema)["default_base_url"] != "https://api.together.ai/v1" {
 		t.Fatalf("expected together preset default base url, got %+v", togetherSchema)
+	}
+	anthropicProvider, ok := providersByName["anthropic"]
+	if !ok {
+		t.Fatalf("expected installed anthropic provider")
+	}
+	chatGPTWebProvider, ok := providersByName["chatgpt-web"]
+	if !ok {
+		t.Fatalf("expected installed chatgpt-web provider")
+	}
+	if chatGPTWebProvider.AdapterType != "reverse-proxy-chatgpt-web" {
+		t.Fatalf("expected chatgpt-web reverse proxy adapter, got %s", chatGPTWebProvider.AdapterType)
+	}
+	chatGPTWebSchema := chatGPTWebProvider.ConfigSchema
+	if chatGPTWebSchema == nil {
+		t.Fatalf("expected chatgpt-web config schema")
+	}
+	chatGPTWebAuthMethods, _ := (*chatGPTWebSchema)["auth_methods"].([]any)
+	if !stringAnySliceContains(chatGPTWebAuthMethods, "web_session_cookie") ||
+		stringAnySliceContains(chatGPTWebAuthMethods, "service_account_json") ||
+		stringAnySliceContains(chatGPTWebAuthMethods, "desktop_client_token") ||
+		stringAnySliceContains(chatGPTWebAuthMethods, "ide_plugin_token") {
+		t.Fatalf("unexpected chatgpt-web auth methods: %+v", chatGPTWebAuthMethods)
+	}
+	oauthReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/providers/"+string(anthropicProvider.Id)+"/oauth-config", nil)
+	oauthReq.AddCookie(sessionCookie)
+	oauthRec := httptest.NewRecorder()
+	handler.ServeHTTP(oauthRec, oauthReq)
+	if oauthRec.Code != http.StatusOK {
+		t.Fatalf("expected provider oauth config 200, got %d body=%s", oauthRec.Code, oauthRec.Body.String())
+	}
+	var oauthResp apiopenapi.ProviderOAuthConfigResponse
+	if err := json.NewDecoder(oauthRec.Body).Decode(&oauthResp); err != nil {
+		t.Fatalf("decode provider oauth config: %v", err)
+	}
+	if oauthResp.Data.ProviderName != "anthropic" ||
+		oauthResp.Data.Config.ClientId == "" ||
+		oauthResp.Data.Config.TokenUrl == nil ||
+		*oauthResp.Data.Config.TokenUrl != "https://api.anthropic.com/v1/oauth/token" {
+		t.Fatalf("unexpected provider oauth config: %+v", oauthResp.Data)
 	}
 
 	for _, preset := range []struct {
@@ -6323,6 +6365,7 @@ func TestGatewayEmbeddingAliasForcesProviderContext(t *testing.T) {
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-embedding","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"embedding-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-embedding","status":"active"}`)
+	mustCreateOpenAIAliasAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, openaiProvider.Id, "openai-compatible-alias-embedding")
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/api/provider/openai-compatible/v1/embeddings", `{"model":"wp270-alias-embedding-model","input":"alias embedding"}`)
@@ -6605,6 +6648,7 @@ func TestGatewayImageGenerationAliasForcesProviderContext(t *testing.T) {
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-image","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"image-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-image","status":"active"}`)
+	mustCreateOpenAIAliasAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, openaiProvider.Id, "openai-compatible-alias-image")
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/api/provider/openai-compatible/v1/images/generations", `{"model":"wp290-alias-image-model","prompt":"alias image prompt"}`)
@@ -7011,6 +7055,7 @@ func TestGatewayImageEditAliasForcesProviderContext(t *testing.T) {
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-image-edit","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"image-edit-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-image-edit","status":"active"}`)
+	mustCreateOpenAIAliasAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, openaiProvider.Id, "openai-compatible-alias-image-edit")
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	mustGatewayImageEditRequest(t, handler, apiKey, "/api/provider/openai-compatible/v1/images/edits", map[string]string{"model": "wp480-alias-image-edit-model", "prompt": "alias image edit prompt"}, "alias.png", "image/png", []byte("PNG-alias"), "", "", nil)
@@ -7164,6 +7209,7 @@ func TestGatewayImageVariationAliasForcesProviderContext(t *testing.T) {
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-image-variation","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"image-variation-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-image-variation","status":"active"}`)
+	mustCreateOpenAIAliasAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, openaiProvider.Id, "openai-compatible-alias-image-variation")
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	mustGatewayImageVariationRequest(t, handler, apiKey, "/api/provider/openai-compatible/v1/images/variations", map[string]string{"model": "wp490-alias-image-variation-model"}, "alias.png", "image/png", []byte("PNG-alias"))
@@ -7303,6 +7349,7 @@ func TestGatewayModerationAliasForcesProviderContext(t *testing.T) {
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-moderation","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"moderation-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-moderation","status":"active"}`)
+	mustCreateOpenAIAliasAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, openaiProvider.Id, "openai-compatible-alias-moderation")
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/api/provider/openai-compatible/v1/moderations", `{"model":"wp310-alias-moderation-model","input":"alias moderation input"}`)
@@ -7574,6 +7621,7 @@ func TestGatewayAudioTranscriptionAliasForcesProviderContext(t *testing.T) {
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-audio","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"audio-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-audio","status":"active"}`)
+	mustCreateOpenAIAliasAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, openaiProvider.Id, "openai-compatible-alias-audio")
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	mustGatewayMultipartRequest(t, handler, apiKey, "/api/provider/openai-compatible/v1/audio/transcriptions", map[string]string{"model": "wp330-alias-audio-model", "response_format": "json"}, "alias.wav", "audio/wav", []byte("RIFF-alias-audio"))
@@ -7607,6 +7655,7 @@ func TestGatewayAudioTranscriptionTextResponseFormatReturnsPlainText(t *testing.
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp330-text-audio-model","display_name":"WP330 Text Audio Model","status":"active","capabilities":[{"key":"audio_transcriptions","level":"required","status":"stable","version":"v1"}]}`)
 	openaiProvider := mustFindProviderByName(t, handler, sessionCookie, "openai-compatible")
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-audio","status":"active"}`)
+	mustCreateOpenAIAliasAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, openaiProvider.Id, "openai-compatible-text-audio")
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	rec := mustGatewayMultipartRequest(t, handler, apiKey, "/v1/audio/transcriptions", map[string]string{"model": "wp330-text-audio-model", "response_format": "text"}, "plain.wav", "audio/wav", []byte("RIFF-plain-audio"))
@@ -7741,6 +7790,7 @@ func TestGatewayAudioSpeechAliasForcesProviderContext(t *testing.T) {
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-speech","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"speech-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-speech","status":"active"}`)
+	mustCreateOpenAIAliasAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, openaiProvider.Id, "openai-compatible-alias-speech")
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/api/provider/openai-compatible/v1/audio/speech", `{"model":"wp340-alias-speech-model","input":"alias speech","voice":"alloy","response_format":"mp3"}`)
@@ -8788,7 +8838,7 @@ func TestGatewayVisionRequestUsesCapabilityTaxonomy(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 
-	createProviderReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/providers", strings.NewReader(`{"name":"text-only-provider","display_name":"Text Only Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`))
+	createProviderReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/providers", strings.NewReader(`{"name":"text-only-provider","display_name":"Text Only Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"vision":false}}`))
 	createProviderReq.Header.Set("Content-Type", "application/json")
 	createProviderReq.AddCookie(sessionCookie)
 	createProviderReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
@@ -9242,7 +9292,46 @@ func TestGatewayChatGPTWebReverseProxyUsesConversationOfficialClientShape(t *tes
 	}
 }
 
-func TestGatewayAntigravityReverseProxyUsesDesktopRuntimeIdentity(t *testing.T) {
+func TestGatewayChatGPTWebPresetAcceptsWebSessionCookie(t *testing.T) {
+	var gotAuthorization string
+	var gotCookie string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/conversation" {
+			t.Fatalf("expected chatgpt web conversation path, got %s", r.URL.Path)
+		}
+		gotAuthorization = r.Header.Get("Authorization")
+		gotCookie = r.Header.Get("Cookie")
+		if r.Header.Get("OpenAI-Sentinel-Chat-Requirements-Token") != "requirements-token" {
+			t.Fatalf("expected requirements token, got %+v", r.Header)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"message\":{\"author\":{\"role\":\"assistant\"},\"content\":{\"parts\":[\"cookie ok\"]}}}\n\ndata: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustInstallProviderPresets(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	chatGPTWebProvider := mustFindProviderByName(t, handler, sessionCookie, "chatgpt-web")
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"chatgpt-web-cookie-model","display_name":"ChatGPT Web Cookie Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(chatGPTWebProvider.Id)+`","upstream_model_name":"gpt-5-chat-web","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(chatGPTWebProvider.Id)+`","name":"chatgpt-web-cookie-account","runtime_class":"web_session_cookie","upstream_client":"chatgpt_web","credential":{"cookie":"__Secure-next-auth.session-token=session-token"},"metadata":{"base_url":"`+upstream.URL+`","user_agent":"Mozilla/5.0 ChatGPTWeb/1.0","chatgpt_requirements_token":"requirements-token"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"chatgpt-web-cookie-model","messages":[{"role":"user","content":"hello cookie"}]}`))
+	chatReq.Header.Set("Content-Type", "application/json")
+	chatReq.Header.Set("Authorization", "Bearer "+apiKey)
+	chatRec := httptest.NewRecorder()
+	handler.ServeHTTP(chatRec, chatReq)
+	if chatRec.Code != http.StatusOK {
+		t.Fatalf("expected ChatGPT Web cookie gateway success 200, got %d body=%s", chatRec.Code, chatRec.Body.String())
+	}
+	if gotAuthorization != "" || gotCookie != "__Secure-next-auth.session-token=session-token" {
+		t.Fatalf("expected cookie auth only, got authorization=%q cookie=%q", gotAuthorization, gotCookie)
+	}
+}
+
+func TestGatewayAntigravityReverseProxyUsesOAuthRuntimeIdentity(t *testing.T) {
 	var upstreamPath string
 	var upstreamAuthorization string
 	var upstreamUserAgent string
@@ -9293,7 +9382,7 @@ func TestGatewayAntigravityReverseProxyUsesDesktopRuntimeIdentity(t *testing.T) 
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-provider","display_name":"Antigravity Provider","adapter_type":"reverse-proxy-antigravity","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"antigravity-model","display_name":"Antigravity Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"antigravity-upstream","status":"active"}`)
-	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-account","runtime_class":"oauth_refresh","upstream_client":"antigravity_desktop","credential":{"access_token":"oauth-token","refresh_token":"refresh-token","oauth_client_secret":"client-secret"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active"}`)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"antigravity-model","messages":[{"role":"user","content":"call antigravity"}]}`))
@@ -9306,7 +9395,7 @@ func TestGatewayAntigravityReverseProxyUsesDesktopRuntimeIdentity(t *testing.T) 
 	if chatRec.Code != http.StatusOK {
 		t.Fatalf("expected antigravity gateway success 200, got %d body=%s", chatRec.Code, chatRec.Body.String())
 	}
-	if upstreamPath != "/v1internal:generateContent" || upstreamAuthorization != "Bearer desktop-token" || upstreamUserAgent != "Antigravity/1.0" {
+	if upstreamPath != "/v1internal:generateContent" || upstreamAuthorization != "Bearer oauth-token" || upstreamUserAgent != "Antigravity/1.0" {
 		t.Fatalf("unexpected antigravity upstream request path=%q auth=%q ua=%q", upstreamPath, upstreamAuthorization, upstreamUserAgent)
 	}
 	if upstreamProject != "project-1" || !strings.HasPrefix(upstreamRequestID, "agent-") || upstreamModel != "antigravity-upstream" || upstreamPrompt != "call antigravity" {
@@ -9927,6 +10016,43 @@ func mustFindProviderByName(t *testing.T, handler http.Handler, sessionCookie *h
 	return apiopenapi.Provider{}
 }
 
+func mustCreateOpenAIAliasAccount(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken string, providerID apiopenapi.Id, name string) apiopenapi.ProviderAccountResponse {
+	t.Helper()
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/chat/completions":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"stop","index":0,"message":{"role":"assistant","content":"alias ok"}}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+		case "/v1/embeddings":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"object":"list","model":"alias-embedding","data":[{"object":"embedding","index":0,"embedding":[0.1,0.2,0.3]}],"usage":{"prompt_tokens":3,"completion_tokens":0,"total_tokens":3}}`))
+		case "/v1/images/generations", "/v1/images/edits", "/v1/images/variations":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"created":1710000400,"data":[{"url":"https://example.test/alias.png"}],"usage":{"input_tokens":4,"output_tokens":1,"total_tokens":5}}`))
+		case "/v1/moderations":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"modr_alias","model":"alias-moderation","results":[{"flagged":false,"categories":{"violence":false},"category_scores":{"violence":0.01}}],"usage":{"prompt_tokens":2,"total_tokens":2}}`))
+		case "/v1/audio/transcriptions":
+			_ = r.ParseMultipartForm(16 << 20)
+			if strings.EqualFold(r.FormValue("response_format"), "text") {
+				w.Header().Set("Content-Type", "text/plain")
+				_, _ = w.Write([]byte("SRapi local transcription for plain.wav"))
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"text":"alias transcription","usage":{"input_tokens":3,"output_tokens":1,"total_tokens":4}}`))
+		case "/v1/audio/speech":
+			w.Header().Set("Content-Type", "audio/mpeg")
+			_, _ = w.Write([]byte("alias speech audio"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(upstream.Close)
+
+	return mustCreateAccount(t, handler, sessionCookie, csrfToken, `{"provider_id":"`+string(providerID)+`","name":"`+name+`","runtime_class":"api_key","credential":{"api_key":"alias-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":10}`)
+}
+
 func mustInstallProviderPresets(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken string) apiopenapi.BatchOperationResponse {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/providers/preset/install", nil)
@@ -10157,6 +10283,15 @@ func findProviderAccountExportByName(items []apiopenapi.ProviderAccountExportIte
 func stringSliceContains(values []string, target string) bool {
 	for _, value := range values {
 		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func stringAnySliceContains(values []any, target string) bool {
+	for _, value := range values {
+		if s, ok := value.(string); ok && s == target {
 			return true
 		}
 	}

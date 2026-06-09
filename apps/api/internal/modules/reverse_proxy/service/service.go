@@ -22,13 +22,6 @@ import (
 const (
 	maxReverseProxyResponseBytes = 8 << 20
 	statusClientClosedRequest    = 499
-	codexOAuthTokenURL           = "https://auth.openai.com/oauth/token"
-	codexOAuthClientID           = "app_EMoamEEZ73f0CkXaXp7hrann"
-	codexOAuthRefreshScope       = "openid profile email"
-	claudeCodeOAuthTokenURL      = "https://api.anthropic.com/v1/oauth/token"
-	claudeCodeOAuthClientID      = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-	antigravityOAuthTokenURL     = "https://oauth2.googleapis.com/token"
-	antigravityOAuthClientID     = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
 	oauthRefreshEncodingForm     = "form"
 	oauthRefreshEncodingJSON     = "json"
 )
@@ -973,28 +966,28 @@ func oauthRefreshSettings(account contract.AccountRuntime) oauthRefreshConfig {
 	switch {
 	case upstreamClientIs(account, "codex_cli"):
 		if config.TokenEndpoint == "" {
-			config.TokenEndpoint = codexOAuthTokenURL
+			config.TokenEndpoint = contract.CodexOAuthTokenURL
 		}
 		if config.ClientID == "" {
-			config.ClientID = codexOAuthClientID
+			config.ClientID = contract.CodexOAuthClientID
 		}
 		if config.Scope == "" {
-			config.Scope = codexOAuthRefreshScope
+			config.Scope = contract.CodexOAuthRefreshScope
 		}
 	case upstreamClientIs(account, "claude_code_cli"):
 		if config.TokenEndpoint == "" {
-			config.TokenEndpoint = claudeCodeOAuthTokenURL
+			config.TokenEndpoint = contract.ClaudeCodeOAuthTokenURL
 		}
 		if config.ClientID == "" {
-			config.ClientID = claudeCodeOAuthClientID
+			config.ClientID = contract.ClaudeCodeOAuthClientID
 		}
 		config.Encoding = oauthRefreshEncodingJSON
 	case upstreamClientIs(account, "antigravity_desktop") || upstreamClientIs(account, "antigravity"):
 		if config.TokenEndpoint == "" {
-			config.TokenEndpoint = antigravityOAuthTokenURL
+			config.TokenEndpoint = contract.AntigravityOAuthTokenURL
 		}
 		if config.ClientID == "" {
-			config.ClientID = antigravityOAuthClientID
+			config.ClientID = contract.AntigravityOAuthClientID
 		}
 	}
 	if encoding := strings.ToLower(accountSetting(account, "oauth_request_encoding", "oauth_encoding", "token_request_encoding")); encoding != "" {

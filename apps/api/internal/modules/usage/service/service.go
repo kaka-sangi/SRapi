@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 type Clock interface {
@@ -58,6 +59,30 @@ func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contr
 	if billableCost == "" {
 		billableCost = actualCost
 	}
+	inputCost := strings.TrimSpace(req.InputCost)
+	if inputCost == "" {
+		inputCost = "0.00000000"
+	}
+	outputCost := strings.TrimSpace(req.OutputCost)
+	if outputCost == "" {
+		outputCost = "0.00000000"
+	}
+	cacheReadCost := strings.TrimSpace(req.CacheReadCost)
+	if cacheReadCost == "" {
+		cacheReadCost = "0.00000000"
+	}
+	cacheWriteCost := strings.TrimSpace(req.CacheWriteCost)
+	if cacheWriteCost == "" {
+		cacheWriteCost = "0.00000000"
+	}
+	requestedModel := strings.TrimSpace(req.RequestedModel)
+	if requestedModel == "" {
+		requestedModel = strings.TrimSpace(req.Model)
+	}
+	billingMode := strings.TrimSpace(req.BillingMode)
+	if billingMode == "" {
+		billingMode = "token"
+	}
 	sourceProtocol := strings.TrimSpace(req.SourceProtocol)
 	if sourceProtocol == "" {
 		sourceProtocol = "openai-compatible"
@@ -91,6 +116,13 @@ func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contr
 		ActualCost:            actualCost,
 		RateMultiplier:        rateMultiplier,
 		BillableCost:          billableCost,
+		InputCost:             inputCost,
+		OutputCost:            outputCost,
+		CacheReadCost:         cacheReadCost,
+		CacheWriteCost:        cacheWriteCost,
+		RequestedModel:        requestedModel,
+		UpstreamModel:         strings.TrimSpace(req.UpstreamModel),
+		BillingMode:           billingMode,
 		Currency:              currency,
 		ChargedAt:             req.ChargedAt,
 		CompatibilityWarnings: cloneStrings(req.CompatibilityWarnings),
@@ -115,6 +147,15 @@ func (s *Service) ListByUser(ctx context.Context, userID int) ([]contract.UsageL
 		return nil, ErrInvalidInput
 	}
 	return s.store.ListByUser(ctx, userID)
+}
+
+func (s *Service) SummarizeUserWindow(ctx context.Context, filter contract.UserWindowFilter) (contract.UserWindowSummary, error) {
+	if filter.UserID <= 0 || filter.Start.IsZero() || filter.End.IsZero() || !filter.End.After(filter.Start) {
+		return contract.UserWindowSummary{}, ErrInvalidInput
+	}
+	filter.Start = filter.Start.UTC()
+	filter.End = filter.End.UTC()
+	return s.store.SummarizeUserWindow(ctx, filter)
 }
 
 // SummarizeAPIKey returns recent usage aggregates scoped to a single Gateway API key.
@@ -157,31 +198,31 @@ func (s *Service) SummarizeAPIKey(ctx context.Context, apiKeyID int, windowDays 
 	byModel := map[string]*usageAccumulator{}
 	byDay := map[string]*usageAccumulator{}
 	todayID := now.Format("2006-01-02")
-	today := &usageAccumulator{AggregateID: todayID, Currency: "USD", totalCost: new(big.Rat)}
+	today := &usageAccumulator{Key: todayID, Type: contract.AggregateDimensionDay, Currency: "USD", totalCost: new(big.Rat)}
 	totalCost := new(big.Rat)
 	for _, log := range logs {
 		accumulateUsageSummary(&summary, log)
-		if cost, ok := decimalRat(log.Cost); ok {
+		if cost, ok := money.DecimalRat(log.Cost); ok {
 			totalCost.Add(totalCost, cost)
 		}
 		if summary.Currency == "" || summary.Currency == "USD" {
-			summary.Currency = normalizeCurrency(log.Currency)
+			summary.Currency = money.NormalizeCurrency(log.Currency)
 		}
 		modelID := strings.TrimSpace(log.Model)
 		if modelID == "" {
 			modelID = "unknown"
 		}
-		accumulateUsageLog(accumulatorFor(byModel, modelID, log.Currency), log)
+		accumulateUsageLog(accumulatorFor(byModel, modelID, contract.AggregateDimensionModel, log.Currency), log)
 		dayID := log.CreatedAt.UTC().Format("2006-01-02")
-		accumulateUsageLog(accumulatorFor(byDay, dayID, log.Currency), log)
+		accumulateUsageLog(accumulatorFor(byDay, dayID, contract.AggregateDimensionDay, log.Currency), log)
 		if dayID == todayID {
 			accumulateUsageLog(today, log)
 		}
 	}
-	summary.TotalCost = formatRatFixed(totalCost, 8)
-	summary.Today = usageWindowSummary(today)
-	summary.ModelStats = usageModelSummaries(byModel)
-	summary.DailyUsage = usageDailySummaries(byDay)
+	summary.TotalCost = money.FormatRatFixed(totalCost, 8)
+	summary.Today = today.aggregate()
+	summary.ModelStats = aggregateAccumulatorValues(byModel, sortAggregatesByTokensDesc)
+	summary.DailyUsage = aggregateAccumulatorValues(byDay, sortAggregatesByKeyAsc)
 	summary.RecentLogs = recentUsageLogs(logs, 20)
 	return summary, nil
 }
@@ -296,67 +337,52 @@ func aggregateLogs(logs []contract.UsageLog, dimension contract.AggregateDimensi
 		accumulator := byID[id]
 		if accumulator == nil {
 			accumulator = &usageAccumulator{
-				AggregateID:   id,
-				AggregateType: dimension,
-				Currency:      normalizeCurrency(log.Currency),
-				totalCost:     new(big.Rat),
+				Key:       id,
+				Type:      dimension,
+				Currency:  money.NormalizeCurrency(log.Currency),
+				totalCost: new(big.Rat),
 			}
 			byID[id] = accumulator
 		}
-		accumulator.RequestCount++
-		if log.Success {
-			accumulator.SuccessCount++
-		} else {
-			accumulator.ErrorCount++
-		}
-		accumulator.InputTokens += log.InputTokens
-		accumulator.OutputTokens += log.OutputTokens
-		accumulator.CachedTokens += log.CachedTokens
-		accumulator.TotalTokens += log.TotalTokens
-		if cost, ok := decimalRat(log.Cost); ok {
-			accumulator.totalCost.Add(accumulator.totalCost, cost)
-		}
-		if accumulator.Currency == "" {
-			accumulator.Currency = normalizeCurrency(log.Currency)
-		}
+		accumulateUsageLog(accumulator, log)
 	}
 	out := make([]contract.UsageAggregate, 0, len(byID))
 	for _, accumulator := range byID {
 		out = append(out, accumulator.aggregate())
 	}
 	sort.Slice(out, func(i, j int) bool {
-		return out[i].AggregateID < out[j].AggregateID
+		return out[i].Key < out[j].Key
 	})
 	return out
 }
 
 type usageAccumulator struct {
-	AggregateID   string
-	AggregateType contract.AggregateDimension
-	RequestCount  int
-	SuccessCount  int
-	ErrorCount    int
-	InputTokens   int
-	OutputTokens  int
-	CachedTokens  int
-	TotalTokens   int
-	Currency      string
-	totalCost     *big.Rat
+	Key          string
+	Type         contract.AggregateDimension
+	RequestCount int
+	SuccessCount int
+	ErrorCount   int
+	InputTokens  int
+	OutputTokens int
+	CachedTokens int
+	TotalTokens  int
+	Currency     string
+	totalCost    *big.Rat
 }
 
 func (a *usageAccumulator) aggregate() contract.UsageAggregate {
 	return contract.UsageAggregate{
-		AggregateID:   a.AggregateID,
-		AggregateType: a.AggregateType,
-		RequestCount:  a.RequestCount,
-		SuccessCount:  a.SuccessCount,
-		ErrorCount:    a.ErrorCount,
-		InputTokens:   a.InputTokens,
-		OutputTokens:  a.OutputTokens,
-		CachedTokens:  a.CachedTokens,
-		TotalTokens:   a.TotalTokens,
-		TotalCost:     formatRatFixed(a.totalCost, 8),
-		Currency:      normalizeCurrency(a.Currency),
+		Key:          a.Key,
+		Type:         a.Type,
+		RequestCount: a.RequestCount,
+		SuccessCount: a.SuccessCount,
+		ErrorCount:   a.ErrorCount,
+		InputTokens:  a.InputTokens,
+		OutputTokens: a.OutputTokens,
+		CachedTokens: a.CachedTokens,
+		TotalTokens:  a.TotalTokens,
+		TotalCost:    money.FormatRatFixed(a.totalCost, 8),
+		Currency:     money.NormalizeCurrency(a.Currency),
 	}
 }
 
@@ -376,30 +402,6 @@ func aggregateID(log contract.UsageLog, dimension contract.AggregateDimension) s
 	default:
 		return ""
 	}
-}
-
-func normalizeCurrency(value string) string {
-	value = strings.ToUpper(strings.TrimSpace(value))
-	if value == "" {
-		return "USD"
-	}
-	return value
-}
-
-func decimalRat(value string) (*big.Rat, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" || strings.ContainsAny(value, "eE") {
-		return nil, false
-	}
-	rat, ok := new(big.Rat).SetString(value)
-	return rat, ok
-}
-
-func formatRatFixed(value *big.Rat, places int) string {
-	if value == nil {
-		value = new(big.Rat)
-	}
-	return value.FloatString(places)
 }
 
 func accumulateUsageSummary(summary *contract.APIKeyUsageSummary, log contract.UsageLog) {
@@ -426,86 +428,51 @@ func accumulateUsageLog(accumulator *usageAccumulator, log contract.UsageLog) {
 	accumulator.OutputTokens += log.OutputTokens
 	accumulator.CachedTokens += log.CachedTokens
 	accumulator.TotalTokens += log.TotalTokens
-	if cost, ok := decimalRat(log.Cost); ok {
+	if cost, ok := money.DecimalRat(log.Cost); ok {
 		accumulator.totalCost.Add(accumulator.totalCost, cost)
 	}
 	if accumulator.Currency == "" || accumulator.Currency == "USD" {
-		accumulator.Currency = normalizeCurrency(log.Currency)
+		accumulator.Currency = money.NormalizeCurrency(log.Currency)
 	}
 }
 
-func accumulatorFor(values map[string]*usageAccumulator, id string, currency string) *usageAccumulator {
+func accumulatorFor(values map[string]*usageAccumulator, id string, dimension contract.AggregateDimension, currency string) *usageAccumulator {
 	accumulator := values[id]
 	if accumulator != nil {
 		return accumulator
 	}
 	accumulator = &usageAccumulator{
-		AggregateID: id,
-		Currency:    normalizeCurrency(currency),
-		totalCost:   new(big.Rat),
+		Key:       id,
+		Type:      dimension,
+		Currency:  money.NormalizeCurrency(currency),
+		totalCost: new(big.Rat),
 	}
 	values[id] = accumulator
 	return accumulator
 }
 
-func usageWindowSummary(accumulator *usageAccumulator) contract.UsageWindowSummary {
-	return contract.UsageWindowSummary{
-		Date:         accumulator.AggregateID,
-		RequestCount: accumulator.RequestCount,
-		SuccessCount: accumulator.SuccessCount,
-		ErrorCount:   accumulator.ErrorCount,
-		InputTokens:  accumulator.InputTokens,
-		OutputTokens: accumulator.OutputTokens,
-		CachedTokens: accumulator.CachedTokens,
-		TotalTokens:  accumulator.TotalTokens,
-		TotalCost:    formatRatFixed(accumulator.totalCost, 8),
-		Currency:     normalizeCurrency(accumulator.Currency),
+type aggregateSort func(out []contract.UsageAggregate)
+
+func aggregateAccumulatorValues(values map[string]*usageAccumulator, sortFn aggregateSort) []contract.UsageAggregate {
+	out := make([]contract.UsageAggregate, 0, len(values))
+	for _, accumulator := range values {
+		out = append(out, accumulator.aggregate())
 	}
+	sortFn(out)
+	return out
 }
 
-func usageModelSummaries(values map[string]*usageAccumulator) []contract.UsageModelSummary {
-	out := make([]contract.UsageModelSummary, 0, len(values))
-	for _, accumulator := range values {
-		out = append(out, contract.UsageModelSummary{
-			Model:        accumulator.AggregateID,
-			RequestCount: accumulator.RequestCount,
-			SuccessCount: accumulator.SuccessCount,
-			ErrorCount:   accumulator.ErrorCount,
-			InputTokens:  accumulator.InputTokens,
-			OutputTokens: accumulator.OutputTokens,
-			CachedTokens: accumulator.CachedTokens,
-			TotalTokens:  accumulator.TotalTokens,
-			TotalCost:    formatRatFixed(accumulator.totalCost, 8),
-			Currency:     normalizeCurrency(accumulator.Currency),
-		})
-	}
+func sortAggregatesByTokensDesc(out []contract.UsageAggregate) {
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].TotalTokens == out[j].TotalTokens {
-			return out[i].Model < out[j].Model
+			return out[i].Key < out[j].Key
 		}
 		return out[i].TotalTokens > out[j].TotalTokens
 	})
-	return out
 }
 
-func usageDailySummaries(values map[string]*usageAccumulator) []contract.UsageDailySummary {
-	out := make([]contract.UsageDailySummary, 0, len(values))
-	for _, accumulator := range values {
-		out = append(out, contract.UsageDailySummary{
-			Date:         accumulator.AggregateID,
-			RequestCount: accumulator.RequestCount,
-			SuccessCount: accumulator.SuccessCount,
-			ErrorCount:   accumulator.ErrorCount,
-			InputTokens:  accumulator.InputTokens,
-			OutputTokens: accumulator.OutputTokens,
-			CachedTokens: accumulator.CachedTokens,
-			TotalTokens:  accumulator.TotalTokens,
-			TotalCost:    formatRatFixed(accumulator.totalCost, 8),
-			Currency:     normalizeCurrency(accumulator.Currency),
-		})
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Date < out[j].Date })
-	return out
+func sortAggregatesByKeyAsc(out []contract.UsageAggregate) {
+	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
 }
 
 func recentUsageLogs(logs []contract.UsageLog, limit int) []contract.UsageLog {

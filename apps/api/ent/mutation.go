@@ -53,6 +53,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
 	"github.com/srapi/srapi/apps/api/ent/pendingoauthsession"
 	"github.com/srapi/srapi/apps/api/ent/predicate"
+	"github.com/srapi/srapi/apps/api/ent/pricinginterval"
 	"github.com/srapi/srapi/apps/api/ent/pricingrule"
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
@@ -134,6 +135,7 @@ const (
 	TypePaymentOrder              = "PaymentOrder"
 	TypePaymentProviderInstance   = "PaymentProviderInstance"
 	TypePendingOAuthSession       = "PendingOAuthSession"
+	TypePricingInterval           = "PricingInterval"
 	TypePricingRule               = "PricingRule"
 	TypeProvider                  = "Provider"
 	TypeProviderAccount           = "ProviderAccount"
@@ -198,6 +200,17 @@ type APIKeyMutation struct {
 	addrequest_limit_1d       *int
 	request_limit_7d          *int
 	addrequest_limit_7d       *int
+	cost_quota                *string
+	cost_used                 *string
+	cost_limit_5h             *string
+	cost_used_5h              *string
+	cost_window_start_5h      *time.Time
+	cost_limit_1d             *string
+	cost_used_1d              *string
+	cost_window_start_1d      *time.Time
+	cost_limit_7d             *string
+	cost_used_7d              *string
+	cost_window_start_7d      *time.Time
 	allowed_ips_json          *[]string
 	appendallowed_ips_json    []string
 	denied_ips_json           *[]string
@@ -1249,6 +1262,493 @@ func (m *APIKeyMutation) ResetRequestLimit7d() {
 	delete(m.clearedFields, apikey.FieldRequestLimit7d)
 }
 
+// SetCostQuota sets the "cost_quota" field.
+func (m *APIKeyMutation) SetCostQuota(s string) {
+	m.cost_quota = &s
+}
+
+// CostQuota returns the value of the "cost_quota" field in the mutation.
+func (m *APIKeyMutation) CostQuota() (r string, exists bool) {
+	v := m.cost_quota
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCostQuota returns the old "cost_quota" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldCostQuota(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCostQuota is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCostQuota requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCostQuota: %w", err)
+	}
+	return oldValue.CostQuota, nil
+}
+
+// ClearCostQuota clears the value of the "cost_quota" field.
+func (m *APIKeyMutation) ClearCostQuota() {
+	m.cost_quota = nil
+	m.clearedFields[apikey.FieldCostQuota] = struct{}{}
+}
+
+// CostQuotaCleared returns if the "cost_quota" field was cleared in this mutation.
+func (m *APIKeyMutation) CostQuotaCleared() bool {
+	_, ok := m.clearedFields[apikey.FieldCostQuota]
+	return ok
+}
+
+// ResetCostQuota resets all changes to the "cost_quota" field.
+func (m *APIKeyMutation) ResetCostQuota() {
+	m.cost_quota = nil
+	delete(m.clearedFields, apikey.FieldCostQuota)
+}
+
+// SetCostUsed sets the "cost_used" field.
+func (m *APIKeyMutation) SetCostUsed(s string) {
+	m.cost_used = &s
+}
+
+// CostUsed returns the value of the "cost_used" field in the mutation.
+func (m *APIKeyMutation) CostUsed() (r string, exists bool) {
+	v := m.cost_used
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCostUsed returns the old "cost_used" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldCostUsed(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCostUsed is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCostUsed requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCostUsed: %w", err)
+	}
+	return oldValue.CostUsed, nil
+}
+
+// ResetCostUsed resets all changes to the "cost_used" field.
+func (m *APIKeyMutation) ResetCostUsed() {
+	m.cost_used = nil
+}
+
+// SetCostLimit5h sets the "cost_limit_5h" field.
+func (m *APIKeyMutation) SetCostLimit5h(s string) {
+	m.cost_limit_5h = &s
+}
+
+// CostLimit5h returns the value of the "cost_limit_5h" field in the mutation.
+func (m *APIKeyMutation) CostLimit5h() (r string, exists bool) {
+	v := m.cost_limit_5h
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCostLimit5h returns the old "cost_limit_5h" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldCostLimit5h(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCostLimit5h is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCostLimit5h requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCostLimit5h: %w", err)
+	}
+	return oldValue.CostLimit5h, nil
+}
+
+// ClearCostLimit5h clears the value of the "cost_limit_5h" field.
+func (m *APIKeyMutation) ClearCostLimit5h() {
+	m.cost_limit_5h = nil
+	m.clearedFields[apikey.FieldCostLimit5h] = struct{}{}
+}
+
+// CostLimit5hCleared returns if the "cost_limit_5h" field was cleared in this mutation.
+func (m *APIKeyMutation) CostLimit5hCleared() bool {
+	_, ok := m.clearedFields[apikey.FieldCostLimit5h]
+	return ok
+}
+
+// ResetCostLimit5h resets all changes to the "cost_limit_5h" field.
+func (m *APIKeyMutation) ResetCostLimit5h() {
+	m.cost_limit_5h = nil
+	delete(m.clearedFields, apikey.FieldCostLimit5h)
+}
+
+// SetCostUsed5h sets the "cost_used_5h" field.
+func (m *APIKeyMutation) SetCostUsed5h(s string) {
+	m.cost_used_5h = &s
+}
+
+// CostUsed5h returns the value of the "cost_used_5h" field in the mutation.
+func (m *APIKeyMutation) CostUsed5h() (r string, exists bool) {
+	v := m.cost_used_5h
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCostUsed5h returns the old "cost_used_5h" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldCostUsed5h(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCostUsed5h is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCostUsed5h requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCostUsed5h: %w", err)
+	}
+	return oldValue.CostUsed5h, nil
+}
+
+// ResetCostUsed5h resets all changes to the "cost_used_5h" field.
+func (m *APIKeyMutation) ResetCostUsed5h() {
+	m.cost_used_5h = nil
+}
+
+// SetCostWindowStart5h sets the "cost_window_start_5h" field.
+func (m *APIKeyMutation) SetCostWindowStart5h(t time.Time) {
+	m.cost_window_start_5h = &t
+}
+
+// CostWindowStart5h returns the value of the "cost_window_start_5h" field in the mutation.
+func (m *APIKeyMutation) CostWindowStart5h() (r time.Time, exists bool) {
+	v := m.cost_window_start_5h
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCostWindowStart5h returns the old "cost_window_start_5h" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldCostWindowStart5h(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCostWindowStart5h is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCostWindowStart5h requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCostWindowStart5h: %w", err)
+	}
+	return oldValue.CostWindowStart5h, nil
+}
+
+// ClearCostWindowStart5h clears the value of the "cost_window_start_5h" field.
+func (m *APIKeyMutation) ClearCostWindowStart5h() {
+	m.cost_window_start_5h = nil
+	m.clearedFields[apikey.FieldCostWindowStart5h] = struct{}{}
+}
+
+// CostWindowStart5hCleared returns if the "cost_window_start_5h" field was cleared in this mutation.
+func (m *APIKeyMutation) CostWindowStart5hCleared() bool {
+	_, ok := m.clearedFields[apikey.FieldCostWindowStart5h]
+	return ok
+}
+
+// ResetCostWindowStart5h resets all changes to the "cost_window_start_5h" field.
+func (m *APIKeyMutation) ResetCostWindowStart5h() {
+	m.cost_window_start_5h = nil
+	delete(m.clearedFields, apikey.FieldCostWindowStart5h)
+}
+
+// SetCostLimit1d sets the "cost_limit_1d" field.
+func (m *APIKeyMutation) SetCostLimit1d(s string) {
+	m.cost_limit_1d = &s
+}
+
+// CostLimit1d returns the value of the "cost_limit_1d" field in the mutation.
+func (m *APIKeyMutation) CostLimit1d() (r string, exists bool) {
+	v := m.cost_limit_1d
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCostLimit1d returns the old "cost_limit_1d" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldCostLimit1d(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCostLimit1d is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCostLimit1d requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCostLimit1d: %w", err)
+	}
+	return oldValue.CostLimit1d, nil
+}
+
+// ClearCostLimit1d clears the value of the "cost_limit_1d" field.
+func (m *APIKeyMutation) ClearCostLimit1d() {
+	m.cost_limit_1d = nil
+	m.clearedFields[apikey.FieldCostLimit1d] = struct{}{}
+}
+
+// CostLimit1dCleared returns if the "cost_limit_1d" field was cleared in this mutation.
+func (m *APIKeyMutation) CostLimit1dCleared() bool {
+	_, ok := m.clearedFields[apikey.FieldCostLimit1d]
+	return ok
+}
+
+// ResetCostLimit1d resets all changes to the "cost_limit_1d" field.
+func (m *APIKeyMutation) ResetCostLimit1d() {
+	m.cost_limit_1d = nil
+	delete(m.clearedFields, apikey.FieldCostLimit1d)
+}
+
+// SetCostUsed1d sets the "cost_used_1d" field.
+func (m *APIKeyMutation) SetCostUsed1d(s string) {
+	m.cost_used_1d = &s
+}
+
+// CostUsed1d returns the value of the "cost_used_1d" field in the mutation.
+func (m *APIKeyMutation) CostUsed1d() (r string, exists bool) {
+	v := m.cost_used_1d
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCostUsed1d returns the old "cost_used_1d" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldCostUsed1d(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCostUsed1d is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCostUsed1d requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCostUsed1d: %w", err)
+	}
+	return oldValue.CostUsed1d, nil
+}
+
+// ResetCostUsed1d resets all changes to the "cost_used_1d" field.
+func (m *APIKeyMutation) ResetCostUsed1d() {
+	m.cost_used_1d = nil
+}
+
+// SetCostWindowStart1d sets the "cost_window_start_1d" field.
+func (m *APIKeyMutation) SetCostWindowStart1d(t time.Time) {
+	m.cost_window_start_1d = &t
+}
+
+// CostWindowStart1d returns the value of the "cost_window_start_1d" field in the mutation.
+func (m *APIKeyMutation) CostWindowStart1d() (r time.Time, exists bool) {
+	v := m.cost_window_start_1d
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCostWindowStart1d returns the old "cost_window_start_1d" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldCostWindowStart1d(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCostWindowStart1d is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCostWindowStart1d requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCostWindowStart1d: %w", err)
+	}
+	return oldValue.CostWindowStart1d, nil
+}
+
+// ClearCostWindowStart1d clears the value of the "cost_window_start_1d" field.
+func (m *APIKeyMutation) ClearCostWindowStart1d() {
+	m.cost_window_start_1d = nil
+	m.clearedFields[apikey.FieldCostWindowStart1d] = struct{}{}
+}
+
+// CostWindowStart1dCleared returns if the "cost_window_start_1d" field was cleared in this mutation.
+func (m *APIKeyMutation) CostWindowStart1dCleared() bool {
+	_, ok := m.clearedFields[apikey.FieldCostWindowStart1d]
+	return ok
+}
+
+// ResetCostWindowStart1d resets all changes to the "cost_window_start_1d" field.
+func (m *APIKeyMutation) ResetCostWindowStart1d() {
+	m.cost_window_start_1d = nil
+	delete(m.clearedFields, apikey.FieldCostWindowStart1d)
+}
+
+// SetCostLimit7d sets the "cost_limit_7d" field.
+func (m *APIKeyMutation) SetCostLimit7d(s string) {
+	m.cost_limit_7d = &s
+}
+
+// CostLimit7d returns the value of the "cost_limit_7d" field in the mutation.
+func (m *APIKeyMutation) CostLimit7d() (r string, exists bool) {
+	v := m.cost_limit_7d
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCostLimit7d returns the old "cost_limit_7d" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldCostLimit7d(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCostLimit7d is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCostLimit7d requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCostLimit7d: %w", err)
+	}
+	return oldValue.CostLimit7d, nil
+}
+
+// ClearCostLimit7d clears the value of the "cost_limit_7d" field.
+func (m *APIKeyMutation) ClearCostLimit7d() {
+	m.cost_limit_7d = nil
+	m.clearedFields[apikey.FieldCostLimit7d] = struct{}{}
+}
+
+// CostLimit7dCleared returns if the "cost_limit_7d" field was cleared in this mutation.
+func (m *APIKeyMutation) CostLimit7dCleared() bool {
+	_, ok := m.clearedFields[apikey.FieldCostLimit7d]
+	return ok
+}
+
+// ResetCostLimit7d resets all changes to the "cost_limit_7d" field.
+func (m *APIKeyMutation) ResetCostLimit7d() {
+	m.cost_limit_7d = nil
+	delete(m.clearedFields, apikey.FieldCostLimit7d)
+}
+
+// SetCostUsed7d sets the "cost_used_7d" field.
+func (m *APIKeyMutation) SetCostUsed7d(s string) {
+	m.cost_used_7d = &s
+}
+
+// CostUsed7d returns the value of the "cost_used_7d" field in the mutation.
+func (m *APIKeyMutation) CostUsed7d() (r string, exists bool) {
+	v := m.cost_used_7d
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCostUsed7d returns the old "cost_used_7d" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldCostUsed7d(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCostUsed7d is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCostUsed7d requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCostUsed7d: %w", err)
+	}
+	return oldValue.CostUsed7d, nil
+}
+
+// ResetCostUsed7d resets all changes to the "cost_used_7d" field.
+func (m *APIKeyMutation) ResetCostUsed7d() {
+	m.cost_used_7d = nil
+}
+
+// SetCostWindowStart7d sets the "cost_window_start_7d" field.
+func (m *APIKeyMutation) SetCostWindowStart7d(t time.Time) {
+	m.cost_window_start_7d = &t
+}
+
+// CostWindowStart7d returns the value of the "cost_window_start_7d" field in the mutation.
+func (m *APIKeyMutation) CostWindowStart7d() (r time.Time, exists bool) {
+	v := m.cost_window_start_7d
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCostWindowStart7d returns the old "cost_window_start_7d" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldCostWindowStart7d(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCostWindowStart7d is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCostWindowStart7d requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCostWindowStart7d: %w", err)
+	}
+	return oldValue.CostWindowStart7d, nil
+}
+
+// ClearCostWindowStart7d clears the value of the "cost_window_start_7d" field.
+func (m *APIKeyMutation) ClearCostWindowStart7d() {
+	m.cost_window_start_7d = nil
+	m.clearedFields[apikey.FieldCostWindowStart7d] = struct{}{}
+}
+
+// CostWindowStart7dCleared returns if the "cost_window_start_7d" field was cleared in this mutation.
+func (m *APIKeyMutation) CostWindowStart7dCleared() bool {
+	_, ok := m.clearedFields[apikey.FieldCostWindowStart7d]
+	return ok
+}
+
+// ResetCostWindowStart7d resets all changes to the "cost_window_start_7d" field.
+func (m *APIKeyMutation) ResetCostWindowStart7d() {
+	m.cost_window_start_7d = nil
+	delete(m.clearedFields, apikey.FieldCostWindowStart7d)
+}
+
 // SetAllowedIpsJSON sets the "allowed_ips_json" field.
 func (m *APIKeyMutation) SetAllowedIpsJSON(s []string) {
 	m.allowed_ips_json = &s
@@ -1511,7 +2011,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 21)
+	fields := make([]string, 0, 32)
 	if m.created_at != nil {
 		fields = append(fields, apikey.FieldCreatedAt)
 	}
@@ -1562,6 +2062,39 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.request_limit_7d != nil {
 		fields = append(fields, apikey.FieldRequestLimit7d)
+	}
+	if m.cost_quota != nil {
+		fields = append(fields, apikey.FieldCostQuota)
+	}
+	if m.cost_used != nil {
+		fields = append(fields, apikey.FieldCostUsed)
+	}
+	if m.cost_limit_5h != nil {
+		fields = append(fields, apikey.FieldCostLimit5h)
+	}
+	if m.cost_used_5h != nil {
+		fields = append(fields, apikey.FieldCostUsed5h)
+	}
+	if m.cost_window_start_5h != nil {
+		fields = append(fields, apikey.FieldCostWindowStart5h)
+	}
+	if m.cost_limit_1d != nil {
+		fields = append(fields, apikey.FieldCostLimit1d)
+	}
+	if m.cost_used_1d != nil {
+		fields = append(fields, apikey.FieldCostUsed1d)
+	}
+	if m.cost_window_start_1d != nil {
+		fields = append(fields, apikey.FieldCostWindowStart1d)
+	}
+	if m.cost_limit_7d != nil {
+		fields = append(fields, apikey.FieldCostLimit7d)
+	}
+	if m.cost_used_7d != nil {
+		fields = append(fields, apikey.FieldCostUsed7d)
+	}
+	if m.cost_window_start_7d != nil {
+		fields = append(fields, apikey.FieldCostWindowStart7d)
 	}
 	if m.allowed_ips_json != nil {
 		fields = append(fields, apikey.FieldAllowedIpsJSON)
@@ -1617,6 +2150,28 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.RequestLimit1d()
 	case apikey.FieldRequestLimit7d:
 		return m.RequestLimit7d()
+	case apikey.FieldCostQuota:
+		return m.CostQuota()
+	case apikey.FieldCostUsed:
+		return m.CostUsed()
+	case apikey.FieldCostLimit5h:
+		return m.CostLimit5h()
+	case apikey.FieldCostUsed5h:
+		return m.CostUsed5h()
+	case apikey.FieldCostWindowStart5h:
+		return m.CostWindowStart5h()
+	case apikey.FieldCostLimit1d:
+		return m.CostLimit1d()
+	case apikey.FieldCostUsed1d:
+		return m.CostUsed1d()
+	case apikey.FieldCostWindowStart1d:
+		return m.CostWindowStart1d()
+	case apikey.FieldCostLimit7d:
+		return m.CostLimit7d()
+	case apikey.FieldCostUsed7d:
+		return m.CostUsed7d()
+	case apikey.FieldCostWindowStart7d:
+		return m.CostWindowStart7d()
 	case apikey.FieldAllowedIpsJSON:
 		return m.AllowedIpsJSON()
 	case apikey.FieldDeniedIpsJSON:
@@ -1668,6 +2223,28 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldRequestLimit1d(ctx)
 	case apikey.FieldRequestLimit7d:
 		return m.OldRequestLimit7d(ctx)
+	case apikey.FieldCostQuota:
+		return m.OldCostQuota(ctx)
+	case apikey.FieldCostUsed:
+		return m.OldCostUsed(ctx)
+	case apikey.FieldCostLimit5h:
+		return m.OldCostLimit5h(ctx)
+	case apikey.FieldCostUsed5h:
+		return m.OldCostUsed5h(ctx)
+	case apikey.FieldCostWindowStart5h:
+		return m.OldCostWindowStart5h(ctx)
+	case apikey.FieldCostLimit1d:
+		return m.OldCostLimit1d(ctx)
+	case apikey.FieldCostUsed1d:
+		return m.OldCostUsed1d(ctx)
+	case apikey.FieldCostWindowStart1d:
+		return m.OldCostWindowStart1d(ctx)
+	case apikey.FieldCostLimit7d:
+		return m.OldCostLimit7d(ctx)
+	case apikey.FieldCostUsed7d:
+		return m.OldCostUsed7d(ctx)
+	case apikey.FieldCostWindowStart7d:
+		return m.OldCostWindowStart7d(ctx)
 	case apikey.FieldAllowedIpsJSON:
 		return m.OldAllowedIpsJSON(ctx)
 	case apikey.FieldDeniedIpsJSON:
@@ -1803,6 +2380,83 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRequestLimit7d(v)
+		return nil
+	case apikey.FieldCostQuota:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCostQuota(v)
+		return nil
+	case apikey.FieldCostUsed:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCostUsed(v)
+		return nil
+	case apikey.FieldCostLimit5h:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCostLimit5h(v)
+		return nil
+	case apikey.FieldCostUsed5h:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCostUsed5h(v)
+		return nil
+	case apikey.FieldCostWindowStart5h:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCostWindowStart5h(v)
+		return nil
+	case apikey.FieldCostLimit1d:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCostLimit1d(v)
+		return nil
+	case apikey.FieldCostUsed1d:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCostUsed1d(v)
+		return nil
+	case apikey.FieldCostWindowStart1d:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCostWindowStart1d(v)
+		return nil
+	case apikey.FieldCostLimit7d:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCostLimit7d(v)
+		return nil
+	case apikey.FieldCostUsed7d:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCostUsed7d(v)
+		return nil
+	case apikey.FieldCostWindowStart7d:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCostWindowStart7d(v)
 		return nil
 	case apikey.FieldAllowedIpsJSON:
 		v, ok := value.([]string)
@@ -1991,6 +2645,27 @@ func (m *APIKeyMutation) ClearedFields() []string {
 	if m.FieldCleared(apikey.FieldRequestLimit7d) {
 		fields = append(fields, apikey.FieldRequestLimit7d)
 	}
+	if m.FieldCleared(apikey.FieldCostQuota) {
+		fields = append(fields, apikey.FieldCostQuota)
+	}
+	if m.FieldCleared(apikey.FieldCostLimit5h) {
+		fields = append(fields, apikey.FieldCostLimit5h)
+	}
+	if m.FieldCleared(apikey.FieldCostWindowStart5h) {
+		fields = append(fields, apikey.FieldCostWindowStart5h)
+	}
+	if m.FieldCleared(apikey.FieldCostLimit1d) {
+		fields = append(fields, apikey.FieldCostLimit1d)
+	}
+	if m.FieldCleared(apikey.FieldCostWindowStart1d) {
+		fields = append(fields, apikey.FieldCostWindowStart1d)
+	}
+	if m.FieldCleared(apikey.FieldCostLimit7d) {
+		fields = append(fields, apikey.FieldCostLimit7d)
+	}
+	if m.FieldCleared(apikey.FieldCostWindowStart7d) {
+		fields = append(fields, apikey.FieldCostWindowStart7d)
+	}
 	if m.FieldCleared(apikey.FieldAllowedIpsJSON) {
 		fields = append(fields, apikey.FieldAllowedIpsJSON)
 	}
@@ -2046,6 +2721,27 @@ func (m *APIKeyMutation) ClearField(name string) error {
 		return nil
 	case apikey.FieldRequestLimit7d:
 		m.ClearRequestLimit7d()
+		return nil
+	case apikey.FieldCostQuota:
+		m.ClearCostQuota()
+		return nil
+	case apikey.FieldCostLimit5h:
+		m.ClearCostLimit5h()
+		return nil
+	case apikey.FieldCostWindowStart5h:
+		m.ClearCostWindowStart5h()
+		return nil
+	case apikey.FieldCostLimit1d:
+		m.ClearCostLimit1d()
+		return nil
+	case apikey.FieldCostWindowStart1d:
+		m.ClearCostWindowStart1d()
+		return nil
+	case apikey.FieldCostLimit7d:
+		m.ClearCostLimit7d()
+		return nil
+	case apikey.FieldCostWindowStart7d:
+		m.ClearCostWindowStart7d()
 		return nil
 	case apikey.FieldAllowedIpsJSON:
 		m.ClearAllowedIpsJSON()
@@ -2117,6 +2813,39 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldRequestLimit7d:
 		m.ResetRequestLimit7d()
+		return nil
+	case apikey.FieldCostQuota:
+		m.ResetCostQuota()
+		return nil
+	case apikey.FieldCostUsed:
+		m.ResetCostUsed()
+		return nil
+	case apikey.FieldCostLimit5h:
+		m.ResetCostLimit5h()
+		return nil
+	case apikey.FieldCostUsed5h:
+		m.ResetCostUsed5h()
+		return nil
+	case apikey.FieldCostWindowStart5h:
+		m.ResetCostWindowStart5h()
+		return nil
+	case apikey.FieldCostLimit1d:
+		m.ResetCostLimit1d()
+		return nil
+	case apikey.FieldCostUsed1d:
+		m.ResetCostUsed1d()
+		return nil
+	case apikey.FieldCostWindowStart1d:
+		m.ResetCostWindowStart1d()
+		return nil
+	case apikey.FieldCostLimit7d:
+		m.ResetCostLimit7d()
+		return nil
+	case apikey.FieldCostUsed7d:
+		m.ResetCostUsed7d()
+		return nil
+	case apikey.FieldCostWindowStart7d:
+		m.ResetCostWindowStart7d()
 		return nil
 	case apikey.FieldAllowedIpsJSON:
 		m.ResetAllowedIpsJSON()
@@ -38691,6 +39420,1051 @@ func (m *PendingOAuthSessionMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown PendingOAuthSession edge %s", name)
 }
 
+// PricingIntervalMutation represents an operation that mutates the PricingInterval nodes in the graph.
+type PricingIntervalMutation struct {
+	config
+	op                            Op
+	typ                           string
+	id                            *int
+	created_at                    *time.Time
+	updated_at                    *time.Time
+	pricing_rule_id               *int
+	addpricing_rule_id            *int
+	min_tokens                    *int
+	addmin_tokens                 *int
+	max_tokens                    *int
+	addmax_tokens                 *int
+	tier_label                    *string
+	image_size                    *string
+	input_price_per_million       *string
+	output_price_per_million      *string
+	cache_read_price_per_million  *string
+	cache_write_price_per_million *string
+	per_image_price               *string
+	clearedFields                 map[string]struct{}
+	done                          bool
+	oldValue                      func(context.Context) (*PricingInterval, error)
+	predicates                    []predicate.PricingInterval
+}
+
+var _ ent.Mutation = (*PricingIntervalMutation)(nil)
+
+// pricingintervalOption allows management of the mutation configuration using functional options.
+type pricingintervalOption func(*PricingIntervalMutation)
+
+// newPricingIntervalMutation creates new mutation for the PricingInterval entity.
+func newPricingIntervalMutation(c config, op Op, opts ...pricingintervalOption) *PricingIntervalMutation {
+	m := &PricingIntervalMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePricingInterval,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPricingIntervalID sets the ID field of the mutation.
+func withPricingIntervalID(id int) pricingintervalOption {
+	return func(m *PricingIntervalMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PricingInterval
+		)
+		m.oldValue = func(ctx context.Context) (*PricingInterval, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PricingInterval.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPricingInterval sets the old PricingInterval of the mutation.
+func withPricingInterval(node *PricingInterval) pricingintervalOption {
+	return func(m *PricingIntervalMutation) {
+		m.oldValue = func(context.Context) (*PricingInterval, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PricingIntervalMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PricingIntervalMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PricingIntervalMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PricingIntervalMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PricingInterval.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PricingIntervalMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PricingIntervalMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PricingInterval entity.
+// If the PricingInterval object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingIntervalMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PricingIntervalMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *PricingIntervalMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *PricingIntervalMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the PricingInterval entity.
+// If the PricingInterval object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingIntervalMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *PricingIntervalMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetPricingRuleID sets the "pricing_rule_id" field.
+func (m *PricingIntervalMutation) SetPricingRuleID(i int) {
+	m.pricing_rule_id = &i
+	m.addpricing_rule_id = nil
+}
+
+// PricingRuleID returns the value of the "pricing_rule_id" field in the mutation.
+func (m *PricingIntervalMutation) PricingRuleID() (r int, exists bool) {
+	v := m.pricing_rule_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPricingRuleID returns the old "pricing_rule_id" field's value of the PricingInterval entity.
+// If the PricingInterval object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingIntervalMutation) OldPricingRuleID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPricingRuleID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPricingRuleID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPricingRuleID: %w", err)
+	}
+	return oldValue.PricingRuleID, nil
+}
+
+// AddPricingRuleID adds i to the "pricing_rule_id" field.
+func (m *PricingIntervalMutation) AddPricingRuleID(i int) {
+	if m.addpricing_rule_id != nil {
+		*m.addpricing_rule_id += i
+	} else {
+		m.addpricing_rule_id = &i
+	}
+}
+
+// AddedPricingRuleID returns the value that was added to the "pricing_rule_id" field in this mutation.
+func (m *PricingIntervalMutation) AddedPricingRuleID() (r int, exists bool) {
+	v := m.addpricing_rule_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPricingRuleID resets all changes to the "pricing_rule_id" field.
+func (m *PricingIntervalMutation) ResetPricingRuleID() {
+	m.pricing_rule_id = nil
+	m.addpricing_rule_id = nil
+}
+
+// SetMinTokens sets the "min_tokens" field.
+func (m *PricingIntervalMutation) SetMinTokens(i int) {
+	m.min_tokens = &i
+	m.addmin_tokens = nil
+}
+
+// MinTokens returns the value of the "min_tokens" field in the mutation.
+func (m *PricingIntervalMutation) MinTokens() (r int, exists bool) {
+	v := m.min_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMinTokens returns the old "min_tokens" field's value of the PricingInterval entity.
+// If the PricingInterval object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingIntervalMutation) OldMinTokens(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMinTokens is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMinTokens requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMinTokens: %w", err)
+	}
+	return oldValue.MinTokens, nil
+}
+
+// AddMinTokens adds i to the "min_tokens" field.
+func (m *PricingIntervalMutation) AddMinTokens(i int) {
+	if m.addmin_tokens != nil {
+		*m.addmin_tokens += i
+	} else {
+		m.addmin_tokens = &i
+	}
+}
+
+// AddedMinTokens returns the value that was added to the "min_tokens" field in this mutation.
+func (m *PricingIntervalMutation) AddedMinTokens() (r int, exists bool) {
+	v := m.addmin_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetMinTokens resets all changes to the "min_tokens" field.
+func (m *PricingIntervalMutation) ResetMinTokens() {
+	m.min_tokens = nil
+	m.addmin_tokens = nil
+}
+
+// SetMaxTokens sets the "max_tokens" field.
+func (m *PricingIntervalMutation) SetMaxTokens(i int) {
+	m.max_tokens = &i
+	m.addmax_tokens = nil
+}
+
+// MaxTokens returns the value of the "max_tokens" field in the mutation.
+func (m *PricingIntervalMutation) MaxTokens() (r int, exists bool) {
+	v := m.max_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaxTokens returns the old "max_tokens" field's value of the PricingInterval entity.
+// If the PricingInterval object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingIntervalMutation) OldMaxTokens(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaxTokens is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaxTokens requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaxTokens: %w", err)
+	}
+	return oldValue.MaxTokens, nil
+}
+
+// AddMaxTokens adds i to the "max_tokens" field.
+func (m *PricingIntervalMutation) AddMaxTokens(i int) {
+	if m.addmax_tokens != nil {
+		*m.addmax_tokens += i
+	} else {
+		m.addmax_tokens = &i
+	}
+}
+
+// AddedMaxTokens returns the value that was added to the "max_tokens" field in this mutation.
+func (m *PricingIntervalMutation) AddedMaxTokens() (r int, exists bool) {
+	v := m.addmax_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearMaxTokens clears the value of the "max_tokens" field.
+func (m *PricingIntervalMutation) ClearMaxTokens() {
+	m.max_tokens = nil
+	m.addmax_tokens = nil
+	m.clearedFields[pricinginterval.FieldMaxTokens] = struct{}{}
+}
+
+// MaxTokensCleared returns if the "max_tokens" field was cleared in this mutation.
+func (m *PricingIntervalMutation) MaxTokensCleared() bool {
+	_, ok := m.clearedFields[pricinginterval.FieldMaxTokens]
+	return ok
+}
+
+// ResetMaxTokens resets all changes to the "max_tokens" field.
+func (m *PricingIntervalMutation) ResetMaxTokens() {
+	m.max_tokens = nil
+	m.addmax_tokens = nil
+	delete(m.clearedFields, pricinginterval.FieldMaxTokens)
+}
+
+// SetTierLabel sets the "tier_label" field.
+func (m *PricingIntervalMutation) SetTierLabel(s string) {
+	m.tier_label = &s
+}
+
+// TierLabel returns the value of the "tier_label" field in the mutation.
+func (m *PricingIntervalMutation) TierLabel() (r string, exists bool) {
+	v := m.tier_label
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTierLabel returns the old "tier_label" field's value of the PricingInterval entity.
+// If the PricingInterval object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingIntervalMutation) OldTierLabel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTierLabel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTierLabel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTierLabel: %w", err)
+	}
+	return oldValue.TierLabel, nil
+}
+
+// ResetTierLabel resets all changes to the "tier_label" field.
+func (m *PricingIntervalMutation) ResetTierLabel() {
+	m.tier_label = nil
+}
+
+// SetImageSize sets the "image_size" field.
+func (m *PricingIntervalMutation) SetImageSize(s string) {
+	m.image_size = &s
+}
+
+// ImageSize returns the value of the "image_size" field in the mutation.
+func (m *PricingIntervalMutation) ImageSize() (r string, exists bool) {
+	v := m.image_size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImageSize returns the old "image_size" field's value of the PricingInterval entity.
+// If the PricingInterval object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingIntervalMutation) OldImageSize(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImageSize is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImageSize requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImageSize: %w", err)
+	}
+	return oldValue.ImageSize, nil
+}
+
+// ResetImageSize resets all changes to the "image_size" field.
+func (m *PricingIntervalMutation) ResetImageSize() {
+	m.image_size = nil
+}
+
+// SetInputPricePerMillion sets the "input_price_per_million" field.
+func (m *PricingIntervalMutation) SetInputPricePerMillion(s string) {
+	m.input_price_per_million = &s
+}
+
+// InputPricePerMillion returns the value of the "input_price_per_million" field in the mutation.
+func (m *PricingIntervalMutation) InputPricePerMillion() (r string, exists bool) {
+	v := m.input_price_per_million
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInputPricePerMillion returns the old "input_price_per_million" field's value of the PricingInterval entity.
+// If the PricingInterval object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingIntervalMutation) OldInputPricePerMillion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInputPricePerMillion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInputPricePerMillion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInputPricePerMillion: %w", err)
+	}
+	return oldValue.InputPricePerMillion, nil
+}
+
+// ResetInputPricePerMillion resets all changes to the "input_price_per_million" field.
+func (m *PricingIntervalMutation) ResetInputPricePerMillion() {
+	m.input_price_per_million = nil
+}
+
+// SetOutputPricePerMillion sets the "output_price_per_million" field.
+func (m *PricingIntervalMutation) SetOutputPricePerMillion(s string) {
+	m.output_price_per_million = &s
+}
+
+// OutputPricePerMillion returns the value of the "output_price_per_million" field in the mutation.
+func (m *PricingIntervalMutation) OutputPricePerMillion() (r string, exists bool) {
+	v := m.output_price_per_million
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOutputPricePerMillion returns the old "output_price_per_million" field's value of the PricingInterval entity.
+// If the PricingInterval object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingIntervalMutation) OldOutputPricePerMillion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOutputPricePerMillion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOutputPricePerMillion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOutputPricePerMillion: %w", err)
+	}
+	return oldValue.OutputPricePerMillion, nil
+}
+
+// ResetOutputPricePerMillion resets all changes to the "output_price_per_million" field.
+func (m *PricingIntervalMutation) ResetOutputPricePerMillion() {
+	m.output_price_per_million = nil
+}
+
+// SetCacheReadPricePerMillion sets the "cache_read_price_per_million" field.
+func (m *PricingIntervalMutation) SetCacheReadPricePerMillion(s string) {
+	m.cache_read_price_per_million = &s
+}
+
+// CacheReadPricePerMillion returns the value of the "cache_read_price_per_million" field in the mutation.
+func (m *PricingIntervalMutation) CacheReadPricePerMillion() (r string, exists bool) {
+	v := m.cache_read_price_per_million
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheReadPricePerMillion returns the old "cache_read_price_per_million" field's value of the PricingInterval entity.
+// If the PricingInterval object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingIntervalMutation) OldCacheReadPricePerMillion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheReadPricePerMillion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheReadPricePerMillion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheReadPricePerMillion: %w", err)
+	}
+	return oldValue.CacheReadPricePerMillion, nil
+}
+
+// ResetCacheReadPricePerMillion resets all changes to the "cache_read_price_per_million" field.
+func (m *PricingIntervalMutation) ResetCacheReadPricePerMillion() {
+	m.cache_read_price_per_million = nil
+}
+
+// SetCacheWritePricePerMillion sets the "cache_write_price_per_million" field.
+func (m *PricingIntervalMutation) SetCacheWritePricePerMillion(s string) {
+	m.cache_write_price_per_million = &s
+}
+
+// CacheWritePricePerMillion returns the value of the "cache_write_price_per_million" field in the mutation.
+func (m *PricingIntervalMutation) CacheWritePricePerMillion() (r string, exists bool) {
+	v := m.cache_write_price_per_million
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheWritePricePerMillion returns the old "cache_write_price_per_million" field's value of the PricingInterval entity.
+// If the PricingInterval object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingIntervalMutation) OldCacheWritePricePerMillion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheWritePricePerMillion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheWritePricePerMillion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheWritePricePerMillion: %w", err)
+	}
+	return oldValue.CacheWritePricePerMillion, nil
+}
+
+// ResetCacheWritePricePerMillion resets all changes to the "cache_write_price_per_million" field.
+func (m *PricingIntervalMutation) ResetCacheWritePricePerMillion() {
+	m.cache_write_price_per_million = nil
+}
+
+// SetPerImagePrice sets the "per_image_price" field.
+func (m *PricingIntervalMutation) SetPerImagePrice(s string) {
+	m.per_image_price = &s
+}
+
+// PerImagePrice returns the value of the "per_image_price" field in the mutation.
+func (m *PricingIntervalMutation) PerImagePrice() (r string, exists bool) {
+	v := m.per_image_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPerImagePrice returns the old "per_image_price" field's value of the PricingInterval entity.
+// If the PricingInterval object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingIntervalMutation) OldPerImagePrice(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPerImagePrice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPerImagePrice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPerImagePrice: %w", err)
+	}
+	return oldValue.PerImagePrice, nil
+}
+
+// ResetPerImagePrice resets all changes to the "per_image_price" field.
+func (m *PricingIntervalMutation) ResetPerImagePrice() {
+	m.per_image_price = nil
+}
+
+// Where appends a list predicates to the PricingIntervalMutation builder.
+func (m *PricingIntervalMutation) Where(ps ...predicate.PricingInterval) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PricingIntervalMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PricingIntervalMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PricingInterval, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PricingIntervalMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PricingIntervalMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PricingInterval).
+func (m *PricingIntervalMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PricingIntervalMutation) Fields() []string {
+	fields := make([]string, 0, 12)
+	if m.created_at != nil {
+		fields = append(fields, pricinginterval.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, pricinginterval.FieldUpdatedAt)
+	}
+	if m.pricing_rule_id != nil {
+		fields = append(fields, pricinginterval.FieldPricingRuleID)
+	}
+	if m.min_tokens != nil {
+		fields = append(fields, pricinginterval.FieldMinTokens)
+	}
+	if m.max_tokens != nil {
+		fields = append(fields, pricinginterval.FieldMaxTokens)
+	}
+	if m.tier_label != nil {
+		fields = append(fields, pricinginterval.FieldTierLabel)
+	}
+	if m.image_size != nil {
+		fields = append(fields, pricinginterval.FieldImageSize)
+	}
+	if m.input_price_per_million != nil {
+		fields = append(fields, pricinginterval.FieldInputPricePerMillion)
+	}
+	if m.output_price_per_million != nil {
+		fields = append(fields, pricinginterval.FieldOutputPricePerMillion)
+	}
+	if m.cache_read_price_per_million != nil {
+		fields = append(fields, pricinginterval.FieldCacheReadPricePerMillion)
+	}
+	if m.cache_write_price_per_million != nil {
+		fields = append(fields, pricinginterval.FieldCacheWritePricePerMillion)
+	}
+	if m.per_image_price != nil {
+		fields = append(fields, pricinginterval.FieldPerImagePrice)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PricingIntervalMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case pricinginterval.FieldCreatedAt:
+		return m.CreatedAt()
+	case pricinginterval.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case pricinginterval.FieldPricingRuleID:
+		return m.PricingRuleID()
+	case pricinginterval.FieldMinTokens:
+		return m.MinTokens()
+	case pricinginterval.FieldMaxTokens:
+		return m.MaxTokens()
+	case pricinginterval.FieldTierLabel:
+		return m.TierLabel()
+	case pricinginterval.FieldImageSize:
+		return m.ImageSize()
+	case pricinginterval.FieldInputPricePerMillion:
+		return m.InputPricePerMillion()
+	case pricinginterval.FieldOutputPricePerMillion:
+		return m.OutputPricePerMillion()
+	case pricinginterval.FieldCacheReadPricePerMillion:
+		return m.CacheReadPricePerMillion()
+	case pricinginterval.FieldCacheWritePricePerMillion:
+		return m.CacheWritePricePerMillion()
+	case pricinginterval.FieldPerImagePrice:
+		return m.PerImagePrice()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PricingIntervalMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case pricinginterval.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case pricinginterval.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case pricinginterval.FieldPricingRuleID:
+		return m.OldPricingRuleID(ctx)
+	case pricinginterval.FieldMinTokens:
+		return m.OldMinTokens(ctx)
+	case pricinginterval.FieldMaxTokens:
+		return m.OldMaxTokens(ctx)
+	case pricinginterval.FieldTierLabel:
+		return m.OldTierLabel(ctx)
+	case pricinginterval.FieldImageSize:
+		return m.OldImageSize(ctx)
+	case pricinginterval.FieldInputPricePerMillion:
+		return m.OldInputPricePerMillion(ctx)
+	case pricinginterval.FieldOutputPricePerMillion:
+		return m.OldOutputPricePerMillion(ctx)
+	case pricinginterval.FieldCacheReadPricePerMillion:
+		return m.OldCacheReadPricePerMillion(ctx)
+	case pricinginterval.FieldCacheWritePricePerMillion:
+		return m.OldCacheWritePricePerMillion(ctx)
+	case pricinginterval.FieldPerImagePrice:
+		return m.OldPerImagePrice(ctx)
+	}
+	return nil, fmt.Errorf("unknown PricingInterval field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PricingIntervalMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case pricinginterval.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case pricinginterval.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case pricinginterval.FieldPricingRuleID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPricingRuleID(v)
+		return nil
+	case pricinginterval.FieldMinTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMinTokens(v)
+		return nil
+	case pricinginterval.FieldMaxTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaxTokens(v)
+		return nil
+	case pricinginterval.FieldTierLabel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTierLabel(v)
+		return nil
+	case pricinginterval.FieldImageSize:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImageSize(v)
+		return nil
+	case pricinginterval.FieldInputPricePerMillion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInputPricePerMillion(v)
+		return nil
+	case pricinginterval.FieldOutputPricePerMillion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOutputPricePerMillion(v)
+		return nil
+	case pricinginterval.FieldCacheReadPricePerMillion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheReadPricePerMillion(v)
+		return nil
+	case pricinginterval.FieldCacheWritePricePerMillion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheWritePricePerMillion(v)
+		return nil
+	case pricinginterval.FieldPerImagePrice:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPerImagePrice(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PricingInterval field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PricingIntervalMutation) AddedFields() []string {
+	var fields []string
+	if m.addpricing_rule_id != nil {
+		fields = append(fields, pricinginterval.FieldPricingRuleID)
+	}
+	if m.addmin_tokens != nil {
+		fields = append(fields, pricinginterval.FieldMinTokens)
+	}
+	if m.addmax_tokens != nil {
+		fields = append(fields, pricinginterval.FieldMaxTokens)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PricingIntervalMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case pricinginterval.FieldPricingRuleID:
+		return m.AddedPricingRuleID()
+	case pricinginterval.FieldMinTokens:
+		return m.AddedMinTokens()
+	case pricinginterval.FieldMaxTokens:
+		return m.AddedMaxTokens()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PricingIntervalMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case pricinginterval.FieldPricingRuleID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPricingRuleID(v)
+		return nil
+	case pricinginterval.FieldMinTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMinTokens(v)
+		return nil
+	case pricinginterval.FieldMaxTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMaxTokens(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PricingInterval numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PricingIntervalMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(pricinginterval.FieldMaxTokens) {
+		fields = append(fields, pricinginterval.FieldMaxTokens)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PricingIntervalMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PricingIntervalMutation) ClearField(name string) error {
+	switch name {
+	case pricinginterval.FieldMaxTokens:
+		m.ClearMaxTokens()
+		return nil
+	}
+	return fmt.Errorf("unknown PricingInterval nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PricingIntervalMutation) ResetField(name string) error {
+	switch name {
+	case pricinginterval.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case pricinginterval.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case pricinginterval.FieldPricingRuleID:
+		m.ResetPricingRuleID()
+		return nil
+	case pricinginterval.FieldMinTokens:
+		m.ResetMinTokens()
+		return nil
+	case pricinginterval.FieldMaxTokens:
+		m.ResetMaxTokens()
+		return nil
+	case pricinginterval.FieldTierLabel:
+		m.ResetTierLabel()
+		return nil
+	case pricinginterval.FieldImageSize:
+		m.ResetImageSize()
+		return nil
+	case pricinginterval.FieldInputPricePerMillion:
+		m.ResetInputPricePerMillion()
+		return nil
+	case pricinginterval.FieldOutputPricePerMillion:
+		m.ResetOutputPricePerMillion()
+		return nil
+	case pricinginterval.FieldCacheReadPricePerMillion:
+		m.ResetCacheReadPricePerMillion()
+		return nil
+	case pricinginterval.FieldCacheWritePricePerMillion:
+		m.ResetCacheWritePricePerMillion()
+		return nil
+	case pricinginterval.FieldPerImagePrice:
+		m.ResetPerImagePrice()
+		return nil
+	}
+	return fmt.Errorf("unknown PricingInterval field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PricingIntervalMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PricingIntervalMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PricingIntervalMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PricingIntervalMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PricingIntervalMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PricingIntervalMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PricingIntervalMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PricingInterval unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PricingIntervalMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PricingInterval edge %s", name)
+}
+
 // PricingRuleMutation represents an operation that mutates the PricingRule nodes in the graph.
 type PricingRuleMutation struct {
 	config
@@ -38703,10 +40477,12 @@ type PricingRuleMutation struct {
 	addmodel_id                   *int
 	provider_id                   *int
 	addprovider_id                *int
+	billing_mode                  *string
 	input_price_per_million       *string
 	output_price_per_million      *string
 	cache_read_price_per_million  *string
 	cache_write_price_per_million *string
+	per_request_price             *string
 	currency                      *string
 	effective_from                *time.Time
 	effective_to                  *time.Time
@@ -38998,6 +40774,42 @@ func (m *PricingRuleMutation) ResetProviderID() {
 	m.addprovider_id = nil
 }
 
+// SetBillingMode sets the "billing_mode" field.
+func (m *PricingRuleMutation) SetBillingMode(s string) {
+	m.billing_mode = &s
+}
+
+// BillingMode returns the value of the "billing_mode" field in the mutation.
+func (m *PricingRuleMutation) BillingMode() (r string, exists bool) {
+	v := m.billing_mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBillingMode returns the old "billing_mode" field's value of the PricingRule entity.
+// If the PricingRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingRuleMutation) OldBillingMode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBillingMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBillingMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBillingMode: %w", err)
+	}
+	return oldValue.BillingMode, nil
+}
+
+// ResetBillingMode resets all changes to the "billing_mode" field.
+func (m *PricingRuleMutation) ResetBillingMode() {
+	m.billing_mode = nil
+}
+
 // SetInputPricePerMillion sets the "input_price_per_million" field.
 func (m *PricingRuleMutation) SetInputPricePerMillion(s string) {
 	m.input_price_per_million = &s
@@ -39140,6 +40952,42 @@ func (m *PricingRuleMutation) OldCacheWritePricePerMillion(ctx context.Context) 
 // ResetCacheWritePricePerMillion resets all changes to the "cache_write_price_per_million" field.
 func (m *PricingRuleMutation) ResetCacheWritePricePerMillion() {
 	m.cache_write_price_per_million = nil
+}
+
+// SetPerRequestPrice sets the "per_request_price" field.
+func (m *PricingRuleMutation) SetPerRequestPrice(s string) {
+	m.per_request_price = &s
+}
+
+// PerRequestPrice returns the value of the "per_request_price" field in the mutation.
+func (m *PricingRuleMutation) PerRequestPrice() (r string, exists bool) {
+	v := m.per_request_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPerRequestPrice returns the old "per_request_price" field's value of the PricingRule entity.
+// If the PricingRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingRuleMutation) OldPerRequestPrice(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPerRequestPrice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPerRequestPrice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPerRequestPrice: %w", err)
+	}
+	return oldValue.PerRequestPrice, nil
+}
+
+// ResetPerRequestPrice resets all changes to the "per_request_price" field.
+func (m *PricingRuleMutation) ResetPerRequestPrice() {
+	m.per_request_price = nil
 }
 
 // SetCurrency sets the "currency" field.
@@ -39310,7 +41158,7 @@ func (m *PricingRuleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PricingRuleMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 13)
 	if m.created_at != nil {
 		fields = append(fields, pricingrule.FieldCreatedAt)
 	}
@@ -39323,6 +41171,9 @@ func (m *PricingRuleMutation) Fields() []string {
 	if m.provider_id != nil {
 		fields = append(fields, pricingrule.FieldProviderID)
 	}
+	if m.billing_mode != nil {
+		fields = append(fields, pricingrule.FieldBillingMode)
+	}
 	if m.input_price_per_million != nil {
 		fields = append(fields, pricingrule.FieldInputPricePerMillion)
 	}
@@ -39334,6 +41185,9 @@ func (m *PricingRuleMutation) Fields() []string {
 	}
 	if m.cache_write_price_per_million != nil {
 		fields = append(fields, pricingrule.FieldCacheWritePricePerMillion)
+	}
+	if m.per_request_price != nil {
+		fields = append(fields, pricingrule.FieldPerRequestPrice)
 	}
 	if m.currency != nil {
 		fields = append(fields, pricingrule.FieldCurrency)
@@ -39360,6 +41214,8 @@ func (m *PricingRuleMutation) Field(name string) (ent.Value, bool) {
 		return m.ModelID()
 	case pricingrule.FieldProviderID:
 		return m.ProviderID()
+	case pricingrule.FieldBillingMode:
+		return m.BillingMode()
 	case pricingrule.FieldInputPricePerMillion:
 		return m.InputPricePerMillion()
 	case pricingrule.FieldOutputPricePerMillion:
@@ -39368,6 +41224,8 @@ func (m *PricingRuleMutation) Field(name string) (ent.Value, bool) {
 		return m.CacheReadPricePerMillion()
 	case pricingrule.FieldCacheWritePricePerMillion:
 		return m.CacheWritePricePerMillion()
+	case pricingrule.FieldPerRequestPrice:
+		return m.PerRequestPrice()
 	case pricingrule.FieldCurrency:
 		return m.Currency()
 	case pricingrule.FieldEffectiveFrom:
@@ -39391,6 +41249,8 @@ func (m *PricingRuleMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldModelID(ctx)
 	case pricingrule.FieldProviderID:
 		return m.OldProviderID(ctx)
+	case pricingrule.FieldBillingMode:
+		return m.OldBillingMode(ctx)
 	case pricingrule.FieldInputPricePerMillion:
 		return m.OldInputPricePerMillion(ctx)
 	case pricingrule.FieldOutputPricePerMillion:
@@ -39399,6 +41259,8 @@ func (m *PricingRuleMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldCacheReadPricePerMillion(ctx)
 	case pricingrule.FieldCacheWritePricePerMillion:
 		return m.OldCacheWritePricePerMillion(ctx)
+	case pricingrule.FieldPerRequestPrice:
+		return m.OldPerRequestPrice(ctx)
 	case pricingrule.FieldCurrency:
 		return m.OldCurrency(ctx)
 	case pricingrule.FieldEffectiveFrom:
@@ -39442,6 +41304,13 @@ func (m *PricingRuleMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetProviderID(v)
 		return nil
+	case pricingrule.FieldBillingMode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBillingMode(v)
+		return nil
 	case pricingrule.FieldInputPricePerMillion:
 		v, ok := value.(string)
 		if !ok {
@@ -39469,6 +41338,13 @@ func (m *PricingRuleMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCacheWritePricePerMillion(v)
+		return nil
+	case pricingrule.FieldPerRequestPrice:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPerRequestPrice(v)
 		return nil
 	case pricingrule.FieldCurrency:
 		v, ok := value.(string)
@@ -39594,6 +41470,9 @@ func (m *PricingRuleMutation) ResetField(name string) error {
 	case pricingrule.FieldProviderID:
 		m.ResetProviderID()
 		return nil
+	case pricingrule.FieldBillingMode:
+		m.ResetBillingMode()
+		return nil
 	case pricingrule.FieldInputPricePerMillion:
 		m.ResetInputPricePerMillion()
 		return nil
@@ -39605,6 +41484,9 @@ func (m *PricingRuleMutation) ResetField(name string) error {
 		return nil
 	case pricingrule.FieldCacheWritePricePerMillion:
 		m.ResetCacheWritePricePerMillion()
+		return nil
+	case pricingrule.FieldPerRequestPrice:
+		m.ResetPerRequestPrice()
 		return nil
 	case pricingrule.FieldCurrency:
 		m.ResetCurrency()
@@ -57041,6 +58923,13 @@ type UsageLogMutation struct {
 	actual_cost                       *string
 	rate_multiplier                   *string
 	billable_cost                     *string
+	input_cost                        *string
+	output_cost                       *string
+	cache_read_cost                   *string
+	cache_write_cost                  *string
+	requested_model                   *string
+	upstream_model                    *string
+	billing_mode                      *string
 	currency                          *string
 	charged_at                        *time.Time
 	compatibility_warnings_json       *[]string
@@ -58310,6 +60199,258 @@ func (m *UsageLogMutation) ResetBillableCost() {
 	m.billable_cost = nil
 }
 
+// SetInputCost sets the "input_cost" field.
+func (m *UsageLogMutation) SetInputCost(s string) {
+	m.input_cost = &s
+}
+
+// InputCost returns the value of the "input_cost" field in the mutation.
+func (m *UsageLogMutation) InputCost() (r string, exists bool) {
+	v := m.input_cost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInputCost returns the old "input_cost" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldInputCost(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInputCost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInputCost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInputCost: %w", err)
+	}
+	return oldValue.InputCost, nil
+}
+
+// ResetInputCost resets all changes to the "input_cost" field.
+func (m *UsageLogMutation) ResetInputCost() {
+	m.input_cost = nil
+}
+
+// SetOutputCost sets the "output_cost" field.
+func (m *UsageLogMutation) SetOutputCost(s string) {
+	m.output_cost = &s
+}
+
+// OutputCost returns the value of the "output_cost" field in the mutation.
+func (m *UsageLogMutation) OutputCost() (r string, exists bool) {
+	v := m.output_cost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOutputCost returns the old "output_cost" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldOutputCost(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOutputCost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOutputCost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOutputCost: %w", err)
+	}
+	return oldValue.OutputCost, nil
+}
+
+// ResetOutputCost resets all changes to the "output_cost" field.
+func (m *UsageLogMutation) ResetOutputCost() {
+	m.output_cost = nil
+}
+
+// SetCacheReadCost sets the "cache_read_cost" field.
+func (m *UsageLogMutation) SetCacheReadCost(s string) {
+	m.cache_read_cost = &s
+}
+
+// CacheReadCost returns the value of the "cache_read_cost" field in the mutation.
+func (m *UsageLogMutation) CacheReadCost() (r string, exists bool) {
+	v := m.cache_read_cost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheReadCost returns the old "cache_read_cost" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldCacheReadCost(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheReadCost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheReadCost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheReadCost: %w", err)
+	}
+	return oldValue.CacheReadCost, nil
+}
+
+// ResetCacheReadCost resets all changes to the "cache_read_cost" field.
+func (m *UsageLogMutation) ResetCacheReadCost() {
+	m.cache_read_cost = nil
+}
+
+// SetCacheWriteCost sets the "cache_write_cost" field.
+func (m *UsageLogMutation) SetCacheWriteCost(s string) {
+	m.cache_write_cost = &s
+}
+
+// CacheWriteCost returns the value of the "cache_write_cost" field in the mutation.
+func (m *UsageLogMutation) CacheWriteCost() (r string, exists bool) {
+	v := m.cache_write_cost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheWriteCost returns the old "cache_write_cost" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldCacheWriteCost(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheWriteCost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheWriteCost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheWriteCost: %w", err)
+	}
+	return oldValue.CacheWriteCost, nil
+}
+
+// ResetCacheWriteCost resets all changes to the "cache_write_cost" field.
+func (m *UsageLogMutation) ResetCacheWriteCost() {
+	m.cache_write_cost = nil
+}
+
+// SetRequestedModel sets the "requested_model" field.
+func (m *UsageLogMutation) SetRequestedModel(s string) {
+	m.requested_model = &s
+}
+
+// RequestedModel returns the value of the "requested_model" field in the mutation.
+func (m *UsageLogMutation) RequestedModel() (r string, exists bool) {
+	v := m.requested_model
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestedModel returns the old "requested_model" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldRequestedModel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestedModel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestedModel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestedModel: %w", err)
+	}
+	return oldValue.RequestedModel, nil
+}
+
+// ResetRequestedModel resets all changes to the "requested_model" field.
+func (m *UsageLogMutation) ResetRequestedModel() {
+	m.requested_model = nil
+}
+
+// SetUpstreamModel sets the "upstream_model" field.
+func (m *UsageLogMutation) SetUpstreamModel(s string) {
+	m.upstream_model = &s
+}
+
+// UpstreamModel returns the value of the "upstream_model" field in the mutation.
+func (m *UsageLogMutation) UpstreamModel() (r string, exists bool) {
+	v := m.upstream_model
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpstreamModel returns the old "upstream_model" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldUpstreamModel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpstreamModel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpstreamModel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpstreamModel: %w", err)
+	}
+	return oldValue.UpstreamModel, nil
+}
+
+// ResetUpstreamModel resets all changes to the "upstream_model" field.
+func (m *UsageLogMutation) ResetUpstreamModel() {
+	m.upstream_model = nil
+}
+
+// SetBillingMode sets the "billing_mode" field.
+func (m *UsageLogMutation) SetBillingMode(s string) {
+	m.billing_mode = &s
+}
+
+// BillingMode returns the value of the "billing_mode" field in the mutation.
+func (m *UsageLogMutation) BillingMode() (r string, exists bool) {
+	v := m.billing_mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBillingMode returns the old "billing_mode" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldBillingMode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBillingMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBillingMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBillingMode: %w", err)
+	}
+	return oldValue.BillingMode, nil
+}
+
+// ResetBillingMode resets all changes to the "billing_mode" field.
+func (m *UsageLogMutation) ResetBillingMode() {
+	m.billing_mode = nil
+}
+
 // SetCurrency sets the "currency" field.
 func (m *UsageLogMutation) SetCurrency(s string) {
 	m.currency = &s
@@ -58494,7 +60635,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 28)
+	fields := make([]string, 0, 35)
 	if m.created_at != nil {
 		fields = append(fields, usagelog.FieldCreatedAt)
 	}
@@ -58570,6 +60711,27 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.billable_cost != nil {
 		fields = append(fields, usagelog.FieldBillableCost)
 	}
+	if m.input_cost != nil {
+		fields = append(fields, usagelog.FieldInputCost)
+	}
+	if m.output_cost != nil {
+		fields = append(fields, usagelog.FieldOutputCost)
+	}
+	if m.cache_read_cost != nil {
+		fields = append(fields, usagelog.FieldCacheReadCost)
+	}
+	if m.cache_write_cost != nil {
+		fields = append(fields, usagelog.FieldCacheWriteCost)
+	}
+	if m.requested_model != nil {
+		fields = append(fields, usagelog.FieldRequestedModel)
+	}
+	if m.upstream_model != nil {
+		fields = append(fields, usagelog.FieldUpstreamModel)
+	}
+	if m.billing_mode != nil {
+		fields = append(fields, usagelog.FieldBillingMode)
+	}
 	if m.currency != nil {
 		fields = append(fields, usagelog.FieldCurrency)
 	}
@@ -58637,6 +60799,20 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.RateMultiplier()
 	case usagelog.FieldBillableCost:
 		return m.BillableCost()
+	case usagelog.FieldInputCost:
+		return m.InputCost()
+	case usagelog.FieldOutputCost:
+		return m.OutputCost()
+	case usagelog.FieldCacheReadCost:
+		return m.CacheReadCost()
+	case usagelog.FieldCacheWriteCost:
+		return m.CacheWriteCost()
+	case usagelog.FieldRequestedModel:
+		return m.RequestedModel()
+	case usagelog.FieldUpstreamModel:
+		return m.UpstreamModel()
+	case usagelog.FieldBillingMode:
+		return m.BillingMode()
 	case usagelog.FieldCurrency:
 		return m.Currency()
 	case usagelog.FieldChargedAt:
@@ -58702,6 +60878,20 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldRateMultiplier(ctx)
 	case usagelog.FieldBillableCost:
 		return m.OldBillableCost(ctx)
+	case usagelog.FieldInputCost:
+		return m.OldInputCost(ctx)
+	case usagelog.FieldOutputCost:
+		return m.OldOutputCost(ctx)
+	case usagelog.FieldCacheReadCost:
+		return m.OldCacheReadCost(ctx)
+	case usagelog.FieldCacheWriteCost:
+		return m.OldCacheWriteCost(ctx)
+	case usagelog.FieldRequestedModel:
+		return m.OldRequestedModel(ctx)
+	case usagelog.FieldUpstreamModel:
+		return m.OldUpstreamModel(ctx)
+	case usagelog.FieldBillingMode:
+		return m.OldBillingMode(ctx)
 	case usagelog.FieldCurrency:
 		return m.OldCurrency(ctx)
 	case usagelog.FieldChargedAt:
@@ -58891,6 +61081,55 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetBillableCost(v)
+		return nil
+	case usagelog.FieldInputCost:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInputCost(v)
+		return nil
+	case usagelog.FieldOutputCost:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOutputCost(v)
+		return nil
+	case usagelog.FieldCacheReadCost:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheReadCost(v)
+		return nil
+	case usagelog.FieldCacheWriteCost:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheWriteCost(v)
+		return nil
+	case usagelog.FieldRequestedModel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestedModel(v)
+		return nil
+	case usagelog.FieldUpstreamModel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpstreamModel(v)
+		return nil
+	case usagelog.FieldBillingMode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBillingMode(v)
 		return nil
 	case usagelog.FieldCurrency:
 		v, ok := value.(string)
@@ -59204,6 +61443,27 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldBillableCost:
 		m.ResetBillableCost()
+		return nil
+	case usagelog.FieldInputCost:
+		m.ResetInputCost()
+		return nil
+	case usagelog.FieldOutputCost:
+		m.ResetOutputCost()
+		return nil
+	case usagelog.FieldCacheReadCost:
+		m.ResetCacheReadCost()
+		return nil
+	case usagelog.FieldCacheWriteCost:
+		m.ResetCacheWriteCost()
+		return nil
+	case usagelog.FieldRequestedModel:
+		m.ResetRequestedModel()
+		return nil
+	case usagelog.FieldUpstreamModel:
+		m.ResetUpstreamModel()
+		return nil
+	case usagelog.FieldBillingMode:
+		m.ResetBillingMode()
 		return nil
 	case usagelog.FieldCurrency:
 		m.ResetCurrency()
@@ -67394,6 +69654,12 @@ type UserSubscriptionMutation struct {
 	entitlements_snapshot_json *map[string]interface{}
 	source_type                *string
 	source_id                  *string
+	daily_usage_usd            *string
+	daily_usage_window_start   *time.Time
+	weekly_usage_usd           *string
+	weekly_usage_window_start  *time.Time
+	monthly_usage_usd          *string
+	monthly_usage_window_start *time.Time
 	clearedFields              map[string]struct{}
 	done                       bool
 	oldValue                   func(context.Context) (*UserSubscription, error)
@@ -67911,6 +70177,261 @@ func (m *UserSubscriptionMutation) ResetSourceID() {
 	m.source_id = nil
 }
 
+// SetDailyUsageUsd sets the "daily_usage_usd" field.
+func (m *UserSubscriptionMutation) SetDailyUsageUsd(s string) {
+	m.daily_usage_usd = &s
+}
+
+// DailyUsageUsd returns the value of the "daily_usage_usd" field in the mutation.
+func (m *UserSubscriptionMutation) DailyUsageUsd() (r string, exists bool) {
+	v := m.daily_usage_usd
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDailyUsageUsd returns the old "daily_usage_usd" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldDailyUsageUsd(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDailyUsageUsd is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDailyUsageUsd requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDailyUsageUsd: %w", err)
+	}
+	return oldValue.DailyUsageUsd, nil
+}
+
+// ResetDailyUsageUsd resets all changes to the "daily_usage_usd" field.
+func (m *UserSubscriptionMutation) ResetDailyUsageUsd() {
+	m.daily_usage_usd = nil
+}
+
+// SetDailyUsageWindowStart sets the "daily_usage_window_start" field.
+func (m *UserSubscriptionMutation) SetDailyUsageWindowStart(t time.Time) {
+	m.daily_usage_window_start = &t
+}
+
+// DailyUsageWindowStart returns the value of the "daily_usage_window_start" field in the mutation.
+func (m *UserSubscriptionMutation) DailyUsageWindowStart() (r time.Time, exists bool) {
+	v := m.daily_usage_window_start
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDailyUsageWindowStart returns the old "daily_usage_window_start" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldDailyUsageWindowStart(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDailyUsageWindowStart is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDailyUsageWindowStart requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDailyUsageWindowStart: %w", err)
+	}
+	return oldValue.DailyUsageWindowStart, nil
+}
+
+// ClearDailyUsageWindowStart clears the value of the "daily_usage_window_start" field.
+func (m *UserSubscriptionMutation) ClearDailyUsageWindowStart() {
+	m.daily_usage_window_start = nil
+	m.clearedFields[usersubscription.FieldDailyUsageWindowStart] = struct{}{}
+}
+
+// DailyUsageWindowStartCleared returns if the "daily_usage_window_start" field was cleared in this mutation.
+func (m *UserSubscriptionMutation) DailyUsageWindowStartCleared() bool {
+	_, ok := m.clearedFields[usersubscription.FieldDailyUsageWindowStart]
+	return ok
+}
+
+// ResetDailyUsageWindowStart resets all changes to the "daily_usage_window_start" field.
+func (m *UserSubscriptionMutation) ResetDailyUsageWindowStart() {
+	m.daily_usage_window_start = nil
+	delete(m.clearedFields, usersubscription.FieldDailyUsageWindowStart)
+}
+
+// SetWeeklyUsageUsd sets the "weekly_usage_usd" field.
+func (m *UserSubscriptionMutation) SetWeeklyUsageUsd(s string) {
+	m.weekly_usage_usd = &s
+}
+
+// WeeklyUsageUsd returns the value of the "weekly_usage_usd" field in the mutation.
+func (m *UserSubscriptionMutation) WeeklyUsageUsd() (r string, exists bool) {
+	v := m.weekly_usage_usd
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWeeklyUsageUsd returns the old "weekly_usage_usd" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldWeeklyUsageUsd(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWeeklyUsageUsd is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWeeklyUsageUsd requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWeeklyUsageUsd: %w", err)
+	}
+	return oldValue.WeeklyUsageUsd, nil
+}
+
+// ResetWeeklyUsageUsd resets all changes to the "weekly_usage_usd" field.
+func (m *UserSubscriptionMutation) ResetWeeklyUsageUsd() {
+	m.weekly_usage_usd = nil
+}
+
+// SetWeeklyUsageWindowStart sets the "weekly_usage_window_start" field.
+func (m *UserSubscriptionMutation) SetWeeklyUsageWindowStart(t time.Time) {
+	m.weekly_usage_window_start = &t
+}
+
+// WeeklyUsageWindowStart returns the value of the "weekly_usage_window_start" field in the mutation.
+func (m *UserSubscriptionMutation) WeeklyUsageWindowStart() (r time.Time, exists bool) {
+	v := m.weekly_usage_window_start
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWeeklyUsageWindowStart returns the old "weekly_usage_window_start" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldWeeklyUsageWindowStart(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWeeklyUsageWindowStart is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWeeklyUsageWindowStart requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWeeklyUsageWindowStart: %w", err)
+	}
+	return oldValue.WeeklyUsageWindowStart, nil
+}
+
+// ClearWeeklyUsageWindowStart clears the value of the "weekly_usage_window_start" field.
+func (m *UserSubscriptionMutation) ClearWeeklyUsageWindowStart() {
+	m.weekly_usage_window_start = nil
+	m.clearedFields[usersubscription.FieldWeeklyUsageWindowStart] = struct{}{}
+}
+
+// WeeklyUsageWindowStartCleared returns if the "weekly_usage_window_start" field was cleared in this mutation.
+func (m *UserSubscriptionMutation) WeeklyUsageWindowStartCleared() bool {
+	_, ok := m.clearedFields[usersubscription.FieldWeeklyUsageWindowStart]
+	return ok
+}
+
+// ResetWeeklyUsageWindowStart resets all changes to the "weekly_usage_window_start" field.
+func (m *UserSubscriptionMutation) ResetWeeklyUsageWindowStart() {
+	m.weekly_usage_window_start = nil
+	delete(m.clearedFields, usersubscription.FieldWeeklyUsageWindowStart)
+}
+
+// SetMonthlyUsageUsd sets the "monthly_usage_usd" field.
+func (m *UserSubscriptionMutation) SetMonthlyUsageUsd(s string) {
+	m.monthly_usage_usd = &s
+}
+
+// MonthlyUsageUsd returns the value of the "monthly_usage_usd" field in the mutation.
+func (m *UserSubscriptionMutation) MonthlyUsageUsd() (r string, exists bool) {
+	v := m.monthly_usage_usd
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMonthlyUsageUsd returns the old "monthly_usage_usd" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldMonthlyUsageUsd(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMonthlyUsageUsd is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMonthlyUsageUsd requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMonthlyUsageUsd: %w", err)
+	}
+	return oldValue.MonthlyUsageUsd, nil
+}
+
+// ResetMonthlyUsageUsd resets all changes to the "monthly_usage_usd" field.
+func (m *UserSubscriptionMutation) ResetMonthlyUsageUsd() {
+	m.monthly_usage_usd = nil
+}
+
+// SetMonthlyUsageWindowStart sets the "monthly_usage_window_start" field.
+func (m *UserSubscriptionMutation) SetMonthlyUsageWindowStart(t time.Time) {
+	m.monthly_usage_window_start = &t
+}
+
+// MonthlyUsageWindowStart returns the value of the "monthly_usage_window_start" field in the mutation.
+func (m *UserSubscriptionMutation) MonthlyUsageWindowStart() (r time.Time, exists bool) {
+	v := m.monthly_usage_window_start
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMonthlyUsageWindowStart returns the old "monthly_usage_window_start" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldMonthlyUsageWindowStart(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMonthlyUsageWindowStart is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMonthlyUsageWindowStart requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMonthlyUsageWindowStart: %w", err)
+	}
+	return oldValue.MonthlyUsageWindowStart, nil
+}
+
+// ClearMonthlyUsageWindowStart clears the value of the "monthly_usage_window_start" field.
+func (m *UserSubscriptionMutation) ClearMonthlyUsageWindowStart() {
+	m.monthly_usage_window_start = nil
+	m.clearedFields[usersubscription.FieldMonthlyUsageWindowStart] = struct{}{}
+}
+
+// MonthlyUsageWindowStartCleared returns if the "monthly_usage_window_start" field was cleared in this mutation.
+func (m *UserSubscriptionMutation) MonthlyUsageWindowStartCleared() bool {
+	_, ok := m.clearedFields[usersubscription.FieldMonthlyUsageWindowStart]
+	return ok
+}
+
+// ResetMonthlyUsageWindowStart resets all changes to the "monthly_usage_window_start" field.
+func (m *UserSubscriptionMutation) ResetMonthlyUsageWindowStart() {
+	m.monthly_usage_window_start = nil
+	delete(m.clearedFields, usersubscription.FieldMonthlyUsageWindowStart)
+}
+
 // Where appends a list predicates to the UserSubscriptionMutation builder.
 func (m *UserSubscriptionMutation) Where(ps ...predicate.UserSubscription) {
 	m.predicates = append(m.predicates, ps...)
@@ -67945,7 +70466,7 @@ func (m *UserSubscriptionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserSubscriptionMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 16)
 	if m.created_at != nil {
 		fields = append(fields, usersubscription.FieldCreatedAt)
 	}
@@ -67976,6 +70497,24 @@ func (m *UserSubscriptionMutation) Fields() []string {
 	if m.source_id != nil {
 		fields = append(fields, usersubscription.FieldSourceID)
 	}
+	if m.daily_usage_usd != nil {
+		fields = append(fields, usersubscription.FieldDailyUsageUsd)
+	}
+	if m.daily_usage_window_start != nil {
+		fields = append(fields, usersubscription.FieldDailyUsageWindowStart)
+	}
+	if m.weekly_usage_usd != nil {
+		fields = append(fields, usersubscription.FieldWeeklyUsageUsd)
+	}
+	if m.weekly_usage_window_start != nil {
+		fields = append(fields, usersubscription.FieldWeeklyUsageWindowStart)
+	}
+	if m.monthly_usage_usd != nil {
+		fields = append(fields, usersubscription.FieldMonthlyUsageUsd)
+	}
+	if m.monthly_usage_window_start != nil {
+		fields = append(fields, usersubscription.FieldMonthlyUsageWindowStart)
+	}
 	return fields
 }
 
@@ -68004,6 +70543,18 @@ func (m *UserSubscriptionMutation) Field(name string) (ent.Value, bool) {
 		return m.SourceType()
 	case usersubscription.FieldSourceID:
 		return m.SourceID()
+	case usersubscription.FieldDailyUsageUsd:
+		return m.DailyUsageUsd()
+	case usersubscription.FieldDailyUsageWindowStart:
+		return m.DailyUsageWindowStart()
+	case usersubscription.FieldWeeklyUsageUsd:
+		return m.WeeklyUsageUsd()
+	case usersubscription.FieldWeeklyUsageWindowStart:
+		return m.WeeklyUsageWindowStart()
+	case usersubscription.FieldMonthlyUsageUsd:
+		return m.MonthlyUsageUsd()
+	case usersubscription.FieldMonthlyUsageWindowStart:
+		return m.MonthlyUsageWindowStart()
 	}
 	return nil, false
 }
@@ -68033,6 +70584,18 @@ func (m *UserSubscriptionMutation) OldField(ctx context.Context, name string) (e
 		return m.OldSourceType(ctx)
 	case usersubscription.FieldSourceID:
 		return m.OldSourceID(ctx)
+	case usersubscription.FieldDailyUsageUsd:
+		return m.OldDailyUsageUsd(ctx)
+	case usersubscription.FieldDailyUsageWindowStart:
+		return m.OldDailyUsageWindowStart(ctx)
+	case usersubscription.FieldWeeklyUsageUsd:
+		return m.OldWeeklyUsageUsd(ctx)
+	case usersubscription.FieldWeeklyUsageWindowStart:
+		return m.OldWeeklyUsageWindowStart(ctx)
+	case usersubscription.FieldMonthlyUsageUsd:
+		return m.OldMonthlyUsageUsd(ctx)
+	case usersubscription.FieldMonthlyUsageWindowStart:
+		return m.OldMonthlyUsageWindowStart(ctx)
 	}
 	return nil, fmt.Errorf("unknown UserSubscription field %s", name)
 }
@@ -68112,6 +70675,48 @@ func (m *UserSubscriptionMutation) SetField(name string, value ent.Value) error 
 		}
 		m.SetSourceID(v)
 		return nil
+	case usersubscription.FieldDailyUsageUsd:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDailyUsageUsd(v)
+		return nil
+	case usersubscription.FieldDailyUsageWindowStart:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDailyUsageWindowStart(v)
+		return nil
+	case usersubscription.FieldWeeklyUsageUsd:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWeeklyUsageUsd(v)
+		return nil
+	case usersubscription.FieldWeeklyUsageWindowStart:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWeeklyUsageWindowStart(v)
+		return nil
+	case usersubscription.FieldMonthlyUsageUsd:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMonthlyUsageUsd(v)
+		return nil
+	case usersubscription.FieldMonthlyUsageWindowStart:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMonthlyUsageWindowStart(v)
+		return nil
 	}
 	return fmt.Errorf("unknown UserSubscription field %s", name)
 }
@@ -68172,6 +70777,15 @@ func (m *UserSubscriptionMutation) ClearedFields() []string {
 	if m.FieldCleared(usersubscription.FieldEntitlementsSnapshotJSON) {
 		fields = append(fields, usersubscription.FieldEntitlementsSnapshotJSON)
 	}
+	if m.FieldCleared(usersubscription.FieldDailyUsageWindowStart) {
+		fields = append(fields, usersubscription.FieldDailyUsageWindowStart)
+	}
+	if m.FieldCleared(usersubscription.FieldWeeklyUsageWindowStart) {
+		fields = append(fields, usersubscription.FieldWeeklyUsageWindowStart)
+	}
+	if m.FieldCleared(usersubscription.FieldMonthlyUsageWindowStart) {
+		fields = append(fields, usersubscription.FieldMonthlyUsageWindowStart)
+	}
 	return fields
 }
 
@@ -68188,6 +70802,15 @@ func (m *UserSubscriptionMutation) ClearField(name string) error {
 	switch name {
 	case usersubscription.FieldEntitlementsSnapshotJSON:
 		m.ClearEntitlementsSnapshotJSON()
+		return nil
+	case usersubscription.FieldDailyUsageWindowStart:
+		m.ClearDailyUsageWindowStart()
+		return nil
+	case usersubscription.FieldWeeklyUsageWindowStart:
+		m.ClearWeeklyUsageWindowStart()
+		return nil
+	case usersubscription.FieldMonthlyUsageWindowStart:
+		m.ClearMonthlyUsageWindowStart()
 		return nil
 	}
 	return fmt.Errorf("unknown UserSubscription nullable field %s", name)
@@ -68226,6 +70849,24 @@ func (m *UserSubscriptionMutation) ResetField(name string) error {
 		return nil
 	case usersubscription.FieldSourceID:
 		m.ResetSourceID()
+		return nil
+	case usersubscription.FieldDailyUsageUsd:
+		m.ResetDailyUsageUsd()
+		return nil
+	case usersubscription.FieldDailyUsageWindowStart:
+		m.ResetDailyUsageWindowStart()
+		return nil
+	case usersubscription.FieldWeeklyUsageUsd:
+		m.ResetWeeklyUsageUsd()
+		return nil
+	case usersubscription.FieldWeeklyUsageWindowStart:
+		m.ResetWeeklyUsageWindowStart()
+		return nil
+	case usersubscription.FieldMonthlyUsageUsd:
+		m.ResetMonthlyUsageUsd()
+		return nil
+	case usersubscription.FieldMonthlyUsageWindowStart:
+		m.ResetMonthlyUsageWindowStart()
 		return nil
 	}
 	return fmt.Errorf("unknown UserSubscription field %s", name)
