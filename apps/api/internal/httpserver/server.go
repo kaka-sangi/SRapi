@@ -111,6 +111,7 @@ type runtimeOptions struct {
 	scheduledTests     scheduledtestscontract.Store
 	channelMonitors    channelmonitorscontract.Store
 	copilotConvs       copilotconvcontract.ConversationStore
+	metrics            *runtimeMetricsState
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -331,6 +332,12 @@ func WithUsageStore(store usagecontract.Store) Option {
 	}
 }
 
+func withRuntimeMetricsState(metrics *runtimeMetricsState) Option {
+	return func(opts *runtimeOptions) {
+		opts.metrics = metrics
+	}
+}
+
 type envelope struct {
 	Data      healthData `json:"data"`
 	RequestID string     `json:"request_id"`
@@ -364,44 +371,23 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /readyz", server.handleReady)
 	mux.HandleFunc("GET /metrics", server.handleMetrics)
 	mux.HandleFunc("GET /api/v1/health", server.handleHealth)
-	mux.HandleFunc("POST /api/v1/auth/login", server.handleLogin)
-	mux.HandleFunc("POST /api/v1/auth/register", server.handleRegister)
-	mux.HandleFunc("GET /api/v1/setup/status", server.handleSetupStatus)
-	mux.HandleFunc("POST /api/v1/setup", server.handleCompleteSetup)
-	mux.HandleFunc("POST /api/v1/auth/password-reset/request", server.handleRequestPasswordReset)
-	mux.HandleFunc("POST /api/v1/auth/password-reset/confirm", server.handleConfirmPasswordReset)
-	mux.HandleFunc("POST /api/v1/auth/email-verification/request", server.handleRequestEmailVerification)
-	mux.HandleFunc("POST /api/v1/auth/email-verification/confirm", server.handleConfirmEmailVerification)
-	mux.HandleFunc("GET /api/v1/auth/oauth/providers", server.handleListOAuthProviders)
-	mux.HandleFunc("GET /api/v1/auth/captcha", server.handleAuthCaptchaConfig)
-	mux.HandleFunc("GET /api/v1/auth/oauth/{provider}/start", server.handleStartOAuthAuthorization)
-	mux.HandleFunc("GET /api/v1/auth/oauth/{provider}/callback", server.handleCompleteOAuthAuthorization)
-	mux.HandleFunc("GET /api/v1/auth/oauth/pending", server.handleGetPendingOAuthSession)
-	mux.HandleFunc("POST /api/v1/auth/oauth/pending/bind-current-user", server.handleBindPendingOAuthCurrentUser)
-	mux.HandleFunc("POST /api/v1/auth/oauth/pending/send-verify-code", server.handleSendPendingOAuthEmailCompletion)
-	mux.HandleFunc("POST /api/v1/auth/oauth/pending/email-completion/confirm", server.handleConfirmPendingOAuthEmailCompletion)
-	mux.HandleFunc("POST /api/v1/auth/oauth/pending/create-account", server.handleCreatePendingOAuthAccount)
-	mux.HandleFunc("POST /api/v1/auth/oauth/pending/bind-login", server.handleBindPendingOAuthLogin)
-	mux.HandleFunc("POST /api/v1/auth/oauth/pending/bind-login/2fa", server.handleCompletePendingOAuthBindLoginTwoFactor)
-	mux.HandleFunc("POST /api/v1/auth/login/2fa", server.handleLoginSecondFactor)
-	mux.HandleFunc("POST /api/v1/auth/logout", server.handleLogout)
-	mux.HandleFunc("GET /api/v1/notifications/unsubscribe", server.handlePreviewNotificationUnsubscribe)
-	mux.HandleFunc("POST /api/v1/notifications/unsubscribe", server.handleNotificationUnsubscribe)
+	server.registerPublicRoutes(mux)
 	server.registerCurrentUserRoutes(mux)
 	mux.HandleFunc("GET /api/v1/payment/methods", server.handleListPaymentMethods)
-	mux.HandleFunc("POST /api/v1/payment/orders", server.handleCreatePaymentOrder)
+	mux.HandleFunc("POST /api/v1/payment/orders", server.withConsoleIdempotency(server.handleCreatePaymentOrder))
 	mux.HandleFunc("GET /api/v1/payment/orders", server.handleListPaymentOrders)
 	mux.HandleFunc("GET /api/v1/payment/orders/{id}", server.handleGetPaymentOrder)
 	mux.HandleFunc("POST /api/v1/payment/orders/{id}/cancel", server.handleCancelPaymentOrder)
 	mux.HandleFunc("POST /api/v1/webhooks/payments/{provider}", server.handlePaymentWebhook)
 	mux.HandleFunc("GET /api/v1/api-keys", server.handleListApiKeys)
-	mux.HandleFunc("POST /api/v1/api-keys", server.handleCreateApiKey)
+	mux.HandleFunc("POST /api/v1/api-keys", server.withConsoleIdempotency(server.handleCreateApiKey))
 	mux.HandleFunc("PATCH /api/v1/api-keys/{id}", server.handleUpdateApiKey)
 	mux.HandleFunc("DELETE /api/v1/api-keys/{id}", server.handleDeleteApiKey)
 	mux.HandleFunc("GET /api/v1/api-keys/{id}/usage", server.handleCurrentUserApiKeyUsage)
 	mux.HandleFunc("GET /api/v1/admin/overview", server.handleAdminOverview)
 	mux.HandleFunc("GET /api/v1/admin/dashboard", server.handleAdminDashboard)
 	mux.HandleFunc("GET /api/v1/admin/dashboard/snapshot", server.handleAdminDashboardSnapshot)
+	mux.HandleFunc("GET /api/v1/admin/permission-catalog", server.handleAdminPermissionCatalog)
 	mux.HandleFunc("GET /api/v1/admin/roles", server.handleListAdminRoles)
 	mux.HandleFunc("POST /api/v1/admin/roles", server.handleCreateAdminRole)
 	mux.HandleFunc("PATCH /api/v1/admin/roles/{id}", server.handleUpdateAdminRole)
@@ -425,6 +411,8 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/providers/preset/install", server.handleInstallAdminProviderPresets)
 	mux.HandleFunc("POST /api/v1/admin/quick-setup", server.handleAdminQuickSetup)
 	mux.HandleFunc("POST /api/v1/admin/models/quick-map", server.handleAdminQuickMapModels)
+	mux.HandleFunc("GET /api/v1/admin/settings/captcha", server.handleGetAdminCaptchaSettings)
+	mux.HandleFunc("PUT /api/v1/admin/settings/captcha", server.handleUpdateAdminCaptchaSettings)
 	mux.HandleFunc("GET /api/v1/admin/providers/{id}/oauth-config", server.handleGetAdminProviderOAuthConfig)
 	mux.HandleFunc("PATCH /api/v1/admin/providers/{id}", server.handleUpdateAdminProvider)
 	mux.HandleFunc("DELETE /api/v1/admin/providers/{id}", server.handleDeleteAdminProvider)
@@ -480,6 +468,12 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/affiliates/invites", server.handleListAdminAffiliateInvites)
 	mux.HandleFunc("GET /api/v1/admin/affiliates/rebates", server.handleListAdminAffiliateRebates)
 	mux.HandleFunc("GET /api/v1/admin/affiliates/transfers", server.handleListAdminAffiliateTransfers)
+	mux.HandleFunc("POST /api/v1/admin/affiliates/manual-adjustments", server.handleCreateAdminAffiliateManualAdjustment)
+	mux.HandleFunc("POST /api/v1/admin/affiliates/withdrawals/{id}/approve", server.handleApproveAdminAffiliateWithdrawal)
+	mux.HandleFunc("POST /api/v1/admin/affiliates/withdrawals/{id}/cancel", server.handleCancelAdminAffiliateWithdrawal)
+	mux.HandleFunc("GET /api/v1/admin/affiliate-rules", server.handleListAdminAffiliateRules)
+	mux.HandleFunc("POST /api/v1/admin/affiliate-rules", server.handleCreateAdminAffiliateRule)
+	mux.HandleFunc("PATCH /api/v1/admin/affiliate-rules/{id}", server.handleUpdateAdminAffiliateRule)
 	mux.HandleFunc("GET /api/v1/admin/payments/providers", server.handleListAdminPaymentProviders)
 	mux.HandleFunc("POST /api/v1/admin/payments/providers", server.handleCreateAdminPaymentProvider)
 	mux.HandleFunc("PATCH /api/v1/admin/payments/providers/{id}", server.handleUpdateAdminPaymentProvider)
@@ -487,6 +481,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/payments/providers/{id}/test", server.handleTestAdminPaymentProvider)
 	mux.HandleFunc("GET /api/v1/admin/payments/orders", server.handleListAdminPaymentOrders)
 	mux.HandleFunc("POST /api/v1/admin/payments/orders/{id}/refund", server.handleRefundAdminPaymentOrder)
+	mux.HandleFunc("GET /api/v1/admin/payment-orders/{id}/audit-logs", server.handleListAdminPaymentOrderAuditLogs)
 	mux.HandleFunc("GET /api/v1/admin/subscription-plans", server.handleListAdminSubscriptionPlans)
 	mux.HandleFunc("POST /api/v1/admin/subscription-plans", server.handleCreateAdminSubscriptionPlan)
 	mux.HandleFunc("PATCH /api/v1/admin/subscription-plans/{id}", server.handleUpdateAdminSubscriptionPlan)
@@ -522,20 +517,56 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("PUT /api/v1/admin/risk-control/config", server.handleUpdateAdminRiskControlConfig)
 	mux.HandleFunc("GET /api/v1/admin/risk-control/status", server.handleGetAdminRiskControlStatus)
 	mux.HandleFunc("GET /api/v1/admin/risk-control/logs", server.handleListAdminRiskControlLogs)
+	mux.HandleFunc("GET /api/v1/admin/content-safety/config", server.handleGetAdminContentSafetyConfig)
+	mux.HandleFunc("PUT /api/v1/admin/content-safety/config", server.handleUpdateAdminContentSafetyConfig)
 	mux.HandleFunc("GET /api/v1/admin/capabilities", server.handleListAdminCapabilities)
 	mux.HandleFunc("GET /api/v1/admin/scheduler/overview", server.handleAdminSchedulerOverview)
 	mux.HandleFunc("GET /api/v1/admin/scheduler/decisions", server.handleListAdminSchedulerDecisions)
 	mux.HandleFunc("GET /api/v1/admin/scheduler/strategies", server.handleListSchedulerStrategies)
+	mux.HandleFunc("POST /api/v1/admin/scheduler/strategies", server.handleCreateSchedulerStrategy)
+	mux.HandleFunc("PATCH /api/v1/admin/scheduler/strategies/{id}", server.handleUpdateSchedulerStrategy)
+	mux.HandleFunc("DELETE /api/v1/admin/scheduler/strategies/{id}", server.handleDeprecateSchedulerStrategy)
+	mux.HandleFunc("POST /api/v1/admin/scheduler/strategies/{id}/activate", server.handleActivateSchedulerStrategy)
 	mux.HandleFunc("POST /api/v1/admin/scheduler/simulate", server.handleSimulateSchedulerStrategy)
 	mux.HandleFunc("POST /api/v1/admin/scheduler/replay", server.handleReplaySchedulerStrategy)
 	server.registerGatewayEndpointRoutes(mux)
 	server.registerGatewayProviderAliases(mux)
 
-	// The admin copilot dispatches approved admin calls in-process against this
-	// bare mux (so path values + handler auth/validation/audit all apply).
-	runtime.internalRouter = mux
+	handler := server.adminRBACMiddleware(mux)
+	// Admin copilot dispatches approved admin calls in-process through the same
+	// RBAC gate used by external admin requests.
+	runtime.internalRouter = handler
+	return securityHeadersMiddleware(requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(handler))))
+}
 
-	return securityHeadersMiddleware(requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(mux))))
+func (s *Server) registerPublicRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/site-config", s.handleSiteConfig)
+	mux.HandleFunc("POST /api/v1/auth/login", s.handleLogin)
+	mux.HandleFunc("POST /api/v1/auth/register", s.handleRegister)
+	mux.HandleFunc("GET /api/v1/auth/registration-attributes", s.handleRegistrationAttributes)
+	mux.HandleFunc("GET /api/v1/setup/status", s.handleSetupStatus)
+	mux.HandleFunc("POST /api/v1/setup", s.handleCompleteSetup)
+	mux.HandleFunc("POST /api/v1/auth/password-reset/request", s.handleRequestPasswordReset)
+	mux.HandleFunc("POST /api/v1/auth/password-reset/confirm", s.handleConfirmPasswordReset)
+	mux.HandleFunc("POST /api/v1/auth/email-verification/request", s.handleRequestEmailVerification)
+	mux.HandleFunc("POST /api/v1/auth/email-verification/confirm", s.handleConfirmEmailVerification)
+	mux.HandleFunc("POST /api/v1/auth/passwordless/request", s.handleRequestPasswordlessCode)
+	mux.HandleFunc("POST /api/v1/auth/passwordless/login", s.handlePasswordlessLogin)
+	mux.HandleFunc("GET /api/v1/auth/oauth/providers", s.handleListOAuthProviders)
+	mux.HandleFunc("GET /api/v1/auth/captcha", s.handleAuthCaptchaConfig)
+	mux.HandleFunc("GET /api/v1/auth/oauth/{provider}/start", s.handleStartOAuthAuthorization)
+	mux.HandleFunc("GET /api/v1/auth/oauth/{provider}/callback", s.handleCompleteOAuthAuthorization)
+	mux.HandleFunc("GET /api/v1/auth/oauth/pending", s.handleGetPendingOAuthSession)
+	mux.HandleFunc("POST /api/v1/auth/oauth/pending/bind-current-user", s.handleBindPendingOAuthCurrentUser)
+	mux.HandleFunc("POST /api/v1/auth/oauth/pending/send-verify-code", s.handleSendPendingOAuthEmailCompletion)
+	mux.HandleFunc("POST /api/v1/auth/oauth/pending/email-completion/confirm", s.handleConfirmPendingOAuthEmailCompletion)
+	mux.HandleFunc("POST /api/v1/auth/oauth/pending/create-account", s.handleCreatePendingOAuthAccount)
+	mux.HandleFunc("POST /api/v1/auth/oauth/pending/bind-login", s.handleBindPendingOAuthLogin)
+	mux.HandleFunc("POST /api/v1/auth/oauth/pending/bind-login/2fa", s.handleCompletePendingOAuthBindLoginTwoFactor)
+	mux.HandleFunc("POST /api/v1/auth/login/2fa", s.handleLoginSecondFactor)
+	mux.HandleFunc("POST /api/v1/auth/logout", s.handleLogout)
+	mux.HandleFunc("GET /api/v1/notifications/unsubscribe", s.handlePreviewNotificationUnsubscribe)
+	mux.HandleFunc("POST /api/v1/notifications/unsubscribe", s.handleNotificationUnsubscribe)
 }
 
 // registerAdminOpsRoutes registers the operational monitoring + maintenance
@@ -671,9 +702,12 @@ func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
 
 func (s *Server) registerCurrentUserRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/me", s.handleCurrentUser)
+	mux.HandleFunc("DELETE /api/v1/me", s.handleDeleteCurrentUser)
 	mux.HandleFunc("GET /api/v1/me/auth-identities", s.handleCurrentUserAuthIdentities)
 	mux.HandleFunc("DELETE /api/v1/me/auth-identities/{id}", s.handleUnbindCurrentUserAuthIdentity)
 	mux.HandleFunc("PATCH /api/v1/me", s.handleUpdateCurrentUser)
+	mux.HandleFunc("GET /api/v1/me/attributes", s.handleCurrentUserAttributes)
+	mux.HandleFunc("PUT /api/v1/me/attributes", s.handleUpdateCurrentUserAttributes)
 	mux.HandleFunc("PUT /api/v1/me/avatar", s.handleUploadCurrentUserAvatar)
 	mux.HandleFunc("DELETE /api/v1/me/avatar", s.handleDeleteCurrentUserAvatar)
 	mux.HandleFunc("GET /api/v1/users/{id}/avatar", s.handleGetUserAvatar)
@@ -694,10 +728,13 @@ func (s *Server) registerCurrentUserRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/me/totp/disable", s.handleCurrentUserTOTPDisable)
 	mux.HandleFunc("GET /api/v1/me/balance", s.handleCurrentUserBalance)
 	mux.HandleFunc("GET /api/v1/me/platform-quotas", s.handleListCurrentUserPlatformQuotas)
-	mux.HandleFunc("POST /api/v1/me/redeem-codes/redeem", s.handleRedeemCurrentUserRedeemCode)
+	mux.HandleFunc("POST /api/v1/me/redeem-codes/redeem", s.withConsoleIdempotency(s.handleRedeemCurrentUserRedeemCode))
 	mux.HandleFunc("GET /api/v1/me/affiliate", s.handleCurrentUserAffiliate)
+	mux.HandleFunc("GET /api/v1/me/affiliate/invite-codes", s.handleListCurrentUserAffiliateInviteCodes)
+	mux.HandleFunc("POST /api/v1/me/affiliate/invite-codes", s.handleCreateCurrentUserAffiliateInviteCode)
 	mux.HandleFunc("GET /api/v1/me/affiliate/ledger", s.handleCurrentUserAffiliateLedger)
 	mux.HandleFunc("POST /api/v1/me/affiliate/transfer-to-balance", s.handleCurrentUserAffiliateTransferToBalance)
+	mux.HandleFunc("POST /api/v1/me/affiliate/withdrawals", s.handleCurrentUserAffiliateWithdrawal)
 	mux.HandleFunc("GET /api/v1/me/usage", s.handleCurrentUserUsage)
 	mux.HandleFunc("GET /api/v1/me/subscriptions", s.handleCurrentUserSubscriptions)
 	mux.HandleFunc("GET /api/v1/me/playground/models", s.handleMePlaygroundModels)
@@ -743,8 +780,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) checkDependencies(ctx context.Context) map[string]string {
 	return map[string]string{
-		"database": probeStatus(ctx, s.runtime.databaseProbe, s.cfg.Database.Address()),
-		"redis":    probeStatus(ctx, s.runtime.redisProbe, s.cfg.Redis.Address()),
+		"database": probeStatus(ctx, s.runtime.databaseProbe),
+		"redis":    probeStatus(ctx, s.runtime.redisProbe),
 	}
 }
 
@@ -754,19 +791,6 @@ func aggregateStatus(dependencies map[string]string) string {
 			return "degraded"
 		}
 	}
-	return "ok"
-}
-
-func tcpStatus(ctx context.Context, address string) string {
-	probeCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-	defer cancel()
-
-	var dialer net.Dialer
-	conn, err := dialer.DialContext(probeCtx, "tcp", address)
-	if err != nil {
-		return "unavailable"
-	}
-	_ = conn.Close()
 	return "ok"
 }
 
@@ -1083,8 +1107,14 @@ func newRequestID() string {
 	return "req_" + hex.EncodeToString(bytes[:])
 }
 
-func Healthcheck(ctx context.Context, address string) error {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+address+"/livez", nil)
+func Healthcheck(ctx context.Context, address, path string) error {
+	if strings.TrimSpace(path) == "" {
+		path = "/readyz"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+address+path, nil)
 	if err != nil {
 		return err
 	}

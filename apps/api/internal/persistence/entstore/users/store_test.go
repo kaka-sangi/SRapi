@@ -95,12 +95,12 @@ func TestStoreCreatesRoleAndLoadsPermissions(t *testing.T) {
 	role, err := store.CreateRole(ctx, contract.CreateStoredRole{
 		Name:        "payment_reader",
 		Description: "Payment reader",
-		Permissions: []string{contract.PermissionPaymentOrderRead},
+		Permissions: []string{contract.PermissionPaymentRead},
 	})
 	if err != nil {
 		t.Fatalf("create role: %v", err)
 	}
-	if role.ID == 0 || len(role.Permissions) != 1 || role.Permissions[0] != contract.PermissionPaymentOrderRead {
+	if role.ID == 0 || len(role.Permissions) != 1 || role.Permissions[0] != contract.PermissionPaymentRead {
 		t.Fatalf("unexpected role: %+v", role)
 	}
 	created, err := store.Create(ctx, contract.CreateStoredUser{
@@ -115,7 +115,7 @@ func TestStoreCreatesRoleAndLoadsPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	if len(created.Permissions) != 1 || created.Permissions[0] != contract.PermissionPaymentOrderRead {
+	if len(created.Permissions) != 1 || created.Permissions[0] != contract.PermissionPaymentRead {
 		t.Fatalf("expected role permission on user, got %+v", created.Permissions)
 	}
 }

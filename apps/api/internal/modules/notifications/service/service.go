@@ -93,7 +93,7 @@ func (s *Service) HandleOutboxEvent(ctx context.Context, event eventscontract.Ou
 			DefaultHTML:    `<p>Hello {{recipient_name}},</p><p>Use this link to reset your SRapi password:</p><p><a href="{{action_url}}">Reset password</a></p><p>This link expires at {{expires_at}}.</p>`,
 		})
 	case notificationscontract.EventAuthEmailVerificationRequested:
-		return s.handleAuthEmail(ctx, event, authEmailSpec{
+		spec := authEmailSpec{
 			Template:       notificationscontract.TemplateAuthEmailVerification,
 			TokenKey:       "verification_token_ciphertext",
 			TokenVersion:   "v1",
@@ -102,7 +102,14 @@ func (s *Service) HandleOutboxEvent(ctx context.Context, event eventscontract.Ou
 			DefaultPath:    "/verify-email",
 			DefaultSubject: "Verify your SRapi email",
 			DefaultHTML:    `<p>Hello {{recipient_name}},</p><p>Use this link to verify your SRapi email address:</p><p><a href="{{action_url}}">Verify email</a></p><p>This link expires at {{expires_at}}.</p>`,
-		})
+		}
+		if payloadString(event.Payload, "template") == "auth.passwordless_login" {
+			spec.Template = "auth.passwordless_login"
+			spec.DefaultPath = "/auth/passwordless"
+			spec.DefaultSubject = "Sign in to SRapi"
+			spec.DefaultHTML = `<p>Hello {{recipient_name}},</p><p>Use this one-time link to sign in to SRapi:</p><p><a href="{{action_url}}">Sign in</a></p><p>This link expires at {{expires_at}}.</p>`
+		}
+		return s.handleAuthEmail(ctx, event, spec)
 	case notificationscontract.EventPendingOAuthEmailCompletionRequested:
 		return s.handlePendingOAuthEmailCompletion(ctx, event)
 	case notificationscontract.EventNotificationContactVerificationRequested:

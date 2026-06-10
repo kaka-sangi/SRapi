@@ -72,10 +72,27 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 		}
 		markImportIdentitySeen(seen, identityKeys, index)
 		if existingID, ok := existing.find(identityKeys); ok {
-			message := "matching account already exists; skipped"
-			skipped++
-			id := idPtr(existingID)
-			items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionSkipped, id, message))
+			credential, err = s.refreshImportCredential(r.Context(), accountcontract.RuntimeClass(item.RuntimeClass), item.UpstreamClient, metadata, item.ProxyId, credential)
+			if err != nil {
+				failed++
+				message := fmt.Sprintf("accounts[%d] oauth refresh failed", idx)
+				importErrors = append(importErrors, message)
+				items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionFailed, nil, message))
+				continue
+			}
+			updated, err := s.updateImportedAccount(r.Context(), existingID, item, metadata, credential)
+			if err != nil {
+				failed++
+				message := fmt.Sprintf("accounts[%d] update failed", idx)
+				importErrors = append(importErrors, message)
+				items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionFailed, idPtr(existingID), message))
+				continue
+			}
+			updatedID := apiopenapi.Id(strconv.Itoa(updated.ID))
+			updatedIDs = append(updatedIDs, updatedID)
+			existing.add(updated.ID, buildImportIdentityKeys(updated.ProviderID, updated.Name, updated.RuntimeClass, updated.UpstreamClient, updated.Metadata, nil))
+			items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionUpdated, &updatedID, ""))
+			s.addImportedAccountGroups(r.Context(), idx, index, item, updated.ID, &importErrors, &warnings)
 			continue
 		}
 		credential, err = s.refreshImportCredential(r.Context(), accountcontract.RuntimeClass(item.RuntimeClass), item.UpstreamClient, metadata, item.ProxyId, credential)
@@ -96,6 +113,7 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 			Status:         toAccountStatusPtr(item.Status),
 			Priority:       item.Priority,
 			Weight:         item.Weight,
+			RiskLevel:      stringPtrFromAPI(item.RiskLevel),
 			UpstreamClient: item.UpstreamClient,
 		})
 		if err != nil {
@@ -109,20 +127,7 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 		createdIDs = append(createdIDs, createdID)
 		existing.add(account.ID, identityKeys)
 		items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionCreated, &createdID, ""))
-		groupIDs, err := apiIDsToInts(item.GroupIds)
-		if err != nil {
-			message := fmt.Sprintf("accounts[%d].group_ids invalid", idx)
-			importErrors = append(importErrors, message)
-			warnings = append(warnings, apiopenapi.CodexSessionImportMessage{Index: index, Name: ptrString(item.Name), Message: message})
-			continue
-		}
-		for _, groupID := range groupIDs {
-			if _, err := s.runtime.accounts.AddAccountToGroup(r.Context(), account.ID, groupID); err != nil {
-				message := fmt.Sprintf("accounts[%d].group_ids[%d] add failed", idx, groupID)
-				importErrors = append(importErrors, message)
-				warnings = append(warnings, apiopenapi.CodexSessionImportMessage{Index: index, Name: ptrString(item.Name), Message: message})
-			}
-		}
+		s.addImportedAccountGroups(r.Context(), idx, index, item, account.ID, &importErrors, &warnings)
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.import", "provider_account", "bulk", nil, map[string]any{
 		"created_count": len(createdIDs),
@@ -147,6 +152,41 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 		},
 		RequestId: requestID,
 	})
+}
+
+func (s *Server) updateImportedAccount(ctx context.Context, accountID int, item apiopenapi.ProviderAccountImportItem, metadata map[string]any, credential map[string]any) (accountcontract.ProviderAccount, error) {
+	runtimeClass := accountcontract.RuntimeClass(item.RuntimeClass)
+	proxyID := item.ProxyId
+	upstreamClient := item.UpstreamClient
+	return s.runtime.accounts.Update(ctx, accountID, accountcontract.UpdateRequest{
+		Name:           &item.Name,
+		RuntimeClass:   &runtimeClass,
+		Credential:     &credential,
+		Metadata:       &metadata,
+		ProxyID:        &proxyID,
+		Status:         toAccountStatusPtr(item.Status),
+		Priority:       item.Priority,
+		Weight:         item.Weight,
+		RiskLevel:      stringPtrFromAPI(item.RiskLevel),
+		UpstreamClient: &upstreamClient,
+	})
+}
+
+func (s *Server) addImportedAccountGroups(ctx context.Context, idx int, index int, item apiopenapi.ProviderAccountImportItem, accountID int, importErrors *[]string, warnings *[]apiopenapi.CodexSessionImportMessage) {
+	groupIDs, err := apiIDsToInts(item.GroupIds)
+	if err != nil {
+		message := fmt.Sprintf("accounts[%d].group_ids invalid", idx)
+		*importErrors = append(*importErrors, message)
+		*warnings = append(*warnings, apiopenapi.CodexSessionImportMessage{Index: index, Name: ptrString(item.Name), Message: message})
+		return
+	}
+	for _, groupID := range groupIDs {
+		if _, err := s.runtime.accounts.AddAccountToGroup(ctx, accountID, groupID); err != nil {
+			message := fmt.Sprintf("accounts[%d].group_ids[%d] add failed", idx, groupID)
+			*importErrors = append(*importErrors, message)
+			*warnings = append(*warnings, apiopenapi.CodexSessionImportMessage{Index: index, Name: ptrString(item.Name), Message: message})
+		}
+	}
 }
 
 func importResultItem(index int, name string, action apiopenapi.CodexSessionImportItemAction, accountID *apiopenapi.Id, message string) apiopenapi.CodexSessionImportItem {

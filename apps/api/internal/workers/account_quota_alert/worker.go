@@ -16,6 +16,7 @@ import (
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	notificationscontract "github.com/srapi/srapi/apps/api/internal/modules/notifications/contract"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -32,6 +33,7 @@ type Config struct {
 	Clock        accountservice.Clock
 	Events       eventscontract.Store
 	AdminControl admincontrolcontract.Store
+	RunGuard     runonceguard.Guard
 }
 
 type Result struct {
@@ -50,6 +52,7 @@ type Worker struct {
 	clock        accountservice.Clock
 	interval     time.Duration
 	historyLimit int
+	guard        runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -98,6 +101,7 @@ func New(accounts accountcontract.Store, logger *slog.Logger, cfg Config) (*Work
 		clock:        clockOrDefault(cfg.Clock),
 		interval:     interval,
 		historyLimit: historyLimit,
+		guard:        cfg.RunGuard,
 	}, nil
 }
 
@@ -164,6 +168,16 @@ func (w *Worker) RunOnce(ctx context.Context) (Result, error) {
 	if w == nil {
 		return Result{}, nil
 	}
+	var result Result
+	_, err := runonceguard.Run(ctx, w.guard, "account_quota_alert", func(runCtx context.Context) error {
+		var runErr error
+		result, runErr = w.alertPass(runCtx)
+		return runErr
+	})
+	return result, err
+}
+
+func (w *Worker) alertPass(ctx context.Context) (Result, error) {
 	if w.events == nil {
 		return Result{}, nil
 	}

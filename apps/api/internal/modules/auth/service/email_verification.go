@@ -100,6 +100,77 @@ func (s *Service) RequestEmailVerification(ctx context.Context, email string) (E
 	return result, nil
 }
 
+func (s *Service) RequestPasswordlessLogin(ctx context.Context, email string) (EmailVerificationRequestResult, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" || !strings.Contains(email, "@") {
+		return EmailVerificationRequestResult{}, ErrInvalidInput
+	}
+	result := EmailVerificationRequestResult{Accepted: true}
+	users, ok := s.users.(EmailVerificationUserService)
+	if !ok {
+		return EmailVerificationRequestResult{}, ErrEmailVerificationUnavailable
+	}
+	verifyStore, ok := s.sessions.(authcontract.EmailVerificationStore)
+	if !ok {
+		return EmailVerificationRequestResult{}, ErrEmailVerificationUnavailable
+	}
+	user, err := users.FindByEmail(ctx, email)
+	if err != nil {
+		return result, nil
+	}
+	if user.ID <= 0 || user.Status != userscontract.StatusActive {
+		return result, nil
+	}
+	if len(s.resetTokenKey) == 0 || s.events == nil {
+		return EmailVerificationRequestResult{}, ErrEmailVerificationUnavailable
+	}
+	rawToken, err := randomToken("passwordless", emailVerificationTokenBytes)
+	if err != nil {
+		return EmailVerificationRequestResult{}, err
+	}
+	tokenHash := s.emailVerificationTokenHash(rawToken)
+	now := s.clock.Now()
+	expiresAt := now.Add(emailVerificationTTL)
+	if _, err := verifyStore.CreateEmailVerificationToken(ctx, authcontract.CreateEmailVerificationToken{
+		UserID:    user.ID,
+		TokenHash: tokenHash,
+		ExpiresAt: expiresAt,
+		CreatedAt: now,
+	}); err != nil {
+		return EmailVerificationRequestResult{}, err
+	}
+	tokenCiphertext, err := s.encryptEmailVerificationToken(rawToken)
+	if err != nil {
+		return EmailVerificationRequestResult{}, err
+	}
+	if _, err := s.events.Enqueue(ctx, eventscontract.EnqueueRequest{
+		EventType:      "AuthEmailVerificationRequested",
+		EventVersion:   emailVerificationTokenV1,
+		ProducerModule: "auth",
+		AggregateType:  "user",
+		AggregateID:    strconv.Itoa(user.ID),
+		IdempotencyKey: "auth.passwordless_login:" + strconv.Itoa(user.ID) + ":" + tokenHash[:16],
+		Payload: map[string]any{
+			"template":                      "auth.passwordless_login",
+			"recipient_user_id":             user.ID,
+			"recipient_email_hash":          emailHash(email),
+			"verification_token_ciphertext": tokenCiphertext,
+			"verification_token_version":    emailVerificationTokenV1,
+			"verification_url_path":         "/auth/passwordless",
+			"expires_at":                    expiresAt.Format(time.RFC3339Nano),
+		},
+		Metadata: map[string]any{
+			"token_delivery": "encrypted_outbox",
+			"purpose":        "passwordless_login",
+		},
+	}); err != nil {
+		return EmailVerificationRequestResult{}, err
+	}
+	result.ExpiresAt = &expiresAt
+	result.UserID = &user.ID
+	return result, nil
+}
+
 func (s *Service) ConfirmEmailVerification(ctx context.Context, token string) error {
 	token = strings.TrimSpace(token)
 	if token == "" {
@@ -125,6 +196,37 @@ func (s *Service) ConfirmEmailVerification(ctx context.Context, token string) er
 		return ErrEmailVerificationInvalid
 	}
 	return nil
+}
+
+func (s *Service) CompletePasswordlessLogin(ctx context.Context, token string) (authcontract.LoginResult, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return authcontract.LoginResult{}, ErrInvalidInput
+	}
+	if len(s.resetTokenKey) == 0 {
+		return authcontract.LoginResult{}, ErrEmailVerificationUnavailable
+	}
+	users, ok := s.users.(EmailVerificationUserService)
+	if !ok {
+		return authcontract.LoginResult{}, ErrEmailVerificationUnavailable
+	}
+	verifyStore, ok := s.sessions.(authcontract.EmailVerificationStore)
+	if !ok {
+		return authcontract.LoginResult{}, ErrEmailVerificationUnavailable
+	}
+	now := s.clock.Now()
+	verifyToken, err := verifyStore.ConsumeEmailVerificationToken(ctx, s.emailVerificationTokenHash(token), now)
+	if err != nil {
+		return authcontract.LoginResult{}, ErrEmailVerificationInvalid
+	}
+	verifiedUser, err := users.VerifyEmail(ctx, verifyToken.UserID, now)
+	if err != nil {
+		return authcontract.LoginResult{}, ErrEmailVerificationInvalid
+	}
+	if verifiedUser.Status != userscontract.StatusActive {
+		return authcontract.LoginResult{}, ErrSessionUserUnavailable
+	}
+	return s.CreateSessionForUser(ctx, verifiedUser)
 }
 
 func (s *Service) emailVerificationTokenHash(token string) string {

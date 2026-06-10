@@ -142,11 +142,14 @@ func (s *Server) handleListOAuthProviders(w http.ResponseWriter, r *http.Request
 func (s *Server) handleAuthCaptchaConfig(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	cfg := apiopenapi.CaptchaConfig{Provider: "turnstile"}
-	if s.runtime.captcha != nil {
-		cfg.Enabled = s.runtime.captcha.Enabled()
-		cfg.Provider = s.runtime.captcha.Provider()
-		cfg.SiteKey = s.runtime.captcha.SiteKey()
+	current, err := s.currentCaptchaConfig(r)
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "captcha config unavailable", requestID)
+		return
 	}
+	cfg.Enabled = current.Enabled
+	cfg.Provider = current.Provider
+	cfg.SiteKey = current.SiteKey
 	writeJSONAny(w, http.StatusOK, apiopenapi.CaptchaConfigResponse{
 		Data:      cfg,
 		RequestId: requestID,
@@ -269,6 +272,11 @@ func (s *Server) handleCompleteOAuthAuthorization(w http.ResponseWriter, r *http
 		return
 	}
 	profile.SubjectHint = oauthSubjectHint(provider, subjectHash)
+	if flow.Intent == authcontract.PendingOAuthIntentLogin {
+		if s.completeOAuthExistingIdentityLogin(w, r, provider, flow.ProviderKey, subjectHash, flow.RedirectTo, requestID) {
+			return
+		}
+	}
 	pending, err := s.runtime.auth.CreatePendingOAuthSession(r.Context(), authservice.CreatePendingOAuthSessionRequest{
 		Intent:              flow.Intent,
 		Provider:            provider,
@@ -877,13 +885,44 @@ func validOAuthStartProvider(provider userscontract.AuthIdentityProvider) bool {
 	case userscontract.AuthIdentityProviderOIDC,
 		userscontract.AuthIdentityProviderGitHub,
 		userscontract.AuthIdentityProviderGoogle,
-		userscontract.AuthIdentityProviderLinuxDo,
-		userscontract.AuthIdentityProviderWeChat,
-		userscontract.AuthIdentityProviderDingTalk:
+		userscontract.AuthIdentityProviderLinuxDo:
 		return true
 	default:
 		return false
 	}
+}
+
+func (s *Server) completeOAuthExistingIdentityLogin(w http.ResponseWriter, r *http.Request, provider userscontract.AuthIdentityProvider, providerKey string, subjectHash string, redirectTo string, requestID string) bool {
+	identity, err := s.runtime.users.FindAuthIdentityByProviderSubject(r.Context(), provider, providerKey, subjectHash)
+	if err != nil {
+		if !errors.Is(err, usersservice.ErrIdentityNotFound) && s.logger != nil {
+			s.logger.Warn("oauth identity lookup failed", "provider", provider, "provider_key", providerKey, "error", err)
+		}
+		return false
+	}
+	user, err := s.runtime.users.FindByID(r.Context(), identity.UserID)
+	if err != nil {
+		writeUserServiceError(w, err, requestID)
+		return true
+	}
+	loginResult, err := s.runtime.auth.CreateSessionForUser(r.Context(), user)
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to create session", requestID)
+		return true
+	}
+	s.clearOAuthFlowCookie(w)
+	s.clearOAuthPendingCookie(w)
+	s.setSessionCookie(w, loginResult)
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, user.ID, "user.login_oauth_identity", "user_auth_identities", strconv.Itoa(identity.ID), nil, map[string]any{
+		"provider":     provider,
+		"provider_key": providerKey,
+		"user_id":      user.ID,
+	}))
+	if strings.TrimSpace(redirectTo) == "" {
+		redirectTo = "/"
+	}
+	http.Redirect(w, r, redirectTo, http.StatusFound)
+	return true
 }
 
 func selectOAuthProviderConfig(settings admincontrolcontract.AdminSettingsSecurity, provider userscontract.AuthIdentityProvider, providerKey string) (admincontrolcontract.OAuthProviderConfig, bool) {

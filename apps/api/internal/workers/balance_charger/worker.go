@@ -24,6 +24,7 @@ import (
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	usersservice "github.com/srapi/srapi/apps/api/internal/modules/users/service"
 	"github.com/srapi/srapi/apps/api/internal/pkg/money"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -42,6 +43,7 @@ type Config struct {
 	Users            userscontract.Store
 	Events           eventscontract.Store
 	AdminControl     admincontrolcontract.Store
+	RunGuard         runonceguard.Guard
 }
 
 type Worker struct {
@@ -54,6 +56,7 @@ type Worker struct {
 	interval     time.Duration
 	limit        int
 	maxBatch     int
+	guard        runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -121,6 +124,7 @@ func New(store billingcontract.UsageChargeStore, logger *slog.Logger, cfg Config
 		interval:     interval,
 		limit:        limit,
 		maxBatch:     maxBatch,
+		guard:        cfg.RunGuard,
 	}, nil
 }
 
@@ -187,14 +191,27 @@ func (w *Worker) RunOnce(ctx context.Context) (billingcontract.ChargePendingUsag
 	if w == nil {
 		return billingcontract.ChargePendingUsageResult{}, nil
 	}
+	var aggregate billingcontract.ChargePendingUsageResult
+	_, err := runonceguard.Run(ctx, w.guard, "balance_charger", func(runCtx context.Context) error {
+		var runErr error
+		aggregate, runErr = w.runCharges(runCtx)
+		return runErr
+	})
+	return aggregate, err
+}
+
+func (w *Worker) runCharges(ctx context.Context) (billingcontract.ChargePendingUsageResult, error) {
 	aggregate := billingcontract.ChargePendingUsageResult{}
+	var firstErr error
 	for batch := 0; batch < w.maxBatch; batch++ {
 		if err := ctx.Err(); err != nil {
 			return aggregate, err
 		}
 		result, err := w.billing.ChargePendingUsage(ctx, billingcontract.ChargePendingUsageRequest{Limit: w.limit})
 		if err != nil {
-			return aggregate, err
+			firstErr = errors.Join(firstErr, err)
+			w.logger.Warn("balance charge batch failed", "batch", batch+1, "error", err)
+			continue
 		}
 		aggregate.Selected += result.Selected
 		aggregate.Charged += result.Charged
@@ -204,12 +221,12 @@ func (w *Worker) RunOnce(ctx context.Context) (billingcontract.ChargePendingUsag
 		}
 	}
 	if err := w.handleDisabledUsers(ctx, aggregate.Batches); err != nil && !errors.Is(err, context.Canceled) {
-		return aggregate, err
+		firstErr = errors.Join(firstErr, err)
 	}
 	if err := w.enqueueBalanceLowNotifications(ctx, aggregate.Batches); err != nil && !errors.Is(err, context.Canceled) {
-		return aggregate, err
+		firstErr = errors.Join(firstErr, err)
 	}
-	return aggregate, nil
+	return aggregate, firstErr
 }
 
 func (w *Worker) run(ctx context.Context) {

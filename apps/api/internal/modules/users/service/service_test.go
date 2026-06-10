@@ -387,12 +387,12 @@ func TestCustomRoleCarriesPermissions(t *testing.T) {
 	role, err := svc.CreateRole(context.Background(), CreateRoleRequest{
 		Name:        "payment_reader",
 		Description: "Payment reader",
-		Permissions: []string{"payment_order:read", "payment_order:read"},
+		Permissions: []string{contract.PermissionPaymentRead, contract.PermissionPaymentRead},
 	})
 	if err != nil {
 		t.Fatalf("create role: %v", err)
 	}
-	if role.Name != "payment_reader" || len(role.Permissions) != 1 || role.Permissions[0] != "payment_order:read" {
+	if role.Name != "payment_reader" || len(role.Permissions) != 1 || role.Permissions[0] != contract.PermissionPaymentRead {
 		t.Fatalf("unexpected role definition: %+v", role)
 	}
 	created, err := svc.Create(context.Background(), CreateRequest{
@@ -404,8 +404,64 @@ func TestCustomRoleCarriesPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	if len(created.Permissions) != 1 || created.Permissions[0] != "payment_order:read" {
+	if len(created.Permissions) != 1 || created.Permissions[0] != contract.PermissionPaymentRead {
 		t.Fatalf("expected role permission on user, got %+v", created.Permissions)
+	}
+}
+
+func TestBuiltInRolesUsePermissionCatalog(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	roles, err := svc.ListRoles(context.Background())
+	if err != nil {
+		t.Fatalf("list roles: %v", err)
+	}
+	byName := map[contract.Role]contract.RoleDefinition{}
+	for _, role := range roles {
+		byName[role.Name] = role
+	}
+
+	allPermissions := permissionSet(contract.AllPermissions())
+	for _, roleName := range []contract.Role{contract.RoleOwner, contract.RoleAdmin} {
+		role, ok := byName[roleName]
+		if !ok {
+			t.Fatalf("expected built-in role %s", roleName)
+		}
+		if !samePermissionSet(permissionSet(role.Permissions), allPermissions) {
+			t.Fatalf("expected %s to have all permissions, got %+v", roleName, role.Permissions)
+		}
+	}
+
+	operator, ok := byName[contract.RoleOperator]
+	if !ok {
+		t.Fatalf("expected built-in operator role")
+	}
+	operatorPermissions := permissionSet(operator.Permissions)
+	for _, permission := range contract.ReadOnlyPermissions() {
+		if !operatorPermissions[permission] {
+			t.Fatalf("expected operator read permission %s", permission)
+		}
+	}
+	for _, permission := range []string{contract.PermissionOpsWrite, contract.PermissionAccountWrite, contract.PermissionRiskControlWrite} {
+		if !operatorPermissions[permission] {
+			t.Fatalf("expected operator write permission %s", permission)
+		}
+	}
+	for _, permission := range []string{contract.PermissionUserWrite, contract.PermissionRoleWrite, contract.PermissionProviderWrite} {
+		if operatorPermissions[permission] {
+			t.Fatalf("operator should not have broad write permission %s", permission)
+		}
+	}
+
+	user, ok := byName[contract.RoleUser]
+	if !ok {
+		t.Fatalf("expected built-in user role")
+	}
+	if len(user.Permissions) != 0 {
+		t.Fatalf("expected user role without admin permissions, got %+v", user.Permissions)
 	}
 }
 
@@ -419,7 +475,7 @@ func TestUpdateAndDeleteRole(t *testing.T) {
 	created, err := svc.CreateRole(ctx, CreateRoleRequest{
 		Name:        "payment_reader",
 		Description: "Payment reader",
-		Permissions: []string{"payment_order:read"},
+		Permissions: []string{contract.PermissionPaymentRead},
 	})
 	if err != nil {
 		t.Fatalf("create role: %v", err)
@@ -428,7 +484,7 @@ func TestUpdateAndDeleteRole(t *testing.T) {
 	newDesc := "Payments + refunds reader"
 	updated, err := svc.UpdateRole(ctx, created.ID, UpdateRoleRequest{
 		Description: &newDesc,
-		Permissions: &[]string{"payment_order:read", "refund:read"},
+		Permissions: &[]string{contract.PermissionPaymentRead, contract.PermissionAuditLogRead},
 	})
 	if err != nil {
 		t.Fatalf("update role: %v", err)
@@ -463,6 +519,10 @@ func TestUpdateAndDeleteRole(t *testing.T) {
 		t.Fatalf("expected ErrRoleNotFound, got %v", err)
 	}
 
+	if _, err := svc.CreateRole(ctx, CreateRoleRequest{Name: "unknown_permission", Permissions: []string{"thing:read"}}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput for unknown permission, got %v", err)
+	}
+
 	// Delete the custom role, then deleting again is not-found.
 	if err := svc.DeleteRole(ctx, created.ID); err != nil {
 		t.Fatalf("delete role: %v", err)
@@ -470,6 +530,26 @@ func TestUpdateAndDeleteRole(t *testing.T) {
 	if err := svc.DeleteRole(ctx, created.ID); !errors.Is(err, ErrRoleNotFound) {
 		t.Fatalf("expected ErrRoleNotFound after delete, got %v", err)
 	}
+}
+
+func permissionSet(permissions []string) map[string]bool {
+	out := make(map[string]bool, len(permissions))
+	for _, permission := range permissions {
+		out[permission] = true
+	}
+	return out
+}
+
+func samePermissionSet(left, right map[string]bool) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for permission := range left {
+		if !right[permission] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestAuthenticatePasswordRejectsWrongPassword(t *testing.T) {

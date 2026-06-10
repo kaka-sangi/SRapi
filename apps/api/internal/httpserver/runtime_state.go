@@ -208,6 +208,7 @@ type runtimeState struct {
 	scheduledTestsStore     scheduledtestscontract.Store
 	channelMonitorsStore    channelmonitorscontract.Store
 	copilotConvsStore       copilotconvcontract.ConversationStore
+	metrics                 *runtimeMetricsState
 	capabilities            []capabilitiescontract.Definition
 	databaseProbe           dependencyPinger
 	redisProbe              dependencyPinger
@@ -229,10 +230,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
-	contentSafetySvc, err := contentsafetyservice.New()
-	if err != nil {
-		return nil, err
-	}
+	contentSafetySvc := contentsafetyservice.New(contentsafetyservice.DefaultConfig())
 
 	gatewaySvc, err := gatewayservice.New()
 	if err != nil {
@@ -908,10 +906,18 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		subscriptionStore:    assembly.subscriptionStore,
 		totpStore:            assembly.totpStore,
 		usageStore:           assembly.usageStore,
+		metrics:              runtimeMetricsFromOptions(opts),
 		capabilities:         seedCapabilities(),
 		databaseProbe:        opts.database,
 		redisProbe:           opts.redis,
 	}
+}
+
+func runtimeMetricsFromOptions(opts runtimeOptions) *runtimeMetricsState {
+	if opts.metrics != nil {
+		return opts.metrics
+	}
+	return newRuntimeMetricsState()
 }
 
 func newOperationsRuntime(store operationscontract.Store, usageStore usagecontract.Store, allowMemoryStores bool) (operationscontract.Store, *operationsservice.Service, error) {
@@ -1050,19 +1056,21 @@ func (rt *runtimeState) healthResponse(ctx context.Context, requestID string) ap
 
 func (rt *runtimeState) dependencyHealth(ctx context.Context) dependencyHealth {
 	return dependencyHealth{
-		Database: dependencyStatus(probeStatus(ctx, rt.databaseProbe, rt.cfg.Database.Address())),
-		Redis:    dependencyStatus(probeStatus(ctx, rt.redisProbe, rt.cfg.Redis.Address())),
+		Database: dependencyStatus(probeStatus(ctx, rt.databaseProbe)),
+		Redis:    dependencyStatus(probeStatus(ctx, rt.redisProbe)),
 	}
 }
 
-func probeStatus(ctx context.Context, probe dependencyPinger, fallbackAddress string) string {
+func probeStatus(ctx context.Context, probe dependencyPinger) string {
 	if probe != nil {
-		if err := probe.Ping(ctx); err != nil {
+		probeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		if err := probe.Ping(probeCtx); err != nil {
 			return "unavailable"
 		}
 		return "ok"
 	}
-	return tcpStatus(ctx, fallbackAddress)
+	return "not_configured"
 }
 
 func dependencyStatus(status string) apiopenapi.HealthDependencyStatus {

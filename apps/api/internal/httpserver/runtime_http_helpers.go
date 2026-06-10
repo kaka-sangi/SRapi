@@ -270,10 +270,8 @@ func (s *Server) requireAdminSession(r *http.Request) (authcontract.LoginResult,
 	if err != nil {
 		return authcontract.LoginResult{}, err
 	}
-	for _, role := range session.User.Roles {
-		if role == userscontract.RoleOwner || role == userscontract.RoleAdmin {
-			return session, nil
-		}
+	if userHasAdminSurfaceAccess(session.User) {
+		return session, nil
 	}
 	return authcontract.LoginResult{}, errors.New("admin access required")
 }
@@ -283,8 +281,11 @@ func (s *Server) requireAdminPermission(r *http.Request, permission string) (aut
 	if err != nil {
 		return authcontract.LoginResult{}, err
 	}
+	if !userscontract.IsKnownPermission(permission) {
+		return authcontract.LoginResult{}, errors.New("unknown permission")
+	}
 	for _, role := range session.User.Roles {
-		if role == userscontract.RoleOwner || role == userscontract.RoleAdmin {
+		if role == userscontract.RoleOwner {
 			return session, nil
 		}
 	}
@@ -294,6 +295,21 @@ func (s *Server) requireAdminPermission(r *http.Request, permission string) (aut
 		}
 	}
 	return authcontract.LoginResult{}, errors.New("permission required")
+}
+
+func userHasAdminSurfaceAccess(user userscontract.User) bool {
+	for _, role := range user.Roles {
+		switch role {
+		case userscontract.RoleOwner, userscontract.RoleAdmin, userscontract.RoleOperator:
+			return true
+		}
+	}
+	for _, permission := range user.Permissions {
+		if userscontract.IsKnownPermission(permission) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) requireGatewayKey(r *http.Request) (apikeycontract.AuthResult, error) {
@@ -347,6 +363,9 @@ func (s *Server) requireGatewayKeyPlaintext(r *http.Request, apiKey string) (api
 		return apikeycontract.AuthResult{}, err
 	}
 	if err := gatewayKeyIPAllowed(authed.Key, clientIP(r)); err != nil {
+		return apikeycontract.AuthResult{}, err
+	}
+	if err := s.runtime.enforceGatewayRiskControl(r.Context(), authed, clientIP(r)); err != nil {
 		return apikeycontract.AuthResult{}, err
 	}
 	if err := s.acquireGatewayConcurrency(r.Context(), authed.Key); err != nil {
@@ -490,6 +509,8 @@ func writeGatewayAuthError(w http.ResponseWriter, err error, requestID string) {
 		writeGatewayError(w, http.StatusTooManyRequests, apiopenapi.RateLimitError, "API key concurrency limit exceeded", "concurrency_limit_exceeded")
 	case errors.Is(err, errGatewayKeyIPNotAllowed):
 		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "API key not permitted from this IP address", "ip_not_allowed")
+	case errors.Is(err, errGatewayRiskControlBlocked):
+		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "request blocked by risk control", "risk_control_blocked")
 	case errors.Is(err, apikeyservice.ErrInvalidKey), errors.Is(err, apikeyservice.ErrInvalidInput):
 		writeGatewayError(w, http.StatusUnauthorized, apiopenapi.AuthenticationError, "invalid API key", "invalid_api_key")
 	case errors.Is(err, apikeyservice.ErrKeyDisabled), errors.Is(err, apikeyservice.ErrKeyExpired):
@@ -538,6 +559,8 @@ func writeGeminiGatewayAuthError(w http.ResponseWriter, err error) {
 		writeGeminiGatewayError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "Query parameter api_key is deprecated. Use x-goog-api-key, Authorization Bearer, or key instead.")
 	case errors.Is(err, errGatewayKeyIPNotAllowed):
 		writeGeminiGatewayError(w, http.StatusForbidden, "PERMISSION_DENIED", "API key not permitted from this IP address")
+	case errors.Is(err, errGatewayRiskControlBlocked):
+		writeGeminiGatewayError(w, http.StatusForbidden, "PERMISSION_DENIED", "request blocked by risk control")
 	case errors.Is(err, apikeyservice.ErrInvalidKey), errors.Is(err, apikeyservice.ErrInvalidInput):
 		writeGeminiGatewayError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "invalid API key")
 	case errors.Is(err, apikeyservice.ErrKeyDisabled), errors.Is(err, apikeyservice.ErrKeyExpired):

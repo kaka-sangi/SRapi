@@ -382,12 +382,15 @@ func (s *Store) DeleteAuthIdentity(_ context.Context, userID int, identityID int
 
 func (s *Store) seedBuiltInRoles() {
 	for _, role := range []contract.Role{contract.RoleOwner, contract.RoleAdmin, contract.RoleOperator, contract.RoleUser} {
+		definition := contract.BuiltInRoleDefinition(role)
 		now := time.Now().UTC()
 		s.roles[role] = contract.RoleDefinition{
-			ID:        s.nextRoleID,
-			Name:      role,
-			CreatedAt: now,
-			UpdatedAt: now,
+			ID:          s.nextRoleID,
+			Name:        role,
+			Description: definition.Description,
+			Permissions: append([]string(nil), definition.Permissions...),
+			CreatedAt:   now,
+			UpdatedAt:   now,
 		}
 		s.nextRoleID++
 	}

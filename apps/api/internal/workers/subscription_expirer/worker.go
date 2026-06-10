@@ -13,6 +13,7 @@ import (
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -25,6 +26,7 @@ type Config struct {
 	Clock        service.Clock
 	Events       eventscontract.Store
 	AdminControl admincontrolcontract.Store
+	RunGuard     runonceguard.Guard
 }
 
 type Dependencies = service.Dependencies
@@ -34,6 +36,7 @@ type Worker struct {
 	adminControl  *admincontrolservice.Service
 	logger        *slog.Logger
 	interval      time.Duration
+	guard         runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -70,7 +73,7 @@ func New(store contract.Store, deps Dependencies, logger *slog.Logger, cfg Confi
 	if interval <= 0 {
 		interval = defaultInterval
 	}
-	return &Worker{subscriptions: subscriptions, adminControl: adminControl, logger: logger, interval: interval}, nil
+	return &Worker{subscriptions: subscriptions, adminControl: adminControl, logger: logger, interval: interval, guard: cfg.RunGuard}, nil
 }
 
 func (w *Worker) Start(parent context.Context) {
@@ -136,6 +139,16 @@ func (w *Worker) RunOnce(ctx context.Context) (contract.ExpireSubscriptionsResul
 	if w == nil {
 		return contract.ExpireSubscriptionsResult{}, nil
 	}
+	var result contract.ExpireSubscriptionsResult
+	_, err := runonceguard.Run(ctx, w.guard, "subscription_expirer", func(runCtx context.Context) error {
+		var runErr error
+		result, runErr = w.expireSubscriptions(runCtx)
+		return runErr
+	})
+	return result, err
+}
+
+func (w *Worker) expireSubscriptions(ctx context.Context) (contract.ExpireSubscriptionsResult, error) {
 	expiration, err := w.subscriptions.ExpireActiveUserSubscriptions(ctx, time.Time{})
 	if err != nil {
 		return expiration, err

@@ -11,11 +11,11 @@ import (
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
-func TestAdminRolePermissionAllowsPaymentOrderReadOnly(t *testing.T) {
+func TestAdminRolePermissionAllowsPaymentReadOnly(t *testing.T) {
 	handler := New(config.Load(), nil)
 	adminLogin, adminCookie := mustLoginAdmin(t, handler)
 
-	roleReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/roles", strings.NewReader(`{"name":"payment_reader","description":"Payment reader","permissions":["payment_order:read"]}`))
+	roleReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/roles", strings.NewReader(`{"name":"payment_reader","description":"Payment reader","permissions":["payment:read"]}`))
 	roleReq.Header.Set("Content-Type", "application/json")
 	roleReq.Header.Set("X-CSRF-Token", adminLogin.Data.CsrfToken)
 	roleReq.AddCookie(adminCookie)

@@ -32,6 +32,8 @@ type userAttributeValuePayload struct {
 	Key          string     `json:"key"`
 	Name         string     `json:"name"`
 	DataType     string     `json:"data_type"`
+	Options      []string   `json:"options"`
+	Required     bool       `json:"required"`
 	Value        string     `json:"value"`
 	UpdatedAt    *time.Time `json:"updated_at,omitempty"`
 }
@@ -256,6 +258,8 @@ func (s *Server) handleListAdminUserAttributeValues(w http.ResponseWriter, r *ht
 			Key:          def.Key,
 			Name:         def.Name,
 			DataType:     string(def.DataType),
+			Options:      attributeOptions(def.Options),
+			Required:     def.Required,
 		}
 		if value, ok := valueByDefinition[def.ID]; ok {
 			payload.Value = value.Value

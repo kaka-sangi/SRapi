@@ -253,18 +253,24 @@ func userSubscriptionAuditSnapshot(subscription subscriptioncontract.UserSubscri
 
 func pricingRuleAuditSnapshot(rule billingcontract.PricingRule) map[string]any {
 	return map[string]any{
-		"model_id":                             rule.ModelID,
-		"provider_id":                          rule.ProviderID,
-		"billing_mode":                         rule.BillingMode,
-		"input_price_per_million_tokens":       rule.InputPricePerMillionTokens,
-		"output_price_per_million_tokens":      rule.OutputPricePerMillionTokens,
-		"cache_read_price_per_million_tokens":  rule.CacheReadPricePerMillionTokens,
-		"cache_write_price_per_million_tokens": rule.CacheWritePricePerMillionTokens,
-		"per_request_price":                    rule.PerRequestPrice,
-		"intervals":                            rule.Intervals,
-		"currency":                             rule.Currency,
-		"effective_from":                       rule.EffectiveFrom,
-		"effective_to":                         rule.EffectiveTo,
+		"model_id":                                rule.ModelID,
+		"provider_id":                             rule.ProviderID,
+		"billing_mode":                            rule.BillingMode,
+		"input_price_per_million_tokens":          rule.InputPricePerMillionTokens,
+		"output_price_per_million_tokens":         rule.OutputPricePerMillionTokens,
+		"cache_read_price_per_million_tokens":     rule.CacheReadPricePerMillionTokens,
+		"cache_write_price_per_million_tokens":    rule.CacheWritePricePerMillionTokens,
+		"cache_write_5m_price_per_million_tokens": rule.CacheWrite5mPricePerMillionTokens,
+		"cache_write_1h_price_per_million_tokens": rule.CacheWrite1hPricePerMillionTokens,
+		"image_output_price_per_million_tokens":   rule.ImageOutputPricePerMillionTokens,
+		"per_request_price":                       rule.PerRequestPrice,
+		"service_tier_multipliers":                rule.ServiceTierMultipliers,
+		"long_context_threshold_tokens":           rule.LongContextThresholdTokens,
+		"long_context_multiplier":                 rule.LongContextMultiplier,
+		"intervals":                               rule.Intervals,
+		"currency":                                rule.Currency,
+		"effective_from":                          rule.EffectiveFrom,
+		"effective_to":                            rule.EffectiveTo,
 	}
 }
 

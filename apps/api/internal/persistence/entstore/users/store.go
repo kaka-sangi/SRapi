@@ -27,7 +27,34 @@ func New(client *ent.Client) (*Store, error) {
 	if client == nil {
 		return nil, ErrInvalidStore
 	}
-	return &Store{client: client}, nil
+	store := &Store{client: client}
+	if err := store.EnsureBuiltInRoles(context.Background()); err != nil {
+		return nil, err
+	}
+	return store, nil
+}
+
+func (s *Store) EnsureBuiltInRoles(ctx context.Context) error {
+	tx, err := s.client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	for _, roleName := range []contract.Role{contract.RoleOwner, contract.RoleAdmin, contract.RoleOperator, contract.RoleUser} {
+		if _, err := ensureRole(ctx, tx, roleName); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }
 
 func (s *Store) Create(ctx context.Context, input contract.CreateStoredUser) (contract.StoredUser, error) {
@@ -548,7 +575,17 @@ func ensureRole(ctx context.Context, tx *ent.Tx, roleName contract.Role) (*ent.R
 	name := strings.TrimSpace(string(roleName))
 	found, err := tx.Role.Query().Where(entrole.NameEQ(name)).Only(ctx)
 	if err == nil {
-		return found, nil
+		if !contract.IsBuiltInRole(roleName) {
+			return found, nil
+		}
+		definition := contract.BuiltInRoleDefinition(roleName)
+		if found.Description == definition.Description && sameStrings(found.PermissionsJSON, definition.Permissions) {
+			return found, nil
+		}
+		return tx.Role.UpdateOneID(found.ID).
+			SetDescription(definition.Description).
+			SetPermissionsJSON(append([]string(nil), definition.Permissions...)).
+			Save(ctx)
 	}
 	if !ent.IsNotFound(err) {
 		return nil, err
@@ -556,7 +593,12 @@ func ensureRole(ctx context.Context, tx *ent.Tx, roleName contract.Role) (*ent.R
 	if !contract.IsBuiltInRole(contract.Role(name)) {
 		return nil, fmt.Errorf("role %q not found", name)
 	}
-	created, err := tx.Role.Create().SetName(name).Save(ctx)
+	definition := contract.BuiltInRoleDefinition(contract.Role(name))
+	created, err := tx.Role.Create().
+		SetName(name).
+		SetDescription(definition.Description).
+		SetPermissionsJSON(append([]string(nil), definition.Permissions...)).
+		Save(ctx)
 	if err == nil {
 		return created, nil
 	}
@@ -564,6 +606,18 @@ func ensureRole(ctx context.Context, tx *ent.Tx, roleName contract.Role) (*ent.R
 		return tx.Role.Query().Where(entrole.NameEQ(name)).Only(ctx)
 	}
 	return nil, err
+}
+
+func sameStrings(left []string, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func toRoleDefinition(row *ent.Role) contract.RoleDefinition {

@@ -64,7 +64,9 @@ var promptInjectionPatterns = []string{
 }
 
 // Service applies lightweight content-safety checks to canonical gateway requests.
-type Service struct{}
+type Service struct {
+	config contentsafetycontract.Config
+}
 
 type redactionPattern struct {
 	kind        contentsafetycontract.FindingKind
@@ -73,89 +75,125 @@ type redactionPattern struct {
 	pattern     *regexp.Regexp
 }
 
-// New creates a content-safety service with the built-in detector set.
-func New() (*Service, error) {
-	return &Service{}, nil
+// New creates a content-safety service with the supplied runtime defaults.
+func New(config contentsafetycontract.Config) *Service {
+	return &Service{config: NormalizeConfig(config)}
+}
+
+func DefaultConfig() contentsafetycontract.Config {
+	return contentsafetycontract.Config{
+		Enabled:              true,
+		Mode:                 contentsafetycontract.ModeMonitor,
+		RedactPII:            true,
+		BlockPII:             false,
+		BlockPromptInjection: false,
+		BlockCustomKeywords:  false,
+		CustomKeywords:       []string{},
+		ModelScopes:          []string{},
+	}
+}
+
+func NormalizeConfig(config contentsafetycontract.Config) contentsafetycontract.Config {
+	if config.Mode != contentsafetycontract.ModeMonitor && config.Mode != contentsafetycontract.ModeEnforce {
+		config.Mode = contentsafetycontract.ModeMonitor
+	}
+	config.CustomKeywords = uniqueLowerTrimmedStrings(config.CustomKeywords)
+	config.ModelScopes = uniqueLowerTrimmedStrings(config.ModelScopes)
+	return config
 }
 
 // Apply redacts detected PII from gateway request text fields and records safe finding evidence.
 func (s *Service) Apply(req gatewaycontract.CanonicalRequest) (gatewaycontract.CanonicalRequest, contentsafetycontract.Result) {
+	return s.ApplyWithConfig(req, s.config)
+}
+
+func (s *Service) ApplyWithConfig(req gatewaycontract.CanonicalRequest, config contentsafetycontract.Config) (gatewaycontract.CanonicalRequest, contentsafetycontract.Result) {
+	config = NormalizeConfig(config)
 	result := contentsafetycontract.Result{}
-	req.Prompt = s.scanText(req.Prompt, &result)
-	req.Instructions = s.scanText(req.Instructions, &result)
-	req.InputItems = s.scanContentBlocks(req.InputItems, &result)
-	req.Messages = s.scanMessages(req.Messages, &result)
-	req.EmbeddingInput = s.scanStrings(req.EmbeddingInput, &result)
-	req.ImagePrompt = s.scanText(req.ImagePrompt, &result)
-	req.AudioPrompt = s.scanText(req.AudioPrompt, &result)
-	req.SpeechInput = s.scanText(req.SpeechInput, &result)
-	req.SpeechInstructions = s.scanText(req.SpeechInstructions, &result)
-	req.ModerationInput = s.scanStrings(req.ModerationInput, &result)
-	req.RerankQuery = s.scanText(req.RerankQuery, &result)
-	req.RerankDocuments = s.scanRerankDocuments(req.RerankDocuments, &result)
+	if !config.Enabled {
+		return req, result
+	}
+	if !configMatchesModel(config, req.CanonicalModel, req.Model) {
+		return req, result
+	}
+	req.Prompt = s.scanText(req.Prompt, config, &result)
+	req.Instructions = s.scanText(req.Instructions, config, &result)
+	req.InputItems = s.scanContentBlocks(req.InputItems, config, &result)
+	req.Messages = s.scanMessages(req.Messages, config, &result)
+	req.EmbeddingInput = s.scanStrings(req.EmbeddingInput, config, &result)
+	req.ImagePrompt = s.scanText(req.ImagePrompt, config, &result)
+	req.AudioPrompt = s.scanText(req.AudioPrompt, config, &result)
+	req.SpeechInput = s.scanText(req.SpeechInput, config, &result)
+	req.SpeechInstructions = s.scanText(req.SpeechInstructions, config, &result)
+	req.ModerationInput = s.scanStrings(req.ModerationInput, config, &result)
+	req.RerankQuery = s.scanText(req.RerankQuery, config, &result)
+	req.RerankDocuments = s.scanRerankDocuments(req.RerankDocuments, config, &result)
+	applyContentSafetyConfig(config, &result)
 	result.Findings = sortedFindings(result.Findings)
 	result.Warnings = resultWarnings(result.Findings)
 	req.CompatibilityWarnings = mergeWarnings(req.CompatibilityWarnings, result.Warnings)
 	return req, result
 }
 
-func (s *Service) scanMessages(values []gatewaycontract.Message, result *contentsafetycontract.Result) []gatewaycontract.Message {
+func (s *Service) scanMessages(values []gatewaycontract.Message, config contentsafetycontract.Config, result *contentsafetycontract.Result) []gatewaycontract.Message {
 	if values == nil {
 		return nil
 	}
 	out := append([]gatewaycontract.Message(nil), values...)
 	for i := range out {
-		out[i].Content = s.scanContentBlocks(out[i].Content, result)
+		out[i].Content = s.scanContentBlocks(out[i].Content, config, result)
 	}
 	return out
 }
 
-func (s *Service) scanContentBlocks(values []gatewaycontract.ContentBlock, result *contentsafetycontract.Result) []gatewaycontract.ContentBlock {
+func (s *Service) scanContentBlocks(values []gatewaycontract.ContentBlock, config contentsafetycontract.Config, result *contentsafetycontract.Result) []gatewaycontract.ContentBlock {
 	if values == nil {
 		return nil
 	}
 	out := append([]gatewaycontract.ContentBlock(nil), values...)
 	for i := range out {
-		out[i].Text = s.scanText(out[i].Text, result)
+		out[i].Text = s.scanText(out[i].Text, config, result)
 	}
 	return out
 }
 
-func (s *Service) scanRerankDocuments(values []gatewaycontract.RerankDocument, result *contentsafetycontract.Result) []gatewaycontract.RerankDocument {
+func (s *Service) scanRerankDocuments(values []gatewaycontract.RerankDocument, config contentsafetycontract.Config, result *contentsafetycontract.Result) []gatewaycontract.RerankDocument {
 	if values == nil {
 		return nil
 	}
 	out := append([]gatewaycontract.RerankDocument(nil), values...)
 	for i := range out {
-		out[i].Text = s.scanText(out[i].Text, result)
+		out[i].Text = s.scanText(out[i].Text, config, result)
 	}
 	return out
 }
 
-func (s *Service) scanStrings(values []string, result *contentsafetycontract.Result) []string {
+func (s *Service) scanStrings(values []string, config contentsafetycontract.Config, result *contentsafetycontract.Result) []string {
 	if values == nil {
 		return nil
 	}
 	out := append([]string(nil), values...)
 	for i := range out {
-		out[i] = s.scanText(out[i], result)
+		out[i] = s.scanText(out[i], config, result)
 	}
 	return out
 }
 
-func (s *Service) scanText(value string, result *contentsafetycontract.Result) string {
+func (s *Service) scanText(value string, config contentsafetycontract.Config, result *contentsafetycontract.Result) string {
 	if strings.TrimSpace(value) == "" {
 		return value
 	}
 	redacted := value
 	for _, item := range piiPatterns {
-		matches := item.pattern.FindAllString(redacted, -1)
+		matches := contentSafetyMatches(item, redacted)
 		if len(matches) == 0 {
 			continue
 		}
-		redacted = item.pattern.ReplaceAllString(redacted, item.replacement)
-		addFinding(result, item.kind, item.severity, len(matches), true)
-		result.Changed = true
+		if config.RedactPII {
+			redacted = replaceContentSafetyMatches(item, redacted)
+			result.Changed = true
+		}
+		addFinding(result, item.kind, item.severity, len(matches), config.RedactPII)
 	}
 	lower := strings.ToLower(value)
 	for _, phrase := range promptInjectionPatterns {
@@ -163,7 +201,165 @@ func (s *Service) scanText(value string, result *contentsafetycontract.Result) s
 			addFinding(result, contentsafetycontract.FindingKindPromptInjection, contentsafetycontract.SeverityMedium, 1, false)
 		}
 	}
+	for _, keyword := range config.CustomKeywords {
+		if strings.Contains(lower, keyword) {
+			addFinding(result, contentsafetycontract.FindingKindCustomKeyword, contentsafetycontract.SeverityHigh, strings.Count(lower, keyword), false)
+		}
+	}
 	return redacted
+}
+
+func contentSafetyMatches(item redactionPattern, value string) []string {
+	indexes := item.pattern.FindAllStringIndex(value, -1)
+	out := make([]string, 0, len(indexes))
+	for _, index := range indexes {
+		match := value[index[0]:index[1]]
+		if contentSafetyMatchAllowed(item.kind, value, index[0], index[1], match) {
+			out = append(out, match)
+		}
+	}
+	return out
+}
+
+func replaceContentSafetyMatches(item redactionPattern, value string) string {
+	indexes := item.pattern.FindAllStringIndex(value, -1)
+	if len(indexes) == 0 {
+		return value
+	}
+	var out strings.Builder
+	start := 0
+	for _, index := range indexes {
+		match := value[index[0]:index[1]]
+		if !contentSafetyMatchAllowed(item.kind, value, index[0], index[1], match) {
+			continue
+		}
+		out.WriteString(value[start:index[0]])
+		out.WriteString(item.replacement)
+		start = index[1]
+	}
+	if start == 0 {
+		return value
+	}
+	out.WriteString(value[start:])
+	return out.String()
+}
+
+func contentSafetyMatchAllowed(kind contentsafetycontract.FindingKind, value string, start int, end int, match string) bool {
+	if kind == contentsafetycontract.FindingKindPIICreditCard {
+		return luhnValidDigits(match)
+	}
+	if kind == contentsafetycontract.FindingKindPIIPhone {
+		return !adjacentDigit(value, start-1) && !adjacentDigit(value, end)
+	}
+	return true
+}
+
+func adjacentDigit(value string, idx int) bool {
+	if idx < 0 || idx >= len(value) {
+		return false
+	}
+	return value[idx] >= '0' && value[idx] <= '9'
+}
+
+func luhnValidDigits(value string) bool {
+	digits := make([]int, 0, len(value))
+	for _, char := range value {
+		if char >= '0' && char <= '9' {
+			digits = append(digits, int(char-'0'))
+		}
+	}
+	if len(digits) < 13 || len(digits) > 19 {
+		return false
+	}
+	var sum int
+	double := false
+	for idx := len(digits) - 1; idx >= 0; idx-- {
+		digit := digits[idx]
+		if double {
+			digit *= 2
+			if digit > 9 {
+				digit -= 9
+			}
+		}
+		sum += digit
+		double = !double
+	}
+	return sum%10 == 0
+}
+
+func applyContentSafetyConfig(config contentsafetycontract.Config, result *contentsafetycontract.Result) {
+	if result == nil || config.Mode != contentsafetycontract.ModeEnforce {
+		return
+	}
+	for _, finding := range result.Findings {
+		if finding.Kind == contentsafetycontract.FindingKindPromptInjection && config.BlockPromptInjection {
+			result.Blocked = true
+			result.Reason = "prompt_injection"
+			return
+		}
+		if finding.Kind == contentsafetycontract.FindingKindCustomKeyword && config.BlockCustomKeywords {
+			result.Blocked = true
+			result.Reason = "custom_keyword"
+			return
+		}
+		if isPIIFinding(finding.Kind) && config.BlockPII {
+			result.Blocked = true
+			result.Reason = string(finding.Kind)
+			return
+		}
+	}
+}
+
+func configMatchesModel(config contentsafetycontract.Config, canonicalModel string, requestedModel string) bool {
+	if len(config.ModelScopes) == 0 {
+		return true
+	}
+	model := strings.ToLower(strings.TrimSpace(canonicalModel))
+	if model == "" {
+		model = strings.ToLower(strings.TrimSpace(requestedModel))
+	}
+	if model == "" {
+		return false
+	}
+	for _, scope := range config.ModelScopes {
+		if model == scope {
+			return true
+		}
+		if strings.HasSuffix(scope, "*") && strings.HasPrefix(model, strings.TrimSuffix(scope, "*")) {
+			return true
+		}
+	}
+	return false
+}
+
+func isPIIFinding(kind contentsafetycontract.FindingKind) bool {
+	switch kind {
+	case contentsafetycontract.FindingKindPIIEmail,
+		contentsafetycontract.FindingKindPIIPhone,
+		contentsafetycontract.FindingKindPIISSN,
+		contentsafetycontract.FindingKindPIINationalID,
+		contentsafetycontract.FindingKindPIICreditCard:
+		return true
+	default:
+		return false
+	}
+}
+
+func uniqueLowerTrimmedStrings(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		trimmed := strings.ToLower(strings.TrimSpace(value))
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
 }
 
 func addFinding(result *contentsafetycontract.Result, kind contentsafetycontract.FindingKind, severity contentsafetycontract.Severity, count int, redacted bool) {

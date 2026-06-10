@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"log/slog"
 	"strings"
@@ -124,6 +125,38 @@ func TestRunOnceDrainsConfiguredBatches(t *testing.T) {
 	}
 }
 
+func TestRunOnceContinuesAfterFailedBatch(t *testing.T) {
+	store := &fakeUsageChargeStore{
+		pending:     makePendingCharges(defaultBatchLimit),
+		failCharges: map[int]error{1: errors.New("serialization failure")},
+	}
+	store.pending = append(store.pending, billingcontract.PendingUsageCharge{
+		UsageLogID: defaultBatchLimit + 1,
+		RequestID:  "req_batch_2",
+		UserID:     1,
+		Cost:       "0.00010000",
+		Currency:   "USD",
+	})
+	worker, err := New(store, discardLogger(), Config{MaxBatchesPerRun: 2})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+
+	result, err := worker.RunOnce(t.Context())
+	if err == nil {
+		t.Fatal("expected aggregate error from failed batch")
+	}
+	if store.chargeCalls != 2 {
+		t.Fatalf("expected worker to continue to second batch, charge calls=%d", store.chargeCalls)
+	}
+	if result.Selected != defaultBatchLimit || result.Charged != defaultBatchLimit {
+		t.Fatalf("expected retry batch charged after first failed, got %+v", result)
+	}
+	if len(store.pending) != 1 {
+		t.Fatalf("expected failed first batch to remain pending, got %d pending", len(store.pending))
+	}
+}
+
 func TestRunOnceEnqueuesBalanceLowNotificationOnThresholdCrossing(t *testing.T) {
 	users := usersmemory.New()
 	user, err := users.Create(t.Context(), userscontract.CreateStoredUser{
@@ -236,6 +269,7 @@ type fakeUsageChargeStore struct {
 	result      billingcontract.ChargeUsageResult
 	listCalls   int
 	chargeCalls int
+	failCharges map[int]error
 }
 
 func (s *fakeUsageChargeStore) ListPendingUsageCharges(_ context.Context, limit int) ([]billingcontract.PendingUsageCharge, error) {
@@ -250,6 +284,9 @@ func (s *fakeUsageChargeStore) ListPendingUsageCharges(_ context.Context, limit 
 
 func (s *fakeUsageChargeStore) ChargeUsage(_ context.Context, req billingcontract.ChargeUsageRequest) (billingcontract.ChargeUsageResult, error) {
 	s.chargeCalls++
+	if err := s.failCharges[s.chargeCalls]; err != nil {
+		return billingcontract.ChargeUsageResult{}, err
+	}
 	result := s.result
 	if result.UserID == 0 {
 		result.UserID = req.UserID

@@ -718,6 +718,25 @@ func (s *Service) BindAuthIdentity(ctx context.Context, req BindAuthIdentityRequ
 	return s.ListAuthIdentities(ctx, req.UserID)
 }
 
+// FindAuthIdentityByProviderSubject returns the user-bound external identity
+// for an already verified provider subject hash.
+func (s *Service) FindAuthIdentityByProviderSubject(ctx context.Context, provider contract.AuthIdentityProvider, providerKey string, providerSubjectHash string) (contract.UserAuthIdentity, error) {
+	provider = normalizeAuthIdentityProvider(provider)
+	providerKey = strings.TrimSpace(providerKey)
+	providerSubjectHash = strings.TrimSpace(providerSubjectHash)
+	if provider == "" || provider == contract.AuthIdentityProviderEmail || providerKey == "" || providerSubjectHash == "" {
+		return contract.UserAuthIdentity{}, ErrInvalidInput
+	}
+	identity, err := s.store.FindAuthIdentityByProviderSubject(ctx, provider, providerKey, providerSubjectHash)
+	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return contract.UserAuthIdentity{}, ErrIdentityNotFound
+		}
+		return contract.UserAuthIdentity{}, err
+	}
+	return identity, nil
+}
+
 // UnbindAuthIdentity removes one external sign-in identity from the user.
 func (s *Service) UnbindAuthIdentity(ctx context.Context, userID int, identityID int) ([]contract.UserAuthIdentity, error) {
 	if userID <= 0 || identityID <= 0 {
@@ -805,6 +824,9 @@ func normalizePermissions(permissions []string) ([]string, error) {
 			continue
 		}
 		if !permissionPattern.MatchString(permission) {
+			return nil, ErrInvalidInput
+		}
+		if !contract.IsKnownPermission(permission) {
 			return nil, ErrInvalidInput
 		}
 		if seen[permission] {
