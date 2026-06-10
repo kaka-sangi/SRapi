@@ -24,6 +24,7 @@ const (
 // Run status values.
 const (
 	RunStatusOK      = "ok"
+	RunStatusWarning = "warning"
 	RunStatusPartial = "partial"
 	RunStatusFailed  = "failed"
 )
@@ -43,6 +44,7 @@ type Plan struct {
 	ScopeID         *int
 	IntervalSeconds int
 	CronExpression  string
+	ProbeModel      string
 	MaxResults      int
 	AutoRecover     bool
 	LastRunAt       *time.Time
@@ -60,6 +62,7 @@ type CreatePlan struct {
 	ScopeID         *int
 	IntervalSeconds int
 	CronExpression  string
+	ProbeModel      string
 	MaxResults      int
 	AutoRecover     bool
 }
@@ -73,6 +76,7 @@ type UpdatePlan struct {
 	ClearScopeID    bool
 	IntervalSeconds *int
 	CronExpression  *string
+	ProbeModel      *string
 	MaxResults      *int
 	AutoRecover     *bool
 }

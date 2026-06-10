@@ -16,6 +16,7 @@ import (
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
 	scheduledcontract "github.com/srapi/srapi/apps/api/internal/modules/scheduled_tests/contract"
 	scheduledservice "github.com/srapi/srapi/apps/api/internal/modules/scheduled_tests/service"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -31,6 +32,7 @@ type Config struct {
 	MasterKey string
 	Clock     accountservice.Clock
 	Adapter   provideradaptercontract.ConversationAdapter
+	RunGuard  runonceguard.Guard
 }
 
 // Worker evaluates due scheduled-test plans on a fixed tick and runs each via
@@ -42,6 +44,7 @@ type Worker struct {
 	tick    time.Duration
 	timeout time.Duration
 	clock   func() time.Time
+	guard   runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -96,6 +99,7 @@ func New(accounts accountcontract.Store, providers providercontract.Store, plans
 		tick:    durationOrDefault(cfg.Tick, defaultTick),
 		timeout: durationOrDefault(cfg.Timeout, defaultTimeout),
 		clock:   clock,
+		guard:   cfg.RunGuard,
 	}, nil
 }
 
@@ -157,7 +161,7 @@ func (w *Worker) Shutdown(ctx context.Context) error {
 }
 
 func (w *Worker) run(ctx context.Context) {
-	w.evaluate(ctx)
+	_, _ = w.RunOnce(ctx)
 	ticker := time.NewTicker(w.tick)
 	defer ticker.Stop()
 	for {
@@ -165,7 +169,7 @@ func (w *Worker) run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			w.evaluate(ctx)
+			_, _ = w.RunOnce(ctx)
 		}
 	}
 }
@@ -175,7 +179,13 @@ func (w *Worker) RunOnce(ctx context.Context) (int, error) {
 	if w == nil {
 		return 0, nil
 	}
-	return w.evaluate(ctx)
+	var ran int
+	_, err := runonceguard.Run(ctx, w.guard, "scheduled_test", func(runCtx context.Context) error {
+		var runErr error
+		ran, runErr = w.evaluate(runCtx)
+		return runErr
+	})
+	return ran, err
 }
 
 func (w *Worker) evaluate(ctx context.Context) (int, error) {

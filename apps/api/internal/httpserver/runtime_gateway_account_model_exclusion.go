@@ -57,6 +57,17 @@ func (rt *runtimeState) modelsHiddenByExclusion(ctx context.Context, models []mo
 	if err != nil {
 		return nil
 	}
+	groupIDsByAccount := map[int][]int{}
+	if len(apiKey.GroupIDs) > 0 {
+		accountIDs := make([]int, 0, len(accounts))
+		for _, account := range accounts {
+			accountIDs = append(accountIDs, account.ID)
+		}
+		groupIDsByAccount, err = rt.accounts.ListGroupIDsByAccounts(ctx, accountIDs)
+		if err != nil {
+			return nil
+		}
+	}
 	hidden := map[string]struct{}{}
 	for _, model := range models {
 		mappings, err := rt.models.ListMappingsByModel(ctx, model.ID)
@@ -70,8 +81,7 @@ func (rt *runtimeState) modelsHiddenByExclusion(ctx context.Context, models []mo
 				if account.ProviderID != mapping.ProviderID {
 					continue
 				}
-				allowed, err := rt.apiKeyAllowsAccount(ctx, apiKey, account.ID)
-				if err != nil || !allowed {
+				if len(apiKey.GroupIDs) > 0 && !intersectsInt(apiKey.GroupIDs, groupIDsByAccount[account.ID]) {
 					continue
 				}
 				serving++

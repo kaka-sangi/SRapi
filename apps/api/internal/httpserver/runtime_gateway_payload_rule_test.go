@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	admincontrolservice "github.com/srapi/srapi/apps/api/internal/modules/admin_control/service"
+	admincontrolmemory "github.com/srapi/srapi/apps/api/internal/modules/admin_control/store/memory"
 	payloadrulescontract "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/contract"
 	payloadrulesmemory "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/store/memory"
 )
@@ -68,5 +70,71 @@ func TestGatewayAppliesPayloadOverrideRule(t *testing.T) {
 	reasoning, _ := doc["reasoning"].(map[string]any)
 	if reasoning["effort"] != "high" {
 		t.Fatalf("expected payload override reasoning.effort=high in upstream body, got %s", sent)
+	}
+}
+
+func TestGatewaySkipsPayloadRulesWhenRequestShaperDisabled(t *testing.T) {
+	bodyCh := make(chan []byte, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		select {
+		case bodyCh <- raw:
+		default:
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"x","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer upstream.Close()
+
+	payloadStore := payloadrulesmemory.New()
+	if _, err := payloadStore.CreateRule(context.Background(), payloadrulescontract.CreateRule{
+		Name:          "force-high-effort",
+		Enabled:       true,
+		Action:        payloadrulescontract.ActionOverride,
+		MatchModel:    "*",
+		MatchProtocol: "openai-compatible",
+		Params:        map[string]any{"reasoning.effort": "high"},
+	}); err != nil {
+		t.Fatalf("seed payload rule: %v", err)
+	}
+	adminStore := admincontrolmemory.New()
+	adminSvc, err := admincontrolservice.New(adminStore, nil)
+	if err != nil {
+		t.Fatalf("new admin control service: %v", err)
+	}
+	settings, err := adminSvc.GetAdminSettings(t.Context())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.Gateway.RequestShaperEnabled = false
+	if _, err := adminSvc.UpdateAdminSettings(t.Context(), settings, 1); err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+
+	handler := New(config.Load(), nil, WithPayloadRulesStore(payloadStore), WithAdminControlStore(adminStore))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"shape-disabled-provider","display_name":"Shape Disabled Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"shape-disabled-model","display_name":"Shape Disabled Model","status":"active","capabilities":[{"key":"streaming","level":"optional","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"shape-disabled-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"shape-disabled-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"shape-disabled-model","messages":[{"role":"user","content":"hello"}]}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var sent []byte
+	select {
+	case sent = <-bodyCh:
+	default:
+		t.Fatal("upstream did not receive a request body")
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(sent, &doc); err != nil {
+		t.Fatalf("decode upstream body %q: %v", sent, err)
+	}
+	if _, ok := doc["reasoning"]; ok {
+		t.Fatalf("request shaper disabled should skip operator payload rules, got %s", sent)
 	}
 }

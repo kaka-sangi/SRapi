@@ -106,6 +106,15 @@ func TestChannelMonitorCRUDAndRun(t *testing.T) {
 		t.Fatalf("expected monitor update 200, got %d body=%s", updateRec.Code, updateRec.Body.String())
 	}
 
+	disabledRunRec := channelMonitorDo(t, handler, http.MethodPost, fmt.Sprintf("/api/v1/admin/channel-monitors/%d/run", monitorID), csrf, cookie, "")
+	if disabledRunRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected disabled monitor run 400, got %d body=%s", disabledRunRec.Code, disabledRunRec.Body.String())
+	}
+	updateRec = channelMonitorDo(t, handler, http.MethodPatch, fmt.Sprintf("/api/v1/admin/channel-monitors/%d", monitorID), csrf, cookie, `{"enabled":true}`)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected monitor re-enable 200, got %d body=%s", updateRec.Code, updateRec.Body.String())
+	}
+
 	// Run-now: returns per-model CheckResult (probe will fail with no upstream but still records a check).
 	runRec := channelMonitorDo(t, handler, http.MethodPost, fmt.Sprintf("/api/v1/admin/channel-monitors/%d/run", monitorID), csrf, cookie, "")
 	if runRec.Code != http.StatusOK {

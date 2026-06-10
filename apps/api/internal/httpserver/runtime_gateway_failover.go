@@ -17,6 +17,7 @@ import (
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	"github.com/srapi/srapi/apps/api/internal/pkg/metacoerce"
 )
 
 // defaultGatewayFailoverAttempts is the fallback cross-candidate failover cap
@@ -707,7 +708,7 @@ func gatewayProviderErrorMessageEnabled(metadata map[string]any) bool {
 }
 
 func gatewayProviderErrorMessageStatusAllowed(metadata map[string]any, upstreamStatus int) bool {
-	value, ok := metadataValue(metadata,
+	value, ok := metacoerce.Value(metadata,
 		"provider_error_passthrough_status_codes",
 		"exposed_provider_error_status_codes",
 		"provider_error_message_status_codes",
@@ -977,7 +978,7 @@ func sleepGatewayRetryDelay(ctx context.Context, delay time.Duration) error {
 }
 
 func gatewayRetryCount(metadata map[string]any, keys ...string) (int, bool) {
-	value, ok := metadataValue(metadata, keys...)
+	value, ok := metacoerce.Value(metadata, keys...)
 	if !ok {
 		return 0, false
 	}
@@ -1048,7 +1049,7 @@ func clampGatewayRetryCount(count int) int {
 }
 
 func gatewayRetryDelay(metadata map[string]any, fallback time.Duration, keys ...string) time.Duration {
-	value, ok := metadataValue(metadata, keys...)
+	value, ok := metacoerce.Value(metadata, keys...)
 	if !ok {
 		return fallback
 	}

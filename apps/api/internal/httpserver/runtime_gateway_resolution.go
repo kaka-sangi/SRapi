@@ -1,10 +1,8 @@
 package httpserver
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +12,7 @@ import (
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/metacoerce"
 )
 
 // This file holds the pure helpers that derive scheduler runtime state and
@@ -183,148 +182,31 @@ func schedulerRuntimeLimits(metadata map[string]any) schedulercontract.RuntimeLi
 }
 
 func metadataBool(metadata map[string]any, key string) bool {
-	return boolValue(metadata[key])
+	return metacoerce.Bool(metadata, key)
 }
 
 func boolValue(value any) bool {
-	switch value := value.(type) {
-	case bool:
-		return value
-	case string:
-		parsed, err := strconv.ParseBool(strings.TrimSpace(value))
-		return err == nil && parsed
-	default:
-		return false
-	}
+	return metacoerce.BoolValue(value)
 }
 
 func metadataInt(metadata map[string]any, keys ...string) int {
-	value, ok := metadataValue(metadata, keys...)
+	value, ok := metacoerce.Value(metadata, keys...)
 	if !ok {
 		return 0
 	}
-	switch value := value.(type) {
-	case int:
-		return value
-	case int8:
-		return int(value)
-	case int16:
-		return int(value)
-	case int32:
-		return int(value)
-	case int64:
-		return int(value)
-	case uint:
-		return int(value)
-	case uint8:
-		return int(value)
-	case uint16:
-		return int(value)
-	case uint32:
-		return int(value)
-	case uint64:
-		return int(value)
-	case float32:
-		return int(value)
-	case float64:
-		return int(value)
-	case json.Number:
-		parsed, err := value.Int64()
-		if err == nil {
-			return int(parsed)
-		}
-		floatValue, err := value.Float64()
-		if err == nil {
-			return int(floatValue)
-		}
-	case string:
-		raw := strings.TrimSpace(value)
-		parsed, err := strconv.Atoi(raw)
-		if err == nil {
-			return parsed
-		}
-		floatValue, err := strconv.ParseFloat(raw, 64)
-		if err == nil {
-			return int(floatValue)
-		}
+	parsed, ok := metacoerce.Int(value)
+	if !ok {
+		return 0
 	}
-	return 0
+	return parsed
 }
 
 func metadataOptionalInt(metadata map[string]any, keys ...string) *int {
-	if _, ok := metadataValue(metadata, keys...); !ok {
-		return nil
-	}
-	value := metadataInt(metadata, keys...)
-	return &value
+	return metacoerce.OptionalInt(metadata, keys...)
 }
 
 func metadataOptionalFloat(metadata map[string]any, keys ...string) *float64 {
-	value, ok := metadataValue(metadata, keys...)
-	if !ok {
-		return nil
-	}
-	switch value := value.(type) {
-	case int:
-		out := float64(value)
-		return &out
-	case int8:
-		out := float64(value)
-		return &out
-	case int16:
-		out := float64(value)
-		return &out
-	case int32:
-		out := float64(value)
-		return &out
-	case int64:
-		out := float64(value)
-		return &out
-	case uint:
-		out := float64(value)
-		return &out
-	case uint8:
-		out := float64(value)
-		return &out
-	case uint16:
-		out := float64(value)
-		return &out
-	case uint32:
-		out := float64(value)
-		return &out
-	case uint64:
-		out := float64(value)
-		return &out
-	case float32:
-		out := float64(value)
-		return &out
-	case float64:
-		return &value
-	case json.Number:
-		parsed, err := value.Float64()
-		if err == nil {
-			return &parsed
-		}
-	case string:
-		parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
-		if err == nil {
-			return &parsed
-		}
-	}
-	return nil
-}
-
-func metadataValue(metadata map[string]any, keys ...string) (any, bool) {
-	if metadata == nil {
-		return nil, false
-	}
-	for _, key := range keys {
-		value, ok := metadata[key]
-		if ok {
-			return value, true
-		}
-	}
-	return nil, false
+	return metacoerce.OptionalFloat(metadata, keys...)
 }
 
 func metadataCooldownActive(metadata map[string]any, now time.Time) bool {

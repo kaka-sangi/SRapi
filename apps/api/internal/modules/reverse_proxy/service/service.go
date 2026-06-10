@@ -706,7 +706,7 @@ func injectAuth(headers http.Header, account contract.AccountRuntime) {
 		if token := firstCredentialString(account.Credential, "cli_client_token", "cli_token", "device_token", "access_token"); token != "" {
 			headers.Set("Authorization", "Bearer "+token)
 		}
-	case "oauth_refresh", "oauth_device_code", "desktop_client_token", "ide_plugin_token":
+	case "oauth_refresh", "oauth_device_code":
 		if token := credentialString(account.Credential, "access_token"); token != "" {
 			headers.Set("Authorization", "Bearer "+token)
 		}
@@ -714,10 +714,6 @@ func injectAuth(headers http.Header, account contract.AccountRuntime) {
 		headers.Del("Authorization")
 		if cookie := credentialString(account.Credential, "cookie"); cookie != "" {
 			headers.Set("Cookie", cookie)
-		}
-	default:
-		if token := credentialString(account.Credential, "access_token"); token != "" {
-			headers.Set("Authorization", "Bearer "+token)
 		}
 	}
 }

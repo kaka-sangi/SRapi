@@ -29,7 +29,7 @@ func (s *Service) SimulateStrategy(ctx context.Context, req contract.StrategySim
 	if err := s.enrichFeedbackSignals(ctx, &scheduleReq); err != nil {
 		return contract.StrategySimulationResult{}, err
 	}
-	if err := s.RefreshStrategies(ctx); err != nil {
+	if err := s.ensureStrategiesFresh(ctx); err != nil {
 		return contract.StrategySimulationResult{}, err
 	}
 
@@ -67,7 +67,7 @@ func (s *Service) SimulateStrategy(ctx context.Context, req contract.StrategySim
 }
 
 func (s *Service) simulateSingleStrategy(req contract.ScheduleRequest, strategyName contract.StrategyName) (contract.SimulatedStrategyDecision, error) {
-	strategy, err := s.registry.Resolve(strategyName)
+	strategy, err := s.registry.Resolve(strategyName, strategyScopeKeys(req)...)
 	if err != nil {
 		return contract.SimulatedStrategyDecision{}, err
 	}
@@ -103,7 +103,7 @@ func (s *Service) ReplayStrategies(ctx context.Context, req contract.StrategyRep
 	if req.Since != nil && req.Until != nil && req.Since.After(*req.Until) {
 		return contract.StrategyReplayResult{}, ErrInvalidInput
 	}
-	if err := s.RefreshStrategies(ctx); err != nil {
+	if err := s.ensureStrategiesFresh(ctx); err != nil {
 		return contract.StrategyReplayResult{}, err
 	}
 	snapshots, err := s.store.ListRequestSnapshots(ctx)

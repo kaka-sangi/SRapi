@@ -1,5 +1,7 @@
 package service
 
+import "github.com/srapi/srapi/apps/api/internal/pkg/metacoerce"
+
 const paretoEpsilon = 0.000000001
 
 type paretoObjective struct {
@@ -93,7 +95,7 @@ func paretoFrontierAccountIDs(scores []candidateScore) []int {
 }
 
 func hasExplicitCost(score candidateScore) bool {
-	_, ok := metadataValue(score.Candidate.Mapping.PricingOverride, "relative_cost")
+	_, ok := metacoerce.Value(score.Candidate.Mapping.PricingOverride, "relative_cost")
 	return ok
 }
 
@@ -101,7 +103,7 @@ func hasExplicitQuality(score candidateScore) bool {
 	valueMaps := []map[string]any{score.Candidate.Mapping.PricingOverride, score.Candidate.Account.Metadata, score.Candidate.Provider.Capabilities, score.Candidate.Provider.ConfigSchema}
 	for _, key := range []string{"quality_score", "quality_eval_score", "online_eval_score", "judge_score", "quality_tier", "quality"} {
 		for _, metadata := range valueMaps {
-			if _, ok := metadataValue(metadata, key); ok {
+			if _, ok := metacoerce.Value(metadata, key); ok {
 				return true
 			}
 		}

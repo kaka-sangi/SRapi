@@ -148,7 +148,7 @@ func TestRuntimeDoesNotInjectAPIKeyRuntimeCredentials(t *testing.T) {
 	}
 }
 
-func TestRuntimeInjectsAntigravityDesktopTokenAndDefaultUserAgent(t *testing.T) {
+func TestRuntimeInjectsAntigravityOAuthTokenAndDefaultUserAgent(t *testing.T) {
 	var gotHeader http.Header
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotHeader = r.Header.Clone()
@@ -163,10 +163,10 @@ func TestRuntimeInjectsAntigravityDesktopTokenAndDefaultUserAgent(t *testing.T) 
 	_, err = svc.Do(context.Background(), contract.Request{
 		Account: contract.AccountRuntime{
 			AccountID:      11,
-			RuntimeClass:   "desktop_client_token",
+			RuntimeClass:   "oauth_refresh",
 			UpstreamClient: ptrString("antigravity_desktop"),
 			Credential: map[string]any{
-				"access_token": "desktop-token",
+				"access_token": "antigravity-token",
 			},
 		},
 		Method: http.MethodPost,
@@ -176,8 +176,8 @@ func TestRuntimeInjectsAntigravityDesktopTokenAndDefaultUserAgent(t *testing.T) 
 	if err != nil {
 		t.Fatalf("runtime request: %v", err)
 	}
-	if gotHeader.Get("Authorization") != "Bearer desktop-token" {
-		t.Fatalf("expected desktop bearer token auth, got %q", gotHeader.Get("Authorization"))
+	if gotHeader.Get("Authorization") != "Bearer antigravity-token" {
+		t.Fatalf("expected OAuth bearer token auth, got %q", gotHeader.Get("Authorization"))
 	}
 	if gotHeader.Get("User-Agent") != "Antigravity/1.0" {
 		t.Fatalf("expected antigravity user agent, got %q", gotHeader.Get("User-Agent"))
@@ -338,8 +338,8 @@ func TestRuntimeBuildsUTLSTransportForSupportedEgressProfile(t *testing.T) {
 	}
 }
 
-func TestRuntimeRejectsTLSEgressProfileWithProxy(t *testing.T) {
-	_, err := newIsolatedClient(contract.AccountRuntime{
+func TestRuntimeAcceptsTLSEgressProfileWithSOCKS5Proxy(t *testing.T) {
+	client, err := newIsolatedClient(contract.AccountRuntime{
 		AccountID:    16,
 		RuntimeClass: "oauth_refresh",
 		ProxyID:      ptrString("socks5://127.0.0.1:1080"),
@@ -347,9 +347,8 @@ func TestRuntimeRejectsTLSEgressProfileWithProxy(t *testing.T) {
 			"egress_profile": map[string]any{"tls_template": "chrome_120"},
 		},
 	}, false)
-	var runtimeErr contract.RuntimeError
-	if !errors.As(err, &runtimeErr) || runtimeErr.Class != "unsupported_egress_profile" {
-		t.Fatalf("expected unsupported egress profile error, got %T %v", err, err)
+	if err != nil || client == nil {
+		t.Fatalf("expected managed SOCKS5 uTLS client, got client=%v err=%v", client != nil, err)
 	}
 }
 
@@ -449,6 +448,153 @@ func TestRuntimeSupportsTLSEgressProfileThroughHTTPConnectProxy(t *testing.T) {
 	}
 	if upstreamHeader.Get("User-Agent") != "ProfileProxyTest/1.0" {
 		t.Fatalf("expected upstream request through proxy, got %+v", upstreamHeader)
+	}
+}
+
+func TestRuntimeSupportsTLSEgressProfileThroughSOCKS5Proxy(t *testing.T) {
+	var upstreamHeader http.Header
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamHeader = r.Header.Clone()
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer upstream.Close()
+
+	proxyURL, proxyTarget := startSOCKS5Proxy(t)
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{RootCAs: upstream.Client().Transport.(*http.Transport).TLSClientConfig.RootCAs}
+	if err := configureTransportForEgress(transport, contract.AccountRuntime{
+		AccountID: 18,
+		ProxyID:   ptrString(proxyURL),
+		Metadata:  map[string]any{"egress_profile": map[string]any{"tls_template": "chrome_120"}},
+	}, egressProfile{TLSTemplate: "chrome_120"}, false); err != nil {
+		t.Fatalf("configure socks5 egress transport: %v", err)
+	}
+	client := &http.Client{Transport: transport, Timeout: 3 * time.Second}
+	req, err := http.NewRequest(http.MethodGet, upstream.URL, nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("User-Agent", "ProfileSOCKS5Test/1.0")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("socks5 uTLS request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected upstream 200, got %d", resp.StatusCode)
+	}
+	upstreamURL, err := url.Parse(upstream.URL)
+	if err != nil {
+		t.Fatalf("parse upstream url: %v", err)
+	}
+	if got := <-proxyTarget; got != upstreamURL.Host {
+		t.Fatalf("expected SOCKS5 CONNECT to %s, got %q", upstreamURL.Host, got)
+	}
+	if upstreamHeader.Get("User-Agent") != "ProfileSOCKS5Test/1.0" {
+		t.Fatalf("expected upstream request through socks5 proxy, got %+v", upstreamHeader)
+	}
+}
+
+func startSOCKS5Proxy(t *testing.T) (string, <-chan string) {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen socks5 proxy: %v", err)
+	}
+	targets := make(chan string, 1)
+	t.Cleanup(func() { _ = listener.Close() })
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		target, err := handleSOCKS5Connect(conn)
+		if err != nil {
+			t.Errorf("handle socks5 connect: %v", err)
+			return
+		}
+		targets <- target
+		upstream, err := net.Dial("tcp", target)
+		if err != nil {
+			t.Errorf("dial socks5 target: %v", err)
+			return
+		}
+		defer upstream.Close()
+		done := make(chan struct{}, 2)
+		go func() {
+			_, _ = io.Copy(upstream, conn)
+			done <- struct{}{}
+		}()
+		go func() {
+			_, _ = io.Copy(conn, upstream)
+			done <- struct{}{}
+		}()
+		<-done
+	}()
+	return "socks5://" + listener.Addr().String(), targets
+}
+
+func handleSOCKS5Connect(conn net.Conn) (string, error) {
+	header := make([]byte, 2)
+	if _, err := io.ReadFull(conn, header); err != nil {
+		return "", err
+	}
+	methods := make([]byte, int(header[1]))
+	if _, err := io.ReadFull(conn, methods); err != nil {
+		return "", err
+	}
+	if _, err := conn.Write([]byte{0x05, 0x00}); err != nil {
+		return "", err
+	}
+	request := make([]byte, 4)
+	if _, err := io.ReadFull(conn, request); err != nil {
+		return "", err
+	}
+	if request[1] != 0x01 {
+		return "", errors.New("socks5 command is not CONNECT")
+	}
+	host, err := readSOCKS5Host(conn, request[3])
+	if err != nil {
+		return "", err
+	}
+	portBytes := make([]byte, 2)
+	if _, err := io.ReadFull(conn, portBytes); err != nil {
+		return "", err
+	}
+	port := int(portBytes[0])<<8 | int(portBytes[1])
+	if _, err := conn.Write([]byte{0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0}); err != nil {
+		return "", err
+	}
+	return net.JoinHostPort(host, strconv.Itoa(port)), nil
+}
+
+func readSOCKS5Host(conn net.Conn, atyp byte) (string, error) {
+	switch atyp {
+	case 0x01:
+		raw := make([]byte, 4)
+		if _, err := io.ReadFull(conn, raw); err != nil {
+			return "", err
+		}
+		return net.IP(raw).String(), nil
+	case 0x03:
+		length := []byte{0}
+		if _, err := io.ReadFull(conn, length); err != nil {
+			return "", err
+		}
+		raw := make([]byte, int(length[0]))
+		if _, err := io.ReadFull(conn, raw); err != nil {
+			return "", err
+		}
+		return string(raw), nil
+	case 0x04:
+		raw := make([]byte, 16)
+		if _, err := io.ReadFull(conn, raw); err != nil {
+			return "", err
+		}
+		return net.IP(raw).String(), nil
+	default:
+		return "", errors.New("unsupported socks5 address type")
 	}
 }
 

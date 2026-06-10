@@ -2,12 +2,18 @@ package contract
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
+)
+
+var (
+	ErrNotFound = errors.New("scheduler resource not found")
+	ErrConflict = errors.New("scheduler resource conflict")
 )
 
 type StrategyName string
@@ -49,15 +55,38 @@ const (
 	LeaseStatusFailed    LeaseStatus = "failed"
 )
 
+type StrategyStatus string
+
+const (
+	StrategyStatusDraft      StrategyStatus = "draft"
+	StrategyStatusActive     StrategyStatus = "active"
+	StrategyStatusDeprecated StrategyStatus = "deprecated"
+)
+
+type StrategyScopeType string
+
+const (
+	StrategyScopeGlobal       StrategyScopeType = "global"
+	StrategyScopeAPIKey       StrategyScopeType = "api_key"
+	StrategyScopeAccountGroup StrategyScopeType = "account_group"
+	StrategyScopeUser         StrategyScopeType = "user"
+)
+
 type StrategyDescriptor struct {
-	ID          int
-	Name        StrategyName
-	Version     string
-	Status      string
-	ConfigHash  string
-	Config      map[string]any
-	Weights     map[string]float64
-	Description string
+	ID           int
+	Name         StrategyName
+	Version      string
+	Status       StrategyStatus
+	ScopeType    StrategyScopeType
+	ScopeID      *int
+	ConfigHash   string
+	Config       map[string]any
+	Weights      map[string]float64
+	Description  string
+	CreatedBy    *int
+	CreatedAt    time.Time
+	ActivatedAt  *time.Time
+	DeprecatedAt *time.Time
 }
 
 type Candidate struct {
@@ -65,6 +94,7 @@ type Candidate struct {
 	Provider              providercontract.Provider
 	Mapping               modelcontract.ModelProviderMapping
 	ModelFamily           string
+	QualityTier           string
 	EffectiveCapabilities []capabilitiescontract.Descriptor
 	RuntimeState          RuntimeState
 	Limits                RuntimeLimits
@@ -369,6 +399,25 @@ type FeedbackSignal struct {
 	HasCache        bool
 }
 
+type StrategyQuery struct {
+	Name      StrategyName
+	Status    StrategyStatus
+	ScopeType StrategyScopeType
+	ScopeID   *int
+}
+
+type StrategyMutation struct {
+	Name        StrategyName
+	Version     string
+	Status      StrategyStatus
+	ScopeType   StrategyScopeType
+	ScopeID     *int
+	Config      map[string]any
+	Weights     map[string]float64
+	Description string
+	CreatedBy   *int
+}
+
 type RecordFeedbackRequest struct {
 	RequestID    string
 	DecisionID   int
@@ -405,6 +454,12 @@ type AccountConcurrencyCounter interface {
 	CountAccountConcurrency(ctx context.Context, accountID int) (int, error)
 }
 
+// ActiveLeaseCounter reports live pending scheduler leases without materializing
+// every historical lease row. Stores that cannot report it may omit this.
+type ActiveLeaseCounter interface {
+	CountActiveLeases(ctx context.Context) (int, error)
+}
+
 type Store interface {
 	CreateDecision(ctx context.Context, input Decision) (Decision, error)
 	CreateDecisionWithSnapshot(ctx context.Context, decision Decision, snapshot RequestSnapshot) (Decision, RequestSnapshot, error)
@@ -413,7 +468,11 @@ type Store interface {
 	CreateFeedback(ctx context.Context, input Feedback) (Feedback, error)
 	ListFeedbacks(ctx context.Context) ([]Feedback, error)
 	ListFeedbackSignals(ctx context.Context, query FeedbackSignalQuery) ([]FeedbackSignal, error)
+	ListStrategies(ctx context.Context, query StrategyQuery) ([]StrategyDescriptor, error)
 	ListActiveStrategies(ctx context.Context) ([]StrategyDescriptor, error)
+	CreateStrategy(ctx context.Context, input StrategyDescriptor) (StrategyDescriptor, error)
+	UpdateStrategy(ctx context.Context, id int, input StrategyDescriptor) (StrategyDescriptor, error)
+	GetStrategy(ctx context.Context, id int) (StrategyDescriptor, error)
 	AcquireLease(ctx context.Context, input Lease, maxConcurrency *int) (Lease, error)
 	UpdateLeaseStatus(ctx context.Context, requestID string, attemptNo int, status LeaseStatus) (Lease, error)
 	ListLeases(ctx context.Context) ([]Lease, error)

@@ -84,6 +84,8 @@ func gatewayEntitlementErrorClass(decision subscriptioncontract.EntitlementDecis
 		return "tpm_limit_exceeded"
 	case "rate_limit_exceeded":
 		return "rate_limit_exceeded"
+	case "content_safety_blocked":
+		return "content_safety_blocked"
 	default:
 		return "entitlement_denied"
 	}
@@ -95,6 +97,8 @@ func gatewayEntitlementHTTPStatus(errorClass string) int {
 		return http.StatusPaymentRequired
 	case "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded", "rpm_limit_exceeded", "tpm_limit_exceeded", "rate_limit_exceeded":
 		return http.StatusTooManyRequests
+	case "content_safety_blocked":
+		return http.StatusForbidden
 	default:
 		return http.StatusForbidden
 	}
@@ -125,6 +129,8 @@ func gatewayEntitlementMessage(errorClass string) string {
 		return "API key TPM limit exceeded"
 	case "rate_limit_exceeded":
 		return "API key rate limit exceeded"
+	case "content_safety_blocked":
+		return "request blocked by content safety policy"
 	default:
 		return "request not allowed by subscription entitlement"
 	}

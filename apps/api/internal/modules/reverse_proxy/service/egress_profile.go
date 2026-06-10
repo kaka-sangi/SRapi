@@ -17,6 +17,7 @@ import (
 
 	utls "github.com/refraction-networking/utls"
 	"github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
+	xproxy "golang.org/x/net/proxy"
 )
 
 const defaultClientCacheKey = "default"
@@ -126,19 +127,33 @@ func configureTransportForEgress(transport *http.Transport, account contract.Acc
 	if err != nil {
 		return err
 	}
-	if proxyURL != nil && !strings.EqualFold(proxyURL.Scheme, "http") {
-		return unsupportedEgressProfile("TLS egress profile currently supports direct or HTTP CONNECT proxy egress")
+	if proxyURL != nil && !supportedUTLSProxyScheme(proxyURL.Scheme) {
+		return unsupportedEgressProfile("TLS egress profile supports direct, HTTP CONNECT, or SOCKS5 proxy egress")
 	}
 	disableHTTP2(transport)
 	transport.Proxy = nil
 	tlsConfig := transport.TLSClientConfig
 	transport.DialTLSContext = func(ctx context.Context, network string, addr string) (net.Conn, error) {
 		if proxyURL != nil {
-			return dialUTLSHTTP1ViaHTTPProxy(ctx, network, addr, proxyURL, clientHelloID, tlsConfig)
+			switch strings.ToLower(proxyURL.Scheme) {
+			case "http":
+				return dialUTLSHTTP1ViaHTTPProxy(ctx, network, addr, proxyURL, clientHelloID, tlsConfig)
+			case "socks5", "socks5h":
+				return dialUTLSHTTP1ViaSOCKS5(ctx, network, addr, proxyURL, clientHelloID, tlsConfig)
+			}
 		}
 		return dialUTLSHTTP1(ctx, network, addr, clientHelloID, tlsConfig, blockPrivateEgress)
 	}
 	return nil
+}
+
+func supportedUTLSProxyScheme(scheme string) bool {
+	switch strings.ToLower(strings.TrimSpace(scheme)) {
+	case "http", "socks5", "socks5h":
+		return true
+	default:
+		return false
+	}
 }
 
 func disableHTTP2(transport *http.Transport) {
@@ -167,6 +182,49 @@ func dialUTLSHTTP1ViaHTTPProxy(ctx context.Context, network string, addr string,
 		return nil, err
 	}
 	return performUTLSHTTP1Handshake(ctx, rawConn, addr, clientHelloID, tlsConfig)
+}
+
+func dialUTLSHTTP1ViaSOCKS5(ctx context.Context, network string, addr string, proxyURL *url.URL, clientHelloID utls.ClientHelloID, tlsConfig *stdtls.Config) (net.Conn, error) {
+	proxyAddr := proxyAddress(proxyURL)
+	auth := socks5Auth(proxyURL)
+	dialer, err := xproxy.SOCKS5(network, proxyAddr, auth, xproxy.Direct)
+	if err != nil {
+		return nil, err
+	}
+	rawConn, err := dialWithContext(ctx, dialer, network, addr)
+	if err != nil {
+		return nil, err
+	}
+	return performUTLSHTTP1Handshake(ctx, rawConn, addr, clientHelloID, tlsConfig)
+}
+
+func socks5Auth(proxyURL *url.URL) *xproxy.Auth {
+	if proxyURL == nil || proxyURL.User == nil {
+		return nil
+	}
+	password, _ := proxyURL.User.Password()
+	return &xproxy.Auth{User: proxyURL.User.Username(), Password: password}
+}
+
+func dialWithContext(ctx context.Context, dialer xproxy.Dialer, network string, addr string) (net.Conn, error) {
+	if contextual, ok := dialer.(xproxy.ContextDialer); ok {
+		return contextual.DialContext(ctx, network, addr)
+	}
+	type result struct {
+		conn net.Conn
+		err  error
+	}
+	done := make(chan result, 1)
+	go func() {
+		conn, err := dialer.Dial(network, addr)
+		done <- result{conn: conn, err: err}
+	}()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case result := <-done:
+		return result.conn, result.err
+	}
 }
 
 func performUTLSHTTP1Handshake(ctx context.Context, rawConn net.Conn, addr string, clientHelloID utls.ClientHelloID, tlsConfig *stdtls.Config) (net.Conn, error) {

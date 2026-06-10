@@ -136,8 +136,9 @@ const (
 )
 
 type Usage struct {
-	InputTokens  int
-	OutputTokens int
+	InputTokens       int
+	OutputTokens      int
+	ImageOutputTokens int
 	// CachedTokens is cache-READ tokens (a prompt-cache hit), billed at the
 	// cache-read rate. For OpenAI/Gemini this is the only cache class; for
 	// Anthropic it is reported separately from input_tokens.
@@ -146,7 +147,12 @@ type Usage struct {
 	// billed at the cache-write rate (which exceeds the input rate). Currently
 	// populated for Anthropic; zero for providers without cache writes.
 	CacheCreationTokens int
-	Estimated           bool
+	// CacheCreation5mTokens and CacheCreation1hTokens split Anthropic cache
+	// writes by TTL when the upstream usage payload exposes ephemeral details.
+	// CacheCreationTokens remains the total for compatibility.
+	CacheCreation5mTokens int
+	CacheCreation1hTokens int
+	Estimated             bool
 }
 
 type EmbeddingRequest struct {

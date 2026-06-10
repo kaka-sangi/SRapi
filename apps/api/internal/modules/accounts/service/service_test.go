@@ -53,6 +53,40 @@ func TestCreateRejectsMissingCredential(t *testing.T) {
 	}
 }
 
+func TestAccountRiskLevelCreateUpdateAndValidation(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	high := "high"
+	created, err := svc.Create(context.Background(), contract.CreateRequest{
+		ProviderID:   1,
+		Name:         "risky",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret-value"},
+		RiskLevel:    &high,
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	if created.RiskLevel == nil || *created.RiskLevel != "high" {
+		t.Fatalf("expected high risk level, got %+v", created.RiskLevel)
+	}
+	medium := "medium"
+	updated, err := svc.Update(context.Background(), created.ID, contract.UpdateRequest{RiskLevel: &medium})
+	if err != nil {
+		t.Fatalf("update account: %v", err)
+	}
+	if updated.RiskLevel == nil || *updated.RiskLevel != "medium" {
+		t.Fatalf("expected medium risk level, got %+v", updated.RiskLevel)
+	}
+	invalid := "critical"
+	if _, err := svc.Update(context.Background(), created.ID, contract.UpdateRequest{RiskLevel: &invalid}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid risk level to fail, got %v", err)
+	}
+}
+
 func TestProxyRegistryEncryptsURLAndResolvesRuntimeURL(t *testing.T) {
 	store := accountmemory.New()
 	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
@@ -233,6 +267,14 @@ func TestAccountOperationsManageGroupsProxyRecoveryAndSnapshots(t *testing.T) {
 	}
 	if len(groupIDs) != 1 || groupIDs[0] != group.ID {
 		t.Fatalf("unexpected group ids: %v", groupIDs)
+	}
+	groupIDsByAccount, err := svc.ListGroupIDsByAccounts(ctx, []int{account.ID, account.ID})
+	if err != nil {
+		t.Fatalf("list group ids by accounts: %v", err)
+	}
+	got := groupIDsByAccount[account.ID]
+	if len(got) != 1 || got[0] != group.ID {
+		t.Fatalf("unexpected batched group ids: %v", groupIDsByAccount)
 	}
 
 	proxyID := "proxy-us-east"

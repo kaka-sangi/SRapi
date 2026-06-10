@@ -114,6 +114,15 @@ func TestStoreListsAccountGroupMemberships(t *testing.T) {
 	if len(groupIDs) != 2 || groupIDs[0] != groupA.ID || groupIDs[1] != groupB.ID {
 		t.Fatalf("unexpected group ids: %v", groupIDs)
 	}
+
+	groupIDsByAccount, err := store.ListGroupIDsByAccounts(ctx, []int{account.ID, account.ID})
+	if err != nil {
+		t.Fatalf("list group ids by accounts: %v", err)
+	}
+	got := groupIDsByAccount[account.ID]
+	if len(got) != 2 || got[0] != groupA.ID || got[1] != groupB.ID {
+		t.Fatalf("unexpected batched group ids: %v", groupIDsByAccount)
+	}
 }
 
 func TestStoreCreatesUpdatesAndListsProxies(t *testing.T) {

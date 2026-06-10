@@ -107,8 +107,8 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !rootAnthropicPreset.MatchesPath("/anthropic/v1/messages") {
 		t.Fatalf("expected root Anthropic legacy route alias to match path")
 	}
-	if containsRuntimeClass(rootAnthropicPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassServiceAccountJSON) {
-		t.Fatalf("expected root Anthropic preset to exclude service_account_json")
+	if containsRuntimeClass(rootAnthropicPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassCustomReverseProxy) {
+		t.Fatalf("unexpected root Anthropic runtime class allowlist: %+v", rootAnthropicPreset.RuntimeClassAllowlist)
 	}
 	if rootAnthropicPreset.AccountTemplate == nil || rootAnthropicPreset.AccountTemplate.UpstreamClient != "claude_code_cli" {
 		t.Fatalf("expected root Anthropic template upstream_client=claude_code_cli, got %+v", rootAnthropicPreset.AccountTemplate)
@@ -130,15 +130,14 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !reflect.DeepEqual(antigravityPreset.GeminiRouteAliases, []string{"/antigravity/v1beta", "/api/provider/antigravity/v1beta"}) {
 		t.Fatalf("unexpected antigravity Gemini aliases: %v", antigravityPreset.GeminiRouteAliases)
 	}
-	if containsRuntimeClass(antigravityPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassDesktopClientToken) ||
-		containsRuntimeClass(antigravityPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassIdePluginToken) {
-		t.Fatalf("expected antigravity allowlist to merge desktop/IDE token accounts into oauth_refresh")
-	}
 	if !containsRuntimeClass(antigravityPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) {
 		t.Fatalf("expected antigravity allowlist to include oauth_refresh")
 	}
 	if antigravityPreset.AccountTemplate == nil || antigravityPreset.AccountTemplate.UpstreamClient != "antigravity_desktop" {
 		t.Fatalf("expected antigravity template upstream_client=antigravity_desktop, got %+v", antigravityPreset.AccountTemplate)
+	}
+	if antigravityPreset.AccountTemplate.MetadataHints["tls_profile"] == "" {
+		t.Fatalf("expected antigravity template to expose tls_profile metadata hint")
 	}
 	if !antigravityPreset.Capabilities["chat_completions"] || !antigravityPreset.Capabilities["messages"] || antigravityPreset.Capabilities["embeddings"] {
 		t.Fatalf("unexpected antigravity capabilities: %+v", antigravityPreset.Capabilities)
@@ -160,8 +159,8 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !containsRuntimeClass(bedrockPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassAPIKey) || !bedrockPreset.Capabilities["messages"] || !bedrockPreset.Capabilities["streaming"] {
 		t.Fatalf("unexpected bedrock capabilities: %+v", bedrockPreset)
 	}
-	if containsRuntimeClass(bedrockPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassServiceAccountJSON) {
-		t.Fatalf("expected bedrock preset to exclude service_account_json")
+	if containsRuntimeClass(bedrockPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassCustomReverseProxy) {
+		t.Fatalf("unexpected bedrock runtime class allowlist: %+v", bedrockPreset.RuntimeClassAllowlist)
 	}
 
 	chatGPTWebPreset, ok := registry.Lookup("chatgpt-web")

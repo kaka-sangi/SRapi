@@ -21,6 +21,8 @@ type Store struct {
 	decisions      map[int]contract.Decision
 	snapshots      map[int]contract.RequestSnapshot
 	feedbacks      map[int]contract.Feedback
+	nextStrategyID int
+	strategies     map[int]contract.StrategyDescriptor
 	leases         map[string]contract.Lease
 	leaseByRequest map[string]string
 }
@@ -30,9 +32,11 @@ func New() *Store {
 		nextDecisionID: 1,
 		nextSnapshotID: 1,
 		nextFeedbackID: 1,
+		nextStrategyID: 1,
 		decisions:      map[int]contract.Decision{},
 		snapshots:      map[int]contract.RequestSnapshot{},
 		feedbacks:      map[int]contract.Feedback{},
+		strategies:     map[int]contract.StrategyDescriptor{},
 		leases:         map[string]contract.Lease{},
 		leaseByRequest: map[string]string{},
 	}
@@ -207,8 +211,94 @@ func (s *Store) ListFeedbackSignals(_ context.Context, query contract.FeedbackSi
 	return out, nil
 }
 
+func (s *Store) ListStrategies(_ context.Context, query contract.StrategyQuery) ([]contract.StrategyDescriptor, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.StrategyDescriptor, 0, len(s.strategies))
+	for _, strategy := range s.strategies {
+		if !strategyMatchesQuery(strategy, query) {
+			continue
+		}
+		out = append(out, cloneStrategy(strategy))
+	}
+	sortStrategies(out)
+	return out, nil
+}
+
 func (s *Store) ListActiveStrategies(_ context.Context) ([]contract.StrategyDescriptor, error) {
-	return nil, nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	latest := map[string]contract.StrategyDescriptor{}
+	for _, strategy := range s.strategies {
+		if strategy.Status != contract.StrategyStatusActive {
+			continue
+		}
+		key := strategyScopeNameKey(strategy)
+		current, ok := latest[key]
+		if !ok || strategyNewer(strategy, current) {
+			latest[key] = strategy
+		}
+	}
+	out := make([]contract.StrategyDescriptor, 0, len(latest))
+	for _, strategy := range latest {
+		out = append(out, cloneStrategy(strategy))
+	}
+	sortStrategies(out)
+	return out, nil
+}
+
+func (s *Store) GetStrategy(_ context.Context, id int) (contract.StrategyDescriptor, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	strategy, ok := s.strategies[id]
+	if !ok {
+		return contract.StrategyDescriptor{}, contract.ErrNotFound
+	}
+	return cloneStrategy(strategy), nil
+}
+
+func (s *Store) CreateStrategy(_ context.Context, input contract.StrategyDescriptor) (contract.StrategyDescriptor, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.strategyVersionExistsLocked(0, input) {
+		return contract.StrategyDescriptor{}, contract.ErrConflict
+	}
+	strategy := cloneStrategy(input)
+	strategy.ID = s.nextStrategyID
+	s.nextStrategyID++
+	now := time.Now().UTC()
+	if strategy.CreatedAt.IsZero() {
+		strategy.CreatedAt = now
+	}
+	if strategy.Status == contract.StrategyStatusActive && strategy.ActivatedAt == nil {
+		strategy.ActivatedAt = &now
+	}
+	s.strategies[strategy.ID] = strategy
+	return cloneStrategy(strategy), nil
+}
+
+func (s *Store) UpdateStrategy(_ context.Context, id int, input contract.StrategyDescriptor) (contract.StrategyDescriptor, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, ok := s.strategies[id]
+	if !ok {
+		return contract.StrategyDescriptor{}, contract.ErrNotFound
+	}
+	next := mergeStrategy(current, input)
+	next.ID = id
+	next.CreatedAt = current.CreatedAt
+	if s.strategyVersionExistsLocked(id, next) {
+		return contract.StrategyDescriptor{}, contract.ErrConflict
+	}
+	now := time.Now().UTC()
+	if next.Status == contract.StrategyStatusActive && next.ActivatedAt == nil {
+		next.ActivatedAt = &now
+	}
+	if next.Status == contract.StrategyStatusActive {
+		next.DeprecatedAt = nil
+	}
+	s.strategies[id] = next
+	return cloneStrategy(next), nil
 }
 
 func (s *Store) AcquireLease(_ context.Context, input contract.Lease, maxConcurrency *int) (contract.Lease, error) {
@@ -273,6 +363,19 @@ func (s *Store) ListLeases(_ context.Context) ([]contract.Lease, error) {
 	return out, nil
 }
 
+func (s *Store) CountActiveLeases(_ context.Context) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.expireLeases(time.Now().UTC())
+	count := 0
+	for _, lease := range s.leases {
+		if lease.Status == contract.LeaseStatusPending {
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (s *Store) pendingConcurrency(accountID int) int {
 	count := 0
 	for _, lease := range s.leases {
@@ -332,6 +435,27 @@ func cloneLease(value contract.Lease) contract.Lease {
 	return value
 }
 
+func cloneStrategy(value contract.StrategyDescriptor) contract.StrategyDescriptor {
+	value.Config = cloneMap(value.Config)
+	value.Weights = cloneWeights(value.Weights)
+	value.ScopeID = cloneInt(value.ScopeID)
+	value.CreatedBy = cloneInt(value.CreatedBy)
+	value.ActivatedAt = cloneTime(value.ActivatedAt)
+	value.DeprecatedAt = cloneTime(value.DeprecatedAt)
+	return value
+}
+
+func cloneWeights(values map[string]float64) map[string]float64 {
+	if values == nil {
+		return nil
+	}
+	cloned := make(map[string]float64, len(values))
+	for key, value := range values {
+		cloned[key] = value
+	}
+	return cloned
+}
+
 func cloneStrings(values []string) []string {
 	if values == nil {
 		return nil
@@ -354,6 +478,141 @@ func cloneMap(value map[string]any) map[string]any {
 		return nil
 	}
 	return cloned
+}
+
+func cloneTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func mergeStrategy(current contract.StrategyDescriptor, input contract.StrategyDescriptor) contract.StrategyDescriptor {
+	next := cloneStrategy(current)
+	if input.Name != "" {
+		next.Name = input.Name
+	}
+	if input.Version != "" {
+		next.Version = input.Version
+	}
+	if input.Status != "" {
+		next.Status = input.Status
+	}
+	if input.ScopeType != "" {
+		next.ScopeType = input.ScopeType
+		next.ScopeID = cloneInt(input.ScopeID)
+	}
+	if input.Config != nil {
+		next.Config = cloneMap(input.Config)
+	}
+	if input.Weights != nil {
+		next.Weights = cloneWeights(input.Weights)
+	}
+	if input.ConfigHash != "" {
+		next.ConfigHash = input.ConfigHash
+	}
+	next.Description = input.Description
+	if input.CreatedBy != nil {
+		next.CreatedBy = cloneInt(input.CreatedBy)
+	}
+	if input.ActivatedAt != nil {
+		next.ActivatedAt = cloneTime(input.ActivatedAt)
+	}
+	if input.DeprecatedAt != nil {
+		next.DeprecatedAt = cloneTime(input.DeprecatedAt)
+	}
+	return next
+}
+
+func strategyMatchesQuery(strategy contract.StrategyDescriptor, query contract.StrategyQuery) bool {
+	if query.Name != "" && strategy.Name != query.Name {
+		return false
+	}
+	if query.Status != "" && strategy.Status != query.Status {
+		return false
+	}
+	if query.ScopeType != "" && strategy.ScopeType != query.ScopeType {
+		return false
+	}
+	if query.ScopeID != nil {
+		if strategy.ScopeID == nil || *strategy.ScopeID != *query.ScopeID {
+			return false
+		}
+	}
+	return true
+}
+
+func sortStrategies(values []contract.StrategyDescriptor) {
+	sort.Slice(values, func(i, j int) bool {
+		if values[i].ScopeType != values[j].ScopeType {
+			return values[i].ScopeType < values[j].ScopeType
+		}
+		leftScopeID := 0
+		rightScopeID := 0
+		if values[i].ScopeID != nil {
+			leftScopeID = *values[i].ScopeID
+		}
+		if values[j].ScopeID != nil {
+			rightScopeID = *values[j].ScopeID
+		}
+		if leftScopeID != rightScopeID {
+			return leftScopeID < rightScopeID
+		}
+		if values[i].Name != values[j].Name {
+			return values[i].Name < values[j].Name
+		}
+		return values[i].ID < values[j].ID
+	})
+}
+
+func (s *Store) strategyVersionExistsLocked(exceptID int, input contract.StrategyDescriptor) bool {
+	for id, strategy := range s.strategies {
+		if id == exceptID {
+			continue
+		}
+		if strategy.Name != input.Name || strategy.Version != input.Version || strategy.ScopeType != input.ScopeType {
+			continue
+		}
+		if sameIntPtr(strategy.ScopeID, input.ScopeID) {
+			return true
+		}
+	}
+	return false
+}
+
+func sameIntPtr(left, right *int) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
+}
+
+func strategyScopeNameKey(strategy contract.StrategyDescriptor) string {
+	scopeID := 0
+	if strategy.ScopeID != nil {
+		scopeID = *strategy.ScopeID
+	}
+	return string(strategy.ScopeType) + ":" + strconv.Itoa(scopeID) + ":" + string(strategy.Name)
+}
+
+func strategyNewer(left, right contract.StrategyDescriptor) bool {
+	leftTime := strategyEffectiveAt(left)
+	rightTime := strategyEffectiveAt(right)
+	if !leftTime.Equal(rightTime) {
+		return leftTime.After(rightTime)
+	}
+	return left.ID > right.ID
+}
+
+func strategyEffectiveAt(strategy contract.StrategyDescriptor) time.Time {
+	if strategy.ActivatedAt != nil {
+		return *strategy.ActivatedAt
+	}
+	if !strategy.CreatedAt.IsZero() {
+		return strategy.CreatedAt
+	}
+	return time.Time{}
 }
 
 func intSet(values []int) map[int]bool {

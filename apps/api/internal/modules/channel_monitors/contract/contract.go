@@ -4,6 +4,18 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
+)
+
+const (
+	// TriggerManual identifies an operator-requested monitor run.
+	TriggerManual = "manual"
+	// TriggerScheduled identifies a worker-scheduled monitor run.
+	TriggerScheduled = "scheduled"
 )
 
 // ErrNotFound is returned when a monitor definition, template, or run does not exist.
@@ -146,4 +158,35 @@ type Store interface {
 
 	RecordRun(ctx context.Context, input RecordRun) (RunResult, error)
 	ListRuns(ctx context.Context, monitorID int, limit int) ([]RunResult, error)
+}
+
+// AccountReader supplies account state and credentials for monitor execution.
+type AccountReader interface {
+	List(ctx context.Context) ([]accountcontract.ProviderAccount, error)
+	ListGroupMembers(ctx context.Context, groupID int) ([]accountcontract.AccountGroupMember, error)
+	DecryptCredential(ctx context.Context, accountID int) (map[string]any, error)
+}
+
+// ProviderReader supplies provider metadata for monitor execution.
+type ProviderReader interface {
+	FindByID(ctx context.Context, id int) (providercontract.Provider, error)
+}
+
+// ModelReader supplies model and provider mapping state for model-scoped monitors.
+type ModelReader interface {
+	List(ctx context.Context) ([]modelcontract.Model, error)
+	ListMappingsByModel(ctx context.Context, modelID int) ([]modelcontract.ModelProviderMapping, error)
+}
+
+// ProbeAdapter executes the per-account synthetic probe.
+type ProbeAdapter interface {
+	ProbeAccount(ctx context.Context, req provideradaptercontract.ProbeRequest) (provideradaptercontract.ProbeResponse, error)
+}
+
+// RunnerDependencies are the cross-module readers needed to execute a monitor.
+type RunnerDependencies struct {
+	Accounts  AccountReader
+	Providers ProviderReader
+	Models    ModelReader
+	Adapter   ProbeAdapter
 }

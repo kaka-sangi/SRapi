@@ -66,6 +66,7 @@ func (s *Store) Create(_ context.Context, input contract.CreateStoredAccount) (c
 		Status:               input.Status,
 		Priority:             input.Priority,
 		Weight:               input.Weight,
+		RiskLevel:            cloneString(input.RiskLevel),
 		UpstreamClient:       input.UpstreamClient,
 		Metadata:             input.Metadata,
 		CreatedAt:            now,
@@ -111,6 +112,29 @@ func (s *Store) List(_ context.Context) ([]contract.ProviderAccount, error) {
 	return out, nil
 }
 
+func (s *Store) ListActiveByProviderIDs(_ context.Context, providerIDs []int) ([]contract.ProviderAccount, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	wanted := make(map[int]struct{}, len(providerIDs))
+	for _, id := range providerIDs {
+		if id > 0 {
+			wanted[id] = struct{}{}
+		}
+	}
+	out := make([]contract.ProviderAccount, 0)
+	for _, account := range s.byID {
+		if account.Status != contract.StatusActive {
+			continue
+		}
+		if _, ok := wanted[account.ProviderID]; !ok {
+			continue
+		}
+		out = append(out, cloneAccount(account))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
 func (s *Store) ListGroupIDsByAccount(_ context.Context, accountID int) ([]int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -124,6 +148,30 @@ func (s *Store) ListGroupIDsByAccount(_ context.Context, accountID int) ([]int, 
 		}
 	}
 	sort.Ints(out)
+	return out, nil
+}
+
+func (s *Store) ListGroupIDsByAccounts(_ context.Context, accountIDs []int) (map[int][]int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make(map[int][]int, len(accountIDs))
+	for _, accountID := range accountIDs {
+		if accountID <= 0 {
+			continue
+		}
+		if _, ok := s.byID[accountID]; !ok {
+			return nil, errors.New("account not found")
+		}
+		out[accountID] = nil
+	}
+	for _, member := range s.groupMembersByID {
+		if _, ok := out[member.AccountID]; ok {
+			out[member.AccountID] = append(out[member.AccountID], member.AccountGroupID)
+		}
+	}
+	for accountID := range out {
+		sort.Ints(out[accountID])
+	}
 	return out, nil
 }
 
@@ -287,6 +335,21 @@ func (s *Store) FindGroupByID(_ context.Context, id int) (contract.AccountGroup,
 		return contract.AccountGroup{}, errors.New("account group not found")
 	}
 	return cloneGroup(group), nil
+}
+
+func (s *Store) FindGroupsByID(_ context.Context, ids []int) ([]contract.AccountGroup, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.AccountGroup, 0, len(ids))
+	for _, id := range ids {
+		group, ok := s.groupsByID[id]
+		if !ok {
+			continue
+		}
+		out = append(out, cloneGroup(group))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
 }
 
 func (s *Store) ListGroups(_ context.Context) ([]contract.AccountGroup, error) {
@@ -482,6 +545,9 @@ func limitQuotaSnapshotsByType(snapshots []contract.AccountQuotaSnapshot, limit 
 
 func cloneAccount(value contract.ProviderAccount) contract.ProviderAccount {
 	value.Metadata = cloneMap(value.Metadata)
+	value.RiskLevel = cloneString(value.RiskLevel)
+	value.UpstreamClient = cloneString(value.UpstreamClient)
+	value.ProxyID = cloneString(value.ProxyID)
 	return value
 }
 
@@ -529,4 +595,12 @@ func cloneMap(value map[string]any) map[string]any {
 		cloned[key] = val
 	}
 	return cloned
+}
+
+func cloneString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }

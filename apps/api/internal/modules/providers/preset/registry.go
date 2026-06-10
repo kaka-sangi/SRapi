@@ -210,7 +210,6 @@ func anthropicPreset(providerKey string, displayName string, defaultBaseURL stri
 			accountscontract.RuntimeClassOauthRefresh,
 			accountscontract.RuntimeClassOauthDeviceCode,
 			accountscontract.RuntimeClassCliClientToken,
-			accountscontract.RuntimeClassCustomReverseProxy,
 		}
 		preset.AccountTemplate = &AccountTemplate{
 			UpstreamClient: "claude_code_cli",
@@ -280,6 +279,16 @@ func antigravityPreset() Preset {
 			"base_url":   "Antigravity / Google Cloud Code upstream URL",
 			"project_id": "Google Cloud project id for Antigravity requests",
 		},
+	}
+	preset.QuotaConfig = map[string]string{
+		"quota_url":                    "https://cloudcode-pa.googleapis.com/v1internal:quota",
+		"quota_credits_remaining_path": "account_plan.subscription_plan.allowance",
+		"quota_credits_used_path":      "account_plan.subscription_plan.usage",
+		"quota_credits_limit_path":     "account_plan.subscription_plan.limit",
+		"quota_plan_path":              "account_plan.account_plan_id",
+		"quota_currency_path":          "account_plan.subscription_plan.currency",
+		"quota_headers":                `{"x-goog-user-project":"{{project_id}}"}`,
+		"auth_mode":                    "bearer",
 	}
 	preset.OAuthConfig = googleOAuthConfig()
 	return preset
@@ -453,6 +462,7 @@ func New(presets ...Preset) *Registry {
 		if preset.ProviderKey == "" {
 			continue
 		}
+		preset = withCommonAccountTemplateHints(preset)
 		if _, exists := registry.presets[preset.ProviderKey]; !exists {
 			registry.keys = append(registry.keys, preset.ProviderKey)
 		}
@@ -460,6 +470,19 @@ func New(presets ...Preset) *Registry {
 	}
 	sort.Strings(registry.keys)
 	return registry
+}
+
+func withCommonAccountTemplateHints(preset Preset) Preset {
+	if preset.AccountTemplate == nil {
+		return preset
+	}
+	hints := make(map[string]string, len(preset.AccountTemplate.MetadataHints)+1)
+	hints["tls_profile"] = "Named TLS fingerprint profile for this account's upstream egress"
+	for key, value := range preset.AccountTemplate.MetadataHints {
+		hints[key] = value
+	}
+	preset.AccountTemplate.MetadataHints = hints
+	return preset
 }
 
 func (r *Registry) Lookup(providerKey string) (Preset, bool) {

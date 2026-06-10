@@ -34,6 +34,13 @@ func okProberFactory() BuildProber {
 	}
 }
 
+func captureModelProberFactory(models *[]string) BuildProber {
+	return func(_ providercontract.Provider, model string) accountcontract.AccountProber {
+		*models = append(*models, model)
+		return fixedProber{result: accountcontract.AccountProbeResult{OK: true, StatusCode: http.StatusOK, LatencyMS: 12, CheckedAt: time.Now().UTC()}}
+	}
+}
+
 func setupRunner(t *testing.T, build BuildProber) (*Runner, *accountservice.Service, *scheduledservice.Service) {
 	t.Helper()
 	accountsSvc, err := accountservice.New(accountmemory.New(), testMasterKey, nil)
@@ -64,6 +71,10 @@ func setupRunner(t *testing.T, build BuildProber) (*Runner, *accountservice.Serv
 }
 
 func createAccount(t *testing.T, accounts *accountservice.Service, status accountcontract.Status) accountcontract.ProviderAccount {
+	return createAccountWithMetadata(t, accounts, status, map[string]any{"test_model": "gpt-test"})
+}
+
+func createAccountWithMetadata(t *testing.T, accounts *accountservice.Service, status accountcontract.Status, metadata map[string]any) accountcontract.ProviderAccount {
 	t.Helper()
 	account, err := accounts.Create(context.Background(), accountcontract.CreateRequest{
 		ProviderID:   1,
@@ -71,7 +82,7 @@ func createAccount(t *testing.T, accounts *accountservice.Service, status accoun
 		RuntimeClass: accountcontract.RuntimeClassAPIKey,
 		Credential:   map[string]any{"api_key": "secret-value"},
 		Status:       &status,
-		Metadata:     map[string]any{"test_model": "gpt-test"},
+		Metadata:     metadata,
 	})
 	if err != nil {
 		t.Fatalf("create account: %v", err)
@@ -178,5 +189,55 @@ func TestRunPlanSkipsInactiveWithoutAutoRecover(t *testing.T) {
 	}
 	if reloaded.Status != accountcontract.StatusNeedsReauth {
 		t.Fatalf("expected account to stay needs_reauth, got %s", reloaded.Status)
+	}
+}
+
+func TestRunPlanProbeModelOverridesMetadata(t *testing.T) {
+	ctx := context.Background()
+	models := []string{}
+	runner, accounts, plans := setupRunner(t, captureModelProberFactory(&models))
+	account := createAccount(t, accounts, accountcontract.StatusActive)
+
+	scopeID := account.ID
+	plan, err := plans.CreatePlan(ctx, scheduledcontract.CreatePlan{
+		Name:       "override",
+		Enabled:    true,
+		ScopeType:  scheduledcontract.ScopeAccount,
+		ScopeID:    &scopeID,
+		ProbeModel: "plan-model",
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	run, err := runner.RunPlan(ctx, plan, scheduledcontract.TriggerSchedule)
+	if err != nil {
+		t.Fatalf("run plan: %v", err)
+	}
+	if run.Probed != 1 || len(models) != 1 || models[0] != "plan-model" {
+		t.Fatalf("expected plan probe_model to be used, run=%+v models=%+v", run, models)
+	}
+}
+
+func TestRunPlanWithoutProbeModelRecordsWarning(t *testing.T) {
+	ctx := context.Background()
+	runner, accounts, plans := setupRunner(t, okProberFactory())
+	account := createAccountWithMetadata(t, accounts, accountcontract.StatusActive, nil)
+
+	scopeID := account.ID
+	plan, err := plans.CreatePlan(ctx, scheduledcontract.CreatePlan{
+		Name:      "missing-model",
+		Enabled:   true,
+		ScopeType: scheduledcontract.ScopeAccount,
+		ScopeID:   &scopeID,
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	run, err := runner.RunPlan(ctx, plan, scheduledcontract.TriggerSchedule)
+	if err != nil {
+		t.Fatalf("run plan: %v", err)
+	}
+	if run.Selected != 1 || run.Probed != 0 || run.Skipped != 1 || run.Status != scheduledcontract.RunStatusWarning {
+		t.Fatalf("expected selected unprobed run to be warning, got %+v", run)
 	}
 }

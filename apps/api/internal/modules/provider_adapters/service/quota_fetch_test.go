@@ -150,6 +150,128 @@ func TestFetchAccountQuotaClassifiesForbiddenAndCachesFailure(t *testing.T) {
 	}
 }
 
+func TestFetchAccountQuotaMapsCodexAccountPlanCredits(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer codex-access-token" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"account_plan": {
+				"account_plan_id": "plus",
+				"subscription_plan": {
+					"allowance": "900",
+					"usage": "100",
+					"limit": "1000",
+					"currency": "credits"
+				}
+			}
+		}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	report, err := svc.FetchAccountQuota(context.Background(), contract.ProbeRequest{
+		Provider: providercontract.Provider{
+			ID:          2,
+			Name:        "codex-cli",
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+			Status:      providercontract.StatusActive,
+			ConfigSchema: map[string]any{
+				"quota_url":                    upstream.URL + "/backend-api/accounts/check/v4-2023-04-27",
+				"quota_plan_path":              "account_plan.account_plan_id",
+				"quota_credits_remaining_path": "account_plan.subscription_plan.allowance",
+				"quota_credits_used_path":      "account_plan.subscription_plan.usage",
+				"quota_credits_limit_path":     "account_plan.subscription_plan.limit",
+				"quota_currency_path":          "account_plan.subscription_plan.currency",
+				"auth_mode":                    "bearer",
+			},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           20,
+			ProviderID:   2,
+			Name:         "codex-oauth",
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Status:       accountcontract.StatusActive,
+			Metadata:     map[string]any{},
+		},
+		Credential: map[string]any{"access_token": "codex-access-token"},
+	})
+	if err != nil {
+		t.Fatalf("fetch codex quota: %v", err)
+	}
+	if !report.Supported || report.Plan != "plus" || report.CreditsRemaining != "900" || report.CreditsUsed != "100" || report.CreditsLimit != "1000" || report.Currency != "credits" {
+		t.Fatalf("unexpected codex quota report: %+v", report)
+	}
+}
+
+func TestFetchAccountQuotaAntigravityUsesProjectHeaderAndSupportsQuota(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer antigravity-access-token" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		if got := r.Header.Get("x-goog-user-project"); got != "project-1" {
+			t.Fatalf("unexpected project header %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"account_plan": {
+				"account_plan_id": "antigravity-pro",
+				"subscription_plan": {
+					"allowance": 42,
+					"usage": 8,
+					"limit": 50,
+					"currency": "credits"
+				}
+			}
+		}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	report, err := svc.FetchAccountQuota(context.Background(), contract.ProbeRequest{
+		Provider: providercontract.Provider{
+			ID:          3,
+			Name:        "antigravity",
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "gemini-compatible",
+			Status:      providercontract.StatusActive,
+			ConfigSchema: map[string]any{
+				"quota_url":                    upstream.URL + "/v1internal:quota",
+				"quota_plan_path":              "account_plan.account_plan_id",
+				"quota_credits_remaining_path": "account_plan.subscription_plan.allowance",
+				"quota_credits_used_path":      "account_plan.subscription_plan.usage",
+				"quota_credits_limit_path":     "account_plan.subscription_plan.limit",
+				"quota_currency_path":          "account_plan.subscription_plan.currency",
+				"quota_headers":                map[string]any{"x-goog-user-project": "{{project_id}}"},
+				"auth_mode":                    "bearer",
+			},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           30,
+			ProviderID:   3,
+			Name:         "antigravity-oauth",
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Status:       accountcontract.StatusActive,
+			Metadata:     map[string]any{"project_id": "project-1"},
+		},
+		Credential: map[string]any{"access_token": "antigravity-access-token"},
+	})
+	if err != nil {
+		t.Fatalf("fetch antigravity quota: %v", err)
+	}
+	if !report.Supported || report.Source != "endpoint" || report.Plan != "antigravity-pro" || report.CreditsRemaining != "42" || report.CreditsUsed != "8" || report.CreditsLimit != "50" || report.Currency != "credits" {
+		t.Fatalf("unexpected antigravity quota report: %+v", report)
+	}
+}
+
 func anthropicQuotaProbeRequest(quotaURL string) contract.ProbeRequest {
 	return contract.ProbeRequest{
 		Provider: providercontract.Provider{

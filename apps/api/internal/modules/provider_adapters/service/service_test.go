@@ -8263,12 +8263,12 @@ func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing
 		},
 		Account: accountcontract.ProviderAccount{
 			ID:             15,
-			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
 			UpstreamClient: ptrString("antigravity_desktop"),
 			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "antigravity-openai-upstream"},
-		Credential: map[string]any{"access_token": "desktop-token"},
+		Credential: map[string]any{"access_token": "antigravity-token"},
 	})
 	if err != nil {
 		t.Fatalf("invoke antigravity openai adapter: %v", err)
@@ -8282,11 +8282,11 @@ func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing
 	if runtime.request.Headers.Get("Content-Type") != "application/json" || runtime.request.Headers.Get("Authorization") != "" {
 		t.Fatalf("adapter should leave antigravity auth injection to runtime, got %+v", runtime.request.Headers)
 	}
-	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassDesktopClientToken) ||
+	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassOauthRefresh) ||
 		runtime.request.Account.UpstreamClient == nil ||
 		*runtime.request.Account.UpstreamClient != "antigravity_desktop" ||
-		runtime.request.Account.Credential["access_token"] != "desktop-token" {
-		t.Fatalf("expected antigravity desktop runtime context, got %+v", runtime.request.Account)
+		runtime.request.Account.Credential["access_token"] != "antigravity-token" {
+		t.Fatalf("expected antigravity OAuth runtime context, got %+v", runtime.request.Account)
 	}
 	var payload struct {
 		Project     string `json:"project"`
@@ -8351,12 +8351,12 @@ func TestReverseProxyAntigravityAnthropicAdapterDispatchesThroughRuntime(t *test
 		},
 		Account: accountcontract.ProviderAccount{
 			ID:             17,
-			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
 			UpstreamClient: ptrString("antigravity_desktop"),
 			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
-		Credential: map[string]any{"access_token": "desktop-token"},
+		Credential: map[string]any{"access_token": "antigravity-token"},
 	})
 	if err != nil {
 		t.Fatalf("invoke antigravity anthropic adapter: %v", err)
@@ -8370,11 +8370,11 @@ func TestReverseProxyAntigravityAnthropicAdapterDispatchesThroughRuntime(t *test
 	if runtime.request.Headers.Get("anthropic-version") != "" || runtime.request.Headers.Get("x-api-key") != "" || runtime.request.Headers.Get("Authorization") != "" {
 		t.Fatalf("unexpected antigravity anthropic headers: %+v", runtime.request.Headers)
 	}
-	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassDesktopClientToken) ||
+	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassOauthRefresh) ||
 		runtime.request.Account.UpstreamClient == nil ||
 		*runtime.request.Account.UpstreamClient != "antigravity_desktop" ||
-		runtime.request.Account.Credential["access_token"] != "desktop-token" {
-		t.Fatalf("expected antigravity desktop runtime context, got %+v", runtime.request.Account)
+		runtime.request.Account.Credential["access_token"] != "antigravity-token" {
+		t.Fatalf("expected antigravity OAuth runtime context, got %+v", runtime.request.Account)
 	}
 	var payload struct {
 		Model   string `json:"model"`
@@ -8423,12 +8423,12 @@ func TestReverseProxyAntigravityGeminiAdapterDispatchesThroughRuntime(t *testing
 		},
 		Account: accountcontract.ProviderAccount{
 			ID:             16,
-			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
 			UpstreamClient: ptrString("antigravity_desktop"),
 			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
-		Credential: map[string]any{"access_token": "desktop-token"},
+		Credential: map[string]any{"access_token": "antigravity-token"},
 	})
 	if err != nil {
 		t.Fatalf("invoke antigravity gemini adapter: %v", err)
@@ -8439,11 +8439,11 @@ func TestReverseProxyAntigravityGeminiAdapterDispatchesThroughRuntime(t *testing
 	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/v1internal:generateContent" {
 		t.Fatalf("unexpected antigravity gemini request: %+v", runtime.request)
 	}
-	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassDesktopClientToken) ||
+	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassOauthRefresh) ||
 		runtime.request.Account.UpstreamClient == nil ||
 		*runtime.request.Account.UpstreamClient != "antigravity_desktop" ||
-		runtime.request.Account.Credential["access_token"] != "desktop-token" {
-		t.Fatalf("expected antigravity desktop runtime context, got %+v", runtime.request.Account)
+		runtime.request.Account.Credential["access_token"] != "antigravity-token" {
+		t.Fatalf("expected antigravity OAuth runtime context, got %+v", runtime.request.Account)
 	}
 	var payload struct {
 		Model   string `json:"model"`
@@ -8487,12 +8487,12 @@ func TestReverseProxyAntigravityAdapterStreamsMultilineSSEData(t *testing.T) {
 		},
 		Account: accountcontract.ProviderAccount{
 			ID:             16,
-			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
 			UpstreamClient: ptrString("antigravity_desktop"),
 			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
-		Credential: map[string]any{"access_token": "desktop-token"},
+		Credential: map[string]any{"access_token": "antigravity-token"},
 	})
 	if err != nil {
 		t.Fatalf("invoke antigravity stream adapter: %v", err)
@@ -8530,12 +8530,12 @@ func TestReverseProxyAntigravityAdapterClassifiesStreamErrorFrame(t *testing.T) 
 		},
 		Account: accountcontract.ProviderAccount{
 			ID:             16,
-			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
 			UpstreamClient: ptrString("antigravity_desktop"),
 			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
-		Credential: map[string]any{"access_token": "desktop-token"},
+		Credential: map[string]any{"access_token": "antigravity-token"},
 	})
 	providerErr := assertProviderError(t, err, "provider_5xx", http.StatusServiceUnavailable)
 	if providerErr.Message != "antigravity unavailable" {
@@ -8564,12 +8564,12 @@ func TestReverseProxyAntigravityCleansToolSchemas(t *testing.T) {
 		},
 		Account: accountcontract.ProviderAccount{
 			ID:             15,
-			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
 			UpstreamClient: ptrString("antigravity_desktop"),
 			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "antigravity-openai-upstream"},
-		Credential: map[string]any{"access_token": "desktop-token"},
+		Credential: map[string]any{"access_token": "antigravity-token"},
 		Tools: []map[string]any{
 			{
 				"type": "function",

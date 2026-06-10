@@ -2,6 +2,7 @@ package contract
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -13,10 +14,7 @@ const (
 	RuntimeClassOauthRefresh       RuntimeClass = "oauth_refresh"
 	RuntimeClassOauthDeviceCode    RuntimeClass = "oauth_device_code"
 	RuntimeClassWebSessionCookie   RuntimeClass = "web_session_cookie"
-	RuntimeClassDesktopClientToken RuntimeClass = "desktop_client_token"
 	RuntimeClassCliClientToken     RuntimeClass = "cli_client_token"
-	RuntimeClassIdePluginToken     RuntimeClass = "ide_plugin_token"
-	RuntimeClassServiceAccountJSON RuntimeClass = "service_account_json"
 	RuntimeClassCustomReverseProxy RuntimeClass = "custom_reverse_proxy"
 )
 
@@ -163,11 +161,121 @@ type AccountQuotaSnapshot struct {
 }
 
 const QuotaTypeSyntheticMonthlyTokens = "synthetic_monthly_tokens"
+const QuotaTypeProviderCredits = "provider_credits"
 
 // IsSyntheticQuotaSnapshot reports whether a quota snapshot is locally derived
 // by SRapi rather than read from an upstream provider quota signal.
 func IsSyntheticQuotaSnapshot(snapshot AccountQuotaSnapshot) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(snapshot.QuotaType)), "synthetic_")
+}
+
+// QuotaCreditReport carries provider subscription/credits fields parsed from an
+// active quota fetch. It is intentionally small so adapters can feed account
+// metadata and quota history without importing provider-adapter contracts.
+type QuotaCreditReport struct {
+	Plan             string
+	CreditsRemaining string
+	CreditsUsed      string
+	CreditsLimit     string
+	Currency         string
+	FetchedAt        time.Time
+}
+
+// QuotaMetadataFromReport persists subscription/credits standing on account
+// metadata so admin views and operators can inspect the latest provider state.
+func QuotaMetadataFromReport(current map[string]any, report QuotaCreditReport) map[string]any {
+	metadata := cloneMetadata(current)
+	if strings.TrimSpace(report.Plan) != "" {
+		metadata["last_quota_plan"] = strings.TrimSpace(report.Plan)
+	}
+	if strings.TrimSpace(report.CreditsRemaining) != "" {
+		metadata["last_quota_credits_remaining"] = strings.TrimSpace(report.CreditsRemaining)
+	}
+	if strings.TrimSpace(report.CreditsUsed) != "" {
+		metadata["last_quota_credits_used"] = strings.TrimSpace(report.CreditsUsed)
+	}
+	if strings.TrimSpace(report.CreditsLimit) != "" {
+		metadata["last_quota_credits_limit"] = strings.TrimSpace(report.CreditsLimit)
+	}
+	if strings.TrimSpace(report.Currency) != "" {
+		metadata["last_quota_currency"] = strings.TrimSpace(report.Currency)
+	}
+	fetchedAt := report.FetchedAt
+	if fetchedAt.IsZero() {
+		fetchedAt = time.Now().UTC()
+	}
+	metadata["last_quota_fetched_at"] = fetchedAt.UTC().Format(time.RFC3339)
+	return metadata
+}
+
+// QuotaCreditSnapshotFromReport returns a real quota snapshot for provider
+// credits, or false when the report has no credit fields to persist.
+func QuotaCreditSnapshotFromReport(account ProviderAccount, report QuotaCreditReport) (AccountQuotaSnapshot, bool) {
+	if account.ID <= 0 || account.ProviderID <= 0 {
+		return AccountQuotaSnapshot{}, false
+	}
+	remaining := strings.TrimSpace(report.CreditsRemaining)
+	used := strings.TrimSpace(report.CreditsUsed)
+	limit := strings.TrimSpace(report.CreditsLimit)
+	if remaining == "" && used == "" && limit == "" {
+		return AccountQuotaSnapshot{}, false
+	}
+	snapshotAt := report.FetchedAt
+	if snapshotAt.IsZero() {
+		snapshotAt = time.Now().UTC()
+	}
+	return AccountQuotaSnapshot{
+		AccountID:      account.ID,
+		ProviderID:     account.ProviderID,
+		QuotaType:      QuotaTypeProviderCredits,
+		Remaining:      remaining,
+		Used:           used,
+		QuotaLimit:     limit,
+		RemainingRatio: creditRemainingRatio(remaining, used, limit),
+		SnapshotAt:     snapshotAt.UTC(),
+	}, true
+}
+
+func creditRemainingRatio(remaining string, used string, limit string) float32 {
+	remainingValue, remainingOK := parseQuotaFloat(remaining)
+	limitValue, limitOK := parseQuotaFloat(limit)
+	if remainingOK && limitOK && limitValue > 0 {
+		return clampQuotaRatio(float32(remainingValue / limitValue))
+	}
+	usedValue, usedOK := parseQuotaFloat(used)
+	if remainingOK && usedOK && remainingValue+usedValue > 0 {
+		return clampQuotaRatio(float32(remainingValue / (remainingValue + usedValue)))
+	}
+	return 0
+}
+
+func parseQuotaFloat(value string) (float64, bool) {
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if err != nil {
+		return 0, false
+	}
+	return parsed, true
+}
+
+func clampQuotaRatio(value float32) float32 {
+	if value < 0 {
+		return 0
+	}
+	if value > 1 {
+		return 1
+	}
+	return value
+}
+
+func cloneMetadata(value map[string]any) map[string]any {
+	if value == nil {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(value))
+	for key, item := range value {
+		out[key] = item
+	}
+	return out
 }
 
 type BatchUpdateResult struct {
@@ -204,6 +312,7 @@ type CreateRequest struct {
 	Status         *Status
 	Priority       *int
 	Weight         *float32
+	RiskLevel      *string
 	UpstreamClient *string
 }
 
@@ -216,6 +325,7 @@ type UpdateRequest struct {
 	Status         *Status
 	Priority       *int
 	Weight         *float32
+	RiskLevel      *string
 	UpstreamClient **string
 }
 
@@ -266,6 +376,7 @@ type CreateStoredAccount struct {
 	Status               Status
 	Priority             int
 	Weight               float32
+	RiskLevel            *string
 	UpstreamClient       *string
 }
 
@@ -293,6 +404,7 @@ type Store interface {
 	Update(ctx context.Context, account ProviderAccount) (ProviderAccount, error)
 	FindByID(ctx context.Context, id int) (ProviderAccount, error)
 	List(ctx context.Context) ([]ProviderAccount, error)
+	ListActiveByProviderIDs(ctx context.Context, providerIDs []int) ([]ProviderAccount, error)
 	CreateProxy(ctx context.Context, input CreateStoredProxy) (ProxyDefinition, error)
 	UpdateProxy(ctx context.Context, proxy ProxyDefinition) (ProxyDefinition, error)
 	FindProxyByID(ctx context.Context, id int) (ProxyDefinition, error)
@@ -301,12 +413,14 @@ type Store interface {
 	CreateGroup(ctx context.Context, input CreateStoredAccountGroup) (AccountGroup, error)
 	UpdateGroup(ctx context.Context, group AccountGroup) (AccountGroup, error)
 	FindGroupByID(ctx context.Context, id int) (AccountGroup, error)
+	FindGroupsByID(ctx context.Context, ids []int) ([]AccountGroup, error)
 	ListGroups(ctx context.Context) ([]AccountGroup, error)
 	DeleteGroup(ctx context.Context, id int) error
 	AddAccountToGroup(ctx context.Context, accountID int, groupID int) (AccountGroupMember, error)
 	RemoveAccountFromGroup(ctx context.Context, accountID int, groupID int) error
 	ListGroupMembers(ctx context.Context, groupID int) ([]AccountGroupMember, error)
 	ListGroupIDsByAccount(ctx context.Context, accountID int) ([]int, error)
+	ListGroupIDsByAccounts(ctx context.Context, accountIDs []int) (map[int][]int, error)
 	RecordHealthSnapshot(ctx context.Context, snapshot AccountHealthSnapshot) (AccountHealthSnapshot, error)
 	LatestHealthSnapshotByAccount(ctx context.Context, accountID int) (AccountHealthSnapshot, error)
 	ListHealthSnapshotsByAccount(ctx context.Context, accountID int, limit int) ([]AccountHealthSnapshot, error)

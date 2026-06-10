@@ -19,6 +19,7 @@ import (
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/metacoerce"
 	platformotel "github.com/srapi/srapi/apps/api/internal/platform/otel"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -32,194 +33,15 @@ type SystemClock struct{}
 func (SystemClock) Now() time.Time { return time.Now().UTC() }
 
 const feedbackSignalWindow = 30 * 24 * time.Hour
+const strategyRefreshInterval = 30 * time.Second
 
 type Service struct {
-	store    contract.Store
-	clock    Clock
-	registry *StrategyRegistry
-}
-
-type StrategyRegistry struct {
-	mu          sync.RWMutex
-	descriptors map[contract.StrategyName]contract.StrategyDescriptor
-}
-
-func NewStrategyRegistry() *StrategyRegistry {
-	return &StrategyRegistry{descriptors: seededStrategyDescriptorMap()}
-}
-
-func seededStrategyDescriptorMap() map[contract.StrategyName]contract.StrategyDescriptor {
-	descriptors := map[contract.StrategyName]contract.StrategyDescriptor{}
-	for _, descriptor := range seededStrategyDescriptors() {
-		descriptors[descriptor.Name] = descriptor
-	}
-	return descriptors
-}
-
-func seededStrategyDescriptors() []contract.StrategyDescriptor {
-	return []contract.StrategyDescriptor{
-		newStrategyDescriptor(contract.StrategyBalanced, "v1", "Balanced default scheduler strategy.", map[string]float64{
-			"health":   0.30,
-			"quota":    0.20,
-			"latency":  0.15,
-			"sticky":   0.10,
-			"cache":    0.10,
-			"cost":     0.10,
-			"fairness": 0.05,
-			"priority": 0.00,
-		}),
-		newStrategyDescriptor(contract.StrategyCostSaver, "v1", "Cost-saving scheduler strategy.", map[string]float64{
-			"cost":     0.30,
-			"quota":    0.20,
-			"cache":    0.15,
-			"health":   0.15,
-			"fairness": 0.10,
-			"latency":  0.05,
-			"sticky":   0.05,
-			"priority": 0.00,
-		}),
-		newStrategyDescriptor(contract.StrategyLatencyFirst, "v1", "Low-latency scheduler strategy.", map[string]float64{
-			"latency":  0.35,
-			"health":   0.25,
-			"quota":    0.15,
-			"sticky":   0.10,
-			"cost":     0.05,
-			"cache":    0.05,
-			"fairness": 0.05,
-			"priority": 0.00,
-		}),
-		newStrategyDescriptor(contract.StrategyQuotaProtect, "v1", "Quota-protection scheduler strategy.", map[string]float64{
-			"quota":    0.35,
-			"health":   0.25,
-			"cost":     0.15,
-			"latency":  0.10,
-			"fairness": 0.05,
-			"sticky":   0.05,
-			"cache":    0.05,
-			"priority": 0.00,
-		}),
-		newStrategyDescriptor(contract.StrategyStickyFirst, "v1", "Sticky-affinity scheduler strategy.", map[string]float64{
-			"sticky":   0.35,
-			"health":   0.25,
-			"quota":    0.15,
-			"latency":  0.10,
-			"cost":     0.05,
-			"cache":    0.05,
-			"fairness": 0.05,
-			"priority": 0.00,
-		}),
-		newStrategyDescriptor(contract.StrategyCacheAffinityFirst, "v1", "Cache-affinity scheduler strategy.", map[string]float64{
-			"cache":    0.30,
-			"cost":     0.20,
-			"health":   0.20,
-			"quota":    0.15,
-			"latency":  0.05,
-			"sticky":   0.05,
-			"fairness": 0.05,
-			"priority": 0.00,
-		}),
-		newStrategyDescriptor(contract.StrategyPremiumQuality, "v1", "Premium-quality scheduler strategy.", map[string]float64{
-			"health":   0.35,
-			"latency":  0.20,
-			"quota":    0.15,
-			"sticky":   0.10,
-			"cost":     0.05,
-			"cache":    0.05,
-			"fairness": 0.05,
-			"priority": 0.05,
-		}),
-	}
-}
-
-func (r *StrategyRegistry) Resolve(name contract.StrategyName) (contract.StrategyDescriptor, error) {
-	if name == "" {
-		name = contract.StrategyBalanced
-	}
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	descriptor, ok := r.descriptors[name]
-	if !ok || descriptor.Status != "active" {
-		return contract.StrategyDescriptor{}, ErrInvalidInput
-	}
-	return cloneStrategyDescriptor(descriptor), nil
-}
-
-func (r *StrategyRegistry) List() []contract.StrategyDescriptor {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	out := make([]contract.StrategyDescriptor, 0, len(r.descriptors))
-	for _, descriptor := range r.descriptors {
-		out = append(out, cloneStrategyDescriptor(descriptor))
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-	return out
-}
-
-func newStrategyDescriptor(name contract.StrategyName, version string, description string, weights map[string]float64) contract.StrategyDescriptor {
-	config := map[string]any{
-		"weights":           weightsPayload(weights),
-		"hard_rules":        []string{"account_disabled", "credential_invalid", "quota_exhausted", "rpm_limit_exceeded", "tpm_limit_exceeded", "concurrency_full", "circuit_open", "cooldown_active", "capability_mismatch"},
-		"fallback_rules":    map[string]any{"max_attempts": 1},
-		"randomization":     map[string]any{"top_n": 1, "seeded_tests": true},
-		"risk_controls":     []string{"runtime_class", "account_status", "circuit_breaker"},
-		"observability":     []string{"decision", "feedback", "usage"},
-		"strategy_registry": "seed",
-	}
-	return contract.StrategyDescriptor{
-		Name:        name,
-		Version:     version,
-		Status:      "active",
-		Config:      config,
-		ConfigHash:  configHash(config),
-		Weights:     cloneWeights(weights),
-		Description: description,
-	}
-}
-
-func configHash(config map[string]any) string {
-	raw, err := json.Marshal(config)
-	if err != nil {
-		return "sha256:invalid"
-	}
-	sum := sha256.Sum256(raw)
-	return "sha256:" + hex.EncodeToString(sum[:])
-}
-
-func cloneStrategyDescriptor(value contract.StrategyDescriptor) contract.StrategyDescriptor {
-	value.Config = cloneMapAny(value.Config)
-	value.Weights = cloneWeights(value.Weights)
-	return value
-}
-
-func cloneWeights(values map[string]float64) map[string]float64 {
-	out := make(map[string]float64, len(values))
-	for key, value := range values {
-		out[key] = value
-	}
-	return out
-}
-
-func cloneMapAny(values map[string]any) map[string]any {
-	if values == nil {
-		return nil
-	}
-	raw, err := json.Marshal(values)
-	if err != nil {
-		return nil
-	}
-	var out map[string]any
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil
-	}
-	return out
-}
-
-func weightsPayload(weights map[string]float64) map[string]any {
-	out := make(map[string]any, len(weights))
-	for key, value := range weights {
-		out[key] = value
-	}
-	return out
+	store            contract.Store
+	clock            Clock
+	registry         *StrategyRegistry
+	strategyCacheMu  sync.Mutex
+	strategyLoadedAt time.Time
+	strategyDirty    bool
 }
 
 func New(store contract.Store, clock Clock) (*Service, error) {
@@ -229,7 +51,7 @@ func New(store contract.Store, clock Clock) (*Service, error) {
 	if clock == nil {
 		clock = SystemClock{}
 	}
-	return &Service{store: store, clock: clock, registry: NewStrategyRegistry()}, nil
+	return &Service{store: store, clock: clock, registry: NewStrategyRegistry(), strategyDirty: true}, nil
 }
 
 func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (result contract.ScheduleResult, err error) {
@@ -254,14 +76,14 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (r
 	if err := s.enrichFeedbackSignals(ctx, &req); err != nil {
 		return contract.ScheduleResult{}, err
 	}
-	if err := s.RefreshStrategies(ctx); err != nil {
+	if err := s.ensureStrategiesFresh(ctx); err != nil {
 		return contract.ScheduleResult{}, err
 	}
 	if err := s.applyStrategyRollout(&req); err != nil {
 		return contract.ScheduleResult{}, err
 	}
 
-	strategy, err := s.registry.Resolve(req.Strategy)
+	strategy, err := s.registry.Resolve(req.Strategy, strategyScopeKeys(req)...)
 	if err != nil {
 		return contract.ScheduleResult{}, err
 	}
@@ -458,7 +280,7 @@ func (s *Service) applyStrategyRollout(req *contract.ScheduleRequest) error {
 	if rollout.ShadowStrategy == "" {
 		return ErrInvalidInput
 	}
-	if _, err := s.registry.Resolve(rollout.ShadowStrategy); err != nil {
+	if _, err := s.registry.Resolve(rollout.ShadowStrategy, strategyScopeKeys(*req)...); err != nil {
 		return err
 	}
 	key := strings.TrimSpace(rollout.Key)
@@ -539,6 +361,32 @@ func (s *Service) ListStrategies(ctx context.Context) ([]contract.StrategyDescri
 
 func (s *Service) ListLeases(ctx context.Context) ([]contract.Lease, error) {
 	return s.store.ListLeases(ctx)
+}
+
+// ActiveLeaseCount returns the live number of pending scheduler leases without
+// requiring metrics collection to scan historical lease rows.
+func (s *Service) ActiveLeaseCount(ctx context.Context) int {
+	if s == nil {
+		return 0
+	}
+	if counter, ok := s.store.(contract.ActiveLeaseCounter); ok {
+		count, err := counter.CountActiveLeases(ctx)
+		if err == nil && count >= 0 {
+			return count
+		}
+		return 0
+	}
+	leases, err := s.store.ListLeases(ctx)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, lease := range leases {
+		if lease.Status == contract.LeaseStatusPending {
+			count++
+		}
+	}
+	return count
 }
 
 // AccountConcurrency returns the live number of in-flight scheduler leases for
@@ -1068,7 +916,7 @@ func scoreCandidate(candidate contract.Candidate, req contract.ScheduleRequest, 
 	fairness := normalizeWeight(candidate.Account.Weight)
 	riskPenalty := riskPenalty(candidate)
 	saturationPenalty := saturationPenalty(candidate)
-	final := health*weights["health"] + quota*weights["quota"] + latency*weights["latency"] + sticky*weights["sticky"] + cache*weights["cache"] + cost*weights["cost"] + fairness*weights["fairness"] + quality*weights["priority"] - riskPenalty - saturationPenalty
+	final := health*weights["health"] + quota*weights["quota"] + latency*weights["latency"] + sticky*weights["sticky"] + cache*weights["cache"] + cost*weights["cost"] + fairness*weights["fairness"] + quality*weights["quality"] - riskPenalty - saturationPenalty
 	return scoreBreakdown{
 		AccountID:          candidate.Account.ID,
 		Final:              final,
@@ -1283,7 +1131,7 @@ func latencyScore(candidate contract.Candidate) float64 {
 }
 
 func qualityScore(candidate contract.Candidate) float64 {
-	valueMaps := []map[string]any{candidate.Mapping.PricingOverride, candidate.Account.Metadata, candidate.Provider.Capabilities, candidate.Provider.ConfigSchema}
+	valueMaps := qualityValueMaps(candidate)
 	if score, ok := firstScoreValue(valueMaps, "quality_score", "quality_eval_score", "online_eval_score", "judge_score"); ok {
 		return score
 	}
@@ -1303,7 +1151,7 @@ func qualityScore(candidate contract.Candidate) float64 {
 }
 
 func qualityEvalScore(candidate contract.Candidate) *float64 {
-	valueMaps := []map[string]any{candidate.Mapping.PricingOverride, candidate.Account.Metadata, candidate.Provider.Capabilities, candidate.Provider.ConfigSchema}
+	valueMaps := qualityValueMaps(candidate)
 	if score, ok := firstScoreValue(valueMaps, "quality_eval_score", "online_eval_score", "judge_score"); ok {
 		return &score
 	}
@@ -1311,7 +1159,7 @@ func qualityEvalScore(candidate contract.Candidate) *float64 {
 }
 
 func qualityEvalSamples(candidate contract.Candidate) int {
-	valueMaps := []map[string]any{candidate.Mapping.PricingOverride, candidate.Account.Metadata, candidate.Provider.Capabilities, candidate.Provider.ConfigSchema}
+	valueMaps := qualityValueMaps(candidate)
 	if count, ok := firstPositiveInt(valueMaps, "quality_eval_samples", "online_eval_samples", "judge_samples"); ok {
 		return count
 	}
@@ -1319,17 +1167,25 @@ func qualityEvalSamples(candidate contract.Candidate) int {
 }
 
 func qualityTierValue(candidate contract.Candidate) string {
-	valueMaps := []map[string]any{candidate.Mapping.PricingOverride, candidate.Account.Metadata, candidate.Provider.Capabilities, candidate.Provider.ConfigSchema}
+	valueMaps := qualityValueMaps(candidate)
 	if tier, ok := firstQualityTier(valueMaps); ok {
 		return tier
 	}
 	return ""
 }
 
+func qualityValueMaps(candidate contract.Candidate) []map[string]any {
+	modelRegistryTier := map[string]any{}
+	if strings.TrimSpace(candidate.QualityTier) != "" {
+		modelRegistryTier["quality_tier"] = candidate.QualityTier
+	}
+	return []map[string]any{candidate.Mapping.PricingOverride, candidate.Account.Metadata, candidate.Provider.Capabilities, candidate.Provider.ConfigSchema, modelRegistryTier}
+}
+
 func firstQualityTier(values []map[string]any) (string, bool) {
 	for _, metadata := range values {
 		for _, key := range []string{"quality_tier", "quality"} {
-			value, ok := metadataValue(metadata, key)
+			value, ok := metacoerce.Value(metadata, key)
 			if !ok {
 				continue
 			}
@@ -1391,7 +1247,7 @@ func freeTier(tier contract.UserTier) bool {
 }
 
 func protectedAccount(candidate contract.Candidate) bool {
-	if metadataBool(candidate.Account.Metadata, "quota_protected") || metadataBool(candidate.Account.Metadata, "protected") {
+	if metacoerce.Bool(candidate.Account.Metadata, "quota_protected") || metacoerce.Bool(candidate.Account.Metadata, "protected") {
 		return true
 	}
 	value, ok := candidate.Account.Metadata["quality_tier"].(string)
@@ -1401,25 +1257,6 @@ func protectedAccount(candidate contract.Candidate) bool {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "high", "premium", "protected":
 		return true
-	default:
-		return false
-	}
-}
-
-func metadataBool(metadata map[string]any, key string) bool {
-	if metadata == nil {
-		return false
-	}
-	value, ok := metadata[key]
-	if !ok {
-		return false
-	}
-	switch value := value.(type) {
-	case bool:
-		return value
-	case string:
-		parsed, err := strconv.ParseBool(strings.TrimSpace(value))
-		return err == nil && parsed
 	default:
 		return false
 	}
@@ -1446,7 +1283,7 @@ func saturationPenalty(candidate contract.Candidate) float64 {
 
 func costScore(candidate contract.Candidate) float64 {
 	if value, ok := candidate.Mapping.PricingOverride["relative_cost"]; ok {
-		if parsed, ok := floatValue(value); ok {
+		if parsed, ok := metacoerce.Float(value); ok {
 			return clamp01(1 - parsed)
 		}
 	}
@@ -1568,7 +1405,7 @@ func normalizedFeedbackCost(cost float64, minCost float64, maxCost float64) floa
 
 func hasAnyMetadataKey(metadata map[string]any, keys ...string) bool {
 	for _, key := range keys {
-		if _, ok := metadataValue(metadata, key); ok {
+		if _, ok := metacoerce.Value(metadata, key); ok {
 			return true
 		}
 	}
@@ -1586,11 +1423,11 @@ func firstScoreValue(values []map[string]any, keys ...string) (float64, bool) {
 func firstFloat(values []map[string]any, keys ...string) (float64, bool) {
 	for _, metadata := range values {
 		for _, key := range keys {
-			value, ok := metadataValue(metadata, key)
+			value, ok := metacoerce.Value(metadata, key)
 			if !ok {
 				continue
 			}
-			parsed, ok := floatValue(value)
+			parsed, ok := metacoerce.Float(value)
 			if ok {
 				return parsed, true
 			}
@@ -1602,11 +1439,11 @@ func firstFloat(values []map[string]any, keys ...string) (float64, bool) {
 func firstPositiveFloat(values []map[string]any, keys ...string) (float64, bool) {
 	for _, metadata := range values {
 		for _, key := range keys {
-			value, ok := metadataValue(metadata, key)
+			value, ok := metacoerce.Value(metadata, key)
 			if !ok {
 				continue
 			}
-			parsed, ok := floatValue(value)
+			parsed, ok := metacoerce.Float(value)
 			if ok && parsed > 0 {
 				return parsed, true
 			}
@@ -1618,65 +1455,17 @@ func firstPositiveFloat(values []map[string]any, keys ...string) (float64, bool)
 func firstPositiveInt(values []map[string]any, keys ...string) (int, bool) {
 	for _, metadata := range values {
 		for _, key := range keys {
-			value, ok := metadataValue(metadata, key)
+			value, ok := metacoerce.Value(metadata, key)
 			if !ok {
 				continue
 			}
-			parsed, ok := intValue(value)
+			parsed, ok := metacoerce.Int(value)
 			if ok && parsed > 0 {
 				return parsed, true
 			}
 		}
 	}
 	return 0, false
-}
-
-func metadataValue(metadata map[string]any, key string) (any, bool) {
-	if metadata == nil {
-		return nil, false
-	}
-	value, ok := metadata[key]
-	return value, ok
-}
-
-func floatValue(value any) (float64, bool) {
-	switch typed := value.(type) {
-	case float64:
-		return typed, true
-	case float32:
-		return float64(typed), true
-	case int:
-		return float64(typed), true
-	case int64:
-		return float64(typed), true
-	case json.Number:
-		parsed, err := typed.Float64()
-		return parsed, err == nil
-	case string:
-		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
-		return parsed, err == nil
-	default:
-		return 0, false
-	}
-}
-
-func intValue(value any) (int, bool) {
-	switch typed := value.(type) {
-	case int:
-		return typed, true
-	case int64:
-		return int(typed), true
-	case float64:
-		return int(typed), true
-	case json.Number:
-		parsed, err := typed.Int64()
-		return int(parsed), err == nil
-	case string:
-		parsed, err := strconv.Atoi(strings.TrimSpace(typed))
-		return parsed, err == nil
-	default:
-		return 0, false
-	}
 }
 
 func riskPenalty(candidate contract.Candidate) float64 {
@@ -1846,7 +1635,7 @@ func sensitiveSnapshotKey(key string) bool {
 		return false
 	}
 	switch normalized {
-	case "api_key", "apikey", "access_token", "refresh_token", "authorization", "cookie", "secret", "password", "token", "credential", "credential_ciphertext", "cookie_jar_ciphertext", "device_fingerprint_ciphertext", "oauth_access_token", "oauth_refresh_token", "oauth_device_code", "web_session_cookie", "desktop_client_token", "cli_client_token", "ide_plugin_token", "service_account_json", "custom_headers", "custom_reverse_proxy_payload":
+	case "api_key", "apikey", "access_token", "refresh_token", "authorization", "cookie", "secret", "password", "token", "credential", "credential_ciphertext", "cookie_jar_ciphertext", "device_fingerprint_ciphertext", "oauth_access_token", "oauth_refresh_token", "oauth_device_code", "web_session_cookie", "cli_client_token", "custom_headers", "custom_reverse_proxy_payload":
 		return true
 	}
 	sensitiveFragments := []string{"api_key", "access_token", "refresh_token", "authorization", "cookie", "secret", "password", "credential", "ciphertext", "device_fingerprint"}

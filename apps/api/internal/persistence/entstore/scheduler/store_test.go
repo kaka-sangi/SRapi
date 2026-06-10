@@ -14,7 +14,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func TestStoreListsActiveGlobalStrategies(t *testing.T) {
+func TestStoreListsActiveStrategiesAcrossScopes(t *testing.T) {
 	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
 	defer client.Close()
 
@@ -65,7 +65,7 @@ func TestStoreListsActiveGlobalStrategies(t *testing.T) {
 		Save(ctx); err != nil {
 		t.Fatalf("create draft strategy: %v", err)
 	}
-	if _, err := client.SchedulerStrategy.Create().
+	scopedRow, err := client.SchedulerStrategy.Create().
 		SetName(string(contract.StrategyLatencyFirst)).
 		SetVersion("v2").
 		SetStatus("active").
@@ -73,7 +73,8 @@ func TestStoreListsActiveGlobalStrategies(t *testing.T) {
 		SetScopeID(10).
 		SetConfigJSON(map[string]any{"weights": map[string]any{"latency": 1.0}}).
 		SetConfigHash("sha256:scoped").
-		Save(ctx); err != nil {
+		Save(ctx)
+	if err != nil {
 		t.Fatalf("create scoped strategy: %v", err)
 	}
 
@@ -81,15 +82,24 @@ func TestStoreListsActiveGlobalStrategies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list active strategies: %v", err)
 	}
-	if len(strategies) != 1 {
-		t.Fatalf("expected only active global strategy, got %+v", strategies)
+	if len(strategies) != 2 {
+		t.Fatalf("expected active global and scoped strategies, got %+v", strategies)
 	}
-	if strategies[0].ID != newer.ID || strategies[0].Name != contract.StrategyBalanced || strategies[0].Version != "v10" {
-		t.Fatalf("unexpected active strategy: %+v", strategies[0])
+	byID := map[int]contract.StrategyDescriptor{}
+	for _, strategy := range strategies {
+		byID[strategy.ID] = strategy
 	}
-	weights, ok := strategies[0].Config["weights"].(map[string]any)
+	global := byID[newer.ID]
+	if global.ID != newer.ID || global.Name != contract.StrategyBalanced || global.Version != "v10" || global.ScopeType != contract.StrategyScopeGlobal {
+		t.Fatalf("unexpected global active strategy: %+v", global)
+	}
+	weights, ok := global.Config["weights"].(map[string]any)
 	if !ok || weights["health_weight"].(float64) != 1.0 {
-		t.Fatalf("expected persisted weights, got %+v", strategies[0].Config)
+		t.Fatalf("expected persisted weights, got %+v", global.Config)
+	}
+	scoped := byID[scopedRow.ID]
+	if scoped.Name != contract.StrategyLatencyFirst || scoped.ScopeType != contract.StrategyScopeAPIKey || scoped.ScopeID == nil || *scoped.ScopeID != 10 {
+		t.Fatalf("expected scoped active strategy to be loaded, got %+v", scoped)
 	}
 	if active.ID == newer.ID {
 		t.Fatal("expected distinct active strategy rows")

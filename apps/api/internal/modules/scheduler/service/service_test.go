@@ -113,6 +113,31 @@ func TestBalancedStrategyPrefersHealthyCandidate(t *testing.T) {
 	}
 }
 
+func TestScheduleAppliesConfiguredAccountRiskPenalty(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.95), withQuotaRemaining(0.90), withRiskLevel("high"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.95), withQuotaRemaining(0.90), withRiskLevel("medium"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	highRisk := decisionScore(t, result.Decision.Scores, 1)
+	mediumRisk := decisionScore(t, result.Decision.Scores, 2)
+	if got := highRisk["risk_penalty"].(float64); got != 0.15 {
+		t.Fatalf("expected high risk penalty 0.15, got %+v", highRisk)
+	}
+	if got := mediumRisk["risk_penalty"].(float64); got != 0.05 {
+		t.Fatalf("expected medium risk penalty 0.05, got %+v", mediumRisk)
+	}
+	if result.Candidate.Account.ID != 2 {
+		t.Fatalf("expected medium-risk candidate selected over high-risk candidate, got %d", result.Candidate.Account.ID)
+	}
+}
+
 func TestScheduleReturnsRankedAvailableCandidates(t *testing.T) {
 	svc := newService(t)
 	req := baseRequest()
@@ -609,8 +634,8 @@ func TestPremiumQualityPrefersHealthOverCost(t *testing.T) {
 	req := baseRequest()
 	req.Strategy = contract.StrategyPremiumQuality
 	req.Candidates = []contract.Candidate{
-		candidate(1, withHealth(0.95), withQuotaRemaining(0.90), withRelativeCost("0.9"), withCapabilities(capabilitiescontract.KeyStreaming)),
-		candidate(2, withHealth(0.60), withQuotaRemaining(0.90), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(1, withHealth(0.95), withQuotaRemaining(0.90), withRelativeCost("0.9"), withQualityScore("0.95"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.60), withQuotaRemaining(0.90), withRelativeCost("0.1"), withQualityScore("0.10"), withCapabilities(capabilitiescontract.KeyStreaming)),
 	}
 
 	result, err := svc.Schedule(context.Background(), req)
@@ -619,6 +644,37 @@ func TestPremiumQualityPrefersHealthOverCost(t *testing.T) {
 	}
 	if result.Candidate.Account.ID != 1 {
 		t.Fatalf("expected premium quality to select healthier account 1, got %d", result.Candidate.Account.ID)
+	}
+	if result.Decision.StrategyWeights["quality"] != 0.05 {
+		t.Fatalf("expected premium quality strategy weight to use quality key, got %+v", result.Decision.StrategyWeights)
+	}
+	if _, ok := result.Decision.StrategyWeights["priority"]; ok {
+		t.Fatalf("priority is a hard account tier, not a quality score weight: %+v", result.Decision.StrategyWeights)
+	}
+	if decisionScore(t, result.Decision.Scores, 1)["quality_score"].(float64) <= decisionScore(t, result.Decision.Scores, 2)["quality_score"].(float64) {
+		t.Fatalf("expected account 1 quality score to dominate: %+v", result.Decision.Scores)
+	}
+}
+
+func TestPremiumQualityUsesCandidateQualityTier(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Strategy = contract.StrategyPremiumQuality
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.80), withQuotaRemaining(0.90), withRelativeCost("0.5"), withQualityTier("premium"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.80), withQuotaRemaining(0.90), withRelativeCost("0.5"), withQualityTier("basic"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 1 {
+		t.Fatalf("expected registry premium quality tier to select account 1, got %d", result.Candidate.Account.ID)
+	}
+	score := decisionScore(t, result.Decision.Scores, 1)
+	if score["quality_tier"] != "premium" || score["quality_score"].(float64) != 0.90 {
+		t.Fatalf("expected model registry quality tier in scheduler score, got %+v", score)
 	}
 }
 
@@ -974,7 +1030,7 @@ func TestStrategyRegistryListsSeededStrategies(t *testing.T) {
 	}
 	seen := map[contract.StrategyName]bool{}
 	for _, strategy := range strategies {
-		if strategy.Version == "" || strategy.Status != "active" || !strings.HasPrefix(strategy.ConfigHash, "sha256:") || len(strategy.Weights) == 0 || len(strategy.Config) == 0 {
+		if strategy.Version == "" || strategy.Status != contract.StrategyStatusActive || !strings.HasPrefix(strategy.ConfigHash, "sha256:") || len(strategy.Weights) == 0 || len(strategy.Config) == 0 {
 			t.Fatalf("unexpected strategy descriptor: %+v", strategy)
 		}
 		seen[strategy.Name] = true
@@ -994,8 +1050,8 @@ func TestStrategyRegistryListsSeededStrategies(t *testing.T) {
 	}
 }
 
-func TestServiceRefreshesActiveStrategyBeforeSchedule(t *testing.T) {
-	store := &dynamicStrategyStore{Store: schedulermemory.New()}
+func TestServiceCRUDStrategyFlowsIntoScheduleAndDeprecates(t *testing.T) {
+	store := schedulermemory.New()
 	svc, err := service.New(store, nil)
 	if err != nil {
 		t.Fatalf("create scheduler service: %v", err)
@@ -1014,19 +1070,21 @@ func TestServiceRefreshesActiveStrategyBeforeSchedule(t *testing.T) {
 		t.Fatalf("expected seeded balanced strategy to select healthier account 1, got %d", first.Candidate.Account.ID)
 	}
 
-	store.strategies = []contract.StrategyDescriptor{
-		{
-			ID:      42,
-			Name:    contract.StrategyBalanced,
-			Version: "v2",
-			Status:  "active",
-			Config: map[string]any{
-				"weights": map[string]any{
-					"cost_weight": 1.0,
-				},
-			},
-			Description: "DB-loaded balanced override",
+	created, err := svc.CreateStrategy(context.Background(), contract.StrategyMutation{
+		Name:        contract.StrategyBalanced,
+		Version:     "v2",
+		Status:      contract.StrategyStatusActive,
+		ScopeType:   contract.StrategyScopeGlobal,
+		Description: "DB-loaded balanced override",
+		Weights: map[string]float64{
+			"cost": 1.0,
 		},
+	})
+	if err != nil {
+		t.Fatalf("create strategy: %v", err)
+	}
+	if created.ID <= 0 || created.ConfigHash == "" || created.ActivatedAt == nil {
+		t.Fatalf("expected persisted active strategy lifecycle, got %+v", created)
 	}
 	req.RequestID = "req_scheduler_strategy_refresh"
 	second, err := svc.Schedule(context.Background(), req)
@@ -1041,6 +1099,90 @@ func TestServiceRefreshesActiveStrategyBeforeSchedule(t *testing.T) {
 	}
 	if second.Decision.StrategyWeights["cost"] != 1.0 {
 		t.Fatalf("expected cost-only strategy weights, got %+v", second.Decision.StrategyWeights)
+	}
+
+	deprecated, err := svc.DeprecateStrategy(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("deprecate strategy: %v", err)
+	}
+	if deprecated.Status != contract.StrategyStatusDeprecated || deprecated.DeprecatedAt == nil {
+		t.Fatalf("expected deprecated lifecycle state, got %+v", deprecated)
+	}
+	req.RequestID = "req_scheduler_strategy_deprecated"
+	third, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule after deprecate: %v", err)
+	}
+	if third.Candidate.Account.ID != 1 {
+		t.Fatalf("expected deprecated strategy to fall back to seeded balanced account 1, got %d", third.Candidate.Account.ID)
+	}
+}
+
+func TestScopedStrategyOverridesOnlyMatchingRequestScope(t *testing.T) {
+	store := schedulermemory.New()
+	svc, err := service.New(store, nil)
+	if err != nil {
+		t.Fatalf("create scheduler service: %v", err)
+	}
+	groupID := 7
+	if _, err := svc.CreateStrategy(context.Background(), contract.StrategyMutation{
+		Name:      contract.StrategyBalanced,
+		Version:   "group-v1",
+		Status:    contract.StrategyStatusActive,
+		ScopeType: contract.StrategyScopeAccountGroup,
+		ScopeID:   &groupID,
+		Weights: map[string]float64{
+			"cost": 1.0,
+		},
+	}); err != nil {
+		t.Fatalf("create scoped strategy: %v", err)
+	}
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.95), withRelativeCost("0.9"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.60), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+	withoutScope, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule without scope: %v", err)
+	}
+	if withoutScope.Candidate.Account.ID != 1 {
+		t.Fatalf("expected unscoped request to use seeded balanced account 1, got %d", withoutScope.Candidate.Account.ID)
+	}
+	req.RequestID = "req_scheduler_scoped_group"
+	req.AccountGroupScope = []int{groupID}
+	withScope, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule with scope: %v", err)
+	}
+	if withScope.Candidate.Account.ID != 2 || withScope.Decision.StrategyVersion != "group-v1" {
+		t.Fatalf("expected scoped cost strategy to select account 2, got %+v", withScope.Decision)
+	}
+}
+
+func TestStrategyLoaderRejectsPriorityWeightKey(t *testing.T) {
+	store := &dynamicStrategyStore{Store: schedulermemory.New()}
+	svc, err := service.New(store, nil)
+	if err != nil {
+		t.Fatalf("create scheduler service: %v", err)
+	}
+	store.strategies = []contract.StrategyDescriptor{
+		{
+			ID:      77,
+			Name:    contract.StrategyBalanced,
+			Version: "v2",
+			Status:  "active",
+			Config: map[string]any{
+				"weights": map[string]any{
+					"priority": 1.0,
+				},
+			},
+		},
+	}
+
+	err = svc.RefreshStrategies(context.Background())
+	if !errors.Is(err, service.ErrInvalidInput) {
+		t.Fatalf("expected priority weight key to be rejected, got %v", err)
 	}
 }
 
@@ -1643,6 +1785,10 @@ func withAccountStatus(status accountcontract.Status) candidateOption {
 	return func(candidate *contract.Candidate) { candidate.Account.Status = status }
 }
 
+func withRiskLevel(value string) candidateOption {
+	return func(candidate *contract.Candidate) { candidate.Account.RiskLevel = &value }
+}
+
 func withCredential(ciphertext string) candidateOption {
 	return func(candidate *contract.Candidate) { candidate.Account.CredentialCiphertext = ciphertext }
 }
@@ -1677,6 +1823,10 @@ func withQualityScore(value string) candidateOption {
 	return func(candidate *contract.Candidate) {
 		candidate.Mapping.PricingOverride["quality_score"] = value
 	}
+}
+
+func withQualityTier(value string) candidateOption {
+	return func(candidate *contract.Candidate) { candidate.QualityTier = value }
 }
 
 func withQualityEvalScore(value string) candidateOption {

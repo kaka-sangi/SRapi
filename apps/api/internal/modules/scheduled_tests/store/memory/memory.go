@@ -42,6 +42,7 @@ func (s *Store) CreatePlan(ctx context.Context, input contract.CreatePlan) (cont
 		ScopeID:         cloneIntPtr(input.ScopeID),
 		IntervalSeconds: input.IntervalSeconds,
 		CronExpression:  input.CronExpression,
+		ProbeModel:      input.ProbeModel,
 		MaxResults:      input.MaxResults,
 		AutoRecover:     input.AutoRecover,
 		LastStatus:      "",
@@ -79,6 +80,9 @@ func (s *Store) UpdatePlan(ctx context.Context, id int, input contract.UpdatePla
 	}
 	if input.CronExpression != nil {
 		plan.CronExpression = *input.CronExpression
+	}
+	if input.ProbeModel != nil {
+		plan.ProbeModel = *input.ProbeModel
 	}
 	if input.MaxResults != nil {
 		plan.MaxResults = *input.MaxResults

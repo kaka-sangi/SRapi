@@ -19,6 +19,7 @@ type scheduledTestPlanPayload struct {
 	ScopeID         *int       `json:"scope_id"`
 	IntervalSeconds int        `json:"interval_seconds"`
 	CronExpression  string     `json:"cron_expression"`
+	ProbeModel      string     `json:"probe_model"`
 	MaxResults      int        `json:"max_results"`
 	AutoRecover     bool       `json:"auto_recover"`
 	LastRunAt       *time.Time `json:"last_run_at"`
@@ -51,6 +52,7 @@ type createScheduledTestPlanRequest struct {
 	ScopeID         *int   `json:"scope_id"`
 	IntervalSeconds *int   `json:"interval_seconds"`
 	CronExpression  string `json:"cron_expression"`
+	ProbeModel      string `json:"probe_model"`
 	MaxResults      *int   `json:"max_results"`
 	AutoRecover     *bool  `json:"auto_recover"`
 }
@@ -62,6 +64,7 @@ type updateScheduledTestPlanRequest struct {
 	ScopeID         *int    `json:"scope_id"`
 	IntervalSeconds *int    `json:"interval_seconds"`
 	CronExpression  *string `json:"cron_expression"`
+	ProbeModel      *string `json:"probe_model"`
 	MaxResults      *int    `json:"max_results"`
 	AutoRecover     *bool   `json:"auto_recover"`
 }
@@ -75,6 +78,7 @@ func toScheduledTestPlanPayload(plan scheduledcontract.Plan) scheduledTestPlanPa
 		ScopeID:         plan.ScopeID,
 		IntervalSeconds: plan.IntervalSeconds,
 		CronExpression:  plan.CronExpression,
+		ProbeModel:      plan.ProbeModel,
 		MaxResults:      plan.MaxResults,
 		AutoRecover:     plan.AutoRecover,
 		LastRunAt:       plan.LastRunAt,
@@ -147,6 +151,7 @@ func (s *Server) handleCreateAdminScheduledTestPlan(w http.ResponseWriter, r *ht
 		ScopeType:      scheduledcontract.ScopeType(body.ScopeType),
 		ScopeID:        body.ScopeID,
 		CronExpression: body.CronExpression,
+		ProbeModel:     body.ProbeModel,
 	}
 	if body.Enabled != nil {
 		input.Enabled = *body.Enabled
@@ -202,6 +207,7 @@ func (s *Server) handleUpdateAdminScheduledTestPlan(w http.ResponseWriter, r *ht
 		ScopeID:         body.ScopeID,
 		IntervalSeconds: body.IntervalSeconds,
 		CronExpression:  body.CronExpression,
+		ProbeModel:      body.ProbeModel,
 		MaxResults:      body.MaxResults,
 		AutoRecover:     body.AutoRecover,
 	}

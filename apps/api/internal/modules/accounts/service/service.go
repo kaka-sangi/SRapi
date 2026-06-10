@@ -57,7 +57,7 @@ func New(store contract.Store, masterKey string, clock Clock) (*Service, error) 
 
 func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contract.ProviderAccount, error) {
 	name := strings.TrimSpace(req.Name)
-	if req.ProviderID <= 0 || name == "" || req.RuntimeClass == "" {
+	if req.ProviderID <= 0 || name == "" || !validRuntimeClass(req.RuntimeClass) {
 		return contract.ProviderAccount{}, ErrInvalidInput
 	}
 	if len(req.Credential) == 0 {
@@ -79,6 +79,14 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 	if req.Weight != nil {
 		weight = *req.Weight
 	}
+	riskLevel := "normal"
+	if req.RiskLevel != nil {
+		normalized, ok := normalizeRiskLevel(*req.RiskLevel)
+		if !ok {
+			return contract.ProviderAccount{}, ErrInvalidInput
+		}
+		riskLevel = normalized
+	}
 
 	stored, err := s.store.Create(ctx, contract.CreateStoredAccount{
 		ProviderID:           req.ProviderID,
@@ -91,6 +99,7 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 		Status:               status,
 		Priority:             priority,
 		Weight:               weight,
+		RiskLevel:            &riskLevel,
 		UpstreamClient:       req.UpstreamClient,
 	})
 	if err != nil {
@@ -111,11 +120,35 @@ func (s *Service) List(ctx context.Context) ([]contract.ProviderAccount, error) 
 	return out, nil
 }
 
+func (s *Service) ListActiveByProviderIDs(ctx context.Context, providerIDs []int) ([]contract.ProviderAccount, error) {
+	ids := normalizePositiveIDs(providerIDs)
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	accounts, err := s.store.ListActiveByProviderIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.ProviderAccount, 0, len(accounts))
+	for _, account := range accounts {
+		out = append(out, account)
+	}
+	return out, nil
+}
+
 func (s *Service) ListGroupIDsByAccount(ctx context.Context, accountID int) ([]int, error) {
 	if accountID <= 0 {
 		return nil, ErrInvalidInput
 	}
 	return s.store.ListGroupIDsByAccount(ctx, accountID)
+}
+
+func (s *Service) ListGroupIDsByAccounts(ctx context.Context, accountIDs []int) (map[int][]int, error) {
+	ids := normalizePositiveIDs(accountIDs)
+	if len(ids) == 0 {
+		return map[int][]int{}, nil
+	}
+	return s.store.ListGroupIDsByAccounts(ctx, ids)
 }
 
 func (s *Service) CreateProxy(ctx context.Context, req contract.CreateProxyRequest) (contract.ProxyDefinition, error) {
@@ -336,6 +369,14 @@ func (s *Service) FindGroupByID(ctx context.Context, id int) (contract.AccountGr
 	return s.store.FindGroupByID(ctx, id)
 }
 
+func (s *Service) FindGroupsByID(ctx context.Context, ids []int) ([]contract.AccountGroup, error) {
+	normalized := normalizePositiveIDs(ids)
+	if len(normalized) == 0 {
+		return nil, ErrInvalidInput
+	}
+	return s.store.FindGroupsByID(ctx, normalized)
+}
+
 func (s *Service) ListGroups(ctx context.Context) ([]contract.AccountGroup, error) {
 	return s.store.ListGroups(ctx)
 }
@@ -400,7 +441,7 @@ func (s *Service) Update(ctx context.Context, id int, req contract.UpdateRequest
 		account.Name = name
 	}
 	if req.RuntimeClass != nil {
-		if *req.RuntimeClass == "" {
+		if !validRuntimeClass(*req.RuntimeClass) {
 			return contract.ProviderAccount{}, ErrInvalidInput
 		}
 		account.RuntimeClass = *req.RuntimeClass
@@ -433,6 +474,13 @@ func (s *Service) Update(ctx context.Context, id int, req contract.UpdateRequest
 			return contract.ProviderAccount{}, ErrInvalidInput
 		}
 		account.Weight = *req.Weight
+	}
+	if req.RiskLevel != nil {
+		riskLevel, ok := normalizeRiskLevel(*req.RiskLevel)
+		if !ok {
+			return contract.ProviderAccount{}, ErrInvalidInput
+		}
+		account.RiskLevel = &riskLevel
 	}
 	if req.UpstreamClient != nil {
 		account.UpstreamClient = cloneString(*req.UpstreamClient)
@@ -951,6 +999,33 @@ func validAccountStatus(status contract.Status) bool {
 	}
 }
 
+func validRuntimeClass(runtimeClass contract.RuntimeClass) bool {
+	switch runtimeClass {
+	case contract.RuntimeClassAPIKey,
+		contract.RuntimeClassOauthRefresh,
+		contract.RuntimeClassOauthDeviceCode,
+		contract.RuntimeClassWebSessionCookie,
+		contract.RuntimeClassCliClientToken,
+		contract.RuntimeClassCustomReverseProxy:
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeRiskLevel(value string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "normal":
+		return "normal", true
+	case "medium":
+		return "medium", true
+	case "high":
+		return "high", true
+	default:
+		return "", false
+	}
+}
+
 func clampRatio(value float32) float32 {
 	if value < 0 {
 		return 0
@@ -1305,4 +1380,21 @@ func cloneString(value *string) *string {
 	}
 	cloned := *value
 	return &cloned
+}
+
+func normalizePositiveIDs(values []int) []int {
+	seen := map[int]struct{}{}
+	out := make([]int, 0, len(values))
+	for _, value := range values {
+		if value <= 0 {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	sort.Ints(out)
+	return out
 }

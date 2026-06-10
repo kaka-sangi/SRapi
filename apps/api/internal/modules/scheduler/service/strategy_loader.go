@@ -3,12 +3,42 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/metacoerce"
 )
 
 func (s *Service) RefreshStrategies(ctx context.Context) error {
+	if err := s.refreshStrategies(ctx); err != nil {
+		return err
+	}
+	s.strategyCacheMu.Lock()
+	s.strategyLoadedAt = s.clock.Now()
+	s.strategyDirty = false
+	s.strategyCacheMu.Unlock()
+	return nil
+}
+
+func (s *Service) ensureStrategiesFresh(ctx context.Context) error {
+	s.strategyCacheMu.Lock()
+	needsRefresh := s.strategyDirty || s.strategyLoadedAt.IsZero() || !s.clock.Now().Before(s.strategyLoadedAt.Add(strategyRefreshInterval))
+	s.strategyCacheMu.Unlock()
+	if !needsRefresh {
+		return nil
+	}
+	return s.RefreshStrategies(ctx)
+}
+
+func (s *Service) invalidateStrategyCache() {
+	s.strategyCacheMu.Lock()
+	s.strategyDirty = true
+	s.strategyCacheMu.Unlock()
+}
+
+func (s *Service) refreshStrategies(ctx context.Context) error {
 	descriptors, err := s.store.ListActiveStrategies(ctx)
 	if err != nil {
 		return err
@@ -23,7 +53,7 @@ func (r *StrategyRegistry) ReplaceActive(descriptors []contract.StrategyDescript
 		if err != nil {
 			return err
 		}
-		next[normalized.Name] = normalized
+		next[strategyRegistryKey{Scope: strategyDescriptorScopeKey(normalized), Name: normalized.Name}] = normalized
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -36,12 +66,16 @@ func normalizeLoadedStrategyDescriptor(descriptor contract.StrategyDescriptor) (
 	if !knownStrategyName(name) {
 		return contract.StrategyDescriptor{}, fmt.Errorf("%w: unknown strategy %q", ErrInvalidInput, descriptor.Name)
 	}
-	status := strings.TrimSpace(descriptor.Status)
+	status := strings.TrimSpace(string(descriptor.Status))
 	if status == "" {
-		status = "active"
+		status = string(contract.StrategyStatusActive)
 	}
-	if status != "active" {
+	if status != string(contract.StrategyStatusActive) {
 		return contract.StrategyDescriptor{}, fmt.Errorf("%w: strategy %s is not active", ErrInvalidInput, name)
+	}
+	scope, scopeID, err := normalizeStrategyScope(descriptor.ScopeType, descriptor.ScopeID)
+	if err != nil {
+		return contract.StrategyDescriptor{}, err
 	}
 	config := cloneMapAny(descriptor.Config)
 	if config == nil {
@@ -60,12 +94,77 @@ func normalizeLoadedStrategyDescriptor(descriptor contract.StrategyDescriptor) (
 		ID:          descriptor.ID,
 		Name:        name,
 		Version:     version,
-		Status:      "active",
+		Status:      contract.StrategyStatusActive,
+		ScopeType:   scope,
+		ScopeID:     cloneIntPtr(scopeID),
 		Config:      config,
 		ConfigHash:  configHash(config),
 		Weights:     weights,
 		Description: strings.TrimSpace(descriptor.Description),
+		CreatedBy:   cloneIntPtr(descriptor.CreatedBy),
+		CreatedAt:   descriptor.CreatedAt,
+		ActivatedAt: cloneTime(descriptor.ActivatedAt),
 	}, nil
+}
+
+func strategyScopeKeys(req contract.ScheduleRequest) []strategyScopeKey {
+	keys := []strategyScopeKey{}
+	if req.APIKeyID > 0 {
+		keys = append(keys, strategyScopeKey{Type: contract.StrategyScopeAPIKey, ID: req.APIKeyID})
+	}
+	groupIDs := append([]int(nil), req.AccountGroupScope...)
+	sort.Ints(groupIDs)
+	lastGroupID := 0
+	for _, groupID := range groupIDs {
+		if groupID <= 0 || groupID == lastGroupID {
+			continue
+		}
+		keys = append(keys, strategyScopeKey{Type: contract.StrategyScopeAccountGroup, ID: groupID})
+		lastGroupID = groupID
+	}
+	if req.UserID > 0 {
+		keys = append(keys, strategyScopeKey{Type: contract.StrategyScopeUser, ID: req.UserID})
+	}
+	keys = append(keys, globalStrategyScope())
+	return keys
+}
+
+func strategyDescriptorScopeKey(descriptor contract.StrategyDescriptor) strategyScopeKey {
+	scope, scopeID, err := normalizeStrategyScope(descriptor.ScopeType, descriptor.ScopeID)
+	if err != nil {
+		return globalStrategyScope()
+	}
+	key := strategyScopeKey{Type: scope}
+	if scopeID != nil {
+		key.ID = *scopeID
+	}
+	return key
+}
+
+func globalStrategyScope() strategyScopeKey {
+	return strategyScopeKey{Type: contract.StrategyScopeGlobal}
+}
+
+func normalizeStrategyScope(scope contract.StrategyScopeType, scopeID *int) (contract.StrategyScopeType, *int, error) {
+	switch contract.StrategyScopeType(strings.TrimSpace(string(scope))) {
+	case "", contract.StrategyScopeGlobal:
+		return contract.StrategyScopeGlobal, nil, nil
+	case contract.StrategyScopeAPIKey, contract.StrategyScopeAccountGroup, contract.StrategyScopeUser:
+		if scopeID == nil || *scopeID <= 0 {
+			return "", nil, fmt.Errorf("%w: scoped strategy requires scope_id", ErrInvalidInput)
+		}
+		return contract.StrategyScopeType(strings.TrimSpace(string(scope))), cloneIntPtr(scopeID), nil
+	default:
+		return "", nil, fmt.Errorf("%w: unknown strategy scope %q", ErrInvalidInput, scope)
+	}
+}
+
+func cloneTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 func normalizedStrategyWeights(descriptor contract.StrategyDescriptor, config map[string]any) (map[string]float64, error) {
@@ -107,7 +206,7 @@ func weightsFromConfig(config map[string]any) (map[string]float64, error) {
 	}
 	weights := make(map[string]float64, len(rawWeights))
 	for key, value := range rawWeights {
-		parsed, ok := floatValue(value)
+		parsed, ok := metacoerce.Float(value)
 		if !ok {
 			return nil, fmt.Errorf("%w: strategy weight %q must be numeric", ErrInvalidInput, key)
 		}
@@ -147,8 +246,8 @@ func normalizeStrategyWeightKey(key string) (string, bool) {
 		return "cost", true
 	case "fairness", "fairness_weight":
 		return "fairness", true
-	case "priority", "priority_weight", "quality", "quality_weight", "premium_quality_weight", "quality_preference_weight":
-		return "priority", true
+	case "quality", "quality_weight", "premium_quality_weight", "quality_preference_weight":
+		return "quality", true
 	default:
 		return "", false
 	}

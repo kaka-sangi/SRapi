@@ -284,6 +284,8 @@ func (s *Server) writeChannelMonitorError(w http.ResponseWriter, err error, requ
 	switch {
 	case errors.Is(err, channelmonitorscontract.ErrNotFound):
 		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "channel monitor not found", requestID)
+	case errors.Is(err, channelmonitorsservice.ErrDisabled):
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "channel monitor is disabled", requestID)
 	case errors.Is(err, channelmonitorsservice.ErrInvalidInput):
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid channel monitor request", requestID)
 	default:

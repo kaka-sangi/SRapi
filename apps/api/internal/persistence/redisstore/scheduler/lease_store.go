@@ -166,6 +166,49 @@ func (s *Store) ListLeases(ctx context.Context) ([]contract.Lease, error) {
 	return out, nil
 }
 
+func (s *Store) CountActiveLeases(ctx context.Context) (int, error) {
+	var (
+		cursor uint64
+		total  int
+	)
+	now := time.Now().UTC()
+	for {
+		keys, next, err := s.client.Scan(ctx, cursor, leaseKeyPrefix+"*", 100).Result()
+		if err != nil {
+			return 0, err
+		}
+		for _, key := range keys {
+			row, err := s.client.HGetAll(ctx, key).Result()
+			if err != nil {
+				return 0, err
+			}
+			if len(row) == 0 {
+				continue
+			}
+			lease := leaseFromHash(row)
+			if lease.ID == "" {
+				continue
+			}
+			if lease.Status == contract.LeaseStatusPending && !lease.ExpiresAt.IsZero() && !lease.ExpiresAt.After(now) {
+				lease.Status = contract.LeaseStatusExpired
+				lease.UpdatedAt = now
+				if err := s.markExpired(ctx, lease); err != nil {
+					return 0, err
+				}
+				continue
+			}
+			if lease.Status == contract.LeaseStatusPending {
+				total++
+			}
+		}
+		cursor = next
+		if cursor == 0 {
+			break
+		}
+	}
+	return total, nil
+}
+
 func (s *Store) findLeaseByID(ctx context.Context, leaseID string) (contract.Lease, error) {
 	row, err := s.client.HGetAll(ctx, s.leaseKey(leaseID)).Result()
 	if err != nil {

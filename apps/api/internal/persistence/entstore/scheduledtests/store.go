@@ -34,6 +34,7 @@ func (s *Store) CreatePlan(ctx context.Context, input contract.CreatePlan) (cont
 		SetScopeType(string(input.ScopeType)).
 		SetIntervalSeconds(input.IntervalSeconds).
 		SetCronExpression(input.CronExpression).
+		SetProbeModel(input.ProbeModel).
 		SetMaxResults(input.MaxResults).
 		SetAutoRecover(input.AutoRecover).
 		SetCreatedAt(now).
@@ -72,6 +73,9 @@ func (s *Store) UpdatePlan(ctx context.Context, id int, input contract.UpdatePla
 	}
 	if input.CronExpression != nil {
 		update.SetCronExpression(*input.CronExpression)
+	}
+	if input.ProbeModel != nil {
+		update.SetProbeModel(*input.ProbeModel)
 	}
 	if input.MaxResults != nil {
 		update.SetMaxResults(*input.MaxResults)
@@ -193,6 +197,7 @@ func toPlan(row *ent.ScheduledTestPlan) contract.Plan {
 		ScopeType:       contract.ScopeType(row.ScopeType),
 		IntervalSeconds: row.IntervalSeconds,
 		CronExpression:  row.CronExpression,
+		ProbeModel:      row.ProbeModel,
 		MaxResults:      row.MaxResults,
 		AutoRecover:     row.AutoRecover,
 		LastStatus:      row.LastStatus,

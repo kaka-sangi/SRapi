@@ -43,6 +43,7 @@ func (s *Store) Create(ctx context.Context, input contract.CreateStoredAccount) 
 		SetStatus(string(input.Status)).
 		SetPriority(input.Priority).
 		SetWeight(float64(input.Weight)).
+		SetNillableRiskLevel(input.RiskLevel).
 		SetMetadataJSON(cloneMap(input.Metadata)).
 		Save(ctx)
 	if err != nil {
@@ -108,6 +109,28 @@ func (s *Store) List(ctx context.Context) ([]contract.ProviderAccount, error) {
 	return out, nil
 }
 
+func (s *Store) ListActiveByProviderIDs(ctx context.Context, providerIDs []int) ([]contract.ProviderAccount, error) {
+	if len(providerIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := s.client.ProviderAccount.Query().
+		Where(
+			entaccount.DeletedAtIsNil(),
+			entaccount.ProviderIDIn(providerIDs...),
+			entaccount.StatusEQ(string(contract.StatusActive)),
+		).
+		Order(entaccount.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.ProviderAccount, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toAccount(row))
+	}
+	return out, nil
+}
+
 func (s *Store) ListGroupIDsByAccount(ctx context.Context, accountID int) ([]int, error) {
 	rows, err := s.client.AccountGroupMember.Query().
 		Where(entaccountgroupmember.AccountIDEQ(accountID)).
@@ -119,6 +142,28 @@ func (s *Store) ListGroupIDsByAccount(ctx context.Context, accountID int) ([]int
 	out := make([]int, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, row.AccountGroupID)
+	}
+	return out, nil
+}
+
+func (s *Store) ListGroupIDsByAccounts(ctx context.Context, accountIDs []int) (map[int][]int, error) {
+	ids := normalizePositiveIDs(accountIDs)
+	out := make(map[int][]int, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	for _, accountID := range ids {
+		out[accountID] = nil
+	}
+	rows, err := s.client.AccountGroupMember.Query().
+		Where(entaccountgroupmember.AccountIDIn(ids...)).
+		Order(entaccountgroupmember.ByAccountID(), entaccountgroupmember.ByAccountGroupID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.AccountID] = append(out[row.AccountID], row.AccountGroupID)
 	}
 	return out, nil
 }
@@ -248,6 +293,24 @@ func (s *Store) FindGroupByID(ctx context.Context, id int) (contract.AccountGrou
 		return contract.AccountGroup{}, err
 	}
 	return toGroup(found), nil
+}
+
+func (s *Store) FindGroupsByID(ctx context.Context, ids []int) ([]contract.AccountGroup, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	rows, err := s.client.AccountGroup.Query().
+		Where(entaccountgroup.IDIn(ids...)).
+		Order(entaccountgroup.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.AccountGroup, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toGroup(row))
+	}
+	return out, nil
 }
 
 func (s *Store) ListGroups(ctx context.Context) ([]contract.AccountGroup, error) {
@@ -551,6 +614,22 @@ func credentialVersionToString(value int) string {
 		value = 1
 	}
 	return "v" + strconv.Itoa(value)
+}
+
+func normalizePositiveIDs(values []int) []int {
+	seen := map[int]struct{}{}
+	out := make([]int, 0, len(values))
+	for _, value := range values {
+		if value <= 0 {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }
 
 func cloneMap(value map[string]any) map[string]any {

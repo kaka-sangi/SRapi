@@ -74,7 +74,10 @@ func (p conversationProber) ProbeAccount(ctx context.Context, account accountcon
 	return accountcontract.AccountProbeResult{OK: false, ErrorClass: errorClass, StatusCode: status, LatencyMS: latency, CheckedAt: time.Now().UTC()}, nil
 }
 
-func probeModel(account accountcontract.ProviderAccount, provider providercontract.Provider) string {
+func probeModel(planModel string, account accountcontract.ProviderAccount, provider providercontract.Provider) string {
+	if model := strings.TrimSpace(planModel); model != "" {
+		return model
+	}
 	for _, values := range []map[string]any{account.Metadata, provider.ConfigSchema, provider.Capabilities} {
 		for _, key := range probeModelKeys {
 			if value := mapString(values, key); value != "" {

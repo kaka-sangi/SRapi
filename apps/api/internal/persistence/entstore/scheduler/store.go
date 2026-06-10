@@ -309,21 +309,46 @@ func sumActualCost() ent.AggregateFunc {
 	}
 }
 
+func (s *Store) ListStrategies(ctx context.Context, query contract.StrategyQuery) ([]contract.StrategyDescriptor, error) {
+	q := s.client.SchedulerStrategy.Query()
+	predicates := []predicate.SchedulerStrategy{}
+	if query.Name != "" {
+		predicates = append(predicates, entschedulerstrategy.NameEQ(string(query.Name)))
+	}
+	if query.Status != "" {
+		predicates = append(predicates, entschedulerstrategy.StatusEQ(string(query.Status)))
+	}
+	if query.ScopeType != "" {
+		predicates = append(predicates, entschedulerstrategy.ScopeTypeEQ(string(query.ScopeType)))
+	}
+	if query.ScopeID != nil {
+		predicates = append(predicates, entschedulerstrategy.ScopeIDEQ(*query.ScopeID))
+	}
+	if len(predicates) > 0 {
+		q = q.Where(predicates...)
+	}
+	rows, err := q.Order(entschedulerstrategy.ByScopeType(), entschedulerstrategy.ByName(), entschedulerstrategy.ByID()).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.StrategyDescriptor, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toStrategyDescriptor(row))
+	}
+	return out, nil
+}
+
 func (s *Store) ListActiveStrategies(ctx context.Context) ([]contract.StrategyDescriptor, error) {
 	rows, err := s.client.SchedulerStrategy.Query().
-		Where(
-			entschedulerstrategy.StatusEQ("active"),
-			entschedulerstrategy.ScopeTypeEQ("global"),
-			entschedulerstrategy.ScopeIDIsNil(),
-		).
-		Order(entschedulerstrategy.ByName(), entschedulerstrategy.ByID()).
+		Where(entschedulerstrategy.StatusEQ(string(contract.StrategyStatusActive))).
+		Order(entschedulerstrategy.ByScopeType(), entschedulerstrategy.ByName(), entschedulerstrategy.ByID()).
 		All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	latestByName := map[contract.StrategyName]*ent.SchedulerStrategy{}
+	latestByName := map[string]*ent.SchedulerStrategy{}
 	for _, row := range rows {
-		name := contract.StrategyName(row.Name)
+		name := strategyScopeNameKey(row)
 		current := latestByName[name]
 		if current == nil || strategyRowNewer(row, current) {
 			latestByName[name] = row
@@ -336,18 +361,179 @@ func (s *Store) ListActiveStrategies(ctx context.Context) ([]contract.StrategyDe
 	sort.Strings(names)
 	out := make([]contract.StrategyDescriptor, 0, len(names))
 	for _, name := range names {
-		row := latestByName[contract.StrategyName(name)]
-		out = append(out, contract.StrategyDescriptor{
-			ID:          row.ID,
-			Name:        contract.StrategyName(row.Name),
-			Version:     row.Version,
-			Status:      row.Status,
-			ConfigHash:  row.ConfigHash,
-			Config:      cloneMap(row.ConfigJSON),
-			Description: row.Description,
-		})
+		row := latestByName[name]
+		out = append(out, toStrategyDescriptor(row))
 	}
 	return out, nil
+}
+
+func (s *Store) GetStrategy(ctx context.Context, id int) (contract.StrategyDescriptor, error) {
+	row, err := s.client.SchedulerStrategy.Get(ctx, id)
+	if err != nil {
+		return contract.StrategyDescriptor{}, strategyStoreError(err)
+	}
+	return toStrategyDescriptor(row), nil
+}
+
+func (s *Store) CreateStrategy(ctx context.Context, input contract.StrategyDescriptor) (contract.StrategyDescriptor, error) {
+	if exists, err := s.strategyVersionExists(ctx, 0, input); err != nil {
+		return contract.StrategyDescriptor{}, err
+	} else if exists {
+		return contract.StrategyDescriptor{}, contract.ErrConflict
+	}
+	create := s.client.SchedulerStrategy.Create().
+		SetName(string(input.Name)).
+		SetVersion(input.Version).
+		SetStatus(string(input.Status)).
+		SetScopeType(string(input.ScopeType)).
+		SetNillableScopeID(input.ScopeID).
+		SetConfigJSON(cloneMap(input.Config)).
+		SetConfigHash(input.ConfigHash).
+		SetDescription(input.Description).
+		SetNillableCreatedBy(input.CreatedBy).
+		SetNillableActivatedAt(input.ActivatedAt).
+		SetNillableDeprecatedAt(input.DeprecatedAt)
+	if !input.CreatedAt.IsZero() {
+		create.SetCreatedAt(input.CreatedAt).SetUpdatedAt(input.CreatedAt)
+	}
+	row, err := create.Save(ctx)
+	if err != nil {
+		return contract.StrategyDescriptor{}, strategyStoreError(err)
+	}
+	return toStrategyDescriptor(row), nil
+}
+
+func (s *Store) UpdateStrategy(ctx context.Context, id int, input contract.StrategyDescriptor) (contract.StrategyDescriptor, error) {
+	current, err := s.client.SchedulerStrategy.Get(ctx, id)
+	if err != nil {
+		return contract.StrategyDescriptor{}, strategyStoreError(err)
+	}
+	next := toStrategyDescriptor(current)
+	next = mergeStrategyDescriptor(next, input)
+	if exists, err := s.strategyVersionExists(ctx, id, next); err != nil {
+		return contract.StrategyDescriptor{}, err
+	} else if exists {
+		return contract.StrategyDescriptor{}, contract.ErrConflict
+	}
+	update := s.client.SchedulerStrategy.UpdateOneID(id).
+		SetName(string(next.Name)).
+		SetVersion(next.Version).
+		SetStatus(string(next.Status)).
+		SetScopeType(string(next.ScopeType)).
+		SetConfigJSON(cloneMap(next.Config)).
+		SetConfigHash(next.ConfigHash).
+		SetDescription(next.Description).
+		SetNillableCreatedBy(next.CreatedBy)
+	if next.ScopeID == nil {
+		update.ClearScopeID()
+	} else {
+		update.SetScopeID(*next.ScopeID)
+	}
+	if next.ActivatedAt == nil {
+		update.ClearActivatedAt()
+	} else {
+		update.SetActivatedAt(*next.ActivatedAt)
+	}
+	if next.DeprecatedAt == nil {
+		update.ClearDeprecatedAt()
+	} else {
+		update.SetDeprecatedAt(*next.DeprecatedAt)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		return contract.StrategyDescriptor{}, strategyStoreError(err)
+	}
+	return toStrategyDescriptor(row), nil
+}
+
+func (s *Store) strategyVersionExists(ctx context.Context, exceptID int, input contract.StrategyDescriptor) (bool, error) {
+	predicates := []predicate.SchedulerStrategy{
+		entschedulerstrategy.NameEQ(string(input.Name)),
+		entschedulerstrategy.VersionEQ(input.Version),
+		entschedulerstrategy.ScopeTypeEQ(string(input.ScopeType)),
+	}
+	if input.ScopeID == nil {
+		predicates = append(predicates, entschedulerstrategy.ScopeIDIsNil())
+	} else {
+		predicates = append(predicates, entschedulerstrategy.ScopeIDEQ(*input.ScopeID))
+	}
+	if exceptID > 0 {
+		predicates = append(predicates, entschedulerstrategy.IDNEQ(exceptID))
+	}
+	return s.client.SchedulerStrategy.Query().Where(predicates...).Exist(ctx)
+}
+
+func mergeStrategyDescriptor(current, input contract.StrategyDescriptor) contract.StrategyDescriptor {
+	next := current
+	if input.Name != "" {
+		next.Name = input.Name
+	}
+	if input.Version != "" {
+		next.Version = input.Version
+	}
+	if input.Status != "" {
+		next.Status = input.Status
+	}
+	if input.ScopeType != "" {
+		next.ScopeType = input.ScopeType
+		next.ScopeID = cloneInt(input.ScopeID)
+	}
+	if input.Config != nil {
+		next.Config = cloneMap(input.Config)
+	}
+	if input.Weights != nil {
+		next.Weights = cloneWeights(input.Weights)
+	}
+	if input.ConfigHash != "" {
+		next.ConfigHash = input.ConfigHash
+	}
+	next.Description = input.Description
+	if input.CreatedBy != nil {
+		next.CreatedBy = cloneInt(input.CreatedBy)
+	}
+	next.ActivatedAt = cloneTime(input.ActivatedAt)
+	next.DeprecatedAt = cloneTime(input.DeprecatedAt)
+	return next
+}
+
+func toStrategyDescriptor(row *ent.SchedulerStrategy) contract.StrategyDescriptor {
+	if row == nil {
+		return contract.StrategyDescriptor{}
+	}
+	return contract.StrategyDescriptor{
+		ID:           row.ID,
+		Name:         contract.StrategyName(row.Name),
+		Version:      row.Version,
+		Status:       contract.StrategyStatus(row.Status),
+		ScopeType:    contract.StrategyScopeType(row.ScopeType),
+		ScopeID:      cloneInt(row.ScopeID),
+		ConfigHash:   row.ConfigHash,
+		Config:       cloneMap(row.ConfigJSON),
+		Description:  row.Description,
+		CreatedBy:    cloneInt(row.CreatedBy),
+		CreatedAt:    row.CreatedAt,
+		ActivatedAt:  cloneTime(row.ActivatedAt),
+		DeprecatedAt: cloneTime(row.DeprecatedAt),
+	}
+}
+
+func strategyStoreError(err error) error {
+	switch {
+	case ent.IsNotFound(err):
+		return contract.ErrNotFound
+	case ent.IsConstraintError(err):
+		return contract.ErrConflict
+	default:
+		return err
+	}
+}
+
+func strategyScopeNameKey(row *ent.SchedulerStrategy) string {
+	scopeID := 0
+	if row.ScopeID != nil {
+		scopeID = *row.ScopeID
+	}
+	return row.ScopeType + ":" + strconv.Itoa(scopeID) + ":" + row.Name
 }
 
 func strategyRowNewer(left, right *ent.SchedulerStrategy) bool {
@@ -447,6 +633,25 @@ func (s *Store) CountAccountConcurrency(ctx context.Context, accountID int) (int
 		return 0, nil
 	}
 	return counter.CountAccountConcurrency(ctx, accountID)
+}
+
+func (s *Store) CountActiveLeases(ctx context.Context) (int, error) {
+	if s.leaseStore != nil {
+		if counter, ok := s.leaseStore.(contract.ActiveLeaseCounter); ok {
+			return counter.CountActiveLeases(ctx)
+		}
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.expireLeases(time.Now().UTC())
+	count := 0
+	for _, lease := range s.leases {
+		if lease.Status == contract.LeaseStatusPending {
+			count++
+		}
+	}
+	return count, nil
 }
 
 // AccountLastUsed forwards to the lease store when it can report it (the Redis
@@ -599,6 +804,14 @@ func cloneString(value *string) *string {
 	return &cloned
 }
 
+func cloneTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
 func cloneInts(values []int) []int {
 	if values == nil {
 		return nil
@@ -614,6 +827,17 @@ func cloneStrings(values []string) []string {
 	}
 	cloned := make([]string, len(values))
 	copy(cloned, values)
+	return cloned
+}
+
+func cloneWeights(values map[string]float64) map[string]float64 {
+	if values == nil {
+		return nil
+	}
+	cloned := make(map[string]float64, len(values))
+	for key, value := range values {
+		cloned[key] = value
+	}
 	return cloned
 }
 

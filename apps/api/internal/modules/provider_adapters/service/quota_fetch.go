@@ -55,6 +55,7 @@ func (s *Service) fetchAccountQuotaUncached(ctx context.Context, req contract.Pr
 	if err != nil {
 		return report, contract.ProviderError{Class: "auth_failed", StatusCode: http.StatusUnauthorized, Message: "quota fetch auth failed"}
 	}
+	mergeQuotaHeaders(headers, req)
 	method := strings.ToUpper(firstMapString(quotaConfigMaps(req), "quota_method", "subscription_method"))
 	if method == "" {
 		method = http.MethodGet
@@ -134,6 +135,57 @@ func quotaHeaders(req contract.ProbeRequest, endpoint *string) (http.Header, err
 
 func quotaConfigMaps(req contract.ProbeRequest) []map[string]any {
 	return []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities}
+}
+
+func mergeQuotaHeaders(headers http.Header, req contract.ProbeRequest) {
+	raw := firstMapValue(quotaConfigMaps(req), "quota_headers", "subscription_headers")
+	switch value := raw.(type) {
+	case map[string]string:
+		for key, item := range value {
+			setQuotaHeader(headers, key, expandQuotaHeaderValue(item, req))
+		}
+	case map[string]any:
+		for key, item := range value {
+			setQuotaHeader(headers, key, expandQuotaHeaderValue(mapString(map[string]any{"value": item}, "value"), req))
+		}
+	case string:
+		var parsed map[string]string
+		if err := json.Unmarshal([]byte(value), &parsed); err == nil {
+			for key, item := range parsed {
+				setQuotaHeader(headers, key, expandQuotaHeaderValue(item, req))
+			}
+		}
+	}
+}
+
+func setQuotaHeader(headers http.Header, key string, value string) {
+	key = strings.TrimSpace(key)
+	value = strings.TrimSpace(value)
+	if key == "" || value == "" || quotaHeaderForbidden(key) {
+		return
+	}
+	headers.Set(key, value)
+}
+
+func quotaHeaderForbidden(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "authorization", "cookie", "set-cookie", "host", "content-length", "connection", "transfer-encoding", "upgrade", "proxy-authorization", "proxy-authenticate":
+		return true
+	default:
+		return false
+	}
+}
+
+func expandQuotaHeaderValue(value string, req contract.ProbeRequest) string {
+	value = strings.TrimSpace(value)
+	if !strings.HasPrefix(value, "{{") || !strings.HasSuffix(value, "}}") {
+		return value
+	}
+	key := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(value, "{{"), "}}"))
+	if key == "" {
+		return ""
+	}
+	return firstMapString(append([]map[string]any{req.Credential}, quotaConfigMaps(req)...), key)
 }
 
 func quotaEndpoint(req contract.ProbeRequest) string {

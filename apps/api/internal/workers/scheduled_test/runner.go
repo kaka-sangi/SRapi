@@ -71,7 +71,7 @@ func (r *Runner) RunPlan(ctx context.Context, plan scheduledcontract.Plan, trigg
 			firstErr = errors.Join(firstErr, err)
 			continue
 		}
-		model := probeModel(account, provider)
+		model := probeModel(plan.ProbeModel, account, provider)
 		if model == "" {
 			outcome.Skipped++
 			continue
@@ -157,6 +157,9 @@ func classifyStatus(outcome scheduledcontract.RunOutcome) string {
 	}
 	if outcome.Failed > 0 || outcome.Unhealthy > 0 {
 		return scheduledcontract.RunStatusPartial
+	}
+	if outcome.Selected > 0 && outcome.Probed == 0 {
+		return scheduledcontract.RunStatusWarning
 	}
 	return scheduledcontract.RunStatusOK
 }

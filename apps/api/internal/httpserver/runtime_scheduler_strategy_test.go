@@ -22,7 +22,6 @@ import (
 	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
-	usagememory "github.com/srapi/srapi/apps/api/internal/modules/usage/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	"github.com/srapi/srapi/apps/api/internal/persistence/entstore"
 
@@ -74,13 +73,93 @@ func TestAdminSchedulerStrategiesReflectActivePersistentStrategy(t *testing.T) {
 		if strategy.Id != apiopenapi.Id(strconv.Itoa(active.ID)) || strategy.Version != "v2" {
 			t.Fatalf("expected persistent balanced strategy row, got %+v", strategy)
 		}
+		if strategy.Source != apiopenapi.Database || strategy.ScopeType != apiopenapi.SchedulerStrategyScopeTypeGlobal {
+			t.Fatalf("expected database global strategy row, got %+v", strategy)
+		}
 		weights, ok := strategy.Config["weights"].(map[string]any)
 		if !ok || weights["cost"].(float64) != 1.0 {
 			t.Fatalf("expected normalized persistent weights, got %+v", strategy.Config)
 		}
+		if strategy.Weights["cost"] != 1.0 {
+			t.Fatalf("expected top-level normalized weights, got %+v", strategy.Weights)
+		}
 		return
 	}
 	t.Fatalf("expected balanced strategy in %+v", resp.Data)
+}
+
+func TestAdminSchedulerStrategyCRUDLifecycle(t *testing.T) {
+	schedulerStore := schedulermemory.New()
+	handler := New(config.Load(), nil, WithSchedulerStore(schedulerStore))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	body := `{
+		"name":"balanced",
+		"version":"crud-v1",
+		"status":"active",
+		"scope_type":"global",
+		"description":"Cost-only CRUD strategy",
+		"weights":{"cost":1}
+	}`
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/scheduler/strategies", strings.NewReader(body))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	createReq.AddCookie(sessionCookie)
+	createRec := httptest.NewRecorder()
+	handler.ServeHTTP(createRec, createReq)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("expected create strategy 201, got %d body=%s", createRec.Code, createRec.Body.String())
+	}
+	var created apiopenapi.SchedulerStrategyResponse
+	if err := json.NewDecoder(createRec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode create strategy response: %v", err)
+	}
+	if created.Data.Id == "" || created.Data.Source != apiopenapi.Database || created.Data.ActivatedAt == nil {
+		t.Fatalf("expected persisted active strategy, got %+v", created.Data)
+	}
+	if created.Data.Weights["cost"] != 1 {
+		t.Fatalf("expected cost-only strategy weights, got %+v", created.Data.Weights)
+	}
+
+	schedulerSvc, err := schedulerservice.New(schedulerStore, nil)
+	if err != nil {
+		t.Fatalf("create scheduler service: %v", err)
+	}
+	scheduled, err := schedulerSvc.Schedule(t.Context(), schedulercontract.ScheduleRequest{
+		RequestID:      "crud-http-schedule",
+		UserID:         1,
+		APIKeyID:       1,
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/chat/completions",
+		Model:          "crud-model",
+		Strategy:       schedulercontract.StrategyBalanced,
+		Candidates: []schedulercontract.Candidate{
+			schedulerReplayCandidate(1, 0.95, "0.9"),
+			schedulerReplayCandidate(2, 0.60, "0.1"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("schedule with CRUD strategy: %v", err)
+	}
+	if scheduled.Candidate.Account.ID != 2 || scheduled.Decision.StrategyVersion != "crud-v1" || scheduled.Decision.StrategyWeights["cost"] != 1.0 {
+		t.Fatalf("expected CRUD cost-only strategy to select account 2, got %+v", scheduled.Decision)
+	}
+
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/scheduler/strategies/"+string(created.Data.Id), nil)
+	deleteReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	deleteReq.AddCookie(sessionCookie)
+	deleteRec := httptest.NewRecorder()
+	handler.ServeHTTP(deleteRec, deleteReq)
+	if deleteRec.Code != http.StatusOK {
+		t.Fatalf("expected deprecate strategy 200, got %d body=%s", deleteRec.Code, deleteRec.Body.String())
+	}
+	var deprecated apiopenapi.SchedulerStrategyResponse
+	if err := json.NewDecoder(deleteRec.Body).Decode(&deprecated); err != nil {
+		t.Fatalf("decode deprecated strategy response: %v", err)
+	}
+	if deprecated.Data.Status != apiopenapi.SchedulerStrategyStatusDeprecated || deprecated.Data.DeprecatedAt == nil {
+		t.Fatalf("expected deprecated lifecycle response, got %+v", deprecated.Data)
+	}
 }
 
 func TestAdminSchedulerSimulationIsDryRun(t *testing.T) {
@@ -244,7 +323,7 @@ func TestAdminSchedulerReplayUsesPersistedSnapshots(t *testing.T) {
 
 func TestMetricsExposeSchedulerStrategyOperationalSignals(t *testing.T) {
 	schedulerStore := schedulermemory.New()
-	usageStore := usagememory.New()
+	metricsState := newRuntimeMetricsState()
 
 	firstSelected := 2
 	firstDecision, err := schedulerStore.CreateDecision(t.Context(), schedulercontract.Decision{
@@ -272,9 +351,10 @@ func TestMetricsExposeSchedulerStrategyOperationalSignals(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create first decision: %v", err)
 	}
+	metricsState.RecordSchedulerDecision(firstDecision)
 
 	secondSelected := 1
-	_, err = schedulerStore.CreateDecision(t.Context(), schedulercontract.Decision{
+	secondDecision, err := schedulerStore.CreateDecision(t.Context(), schedulercontract.Decision{
 		RequestID:              firstDecision.RequestID,
 		AttemptNo:              2,
 		UserID:                 1,
@@ -300,17 +380,16 @@ func TestMetricsExposeSchedulerStrategyOperationalSignals(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create fallback decision: %v", err)
 	}
+	metricsState.RecordSchedulerDecision(secondDecision)
 	errorClass := "upstream_error"
 	for _, log := range []usagecontract.UsageLog{
 		{RequestID: firstDecision.RequestID, AttemptNo: 1, Success: false, ErrorClass: &errorClass, SourceEndpoint: "/v1/chat/completions", TargetProtocol: "openai-compatible", Model: firstDecision.Model},
 		{RequestID: firstDecision.RequestID, AttemptNo: 2, Success: true, SourceEndpoint: "/v1/chat/completions", TargetProtocol: "openai-compatible", Model: firstDecision.Model},
 	} {
-		if _, err := usageStore.Create(t.Context(), log); err != nil {
-			t.Fatalf("create usage log: %v", err)
-		}
+		metricsState.RecordGatewayUsage(log)
 	}
 
-	handler := New(config.Load(), nil, WithSchedulerStore(schedulerStore), WithUsageStore(usageStore))
+	handler := New(config.Load(), nil, WithSchedulerStore(schedulerStore), withRuntimeMetricsState(metricsState))
 	metrics := metricsBody(t, handler)
 	for _, expected := range []string{
 		`scheduler_strategy_selected_total{strategy="cost_saver",version="v1"} 2`,

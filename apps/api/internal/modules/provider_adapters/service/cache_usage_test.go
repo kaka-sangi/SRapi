@@ -7,11 +7,15 @@ func TestAnthropicUsageSplitsCacheCreationAndRead(t *testing.T) {
 	out := 20
 	create := 100
 	read := 50
+	create5m := 40
+	create1h := 60
 	usage := anthropicUsage{
-		InputTokens:              &in,
-		OutputTokens:             &out,
-		CacheCreationInputTokens: &create,
-		CacheReadInputTokens:     &read,
+		InputTokens:                &in,
+		OutputTokens:               &out,
+		CacheCreationInputTokens:   &create,
+		CacheReadInputTokens:       &read,
+		CacheCreation5mInputTokens: &create5m,
+		CacheCreation1hInputTokens: &create1h,
 	}.ToUsage("")
 
 	if usage.InputTokens != 10 {
@@ -26,8 +30,21 @@ func TestAnthropicUsageSplitsCacheCreationAndRead(t *testing.T) {
 	if usage.CacheCreationTokens != 100 {
 		t.Fatalf("cache-creation (write) tokens = %d, want 100", usage.CacheCreationTokens)
 	}
+	if usage.CacheCreation5mTokens != 40 || usage.CacheCreation1hTokens != 60 {
+		t.Fatalf("cache-creation buckets = 5m:%d 1h:%d, want 40/60", usage.CacheCreation5mTokens, usage.CacheCreation1hTokens)
+	}
 	if usage.Estimated {
 		t.Fatal("usage should not be estimated when real counts are present")
+	}
+}
+
+func TestAnthropicUsageFallsBackCacheCreationToFiveMinutes(t *testing.T) {
+	create := 100
+	usage := anthropicUsage{
+		CacheCreationInputTokens: &create,
+	}.ToUsage("")
+	if usage.CacheCreationTokens != 100 || usage.CacheCreation5mTokens != 100 || usage.CacheCreation1hTokens != 0 {
+		t.Fatalf("expected missing cache creation detail to fall back to 5m, got %+v", usage)
 	}
 }
 

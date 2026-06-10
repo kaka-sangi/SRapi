@@ -99,6 +99,54 @@ func TestDuePlansSelectsPastNextRun(t *testing.T) {
 	}
 }
 
+func TestNextRunAtUsesCronExpressionWhenValid(t *testing.T) {
+	lastRun := time.Date(2026, 6, 5, 12, 30, 0, 0, time.UTC)
+	next := NextRunAt(contract.Plan{
+		LastRunAt:       &lastRun,
+		IntervalSeconds: 3600,
+		CronExpression:  "0 */6 * * *",
+	})
+	if next == nil {
+		t.Fatal("expected next cron run")
+	}
+	want := time.Date(2026, 6, 5, 18, 0, 0, 0, time.UTC)
+	if !next.Equal(want) {
+		t.Fatalf("expected cron next run %s, got %s", want, *next)
+	}
+}
+
+func TestNextRunAtUsesCronDayOfMonthOrWeekdaySemantics(t *testing.T) {
+	lastRun := time.Date(2026, 6, 4, 12, 30, 0, 0, time.UTC)
+	next := NextRunAt(contract.Plan{
+		LastRunAt:       &lastRun,
+		IntervalSeconds: 3600,
+		CronExpression:  "0 9 15 * 5",
+	})
+	if next == nil {
+		t.Fatal("expected next cron run")
+	}
+	want := time.Date(2026, 6, 5, 9, 0, 0, 0, time.UTC)
+	if !next.Equal(want) {
+		t.Fatalf("expected weekday cron run %s, got %s", want, *next)
+	}
+}
+
+func TestNextRunAtFallsBackToIntervalForInvalidCron(t *testing.T) {
+	lastRun := time.Date(2026, 6, 5, 12, 30, 0, 0, time.UTC)
+	next := NextRunAt(contract.Plan{
+		LastRunAt:       &lastRun,
+		IntervalSeconds: 3600,
+		CronExpression:  "bad cron",
+	})
+	if next == nil {
+		t.Fatal("expected fallback next run")
+	}
+	want := time.Date(2026, 6, 5, 13, 30, 0, 0, time.UTC)
+	if !next.Equal(want) {
+		t.Fatalf("expected interval fallback %s, got %s", want, *next)
+	}
+}
+
 func TestRecordOutcomeUpdatesPlanSummary(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 6, 5, 9, 0, 0, 0, time.UTC)

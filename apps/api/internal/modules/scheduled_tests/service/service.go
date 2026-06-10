@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -69,6 +70,7 @@ func (s *Service) CreatePlan(ctx context.Context, input contract.CreatePlan) (co
 		return contract.Plan{}, ErrInvalidInput
 	}
 	input.CronExpression = strings.TrimSpace(input.CronExpression)
+	input.ProbeModel = strings.TrimSpace(input.ProbeModel)
 	input.IntervalSeconds = normalizeInterval(input.IntervalSeconds)
 	if input.MaxResults < 0 {
 		input.MaxResults = 0
@@ -106,6 +108,10 @@ func (s *Service) UpdatePlan(ctx context.Context, id int, input contract.UpdateP
 		cron := strings.TrimSpace(*input.CronExpression)
 		input.CronExpression = &cron
 	}
+	if input.ProbeModel != nil {
+		model := strings.TrimSpace(*input.ProbeModel)
+		input.ProbeModel = &model
+	}
 	if input.IntervalSeconds != nil {
 		interval := normalizeInterval(*input.IntervalSeconds)
 		input.IntervalSeconds = &interval
@@ -140,8 +146,7 @@ func (s *Service) ListRuns(ctx context.Context, planID int, limit int) ([]contra
 }
 
 // DuePlans returns enabled plans whose next scheduled run has passed at the
-// given moment. A plan that has never run is due immediately. The next run is
-// last_run_at + interval (cron is treated as an interval hint for now).
+// given moment. A plan that has never run is due immediately.
 func (s *Service) DuePlans(ctx context.Context, at time.Time) ([]contract.Plan, error) {
 	plans, err := s.store.ListPlans(ctx)
 	if err != nil {
@@ -178,9 +183,135 @@ func NextRunAt(plan contract.Plan) *time.Time {
 	if plan.LastRunAt == nil {
 		return nil
 	}
+	if next, ok := cronNextAfter(strings.TrimSpace(plan.CronExpression), plan.LastRunAt.UTC()); ok {
+		return &next
+	}
 	interval := time.Duration(normalizeInterval(plan.IntervalSeconds)) * time.Second
 	next := plan.LastRunAt.UTC().Add(interval)
 	return &next
+}
+
+func cronNextAfter(expression string, after time.Time) (time.Time, bool) {
+	fields := strings.Fields(expression)
+	if len(fields) != 5 {
+		return time.Time{}, false
+	}
+	minutes, _, ok := parseCronField(fields[0], 0, 59)
+	if !ok {
+		return time.Time{}, false
+	}
+	hours, _, ok := parseCronField(fields[1], 0, 23)
+	if !ok {
+		return time.Time{}, false
+	}
+	days, dayWildcard, ok := parseCronField(fields[2], 1, 31)
+	if !ok {
+		return time.Time{}, false
+	}
+	months, _, ok := parseCronField(fields[3], 1, 12)
+	if !ok {
+		return time.Time{}, false
+	}
+	weekdays, _, ok := parseCronField(fields[4], 0, 7)
+	if !ok {
+		return time.Time{}, false
+	}
+	weekdays[0] = weekdays[0] || weekdays[7]
+	weekdayWildcard := cronFieldCoversRange(weekdays, 0, 6)
+	cursor := after.UTC().Truncate(time.Minute).Add(time.Minute)
+	limit := cursor.Add(366 * 24 * time.Hour)
+	for !cursor.After(limit) {
+		if cronTimeMatches(cursor, minutes, hours, days, months, weekdays, dayWildcard, weekdayWildcard) {
+			return cursor, true
+		}
+		cursor = cursor.Add(time.Minute)
+	}
+	return time.Time{}, false
+}
+
+func cronTimeMatches(t time.Time, minutes, hours, days, months, weekdays []bool, dayWildcard, weekdayWildcard bool) bool {
+	dayMatches := days[t.Day()]
+	weekdayMatches := weekdays[int(t.Weekday())]
+	if !dayWildcard && !weekdayWildcard {
+		dayMatches = dayMatches || weekdayMatches
+	} else {
+		dayMatches = dayMatches && weekdayMatches
+	}
+	return minutes[t.Minute()] &&
+		hours[t.Hour()] &&
+		months[int(t.Month())] &&
+		dayMatches
+}
+
+func parseCronField(field string, min int, max int) ([]bool, bool, bool) {
+	out := make([]bool, max+1)
+	for _, part := range strings.Split(field, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			return nil, false, false
+		}
+		step := 1
+		if strings.Contains(part, "/") {
+			pieces := strings.Split(part, "/")
+			if len(pieces) != 2 {
+				return nil, false, false
+			}
+			part = pieces[0]
+			parsedStep, err := strconv.Atoi(pieces[1])
+			if err != nil || parsedStep <= 0 {
+				return nil, false, false
+			}
+			step = parsedStep
+		}
+		start, end, ok := cronRange(part, min, max)
+		if !ok {
+			return nil, false, false
+		}
+		for value := start; value <= end; value += step {
+			out[value] = true
+		}
+	}
+	for value := min; value <= max; value++ {
+		if out[value] {
+			return out, cronFieldCoversRange(out, min, max), true
+		}
+	}
+	return nil, false, false
+}
+
+func cronFieldCoversRange(values []bool, min int, max int) bool {
+	for value := min; value <= max; value++ {
+		if value >= len(values) || !values[value] {
+			return false
+		}
+	}
+	return true
+}
+
+func cronRange(part string, min int, max int) (int, int, bool) {
+	if part == "*" {
+		return min, max, true
+	}
+	if strings.Contains(part, "-") {
+		pieces := strings.Split(part, "-")
+		if len(pieces) != 2 {
+			return 0, 0, false
+		}
+		start, err := strconv.Atoi(pieces[0])
+		if err != nil {
+			return 0, 0, false
+		}
+		end, err := strconv.Atoi(pieces[1])
+		if err != nil {
+			return 0, 0, false
+		}
+		return start, end, start >= min && end <= max && start <= end
+	}
+	value, err := strconv.Atoi(part)
+	if err != nil || value < min || value > max {
+		return 0, 0, false
+	}
+	return value, value, true
 }
 
 // RecordOutcome persists a run and updates the plan's last-run summary.
