@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: srapi-postgres-backup
+  labels:
+    app.kubernetes.io/name: srapi
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "17 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: pg-dump
+              image: postgres:16-alpine
+              env:
+                - name: PGHOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: srapi-database
+                      key: host
+                - name: PGPORT
+                  value: "5432"
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: srapi-database
+                      key: user
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: srapi-database
+                      key: password
+                - name: PGDATABASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: srapi-database
+                      key: database
+              command:
+                - /bin/sh
+                - -ec
+                - |
+                  stamp="$(date -u +%Y%m%d%H%M%S)"
+                  file="/backups/srapi-${stamp}.dump"
+                  pg_dump --format custom --file "${file}"
+                  sha256sum "${file}" > "${file}.sha256"
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: srapi-postgres-backups

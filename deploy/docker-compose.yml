@@ -3,6 +3,7 @@ name: srapi
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${DATABASE_USER:-srapi}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-srapi_dev_password_change_me}
@@ -16,9 +17,15 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 1g
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "${REDIS_PORT:-6379}:6379"
@@ -29,16 +36,26 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512m
 
   api:
+    # Run one API container in local Compose. Before using `docker compose up
+    # --scale api=N`, validate process-local metrics, worker leader-gate skips,
+    # and DATABASE_MAX_OPEN_CONNS / REDIS_POOL_SIZE against the target N.
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
     environment:
       SERVER_HOST: 0.0.0.0
       SERVER_PORT: 8080
       SERVER_MODE: ${SERVER_MODE:-local}
       SERVER_SHUTDOWN_TIMEOUT_SECONDS: ${SERVER_SHUTDOWN_TIMEOUT_SECONDS:-45}
+      GOMAXPROCS: ${GOMAXPROCS:-2}
       SRAPI_VERSION: ${SRAPI_VERSION:-0.1.0}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-postgres}
       DATABASE_HOST: postgres
@@ -50,6 +67,13 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_POOL_SIZE: ${REDIS_POOL_SIZE:-32}
+      REDIS_MIN_IDLE_CONNS: ${REDIS_MIN_IDLE_CONNS:-4}
+      REDIS_DIAL_TIMEOUT_SECONDS: ${REDIS_DIAL_TIMEOUT_SECONDS:-3}
+      REDIS_READ_TIMEOUT_SECONDS: ${REDIS_READ_TIMEOUT_SECONDS:-2}
+      REDIS_WRITE_TIMEOUT_SECONDS: ${REDIS_WRITE_TIMEOUT_SECONDS:-2}
+      REDIS_POOL_TIMEOUT_SECONDS: ${REDIS_POOL_TIMEOUT_SECONDS:-3}
       JWT_SECRET: ${JWT_SECRET:-local_dev_jwt_secret_32_bytes_minimum_change_me}
       SRAPI_MASTER_KEY: ${SRAPI_MASTER_KEY:-local_dev_master_key_32_bytes_minimum_change_me}
       API_KEY_PEPPER: ${API_KEY_PEPPER:-local_dev_api_key_pepper_change_me_32+}
@@ -61,6 +85,7 @@ services:
       DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS: ${DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS:-90}
       DATA_RETENTION_AUDIT_LOGS_DAYS: ${DATA_RETENTION_AUDIT_LOGS_DAYS:-365}
       DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS: ${DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS:-90}
+      DATA_RETENTION_BATCH_LIMIT: ${DATA_RETENTION_BATCH_LIMIT:-1000}
       QUALITY_EVAL_ENABLED: ${QUALITY_EVAL_ENABLED:-false}
       QUALITY_EVAL_INTERVAL_SECONDS: ${QUALITY_EVAL_INTERVAL_SECONDS:-3600}
       QUALITY_EVAL_TIMEOUT_SECONDS: ${QUALITY_EVAL_TIMEOUT_SECONDS:-30}
@@ -78,19 +103,21 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/srapi", "-healthcheck"]
+      test: ["CMD", "/srapi", "-healthcheck", "-healthcheck-path=/readyz"]
       interval: 10s
-      timeout: 3s
+      timeout: 5s
       retries: 12
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 1g
 
   web:
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
-      args:
-        # Baked into Next's route manifest at build time — must match the runtime
-        # value below, otherwise the /api and /v1 proxy falls back to 127.0.0.1.
-        SRAPI_API_PROXY_TARGET: ${SRAPI_API_PROXY_TARGET:-http://api:8080}
+    restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -101,6 +128,11 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512m
 
   prometheus:
     image: prom/prometheus:v3.7.3
