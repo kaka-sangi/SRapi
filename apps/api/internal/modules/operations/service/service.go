@@ -14,6 +14,11 @@ import (
 
 const burnRateAlertRulePrefix = "slo.burn_rate."
 
+const (
+	defaultRetentionBatchLimit = 1000
+	maxRetentionBatchLimit     = 5000
+)
+
 type Clock interface {
 	Now() time.Time
 }
@@ -53,7 +58,18 @@ func (s *Service) CleanupRetention(ctx context.Context, policy contract.Retentio
 		SchedulerFeedbacks:     cutoff(now, policy.SchedulerFeedbacks),
 		AuditLogs:              cutoff(now, policy.AuditLogs),
 		AccountHealthSnapshots: cutoff(now, policy.AccountHealthSnapshots),
+		BatchLimit:             normalizeRetentionBatchLimit(policy.BatchLimit),
 	})
+}
+
+func normalizeRetentionBatchLimit(value int) int {
+	if value <= 0 {
+		return defaultRetentionBatchLimit
+	}
+	if value > maxRetentionBatchLimit {
+		return maxRetentionBatchLimit
+	}
+	return value
 }
 
 func cutoff(now time.Time, retention time.Duration) *time.Time {

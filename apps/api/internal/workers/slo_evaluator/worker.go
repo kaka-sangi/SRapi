@@ -9,6 +9,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/operations/service"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -21,6 +22,7 @@ type Config struct {
 	Interval time.Duration
 	Timeout  time.Duration
 	Clock    service.Clock
+	RunGuard runonceguard.Guard
 }
 
 type Worker struct {
@@ -28,6 +30,7 @@ type Worker struct {
 	logger     *slog.Logger
 	interval   time.Duration
 	timeout    time.Duration
+	guard      runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -50,6 +53,7 @@ func New(store contract.ObservabilityStore, logger *slog.Logger, cfg Config) (*W
 		logger:     logger,
 		interval:   durationOrDefault(cfg.Interval, defaultInterval),
 		timeout:    durationOrDefault(cfg.Timeout, defaultTimeout),
+		guard:      cfg.RunGuard,
 	}, nil
 }
 
@@ -116,12 +120,11 @@ func (w *Worker) RunOnce(ctx context.Context) (contract.AlertEvaluationResult, e
 	if w == nil {
 		return contract.AlertEvaluationResult{}, nil
 	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	evalCtx, cancel := context.WithTimeout(ctx, w.timeout)
-	defer cancel()
-	return w.operations.EvaluateSLOAlerts(evalCtx)
+	result, _, err := w.runGuarded(ctx, func(runCtx context.Context) (contract.AlertEvaluationResult, contract.AlertRuleEvaluationResult, error) {
+		result, err := w.evaluateSLOAlerts(runCtx)
+		return result, contract.AlertRuleEvaluationResult{}, err
+	})
+	return result, err
 }
 
 // RunRulesOnce evaluates the configurable generic metric alert rules and applies
@@ -130,6 +133,23 @@ func (w *Worker) RunRulesOnce(ctx context.Context) (contract.AlertRuleEvaluation
 	if w == nil {
 		return contract.AlertRuleEvaluationResult{}, nil
 	}
+	_, result, err := w.runGuarded(ctx, func(runCtx context.Context) (contract.AlertEvaluationResult, contract.AlertRuleEvaluationResult, error) {
+		result, runErr := w.evaluateAlertRules(runCtx)
+		return contract.AlertEvaluationResult{}, result, runErr
+	})
+	return result, err
+}
+
+func (w *Worker) evaluateSLOAlerts(ctx context.Context) (contract.AlertEvaluationResult, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	evalCtx, cancel := context.WithTimeout(ctx, w.timeout)
+	defer cancel()
+	return w.operations.EvaluateSLOAlerts(evalCtx)
+}
+
+func (w *Worker) evaluateAlertRules(ctx context.Context) (contract.AlertRuleEvaluationResult, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -153,10 +173,19 @@ func (w *Worker) run(ctx context.Context) {
 }
 
 func (w *Worker) evaluateAndLog(ctx context.Context) {
-	result, err := w.RunOnce(ctx)
+	result, ruleResult, err := w.runGuarded(ctx, func(runCtx context.Context) (contract.AlertEvaluationResult, contract.AlertRuleEvaluationResult, error) {
+		result, err := w.evaluateSLOAlerts(runCtx)
+		if err != nil {
+			return result, contract.AlertRuleEvaluationResult{}, err
+		}
+		ruleResult, err := w.evaluateAlertRules(runCtx)
+		return result, ruleResult, err
+	})
 	if err != nil && !errors.Is(err, context.Canceled) {
 		w.logger.Warn("SLO alert evaluation failed", "error", err)
-	} else if result.Created > 0 || result.Updated > 0 || result.Resolved > 0 {
+		return
+	}
+	if result.Created > 0 || result.Updated > 0 || result.Resolved > 0 {
 		w.logger.Info(
 			"SLO alert evaluation completed",
 			"evaluated", result.Evaluated,
@@ -167,11 +196,6 @@ func (w *Worker) evaluateAndLog(ctx context.Context) {
 		)
 	}
 
-	ruleResult, err := w.RunRulesOnce(ctx)
-	if err != nil && !errors.Is(err, context.Canceled) {
-		w.logger.Warn("alert rule evaluation failed", "error", err)
-		return
-	}
 	if ruleResult.Created > 0 || ruleResult.Updated > 0 || ruleResult.Resolved > 0 {
 		w.logger.Info(
 			"alert rule evaluation completed",
@@ -183,6 +207,17 @@ func (w *Worker) evaluateAndLog(ctx context.Context) {
 			"suppressed", ruleResult.Suppressed,
 		)
 	}
+}
+
+func (w *Worker) runGuarded(ctx context.Context, fn func(context.Context) (contract.AlertEvaluationResult, contract.AlertRuleEvaluationResult, error)) (contract.AlertEvaluationResult, contract.AlertRuleEvaluationResult, error) {
+	var sloResult contract.AlertEvaluationResult
+	var ruleResult contract.AlertRuleEvaluationResult
+	_, err := runonceguard.Run(ctx, w.guard, "slo_evaluator", func(runCtx context.Context) error {
+		var runErr error
+		sloResult, ruleResult, runErr = fn(runCtx)
+		return runErr
+	})
+	return sloResult, ruleResult, err
 }
 
 func durationOrDefault(value, fallback time.Duration) time.Duration {

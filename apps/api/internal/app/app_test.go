@@ -6,10 +6,12 @@ import (
 	"net"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/srapi/srapi/apps/api/internal/config"
 	authmemory "github.com/srapi/srapi/apps/api/internal/modules/auth/store/memory"
+	billingmemory "github.com/srapi/srapi/apps/api/internal/modules/billing/store/memory"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
@@ -184,6 +186,64 @@ func TestRealtimeSlotStoreRequiresRedisInRelease(t *testing.T) {
 	}
 }
 
+func TestReleaseRedisDependencyPingRetriesTransientStartupFailure(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve redis port: %v", err)
+	}
+	addr := listener.Addr().String()
+	if err := listener.Close(); err != nil {
+		t.Fatalf("release redis port: %v", err)
+	}
+	host, portRaw, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatalf("split redis addr: %v", err)
+	}
+	port, err := strconv.Atoi(portRaw)
+	if err != nil {
+		t.Fatalf("parse redis port: %v", err)
+	}
+
+	cfg := config.Load()
+	cfg.Server.Mode = "release"
+	cfg.Redis.Host = host
+	cfg.Redis.Port = port
+	cfg.Redis.DialTimeoutSeconds = 1
+	cfg.Redis.ReadTimeoutSeconds = 1
+	cfg.Redis.PoolTimeoutSeconds = 1
+	redisClient, err := platformredis.Open(cfg.Redis)
+	if err != nil {
+		t.Fatalf("open redis client: %v", err)
+	}
+	defer redisClient.Close()
+
+	servers := make(chan *miniredis.Miniredis, 1)
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		server := miniredis.NewMiniRedis()
+		if err := server.StartAddr(addr); err != nil {
+			servers <- nil
+			return
+		}
+		servers <- server
+	}()
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if err := pingRedisForDependency(t.Context(), cfg, logger, redisClient, "test"); err != nil {
+		t.Fatalf("expected transient redis startup to succeed after retry, got %v", err)
+	}
+
+	select {
+	case server := <-servers:
+		if server == nil {
+			t.Fatal("miniredis did not start")
+		}
+		server.Close()
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for miniredis")
+	}
+}
+
 func TestDomainEventsWorkerRequiresPersistentEventStore(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	cfg := config.Load()
@@ -301,6 +361,26 @@ func TestSLOEvaluatorWorkerRequiresPersistentOperationsStore(t *testing.T) {
 	}
 	if worker == nil {
 		t.Fatal("expected worker for persistent operations store")
+	}
+}
+
+func TestLiteLLMPricingWorkerRequiresSourceURLAndBillingStore(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	cfg := config.Load()
+	if worker, err := liteLLMPricingWorker(cfg, nil, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker without persistent stores, worker=%v err=%v", worker, err)
+	}
+	if worker, err := liteLLMPricingWorker(cfg, &entstore.Stores{Pricing: billingmemory.New()}, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker without source URL, worker=%v err=%v", worker, err)
+	}
+
+	cfg.LiteLLMPricing.SourceURL = "https://prices.example.com/model_prices.json"
+	worker, err := liteLLMPricingWorker(cfg, &entstore.Stores{Pricing: billingmemory.New()}, logger)
+	if err != nil {
+		t.Fatalf("create LiteLLM pricing worker: %v", err)
+	}
+	if worker == nil {
+		t.Fatal("expected LiteLLM pricing worker")
 	}
 }
 

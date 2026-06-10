@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -108,6 +109,9 @@ func (s *Service) DispatchPending(ctx context.Context, handler OutboxHandler, op
 	result := DispatchResult{Selected: len(events)}
 	for _, event := range events {
 		if err := handler.HandleOutboxEvent(ctx, event); err != nil {
+			if errors.Is(err, contract.ErrInboxClaimed) {
+				continue
+			}
 			nextRetryAt := now.Add(retryDelay(backoff, event.AttemptCount+1))
 			if _, markErr := s.store.MarkOutboxFailed(ctx, event.ID, event.AttemptCount+1, &nextRetryAt, truncateError(err.Error())); markErr != nil {
 				return result, markErr
@@ -116,6 +120,9 @@ func (s *Service) DispatchPending(ctx context.Context, handler OutboxHandler, op
 			continue
 		}
 		if _, err := s.store.MarkOutboxPublished(ctx, event.ID, now); err != nil {
+			if errors.Is(err, contract.ErrNotDispatchable) {
+				continue
+			}
 			return result, err
 		}
 		result.Published++

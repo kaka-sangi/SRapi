@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -184,7 +185,7 @@ func newRuntimeMetricsCollector(ctx context.Context, rt *runtimeState) *runtimeM
 			),
 			providerProbeLatency: prometheus.NewDesc(
 				"srapi_provider_probe_latency_seconds",
-				"Provider account probe latency histogram derived from latest health snapshots.",
+				"Provider account probe availability signal derived from materialized health rollups.",
 				[]string{"provider_protocol", "status"},
 				nil,
 			),
@@ -273,8 +274,13 @@ func (d runtimeMetricDescs) all() []*prometheus.Desc {
 
 func (c *runtimeMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 	emitted := map[string]bool{}
-	usageLogs := c.collectUsageMetrics(ch, emitted)
-	c.collectSchedulerMetrics(ch, emitted, usageLogs)
+	metrics := c.rt.metrics
+	if metrics == nil {
+		metrics = newRuntimeMetricsState()
+	}
+	snapshot := metrics.Snapshot()
+	c.collectUsageMetrics(ch, emitted, snapshot)
+	c.collectSchedulerMetrics(ch, emitted, snapshot)
 	c.collectRealtimeMetrics(ch, emitted)
 	c.collectReverseProxyMetrics(ch, emitted)
 	c.collectOpsAlertMetrics(ch, emitted)
@@ -282,88 +288,70 @@ func (c *runtimeMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 	c.collectBaselineMetrics(ch, emitted)
 }
 
-func (c *runtimeMetricsCollector) collectUsageMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) []usagecontract.UsageLog {
-	logs, err := c.rt.usage.List(c.ctx)
-	if err != nil {
-		c.rt.logger.Warn("failed to collect usage metrics", "error", err)
-		return nil
-	}
-	requests, failovers, providerErrors, gatewayErrors, tokenCounts := aggregateUsageMetrics(logs)
-	for _, key := range sortedKeys(requests) {
+func (c *runtimeMetricsCollector) collectUsageMetrics(ch chan<- prometheus.Metric, emitted map[string]bool, snapshot runtimeMetricsSnapshot) {
+	for _, key := range sortedKeys(snapshot.requests) {
 		labels := strings.Split(key, "\xff")
-		value := requests[key]
+		value := snapshot.requests[key]
 		emitConstMetric(ch, emitted, "srapi_gateway_requests_total", c.descs.gatewayRequests, prometheus.CounterValue, float64(value.count), labels...)
 		emitConstHistogram(ch, emitted, "srapi_gateway_request_duration_seconds", c.descs.gatewayDuration, value.count, float64(value.latencyMS)/1000, value.buckets, labels...)
 	}
-	for _, key := range sortedKeys(failovers) {
+	for _, key := range sortedKeys(snapshot.failovers) {
 		labels := strings.Split(key, "\xff")
-		emitConstMetric(ch, emitted, "srapi_gateway_failover_total", c.descs.gatewayFailover, prometheus.CounterValue, float64(failovers[key]), labels...)
+		emitConstMetric(ch, emitted, "srapi_gateway_failover_total", c.descs.gatewayFailover, prometheus.CounterValue, float64(snapshot.failovers[key]), labels...)
 	}
-	for _, key := range sortedKeys(providerErrors) {
+	for _, key := range sortedKeys(snapshot.providerErrors) {
 		labels := strings.Split(key, "\xff")
-		emitConstMetric(ch, emitted, "srapi_provider_errors_total", c.descs.providerErrors, prometheus.CounterValue, float64(providerErrors[key]), labels...)
+		emitConstMetric(ch, emitted, "srapi_provider_errors_total", c.descs.providerErrors, prometheus.CounterValue, float64(snapshot.providerErrors[key]), labels...)
 	}
-	for _, key := range sortedKeys(gatewayErrors) {
-		emitConstMetric(ch, emitted, "srapi_gateway_errors_total", c.descs.gatewayErrors, prometheus.CounterValue, float64(gatewayErrors[key]), key)
+	for _, key := range sortedKeys(snapshot.gatewayErrors) {
+		emitConstMetric(ch, emitted, "srapi_gateway_errors_total", c.descs.gatewayErrors, prometheus.CounterValue, float64(snapshot.gatewayErrors[key]), key)
 	}
-	for _, key := range sortedKeys(tokenCounts) {
+	for _, key := range sortedKeys(snapshot.tokenCounts) {
 		labels := strings.Split(key, "\xff")
-		emitConstMetric(ch, emitted, "srapi_usage_tokens_total", c.descs.usageTokens, prometheus.CounterValue, float64(tokenCounts[key]), labels...)
+		emitConstMetric(ch, emitted, "srapi_usage_tokens_total", c.descs.usageTokens, prometheus.CounterValue, float64(snapshot.tokenCounts[key]), labels...)
 	}
-	return logs
 }
 
-func (c *runtimeMetricsCollector) collectSchedulerMetrics(ch chan<- prometheus.Metric, emitted map[string]bool, usageLogs []usagecontract.UsageLog) {
-	decisions, err := c.rt.scheduler.ListDecisions(c.ctx)
-	if err != nil {
-		c.rt.logger.Warn("failed to collect scheduler decision metrics", "error", err)
-	} else {
-		counts := schedulerDecisionCounts(decisions)
-		for _, key := range sortedKeys(counts) {
-			labels := strings.Split(key, "\xff")
-			emitConstMetric(ch, emitted, "srapi_scheduler_decisions_total", c.descs.schedulerDecisions, prometheus.CounterValue, float64(counts[key]), labels...)
-		}
-		costScores := schedulerCostScoreAverages(decisions)
-		for _, strategy := range sortedKeys(costScores) {
-			emitConstMetric(ch, emitted, "srapi_scheduler_cost_score_avg", c.descs.schedulerCostScore, prometheus.GaugeValue, costScores[strategy], strategy)
-		}
-		strategyMetrics := schedulerStrategyMetrics(decisions, usageLogs)
-		for _, key := range sortedKeys(strategyMetrics.selected) {
-			labels := strings.Split(key, "\xff")
-			emitConstMetric(ch, emitted, "scheduler_strategy_selected_total", c.descs.schedulerStrategySelected, prometheus.CounterValue, float64(strategyMetrics.selected[key]), labels...)
-		}
-		for _, key := range sortedKeys(strategyMetrics.fallback) {
-			labels := strings.Split(key, "\xff")
-			emitConstMetric(ch, emitted, "scheduler_strategy_fallback_total", c.descs.schedulerStrategyFallback, prometheus.CounterValue, float64(strategyMetrics.fallback[key]), labels...)
-		}
-		for _, key := range sortedKeys(strategyMetrics.shadowDiff) {
-			labels := strings.Split(key, "\xff")
-			emitConstMetric(ch, emitted, "scheduler_strategy_shadow_diff", c.descs.schedulerStrategyShadowDiff, prometheus.CounterValue, float64(strategyMetrics.shadowDiff[key]), labels...)
-		}
-		for _, key := range sortedKeys(strategyMetrics.costDelta) {
-			labels := strings.Split(key, "\xff")
-			emitConstMetric(ch, emitted, "scheduler_strategy_cost_delta", c.descs.schedulerStrategyCostDelta, prometheus.GaugeValue, strategyMetrics.costDelta[key], labels...)
-		}
-		for _, key := range sortedKeys(strategyMetrics.latencyDelta) {
-			labels := strings.Split(key, "\xff")
-			emitConstMetric(ch, emitted, "scheduler_strategy_latency_delta", c.descs.schedulerStrategyLatencyDelta, prometheus.GaugeValue, strategyMetrics.latencyDelta[key], labels...)
-		}
-		for _, key := range sortedKeys(strategyMetrics.errorRate) {
-			labels := strings.Split(key, "\xff")
-			emitConstMetric(ch, emitted, "scheduler_strategy_error_rate", c.descs.schedulerStrategyErrorRate, prometheus.GaugeValue, strategyMetrics.errorRate[key], labels...)
-		}
-		for _, key := range sortedKeys(strategyMetrics.rejectReason) {
-			labels := strings.Split(key, "\xff")
-			emitConstMetric(ch, emitted, "scheduler_strategy_reject_reason_total", c.descs.schedulerStrategyRejectReason, prometheus.CounterValue, float64(strategyMetrics.rejectReason[key]), labels...)
-		}
+func (c *runtimeMetricsCollector) collectSchedulerMetrics(ch chan<- prometheus.Metric, emitted map[string]bool, snapshot runtimeMetricsSnapshot) {
+	counts := schedulerDecisionCounts(snapshot.schedulerDecisions)
+	for _, key := range sortedKeys(counts) {
+		labels := strings.Split(key, "\xff")
+		emitConstMetric(ch, emitted, "srapi_scheduler_decisions_total", c.descs.schedulerDecisions, prometheus.CounterValue, float64(counts[key]), labels...)
 	}
-	leases, err := c.rt.scheduler.ListLeases(c.ctx)
-	if err != nil {
-		c.rt.logger.Warn("failed to collect scheduler lease metrics", "error", err)
-		emitConstMetric(ch, emitted, "srapi_gateway_inflight_requests", c.descs.gatewayInflight, prometheus.GaugeValue, 0)
-		return
+	costScores := schedulerCostScoreAverages(snapshot.schedulerDecisions)
+	for _, strategy := range sortedKeys(costScores) {
+		emitConstMetric(ch, emitted, "srapi_scheduler_cost_score_avg", c.descs.schedulerCostScore, prometheus.GaugeValue, costScores[strategy], strategy)
 	}
-	emitConstMetric(ch, emitted, "srapi_gateway_inflight_requests", c.descs.gatewayInflight, prometheus.GaugeValue, float64(pendingLeaseCount(leases)))
+	strategyMetrics := schedulerStrategyMetrics(snapshot.schedulerDecisions, snapshot.usageLogs)
+	for _, key := range sortedKeys(strategyMetrics.selected) {
+		labels := strings.Split(key, "\xff")
+		emitConstMetric(ch, emitted, "scheduler_strategy_selected_total", c.descs.schedulerStrategySelected, prometheus.CounterValue, float64(strategyMetrics.selected[key]), labels...)
+	}
+	for _, key := range sortedKeys(strategyMetrics.fallback) {
+		labels := strings.Split(key, "\xff")
+		emitConstMetric(ch, emitted, "scheduler_strategy_fallback_total", c.descs.schedulerStrategyFallback, prometheus.CounterValue, float64(strategyMetrics.fallback[key]), labels...)
+	}
+	for _, key := range sortedKeys(strategyMetrics.shadowDiff) {
+		labels := strings.Split(key, "\xff")
+		emitConstMetric(ch, emitted, "scheduler_strategy_shadow_diff", c.descs.schedulerStrategyShadowDiff, prometheus.CounterValue, float64(strategyMetrics.shadowDiff[key]), labels...)
+	}
+	for _, key := range sortedKeys(strategyMetrics.costDelta) {
+		labels := strings.Split(key, "\xff")
+		emitConstMetric(ch, emitted, "scheduler_strategy_cost_delta", c.descs.schedulerStrategyCostDelta, prometheus.GaugeValue, strategyMetrics.costDelta[key], labels...)
+	}
+	for _, key := range sortedKeys(strategyMetrics.latencyDelta) {
+		labels := strings.Split(key, "\xff")
+		emitConstMetric(ch, emitted, "scheduler_strategy_latency_delta", c.descs.schedulerStrategyLatencyDelta, prometheus.GaugeValue, strategyMetrics.latencyDelta[key], labels...)
+	}
+	for _, key := range sortedKeys(strategyMetrics.errorRate) {
+		labels := strings.Split(key, "\xff")
+		emitConstMetric(ch, emitted, "scheduler_strategy_error_rate", c.descs.schedulerStrategyErrorRate, prometheus.GaugeValue, strategyMetrics.errorRate[key], labels...)
+	}
+	for _, key := range sortedKeys(strategyMetrics.rejectReason) {
+		labels := strings.Split(key, "\xff")
+		emitConstMetric(ch, emitted, "scheduler_strategy_reject_reason_total", c.descs.schedulerStrategyRejectReason, prometheus.CounterValue, float64(strategyMetrics.rejectReason[key]), labels...)
+	}
+	emitConstMetric(ch, emitted, "srapi_gateway_inflight_requests", c.descs.gatewayInflight, prometheus.GaugeValue, float64(c.rt.scheduler.ActiveLeaseCount(c.ctx)))
 }
 
 func (c *runtimeMetricsCollector) collectRealtimeMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {
@@ -421,38 +409,50 @@ func (c *runtimeMetricsCollector) collectOpsAlertMetrics(ch chan<- prometheus.Me
 }
 
 func (c *runtimeMetricsCollector) collectProviderProbeMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {
-	accounts, err := c.rt.accounts.List(c.ctx)
+	if c.rt.healthRollups == nil {
+		return
+	}
+	rollups, err := c.rt.healthRollups.ListRecent(c.ctx, 1, time.Now().UTC())
 	if err != nil {
 		c.rt.logger.Warn("failed to collect provider probe metrics", "error", err)
 		return
 	}
 	protocols := map[int]string{}
 	aggregates := map[string]*histogramAggregate{}
-	for _, account := range accounts {
-		snapshot, err := c.rt.accounts.LatestHealthSnapshotByAccount(c.ctx, account.ID)
-		if err != nil {
+	for _, rollup := range rollups {
+		if rollup.TotalSamples <= 0 {
 			continue
 		}
-		protocol := protocols[account.ProviderID]
+		protocol := protocols[rollup.ProviderID]
 		if protocol == "" {
 			protocol = "unknown"
-			if provider, err := c.rt.providers.FindByID(c.ctx, account.ProviderID); err == nil {
+			if provider, err := c.rt.providers.FindByID(c.ctx, rollup.ProviderID); err == nil {
 				protocol = metricLabelValue(provider.Protocol, "unknown")
 			}
-			protocols[account.ProviderID] = protocol
+			protocols[rollup.ProviderID] = protocol
 		}
-		status := metricLabelValue(snapshot.Status, "unknown")
+		status := rollupProbeStatus(rollup.AvailabilityRatio)
 		key := strings.Join([]string{protocol, status}, "\xff")
 		if aggregates[key] == nil {
 			aggregates[key] = newHistogramAggregate()
 		}
-		aggregates[key].observe(float64(snapshot.LatencyP95MS) / 1000)
+		aggregates[key].observe(float64(1 - rollup.AvailabilityRatio))
 	}
 	for _, key := range sortedKeys(aggregates) {
 		labels := strings.Split(key, "\xff")
 		value := aggregates[key]
 		emitConstHistogram(ch, emitted, "srapi_provider_probe_latency_seconds", c.descs.providerProbeLatency, value.count, value.sum, value.buckets, labels...)
 	}
+}
+
+func rollupProbeStatus(availabilityRatio float32) string {
+	if availabilityRatio >= 0.99 {
+		return "healthy"
+	}
+	if availabilityRatio > 0 {
+		return "degraded"
+	}
+	return "dead"
 }
 
 func (c *runtimeMetricsCollector) collectBaselineMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {

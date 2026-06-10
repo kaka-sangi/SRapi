@@ -7,7 +7,7 @@ const requiredFiles = [
   'examples/curl/gateway.sh',
   'examples/typescript/gateway.ts',
   'examples/python/gateway.py',
-  'docs/MIGRATION_GUIDE_2API.md',
+  'docs/insights/MIGRATION_GUIDE_2API.md',
   'tools/examples-check.mjs',
 ];
 
@@ -49,7 +49,7 @@ const docs = read('examples/README.md')
   + '\n' + read('examples/curl/gateway.sh')
   + '\n' + read('examples/typescript/gateway.ts')
   + '\n' + read('examples/python/gateway.py')
-  + '\n' + read('docs/MIGRATION_GUIDE_2API.md');
+  + '\n' + read('docs/insights/MIGRATION_GUIDE_2API.md');
 
 function main() {
   for (const file of requiredFiles) {
@@ -66,16 +66,16 @@ function main() {
     assert(docs.includes(name), `examples/docs missing env var ${name}`);
   }
 
-  const migrationGuide = read('docs/MIGRATION_GUIDE_2API.md');
+  const migrationGuide = read('docs/insights/MIGRATION_GUIDE_2API.md');
   for (const phrase of migrationRequiredPhrases) {
     assert(migrationGuide.includes(phrase), `migration guide missing required 2api boundary phrase: ${phrase}`);
   }
 
   assertNoSecretPlaceholders(docs);
   assert(read('README.md').includes('examples/README.md'), 'README.md must link examples/README.md');
-  assert(read('README.md').includes('docs/MIGRATION_GUIDE_2API.md'), 'README.md must link docs/MIGRATION_GUIDE_2API.md');
+  assert(read('README.md').includes('docs/insights/MIGRATION_GUIDE_2API.md'), 'README.md must link docs/insights/MIGRATION_GUIDE_2API.md');
   assert(read('docs/README.md').includes('MIGRATION_GUIDE_2API.md'), 'docs/README.md must link migration guide');
-  assert(read('specs/QUALITY_GATES.md').includes('make examples-check'), 'QUALITY_GATES.md must document make examples-check');
+  assert(read('docs/requirements/QUALITY_GATES.md').includes('make examples-check'), 'QUALITY_GATES.md must document make examples-check');
 
   runTypeScriptCheck();
   console.log('examples check ok');

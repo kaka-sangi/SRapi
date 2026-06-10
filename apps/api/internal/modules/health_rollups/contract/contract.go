@@ -31,4 +31,5 @@ type Rollup struct {
 type Store interface {
 	UpsertRollup(ctx context.Context, rollup Rollup) (Rollup, error)
 	ListRollupsByAccount(ctx context.Context, accountID int, sinceDate string) ([]Rollup, error)
+	ListRollupsSince(ctx context.Context, sinceDate string) ([]Rollup, error)
 }

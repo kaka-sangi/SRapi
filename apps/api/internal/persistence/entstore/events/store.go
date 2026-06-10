@@ -108,7 +108,14 @@ func (s *Store) ListDispatchableOutbox(ctx context.Context, now time.Time, limit
 }
 
 func (s *Store) MarkOutboxPublished(ctx context.Context, id int, publishedAt time.Time) (contract.OutboxEvent, error) {
-	row, err := s.client.DomainEventsOutbox.UpdateOneID(id).
+	affected, err := s.client.DomainEventsOutbox.Update().
+		Where(
+			entdomaineventsoutbox.IDEQ(id),
+			entdomaineventsoutbox.Or(
+				entdomaineventsoutbox.StatusEQ(string(contract.OutboxStatusPending)),
+				entdomaineventsoutbox.StatusEQ(string(contract.OutboxStatusFailed)),
+			),
+		).
 		SetStatus(string(contract.OutboxStatusPublished)).
 		SetPublishedAt(publishedAt).
 		ClearNextRetryAt().
@@ -117,7 +124,10 @@ func (s *Store) MarkOutboxPublished(ctx context.Context, id int, publishedAt tim
 	if err != nil {
 		return contract.OutboxEvent{}, err
 	}
-	return toOutbox(row), nil
+	if affected == 0 {
+		return contract.OutboxEvent{}, contract.ErrNotDispatchable
+	}
+	return s.findOutboxByID(ctx, id)
 }
 
 func (s *Store) MarkOutboxFailed(ctx context.Context, id int, attemptCount int, nextRetryAt *time.Time, lastError string) (contract.OutboxEvent, error) {
@@ -139,12 +149,6 @@ func (s *Store) MarkOutboxFailed(ctx context.Context, id int, attemptCount int, 
 }
 
 func (s *Store) CreateInbox(ctx context.Context, input contract.InboxRecord) (contract.InboxRecord, bool, error) {
-	if existing, err := s.findInbox(ctx, input.EventID, input.ConsumerName); err == nil {
-		return existing, false, nil
-	} else if !ent.IsNotFound(err) {
-		return contract.InboxRecord{}, false, err
-	}
-
 	create := s.client.DomainEventsInbox.Create().
 		SetEventID(input.EventID).
 		SetConsumerName(input.ConsumerName).
@@ -157,15 +161,49 @@ func (s *Store) CreateInbox(ctx context.Context, input contract.InboxRecord) (co
 		create.SetCreatedAt(input.CreatedAt).SetUpdatedAt(input.CreatedAt)
 	}
 	created, err := create.Save(ctx)
-	if err != nil {
-		if ent.IsConstraintError(err) {
-			if existing, findErr := s.findInbox(ctx, input.EventID, input.ConsumerName); findErr == nil {
-				return existing, false, nil
-			}
-		}
+	if err == nil {
+		return toInbox(created), true, nil
+	}
+	if !ent.IsConstraintError(err) {
 		return contract.InboxRecord{}, false, err
 	}
-	return toInbox(created), true, nil
+	record, err := s.findInbox(ctx, input.EventID, input.ConsumerName)
+	if err != nil {
+		return contract.InboxRecord{}, false, err
+	}
+	if record.Status == contract.InboxStatusFailed {
+		affected, updateErr := s.client.DomainEventsInbox.Update().
+			Where(
+				entdomaineventsinbox.IDEQ(record.ID),
+				entdomaineventsinbox.StatusEQ(string(contract.InboxStatusFailed)),
+			).
+			SetStatus(string(contract.InboxStatusPending)).
+			ClearLastError().
+			ClearProcessedAt().
+			Save(ctx)
+		if updateErr != nil {
+			return contract.InboxRecord{}, false, updateErr
+		}
+		if affected == 1 {
+			claimed, findErr := s.findInbox(ctx, input.EventID, input.ConsumerName)
+			return claimed, true, findErr
+		}
+		record, err = s.findInbox(ctx, input.EventID, input.ConsumerName)
+		if err != nil {
+			return contract.InboxRecord{}, false, err
+		}
+	}
+	return record, false, nil
+}
+
+func (s *Store) findOutboxByID(ctx context.Context, id int) (contract.OutboxEvent, error) {
+	row, err := s.client.DomainEventsOutbox.Query().
+		Where(entdomaineventsoutbox.IDEQ(id)).
+		Only(ctx)
+	if err != nil {
+		return contract.OutboxEvent{}, err
+	}
+	return toOutbox(row), nil
 }
 
 func (s *Store) ListInbox(ctx context.Context) ([]contract.InboxRecord, error) {

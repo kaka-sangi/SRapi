@@ -66,8 +66,8 @@ test("deploy preflight is exposed through Makefile, docs, and dev entrypoint", (
   const makefile = readFileSync("Makefile", "utf8");
   const devPs1 = readFileSync("tools/dev.ps1", "utf8");
   const readme = readFileSync("README.md", "utf8");
-  const operations = readFileSync("docs/OPERATIONS.md", "utf8");
-  const qualityGates = readFileSync("specs/QUALITY_GATES.md", "utf8");
+  const operations = readFileSync("docs/requirements/OPERATIONS.md", "utf8");
+  const qualityGates = readFileSync("docs/requirements/QUALITY_GATES.md", "utf8");
 
   assert.match(
     makefile,

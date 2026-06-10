@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/url"
 	"strings"
 	"time"
@@ -66,7 +67,15 @@ func (c *Client) Ping(ctx context.Context) error {
 	if c == nil || c.db == nil {
 		return nil
 	}
-	return c.db.PingContext(ctx)
+	var ok int
+	var readOnly string
+	if err := c.db.QueryRowContext(ctx, "SELECT 1, current_setting('transaction_read_only')").Scan(&ok, &readOnly); err != nil {
+		return err
+	}
+	if strings.EqualFold(readOnly, "on") {
+		return errors.New("database is read-only")
+	}
+	return nil
 }
 
 func (c *Client) Ent() *ent.Client {
@@ -74,6 +83,15 @@ func (c *Client) Ent() *ent.Client {
 		return nil
 	}
 	return c.ent
+}
+
+// SQLDB exposes the shared database handle for platform-level infrastructure
+// that needs database/session primitives without going through Ent.
+func (c *Client) SQLDB() *sql.DB {
+	if c == nil {
+		return nil
+	}
+	return c.db
 }
 
 func (c *Client) CreateSchema(ctx context.Context) error {

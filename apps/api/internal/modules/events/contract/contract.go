@@ -2,8 +2,15 @@ package contract
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+// ErrNotDispatchable is returned when an event is no longer eligible to publish.
+var ErrNotDispatchable = errors.New("outbox event is not dispatchable")
+
+// ErrInboxClaimed is returned when another worker already owns this inbox row.
+var ErrInboxClaimed = errors.New("inbox event is already claimed")
 
 type OutboxStatus string
 

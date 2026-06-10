@@ -37,6 +37,7 @@ type Config struct {
 	Observability    ObservabilityConfig
 	Captcha          CaptchaConfig
 	QuotaRefresh     QuotaRefreshConfig
+	LiteLLMPricing   LiteLLMPricingConfig
 	ConnectivityTest ConnectivityTestConfig
 	ScheduledTest    ScheduledTestConfig
 	OAuth            OAuthConfig
@@ -50,6 +51,14 @@ type QuotaRefreshConfig struct {
 	Interval      time.Duration
 	Timeout       time.Duration
 	MaxConcurrent int
+}
+
+// LiteLLMPricingConfig controls optional remote LiteLLM price-list sync.
+// It is disabled until SourceURL is set.
+type LiteLLMPricingConfig struct {
+	SourceURL string
+	Interval  time.Duration
+	Timeout   time.Duration
 }
 
 // ConnectivityTestConfig controls the scheduled connectivity test worker, which
@@ -95,6 +104,13 @@ type DependencyConfig struct {
 	MaxOpenConns           int
 	MaxIdleConns           int
 	ConnMaxLifetimeSeconds int
+	// Redis connection-pool and timeout tuning (zero = go-redis default).
+	PoolSize            int
+	MinIdleConns        int
+	DialTimeoutSeconds  int
+	ReadTimeoutSeconds  int
+	WriteTimeoutSeconds int
+	PoolTimeoutSeconds  int
 }
 
 type GatewayConfig struct {
@@ -151,6 +167,7 @@ type RetentionConfig struct {
 	SchedulerFeedbacksDays     int
 	AuditLogsDays              int
 	AccountHealthSnapshotsDays int
+	BatchLimit                 int
 }
 
 // AuthCleanupConfig controls expired console session cleanup.
@@ -243,10 +260,16 @@ func Load() Config {
 			ConnMaxLifetimeSeconds: getIntEnv("DATABASE_CONN_MAX_LIFETIME_SECONDS", 1800),
 		},
 		Redis: DependencyConfig{
-			Host:     getEnv("REDIS_HOST", "localhost"),
-			Port:     getIntEnv("REDIS_PORT", 6379),
-			Password: getEnv("REDIS_PASSWORD", ""),
-			Database: getEnv("REDIS_DB", "0"),
+			Host:                getEnv("REDIS_HOST", "localhost"),
+			Port:                getIntEnv("REDIS_PORT", 6379),
+			Password:            getEnv("REDIS_PASSWORD", ""),
+			Database:            getEnv("REDIS_DB", "0"),
+			PoolSize:            getIntEnv("REDIS_POOL_SIZE", 32),
+			MinIdleConns:        getIntEnv("REDIS_MIN_IDLE_CONNS", 4),
+			DialTimeoutSeconds:  getIntEnv("REDIS_DIAL_TIMEOUT_SECONDS", 3),
+			ReadTimeoutSeconds:  getIntEnv("REDIS_READ_TIMEOUT_SECONDS", 2),
+			WriteTimeoutSeconds: getIntEnv("REDIS_WRITE_TIMEOUT_SECONDS", 2),
+			PoolTimeoutSeconds:  getIntEnv("REDIS_POOL_TIMEOUT_SECONDS", 3),
 		},
 		Gateway: GatewayConfig{
 			MaxBodySize:                int64(getIntEnv("GATEWAY_MAX_BODY_SIZE", defaultGatewayBodySize)),
@@ -268,6 +291,7 @@ func Load() Config {
 			SchedulerFeedbacksDays:     getIntEnv("DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS", 90),
 			AuditLogsDays:              getIntEnv("DATA_RETENTION_AUDIT_LOGS_DAYS", 365),
 			AccountHealthSnapshotsDays: getIntEnv("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS", 90),
+			BatchLimit:                 getIntEnv("DATA_RETENTION_BATCH_LIMIT", 1000),
 		},
 		AuthCleanup: AuthCleanupConfig{
 			Interval: time.Duration(getIntEnv("AUTH_SESSION_CLEANUP_INTERVAL_SECONDS", 86400)) * time.Second,
@@ -334,6 +358,11 @@ func Load() Config {
 			Timeout:       time.Duration(getIntEnv("ACCOUNT_QUOTA_REFRESH_TIMEOUT_SECONDS", 15)) * time.Second,
 			MaxConcurrent: getIntEnv("ACCOUNT_QUOTA_REFRESH_MAX_CONCURRENT", 4),
 		},
+		LiteLLMPricing: LiteLLMPricingConfig{
+			SourceURL: getEnv("LITELLM_PRICING_SOURCE_URL", ""),
+			Interval:  time.Duration(getIntEnv("LITELLM_PRICING_INTERVAL_SECONDS", 43200)) * time.Second,
+			Timeout:   time.Duration(getIntEnv("LITELLM_PRICING_TIMEOUT_SECONDS", 15)) * time.Second,
+		},
 		ConnectivityTest: ConnectivityTestConfig{
 			Enabled:       getBoolEnv("ACCOUNT_CONNECTIVITY_TEST_ENABLED", false),
 			Interval:      time.Duration(getIntEnv("ACCOUNT_CONNECTIVITY_TEST_INTERVAL_SECONDS", 3600)) * time.Second,
@@ -387,6 +416,27 @@ func (c Config) Validate() error {
 	if c.Gateway.RealtimeMaxOpenSlotsPerKey < 0 {
 		return fmt.Errorf("GATEWAY_REALTIME_MAX_OPEN_SLOTS_PER_API_KEY must be zero or positive")
 	}
+	if c.Redis.PoolSize <= 0 {
+		return fmt.Errorf("REDIS_POOL_SIZE must be positive")
+	}
+	if c.Redis.MinIdleConns < 0 {
+		return fmt.Errorf("REDIS_MIN_IDLE_CONNS must be zero or positive")
+	}
+	if c.Redis.MinIdleConns > c.Redis.PoolSize {
+		return fmt.Errorf("REDIS_MIN_IDLE_CONNS must be less than or equal to REDIS_POOL_SIZE")
+	}
+	if c.Redis.DialTimeoutSeconds <= 0 {
+		return fmt.Errorf("REDIS_DIAL_TIMEOUT_SECONDS must be positive")
+	}
+	if c.Redis.ReadTimeoutSeconds <= 0 {
+		return fmt.Errorf("REDIS_READ_TIMEOUT_SECONDS must be positive")
+	}
+	if c.Redis.WriteTimeoutSeconds <= 0 {
+		return fmt.Errorf("REDIS_WRITE_TIMEOUT_SECONDS must be positive")
+	}
+	if c.Redis.PoolTimeoutSeconds <= 0 {
+		return fmt.Errorf("REDIS_POOL_TIMEOUT_SECONDS must be positive")
+	}
 	if c.Retention.UsageLogsDays < 0 {
 		return fmt.Errorf("DATA_RETENTION_USAGE_LOGS_DAYS must be zero or positive")
 	}
@@ -401,6 +451,9 @@ func (c Config) Validate() error {
 	}
 	if c.Retention.AccountHealthSnapshotsDays < 0 {
 		return fmt.Errorf("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS must be zero or positive")
+	}
+	if c.Retention.BatchLimit <= 0 || c.Retention.BatchLimit > 5000 {
+		return fmt.Errorf("DATA_RETENTION_BATCH_LIMIT must be between 1 and 5000")
 	}
 	if c.AuthCleanup.Interval <= 0 {
 		return fmt.Errorf("AUTH_SESSION_CLEANUP_INTERVAL_SECONDS must be positive")
@@ -458,6 +511,15 @@ func (c Config) Validate() error {
 	}
 	if c.SLOEvaluator.Timeout <= 0 {
 		return fmt.Errorf("SLO_EVALUATOR_TIMEOUT_SECONDS must be positive")
+	}
+	if c.LiteLLMPricing.Interval <= 0 {
+		return fmt.Errorf("LITELLM_PRICING_INTERVAL_SECONDS must be positive")
+	}
+	if c.LiteLLMPricing.Timeout <= 0 {
+		return fmt.Errorf("LITELLM_PRICING_TIMEOUT_SECONDS must be positive")
+	}
+	if strings.TrimSpace(c.LiteLLMPricing.SourceURL) != "" && !validHTTPBaseURL(c.LiteLLMPricing.SourceURL) {
+		return fmt.Errorf("LITELLM_PRICING_SOURCE_URL must be an absolute http or https URL without query or fragment")
 	}
 	if c.Email.SMTPPort <= 0 || c.Email.SMTPPort > 65535 {
 		return fmt.Errorf("EMAIL_SMTP_PORT must be between 1 and 65535")

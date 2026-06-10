@@ -96,6 +96,22 @@ func (s *Store) ListRollupsByAccount(ctx context.Context, accountID int, sinceDa
 	return out, nil
 }
 
+func (s *Store) ListRollupsSince(ctx context.Context, sinceDate string) ([]contract.Rollup, error) {
+	query := s.client.AccountAvailabilityRollup.Query()
+	if sinceDate != "" {
+		query = query.Where(entrollup.BucketDateGTE(sinceDate))
+	}
+	rows, err := query.Order(ent.Asc(entrollup.FieldBucketDate), ent.Asc(entrollup.FieldAccountID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.Rollup, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toRollup(row))
+	}
+	return out, nil
+}
+
 func toRollup(row *ent.AccountAvailabilityRollup) contract.Rollup {
 	return contract.Rollup{
 		ID:                row.ID,

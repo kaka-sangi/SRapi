@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/idempotency/contract"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -25,6 +26,7 @@ type Clock interface {
 type Config struct {
 	Interval time.Duration
 	Clock    Clock
+	RunGuard runonceguard.Guard
 }
 
 // Worker periodically deletes idempotency records whose expiry time has passed so
@@ -34,6 +36,7 @@ type Worker struct {
 	logger   *slog.Logger
 	interval time.Duration
 	clock    Clock
+	guard    runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -55,7 +58,7 @@ func New(store contract.Store, logger *slog.Logger, cfg Config) (*Worker, error)
 	if clock == nil {
 		clock = systemClock{}
 	}
-	return &Worker{store: store, logger: logger, interval: interval, clock: clock}, nil
+	return &Worker{store: store, logger: logger, interval: interval, clock: clock, guard: cfg.RunGuard}, nil
 }
 
 // Start runs the cleanup loop until Shutdown is called or parent is canceled.
@@ -124,7 +127,13 @@ func (w *Worker) RunOnce(ctx context.Context) (int, error) {
 	if w == nil {
 		return 0, nil
 	}
-	return w.store.DeleteExpired(ctx, w.clock.Now())
+	var deleted int
+	_, err := runonceguard.Run(ctx, w.guard, "idempotency_cleanup", func(runCtx context.Context) error {
+		var runErr error
+		deleted, runErr = w.store.DeleteExpired(runCtx, w.clock.Now())
+		return runErr
+	})
+	return deleted, err
 }
 
 func (w *Worker) run(ctx context.Context) {

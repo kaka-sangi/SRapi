@@ -101,3 +101,13 @@ func (s *Service) ListByAccount(ctx context.Context, accountID, days int, now ti
 	since := now.UTC().AddDate(0, 0, -(days - 1)).Format(bucketDateLayout)
 	return s.store.ListRollupsByAccount(ctx, accountID, since)
 }
+
+// ListRecent returns all persisted rollups within the trailing window of days,
+// grouped by the metrics/reporting caller rather than by account.
+func (s *Service) ListRecent(ctx context.Context, days int, now time.Time) ([]contract.Rollup, error) {
+	if days <= 0 {
+		days = 7
+	}
+	since := now.UTC().AddDate(0, 0, -(days - 1)).Format(bucketDateLayout)
+	return s.store.ListRollupsSince(ctx, since)
+}

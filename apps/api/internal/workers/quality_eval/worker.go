@@ -9,6 +9,7 @@ import (
 
 	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
 	qualityservice "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/service"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -31,6 +32,7 @@ type Config struct {
 	OpenAIBaseURL string
 	JudgeModel    string
 	JudgeTimeout  time.Duration
+	RunGuard      runonceguard.Guard
 }
 
 type Result struct {
@@ -48,6 +50,7 @@ type Worker struct {
 	timeout       time.Duration
 	batchLimit    int
 	samplePercent float64
+	guard         runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -88,6 +91,7 @@ func New(store qualitycontract.Store, logger *slog.Logger, cfg Config) (*Worker,
 		timeout:       durationOrDefault(cfg.Timeout, defaultTimeout),
 		batchLimit:    positiveOrDefault(cfg.BatchLimit, defaultBatchLimit),
 		samplePercent: samplePercentOrDefault(cfg.SamplePercent),
+		guard:         cfg.RunGuard,
 	}, nil
 }
 
@@ -154,6 +158,16 @@ func (w *Worker) RunOnce(ctx context.Context) (Result, error) {
 	if w == nil {
 		return Result{}, nil
 	}
+	var result Result
+	_, err := runonceguard.Run(ctx, w.guard, "quality_eval", func(runCtx context.Context) error {
+		var runErr error
+		result, runErr = w.evaluatePending(runCtx)
+		return runErr
+	})
+	return result, err
+}
+
+func (w *Worker) evaluatePending(ctx context.Context) (Result, error) {
 	samples, err := w.quality.ListPendingSamples(ctx, qualitycontract.PendingSampleFilter{
 		SamplePercent: w.samplePercent,
 		Limit:         w.batchLimit,

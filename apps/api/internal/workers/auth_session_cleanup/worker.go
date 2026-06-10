@@ -9,6 +9,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/auth/service"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -24,6 +25,7 @@ type Clock interface {
 type Config struct {
 	Interval time.Duration
 	Clock    Clock
+	RunGuard runonceguard.Guard
 }
 
 // Worker periodically expires active console sessions whose expiry time has passed.
@@ -32,6 +34,7 @@ type Worker struct {
 	logger   *slog.Logger
 	interval time.Duration
 	clock    Clock
+	guard    runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -54,7 +57,7 @@ func New(store contract.CleanupStore, logger *slog.Logger, cfg Config) (*Worker,
 	if clock == nil {
 		clock = systemClock{}
 	}
-	return &Worker{store: store, logger: logger, interval: interval, clock: clock}, nil
+	return &Worker{store: store, logger: logger, interval: interval, clock: clock, guard: cfg.RunGuard}, nil
 }
 
 // NewFromStore returns nil when store does not support expired session cleanup.
@@ -132,7 +135,13 @@ func (w *Worker) RunOnce(ctx context.Context) (contract.CleanupExpiredSessionsRe
 	if w == nil {
 		return contract.CleanupExpiredSessionsResult{}, nil
 	}
-	return w.store.CleanupExpiredSessions(ctx, w.clock.Now())
+	var result contract.CleanupExpiredSessionsResult
+	_, err := runonceguard.Run(ctx, w.guard, "auth_session_cleanup", func(runCtx context.Context) error {
+		var runErr error
+		result, runErr = w.store.CleanupExpiredSessions(runCtx, w.clock.Now())
+		return runErr
+	})
+	return result, err
 }
 
 func (w *Worker) run(ctx context.Context) {

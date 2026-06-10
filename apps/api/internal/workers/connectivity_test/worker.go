@@ -19,6 +19,7 @@ import (
 	provideradapterservice "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -44,6 +45,7 @@ type Config struct {
 	MasterKey     string
 	Clock         accountservice.Clock
 	Adapter       provideradaptercontract.ConversationAdapter
+	RunGuard      runonceguard.Guard
 }
 
 // Result summarizes one connectivity test pass.
@@ -67,6 +69,7 @@ type Worker struct {
 	timeout       time.Duration
 	maxConcurrent int
 	policy        accountcontract.AccountProbePolicy
+	guard         runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -106,6 +109,7 @@ func New(accounts accountcontract.Store, providers providercontract.Store, logge
 		timeout:       durationOrDefault(cfg.Timeout, defaultTimeout),
 		maxConcurrent: positiveOrDefault(cfg.MaxConcurrent, defaultMaxConcurrent),
 		policy:        accountcontract.AccountProbePolicy{HistoryLimit: defaultHistoryLimit},
+		guard:         cfg.RunGuard,
 	}, nil
 }
 
@@ -171,7 +175,13 @@ func (w *Worker) RunOnce(ctx context.Context) (Result, error) {
 	if w == nil {
 		return Result{}, nil
 	}
-	return w.testPass(ctx)
+	var result Result
+	_, err := runonceguard.Run(ctx, w.guard, "connectivity_test", func(runCtx context.Context) error {
+		var runErr error
+		result, runErr = w.testPass(runCtx)
+		return runErr
+	})
+	return result, err
 }
 
 func (w *Worker) run(ctx context.Context) {
@@ -189,7 +199,7 @@ func (w *Worker) run(ctx context.Context) {
 }
 
 func (w *Worker) testAndLog(ctx context.Context) {
-	result, err := w.testPass(ctx)
+	result, err := w.RunOnce(ctx)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		w.logger.Warn("scheduled connectivity test failed", "error", err)
 	}

@@ -2,6 +2,7 @@ package operations
 
 import (
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -103,6 +104,7 @@ func TestCleanupDeletesExpiredOperationalRows(t *testing.T) {
 		SchedulerFeedbacks:     &cutoff,
 		AuditLogs:              &cutoff,
 		AccountHealthSnapshots: &cutoff,
+		BatchLimit:             1000,
 	})
 	if err != nil {
 		t.Fatalf("cleanup: %v", err)
@@ -121,6 +123,40 @@ func TestCleanupDeletesExpiredOperationalRows(t *testing.T) {
 	}
 	if len(remaining) != 1 || remaining[0].RequestID != "req_fresh_usage" {
 		t.Fatalf("expected fresh usage log to remain, got %+v", remaining)
+	}
+}
+
+func TestCleanupRetentionHonorsBatchLimit(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, "file:"+t.TempDir()+"/operations-retention-batch.db?_fk=1")
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	ctx := t.Context()
+	old := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	cutoff := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	for idx := 0; idx < 5; idx++ {
+		createUsageLog(t, client, "req_old_usage_batch_"+strconv.Itoa(idx), old)
+	}
+
+	result, err := store.Cleanup(ctx, contract.RetentionCutoffs{
+		UsageLogs:  &cutoff,
+		BatchLimit: 3,
+	})
+	if err != nil {
+		t.Fatalf("cleanup: %v", err)
+	}
+	if result.UsageLogs != 3 || !result.Limited {
+		t.Fatalf("expected limited cleanup of 3 usage logs, got %+v", result)
+	}
+	remaining, err := client.UsageLog.Query().Order(entusagelog.ByID()).All(ctx)
+	if err != nil {
+		t.Fatalf("list remaining usage logs: %v", err)
+	}
+	if len(remaining) != 2 {
+		t.Fatalf("expected 2 retained rows after bounded cleanup, got %+v", remaining)
 	}
 }
 

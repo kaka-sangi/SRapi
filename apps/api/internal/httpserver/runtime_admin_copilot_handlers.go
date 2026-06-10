@@ -4,10 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,7 +18,6 @@ import (
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
-	platformcrypto "github.com/srapi/srapi/apps/api/internal/platform/crypto"
 )
 
 const copilotSecretVersion = "copilotv1"
@@ -633,59 +628,10 @@ func copilotIsMutation(method string) bool {
 	}
 }
 
-func (s *Server) copilotCryptoKey() ([]byte, error) {
-	return platformcrypto.DeriveAESKey(s.cfg.Security.MasterKey)
-}
-
 func (s *Server) encryptCopilotSecret(plaintext string) (string, error) {
-	key, err := s.copilotCryptoKey()
-	if err != nil {
-		return "", err
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", err
-	}
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err := rand.Read(nonce); err != nil {
-		return "", err
-	}
-	ciphertext := gcm.Seal(nil, nonce, []byte(plaintext), []byte(copilotSecretVersion))
-	return fmt.Sprintf("%s:%s:%s", copilotSecretVersion, base64.RawURLEncoding.EncodeToString(nonce), base64.RawURLEncoding.EncodeToString(ciphertext)), nil
+	return s.encryptMasterSecret(plaintext, copilotSecretVersion)
 }
 
 func (s *Server) decryptCopilotSecret(ciphertext string) (string, error) {
-	parts := strings.Split(ciphertext, ":")
-	if len(parts) != 3 || parts[0] != copilotSecretVersion {
-		return "", errors.New("invalid copilot secret")
-	}
-	nonce, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return "", err
-	}
-	encrypted, err := base64.RawURLEncoding.DecodeString(parts[2])
-	if err != nil {
-		return "", err
-	}
-	key, err := s.copilotCryptoKey()
-	if err != nil {
-		return "", err
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", err
-	}
-	raw, err := gcm.Open(nil, nonce, encrypted, []byte(copilotSecretVersion))
-	if err != nil {
-		return "", err
-	}
-	return string(raw), nil
+	return s.decryptMasterSecret(ciphertext, copilotSecretVersion)
 }

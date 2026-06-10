@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 
@@ -24,9 +25,15 @@ func Open(cfg config.DependencyConfig) (*Client, error) {
 		}
 	}
 	client := redis.NewClient(&redis.Options{
-		Addr:     cfg.Address(),
-		Password: cfg.Password,
-		DB:       db,
+		Addr:         cfg.Address(),
+		Password:     cfg.Password,
+		DB:           db,
+		PoolSize:     cfg.PoolSize,
+		MinIdleConns: cfg.MinIdleConns,
+		DialTimeout:  time.Duration(cfg.DialTimeoutSeconds) * time.Second,
+		ReadTimeout:  time.Duration(cfg.ReadTimeoutSeconds) * time.Second,
+		WriteTimeout: time.Duration(cfg.WriteTimeoutSeconds) * time.Second,
+		PoolTimeout:  time.Duration(cfg.PoolTimeoutSeconds) * time.Second,
 	})
 	return &Client{client: client, addr: cfg.Address(), db: db}, nil
 }
@@ -64,4 +71,11 @@ func (c *Client) Raw() *redis.Client {
 		return nil
 	}
 	return c.client
+}
+
+func (c *Client) Options() *redis.Options {
+	if c == nil || c.client == nil {
+		return nil
+	}
+	return c.client.Options()
 }

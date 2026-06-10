@@ -9,6 +9,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/operations/service"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -23,7 +24,9 @@ type Config struct {
 	SchedulerFeedbacksDays     int
 	AuditLogsDays              int
 	AccountHealthSnapshotsDays int
+	BatchLimit                 int
 	Clock                      service.Clock
+	RunGuard                   runonceguard.Guard
 }
 
 type Worker struct {
@@ -31,6 +34,7 @@ type Worker struct {
 	logger     *slog.Logger
 	interval   time.Duration
 	policy     contract.RetentionPolicy
+	guard      runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -57,6 +61,7 @@ func New(store contract.RetentionStore, logger *slog.Logger, cfg Config) (*Worke
 		logger:     logger,
 		interval:   interval,
 		policy:     policyFromConfig(cfg),
+		guard:      cfg.RunGuard,
 	}, nil
 }
 
@@ -123,7 +128,13 @@ func (w *Worker) RunOnce(ctx context.Context) (contract.CleanupResult, error) {
 	if w == nil {
 		return contract.CleanupResult{}, nil
 	}
-	return w.operations.CleanupRetention(ctx, w.policy)
+	var result contract.CleanupResult
+	_, err := runonceguard.Run(ctx, w.guard, "retention", func(runCtx context.Context) error {
+		var runErr error
+		result, runErr = w.operations.CleanupRetention(runCtx, w.policy)
+		return runErr
+	})
+	return result, err
 }
 
 func (w *Worker) run(ctx context.Context) {
@@ -154,6 +165,7 @@ func (w *Worker) cleanupAndLog(ctx context.Context) {
 			"scheduler_feedbacks", result.SchedulerFeedbacks,
 			"audit_logs", result.AuditLogs,
 			"account_health_snapshots", result.AccountHealthSnapshots,
+			"limited", result.Limited,
 		)
 	}
 }
@@ -173,6 +185,7 @@ func policyFromConfig(cfg Config) contract.RetentionPolicy {
 		SchedulerFeedbacks:     days(cfg.SchedulerFeedbacksDays),
 		AuditLogs:              days(cfg.AuditLogsDays),
 		AccountHealthSnapshots: days(cfg.AccountHealthSnapshotsDays),
+		BatchLimit:             cfg.BatchLimit,
 	}
 }
 

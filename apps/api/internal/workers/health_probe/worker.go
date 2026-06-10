@@ -15,6 +15,7 @@ import (
 	provideradapterservice "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -43,6 +44,7 @@ type Config struct {
 	Cooldown               time.Duration
 	ProbePolicy            accountcontract.AccountProbePolicy
 	Adapter                provideradaptercontract.ProbeAdapter
+	RunGuard               runonceguard.Guard
 }
 
 // Result summarizes one health probe worker pass.
@@ -66,6 +68,7 @@ type Worker struct {
 	maxConcurrent int
 	policy        accountcontract.AccountProbePolicy
 	randN         func(int64) int64
+	guard         runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -115,6 +118,7 @@ func New(accounts accountcontract.Store, providers providercontract.Store, logge
 		maxConcurrent: positiveOrDefault(cfg.MaxConcurrent, defaultMaxConcurrent),
 		policy:        normalizePolicy(cfg),
 		randN:         func(n int64) int64 { return rand.Int64N(n) },
+		guard:         cfg.RunGuard,
 	}, nil
 }
 
@@ -186,7 +190,13 @@ func (w *Worker) RunOnce(ctx context.Context) (Result, error) {
 	if w == nil {
 		return Result{}, nil
 	}
-	return w.probePass(ctx, false)
+	var result Result
+	_, err := runonceguard.Run(ctx, w.guard, "health_probe", func(runCtx context.Context) error {
+		var runErr error
+		result, runErr = w.probePass(runCtx, false)
+		return runErr
+	})
+	return result, err
 }
 
 func (w *Worker) probePass(ctx context.Context, applyJitter bool) (Result, error) {

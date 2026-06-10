@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -88,6 +89,50 @@ func TestBeginReacquiresStaleLock(t *testing.T) {
 	out, err := svc.Begin(ctx, key, method, path, "h")
 	if err != nil || out.Outcome != OutcomeProceed {
 		t.Fatalf("expected stale lock to be re-acquired, got %v err=%v", out.Outcome, err)
+	}
+}
+
+func TestBeginConcurrentStaleReacquireOnlyOneProceeds(t *testing.T) {
+	ctx := context.Background()
+	clock := &fixedClock{now: time.Date(2026, 5, 30, 12, 0, 0, 0, time.UTC)}
+	svc, _ := New(memory.New(), clock, time.Minute, time.Hour)
+	const key, method, path = "tenant-c:stale-concurrent", "POST", "/v1/responses"
+
+	if out, _ := svc.Begin(ctx, key, method, path, "h"); out.Outcome != OutcomeProceed {
+		t.Fatalf("expected first begin to proceed")
+	}
+	clock.now = clock.now.Add(2 * time.Minute)
+
+	var wg sync.WaitGroup
+	outcomes := make(chan Outcome, 2)
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			out, err := svc.Begin(ctx, key, method, path, "h")
+			if err != nil {
+				t.Errorf("begin stale concurrent: %v", err)
+				return
+			}
+			outcomes <- out.Outcome
+		}()
+	}
+	wg.Wait()
+	close(outcomes)
+
+	var proceed, inFlight int
+	for outcome := range outcomes {
+		switch outcome {
+		case OutcomeProceed:
+			proceed++
+		case OutcomeInFlight:
+			inFlight++
+		default:
+			t.Fatalf("unexpected outcome %v", outcome)
+		}
+	}
+	if proceed != 1 || inFlight != 1 {
+		t.Fatalf("expected one proceed and one in-flight, got proceed=%d inFlight=%d", proceed, inFlight)
 	}
 }
 

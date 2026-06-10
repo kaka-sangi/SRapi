@@ -187,6 +187,60 @@ func TestGatewayTimeoutDefaultsAndOverrides(t *testing.T) {
 	}
 }
 
+func TestRedisConnectionDefaultsOverridesAndValidation(t *testing.T) {
+	t.Setenv("REDIS_POOL_SIZE", "")
+	t.Setenv("REDIS_MIN_IDLE_CONNS", "")
+	t.Setenv("REDIS_DIAL_TIMEOUT_SECONDS", "")
+	t.Setenv("REDIS_READ_TIMEOUT_SECONDS", "")
+	t.Setenv("REDIS_WRITE_TIMEOUT_SECONDS", "")
+	t.Setenv("REDIS_POOL_TIMEOUT_SECONDS", "")
+	cfg := Load()
+	if cfg.Redis.PoolSize != 32 ||
+		cfg.Redis.MinIdleConns != 4 ||
+		cfg.Redis.DialTimeoutSeconds != 3 ||
+		cfg.Redis.ReadTimeoutSeconds != 2 ||
+		cfg.Redis.WriteTimeoutSeconds != 2 ||
+		cfg.Redis.PoolTimeoutSeconds != 3 {
+		t.Fatalf("unexpected redis defaults: %+v", cfg.Redis)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected default redis config to validate, got %v", err)
+	}
+
+	t.Setenv("REDIS_POOL_SIZE", "12")
+	t.Setenv("REDIS_MIN_IDLE_CONNS", "2")
+	t.Setenv("REDIS_DIAL_TIMEOUT_SECONDS", "4")
+	t.Setenv("REDIS_READ_TIMEOUT_SECONDS", "5")
+	t.Setenv("REDIS_WRITE_TIMEOUT_SECONDS", "6")
+	t.Setenv("REDIS_POOL_TIMEOUT_SECONDS", "7")
+	cfg = Load()
+	if cfg.Redis.PoolSize != 12 ||
+		cfg.Redis.MinIdleConns != 2 ||
+		cfg.Redis.DialTimeoutSeconds != 4 ||
+		cfg.Redis.ReadTimeoutSeconds != 5 ||
+		cfg.Redis.WriteTimeoutSeconds != 6 ||
+		cfg.Redis.PoolTimeoutSeconds != 7 {
+		t.Fatalf("unexpected redis overrides: %+v", cfg.Redis)
+	}
+
+	cfg.Redis.PoolSize = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "REDIS_POOL_SIZE") {
+		t.Fatalf("expected redis pool validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.Redis.MinIdleConns = cfg.Redis.PoolSize + 1
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "REDIS_MIN_IDLE_CONNS") {
+		t.Fatalf("expected redis min idle validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.Redis.ReadTimeoutSeconds = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "REDIS_READ_TIMEOUT_SECONDS") {
+		t.Fatalf("expected redis read timeout validation failure, got %v", err)
+	}
+}
+
 func TestHealthcheckAddressUsesLoopbackForWildcardHost(t *testing.T) {
 	cfg := Load()
 	cfg.Server.Host = "0.0.0.0"
@@ -227,6 +281,7 @@ func TestRetentionDefaultsOverridesAndValidation(t *testing.T) {
 	t.Setenv("DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS", "")
 	t.Setenv("DATA_RETENTION_AUDIT_LOGS_DAYS", "")
 	t.Setenv("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS", "")
+	t.Setenv("DATA_RETENTION_BATCH_LIMIT", "")
 	t.Setenv("AUTH_SESSION_CLEANUP_INTERVAL_SECONDS", "")
 	cfg := Load()
 	if cfg.Retention.UsageLogsDays != 90 ||
@@ -234,6 +289,7 @@ func TestRetentionDefaultsOverridesAndValidation(t *testing.T) {
 		cfg.Retention.SchedulerFeedbacksDays != 90 ||
 		cfg.Retention.AuditLogsDays != 365 ||
 		cfg.Retention.AccountHealthSnapshotsDays != 90 ||
+		cfg.Retention.BatchLimit != 1000 ||
 		cfg.AuthCleanup.Interval != 24*time.Hour {
 		t.Fatalf("unexpected retention defaults: %+v", cfg.Retention)
 	}
@@ -243,6 +299,7 @@ func TestRetentionDefaultsOverridesAndValidation(t *testing.T) {
 	t.Setenv("DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS", "32")
 	t.Setenv("DATA_RETENTION_AUDIT_LOGS_DAYS", "180")
 	t.Setenv("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS", "45")
+	t.Setenv("DATA_RETENTION_BATCH_LIMIT", "2500")
 	t.Setenv("AUTH_SESSION_CLEANUP_INTERVAL_SECONDS", "3600")
 	cfg = Load()
 	if cfg.Retention.UsageLogsDays != 30 ||
@@ -250,6 +307,7 @@ func TestRetentionDefaultsOverridesAndValidation(t *testing.T) {
 		cfg.Retention.SchedulerFeedbacksDays != 32 ||
 		cfg.Retention.AuditLogsDays != 180 ||
 		cfg.Retention.AccountHealthSnapshotsDays != 45 ||
+		cfg.Retention.BatchLimit != 2500 ||
 		cfg.AuthCleanup.Interval != time.Hour {
 		t.Fatalf("unexpected retention overrides: %+v", cfg.Retention)
 	}
@@ -257,6 +315,12 @@ func TestRetentionDefaultsOverridesAndValidation(t *testing.T) {
 	cfg.Retention.UsageLogsDays = -1
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "DATA_RETENTION_USAGE_LOGS_DAYS") {
 		t.Fatalf("expected retention validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.Retention.BatchLimit = 5001
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "DATA_RETENTION_BATCH_LIMIT") {
+		t.Fatalf("expected retention batch validation failure, got %v", err)
 	}
 
 	cfg = Load()
@@ -441,6 +505,42 @@ func TestSLOEvaluatorDefaultsOverridesAndValidation(t *testing.T) {
 	cfg.SLOEvaluator.Timeout = 0
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "SLO_EVALUATOR_TIMEOUT_SECONDS") {
 		t.Fatalf("expected SLO evaluator timeout validation failure, got %v", err)
+	}
+}
+
+func TestLiteLLMPricingDefaultsOverridesAndValidation(t *testing.T) {
+	t.Setenv("LITELLM_PRICING_SOURCE_URL", "")
+	t.Setenv("LITELLM_PRICING_INTERVAL_SECONDS", "")
+	t.Setenv("LITELLM_PRICING_TIMEOUT_SECONDS", "")
+	cfg := Load()
+	if cfg.LiteLLMPricing.SourceURL != "" ||
+		cfg.LiteLLMPricing.Interval != 12*time.Hour ||
+		cfg.LiteLLMPricing.Timeout != 15*time.Second {
+		t.Fatalf("unexpected LiteLLM pricing defaults: %+v", cfg.LiteLLMPricing)
+	}
+
+	t.Setenv("LITELLM_PRICING_SOURCE_URL", "https://prices.example.com/model_prices.json")
+	t.Setenv("LITELLM_PRICING_INTERVAL_SECONDS", "3600")
+	t.Setenv("LITELLM_PRICING_TIMEOUT_SECONDS", "7")
+	cfg = Load()
+	if cfg.LiteLLMPricing.SourceURL != "https://prices.example.com/model_prices.json" ||
+		cfg.LiteLLMPricing.Interval != time.Hour ||
+		cfg.LiteLLMPricing.Timeout != 7*time.Second {
+		t.Fatalf("unexpected LiteLLM pricing overrides: %+v", cfg.LiteLLMPricing)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected LiteLLM pricing config to validate, got %v", err)
+	}
+
+	cfg.LiteLLMPricing.SourceURL = "not-a-url"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "LITELLM_PRICING_SOURCE_URL") {
+		t.Fatalf("expected LiteLLM pricing URL validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.LiteLLMPricing.Interval = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "LITELLM_PRICING_INTERVAL_SECONDS") {
+		t.Fatalf("expected LiteLLM pricing interval validation failure, got %v", err)
 	}
 }
 

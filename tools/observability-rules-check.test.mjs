@@ -17,7 +17,7 @@ test("observability rules check passes for repository rules", () => {
 
 test("observability rules check is exposed through Makefile and quality gates", () => {
   const makefile = readFileSync("Makefile", "utf8");
-  const qualityGates = readFileSync("specs/QUALITY_GATES.md", "utf8");
+  const qualityGates = readFileSync("docs/requirements/QUALITY_GATES.md", "utf8");
   const devPs1 = readFileSync("tools/dev.ps1", "utf8");
 
   assert.match(makefile, /observability-rules-check:/);

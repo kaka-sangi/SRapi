@@ -16,6 +16,7 @@ type RetentionPolicy struct {
 	SchedulerFeedbacks     time.Duration
 	AuditLogs              time.Duration
 	AccountHealthSnapshots time.Duration
+	BatchLimit             int
 }
 
 type CleanupResult struct {
@@ -24,6 +25,7 @@ type CleanupResult struct {
 	SchedulerFeedbacks     int
 	AuditLogs              int
 	AccountHealthSnapshots int
+	Limited                bool
 }
 
 type RetentionStore interface {
@@ -36,6 +38,7 @@ type RetentionCutoffs struct {
 	SchedulerFeedbacks     *time.Time
 	AuditLogs              *time.Time
 	AccountHealthSnapshots *time.Time
+	BatchLimit             int
 }
 
 type SLOStatus string

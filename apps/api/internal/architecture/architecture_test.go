@@ -18,6 +18,12 @@ var allowedContractImports = map[string]map[string]bool{
 	"auth": {
 		"users": true,
 	},
+	"channel_monitors": {
+		"accounts":          true,
+		"models":            true,
+		"provider_adapters": true,
+		"providers":         true,
+	},
 	"models": {
 		"capabilities": true,
 	},
@@ -196,58 +202,81 @@ func TestCommandEntryPointOnlyImportsBootstrapPackages(t *testing.T) {
 }
 
 func TestAppBootstrapOnlyImportsBootstrapPackages(t *testing.T) {
-	path := filepath.Clean("../../internal/app/app.go")
-	imports, err := fileImports(path)
+	root := filepath.Clean("../../internal/app")
+	var paths []string
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		paths = append(paths, path)
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	allowed := map[string]bool{
-		"context":  true,
-		"errors":   true,
-		"fmt":      true,
-		"log/slog": true,
-		"net/http": true,
-		"time":     true,
-
-		"github.com/srapi/srapi/apps/api/internal/config":                                 true,
-		"github.com/srapi/srapi/apps/api/internal/httpserver":                             true,
-		"github.com/srapi/srapi/apps/api/internal/persistence/entstore":                   true,
-		"github.com/srapi/srapi/apps/api/internal/persistence/entstore/scheduler":         true,
-		"github.com/srapi/srapi/apps/api/internal/persistence/redisstore/realtime":        true,
-		"github.com/srapi/srapi/apps/api/internal/persistence/redisstore/scheduler":       true,
-		"github.com/srapi/srapi/apps/api/internal/persistence/redisstore/sessionaffinity": true,
-		"github.com/srapi/srapi/apps/api/internal/platform/db":                            true,
-		"github.com/srapi/srapi/apps/api/internal/platform/otel":                          true,
-		"github.com/srapi/srapi/apps/api/internal/platform/redis":                         true,
-		"github.com/srapi/srapi/apps/api/internal/workers/account_quota_alert":            true,
-		"github.com/srapi/srapi/apps/api/internal/workers/auth_session_cleanup":           true,
-		"github.com/srapi/srapi/apps/api/internal/workers/idempotency_cleanup":            true,
-		"github.com/srapi/srapi/apps/api/internal/workers/health_probe":                   true,
-		"github.com/srapi/srapi/apps/api/internal/workers/order_expirer":                  true,
-		"github.com/srapi/srapi/apps/api/internal/workers/outbox":                         true,
-		"github.com/srapi/srapi/apps/api/internal/workers/quality_eval":                   true,
-		"github.com/srapi/srapi/apps/api/internal/workers/retention":                      true,
-		"github.com/srapi/srapi/apps/api/internal/workers/slo_evaluator":                  true,
-		"github.com/srapi/srapi/apps/api/internal/workers/balance_charger":                true,
-		"github.com/srapi/srapi/apps/api/internal/workers/subscription_expirer":           true,
-		"github.com/srapi/srapi/apps/api/internal/workers/quota_refresh":                  true,
-		"github.com/srapi/srapi/apps/api/internal/workers/connectivity_test":              true,
-		"github.com/srapi/srapi/apps/api/internal/workers/scheduled_test":                 true,
-	}
-
 	var violations []string
-	for _, imported := range imports {
-		if strings.HasPrefix(imported, "github.com/srapi/srapi/apps/api/ent") {
-			violations = append(violations, path+": app bootstrap must not import Ent packages")
-			continue
+	for _, path := range paths {
+		imports, err := fileImports(path)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if strings.HasPrefix(imported, moduleImportPrefix) {
-			violations = append(violations, path+": app bootstrap must not import business modules, got "+imported)
-			continue
+
+		allowed := map[string]bool{
+			"context":  true,
+			"errors":   true,
+			"fmt":      true,
+			"log/slog": true,
+			"net/http": true,
+			"time":     true,
+
+			"github.com/srapi/srapi/apps/api/internal/config":                                 true,
+			"github.com/srapi/srapi/apps/api/internal/httpserver":                             true,
+			"github.com/srapi/srapi/apps/api/internal/persistence/entstore":                   true,
+			"github.com/srapi/srapi/apps/api/internal/persistence/entstore/scheduler":         true,
+			"github.com/srapi/srapi/apps/api/internal/persistence/redisstore/realtime":        true,
+			"github.com/srapi/srapi/apps/api/internal/persistence/redisstore/scheduler":       true,
+			"github.com/srapi/srapi/apps/api/internal/persistence/redisstore/sessionaffinity": true,
+			"github.com/srapi/srapi/apps/api/internal/platform/db":                            true,
+			"github.com/srapi/srapi/apps/api/internal/platform/leadergate":                    true,
+			"github.com/srapi/srapi/apps/api/internal/platform/otel":                          true,
+			"github.com/srapi/srapi/apps/api/internal/platform/redis":                         true,
+			"github.com/srapi/srapi/apps/api/internal/workers/account_quota_alert":            true,
+			"github.com/srapi/srapi/apps/api/internal/workers/auth_session_cleanup":           true,
+			"github.com/srapi/srapi/apps/api/internal/workers/availability_rollup":            true,
+			"github.com/srapi/srapi/apps/api/internal/workers/backup":                         true,
+			"github.com/srapi/srapi/apps/api/internal/workers/idempotency_cleanup":            true,
+			"github.com/srapi/srapi/apps/api/internal/workers/health_probe":                   true,
+			"github.com/srapi/srapi/apps/api/internal/workers/litellm_pricing":                true,
+			"github.com/srapi/srapi/apps/api/internal/workers/order_expirer":                  true,
+			"github.com/srapi/srapi/apps/api/internal/workers/outbox":                         true,
+			"github.com/srapi/srapi/apps/api/internal/workers/payment_reconcile":              true,
+			"github.com/srapi/srapi/apps/api/internal/workers/quality_eval":                   true,
+			"github.com/srapi/srapi/apps/api/internal/workers/retention":                      true,
+			"github.com/srapi/srapi/apps/api/internal/workers/slo_evaluator":                  true,
+			"github.com/srapi/srapi/apps/api/internal/workers/balance_charger":                true,
+			"github.com/srapi/srapi/apps/api/internal/workers/channel_monitor":                true,
+			"github.com/srapi/srapi/apps/api/internal/workers/subscription_expirer":           true,
+			"github.com/srapi/srapi/apps/api/internal/workers/quota_refresh":                  true,
+			"github.com/srapi/srapi/apps/api/internal/workers/connectivity_test":              true,
+			"github.com/srapi/srapi/apps/api/internal/workers/scheduled_test":                 true,
 		}
-		if strings.HasPrefix(imported, "github.com/srapi/srapi/apps/api/internal/") && !allowed[imported] {
-			violations = append(violations, path+": app bootstrap must not import internal packages outside bootstrap scope, got "+imported)
+
+		for _, imported := range imports {
+			if strings.HasPrefix(imported, "github.com/srapi/srapi/apps/api/ent") {
+				violations = append(violations, path+": app bootstrap must not import Ent packages")
+				continue
+			}
+			if strings.HasPrefix(imported, moduleImportPrefix) {
+				violations = append(violations, path+": app bootstrap must not import business modules, got "+imported)
+				continue
+			}
+			if strings.HasPrefix(imported, "github.com/srapi/srapi/apps/api/internal/") && !allowed[imported] {
+				violations = append(violations, path+": app bootstrap must not import internal packages outside bootstrap scope, got "+imported)
+			}
 		}
 	}
 	if len(violations) > 0 {

@@ -114,6 +114,9 @@ func (s *Service) Begin(ctx context.Context, key, method, path, requestHash stri
 	}
 	reacquired, err := s.store.Reacquire(ctx, input)
 	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return BeginResult{Outcome: OutcomeInFlight, Record: existing}, nil
+		}
 		return BeginResult{}, err
 	}
 	return BeginResult{Outcome: OutcomeProceed, Record: reacquired}, nil

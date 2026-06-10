@@ -14,7 +14,8 @@ import (
 )
 
 func main() {
-	healthcheck := flag.Bool("healthcheck", false, "check the local process liveness endpoint")
+	healthcheck := flag.Bool("healthcheck", false, "check the local process readiness endpoint")
+	healthcheckPath := flag.String("healthcheck-path", "/readyz", "HTTP path used by -healthcheck")
 	flag.Parse()
 
 	logger := platformlogger.New()
@@ -27,7 +28,7 @@ func main() {
 	if *healthcheck {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		if err := app.Healthcheck(ctx, cfg); err != nil {
+		if err := app.Healthcheck(ctx, cfg, *healthcheckPath); err != nil {
 			logger.Error("healthcheck failed", "error", err)
 			os.Exit(1)
 		}

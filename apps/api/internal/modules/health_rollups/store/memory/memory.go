@@ -75,3 +75,22 @@ func (s *Store) ListRollupsByAccount(ctx context.Context, accountID int, sinceDa
 	sort.Slice(out, func(i, j int) bool { return out[i].Date < out[j].Date })
 	return out, nil
 }
+
+func (s *Store) ListRollupsSince(ctx context.Context, sinceDate string) ([]contract.Rollup, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.Rollup, 0)
+	for _, rollup := range s.rollups {
+		if sinceDate != "" && rollup.Date < sinceDate {
+			continue
+		}
+		out = append(out, rollup)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Date != out[j].Date {
+			return out[i].Date < out[j].Date
+		}
+		return out[i].AccountID < out[j].AccountID
+	})
+	return out, nil
+}

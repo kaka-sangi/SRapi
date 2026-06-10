@@ -91,6 +91,9 @@ func (s *Store) MarkOutboxPublished(_ context.Context, id int, publishedAt time.
 	if !ok {
 		return contract.OutboxEvent{}, errors.New("outbox event not found")
 	}
+	if event.Status != contract.OutboxStatusPending && event.Status != contract.OutboxStatusFailed {
+		return contract.OutboxEvent{}, contract.ErrNotDispatchable
+	}
 	event.Status = contract.OutboxStatusPublished
 	event.PublishedAt = &publishedAt
 	event.NextRetryAt = nil
@@ -120,7 +123,15 @@ func (s *Store) CreateInbox(_ context.Context, input contract.InboxRecord) (cont
 	defer s.mu.Unlock()
 	key := input.EventID + ":" + input.ConsumerName
 	if id, ok := s.inboxByKey[key]; ok {
-		return cloneInbox(s.inboxByID[id]), false, nil
+		record := s.inboxByID[id]
+		if record.Status == contract.InboxStatusFailed {
+			record.Status = contract.InboxStatusPending
+			record.LastError = nil
+			record.ProcessedAt = nil
+			s.inboxByID[id] = record
+			return cloneInbox(record), true, nil
+		}
+		return cloneInbox(record), false, nil
 	}
 	record := input
 	record.ID = s.nextInboxID

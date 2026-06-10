@@ -35,52 +35,161 @@ func New(client *ent.Client) (*Store, error) {
 
 func (s *Store) Cleanup(ctx context.Context, cutoffs contract.RetentionCutoffs) (contract.CleanupResult, error) {
 	var result contract.CleanupResult
+	batchLimit := cutoffs.BatchLimit
+	if batchLimit <= 0 {
+		batchLimit = 1000
+	}
 	if cutoffs.UsageLogs != nil {
-		deleted, err := s.client.UsageLog.Delete().
-			Where(entusagelog.CreatedAtLT(*cutoffs.UsageLogs)).
-			Exec(ctx)
+		deleted, limited, err := cleanupUsageLogs(ctx, s.client, *cutoffs.UsageLogs, batchLimit)
 		if err != nil {
 			return contract.CleanupResult{}, err
 		}
 		result.UsageLogs = deleted
+		result.Limited = result.Limited || limited
 	}
 	if cutoffs.SchedulerFeedbacks != nil {
-		deleted, err := s.client.SchedulerFeedback.Delete().
-			Where(entschedulerfeedback.CreatedAtLT(*cutoffs.SchedulerFeedbacks)).
-			Exec(ctx)
+		deleted, limited, err := cleanupSchedulerFeedbacks(ctx, s.client, *cutoffs.SchedulerFeedbacks, batchLimit)
 		if err != nil {
 			return contract.CleanupResult{}, err
 		}
 		result.SchedulerFeedbacks = deleted
+		result.Limited = result.Limited || limited
 	}
 	if cutoffs.SchedulerDecisions != nil {
-		deleted, err := s.client.SchedulerDecision.Delete().
-			Where(entschedulerdecision.CreatedAtLT(*cutoffs.SchedulerDecisions)).
-			Exec(ctx)
+		deleted, limited, err := cleanupSchedulerDecisions(ctx, s.client, *cutoffs.SchedulerDecisions, batchLimit)
 		if err != nil {
 			return contract.CleanupResult{}, err
 		}
 		result.SchedulerDecisions = deleted
+		result.Limited = result.Limited || limited
 	}
 	if cutoffs.AuditLogs != nil {
-		deleted, err := s.client.AuditLog.Delete().
-			Where(entauditlog.CreatedAtLT(*cutoffs.AuditLogs)).
-			Exec(ctx)
+		deleted, limited, err := cleanupAuditLogs(ctx, s.client, *cutoffs.AuditLogs, batchLimit)
 		if err != nil {
 			return contract.CleanupResult{}, err
 		}
 		result.AuditLogs = deleted
+		result.Limited = result.Limited || limited
 	}
 	if cutoffs.AccountHealthSnapshots != nil {
-		deleted, err := s.client.AccountHealthSnapshot.Delete().
-			Where(entaccounthealthsnapshot.SnapshotAtLT(*cutoffs.AccountHealthSnapshots)).
-			Exec(ctx)
+		deleted, limited, err := cleanupAccountHealthSnapshots(ctx, s.client, *cutoffs.AccountHealthSnapshots, batchLimit)
 		if err != nil {
 			return contract.CleanupResult{}, err
 		}
 		result.AccountHealthSnapshots = deleted
+		result.Limited = result.Limited || limited
 	}
 	return result, nil
+}
+
+func cleanupUsageLogs(ctx context.Context, client *ent.Client, cutoff time.Time, batchLimit int) (int, bool, error) {
+	ids, err := client.UsageLog.Query().
+		Where(entusagelog.CreatedAtLT(cutoff)).
+		Order(entusagelog.ByID()).
+		Limit(batchLimit + 1).
+		IDs(ctx)
+	if err != nil {
+		return 0, false, err
+	}
+	limited := len(ids) > batchLimit
+	ids = capIDs(ids, batchLimit)
+	if len(ids) == 0 {
+		return 0, false, nil
+	}
+	deleted, err := client.UsageLog.Delete().
+		Where(entusagelog.IDIn(ids...)).
+		Exec(ctx)
+	return deleted, limited, err
+}
+
+func cleanupSchedulerFeedbacks(ctx context.Context, client *ent.Client, cutoff time.Time, batchLimit int) (int, bool, error) {
+	ids, err := client.SchedulerFeedback.Query().
+		Where(entschedulerfeedback.CreatedAtLT(cutoff)).
+		Order(entschedulerfeedback.ByID()).
+		Limit(batchLimit + 1).
+		IDs(ctx)
+	if err != nil {
+		return 0, false, err
+	}
+	limited := len(ids) > batchLimit
+	ids = capIDs(ids, batchLimit)
+	if len(ids) == 0 {
+		return 0, false, nil
+	}
+	deleted, err := client.SchedulerFeedback.Delete().
+		Where(entschedulerfeedback.IDIn(ids...)).
+		Exec(ctx)
+	return deleted, limited, err
+}
+
+func cleanupSchedulerDecisions(ctx context.Context, client *ent.Client, cutoff time.Time, batchLimit int) (int, bool, error) {
+	ids, err := client.SchedulerDecision.Query().
+		Where(entschedulerdecision.CreatedAtLT(cutoff)).
+		Order(entschedulerdecision.ByID()).
+		Limit(batchLimit + 1).
+		IDs(ctx)
+	if err != nil {
+		return 0, false, err
+	}
+	limited := len(ids) > batchLimit
+	ids = capIDs(ids, batchLimit)
+	if len(ids) == 0 {
+		return 0, false, nil
+	}
+	deleted, err := client.SchedulerDecision.Delete().
+		Where(entschedulerdecision.IDIn(ids...)).
+		Exec(ctx)
+	return deleted, limited, err
+}
+
+func cleanupAuditLogs(ctx context.Context, client *ent.Client, cutoff time.Time, batchLimit int) (int, bool, error) {
+	ids, err := client.AuditLog.Query().
+		Where(entauditlog.CreatedAtLT(cutoff)).
+		Order(entauditlog.ByID()).
+		Limit(batchLimit + 1).
+		IDs(ctx)
+	if err != nil {
+		return 0, false, err
+	}
+	limited := len(ids) > batchLimit
+	ids = capIDs(ids, batchLimit)
+	if len(ids) == 0 {
+		return 0, false, nil
+	}
+	deleted, err := client.AuditLog.Delete().
+		Where(entauditlog.IDIn(ids...)).
+		Exec(ctx)
+	return deleted, limited, err
+}
+
+func cleanupAccountHealthSnapshots(ctx context.Context, client *ent.Client, cutoff time.Time, batchLimit int) (int, bool, error) {
+	ids, err := client.AccountHealthSnapshot.Query().
+		Where(entaccounthealthsnapshot.SnapshotAtLT(cutoff)).
+		Order(entaccounthealthsnapshot.ByID()).
+		Limit(batchLimit + 1).
+		IDs(ctx)
+	if err != nil {
+		return 0, false, err
+	}
+	limited := len(ids) > batchLimit
+	ids = capIDs(ids, batchLimit)
+	if len(ids) == 0 {
+		return 0, false, nil
+	}
+	deleted, err := client.AccountHealthSnapshot.Delete().
+		Where(entaccounthealthsnapshot.IDIn(ids...)).
+		Exec(ctx)
+	return deleted, limited, err
+}
+
+func capIDs(ids []int, limit int) []int {
+	if limit <= 0 {
+		return nil
+	}
+	if len(ids) > limit {
+		return ids[:limit]
+	}
+	return ids
 }
 
 func (s *Store) CreateSLO(ctx context.Context, input contract.SLODefinition) (contract.SLODefinition, error) {

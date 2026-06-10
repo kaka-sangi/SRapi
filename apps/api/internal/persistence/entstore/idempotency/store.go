@@ -56,6 +56,8 @@ func (s *Store) Reacquire(ctx context.Context, input contract.BeginInput) (contr
 			entidem.IdempotencyKeyEQ(input.Key),
 			entidem.MethodEQ(input.Method),
 			entidem.PathEQ(input.Path),
+			entidem.StatusEQ(string(contract.StatusInProgress)),
+			entidem.LockedUntilLT(input.Now),
 		).
 		SetRequestHash(input.RequestHash).
 		SetStatus(string(contract.StatusInProgress)).

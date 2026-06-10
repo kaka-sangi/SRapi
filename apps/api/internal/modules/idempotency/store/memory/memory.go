@@ -53,6 +53,9 @@ func (s *Store) Reacquire(_ context.Context, input contract.BeginInput) (contrac
 	if !ok {
 		return contract.Record{}, contract.ErrNotFound
 	}
+	if record.Status != contract.StatusInProgress || record.LockedUntil == nil || !record.LockedUntil.Before(input.Now) {
+		return contract.Record{}, contract.ErrNotFound
+	}
 	lockedUntil := input.LockedUntil
 	record.RequestHash = input.RequestHash
 	record.Status = contract.StatusInProgress
