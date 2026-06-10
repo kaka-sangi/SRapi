@@ -1,5 +1,5 @@
 // English message catalog. Mirror every key in zh.ts (asserted by unit test).
-// Copy must follow docs/PRODUCT_TONE.md (§4 / §6).
+// Copy must follow docs/requirements/PRODUCT_TONE.md (§4 / §6).
 
 export const en = {
   common: {

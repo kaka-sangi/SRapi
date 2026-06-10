@@ -2,7 +2,7 @@
 
 > **历史文档 — 已被取代（Historical — superseded）。** 本文是 SRapi 最初的 MVP / 第一阶段实现级规格，记录了当年的范围裁剪与需求→测试契约。如今平台早已超出 MVP 阶段：多协议 Gateway、支付/订阅/邀请返利/账务台账、OAuth/OIDC + TOTP 双因子、完整的 Next.js 管理控制台与用户自助工作台、Copilot、Playground、调度内核与可观测性均已交付。本文仅作为设计渊源与原始验收契约保留——其中多数「暂缓 / 第一阶段 / 建议 / 骨架」描述已不再代表现状，请勿据此判断当前能力。
 >
-> **当前现状以下列文档为准（current status / authoritative sources）：** [`../specs/STATUS.md`](../specs/STATUS.md)（已完成工作包逐条台账）、[`ARCHITECTURE_REQUIREMENTS.md`](ARCHITECTURE_REQUIREMENTS.md)、[`../specs/WORK_PACKAGES.md`](../specs/WORK_PACKAGES.md)、以及 OpenAPI 契约 `packages/openapi/openapi.yaml`、各领域 `*_SPEC.md`。
+> **当前现状以下列文档为准（current status / authoritative sources）：** [`STATUS.md`](STATUS.md)（已完成工作包逐条台账）、[`ARCHITECTURE_REQUIREMENTS.md`](../../docs/requirements/ARCHITECTURE_REQUIREMENTS.md)、[`WORK_PACKAGES.md`](WORK_PACKAGES.md)、以及 OpenAPI 契约 `packages/openapi/openapi.yaml`、各领域 `*_SPEC.md`。
 >
 > 下文保留原始 MVP 范围与契约；其中仍然成立的工程门禁（不存 API Key 原文、凭证加密、Gateway 必产 decision/feedback/usage、契约即代码等）至今依旧适用，故未删除。已落地但原文仍以「暂缓 / 未来」呈现的条目，已就地标注。
 
@@ -10,7 +10,7 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 状态 | Historical — superseded（历史，已被取代；当前现状见 `../specs/STATUS.md` 与 `ARCHITECTURE_REQUIREMENTS.md`） |
+| 状态 | Historical — superseded（历史，已被取代；当前现状见 `STATUS.md` 与 `ARCHITECTURE_REQUIREMENTS.md`） |
 | 适用阶段 | MVP / Phase 1（历史范围；平台现已远超此阶段） |
 | 关联文档 | `MVP_IMPLEMENTATION_PLAN.md`, `ARCHITECTURE.md`, `MODULE_INTERFACE_CONTRACTS.md`, `DOMAIN_EVENTS_SPEC.md`, `OPENAPI_CONTRACT.md`, `AI_ENDPOINT_COMPATIBILITY.md`, `GATEWAY_ROUTE_MATRIX.md`, `DATA_MODEL.md`, `DOMAIN_MODEL.md`, `CAPABILITY_TAXONOMY_SPEC.md`, `SCHEDULING_KERNEL_DESIGN.md`, `SCHEDULER_STRATEGY_EXTENSION_SPEC.md`, `PROVIDER_ADAPTER_SPEC.md`, `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`, `REVERSE_PROXY_SPEC.md`, `SECURITY_MODEL.md`, `CONFIGURATION_SPEC.md`, `OPERATIONS.md`, `OBSERVABILITY_SPEC.md`, `PAYMENT_SPEC.md`, `AFFILIATE_REBATE_SPEC.md` |
 | 目标读者 | 后端、前端、测试、文档、AI 编码代理 |
@@ -31,7 +31,7 @@ API Key -> Client Endpoint Adapter -> Canonical AI Request -> Scheduler v1 -> Pr
 
 ### 3.1 必须包含
 
-> 历史范围。下列是 MVP 阶段的必含项，均已交付；当前平台的能力范围已远超此清单（见 §3.2 标注与 `../specs/STATUS.md`）。
+> 历史范围。下列是 MVP 阶段的必含项，均已交付；当前平台的能力范围已远超此清单（见 §3.2 标注与 `STATUS.md`）。
 
 - Monorepo 基础目录。
 - Go API 服务。
@@ -60,7 +60,7 @@ API Key -> Client Endpoint Adapter -> Canonical AI Request -> Scheduler v1 -> Pr
 
 ### 3.2 明确暂缓（历史；下列绝大多数现已交付）
 
-> 本节是 MVP 阶段「明确暂缓」的清单。截至 0.1.0 公开发布，下表中绝大多数条目已经落地并通过测试；仅在条目尾部以 **[已交付]** / **[Roadmap / 尚未实现]** 明确标注当前状态。当前能力以 `../specs/STATUS.md` 与 OpenAPI 契约为准。
+> 本节是 MVP 阶段「明确暂缓」的清单。截至 0.1.0 公开发布，下表中绝大多数条目已经落地并通过测试；仅在条目尾部以 **[已交付]** / **[Roadmap / 尚未实现]** 明确标注当前状态。当前能力以 `STATUS.md` 与 OpenAPI 契约为准。
 
 - 支付和外部支付 Webhook，详见 `PAYMENT_SPEC.md`。 **[已交付]** — Stripe / EasyPay / Alipay / WeChat 支付与退款均已上线；统一 Webhook 路由为 `POST /api/v1/webhooks/payments/{provider}`，代码位于 `apps/api/internal/modules/payments/providers/{checkout,stripe,easypay,alipay,wechat}`。
 - 邀请返利、提现和退款返利补偿，详见 `AFFILIATE_REBATE_SPEC.md`。 **[已交付]** — `apps/api/internal/modules/affiliate`；端点含 `GET /api/v1/me/affiliate`、`/api/v1/me/affiliate/ledger` 及 `AdminAffiliates` 管理端（邀请、返利、转账）。

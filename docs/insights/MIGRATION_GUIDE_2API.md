@@ -24,7 +24,7 @@ SRapi Gateway compatible endpoint
 - 不是把调用方传来的 `Authorization`、`Cookie` 或本地 CLI token 透传给上游。
 - 不是绕过 Scheduler 直接按 provider 名称选账号。
 
-权威定义见 `docs/2API_REVERSE_PROXY_DEFINITION.md` 和 `docs/REVERSE_PROXY_SPEC.md`。
+权威定义见 `../constraints/2API_REVERSE_PROXY_DEFINITION.md` 和 `../../specs/design/REVERSE_PROXY_SPEC.md`。
 
 ## 2. 概念映射
 

@@ -1,6 +1,6 @@
 # SRapi Final State
 
-> Status: this target architecture has been realized. The platform described below is shipped and route-registered today; for the full work-package ledger see `specs/STATUS.md`. The normative voice ("must", "the final runtime supports") is retained as the binding architectural contract that the implementation conforms to.
+> Status: this target architecture has been realized. The platform described below is shipped and route-registered today; for the full work-package ledger see `plans/STATUS.md`. The normative voice ("must", "the final runtime supports") is retained as the binding architectural contract that the implementation conforms to.
 
 ## 1. Product Definition
 
@@ -196,7 +196,7 @@ It includes:
 - settings and audit
 - self-service playground and an admin AI copilot
 
-Visual direction follows `docs/FRONTEND_DESIGN_SYSTEM.md`.
+Visual direction follows `../docs/requirements/FRONTEND_DESIGN_SYSTEM.md`.
 
 ## 3. Non-Negotiable Invariants
 

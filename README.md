@@ -9,7 +9,7 @@ endpoint — with built-in scheduling, quotas, billing, and audit logs.
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8.svg)](apps/api/go.mod)
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000.svg)](apps/web/package.json)
 [![OpenAPI](https://img.shields.io/badge/OpenAPI-332%20operations-6BA539.svg)](packages/openapi/openapi.yaml)
-[![Status](https://img.shields.io/badge/status-0.1.0%20release%20candidate-orange.svg)](specs/STATUS.md)
+[![Status](https://img.shields.io/badge/status-0.1.0%20release%20candidate-orange.svg)](specs/plans/STATUS.md)
 
 English · [简体中文](README.zh-CN.md)
 
@@ -158,8 +158,8 @@ SRapi/
 │   ├── openapi/             # OpenAPI contract (source of truth)
 │   └── sdk/typescript/      # Generated TypeScript SDK
 ├── deploy/                  # Docker Compose, Prometheus, Alertmanager, Tempo
-├── docs/                    # Architecture, specs, and operations docs
-├── specs/                   # Long-running development execution specs
+├── docs/                    # Development requirements, constraints, and insights
+├── specs/                   # Target final state (design specs) and development plans
 ├── examples/                # curl / TypeScript / Python gateway examples
 └── tools/                   # Codegen, checks, dev scripts
 ```
@@ -168,7 +168,7 @@ SRapi/
 Prometheus · OpenTelemetry · `go-oidc`. Frontend: Next.js 16 (App Router) · React 19 · TypeScript ·
 Tailwind CSS 4 · TanStack Query · the generated OpenAPI client.
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for module boundaries and dependency direction.
+See [`docs/requirements/ARCHITECTURE.md`](docs/requirements/ARCHITECTURE.md) for module boundaries and dependency direction.
 
 ## Quick start
 
@@ -194,8 +194,8 @@ docker compose -f deploy/docker-compose.yml up --build
 > **Behind a reverse proxy:** point the public front door at the **console on :3000**
 > (which forwards `/api` and `/v1` to the API), not at the API on :8080 — otherwise no
 > UI is served. See [`deploy/nginx.example.conf`](deploy/nginx.example.conf). To publish on a
-> custom origin, set `SRAPI_API_PROXY_TARGET` (it is baked into the web image at build time,
-> so rebuild the `web` image after changing it).
+> custom origin, set `SRAPI_API_PROXY_TARGET` on the running web container; the standalone image
+> reads it at runtime through the App Router proxy handlers.
 
 ### Option B — Local development
 
@@ -237,7 +237,7 @@ Runnable curl / TypeScript / Python examples live in [`examples/`](examples/READ
 ## Configuration
 
 SRapi is configured entirely through environment variables. [`.env.example`](.env.example) documents
-every key with safe local defaults; [`docs/CONFIGURATION_SPEC.md`](docs/CONFIGURATION_SPEC.md)
+every key with safe local defaults; [`docs/requirements/CONFIGURATION_SPEC.md`](docs/requirements/CONFIGURATION_SPEC.md)
 defines precedence and production constraints. Highlights:
 
 | Area | Keys (selected) |
@@ -260,14 +260,14 @@ The full index is [`docs/README.md`](docs/README.md). Start here:
 
 | If you want to… | Read |
 | --- | --- |
-| Understand the platform & roadmap | [`docs/PROJECT_DEVELOPMENT_PLAN.md`](docs/PROJECT_DEVELOPMENT_PLAN.md) |
-| Understand the backend architecture | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/MODULE_INTERFACE_CONTRACTS.md`](docs/MODULE_INTERFACE_CONTRACTS.md) |
-| Understand endpoint conversion | [`docs/AI_ENDPOINT_COMPATIBILITY.md`](docs/AI_ENDPOINT_COMPATIBILITY.md), [`docs/GATEWAY_ROUTE_MATRIX.md`](docs/GATEWAY_ROUTE_MATRIX.md) |
-| Understand the scheduler | [`docs/SCHEDULING_KERNEL_DESIGN.md`](docs/SCHEDULING_KERNEL_DESIGN.md), [`docs/SCHEDULER_V1_SPEC.md`](docs/SCHEDULER_V1_SPEC.md) |
-| Add or migrate upstream accounts | [`docs/REVERSE_PROXY_SPEC.md`](docs/REVERSE_PROXY_SPEC.md), [`docs/MIGRATION_GUIDE_2API.md`](docs/MIGRATION_GUIDE_2API.md) |
-| Deploy & operate | [`docs/OPERATIONS.md`](docs/OPERATIONS.md), [`docs/CONFIGURATION_SPEC.md`](docs/CONFIGURATION_SPEC.md), [`docs/OBSERVABILITY_SPEC.md`](docs/OBSERVABILITY_SPEC.md) |
-| Review the security model | [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md), [`SECURITY.md`](SECURITY.md) |
-| Integrate as a client | [`examples/README.md`](examples/README.md), [`docs/OPENAPI_CONTRACT.md`](docs/OPENAPI_CONTRACT.md) |
+| Understand the platform & roadmap | [`specs/plans/PROJECT_DEVELOPMENT_PLAN.md`](specs/plans/PROJECT_DEVELOPMENT_PLAN.md) |
+| Understand the backend architecture | [`docs/requirements/ARCHITECTURE.md`](docs/requirements/ARCHITECTURE.md), [`docs/requirements/MODULE_INTERFACE_CONTRACTS.md`](docs/requirements/MODULE_INTERFACE_CONTRACTS.md) |
+| Understand endpoint conversion | [`specs/design/AI_ENDPOINT_COMPATIBILITY.md`](specs/design/AI_ENDPOINT_COMPATIBILITY.md), [`specs/design/GATEWAY_ROUTE_MATRIX.md`](specs/design/GATEWAY_ROUTE_MATRIX.md) |
+| Understand the scheduler | [`specs/design/SCHEDULING_KERNEL_DESIGN.md`](specs/design/SCHEDULING_KERNEL_DESIGN.md), [`specs/design/SCHEDULER_V1_SPEC.md`](specs/design/SCHEDULER_V1_SPEC.md) |
+| Add or migrate upstream accounts | [`specs/design/REVERSE_PROXY_SPEC.md`](specs/design/REVERSE_PROXY_SPEC.md), [`docs/insights/MIGRATION_GUIDE_2API.md`](docs/insights/MIGRATION_GUIDE_2API.md) |
+| Deploy & operate | [`docs/requirements/OPERATIONS.md`](docs/requirements/OPERATIONS.md), [`docs/requirements/CONFIGURATION_SPEC.md`](docs/requirements/CONFIGURATION_SPEC.md), [`specs/design/OBSERVABILITY_SPEC.md`](specs/design/OBSERVABILITY_SPEC.md) |
+| Review the security model | [`docs/requirements/SECURITY_MODEL.md`](docs/requirements/SECURITY_MODEL.md), [`SECURITY.md`](SECURITY.md) |
+| Integrate as a client | [`examples/README.md`](examples/README.md), [`docs/requirements/OPENAPI_CONTRACT.md`](docs/requirements/OPENAPI_CONTRACT.md) |
 
 ## Development
 
@@ -303,7 +303,7 @@ SRapi is at **0.1.0 release-candidate** maturity. The gateway, scheduler, contro
 commerce surfaces are implemented and covered by tests and quality gates. Some integrations are
 opt-in and verified through credential-gated smoke tests (live payment providers, certain
 reverse-proxy upstreams) rather than continuous CI. The long-running development ledger and roadmap
-live in [`specs/`](specs/README.md) ([`STATUS.md`](specs/STATUS.md), [`ROADMAP.md`](specs/ROADMAP.md)).
+live in [`specs/`](specs/README.md) ([`STATUS.md`](specs/plans/STATUS.md), [`ROADMAP.md`](specs/plans/ROADMAP.md)).
 
 ## Security & compliance boundary
 
@@ -315,7 +315,7 @@ upstream provider's terms — and they bear the associated compliance and accoun
 
 Credentials are encrypted at rest and stored write-only (they are never returned by the API).
 Report vulnerabilities privately per [`SECURITY.md`](SECURITY.md); the threat model is in
-[`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md).
+[`docs/requirements/SECURITY_MODEL.md`](docs/requirements/SECURITY_MODEL.md).
 
 ## Contributing
 

@@ -2,8 +2,8 @@
 
 > This is SRapi's internal development execution ledger — the work-package backlog that drives
 > long-running implementation goals. It is engineering process, not product documentation. For the
-> product overview and getting started, see the root [`README.md`](../README.md); for current
-> progress see [`STATUS.md`](STATUS.md); for the documentation map see [`README.md`](README.md).
+> product overview and getting started, see the root [`README.md`](../../README.md); for current
+> progress see [`STATUS.md`](STATUS.md); for the documentation map see [`README.md`](../README.md).
 
 ## Package Format
 
@@ -48,10 +48,10 @@ Objective: audit the current implementation against the modular monolith rules a
 
 Read first:
 
-- `docs/ARCHITECTURE.md`
-- `docs/ARCHITECTURE_REQUIREMENTS.md`
-- `docs/MODULE_INTERFACE_CONTRACTS.md`
-- `specs/QUALITY_GATES.md`
+- `../../docs/requirements/ARCHITECTURE.md`
+- `../../docs/requirements/ARCHITECTURE_REQUIREMENTS.md`
+- `../../docs/requirements/MODULE_INTERFACE_CONTRACTS.md`
+- `../../docs/requirements/QUALITY_GATES.md`
 
 Owns:
 
@@ -78,9 +78,9 @@ Objective: make OpenAPI maintainable as the route surface grows.
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
 - `packages/openapi/openapi.yaml`
 
 Owns:
@@ -110,17 +110,17 @@ Objective: align Ent schemas, PostgreSQL migrations, and data model docs.
 
 Read first:
 
-- `docs/DATA_MODEL.md`
-- `docs/DOMAIN_MODEL.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/DOMAIN_EVENTS_SPEC.md`
+- `../../docs/requirements/DATA_MODEL.md`
+- `../../docs/requirements/DOMAIN_MODEL.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/DOMAIN_EVENTS_SPEC.md`
 
 Owns:
 
 - `apps/api/ent/schema`
 - `apps/api/migrations`
 - `apps/api/internal/persistence/entstore`
-- `docs/DATA_MODEL.md` when behavior changes
+- `../../docs/requirements/DATA_MODEL.md` when behavior changes
 
 Definition of Done:
 
@@ -142,9 +142,9 @@ Objective: make console auth and Gateway API key auth production-safe.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/MVP_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `MVP_SPEC.md`
 
 Owns:
 
@@ -173,10 +173,10 @@ Objective: extract Gateway logic from HTTP glue and introduce Canonical AI Reque
 
 Read first:
 
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/MODULE_INTERFACE_CONTRACTS.md`
-- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../../docs/requirements/MODULE_INTERFACE_CONTRACTS.md`
+- `../design/CAPABILITY_TAXONOMY_SPEC.md`
 
 Owns:
 
@@ -205,9 +205,9 @@ Objective: replace ad hoc capability names with canonical descriptors.
 
 Read first:
 
-- `docs/CAPABILITY_TAXONOMY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/SCHEDULER_V1_SPEC.md`
+- `../design/CAPABILITY_TAXONOMY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/SCHEDULER_V1_SPEC.md`
 
 Owns:
 
@@ -233,10 +233,10 @@ Objective: make OpenAI-compatible upstream dispatch robust enough for MVP.
 
 Read first:
 
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/SECURITY_MODEL.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
 
 Owns:
 
@@ -265,9 +265,9 @@ Objective: finish MVP endpoint conversion between Chat Completions, Responses, a
 
 Read first:
 
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
 
 Owns:
 
@@ -292,10 +292,10 @@ Objective: make Scheduler v1 auditable and safe under concurrency.
 
 Read first:
 
-- `docs/SCHEDULING_KERNEL_DESIGN.md`
-- `docs/SCHEDULER_V1_SPEC.md`
-- `docs/SCHEDULER_STRATEGY_EXTENSION_SPEC.md`
-- `docs/SCHEDULING_SCENARIOS.md`
+- `../design/SCHEDULING_KERNEL_DESIGN.md`
+- `../design/SCHEDULER_V1_SPEC.md`
+- `../design/SCHEDULER_STRATEGY_EXTENSION_SPEC.md`
+- `../design/SCHEDULING_SCENARIOS.md`
 
 Owns:
 
@@ -314,7 +314,7 @@ Definition of Done:
 Required gates:
 
 - `cd apps/api && go test ./internal/modules/scheduler/... ./internal/persistence/redisstore/scheduler/... ./internal/persistence/entstore/scheduler/...`
-- Scenario tests from `docs/SCHEDULING_SCENARIOS.md`.
+- Scenario tests from `../design/SCHEDULING_SCENARIOS.md`.
 
 ## WP-100: Usage, Billing, Audit, Outbox Closure
 
@@ -322,10 +322,10 @@ Objective: make every Gateway request produce durable operational evidence witho
 
 Read first:
 
-- `docs/DOMAIN_EVENTS_SPEC.md`
-- `docs/OBSERVABILITY_SPEC.md`
-- `docs/DATA_MODEL.md`
-- `docs/SECURITY_MODEL.md`
+- `../../docs/requirements/DOMAIN_EVENTS_SPEC.md`
+- `../design/OBSERVABILITY_SPEC.md`
+- `../../docs/requirements/DATA_MODEL.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
 
 Owns:
 
@@ -353,9 +353,9 @@ Objective: support compatible provider presets without creating adapter forks fo
 
 Read first:
 
-- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `../design/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
 
 Owns:
 
@@ -380,10 +380,10 @@ Objective: implement the safe base runtime for non-API-key accounts.
 
 Read first:
 
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/OBSERVABILITY_SPEC.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../design/OBSERVABILITY_SPEC.md`
 
 Owns:
 
@@ -412,9 +412,9 @@ Objective: support refreshable non-API-key credentials safely.
 
 Read first:
 
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/OPERATIONS.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPERATIONS.md`
 
 Owns:
 
@@ -440,10 +440,10 @@ Objective: add Codex/Claude/Gemini CLI-style runtime concepts without importing 
 
 Read first:
 
-- `specs/REFERENCE_PROJECT_DECISIONS.md`
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `../../docs/insights/REFERENCE_PROJECT_DECISIONS.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
 
 Owns:
 
@@ -469,10 +469,10 @@ Objective: expose the minimum operator view required to debug Gateway behavior.
 
 Read first:
 
-- `docs/OBSERVABILITY_SPEC.md`
-- `docs/SCHEDULER_V1_SPEC.md`
-- `docs/OPERATIONS.md`
-- `docs/OPENAPI_CONTRACT.md`
+- `../design/OBSERVABILITY_SPEC.md`
+- `../design/SCHEDULER_V1_SPEC.md`
+- `../../docs/requirements/OPERATIONS.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
 
 Owns:
 
@@ -499,9 +499,9 @@ Objective: create the actual console shell and first usable workflows.
 
 Read first:
 
-- `docs/FRONTEND_DESIGN_SYSTEM.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `specs/FINAL_STATE.md`
+- `../../docs/requirements/FRONTEND_DESIGN_SYSTEM.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../FINAL_STATE.md`
 
 Owns:
 
@@ -529,10 +529,10 @@ Objective: implement operator-grade account pool management inspired by sub2api.
 
 Read first:
 
-- `specs/REFERENCE_PROJECT_DECISIONS.md`
-- `docs/DOMAIN_MODEL.md`
-- `docs/OBSERVABILITY_SPEC.md`
-- `docs/REVERSE_PROXY_SPEC.md`
+- `../../docs/insights/REFERENCE_PROJECT_DECISIONS.md`
+- `../../docs/requirements/DOMAIN_MODEL.md`
+- `../design/OBSERVABILITY_SPEC.md`
+- `../design/REVERSE_PROXY_SPEC.md`
 
 Owns:
 
@@ -559,10 +559,10 @@ Objective: implement user entitlement, pricing rules, and subscription state bef
 
 Read first:
 
-- `docs/DOMAIN_MODEL.md`
-- `docs/DATA_MODEL.md`
-- `docs/PAYMENT_SPEC.md`
-- `docs/MVP_SPEC.md`
+- `../../docs/requirements/DOMAIN_MODEL.md`
+- `../../docs/requirements/DATA_MODEL.md`
+- `../design/PAYMENT_SPEC.md`
+- `MVP_SPEC.md`
 
 Owns:
 
@@ -588,10 +588,10 @@ Objective: implement payment orders and at least one provider integration path.
 
 Read first:
 
-- `docs/PAYMENT_SPEC.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/DOMAIN_EVENTS_SPEC.md`
-- `docs/OPERATIONS.md`
+- `../design/PAYMENT_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/DOMAIN_EVENTS_SPEC.md`
+- `../../docs/requirements/OPERATIONS.md`
 
 Owns:
 
@@ -620,9 +620,9 @@ Objective: implement invitation and rebate ledger after payment correctness exis
 
 Read first:
 
-- `docs/AFFILIATE_REBATE_SPEC.md`
-- `docs/PAYMENT_SPEC.md`
-- `docs/DOMAIN_EVENTS_SPEC.md`
+- `../design/AFFILIATE_REBATE_SPEC.md`
+- `../design/PAYMENT_SPEC.md`
+- `../../docs/requirements/DOMAIN_EVENTS_SPEC.md`
 
 Owns:
 
@@ -651,10 +651,10 @@ Objective: make self-hosted production operation safe.
 
 Read first:
 
-- `docs/OPERATIONS.md`
-- `docs/CONFIGURATION_SPEC.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/OBSERVABILITY_SPEC.md`
+- `../../docs/requirements/OPERATIONS.md`
+- `../../docs/requirements/CONFIGURATION_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../design/OBSERVABILITY_SPEC.md`
 
 Owns:
 
@@ -684,11 +684,11 @@ Objective: complete Anthropic-compatible upstream dispatch for the existing `/v1
 
 Read first:
 
-- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `../design/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/CAPABILITY_TAXONOMY_SPEC.md`
 
 Owns:
 
@@ -718,11 +718,11 @@ Objective: add the first Gemini-native Gateway route family while preserving the
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/CAPABILITY_TAXONOMY_SPEC.md`
 
 Owns:
 
@@ -757,10 +757,10 @@ Objective: allow scheduled Gemini-compatible and native-gemini Provider Accounts
 
 Read first:
 
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/CAPABILITY_TAXONOMY_SPEC.md`
 
 Owns:
 
@@ -794,11 +794,11 @@ Objective: let operators safely discover upstream model catalogs for Provider Ac
 
 Read first:
 
-- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
-- `docs/CAPABILITY_TAXONOMY_SPEC.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/ARCHITECTURE.md`
-- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `../design/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `../design/CAPABILITY_TAXONOMY_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/ARCHITECTURE.md`
+- `../../docs/requirements/MODULE_INTERFACE_CONTRACTS.md`
 
 Owns:
 
@@ -836,12 +836,12 @@ Objective: add the first durable operations control plane for SLO definitions, S
 
 Read first:
 
-- `docs/OBSERVABILITY_SPEC.md`
-- `docs/OPERATIONS.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/DATA_MODEL.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `../design/OBSERVABILITY_SPEC.md`
+- `../../docs/requirements/OPERATIONS.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DATA_MODEL.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/MODULE_INTERFACE_CONTRACTS.md`
 
 Owns:
 
@@ -889,11 +889,11 @@ Objective: add the first `/v1/embeddings` Gateway runtime so OpenAI-compatible e
 
 Read first:
 
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/MODULE_INTERFACE_CONTRACTS.md`
 
 Owns:
 
@@ -935,9 +935,9 @@ Objective: split the oversized HTTP runtime implementation into route-family fil
 
 Read first:
 
-- `docs/ARCHITECTURE.md`
-- `docs/ARCHITECTURE_REQUIREMENTS.md`
-- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `../../docs/requirements/ARCHITECTURE.md`
+- `../../docs/requirements/ARCHITECTURE_REQUIREMENTS.md`
+- `../../docs/requirements/MODULE_INTERFACE_CONTRACTS.md`
 - `apps/api/internal/httpserver`
 - `apps/api/internal/architecture`
 
@@ -969,10 +969,10 @@ Objective: add OpenAI-compatible image generation runtime through the standard G
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/gateway`
 - `apps/api/internal/modules/provider_adapters`
@@ -1017,10 +1017,10 @@ Objective: add an explicit code-quality harness so formatting, static checks, an
 
 Read first:
 
-- `docs/ARCHITECTURE.md`
-- `docs/ARCHITECTURE_REQUIREMENTS.md`
-- `docs/MODULE_INTERFACE_CONTRACTS.md`
-- `specs/QUALITY_GATES.md`
+- `../../docs/requirements/ARCHITECTURE.md`
+- `../../docs/requirements/ARCHITECTURE_REQUIREMENTS.md`
+- `../../docs/requirements/MODULE_INTERFACE_CONTRACTS.md`
+- `../../docs/requirements/QUALITY_GATES.md`
 - `Makefile`
 - `apps/api/internal/architecture`
 
@@ -1028,7 +1028,7 @@ Owns:
 
 - `Makefile`
 - `apps/api/internal/codequality`
-- `specs/QUALITY_GATES.md`
+- `../../docs/requirements/QUALITY_GATES.md`
 - architecture requirements/status updates
 
 Definition of Done:
@@ -1054,11 +1054,11 @@ Objective: add the first OpenAI-compatible moderation runtime so safety classifi
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/CAPABILITY_TAXONOMY_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/gateway`
 - `apps/api/internal/modules/provider_adapters`
@@ -1104,12 +1104,12 @@ Objective: add a provider-neutral rerank runtime so search/retrieval ranking req
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
-- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `../design/CAPABILITY_TAXONOMY_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/gateway`
 - `apps/api/internal/modules/provider_adapters`
@@ -1157,12 +1157,12 @@ Objective: add OpenAI-compatible audio transcription runtime so speech-to-text r
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
-- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `../design/CAPABILITY_TAXONOMY_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/gateway`
 - `apps/api/internal/modules/provider_adapters`
@@ -1208,12 +1208,12 @@ Objective: add OpenAI-compatible audio speech synthesis runtime so text-to-speec
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
-- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `../design/CAPABILITY_TAXONOMY_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/gateway`
 - `apps/api/internal/modules/provider_adapters`
@@ -1259,11 +1259,11 @@ Objective: make Antigravity a first-class backend reverse-proxy identity so oper
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/REVERSE_PROXY_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/REVERSE_PROXY_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/provider_adapters`
 - `apps/api/internal/modules/reverse_proxy`
@@ -1307,12 +1307,12 @@ Objective: promote Antigravity text provider aliases from the route matrix plann
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/REVERSE_PROXY_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/REVERSE_PROXY_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/providers/preset`
 - `apps/api/internal/modules/provider_adapters`
@@ -1358,12 +1358,12 @@ Objective: complete the Antigravity provider-prefixed Gateway alias surface for 
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/REVERSE_PROXY_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/REVERSE_PROXY_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/providers/preset`
 - `apps/api/internal/modules/provider_adapters`
@@ -1407,11 +1407,11 @@ Objective: expose the first backend WebSocket transport for Responses-compatible
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/SCHEDULING_KERNEL_DESIGN.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/SCHEDULING_KERNEL_DESIGN.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/httpserver`
 - `apps/api/internal/modules/gateway`
@@ -1455,10 +1455,10 @@ Objective: add the first Reverse Proxy Runtime primitive for direct upstream Web
 
 Read first:
 
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../../docs/requirements/MODULE_INTERFACE_CONTRACTS.md`
 - `apps/api/internal/modules/reverse_proxy/contract`
 - `apps/api/internal/modules/reverse_proxy/service`
 
@@ -1497,9 +1497,9 @@ Objective: make `reverse-proxy-codex-cli` construct the Codex official-client HT
 
 Read first:
 
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
 - `apps/api/internal/modules/provider_adapters/contract`
 - `apps/api/internal/modules/provider_adapters/service`
 - `apps/api/internal/modules/reverse_proxy/contract`
@@ -1539,11 +1539,11 @@ Objective: bind `/v1/responses/ws` to the Reverse Proxy Runtime WebSocket primit
 
 Read first:
 
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
 - `apps/api/internal/httpserver/runtime_gateway_websocket.go`
 - `apps/api/internal/modules/provider_adapters/contract`
 - `apps/api/internal/modules/provider_adapters/service`
@@ -1586,11 +1586,11 @@ Objective: expose `GET /v1/realtime` as an OpenAI-compatible Realtime WebSocket 
 
 Read first:
 
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/httpserver/runtime_gateway_websocket.go`
 - `apps/api/internal/modules/provider_adapters/contract`
@@ -1637,9 +1637,9 @@ Objective: make `reverse-proxy-claude-code-cli` construct the Claude Code offici
 
 Read first:
 
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
 - `apps/api/internal/modules/provider_adapters/contract`
 - `apps/api/internal/modules/provider_adapters/service`
 - `apps/api/internal/modules/reverse_proxy/contract`
@@ -1680,9 +1680,9 @@ Objective: make `reverse-proxy-chatgpt-web` construct the ChatGPT Web official-c
 
 Read first:
 
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
 - `apps/api/internal/modules/provider_adapters/contract`
 - `apps/api/internal/modules/provider_adapters/service`
 - `apps/api/internal/modules/reverse_proxy/contract`
@@ -1724,9 +1724,9 @@ Objective: make `reverse-proxy-chatgpt-web` obtain ChatGPT Web Sentinel chat req
 
 Read first:
 
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
 - `apps/api/internal/modules/provider_adapters/service/chatgpt_web.go`
 - `apps/api/internal/modules/reverse_proxy/contract`
 - local reference: `/home/senran/Desktop/chatgpt2api/services/openai_backend_api.py`
@@ -1766,11 +1766,11 @@ Objective: make `reverse-proxy-antigravity` construct the Antigravity / Google C
 
 Read first:
 
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
 - `apps/api/internal/modules/provider_adapters/contract`
 - `apps/api/internal/modules/provider_adapters/service`
 - `apps/api/internal/modules/reverse_proxy/contract`
@@ -1813,11 +1813,11 @@ Objective: make Responses WebSocket and future provider-native realtime adapters
 
 Read first:
 
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/requirements/MODULE_INTERFACE_CONTRACTS.md`
 - `apps/api/internal/httpserver/runtime_gateway_websocket.go`
 - `apps/api/internal/modules/reverse_proxy/contract`
 - `apps/api/internal/modules/provider_adapters/contract`
@@ -1857,10 +1857,10 @@ Objective: add OpenAI-compatible image edits through the standard Gateway auth, 
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - OpenAI official image edits API docs
 - `apps/api/internal/modules/gateway`
@@ -1906,10 +1906,10 @@ Objective: add OpenAI-compatible image variations through the standard Gateway a
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - OpenAI official image variations OpenAPI spec
 - `apps/api/internal/modules/gateway`
@@ -1955,10 +1955,10 @@ Objective: let operators discover Antigravity official-client upstream model cat
 
 Read first:
 
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/OPENAPI_CONTRACT.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
 - `/home/senran/Desktop/CLIProxyAPI/cmd/fetch_antigravity_models/main.go`
 - `apps/api/internal/httpserver/model_discovery.go`
 - `apps/api/internal/modules/reverse_proxy`
@@ -2004,10 +2004,10 @@ Objective: extend the existing OpenAI-compatible `/v1/images/edits` runtime so J
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `/home/senran/Desktop/chatgpt2api/test/test_v1_images_edits_json.py`
 - `/home/senran/Desktop/chatgpt2api/test/test_v1_images_edits_api.py`
@@ -2054,10 +2054,10 @@ Objective: add OpenAI-compatible image edit streaming events to the existing `/v
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `/home/senran/Desktop/chatgpt2api/test/test_v1_images_edits.py`
 - `/home/senran/Desktop/chatgpt2api/services/protocol/conversation.py`
@@ -2103,10 +2103,10 @@ Objective: let configured Antigravity 2api accounts discover their Cloud Code pr
 
 Read first:
 
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
 - `/home/senran/Desktop/CLIProxyAPI/internal/auth/antigravity/auth.go`
 - `/home/senran/Desktop/sub2api/backend/internal/pkg/antigravity/client.go`
 - `apps/api/internal/httpserver/model_discovery.go`
@@ -2146,9 +2146,9 @@ Objective: implement Gemini-compatible `GET /v1beta/models` model listing so Gem
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
 - `packages/openapi/openapi.yaml`
 - Gemini official `models.list` REST contract
 - `apps/api/internal/httpserver/runtime_gateway_handlers.go`
@@ -2193,10 +2193,10 @@ Objective: implement Gemini-compatible `POST /v1beta/models/{model}:countTokens`
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/CAPABILITY_TAXONOMY_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - Gemini official `models.countTokens` REST contract
 - `apps/api/internal/httpserver/runtime_gateway_handlers.go`
@@ -2243,11 +2243,11 @@ Objective: implement Anthropic-compatible `POST /v1/messages/count_tokens` so An
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/CAPABILITY_TAXONOMY_SPEC.md`
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/CAPABILITY_TAXONOMY_SPEC.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
 - `packages/openapi/openapi.yaml`
 - Anthropic official Messages Count Tokens API contract
 - `apps/api/internal/httpserver/runtime_gateway_handlers.go`
@@ -2294,11 +2294,11 @@ Objective: expose a safe AdminOps read API for current realtime WebSocket slots 
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/OBSERVABILITY_SPEC.md`
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/OBSERVABILITY_SPEC.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/REVERSE_PROXY_SPEC.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/realtime/contract`
 - `apps/api/internal/modules/realtime/service`
@@ -2343,18 +2343,18 @@ Objective: add the first public integration examples and migration guides so ope
 Read first:
 
 - `README.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `specs/FINAL_STATE.md`
-- `specs/QUALITY_GATES.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
+- `../FINAL_STATE.md`
+- `../../docs/requirements/QUALITY_GATES.md`
 - `packages/sdk/typescript/src`
 - `tools/smoke-local.mjs`
 
 Owns:
 
 - `examples/` developer-facing examples for curl, TypeScript SDK, and Python requests.
-- `docs/MIGRATION_GUIDE_2API.md` for sub2api / CLIProxyAPI / chatgpt2api style deployment migration.
+- `../../docs/insights/MIGRATION_GUIDE_2API.md` for sub2api / CLIProxyAPI / chatgpt2api style deployment migration.
 - README and docs index links to the examples and migration guide.
 - A lightweight examples quality harness that checks examples for route drift, required environment variables, and forbidden real-secret placeholders.
 - Specs status and work package ledger updates.
@@ -2380,11 +2380,11 @@ Objective: make realtime WebSocket slot lifecycle enforceable across API nodes b
 
 Read first:
 
-- `docs/ARCHITECTURE.md`
-- `docs/MODULE_INTERFACE_CONTRACTS.md`
-- `docs/OBSERVABILITY_SPEC.md`
-- `docs/CONFIGURATION_SPEC.md`
-- `docs/REVERSE_PROXY_SPEC.md`
+- `../../docs/requirements/ARCHITECTURE.md`
+- `../../docs/requirements/MODULE_INTERFACE_CONTRACTS.md`
+- `../design/OBSERVABILITY_SPEC.md`
+- `../../docs/requirements/CONFIGURATION_SPEC.md`
+- `../design/REVERSE_PROXY_SPEC.md`
 - `apps/api/internal/modules/realtime/contract`
 - `apps/api/internal/modules/realtime/service`
 - `apps/api/internal/httpserver/runtime_gateway_websocket.go`
@@ -2433,8 +2433,8 @@ Objective: make Codex 2api account onboarding match the sub2api-style operator f
 
 Read first:
 
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `docs/MIGRATION_GUIDE_2API.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
+- `../../docs/insights/MIGRATION_GUIDE_2API.md`
 - `apps/api/internal/modules/accounts/service`
 - `apps/api/internal/modules/reverse_proxy/service`
 - `apps/api/internal/modules/provider_adapters/service/codex.go`
@@ -2474,9 +2474,9 @@ Objective: extend the refresh-token-only onboarding pattern from Codex to Claude
 
 Read first:
 
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `docs/MIGRATION_GUIDE_2API.md`
-- `docs/REVERSE_PROXY_SPEC.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
+- `../../docs/insights/MIGRATION_GUIDE_2API.md`
+- `../design/REVERSE_PROXY_SPEC.md`
 - `apps/api/internal/modules/reverse_proxy/service`
 - `apps/api/internal/modules/provider_adapters/service/claude_code.go`
 - `apps/api/internal/httpserver/runtime_admin_catalog_handlers.go`
@@ -2512,9 +2512,9 @@ Objective: extend the refresh-token-only onboarding pattern to Antigravity 2api 
 
 Read first:
 
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `docs/MIGRATION_GUIDE_2API.md`
-- `docs/REVERSE_PROXY_SPEC.md`
+- `../../docs/constraints/2API_REVERSE_PROXY_DEFINITION.md`
+- `../../docs/insights/MIGRATION_GUIDE_2API.md`
+- `../design/REVERSE_PROXY_SPEC.md`
 - `apps/api/internal/modules/reverse_proxy/service`
 - `apps/api/internal/modules/provider_adapters/service/antigravity.go`
 - `apps/api/internal/httpserver/runtime_admin_catalog_handlers.go`
@@ -2550,10 +2550,10 @@ Objective: close the official API-key Realtime gap for trusted server-side `/v1/
 
 Read first:
 
-- `docs/AI_ENDPOINT_COMPATIBILITY.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/REVERSE_PROXY_SPEC.md`
+- `../design/AI_ENDPOINT_COMPATIBILITY.md`
+- `../design/GATEWAY_ROUTE_MATRIX.md`
+- `../design/PROVIDER_ADAPTER_SPEC.md`
+- `../design/REVERSE_PROXY_SPEC.md`
 - official OpenAI Realtime WebSocket docs: `https://developers.openai.com/api/docs/guides/realtime-websocket`
 - `apps/api/internal/httpserver/runtime_gateway_websocket.go`
 - `apps/api/internal/modules/provider_adapters/service/realtime.go`
@@ -2596,12 +2596,12 @@ logging.
 
 Read first:
 
-- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/OBSERVABILITY_SPEC.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/DATA_MODEL.md`
-- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `../design/ADMIN_CONTROL_PLANE_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/OBSERVABILITY_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/DATA_MODEL.md`
+- `../../docs/requirements/MODULE_INTERFACE_CONTRACTS.md`
 - `packages/openapi/openapi.yaml`
 - `/home/senran/Desktop/sub2api` for capability analysis only; do not copy code
   or reproduce its service shape.
@@ -2636,7 +2636,7 @@ Definition of Done:
   settings, and typed system settings are managed through module contracts.
 - All write routes require CSRF and record safe audit logs.
 - Financial fields use decimal strings and currency, not float.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -2657,11 +2657,11 @@ and into a durable, queryable, bounded-cleanup store.
 
 Read first:
 
-- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/DATA_MODEL.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `../design/ADMIN_CONTROL_PLANE_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DATA_MODEL.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/MODULE_INTERFACE_CONTRACTS.md`
 - `packages/openapi/openapi.yaml`
 
 Owns:
@@ -2687,7 +2687,7 @@ Definition of Done:
   and records audit evidence without raw search strings or log bodies.
 - Admin Control Plane and data-model docs no longer describe durable system
   logs as pending.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -2711,8 +2711,8 @@ sub2api's username/avatar/notify-email shape.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/users/contract/contract.go`
 - `apps/api/internal/httpserver/runtime_user_handlers.go`
@@ -2739,7 +2739,7 @@ Definition of Done:
 - Email change, avatar URL, notification email, and auth identity binding remain
   explicit follow-ups because they need verification, dedicated schema, or OAuth
   provider flows.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -2761,8 +2761,8 @@ session, CSRF, users service, hashed session store, and audit boundaries.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/users/contract/contract.go`
 - `apps/api/internal/modules/auth/contract/contract.go`
@@ -2792,7 +2792,7 @@ Definition of Done:
   sessions for the user, and clears the current cookie.
 - Persistent auth sessions are revoked by `user_id` using existing indexed
   `auth_sessions` fields; no new migration is required.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -2813,9 +2813,9 @@ copying sub2api frontend or storage internals.
 
 Read first:
 
-- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/DATA_MODEL.md`
+- `../design/ADMIN_CONTROL_PLANE_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DATA_MODEL.md`
 - `packages/openapi/openapi.yaml`
 
 Owns:
@@ -2839,7 +2839,7 @@ Definition of Done:
 - Mark-read requires CSRF and returns 404 for invisible announcements.
 - Data-model and control-plane docs no longer describe announcement read
   receipts as pending.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -2862,10 +2862,10 @@ route internals.
 
 Read first:
 
-- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/DATA_MODEL.md`
-- `docs/PAYMENT_SPEC.md`
+- `../design/ADMIN_CONTROL_PLANE_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DATA_MODEL.md`
+- `../design/PAYMENT_SPEC.md`
 - `packages/openapi/openapi.yaml`
 
 Owns:
@@ -2897,7 +2897,7 @@ Definition of Done:
   the plaintext code.
 - Data-model, OpenAPI, and control-plane docs no longer describe user redeem
   flow as pending.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -2920,10 +2920,10 @@ creation without copying sub2api order or coupon internals.
 
 Read first:
 
-- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/DATA_MODEL.md`
-- `docs/PAYMENT_SPEC.md`
+- `../design/ADMIN_CONTROL_PLANE_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DATA_MODEL.md`
+- `../design/PAYMENT_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/payments/contract/contract.go`
 - `apps/api/internal/modules/admin_control/contract/contract.go`
@@ -2955,7 +2955,7 @@ Definition of Done:
   `used_count` twice.
 - Data-model, OpenAPI, payment, and control-plane docs no longer describe promo
   application as pending.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -2978,10 +2978,10 @@ or storage internals.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/CONFIGURATION_SPEC.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/DATA_MODEL.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/CONFIGURATION_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DATA_MODEL.md`
 - `packages/openapi/openapi.yaml`
 
 Owns:
@@ -3006,7 +3006,7 @@ Definition of Done:
   recovery codes beyond the enable response.
 - `TOTP_ENCRYPTION_KEY` is documented and release validation rejects weak
   values.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3029,8 +3029,8 @@ copying sub2api auth routes or storage internals.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/users/contract/contract.go`
 - `apps/api/internal/modules/auth/contract/contract.go`
@@ -3065,7 +3065,7 @@ Definition of Done:
   or CSRF token.
 - Email verification and password reset remain explicit follow-ups until SRapi
   has mail/outbox delivery and hash-stored one-time token infrastructure.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3089,11 +3089,11 @@ exists.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/DATA_MODEL.md`
-- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
-- `docs/CONFIGURATION_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DATA_MODEL.md`
+- `../design/ADMIN_CONTROL_PLANE_SPEC.md`
+- `../../docs/requirements/CONFIGURATION_SPEC.md`
 - `apps/api/internal/workers/outbox`
 - `apps/api/internal/modules/auth/service/password_reset.go`
 - `apps/api/internal/modules/auth/service/email_verification.go`
@@ -3142,7 +3142,7 @@ Definition of Done:
 - Broader user notification preferences, unsubscribe links, balance/subscription
   notifications, template preview/restore APIs, avatar storage, and OAuth
   identity onboarding remain separate follow-up packages.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3164,10 +3164,10 @@ state by recipient email hash and keeps transactional auth mail non-suppressible
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/DATA_MODEL.md`
-- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DATA_MODEL.md`
+- `../design/ADMIN_CONTROL_PLANE_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/notifications/contract/contract.go`
 - `apps/api/internal/modules/notifications/service`
@@ -3202,7 +3202,7 @@ Definition of Done:
 - Balance/subscription/account-quota triggers, template preview/restore APIs,
   avatar storage, OAuth identity binding/onboarding, and credential-gated SMTP
   smoke remain separate follow-up packages.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3227,9 +3227,9 @@ current key contract.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/ADMIN_CONTROL_PLANE_SPEC.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/notifications/contract/contract.go`
 - `apps/api/internal/modules/notifications/service`
@@ -3271,7 +3271,7 @@ Definition of Done:
 - Balance/subscription/account-quota trigger scheduling, current-user
   preference management, avatar storage, OAuth identity binding/onboarding, and
   credential-gated SMTP smoke remain separate follow-up packages.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3296,9 +3296,9 @@ optional email with one-click unsubscribe support.
 
 Read first:
 
-- `docs/DOMAIN_EVENTS_SPEC.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DOMAIN_EVENTS_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
 - `apps/api/internal/workers/subscription_expirer/worker.go`
 - `apps/api/internal/modules/subscriptions/service/service.go`
 - `apps/api/internal/modules/notifications/service/service.go`
@@ -3335,7 +3335,7 @@ Definition of Done:
   state.
 - Avatar storage, OAuth identity binding/onboarding, and credential-gated SMTP
   smoke remain separate follow-up packages.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3360,9 +3360,9 @@ retry, and deliver optional admin email.
 
 Read first:
 
-- `docs/DOMAIN_EVENTS_SPEC.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DOMAIN_EVENTS_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
 - `apps/api/internal/workers/account_quota_alert/worker.go`
 - `apps/api/internal/modules/notifications/service/service.go`
 - `apps/api/internal/modules/accounts/contract/contract.go`
@@ -3402,7 +3402,7 @@ Definition of Done:
   state or gateway request outcomes.
 - Avatar storage, OAuth identity binding/onboarding, and credential-gated SMTP
   smoke remain separate follow-up packages.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3426,9 +3426,9 @@ enabled contacts in optional notification delivery.
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/DOMAIN_EVENTS_SPEC.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/DOMAIN_EVENTS_SPEC.md`
 - `apps/api/internal/modules/notifications/service/contacts.go`
 - `apps/api/internal/modules/notifications/service/service.go`
 - `apps/api/internal/httpserver/runtime_notification_handlers.go`
@@ -3466,7 +3466,7 @@ Definition of Done:
   API key, provider credential, or prompt.
 - Avatar storage, OAuth identity binding/onboarding, and credential-gated SMTP
   smoke remain separate follow-up packages.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3490,9 +3490,9 @@ SRapi-owned PNG, and serves it through a controlled API.
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/DATA_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/DATA_MODEL.md`
 - `apps/api/internal/modules/users/service/avatar.go`
 - `apps/api/internal/httpserver/runtime_user_handlers.go`
 
@@ -3523,7 +3523,7 @@ Definition of Done:
 - Objectstore/CDN-backed avatar storage remains a future promotion path if
   avatar traffic or storage volume exceeds the low-frequency settings-backed
   v1 design.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3547,9 +3547,9 @@ identity foundation that future OAuth/OIDC callbacks can write to safely.
 
 Read first:
 
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/DATA_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/DATA_MODEL.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/users/contract/contract.go`
 - `apps/api/internal/persistence/entstore/users/store.go`
@@ -3586,7 +3586,7 @@ Definition of Done:
 - OAuth/OIDC start/callback, pending decision sessions, profile adoption, and
   external identity bind mutation APIs remain follow-up packages built on this
   directory.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3612,9 +3612,9 @@ consume safely.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/DATA_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/DATA_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
 - `apps/api/internal/modules/auth/contract/contract.go`
 - `apps/api/internal/persistence/entstore/auth/store.go`
 - `apps/api/ent/schema/userauthidentity.go`
@@ -3649,7 +3649,7 @@ Definition of Done:
 - No public OAuth/OIDC OpenAPI route is exposed in this package; provider
   start/callback, profile adoption, bind-current-user, and create-account routes
   remain follow-up packages built on this foundation.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3671,9 +3671,9 @@ exchange/profile adoption for the next package.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/CONFIGURATION_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/CONFIGURATION_SPEC.md`
 - `apps/api/internal/modules/auth/service/pending_oauth.go`
 - `apps/api/internal/modules/users/contract/contract.go`
 - `packages/openapi/openapi.yaml`
@@ -3709,7 +3709,7 @@ Definition of Done:
 - Callback token exchange, ID token validation, profile normalization, pending
   decision session creation, bind-current-user, create-account, and
   bind-existing-login flows remain follow-up packages.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3735,9 +3735,9 @@ provider subject hashes.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/CONFIGURATION_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/CONFIGURATION_SPEC.md`
 - `apps/api/internal/httpserver/runtime_oauth_handlers.go`
 - `apps/api/internal/modules/auth/service/pending_oauth.go`
 - `packages/openapi/openapi.yaml`
@@ -3778,7 +3778,7 @@ Definition of Done:
 - Confidential-client secret handling, ID token signature/nonce validation,
   pending decision exchange, create-account, bind-existing-login, and
   bind-current-user mutation APIs remain follow-up packages.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3803,8 +3803,8 @@ authenticated bind flow without consuming the pending token.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
 - `apps/api/internal/httpserver/runtime_oauth_handlers.go`
 - `apps/api/internal/modules/auth/service/pending_oauth.go`
 - `apps/api/internal/persistence/entstore/auth/store.go`
@@ -3834,7 +3834,7 @@ Definition of Done:
 - Existing active-account detection is limited to a next-step decision and a
   boolean continuation hint; final account creation/binding remains a follow-up
   mutation package.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -3859,9 +3859,9 @@ user.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/DATA_MODEL.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DATA_MODEL.md`
 - `apps/api/internal/modules/users/contract/contract.go`
 - `apps/api/internal/modules/users/service/service.go`
 - `apps/api/internal/modules/auth/service/pending_oauth.go`
@@ -3902,7 +3902,7 @@ Definition of Done:
   session cookie, CSRF token, API key material, or full upstream claims.
 - Create-account, bind-existing-login with password/2FA, email completion, and
   verification-code pending flows remain separate follow-up mutation packages.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -4656,8 +4656,8 @@ identity and issuing a normal console session cookie.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
 - `apps/api/internal/modules/auth/service/pending_oauth.go`
 - `apps/api/internal/modules/users/service/service.go`
 - `apps/api/internal/httpserver/runtime_oauth_handlers.go`
@@ -4697,7 +4697,7 @@ Definition of Done:
   claims.
 - Create-account, email completion, send-verify-code, and profile adoption
   remain separate follow-up mutation packages.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -4723,9 +4723,9 @@ and deliver the optional email.
 
 Read first:
 
-- `docs/DOMAIN_EVENTS_SPEC.md`
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DOMAIN_EVENTS_SPEC.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
 - `apps/api/internal/workers/balance_charger/worker.go`
 - `apps/api/internal/modules/notifications/service/service.go`
 - `apps/api/internal/workers/outbox/domain_handler.go`
@@ -4762,7 +4762,7 @@ Definition of Done:
   charging.
 - Avatar storage, OAuth identity binding/onboarding, and credential-gated SMTP
   smoke remain separate follow-up packages.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -4787,8 +4787,8 @@ separate verified-contact flow.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/notifications/service/preferences.go`
 - `apps/api/internal/httpserver/runtime_notification_handlers.go`
@@ -4820,7 +4820,7 @@ Definition of Done:
 - Extra notification email addresses, notification triggers, avatar storage,
   OAuth identity binding/onboarding, and credential-gated SMTP smoke remain
   separate follow-up packages.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -4845,9 +4845,9 @@ verification as proof of email ownership rather than login.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/DATA_MODEL.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DATA_MODEL.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/auth/contract/contract.go`
 - `apps/api/internal/modules/users/contract/contract.go`
@@ -4882,7 +4882,7 @@ Definition of Done:
 - Confirming email ownership does not create or revoke console sessions.
 - Notification email management, avatar storage, and OAuth identity binding
   remain separate follow-up flows.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -4907,9 +4907,9 @@ the existing domain-event outbox boundary.
 
 Read first:
 
-- `docs/SECURITY_MODEL.md`
-- `docs/OPENAPI_CONTRACT.md`
-- `docs/DATA_MODEL.md`
+- `../../docs/requirements/SECURITY_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../../docs/requirements/DATA_MODEL.md`
 - `packages/openapi/openapi.yaml`
 - `apps/api/internal/modules/auth/contract/contract.go`
 - `apps/api/internal/modules/users/contract/contract.go`
@@ -4943,7 +4943,7 @@ Definition of Done:
   rejects token reuse.
 - Email verification, notification email management, avatar storage, and OAuth
   identity binding remain separate follow-up flows.
-- `specs/STATUS.md` records completion and gates.
+- `STATUS.md` records completion and gates.
 
 Required gates:
 
@@ -4969,9 +4969,9 @@ bug. Close the reachability + correctness gaps; no backend changes.
 
 Read first:
 
-- `docs/FRONTEND_ARCHITECTURE.md`
-- `docs/FRONTEND_DESIGN_SYSTEM.md`
-- `docs/PRODUCT_TONE.md`
+- `../../docs/requirements/FRONTEND_ARCHITECTURE.md`
+- `../../docs/requirements/FRONTEND_DESIGN_SYSTEM.md`
+- `../../docs/requirements/PRODUCT_TONE.md`
 
 Owned modules:
 
@@ -4988,14 +4988,14 @@ Definition of done (slice 1 — completed):
 - Each mutation shows loading + success/error feedback; destructive/bulk actions confirm; list queries invalidate after success.
 - Backend capabilities are exposed in the UI wherever a hook + endpoint already exist (account lifecycle/diagnostics actions, redeem stats, admin dashboard snapshot, payment providers, usage aggregates).
 - `apps/web` typecheck + lint + i18n-parity unit test pass; en/zh catalogs stay aligned.
-- `docs/FRONTEND_ARCHITECTURE.md` reflects the current code.
+- `../../docs/requirements/FRONTEND_ARCHITECTURE.md` reflects the current code.
 
 Slice 2 (completed):
 
 - Ops SLO create/edit dialog; models list pagination/filter/search; partial-refund remaining-amount cap; scheduler strategy-replay extra inputs + richer result rendering; pricing-rule bulk-import dialog; account detail drawer (health/quota/rpm/proxy-quality); status-badge enum→label i18n across all badges.
 - Group member management (completed — the one WP-1310 item that needed a backend change): added `GET /api/v1/admin/account-groups/{id}/accounts` (`listAdminAccountGroupMembers`) OpenAPI-first — op + `AccountGroupMemberListResponse` schema + handler + route, reusing the existing `accounts.ListGroupMembers` service/store (no schema/migration change) — regenerated Go + TS SDKs, added the `TestAdminListAccountGroupMembers` HTTP regression, and wired a frontend Manage-members dialog (list/add/remove) on the groups page.
 
-Remaining (tracked in `specs/STATUS.md`):
+Remaining (tracked in `STATUS.md`):
 
 - Browser verification (desktop + mobile) per the Frontend quality gate — the only remaining item.
 
@@ -5005,4 +5005,4 @@ Required gates:
 - `cd apps/web && npm run lint`
 - `cd apps/web && npx vitest run tests/unit/messages.test.ts`
 - For the group-members backend endpoint: `make openapi-lint`, `make openapi-codegen-check`, `make openapi-ts-codegen-check`, `make sdk-ts-typecheck`, and `cd apps/api && go test ./internal/httpserver -run TestAdminListAccountGroupMembers`.
-- Browser verification for substantial UI work (desktop + mobile screenshots), per `specs/QUALITY_GATES.md` §9.
+- Browser verification for substantial UI work (desktop + mobile screenshots), per `../../docs/requirements/QUALITY_GATES.md` §9.

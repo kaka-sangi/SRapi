@@ -38,3 +38,6 @@ func (ProviderAccount) Indexes() []ent.Index {
 		index.Fields("status", "priority"),
 	}
 }
+
+// Scale trigger: when active provider accounts exceed 5,000, promote hot
+// scheduling metadata keys into typed indexed columns. See docs/constraints/CAPABILITY_BOUNDARIES.md.

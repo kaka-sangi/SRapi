@@ -1,6 +1,6 @@
 # SRapi 前端设计系统与视觉工程规范
 
-> 本文件只规定**视觉**。文案语气与中英文术语表统一在 [`docs/PRODUCT_TONE.md`](./PRODUCT_TONE.md)。任何 UI 改动同时遵守这两份规范。
+> 本文件只规定**视觉**。文案语气与中英文术语表统一在 [`PRODUCT_TONE.md`](./PRODUCT_TONE.md)。任何 UI 改动同时遵守这两份规范。
 
 ## 1. 设计哲学 (Academic Editorial & Cards)
 
@@ -21,7 +21,7 @@ SRapi 的视觉风格定义为 **“学术期刊/社论感 (Anthropic Claude)”
 
 设计系统提供两套核心主题：**温润纸张 (Warm Light)** 与 **深邃墨水 (Ink Dark)**。
 
-> **唯一事实来源：[`apps/web/src/app/globals.css`](../apps/web/src/app/globals.css) 的 `@theme` / `.dark` 块。** 下表与该文件 1:1 同步（截至 0.1.0）；若两者出现差异，以 `globals.css` 为准并回填本表。组件中不得散落硬编码颜色，一律引用 `--color-srapi-*` 变量（见 §9.5）。
+> **唯一事实来源：[`apps/web/src/app/globals.css`](../../apps/web/src/app/globals.css) 的 `@theme` / `.dark` 块。** 下表与该文件 1:1 同步（截至 0.1.0）；若两者出现差异，以 `globals.css` 为准并回填本表。组件中不得散落硬编码颜色，一律引用 `--color-srapi-*` 变量（见 §9.5）。
 
 ### 2.1 温润纸张 (Warm Light)
 

@@ -15,7 +15,7 @@ Review every implementation change against these standards:
 - Stable evolution: changes are small, reversible, and protected by behavior checks.
 - Consistency: error handling, dependency injection, API shapes, tests, and layout follow existing project patterns.
 
-Run for every implementation package unless explicitly skipped with a reason in `specs/STATUS.md`:
+Run for every implementation package unless explicitly skipped with a reason in `../../specs/plans/STATUS.md`:
 
 ```bash
 git status --short
@@ -65,7 +65,7 @@ cd apps/api && go test ./internal/persistence/entstore/... ./internal/platform/d
 
 Rules:
 
-- Ent schema, migrations, and `docs/DATA_MODEL.md` must agree.
+- Ent schema, migrations, and `DATA_MODEL.md` must agree.
 - PostgreSQL is source of truth.
 - Redis must remain rebuildable.
 - Secrets are encrypted or hashed.
@@ -121,7 +121,7 @@ Rules:
 
 - Treat failures as harness findings, not as optional style advice.
 - If a threshold is hit by new code, split by ownership, extract cohesive private functions, or move behavior behind an existing boundary before merging.
-- Threshold changes must be documented in `docs/ARCHITECTURE_REQUIREMENTS.md` and justified in `specs/STATUS.md`.
+- Threshold changes must be documented in `ARCHITECTURE_REQUIREMENTS.md` and justified in `../../specs/plans/STATUS.md`.
 - Do not add a new abstraction, framework, helper, or global registry unless at least two real call sites need it now.
 - New exported APIs must be documented; complex private logic needs a short comment explaining why, not what.
 - Errors must be explicit and actionable; do not silently swallow failures.
@@ -262,16 +262,16 @@ It covers:
 
 Required whenever implementation changes behavior:
 
-- Gateway route change -> update `docs/GATEWAY_ROUTE_MATRIX.md`.
-- OpenAPI contract change -> update `docs/OPENAPI_CONTRACT.md`.
-- Data model change -> update `docs/DATA_MODEL.md`.
-- Module dependency change -> update `docs/MODULE_INTERFACE_CONTRACTS.md`.
-- Domain event change -> update `docs/DOMAIN_EVENTS_SPEC.md`.
-- Capability change -> update `docs/CAPABILITY_TAXONOMY_SPEC.md`.
-- Reverse proxy behavior change -> update `docs/REVERSE_PROXY_SPEC.md`.
+- Gateway route change -> update `../../specs/design/GATEWAY_ROUTE_MATRIX.md`.
+- OpenAPI contract change -> update `OPENAPI_CONTRACT.md`.
+- Data model change -> update `DATA_MODEL.md`.
+- Module dependency change -> update `MODULE_INTERFACE_CONTRACTS.md`.
+- Domain event change -> update `DOMAIN_EVENTS_SPEC.md`.
+- Capability change -> update `../../specs/design/CAPABILITY_TAXONOMY_SPEC.md`.
+- Reverse proxy behavior change -> update `../../specs/design/REVERSE_PROXY_SPEC.md`.
 - Scheduler strategy change -> update scheduler docs.
-- Payment change -> update `docs/PAYMENT_SPEC.md`.
-- Observability change -> update `docs/OBSERVABILITY_SPEC.md`.
+- Payment change -> update `../../specs/design/PAYMENT_SPEC.md`.
+- Observability change -> update `../../specs/design/OBSERVABILITY_SPEC.md`.
 
 ## 12. Definition Of Done
 
@@ -282,5 +282,5 @@ A package is done when:
 - Generated artifacts are current.
 - Security-sensitive changes are covered.
 - Docs are updated.
-- `specs/STATUS.md` is updated.
+- `../../specs/plans/STATUS.md` is updated.
 - Any skipped gate has a clear reason.

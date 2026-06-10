@@ -3,10 +3,10 @@
 > **历史文档 — 已被取代（Historical — superseded）。** 本文档记录的是项目最初的 MVP（M0–M10）里程碑计划，**该计划已全部执行完毕**。SRapi 现已是成熟平台（多协议网关、支付/订阅/返利、OAuth/OIDC + TOTP 二步验证、完整的 Next.js 管理与自助控制台、Copilot、Playground、调度内核、可观测体系等约 150 个工作包均已交付）。
 >
 > 本文保留下来仅作历史设计与排期的参考，**不代表当前的功能范围或实现状态**。当前权威信息请见：
-> - 工程执行进度：[`specs/STATUS.md`](../specs/STATUS.md)
-> - 工作包总账：[`specs/WORK_PACKAGES.md`](../specs/WORK_PACKAGES.md)、路线图：[`specs/ROADMAP.md`](../specs/ROADMAP.md)
-> - 产品概览：根目录 [`README.md`](../README.md)
-> - 架构现状：[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`ARCHITECTURE_REQUIREMENTS.md`](ARCHITECTURE_REQUIREMENTS.md)
+> - 工程执行进度：[`STATUS.md`](STATUS.md)
+> - 工作包总账：[`WORK_PACKAGES.md`](WORK_PACKAGES.md)、路线图：[`ROADMAP.md`](ROADMAP.md)
+> - 产品概览：根目录 [`README.md`](../../README.md)
+> - 架构现状：[`ARCHITECTURE.md`](../../docs/requirements/ARCHITECTURE.md)、[`ARCHITECTURE_REQUIREMENTS.md`](../../docs/requirements/ARCHITECTURE_REQUIREMENTS.md)
 >
 > 阅读下文时请把 “MVP / 第一阶段 / 暂缓 / 下一阶段” 等措辞理解为**当时的计划语境**，而非现状。
 
@@ -22,7 +22,7 @@ MVP 目标：
 
 MVP 不追求功能大而全，重点是把架构骨架、契约、数据模型和调度内核闭环打稳。
 
-> **现状说明：** 上述 MVP 目标早已达成并被大幅超越。这里的“骨架 / 不追求大而全”仅描述项目起步时的范围取舍，不代表当前能力边界（当前已是成熟多协议网关 + 商业化与治理体系，见顶部横幅与 `specs/STATUS.md`）。
+> **现状说明：** 上述 MVP 目标早已达成并被大幅超越。这里的“骨架 / 不追求大而全”仅描述项目起步时的范围取舍，不代表当前能力边界（当前已是成熟多协议网关 + 商业化与治理体系，见顶部横幅与 `STATUS.md`）。
 
 实现级需求、非功能需求、验收条件和测试映射以 `MVP_SPEC.md` 为准（该文档同样为历史 MVP-era 规格）；本文档负责里程碑拆分和执行顺序。
 

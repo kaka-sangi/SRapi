@@ -2,7 +2,7 @@ import type { SchedulerDecisionSummary } from "./srapi-types";
 
 /**
  * Render a scheduler decision into the readable, lowercase-tagged trace format
- * defined in docs/PRODUCT_TONE.md §6.7 (no [INFO]/[SCHEDULER] caps tags).
+ * defined in docs/requirements/PRODUCT_TONE.md §6.7 (no [INFO]/[SCHEDULER] caps tags).
  */
 export function decisionToLines(decision: SchedulerDecisionSummary): string[] {
   const lines: string[] = [];

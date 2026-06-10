@@ -1,6 +1,6 @@
 # SRapi Roadmap
 
-> **Status: all phases below are complete.** The program ran well past this roadmap — through ~WP-1310 (≈150 work packages beyond the WP-360 cap enumerated here), adding the 700-series Admin Control Plane, 900-series notifications, 1000-series OAuth/OIDC + TOTP 2FA, and the 1100–1300-series rate-limit matrix and frontend business-completeness work. See `specs/STATUS.md` for the authoritative ledger and `specs/WORK_PACKAGES.md` for the full package definitions.
+> **Status: all phases below are complete.** The program ran well past this roadmap — through ~WP-1310 (≈150 work packages beyond the WP-360 cap enumerated here), adding the 700-series Admin Control Plane, 900-series notifications, 1000-series OAuth/OIDC + TOTP 2FA, and the 1100–1300-series rate-limit matrix and frontend business-completeness work. See `STATUS.md` for the authoritative ledger and `WORK_PACKAGES.md` for the full package definitions.
 >
 > The phase narrative below is preserved as the historical plan that the project executed. Each phase records the exit criteria as **delivered**.
 
@@ -11,7 +11,7 @@ Goal: make SRapi governable by specs and quality gates.
 Exit criteria:
 
 - `specs/` exists and is linked from README.
-- `specs/STATUS.md` identifies the next work package.
+- `STATUS.md` identifies the next work package.
 - Quality gates are documented.
 - Current docs remain the source of architecture truth.
 
@@ -149,7 +149,7 @@ Primary packages:
 
 ## Beyond the roadmap (WP-500 → WP-1310)
 
-This roadmap's package enumeration stops at WP-360. The program kept going well past it; the following series shipped and are recorded individually in `specs/STATUS.md` / `specs/WORK_PACKAGES.md`:
+This roadmap's package enumeration stops at WP-360. The program kept going well past it; the following series shipped and are recorded individually in `STATUS.md` / `WORK_PACKAGES.md`:
 
 - **700-series — Admin Control Plane:** dashboard snapshot, ops monitoring, typed settings, announcements, redeem codes, promo codes, risk-control APIs (WP-700), and console TOTP 2FA (WP-770).
 - **900-series — Notifications:** low-balance notification triggers, outbox/email dispatch, admin-managed templates (WP-900).
@@ -158,5 +158,5 @@ This roadmap's package enumeration stops at WP-360. The program kept going well 
 
 ### Roadmap / not yet implemented
 
-Genuinely deferred items (tracked in `specs/STATUS.md` and the relevant `docs/`) include Batch / Fine-tuning API families, full JA3/JA4 + HTTP/2 fingerprinting, and affiliate withdrawal. Everything else enumerated in the phases above is delivered.
+Genuinely deferred items (tracked in `STATUS.md` and the relevant `docs/`) include Batch / Fine-tuning API families, full JA3/JA4 + HTTP/2 fingerprinting, and affiliate withdrawal. Everything else enumerated in the phases above is delivered.
 

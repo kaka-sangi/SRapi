@@ -25,7 +25,7 @@ Please give us a reasonable window to remediate before any public disclosure.
 ## Security posture
 
 SRapi is designed to be self-hosted and to keep operator and end-user secrets under the operator's
-control. Key properties (see [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md) for the full model):
+control. Key properties (see [`docs/requirements/SECURITY_MODEL.md`](docs/requirements/SECURITY_MODEL.md) for the full model):
 
 - **Credentials are write-only.** Provider credentials and other secrets are encrypted at rest and
   are never returned by the API or shown in the console after creation.

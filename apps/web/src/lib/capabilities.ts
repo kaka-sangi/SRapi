@@ -3,7 +3,7 @@ import type { CapabilityDescriptor } from "../../../../packages/sdk/typescript/s
 /**
  * Endpoint capabilities a model can expose, surfaced as graphical chips instead
  * of a hand-written `CapabilityDescriptor[]` JSON array. Keys match the canonical
- * capability taxonomy (docs/CAPABILITY_TAXONOMY_SPEC.md); labels are the standard
+ * capability taxonomy (specs/design/CAPABILITY_TAXONOMY_SPEC.md); labels are the standard
  * API endpoint names (kept verbatim per PRODUCT_TONE "term's real name").
  */
 export const MODEL_CAPABILITY_OPTIONS: { value: string; label: string }[] = [

@@ -2,7 +2,7 @@
 
 本文件定义 SRapi v0.1.0 起统一的产品定位、语气、文案规则与中英文术语表，是控制台、官网、API 错误信息、文档与营销文案的唯一基调来源。
 
-`docs/FRONTEND_DESIGN_SYSTEM.md` 负责视觉，`docs/PRODUCT_TONE.md` 负责语气，两者共同决定 SRapi 的产品观感。
+`FRONTEND_DESIGN_SYSTEM.md` 负责视觉，`PRODUCT_TONE.md` 负责语气，两者共同决定 SRapi 的产品观感。
 
 ---
 

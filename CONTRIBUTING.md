@@ -72,8 +72,8 @@ Useful focused gates: `make architecture-check`, `make code-quality-check`, `mak
 
 When you change behavior, update the matching doc in the same PR. The mapping is listed in
 [`docs/README.md`](docs/README.md) (§ "维护规则" / maintenance rules) — for example, changing the HTTP
-contract requires updating `docs/OPENAPI_CONTRACT.md`, changing data tables requires
-`docs/DATA_MODEL.md`, and any new user-visible copy must follow `docs/PRODUCT_TONE.md`.
+contract requires updating `docs/requirements/OPENAPI_CONTRACT.md`, changing data tables requires
+`docs/requirements/DATA_MODEL.md`, and any new user-visible copy must follow `docs/requirements/PRODUCT_TONE.md`.
 
 ## Commits and pull requests
 
@@ -81,7 +81,7 @@ contract requires updating `docs/OPENAPI_CONTRACT.md`, changing data tables requ
   `feat(gateway): ...`, `fix(quality): ...`, `docs(specs): ...`.
 - Keep the diff minimal and easy to review; no unrelated changes.
 - In the PR description: summarize what changed, what you tested, and any remaining risk. If you
-  added user-visible copy, link the relevant entries in `docs/PRODUCT_TONE.md`.
+  added user-visible copy, link the relevant entries in `docs/requirements/PRODUCT_TONE.md`.
 - Make sure `make check` passes.
 
 ## License

@@ -17,7 +17,7 @@ groups:
             One or more critical SRapi Ops alert events are firing. Open AdminOps
             alerts and inspect the matching alert event details, SLO evidence, and
             recent Gateway usage logs.
-          runbook_url: docs/OPERATIONS.md
+          runbook_url: docs/requirements/OPERATIONS.md
 
       - alert: SRapiWarningOpsAlertsPersisting
         expr: sum by (severity, status) (srapi_ops_alert_events{severity="warning",status="firing"}) > 0
@@ -32,4 +32,4 @@ groups:
             Warning-level SRapi Ops alert events have remained firing for at least
             15 minutes. Review AdminOps alert posture before the condition burns
             into a critical incident.
-          runbook_url: docs/OPERATIONS.md
+          runbook_url: docs/requirements/OPERATIONS.md

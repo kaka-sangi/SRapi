@@ -197,7 +197,7 @@
 
 ## 认证矩阵基线（防回归 · 已逐格 trace 网关签发路径核查）
 
-当前落地矩阵见 [`PROVIDER_AUTH_MATRIX.md`](./PROVIDER_AUTH_MATRIX.md)。第七批后，preset `auth_methods` 只暴露真实可签发集合：
+当前落地矩阵见 [`PROVIDER_AUTH_MATRIX.md`](../../../docs/constraints/PROVIDER_AUTH_MATRIX.md)。第七批后，preset `auth_methods` 只暴露真实可签发集合：
 
 - `service_account_json` 已从 anthropic/bedrock preset 下架，仅作为 legacy enum 保留（batch11 rank27 收尾删枚举或实接 Vertex）。
 - OpenAI/Gemini preset OAuth 已下架；手工误配会返回 `not_supported`。

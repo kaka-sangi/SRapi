@@ -116,7 +116,7 @@ session affinity keys, credentials, prompts, cookies, or provider-native frames.
 These routes are the console ops dashboard surface and match
 `packages/openapi/openapi.yaml` (`/api/v1/admin/ops/*`). They are complementary
 to the SLO / scheduler-decision / realtime-slot ops routes documented in
-`docs/OBSERVABILITY_SPEC.md` §11 (`overview`, `slo`, `scheduler/decisions`,
+`OBSERVABILITY_SPEC.md` §11 (`overview`, `slo`, `scheduler/decisions`,
 `realtime/slots`, `alerts/{id}/ack`); see OpenAPI for the authoritative,
 combined ops route list.
 
@@ -429,7 +429,7 @@ no longer roadmap items:
 - Admin notification email-template management (catalog, per-event subject/HTML
   overrides, restore-to-default, and preview) — see §3.7.
 - Operational PostgreSQL backup/restore via the `make backup-postgres` and
-  `make restore-postgres` targets (see `docs/OPERATIONS.md`).
+  `make restore-postgres` targets (see `../../docs/requirements/OPERATIONS.md`).
 
 Roadmap / not yet implemented:
 

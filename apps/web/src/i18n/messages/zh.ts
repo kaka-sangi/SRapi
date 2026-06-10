@@ -1,5 +1,5 @@
 // 简体中文文案。key 必须与 en.ts 完全对齐（由单测断言）。
-// 文案遵循 docs/PRODUCT_TONE.md（§5 / §6）：控制台用「你」，术语本名，计费用「花费 / Token / 已用」。
+// 文案遵循 docs/requirements/PRODUCT_TONE.md（§5 / §6）：控制台用「你」，术语本名，计费用「花费 / Token / 已用」。
 
 import type { Messages } from "./en";
 
