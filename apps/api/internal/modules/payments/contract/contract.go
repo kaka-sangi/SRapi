@@ -27,7 +27,9 @@ const (
 	OrderStatusPaid              OrderStatus = "paid"
 	OrderStatusFulfilled         OrderStatus = "fulfilled"
 	OrderStatusPartiallyRefunded OrderStatus = "partially_refunded"
+	OrderStatusRefunding         OrderStatus = "refunding"
 	OrderStatusRefunded          OrderStatus = "refunded"
+	OrderStatusRefundFailed      OrderStatus = "refund_failed"
 	OrderStatusExpired           OrderStatus = "expired"
 	OrderStatusCanceled          OrderStatus = "canceled"
 	OrderStatusFailed            OrderStatus = "failed"
@@ -50,6 +52,8 @@ type PaymentProviderInstance struct {
 	SupportedMethods []string
 	Limits           map[string]any
 	SortOrder        int
+	FeeRate          string
+	Weight           int
 	Metadata         map[string]any
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -71,6 +75,8 @@ type PaymentOrder struct {
 	ProviderInstanceID    int
 	OriginalAmount        string
 	DiscountAmount        string
+	FeeAmount             string
+	PayableAmount         string
 	PromoCodeID           *int
 	Amount                string
 	Currency              string
@@ -106,6 +112,8 @@ type CreateProviderInstanceRequest struct {
 	SupportedMethods []string
 	Limits           map[string]any
 	SortOrder        *int
+	FeeRate          *string
+	Weight           *int
 	Metadata         map[string]any
 }
 
@@ -117,6 +125,8 @@ type UpdateProviderInstanceRequest struct {
 	SupportedMethods *[]string
 	Limits           *map[string]any
 	SortOrder        *int
+	FeeRate          *string
+	Weight           *int
 	Metadata         *map[string]any
 }
 
@@ -129,6 +139,8 @@ type CreateStoredProviderInstance struct {
 	SupportedMethods []string
 	Limits           map[string]any
 	SortOrder        int
+	FeeRate          string
+	Weight           int
 	Metadata         map[string]any
 }
 
@@ -142,15 +154,17 @@ type ProviderInstanceTestResult struct {
 }
 
 type CreateOrderRequest struct {
-	UserID      int
-	Method      string
-	Amount      string
-	Currency    string
-	ProductType ProductType
-	ProductID   string
-	PromoCode   string
-	ExpiresAt   *time.Time
-	Metadata    map[string]any
+	UserID        int
+	Method        string
+	Amount        string
+	Currency      string
+	ProductType   ProductType
+	ProductID     string
+	PromoCode     string
+	ExpiresAt     *time.Time
+	PayerOpenID   string
+	PayerClientIP string
+	Metadata      map[string]any
 }
 
 type CreateStoredOrder struct {
@@ -159,6 +173,8 @@ type CreateStoredOrder struct {
 	ProviderInstanceID int
 	OriginalAmount     string
 	DiscountAmount     string
+	FeeAmount          string
+	PayableAmount      string
 	PromoCodeID        *int
 	PromoCode          string
 	Amount             string
@@ -179,6 +195,12 @@ type PromoCodePreviewInput struct {
 	Now      time.Time
 }
 
+type PromoCodeReleaseInput struct {
+	PaymentOrderID int
+	ReleasedAt     time.Time
+	Reason         string
+}
+
 type PromoCodeApplication struct {
 	ID             int
 	UserID         int
@@ -191,6 +213,7 @@ type PromoCodeApplication struct {
 	Currency       string
 	DiscountType   string
 	AppliedAt      time.Time
+	Metadata       map[string]any
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
@@ -219,6 +242,13 @@ type ExpireOrdersResult struct {
 	Expired  int
 }
 
+// ReconcileOrdersResult reports one active upstream reconciliation pass.
+type ReconcileOrdersResult struct {
+	Selected int
+	Paid     int
+	Failed   int
+}
+
 type Store interface {
 	CreateProviderInstance(ctx context.Context, input CreateStoredProviderInstance) (PaymentProviderInstance, error)
 	ListProviderInstances(ctx context.Context) ([]PaymentProviderInstance, error)
@@ -226,11 +256,13 @@ type Store interface {
 	UpdateProviderInstance(ctx context.Context, input PaymentProviderInstance) (PaymentProviderInstance, error)
 	SoftDeleteProviderInstance(ctx context.Context, id int) error
 	PreviewPromoCode(ctx context.Context, input PromoCodePreviewInput) (PromoCodeApplication, error)
+	ReleasePromoCode(ctx context.Context, input PromoCodeReleaseInput) (PromoCodeApplication, bool, error)
 	CreateOrder(ctx context.Context, input CreateStoredOrder) (PaymentOrder, error)
 	UpdateOrder(ctx context.Context, input PaymentOrder) (PaymentOrder, error)
 	FindOrderByID(ctx context.Context, id int) (PaymentOrder, error)
 	FindOrderByOrderNo(ctx context.Context, orderNo string) (PaymentOrder, error)
 	ListOrders(ctx context.Context) ([]PaymentOrder, error)
+	ListPendingOrders(ctx context.Context, now time.Time) ([]PaymentOrder, error)
 	ListExpiredPendingOrders(ctx context.Context, now time.Time) ([]PaymentOrder, error)
 	ListOrdersByUser(ctx context.Context, userID int) ([]PaymentOrder, error)
 	CountInProgressOrdersByProviderInstance(ctx context.Context, providerInstanceID int) (int, error)

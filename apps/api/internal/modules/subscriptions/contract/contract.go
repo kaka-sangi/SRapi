@@ -189,6 +189,8 @@ type EntitlementDecision struct {
 	AccountGroupScope []int
 	SchedulerStrategy string
 	MonthlyTokenQuota *int
+	DailyCostQuota    *string
+	WeeklyCostQuota   *string
 	MonthlyCostQuota  *string
 	// CostQuotaMode is "hard_cap" (default — deny when the monthly cost quota is
 	// exceeded) or "allowance" (treat the quota as an included allowance and bill
@@ -199,8 +201,10 @@ type EntitlementDecision struct {
 // CostAllowance describes a user's active subscription cost allowance, used to
 // split per-request cost into subscription-covered vs balance-billable.
 type CostAllowance struct {
-	Mode  string  // "" / "hard_cap" / "allowance"
-	Quota *string // monthly cost quota (allowance ceiling), nil when unset
+	Mode        string  // "" / "hard_cap" / "allowance"
+	DailyQuota  *string // daily cost quota / allowance ceiling, nil when unset
+	WeeklyQuota *string // weekly cost quota / allowance ceiling, nil when unset
+	Quota       *string // monthly cost quota / allowance ceiling, nil when unset
 }
 
 // ExpireSubscriptionsResult reports the outcome of a subscription expiration pass.

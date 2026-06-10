@@ -75,12 +75,40 @@ func (s *Service) UpdatePricingRule(ctx context.Context, id int, req contract.Up
 		}
 		req.CacheWritePricePerMillionTokens = &v
 	}
+	if req.CacheWrite5mPricePerMillionTokens != nil {
+		v, ok := normalizeMoney(*req.CacheWrite5mPricePerMillionTokens)
+		if !ok {
+			return contract.PricingRule{}, ErrInvalidInput
+		}
+		req.CacheWrite5mPricePerMillionTokens = &v
+	}
+	if req.CacheWrite1hPricePerMillionTokens != nil {
+		v, ok := normalizeMoney(*req.CacheWrite1hPricePerMillionTokens)
+		if !ok {
+			return contract.PricingRule{}, ErrInvalidInput
+		}
+		req.CacheWrite1hPricePerMillionTokens = &v
+	}
+	if req.ImageOutputPricePerMillionTokens != nil {
+		v, ok := normalizeMoney(*req.ImageOutputPricePerMillionTokens)
+		if !ok {
+			return contract.PricingRule{}, ErrInvalidInput
+		}
+		req.ImageOutputPricePerMillionTokens = &v
+	}
 	if req.PerRequestPrice != nil {
 		v, ok := normalizeMoney(*req.PerRequestPrice)
 		if !ok {
 			return contract.PricingRule{}, ErrInvalidInput
 		}
 		req.PerRequestPrice = &v
+	}
+	if req.LongContextMultiplier != nil {
+		v, ok := normalizeMoney(*req.LongContextMultiplier)
+		if !ok {
+			return contract.PricingRule{}, ErrInvalidInput
+		}
+		req.LongContextMultiplier = &v
 	}
 	if req.Intervals != nil {
 		intervals, err := normalizePricingIntervals(*req.Intervals)
@@ -132,16 +160,25 @@ func (s *Service) EstimatePrice(ctx context.Context, req contract.PricingRequest
 		at = s.clock.Now()
 	}
 	if len(req.PricingOverride) > 0 {
+		req = applyPricingOverrideRequestOptions(req)
 		result, ok := priceFromPayload(req.PricingOverride, req, nil)
 		if ok {
 			return result, nil
 		}
 	}
-	rules, err := s.pricing.ListPricingRules(ctx)
+	rules, err := s.pricing.QueryPricingRules(ctx, contract.PricingRuleQuery{
+		ModelID:            req.ModelID,
+		ModelFamily:        req.ModelFamily,
+		RequestedModel:     req.RequestedModel,
+		UpstreamModel:      req.UpstreamModel,
+		BillingModelSource: billingModelSource(req),
+		ProviderID:         req.ProviderID,
+		At:                 at,
+	})
 	if err != nil {
 		return contract.PricingResult{}, err
 	}
-	rule, ok := selectPricingRule(rules, req.ModelID, req.ProviderID, at)
+	rule, ok := selectPricingRuleForRequest(rules, req, at)
 	if !ok {
 		rule, ok = selectFamilyPricingRule(rules, req.ModelFamily, req.ProviderID, at)
 		if !ok {
@@ -164,21 +201,25 @@ func (s *Service) PriceGatewayUsage(ctx context.Context, req contract.GatewayPri
 		source = "pricing_rule"
 	}
 	return priceGatewayCost(contract.GatewayCostRequest{
-		Amount:         pricing.Amount,
-		Currency:       money.NormalizeCurrency(pricing.Currency),
-		PricingRuleID:  cloneIntPtr(pricing.PricingRuleID),
-		BillingMode:    pricing.BillingMode,
-		InputCost:      pricing.InputCost,
-		OutputCost:     pricing.OutputCost,
-		CacheReadCost:  pricing.CacheReadCost,
-		CacheWriteCost: pricing.CacheWriteCost,
-		Source:         source,
-		Estimated:      req.Estimated,
-		RateMultiplier: req.RateMultiplier,
-		Success:        req.Success,
-		AllowanceMode:  req.AllowanceMode,
-		AllowanceQuota: req.AllowanceQuota,
-		UsedCost:       req.UsedCost,
+		Amount:               pricing.Amount,
+		Currency:             money.NormalizeCurrency(pricing.Currency),
+		PricingRuleID:        cloneIntPtr(pricing.PricingRuleID),
+		BillingMode:          pricing.BillingMode,
+		InputCost:            pricing.InputCost,
+		OutputCost:           pricing.OutputCost,
+		CacheReadCost:        pricing.CacheReadCost,
+		CacheWriteCost:       pricing.CacheWriteCost,
+		Source:               source,
+		Estimated:            req.Estimated,
+		RateMultiplier:       req.RateMultiplier,
+		Success:              req.Success,
+		AllowanceMode:        req.AllowanceMode,
+		DailyAllowanceQuota:  req.DailyAllowanceQuota,
+		WeeklyAllowanceQuota: req.WeeklyAllowanceQuota,
+		AllowanceQuota:       req.AllowanceQuota,
+		DailyUsedCost:        req.DailyUsedCost,
+		WeeklyUsedCost:       req.WeeklyUsedCost,
+		UsedCost:             req.UsedCost,
 	}), nil
 }
 
@@ -189,8 +230,12 @@ func (s *Service) PriceGatewayCost(req contract.GatewayCostRequest) contract.Gat
 func priceGatewayCost(req contract.GatewayCostRequest) contract.GatewayPricingResult {
 	actualCost := applyRateMultiplier(req.Amount, req.RateMultiplier)
 	billableCost := actualCost
-	if req.Success && strings.EqualFold(strings.TrimSpace(req.AllowanceMode), "allowance") && req.AllowanceQuota != nil {
-		billableCost = BillableOverage(actualCost, req.UsedCost, *req.AllowanceQuota)
+	if req.Success && strings.EqualFold(strings.TrimSpace(req.AllowanceMode), "allowance") {
+		billableCost = BillableOverageForWindows(actualCost, []AllowanceWindow{
+			{UsedCost: req.DailyUsedCost, Quota: req.DailyAllowanceQuota},
+			{UsedCost: req.WeeklyUsedCost, Quota: req.WeeklyAllowanceQuota},
+			{UsedCost: req.UsedCost, Quota: req.AllowanceQuota},
+		})
 	}
 	return contract.GatewayPricingResult{
 		Amount:         money.NormalizeAmount(req.Amount),
@@ -232,6 +277,22 @@ func PricingRuleFromRequest(req contract.CreatePricingRuleRequest) (contract.Pri
 	if !ok {
 		return contract.PricingRule{}, ErrInvalidInput
 	}
+	cacheWrite5m, ok := normalizeMoney(req.CacheWrite5mPricePerMillionTokens)
+	if !ok {
+		return contract.PricingRule{}, ErrInvalidInput
+	}
+	cacheWrite1h, ok := normalizeMoney(req.CacheWrite1hPricePerMillionTokens)
+	if !ok {
+		return contract.PricingRule{}, ErrInvalidInput
+	}
+	imageOutput, ok := normalizeMoney(req.ImageOutputPricePerMillionTokens)
+	if !ok {
+		return contract.PricingRule{}, ErrInvalidInput
+	}
+	longContextMultiplier, ok := normalizeMoney(req.LongContextMultiplier)
+	if !ok {
+		return contract.PricingRule{}, ErrInvalidInput
+	}
 	perRequestPrice, ok := normalizeMoney(req.PerRequestPrice)
 	if !ok {
 		return contract.PricingRule{}, ErrInvalidInput
@@ -243,19 +304,28 @@ func PricingRuleFromRequest(req contract.CreatePricingRuleRequest) (contract.Pri
 	if req.EffectiveFrom != nil && req.EffectiveTo != nil && !req.EffectiveTo.After(*req.EffectiveFrom) {
 		return contract.PricingRule{}, ErrInvalidInput
 	}
+	if req.LongContextThresholdTokens != nil && *req.LongContextThresholdTokens <= 0 {
+		return contract.PricingRule{}, ErrInvalidInput
+	}
 	return contract.PricingRule{
-		ModelID:                         req.ModelID,
-		ProviderID:                      req.ProviderID,
-		BillingMode:                     mode,
-		InputPricePerMillionTokens:      input,
-		OutputPricePerMillionTokens:     output,
-		CacheReadPricePerMillionTokens:  cacheRead,
-		CacheWritePricePerMillionTokens: cacheWrite,
-		PerRequestPrice:                 perRequestPrice,
-		Intervals:                       intervals,
-		Currency:                        money.NormalizeCurrency(req.Currency),
-		EffectiveFrom:                   cloneTime(req.EffectiveFrom),
-		EffectiveTo:                     cloneTime(req.EffectiveTo),
+		ModelID:                           req.ModelID,
+		ProviderID:                        req.ProviderID,
+		BillingMode:                       mode,
+		InputPricePerMillionTokens:        input,
+		OutputPricePerMillionTokens:       output,
+		CacheReadPricePerMillionTokens:    cacheRead,
+		CacheWritePricePerMillionTokens:   cacheWrite,
+		CacheWrite5mPricePerMillionTokens: cacheWrite5m,
+		CacheWrite1hPricePerMillionTokens: cacheWrite1h,
+		ImageOutputPricePerMillionTokens:  imageOutput,
+		PerRequestPrice:                   perRequestPrice,
+		ServiceTierMultipliers:            cloneStringMap(req.ServiceTierMultipliers),
+		LongContextThresholdTokens:        cloneIntPtr(req.LongContextThresholdTokens),
+		LongContextMultiplier:             longContextMultiplier,
+		Intervals:                         intervals,
+		Currency:                          money.NormalizeCurrency(req.Currency),
+		EffectiveFrom:                     cloneTime(req.EffectiveFrom),
+		EffectiveTo:                       cloneTime(req.EffectiveTo),
 	}, nil
 }
 
@@ -278,6 +348,63 @@ func selectPricingRule(rules []contract.PricingRule, modelID int, providerID int
 		}
 	}
 	return selected, found
+}
+
+func selectPricingRuleForRequest(rules []contract.PricingRule, req contract.PricingRequest, at time.Time) (contract.PricingRule, bool) {
+	source := billingModelSource(req)
+	switch source {
+	case "requested":
+		if modelID := modelIDForName(rules, req.RequestedModel, req.ProviderID, at); modelID > 0 {
+			return selectPricingRule(rules, modelID, req.ProviderID, at)
+		}
+	case "upstream":
+		if modelID := modelIDForName(rules, req.UpstreamModel, req.ProviderID, at); modelID > 0 {
+			return selectPricingRule(rules, modelID, req.ProviderID, at)
+		}
+	}
+	return selectPricingRule(rules, req.ModelID, req.ProviderID, at)
+}
+
+func billingModelSource(req contract.PricingRequest) string {
+	source := strings.ToLower(strings.TrimSpace(req.BillingModelSource))
+	if source == "" && req.PricingOverride != nil {
+		source = strings.ToLower(strings.TrimSpace(payloadString(req.PricingOverride, "billing_model_source")))
+	}
+	switch source {
+	case "requested", "upstream", "channel_mapped":
+		return source
+	default:
+		return "channel_mapped"
+	}
+}
+
+func modelIDForName(rules []contract.PricingRule, modelName string, providerID int, at time.Time) int {
+	modelName = normalizePricingFamily(modelName)
+	if modelName == "" {
+		return 0
+	}
+	var selected contract.PricingRule
+	found := false
+	for _, rule := range rules {
+		if rule.ModelID <= 0 || !pricingRuleActive(rule, at) {
+			continue
+		}
+		if rule.ProviderID != providerID && rule.ProviderID != 0 {
+			continue
+		}
+		family := normalizePricingFamily(rule.ModelFamily)
+		if family == "" || family != modelName {
+			continue
+		}
+		if !found || moreSpecificPricingRule(rule, selected) {
+			selected = rule
+			found = true
+		}
+	}
+	if !found {
+		return 0
+	}
+	return selected.ModelID
 }
 
 func selectFamilyPricingRule(rules []contract.PricingRule, modelFamily string, providerID int, at time.Time) (contract.PricingRule, bool) {
@@ -350,17 +477,36 @@ func priceFromRule(rule contract.PricingRule, req contract.PricingRequest, ruleI
 
 func tokenPriceFromRule(rule contract.PricingRule, req contract.PricingRequest, ruleID *int) contract.PricingResult {
 	pricedRule := rule
+	_, hasInterval := selectTokenPricingInterval(rule.Intervals, req.InputTokens+req.CacheReadTokens)
 	if interval, ok := selectTokenPricingInterval(rule.Intervals, req.InputTokens+req.CacheReadTokens); ok {
 		pricedRule.InputPricePerMillionTokens = interval.InputPricePerMillionTokens
 		pricedRule.OutputPricePerMillionTokens = interval.OutputPricePerMillionTokens
 		pricedRule.CacheReadPricePerMillionTokens = interval.CacheReadPricePerMillionTokens
 		pricedRule.CacheWritePricePerMillionTokens = interval.CacheWritePricePerMillionTokens
 	}
+	req = normalizeCacheWriteBuckets(req)
 	inputCost := usagePrice(req.InputTokens, pricedRule.InputPricePerMillionTokens)
-	outputCost := usagePrice(req.OutputTokens, pricedRule.OutputPricePerMillionTokens)
+	textOutputTokens := req.OutputTokens - maxInt(req.ImageOutputTokens, 0)
+	if textOutputTokens < 0 {
+		textOutputTokens = 0
+	}
+	outputCost := usagePrice(textOutputTokens, pricedRule.OutputPricePerMillionTokens)
+	outputCost = money.AddMoney(outputCost, usagePrice(req.ImageOutputTokens, imageOutputRateOrOutput(pricedRule)))
 	cacheReadCost := usagePrice(req.CacheReadTokens, pricedRule.CacheReadPricePerMillionTokens)
-	cacheWriteCost := usagePrice(req.CacheWriteTokens, cacheWriteRateOrInput(pricedRule))
-	return pricingResult(rule, ruleID, contract.BillingModeToken, inputCost, outputCost, cacheReadCost, cacheWriteCost)
+	cacheWriteCost := cacheWriteCostFromRule(pricedRule, req)
+	if !hasInterval && longContextApplies(rule, req) {
+		multiplier := rule.LongContextMultiplier
+		inputCost = applyRateMultiplier(inputCost, multiplier)
+		outputCost = applyRateMultiplier(outputCost, multiplier)
+		cacheReadCost = applyRateMultiplier(cacheReadCost, multiplier)
+		cacheWriteCost = applyRateMultiplier(cacheWriteCost, multiplier)
+	}
+	multiplier := serviceTierMultiplier(pricedRule, req.ServiceTier)
+	inputCost = applyRateMultiplier(inputCost, multiplier)
+	outputCost = applyRateMultiplier(outputCost, multiplier)
+	cacheReadCost = applyRateMultiplier(cacheReadCost, multiplier)
+	cacheWriteCost = applyRateMultiplier(cacheWriteCost, multiplier)
+	return pricingResult(pricedRule, ruleID, contract.BillingModeToken, inputCost, outputCost, cacheReadCost, cacheWriteCost)
 }
 
 func perRequestPriceFromRule(rule contract.PricingRule, ruleID *int) contract.PricingResult {
@@ -448,25 +594,65 @@ func cacheWriteRateOrInput(rule contract.PricingRule) string {
 }
 
 func priceFromPayload(payload map[string]any, req contract.PricingRequest, ruleID *int) (contract.PricingResult, bool) {
+	if hasLegacyPricingOverrideKey(payload) {
+		return contract.PricingResult{}, false
+	}
 	mode, _ := normalizeBillingMode(contract.BillingMode(payloadString(payload, "billing_mode")))
-	input := payloadMoney(payload, "input_price_per_million_tokens", "input_price_per_million")
-	output := payloadMoney(payload, "output_price_per_million_tokens", "output_price_per_million")
-	cacheRead := payloadMoney(payload, "cache_read_price_per_million_tokens", "cache_read_price_per_million")
-	cacheWrite := payloadMoney(payload, "cache_write_price_per_million_tokens", "cache_write_price_per_million")
-	perRequest := payloadMoney(payload, "per_request_price", "per_image_price")
-	if input == "" && output == "" && cacheRead == "" && cacheWrite == "" && perRequest == "" {
+	input := payloadMoney(payload, "input_price_per_million_tokens")
+	output := payloadMoney(payload, "output_price_per_million_tokens")
+	cacheRead := payloadMoney(payload, "cache_read_price_per_million_tokens")
+	cacheWrite := payloadMoney(payload, "cache_write_price_per_million_tokens")
+	cacheWrite5m := payloadMoney(payload, "cache_write_5m_price_per_million_tokens")
+	cacheWrite1h := payloadMoney(payload, "cache_write_1h_price_per_million_tokens")
+	imageOutput := payloadMoney(payload, "image_output_price_per_million_tokens")
+	perRequest := payloadMoney(payload, "per_request_price")
+	if input == "" && output == "" && cacheRead == "" && cacheWrite == "" && cacheWrite5m == "" && cacheWrite1h == "" && imageOutput == "" && perRequest == "" {
 		return contract.PricingResult{}, false
 	}
 	rule := contract.PricingRule{
-		BillingMode:                     mode,
-		InputPricePerMillionTokens:      money.NormalizeAmount(input),
-		OutputPricePerMillionTokens:     money.NormalizeAmount(output),
-		CacheReadPricePerMillionTokens:  money.NormalizeAmount(cacheRead),
-		CacheWritePricePerMillionTokens: money.NormalizeAmount(cacheWrite),
-		PerRequestPrice:                 money.NormalizeAmount(perRequest),
-		Currency:                        payloadString(payload, "currency"),
+		BillingMode:                       mode,
+		InputPricePerMillionTokens:        money.NormalizeAmount(input),
+		OutputPricePerMillionTokens:       money.NormalizeAmount(output),
+		CacheReadPricePerMillionTokens:    money.NormalizeAmount(cacheRead),
+		CacheWritePricePerMillionTokens:   money.NormalizeAmount(cacheWrite),
+		CacheWrite5mPricePerMillionTokens: money.NormalizeAmount(cacheWrite5m),
+		CacheWrite1hPricePerMillionTokens: money.NormalizeAmount(cacheWrite1h),
+		ImageOutputPricePerMillionTokens:  money.NormalizeAmount(imageOutput),
+		PerRequestPrice:                   money.NormalizeAmount(perRequest),
+		ServiceTierMultipliers:            payloadStringMap(payload, "service_tier_multipliers"),
+		LongContextThresholdTokens:        payloadIntPtr(payload, "long_context_threshold_tokens", "long_context_threshold"),
+		LongContextMultiplier:             money.NormalizeAmount(payloadMoney(payload, "long_context_multiplier")),
+		Currency:                          payloadString(payload, "currency"),
 	}
 	return priceFromRule(rule, req, ruleID), true
+}
+
+func hasLegacyPricingOverrideKey(payload map[string]any) bool {
+	for _, key := range []string{
+		"input_price_per_million",
+		"output_price_per_million",
+		"cache_read_price_per_million",
+		"cache_write_price_per_million",
+		"cache_write_5m_price_per_million",
+		"cache_write_1h_price_per_million",
+		"image_output_price_per_million",
+		"per_image_price",
+	} {
+		if _, ok := payload[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func applyPricingOverrideRequestOptions(req contract.PricingRequest) contract.PricingRequest {
+	if req.BillingModelSource == "" {
+		req.BillingModelSource = payloadString(req.PricingOverride, "billing_model_source")
+	}
+	if req.ServiceTier == "" {
+		req.ServiceTier = payloadString(req.PricingOverride, "service_tier")
+	}
+	return req
 }
 
 func usagePrice(tokens int, pricePerMillion string) string {
@@ -590,6 +776,88 @@ func multiplyMoneyByInt(amount string, count int) string {
 	return money.FormatRatFixed(rat, 8)
 }
 
+func normalizeCacheWriteBuckets(req contract.PricingRequest) contract.PricingRequest {
+	if req.CacheWriteTokens <= 0 {
+		return req
+	}
+	if req.CacheWrite5mTokens <= 0 && req.CacheWrite1hTokens <= 0 {
+		req.CacheWrite5mTokens = req.CacheWriteTokens
+		return req
+	}
+	total := req.CacheWrite5mTokens + req.CacheWrite1hTokens
+	if total < req.CacheWriteTokens {
+		req.CacheWrite5mTokens += req.CacheWriteTokens - total
+	}
+	return req
+}
+
+func cacheWriteCostFromRule(rule contract.PricingRule, req contract.PricingRequest) string {
+	if req.CacheWrite5mTokens > 0 || req.CacheWrite1hTokens > 0 {
+		cost := usagePrice(req.CacheWrite5mTokens, cacheWrite5mRateOrDefault(rule))
+		return money.AddMoney(cost, usagePrice(req.CacheWrite1hTokens, cacheWrite1hRateOrDefault(rule)))
+	}
+	return usagePrice(req.CacheWriteTokens, cacheWriteRateOrInput(rule))
+}
+
+func cacheWrite5mRateOrDefault(rule contract.PricingRule) string {
+	if rate, ok := money.DecimalRat(rule.CacheWrite5mPricePerMillionTokens); ok && rate.Sign() > 0 {
+		return rule.CacheWrite5mPricePerMillionTokens
+	}
+	return cacheWriteRateOrInput(rule)
+}
+
+func cacheWrite1hRateOrDefault(rule contract.PricingRule) string {
+	if rate, ok := money.DecimalRat(rule.CacheWrite1hPricePerMillionTokens); ok && rate.Sign() > 0 {
+		return rule.CacheWrite1hPricePerMillionTokens
+	}
+	return cacheWrite5mRateOrDefault(rule)
+}
+
+func imageOutputRateOrOutput(rule contract.PricingRule) string {
+	if rate, ok := money.DecimalRat(rule.ImageOutputPricePerMillionTokens); ok && rate.Sign() > 0 {
+		return rule.ImageOutputPricePerMillionTokens
+	}
+	return rule.OutputPricePerMillionTokens
+}
+
+func longContextApplies(rule contract.PricingRule, req contract.PricingRequest) bool {
+	if rule.LongContextThresholdTokens == nil || *rule.LongContextThresholdTokens <= 0 {
+		return false
+	}
+	if req.InputTokens+req.OutputTokens+req.CacheReadTokens+req.CacheWriteTokens < *rule.LongContextThresholdTokens {
+		return false
+	}
+	rate, ok := money.DecimalRat(rule.LongContextMultiplier)
+	return ok && rate.Sign() > 0
+}
+
+func serviceTierMultiplier(rule contract.PricingRule, tier string) string {
+	tier = strings.ToLower(strings.TrimSpace(tier))
+	if tier == "" || tier == "auto" || tier == "default" || tier == "standard" {
+		return "1.00000000"
+	}
+	if rule.ServiceTierMultipliers != nil {
+		if value := strings.TrimSpace(rule.ServiceTierMultipliers[tier]); value != "" {
+			return value
+		}
+	}
+	switch tier {
+	case "priority", "fast":
+		return "2.00000000"
+	case "flex":
+		return "0.50000000"
+	default:
+		return "1.00000000"
+	}
+}
+
+func maxInt(left int, right int) int {
+	if left > right {
+		return left
+	}
+	return right
+}
+
 func applyRateMultiplier(cost string, rateMultiplier string) string {
 	costRat, ok := money.DecimalRat(cost)
 	if !ok {
@@ -629,12 +897,67 @@ func BillableOverage(cost, usedBefore, allowance string) string {
 	return money.FormatRatFixed(overage, 8)
 }
 
+// AllowanceWindow carries one cost allowance window. Nil quotas are ignored.
+type AllowanceWindow struct {
+	UsedCost string
+	Quota    *string
+}
+
+// BillableOverageForWindows returns the highest overage across all active
+// allowance windows, so daily/weekly/monthly ceilings all constrain the covered
+// portion of a request.
+func BillableOverageForWindows(cost string, windows []AllowanceWindow) string {
+	if _, ok := money.DecimalRat(cost); !ok {
+		return cost
+	}
+	maxOverage := money.ZeroAmount
+	found := false
+	for _, window := range windows {
+		if window.Quota == nil {
+			continue
+		}
+		overage := BillableOverage(cost, window.UsedCost, *window.Quota)
+		if compareMoney(overage, maxOverage) > 0 {
+			maxOverage = overage
+		}
+		found = true
+	}
+	if !found {
+		return cost
+	}
+	return maxOverage
+}
+
+func compareMoney(left string, right string) int {
+	leftRat, leftOK := money.DecimalRat(money.NormalizeAmount(left))
+	rightRat, rightOK := money.DecimalRat(money.NormalizeAmount(right))
+	if !leftOK || !rightOK {
+		return strings.Compare(money.NormalizeAmount(left), money.NormalizeAmount(right))
+	}
+	return leftRat.Cmp(rightRat)
+}
+
 func cloneIntPtr(value *int) *int {
 	if value == nil {
 		return nil
 	}
 	cloned := *value
 	return &cloned
+}
+
+func cloneStringMap(value map[string]string) map[string]string {
+	if value == nil {
+		return nil
+	}
+	out := make(map[string]string, len(value))
+	for key, item := range value {
+		normalizedKey := strings.ToLower(strings.TrimSpace(key))
+		normalizedValue := strings.TrimSpace(item)
+		if normalizedKey != "" && normalizedValue != "" {
+			out[normalizedKey] = normalizedValue
+		}
+	}
+	return out
 }
 
 func payloadMoney(payload map[string]any, keys ...string) string {
@@ -657,6 +980,58 @@ func payloadString(payload map[string]any, key string) string {
 		return ""
 	}
 	return toString(value)
+}
+
+func payloadIntPtr(payload map[string]any, keys ...string) *int {
+	for _, key := range keys {
+		value, ok := payload[key]
+		if !ok || value == nil {
+			continue
+		}
+		var parsed int
+		switch typed := value.(type) {
+		case int:
+			parsed = typed
+		case int64:
+			parsed = int(typed)
+		case float64:
+			parsed = int(typed)
+		case json.Number:
+			n, err := typed.Int64()
+			if err != nil {
+				continue
+			}
+			parsed = int(n)
+		default:
+			if _, err := fmt.Sscan(toString(typed), &parsed); err != nil {
+				continue
+			}
+		}
+		if parsed > 0 {
+			return &parsed
+		}
+	}
+	return nil
+}
+
+func payloadStringMap(payload map[string]any, key string) map[string]string {
+	value, ok := payload[key]
+	if !ok || value == nil {
+		return nil
+	}
+	raw, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	out := make(map[string]string, len(raw))
+	for k, v := range raw {
+		normalizedKey := strings.ToLower(strings.TrimSpace(k))
+		normalizedValue := strings.TrimSpace(toString(v))
+		if normalizedKey != "" && normalizedValue != "" {
+			out[normalizedKey] = normalizedValue
+		}
+	}
+	return out
 }
 
 func toString(value any) string {

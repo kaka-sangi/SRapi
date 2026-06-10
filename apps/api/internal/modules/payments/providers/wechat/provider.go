@@ -23,6 +23,7 @@ import (
 	"github.com/wechatpay-apiv3/wechatpay-go/services/payments/h5"
 	"github.com/wechatpay-apiv3/wechatpay-go/services/payments/jsapi"
 	"github.com/wechatpay-apiv3/wechatpay-go/services/payments/native"
+	"github.com/wechatpay-apiv3/wechatpay-go/services/refunddomestic"
 	"github.com/wechatpay-apiv3/wechatpay-go/utils"
 
 	checkoutprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/checkout"
@@ -204,6 +205,87 @@ func (Provider) CreatePrepay(req PrepayRequest) (PrepaySession, error) {
 	}
 }
 
+func (p Provider) Refund(req checkoutprovider.RefundRequest) (checkoutprovider.RefundResult, error) {
+	client, err := wechatClient(req.Config)
+	if err != nil {
+		return checkoutprovider.RefundResult{}, err
+	}
+	refundAmount, ok := minorAmount(req.Amount)
+	if !ok || refundAmount <= 0 {
+		return checkoutprovider.RefundResult{}, checkoutprovider.ErrInvalidConfig
+	}
+	totalAmount, ok := minorAmount(req.OriginalAmount)
+	if !ok || totalAmount <= 0 {
+		return checkoutprovider.RefundResult{}, checkoutprovider.ErrInvalidConfig
+	}
+	currency := strings.ToUpper(strings.TrimSpace(req.Currency))
+	if currency == "" {
+		currency = defaultWechatCurrency
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), defaultWechatTimeout)
+	defer cancel()
+	resp, _, err := (&refunddomestic.RefundsApiService{Client: client}).Create(ctx, refunddomestic.CreateRequest{
+		OutTradeNo:  optionalCoreString(req.OrderNo),
+		OutRefundNo: optionalCoreString(firstNonEmpty(req.IdempotencyKey, req.OrderNo)),
+		Reason:      optionalCoreString(req.Reason),
+		NotifyUrl:   optionalCoreString(configString(req.Config, "refund_notify_url", "notify_url", "webhook_url")),
+		Amount: &refunddomestic.AmountReq{
+			Refund:   core.Int64(refundAmount),
+			Total:    core.Int64(totalAmount),
+			Currency: core.String(currency),
+		},
+	})
+	if err != nil {
+		return checkoutprovider.RefundResult{}, errors.Join(checkoutprovider.ErrUnavailable, err)
+	}
+	status := wechatRefundStatus(resp.Status)
+	return checkoutprovider.RefundResult{
+		ID:     stringValue(resp.RefundId),
+		Status: status,
+		Metadata: map[string]any{
+			"wechat_refund_status": stringValue((*string)(resp.Status)),
+			"wechat_refund_id":     stringValue(resp.RefundId),
+		},
+	}, nil
+}
+
+func (p Provider) QueryOrder(req checkoutprovider.QueryRequest) (checkoutprovider.QueryResult, error) {
+	client, err := wechatClient(req.Config)
+	if err != nil {
+		return checkoutprovider.QueryResult{}, err
+	}
+	mchID := configString(req.Config, "mch_id", "mchid", "merchant_id")
+	if mchID == "" || strings.TrimSpace(req.OrderNo) == "" {
+		return checkoutprovider.QueryResult{}, checkoutprovider.ErrInvalidConfig
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), defaultWechatTimeout)
+	defer cancel()
+	resp, _, err := (&native.NativeApiService{Client: client}).QueryOrderByOutTradeNo(ctx, native.QueryOrderByOutTradeNoRequest{
+		OutTradeNo: core.String(req.OrderNo),
+		Mchid:      core.String(mchID),
+	})
+	if err != nil {
+		return checkoutprovider.QueryResult{}, errors.Join(checkoutprovider.ErrUnavailable, err)
+	}
+	amount := ""
+	currency := req.Currency
+	if resp.Amount != nil {
+		if resp.Amount.Total != nil {
+			amount = amountFromMinor(*resp.Amount.Total)
+		}
+		if resp.Amount.Currency != nil {
+			currency = *resp.Amount.Currency
+		}
+	}
+	return checkoutprovider.QueryResult{
+		Status:                wechatQueryStatus(stringValue(resp.TradeState)),
+		ProviderTransactionID: stringValue(resp.TransactionId),
+		Amount:                amount,
+		Currency:              strings.ToUpper(currency),
+		Metadata:              map[string]any{"wechat_trade_state": stringValue(resp.TradeState)},
+	}, nil
+}
+
 func ParseNotification(rawBody string, headers map[string]string, config map[string]any) (Notification, error) {
 	rawBody = strings.TrimSpace(rawBody)
 	if rawBody == "" {
@@ -272,8 +354,8 @@ func prepayRequest(req checkoutprovider.Request) (PrepayRequest, error) {
 		Currency:            currency,
 		Description:         firstNonEmpty(configString(req.Config, "description", "body", "subject"), "SRapi order "+strings.TrimSpace(req.OrderNo)),
 		NotifyURL:           notifyURL,
-		PayerClientIP:       firstNonEmpty(metadataString(req.Metadata, "payer_client_ip", "client_ip"), configString(req.Config, "payer_client_ip", "client_ip")),
-		PayerOpenID:         firstNonEmpty(metadataString(req.Metadata, "payer_openid", "openid"), configString(req.Config, "payer_openid", "openid")),
+		PayerClientIP:       firstNonEmpty(req.PayerClientIP, metadataString(req.Metadata, "payer_client_ip", "client_ip"), configString(req.Config, "payer_client_ip", "client_ip")),
+		PayerOpenID:         firstNonEmpty(req.PayerOpenID, metadataString(req.Metadata, "payer_openid", "openid"), configString(req.Config, "payer_openid", "openid")),
 		H5Type:              firstNonEmpty(configString(req.Config, "h5_type", "scene_type"), "Wap"),
 		H5AppName:           configString(req.Config, "h5_app_name", "app_name"),
 		H5AppURL:            configString(req.Config, "h5_app_url", "app_url"),
@@ -290,6 +372,50 @@ func prepayRequest(req checkoutprovider.Request) (PrepayRequest, error) {
 		return PrepayRequest{}, checkoutprovider.ErrInvalidConfig
 	}
 	return out, nil
+}
+
+func wechatClient(config map[string]any) (*core.Client, error) {
+	mchID := configString(config, "mch_id", "mchid", "merchant_id")
+	apiV3Key := configString(config, "api_v3_key", "apiV3Key")
+	serialNo := configString(config, "serial_no", "certificate_serial_no", "mch_certificate_serial_no")
+	privateKeyText := configString(config, "private_key", "merchant_private_key")
+	if mchID == "" || apiV3Key == "" || serialNo == "" || privateKeyText == "" {
+		return nil, checkoutprovider.ErrInvalidConfig
+	}
+	privateKey, err := loadPrivateKey(privateKeyText)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), defaultWechatTimeout)
+	defer cancel()
+	return core.NewClient(ctx, option.WithWechatPayAutoAuthCipher(mchID, serialNo, privateKey, apiV3Key))
+}
+
+func wechatRefundStatus(status *refunddomestic.Status) checkoutprovider.RefundStatus {
+	if status == nil {
+		return checkoutprovider.RefundStatusProcessing
+	}
+	switch *status {
+	case refunddomestic.STATUS_SUCCESS:
+		return checkoutprovider.RefundStatusSucceeded
+	case refunddomestic.STATUS_CLOSED, refunddomestic.STATUS_ABNORMAL:
+		return checkoutprovider.RefundStatusFailed
+	default:
+		return checkoutprovider.RefundStatusProcessing
+	}
+}
+
+func wechatQueryStatus(status string) checkoutprovider.QueryStatus {
+	switch strings.ToUpper(strings.TrimSpace(status)) {
+	case "SUCCESS":
+		return checkoutprovider.QueryStatusPaid
+	case "CLOSED", "REVOKED":
+		return checkoutprovider.QueryStatusCanceled
+	case "PAYERROR":
+		return checkoutprovider.QueryStatusFailed
+	default:
+		return checkoutprovider.QueryStatusPending
+	}
 }
 
 func paymentMode(config map[string]any, metadata map[string]any) string {

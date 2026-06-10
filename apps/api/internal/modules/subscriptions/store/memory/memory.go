@@ -412,7 +412,7 @@ func (s *Store) replaceSubscriptionEntitlementsLocked(subscription contract.User
 
 func entitlementQuotaLimit(key string, value any) *string {
 	switch key {
-	case "monthly_token_quota", "monthly_cost_quota":
+	case "monthly_token_quota", "daily_cost_quota", "weekly_cost_quota", "monthly_cost_quota":
 		quota := toString(value)
 		return &quota
 	default:

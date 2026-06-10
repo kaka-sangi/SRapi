@@ -43,22 +43,28 @@ type LedgerEntry struct {
 }
 
 type PricingRule struct {
-	ID                              int
-	ModelID                         int
-	ModelFamily                     string
-	ProviderID                      int
-	BillingMode                     BillingMode
-	InputPricePerMillionTokens      string
-	OutputPricePerMillionTokens     string
-	CacheReadPricePerMillionTokens  string
-	CacheWritePricePerMillionTokens string
-	PerRequestPrice                 string
-	Intervals                       []PricingInterval
-	Currency                        string
-	EffectiveFrom                   *time.Time
-	EffectiveTo                     *time.Time
-	CreatedAt                       time.Time
-	UpdatedAt                       time.Time
+	ID                                int
+	ModelID                           int
+	ModelFamily                       string
+	ProviderID                        int
+	BillingMode                       BillingMode
+	InputPricePerMillionTokens        string
+	OutputPricePerMillionTokens       string
+	CacheReadPricePerMillionTokens    string
+	CacheWritePricePerMillionTokens   string
+	CacheWrite5mPricePerMillionTokens string
+	CacheWrite1hPricePerMillionTokens string
+	ImageOutputPricePerMillionTokens  string
+	PerRequestPrice                   string
+	ServiceTierMultipliers            map[string]string
+	LongContextThresholdTokens        *int
+	LongContextMultiplier             string
+	Intervals                         []PricingInterval
+	Currency                          string
+	EffectiveFrom                     *time.Time
+	EffectiveTo                       *time.Time
+	CreatedAt                         time.Time
+	UpdatedAt                         time.Time
 }
 
 type PricingInterval struct {
@@ -78,47 +84,79 @@ type PricingInterval struct {
 }
 
 type CreatePricingRuleRequest struct {
-	ModelID                         int
-	ProviderID                      int
-	BillingMode                     BillingMode
-	InputPricePerMillionTokens      string
-	OutputPricePerMillionTokens     string
-	CacheReadPricePerMillionTokens  string
-	CacheWritePricePerMillionTokens string
-	PerRequestPrice                 string
-	Intervals                       []PricingInterval
-	Currency                        string
-	EffectiveFrom                   *time.Time
-	EffectiveTo                     *time.Time
+	ModelID                           int
+	ProviderID                        int
+	BillingMode                       BillingMode
+	InputPricePerMillionTokens        string
+	OutputPricePerMillionTokens       string
+	CacheReadPricePerMillionTokens    string
+	CacheWritePricePerMillionTokens   string
+	CacheWrite5mPricePerMillionTokens string
+	CacheWrite1hPricePerMillionTokens string
+	ImageOutputPricePerMillionTokens  string
+	PerRequestPrice                   string
+	ServiceTierMultipliers            map[string]string
+	LongContextThresholdTokens        *int
+	LongContextMultiplier             string
+	Intervals                         []PricingInterval
+	Currency                          string
+	EffectiveFrom                     *time.Time
+	EffectiveTo                       *time.Time
 }
 
 // UpdatePricingRuleRequest carries a partial pricing-rule edit: nil pointer
 // means "leave unchanged".
 type UpdatePricingRuleRequest struct {
-	BillingMode                     *BillingMode
-	InputPricePerMillionTokens      *string
-	OutputPricePerMillionTokens     *string
-	CacheReadPricePerMillionTokens  *string
-	CacheWritePricePerMillionTokens *string
-	PerRequestPrice                 *string
-	Intervals                       *[]PricingInterval
-	Currency                        *string
-	EffectiveFrom                   **time.Time
-	EffectiveTo                     **time.Time
+	BillingMode                       *BillingMode
+	InputPricePerMillionTokens        *string
+	OutputPricePerMillionTokens       *string
+	CacheReadPricePerMillionTokens    *string
+	CacheWritePricePerMillionTokens   *string
+	CacheWrite5mPricePerMillionTokens *string
+	CacheWrite1hPricePerMillionTokens *string
+	ImageOutputPricePerMillionTokens  *string
+	PerRequestPrice                   *string
+	ServiceTierMultipliers            *map[string]string
+	LongContextThresholdTokens        **int
+	LongContextMultiplier             *string
+	Intervals                         *[]PricingInterval
+	Currency                          *string
+	EffectiveFrom                     **time.Time
+	EffectiveTo                       **time.Time
 }
 
 type PricingRequest struct {
-	ModelID          int
-	ModelFamily      string
-	ProviderID       int
-	InputTokens      int
-	OutputTokens     int
-	CacheReadTokens  int
-	CacheWriteTokens int
-	ImageCount       int
-	ImageSize        string
-	At               time.Time
-	PricingOverride  map[string]any
+	ModelID            int
+	ModelFamily        string
+	ProviderID         int
+	RequestedModel     string
+	UpstreamModel      string
+	BillingModelSource string
+	ServiceTier        string
+	InputTokens        int
+	OutputTokens       int
+	CacheReadTokens    int
+	CacheWriteTokens   int
+	CacheWrite5mTokens int
+	CacheWrite1hTokens int
+	ImageOutputTokens  int
+	ImageCount         int
+	ImageSize          string
+	At                 time.Time
+	PricingOverride    map[string]any
+}
+
+// PricingRuleQuery narrows the hot-path price lookup. Stores should apply the
+// provider, effective window, model id, and family/name predicates before
+// materializing candidate rules.
+type PricingRuleQuery struct {
+	ModelID            int
+	ModelFamily        string
+	RequestedModel     string
+	UpstreamModel      string
+	BillingModelSource string
+	ProviderID         int
+	At                 time.Time
 }
 
 type PricingResult struct {
@@ -134,30 +172,38 @@ type PricingResult struct {
 
 type GatewayPricingRequest struct {
 	PricingRequest
-	RateMultiplier string
-	Success        bool
-	AllowanceMode  string
-	AllowanceQuota *string
-	UsedCost       string
-	Estimated      bool
+	RateMultiplier       string
+	Success              bool
+	AllowanceMode        string
+	DailyAllowanceQuota  *string
+	WeeklyAllowanceQuota *string
+	AllowanceQuota       *string
+	DailyUsedCost        string
+	WeeklyUsedCost       string
+	UsedCost             string
+	Estimated            bool
 }
 
 type GatewayCostRequest struct {
-	Amount         string
-	Currency       string
-	PricingRuleID  *int
-	BillingMode    BillingMode
-	InputCost      string
-	OutputCost     string
-	CacheReadCost  string
-	CacheWriteCost string
-	Source         string
-	Estimated      bool
-	RateMultiplier string
-	Success        bool
-	AllowanceMode  string
-	AllowanceQuota *string
-	UsedCost       string
+	Amount               string
+	Currency             string
+	PricingRuleID        *int
+	BillingMode          BillingMode
+	InputCost            string
+	OutputCost           string
+	CacheReadCost        string
+	CacheWriteCost       string
+	Source               string
+	Estimated            bool
+	RateMultiplier       string
+	Success              bool
+	AllowanceMode        string
+	DailyAllowanceQuota  *string
+	WeeklyAllowanceQuota *string
+	AllowanceQuota       *string
+	DailyUsedCost        string
+	WeeklyUsedCost       string
+	UsedCost             string
 }
 
 type GatewayPricingResult struct {
@@ -240,6 +286,7 @@ type PricingStore interface {
 	CreatePricingRule(ctx context.Context, input PricingRule) (PricingRule, error)
 	UpdatePricingRule(ctx context.Context, id int, input UpdatePricingRuleRequest) (PricingRule, error)
 	FindPricingRuleByID(ctx context.Context, id int) (PricingRule, error)
+	QueryPricingRules(ctx context.Context, query PricingRuleQuery) ([]PricingRule, error)
 	ListPricingRules(ctx context.Context) ([]PricingRule, error)
 	DeletePricingRule(ctx context.Context, id int) error
 }

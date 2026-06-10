@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
@@ -81,10 +82,12 @@ type Dependencies struct {
 }
 
 type Service struct {
-	store     contract.Store
-	masterKey []byte
-	deps      Dependencies
-	clock     Clock
+	store       contract.Store
+	masterKey   []byte
+	deps        Dependencies
+	clock       Clock
+	selectorMu  sync.Mutex
+	selectorSeq map[string]int
 }
 
 func New(store contract.Store, masterKey string, deps Dependencies, clock Clock) (*Service, error) {
@@ -104,7 +107,7 @@ func New(store contract.Store, masterKey string, deps Dependencies, clock Clock)
 	if deps.Checkout == nil {
 		deps.Checkout = defaultCheckoutRegistry(deps.Stripe)
 	}
-	return &Service{store: store, masterKey: derivedKey, deps: deps, clock: clock}, nil
+	return &Service{store: store, masterKey: derivedKey, deps: deps, clock: clock, selectorSeq: map[string]int{}}, nil
 }
 
 func (s *Service) CreateProviderInstance(ctx context.Context, req contract.CreateProviderInstanceRequest) (contract.PaymentProviderInstance, error) {
@@ -124,6 +127,14 @@ func (s *Service) CreateProviderInstance(ctx context.Context, req contract.Creat
 	if req.SortOrder != nil {
 		sortOrder = *req.SortOrder
 	}
+	feeRate, err := normalizeRatePtr(req.FeeRate)
+	if err != nil {
+		return contract.PaymentProviderInstance{}, err
+	}
+	if req.Weight != nil && *req.Weight <= 0 {
+		return contract.PaymentProviderInstance{}, ErrInvalidInput
+	}
+	weight := defaultProviderWeight(req.Weight)
 	methods := normalizeMethods(req.SupportedMethods)
 	if len(methods) == 0 {
 		methods = []string{provider}
@@ -141,6 +152,8 @@ func (s *Service) CreateProviderInstance(ctx context.Context, req contract.Creat
 		SupportedMethods: methods,
 		Limits:           cloneMap(req.Limits),
 		SortOrder:        sortOrder,
+		FeeRate:          feeRate,
+		Weight:           weight,
 		Metadata:         cloneMap(req.Metadata),
 	})
 }
@@ -207,6 +220,19 @@ func (s *Service) UpdateProviderInstance(ctx context.Context, id int, req contra
 	}
 	if req.SortOrder != nil {
 		provider.SortOrder = *req.SortOrder
+	}
+	if req.FeeRate != nil {
+		feeRate, err := normalizeRatePtr(req.FeeRate)
+		if err != nil {
+			return contract.PaymentProviderInstance{}, err
+		}
+		provider.FeeRate = feeRate
+	}
+	if req.Weight != nil {
+		if *req.Weight <= 0 {
+			return contract.PaymentProviderInstance{}, ErrInvalidInput
+		}
+		provider.Weight = *req.Weight
 	}
 	if req.Metadata != nil {
 		provider.Metadata = cloneMap(*req.Metadata)
@@ -355,13 +381,15 @@ func (s *Service) ListMethods(ctx context.Context) ([]contract.PaymentMethod, er
 		if instance.Status != contract.ProviderStatusActive || instance.DeletedAt != nil {
 			continue
 		}
+		metadata := publicProviderMetadata(instance.Metadata)
+		metadata["fee_rate"] = defaultMoney(instance.FeeRate)
 		for _, method := range normalizeMethods(instance.SupportedMethods) {
 			out = append(out, contract.PaymentMethod{
 				Method:             method,
 				Provider:           instance.Provider,
 				ProviderInstanceID: instance.ID,
 				Name:               instance.Name,
-				Metadata:           publicProviderMetadata(instance.Metadata),
+				Metadata:           cloneMap(metadata),
 			})
 		}
 	}
@@ -420,6 +448,10 @@ func (s *Service) CreateOrder(ctx context.Context, req contract.CreateOrderReque
 	if err != nil {
 		return contract.PaymentOrder{}, err
 	}
+	feeAmount, payableAmount, err := applyFeeRate(amount, instance.FeeRate)
+	if err != nil {
+		return contract.PaymentOrder{}, err
+	}
 	expiresAt := s.clock.Now().Add(defaultOrderExpiresIn)
 	if req.ExpiresAt != nil {
 		expiresAt = req.ExpiresAt.UTC()
@@ -428,12 +460,21 @@ func (s *Service) CreateOrder(ctx context.Context, req contract.CreateOrderReque
 		return contract.PaymentOrder{}, ErrInvalidInput
 	}
 	orderNo := newOrderNo()
+	orderMetadata := cloneMap(req.Metadata)
+	if strings.TrimSpace(req.PayerOpenID) != "" {
+		orderMetadata["payer_openid"] = strings.TrimSpace(req.PayerOpenID)
+	}
+	if strings.TrimSpace(req.PayerClientIP) != "" {
+		orderMetadata["payer_client_ip"] = strings.TrimSpace(req.PayerClientIP)
+	}
 	order, err := s.store.CreateOrder(ctx, contract.CreateStoredOrder{
 		UserID:             req.UserID,
 		OrderNo:            orderNo,
 		ProviderInstanceID: instance.ID,
 		OriginalAmount:     originalAmount,
 		DiscountAmount:     discountAmount,
+		FeeAmount:          feeAmount,
+		PayableAmount:      payableAmount,
 		PromoCodeID:        cloneInt(promoCodeID),
 		PromoCode:          promoCode,
 		Amount:             amount,
@@ -446,10 +487,13 @@ func (s *Service) CreateOrder(ctx context.Context, req contract.CreateOrderReque
 			"provider_instance_id": instance.ID,
 			"name":                 instance.Name,
 			"method":               strings.TrimSpace(req.Method),
+			"fee_rate":             defaultMoney(instance.FeeRate),
+			"fee_amount":           feeAmount,
+			"payable_amount":       payableAmount,
 			"metadata":             publicProviderMetadata(instance.Metadata),
 		},
 		ExpiresAt: &expiresAt,
-		Metadata:  cloneMap(req.Metadata),
+		Metadata:  orderMetadata,
 	})
 	if err != nil {
 		return contract.PaymentOrder{}, err
@@ -475,6 +519,16 @@ func (s *Service) FindOrderByID(ctx context.Context, id int) (contract.PaymentOr
 	return s.store.FindOrderByID(ctx, id)
 }
 
+func (s *Service) ListAuditLogsByOrder(ctx context.Context, orderID int) ([]contract.PaymentAuditLog, error) {
+	if orderID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	if _, err := s.store.FindOrderByID(ctx, orderID); err != nil {
+		return nil, err
+	}
+	return s.store.ListAuditLogsByOrder(ctx, orderID)
+}
+
 func (s *Service) CancelOrder(ctx context.Context, userID int, orderID int) (contract.PaymentOrder, error) {
 	if userID <= 0 || orderID <= 0 {
 		return contract.PaymentOrder{}, ErrInvalidInput
@@ -496,7 +550,16 @@ func (s *Service) CancelOrder(ctx context.Context, userID int, orderID int) (con
 	order.Status = contract.OrderStatusCanceled
 	order.ClosedAt = &now
 	order.UpdatedAt = now
-	return s.store.UpdateOrder(ctx, order)
+	updated, err := s.store.UpdateOrder(ctx, order)
+	if err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	if updated.PromoCodeID != nil {
+		if _, _, err := s.store.ReleasePromoCode(ctx, contract.PromoCodeReleaseInput{PaymentOrderID: updated.ID, ReleasedAt: now, Reason: "order_canceled"}); err != nil && !errors.Is(err, contract.ErrNotFound) {
+			return contract.PaymentOrder{}, err
+		}
+	}
+	return updated, nil
 }
 
 func (s *Service) ExpirePendingOrders(ctx context.Context, now time.Time) (contract.ExpireOrdersResult, error) {
@@ -522,6 +585,11 @@ func (s *Service) ExpirePendingOrders(ctx context.Context, now time.Time) (contr
 		}
 		if !expired {
 			continue
+		}
+		if updated.PromoCodeID != nil {
+			if _, _, err := s.store.ReleasePromoCode(ctx, contract.PromoCodeReleaseInput{PaymentOrderID: updated.ID, ReleasedAt: now, Reason: "order_expired"}); err != nil && !errors.Is(err, contract.ErrNotFound) {
+				continue
+			}
 		}
 		_, _, err = s.store.CreateAuditLog(ctx, contract.PaymentAuditLog{
 			OrderID:            updated.ID,
@@ -618,6 +686,27 @@ func (s *Service) HandleWebhook(ctx context.Context, req contract.WebhookRequest
 	if err := verifyWebhookOrder(order, normalized.Payload); err != nil {
 		return contract.WebhookResult{}, err
 	}
+	if status == "failed" {
+		updated, err := s.markFailed(ctx, order)
+		if err != nil {
+			return contract.WebhookResult{}, err
+		}
+		return contract.WebhookResult{Order: updated, Handled: true}, nil
+	}
+	if status == "refunded" {
+		updated, err := s.completePendingRefund(ctx, order, true, "refund.webhook")
+		if err != nil {
+			return contract.WebhookResult{}, err
+		}
+		return contract.WebhookResult{Order: updated, Handled: true}, nil
+	}
+	if status == "refund_failed" {
+		updated, err := s.completePendingRefund(ctx, order, false, "refund.webhook")
+		if err != nil {
+			return contract.WebhookResult{}, err
+		}
+		return contract.WebhookResult{Order: updated, Handled: true}, nil
+	}
 	if status != "paid" {
 		return contract.WebhookResult{Order: order, Handled: false}, nil
 	}
@@ -678,12 +767,14 @@ func (s *Service) attachProviderCheckout(ctx context.Context, order contract.Pay
 		return contract.PaymentOrder{}, err
 	}
 	session, err := provider.CreateSession(checkoutprovider.Request{
-		Provider: instance.Provider,
-		Config:   config,
-		OrderNo:  order.OrderNo,
-		UserID:   order.UserID,
-		Amount:   order.Amount,
-		Currency: order.Currency,
+		Provider:      instance.Provider,
+		Config:        config,
+		OrderNo:       order.OrderNo,
+		UserID:        order.UserID,
+		Amount:        payableAmount(order),
+		Currency:      order.Currency,
+		PayerOpenID:   payloadString(order.Metadata, "payer_openid"),
+		PayerClientIP: payloadString(order.Metadata, "payer_client_ip"),
 		Product: checkoutprovider.Product{
 			Type: string(order.ProductType),
 			ID:   order.ProductID,
@@ -752,7 +843,7 @@ func (s *Service) RequestRefund(ctx context.Context, req contract.RefundRequest)
 	// One-shot refund: the order carries no cumulative-refunded accounting, so a
 	// second refund (PartiallyRefunded -> Refunded, or another partial) would claw
 	// back more balance than was ever paid. Reject once any refund has happened.
-	if order.Status == contract.OrderStatusRefunded || order.Status == contract.OrderStatusPartiallyRefunded {
+	if order.Status == contract.OrderStatusRefunded || order.Status == contract.OrderStatusPartiallyRefunded || order.Status == contract.OrderStatusRefunding {
 		return contract.PaymentOrder{}, ErrInvalidTransition
 	}
 	refundAmount, ok := normalizeMoney(req.Amount)
@@ -763,6 +854,112 @@ func (s *Service) RequestRefund(ctx context.Context, req contract.RefundRequest)
 	if !ok || compareMoney(refundAmount, "0.00000000") <= 0 || compareMoney(refundAmount, order.Amount) > 0 {
 		return contract.PaymentOrder{}, ErrInvalidInput
 	}
+	if err := validateTransition(order.Status, contract.OrderStatusRefunding); err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	instance, err := s.store.FindProviderInstanceByID(ctx, order.ProviderInstanceID)
+	if err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	provider, ok := s.deps.Checkout[instance.Provider]
+	if !ok {
+		return contract.PaymentOrder{}, ErrProviderUnavailable
+	}
+	config, err := s.decryptConfig(instance, instance.ConfigCiphertext)
+	if err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	now := s.clock.Now()
+	original := order
+	order.Status = contract.OrderStatusRefunding
+	order.Metadata = cloneMap(order.Metadata)
+	order.Metadata["pending_refund_amount"] = refundAmount
+	order.Metadata["pending_refund_reason"] = strings.TrimSpace(req.Reason)
+	order.Metadata["pending_refund_provider_amount"] = payableRefundAmount(order, refundAmount)
+	order.UpdatedAt = now
+	refunding, err := s.store.UpdateOrder(ctx, order)
+	if err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	s.recordPaymentAudit(ctx, refunding, "refund.requested", "refund_requested:"+refunding.OrderNo+":"+refundAmount, map[string]any{
+		"order_no":               refunding.OrderNo,
+		"refund_amount":          refundAmount,
+		"provider_refund_amount": payloadString(refunding.Metadata, "pending_refund_provider_amount"),
+		"reason":                 strings.TrimSpace(req.Reason),
+	})
+	refundResult, err := provider.Refund(checkoutprovider.RefundRequest{
+		Provider:              instance.Provider,
+		Config:                config,
+		OrderNo:               refunding.OrderNo,
+		ProviderTransactionID: stringValue(refunding.ProviderTransactionID),
+		Amount:                payloadString(refunding.Metadata, "pending_refund_provider_amount"),
+		OriginalAmount:        payableAmount(refunding),
+		Currency:              refunding.Currency,
+		Reason:                strings.TrimSpace(req.Reason),
+		IdempotencyKey:        "refund:" + refunding.OrderNo + ":" + refundAmount,
+		Metadata: map[string]any{
+			"local_refund_amount": refundAmount,
+			"payment_order_id":    refunding.ID,
+		},
+	})
+	if err != nil {
+		original.UpdatedAt = s.clock.Now()
+		_, _ = s.store.UpdateOrder(ctx, original)
+		s.recordPaymentAudit(ctx, original, "refund.failed", "refund_failed:"+original.OrderNo+":"+refundAmount, map[string]any{
+			"order_no":      original.OrderNo,
+			"refund_amount": refundAmount,
+			"error":         err.Error(),
+		})
+		return contract.PaymentOrder{}, err
+	}
+	refunding.Metadata = cloneMap(refunding.Metadata)
+	if refundResult.ID != "" {
+		refunding.Metadata["pending_refund_id"] = refundResult.ID
+	}
+	for key, value := range refundResult.Metadata {
+		refunding.Metadata[key] = value
+	}
+	refunding.UpdatedAt = s.clock.Now()
+	refunding, err = s.store.UpdateOrder(ctx, refunding)
+	if err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	switch refundResult.Status {
+	case checkoutprovider.RefundStatusProcessing:
+		return refunding, nil
+	case checkoutprovider.RefundStatusFailed:
+		return s.completePendingRefund(ctx, refunding, false, strings.TrimSpace(req.Reason))
+	default:
+		return s.completePendingRefund(ctx, refunding, true, strings.TrimSpace(req.Reason))
+	}
+}
+
+func (s *Service) completePendingRefund(ctx context.Context, order contract.PaymentOrder, succeeded bool, reason string) (contract.PaymentOrder, error) {
+	if order.Status != contract.OrderStatusRefunding {
+		return contract.PaymentOrder{}, ErrInvalidTransition
+	}
+	refundAmount, ok := normalizeMoney(payloadString(order.Metadata, "pending_refund_amount"))
+	if !ok || compareMoney(refundAmount, "0.00000000") <= 0 || compareMoney(refundAmount, order.Amount) > 0 {
+		return contract.PaymentOrder{}, ErrInvalidInput
+	}
+	now := s.clock.Now()
+	if !succeeded {
+		if err := validateTransition(order.Status, contract.OrderStatusRefundFailed); err != nil {
+			return contract.PaymentOrder{}, err
+		}
+		order.Status = contract.OrderStatusRefundFailed
+		order.UpdatedAt = now
+		updated, err := s.store.UpdateOrder(ctx, order)
+		if err != nil {
+			return contract.PaymentOrder{}, err
+		}
+		s.recordPaymentAudit(ctx, updated, "refund.failed", "refund_failed:"+updated.OrderNo+":"+refundAmount, map[string]any{
+			"order_no":      updated.OrderNo,
+			"refund_amount": refundAmount,
+			"reason":        strings.TrimSpace(reason),
+		})
+		return updated, nil
+	}
 	nextStatus := contract.OrderStatusRefunded
 	if compareMoney(refundAmount, order.Amount) < 0 {
 		nextStatus = contract.OrderStatusPartiallyRefunded
@@ -770,11 +967,10 @@ func (s *Service) RequestRefund(ctx context.Context, req contract.RefundRequest)
 	if err := validateTransition(order.Status, nextStatus); err != nil {
 		return contract.PaymentOrder{}, err
 	}
-	now := s.clock.Now()
 	// Claw back the spendable balance BEFORE persisting the refunded status. Only
 	// balance_credit orders ever credited balance, so only those are debited. If
-	// the debit fails (e.g. the user already spent the funds), the order is left
-	// untouched instead of marked Refunded with the money never recovered.
+	// the debit fails (e.g. the user already spent the funds), the order remains
+	// refunding for operator follow-up instead of being marked refunded.
 	if order.ProductType == contract.ProductTypeBalanceCredit && s.deps.Balance != nil {
 		if err := s.deps.Balance.DebitBalance(ctx, order.UserID, refundAmount, order.Currency); err != nil {
 			return contract.PaymentOrder{}, err
@@ -797,12 +993,17 @@ func (s *Service) RequestRefund(ctx context.Context, req contract.RefundRequest)
 		ReferenceID:   order.OrderNo,
 		Metadata: map[string]any{
 			"payment_order_id": order.ID,
-			"refund_reason":    strings.TrimSpace(req.Reason),
+			"refund_reason":    strings.TrimSpace(reason),
 			"refund_amount":    refundAmount,
 		},
 	})
-	s.recordAudit(ctx, &req.ActorUserID, "payment_order.refund", "payment_order", strconv.Itoa(order.ID), paymentOrderAuditSnapshot(order), paymentOrderAuditSnapshot(updated))
-	s.enqueueRefunded(ctx, updated, refundAmount, req.Reason)
+	s.recordAudit(ctx, nil, "payment_order.refund", "payment_order", strconv.Itoa(order.ID), paymentOrderAuditSnapshot(order), paymentOrderAuditSnapshot(updated))
+	s.recordPaymentAudit(ctx, updated, "refund.succeeded", "refund_succeeded:"+updated.OrderNo+":"+refundAmount, map[string]any{
+		"order_no":      updated.OrderNo,
+		"refund_amount": refundAmount,
+		"reason":        strings.TrimSpace(reason),
+	})
+	s.enqueueRefunded(ctx, updated, refundAmount, reason)
 	return updated, nil
 }
 
@@ -834,6 +1035,96 @@ func (s *Service) markPaidAndFulfill(ctx context.Context, order contract.Payment
 	s.recordAudit(ctx, nil, "payment_order.fulfill", "payment_order", strconv.Itoa(order.ID), paymentOrderAuditSnapshot(order), paymentOrderAuditSnapshot(fulfilled))
 	s.enqueuePaid(ctx, fulfilled, instance)
 	return fulfilled, nil
+}
+
+func (s *Service) markFailed(ctx context.Context, order contract.PaymentOrder) (contract.PaymentOrder, error) {
+	if order.Status != contract.OrderStatusPending {
+		return order, nil
+	}
+	if err := validateTransition(order.Status, contract.OrderStatusFailed); err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	now := s.clock.Now()
+	order.Status = contract.OrderStatusFailed
+	order.ClosedAt = &now
+	order.UpdatedAt = now
+	updated, err := s.store.UpdateOrder(ctx, order)
+	if err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	if updated.PromoCodeID != nil {
+		if _, _, err := s.store.ReleasePromoCode(ctx, contract.PromoCodeReleaseInput{PaymentOrderID: updated.ID, ReleasedAt: now, Reason: "order_failed"}); err != nil && !errors.Is(err, contract.ErrNotFound) {
+			return contract.PaymentOrder{}, err
+		}
+	}
+	s.recordPaymentAudit(ctx, updated, "order.failed", "order_failed:"+updated.OrderNo, map[string]any{
+		"order_id":  updated.ID,
+		"order_no":  updated.OrderNo,
+		"failed_at": now.Format(time.RFC3339Nano),
+	})
+	return updated, nil
+}
+
+func (s *Service) ReconcilePendingOrders(ctx context.Context, now time.Time) (contract.ReconcileOrdersResult, error) {
+	if now.IsZero() {
+		now = s.clock.Now()
+	}
+	orders, err := s.store.ListPendingOrders(ctx, now)
+	if err != nil {
+		return contract.ReconcileOrdersResult{}, err
+	}
+	result := contract.ReconcileOrdersResult{Selected: len(orders)}
+	for _, order := range orders {
+		instance, err := s.store.FindProviderInstanceByID(ctx, order.ProviderInstanceID)
+		if err != nil {
+			continue
+		}
+		provider, ok := s.deps.Checkout[instance.Provider]
+		if !ok {
+			continue
+		}
+		config, err := s.decryptConfig(instance, instance.ConfigCiphertext)
+		if err != nil {
+			continue
+		}
+		query, err := provider.QueryOrder(checkoutprovider.QueryRequest{
+			Provider:              instance.Provider,
+			Config:                config,
+			OrderNo:               order.OrderNo,
+			ProviderTransactionID: stringValue(order.ProviderTransactionID),
+			Amount:                payableAmount(order),
+			Currency:              order.Currency,
+			Metadata:              cloneMap(order.Metadata),
+		})
+		if err != nil {
+			continue
+		}
+		s.recordPaymentAudit(ctx, order, "reconcile.query", "reconcile:"+order.OrderNo+":"+string(query.Status), map[string]any{
+			"order_no":                order.OrderNo,
+			"status":                  string(query.Status),
+			"provider_transaction_id": query.ProviderTransactionID,
+			"amount":                  query.Amount,
+			"currency":                query.Currency,
+		})
+		switch query.Status {
+		case checkoutprovider.QueryStatusPaid:
+			fulfilled, err := s.markPaidAndFulfill(ctx, order, instance, query.ProviderTransactionID)
+			if err != nil {
+				continue
+			}
+			s.recordPaymentAudit(ctx, fulfilled, "reconcile.fulfilled", "reconcile_fulfilled:"+fulfilled.OrderNo, map[string]any{
+				"order_no":                fulfilled.OrderNo,
+				"provider_transaction_id": stringValue(fulfilled.ProviderTransactionID),
+			})
+			result.Paid++
+		case checkoutprovider.QueryStatusFailed, checkoutprovider.QueryStatusCanceled:
+			if _, err := s.markFailed(ctx, order); err != nil {
+				continue
+			}
+			result.Failed++
+		}
+	}
+	return result, nil
 }
 
 func (s *Service) fulfill(ctx context.Context, order contract.PaymentOrder, instance contract.PaymentProviderInstance) error {
@@ -900,6 +1191,18 @@ func (s *Service) recordAudit(ctx context.Context, actorUserID *int, action stri
 		ResourceID:   resourceID,
 		Before:       before,
 		After:        after,
+	})
+}
+
+func (s *Service) recordPaymentAudit(ctx context.Context, order contract.PaymentOrder, eventType string, idempotencyKey string, payload map[string]any) {
+	_, _, _ = s.store.CreateAuditLog(ctx, contract.PaymentAuditLog{
+		OrderID:            order.ID,
+		ProviderInstanceID: order.ProviderInstanceID,
+		EventType:          eventType,
+		IdempotencyKey:     idempotencyKey,
+		Payload:            sanitizePayload(payload),
+		SignatureValid:     true,
+		CreatedAt:          s.clock.Now(),
 	})
 }
 
@@ -983,7 +1286,32 @@ func (s *Service) selectProviderInstance(ctx context.Context, method string, amo
 	if len(candidates) == 0 {
 		return contract.PaymentProviderInstance{}, ErrProviderUnavailable
 	}
-	return candidates[0], nil
+	return s.nextProviderCandidate(method, candidates), nil
+}
+
+func (s *Service) nextProviderCandidate(method string, candidates []contract.PaymentProviderInstance) contract.PaymentProviderInstance {
+	if len(candidates) == 1 {
+		return candidates[0]
+	}
+	expanded := make([]contract.PaymentProviderInstance, 0, len(candidates))
+	for _, candidate := range candidates {
+		weight := candidate.Weight
+		if weight <= 0 {
+			weight = 1
+		}
+		for i := 0; i < weight; i++ {
+			expanded = append(expanded, candidate)
+		}
+	}
+	if len(expanded) == 0 {
+		return candidates[0]
+	}
+	s.selectorMu.Lock()
+	defer s.selectorMu.Unlock()
+	key := strings.ToLower(strings.TrimSpace(method))
+	idx := s.selectorSeq[key] % len(expanded)
+	s.selectorSeq[key]++
+	return expanded[idx]
 }
 
 func (s *Service) encryptConfig(provider string, name string, payload map[string]any) (string, error) {
@@ -1088,7 +1416,7 @@ func canonicalPayload(payload map[string]any) string {
 
 func verifyWebhookOrder(order contract.PaymentOrder, payload map[string]any) error {
 	amount, ok := normalizeMoney(payloadString(payload, "amount", "money"))
-	if !ok || amount != order.Amount {
+	if !ok || amount != payableAmount(order) {
 		return ErrOrderMismatch
 	}
 	currency := normalizeCurrency(payloadString(payload, "currency"))
@@ -1110,16 +1438,25 @@ func validateTransition(from contract.OrderStatus, to contract.OrderStatus) erro
 		}
 	case contract.OrderStatusPaid:
 		switch to {
-		case contract.OrderStatusFulfilled, contract.OrderStatusPartiallyRefunded, contract.OrderStatusRefunded:
+		case contract.OrderStatusFulfilled, contract.OrderStatusPartiallyRefunded, contract.OrderStatusRefunding, contract.OrderStatusRefunded:
 			return nil
 		}
 	case contract.OrderStatusFulfilled:
 		switch to {
-		case contract.OrderStatusPartiallyRefunded, contract.OrderStatusRefunded:
+		case contract.OrderStatusPartiallyRefunded, contract.OrderStatusRefunding, contract.OrderStatusRefunded:
+			return nil
+		}
+	case contract.OrderStatusRefunding:
+		switch to {
+		case contract.OrderStatusPartiallyRefunded, contract.OrderStatusRefunded, contract.OrderStatusRefundFailed:
+			return nil
+		}
+	case contract.OrderStatusRefundFailed:
+		if to == contract.OrderStatusRefunding {
 			return nil
 		}
 	case contract.OrderStatusPartiallyRefunded:
-		if to == contract.OrderStatusRefunded {
+		if to == contract.OrderStatusRefunding || to == contract.OrderStatusRefunded {
 			return nil
 		}
 	}
@@ -1130,6 +1467,10 @@ func normalizeProviderStatus(status string) string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "paid", "success", "succeeded", "trade_success", "finished":
 		return "paid"
+	case "refunded", "refund_success", "refund_succeeded", "refund.success", "refund_successful":
+		return "refunded"
+	case "refund_failed", "refund.fail", "refund_failure":
+		return "refund_failed"
 	case "failed", "failure":
 		return "failed"
 	case "canceled", "cancelled", "closed":
@@ -1240,6 +1581,69 @@ func withinLimits(limits map[string]any, amount string, currency string) bool {
 		return false
 	}
 	return true
+}
+
+func applyFeeRate(amount string, feeRate string) (string, string, error) {
+	amountRat, ok := money.DecimalRat(amount)
+	if !ok || amountRat.Sign() < 0 {
+		return "", "", ErrInvalidInput
+	}
+	rateRat, ok := money.DecimalRat(defaultMoney(feeRate))
+	if !ok || rateRat.Sign() < 0 {
+		return "", "", ErrInvalidInput
+	}
+	feeRat := new(big.Rat).Mul(amountRat, rateRat)
+	feeAmount := money.FormatRatFixed(feeRat, 8)
+	payableRat := new(big.Rat).Add(amountRat, feeRat)
+	return feeAmount, money.FormatRatFixed(payableRat, 8), nil
+}
+
+func payableAmount(order contract.PaymentOrder) string {
+	if strings.TrimSpace(order.PayableAmount) != "" {
+		return defaultMoney(order.PayableAmount)
+	}
+	return defaultMoney(order.Amount)
+}
+
+func payableRefundAmount(order contract.PaymentOrder, refundAmount string) string {
+	if compareMoney(refundAmount, order.Amount) == 0 {
+		return payableAmount(order)
+	}
+	refundRat, ok := money.DecimalRat(defaultMoney(refundAmount))
+	if !ok {
+		return defaultMoney(refundAmount)
+	}
+	amountRat, ok := money.DecimalRat(defaultMoney(order.Amount))
+	if !ok || amountRat.Sign() == 0 {
+		return defaultMoney(refundAmount)
+	}
+	payableRat, ok := money.DecimalRat(payableAmount(order))
+	if !ok {
+		return defaultMoney(refundAmount)
+	}
+	ratio := new(big.Rat).Quo(refundRat, amountRat)
+	return money.FormatRatFixed(new(big.Rat).Mul(payableRat, ratio), 8)
+}
+
+func normalizeRatePtr(value *string) (string, error) {
+	if value == nil {
+		return "0.00000000", nil
+	}
+	normalized, ok := normalizeMoney(*value)
+	if !ok {
+		return "", ErrInvalidInput
+	}
+	return normalized, nil
+}
+
+func defaultProviderWeight(value *int) int {
+	if value == nil {
+		return 1
+	}
+	if *value <= 0 {
+		return 0
+	}
+	return *value
 }
 
 func normalizeMoney(value string) (string, bool) {

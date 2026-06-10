@@ -27,3 +27,11 @@ func (a stripeCheckoutAdapter) CreateSession(req checkoutprovider.Request) (chec
 	}
 	return stripeprovider.Provider{Creator: a.creator}.CreateSession(req)
 }
+
+func (a stripeCheckoutAdapter) Refund(req checkoutprovider.RefundRequest) (checkoutprovider.RefundResult, error) {
+	return stripeprovider.Provider{}.Refund(req)
+}
+
+func (a stripeCheckoutAdapter) QueryOrder(req checkoutprovider.QueryRequest) (checkoutprovider.QueryResult, error) {
+	return stripeprovider.Provider{}.QueryOrder(req)
+}

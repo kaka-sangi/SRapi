@@ -182,15 +182,22 @@ func TestStorePersistsPricingRules(t *testing.T) {
 	ctx := context.Background()
 	from := time.Date(2026, 5, 22, 11, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 5, 22, 13, 0, 0, 0, time.UTC)
+	threshold := 200000
 	rule, err := store.CreatePricingRule(ctx, contract.PricingRule{
-		ModelID:                         11,
-		ProviderID:                      22,
-		BillingMode:                     contract.BillingModeImage,
-		InputPricePerMillionTokens:      "1.25000000",
-		OutputPricePerMillionTokens:     "2.50000000",
-		CacheReadPricePerMillionTokens:  "0.10000000",
-		CacheWritePricePerMillionTokens: "0.20000000",
-		PerRequestPrice:                 "0.03000000",
+		ModelID:                           11,
+		ProviderID:                        22,
+		BillingMode:                       contract.BillingModeImage,
+		InputPricePerMillionTokens:        "1.25000000",
+		OutputPricePerMillionTokens:       "2.50000000",
+		CacheReadPricePerMillionTokens:    "0.10000000",
+		CacheWritePricePerMillionTokens:   "0.20000000",
+		CacheWrite5mPricePerMillionTokens: "0.20000000",
+		CacheWrite1hPricePerMillionTokens: "0.40000000",
+		ImageOutputPricePerMillionTokens:  "5.00000000",
+		PerRequestPrice:                   "0.03000000",
+		ServiceTierMultipliers:            map[string]string{"priority": "2.00000000"},
+		LongContextThresholdTokens:        &threshold,
+		LongContextMultiplier:             "2.00000000",
 		Intervals: []contract.PricingInterval{
 			{ImageSize: "1024x1024", PerImagePrice: "0.04000000"},
 		},
@@ -210,6 +217,13 @@ func TestStorePersistsPricingRules(t *testing.T) {
 	}
 	if rules[0].BillingMode != contract.BillingModeImage || rules[0].PerRequestPrice != "0.03000000" || len(rules[0].Intervals) != 1 || rules[0].Intervals[0].PerImagePrice != "0.04000000" {
 		t.Fatalf("expected persisted billing mode and interval, got %+v", rules[0])
+	}
+	if rules[0].CacheWrite1hPricePerMillionTokens != "0.40000000" ||
+		rules[0].ImageOutputPricePerMillionTokens != "5.00000000" ||
+		rules[0].ServiceTierMultipliers["priority"] != "2.00000000" ||
+		rules[0].LongContextThresholdTokens == nil || *rules[0].LongContextThresholdTokens != threshold ||
+		rules[0].LongContextMultiplier != "2.00000000" {
+		t.Fatalf("expected persisted batch13 pricing dimensions, got %+v", rules[0])
 	}
 }
 

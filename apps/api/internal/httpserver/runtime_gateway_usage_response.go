@@ -56,30 +56,38 @@ func gatewayUsageMode(key apikeycontract.APIKey) apiopenapi.GatewayUsageResponse
 
 func gatewayUsageTotals(summary usagecontract.APIKeyUsageSummary) apiopenapi.GatewayUsageTotals {
 	return apiopenapi.GatewayUsageTotals{
-		CachedTokens: summary.CachedTokens,
-		Cost:         summary.TotalCost,
-		Currency:     normalizeGatewayUsageCurrency(summary.Currency),
-		ErrorCount:   summary.ErrorCount,
-		InputTokens:  summary.InputTokens,
-		OutputTokens: summary.OutputTokens,
-		Requests:     summary.RequestCount,
-		SuccessCount: summary.SuccessCount,
-		TotalTokens:  summary.TotalTokens,
+		CachedTokens:   summary.CachedTokens,
+		CacheReadCost:  &summary.CacheReadCost,
+		CacheWriteCost: &summary.CacheWriteCost,
+		Cost:           summary.TotalCost,
+		Currency:       normalizeGatewayUsageCurrency(summary.Currency),
+		ErrorCount:     summary.ErrorCount,
+		InputCost:      &summary.InputCost,
+		InputTokens:    summary.InputTokens,
+		OutputCost:     &summary.OutputCost,
+		OutputTokens:   summary.OutputTokens,
+		Requests:       summary.RequestCount,
+		SuccessCount:   summary.SuccessCount,
+		TotalTokens:    summary.TotalTokens,
 	}
 }
 
 func gatewayUsageWindow(summary usagecontract.UsageAggregate) apiopenapi.GatewayUsageWindow {
 	return apiopenapi.GatewayUsageWindow{
-		CachedTokens: summary.CachedTokens,
-		Cost:         summary.TotalCost,
-		Currency:     normalizeGatewayUsageCurrency(summary.Currency),
-		Date:         gatewayUsageDate(summary.Key),
-		ErrorCount:   summary.ErrorCount,
-		InputTokens:  summary.InputTokens,
-		OutputTokens: summary.OutputTokens,
-		Requests:     summary.RequestCount,
-		SuccessCount: summary.SuccessCount,
-		TotalTokens:  summary.TotalTokens,
+		CachedTokens:   summary.CachedTokens,
+		CacheReadCost:  &summary.CacheReadCost,
+		CacheWriteCost: &summary.CacheWriteCost,
+		Cost:           summary.TotalCost,
+		Currency:       normalizeGatewayUsageCurrency(summary.Currency),
+		Date:           gatewayUsageDate(summary.Key),
+		ErrorCount:     summary.ErrorCount,
+		InputCost:      &summary.InputCost,
+		InputTokens:    summary.InputTokens,
+		OutputCost:     &summary.OutputCost,
+		OutputTokens:   summary.OutputTokens,
+		Requests:       summary.RequestCount,
+		SuccessCount:   summary.SuccessCount,
+		TotalTokens:    summary.TotalTokens,
 	}
 }
 
@@ -95,16 +103,20 @@ func gatewayUsageModels(values []usagecontract.UsageAggregate) []apiopenapi.Gate
 	out := make([]apiopenapi.GatewayUsageModel, 0, len(values))
 	for _, item := range values {
 		out = append(out, apiopenapi.GatewayUsageModel{
-			CachedTokens: item.CachedTokens,
-			Cost:         item.TotalCost,
-			Currency:     normalizeGatewayUsageCurrency(item.Currency),
-			ErrorCount:   item.ErrorCount,
-			InputTokens:  item.InputTokens,
-			Model:        item.Key,
-			OutputTokens: item.OutputTokens,
-			Requests:     item.RequestCount,
-			SuccessCount: item.SuccessCount,
-			TotalTokens:  item.TotalTokens,
+			CachedTokens:   item.CachedTokens,
+			CacheReadCost:  &item.CacheReadCost,
+			CacheWriteCost: &item.CacheWriteCost,
+			Cost:           item.TotalCost,
+			Currency:       normalizeGatewayUsageCurrency(item.Currency),
+			ErrorCount:     item.ErrorCount,
+			InputCost:      &item.InputCost,
+			InputTokens:    item.InputTokens,
+			Model:          item.Key,
+			OutputCost:     &item.OutputCost,
+			OutputTokens:   item.OutputTokens,
+			Requests:       item.RequestCount,
+			SuccessCount:   item.SuccessCount,
+			TotalTokens:    item.TotalTokens,
 		})
 	}
 	return out

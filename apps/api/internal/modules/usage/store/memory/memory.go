@@ -92,6 +92,28 @@ func (s *Store) ListByUser(_ context.Context, userID int) ([]contract.UsageLog, 
 	return out, nil
 }
 
+func (s *Store) ListByAccountWindow(_ context.Context, filter contract.AccountWindowFilter) ([]contract.UsageLog, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	start := filter.Start.UTC()
+	end := filter.End.UTC()
+	out := make([]contract.UsageLog, 0)
+	for _, log := range s.byID {
+		if log.AccountID == nil || *log.AccountID != filter.AccountID {
+			continue
+		}
+		if log.CreatedAt.Before(start) || !log.CreatedAt.Before(end) {
+			continue
+		}
+		out = append(out, cloneLog(log))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	if filter.Limit > 0 && len(out) > filter.Limit {
+		out = out[len(out)-filter.Limit:]
+	}
+	return out, nil
+}
+
 func (s *Store) SummarizeUserWindow(_ context.Context, filter contract.UserWindowFilter) (contract.UserWindowSummary, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -151,7 +151,10 @@ func TestPaymentWebhookFulfillsSubscriptionOrderIdempotently(t *testing.T) {
 // Regression for B2: a paid balance_credit top-up must credit the user's
 // spendable balance, and refunding it must claw that balance back.
 func TestPaidBalanceCreditCreditsThenRefundDebits(t *testing.T) {
-	h := newHarness(t)
+	checkout := &fakeCheckoutProvider{
+		refund: checkoutprovider.RefundResult{ID: "rf_success", Status: checkoutprovider.RefundStatusSucceeded},
+	}
+	h := newHarnessWithDeps(t, Dependencies{Checkout: checkoutprovider.Registry{"easypay": checkout}})
 	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
 		Provider:         "easypay",
 		Name:             "primary",
@@ -194,11 +197,70 @@ func TestPaidBalanceCreditCreditsThenRefundDebits(t *testing.T) {
 		t.Fatalf("balance after top-up = %s, want 25.00000000", got)
 	}
 
-	if _, err := h.payments.RequestRefund(t.Context(), contract.RefundRequest{OrderID: order.ID, ActorUserID: 1, Reason: "test refund"}); err != nil {
+	refunded, err := h.payments.RequestRefund(t.Context(), contract.RefundRequest{OrderID: order.ID, ActorUserID: 1, Reason: "test refund"})
+	if err != nil {
 		t.Fatalf("refund: %v", err)
+	}
+	if checkout.lastRefund.OrderNo != order.OrderNo || checkout.lastRefund.Amount != "25.00000000" {
+		t.Fatalf("expected upstream refund before local settlement, got %+v", checkout.lastRefund)
+	}
+	if refunded.Status != contract.OrderStatusRefunded {
+		t.Fatalf("expected refunded order, got %+v", refunded)
 	}
 	if got := h.balance.net(7); got != "0.00000000" {
 		t.Fatalf("balance after refund = %s, want 0.00000000 (credit must be clawed back)", got)
+	}
+}
+
+func TestRefundUpstreamFailureDoesNotMutateOrderOrBalance(t *testing.T) {
+	checkout := &fakeCheckoutProvider{refundErr: errors.New("upstream refund failed")}
+	h := newHarnessWithDeps(t, Dependencies{Checkout: checkoutprovider.Registry{"easypay": checkout}})
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "primary",
+		Config:           easypayTestConfig("provider-signing-secret"),
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "USD"},
+	}); err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      7,
+		Method:      "alipay",
+		Amount:      "25.00",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	payload := map[string]any{
+		"order_no":        order.OrderNo,
+		"amount":          "25.00000000",
+		"currency":        "USD",
+		"status":          "paid",
+		"transaction_id":  "txn_balance",
+		"idempotency_key": "evt_balance_paid_failure_case",
+	}
+	if _, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{
+		Provider: "easypay",
+		Headers:  map[string]string{"X-SRapi-Payment-Signature": signWebhookPayload("provider-signing-secret", payload)},
+		Payload:  payload,
+	}); err != nil {
+		t.Fatalf("handle webhook: %v", err)
+	}
+	if _, err := h.payments.RequestRefund(t.Context(), contract.RefundRequest{OrderID: order.ID, ActorUserID: 1, Reason: "test refund"}); err == nil {
+		t.Fatal("expected upstream refund error")
+	}
+	updated, err := h.payments.FindOrderByID(t.Context(), order.ID)
+	if err != nil {
+		t.Fatalf("find order: %v", err)
+	}
+	if updated.Status != contract.OrderStatusFulfilled {
+		t.Fatalf("upstream refund failure must restore original order status, got %+v", updated)
+	}
+	if got := h.balance.net(7); got != "25.00000000" {
+		t.Fatalf("balance after failed refund = %s, want 25.00000000", got)
 	}
 }
 
@@ -206,7 +268,10 @@ func TestPaidBalanceCreditCreditsThenRefundDebits(t *testing.T) {
 // a second refund would claw back more balance than was ever paid. Verify the
 // second attempt is rejected and the balance is not debited again.
 func TestRefundIsOneShotPreventsDoubleDebit(t *testing.T) {
-	h := newHarness(t)
+	checkout := &fakeCheckoutProvider{
+		refund: checkoutprovider.RefundResult{ID: "rf_partial", Status: checkoutprovider.RefundStatusSucceeded},
+	}
+	h := newHarnessWithDeps(t, Dependencies{Checkout: checkoutprovider.Registry{"easypay": checkout}})
 	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
 		Provider:         "easypay",
 		Name:             "primary",
@@ -256,6 +321,174 @@ func TestRefundIsOneShotPreventsDoubleDebit(t *testing.T) {
 	}
 	if got := h.balance.net(7); got != "15.00000000" {
 		t.Fatalf("balance after rejected second refund = %s, want 15.00000000 (no double debit)", got)
+	}
+}
+
+func TestRefundProcessingWebhookCompletesOrFails(t *testing.T) {
+	checkout := &fakeCheckoutProvider{
+		refund: checkoutprovider.RefundResult{ID: "rf_async", Status: checkoutprovider.RefundStatusProcessing},
+	}
+	h := newHarnessWithDeps(t, Dependencies{Checkout: checkoutprovider.Registry{"easypay": checkout}})
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "primary",
+		Config:           easypayTestConfig("provider-signing-secret"),
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "USD"},
+	}); err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+	order := createPaidBalanceOrder(t, h, "evt_async_refund_paid")
+	refunding, err := h.payments.RequestRefund(t.Context(), contract.RefundRequest{OrderID: order.ID, ActorUserID: 1, Amount: "10.00", Reason: "async"})
+	if err != nil {
+		t.Fatalf("request async refund: %v", err)
+	}
+	if refunding.Status != contract.OrderStatusRefunding {
+		t.Fatalf("expected refunding status, got %+v", refunding)
+	}
+	if got := h.balance.net(7); got != "25.00000000" {
+		t.Fatalf("balance before refund webhook = %s, want 25.00000000", got)
+	}
+	payload := map[string]any{
+		"order_no":        order.OrderNo,
+		"amount":          "25.00000000",
+		"currency":        "USD",
+		"status":          "refunded",
+		"transaction_id":  "txn_balance",
+		"idempotency_key": "evt_refund_done",
+	}
+	result, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{
+		Provider: "easypay",
+		Headers:  map[string]string{"X-SRapi-Payment-Signature": signWebhookPayload("provider-signing-secret", payload)},
+		Payload:  payload,
+	})
+	if err != nil {
+		t.Fatalf("handle refund webhook: %v", err)
+	}
+	if !result.Handled || result.Order.Status != contract.OrderStatusPartiallyRefunded {
+		t.Fatalf("expected partial refund terminal status, got %+v", result)
+	}
+	if got := h.balance.net(7); got != "15.00000000" {
+		t.Fatalf("balance after async refund = %s, want 15.00000000", got)
+	}
+
+	order = createPaidBalanceOrder(t, h, "evt_async_refund_failed_paid")
+	refunding, err = h.payments.RequestRefund(t.Context(), contract.RefundRequest{OrderID: order.ID, ActorUserID: 1, Amount: "5.00", Reason: "async fail"})
+	if err != nil {
+		t.Fatalf("request failed async refund: %v", err)
+	}
+	payload["order_no"] = order.OrderNo
+	payload["status"] = "refund_failed"
+	payload["idempotency_key"] = "evt_refund_failed"
+	result, err = h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{
+		Provider: "easypay",
+		Headers:  map[string]string{"X-SRapi-Payment-Signature": signWebhookPayload("provider-signing-secret", payload)},
+		Payload:  payload,
+	})
+	if err != nil {
+		t.Fatalf("handle refund failed webhook: %v", err)
+	}
+	if !result.Handled || result.Order.Status != contract.OrderStatusRefundFailed || refunding.Status != contract.OrderStatusRefunding {
+		t.Fatalf("expected refund_failed status, got result=%+v refunding=%+v", result, refunding)
+	}
+}
+
+func TestCreateOrderAppliesFeeRateAndRoundRobinSelection(t *testing.T) {
+	checkout := &fakeCheckoutProvider{session: checkoutprovider.Session{ID: "session"}}
+	h := newHarnessWithDeps(t, Dependencies{Checkout: checkoutprovider.Registry{"easypay": checkout}})
+	feeRate := "0.03000000"
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "first",
+		Config:           easypayTestConfig("secret-1"),
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "USD"},
+		FeeRate:          &feeRate,
+	}); err != nil {
+		t.Fatalf("create first provider: %v", err)
+	}
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "second",
+		Config:           easypayTestConfig("secret-2"),
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "USD"},
+		FeeRate:          &feeRate,
+	}); err != nil {
+		t.Fatalf("create second provider: %v", err)
+	}
+	first, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{UserID: 7, Method: "alipay", Amount: "10.00", Currency: "USD", ProductType: contract.ProductTypeBalanceCredit})
+	if err != nil {
+		t.Fatalf("create first order: %v", err)
+	}
+	second, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{UserID: 7, Method: "alipay", Amount: "10.00", Currency: "USD", ProductType: contract.ProductTypeBalanceCredit})
+	if err != nil {
+		t.Fatalf("create second order: %v", err)
+	}
+	if first.ProviderInstanceID == second.ProviderInstanceID {
+		t.Fatalf("round-robin should split providers, first=%+v second=%+v", first, second)
+	}
+	if first.Amount != "10.00000000" || first.FeeAmount != "0.30000000" || first.PayableAmount != "10.30000000" {
+		t.Fatalf("unexpected fee calculation: %+v", first)
+	}
+	if got := first.ProviderSnapshot["payable_amount"]; got != "10.30000000" {
+		t.Fatalf("expected payable amount in provider snapshot, got %+v", first.ProviderSnapshot)
+	}
+	methods, err := h.payments.ListMethods(t.Context())
+	if err != nil {
+		t.Fatalf("list methods: %v", err)
+	}
+	if len(methods) != 2 || methods[0].Metadata["fee_rate"] != "0.03000000" || methods[1].Metadata["fee_rate"] != "0.03000000" {
+		t.Fatalf("expected fee_rate metadata on public methods, got %+v", methods)
+	}
+}
+
+func TestFailedWebhookMarksPendingOrderFailed(t *testing.T) {
+	h := newHarness(t)
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "primary",
+		Config:           easypayTestConfig("provider-signing-secret"),
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "USD"},
+	}); err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      7,
+		Method:      "alipay",
+		Amount:      "25.00",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	payload := map[string]any{
+		"order_no":        order.OrderNo,
+		"amount":          "25.00000000",
+		"currency":        "USD",
+		"status":          "failed",
+		"transaction_id":  "txn_failed",
+		"idempotency_key": "evt_failed",
+	}
+	result, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{
+		Provider: "easypay",
+		Headers:  map[string]string{"X-SRapi-Payment-Signature": signWebhookPayload("provider-signing-secret", payload)},
+		Payload:  payload,
+	})
+	if err != nil {
+		t.Fatalf("handle failed webhook: %v", err)
+	}
+	if !result.Handled || result.Order.Status != contract.OrderStatusFailed {
+		t.Fatalf("expected failed order, got %+v", result)
+	}
+	audits, err := h.store.ListAuditLogsByOrder(t.Context(), order.ID)
+	if err != nil {
+		t.Fatalf("list audits: %v", err)
+	}
+	if len(audits) < 2 || audits[len(audits)-1].EventType != "order.failed" {
+		t.Fatalf("expected failed audit log, got %+v", audits)
 	}
 }
 
@@ -567,7 +800,7 @@ func TestCreateOrderAppliesPromoCodeBeforeCheckout(t *testing.T) {
 func TestWechatOrderCreatesPrepayCheckoutMetadata(t *testing.T) {
 	h := newHarnessWithDeps(t, Dependencies{
 		Checkout: checkoutprovider.Registry{
-			"wechat": fakeCheckoutProvider{session: checkoutprovider.Session{
+			"wechat": &fakeCheckoutProvider{session: checkoutprovider.Session{
 				ID:  "prepay_id=test",
 				URL: "weixin://wxpay/bizpayurl?pr=test",
 				Metadata: map[string]any{
@@ -1076,6 +1309,50 @@ func TestPaymentOrderStatusMachineRejectsIllegalTransitions(t *testing.T) {
 	}
 }
 
+func TestCancelOrderReleasesPromoUsage(t *testing.T) {
+	store := &promoPreviewStore{
+		Store: paymentmemory.New(),
+		preview: contract.PromoCodeApplication{
+			PromoCodeID:    44,
+			OriginalAmount: "20.00000000",
+			DiscountAmount: "5.00000000",
+			FinalAmount:    "15.00000000",
+			Currency:       "USD",
+		},
+	}
+	payments, err := New(store, testMasterKey, Dependencies{}, fixedClock{now: time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new payments service: %v", err)
+	}
+	if _, err := payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "manual",
+		Name:             "manual-credit",
+		Config:           map[string]any{"webhook_secret": "manual-secret"},
+		SupportedMethods: []string{"manual"},
+	}); err != nil {
+		t.Fatalf("create provider instance: %v", err)
+	}
+	order, err := payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      7,
+		Method:      "manual",
+		Amount:      "20.00",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+		PromoCode:   "SAVE5",
+	})
+	if err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	canceled, err := payments.CancelOrder(t.Context(), 7, order.ID)
+	if err != nil {
+		t.Fatalf("cancel order: %v", err)
+	}
+	if canceled.Status != contract.OrderStatusCanceled || len(store.releases) != 1 || store.releases[0].PaymentOrderID != order.ID || store.releases[0].Reason != "order_canceled" {
+		t.Fatalf("expected promo release on cancel, order=%+v releases=%+v", canceled, store.releases)
+	}
+}
+
 func TestExpirePendingOrdersMarksExpiredOrdersAndWritesAudit(t *testing.T) {
 	h := newHarness(t)
 	_, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
@@ -1159,6 +1436,56 @@ func TestExpirePendingOrdersMarksExpiredOrdersAndWritesAudit(t *testing.T) {
 	}
 }
 
+func TestExpirePendingOrdersReleasesPromoUsage(t *testing.T) {
+	store := &promoPreviewStore{
+		Store: paymentmemory.New(),
+		preview: contract.PromoCodeApplication{
+			PromoCodeID:    44,
+			OriginalAmount: "20.00000000",
+			DiscountAmount: "5.00000000",
+			FinalAmount:    "15.00000000",
+			Currency:       "USD",
+		},
+	}
+	payments, err := New(store, testMasterKey, Dependencies{}, fixedClock{now: time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new payments service: %v", err)
+	}
+	if _, err := payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "manual",
+		Name:             "manual-credit",
+		Config:           map[string]any{"webhook_secret": "manual-secret"},
+		SupportedMethods: []string{"manual"},
+	}); err != nil {
+		t.Fatalf("create provider instance: %v", err)
+	}
+	order, err := payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      7,
+		Method:      "manual",
+		Amount:      "20.00",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+		PromoCode:   "SAVE5",
+	})
+	if err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	now := time.Date(2026, 6, 9, 12, 5, 0, 0, time.UTC)
+	past := now.Add(-time.Minute)
+	order.ExpiresAt = &past
+	if _, err := store.UpdateOrder(t.Context(), order); err != nil {
+		t.Fatalf("backdate order expiry: %v", err)
+	}
+
+	result, err := payments.ExpirePendingOrders(t.Context(), now)
+	if err != nil {
+		t.Fatalf("expire pending orders: %v", err)
+	}
+	if result.Expired != 1 || len(store.releases) != 1 || store.releases[0].PaymentOrderID != order.ID || store.releases[0].Reason != "order_expired" {
+		t.Fatalf("expected promo release on expire, result=%+v releases=%+v", result, store.releases)
+	}
+}
+
 func TestDeleteProviderInstanceSoftDeletesAndGuardsInProgressOrders(t *testing.T) {
 	h := newHarness(t)
 
@@ -1239,6 +1566,7 @@ type promoPreviewStore struct {
 	previewErr   error
 	previewInput contract.PromoCodePreviewInput
 	createInput  contract.CreateStoredOrder
+	releases     []contract.PromoCodeReleaseInput
 }
 
 func (s *promoPreviewStore) PreviewPromoCode(_ context.Context, input contract.PromoCodePreviewInput) (contract.PromoCodeApplication, error) {
@@ -1249,6 +1577,11 @@ func (s *promoPreviewStore) PreviewPromoCode(_ context.Context, input contract.P
 func (s *promoPreviewStore) CreateOrder(ctx context.Context, input contract.CreateStoredOrder) (contract.PaymentOrder, error) {
 	s.createInput = input
 	return s.Store.CreateOrder(ctx, input)
+}
+
+func (s *promoPreviewStore) ReleasePromoCode(ctx context.Context, input contract.PromoCodeReleaseInput) (contract.PromoCodeApplication, bool, error) {
+	s.releases = append(s.releases, input)
+	return s.Store.ReleasePromoCode(ctx, input)
 }
 
 func newHarness(t *testing.T) harness {
@@ -1368,6 +1701,40 @@ func assertCounts(t *testing.T, h harness, wantLedger int, wantSubs int, wantOut
 	if len(audits) != wantAudit {
 		t.Fatalf("audit count = %d, want %d: %+v", len(audits), wantAudit, audits)
 	}
+}
+
+func createPaidBalanceOrder(t *testing.T, h harness, eventID string) contract.PaymentOrder {
+	t.Helper()
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      7,
+		Method:      "alipay",
+		Amount:      "25.00",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	payload := map[string]any{
+		"order_no":        order.OrderNo,
+		"amount":          "25.00000000",
+		"currency":        "USD",
+		"status":          "paid",
+		"transaction_id":  "txn_balance",
+		"idempotency_key": eventID,
+	}
+	result, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{
+		Provider: "easypay",
+		Headers:  map[string]string{"X-SRapi-Payment-Signature": signWebhookPayload("provider-signing-secret", payload)},
+		Payload:  payload,
+	})
+	if err != nil {
+		t.Fatalf("handle paid webhook: %v", err)
+	}
+	if !result.Handled || result.Order.Status != contract.OrderStatusFulfilled {
+		t.Fatalf("expected paid fulfilled order, got %+v", result)
+	}
+	return result.Order
 }
 
 func mustJSON(t *testing.T, value map[string]any) string {
@@ -1562,13 +1929,49 @@ func (f *fakeStripeCheckout) CreateCheckoutSession(req stripeprovider.CheckoutSe
 }
 
 type fakeCheckoutProvider struct {
-	session checkoutprovider.Session
-	err     error
+	session    checkoutprovider.Session
+	refund     checkoutprovider.RefundResult
+	query      checkoutprovider.QueryResult
+	err        error
+	sessionErr error
+	refundErr  error
+	queryErr   error
+	lastRefund checkoutprovider.RefundRequest
+	lastQuery  checkoutprovider.QueryRequest
 }
 
-func (f fakeCheckoutProvider) CreateSession(checkoutprovider.Request) (checkoutprovider.Session, error) {
+func (f *fakeCheckoutProvider) CreateSession(checkoutprovider.Request) (checkoutprovider.Session, error) {
+	if f.sessionErr != nil {
+		return checkoutprovider.Session{}, f.sessionErr
+	}
 	if f.err != nil {
 		return checkoutprovider.Session{}, f.err
 	}
 	return f.session, nil
+}
+
+func (f *fakeCheckoutProvider) Refund(req checkoutprovider.RefundRequest) (checkoutprovider.RefundResult, error) {
+	f.lastRefund = req
+	if f.refundErr != nil {
+		return checkoutprovider.RefundResult{}, f.refundErr
+	}
+	if f.err != nil {
+		return checkoutprovider.RefundResult{}, f.err
+	}
+	result := f.refund
+	if result.Status == "" {
+		result.Status = checkoutprovider.RefundStatusSucceeded
+	}
+	return result, nil
+}
+
+func (f *fakeCheckoutProvider) QueryOrder(req checkoutprovider.QueryRequest) (checkoutprovider.QueryResult, error) {
+	f.lastQuery = req
+	if f.queryErr != nil {
+		return checkoutprovider.QueryResult{}, f.queryErr
+	}
+	if f.err != nil {
+		return checkoutprovider.QueryResult{}, f.err
+	}
+	return f.query, nil
 }

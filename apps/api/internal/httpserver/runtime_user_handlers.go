@@ -3,6 +3,7 @@ package httpserver
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"io"
@@ -14,11 +15,13 @@ import (
 
 	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
+	affiliateservice "github.com/srapi/srapi/apps/api/internal/modules/affiliate/service"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	apikeyservice "github.com/srapi/srapi/apps/api/internal/modules/api_keys/service"
 	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
 	authservice "github.com/srapi/srapi/apps/api/internal/modules/auth/service"
 	captchacontract "github.com/srapi/srapi/apps/api/internal/modules/captcha/contract"
+	captchaservice "github.com/srapi/srapi/apps/api/internal/modules/captcha/service"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	usersservice "github.com/srapi/srapi/apps/api/internal/modules/users/service"
@@ -29,14 +32,29 @@ import (
 // returns true when the request may proceed and writes the error response (and
 // returns false) otherwise. When captcha is disabled it always returns true.
 func (s *Server) verifyCaptcha(w http.ResponseWriter, r *http.Request, requestID string) bool {
-	if s.runtime.captcha == nil || !s.runtime.captcha.Enabled() {
+	captchaSvc := s.runtime.captcha
+	cfg, cfgErr := s.currentCaptchaConfig(r)
+	if cfgErr != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "captcha config unavailable", requestID)
+		return false
+	}
+	if cfg.Managed {
+		captchaSvc = captchaservice.New(captchaservice.Config{
+			Enabled:   cfg.Enabled,
+			Provider:  cfg.Provider,
+			SecretKey: cfg.SecretKey,
+			SiteKey:   cfg.SiteKey,
+			VerifyURL: cfg.VerifyURL,
+		}, nil)
+	}
+	if captchaSvc == nil || !captchaSvc.Enabled() {
 		return true
 	}
 	token := strings.TrimSpace(r.Header.Get("X-Captcha-Token"))
 	if token == "" {
 		token = strings.TrimSpace(r.Header.Get("Cf-Turnstile-Response"))
 	}
-	err := s.runtime.captcha.Verify(r.Context(), token, clientIP(r))
+	err := captchaSvc.Verify(r.Context(), token, clientIP(r))
 	if err == nil {
 		return true
 	}
@@ -115,14 +133,40 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, s.cfg.Gateway.MaxBodySize+1))
+	if err != nil || int64(len(bodyBytes)) > s.cfg.Gateway.MaxBodySize {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid registration request", requestID)
+		return
+	}
 	var body apiopenapi.RegisterRequest
-	if err := s.decodeJSONBody(w, r, &body); err != nil {
+	if err := json.Unmarshal(bodyBytes, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid registration request", requestID)
+		return
+	}
+	attributeValues, err := decodeRegistrationAttributeValues(bodyBytes)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid registration request", requestID)
+		return
+	}
+	if err := s.runtime.userAttributes.ValidateRequiredValues(r.Context(), attributeValues); err != nil {
+		s.writeUserAttributeError(w, err, requestID, "invalid registration request")
 		return
 	}
 	if !registrationEmailSuffixAllowed(string(body.Email), settings.Security.RegistrationEmailSuffixAllowlist) {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid registration request", requestID)
 		return
+	}
+	inviteCode := optionalStringValue(body.InviteCode)
+	if inviteCode != "" {
+		if _, err := s.runtime.affiliate.ValidateInviteCode(r.Context(), inviteCode); err != nil {
+			switch {
+			case errors.Is(err, affiliatecontract.ErrNotFound), errors.Is(err, affiliateservice.ErrInvalidInput):
+				writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid registration request", requestID)
+			default:
+				writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "registration failed", requestID)
+			}
+			return
+		}
 	}
 	user, err := s.runtime.users.Create(r.Context(), usersservice.CreateRequest{
 		Email:    string(body.Email),
@@ -138,6 +182,24 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		default:
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "registration failed", requestID)
 		}
+		return
+	}
+	if inviteCode != "" {
+		if _, err := s.runtime.affiliate.BindInvite(r.Context(), affiliatecontract.BindInviteRequest{
+			InviteeUserID: user.ID,
+			Code:          inviteCode,
+		}); err != nil {
+			switch {
+			case errors.Is(err, affiliatecontract.ErrNotFound), errors.Is(err, affiliatecontract.ErrConflict), errors.Is(err, affiliateservice.ErrInvalidInput):
+				writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid registration request", requestID)
+			default:
+				writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "registration failed", requestID)
+			}
+			return
+		}
+	}
+	if _, err := s.runtime.userAttributes.SetUserValues(r.Context(), user.ID, attributeValues); err != nil {
+		s.writeUserAttributeError(w, err, requestID, "invalid registration request")
 		return
 	}
 
@@ -157,6 +219,23 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		},
 		RequestId: requestID,
 	})
+}
+
+func decodeRegistrationAttributeValues(body []byte) (map[int]string, error) {
+	var raw struct {
+		Attributes []currentUserAttributeValueInput `json:"attributes"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, err
+	}
+	values := make(map[int]string, len(raw.Attributes))
+	for _, item := range raw.Attributes {
+		if item.DefinitionID <= 0 {
+			return nil, errors.New("invalid registration attribute")
+		}
+		values[item.DefinitionID] = item.Value
+	}
+	return values, nil
 }
 
 func (s *Server) handleRequestPasswordReset(w http.ResponseWriter, r *http.Request) {
@@ -840,6 +919,66 @@ func (s *Server) handleCurrentUserAffiliate(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+func (s *Server) handleListCurrentUserAffiliateInviteCodes(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	items, err := s.runtime.affiliate.ListInviteCodesByUser(r.Context(), session.User.ID)
+	if err != nil {
+		writeAffiliateServiceError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.AffiliateInviteCodeListResponse{
+		Data:       toAPIAffiliateInviteCodes(items),
+		Pagination: pagination(len(items)),
+		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleCreateCurrentUserAffiliateInviteCode(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.CreateAffiliateInviteCodeRequest
+	if r.ContentLength != 0 {
+		if err := s.decodeJSONBody(w, r, &body); err != nil {
+			writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid affiliate invite code request", requestID)
+			return
+		}
+	}
+	code := optionalStringValue(body.Code)
+	if code == "" {
+		code = generatedAffiliateInviteCode(session.User.ID)
+	}
+	created, err := s.runtime.affiliate.CreateInviteCode(r.Context(), affiliatecontract.CreateInviteCodeRequest{
+		UserID:    session.User.ID,
+		Code:      strings.ToUpper(code),
+		ExpiresAt: body.ExpiresAt,
+	})
+	if err != nil {
+		writeAffiliateServiceError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "affiliate_invite_code.create", "affiliate_invite_code", strconv.Itoa(created.ID), nil, map[string]any{
+		"code":       created.Code,
+		"expires_at": created.ExpiresAt,
+	}))
+	writeJSONAny(w, http.StatusCreated, apiopenapi.AffiliateInviteCodeResponse{
+		Data:      toAPIAffiliateInviteCode(created),
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleCurrentUserAffiliateLedger(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireConsoleSession(r)
@@ -900,6 +1039,59 @@ func (s *Server) handleCurrentUserAffiliateTransferToBalance(w http.ResponseWrit
 	})
 }
 
+func (s *Server) handleCurrentUserAffiliateWithdrawal(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if idempotencyKey == "" {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "idempotency key is required", requestID)
+		return
+	}
+	var body apiopenapi.AffiliateWithdrawalRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid affiliate withdrawal request", requestID)
+		return
+	}
+	ledger, _, err := s.runtime.affiliate.RequestWithdraw(r.Context(), affiliatecontract.WithdrawRequest{
+		UserID:         session.User.ID,
+		Amount:         body.Amount,
+		Currency:       optionalStringValue(body.Currency),
+		Destination:    optionalStringValue(body.Destination),
+		IdempotencyKey: idempotencyKey,
+	})
+	if err != nil {
+		writeAffiliateServiceError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusCreated, apiopenapi.AffiliateLedgerEntryResponse{
+		Data:      toAPIAffiliateLedgerEntry(ledger),
+		RequestId: requestID,
+	})
+}
+
+func generatedAffiliateInviteCode(userID int) string {
+	const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	raw := make([]byte, 8)
+	if _, err := rand.Read(raw); err != nil {
+		return "U" + strconv.Itoa(userID) + strconv.FormatInt(time.Now().UnixNano(), 36)
+	}
+	out := make([]byte, len(raw)+2)
+	out[0] = 'U'
+	out[1] = byte(alphabet[userID%len(alphabet)])
+	for i, value := range raw {
+		out[i+2] = byte(alphabet[int(value)%len(alphabet)])
+	}
+	return string(out)
+}
+
 func (s *Server) handleCurrentUserUsage(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireConsoleSession(r)
@@ -930,6 +1122,9 @@ func (s *Server) handleCurrentUserSubscriptions(w http.ResponseWriter, r *http.R
 		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
 		return
 	}
+	if !s.requireSubscriptionPlansEnabled(w, r, requestID) {
+		return
+	}
 	items, err := s.runtime.subscriptions.ListUserSubscriptionsByUser(r.Context(), session.User.ID)
 	if err != nil {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list subscriptions", requestID)
@@ -950,6 +1145,9 @@ func (s *Server) handleListPaymentMethods(w http.ResponseWriter, r *http.Request
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireConsoleSession(r); err != nil {
 		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	if !s.requirePaymentsEnabled(w, r, requestID) {
 		return
 	}
 	items, err := s.runtime.payments.ListMethods(r.Context())
@@ -975,6 +1173,9 @@ func (s *Server) handleCreatePaymentOrder(w http.ResponseWriter, r *http.Request
 		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
 		return
 	}
+	if !s.requirePaymentsEnabled(w, r, requestID) {
+		return
+	}
 	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
 		return
@@ -985,15 +1186,17 @@ func (s *Server) handleCreatePaymentOrder(w http.ResponseWriter, r *http.Request
 		return
 	}
 	order, err := s.runtime.payments.CreateOrder(r.Context(), paymentcontract.CreateOrderRequest{
-		UserID:      session.User.ID,
-		Method:      body.Method,
-		Amount:      body.Amount,
-		Currency:    optionalStringValue(body.Currency),
-		ProductType: paymentcontract.ProductType(body.ProductType),
-		ProductID:   optionalStringValue(body.ProductId),
-		PromoCode:   optionalStringValue(body.PromoCode),
-		ExpiresAt:   body.ExpiresAt,
-		Metadata:    jsonObjectToMap(body.Metadata),
+		UserID:        session.User.ID,
+		Method:        body.Method,
+		Amount:        body.Amount,
+		Currency:      optionalStringValue(body.Currency),
+		ProductType:   paymentcontract.ProductType(body.ProductType),
+		ProductID:     optionalStringValue(body.ProductId),
+		PromoCode:     optionalStringValue(body.PromoCode),
+		ExpiresAt:     body.ExpiresAt,
+		PayerOpenID:   optionalStringValue(body.PayerOpenid),
+		PayerClientIP: firstNonEmpty(optionalStringValue(body.PayerClientIp), clientIP(r)),
+		Metadata:      jsonObjectToMap(body.Metadata),
 	})
 	if err != nil {
 		writePaymentServiceError(w, err, requestID)
@@ -1201,6 +1404,9 @@ func (s *Server) handleCreateApiKey(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid group ids", requestID)
 		return
+	}
+	if len(groupIDs) == 0 {
+		groupIDs = s.defaultAPIKeyGroupIDs(r.Context())
 	}
 
 	result, err := s.runtime.apiKeys.Create(r.Context(), apikeycontract.CreateRequest{

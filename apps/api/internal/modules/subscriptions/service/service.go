@@ -350,6 +350,8 @@ func (s *Service) CheckEntitlement(ctx context.Context, req contract.Entitlement
 		AccountGroupScope: entitlementIntSlice(entitlements, "account_group_scope"),
 		SchedulerStrategy: entitlementString(entitlements, "scheduler_strategy"),
 		MonthlyTokenQuota: entitlementOptionalInt(entitlements, "monthly_token_quota"),
+		DailyCostQuota:    entitlementOptionalMoney(entitlements, "daily_cost_quota"),
+		WeeklyCostQuota:   entitlementOptionalMoney(entitlements, "weekly_cost_quota"),
 		MonthlyCostQuota:  entitlementOptionalMoney(entitlements, "monthly_cost_quota"),
 		CostQuotaMode:     normalizeCostQuotaMode(entitlementString(entitlements, "cost_quota_mode")),
 	}
@@ -363,22 +365,49 @@ func (s *Service) CheckEntitlement(ctx context.Context, req contract.Entitlement
 		decision.Reason = "monthly_token_quota_exceeded"
 		return decision, nil
 	}
-	// In hard_cap mode an exceeded cost quota denies the request. In allowance
-	// mode the quota is an included allowance: the request is allowed and the
-	// overage is billed to balance downstream (WP-1180).
-	if decision.MonthlyCostQuota != nil && decision.CostQuotaMode != costQuotaModeAllowance {
-		costUsed := req.CostUsedInPeriod
-		if req.MaterializedUsage != nil {
-			costUsed = req.MaterializedUsage.MonthlyUsageUSD
-		}
-		totalCost := money.AddMoney(costUsed, req.EstimatedCost)
-		if compareMoney(totalCost, *decision.MonthlyCostQuota) > 0 {
-			decision.Allowed = false
-			decision.Reason = "monthly_cost_quota_exceeded"
-			return decision, nil
+	if decision.CostQuotaMode != costQuotaModeAllowance {
+		for _, quota := range costQuotaWindows(decision, req) {
+			totalCost := money.AddMoney(quota.usedCost, req.EstimatedCost)
+			if compareMoney(totalCost, quota.limit) > 0 {
+				decision.Allowed = false
+				decision.Reason = quota.reason
+				return decision, nil
+			}
 		}
 	}
 	return decision, nil
+}
+
+type costQuotaWindow struct {
+	limit    string
+	usedCost string
+	reason   string
+}
+
+func costQuotaWindows(decision contract.EntitlementDecision, req contract.EntitlementCheckRequest) []costQuotaWindow {
+	windows := make([]costQuotaWindow, 0, 3)
+	if decision.DailyCostQuota != nil {
+		usedCost := ""
+		if req.MaterializedUsage != nil {
+			usedCost = req.MaterializedUsage.DailyUsageUSD
+		}
+		windows = append(windows, costQuotaWindow{limit: *decision.DailyCostQuota, usedCost: usedCost, reason: "daily_cost_quota_exceeded"})
+	}
+	if decision.WeeklyCostQuota != nil {
+		usedCost := ""
+		if req.MaterializedUsage != nil {
+			usedCost = req.MaterializedUsage.WeeklyUsageUSD
+		}
+		windows = append(windows, costQuotaWindow{limit: *decision.WeeklyCostQuota, usedCost: usedCost, reason: "weekly_cost_quota_exceeded"})
+	}
+	if decision.MonthlyCostQuota != nil {
+		usedCost := req.CostUsedInPeriod
+		if req.MaterializedUsage != nil {
+			usedCost = req.MaterializedUsage.MonthlyUsageUSD
+		}
+		windows = append(windows, costQuotaWindow{limit: *decision.MonthlyCostQuota, usedCost: usedCost, reason: "monthly_cost_quota_exceeded"})
+	}
+	return windows
 }
 
 const (
@@ -411,8 +440,10 @@ func (s *Service) CostAllowance(ctx context.Context, userID int, now time.Time) 
 	}
 	entitlements := mergeEntitlementRows(active)
 	return contract.CostAllowance{
-		Mode:  normalizeCostQuotaMode(entitlementString(entitlements, "cost_quota_mode")),
-		Quota: entitlementOptionalMoney(entitlements, "monthly_cost_quota"),
+		Mode:        normalizeCostQuotaMode(entitlementString(entitlements, "cost_quota_mode")),
+		DailyQuota:  entitlementOptionalMoney(entitlements, "daily_cost_quota"),
+		WeeklyQuota: entitlementOptionalMoney(entitlements, "weekly_cost_quota"),
+		Quota:       entitlementOptionalMoney(entitlements, "monthly_cost_quota"),
 	}, nil
 }
 
@@ -493,19 +524,6 @@ func maxReminderDays(days []int) int {
 		}
 	}
 	return max
-}
-
-func mergeEntitlements(subscriptions []contract.UserSubscription) map[string]any {
-	sort.SliceStable(subscriptions, func(i, j int) bool {
-		return subscriptions[i].StartsAt.Before(subscriptions[j].StartsAt)
-	})
-	merged := map[string]any{}
-	for _, sub := range subscriptions {
-		for key, value := range sub.EntitlementsSnapshot {
-			merged[key] = cloneAny(value)
-		}
-	}
-	return merged
 }
 
 func mergeEntitlementRows(entitlements []contract.Entitlement) map[string]any {
@@ -682,28 +700,6 @@ func entitlementString(entitlements map[string]any, key string) string {
 	return strings.TrimSpace(toString(value))
 }
 
-func payloadMoney(payload map[string]any, keys ...string) string {
-	for _, key := range keys {
-		value, ok := payload[key]
-		if !ok || value == nil {
-			continue
-		}
-		normalized, ok := normalizeMoney(toString(value))
-		if ok {
-			return normalized
-		}
-	}
-	return ""
-}
-
-func payloadString(payload map[string]any, key string) string {
-	value, ok := payload[key]
-	if !ok || value == nil {
-		return ""
-	}
-	return toString(value)
-}
-
 func toInt(value any) (int, bool) {
 	switch value := value.(type) {
 	case int:
@@ -781,12 +777,4 @@ func cloneAny(value any) any {
 		return value
 	}
 	return cloned
-}
-
-func cloneTime(value *time.Time) *time.Time {
-	if value == nil {
-		return nil
-	}
-	cloned := value.UTC()
-	return &cloned
 }

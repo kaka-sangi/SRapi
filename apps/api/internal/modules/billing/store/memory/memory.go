@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -86,8 +87,26 @@ func (s *Store) UpdatePricingRule(_ context.Context, id int, input contract.Upda
 	if input.CacheWritePricePerMillionTokens != nil {
 		rule.CacheWritePricePerMillionTokens = *input.CacheWritePricePerMillionTokens
 	}
+	if input.CacheWrite5mPricePerMillionTokens != nil {
+		rule.CacheWrite5mPricePerMillionTokens = *input.CacheWrite5mPricePerMillionTokens
+	}
+	if input.CacheWrite1hPricePerMillionTokens != nil {
+		rule.CacheWrite1hPricePerMillionTokens = *input.CacheWrite1hPricePerMillionTokens
+	}
+	if input.ImageOutputPricePerMillionTokens != nil {
+		rule.ImageOutputPricePerMillionTokens = *input.ImageOutputPricePerMillionTokens
+	}
 	if input.PerRequestPrice != nil {
 		rule.PerRequestPrice = *input.PerRequestPrice
+	}
+	if input.ServiceTierMultipliers != nil {
+		rule.ServiceTierMultipliers = cloneStringMap(*input.ServiceTierMultipliers)
+	}
+	if input.LongContextThresholdTokens != nil {
+		rule.LongContextThresholdTokens = cloneIntPtr(*input.LongContextThresholdTokens)
+	}
+	if input.LongContextMultiplier != nil {
+		rule.LongContextMultiplier = *input.LongContextMultiplier
 	}
 	if input.Intervals != nil {
 		rule.Intervals = clonePricingIntervals(*input.Intervals)
@@ -140,6 +159,61 @@ func (s *Store) ListPricingRules(_ context.Context) ([]contract.PricingRule, err
 	return out, nil
 }
 
+func (s *Store) QueryPricingRules(_ context.Context, query contract.PricingRuleQuery) ([]contract.PricingRule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	at := query.At
+	if at.IsZero() {
+		at = time.Now().UTC()
+	}
+	out := make([]contract.PricingRule, 0)
+	for _, rule := range s.pricingRules {
+		if rule.ProviderID != query.ProviderID && rule.ProviderID != 0 {
+			continue
+		}
+		if !pricingRuleActive(rule, at) {
+			continue
+		}
+		if !pricingRuleMatchesQuery(rule, query) {
+			continue
+		}
+		out = append(out, clonePricingRule(rule))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func pricingRuleActive(rule contract.PricingRule, at time.Time) bool {
+	if rule.EffectiveFrom != nil && at.Before(*rule.EffectiveFrom) {
+		return false
+	}
+	if rule.EffectiveTo != nil && !at.Before(*rule.EffectiveTo) {
+		return false
+	}
+	return true
+}
+
+func pricingRuleMatchesQuery(rule contract.PricingRule, query contract.PricingRuleQuery) bool {
+	if rule.ModelID == query.ModelID {
+		return true
+	}
+	family := strings.ToLower(strings.TrimSpace(query.ModelFamily))
+	if family != "" && pricingFamilyMatches(family, rule.ModelFamily) {
+		return true
+	}
+	for _, name := range []string{query.RequestedModel, query.UpstreamModel} {
+		if pricingFamilyMatches(strings.ToLower(strings.TrimSpace(name)), rule.ModelFamily) {
+			return true
+		}
+	}
+	return false
+}
+
+func pricingFamilyMatches(requestFamily string, ruleFamily string) bool {
+	ruleFamily = strings.ToLower(strings.TrimSpace(ruleFamily))
+	return requestFamily != "" && ruleFamily != "" && (requestFamily == ruleFamily || strings.Contains(requestFamily, ruleFamily) || strings.Contains(ruleFamily, requestFamily))
+}
+
 func cloneEntry(value contract.LedgerEntry) contract.LedgerEntry {
 	value.Metadata = cloneMap(value.Metadata)
 	return value
@@ -148,6 +222,8 @@ func cloneEntry(value contract.LedgerEntry) contract.LedgerEntry {
 func clonePricingRule(value contract.PricingRule) contract.PricingRule {
 	value.EffectiveFrom = cloneTime(value.EffectiveFrom)
 	value.EffectiveTo = cloneTime(value.EffectiveTo)
+	value.ServiceTierMultipliers = cloneStringMap(value.ServiceTierMultipliers)
+	value.LongContextThresholdTokens = cloneIntPtr(value.LongContextThresholdTokens)
 	value.Intervals = clonePricingIntervals(value.Intervals)
 	return value
 }
@@ -173,6 +249,25 @@ func cloneTime(value *time.Time) *time.Time {
 	}
 	cloned := value.UTC()
 	return &cloned
+}
+
+func cloneIntPtr(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func cloneStringMap(value map[string]string) map[string]string {
+	if value == nil {
+		return nil
+	}
+	out := make(map[string]string, len(value))
+	for key, item := range value {
+		out[key] = item
+	}
+	return out
 }
 
 func cloneMap(value map[string]any) map[string]any {

@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -20,15 +21,18 @@ func contractGatewayPricingRequest(req billingcontract.PricingRequest, estimated
 
 func gatewayPricingRequest(modelID int, candidate schedulercontract.Candidate, usage gatewaycontract.Usage) billingcontract.PricingRequest {
 	return billingcontract.PricingRequest{
-		ModelID:          modelID,
-		ModelFamily:      candidate.ModelFamily,
-		ProviderID:       candidate.Provider.ID,
-		InputTokens:      usage.InputTokens,
-		OutputTokens:     usage.OutputTokens,
-		CacheReadTokens:  usage.CachedTokens,
-		CacheWriteTokens: usage.CacheCreationTokens,
-		At:               time.Now().UTC(),
-		PricingOverride:  cloneAnyMap(candidate.Mapping.PricingOverride),
+		ModelID:            modelID,
+		ModelFamily:        candidate.ModelFamily,
+		ProviderID:         candidate.Provider.ID,
+		InputTokens:        usage.InputTokens,
+		OutputTokens:       usage.OutputTokens,
+		ImageOutputTokens:  usage.ImageOutputTokens,
+		CacheReadTokens:    usage.CachedTokens,
+		CacheWriteTokens:   usage.CacheCreationTokens,
+		CacheWrite5mTokens: usage.CacheCreation5mTokens,
+		CacheWrite1hTokens: usage.CacheCreation1hTokens,
+		At:                 time.Now().UTC(),
+		PricingOverride:    cloneAnyMap(candidate.Mapping.PricingOverride),
 	}
 }
 
@@ -36,7 +40,22 @@ func gatewayPricingRequestForCanonical(modelID int, candidate schedulercontract.
 	req := gatewayPricingRequest(modelID, candidate, usage)
 	req.ImageCount = canonical.ImageCount
 	req.ImageSize = canonical.ImageSize
+	req.RequestedModel = gatewayRequestedModel(canonical)
+	req.UpstreamModel = gatewayUpstreamModel(candidate)
+	req.BillingModelSource = mapString(candidate.Mapping.PricingOverride, "billing_model_source")
+	req.ServiceTier = gatewayServiceTier(canonical)
 	return req
+}
+
+func gatewayServiceTier(canonical gatewaycontract.CanonicalRequest) string {
+	var raw map[string]any
+	if len(canonical.RawBody) == 0 {
+		return ""
+	}
+	if err := json.Unmarshal(canonical.RawBody, &raw); err != nil {
+		return ""
+	}
+	return mapString(raw, "service_tier")
 }
 
 func gatewayRequestedModel(canonical gatewaycontract.CanonicalRequest) string {

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sort"
 	"strconv"
 	"strings"
@@ -117,6 +118,7 @@ func (s *Service) ChargePendingUsage(ctx context.Context, req contract.ChargePen
 	if len(pending) == 0 {
 		return result, nil
 	}
+	var firstErr error
 	sort.Slice(pending, func(i, j int) bool {
 		if pending[i].UserID != pending[j].UserID {
 			return pending[i].UserID < pending[j].UserID
@@ -144,7 +146,9 @@ func (s *Service) ChargePendingUsage(ctx context.Context, req contract.ChargePen
 			ReferenceID:   usageChargeReferenceID(usageLogIDs),
 		})
 		if err != nil {
-			return result, err
+			firstErr = errors.Join(firstErr, err)
+			start = end
+			continue
 		}
 		if chargeResult.LedgerEntry.ID > 0 {
 			result.Batches = append(result.Batches, chargeResult)
@@ -152,7 +156,7 @@ func (s *Service) ChargePendingUsage(ctx context.Context, req contract.ChargePen
 		}
 		start = end
 	}
-	return result, nil
+	return result, firstErr
 }
 
 func (s *Service) ChargeUsage(ctx context.Context, req contract.ChargeUsageRequest) (contract.ChargeUsageResult, error) {

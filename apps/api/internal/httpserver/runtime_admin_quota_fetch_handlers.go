@@ -1,7 +1,6 @@
 package httpserver
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -156,7 +155,7 @@ func (s *Server) handleAdminAccountQuotaFetch(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	s.persistQuotaSignals(r, account, report.QuotaSignals)
+	s.persistQuotaReport(r, account, report)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account.quota_fetch", "account", strconv.Itoa(accountID), nil, map[string]any{
 		"supported": report.Supported,
 		"source":    report.Source,
@@ -192,44 +191,14 @@ func (s *Server) handleAdminAccountQuotaFetch(w http.ResponseWriter, r *http.Req
 	})
 }
 
-func (s *Server) persistQuotaSignals(r *http.Request, account accountcontract.ProviderAccount, signals []provideradaptercontract.QuotaSignal) {
-	for _, signal := range signals {
-		snapshotAt := signal.SnapshotAt
-		if snapshotAt.IsZero() {
-			snapshotAt = time.Now().UTC()
-		}
-		if _, err := s.runtime.accounts.RecordQuotaSnapshot(r.Context(), accountcontract.AccountQuotaSnapshot{
-			AccountID:      account.ID,
-			ProviderID:     account.ProviderID,
-			QuotaType:      signal.QuotaType,
-			Remaining:      signal.Remaining,
-			Used:           signal.Used,
-			QuotaLimit:     signal.QuotaLimit,
-			RemainingRatio: signal.RemainingRatio,
-			ResetAt:        signal.ResetAt,
-			SnapshotAt:     snapshotAt,
-		}); err != nil {
-			// Persisting snapshots is best-effort; the report is still returned.
-			_ = err
-			continue
-		}
+func (s *Server) persistQuotaReport(r *http.Request, account accountcontract.ProviderAccount, report provideradaptercontract.QuotaReport) {
+	if _, err := s.runtime.accounts.ApplyQuotaReport(r.Context(), account, report); err != nil {
+		_ = err
 	}
 }
 
 func (s *Server) persistQuotaProviderError(r *http.Request, account accountcontract.ProviderAccount, err error) {
-	var providerErr provideradaptercontract.ProviderError
-	if !errors.As(err, &providerErr) {
-		return
-	}
-	if providerErr.StatusCode != http.StatusForbidden {
-		return
-	}
-	metadata := provideradaptercontract.QuotaErrorMetadata(account.Metadata, providerErr, time.Now().UTC())
-	status := account.Status
-	if provideradaptercontract.QuotaErrorClassRequiresOperatorAction(providerErr.Class) {
-		status = accountcontract.StatusSuspended
-	}
-	if _, updateErr := s.runtime.accounts.Update(r.Context(), account.ID, accountcontract.UpdateRequest{Metadata: &metadata, Status: &status}); updateErr != nil {
+	if updateErr := s.runtime.accounts.ApplyQuotaProviderError(r.Context(), account, err); updateErr != nil {
 		// Returning the provider error matters more than metadata persistence.
 		_ = updateErr
 	}

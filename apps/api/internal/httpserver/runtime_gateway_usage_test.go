@@ -27,6 +27,7 @@ import (
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
+	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	usageservice "github.com/srapi/srapi/apps/api/internal/modules/usage/service"
 	usagememory "github.com/srapi/srapi/apps/api/internal/modules/usage/store/memory"
 	"github.com/srapi/srapi/apps/api/internal/pkg/money"
@@ -280,21 +281,125 @@ func TestRecordGatewayUsagePersistsProviderQuotaSignals(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list quota snapshots: %v", err)
 	}
+	if len(quotas) != 0 {
+		t.Fatalf("expected quota snapshots to be deferred to outbox, got %+v", quotas)
+	}
+	outboxRows, err := events.ListOutbox(ctx)
+	if err != nil {
+		t.Fatalf("list outbox: %v", err)
+	}
+	foundRefreshEvent := false
+	for _, row := range outboxRows {
+		if row.EventType == "GatewayAccountSnapshotRefreshRequested" {
+			foundRefreshEvent = true
+			if row.AggregateID != strconv.Itoa(account.ID) || row.Payload["account_id"] == nil {
+				t.Fatalf("unexpected refresh event payload: %+v", row)
+			}
+		}
+	}
+	if !foundRefreshEvent {
+		t.Fatalf("expected deferred account snapshot refresh event, got %+v", outboxRows)
+	}
+}
+
+func TestRecordGatewayAccountSnapshotsUsesBoundedAccountWindow(t *testing.T) {
+	ctx := context.Background()
+	accounts, err := accountservice.New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new account service: %v", err)
+	}
+	account, err := accounts.Create(ctx, accountcontract.CreateRequest{
+		ProviderID:   12,
+		Name:         "bounded-snapshot-account",
+		RuntimeClass: accountcontract.RuntimeClassCliClientToken,
+		Credential:   map[string]any{"cli_client_token": "secret"},
+		Metadata: map[string]any{
+			"runtime_quota_window_seconds": 60,
+			"cost_window_seconds":          60,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	otherAccount, err := accounts.Create(ctx, accountcontract.CreateRequest{
+		ProviderID:   12,
+		Name:         "other-snapshot-account",
+		RuntimeClass: accountcontract.RuntimeClassCliClientToken,
+		Credential:   map[string]any{"cli_client_token": "secret"},
+	})
+	if err != nil {
+		t.Fatalf("create other account: %v", err)
+	}
+	usageStore := usagememory.New()
+	now := time.Now().UTC()
+	for _, log := range []struct {
+		id        string
+		accountID int
+		tokens    int
+		at        time.Time
+	}{
+		{id: "old", accountID: account.ID, tokens: 1000, at: now.Add(-10 * time.Minute)},
+		{id: "inside", accountID: account.ID, tokens: 25, at: now.Add(-10 * time.Second)},
+		{id: "other", accountID: otherAccount.ID, tokens: 5000, at: now.Add(-5 * time.Second)},
+	} {
+		accountID := log.accountID
+		if _, err := usageStore.Create(ctx, usagecontract.UsageLog{
+			RequestID:      log.id,
+			UserID:         1,
+			APIKeyID:       2,
+			AccountID:      &accountID,
+			ProviderID:     ptrInt(12),
+			SourceEndpoint: "/v1/responses",
+			Model:          "codex-model",
+			Success:        true,
+			TotalTokens:    log.tokens,
+			BillableCost:   "0.01000000",
+			CreatedAt:      log.at,
+		}); err != nil {
+			t.Fatalf("seed usage %s: %v", log.id, err)
+		}
+	}
+	usage, err := usageservice.New(usageStore, nil)
+	if err != nil {
+		t.Fatalf("new usage service: %v", err)
+	}
+	rt := &runtimeState{
+		logger:   slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		accounts: accounts,
+		usage:    usage,
+	}
+	rt.recordGatewayAccountSnapshots(ctx, gatewayUsageRecord{
+		RequestID:      "req_bounded_snapshot",
+		ProviderID:     ptrInt(account.ProviderID),
+		AccountID:      ptrInt(account.ID),
+		SourceEndpoint: "/v1/responses",
+		Model:          "codex-model",
+		Success:        true,
+	})
+
+	updated, err := accounts.FindByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("find account: %v", err)
+	}
+	if metadataInt(updated.Metadata, "tpm_used") != 25 || metadataInt(updated.Metadata, "rpm_used") != 1 {
+		t.Fatalf("expected bounded account window usage, got metadata %+v", updated.Metadata)
+	}
+	quotas, err := accounts.ListQuotaSnapshotsByAccount(ctx, account.ID, 10)
+	if err != nil {
+		t.Fatalf("list quota snapshots: %v", err)
+	}
 	var codexQuota *accountcontract.AccountQuotaSnapshot
 	for i := range quotas {
-		if quotas[i].QuotaType == "codex_5h_percent" {
+		if quotas[i].QuotaType == accountcontract.QuotaTypeSyntheticMonthlyTokens {
 			codexQuota = &quotas[i]
 			break
 		}
 	}
 	if codexQuota == nil {
-		t.Fatalf("expected codex quota snapshot, got %+v", quotas)
+		t.Fatalf("expected synthetic quota snapshot, got %+v", quotas)
 	}
-	if codexQuota.Used != "34" || codexQuota.Remaining != "66" || codexQuota.QuotaLimit != "100" || codexQuota.RemainingRatio != 0.66 {
-		t.Fatalf("unexpected codex quota snapshot: %+v", *codexQuota)
-	}
-	if codexQuota.ResetAt == nil || !codexQuota.ResetAt.Equal(resetAt) {
-		t.Fatalf("unexpected codex reset time: %+v", codexQuota.ResetAt)
+	if codexQuota.Used != "25" {
+		t.Fatalf("expected synthetic quota to use bounded account window only, got %+v", *codexQuota)
 	}
 }
 

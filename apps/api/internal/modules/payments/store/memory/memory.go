@@ -56,6 +56,8 @@ func (s *Store) CreateProviderInstance(_ context.Context, input contract.CreateS
 		SupportedMethods: cloneStringSlice(input.SupportedMethods),
 		Limits:           cloneMap(input.Limits),
 		SortOrder:        input.SortOrder,
+		FeeRate:          defaultMoney(input.FeeRate, "0.00000000"),
+		Weight:           defaultWeight(input.Weight),
 		Metadata:         cloneMap(input.Metadata),
 		CreatedAt:        now,
 		UpdatedAt:        now,
@@ -134,6 +136,33 @@ func (s *Store) PreviewPromoCode(_ context.Context, _ contract.PromoCodePreviewI
 	return contract.PromoCodeApplication{}, contract.ErrNotFound
 }
 
+func (s *Store) ReleasePromoCode(_ context.Context, input contract.PromoCodeReleaseInput) (contract.PromoCodeApplication, bool, error) {
+	if input.PaymentOrderID <= 0 {
+		return contract.PromoCodeApplication{}, false, contract.ErrInvalidInput
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	order, ok := s.orders[input.PaymentOrderID]
+	if !ok || order.PromoCodeID == nil {
+		return contract.PromoCodeApplication{}, false, contract.ErrNotFound
+	}
+	usageID, ok := s.promoUsageByOrderNo[order.OrderNo]
+	if !ok {
+		return contract.PromoCodeApplication{}, false, contract.ErrNotFound
+	}
+	usage := s.promoUsages[usageID]
+	if usage.UpdatedAt.After(usage.CreatedAt) {
+		return usage, false, nil
+	}
+	releasedAt := input.ReleasedAt.UTC()
+	if releasedAt.IsZero() {
+		releasedAt = time.Now().UTC()
+	}
+	usage.UpdatedAt = releasedAt
+	s.promoUsages[usageID] = usage
+	return usage, true, nil
+}
+
 func (s *Store) CreateOrder(_ context.Context, input contract.CreateStoredOrder) (contract.PaymentOrder, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -151,6 +180,8 @@ func (s *Store) CreateOrder(_ context.Context, input contract.CreateStoredOrder)
 		ProviderInstanceID: input.ProviderInstanceID,
 		OriginalAmount:     defaultMoney(input.OriginalAmount, input.Amount),
 		DiscountAmount:     defaultMoney(input.DiscountAmount, "0.00000000"),
+		FeeAmount:          defaultMoney(input.FeeAmount, "0.00000000"),
+		PayableAmount:      defaultMoney(input.PayableAmount, input.Amount),
 		PromoCodeID:        cloneInt(input.PromoCodeID),
 		Amount:             input.Amount,
 		Currency:           input.Currency,
@@ -234,6 +265,24 @@ func (s *Store) ListOrders(_ context.Context) ([]contract.PaymentOrder, error) {
 	return out, nil
 }
 
+func (s *Store) ListPendingOrders(_ context.Context, now time.Time) ([]contract.PaymentOrder, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now = now.UTC()
+	out := make([]contract.PaymentOrder, 0)
+	for _, order := range s.orders {
+		if order.Status != contract.OrderStatusPending {
+			continue
+		}
+		if order.ExpiresAt != nil && !order.ExpiresAt.After(now) {
+			continue
+		}
+		out = append(out, cloneOrder(order))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
 func (s *Store) ListExpiredPendingOrders(_ context.Context, now time.Time) ([]contract.PaymentOrder, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -294,7 +343,7 @@ func (s *Store) ExpireOrder(_ context.Context, orderID int, now time.Time) (cont
 
 func inProgressOrderStatus(status contract.OrderStatus) bool {
 	switch status {
-	case contract.OrderStatusPending, contract.OrderStatusPaid:
+	case contract.OrderStatusPending, contract.OrderStatusPaid, contract.OrderStatusRefunding:
 		return true
 	default:
 		return false
@@ -408,6 +457,13 @@ func defaultMoney(value string, fallback string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return fallback
+	}
+	return value
+}
+
+func defaultWeight(value int) int {
+	if value <= 0 {
+		return 1
 	}
 	return value
 }

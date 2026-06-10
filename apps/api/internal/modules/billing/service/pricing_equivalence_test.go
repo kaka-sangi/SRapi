@@ -1,6 +1,7 @@
 package service_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
@@ -204,6 +205,87 @@ func TestEstimatePriceFallsBackToModelFamilyRule(t *testing.T) {
 	if estimated.PricingRuleID == nil || *estimated.PricingRuleID != rule.ID {
 		t.Fatalf("expected fallback rule id %d, got %+v", rule.ID, estimated.PricingRuleID)
 	}
+}
+
+func TestEstimatePriceUsesBoundedPricingRuleQuery(t *testing.T) {
+	store := &queryTrackingPricingStore{Store: billingmemory.New()}
+	svc, err := service.NewPricing(store, nil)
+	if err != nil {
+		t.Fatalf("new billing pricing service: %v", err)
+	}
+	generic, err := svc.CreatePricingRule(t.Context(), contract.CreatePricingRuleRequest{
+		ModelID:                         1,
+		ProviderID:                      0,
+		InputPricePerMillionTokens:      "9",
+		OutputPricePerMillionTokens:     "9",
+		CacheReadPricePerMillionTokens:  "0",
+		CacheWritePricePerMillionTokens: "0",
+		Currency:                        "usd",
+	})
+	if err != nil {
+		t.Fatalf("create generic rule: %v", err)
+	}
+	specific, err := svc.CreatePricingRule(t.Context(), contract.CreatePricingRuleRequest{
+		ModelID:                         1,
+		ProviderID:                      7,
+		InputPricePerMillionTokens:      "1",
+		OutputPricePerMillionTokens:     "2",
+		CacheReadPricePerMillionTokens:  "0",
+		CacheWritePricePerMillionTokens: "0",
+		Currency:                        "usd",
+	})
+	if err != nil {
+		t.Fatalf("create provider rule: %v", err)
+	}
+	if _, err := svc.CreatePricingRule(t.Context(), contract.CreatePricingRuleRequest{
+		ModelID:                         2,
+		ProviderID:                      8,
+		InputPricePerMillionTokens:      "100",
+		OutputPricePerMillionTokens:     "100",
+		CacheReadPricePerMillionTokens:  "0",
+		CacheWritePricePerMillionTokens: "0",
+		Currency:                        "usd",
+	}); err != nil {
+		t.Fatalf("create unrelated rule: %v", err)
+	}
+
+	estimated, err := svc.EstimatePrice(t.Context(), contract.PricingRequest{
+		ModelID:      1,
+		ProviderID:   7,
+		InputTokens:  1000,
+		OutputTokens: 1000,
+	})
+	if err != nil {
+		t.Fatalf("estimate price: %v", err)
+	}
+	if estimated.Amount != "0.00300000" || estimated.Currency != "USD" {
+		t.Fatalf("unexpected price result: %+v", estimated)
+	}
+	if estimated.PricingRuleID == nil || *estimated.PricingRuleID != specific.ID || *estimated.PricingRuleID == generic.ID {
+		t.Fatalf("expected provider-specific rule %d, got %+v", specific.ID, estimated.PricingRuleID)
+	}
+	if store.queryCalls != 1 {
+		t.Fatalf("expected one bounded query, got %d", store.queryCalls)
+	}
+	if store.listCalls != 0 {
+		t.Fatalf("EstimatePrice should not use full ListPricingRules, got %d calls", store.listCalls)
+	}
+}
+
+type queryTrackingPricingStore struct {
+	*billingmemory.Store
+	queryCalls int
+	listCalls  int
+}
+
+func (s *queryTrackingPricingStore) QueryPricingRules(ctx context.Context, query contract.PricingRuleQuery) ([]contract.PricingRule, error) {
+	s.queryCalls++
+	return s.Store.QueryPricingRules(ctx, query)
+}
+
+func (s *queryTrackingPricingStore) ListPricingRules(ctx context.Context) ([]contract.PricingRule, error) {
+	s.listCalls++
+	return s.Store.ListPricingRules(ctx)
 }
 
 func TestValidatePricingRuleDoesNotPersist(t *testing.T) {

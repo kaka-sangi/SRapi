@@ -17,6 +17,7 @@ import (
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	"github.com/srapi/srapi/apps/api/internal/pkg/metacoerce"
 	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
@@ -66,6 +67,9 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		rt.logger.Warn("failed to record usage log", "error", usageErr, "request_id", rec.RequestID)
 		rt.enqueueGatewayUsageFailureEvent(ctx, rec, model)
 	} else {
+		if rt.metrics != nil {
+			rt.metrics.RecordGatewayUsage(usageLog)
+		}
 		rt.enqueueGatewayUsageEvent(ctx, usageLog)
 	}
 	if rec.Success {
@@ -100,7 +104,8 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	if !rec.Success && rec.ErrorClass != nil {
 		rt.applyProviderAccountCooldown(ctx, rec)
 	}
-	rt.recordGatewayAccountSnapshots(ctx, rec)
+	rt.recordGatewayRiskFailure(ctx, rec)
+	rt.enqueueGatewayAccountSnapshotRefresh(ctx, rec)
 }
 
 func gatewayUsageRequestedModel(rec gatewayUsageRecord, recordedModel string) string {
@@ -111,23 +116,27 @@ func gatewayUsageRequestedModel(rec gatewayUsageRecord, recordedModel string) st
 }
 
 func (rt *runtimeState) gatewayUsageCost(ctx context.Context, rec gatewayUsageRecord, pricing gatewayPricingEvidence, rateMultiplier string) gatewayPricingEvidence {
-	mode, quota, usedCost := rt.gatewayAllowanceCostInputs(ctx, rec, pricing.Amount)
+	allowance := rt.gatewayAllowanceCostInputs(ctx, rec, pricing.Amount)
 	result := rt.billing.PriceGatewayCost(billingcontract.GatewayCostRequest{
-		Amount:         pricing.Amount,
-		Currency:       pricing.Currency,
-		PricingRuleID:  pricing.PricingRuleID,
-		BillingMode:    pricing.BillingMode,
-		InputCost:      pricing.InputCost,
-		OutputCost:     pricing.OutputCost,
-		CacheReadCost:  pricing.CacheReadCost,
-		CacheWriteCost: pricing.CacheWriteCost,
-		Source:         pricing.PricingSource,
-		Estimated:      pricing.PricingEstimated,
-		RateMultiplier: rateMultiplier,
-		Success:        rec.Success,
-		AllowanceMode:  mode,
-		AllowanceQuota: quota,
-		UsedCost:       usedCost,
+		Amount:               pricing.Amount,
+		Currency:             pricing.Currency,
+		PricingRuleID:        pricing.PricingRuleID,
+		BillingMode:          pricing.BillingMode,
+		InputCost:            pricing.InputCost,
+		OutputCost:           pricing.OutputCost,
+		CacheReadCost:        pricing.CacheReadCost,
+		CacheWriteCost:       pricing.CacheWriteCost,
+		Source:               pricing.PricingSource,
+		Estimated:            pricing.PricingEstimated,
+		RateMultiplier:       rateMultiplier,
+		Success:              rec.Success,
+		AllowanceMode:        allowance.mode,
+		DailyAllowanceQuota:  allowance.dailyQuota,
+		WeeklyAllowanceQuota: allowance.weeklyQuota,
+		AllowanceQuota:       allowance.monthlyQuota,
+		DailyUsedCost:        allowance.dailyUsedCost,
+		WeeklyUsedCost:       allowance.weeklyUsedCost,
+		UsedCost:             allowance.monthlyUsedCost,
 	})
 	return gatewayPricingEvidence{
 		Amount:           result.Amount,
@@ -145,24 +154,45 @@ func (rt *runtimeState) gatewayUsageCost(ctx context.Context, rec gatewayUsageRe
 	}.withDefaults()
 }
 
-func (rt *runtimeState) gatewayAllowanceCostInputs(ctx context.Context, rec gatewayUsageRecord, cost string) (string, *string, string) {
+type gatewayAllowanceCostInput struct {
+	mode            string
+	dailyQuota      *string
+	weeklyQuota     *string
+	monthlyQuota    *string
+	dailyUsedCost   string
+	weeklyUsedCost  string
+	monthlyUsedCost string
+}
+
+func (rt *runtimeState) gatewayAllowanceCostInputs(ctx context.Context, rec gatewayUsageRecord, cost string) gatewayAllowanceCostInput {
 	if rt.subscriptions == nil || !rec.Success || rec.Authed.UserID <= 0 {
-		return "", nil, ""
+		return gatewayAllowanceCostInput{}
 	}
 	trimmed := strings.TrimSpace(cost)
 	if trimmed == "" || trimmed == "0.00000000" || trimmed == "0" {
-		return "", nil, ""
+		return gatewayAllowanceCostInput{}
 	}
 	now := time.Now().UTC()
 	allowance, err := rt.subscriptions.CostAllowance(ctx, rec.Authed.UserID, now)
-	if err != nil || allowance.Mode != "allowance" || allowance.Quota == nil {
-		return "", nil, ""
+	if err != nil || allowance.Mode != "allowance" || (allowance.DailyQuota == nil && allowance.WeeklyQuota == nil && allowance.Quota == nil) {
+		return gatewayAllowanceCostInput{}
 	}
-	periodUsage, err := rt.gatewayUserPeriodUsage(ctx, rec.Authed.UserID, now)
-	if err != nil {
-		return "", nil, ""
+	input := gatewayAllowanceCostInput{
+		mode:         allowance.Mode,
+		dailyQuota:   allowance.DailyQuota,
+		weeklyQuota:  allowance.WeeklyQuota,
+		monthlyQuota: allowance.Quota,
 	}
-	return allowance.Mode, allowance.Quota, periodUsage.BillableCost
+	if materialized, err := rt.subscriptions.MaterializedUsageForUser(ctx, rec.Authed.UserID, now); err == nil {
+		input.dailyUsedCost = materialized.DailyUsageUSD
+		input.weeklyUsedCost = materialized.WeeklyUsageUSD
+		input.monthlyUsedCost = materialized.MonthlyUsageUSD
+		return input
+	}
+	if periodUsage, err := rt.gatewayUserPeriodUsage(ctx, rec.Authed.UserID, now); err == nil {
+		input.monthlyUsedCost = periodUsage.BillableCost
+	}
+	return input
 }
 
 func (rt *runtimeState) recordGatewayMaterializedCosts(ctx context.Context, rec gatewayUsageRecord, billableCost string) {
@@ -198,17 +228,20 @@ func (rt *runtimeState) gatewayAccountRateMultiplier(ctx context.Context, accoun
 	if err != nil || len(groupIDs) == 0 {
 		return "1.00000000"
 	}
+	groups, err := rt.accounts.FindGroupsByID(ctx, groupIDs)
+	if err != nil || len(groups) == 0 {
+		return "1.00000000"
+	}
 	multiplier := big.NewRat(1, 1)
 	found := false
-	for _, groupID := range groupIDs {
-		group, err := rt.accounts.FindGroupByID(ctx, groupID)
-		if err != nil || group.Status != accountcontract.GroupStatusActive {
+	for _, group := range groups {
+		if group.Status != accountcontract.GroupStatusActive {
 			continue
 		}
 		rate, ok := money.DecimalRat(group.RateMultiplier)
 		if !ok || rate.Sign() < 0 {
 			if rt.logger != nil {
-				rt.logger.Warn("invalid account group rate multiplier", "account_id", *accountID, "group_id", groupID, "rate_multiplier", group.RateMultiplier)
+				rt.logger.Warn("invalid account group rate multiplier", "account_id", *accountID, "group_id", group.ID, "rate_multiplier", group.RateMultiplier)
 			}
 			continue
 		}
@@ -369,11 +402,11 @@ func gatewayAccountFailureStatusHandled(metadata map[string]any, statusCode *int
 	if statusCode == nil || *statusCode <= 0 {
 		return true
 	}
-	if value, ok := metadataValue(metadata, "handled_error_status_codes", "account_error_status_codes"); ok {
+	if value, ok := metacoerce.Value(metadata, "handled_error_status_codes", "account_error_status_codes"); ok {
 		return gatewayStatusCodeAllowed(gatewayStatusCodeList(value), statusCode)
 	}
 	if metadataBool(metadata, "custom_error_codes_enabled") {
-		value, ok := metadataValue(metadata, "custom_error_codes")
+		value, ok := metacoerce.Value(metadata, "custom_error_codes")
 		if !ok {
 			return true
 		}
@@ -658,25 +691,103 @@ func (rt *runtimeState) recordGatewayAccountSnapshots(ctx context.Context, rec g
 		rt.logger.Warn("failed to load provider account for snapshot", "error", err, "account_id", *rec.AccountID)
 		return
 	}
-	usageLogs, err := rt.usage.List(ctx)
+	now := time.Now().UTC()
+	usageLogs, err := rt.accountSnapshotUsageLogs(ctx, account, now)
 	if err != nil {
-		rt.logger.Warn("failed to list usage logs for account snapshot", "error", err, "account_id", *rec.AccountID)
+		rt.logger.Warn("failed to list account usage logs for snapshot", "error", err, "account_id", *rec.AccountID)
 		return
 	}
-	now := time.Now().UTC()
-	accountLogs := usageLogsForAccount(usageLogs, account.ID)
-	if err := rt.updateAccountRuntimeQuotaMetadata(ctx, account, accountLogs, now); err != nil {
+	if err := rt.updateAccountRuntimeQuotaMetadata(ctx, account, usageLogs, now); err != nil {
 		rt.logger.Warn("failed to update account runtime quota metadata", "error", err, "account_id", account.ID)
 	}
 	rt.recordProviderQuotaSignals(ctx, account, rec.ProviderQuotaSignals, now)
-	health := buildAccountHealthSnapshot(account, accountLogs, now)
+	health := buildAccountHealthSnapshot(account, usageLogs, now)
 	if _, err := rt.accounts.RecordHealthSnapshot(ctx, accountHealthSnapshotFromAPI(health)); err != nil {
 		rt.logger.Warn("failed to record account health snapshot", "error", err, "account_id", account.ID)
 	}
-	quota := buildAccountQuotaSnapshot(account, accountLogs, now)
+	quota := buildAccountQuotaSnapshot(account, usageLogs, now)
 	if _, err := rt.accounts.RecordQuotaSnapshot(ctx, accountQuotaSnapshotFromAPI(quota)); err != nil {
 		rt.logger.Warn("failed to record account quota snapshot", "error", err, "account_id", account.ID)
 	}
+}
+
+func (rt *runtimeState) accountSnapshotUsageLogs(ctx context.Context, account accountcontract.ProviderAccount, now time.Time) ([]usagecontract.UsageLog, error) {
+	window := accountRuntimeQuotaWindow(account.Metadata)
+	if costWindow := accountCostWindow(account.Metadata); costWindow > window {
+		window = costWindow
+	}
+	return rt.usage.ListByAccountWindow(ctx, usagecontract.AccountWindowFilter{
+		AccountID: account.ID,
+		Start:     now.UTC().Add(-window),
+		End:       now.UTC().Add(time.Nanosecond),
+		Limit:     accountSnapshotUsageLogLimit(account.Metadata),
+	})
+}
+
+func accountSnapshotUsageLogLimit(metadata map[string]any) int {
+	limit := metadataInt(metadata, "runtime_snapshot_usage_limit")
+	if limit <= 0 {
+		return 5000
+	}
+	return limit
+}
+
+func (rt *runtimeState) enqueueGatewayAccountSnapshotRefresh(ctx context.Context, rec gatewayUsageRecord) {
+	if rt.events == nil || rec.AccountID == nil || rec.ProviderID == nil {
+		return
+	}
+	payload := map[string]any{
+		"request_id":    rec.RequestID,
+		"attempt_no":    rec.AttemptNo,
+		"account_id":    *rec.AccountID,
+		"provider_id":   *rec.ProviderID,
+		"quota_signals": gatewayQuotaSignalsPayload(rec.ProviderQuotaSignals),
+	}
+	_, err := rt.events.Enqueue(ctx, eventscontract.EnqueueRequest{
+		EventType:      "GatewayAccountSnapshotRefreshRequested",
+		EventVersion:   "v1",
+		ProducerModule: "gateway",
+		AggregateType:  "provider_account",
+		AggregateID:    strconv.Itoa(*rec.AccountID),
+		CorrelationID:  rec.RequestID,
+		CausationID:    rec.RequestID,
+		IdempotencyKey: gatewayAccountSnapshotEventIdempotencyKey(rec.RequestID, rec.AttemptNo),
+		Payload:        payload,
+		Metadata: map[string]any{
+			"source_endpoint": rec.SourceEndpoint,
+		},
+	})
+	if err != nil {
+		rt.logger.Warn("failed to enqueue gateway account snapshot refresh", "error", err, "request_id", rec.RequestID)
+	}
+}
+
+func gatewayAccountSnapshotEventIdempotencyKey(requestID string, attemptNo int) string {
+	if attemptNo <= 0 {
+		attemptNo = 1
+	}
+	return requestID + ":account_snapshot:" + strconv.Itoa(attemptNo)
+}
+
+func gatewayQuotaSignalsPayload(signals []provideradaptercontract.QuotaSignal) []map[string]any {
+	out := make([]map[string]any, 0, len(signals))
+	for _, signal := range signals {
+		item := map[string]any{
+			"quota_type":      signal.QuotaType,
+			"remaining":       signal.Remaining,
+			"used":            signal.Used,
+			"quota_limit":     signal.QuotaLimit,
+			"remaining_ratio": float64(signal.RemainingRatio),
+		}
+		if signal.ResetAt != nil {
+			item["reset_at"] = signal.ResetAt.UTC().Format(time.RFC3339Nano)
+		}
+		if !signal.SnapshotAt.IsZero() {
+			item["snapshot_at"] = signal.SnapshotAt.UTC().Format(time.RFC3339Nano)
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func (rt *runtimeState) recordProviderQuotaSignals(ctx context.Context, account accountcontract.ProviderAccount, signals []provideradaptercontract.QuotaSignal, now time.Time) {

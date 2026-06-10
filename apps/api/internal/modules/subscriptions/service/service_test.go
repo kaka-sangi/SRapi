@@ -174,6 +174,104 @@ func TestCheckEntitlementRejectsBeforeSchedulingAndCarriesRoutingPolicy(t *testi
 	}
 }
 
+func TestCheckEntitlementUsesDailyAndWeeklyCostQuotas(t *testing.T) {
+	clock := fixedClock{now: time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)}
+	store := subscriptionmemory.New()
+	svc, err := service.New(store, clock)
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+	plan, err := svc.CreatePlan(t.Context(), contract.CreatePlanRequest{
+		Name:         "quota",
+		Price:        "9.99",
+		Currency:     "USD",
+		ValidityDays: 30,
+		Entitlements: map[string]any{
+			"daily_cost_quota":   "0.01000000",
+			"weekly_cost_quota":  "0.10000000",
+			"monthly_cost_quota": "1.00000000",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	if _, err := svc.CreateUserSubscription(t.Context(), contract.CreateSubscriptionRequest{UserID: 1, PlanID: plan.ID}); err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+
+	daily, err := svc.CheckEntitlement(t.Context(), contract.EntitlementCheckRequest{
+		UserID:        1,
+		EstimatedCost: "0.00200000",
+		RequestTime:   clock.now,
+		MaterializedUsage: &contract.MaterializedUsage{
+			DailyUsageUSD:   "0.00900000",
+			WeeklyUsageUSD:  "0.05000000",
+			MonthlyUsageUSD: "0.50000000",
+		},
+	})
+	if err != nil {
+		t.Fatalf("check daily quota: %v", err)
+	}
+	if daily.Allowed || daily.Reason != "daily_cost_quota_exceeded" {
+		t.Fatalf("expected daily quota denial, got %+v", daily)
+	}
+
+	weekly, err := svc.CheckEntitlement(t.Context(), contract.EntitlementCheckRequest{
+		UserID:        1,
+		EstimatedCost: "0.00500000",
+		RequestTime:   clock.now,
+		MaterializedUsage: &contract.MaterializedUsage{
+			DailyUsageUSD:   "0.00100000",
+			WeeklyUsageUSD:  "0.09600000",
+			MonthlyUsageUSD: "0.50000000",
+		},
+	})
+	if err != nil {
+		t.Fatalf("check weekly quota: %v", err)
+	}
+	if weekly.Allowed || weekly.Reason != "weekly_cost_quota_exceeded" {
+		t.Fatalf("expected weekly quota denial, got %+v", weekly)
+	}
+}
+
+func TestCostAllowanceReturnsDailyWeeklyMonthlyQuotas(t *testing.T) {
+	clock := fixedClock{now: time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)}
+	store := subscriptionmemory.New()
+	svc, err := service.New(store, clock)
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+	plan, err := svc.CreatePlan(t.Context(), contract.CreatePlanRequest{
+		Name:         "allowance",
+		Price:        "9.99",
+		Currency:     "USD",
+		ValidityDays: 30,
+		Entitlements: map[string]any{
+			"cost_quota_mode":    "allowance",
+			"daily_cost_quota":   "0.01000000",
+			"weekly_cost_quota":  "0.10000000",
+			"monthly_cost_quota": "1.00000000",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	if _, err := svc.CreateUserSubscription(t.Context(), contract.CreateSubscriptionRequest{UserID: 1, PlanID: plan.ID}); err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+
+	allowance, err := svc.CostAllowance(t.Context(), 1, clock.now)
+	if err != nil {
+		t.Fatalf("cost allowance: %v", err)
+	}
+	if allowance.Mode != "allowance" ||
+		allowance.DailyQuota == nil || *allowance.DailyQuota != "0.01000000" ||
+		allowance.WeeklyQuota == nil || *allowance.WeeklyQuota != "0.10000000" ||
+		allowance.Quota == nil || *allowance.Quota != "1.00000000" {
+		t.Fatalf("unexpected allowance: %+v", allowance)
+	}
+}
+
 func TestCreateUserSubscriptionIsIdempotentBySource(t *testing.T) {
 	clock := fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
 	svc, err := service.New(subscriptionmemory.New(), clock)

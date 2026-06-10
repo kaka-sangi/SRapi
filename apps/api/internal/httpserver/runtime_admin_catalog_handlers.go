@@ -884,6 +884,7 @@ func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request
 		Status:         toAccountStatusPtr(body.Status),
 		Priority:       body.Priority,
 		Weight:         body.Weight,
+		RiskLevel:      stringPtrFromAPI(body.RiskLevel),
 		UpstreamClient: body.UpstreamClient,
 	})
 	if err != nil {
@@ -931,6 +932,7 @@ func (s *Server) handleExportAdminAccounts(w http.ResponseWriter, r *http.Reques
 			Priority:           account.Priority,
 			ProviderId:         apiopenapi.Id(strconv.Itoa(account.ProviderID)),
 			ProxyId:            account.ProxyID,
+			RiskLevel:          apiStringPtr[apiopenapi.ProviderAccountExportItemRiskLevel](account.RiskLevel),
 			RuntimeClass:       apiopenapi.RuntimeClass(account.RuntimeClass),
 			Status:             apiopenapi.ProviderAccountStatus(account.Status),
 			UpstreamClient:     account.UpstreamClient,
@@ -1109,6 +1111,7 @@ func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request
 		Status:         toAccountStatusPtr(body.Status),
 		Priority:       body.Priority,
 		Weight:         body.Weight,
+		RiskLevel:      stringPtrFromAPI(body.RiskLevel),
 		UpstreamClient: optionalNullableString(body.UpstreamClient),
 	})
 	if err != nil {

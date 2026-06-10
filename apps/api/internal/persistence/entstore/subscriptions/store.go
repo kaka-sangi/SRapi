@@ -554,7 +554,7 @@ func entitlementValue(value any) map[string]any {
 
 func entitlementQuotaLimit(key string, value any) *string {
 	switch key {
-	case "monthly_token_quota", "monthly_cost_quota":
+	case "monthly_token_quota", "daily_cost_quota", "weekly_cost_quota", "monthly_cost_quota":
 		quota := fmt.Sprint(value)
 		return &quota
 	default:

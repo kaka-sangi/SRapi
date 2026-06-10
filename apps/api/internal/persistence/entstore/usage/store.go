@@ -2,11 +2,12 @@ package usage
 
 import (
 	"context"
+	stdsql "database/sql"
 	"errors"
-	"math/big"
 	"strings"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"github.com/srapi/srapi/apps/api/ent"
 	"github.com/srapi/srapi/apps/api/ent/predicate"
 	entusagelog "github.com/srapi/srapi/apps/api/ent/usagelog"
@@ -93,6 +94,30 @@ func (s *Store) ListByUser(ctx context.Context, userID int) ([]contract.UsageLog
 	return toUsageLogs(rows), nil
 }
 
+func (s *Store) ListByAccountWindow(ctx context.Context, filter contract.AccountWindowFilter) ([]contract.UsageLog, error) {
+	query := s.client.UsageLog.Query().
+		Where(
+			entusagelog.AccountIDEQ(filter.AccountID),
+			entusagelog.CreatedAtGTE(filter.Start.UTC()),
+			entusagelog.CreatedAtLT(filter.End.UTC()),
+		)
+	if filter.Limit > 0 {
+		query = query.Order(ent.Desc(entusagelog.FieldID)).Limit(filter.Limit)
+	} else {
+		query = query.Order(entusagelog.ByID())
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if filter.Limit > 0 {
+		for left, right := 0, len(rows)-1; left < right; left, right = left+1, right-1 {
+			rows[left], rows[right] = rows[right], rows[left]
+		}
+	}
+	return toUsageLogs(rows), nil
+}
+
 func (s *Store) SummarizeUserWindow(ctx context.Context, filter contract.UserWindowFilter) (contract.UserWindowSummary, error) {
 	predicates := []predicate.UsageLog{
 		entusagelog.UserIDEQ(filter.UserID),
@@ -105,14 +130,17 @@ func (s *Store) SummarizeUserWindow(ctx context.Context, filter contract.UserWin
 	if filter.ProviderID != nil {
 		predicates = append(predicates, entusagelog.ProviderIDEQ(*filter.ProviderID))
 	}
-	rows, err := s.client.UsageLog.Query().
+	var rows []userWindowSummaryRow
+	err := s.client.UsageLog.Query().
 		Where(predicates...).
-		Select(entusagelog.FieldTotalTokens, entusagelog.FieldBillableCost).
-		All(ctx)
+		Aggregate(
+			ent.As(ent.Sum(entusagelog.FieldTotalTokens), "total_tokens"),
+			ent.As(sumBillableCost(), "billable_cost"),
+		).
+		Scan(ctx, &rows)
 	if err != nil {
 		return contract.UserWindowSummary{}, err
 	}
-	totalCost := new(big.Rat)
 	summary := contract.UserWindowSummary{
 		UserID:      filter.UserID,
 		ProviderID:  cloneInt(filter.ProviderID),
@@ -120,14 +148,34 @@ func (s *Store) SummarizeUserWindow(ctx context.Context, filter contract.UserWin
 		End:         filter.End.UTC(),
 		SuccessOnly: filter.SuccessOnly,
 	}
-	for _, row := range rows {
-		summary.TotalTokens += row.TotalTokens
-		if cost, ok := money.DecimalRat(row.BillableCost); ok {
-			totalCost.Add(totalCost, cost)
-		}
+	if len(rows) == 0 {
+		summary.BillableCost = "0.00000000"
+		return summary, nil
 	}
-	summary.BillableCost = money.FormatRatFixed(totalCost, 8)
+	summary.TotalTokens = int(rows[0].TotalTokens.Int64)
+	summary.BillableCost = normalizeSummaryCost(rows[0].BillableCost)
 	return summary, nil
+}
+
+type userWindowSummaryRow struct {
+	TotalTokens  stdsql.NullInt64  `sql:"total_tokens"`
+	BillableCost stdsql.NullString `sql:"billable_cost"`
+}
+
+func sumBillableCost() ent.AggregateFunc {
+	return func(selector *sql.Selector) string {
+		return "COALESCE(SUM(CAST(" + selector.C(entusagelog.FieldBillableCost) + " AS NUMERIC)), 0)"
+	}
+}
+
+func normalizeSummaryCost(value stdsql.NullString) string {
+	if !value.Valid || strings.TrimSpace(value.String) == "" {
+		return "0.00000000"
+	}
+	if cost, ok := money.DecimalRat(value.String); ok {
+		return money.FormatRatFixed(cost, 8)
+	}
+	return "0.00000000"
 }
 
 // CleanupLogs counts the matching records and deletes the oldest up to

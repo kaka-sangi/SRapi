@@ -14,6 +14,7 @@ import (
 	provideradapterservice "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -31,6 +32,7 @@ type Config struct {
 	MasterKey     string
 	Clock         accountservice.Clock
 	Adapter       provideradaptercontract.AccountQuotaFetcher
+	RunGuard      runonceguard.Guard
 }
 
 // Result summarizes one refresh pass.
@@ -52,6 +54,7 @@ type Worker struct {
 	interval      time.Duration
 	timeout       time.Duration
 	maxConcurrent int
+	guard         runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -91,6 +94,7 @@ func New(accounts accountcontract.Store, providers providercontract.Store, logge
 		interval:      durationOrDefault(cfg.Interval, defaultInterval),
 		timeout:       durationOrDefault(cfg.Timeout, defaultTimeout),
 		maxConcurrent: positiveOrDefault(cfg.MaxConcurrent, defaultMaxConcurrent),
+		guard:         cfg.RunGuard,
 	}, nil
 }
 
@@ -159,7 +163,13 @@ func (w *Worker) RunOnce(ctx context.Context) (Result, error) {
 	if w == nil {
 		return Result{}, nil
 	}
-	return w.refreshPass(ctx)
+	var result Result
+	_, err := runonceguard.Run(ctx, w.guard, "quota_refresh", func(runCtx context.Context) error {
+		var runErr error
+		result, runErr = w.refreshPass(runCtx)
+		return runErr
+	})
+	return result, err
 }
 
 func (w *Worker) run(ctx context.Context) {
@@ -177,7 +187,7 @@ func (w *Worker) run(ctx context.Context) {
 }
 
 func (w *Worker) refreshAndLog(ctx context.Context) {
-	result, err := w.refreshPass(ctx)
+	result, err := w.RunOnce(ctx)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		w.logger.Warn("account quota refresh failed", "error", err)
 	}
@@ -262,28 +272,11 @@ func (w *Worker) refreshOne(parent context.Context, account accountcontract.Prov
 		return
 	}
 	signals := 0
-	for _, signal := range report.QuotaSignals {
-		snapshotAt := signal.SnapshotAt
-		if snapshotAt.IsZero() {
-			snapshotAt = time.Now().UTC()
-		}
-		if _, err := w.accounts.RecordQuotaSnapshot(ctx, accountcontract.AccountQuotaSnapshot{
-			AccountID:      account.ID,
-			ProviderID:     account.ProviderID,
-			QuotaType:      signal.QuotaType,
-			Remaining:      signal.Remaining,
-			Used:           signal.Used,
-			QuotaLimit:     signal.QuotaLimit,
-			RemainingRatio: signal.RemainingRatio,
-			ResetAt:        signal.ResetAt,
-			SnapshotAt:     snapshotAt,
-		}); err != nil {
-			mu.Lock()
-			*firstErr = errors.Join(*firstErr, err)
-			mu.Unlock()
-			break
-		}
-		signals++
+	signals, err = w.accounts.ApplyQuotaReport(ctx, account, report)
+	if err != nil {
+		mu.Lock()
+		*firstErr = errors.Join(*firstErr, err)
+		mu.Unlock()
 	}
 	mu.Lock()
 	result.Refreshed++
@@ -292,19 +285,7 @@ func (w *Worker) refreshOne(parent context.Context, account accountcontract.Prov
 }
 
 func (w *Worker) persistQuotaProviderError(ctx context.Context, account accountcontract.ProviderAccount, err error) {
-	var providerErr provideradaptercontract.ProviderError
-	if !errors.As(err, &providerErr) {
-		return
-	}
-	if providerErr.StatusCode != http.StatusForbidden {
-		return
-	}
-	metadata := provideradaptercontract.QuotaErrorMetadata(account.Metadata, providerErr, time.Now().UTC())
-	status := account.Status
-	if provideradaptercontract.QuotaErrorClassRequiresOperatorAction(providerErr.Class) {
-		status = accountcontract.StatusSuspended
-	}
-	if _, updateErr := w.accounts.Update(ctx, account.ID, accountcontract.UpdateRequest{Metadata: &metadata, Status: &status}); updateErr != nil {
+	if updateErr := w.accounts.ApplyQuotaProviderError(ctx, account, err); updateErr != nil {
 		w.logger.Warn("failed to persist account quota error metadata", "account_id", account.ID, "error", updateErr)
 	}
 }

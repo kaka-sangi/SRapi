@@ -1,6 +1,7 @@
 package alipayprovider
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -68,6 +69,40 @@ func (p Provider) CreateSession(req checkoutprovider.Request) (checkoutprovider.
 	}, nil
 }
 
+func (p Provider) Refund(req checkoutprovider.RefundRequest) (checkoutprovider.RefundResult, error) {
+	refundReq, err := alipayRefundRequest(req)
+	if err != nil {
+		return checkoutprovider.RefundResult{}, err
+	}
+	result, err := p.createRefund(refundReq)
+	if err != nil {
+		return checkoutprovider.RefundResult{}, errors.Join(checkoutprovider.ErrUnavailable, err)
+	}
+	return checkoutprovider.RefundResult{
+		ID:       firstNonEmpty(result.TradeNo, req.IdempotencyKey),
+		Status:   checkoutprovider.RefundStatusSucceeded,
+		Metadata: map[string]any{"alipay_refund_fee": result.RefundFee, "alipay_fund_change": result.FundChange},
+	}, nil
+}
+
+func (p Provider) QueryOrder(req checkoutprovider.QueryRequest) (checkoutprovider.QueryResult, error) {
+	queryReq, err := alipayQueryRequest(req)
+	if err != nil {
+		return checkoutprovider.QueryResult{}, err
+	}
+	result, err := p.queryTrade(queryReq)
+	if err != nil {
+		return checkoutprovider.QueryResult{}, errors.Join(checkoutprovider.ErrUnavailable, err)
+	}
+	return checkoutprovider.QueryResult{
+		Status:                alipayQueryStatus(result.TradeStatus),
+		ProviderTransactionID: result.TradeNo,
+		Amount:                normalizeAlipayAmount(result.TotalAmount),
+		Currency:              "CNY",
+		Metadata:              map[string]any{"alipay_trade_status": string(result.TradeStatus)},
+	}, nil
+}
+
 func (p Provider) createPagePay(req PagePayRequest) (PagePaySession, error) {
 	if p.Creator != nil {
 		return p.Creator.CreatePagePay(req)
@@ -107,6 +142,50 @@ func createPagePay(req PagePayRequest) (PagePaySession, error) {
 		return PagePaySession{}, err
 	}
 	return PagePaySession{URL: payURL.String()}, nil
+}
+
+func (p Provider) createRefund(req alipayRefundRequestData) (*alipay.TradeRefundRsp, error) {
+	if p.Creator != nil {
+		return nil, checkoutprovider.ErrInvalidConfig
+	}
+	client, err := newClient(req.PagePayRequest)
+	if err != nil {
+		return nil, err
+	}
+	return client.TradeRefund(context.Background(), alipay.TradeRefund{
+		OutTradeNo:   req.OrderNo,
+		TradeNo:      req.TradeNo,
+		RefundAmount: req.Amount,
+		RefundReason: req.Reason,
+		OutRequestNo: req.OutRequestNo,
+	})
+}
+
+func (p Provider) queryTrade(req alipayQueryRequestData) (*alipay.TradeQueryRsp, error) {
+	if p.Creator != nil {
+		return nil, checkoutprovider.ErrInvalidConfig
+	}
+	client, err := newClient(req.PagePayRequest)
+	if err != nil {
+		return nil, err
+	}
+	return client.TradeQuery(context.Background(), alipay.TradeQuery{
+		OutTradeNo: req.OrderNo,
+		TradeNo:    req.TradeNo,
+	})
+}
+
+type alipayRefundRequestData struct {
+	PagePayRequest
+	TradeNo      string
+	Amount       string
+	Reason       string
+	OutRequestNo string
+}
+
+type alipayQueryRequestData struct {
+	PagePayRequest
+	TradeNo string
 }
 
 func newClient(req PagePayRequest) (*alipay.Client, error) {
@@ -172,6 +251,73 @@ func pagePayRequest(req checkoutprovider.Request) (PagePayRequest, error) {
 		QRPayMode:       configString(req.Config, "qr_pay_mode"),
 		QRCodeWidth:     configString(req.Config, "qrcode_width", "qr_code_width"),
 	}, nil
+}
+
+func alipayRefundRequest(req checkoutprovider.RefundRequest) (alipayRefundRequestData, error) {
+	payReq, err := pagePayRequest(checkoutprovider.Request{
+		Config:   req.Config,
+		OrderNo:  req.OrderNo,
+		Amount:   req.OriginalAmount,
+		Currency: req.Currency,
+		Metadata: req.Metadata,
+	})
+	if err != nil {
+		return alipayRefundRequestData{}, err
+	}
+	amount := money2(req.Amount)
+	if amount == "" {
+		return alipayRefundRequestData{}, checkoutprovider.ErrInvalidConfig
+	}
+	return alipayRefundRequestData{
+		PagePayRequest: payReq,
+		TradeNo:        req.ProviderTransactionID,
+		Amount:         amount,
+		Reason:         strings.TrimSpace(req.Reason),
+		OutRequestNo:   firstNonEmpty(req.IdempotencyKey, req.OrderNo),
+	}, nil
+}
+
+func alipayQueryRequest(req checkoutprovider.QueryRequest) (alipayQueryRequestData, error) {
+	payReq, err := pagePayRequest(checkoutprovider.Request{
+		Config:   req.Config,
+		OrderNo:  req.OrderNo,
+		Amount:   firstNonEmpty(req.Amount, "1.00"),
+		Currency: req.Currency,
+		Metadata: req.Metadata,
+	})
+	if err != nil {
+		return alipayQueryRequestData{}, err
+	}
+	return alipayQueryRequestData{PagePayRequest: payReq, TradeNo: req.ProviderTransactionID}, nil
+}
+
+func alipayQueryStatus(status alipay.TradeStatus) checkoutprovider.QueryStatus {
+	switch status {
+	case alipay.TradeStatusSuccess, alipay.TradeStatusFinished:
+		return checkoutprovider.QueryStatusPaid
+	case alipay.TradeStatusClosed:
+		return checkoutprovider.QueryStatusCanceled
+	default:
+		return checkoutprovider.QueryStatusPending
+	}
+}
+
+func normalizeAlipayAmount(value string) string {
+	if value == "" {
+		return ""
+	}
+	if !strings.Contains(value, ".") {
+		return value + ".00000000"
+	}
+	parts := strings.SplitN(value, ".", 2)
+	fraction := parts[1]
+	for len(fraction) < 8 {
+		fraction += "0"
+	}
+	if len(fraction) > 8 {
+		fraction = fraction[:8]
+	}
+	return parts[0] + "." + fraction
 }
 
 func methodMode(metadata map[string]any) string {

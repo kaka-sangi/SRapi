@@ -11,6 +11,7 @@ import (
 	auditservice "github.com/srapi/srapi/apps/api/internal/modules/audit/service"
 	"github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/payments/service"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -22,6 +23,7 @@ type Config struct {
 	Interval time.Duration
 	Clock    service.Clock
 	Audit    auditcontract.Store
+	RunGuard runonceguard.Guard
 }
 
 type Dependencies = service.Dependencies
@@ -30,6 +32,7 @@ type Worker struct {
 	payments *service.Service
 	logger   *slog.Logger
 	interval time.Duration
+	guard    runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -58,7 +61,7 @@ func New(store contract.Store, masterKey string, deps service.Dependencies, logg
 	if interval <= 0 {
 		interval = defaultInterval
 	}
-	return &Worker{payments: payments, logger: logger, interval: interval}, nil
+	return &Worker{payments: payments, logger: logger, interval: interval, guard: cfg.RunGuard}, nil
 }
 
 func (w *Worker) Start(parent context.Context) {
@@ -124,7 +127,13 @@ func (w *Worker) RunOnce(ctx context.Context) (contract.ExpireOrdersResult, erro
 	if w == nil {
 		return contract.ExpireOrdersResult{}, nil
 	}
-	return w.payments.ExpirePendingOrders(ctx, time.Time{})
+	var result contract.ExpireOrdersResult
+	_, err := runonceguard.Run(ctx, w.guard, "order_expirer", func(runCtx context.Context) error {
+		var runErr error
+		result, runErr = w.payments.ExpirePendingOrders(runCtx, time.Time{})
+		return runErr
+	})
+	return result, err
 }
 
 func (w *Worker) run(ctx context.Context) {

@@ -113,6 +113,16 @@ type UserWindowSummary struct {
 	BillableCost string
 }
 
+// AccountWindowFilter bounds account-scoped usage reads used by runtime
+// account snapshots. Stores must apply account and time predicates before
+// materializing rows and honor Limit when it is positive.
+type AccountWindowFilter struct {
+	AccountID int
+	Start     time.Time
+	End       time.Time
+	Limit     int
+}
+
 // CleanupFilter bounds an operator on-demand deletion of usage records. It
 // complements the background retention worker (which only purges by age):
 // here an operator can target a model and/or a time range, capped by MaxDelete
@@ -140,37 +150,45 @@ type CleanupResult struct {
 
 // APIKeyUsageSummary contains key-scoped usage aggregates for client-facing Gateway usage snapshots.
 type APIKeyUsageSummary struct {
-	APIKeyID     int
-	WindowDays   int
-	RequestCount int
-	SuccessCount int
-	ErrorCount   int
-	InputTokens  int
-	OutputTokens int
-	CachedTokens int
-	TotalTokens  int
-	TotalCost    string
-	Currency     string
-	Today        UsageAggregate
-	ModelStats   []UsageAggregate
-	DailyUsage   []UsageAggregate
-	RecentLogs   []UsageLog
-	GeneratedAt  time.Time
+	APIKeyID       int
+	WindowDays     int
+	RequestCount   int
+	SuccessCount   int
+	ErrorCount     int
+	InputTokens    int
+	OutputTokens   int
+	CachedTokens   int
+	TotalTokens    int
+	TotalCost      string
+	InputCost      string
+	OutputCost     string
+	CacheReadCost  string
+	CacheWriteCost string
+	Currency       string
+	Today          UsageAggregate
+	ModelStats     []UsageAggregate
+	DailyUsage     []UsageAggregate
+	RecentLogs     []UsageLog
+	GeneratedAt    time.Time
 }
 
 // UsageAggregate contains usage totals for one aggregation key and dimension.
 type UsageAggregate struct {
-	Key          string
-	Type         AggregateDimension
-	RequestCount int
-	SuccessCount int
-	ErrorCount   int
-	InputTokens  int
-	OutputTokens int
-	CachedTokens int
-	TotalTokens  int
-	TotalCost    string
-	Currency     string
+	Key            string
+	Type           AggregateDimension
+	RequestCount   int
+	SuccessCount   int
+	ErrorCount     int
+	InputTokens    int
+	OutputTokens   int
+	CachedTokens   int
+	TotalTokens    int
+	TotalCost      string
+	InputCost      string
+	OutputCost     string
+	CacheReadCost  string
+	CacheWriteCost string
+	Currency       string
 }
 
 type UsageExport struct {
@@ -186,6 +204,7 @@ type Store interface {
 	Create(ctx context.Context, input UsageLog) (UsageLog, error)
 	List(ctx context.Context) ([]UsageLog, error)
 	ListByUser(ctx context.Context, userID int) ([]UsageLog, error)
+	ListByAccountWindow(ctx context.Context, filter AccountWindowFilter) ([]UsageLog, error)
 	SummarizeUserWindow(ctx context.Context, filter UserWindowFilter) (UserWindowSummary, error)
 	// CleanupLogs performs a bounded delete of usage records matching filter.
 	// Implementations must honor filter.MaxDelete and filter.DryRun and return

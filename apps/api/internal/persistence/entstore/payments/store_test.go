@@ -3,6 +3,7 @@ package payments
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -291,6 +292,110 @@ func TestStoreCreatesDiscountedOrderAndPromoApplicationAtomically(t *testing.T) 
 	}
 	if count != 0 {
 		t.Fatalf("expected rejected discounted order to rollback, found %d rows", count)
+	}
+}
+
+func TestStorePromoLimitsAndRelease(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	ctx := context.Background()
+	now := time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
+	provider, err := store.CreateProviderInstance(ctx, contract.CreateStoredProviderInstance{
+		Provider:         "easypay",
+		Name:             "primary",
+		Status:           contract.ProviderStatusActive,
+		ConfigCiphertext: "v1:nonce:ciphertext",
+		ConfigVersion:    1,
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "USD"},
+	})
+	if err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+	seedPromoCodes(t, ctx, client, map[string]any{
+		"next_id": 2,
+		"items": []map[string]any{
+			{
+				"id":               1,
+				"code":             "SAVE10",
+				"status":           string(admincontrolcontract.PromoCodeStatusActive),
+				"discount_type":    string(admincontrolcontract.PromoDiscountTypeAmount),
+				"discount_value":   "10.00",
+				"currency":         "USD",
+				"max_uses":         3,
+				"per_user_limit":   1,
+				"min_order_amount": "50.00",
+				"used_count":       0,
+				"created_at":       now.Format(time.RFC3339Nano),
+				"updated_at":       now.Format(time.RFC3339Nano),
+			},
+		},
+	})
+	if _, err := store.PreviewPromoCode(ctx, contract.PromoCodePreviewInput{
+		UserID:   7,
+		Code:     "SAVE10",
+		Amount:   "40.00000000",
+		Currency: "USD",
+		Now:      now,
+	}); !errors.Is(err, contract.ErrConflict) {
+		t.Fatalf("expected min order conflict, got %v", err)
+	}
+
+	order, err := store.CreateOrder(ctx, contract.CreateStoredOrder{
+		UserID:             7,
+		OrderNo:            "pay_promo_limit_1",
+		ProviderInstanceID: provider.ID,
+		OriginalAmount:     "60.00000000",
+		DiscountAmount:     "10.00000000",
+		PromoCodeID:        intPtr(1),
+		PromoCode:          "SAVE10",
+		Amount:             "50.00000000",
+		Currency:           "USD",
+		Status:             contract.OrderStatusPending,
+		ProductType:        contract.ProductTypeBalanceCredit,
+		ProviderSnapshot:   map[string]any{"provider": "easypay"},
+	})
+	if err != nil {
+		t.Fatalf("create discounted order: %v", err)
+	}
+	if _, err := store.PreviewPromoCode(ctx, contract.PromoCodePreviewInput{
+		UserID:   7,
+		Code:     "SAVE10",
+		Amount:   "60.00000000",
+		Currency: "USD",
+		Now:      now,
+	}); !errors.Is(err, contract.ErrConflict) {
+		t.Fatalf("expected per-user limit conflict, got %v", err)
+	}
+
+	released, ok, err := store.ReleasePromoCode(ctx, contract.PromoCodeReleaseInput{PaymentOrderID: order.ID, ReleasedAt: now.Add(time.Minute), Reason: "order_canceled"})
+	if err != nil || !ok {
+		t.Fatalf("release promo: released=%+v ok=%v err=%v", released, ok, err)
+	}
+	if released.Metadata["released"] != true {
+		t.Fatalf("expected released metadata, got %+v", released.Metadata)
+	}
+	setting, err := client.Setting.Query().Where(entsetting.KeyEQ("admin_control.promo_codes")).Only(ctx)
+	if err != nil {
+		t.Fatalf("find promo setting: %v", err)
+	}
+	usedCount, status := promoUsageState(t, setting.ValueJSON)
+	if usedCount != 0 || status != string(admincontrolcontract.PromoCodeStatusActive) {
+		t.Fatalf("expected released promo usage, used=%d status=%s value=%+v", usedCount, status, setting.ValueJSON)
+	}
+	if _, err := store.PreviewPromoCode(ctx, contract.PromoCodePreviewInput{
+		UserID:   7,
+		Code:     "SAVE10",
+		Amount:   "60.00000000",
+		Currency: "USD",
+		Now:      now.Add(2 * time.Minute),
+	}); err != nil {
+		t.Fatalf("expected promo reusable after release: %v", err)
 	}
 }
 

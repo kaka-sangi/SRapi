@@ -7,6 +7,7 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/usage/service"
 	usagememory "github.com/srapi/srapi/apps/api/internal/modules/usage/store/memory"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 func TestRecordStoresSuccessfulGatewayUsageEvidence(t *testing.T) {
@@ -113,6 +114,10 @@ func TestAggregateAndExportUsage(t *testing.T) {
 			OutputTokens:   4,
 			Success:        true,
 			Cost:           "0.10000000",
+			InputCost:      "0.01000000",
+			OutputCost:     "0.02000000",
+			CacheReadCost:  "0.03000000",
+			CacheWriteCost: "0.04000000",
 		},
 		{
 			RequestID:      "req_usage_2",
@@ -125,6 +130,10 @@ func TestAggregateAndExportUsage(t *testing.T) {
 			OutputTokens:   6,
 			Success:        false,
 			Cost:           "0.20000000",
+			InputCost:      "0.05000000",
+			OutputCost:     "0.06000000",
+			CacheReadCost:  "0.04000000",
+			CacheWriteCost: "0.05000000",
 		},
 	} {
 		if _, err := svc.Record(t.Context(), req); err != nil {
@@ -139,6 +148,7 @@ func TestAggregateAndExportUsage(t *testing.T) {
 	if len(aggregates) != 1 || aggregates[0].Key != "gpt-4o-mini" || aggregates[0].RequestCount != 2 || aggregates[0].SuccessCount != 1 || aggregates[0].ErrorCount != 1 || aggregates[0].TotalTokens != 18 || aggregates[0].TotalCost != "0.30000000" {
 		t.Fatalf("unexpected aggregate: %+v", aggregates)
 	}
+	assertUsageBreakdownSums(t, aggregates[0])
 
 	exported, err := svc.Export(t.Context(), contract.QueryFilter{})
 	if err != nil {
@@ -169,6 +179,10 @@ func TestSummarizeAPIKeyIsScopedAndAggregated(t *testing.T) {
 			CachedTokens:   1,
 			Success:        true,
 			Cost:           "0.10000000",
+			InputCost:      "0.01000000",
+			OutputCost:     "0.02000000",
+			CacheReadCost:  "0.03000000",
+			CacheWriteCost: "0.04000000",
 			Currency:       "USD",
 			CreatedAt:      clock.now,
 		},
@@ -182,6 +196,10 @@ func TestSummarizeAPIKeyIsScopedAndAggregated(t *testing.T) {
 			OutputTokens:   6,
 			Success:        false,
 			Cost:           "0.25000000",
+			InputCost:      "0.05000000",
+			OutputCost:     "0.06000000",
+			CacheReadCost:  "0.07000000",
+			CacheWriteCost: "0.07000000",
 			Currency:       "USD",
 			CreatedAt:      clock.now,
 		},
@@ -227,6 +245,10 @@ func TestSummarizeAPIKeyIsScopedAndAggregated(t *testing.T) {
 	if summary.APIKeyID != 2 || summary.RequestCount != 2 || summary.SuccessCount != 1 || summary.ErrorCount != 1 || summary.TotalTokens != 19 || summary.TotalCost != "0.35000000" {
 		t.Fatalf("unexpected summary totals: %+v", summary)
 	}
+	if summary.InputCost != "0.06000000" || summary.OutputCost != "0.08000000" || summary.CacheReadCost != "0.10000000" || summary.CacheWriteCost != "0.11000000" {
+		t.Fatalf("unexpected summary cost breakdown: %+v", summary)
+	}
+	assertUsageBreakdownSums(t, summary.Today)
 	if summary.Today.RequestCount != 2 || summary.Today.TotalTokens != 19 {
 		t.Fatalf("unexpected today summary: %+v", summary.Today)
 	}
@@ -235,6 +257,16 @@ func TestSummarizeAPIKeyIsScopedAndAggregated(t *testing.T) {
 	}
 	if len(summary.RecentLogs) != 2 || summary.RecentLogs[0].RequestID != "req_key_2_other_model" || summary.RecentLogs[1].RequestID != "req_key_2_today" {
 		t.Fatalf("unexpected recent logs: %+v", summary.RecentLogs)
+	}
+}
+
+func assertUsageBreakdownSums(t *testing.T, aggregate contract.UsageAggregate) {
+	t.Helper()
+	sum := money.AddMoney(aggregate.InputCost, aggregate.OutputCost)
+	sum = money.AddMoney(sum, aggregate.CacheReadCost)
+	sum = money.AddMoney(sum, aggregate.CacheWriteCost)
+	if sum != aggregate.TotalCost {
+		t.Fatalf("usage breakdown sum %s != total cost %s in %+v", sum, aggregate.TotalCost, aggregate)
 	}
 }
 

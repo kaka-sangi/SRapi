@@ -14,6 +14,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent"
 	entbillingledger "github.com/srapi/srapi/apps/api/ent/billingledger"
 	entmodelregistry "github.com/srapi/srapi/apps/api/ent/modelregistry"
+	"github.com/srapi/srapi/apps/api/ent/predicate"
 	entpricinginterval "github.com/srapi/srapi/apps/api/ent/pricinginterval"
 	entpricingrule "github.com/srapi/srapi/apps/api/ent/pricingrule"
 	entusagelog "github.com/srapi/srapi/apps/api/ent/usagelog"
@@ -283,13 +284,20 @@ func (s *Store) CreatePricingRule(ctx context.Context, input contract.PricingRul
 	}
 	create := tx.PricingRule.Create().
 		SetModelID(input.ModelID).
+		SetModelFamily(input.ModelFamily).
 		SetProviderID(input.ProviderID).
 		SetBillingMode(billingModeOrToken(input.BillingMode)).
 		SetInputPricePerMillion(moneyOrZero(input.InputPricePerMillionTokens)).
 		SetOutputPricePerMillion(moneyOrZero(input.OutputPricePerMillionTokens)).
 		SetCacheReadPricePerMillion(moneyOrZero(input.CacheReadPricePerMillionTokens)).
 		SetCacheWritePricePerMillion(moneyOrZero(input.CacheWritePricePerMillionTokens)).
+		SetCacheWrite5mPricePerMillion(moneyOrZero(input.CacheWrite5mPricePerMillionTokens)).
+		SetCacheWrite1hPricePerMillion(moneyOrZero(input.CacheWrite1hPricePerMillionTokens)).
+		SetImageOutputPricePerMillion(moneyOrZero(input.ImageOutputPricePerMillionTokens)).
 		SetPerRequestPrice(moneyOrZero(input.PerRequestPrice)).
+		SetServiceTierMultipliersJSON(cloneStringMap(input.ServiceTierMultipliers)).
+		SetNillableLongContextThresholdTokens(input.LongContextThresholdTokens).
+		SetLongContextMultiplier(moneyOrZero(input.LongContextMultiplier)).
 		SetCurrency(money.NormalizeCurrency(input.Currency)).
 		SetNillableEffectiveFrom(input.EffectiveFrom).
 		SetNillableEffectiveTo(input.EffectiveTo)
@@ -321,10 +329,26 @@ func (s *Store) UpdatePricingRule(ctx context.Context, id int, input contract.Up
 		SetNillableOutputPricePerMillion(input.OutputPricePerMillionTokens).
 		SetNillableCacheReadPricePerMillion(input.CacheReadPricePerMillionTokens).
 		SetNillableCacheWritePricePerMillion(input.CacheWritePricePerMillionTokens).
+		SetNillableCacheWrite5mPricePerMillion(input.CacheWrite5mPricePerMillionTokens).
+		SetNillableCacheWrite1hPricePerMillion(input.CacheWrite1hPricePerMillionTokens).
+		SetNillableImageOutputPricePerMillion(input.ImageOutputPricePerMillionTokens).
 		SetNillablePerRequestPrice(input.PerRequestPrice).
 		SetNillableCurrency(input.Currency)
 	if input.BillingMode != nil {
 		update = update.SetBillingMode(billingModeOrToken(*input.BillingMode))
+	}
+	if input.ServiceTierMultipliers != nil {
+		update = update.SetServiceTierMultipliersJSON(cloneStringMap(*input.ServiceTierMultipliers))
+	}
+	if input.LongContextThresholdTokens != nil {
+		if *input.LongContextThresholdTokens == nil {
+			update = update.ClearLongContextThresholdTokens()
+		} else {
+			update = update.SetLongContextThresholdTokens(**input.LongContextThresholdTokens)
+		}
+	}
+	if input.LongContextMultiplier != nil {
+		update = update.SetLongContextMultiplier(moneyOrZero(*input.LongContextMultiplier))
 	}
 	if input.EffectiveFrom != nil {
 		if *input.EffectiveFrom == nil {
@@ -392,9 +416,69 @@ func (s *Store) ListPricingRules(ctx context.Context) ([]contract.PricingRule, e
 	}
 	out := make([]contract.PricingRule, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, toPricingRuleWithFamily(row, families[row.ModelID], intervals[row.ID]))
+		family := row.ModelFamily
+		if strings.TrimSpace(family) == "" {
+			family = families[row.ModelID]
+		}
+		out = append(out, toPricingRuleWithFamily(row, family, intervals[row.ID]))
 	}
 	return out, nil
+}
+
+func (s *Store) QueryPricingRules(ctx context.Context, query contract.PricingRuleQuery) ([]contract.PricingRule, error) {
+	at := query.At
+	if at.IsZero() {
+		at = time.Now().UTC()
+	}
+	predicates := []predicate.PricingRule{
+		entpricingrule.ProviderIDIn(0, query.ProviderID),
+		entpricingrule.Or(entpricingrule.EffectiveFromIsNil(), entpricingrule.EffectiveFromLTE(at)),
+		entpricingrule.Or(entpricingrule.EffectiveToIsNil(), entpricingrule.EffectiveToGT(at)),
+	}
+	if queryUsesOnlyMappedModel(query) {
+		predicates = append(predicates, entpricingrule.ModelIDEQ(query.ModelID))
+	}
+	rows, err := s.client.PricingRule.Query().
+		Where(predicates...).
+		Order(entpricingrule.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	families, err := s.pricingRuleModelFamilies(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	intervals, err := s.pricingIntervals(ctx, pricingRuleIDs(rows))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.PricingRule, 0, len(rows))
+	for _, row := range rows {
+		family := row.ModelFamily
+		if strings.TrimSpace(family) == "" {
+			family = families[row.ModelID]
+		}
+		out = append(out, toPricingRuleWithFamily(row, family, intervals[row.ID]))
+	}
+	return out, nil
+}
+
+func queryUsesOnlyMappedModel(query contract.PricingRuleQuery) bool {
+	if query.ModelID <= 0 {
+		return false
+	}
+	if strings.TrimSpace(query.ModelFamily) != "" {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(query.BillingModelSource)) {
+	case "requested":
+		return strings.TrimSpace(query.RequestedModel) == ""
+	case "upstream":
+		return strings.TrimSpace(query.UpstreamModel) == ""
+	default:
+		return true
+	}
 }
 
 func pricingRuleIDs(rows []*ent.PricingRule) []int {
@@ -459,22 +543,28 @@ func toPricingRule(row *ent.PricingRule) contract.PricingRule {
 
 func toPricingRuleWithFamily(row *ent.PricingRule, modelFamily string, intervals []contract.PricingInterval) contract.PricingRule {
 	return contract.PricingRule{
-		ID:                              row.ID,
-		ModelID:                         row.ModelID,
-		ModelFamily:                     modelFamily,
-		ProviderID:                      row.ProviderID,
-		BillingMode:                     contract.BillingMode(row.BillingMode),
-		InputPricePerMillionTokens:      row.InputPricePerMillion,
-		OutputPricePerMillionTokens:     row.OutputPricePerMillion,
-		CacheReadPricePerMillionTokens:  row.CacheReadPricePerMillion,
-		CacheWritePricePerMillionTokens: row.CacheWritePricePerMillion,
-		PerRequestPrice:                 row.PerRequestPrice,
-		Intervals:                       clonePricingIntervals(intervals),
-		Currency:                        row.Currency,
-		EffectiveFrom:                   cloneTime(row.EffectiveFrom),
-		EffectiveTo:                     cloneTime(row.EffectiveTo),
-		CreatedAt:                       row.CreatedAt,
-		UpdatedAt:                       row.UpdatedAt,
+		ID:                                row.ID,
+		ModelID:                           row.ModelID,
+		ModelFamily:                       modelFamily,
+		ProviderID:                        row.ProviderID,
+		BillingMode:                       contract.BillingMode(row.BillingMode),
+		InputPricePerMillionTokens:        row.InputPricePerMillion,
+		OutputPricePerMillionTokens:       row.OutputPricePerMillion,
+		CacheReadPricePerMillionTokens:    row.CacheReadPricePerMillion,
+		CacheWritePricePerMillionTokens:   row.CacheWritePricePerMillion,
+		CacheWrite5mPricePerMillionTokens: row.CacheWrite5mPricePerMillion,
+		CacheWrite1hPricePerMillionTokens: row.CacheWrite1hPricePerMillion,
+		ImageOutputPricePerMillionTokens:  row.ImageOutputPricePerMillion,
+		PerRequestPrice:                   row.PerRequestPrice,
+		ServiceTierMultipliers:            cloneStringMap(row.ServiceTierMultipliersJSON),
+		LongContextThresholdTokens:        cloneInt(row.LongContextThresholdTokens),
+		LongContextMultiplier:             row.LongContextMultiplier,
+		Intervals:                         clonePricingIntervals(intervals),
+		Currency:                          row.Currency,
+		EffectiveFrom:                     cloneTime(row.EffectiveFrom),
+		EffectiveTo:                       cloneTime(row.EffectiveTo),
+		CreatedAt:                         row.CreatedAt,
+		UpdatedAt:                         row.UpdatedAt,
 	}
 }
 
@@ -634,4 +724,15 @@ func cloneMap(value map[string]any) map[string]any {
 		return map[string]any{}
 	}
 	return cloned
+}
+
+func cloneStringMap(value map[string]string) map[string]string {
+	if value == nil {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(value))
+	for key, item := range value {
+		out[key] = item
+	}
+	return out
 }

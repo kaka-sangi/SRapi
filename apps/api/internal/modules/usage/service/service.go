@@ -149,6 +149,15 @@ func (s *Service) ListByUser(ctx context.Context, userID int) ([]contract.UsageL
 	return s.store.ListByUser(ctx, userID)
 }
 
+func (s *Service) ListByAccountWindow(ctx context.Context, filter contract.AccountWindowFilter) ([]contract.UsageLog, error) {
+	if filter.AccountID <= 0 || filter.Start.IsZero() || filter.End.IsZero() || !filter.End.After(filter.Start) {
+		return nil, ErrInvalidInput
+	}
+	filter.Start = filter.Start.UTC()
+	filter.End = filter.End.UTC()
+	return s.store.ListByAccountWindow(ctx, filter)
+}
+
 func (s *Service) SummarizeUserWindow(ctx context.Context, filter contract.UserWindowFilter) (contract.UserWindowSummary, error) {
 	if filter.UserID <= 0 || filter.Start.IsZero() || filter.End.IsZero() || !filter.End.After(filter.Start) {
 		return contract.UserWindowSummary{}, ErrInvalidInput
@@ -198,7 +207,7 @@ func (s *Service) SummarizeAPIKey(ctx context.Context, apiKeyID int, windowDays 
 	byModel := map[string]*usageAccumulator{}
 	byDay := map[string]*usageAccumulator{}
 	todayID := now.Format("2006-01-02")
-	today := &usageAccumulator{Key: todayID, Type: contract.AggregateDimensionDay, Currency: "USD", totalCost: new(big.Rat)}
+	today := newUsageAccumulator(todayID, contract.AggregateDimensionDay, "USD")
 	totalCost := new(big.Rat)
 	for _, log := range logs {
 		accumulateUsageSummary(&summary, log)
@@ -337,10 +346,14 @@ func aggregateLogs(logs []contract.UsageLog, dimension contract.AggregateDimensi
 		accumulator := byID[id]
 		if accumulator == nil {
 			accumulator = &usageAccumulator{
-				Key:       id,
-				Type:      dimension,
-				Currency:  money.NormalizeCurrency(log.Currency),
-				totalCost: new(big.Rat),
+				Key:            id,
+				Type:           dimension,
+				Currency:       money.NormalizeCurrency(log.Currency),
+				totalCost:      new(big.Rat),
+				inputCost:      new(big.Rat),
+				outputCost:     new(big.Rat),
+				cacheReadCost:  new(big.Rat),
+				cacheWriteCost: new(big.Rat),
 			}
 			byID[id] = accumulator
 		}
@@ -357,32 +370,40 @@ func aggregateLogs(logs []contract.UsageLog, dimension contract.AggregateDimensi
 }
 
 type usageAccumulator struct {
-	Key          string
-	Type         contract.AggregateDimension
-	RequestCount int
-	SuccessCount int
-	ErrorCount   int
-	InputTokens  int
-	OutputTokens int
-	CachedTokens int
-	TotalTokens  int
-	Currency     string
-	totalCost    *big.Rat
+	Key            string
+	Type           contract.AggregateDimension
+	RequestCount   int
+	SuccessCount   int
+	ErrorCount     int
+	InputTokens    int
+	OutputTokens   int
+	CachedTokens   int
+	TotalTokens    int
+	Currency       string
+	totalCost      *big.Rat
+	inputCost      *big.Rat
+	outputCost     *big.Rat
+	cacheReadCost  *big.Rat
+	cacheWriteCost *big.Rat
 }
 
 func (a *usageAccumulator) aggregate() contract.UsageAggregate {
 	return contract.UsageAggregate{
-		Key:          a.Key,
-		Type:         a.Type,
-		RequestCount: a.RequestCount,
-		SuccessCount: a.SuccessCount,
-		ErrorCount:   a.ErrorCount,
-		InputTokens:  a.InputTokens,
-		OutputTokens: a.OutputTokens,
-		CachedTokens: a.CachedTokens,
-		TotalTokens:  a.TotalTokens,
-		TotalCost:    money.FormatRatFixed(a.totalCost, 8),
-		Currency:     money.NormalizeCurrency(a.Currency),
+		Key:            a.Key,
+		Type:           a.Type,
+		RequestCount:   a.RequestCount,
+		SuccessCount:   a.SuccessCount,
+		ErrorCount:     a.ErrorCount,
+		InputTokens:    a.InputTokens,
+		OutputTokens:   a.OutputTokens,
+		CachedTokens:   a.CachedTokens,
+		TotalTokens:    a.TotalTokens,
+		TotalCost:      money.FormatRatFixed(a.totalCost, 8),
+		InputCost:      money.FormatRatFixed(a.inputCost, 8),
+		OutputCost:     money.FormatRatFixed(a.outputCost, 8),
+		CacheReadCost:  money.FormatRatFixed(a.cacheReadCost, 8),
+		CacheWriteCost: money.FormatRatFixed(a.cacheWriteCost, 8),
+		Currency:       money.NormalizeCurrency(a.Currency),
 	}
 }
 
@@ -415,6 +436,11 @@ func accumulateUsageSummary(summary *contract.APIKeyUsageSummary, log contract.U
 	summary.OutputTokens += log.OutputTokens
 	summary.CachedTokens += log.CachedTokens
 	summary.TotalTokens += log.TotalTokens
+	summary.TotalCost = money.AddMoney(summary.TotalCost, log.Cost)
+	summary.InputCost = money.AddMoney(summary.InputCost, log.InputCost)
+	summary.OutputCost = money.AddMoney(summary.OutputCost, log.OutputCost)
+	summary.CacheReadCost = money.AddMoney(summary.CacheReadCost, log.CacheReadCost)
+	summary.CacheWriteCost = money.AddMoney(summary.CacheWriteCost, log.CacheWriteCost)
 }
 
 func accumulateUsageLog(accumulator *usageAccumulator, log contract.UsageLog) {
@@ -431,8 +457,18 @@ func accumulateUsageLog(accumulator *usageAccumulator, log contract.UsageLog) {
 	if cost, ok := money.DecimalRat(log.Cost); ok {
 		accumulator.totalCost.Add(accumulator.totalCost, cost)
 	}
+	addCost(accumulator.inputCost, log.InputCost)
+	addCost(accumulator.outputCost, log.OutputCost)
+	addCost(accumulator.cacheReadCost, log.CacheReadCost)
+	addCost(accumulator.cacheWriteCost, log.CacheWriteCost)
 	if accumulator.Currency == "" || accumulator.Currency == "USD" {
 		accumulator.Currency = money.NormalizeCurrency(log.Currency)
+	}
+}
+
+func addCost(total *big.Rat, amount string) {
+	if cost, ok := money.DecimalRat(amount); ok {
+		total.Add(total, cost)
 	}
 }
 
@@ -441,14 +477,22 @@ func accumulatorFor(values map[string]*usageAccumulator, id string, dimension co
 	if accumulator != nil {
 		return accumulator
 	}
-	accumulator = &usageAccumulator{
-		Key:       id,
-		Type:      dimension,
-		Currency:  money.NormalizeCurrency(currency),
-		totalCost: new(big.Rat),
-	}
+	accumulator = newUsageAccumulator(id, dimension, currency)
 	values[id] = accumulator
 	return accumulator
+}
+
+func newUsageAccumulator(id string, dimension contract.AggregateDimension, currency string) *usageAccumulator {
+	return &usageAccumulator{
+		Key:            id,
+		Type:           dimension,
+		Currency:       money.NormalizeCurrency(currency),
+		totalCost:      new(big.Rat),
+		inputCost:      new(big.Rat),
+		outputCost:     new(big.Rat),
+		cacheReadCost:  new(big.Rat),
+		cacheWriteCost: new(big.Rat),
+	}
 }
 
 type aggregateSort func(out []contract.UsageAggregate)

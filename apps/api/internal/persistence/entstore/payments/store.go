@@ -40,6 +40,8 @@ func (s *Store) CreateProviderInstance(ctx context.Context, input contract.Creat
 		SetSupportedMethodsJSON(cloneStringSlice(input.SupportedMethods)).
 		SetLimitsJSON(cloneMap(input.Limits)).
 		SetSortOrder(input.SortOrder).
+		SetFeeRate(defaultString(input.FeeRate, "0.00000000")).
+		SetWeight(defaultWeight(input.Weight)).
 		SetMetadataJSON(cloneMap(input.Metadata)).
 		Save(ctx)
 	if err != nil {
@@ -90,6 +92,8 @@ func (s *Store) UpdateProviderInstance(ctx context.Context, input contract.Payme
 		SetSupportedMethodsJSON(cloneStringSlice(input.SupportedMethods)).
 		SetLimitsJSON(cloneMap(input.Limits)).
 		SetSortOrder(input.SortOrder).
+		SetFeeRate(defaultString(input.FeeRate, "0.00000000")).
+		SetWeight(defaultWeight(input.Weight)).
 		SetMetadataJSON(cloneMap(input.Metadata))
 	if !input.UpdatedAt.IsZero() {
 		update.SetUpdatedAt(input.UpdatedAt)
@@ -136,6 +140,18 @@ func (s *Store) PreviewPromoCode(ctx context.Context, input contract.PromoCodePr
 	return toPaymentPromoCodeApplication(application), nil
 }
 
+func (s *Store) ReleasePromoCode(ctx context.Context, input contract.PromoCodeReleaseInput) (contract.PromoCodeApplication, bool, error) {
+	application, released, err := admincontrolstore.ReleasePromoCodeWithClient(ctx, s.client, admincontrolcontract.PromoCodeReleaseInput{
+		PaymentOrderID: input.PaymentOrderID,
+		ReleasedAt:     input.ReleasedAt,
+		Reason:         input.Reason,
+	})
+	if err != nil {
+		return contract.PromoCodeApplication{}, false, paymentPromoError(err)
+	}
+	return toPaymentPromoCodeApplication(application), released, nil
+}
+
 func (s *Store) CreateOrder(ctx context.Context, input contract.CreateStoredOrder) (contract.PaymentOrder, error) {
 	if strings.TrimSpace(input.PromoCode) == "" || input.PromoCodeID == nil {
 		return s.createOrder(ctx, s.client, input)
@@ -178,6 +194,8 @@ func (s *Store) createOrder(ctx context.Context, client *ent.Client, input contr
 		SetProviderInstanceID(input.ProviderInstanceID).
 		SetOriginalAmount(originalAmount).
 		SetDiscountAmount(discountAmount).
+		SetFeeAmount(defaultString(input.FeeAmount, "0.00000000")).
+		SetPayableAmount(defaultString(input.PayableAmount, input.Amount)).
 		SetNillablePromoCodeID(input.PromoCodeID).
 		SetAmount(input.Amount).
 		SetCurrency(input.Currency).
@@ -201,6 +219,8 @@ func (s *Store) UpdateOrder(ctx context.Context, input contract.PaymentOrder) (c
 		SetProviderInstanceID(input.ProviderInstanceID).
 		SetOriginalAmount(defaultString(input.OriginalAmount, input.Amount)).
 		SetDiscountAmount(defaultString(input.DiscountAmount, "0.00000000")).
+		SetFeeAmount(defaultString(input.FeeAmount, "0.00000000")).
+		SetPayableAmount(defaultString(input.PayableAmount, input.Amount)).
 		SetNillablePromoCodeID(input.PromoCodeID).
 		SetAmount(input.Amount).
 		SetCurrency(input.Currency).
@@ -254,6 +274,27 @@ func (s *Store) FindOrderByOrderNo(ctx context.Context, orderNo string) (contrac
 
 func (s *Store) ListOrders(ctx context.Context) ([]contract.PaymentOrder, error) {
 	rows, err := s.client.PaymentOrder.Query().
+		Order(entpaymentorder.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.PaymentOrder, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toOrder(row))
+	}
+	return out, nil
+}
+
+func (s *Store) ListPendingOrders(ctx context.Context, now time.Time) ([]contract.PaymentOrder, error) {
+	rows, err := s.client.PaymentOrder.Query().
+		Where(
+			entpaymentorder.StatusEQ(string(contract.OrderStatusPending)),
+			entpaymentorder.Or(
+				entpaymentorder.ExpiresAtIsNil(),
+				entpaymentorder.ExpiresAtGT(now.UTC()),
+			),
+		).
 		Order(entpaymentorder.ByID()).
 		All(ctx)
 	if err != nil {
@@ -338,6 +379,7 @@ func inProgressOrderStatuses() []string {
 	return []string{
 		string(contract.OrderStatusPending),
 		string(contract.OrderStatusPaid),
+		string(contract.OrderStatusRefunding),
 	}
 }
 
@@ -405,6 +447,8 @@ func toProvider(row *ent.PaymentProviderInstance) contract.PaymentProviderInstan
 		SupportedMethods: cloneStringSlice(row.SupportedMethodsJSON),
 		Limits:           cloneMap(row.LimitsJSON),
 		SortOrder:        row.SortOrder,
+		FeeRate:          defaultString(row.FeeRate, "0.00000000"),
+		Weight:           defaultWeight(row.Weight),
 		Metadata:         cloneMap(row.MetadataJSON),
 		CreatedAt:        row.CreatedAt,
 		UpdatedAt:        row.UpdatedAt,
@@ -420,6 +464,8 @@ func toOrder(row *ent.PaymentOrder) contract.PaymentOrder {
 		ProviderInstanceID:    row.ProviderInstanceID,
 		OriginalAmount:        defaultString(row.OriginalAmount, row.Amount),
 		DiscountAmount:        defaultString(row.DiscountAmount, "0.00000000"),
+		FeeAmount:             defaultString(row.FeeAmount, "0.00000000"),
+		PayableAmount:         defaultString(row.PayableAmount, row.Amount),
 		PromoCodeID:           cloneInt(row.PromoCodeID),
 		Amount:                row.Amount,
 		Currency:              row.Currency,
@@ -505,6 +551,13 @@ func defaultString(value string, fallback string) string {
 	return value
 }
 
+func defaultWeight(value int) int {
+	if value <= 0 {
+		return 1
+	}
+	return value
+}
+
 func toPaymentPromoCodeApplication(application admincontrolcontract.PromoCodeApplication) contract.PromoCodeApplication {
 	return contract.PromoCodeApplication{
 		ID:             application.ID,
@@ -518,6 +571,7 @@ func toPaymentPromoCodeApplication(application admincontrolcontract.PromoCodeApp
 		Currency:       application.Currency,
 		DiscountType:   string(application.DiscountType),
 		AppliedAt:      application.AppliedAt,
+		Metadata:       cloneMap(application.Metadata),
 		CreatedAt:      application.CreatedAt,
 		UpdatedAt:      application.UpdatedAt,
 	}

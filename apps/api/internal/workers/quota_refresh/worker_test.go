@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"testing"
+	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	accountservice "github.com/srapi/srapi/apps/api/internal/modules/accounts/service"
@@ -89,6 +90,93 @@ func TestWorkerPersistsForbiddenQuotaErrorMetadataAndSuspendsAccount(t *testing.
 	}
 }
 
+func TestWorkerPersistsQuotaReportCreditsAndMetadata(t *testing.T) {
+	ctx := context.Background()
+	accountStore := accountmemory.New()
+	providerStore := providermemory.New()
+	provider, err := providerStore.Create(ctx, providercontract.CreateStoredProvider{
+		Name:        "codex-cli",
+		DisplayName: "Codex CLI",
+		AdapterType: "reverse-proxy-codex-cli",
+		Protocol:    "openai-compatible",
+		Status:      providercontract.StatusActive,
+		ConfigSchema: map[string]any{
+			"quota_url": "https://example.invalid/quota",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+	accountsSvc, err := accountservice.New(accountStore, testMasterKey, nil)
+	if err != nil {
+		t.Fatalf("new account service: %v", err)
+	}
+	account, err := accountsSvc.Create(ctx, accountcontract.CreateRequest{
+		ProviderID:   provider.ID,
+		Name:         "codex-oauth",
+		RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+		Credential:   map[string]any{"access_token": "token"},
+		Metadata:     map[string]any{"existing": "kept"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	fetchedAt := time.Date(2026, 6, 9, 1, 2, 3, 0, time.UTC)
+	worker, err := New(accountStore, providerStore, slog.Default(), Config{
+		MasterKey:     testMasterKey,
+		MaxConcurrent: 1,
+		Adapter: quotaReportAdapter{
+			report: adaptercontract.QuotaReport{
+				Provider:         "codex-cli",
+				Supported:        true,
+				Source:           "endpoint",
+				Plan:             "plus",
+				CreditsRemaining: "900",
+				CreditsUsed:      "100",
+				CreditsLimit:     "1000",
+				Currency:         "credits",
+				FetchedAt:        fetchedAt,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+
+	result, err := worker.RunOnce(ctx)
+	if err != nil {
+		t.Fatalf("run worker: %v", err)
+	}
+	if result.Refreshed != 1 || result.Signals != 1 || result.Failed != 0 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	stored, err := accountStore.FindByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("find account: %v", err)
+	}
+	if stored.Metadata["existing"] != "kept" ||
+		stored.Metadata["last_quota_plan"] != "plus" ||
+		stored.Metadata["last_quota_credits_remaining"] != "900" ||
+		stored.Metadata["last_quota_credits_used"] != "100" ||
+		stored.Metadata["last_quota_credits_limit"] != "1000" ||
+		stored.Metadata["last_quota_currency"] != "credits" ||
+		stored.Metadata["last_quota_fetched_at"] != fetchedAt.Format(time.RFC3339) {
+		t.Fatalf("unexpected quota metadata: %+v", stored.Metadata)
+	}
+	snapshots, err := accountStore.ListQuotaSnapshotsByAccount(ctx, account.ID, 10)
+	if err != nil {
+		t.Fatalf("list quota snapshots: %v", err)
+	}
+	if len(snapshots) != 1 ||
+		snapshots[0].QuotaType != accountcontract.QuotaTypeProviderCredits ||
+		snapshots[0].Remaining != "900" ||
+		snapshots[0].Used != "100" ||
+		snapshots[0].QuotaLimit != "1000" ||
+		snapshots[0].RemainingRatio != 0.9 {
+		t.Fatalf("unexpected quota snapshots: %+v", snapshots)
+	}
+}
+
 type forbiddenQuotaAdapter struct {
 	err error
 }
@@ -98,5 +186,17 @@ func (a forbiddenQuotaAdapter) FetchAccountQuota(context.Context, adaptercontrac
 }
 
 func (a forbiddenQuotaAdapter) QuotaConfigured(adaptercontract.ProbeRequest) bool {
+	return true
+}
+
+type quotaReportAdapter struct {
+	report adaptercontract.QuotaReport
+}
+
+func (a quotaReportAdapter) FetchAccountQuota(context.Context, adaptercontract.ProbeRequest) (adaptercontract.QuotaReport, error) {
+	return a.report, nil
+}
+
+func (a quotaReportAdapter) QuotaConfigured(adaptercontract.ProbeRequest) bool {
 	return true
 }
