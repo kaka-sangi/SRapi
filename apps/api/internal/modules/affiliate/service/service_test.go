@@ -232,6 +232,105 @@ func TestTransferToBalanceWritesLedgerAndAuditIdempotently(t *testing.T) {
 	}
 }
 
+func TestWithdrawRequestApprovalAndCancellationFlow(t *testing.T) {
+	h := newHarness(t)
+	seedInviteAndRule(t, h)
+	if _, err := h.affiliate.AccrueRebate(t.Context(), contract.AccrueRebateRequest{
+		OrderID:       303,
+		OrderNo:       "pay_withdraw_303",
+		InviteeUserID: 20,
+		Amount:        "100.00",
+		Currency:      "USD",
+		PaidAt:        h.clock.now,
+	}); err != nil {
+		t.Fatalf("accrue rebate: %v", err)
+	}
+
+	withdraw, created, err := h.affiliate.RequestWithdraw(t.Context(), contract.WithdrawRequest{
+		UserID:         10,
+		Amount:         "4.00",
+		Currency:       "USD",
+		Destination:    "paypal:test@example.com",
+		IdempotencyKey: "withdraw_303",
+		RequestedAt:    h.clock.now.Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("request withdraw: %v", err)
+	}
+	if !created || withdraw.Type != contract.LedgerTypeWithdraw || withdraw.Amount != "-4.00000000" || withdraw.Status != contract.LedgerStatusPending || withdraw.SettledAt != nil {
+		t.Fatalf("unexpected withdraw request: created=%v ledger=%+v", created, withdraw)
+	}
+
+	duplicate, created, err := h.affiliate.RequestWithdraw(t.Context(), contract.WithdrawRequest{
+		UserID:         10,
+		Amount:         "4.00",
+		Currency:       "USD",
+		IdempotencyKey: "withdraw_303",
+		RequestedAt:    h.clock.now.Add(2 * time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("duplicate withdraw: %v", err)
+	}
+	if created || duplicate.ID != withdraw.ID {
+		t.Fatalf("expected duplicate withdraw no-op, got created=%v ledger=%+v", created, duplicate)
+	}
+	if _, _, err := h.affiliate.RequestWithdraw(t.Context(), contract.WithdrawRequest{
+		UserID:         10,
+		Amount:         "7.00",
+		Currency:       "USD",
+		IdempotencyKey: "withdraw_overdraft",
+	}); !errors.Is(err, contract.ErrInsufficientBalance) {
+		t.Fatalf("expected insufficient affiliate balance, got %v", err)
+	}
+
+	approved, err := h.affiliate.ApproveWithdraw(t.Context(), contract.WithdrawDecisionRequest{
+		AdminUserID: 99,
+		LedgerID:    withdraw.ID,
+		Reason:      "paid out",
+		DecidedAt:   h.clock.now.Add(3 * time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("approve withdraw: %v", err)
+	}
+	if approved.Status != contract.LedgerStatusSettled || approved.SettledAt == nil {
+		t.Fatalf("unexpected approved withdraw: %+v", approved)
+	}
+	if _, err := h.affiliate.ApproveWithdraw(t.Context(), contract.WithdrawDecisionRequest{AdminUserID: 99, LedgerID: withdraw.ID}); !errors.Is(err, contract.ErrConflict) {
+		t.Fatalf("expected duplicate approval conflict, got %v", err)
+	}
+
+	cancelCandidate, created, err := h.affiliate.RequestWithdraw(t.Context(), contract.WithdrawRequest{
+		UserID:         10,
+		Amount:         "2.00",
+		Currency:       "USD",
+		IdempotencyKey: "withdraw_cancel_303",
+	})
+	if err != nil {
+		t.Fatalf("request cancel candidate: %v", err)
+	}
+	if !created {
+		t.Fatalf("expected new cancel candidate, got %+v", cancelCandidate)
+	}
+	canceled, err := h.affiliate.CancelWithdraw(t.Context(), contract.WithdrawDecisionRequest{
+		AdminUserID: 99,
+		LedgerID:    cancelCandidate.ID,
+		Reason:      "duplicate request",
+	})
+	if err != nil {
+		t.Fatalf("cancel withdraw: %v", err)
+	}
+	if canceled.Status != contract.LedgerStatusCanceled || canceled.SettledAt != nil {
+		t.Fatalf("unexpected canceled withdraw: %+v", canceled)
+	}
+	summary, err := h.affiliate.GetSummary(t.Context(), 10)
+	if err != nil {
+		t.Fatalf("get summary: %v", err)
+	}
+	if len(summary.Balances) != 1 || summary.Balances[0].AvailableBalance != "6.00000000" || summary.Balances[0].WithdrawnAmount != "4.00000000" {
+		t.Fatalf("unexpected summary after withdraw decisions: %+v", summary.Balances)
+	}
+}
+
 func TestAffiliateSummaryGroupsLedgerAmountsByCurrency(t *testing.T) {
 	h := newHarness(t)
 	seedInviteAndRule(t, h)

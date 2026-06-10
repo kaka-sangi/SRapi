@@ -241,7 +241,8 @@ func (s *Store) PreviewPromoCode(_ context.Context, input admincontrol.PromoCode
 	if !ok {
 		return admincontrol.PromoCodeApplication{}, admincontrol.ErrNotFound
 	}
-	return previewPromoCode(item, input.UserID, input.Amount, input.Currency, now)
+	userUses := countActivePromoUses(s.promoApplications, item.ID, input.UserID)
+	return previewPromoCode(item, input.UserID, input.Amount, input.Currency, now, userUses)
 }
 
 func (s *Store) FinalizePromoCode(_ context.Context, input admincontrol.PromoCodeFinalizeInput) (admincontrol.PromoCodeApplication, error) {
@@ -265,7 +266,8 @@ func (s *Store) FinalizePromoCode(_ context.Context, input admincontrol.PromoCod
 	if !ok {
 		return admincontrol.PromoCodeApplication{}, admincontrol.ErrNotFound
 	}
-	application, err := previewPromoCode(item, input.UserID, input.OriginalAmount, input.Currency, now)
+	userUses := countActivePromoUses(s.promoApplications, item.ID, input.UserID)
+	application, err := previewPromoCode(item, input.UserID, input.OriginalAmount, input.Currency, now, userUses)
 	if err != nil {
 		return admincontrol.PromoCodeApplication{}, err
 	}
@@ -289,6 +291,54 @@ func (s *Store) FinalizePromoCode(_ context.Context, input admincontrol.PromoCod
 	}
 	s.promoApplications[input.PaymentOrderID] = application
 	return application, nil
+}
+
+func (s *Store) ReleasePromoCode(_ context.Context, input admincontrol.PromoCodeReleaseInput) (admincontrol.PromoCodeApplication, bool, error) {
+	if input.PaymentOrderID <= 0 {
+		return admincontrol.PromoCodeApplication{}, false, admincontrol.ErrInvalidInput
+	}
+	releasedAt := input.ReleasedAt.UTC()
+	if releasedAt.IsZero() {
+		releasedAt = time.Now().UTC()
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	application, ok := s.promoApplications[input.PaymentOrderID]
+	if !ok {
+		return admincontrol.PromoCodeApplication{}, false, admincontrol.ErrNotFound
+	}
+	if promoApplicationReleased(application) {
+		return application, false, nil
+	}
+	collection, err := s.promoCodeCollection()
+	if err != nil {
+		return admincontrol.PromoCodeApplication{}, false, err
+	}
+	item, idx, ok := findPromoCodeByID(collection.Items, application.PromoCodeID)
+	if !ok {
+		return admincontrol.PromoCodeApplication{}, false, admincontrol.ErrNotFound
+	}
+	if item.UsedCount > 0 {
+		item.UsedCount--
+	}
+	if item.Status == admincontrol.PromoCodeStatusExpired && item.UsedCount < item.MaxUses && (item.ExpiresAt == nil || item.ExpiresAt.After(releasedAt)) {
+		item.Status = admincontrol.PromoCodeStatusActive
+	}
+	item.UpdatedAt = releasedAt
+	collection.Items[idx] = item
+	if err := s.savePromoCodeCollection(collection); err != nil {
+		return admincontrol.PromoCodeApplication{}, false, err
+	}
+	metadata := cloneMap(application.Metadata)
+	metadata["released"] = true
+	metadata["released_at"] = releasedAt.Format(time.RFC3339Nano)
+	if reason := strings.TrimSpace(input.Reason); reason != "" {
+		metadata["release_reason"] = reason
+	}
+	application.Metadata = metadata
+	application.UpdatedAt = releasedAt
+	s.promoApplications[input.PaymentOrderID] = application
+	return application, true, nil
 }
 
 func (s *Store) ListPromoCodeUsages(_ context.Context, promoCodeID, limit int) ([]admincontrol.PromoCodeApplication, error) {
@@ -700,6 +750,15 @@ func findPromoCode(items []admincontrol.PromoCode, code string, now time.Time) (
 	return admincontrol.PromoCode{}, -1, false
 }
 
+func findPromoCodeByID(items []admincontrol.PromoCode, id int) (admincontrol.PromoCode, int, bool) {
+	for idx, item := range items {
+		if item.ID == id {
+			return item, idx, true
+		}
+	}
+	return admincontrol.PromoCode{}, -1, false
+}
+
 func promoCodeWithDerivedStatus(item admincontrol.PromoCode, now time.Time) admincontrol.PromoCode {
 	if item.Status == admincontrol.PromoCodeStatusActive && item.ExpiresAt != nil && item.ExpiresAt.Before(now) {
 		item.Status = admincontrol.PromoCodeStatusExpired
@@ -710,9 +769,12 @@ func promoCodeWithDerivedStatus(item admincontrol.PromoCode, now time.Time) admi
 	return item
 }
 
-func previewPromoCode(item admincontrol.PromoCode, userID int, amount string, currency string, now time.Time) (admincontrol.PromoCodeApplication, error) {
+func previewPromoCode(item admincontrol.PromoCode, userID int, amount string, currency string, now time.Time, userUses int) (admincontrol.PromoCodeApplication, error) {
 	item = promoCodeWithDerivedStatus(item, now)
 	if item.Status != admincontrol.PromoCodeStatusActive || item.MaxUses <= 0 || item.UsedCount >= item.MaxUses {
+		return admincontrol.PromoCodeApplication{}, admincontrol.ErrConflict
+	}
+	if item.PerUserLimit > 0 && userUses >= item.PerUserLimit {
 		return admincontrol.PromoCodeApplication{}, admincontrol.ErrConflict
 	}
 	if item.StartsAt != nil && item.StartsAt.After(now) {
@@ -724,6 +786,9 @@ func previewPromoCode(item admincontrol.PromoCode, userID int, amount string, cu
 	}
 	normalizedCurrency := normalizeCurrency(currency)
 	if item.DiscountType == admincontrol.PromoDiscountTypeAmount && normalizeCurrency(item.Currency) != normalizedCurrency {
+		return admincontrol.PromoCodeApplication{}, admincontrol.ErrConflict
+	}
+	if minOrderAmount, ok := money.RequiredDecimalRat(item.MinOrderAmount); ok && minOrderAmount.Sign() > 0 && inputAmount.Cmp(minOrderAmount) < 0 {
 		return admincontrol.PromoCodeApplication{}, admincontrol.ErrConflict
 	}
 	discount, err := promoDiscountAmount(item, inputAmount)
@@ -744,6 +809,21 @@ func previewPromoCode(item admincontrol.PromoCode, userID int, amount string, cu
 		DiscountType:   item.DiscountType,
 		AppliedAt:      now,
 	}, nil
+}
+
+func countActivePromoUses(applications map[int]admincontrol.PromoCodeApplication, promoCodeID int, userID int) int {
+	count := 0
+	for _, application := range applications {
+		if application.PromoCodeID == promoCodeID && application.UserID == userID && !promoApplicationReleased(application) {
+			count++
+		}
+	}
+	return count
+}
+
+func promoApplicationReleased(application admincontrol.PromoCodeApplication) bool {
+	value, ok := application.Metadata["released"].(bool)
+	return ok && value
 }
 
 func promoDiscountAmount(item admincontrol.PromoCode, amount *big.Rat) (*big.Rat, error) {

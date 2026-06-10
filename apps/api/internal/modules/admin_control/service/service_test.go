@@ -91,6 +91,44 @@ func TestUpdateAdminSettingsNormalizesPassthroughHeaderAllowlist(t *testing.T) {
 	}
 }
 
+func TestAdminSettingsEmailNotificationSwitchesDefaultVisible(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 10, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	if settings.Email.BalanceLowNotifyEnabled == nil || !*settings.Email.BalanceLowNotifyEnabled {
+		t.Fatalf("expected visible enabled balance notification switch, got %+v", settings.Email.BalanceLowNotifyEnabled)
+	}
+	if settings.Email.SubscriptionExpiryNotifyEnabled == nil || !*settings.Email.SubscriptionExpiryNotifyEnabled {
+		t.Fatalf("expected visible enabled subscription notification switch, got %+v", settings.Email.SubscriptionExpiryNotifyEnabled)
+	}
+	if settings.Email.AccountQuotaNotifyEnabled == nil || !*settings.Email.AccountQuotaNotifyEnabled {
+		t.Fatalf("expected visible enabled account quota notification switch, got %+v", settings.Email.AccountQuotaNotifyEnabled)
+	}
+
+	settings.Email.BalanceLowNotifyEnabled = nil
+	settings.Email.SubscriptionExpiryNotifyEnabled = nil
+	settings.Email.AccountQuotaNotifyEnabled = nil
+	updated, err := svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	if updated.Email.BalanceLowNotifyEnabled == nil || !*updated.Email.BalanceLowNotifyEnabled {
+		t.Fatalf("expected normalized balance notification switch, got %+v", updated.Email.BalanceLowNotifyEnabled)
+	}
+	if updated.Email.SubscriptionExpiryNotifyEnabled == nil || !*updated.Email.SubscriptionExpiryNotifyEnabled {
+		t.Fatalf("expected normalized subscription notification switch, got %+v", updated.Email.SubscriptionExpiryNotifyEnabled)
+	}
+	if updated.Email.AccountQuotaNotifyEnabled == nil || !*updated.Email.AccountQuotaNotifyEnabled {
+		t.Fatalf("expected normalized account quota notification switch, got %+v", updated.Email.AccountQuotaNotifyEnabled)
+	}
+}
+
 func TestUpdateAdminSettingsRejectsInvalidRegistrationEmailSuffixAllowlist(t *testing.T) {
 	store := admincontrolmemory.New()
 	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)})
@@ -106,6 +144,95 @@ func TestUpdateAdminSettingsRejectsInvalidRegistrationEmailSuffixAllowlist(t *te
 	_, err = svc.UpdateAdminSettings(context.Background(), settings, 1)
 	if !errors.Is(err, admincontrol.ErrInvalidInput) {
 		t.Fatalf("expected invalid input, got %v", err)
+	}
+}
+
+func TestContentSafetyConfigNormalizesListsAndRejectsInvalidMode(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 9, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	updated, err := svc.UpdateContentSafetyConfig(context.Background(), admincontrol.ContentSafetyConfig{
+		Enabled:              true,
+		Mode:                 admincontrol.ContentSafetyModeEnforce,
+		RedactPII:            false,
+		BlockPII:             true,
+		BlockPromptInjection: true,
+		BlockCustomKeywords:  true,
+		CustomKeywords:       []string{" Secret ", "secret", ""},
+		ModelScopes:          []string{" GPT-4O* ", "gpt-4o*"},
+	}, 1)
+	if err != nil {
+		t.Fatalf("update content safety config: %v", err)
+	}
+	if len(updated.CustomKeywords) != 1 || updated.CustomKeywords[0] != "secret" {
+		t.Fatalf("unexpected custom keywords: %+v", updated.CustomKeywords)
+	}
+	if len(updated.ModelScopes) != 1 || updated.ModelScopes[0] != "gpt-4o*" {
+		t.Fatalf("unexpected model scopes: %+v", updated.ModelScopes)
+	}
+
+	loaded, err := svc.GetContentSafetyConfig(context.Background())
+	if err != nil {
+		t.Fatalf("get content safety config: %v", err)
+	}
+	if loaded.Mode != admincontrol.ContentSafetyModeEnforce || loaded.RedactPII {
+		t.Fatalf("unexpected loaded config: %+v", loaded)
+	}
+
+	_, err = svc.UpdateContentSafetyConfig(context.Background(), admincontrol.ContentSafetyConfig{
+		Enabled: true,
+		Mode:    admincontrol.ContentSafetyMode("block"),
+	}, 1)
+	if !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("expected invalid mode error, got %v", err)
+	}
+}
+
+func TestPromoCodeSupportsPerUserLimitAndMinimumOrderAmount(t *testing.T) {
+	now := time.Date(2026, time.June, 9, 9, 0, 0, 0, time.UTC)
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	promo, err := svc.CreatePromoCode(context.Background(), admincontrol.PromoCodeRequest{
+		Code:           "SAVE10",
+		DiscountType:   admincontrol.PromoDiscountTypeAmount,
+		DiscountValue:  "10.00",
+		Currency:       "usd",
+		MaxUses:        5,
+		PerUserLimit:   1,
+		MinOrderAmount: "50.00",
+	}, 1)
+	if err != nil {
+		t.Fatalf("create promo code: %v", err)
+	}
+	if promo.PerUserLimit != 1 || promo.MinOrderAmount != "50.00" || promo.Currency != "USD" {
+		t.Fatalf("unexpected promo code fields: %+v", promo)
+	}
+
+	if _, err := svc.CreatePromoCode(context.Background(), admincontrol.PromoCodeRequest{
+		Code:           "BADLIMIT",
+		DiscountType:   admincontrol.PromoDiscountTypeAmount,
+		DiscountValue:  "1.00",
+		MaxUses:        1,
+		PerUserLimit:   2,
+		MinOrderAmount: "1.00",
+	}, 1); !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("expected invalid per-user limit, got %v", err)
+	}
+	if _, err := svc.CreatePromoCode(context.Background(), admincontrol.PromoCodeRequest{
+		Code:           "BADMIN",
+		DiscountType:   admincontrol.PromoDiscountTypeAmount,
+		DiscountValue:  "1.00",
+		MaxUses:        1,
+		MinOrderAmount: "-1.00",
+	}, 1); !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("expected invalid min order amount, got %v", err)
 	}
 }
 

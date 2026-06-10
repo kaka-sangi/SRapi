@@ -24,6 +24,7 @@ const (
 	settingsKeySystemLogs    = "admin_control.system_logs"
 	settingsKeyRiskLogs      = "admin_control.risk_logs"
 	settingsKeyRiskConfig    = "admin_control.risk_config"
+	settingsKeyContentSafety = "admin_control.content_safety_config"
 	settingsKeyOpsSettings   = "admin_control.ops_settings"
 	settingsKeyAdminSettings = "admin_control.admin_settings"
 
@@ -548,6 +549,29 @@ func (s *Service) UpdateRiskConfig(ctx context.Context, config admincontrol.Risk
 	return normalized, nil
 }
 
+func (s *Service) GetContentSafetyConfig(ctx context.Context) (admincontrol.ContentSafetyConfig, error) {
+	config := defaultContentSafetyConfig()
+	if err := s.loadTyped(ctx, settingsKeyContentSafety, &config); err != nil {
+		return admincontrol.ContentSafetyConfig{}, err
+	}
+	normalized, err := normalizeContentSafetyConfig(config)
+	if err != nil {
+		return admincontrol.ContentSafetyConfig{}, err
+	}
+	return normalized, nil
+}
+
+func (s *Service) UpdateContentSafetyConfig(ctx context.Context, config admincontrol.ContentSafetyConfig, actorUserID int) (admincontrol.ContentSafetyConfig, error) {
+	normalized, err := normalizeContentSafetyConfig(config)
+	if err != nil {
+		return admincontrol.ContentSafetyConfig{}, err
+	}
+	if err := s.saveTyped(ctx, settingsKeyContentSafety, normalized, actorUserID); err != nil {
+		return admincontrol.ContentSafetyConfig{}, err
+	}
+	return normalized, nil
+}
+
 func (s *Service) RiskStatus(ctx context.Context) (admincontrol.RiskControlStatus, error) {
 	config, err := s.GetRiskConfig(ctx)
 	if err != nil {
@@ -590,6 +614,27 @@ func (s *Service) ListRiskLogs(ctx context.Context, opts admincontrol.ListOption
 	}
 	sort.SliceStable(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
 	return admincontrol.RiskLogList{Items: pageItems(items, opts), Total: len(items)}, nil
+}
+
+func (s *Service) RecordRiskLog(ctx context.Context, req admincontrol.RecordRiskLogRequest) (admincontrol.RiskControlLog, error) {
+	item, err := riskLogFromRecordRequest(req, s.clock.Now())
+	if err != nil {
+		return admincontrol.RiskControlLog{}, err
+	}
+	var collection riskLogCollection
+	if err := s.loadTyped(ctx, settingsKeyRiskLogs, &collection); err != nil {
+		return admincontrol.RiskControlLog{}, err
+	}
+	item.ID = nextID(collection.NextID, len(collection.Items))
+	collection.Items = append(collection.Items, item)
+	collection.NextID = item.ID + 1
+	if len(collection.Items) > 1000 {
+		collection.Items = collection.Items[len(collection.Items)-1000:]
+	}
+	if err := s.saveTyped(ctx, settingsKeyRiskLogs, collection, 0); err != nil {
+		return admincontrol.RiskControlLog{}, err
+	}
+	return item, nil
 }
 
 func (s *Service) RecordSystemLog(ctx context.Context, req admincontrol.RecordSystemLogRequest) (admincontrol.OpsSystemLog, error) {
@@ -989,6 +1034,14 @@ func promoCodeFromRequest(req admincontrol.PromoCodeRequest, id int, now time.Ti
 	if maxUses <= 0 {
 		return admincontrol.PromoCode{}, admincontrol.ErrInvalidInput
 	}
+	perUserLimit := req.PerUserLimit
+	if perUserLimit < 0 || perUserLimit > maxUses {
+		return admincontrol.PromoCode{}, admincontrol.ErrInvalidInput
+	}
+	minOrderAmount := strings.TrimSpace(req.MinOrderAmount)
+	if minOrderAmount != "" && !validPositiveDecimal(minOrderAmount) {
+		return admincontrol.PromoCode{}, admincontrol.ErrInvalidInput
+	}
 	status := req.Status
 	if status == "" {
 		status = admincontrol.PromoCodeStatusActive
@@ -1003,22 +1056,27 @@ func promoCodeFromRequest(req admincontrol.PromoCodeRequest, id int, now time.Ti
 		usedCount = existing.UsedCount
 	}
 	return admincontrol.PromoCode{
-		ID:            id,
-		Code:          normalizeCode(req.Code),
-		Status:        status,
-		DiscountType:  req.DiscountType,
-		DiscountValue: strings.TrimSpace(req.DiscountValue),
-		Currency:      normalizeCurrency(req.Currency),
-		MaxUses:       maxUses,
-		UsedCount:     usedCount,
-		StartsAt:      req.StartsAt,
-		ExpiresAt:     req.ExpiresAt,
-		CreatedAt:     createdAt,
-		UpdatedAt:     now,
+		ID:             id,
+		Code:           normalizeCode(req.Code),
+		Status:         status,
+		DiscountType:   req.DiscountType,
+		DiscountValue:  strings.TrimSpace(req.DiscountValue),
+		Currency:       normalizeCurrency(req.Currency),
+		MaxUses:        maxUses,
+		PerUserLimit:   perUserLimit,
+		MinOrderAmount: minOrderAmount,
+		UsedCount:      usedCount,
+		StartsAt:       req.StartsAt,
+		ExpiresAt:      req.ExpiresAt,
+		CreatedAt:      createdAt,
+		UpdatedAt:      now,
 	}, nil
 }
 
 func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
+	balanceLowNotifyEnabled := true
+	subscriptionExpiryNotifyEnabled := true
+	accountQuotaNotifyEnabled := true
 	return admincontrol.AdminSettings{
 		General: admincontrol.AdminSettingsGeneral{
 			SiteName:     "SRapi",
@@ -1079,8 +1137,11 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 			SMTPUseTLS:                       false,
 			PublicBaseURL:                    "",
 			Templates:                        map[string]string{},
+			BalanceLowNotifyEnabled:          &balanceLowNotifyEnabled,
 			BalanceLowNotifyThreshold:        "5.00000000",
 			BalanceLowNotifyRechargeURL:      "",
+			SubscriptionExpiryNotifyEnabled:  &subscriptionExpiryNotifyEnabled,
+			AccountQuotaNotifyEnabled:        &accountQuotaNotifyEnabled,
 			AccountQuotaNotifyRemainingRatio: "0.20000000",
 		},
 		Backup: admincontrol.AdminSettingsBackup{
@@ -1187,6 +1248,18 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	}
 	if settings.Email.Templates == nil {
 		settings.Email.Templates = map[string]string{}
+	}
+	if settings.Email.BalanceLowNotifyEnabled == nil {
+		enabled := true
+		settings.Email.BalanceLowNotifyEnabled = &enabled
+	}
+	if settings.Email.SubscriptionExpiryNotifyEnabled == nil {
+		enabled := true
+		settings.Email.SubscriptionExpiryNotifyEnabled = &enabled
+	}
+	if settings.Email.AccountQuotaNotifyEnabled == nil {
+		enabled := true
+		settings.Email.AccountQuotaNotifyEnabled = &enabled
 	}
 	if settings.Gateway.SchedulerStrategyRolloutModels == nil {
 		settings.Gateway.SchedulerStrategyRolloutModels = []string{}
@@ -1543,6 +1616,28 @@ func defaultRiskConfig() admincontrol.RiskControlConfig {
 	}
 }
 
+func defaultContentSafetyConfig() admincontrol.ContentSafetyConfig {
+	return admincontrol.ContentSafetyConfig{
+		Enabled:              true,
+		Mode:                 admincontrol.ContentSafetyModeMonitor,
+		RedactPII:            true,
+		BlockPII:             false,
+		BlockPromptInjection: false,
+		BlockCustomKeywords:  false,
+		CustomKeywords:       []string{},
+		ModelScopes:          []string{},
+	}
+}
+
+func normalizeContentSafetyConfig(config admincontrol.ContentSafetyConfig) (admincontrol.ContentSafetyConfig, error) {
+	if !config.Mode.Valid() {
+		return admincontrol.ContentSafetyConfig{}, admincontrol.ErrInvalidInput
+	}
+	config.CustomKeywords = lowerUniqueTrimmedStrings(config.CustomKeywords)
+	config.ModelScopes = lowerUniqueTrimmedStrings(config.ModelScopes)
+	return config, nil
+}
+
 func normalizeRiskConfig(config admincontrol.RiskControlConfig) (admincontrol.RiskControlConfig, error) {
 	if !config.Mode.Valid() || config.MaxFailedRequestsPerMinute < 0 || config.CooldownSeconds < 0 || !validDecimal(config.MaxCostPerDay) {
 		return admincontrol.RiskControlConfig{}, admincontrol.ErrInvalidInput
@@ -1554,6 +1649,46 @@ func normalizeRiskConfig(config admincontrol.RiskControlConfig) (admincontrol.Ri
 		config.BlockedIPs = []string{}
 	}
 	return config, nil
+}
+
+func riskLogFromRecordRequest(req admincontrol.RecordRiskLogRequest, now time.Time) (admincontrol.RiskControlLog, error) {
+	level := req.Level
+	if level == "" {
+		level = admincontrol.RiskControlLogLevelInfo
+	}
+	action := strings.TrimSpace(req.Action)
+	reason := strings.TrimSpace(req.Reason)
+	if !validRiskLogLevel(level) || action == "" || reason == "" {
+		return admincontrol.RiskControlLog{}, admincontrol.ErrInvalidInput
+	}
+	createdAt := req.CreatedAt.UTC()
+	if createdAt.IsZero() {
+		createdAt = now.UTC()
+	}
+	var subject *string
+	if req.Subject != nil {
+		trimmed := strings.TrimSpace(*req.Subject)
+		if trimmed != "" {
+			subject = &trimmed
+		}
+	}
+	return admincontrol.RiskControlLog{
+		Level:     level,
+		Action:    action,
+		Reason:    reason,
+		Subject:   subject,
+		Metadata:  cloneAnyMap(req.Metadata),
+		CreatedAt: createdAt,
+	}, nil
+}
+
+func validRiskLogLevel(level admincontrol.RiskControlLogLevel) bool {
+	switch level {
+	case admincontrol.RiskControlLogLevelInfo, admincontrol.RiskControlLogLevelWarn, admincontrol.RiskControlLogLevelBlock:
+		return true
+	default:
+		return false
+	}
 }
 
 func systemLogFromRecordRequest(req admincontrol.RecordSystemLogRequest, now time.Time) (admincontrol.OpsSystemLog, error) {

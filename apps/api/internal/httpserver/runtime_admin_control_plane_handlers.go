@@ -520,6 +520,50 @@ func (s *Server) handleListAdminRiskControlLogs(w http.ResponseWriter, r *http.R
 	writeJSONAny(w, http.StatusOK, apiopenapi.RiskControlLogListResponse{Data: toAPIRiskControlLogs(list.Items), Pagination: paginationWithRequest(r, list.Total), RequestId: requestID})
 }
 
+func (s *Server) handleGetAdminContentSafetyConfig(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	config, err := s.runtime.adminControl.GetContentSafetyConfig(r.Context())
+	if err != nil {
+		writeAdminControlError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.ContentSafetyConfigResponse{Data: toAPIContentSafetyConfig(config), RequestId: requestID})
+}
+
+func (s *Server) handleUpdateAdminContentSafetyConfig(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	before, err := s.runtime.adminControl.GetContentSafetyConfig(r.Context())
+	if err != nil {
+		writeAdminControlError(w, err, requestID)
+		return
+	}
+	var body apiopenapi.ContentSafetyConfig
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid content safety request", requestID)
+		return
+	}
+	updated, err := s.runtime.adminControl.UpdateContentSafetyConfig(r.Context(), contentSafetyConfigFromAPI(body), session.User.ID)
+	if err != nil {
+		writeAdminControlError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "content_safety.update", "content_safety", "config", adminControlAuditSnapshot(before), adminControlAuditSnapshot(updated)))
+	writeJSONAny(w, http.StatusOK, apiopenapi.ContentSafetyConfigResponse{Data: toAPIContentSafetyConfig(updated), RequestId: requestID})
+}
+
 func pathID(w http.ResponseWriter, r *http.Request, requestID string) (int, bool) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || id <= 0 {
@@ -1215,18 +1259,20 @@ func toAPIPromoCodes(items []admincontrol.PromoCode) []apiopenapi.PromoCode {
 
 func toAPIPromoCode(in admincontrol.PromoCode) apiopenapi.PromoCode {
 	return apiopenapi.PromoCode{
-		Code:          in.Code,
-		CreatedAt:     in.CreatedAt,
-		Currency:      in.Currency,
-		DiscountType:  apiopenapi.PromoDiscountType(in.DiscountType),
-		DiscountValue: in.DiscountValue,
-		ExpiresAt:     in.ExpiresAt,
-		Id:            apiopenapi.Id(strconv.Itoa(in.ID)),
-		MaxUses:       in.MaxUses,
-		StartsAt:      in.StartsAt,
-		Status:        apiopenapi.PromoCodeStatus(in.Status),
-		UpdatedAt:     in.UpdatedAt,
-		UsedCount:     in.UsedCount,
+		Code:           in.Code,
+		CreatedAt:      in.CreatedAt,
+		Currency:       in.Currency,
+		DiscountType:   apiopenapi.PromoDiscountType(in.DiscountType),
+		DiscountValue:  in.DiscountValue,
+		ExpiresAt:      in.ExpiresAt,
+		Id:             apiopenapi.Id(strconv.Itoa(in.ID)),
+		MaxUses:        in.MaxUses,
+		MinOrderAmount: in.MinOrderAmount,
+		PerUserLimit:   in.PerUserLimit,
+		StartsAt:       in.StartsAt,
+		Status:         apiopenapi.PromoCodeStatus(in.Status),
+		UpdatedAt:      in.UpdatedAt,
+		UsedCount:      in.UsedCount,
 	}
 }
 
@@ -1246,6 +1292,12 @@ func promoCodeRequestFromAPI(in apiopenapi.CreatePromoCodeRequest) admincontrol.
 	}
 	if in.MaxUses != nil {
 		req.MaxUses = *in.MaxUses
+	}
+	if in.PerUserLimit != nil {
+		req.PerUserLimit = *in.PerUserLimit
+	}
+	if in.MinOrderAmount != nil {
+		req.MinOrderAmount = *in.MinOrderAmount
 	}
 	return req
 }
@@ -1279,6 +1331,40 @@ func riskControlConfigFromAPI(in apiopenapi.RiskControlConfig) admincontrol.Risk
 		MaxCostPerDay:              in.MaxCostPerDay,
 		MaxFailedRequestsPerMinute: in.MaxFailedRequestsPerMinute,
 		Mode:                       admincontrol.RiskControlMode(in.Mode),
+	}
+}
+
+func toAPIContentSafetyConfig(in admincontrol.ContentSafetyConfig) apiopenapi.ContentSafetyConfig {
+	customKeywords := append([]string(nil), in.CustomKeywords...)
+	if customKeywords == nil {
+		customKeywords = []string{}
+	}
+	modelScopes := append([]string(nil), in.ModelScopes...)
+	if modelScopes == nil {
+		modelScopes = []string{}
+	}
+	return apiopenapi.ContentSafetyConfig{
+		BlockCustomKeywords:  in.BlockCustomKeywords,
+		BlockPii:             in.BlockPII,
+		BlockPromptInjection: in.BlockPromptInjection,
+		CustomKeywords:       customKeywords,
+		Enabled:              in.Enabled,
+		Mode:                 apiopenapi.ContentSafetyMode(in.Mode),
+		ModelScopes:          modelScopes,
+		RedactPii:            in.RedactPII,
+	}
+}
+
+func contentSafetyConfigFromAPI(in apiopenapi.ContentSafetyConfig) admincontrol.ContentSafetyConfig {
+	return admincontrol.ContentSafetyConfig{
+		BlockCustomKeywords:  in.BlockCustomKeywords,
+		BlockPII:             in.BlockPii,
+		BlockPromptInjection: in.BlockPromptInjection,
+		CustomKeywords:       append([]string(nil), in.CustomKeywords...),
+		Enabled:              in.Enabled,
+		Mode:                 admincontrol.ContentSafetyMode(in.Mode),
+		ModelScopes:          append([]string(nil), in.ModelScopes...),
+		RedactPII:            in.RedactPii,
 	}
 }
 

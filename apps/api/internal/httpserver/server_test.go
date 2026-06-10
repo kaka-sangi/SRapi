@@ -22,6 +22,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,8 +33,14 @@ import (
 	"github.com/redis/go-redis/v9"
 	alipaysdk "github.com/smartwalle/alipay/v3"
 	"github.com/srapi/srapi/apps/api/internal/config"
+	accountmemory "github.com/srapi/srapi/apps/api/internal/modules/accounts/store/memory"
+	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
+	affiliatememory "github.com/srapi/srapi/apps/api/internal/modules/affiliate/store/memory"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	auditmemory "github.com/srapi/srapi/apps/api/internal/modules/audit/store/memory"
+	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
+	healthrollupscontract "github.com/srapi/srapi/apps/api/internal/modules/health_rollups/contract"
+	healthrollupsmemory "github.com/srapi/srapi/apps/api/internal/modules/health_rollups/store/memory"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
@@ -47,6 +54,7 @@ import (
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	platformcrypto "github.com/srapi/srapi/apps/api/internal/platform/crypto"
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
+	outboxworker "github.com/srapi/srapi/apps/api/internal/workers/outbox"
 )
 
 func TestMain(m *testing.M) {
@@ -183,6 +191,44 @@ func TestRegisterCreatesSessionWhenEnabled(t *testing.T) {
 	}
 	if meResp.Data.Email != registerResp.Data.User.Email {
 		t.Fatalf("expected registered session user email, got %s", meResp.Data.Email)
+	}
+}
+
+func TestRegisterWithInviteCodeBindsAffiliateRelationship(t *testing.T) {
+	store := affiliatememory.New()
+	if _, err := store.CreateInviteCode(t.Context(), affiliatecontract.InviteCode{
+		UserID:    1,
+		Code:      "AFF-REG",
+		Status:    affiliatecontract.InviteCodeStatusActive,
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("seed invite code: %v", err)
+	}
+
+	handler := New(config.Load(), nil, WithAffiliateStore(store))
+	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"invited-user@srapi.local","name":"Invited User","password":"password123","invite_code":"AFF-REG"}`))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerRec := httptest.NewRecorder()
+	handler.ServeHTTP(registerRec, registerReq)
+
+	if registerRec.Code != http.StatusCreated {
+		t.Fatalf("expected register 201, got %d body=%s", registerRec.Code, registerRec.Body.String())
+	}
+	var registerResp apiopenapi.LoginResponse
+	if err := json.NewDecoder(registerRec.Body).Decode(&registerResp); err != nil {
+		t.Fatalf("decode register response: %v", err)
+	}
+	userID, err := strconv.Atoi(registerResp.Data.User.Id)
+	if err != nil {
+		t.Fatalf("parse registered user id: %v", err)
+	}
+	relationship, err := store.FindRelationshipByInvitee(t.Context(), userID)
+	if err != nil {
+		t.Fatalf("load invite relationship: %v", err)
+	}
+	if relationship.InviterUserID != 1 || relationship.InviteeUserID != userID {
+		t.Fatalf("unexpected invite relationship: %+v", relationship)
 	}
 }
 
@@ -719,19 +765,25 @@ func TestUpdateCurrentUserProfileRequiresCSRFAndAllowlistsFields(t *testing.T) {
 	}
 }
 
-func TestReadyzFailsWhenDependenciesAreUnavailable(t *testing.T) {
-	cfg := config.Load()
-	cfg.Database.Host = "127.0.0.1"
-	cfg.Database.Port = 1
-	cfg.Redis.Host = "127.0.0.1"
-	cfg.Redis.Port = 1
-	handler := New(cfg, nil)
+func TestReadyzFailsWhenDependencyPingersAreMissing(t *testing.T) {
+	handler := New(config.Load(), nil)
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/readyz", nil))
 
 	if response.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", response.Code)
+	}
+
+	var body struct {
+		Data healthData `json:"data"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Data.Dependencies["database"] != "not_configured" ||
+		body.Data.Dependencies["redis"] != "not_configured" {
+		t.Fatalf("expected missing pingers to be not_configured, got %+v", body.Data.Dependencies)
 	}
 }
 
@@ -760,10 +812,56 @@ func TestReadyzUsesInjectedDependencyProbes(t *testing.T) {
 	}
 }
 
+func TestReadyzFailsWhenDatabaseProbeFails(t *testing.T) {
+	handler := New(config.Load(), nil,
+		WithDatabasePinger(stubDependencyPinger{err: errors.New("database unavailable")}),
+		WithRedisPinger(stubDependencyPinger{err: nil}),
+	)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", response.Code)
+	}
+
+	var body apiopenapi.HealthResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Data.Dependencies.Database != apiopenapi.HealthDependencyStatusUnavailable {
+		t.Fatalf("expected database dependency unavailable, got %s", body.Data.Dependencies.Database)
+	}
+	if body.Data.Dependencies.Redis != apiopenapi.HealthDependencyStatusOk {
+		t.Fatalf("expected redis dependency ok, got %s", body.Data.Dependencies.Redis)
+	}
+}
+
 func TestMetricsExposeBaselineSRapiSignals(t *testing.T) {
-	handler := New(config.Load(), nil)
+	cfg := config.Load()
+	accountStore := accountmemory.New()
+	eventStore := eventsmemory.New()
+	usageStore := usagememory.New()
+	rollupStore := healthrollupsmemory.New()
+	handler := New(cfg, nil, WithAccountStore(accountStore), WithEventStore(eventStore), WithUsageStore(usageStore), WithHealthRollupsStore(rollupStore))
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
-	mustCreateOpenAIChatGatewayTarget(t, handler, sessionCookie, loginResp.Data.CsrfToken, "metrics-provider", "metrics-model")
+	providerResp := mustCreateOpenAIChatGatewayTarget(t, handler, sessionCookie, loginResp.Data.CsrfToken, "metrics-provider", "metrics-model")
+	providerID, err := strconv.Atoi(string(providerResp.Data.Id))
+	if err != nil {
+		t.Fatalf("parse provider id: %v", err)
+	}
+	if _, err := rollupStore.UpsertRollup(t.Context(), healthrollupscontract.Rollup{
+		AccountID:         1,
+		ProviderID:        providerID,
+		Date:              time.Now().UTC().Format("2006-01-02"),
+		TotalSamples:      1,
+		HealthySamples:    1,
+		AvailabilityRatio: 1,
+		AvgSuccessRate:    1,
+		ComputedAt:        time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("seed provider probe rollup: %v", err)
+	}
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 
 	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"metrics-model","messages":[{"role":"user","content":"metrics smoke"}]}`))
@@ -773,6 +871,19 @@ func TestMetricsExposeBaselineSRapiSignals(t *testing.T) {
 	handler.ServeHTTP(chatRec, chatReq)
 	if chatRec.Code != http.StatusOK {
 		t.Fatalf("expected gateway success 200, got %d body=%s", chatRec.Code, chatRec.Body.String())
+	}
+	worker, err := outboxworker.New(eventStore, nil, outboxworker.Config{
+		AccountStore: accountStore,
+		UsageStore:   usageStore,
+		MasterKey:    cfg.Security.MasterKey,
+	})
+	if err != nil {
+		t.Fatalf("new outbox worker: %v", err)
+	}
+	if result, err := worker.RunOnce(t.Context()); err != nil {
+		t.Fatalf("run outbox once: %v", err)
+	} else if result.Selected != 2 || result.Published != 2 || result.Failed != 0 {
+		t.Fatalf("expected gateway usage and account snapshot events to publish, got %+v", result)
 	}
 
 	metricsReq := httptest.NewRequest(http.MethodGet, "/metrics", nil)
@@ -1770,6 +1881,22 @@ func TestAdminUsageCleanupControlPlane(t *testing.T) {
 func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	settingsResp := mustGetAdminSettings(t, handler, sessionCookie)
+	settingsResp.Data.Payment.SubscriptionPlansEnabled = true
+	settingsBody, err := json.Marshal(settingsResp.Data)
+	if err != nil {
+		t.Fatalf("marshal settings: %v", err)
+	}
+	settingsReq := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", bytes.NewReader(settingsBody))
+	settingsReq.Header.Set("Content-Type", "application/json")
+	settingsReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	settingsReq.AddCookie(sessionCookie)
+	settingsRec := httptest.NewRecorder()
+	handler.ServeHTTP(settingsRec, settingsReq)
+	if settingsRec.Code != http.StatusOK {
+		t.Fatalf("expected settings update 200, got %d body=%s", settingsRec.Code, settingsRec.Body.String())
+	}
+
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"subscription-provider","display_name":"Subscription Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"subscription-model","display_name":"Subscription Model","status":"active"}`)
 
@@ -2011,6 +2138,7 @@ func TestAdminPaymentProviderUpdateAndTest(t *testing.T) {
 func TestAlipayPaymentWebhookRespondsWithChannelAck(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustEnablePayments(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	keys := newAlipayWebhookHTTPTestKeys(t)
 	providerBody := mustMarshalJSON(t, map[string]any{
 		"provider": "alipay",
@@ -2072,6 +2200,7 @@ func TestWechatPaymentWebhookAcceptsSignedNotification(t *testing.T) {
 	paymentStore := paymentmemory.New()
 	handler := New(config.Load(), nil, WithPaymentStore(paymentStore))
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustEnablePayments(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	keys := newWechatWebhookHTTPTestKeys(t)
 	providerBody := mustMarshalJSON(t, map[string]any{
 		"provider": "wechat",
@@ -2506,7 +2635,7 @@ func TestAdminAccountModelDiscoveryPreviewAntigravityReverseProxy(t *testing.T) 
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-discovery-provider","display_name":"Antigravity Discovery","adapter_type":"reverse-proxy-antigravity","protocol":"gemini-compatible","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-discovery-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"antigravity-discovery-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-discovery-account","runtime_class":"oauth_refresh","upstream_client":"antigravity_desktop","credential":{"access_token":"antigravity-discovery-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active"}`)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/discover-models", strings.NewReader(`{"limit":10}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -2568,7 +2697,7 @@ func TestAdminAccountModelDiscoveryPersistsAntigravityReverseProxy(t *testing.T)
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-persist-provider","display_name":"Antigravity Persist","adapter_type":"reverse-proxy-antigravity","protocol":"gemini-compatible","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-persist-account","runtime_class":"ide_plugin_token","credential":{"access_token":"antigravity-persist-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"persist-project"},"status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-persist-account","runtime_class":"oauth_refresh","credential":{"access_token":"antigravity-persist-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"persist-project"},"status":"active"}`)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/discover-models", strings.NewReader(`{"persist":true}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -2650,7 +2779,7 @@ func TestAdminAccountModelDiscoveryBootstrapsAntigravityProjectFromLoadCodeAssis
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-bootstrap-load-provider","display_name":"Antigravity Bootstrap Load","adapter_type":"reverse-proxy-antigravity","protocol":"gemini-compatible","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-bootstrap-load-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"antigravity-bootstrap-token"},"metadata":{"base_url":"`+upstream.URL+`","user_agent":"antigravity/1.23.2 windows/amd64"},"status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-bootstrap-load-account","runtime_class":"oauth_refresh","upstream_client":"antigravity_desktop","credential":{"access_token":"antigravity-bootstrap-token"},"metadata":{"base_url":"`+upstream.URL+`","user_agent":"antigravity/1.23.2 windows/amd64"},"status":"active"}`)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/discover-models", strings.NewReader(`{"limit":10}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -2736,7 +2865,7 @@ func TestAdminAccountModelDiscoveryPersistsAntigravityOnboardedProject(t *testin
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-bootstrap-onboard-provider","display_name":"Antigravity Bootstrap Onboard","adapter_type":"reverse-proxy-antigravity","protocol":"gemini-compatible","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-bootstrap-onboard-account","runtime_class":"ide_plugin_token","upstream_client":"antigravity_desktop","credential":{"access_token":"antigravity-onboard-token"},"metadata":{"base_url":"`+upstream.URL+`"},"status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-bootstrap-onboard-account","runtime_class":"oauth_refresh","upstream_client":"antigravity_desktop","credential":{"access_token":"antigravity-onboard-token"},"metadata":{"base_url":"`+upstream.URL+`"},"status":"active"}`)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/discover-models", strings.NewReader(`{"persist":true}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -5923,10 +6052,8 @@ func TestAdminInstallProviderPresetsIsIdempotent(t *testing.T) {
 		t.Fatalf("expected chatgpt-web config schema")
 	}
 	chatGPTWebAuthMethods, _ := (*chatGPTWebSchema)["auth_methods"].([]any)
-	if !stringAnySliceContains(chatGPTWebAuthMethods, "web_session_cookie") ||
-		stringAnySliceContains(chatGPTWebAuthMethods, "service_account_json") ||
-		stringAnySliceContains(chatGPTWebAuthMethods, "desktop_client_token") ||
-		stringAnySliceContains(chatGPTWebAuthMethods, "ide_plugin_token") {
+	expectedChatGPTWebAuthMethods := []any{"web_session_cookie", "custom_reverse_proxy"}
+	if !reflect.DeepEqual(chatGPTWebAuthMethods, expectedChatGPTWebAuthMethods) {
 		t.Fatalf("unexpected chatgpt-web auth methods: %+v", chatGPTWebAuthMethods)
 	}
 	oauthReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/providers/"+string(anthropicProvider.Id)+"/oauth-config", nil)
@@ -8643,7 +8770,11 @@ func TestGatewayUpdatesAccountRuntimeQuotaMetadataForScheduler(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	handler := New(config.Load(), nil)
+	cfg := config.Load()
+	accountStore := accountmemory.New()
+	eventStore := eventsmemory.New()
+	usageStore := usagememory.New()
+	handler := New(cfg, nil, WithAccountStore(accountStore), WithEventStore(eventStore), WithUsageStore(usageStore))
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"account-runtime-quota-provider","display_name":"Account Runtime Quota","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"account-runtime-quota-model","display_name":"Account Runtime Quota Model","status":"active"}`)
@@ -8658,6 +8789,19 @@ func TestGatewayUpdatesAccountRuntimeQuotaMetadataForScheduler(t *testing.T) {
 	handler.ServeHTTP(firstRec, firstReq)
 	if firstRec.Code != http.StatusOK {
 		t.Fatalf("expected first gateway request 200, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+	worker, err := outboxworker.New(eventStore, nil, outboxworker.Config{
+		AccountStore: accountStore,
+		UsageStore:   usageStore,
+		MasterKey:    cfg.Security.MasterKey,
+	})
+	if err != nil {
+		t.Fatalf("new outbox worker: %v", err)
+	}
+	if result, err := worker.RunOnce(t.Context()); err != nil {
+		t.Fatalf("run outbox once: %v", err)
+	} else if result.Selected == 0 || result.Published == 0 || result.Failed != 0 {
+		t.Fatalf("expected gateway account snapshot event to publish, got %+v", result)
 	}
 
 	accountsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts", nil)
@@ -9578,6 +9722,26 @@ func mustGetAdminSettings(t *testing.T, handler http.Handler, sessionCookie *htt
 		t.Fatalf("decode settings response: %v", err)
 	}
 	return resp
+}
+
+func mustEnablePayments(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken string) {
+	t.Helper()
+	settingsResp := mustGetAdminSettings(t, handler, sessionCookie)
+	settingsResp.Data.Features.PaymentsEnabled = true
+	settingsResp.Data.Payment.Enabled = true
+	body, err := json.Marshal(settingsResp.Data)
+	if err != nil {
+		t.Fatalf("marshal settings request: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected payments settings update 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
 }
 
 func mustCreateGatewayAPIKey(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken string) (apiopenapi.CreateApiKeyResponse, string) {

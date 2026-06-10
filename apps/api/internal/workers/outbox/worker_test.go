@@ -8,9 +8,15 @@ import (
 	"testing"
 	"time"
 
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	accountservice "github.com/srapi/srapi/apps/api/internal/modules/accounts/service"
+	accountmemory "github.com/srapi/srapi/apps/api/internal/modules/accounts/store/memory"
+	admincontrolservice "github.com/srapi/srapi/apps/api/internal/modules/admin_control/service"
+	admincontrolmemory "github.com/srapi/srapi/apps/api/internal/modules/admin_control/store/memory"
 	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	affiliateservice "github.com/srapi/srapi/apps/api/internal/modules/affiliate/service"
 	affiliatememory "github.com/srapi/srapi/apps/api/internal/modules/affiliate/store/memory"
+	auditmemory "github.com/srapi/srapi/apps/api/internal/modules/audit/store/memory"
 	"github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
@@ -18,6 +24,8 @@ import (
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
+	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
+	usagememory "github.com/srapi/srapi/apps/api/internal/modules/usage/store/memory"
 	"github.com/srapi/srapi/apps/api/internal/workers/outbox"
 )
 
@@ -65,6 +73,125 @@ func TestWorkerRunOnceRecordsInboxAndPublishesOutbox(t *testing.T) {
 	}
 	if len(inboxRows) != 1 || inboxRows[0].EventID != enqueued.EventID || inboxRows[0].ConsumerName != "test-consumer" || inboxRows[0].Status != contract.InboxStatusProcessed || inboxRows[0].ProcessedAt == nil {
 		t.Fatalf("expected processed inbox record for dispatched event, got %+v", inboxRows)
+	}
+}
+
+func TestWorkerRunOnceRefreshesGatewayAccountSnapshot(t *testing.T) {
+	ctx := t.Context()
+	eventStore := eventsmemory.New()
+	clock := &fixedClock{now: time.Date(2026, 5, 21, 10, 0, 0, 0, time.UTC)}
+	events, err := eventsservice.New(eventStore, clock)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	accountStore := accountmemory.New()
+	accounts, err := accountservice.New(accountStore, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new accounts service: %v", err)
+	}
+	account, err := accounts.Create(ctx, accountcontract.CreateRequest{
+		ProviderID:   12,
+		Name:         "outbox-snapshot-account",
+		RuntimeClass: accountcontract.RuntimeClassCliClientToken,
+		Credential:   map[string]any{"cli_client_token": "secret"},
+		Metadata: map[string]any{
+			"runtime_quota_window_seconds": 60,
+			"cost_window_seconds":          60,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	usageStore := usagememory.New()
+	accountID := account.ID
+	providerID := account.ProviderID
+	if _, err := usageStore.Create(ctx, usagecontract.UsageLog{
+		RequestID:      "req_outbox_snapshot_usage",
+		UserID:         1,
+		APIKeyID:       2,
+		AccountID:      &accountID,
+		ProviderID:     &providerID,
+		SourceEndpoint: "/v1/responses",
+		Model:          "codex-model",
+		Success:        true,
+		TotalTokens:    42,
+		BillableCost:   "0.01000000",
+		CreatedAt:      time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("seed usage: %v", err)
+	}
+	resetAt := time.Date(2026, 5, 21, 11, 0, 0, 0, time.UTC)
+	if _, err := events.Enqueue(ctx, contract.EnqueueRequest{
+		EventType:      "GatewayAccountSnapshotRefreshRequested",
+		ProducerModule: "gateway",
+		AggregateType:  "provider_account",
+		AggregateID:    "1",
+		IdempotencyKey: "gateway.account_snapshot:test",
+		Payload: map[string]any{
+			"request_id":  "req_outbox_snapshot",
+			"attempt_no":  1,
+			"account_id":  account.ID,
+			"provider_id": account.ProviderID,
+			"quota_signals": []any{map[string]any{
+				"quota_type":      "codex_5h_percent",
+				"remaining":       "66",
+				"used":            "34",
+				"quota_limit":     "100",
+				"remaining_ratio": 0.66,
+				"reset_at":        resetAt.Format(time.RFC3339Nano),
+				"snapshot_at":     resetAt.Add(-time.Hour).Format(time.RFC3339Nano),
+			}},
+		},
+	}); err != nil {
+		t.Fatalf("enqueue refresh event: %v", err)
+	}
+	worker, err := outbox.New(eventStore, discardLogger(), outbox.Config{
+		ConsumerName:  "test-consumer",
+		DispatchClock: clock,
+		AccountStore:  accountStore,
+		MasterKey:     "0123456789abcdef0123456789abcdef",
+		UsageStore:    usageStore,
+	})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+	result, err := worker.RunOnce(ctx)
+	if err != nil {
+		t.Fatalf("run worker once: %v", err)
+	}
+	if result.Selected != 1 || result.Published != 1 || result.Failed != 0 {
+		t.Fatalf("unexpected dispatch result: %+v", result)
+	}
+	health, err := accounts.LatestHealthSnapshotByAccount(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("latest health snapshot: %v", err)
+	}
+	if health.SuccessRate != 1 || health.LatencyP95MS != 0 {
+		t.Fatalf("unexpected health snapshot: %+v", health)
+	}
+	updated, err := accounts.FindByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("find updated account: %v", err)
+	}
+	if testMetadataInt(updated.Metadata, "tpm_used") != 42 || testMetadataInt(updated.Metadata, "rpm_used") != 1 {
+		t.Fatalf("expected bounded runtime quota metadata, got %+v", updated.Metadata)
+	}
+	quotas, err := accounts.ListQuotaSnapshotsByAccount(ctx, account.ID, 10)
+	if err != nil {
+		t.Fatalf("list quota snapshots: %v", err)
+	}
+	foundSignal := false
+	foundSynthetic := false
+	for _, quota := range quotas {
+		switch quota.QuotaType {
+		case "codex_5h_percent":
+			foundSignal = quota.ResetAt != nil && quota.ResetAt.Equal(resetAt) && quota.Used == "34"
+		case accountcontract.QuotaTypeSyntheticMonthlyTokens:
+			foundSynthetic = quota.Used == "42"
+		}
+	}
+	if !foundSignal || !foundSynthetic {
+		t.Fatalf("expected provider and synthetic quota snapshots, got %+v", quotas)
 	}
 }
 
@@ -217,6 +344,60 @@ func TestWorkerSkipsAlreadyProcessedInbox(t *testing.T) {
 	}
 }
 
+func TestWorkerSkipsClaimedPendingInboxWithoutPublishing(t *testing.T) {
+	store := eventsmemory.New()
+	clock := &fixedClock{now: time.Date(2026, 5, 21, 12, 30, 0, 0, time.UTC)}
+	events, err := eventsservice.New(store, clock)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	enqueued, err := events.Enqueue(t.Context(), contract.EnqueueRequest{
+		EventType:      "GatewayRequestCompleted",
+		ProducerModule: "gateway",
+		IdempotencyKey: "req_worker_claimed",
+	})
+	if err != nil {
+		t.Fatalf("enqueue outbox event: %v", err)
+	}
+	if _, created, err := events.RecordInbox(t.Context(), contract.RecordInboxRequest{
+		EventID:      enqueued.EventID,
+		ConsumerName: "test-consumer",
+		EventType:    enqueued.EventType,
+	}); err != nil || !created {
+		t.Fatalf("claim inbox: created=%v err=%v", created, err)
+	}
+
+	calls := 0
+	worker, err := outbox.New(store, discardLogger(), outbox.Config{
+		ConsumerName:  "test-consumer",
+		DispatchClock: clock,
+		EventHandler: eventsservice.OutboxHandlerFunc(func(context.Context, contract.OutboxEvent) error {
+			calls++
+			return nil
+		}),
+	})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+	result, err := worker.RunOnce(t.Context())
+	if err != nil {
+		t.Fatalf("run worker once: %v", err)
+	}
+	if calls != 0 {
+		t.Fatalf("expected claimed pending inbox to skip handler, got %d calls", calls)
+	}
+	if result.Selected != 1 || result.Published != 0 || result.Failed != 0 {
+		t.Fatalf("unexpected dispatch result for claimed inbox: %+v", result)
+	}
+	outboxRows, err := events.ListOutbox(t.Context())
+	if err != nil {
+		t.Fatalf("list outbox: %v", err)
+	}
+	if len(outboxRows) != 1 || outboxRows[0].Status != contract.OutboxStatusPending {
+		t.Fatalf("expected outbox to remain pending, got %+v", outboxRows)
+	}
+}
+
 func TestWorkerDispatchesPaymentEventsToAffiliate(t *testing.T) {
 	store := eventsmemory.New()
 	clock := &fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
@@ -290,6 +471,98 @@ func TestWorkerDispatchesPaymentEventsToAffiliate(t *testing.T) {
 	}
 	if len(outboxRows) != 2 || outboxRows[0].EventType != "PaymentOrderPaid" || outboxRows[0].Status != contract.OutboxStatusPublished || outboxRows[1].EventType != "AffiliateRebateAccrued" {
 		t.Fatalf("expected payment published and affiliate accrued pending, got %+v", outboxRows)
+	}
+}
+
+func TestWorkerSkipsInvitationRebateWhenDisabledAndAuditsReason(t *testing.T) {
+	store := eventsmemory.New()
+	clock := &fixedClock{now: time.Date(2026, 5, 22, 11, 0, 0, 0, time.UTC)}
+	events, err := eventsservice.New(store, clock)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	affiliateStore := affiliatememory.New()
+	affiliateSvc, err := affiliateservice.New(affiliateStore, affiliateservice.Dependencies{Events: events}, clock)
+	if err != nil {
+		t.Fatalf("new affiliate service: %v", err)
+	}
+	if _, err := affiliateSvc.CreateInviteCode(t.Context(), affiliatecontract.CreateInviteCodeRequest{UserID: 10, Code: "INVITE10"}); err != nil {
+		t.Fatalf("create invite code: %v", err)
+	}
+	if _, err := affiliateSvc.BindInvite(t.Context(), affiliatecontract.BindInviteRequest{InviteeUserID: 20, Code: "INVITE10"}); err != nil {
+		t.Fatalf("bind invite: %v", err)
+	}
+	if _, err := affiliateSvc.CreateRule(t.Context(), affiliatecontract.CreateRuleRequest{
+		Name:        "ten-percent",
+		TriggerType: affiliatecontract.TriggerTypePaymentPaid,
+		Rate:        "0.10",
+		Currency:    "USD",
+	}); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+	adminStore := admincontrolmemory.New()
+	adminSvc, err := admincontrolservice.New(adminStore, nil)
+	if err != nil {
+		t.Fatalf("new admin service: %v", err)
+	}
+	settings, err := adminSvc.GetAdminSettings(t.Context())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.Features.InvitationRebateEnabled = false
+	if _, err := adminSvc.UpdateAdminSettings(t.Context(), settings, 1); err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	if _, err := events.Enqueue(t.Context(), contract.EnqueueRequest{
+		EventType:      "PaymentOrderPaid",
+		ProducerModule: "payments",
+		AggregateType:  "payment_order",
+		AggregateID:    "pay_disabled",
+		IdempotencyKey: "payment_paid:pay_disabled",
+		Payload: map[string]any{
+			"order_id":                2,
+			"order_no":                "pay_disabled",
+			"user_id":                 20,
+			"amount":                  "100.00000000",
+			"currency":                "USD",
+			"paid_at":                 clock.now.Format(time.RFC3339Nano),
+			"provider_transaction_id": "txn_disabled",
+		},
+	}); err != nil {
+		t.Fatalf("enqueue payment event: %v", err)
+	}
+	auditStore := auditmemory.New()
+	worker, err := outbox.New(store, discardLogger(), outbox.Config{
+		ConsumerName:      "affiliate-disabled-consumer",
+		DispatchClock:     clock,
+		AffiliateStore:    affiliateStore,
+		AdminControlStore: adminStore,
+		AuditStore:        auditStore,
+	})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+
+	result, err := worker.RunOnce(t.Context())
+	if err != nil {
+		t.Fatalf("run worker once: %v", err)
+	}
+	if result.Selected != 1 || result.Published != 1 || result.Failed != 0 {
+		t.Fatalf("unexpected dispatch result: %+v", result)
+	}
+	ledgers, err := affiliateSvc.ListLedgers(t.Context())
+	if err != nil {
+		t.Fatalf("list affiliate ledgers: %v", err)
+	}
+	if len(ledgers) != 0 {
+		t.Fatalf("disabled invitation rebate should not accrue ledger, got %+v", ledgers)
+	}
+	auditLogs, err := auditStore.List(t.Context())
+	if err != nil {
+		t.Fatalf("list audit logs: %v", err)
+	}
+	if len(auditLogs) != 1 || auditLogs[0].Action != "affiliate.rebate.skipped" || auditLogs[0].After["reason"] != "invitation_rebate_disabled" {
+		t.Fatalf("expected disabled rebate audit reason, got %+v", auditLogs)
 	}
 }
 
@@ -404,4 +677,17 @@ func (c *fixedClock) Now() time.Time {
 
 func discardLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+func testMetadataInt(metadata map[string]any, key string) int {
+	switch value := metadata[key].(type) {
+	case int:
+		return value
+	case int64:
+		return int(value)
+	case float64:
+		return int(value)
+	default:
+		return 0
+	}
 }

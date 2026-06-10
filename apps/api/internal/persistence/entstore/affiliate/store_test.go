@@ -212,6 +212,40 @@ func TestTransferToBalanceWritesAffiliateLedgerBillingLedgerAndUserBalance(t *te
 	}); !errors.Is(err, contract.ErrInsufficientBalance) {
 		t.Fatalf("expected insufficient affiliate balance, got %v", err)
 	}
+
+	withdraw, created, err := store.CreateWithdrawal(ctx, contract.WithdrawalInput{
+		UserID:      user.ID,
+		Amount:      "2.00000000",
+		Currency:    "USD",
+		ReferenceID: "withdraw:idem_88",
+		Metadata:    map[string]any{"idempotency_key": "idem_88"},
+		CreatedAt:   now.Add(3 * time.Hour),
+	})
+	if err != nil || !created {
+		t.Fatalf("create withdrawal: withdraw=%+v created=%v err=%v", withdraw, created, err)
+	}
+	if withdraw.Type != contract.LedgerTypeWithdraw || withdraw.Amount != "-2.00000000" || withdraw.Status != contract.LedgerStatusPending || withdraw.SettledAt != nil {
+		t.Fatalf("unexpected withdrawal ledger: %+v", withdraw)
+	}
+	duplicateWithdraw, created, err := store.CreateWithdrawal(ctx, contract.WithdrawalInput{
+		UserID:      user.ID,
+		Amount:      "2.00000000",
+		Currency:    "USD",
+		ReferenceID: "withdraw:idem_88",
+		CreatedAt:   now.Add(4 * time.Hour),
+	})
+	if err != nil || created || duplicateWithdraw.ID != withdraw.ID {
+		t.Fatalf("expected idempotent withdrawal duplicate, duplicate=%+v created=%v err=%v", duplicateWithdraw, created, err)
+	}
+	if _, _, err := store.CreateWithdrawal(ctx, contract.WithdrawalInput{
+		UserID:      user.ID,
+		Amount:      "3.00000000",
+		Currency:    "USD",
+		ReferenceID: "withdraw:overdraft",
+		CreatedAt:   now.Add(5 * time.Hour),
+	}); !errors.Is(err, contract.ErrInsufficientBalance) {
+		t.Fatalf("expected insufficient affiliate balance for withdrawal, got %v", err)
+	}
 }
 
 func sqliteDSN(t *testing.T) string {

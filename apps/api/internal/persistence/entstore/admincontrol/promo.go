@@ -38,7 +38,11 @@ func PreviewPromoCodeWithClient(ctx context.Context, client *ent.Client, input a
 	if !ok {
 		return admincontrolcontract.PromoCodeApplication{}, admincontrolcontract.ErrNotFound
 	}
-	return previewPromoCode(item, input.UserID, input.Amount, input.Currency, now)
+	userUses, err := countActivePromoUses(ctx, client, item.ID, input.UserID)
+	if err != nil {
+		return admincontrolcontract.PromoCodeApplication{}, err
+	}
+	return previewPromoCode(item, input.UserID, input.Amount, input.Currency, now, userUses)
 }
 
 // FinalizePromoCodeWithClient creates the durable application receipt and increments promo usage.
@@ -66,7 +70,11 @@ func FinalizePromoCodeWithClient(ctx context.Context, client *ent.Client, input 
 	if !ok {
 		return admincontrolcontract.PromoCodeApplication{}, admincontrolcontract.ErrNotFound
 	}
-	application, err := previewPromoCode(item, input.UserID, input.OriginalAmount, input.Currency, now)
+	userUses, err := countActivePromoUses(ctx, client, item.ID, input.UserID)
+	if err != nil {
+		return admincontrolcontract.PromoCodeApplication{}, err
+	}
+	application, err := previewPromoCode(item, input.UserID, input.OriginalAmount, input.Currency, now, userUses)
 	if err != nil {
 		return admincontrolcontract.PromoCodeApplication{}, err
 	}
@@ -109,6 +117,61 @@ func FinalizePromoCodeWithClient(ctx context.Context, client *ent.Client, input 
 		return admincontrolcontract.PromoCodeApplication{}, err
 	}
 	return ToPromoCodeApplication(row), nil
+}
+
+func ReleasePromoCodeWithClient(ctx context.Context, client *ent.Client, input admincontrolcontract.PromoCodeReleaseInput) (admincontrolcontract.PromoCodeApplication, bool, error) {
+	if client == nil || input.PaymentOrderID <= 0 {
+		return admincontrolcontract.PromoCodeApplication{}, false, admincontrolcontract.ErrInvalidInput
+	}
+	releasedAt := input.ReleasedAt.UTC()
+	if releasedAt.IsZero() {
+		releasedAt = time.Now().UTC()
+	}
+	row, err := client.UserPromoCodeApplication.Query().
+		Where(entuserpromocodeapplication.PaymentOrderIDEQ(input.PaymentOrderID)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return admincontrolcontract.PromoCodeApplication{}, false, admincontrolcontract.ErrNotFound
+		}
+		return admincontrolcontract.PromoCodeApplication{}, false, err
+	}
+	if promoApplicationReleased(row.MetadataJSON) {
+		return ToPromoCodeApplication(row), false, nil
+	}
+	collection, setting, err := LoadPromoCodes(ctx, client)
+	if err != nil {
+		return admincontrolcontract.PromoCodeApplication{}, false, err
+	}
+	item, idx, ok := findPromoCodeByID(collection.Items, row.PromoCodeID)
+	if !ok {
+		return admincontrolcontract.PromoCodeApplication{}, false, admincontrolcontract.ErrNotFound
+	}
+	if item.UsedCount > 0 {
+		item.UsedCount--
+	}
+	if item.Status == admincontrolcontract.PromoCodeStatusExpired && item.UsedCount < item.MaxUses && (item.ExpiresAt == nil || item.ExpiresAt.After(releasedAt)) {
+		item.Status = admincontrolcontract.PromoCodeStatusActive
+	}
+	item.UpdatedAt = releasedAt
+	collection.Items[idx] = item
+	if err := SavePromoCodeSetting(ctx, client, setting.ID, collection); err != nil {
+		return admincontrolcontract.PromoCodeApplication{}, false, err
+	}
+	metadata := cloneMap(row.MetadataJSON)
+	metadata["released"] = true
+	metadata["released_at"] = releasedAt.Format(time.RFC3339Nano)
+	if reason := strings.TrimSpace(input.Reason); reason != "" {
+		metadata["release_reason"] = reason
+	}
+	updated, err := client.UserPromoCodeApplication.UpdateOneID(row.ID).
+		SetMetadataJSON(metadata).
+		SetUpdatedAt(releasedAt).
+		Save(ctx)
+	if err != nil {
+		return admincontrolcontract.PromoCodeApplication{}, false, err
+	}
+	return ToPromoCodeApplication(updated), true, nil
 }
 
 // ListPromoCodeUsagesWithClient returns the redemption rows for one promo code,
@@ -197,9 +260,21 @@ func findPromoCode(items []admincontrolcontract.PromoCode, code string, now time
 	return admincontrolcontract.PromoCode{}, -1, false
 }
 
-func previewPromoCode(item admincontrolcontract.PromoCode, userID int, amount string, currency string, now time.Time) (admincontrolcontract.PromoCodeApplication, error) {
+func findPromoCodeByID(items []admincontrolcontract.PromoCode, id int) (admincontrolcontract.PromoCode, int, bool) {
+	for idx, item := range items {
+		if item.ID == id {
+			return item, idx, true
+		}
+	}
+	return admincontrolcontract.PromoCode{}, -1, false
+}
+
+func previewPromoCode(item admincontrolcontract.PromoCode, userID int, amount string, currency string, now time.Time, userUses int) (admincontrolcontract.PromoCodeApplication, error) {
 	item = promoCodeWithDerivedStatus(item, now)
 	if item.Status != admincontrolcontract.PromoCodeStatusActive || item.MaxUses <= 0 || item.UsedCount >= item.MaxUses {
+		return admincontrolcontract.PromoCodeApplication{}, admincontrolcontract.ErrConflict
+	}
+	if item.PerUserLimit > 0 && userUses >= item.PerUserLimit {
 		return admincontrolcontract.PromoCodeApplication{}, admincontrolcontract.ErrConflict
 	}
 	if item.StartsAt != nil && item.StartsAt.After(now) {
@@ -211,6 +286,9 @@ func previewPromoCode(item admincontrolcontract.PromoCode, userID int, amount st
 	}
 	normalizedCurrency := normalizeCurrency(currency)
 	if item.DiscountType == admincontrolcontract.PromoDiscountTypeAmount && normalizeCurrency(item.Currency) != normalizedCurrency {
+		return admincontrolcontract.PromoCodeApplication{}, admincontrolcontract.ErrConflict
+	}
+	if minOrderAmount, ok := money.RequiredDecimalRat(item.MinOrderAmount); ok && minOrderAmount.Sign() > 0 && inputAmount.Cmp(minOrderAmount) < 0 {
 		return admincontrolcontract.PromoCodeApplication{}, admincontrolcontract.ErrConflict
 	}
 	discount, err := promoDiscountAmount(item, inputAmount)
@@ -261,6 +339,30 @@ func promoCodeWithDerivedStatus(item admincontrolcontract.PromoCode, now time.Ti
 	return item
 }
 
+func countActivePromoUses(ctx context.Context, client *ent.Client, promoCodeID int, userID int) (int, error) {
+	rows, err := client.UserPromoCodeApplication.Query().
+		Where(
+			entuserpromocodeapplication.PromoCodeIDEQ(promoCodeID),
+			entuserpromocodeapplication.UserIDEQ(userID),
+		).
+		All(ctx)
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	for _, row := range rows {
+		if !promoApplicationReleased(row.MetadataJSON) {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func promoApplicationReleased(metadata map[string]any) bool {
+	value, ok := metadata["released"].(bool)
+	return ok && value
+}
+
 func formatInputMoney(value string) string {
 	rat, ok := money.RequiredDecimalRat(value)
 	if !ok {
@@ -286,6 +388,7 @@ func ToPromoCodeApplication(row *ent.UserPromoCodeApplication) admincontrolcontr
 		Currency:       row.Currency,
 		DiscountType:   admincontrolcontract.PromoDiscountType(row.DiscountType),
 		AppliedAt:      row.AppliedAt,
+		Metadata:       cloneMap(row.MetadataJSON),
 		CreatedAt:      row.CreatedAt,
 		UpdatedAt:      row.UpdatedAt,
 	}

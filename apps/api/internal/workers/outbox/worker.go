@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
@@ -14,7 +15,9 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	notificationscontract "github.com/srapi/srapi/apps/api/internal/modules/notifications/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
+	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
 const (
@@ -32,6 +35,7 @@ type Config struct {
 	ConsumerName          string
 	EventHandler          service.OutboxHandler
 	DispatchClock         service.Clock
+	AccountStore          accountcontract.Store
 	AffiliateStore        affiliatecontract.Store
 	AdminControlStore     admincontrolcontract.Store
 	AuditStore            auditcontract.Store
@@ -50,6 +54,8 @@ type Config struct {
 	EmailTemplateProvider notificationscontract.EmailTemplateProvider
 	MasterKey             string
 	SubscriptionStore     subscriptioncontract.Store
+	UsageStore            usagecontract.Store
+	RunGuard              runonceguard.Guard
 }
 
 type Worker struct {
@@ -59,6 +65,7 @@ type Worker struct {
 	interval     time.Duration
 	limit        int
 	retryBackoff time.Duration
+	guard        runonceguard.Guard
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -111,6 +118,7 @@ func New(store contract.Store, logger *slog.Logger, cfg Config) (*Worker, error)
 		interval:     interval,
 		limit:        limit,
 		retryBackoff: retryBackoff,
+		guard:        cfg.RunGuard,
 	}, nil
 }
 
@@ -177,10 +185,16 @@ func (w *Worker) RunOnce(ctx context.Context) (service.DispatchResult, error) {
 	if w == nil {
 		return service.DispatchResult{}, nil
 	}
-	return w.events.DispatchPending(ctx, w.handler, service.DispatchOptions{
-		Limit:        w.limit,
-		RetryBackoff: w.retryBackoff,
+	var result service.DispatchResult
+	_, err := runonceguard.Run(ctx, w.guard, "outbox", func(runCtx context.Context) error {
+		var runErr error
+		result, runErr = w.events.DispatchPending(runCtx, w.handler, service.DispatchOptions{
+			Limit:        w.limit,
+			RetryBackoff: w.retryBackoff,
+		})
+		return runErr
 	})
+	return result, err
 }
 
 func (w *Worker) run(ctx context.Context) {
@@ -215,7 +229,7 @@ type inboxHandler struct {
 }
 
 func (h inboxHandler) HandleOutboxEvent(ctx context.Context, event contract.OutboxEvent) error {
-	record, _, err := h.events.RecordInbox(ctx, contract.RecordInboxRequest{
+	record, created, err := h.events.RecordInbox(ctx, contract.RecordInboxRequest{
 		EventID:      event.EventID,
 		ConsumerName: h.consumerName,
 		EventType:    event.EventType,
@@ -223,6 +237,19 @@ func (h inboxHandler) HandleOutboxEvent(ctx context.Context, event contract.Outb
 	if err != nil {
 		return err
 	}
+	if !created {
+		if record.Status == contract.InboxStatusProcessed {
+			return nil
+		}
+		if record.Status == contract.InboxStatusFailed {
+			return h.handleAndMark(ctx, record, event)
+		}
+		return contract.ErrInboxClaimed
+	}
+	return h.handleAndMark(ctx, record, event)
+}
+
+func (h inboxHandler) handleAndMark(ctx context.Context, record contract.InboxRecord, event contract.OutboxEvent) error {
 	if record.Status == contract.InboxStatusProcessed {
 		return nil
 	}
@@ -232,6 +259,6 @@ func (h inboxHandler) HandleOutboxEvent(ctx context.Context, event contract.Outb
 		}
 		return err
 	}
-	_, err = h.events.MarkInboxProcessed(ctx, record.ID)
+	_, err := h.events.MarkInboxProcessed(ctx, record.ID)
 	return err
 }

@@ -7,9 +7,11 @@ import (
 	"strings"
 	"time"
 
+	accountservice "github.com/srapi/srapi/apps/api/internal/modules/accounts/service"
 	admincontrolservice "github.com/srapi/srapi/apps/api/internal/modules/admin_control/service"
 	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	affiliateservice "github.com/srapi/srapi/apps/api/internal/modules/affiliate/service"
+	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	auditservice "github.com/srapi/srapi/apps/api/internal/modules/audit/service"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
@@ -17,6 +19,7 @@ import (
 	notificationsservice "github.com/srapi/srapi/apps/api/internal/modules/notifications/service"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
+	usageservice "github.com/srapi/srapi/apps/api/internal/modules/usage/service"
 )
 
 func defaultEventHandler(events *eventsservice.Service, cfg Config) (eventsservice.OutboxHandler, error) {
@@ -83,7 +86,31 @@ func defaultEventHandler(events *eventsservice.Service, cfg Config) (eventsservi
 			notifications.SetTemplateProvider(templateProvider)
 		}
 	}
-	return domainEventHandler{affiliate: affiliate, subscriptions: subscriptions, notifications: notifications}, nil
+	var adminControl *admincontrolservice.Service
+	if cfg.AdminControlStore != nil {
+		var err error
+		adminControl, err = admincontrolservice.New(cfg.AdminControlStore, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var accounts *accountservice.Service
+	if cfg.AccountStore != nil {
+		var err error
+		accounts, err = accountservice.New(cfg.AccountStore, cfg.MasterKey, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var usage *usageservice.Service
+	if cfg.UsageStore != nil {
+		var err error
+		usage, err = usageservice.New(cfg.UsageStore, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return domainEventHandler{accounts: accounts, affiliate: affiliate, audit: audit, adminControl: adminControl, subscriptions: subscriptions, notifications: notifications, usage: usage}, nil
 }
 
 func notificationEmailConfig(cfg Config) notificationscontract.EmailConfig {
@@ -116,19 +143,28 @@ func notificationEmailConfig(cfg Config) notificationscontract.EmailConfig {
 }
 
 type domainEventHandler struct {
+	accounts      *accountservice.Service
 	affiliate     *affiliateservice.Service
+	audit         *auditservice.Service
+	adminControl  *admincontrolservice.Service
 	notifications *notificationsservice.Service
 	subscriptions *subscriptionservice.Service
+	usage         *usageservice.Service
 }
 
 func (h domainEventHandler) HandleOutboxEvent(ctx context.Context, event eventscontract.OutboxEvent) error {
 	switch event.EventType {
+	case "GatewayAccountSnapshotRefreshRequested":
+		return h.refreshGatewayAccountSnapshot(ctx, event)
 	case "PaymentOrderPaid":
 		if err := h.activateSubscription(ctx, event); err != nil {
 			return err
 		}
 		if h.affiliate == nil {
 			return nil
+		}
+		if !h.invitationRebateEnabled(ctx) {
+			return h.recordInvitationRebateSkipped(ctx, event)
 		}
 		_, err := h.affiliate.AccrueRebate(ctx, affiliateAccrualFromEvent(event))
 		return err
@@ -146,6 +182,36 @@ func (h domainEventHandler) HandleOutboxEvent(ctx context.Context, event eventsc
 	default:
 		return nil
 	}
+}
+
+func (h domainEventHandler) invitationRebateEnabled(ctx context.Context) bool {
+	if h.adminControl == nil {
+		return true
+	}
+	settings, err := h.adminControl.GetAdminSettings(ctx)
+	if err != nil {
+		return false
+	}
+	return settings.Features.InvitationRebateEnabled
+}
+
+func (h domainEventHandler) recordInvitationRebateSkipped(ctx context.Context, event eventscontract.OutboxEvent) error {
+	if h.audit == nil {
+		return nil
+	}
+	_, err := h.audit.Record(ctx, auditcontract.RecordRequest{
+		Action:       "affiliate.rebate.skipped",
+		ResourceType: "payment_order",
+		ResourceID:   payloadString(event.Payload, "order_no"),
+		TraceID:      payloadString(event.Payload, "request_id"),
+		After: map[string]any{
+			"reason":          "invitation_rebate_disabled",
+			"order_id":        payloadInt(event.Payload, "order_id"),
+			"invitee_user_id": payloadInt(event.Payload, "user_id"),
+			"event_id":        event.EventID,
+		},
+	})
+	return err
 }
 
 func (h domainEventHandler) activateSubscription(ctx context.Context, event eventscontract.OutboxEvent) error {

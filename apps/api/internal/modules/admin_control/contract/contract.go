@@ -21,6 +21,7 @@ type Store interface {
 	RedeemCode(ctx context.Context, input RedeemCodeRedemptionInput) (RedeemCodeRedemptionResult, error)
 	PreviewPromoCode(ctx context.Context, input PromoCodePreviewInput) (PromoCodeApplication, error)
 	FinalizePromoCode(ctx context.Context, input PromoCodeFinalizeInput) (PromoCodeApplication, error)
+	ReleasePromoCode(ctx context.Context, input PromoCodeReleaseInput) (PromoCodeApplication, bool, error)
 	ListPromoCodeUsages(ctx context.Context, promoCodeID, limit int) ([]PromoCodeApplication, error)
 }
 
@@ -158,6 +159,15 @@ type AdminSettingsBackup struct {
 	Enabled       bool       `json:"enabled"`
 	LastBackupAt  *time.Time `json:"last_backup_at,omitempty"`
 	RetentionDays int        `json:"retention_days"`
+}
+
+type CaptchaSettings struct {
+	Managed             bool   `json:"managed"`
+	Enabled             bool   `json:"enabled"`
+	Provider            string `json:"provider"`
+	SiteKey             string `json:"site_key"`
+	SecretKeyCiphertext string `json:"secret_key_ciphertext,omitempty"`
+	VerifyURL           string `json:"verify_url"`
 }
 
 type OpsSettings struct {
@@ -388,28 +398,32 @@ func (t PromoDiscountType) Valid() bool {
 }
 
 type PromoCode struct {
-	ID            int               `json:"id"`
-	Code          string            `json:"code"`
-	Status        PromoCodeStatus   `json:"status"`
-	DiscountType  PromoDiscountType `json:"discount_type"`
-	DiscountValue string            `json:"discount_value"`
-	Currency      string            `json:"currency"`
-	MaxUses       int               `json:"max_uses"`
-	UsedCount     int               `json:"used_count"`
-	StartsAt      *time.Time        `json:"starts_at,omitempty"`
-	ExpiresAt     *time.Time        `json:"expires_at,omitempty"`
-	CreatedAt     time.Time         `json:"created_at"`
-	UpdatedAt     time.Time         `json:"updated_at"`
+	ID             int               `json:"id"`
+	Code           string            `json:"code"`
+	Status         PromoCodeStatus   `json:"status"`
+	DiscountType   PromoDiscountType `json:"discount_type"`
+	DiscountValue  string            `json:"discount_value"`
+	Currency       string            `json:"currency"`
+	MaxUses        int               `json:"max_uses"`
+	PerUserLimit   int               `json:"per_user_limit"`
+	MinOrderAmount string            `json:"min_order_amount"`
+	UsedCount      int               `json:"used_count"`
+	StartsAt       *time.Time        `json:"starts_at,omitempty"`
+	ExpiresAt      *time.Time        `json:"expires_at,omitempty"`
+	CreatedAt      time.Time         `json:"created_at"`
+	UpdatedAt      time.Time         `json:"updated_at"`
 }
 type PromoCodeRequest struct {
-	Code          string
-	Status        PromoCodeStatus
-	DiscountType  PromoDiscountType
-	DiscountValue string
-	Currency      string
-	MaxUses       int
-	StartsAt      *time.Time
-	ExpiresAt     *time.Time
+	Code           string
+	Status         PromoCodeStatus
+	DiscountType   PromoDiscountType
+	DiscountValue  string
+	Currency       string
+	MaxUses        int
+	PerUserLimit   int
+	MinOrderAmount string
+	StartsAt       *time.Time
+	ExpiresAt      *time.Time
 }
 type PromoCodeList struct {
 	Items []PromoCode
@@ -432,6 +446,11 @@ type PromoCodeFinalizeInput struct {
 	Currency       string
 	AppliedAt      time.Time
 }
+type PromoCodeReleaseInput struct {
+	PaymentOrderID int
+	ReleasedAt     time.Time
+	Reason         string
+}
 type PromoCodeApplication struct {
 	ID             int               `json:"id"`
 	UserID         int               `json:"user_id"`
@@ -444,6 +463,7 @@ type PromoCodeApplication struct {
 	Currency       string            `json:"currency"`
 	DiscountType   PromoDiscountType `json:"discount_type"`
 	AppliedAt      time.Time         `json:"applied_at"`
+	Metadata       map[string]any    `json:"metadata,omitempty"`
 	CreatedAt      time.Time         `json:"created_at"`
 	UpdatedAt      time.Time         `json:"updated_at"`
 }
@@ -492,9 +512,39 @@ type RiskControlLog struct {
 	Metadata  map[string]any      `json:"metadata,omitempty"`
 	CreatedAt time.Time           `json:"created_at"`
 }
+type RecordRiskLogRequest struct {
+	Level     RiskControlLogLevel
+	Action    string
+	Reason    string
+	Subject   *string
+	Metadata  map[string]any
+	CreatedAt time.Time
+}
 type RiskLogList struct {
 	Items []RiskControlLog
 	Total int
+}
+
+type ContentSafetyMode string
+
+const (
+	ContentSafetyModeMonitor ContentSafetyMode = "monitor"
+	ContentSafetyModeEnforce ContentSafetyMode = "enforce"
+)
+
+func (m ContentSafetyMode) Valid() bool {
+	return m == ContentSafetyModeMonitor || m == ContentSafetyModeEnforce
+}
+
+type ContentSafetyConfig struct {
+	Enabled              bool              `json:"enabled"`
+	Mode                 ContentSafetyMode `json:"mode"`
+	RedactPII            bool              `json:"redact_pii"`
+	BlockPII             bool              `json:"block_pii"`
+	BlockPromptInjection bool              `json:"block_prompt_injection"`
+	BlockCustomKeywords  bool              `json:"block_custom_keywords"`
+	CustomKeywords       []string          `json:"custom_keywords"`
+	ModelScopes          []string          `json:"model_scopes"`
 }
 
 type OpsSystemLogLevel string

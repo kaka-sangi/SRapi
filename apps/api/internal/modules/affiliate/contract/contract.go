@@ -45,7 +45,6 @@ type LedgerType string
 
 const (
 	LedgerTypeAccrue             LedgerType = "accrue"
-	LedgerTypeSettle             LedgerType = "settle"
 	LedgerTypeTransferToBalance  LedgerType = "transfer_to_balance"
 	LedgerTypeWithdraw           LedgerType = "withdraw"
 	LedgerTypeRefundCompensation LedgerType = "refund_compensation"
@@ -122,15 +121,16 @@ type AffiliateCurrencySummary struct {
 	AccruedAmount              string
 	RefundCompensatedAmount    string
 	TransferredToBalanceAmount string
-	SettledAmount              string
 	WithdrawnAmount            string
 	ManualAdjustmentAmount     string
 }
 
 // AffiliateSummary is the current user's affiliate balance summary across currencies.
 type AffiliateSummary struct {
-	UserID   int
-	Balances []AffiliateCurrencySummary
+	UserID       int
+	Balances     []AffiliateCurrencySummary
+	InviteCodes  []InviteCode
+	InvitedCount int
 }
 
 type CreateInviteCodeRequest struct {
@@ -155,6 +155,19 @@ type CreateRuleRequest struct {
 	ValidFrom       *time.Time
 	ValidTo         *time.Time
 	Metadata        map[string]any
+}
+
+type UpdateRuleRequest struct {
+	Name            *string
+	Status          *RuleStatus
+	TriggerType     *TriggerType
+	Rate            *string
+	FixedAmount     *string
+	Currency        *string
+	MaxRebateAmount *string
+	ValidFrom       *time.Time
+	ValidTo         *time.Time
+	Metadata        *map[string]any
 }
 
 type AccrueRebateRequest struct {
@@ -185,6 +198,33 @@ type TransferToBalanceRequest struct {
 	RequestedAt    time.Time
 }
 
+type WithdrawRequest struct {
+	UserID         int
+	Amount         string
+	Currency       string
+	Destination    string
+	IdempotencyKey string
+	RequestedAt    time.Time
+}
+
+type WithdrawDecisionRequest struct {
+	AdminUserID int
+	LedgerID    int
+	Reason      string
+	DecidedAt   time.Time
+}
+
+type ManualAdjustmentRequest struct {
+	AdminUserID int
+	UserID      int
+	Amount      string
+	Currency    string
+	Reason      string
+	ReferenceID string
+	Metadata    map[string]any
+	CreatedAt   time.Time
+}
+
 type RebateResult struct {
 	Applied bool
 	Reason  string
@@ -192,6 +232,15 @@ type RebateResult struct {
 }
 
 type TransferToBalanceInput struct {
+	UserID      int
+	Amount      string
+	Currency    string
+	ReferenceID string
+	Metadata    map[string]any
+	CreatedAt   time.Time
+}
+
+type WithdrawalInput struct {
 	UserID      int
 	Amount      string
 	Currency    string
@@ -212,14 +261,21 @@ type TransferToBalanceResult struct {
 type Store interface {
 	CreateInviteCode(ctx context.Context, input InviteCode) (InviteCode, error)
 	FindInviteCodeByCode(ctx context.Context, code string) (InviteCode, error)
+	ListInviteCodesByUser(ctx context.Context, userID int) ([]InviteCode, error)
 	CreateRelationship(ctx context.Context, input InviteRelationship) (InviteRelationship, error)
 	FindRelationshipByInvitee(ctx context.Context, inviteeUserID int) (InviteRelationship, error)
 	ListRelationships(ctx context.Context) ([]InviteRelationship, error)
 	MarkRelationshipFirstPaid(ctx context.Context, id int, firstPaidAt time.Time) (InviteRelationship, error)
 	CreateRule(ctx context.Context, input AffiliateRule) (AffiliateRule, error)
+	GetRule(ctx context.Context, id int) (AffiliateRule, error)
+	ListRules(ctx context.Context) ([]AffiliateRule, error)
+	UpdateRule(ctx context.Context, input AffiliateRule) (AffiliateRule, error)
 	GetEffectiveRule(ctx context.Context, trigger TriggerType, currency string, at time.Time) (AffiliateRule, error)
 	AppendLedger(ctx context.Context, input AffiliateLedger) (AffiliateLedger, bool, error)
+	GetLedger(ctx context.Context, id int) (AffiliateLedger, error)
+	UpdateLedger(ctx context.Context, input AffiliateLedger, expectedStatus LedgerStatus) (AffiliateLedger, error)
 	TransferToBalance(ctx context.Context, input TransferToBalanceInput) (TransferToBalanceResult, bool, error)
+	CreateWithdrawal(ctx context.Context, input WithdrawalInput) (AffiliateLedger, bool, error)
 	ListLedgers(ctx context.Context) ([]AffiliateLedger, error)
 	ListLedgersByUser(ctx context.Context, userID int) ([]AffiliateLedger, error)
 	ListLedgersByPaymentOrder(ctx context.Context, paymentOrderID int) ([]AffiliateLedger, error)

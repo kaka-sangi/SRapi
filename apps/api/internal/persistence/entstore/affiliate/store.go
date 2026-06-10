@@ -68,6 +68,21 @@ func (s *Store) FindInviteCodeByCode(ctx context.Context, code string) (contract
 	return toInviteCode(row), nil
 }
 
+func (s *Store) ListInviteCodesByUser(ctx context.Context, userID int) ([]contract.InviteCode, error) {
+	rows, err := s.client.InviteCode.Query().
+		Where(entinvitecode.UserIDEQ(userID)).
+		Order(entinvitecode.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.InviteCode, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toInviteCode(row))
+	}
+	return out, nil
+}
+
 func (s *Store) CreateRelationship(ctx context.Context, input contract.InviteRelationship) (contract.InviteRelationship, error) {
 	create := s.client.InviteRelationship.Create().
 		SetInviterUserID(input.InviterUserID).
@@ -164,6 +179,62 @@ func (s *Store) CreateRule(ctx context.Context, input contract.AffiliateRule) (c
 	return toRule(row), nil
 }
 
+func (s *Store) GetRule(ctx context.Context, id int) (contract.AffiliateRule, error) {
+	row, err := s.client.AffiliateRule.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.AffiliateRule{}, contract.ErrNotFound
+		}
+		return contract.AffiliateRule{}, err
+	}
+	return toRule(row), nil
+}
+
+func (s *Store) ListRules(ctx context.Context) ([]contract.AffiliateRule, error) {
+	rows, err := s.client.AffiliateRule.Query().
+		Order(entaffiliaterule.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.AffiliateRule, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toRule(row))
+	}
+	return out, nil
+}
+
+func (s *Store) UpdateRule(ctx context.Context, input contract.AffiliateRule) (contract.AffiliateRule, error) {
+	update := s.client.AffiliateRule.UpdateOneID(input.ID).
+		SetName(input.Name).
+		SetStatus(string(input.Status)).
+		SetTriggerType(string(input.TriggerType)).
+		SetRate(input.Rate).
+		SetFixedAmount(input.FixedAmount).
+		SetCurrency(input.Currency).
+		SetMaxRebateAmount(input.MaxRebateAmount).
+		SetMetadataJSON(cloneMap(input.Metadata)).
+		SetUpdatedAt(input.UpdatedAt)
+	if input.ValidFrom == nil {
+		update.ClearValidFrom()
+	} else {
+		update.SetValidFrom(*input.ValidFrom)
+	}
+	if input.ValidTo == nil {
+		update.ClearValidTo()
+	} else {
+		update.SetValidTo(*input.ValidTo)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.AffiliateRule{}, contract.ErrNotFound
+		}
+		return contract.AffiliateRule{}, err
+	}
+	return toRule(row), nil
+}
+
 func (s *Store) GetEffectiveRule(ctx context.Context, trigger contract.TriggerType, currency string, at time.Time) (contract.AffiliateRule, error) {
 	row, err := s.client.AffiliateRule.Query().
 		Where(
@@ -218,6 +289,59 @@ func (s *Store) AppendLedger(ctx context.Context, input contract.AffiliateLedger
 		return contract.AffiliateLedger{}, false, err
 	}
 	return toLedger(row), true, nil
+}
+
+func (s *Store) GetLedger(ctx context.Context, id int) (contract.AffiliateLedger, error) {
+	row, err := s.client.AffiliateLedger.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.AffiliateLedger{}, contract.ErrNotFound
+		}
+		return contract.AffiliateLedger{}, err
+	}
+	return toLedger(row), nil
+}
+
+func (s *Store) UpdateLedger(ctx context.Context, input contract.AffiliateLedger, expectedStatus contract.LedgerStatus) (contract.AffiliateLedger, error) {
+	update := s.client.AffiliateLedger.UpdateOneID(input.ID).
+		SetUserID(input.UserID).
+		SetRelatedUserID(input.RelatedUserID).
+		SetType(string(input.Type)).
+		SetAmount(input.Amount).
+		SetCurrency(input.Currency).
+		SetStatus(string(input.Status)).
+		SetReferenceID(input.ReferenceID).
+		SetMetadataJSON(cloneMap(input.Metadata)).
+		SetUpdatedAt(input.UpdatedAt)
+	if input.PaymentOrderID == nil {
+		update.ClearPaymentOrderID()
+	} else {
+		update.SetPaymentOrderID(*input.PaymentOrderID)
+	}
+	if input.SubscriptionID == nil {
+		update.ClearSubscriptionID()
+	} else {
+		update.SetSubscriptionID(*input.SubscriptionID)
+	}
+	if input.SettledAt == nil {
+		update.ClearSettledAt()
+	} else {
+		update.SetSettledAt(*input.SettledAt)
+	}
+	if expectedStatus != "" {
+		update.Where(entaffiliateledger.StatusEQ(string(expectedStatus)))
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			if _, getErr := s.client.AffiliateLedger.Get(ctx, input.ID); getErr == nil {
+				return contract.AffiliateLedger{}, contract.ErrConflict
+			}
+			return contract.AffiliateLedger{}, contract.ErrNotFound
+		}
+		return contract.AffiliateLedger{}, err
+	}
+	return toLedger(row), nil
 }
 
 func (s *Store) TransferToBalance(ctx context.Context, input contract.TransferToBalanceInput) (contract.TransferToBalanceResult, bool, error) {
@@ -338,6 +462,67 @@ func (s *Store) TransferToBalance(ctx context.Context, input contract.TransferTo
 		BalanceBefore:   balanceBefore,
 		BalanceAfter:    balanceAfter,
 	}, true, nil
+}
+
+func (s *Store) CreateWithdrawal(ctx context.Context, input contract.WithdrawalInput) (contract.AffiliateLedger, bool, error) {
+	tx, err := s.client.BeginTx(ctx, &stdsql.TxOptions{Isolation: stdsql.LevelSerializable})
+	if err != nil {
+		return contract.AffiliateLedger{}, false, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if existing, err := findLedgerByReference(ctx, tx.Client(), input.ReferenceID); err == nil {
+		return existing, false, nil
+	} else if !ent.IsNotFound(err) {
+		return contract.AffiliateLedger{}, false, err
+	}
+
+	amount, ok := money.RequiredDecimalRat(input.Amount)
+	if !ok || amount.Sign() <= 0 {
+		return contract.AffiliateLedger{}, false, contract.ErrInsufficientBalance
+	}
+	available, err := availableAffiliateBalance(ctx, tx.Client(), input.UserID, input.Currency)
+	if err != nil {
+		return contract.AffiliateLedger{}, false, err
+	}
+	if available.Cmp(amount) < 0 {
+		return contract.AffiliateLedger{}, false, contract.ErrInsufficientBalance
+	}
+
+	createdAt := input.CreatedAt.UTC()
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+	}
+	ledger, err := tx.AffiliateLedger.Create().
+		SetUserID(input.UserID).
+		SetRelatedUserID(0).
+		SetType(string(contract.LedgerTypeWithdraw)).
+		SetAmount("-" + input.Amount).
+		SetCurrency(input.Currency).
+		SetStatus(string(contract.LedgerStatusPending)).
+		SetReferenceID(input.ReferenceID).
+		SetMetadataJSON(cloneMap(input.Metadata)).
+		SetCreatedAt(createdAt).
+		SetUpdatedAt(createdAt).
+		Save(ctx)
+	if err != nil {
+		if ent.IsConstraintError(err) {
+			if existing, findErr := s.findLedgerByReference(ctx, input.ReferenceID); findErr == nil {
+				return existing, false, nil
+			}
+		}
+		return contract.AffiliateLedger{}, false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return contract.AffiliateLedger{}, false, err
+	}
+	committed = true
+	return toLedger(ledger), true, nil
 }
 
 func (s *Store) ListLedgers(ctx context.Context) ([]contract.AffiliateLedger, error) {

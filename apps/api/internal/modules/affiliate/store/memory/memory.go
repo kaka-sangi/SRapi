@@ -78,6 +78,19 @@ func (s *Store) FindInviteCodeByCode(_ context.Context, code string) (contract.I
 	return cloneInviteCode(s.inviteCodes[id]), nil
 }
 
+func (s *Store) ListInviteCodesByUser(_ context.Context, userID int) ([]contract.InviteCode, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.InviteCode, 0)
+	for _, row := range s.inviteCodes {
+		if row.UserID == userID {
+			out = append(out, cloneInviteCode(row))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
 func (s *Store) CreateRelationship(_ context.Context, input contract.InviteRelationship) (contract.InviteRelationship, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -158,6 +171,41 @@ func (s *Store) CreateRule(_ context.Context, input contract.AffiliateRule) (con
 	return cloneRule(row), nil
 }
 
+func (s *Store) GetRule(_ context.Context, id int) (contract.AffiliateRule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	row, ok := s.rules[id]
+	if !ok {
+		return contract.AffiliateRule{}, contract.ErrNotFound
+	}
+	return cloneRule(row), nil
+}
+
+func (s *Store) ListRules(_ context.Context) ([]contract.AffiliateRule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.AffiliateRule, 0, len(s.rules))
+	for _, row := range s.rules {
+		out = append(out, cloneRule(row))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func (s *Store) UpdateRule(_ context.Context, input contract.AffiliateRule) (contract.AffiliateRule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.rules[input.ID]; !ok {
+		return contract.AffiliateRule{}, contract.ErrNotFound
+	}
+	row := cloneRule(input)
+	if row.UpdatedAt.IsZero() {
+		row.UpdatedAt = time.Now().UTC()
+	}
+	s.rules[row.ID] = row
+	return cloneRule(row), nil
+}
+
 func (s *Store) GetEffectiveRule(_ context.Context, trigger contract.TriggerType, currency string, at time.Time) (contract.AffiliateRule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -215,6 +263,35 @@ func (s *Store) AppendLedger(_ context.Context, input contract.AffiliateLedger) 
 	return cloneLedger(row), true, nil
 }
 
+func (s *Store) GetLedger(_ context.Context, id int) (contract.AffiliateLedger, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	row, ok := s.ledgers[id]
+	if !ok {
+		return contract.AffiliateLedger{}, contract.ErrNotFound
+	}
+	return cloneLedger(row), nil
+}
+
+func (s *Store) UpdateLedger(_ context.Context, input contract.AffiliateLedger, expectedStatus contract.LedgerStatus) (contract.AffiliateLedger, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, ok := s.ledgers[input.ID]
+	if !ok {
+		return contract.AffiliateLedger{}, contract.ErrNotFound
+	}
+	if expectedStatus != "" && current.Status != expectedStatus {
+		return contract.AffiliateLedger{}, contract.ErrConflict
+	}
+	row := cloneLedger(input)
+	if row.UpdatedAt.IsZero() {
+		row.UpdatedAt = time.Now().UTC()
+	}
+	s.ledgers[row.ID] = row
+	s.ledgerByReference[row.ReferenceID] = row.ID
+	return cloneLedger(row), nil
+}
+
 func (s *Store) TransferToBalance(_ context.Context, input contract.TransferToBalanceInput) (contract.TransferToBalanceResult, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -268,6 +345,43 @@ func (s *Store) TransferToBalance(_ context.Context, input contract.TransferToBa
 	s.nextLedgerID++
 	s.setUserBalance(input.UserID, input.Currency, balanceAfter)
 	return transferResultFromLedger(row), true, nil
+}
+
+func (s *Store) CreateWithdrawal(_ context.Context, input contract.WithdrawalInput) (contract.AffiliateLedger, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if id, ok := s.ledgerByReference[input.ReferenceID]; ok {
+		return cloneLedger(s.ledgers[id]), false, nil
+	}
+	amount, ok := money.RequiredDecimalRat(input.Amount)
+	if !ok || amount.Sign() <= 0 {
+		return contract.AffiliateLedger{}, false, contract.ErrInsufficientBalance
+	}
+	available := s.availableAffiliateBalance(input.UserID, input.Currency)
+	if available.Cmp(amount) < 0 {
+		return contract.AffiliateLedger{}, false, contract.ErrInsufficientBalance
+	}
+	now := time.Now().UTC()
+	createdAt := input.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = now
+	}
+	row := contract.AffiliateLedger{
+		ID:          s.nextLedgerID,
+		UserID:      input.UserID,
+		Type:        contract.LedgerTypeWithdraw,
+		Amount:      "-" + input.Amount,
+		Currency:    input.Currency,
+		Status:      contract.LedgerStatusPending,
+		ReferenceID: input.ReferenceID,
+		Metadata:    cloneMap(input.Metadata),
+		CreatedAt:   createdAt,
+		UpdatedAt:   createdAt,
+	}
+	s.ledgers[row.ID] = cloneLedger(row)
+	s.ledgerByReference[row.ReferenceID] = row.ID
+	s.nextLedgerID++
+	return cloneLedger(row), true, nil
 }
 
 func (s *Store) ListLedgers(_ context.Context) ([]contract.AffiliateLedger, error) {

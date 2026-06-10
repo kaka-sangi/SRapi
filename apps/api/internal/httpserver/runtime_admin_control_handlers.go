@@ -15,6 +15,7 @@ import (
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
+	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
@@ -149,6 +150,8 @@ func (s *Server) handleCreateAdminPaymentProvider(w http.ResponseWriter, r *http
 		SupportedMethods: derefStrings(body.SupportedMethods),
 		Limits:           jsonObjectToMap(body.Limits),
 		SortOrder:        body.SortOrder,
+		FeeRate:          body.FeeRate,
+		Weight:           body.Weight,
 		Metadata:         jsonObjectToMap(body.Metadata),
 	})
 	if err != nil {
@@ -201,6 +204,8 @@ func (s *Server) handleUpdateAdminPaymentProvider(w http.ResponseWriter, r *http
 		SupportedMethods: body.SupportedMethods,
 		Limits:           jsonObjectToMapPtr(body.Limits),
 		SortOrder:        body.SortOrder,
+		FeeRate:          body.FeeRate,
+		Weight:           body.Weight,
 		Metadata:         jsonObjectToMapPtr(body.Metadata),
 	})
 	if err != nil {
@@ -283,7 +288,7 @@ func (s *Server) handleTestAdminPaymentProvider(w http.ResponseWriter, r *http.R
 
 func (s *Server) handleListAdminPaymentOrders(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
-	if _, err := s.requireAdminPermission(r, userscontract.PermissionPaymentOrderRead); err != nil {
+	if _, err := s.requireAdminPermission(r, userscontract.PermissionPaymentRead); err != nil {
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "permission required", requestID)
 		return
 	}
@@ -354,6 +359,33 @@ func (s *Server) handleRefundAdminPaymentOrder(w http.ResponseWriter, r *http.Re
 	})
 }
 
+func (s *Server) handleListAdminPaymentOrderAuditLogs(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminPermission(r, userscontract.PermissionPaymentRead); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "permission required", requestID)
+		return
+	}
+	orderID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || orderID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment order id", requestID)
+		return
+	}
+	items, err := s.runtime.payments.ListAuditLogsByOrder(r.Context(), orderID)
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	data := make([]apiopenapi.PaymentAuditLog, 0, len(items))
+	for _, item := range items {
+		data = append(data, toAPIPaymentAuditLog(item))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentAuditLogListResponse{
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
 func (s *Server) handleListAdminSubscriptionPlans(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {
@@ -381,6 +413,9 @@ func (s *Server) handleCreateAdminSubscriptionPlan(w http.ResponseWriter, r *htt
 	session, err := s.requireAdminSession(r)
 	if err != nil {
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if !s.requireSubscriptionPlansEnabled(w, r, requestID) {
 		return
 	}
 	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
@@ -423,6 +458,9 @@ func (s *Server) handleUpdateAdminSubscriptionPlan(w http.ResponseWriter, r *htt
 	session, err := s.requireAdminSession(r)
 	if err != nil {
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if !s.requireSubscriptionPlansEnabled(w, r, requestID) {
 		return
 	}
 	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
@@ -474,6 +512,9 @@ func (s *Server) handleDeleteAdminSubscriptionPlan(w http.ResponseWriter, r *htt
 	session, err := s.requireAdminSession(r)
 	if err != nil {
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if !s.requireSubscriptionPlansEnabled(w, r, requestID) {
 		return
 	}
 	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
@@ -546,6 +587,9 @@ func (s *Server) handleCreateAdminUserSubscription(w http.ResponseWriter, r *htt
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
+	if !s.requireSubscriptionPlansEnabled(w, r, requestID) {
+		return
+	}
 	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
 		return
@@ -602,6 +646,9 @@ func (s *Server) handleDeleteAdminUserSubscription(w http.ResponseWriter, r *htt
 	session, err := s.requireAdminSession(r)
 	if err != nil {
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if !s.requireSubscriptionPlansEnabled(w, r, requestID) {
 		return
 	}
 	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
@@ -709,13 +756,21 @@ func (s *Server) handleUpdateAdminPricingRule(w http.ResponseWriter, r *http.Req
 		return
 	}
 	req := billingcontract.UpdatePricingRuleRequest{
-		BillingMode:                     optionalBillingModeFromAPI(body.BillingMode),
-		InputPricePerMillionTokens:      body.InputPricePerMillionTokens,
-		OutputPricePerMillionTokens:     body.OutputPricePerMillionTokens,
-		CacheReadPricePerMillionTokens:  body.CacheReadPricePerMillionTokens,
-		CacheWritePricePerMillionTokens: body.CacheWritePricePerMillionTokens,
-		PerRequestPrice:                 body.PerRequestPrice,
-		Currency:                        body.Currency,
+		BillingMode:                       optionalBillingModeFromAPI(body.BillingMode),
+		InputPricePerMillionTokens:        body.InputPricePerMillionTokens,
+		OutputPricePerMillionTokens:       body.OutputPricePerMillionTokens,
+		CacheReadPricePerMillionTokens:    body.CacheReadPricePerMillionTokens,
+		CacheWritePricePerMillionTokens:   body.CacheWritePricePerMillionTokens,
+		CacheWrite5mPricePerMillionTokens: body.CacheWrite5mPricePerMillionTokens,
+		CacheWrite1hPricePerMillionTokens: body.CacheWrite1hPricePerMillionTokens,
+		ImageOutputPricePerMillionTokens:  body.ImageOutputPricePerMillionTokens,
+		PerRequestPrice:                   body.PerRequestPrice,
+		ServiceTierMultipliers:            body.ServiceTierMultipliers,
+		LongContextMultiplier:             body.LongContextMultiplier,
+		Currency:                          body.Currency,
+	}
+	if body.LongContextThresholdTokens != nil {
+		req.LongContextThresholdTokens = &body.LongContextThresholdTokens
 	}
 	if body.Intervals != nil {
 		intervals := pricingIntervalsFromAPI(*body.Intervals)
@@ -902,18 +957,24 @@ func (s *Server) pricingRuleRequestFromAPI(ctx context.Context, body apiopenapi.
 		}
 	}
 	return billingcontract.CreatePricingRuleRequest{
-		ModelID:                         modelID,
-		ProviderID:                      providerID,
-		BillingMode:                     billingModeFromAPI(body.BillingMode),
-		InputPricePerMillionTokens:      body.InputPricePerMillionTokens,
-		OutputPricePerMillionTokens:     body.OutputPricePerMillionTokens,
-		CacheReadPricePerMillionTokens:  body.CacheReadPricePerMillionTokens,
-		CacheWritePricePerMillionTokens: body.CacheWritePricePerMillionTokens,
-		PerRequestPrice:                 optionalStringValue(body.PerRequestPrice),
-		Intervals:                       pricingIntervalsFromAPIPtr(body.Intervals),
-		Currency:                        body.Currency,
-		EffectiveFrom:                   body.EffectiveFrom,
-		EffectiveTo:                     body.EffectiveTo,
+		ModelID:                           modelID,
+		ProviderID:                        providerID,
+		BillingMode:                       billingModeFromAPI(body.BillingMode),
+		InputPricePerMillionTokens:        body.InputPricePerMillionTokens,
+		OutputPricePerMillionTokens:       body.OutputPricePerMillionTokens,
+		CacheReadPricePerMillionTokens:    body.CacheReadPricePerMillionTokens,
+		CacheWritePricePerMillionTokens:   body.CacheWritePricePerMillionTokens,
+		CacheWrite5mPricePerMillionTokens: optionalStringValue(body.CacheWrite5mPricePerMillionTokens),
+		CacheWrite1hPricePerMillionTokens: optionalStringValue(body.CacheWrite1hPricePerMillionTokens),
+		ImageOutputPricePerMillionTokens:  optionalStringValue(body.ImageOutputPricePerMillionTokens),
+		PerRequestPrice:                   optionalStringValue(body.PerRequestPrice),
+		ServiceTierMultipliers:            mapStringStringValue(body.ServiceTierMultipliers),
+		LongContextThresholdTokens:        body.LongContextThresholdTokens,
+		LongContextMultiplier:             optionalStringValue(body.LongContextMultiplier),
+		Intervals:                         pricingIntervalsFromAPIPtr(body.Intervals),
+		Currency:                          body.Currency,
+		EffectiveFrom:                     body.EffectiveFrom,
+		EffectiveTo:                       body.EffectiveTo,
 	}, ""
 }
 
@@ -956,16 +1017,19 @@ func pricingRuleFromCSVRecord(columns map[string]int, record []string) (apiopena
 		return apiopenapi.CreatePricingRuleRequest{}, err
 	}
 	return apiopenapi.CreatePricingRuleRequest{
-		ModelId:                         apiopenapi.Id(csvValue(columns, record, "model_id")),
-		ProviderId:                      apiopenapi.Id(csvValue(columns, record, "provider_id")),
-		InputPricePerMillionTokens:      csvValue(columns, record, "input_price_per_million_tokens"),
-		OutputPricePerMillionTokens:     csvValue(columns, record, "output_price_per_million_tokens"),
-		CacheReadPricePerMillionTokens:  csvValue(columns, record, "cache_read_price_per_million_tokens"),
-		CacheWritePricePerMillionTokens: csvValue(columns, record, "cache_write_price_per_million_tokens"),
-		PerRequestPrice:                 ptrStringValue(csvValue(columns, record, "per_request_price")),
-		Currency:                        csvValue(columns, record, "currency"),
-		EffectiveFrom:                   effectiveFrom,
-		EffectiveTo:                     effectiveTo,
+		ModelId:                           apiopenapi.Id(csvValue(columns, record, "model_id")),
+		ProviderId:                        apiopenapi.Id(csvValue(columns, record, "provider_id")),
+		InputPricePerMillionTokens:        csvValue(columns, record, "input_price_per_million_tokens"),
+		OutputPricePerMillionTokens:       csvValue(columns, record, "output_price_per_million_tokens"),
+		CacheReadPricePerMillionTokens:    csvValue(columns, record, "cache_read_price_per_million_tokens"),
+		CacheWritePricePerMillionTokens:   csvValue(columns, record, "cache_write_price_per_million_tokens"),
+		CacheWrite5mPricePerMillionTokens: ptrStringValue(csvValue(columns, record, "cache_write_5m_price_per_million_tokens")),
+		CacheWrite1hPricePerMillionTokens: ptrStringValue(csvValue(columns, record, "cache_write_1h_price_per_million_tokens")),
+		ImageOutputPricePerMillionTokens:  ptrStringValue(csvValue(columns, record, "image_output_price_per_million_tokens")),
+		PerRequestPrice:                   ptrStringValue(csvValue(columns, record, "per_request_price")),
+		Currency:                          csvValue(columns, record, "currency"),
+		EffectiveFrom:                     effectiveFrom,
+		EffectiveTo:                       effectiveTo,
 	}, nil
 }
 
@@ -1346,33 +1410,139 @@ func (s *Server) handleListSchedulerStrategies(w http.ResponseWriter, r *http.Re
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	now := time.Now().UTC()
 	strategies, err := s.runtime.scheduler.ListStrategies(r.Context())
 	if err != nil {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler strategies", requestID)
 		return
 	}
 	data := make([]apiopenapi.SchedulerStrategy, 0, len(strategies))
-	for index, strategy := range strategies {
-		id := strategy.ID
-		if id <= 0 {
-			id = index + 1
-		}
-		data = append(data, apiopenapi.SchedulerStrategy{
-			Id:          apiopenapi.Id(strconv.Itoa(id)),
-			Name:        apiopenapi.SchedulerStrategyName(strategy.Name),
-			Version:     strategy.Version,
-			Status:      apiopenapi.SchedulerStrategyStatus(strategy.Status),
-			Config:      jsonObject(strategy.Config),
-			ConfigHash:  strategy.ConfigHash,
-			CreatedAt:   now,
-			ActivatedAt: &now,
-		})
+	for _, strategy := range strategies {
+		data = append(data, toAPISchedulerStrategy(strategy))
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.SchedulerStrategyListResponse{
 		Data:       data,
 		Pagination: pagination(len(data)),
 		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleCreateSchedulerStrategy(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.SchedulerStrategyMutationRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid scheduler strategy request", requestID)
+		return
+	}
+	input, err := schedulerStrategyMutationFromAPI(body, session.User.ID)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduler strategy request", requestID)
+		return
+	}
+	created, err := s.runtime.scheduler.CreateStrategy(r.Context(), input)
+	if err != nil {
+		writeSchedulerStrategyMutationError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusCreated, apiopenapi.SchedulerStrategyResponse{
+		Data:      toAPISchedulerStrategy(created),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleUpdateSchedulerStrategy(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	id, ok := pathID(w, r, requestID)
+	if !ok {
+		return
+	}
+	var body apiopenapi.SchedulerStrategyMutationRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid scheduler strategy request", requestID)
+		return
+	}
+	input, err := schedulerStrategyMutationFromAPI(body, session.User.ID)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduler strategy request", requestID)
+		return
+	}
+	updated, err := s.runtime.scheduler.UpdateStrategy(r.Context(), id, input)
+	if err != nil {
+		writeSchedulerStrategyMutationError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.SchedulerStrategyResponse{
+		Data:      toAPISchedulerStrategy(updated),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleActivateSchedulerStrategy(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	id, ok := pathID(w, r, requestID)
+	if !ok {
+		return
+	}
+	updated, err := s.runtime.scheduler.ActivateStrategy(r.Context(), id)
+	if err != nil {
+		writeSchedulerStrategyMutationError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.SchedulerStrategyResponse{
+		Data:      toAPISchedulerStrategy(updated),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleDeprecateSchedulerStrategy(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	id, ok := pathID(w, r, requestID)
+	if !ok {
+		return
+	}
+	updated, err := s.runtime.scheduler.DeprecateStrategy(r.Context(), id)
+	if err != nil {
+		writeSchedulerStrategyMutationError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.SchedulerStrategyResponse{
+		Data:      toAPISchedulerStrategy(updated),
+		RequestId: requestID,
 	})
 }
 
@@ -1442,6 +1612,19 @@ func writeSchedulerSimulationError(w http.ResponseWriter, err error, requestID s
 		return
 	}
 	writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to simulate scheduler strategy", requestID)
+}
+
+func writeSchedulerStrategyMutationError(w http.ResponseWriter, err error, requestID string) {
+	switch {
+	case errors.Is(err, schedulerservice.ErrInvalidInput):
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduler strategy request", requestID)
+	case errors.Is(err, schedulercontract.ErrNotFound):
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "scheduler strategy not found", requestID)
+	case errors.Is(err, schedulercontract.ErrConflict):
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "scheduler strategy already exists", requestID)
+	default:
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to update scheduler strategy", requestID)
+	}
 }
 
 func writeSchedulerReplayError(w http.ResponseWriter, err error, requestID string) {
