@@ -146,11 +146,14 @@ type ImageInput struct {
 }
 
 type Usage struct {
-	InputTokens         int
-	OutputTokens        int
-	CachedTokens        int // cache-read tokens
-	CacheCreationTokens int // cache-write tokens (billed at the cache-write rate)
-	Estimated           bool
+	InputTokens           int
+	OutputTokens          int
+	ImageOutputTokens     int
+	CachedTokens          int // cache-read tokens
+	CacheCreationTokens   int // cache-write tokens (billed at the cache-write rate)
+	CacheCreation5mTokens int
+	CacheCreation1hTokens int
+	Estimated             bool
 }
 
 // StreamEvent captures canonical stream deltas so protocol renderers do not

@@ -292,6 +292,25 @@ func (s *Store) FinalizePromoCode(ctx context.Context, input admincontrolcontrac
 	return application, nil
 }
 
+func (s *Store) ReleasePromoCode(ctx context.Context, input admincontrolcontract.PromoCodeReleaseInput) (admincontrolcontract.PromoCodeApplication, bool, error) {
+	if s == nil || s.client == nil {
+		return admincontrolcontract.PromoCodeApplication{}, false, admincontrolcontract.ErrInvalidInput
+	}
+	tx, err := s.client.BeginTx(ctx, &stdsql.TxOptions{Isolation: stdsql.LevelSerializable})
+	if err != nil {
+		return admincontrolcontract.PromoCodeApplication{}, false, err
+	}
+	application, released, err := ReleasePromoCodeWithClient(ctx, tx.Client(), input)
+	if err != nil {
+		_ = tx.Rollback()
+		return admincontrolcontract.PromoCodeApplication{}, false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return admincontrolcontract.PromoCodeApplication{}, false, err
+	}
+	return application, released, nil
+}
+
 func (s *Store) ListPromoCodeUsages(ctx context.Context, promoCodeID, limit int) ([]admincontrolcontract.PromoCodeApplication, error) {
 	if s == nil || s.client == nil {
 		return nil, admincontrolcontract.ErrInvalidInput
@@ -684,7 +703,7 @@ func entitlementValue(value any) map[string]any {
 
 func entitlementQuotaLimit(key string, value any) *string {
 	switch key {
-	case "monthly_token_quota", "monthly_cost_quota":
+	case "monthly_token_quota", "daily_cost_quota", "weekly_cost_quota", "monthly_cost_quota":
 		quota := fmt.Sprint(value)
 		return &quota
 	default:
