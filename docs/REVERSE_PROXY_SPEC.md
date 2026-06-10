@@ -141,10 +141,11 @@ version
 以及 `tls_template=chrome_120|chrome_133|firefox_120|safari_16|ios_14|android_11_okhttp|randomized*`
 等显式模板。静态 header 不允许设置 `Authorization`、`Cookie`、`Host`、`User-Agent`、
 hop-by-hop、WebSocket 或 SRapi/Gateway 内部 header；凭证注入仍由 Runtime 最后执行。
-`tls_template` 仅对直连 HTTPS/WSS 或 HTTP proxy CONNECT 隧道内 HTTPS/WSS 生效，
+`tls_template` 仅对直连 HTTPS/WSS、HTTP proxy CONNECT 或 SOCKS5/SOCKS5H 隧道内 HTTPS/WSS 生效，
 运行时会用 uTLS 构造 HTTP/1.1 ClientHello，并保留已配置的 Root CA / client TLS 验证边界；
-HTTPS proxy 与 SOCKS5 proxy 内 uTLS、HTTP/2 SETTINGS、header 顺序、JA3/JA4 快照和版本化
+HTTPS proxy、HTTP/2 SETTINGS、header 顺序、JA3/JA4 快照和版本化
 Profile 库仍属于 Phase 2，配置这些未支持字段会返回 `unsupported_egress_profile` 而不是静默降级。
+当前明确边界见 `CAPABILITY_BOUNDARIES.md`。
 
 ## 6. TLS / JA3 / JA4 指纹
 

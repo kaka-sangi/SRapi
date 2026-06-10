@@ -796,6 +796,9 @@ index(status, priority)
   历史文档曾提到 `cookie_jar_ciphertext` / `device_fingerprint_ciphertext`，这两列从未落库，
   反向代理类账号的 cookie / 指纹等运行态信息按需走 `credential_ciphertext` 或 `metadata_json`，
   不单独建密文列（见 §19）。
+- 调度热状态（如 `rate_limited_at`、`overload_until`、`schedulable` 与过期类键）当前保存在
+  `metadata_json`。当 active provider accounts 超过 5,000 时，应把这些热键提升为类型化索引列；
+  规模触发条件与落点见 `CAPABILITY_BOUNDARIES.md`。
 
 ### 9.2 account_groups
 

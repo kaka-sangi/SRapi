@@ -45,9 +45,10 @@ GET /api/v1/health
 当前实现：
 
 - `/livez` 只验证 HTTP server 可响应。
-- `/readyz` 通过注入 pinger 或 TCP fallback 检查 PostgreSQL 和 Redis。
+- `/readyz` 只接受注入的真实依赖 pinger：PostgreSQL 执行 `SELECT 1`，Redis 执行 `PING`。缺少 pinger 会返回 `not_configured`，不会用 TCP 端口可连假定依赖可用。
 - 默认 `STORAGE_BACKEND=postgres` 要求启动时 PostgreSQL 可用；只有显式设置 `STORAGE_BACKEND=memory` 才会进入临时内存模式。
 - release 模式在启动前拒绝弱 `JWT_SECRET`、`SRAPI_MASTER_KEY`、`API_KEY_PEPPER`、`DATABASE_PASSWORD` 和默认 `BOOTSTRAP_ADMIN_PASSWORD`。
+- 容器健康检查必须调用 `/readyz`。`/srapi -healthcheck -healthcheck-path=/readyz` 是 distroless API 镜像内置的 readiness probe，不依赖 curl/wget。
 
 ## 3.1 本地环境 bootstrap
 
@@ -88,6 +89,38 @@ HTTP listener 可以启动，但 Gateway 流量不得在以下条件满足前进
 - Reverse Proxy Runtime 的 credential decryptor、cookie jar store、HTTP client factory 初始化成功。
 
 如果启动预算耗尽，进程必须 fail fast，不得半初始化对外服务。
+
+### 4.1 Redis 连接护栏
+
+Redis 承载 gateway rate limit、并发槽、scheduler lease 和 session affinity。生产部署必须显式控制单副本连接数和 I/O 超时，避免 `replicas * GOMAXPROCS` 推高 Redis 连接数。
+
+| 环境变量 | 默认 | 用途 |
+| --- | --- | --- |
+| `REDIS_POOL_SIZE` | `32` | 每个 API 副本的最大 Redis 连接池大小。 |
+| `REDIS_MIN_IDLE_CONNS` | `4` | 每个副本预热 idle 连接数，不得大于 `REDIS_POOL_SIZE`。 |
+| `REDIS_DIAL_TIMEOUT_SECONDS` | `3` | 建连超时。 |
+| `REDIS_READ_TIMEOUT_SECONDS` | `2` | Redis 读超时。 |
+| `REDIS_WRITE_TIMEOUT_SECONDS` | `2` | Redis 写超时。 |
+| `REDIS_POOL_TIMEOUT_SECONDS` | `3` | 等待连接池可用的超时。 |
+
+容量估算：`api_replicas * REDIS_POOL_SIZE` 应低于 Redis 实例 `maxclients` 和代理层连接上限，并给运维客户端、Prometheus exporter、备份/故障切换连接预留余量。默认值是有界生产基线，最终应按 Redis 实例规格和 gateway QPS 复核。
+
+Release 模式初始化 Redis 依赖时会有限重试短暂 `PING` 失败，再决定是否 fail fast；这只处理瞬时启动抖动，不会把长期不可用的 Redis 伪装成可用。
+
+## 4.2 多副本与 HA 基线
+
+SRapi 支持受控多副本 API 部署。当前代码已确认 batch16 worker leader-gate 就位：`internal/platform/leadergate` 使用 PostgreSQL `pg_try_advisory_lock`，`internal/app` 将 worker guard 注入周期 worker，worker 通过 `runonceguard` 执行一轮任务。没有该前置时不得把 API 扩到 `replicas > 1`。
+
+多副本上线前置：
+
+- API Deployment readiness probe 指向 `/readyz`。
+- Redis 连接预算按 `replicas * REDIS_POOL_SIZE` 审核。
+- PostgreSQL `max_connections` 按 `replicas * DATABASE_MAX_OPEN_CONNS` 审核。
+- Prometheus 按 pod/job 维度抓取 `/metrics`，滚动升级期间关注 `up{job="srapi-api"}`、ready pod 数、Redis `PING` 延迟和 PostgreSQL 连接池饱和。
+- 生产 PostgreSQL 使用托管服务或具备自动备份 + PITR 的 HA 方案；单容器本地卷只适合开发和小型试用。
+- 生产 Redis 使用托管 Redis、Sentinel 或等价 failover；本地单 Redis 容器没有 HA。
+
+仓库提供 `deploy/k8s/api-deployment.yaml` 与 `deploy/k8s/api-hpa.yaml` 作为可演进骨架。它们不是完整 Helm chart；生产环境仍需接入 secret manager、ingress、network policy、pod disruption budget 和托管数据面。
 
 ## 5. 迁移与回滚
 
@@ -224,6 +257,14 @@ make backup-postgres BACKUP_FILE=backups/srapi-$(date +%Y%m%d%H%M%S).dump
 
 该命令使用 `pg_dump --format custom` 生成备份，并写入同名 `.sha256` 校验文件。`SRAPI_MASTER_KEY`、外部 KMS key id、对象存储凭证等不写入备份文件，必须由部署者在 secret manager 或离线密钥库中独立备份。
 
+单机 crontab 示例：
+
+```cron
+17 2 * * * cd /opt/srapi && /usr/bin/make backup-postgres BACKUP_FILE=backups/srapi-$(date +\%Y\%m\%d\%H\%M\%S).dump >> logs/backup-postgres.log 2>&1
+```
+
+Kubernetes CronJob 骨架见 `deploy/k8s/postgres-backup-cronjob.yaml`。生产应把备份文件同步到对象存储，并在同一保留策略内保存 `.sha256` 校验文件和恢复演练记录。
+
 ### 6.3 恢复要求
 
 恢复流程必须确保：
@@ -242,6 +283,14 @@ make smoke-release
 ```
 
 恢复前必须停止 Gateway 写流量和后台 worker。恢复后应重启 API 以重建 Redis scheduler lease / cache 状态，并重新运行迁移检查与 release smoke。
+
+最小恢复验证流程：
+
+1. 在隔离数据库上执行 `make restore-postgres BACKUP_FILE=...`。
+2. 清空同环境 Redis 可重建状态，重启 API。
+3. 执行迁移检查或启动 release 模式确认迁移版本可判定。
+4. 运行 `make smoke-release`，确认 `/readyz`、管理员登录、API Key 创建和一次 mock gateway 请求通过。
+5. 抽查一条用户余额、支付订单、usage log、provider account 密文记录，确认核心数据可读且密文未泄露。
 
 ## 7. 数据生命周期矩阵
 

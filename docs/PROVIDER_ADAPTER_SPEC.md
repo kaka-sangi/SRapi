@@ -78,12 +78,14 @@ api_key
 oauth_refresh
 oauth_device_code
 web_session_cookie
-desktop_client_token
 cli_client_token
-ide_plugin_token
-service_account_json
 custom_reverse_proxy
 ```
+
+`desktop_client_token`, `ide_plugin_token`, and `service_account_json` are not
+runtime classes. Desktop/IDE clients that use bearer access tokens are modeled as
+`oauth_refresh` with the appropriate `upstream_client`; service-account JSON is
+not exposed until a real signer/token-exchange implementation exists.
 
 命名约束：
 
@@ -321,10 +323,7 @@ oauth_access_token
 oauth_refresh_token
 oauth_device_code
 web_session_cookie
-desktop_session_token
 cli_device_token
-ide_plugin_token
-service_account_json
 custom_headers
 custom_reverse_proxy_payload
 ```

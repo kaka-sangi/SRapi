@@ -401,7 +401,7 @@ Provider-specific reasoning blocks -> 目标协议无 reasoning 字段
 Provider 原生 safety settings -> OpenAI-compatible 无直接字段
 ```
 
-Provider-hosted web search 是 built-in tool 的特例：Responses `web_search` / legacy `web_search_preview` 与 Anthropic web search server tool 在 Canonical AI Request 中保留原始 tool `type`，并要求 `web_search.v1`。Gateway 不把这类 hosted tool 重写成普通 function；当 Provider 返回 Responses-style `web_search_call` 时，Responses renderer 保留 `web_search_call.action`，而不是输出 `function_call.arguments`。
+Provider-hosted web search 是 built-in tool 的特例：Responses `web_search` / legacy `web_search_preview` 与 Anthropic web search server tool 在 Canonical AI Request 中保留原始 tool `type`，并要求 `web_search.v1`。Gateway 不把这类 hosted tool 重写成普通 function；当 Provider 返回 Responses-style `web_search_call` 时，Responses renderer 保留 `web_search_call.action`，而不是输出 `function_call.arguments`。SRapi 不用 Tavily/Brave/Copilot search 为无 hosted-search 能力的上游自履约 gateway web search；该产品边界见 `CAPABILITY_BOUNDARIES.md`。
 
 ## 9. Endpoint Compatibility Matrix
 
