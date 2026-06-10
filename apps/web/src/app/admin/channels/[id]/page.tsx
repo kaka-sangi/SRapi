@@ -48,6 +48,10 @@ import type {
 
 type MappingWithModel = ModelProviderMapping & { model: Model };
 type LimitWithModel = ModelRateLimit & { model: Model };
+type TlsProfileBinding = {
+  profile: Pick<TlsProfile, "id" | "name" | "user_agent" | "enabled">;
+  accountNames: string[];
+};
 
 export default function AdminChannelDetailPage() {
   return (
@@ -163,7 +167,30 @@ function ChannelDetailContent() {
     : [];
   const sortedErrors = sortedErrorRules(errorRules.data?.data ?? []);
   const activeAccounts = (accounts.data?.data ?? []).filter((account) => account.status === "active");
-  const activeTlsProfiles = (tlsProfiles.data?.data ?? []).filter((profile) => profile.enabled);
+  const tlsBindings = useMemo<TlsProfileBinding[]>(() => {
+    const profilesByName = new Map((tlsProfiles.data?.data ?? []).map((profile) => [profile.name, profile] as const));
+    const namesByProfile = new Map<string, string[]>();
+    for (const account of accounts.data?.data ?? []) {
+      const profileName =
+        typeof account.metadata?.tls_profile === "string" ? account.metadata.tls_profile.trim() : "";
+      if (!profileName) continue;
+      const names = namesByProfile.get(profileName) ?? [];
+      names.push(account.name);
+      namesByProfile.set(profileName, names);
+    }
+    return [...namesByProfile.entries()]
+      .map(([profileName, accountNames]) => ({
+        profile:
+          profilesByName.get(profileName) ?? {
+            id: -Math.abs(profileName.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0)),
+            name: profileName,
+            user_agent: "",
+            enabled: false,
+          },
+        accountNames,
+      }))
+      .sort((a, b) => a.profile.name.localeCompare(b.profile.name));
+  }, [accounts.data, tlsProfiles.data]);
   const mappingLoading = mappingQueries.some((query) => query.isLoading);
 
   if (providers.isLoading) {
@@ -223,7 +250,7 @@ function ChannelDetailContent() {
         <SummaryCard
           icon={Fingerprint}
           label={t("adminChannelsDetail.tlsFingerprints")}
-          value={activeTlsProfiles.length}
+          value={tlsBindings.length}
           loading={tlsProfiles.isLoading}
         />
       </div>
@@ -262,7 +289,7 @@ function ChannelDetailContent() {
           <ErrorPanel rules={sortedErrors} loading={errorRules.isLoading} />
         </TabsContent>
         <TabsContent value="tls">
-          <TlsPanel profiles={tlsProfiles.data?.data ?? []} loading={tlsProfiles.isLoading} />
+          <TlsPanel bindings={tlsBindings} loading={tlsProfiles.isLoading || accounts.isLoading} />
         </TabsContent>
       </Tabs>
     </>
@@ -539,7 +566,7 @@ function ErrorPanel({ rules, loading }: { rules: ErrorPassthroughRule[]; loading
   );
 }
 
-function TlsPanel({ profiles, loading }: { profiles: TlsProfile[]; loading?: boolean }) {
+function TlsPanel({ bindings, loading }: { bindings: TlsProfileBinding[]; loading?: boolean }) {
   const { t } = useLanguage();
   return (
     <Panel
@@ -547,14 +574,14 @@ function TlsPanel({ profiles, loading }: { profiles: TlsProfile[]; loading?: boo
       actionHref={ADMIN_ROUTES.tlsProfiles}
       actionLabel={t("common.edit")}
       loading={loading}
-      empty={profiles.length === 0}
+      empty={bindings.length === 0}
     >
       <div className="divide-y divide-srapi-border">
-        {profiles.map((profile) => (
+        {bindings.map(({ profile, accountNames }) => (
           <Row
             key={profile.id}
             primary={profile.name}
-            secondary={`${profile.tls_template || "default"} · ${profile.http_version_policy}`}
+            secondary={accountNames.join(" · ")}
             meta={profile.user_agent || "—"}
             badge={
               <QuietBadge

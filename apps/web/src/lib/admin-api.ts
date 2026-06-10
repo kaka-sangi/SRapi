@@ -57,6 +57,7 @@ import {
   deleteAdminTlsProfile,
   listAdminTlsProfiles,
   updateAdminTlsProfile,
+  getAdminPermissionCatalog,
   createAdminRole,
   deleteAdminRole,
   listAdminRoles,
@@ -88,6 +89,7 @@ import {
   createAdminPricingRule,
   updateAdminPricingRule,
   deleteAdminPricingRule,
+  createAdminAffiliateRule,
   createAdminPromoCode,
   createAdminProvider,
   deleteAdminAccount,
@@ -120,6 +122,7 @@ import {
   getAdminConfigSnapshot,
   importAdminConfigSnapshot,
   getAdminDashboardSnapshot,
+  getAdminContentSafetyConfig,
   getAdminOpsConcurrency,
   getAdminOpsErrorDistribution,
   getAdminOpsErrorTrend,
@@ -141,6 +144,7 @@ import {
   listAdminAccounts,
   listAdminAffiliateInvites,
   listAdminAffiliateRebates,
+  listAdminAffiliateRules,
   listAdminAffiliateTransfers,
   listAdminAnnouncements,
   listAdminAuditLogs,
@@ -164,6 +168,7 @@ import {
   getAdminApiKeyUsage,
   listAdminOutboxEvents,
   listAdminPaymentOrders,
+  listAdminPaymentOrderAuditLogs,
   listAdminPaymentProviders,
   listAdminPricingRules,
   listAdminPromoCodes,
@@ -179,6 +184,13 @@ import {
   refundAdminPaymentOrder,
   removeAdminAccountGroupMember,
   replaySchedulerStrategy,
+  getAdminSchedulerOverview,
+  listSchedulerStrategies,
+  createSchedulerStrategy,
+  updateSchedulerStrategy,
+  deprecateSchedulerStrategy,
+  activateSchedulerStrategy,
+  simulateSchedulerStrategy,
   recoverAdminAccount,
   resetAdminAccountQuota,
   sendAdminTestEmail,
@@ -191,9 +203,11 @@ import {
   updateAdminOpsSettings,
   updateAdminOpsSlo,
   updateAdminPaymentProvider,
+  updateAdminAffiliateRule,
   updateAdminPromoCode,
   updateAdminProvider,
   updateAdminProxy,
+  updateAdminContentSafetyConfig,
   updateAdminRiskControlConfig,
   updateAdminSettings,
   updateAdminUser,
@@ -215,10 +229,12 @@ import type {
   AdminTestResult,
   AdminUpdateApiKeyRequest,
   ApiKey,
+  ContentSafetyConfig,
   GatewayUsageResponse,
   PromoCodeUsage,
   AffiliateInviteRecord,
   AffiliateLedgerEntry,
+  AffiliateRule,
   Announcement,
   AnnouncementStatus,
   AnnouncementReadStatus,
@@ -241,6 +257,7 @@ import type {
   UpdateChannelMonitorTemplateRequest,
   CreateTlsProfileRequest,
   TlsProfile,
+  PermissionDefinition,
   UpdateTlsProfileRequest,
   Role,
   CreateRoleRequest,
@@ -281,6 +298,7 @@ import type {
   CreateAdminUserSubscriptionData,
   CreateAdminUserData,
   CreateAnnouncementRequest,
+  CreateAffiliateRuleRequest,
   CreateRedeemCodeRequest,
   DiscoverAdminAccountModelsData,
   DomainEventOutbox,
@@ -293,6 +311,7 @@ import type {
   ListAdminAccountsData,
   ListAdminAffiliateInvitesData,
   ListAdminAffiliateRebatesData,
+  ListAdminAffiliateRulesData,
   ListAdminAffiliateTransfersData,
   ListAdminAnnouncementsData,
   ListAdminAuditLogsData,
@@ -344,6 +363,7 @@ import type {
   UpsertModelRateLimitRequest,
   UpsertGroupRateLimitRequest,
   PaymentOrder,
+  PaymentAuditLog,
   PaymentProviderInstance,
   PricingRule,
   PromoCode,
@@ -357,10 +377,16 @@ import type {
   RedeemCode,
   RedeemCodeStats,
   ReplaySchedulerStrategyData,
+  SimulateSchedulerStrategyData,
+  CreateSchedulerStrategyData,
+  UpdateSchedulerStrategyData,
   RiskControlConfig,
   RiskControlLog,
   RiskControlStatus,
+  SchedulerOverview,
+  SchedulerStrategy,
   SchedulerReplayResult,
+  SchedulerSimulationResult,
   SubscriptionPlan,
   UpdateAccountGroupRequest,
   UpdateAdminAccountData,
@@ -369,6 +395,7 @@ import type {
   UpdateAdminProxyData,
   UpdateAdminUserData,
   UpdateAnnouncementRequest,
+  UpdateAffiliateRuleRequest,
   UpdatePromoCodeRequest,
   UpdateUserBalanceRequest,
   UsageAggregate,
@@ -539,6 +566,34 @@ export const adminApi = {
     body: ReplaySchedulerStrategyData["body"],
   ): Promise<SchedulerReplayResult> {
     return unwrapData(() => replaySchedulerStrategy({ body, throwOnError: true }));
+  },
+  schedulerOverview(): Promise<SchedulerOverview> {
+    return unwrapData(() => getAdminSchedulerOverview({ throwOnError: true }));
+  },
+  listSchedulerStrategies(): Promise<AdminListResult<SchedulerStrategy>> {
+    return unwrapList(() => listSchedulerStrategies({ throwOnError: true }));
+  },
+  createSchedulerStrategy(body: CreateSchedulerStrategyData["body"]): Promise<SchedulerStrategy> {
+    return unwrapData(() => createSchedulerStrategy({ body, throwOnError: true }));
+  },
+  updateSchedulerStrategy(
+    id: Id,
+    body: UpdateSchedulerStrategyData["body"],
+  ): Promise<SchedulerStrategy> {
+    return unwrapData(() =>
+      updateSchedulerStrategy({ path: { id }, body, throwOnError: true }),
+    );
+  },
+  deprecateSchedulerStrategy(id: Id): Promise<SchedulerStrategy> {
+    return unwrapData(() => deprecateSchedulerStrategy({ path: { id }, throwOnError: true }));
+  },
+  activateSchedulerStrategy(id: Id): Promise<SchedulerStrategy> {
+    return unwrapData(() => activateSchedulerStrategy({ path: { id }, throwOnError: true }));
+  },
+  simulateSchedulerStrategy(
+    body: SimulateSchedulerStrategyData["body"],
+  ): Promise<SchedulerSimulationResult> {
+    return unwrapData(() => simulateSchedulerStrategy({ body, throwOnError: true }));
   },
 
   acknowledgeAlert(id: Id): Promise<OpsAlertEvent> {
@@ -922,6 +977,20 @@ export const adminApi = {
     return unwrapList(() => listAdminAffiliateTransfers({ query, throwOnError: true }));
   },
 
+  listAffiliateRules(
+    query?: ListAdminAffiliateRulesData["query"],
+  ): Promise<AdminListResult<AffiliateRule>> {
+    return unwrapList(() => listAdminAffiliateRules({ query, throwOnError: true }));
+  },
+
+  createAffiliateRule(body: CreateAffiliateRuleRequest): Promise<AffiliateRule> {
+    return unwrapData(() => createAdminAffiliateRule({ body, throwOnError: true }));
+  },
+
+  updateAffiliateRule(id: Id, body: UpdateAffiliateRuleRequest): Promise<AffiliateRule> {
+    return unwrapData(() => updateAdminAffiliateRule({ path: { id }, body, throwOnError: true }));
+  },
+
   listPaymentProviders(
     query?: ListAdminPaymentProvidersData["query"],
   ): Promise<AdminListResult<PaymentProviderInstance>> {
@@ -952,6 +1021,12 @@ export const adminApi = {
     query?: ListAdminPaymentOrdersData["query"],
   ): Promise<AdminListResult<PaymentOrder>> {
     return unwrapList(() => listAdminPaymentOrders({ query, throwOnError: true }));
+  },
+
+  listPaymentOrderAuditLogs(id: Id): Promise<AdminListResult<PaymentAuditLog>> {
+    return unwrapList(() =>
+      listAdminPaymentOrderAuditLogs({ path: { id }, throwOnError: true }),
+    );
   },
 
   refundPaymentOrder(id: Id, body: Parameters<typeof refundAdminPaymentOrder>[0]["body"]): Promise<PaymentOrder> {
@@ -1236,6 +1311,10 @@ export const adminApi = {
     return unwrapList(() => listAdminRoles({ throwOnError: true }));
   },
 
+  listPermissionCatalog(): Promise<PermissionDefinition[]> {
+    return unwrapData(() => getAdminPermissionCatalog({ throwOnError: true }));
+  },
+
   createRole(body: CreateRoleRequest): Promise<Role> {
     return unwrapData(() => createAdminRole({ body, throwOnError: true }));
   },
@@ -1411,6 +1490,14 @@ export const adminApi = {
 
   listRiskLogs(query?: ListAdminRiskControlLogsData["query"]): Promise<AdminListResult<RiskControlLog>> {
     return unwrapList(() => listAdminRiskControlLogs({ query, throwOnError: true }));
+  },
+
+  getContentSafetyConfig(): Promise<ContentSafetyConfig> {
+    return unwrapData(() => getAdminContentSafetyConfig({ throwOnError: true }));
+  },
+
+  updateContentSafetyConfig(body: ContentSafetyConfig): Promise<ContentSafetyConfig> {
+    return unwrapData(() => updateAdminContentSafetyConfig({ body, throwOnError: true }));
   },
 
   getSettings(): Promise<AdminSettings> {

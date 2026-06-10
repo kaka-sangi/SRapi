@@ -91,6 +91,18 @@ function PaymentProvidersContent() {
       type: "textarea",
       hint: t("adminPayments.supportedMethodsHint"),
     },
+    {
+      name: "feeRate",
+      label: "Fee rate",
+      type: "number",
+      hint: "Decimal channel fee rate, for example 0.006 means 0.6%.",
+    },
+    {
+      name: "weight",
+      label: "Weight",
+      type: "number",
+      hint: "Positive round-robin weight used when multiple active channels support the same method.",
+    },
     { name: "config", label: t("adminPayments.config"), type: "keyvalue", hint: t("adminPayments.configHint") },
     {
       name: "limits",
@@ -138,6 +150,28 @@ function PaymentProvidersContent() {
         <span className="text-2xs text-srapi-text-tertiary">
           {p.supported_methods.length ? p.supported_methods.join(" · ") : "—"}
         </span>
+      ),
+    },
+    {
+      key: "fee",
+      header: "Fee",
+      hideOnMobile: true,
+      align: "right",
+      sortValue: (p) => Number(p.fee_rate),
+      render: (p) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {(Number(p.fee_rate) * 100).toFixed(3)}%
+        </span>
+      ),
+    },
+    {
+      key: "weight",
+      header: "Weight",
+      hideOnMobile: true,
+      align: "right",
+      sortValue: (p) => p.weight,
+      render: (p) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">{p.weight}</span>
       ),
     },
   ];

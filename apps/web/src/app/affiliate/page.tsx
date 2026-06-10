@@ -1,11 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Coins } from "lucide-react";
+import { Coins, Link2, UserPlus, WalletCards } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
-import { useAffiliate, useAffiliateLedger, useTransferToBalance } from "@/hooks/queries";
+import {
+  useAffiliate,
+  useAffiliateInviteCodes,
+  useAffiliateLedger,
+  useCreateAffiliateInviteCode,
+  useRequestAffiliateWithdrawal,
+  useTransferToBalance,
+} from "@/hooks/queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,10 +21,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { CopyButton, CopyableValue } from "@/components/ui/copy-button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { formatMoney, formatDateTime } from "@/lib/admin-format";
 import { meErrorMessage } from "@/lib/me-api";
-import type { AffiliateLedgerEntry } from "@/lib/sdk-types";
+import type { AffiliateInviteCode, AffiliateLedgerEntry } from "@/lib/sdk-types";
 
 export default function AffiliatePage() {
   return (
@@ -31,12 +39,21 @@ function AffiliateContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const affiliate = useAffiliate();
+  const inviteCodes = useAffiliateInviteCodes();
   const ledger = useAffiliateLedger();
   const transferMut = useTransferToBalance();
+  const createInviteMut = useCreateAffiliateInviteCode();
+  const withdrawMut = useRequestAffiliateWithdrawal();
 
   const primary = affiliate.data?.balances?.[0];
+  const codes = affiliate.data?.invite_codes?.length
+    ? affiliate.data.invite_codes
+    : inviteCodes.data?.data ?? [];
   const [amount, setAmount] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawDestination, setWithdrawDestination] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
   async function transfer(event: React.FormEvent) {
     event.preventDefault();
@@ -50,6 +67,32 @@ function AffiliateContent() {
       setAmount("");
     } catch (err) {
       setError(meErrorMessage(err));
+    }
+  }
+
+  async function createInviteCode() {
+    try {
+      await createInviteMut.mutateAsync({});
+      toast({ title: t("feedback.created"), tone: "success" });
+    } catch (err) {
+      toast({ title: meErrorMessage(err), tone: "error" });
+    }
+  }
+
+  async function requestWithdrawal(event: React.FormEvent) {
+    event.preventDefault();
+    setWithdrawError(null);
+    try {
+      await withdrawMut.mutateAsync({
+        amount: withdrawAmount.trim(),
+        currency: primary?.currency,
+        destination: withdrawDestination.trim() || undefined,
+      });
+      toast({ title: t("feedback.created"), tone: "success" });
+      setWithdrawAmount("");
+      setWithdrawDestination("");
+    } catch (err) {
+      setWithdrawError(meErrorMessage(err));
     }
   }
 
@@ -151,6 +194,96 @@ function AffiliateContent() {
         </Card>
       </div>
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="font-serif text-lg text-srapi-text-primary">
+                  {t("affiliate.inviteCodes")}
+                </h3>
+                <p className="mt-1 text-sm text-srapi-text-secondary">
+                  {t("affiliate.invitedCount", { count: affiliate.data?.invited_count ?? 0 })}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                loading={createInviteMut.isPending}
+                onClick={createInviteCode}
+              >
+                ＋ {t("affiliate.generateInviteCode")}
+              </Button>
+            </div>
+
+            {inviteCodes.isLoading && !affiliate.data ? (
+              <Skeleton className="h-16 w-full" />
+            ) : codes.length > 0 ? (
+              <div className="space-y-2">
+                {codes.slice(0, 5).map((code) => (
+                  <InviteCodeRow key={code.id} code={code} />
+                ))}
+              </div>
+            ) : (
+              <div className="flex min-h-24 flex-col items-center justify-center rounded-lg border border-dashed border-srapi-border px-4 py-6 text-center">
+                <UserPlus className="size-5 text-srapi-text-tertiary" aria-hidden />
+                <p className="mt-2 text-sm text-srapi-text-secondary">
+                  {t("affiliate.emptyInviteCodes")}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent>
+            <form onSubmit={requestWithdrawal} className="space-y-4">
+              <h3 className="font-serif text-lg text-srapi-text-primary">
+                {t("affiliate.withdraw")}
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="withdraw-amount">{t("affiliate.withdrawAmount")}</Label>
+                  <Input
+                    id="withdraw-amount"
+                    inputMode="decimal"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    disabled={withdrawMut.isPending}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="withdraw-destination">
+                    {t("affiliate.withdrawDestination")}
+                  </Label>
+                  <Input
+                    id="withdraw-destination"
+                    value={withdrawDestination}
+                    onChange={(e) => setWithdrawDestination(e.target.value)}
+                    disabled={withdrawMut.isPending}
+                  />
+                </div>
+              </div>
+              {withdrawError ? (
+                <p role="alert" className="text-sm text-srapi-error">
+                  {withdrawError}
+                </p>
+              ) : null}
+              <Button
+                type="submit"
+                variant="outline"
+                loading={withdrawMut.isPending}
+                disabled={!withdrawAmount.trim()}
+              >
+                <WalletCards className="size-4" aria-hidden />
+                {t("affiliate.withdraw")}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+
       <AdminListView
         query={ledger}
         columns={columns}
@@ -162,4 +295,29 @@ function AffiliateContent() {
       />
     </>
   );
+}
+
+function InviteCodeRow({ code }: { code: AffiliateInviteCode }) {
+  const { t } = useLanguage();
+  const inviteLink = invitePathForCode(code.code);
+
+  return (
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-srapi-border bg-srapi-card-muted px-3 py-2">
+      <div className="min-w-0">
+        <CopyableValue value={code.code} label={t("affiliate.copyCode")} />
+        <div className="mt-1 flex min-w-0 items-center gap-1 text-2xs text-srapi-text-tertiary">
+          <Link2 className="size-3" aria-hidden />
+          <span className="truncate">{inviteLink}</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <QuietBadge status={quietStatusFor(code.status)} label={statusLabel(t, code.status)} />
+        <CopyButton value={inviteLink} label={t("affiliate.copyLink")} />
+      </div>
+    </div>
+  );
+}
+
+function invitePathForCode(code: string): string {
+  return `/register?invite_code=${encodeURIComponent(code)}`;
 }

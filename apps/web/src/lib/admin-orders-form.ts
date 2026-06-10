@@ -31,6 +31,8 @@ export interface PaymentProviderFormState {
   limits: Record<string, unknown>;
   metadata: Record<string, unknown>;
   sortOrder: string;
+  feeRate: string;
+  weight: string;
 }
 
 export function isRefundableOrder(order: Pick<PaymentOrder, "status">): boolean {
@@ -73,6 +75,8 @@ export function emptyPaymentProviderForm(): PaymentProviderFormState {
     limits: {},
     metadata: {},
     sortOrder: "0",
+    feeRate: "0",
+    weight: "1",
   };
 }
 
@@ -88,6 +92,8 @@ export function buildCreatePaymentProviderBody(
     limits: form.limits,
     metadata: form.metadata,
     sort_order: parseInteger(form.sortOrder, "Sort order"),
+    fee_rate: optionalDecimalString(form.feeRate, "Fee rate") ?? "0",
+    weight: parsePositiveInteger(form.weight, "Weight"),
   };
 }
 
@@ -105,6 +111,8 @@ export function paymentProviderFormFromInstance(
     limits: (p.limits as Record<string, unknown>) ?? {},
     metadata: (p.metadata as Record<string, unknown>) ?? {},
     sortOrder: String(p.sort_order),
+    feeRate: p.fee_rate,
+    weight: String(p.weight),
   };
 }
 
@@ -120,6 +128,8 @@ export function buildUpdatePaymentProviderBody(
     limits: form.limits,
     metadata: form.metadata,
     sort_order: parseInteger(form.sortOrder, "Sort order"),
+    fee_rate: optionalDecimalString(form.feeRate, "Fee rate") ?? "0",
+    weight: parsePositiveInteger(form.weight, "Weight"),
   };
 }
 
@@ -178,6 +188,14 @@ function parseInteger(value: string, fieldName: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed)) {
     throw new Error(`${fieldName} must be an integer.`);
+  }
+  return parsed;
+}
+
+function parsePositiveInteger(value: string, fieldName: string): number {
+  const parsed = parseInteger(value, fieldName);
+  if (parsed <= 0) {
+    throw new Error(`${fieldName} must be greater than zero.`);
   }
   return parsed;
 }

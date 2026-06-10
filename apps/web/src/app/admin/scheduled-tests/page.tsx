@@ -45,6 +45,7 @@ import type { ScheduledTestPlan } from "@/lib/sdk-types";
 
 const STATUS_TONE: Record<string, QuietStatus> = {
   ok: "active",
+  warning: "limited",
   partial: "limited",
   failed: "error",
 };
@@ -56,7 +57,7 @@ function planMatch(
 ): boolean {
   if (filters.scope_type && plan.scope_type !== filters.scope_type) return false;
   if (!term) return true;
-  return [plan.name, plan.scope_type, plan.cron_expression]
+  return [plan.name, plan.scope_type, plan.cron_expression, plan.probe_model]
     .filter(Boolean)
     .join(" ")
     .toLowerCase()
@@ -136,6 +137,12 @@ export function ScheduledTestsContent() {
       hint: t("adminScheduledTests.cronHint"),
     },
     {
+      name: "probeModel",
+      label: t("adminScheduledTests.probeModel"),
+      placeholder: "gpt-4o-mini",
+      hint: t("adminScheduledTests.probeModelHint"),
+    },
+    {
       name: "maxResults",
       label: t("adminScheduledTests.maxResults"),
       type: "number",
@@ -179,6 +186,17 @@ export function ScheduledTestsContent() {
           {p.interval_seconds}s
         </span>
       ),
+    },
+    {
+      key: "probeModel",
+      header: t("adminScheduledTests.probeModel"),
+      hideOnMobile: true,
+      render: (p) =>
+        p.probe_model ? (
+          <span className="font-mono text-2xs text-srapi-text-secondary">{p.probe_model}</span>
+        ) : (
+          <QuietBadge status="limited" label={t("adminScheduledTests.metadataProbeModel")} />
+        ),
     },
     {
       key: "autoRecover",

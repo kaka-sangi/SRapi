@@ -32,6 +32,7 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [providers, setProviders] = useState<EnabledOAuthProvider[]>([]);
+  const [passwordlessSent, setPasswordlessSent] = useState(false);
   // When set, the password step succeeded but TOTP is required to finish.
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -41,7 +42,7 @@ export function LoginForm() {
   useEffect(() => {
     let active = true;
     apiService.listOAuthProviders().then((list) => {
-      if (active) setProviders(list);
+      if (active) setProviders(list.filter((item) => !["wechat", "dingtalk"].includes(item.provider)));
     });
     return () => {
       active = false;
@@ -75,6 +76,23 @@ export function LoginForm() {
       } else {
         goHome(result.user.role);
       }
+    } catch {
+      setError(t("login.errWrong"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function requestPasswordless() {
+    setError(null);
+    if (!email) {
+      setError(t("login.errRequired"));
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await apiService.requestPasswordlessCode(email, undefined, [], captcha.token);
+      setPasswordlessSent(true);
     } catch {
       setError(t("login.errWrong"));
     } finally {
@@ -209,6 +227,21 @@ export function LoginForm() {
         >
           {submitting ? t("login.signingIn") : t("login.signIn")}
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="w-full"
+          disabled={submitting || !email || (captcha.required && !captcha.token)}
+          onClick={requestPasswordless}
+        >
+          Send email sign-in link
+        </Button>
+        {passwordlessSent ? (
+          <p className="text-center text-xs text-srapi-text-secondary">
+            Check your email for a one-time sign-in link.
+          </p>
+        ) : null}
       </form>
 
       {providers.length > 0 && (

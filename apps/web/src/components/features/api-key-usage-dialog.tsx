@@ -97,6 +97,12 @@ function UsageBody({ usage }: { usage: GatewayUsageResponse }) {
         <Stat label={t("apiKeys.usageTokens")} value={totals.total_tokens.toLocaleString()} />
         <Stat label={t("apiKeys.usageCost")} value={formatMoney(totals.cost, currency)} />
       </dl>
+      <div className="grid grid-cols-2 gap-2 text-2xs text-srapi-text-tertiary sm:grid-cols-4">
+        <span>in {formatMoney(totals.input_cost ?? "0", currency)}</span>
+        <span>out {formatMoney(totals.output_cost ?? "0", currency)}</span>
+        <span>cache r {formatMoney(totals.cache_read_cost ?? "0", currency)}</span>
+        <span>cache w {formatMoney(totals.cache_write_cost ?? "0", currency)}</span>
+      </div>
 
       {usage.model_stats.length === 0 && usage.recent_requests.length === 0 ? (
         <p className="py-6 text-center text-sm text-srapi-text-tertiary">{t("apiKeys.usageEmpty")}</p>

@@ -24,6 +24,8 @@ export interface SubscriptionPlanFormState {
   // an admin never has to know the exact backend keys.
   allowedModels: string[];
   monthlyTokenQuota: string;
+  dailyCostQuota: string;
+  weeklyCostQuota: string;
   monthlyCostQuota: string;
   costQuotaMode: CostQuotaMode;
   schedulerStrategy: string;
@@ -91,6 +93,8 @@ export const SCHEDULER_STRATEGIES = [
 const KNOWN_ENTITLEMENT_KEYS = [
   "allowed_models",
   "monthly_token_quota",
+  "daily_cost_quota",
+  "weekly_cost_quota",
   "monthly_cost_quota",
   "cost_quota_mode",
   "account_group_scope",
@@ -113,6 +117,8 @@ export function emptySubscriptionPlanForm(): SubscriptionPlanFormState {
     validityDays: "30",
     allowedModels: [],
     monthlyTokenQuota: "",
+    dailyCostQuota: "",
+    weeklyCostQuota: "",
     monthlyCostQuota: "",
     costQuotaMode: "hard_cap",
     schedulerStrategy: "default",
@@ -142,6 +148,8 @@ export function subscriptionPlanFormFromPlan(plan: SubscriptionPlan): Subscripti
     validityDays: String(plan.validity_days),
     allowedModels: toStringArray(ent.allowed_models),
     monthlyTokenQuota: ent.monthly_token_quota == null ? "" : String(ent.monthly_token_quota),
+    dailyCostQuota: ent.daily_cost_quota == null ? "" : String(ent.daily_cost_quota),
+    weeklyCostQuota: ent.weekly_cost_quota == null ? "" : String(ent.weekly_cost_quota),
     monthlyCostQuota: ent.monthly_cost_quota == null ? "" : String(ent.monthly_cost_quota),
     costQuotaMode: ent.cost_quota_mode === "allowance" ? "allowance" : "hard_cap",
     schedulerStrategy:
@@ -215,9 +223,19 @@ function composeEntitlements(form: SubscriptionPlanFormState): Record<string, un
   if (tokenQuota != null) {
     out.monthly_token_quota = tokenQuota;
   }
-  const costQuota = optionalDecimal(form.monthlyCostQuota, "Monthly cost quota");
-  if (costQuota != null) {
-    out.monthly_cost_quota = costQuota;
+  const dailyCostQuota = optionalDecimal(form.dailyCostQuota, "Daily cost quota");
+  if (dailyCostQuota != null) {
+    out.daily_cost_quota = dailyCostQuota;
+  }
+  const weeklyCostQuota = optionalDecimal(form.weeklyCostQuota, "Weekly cost quota");
+  if (weeklyCostQuota != null) {
+    out.weekly_cost_quota = weeklyCostQuota;
+  }
+  const monthlyCostQuota = optionalDecimal(form.monthlyCostQuota, "Monthly cost quota");
+  if (monthlyCostQuota != null) {
+    out.monthly_cost_quota = monthlyCostQuota;
+  }
+  if (dailyCostQuota != null || weeklyCostQuota != null || monthlyCostQuota != null) {
     // cost_quota_mode only matters when a cost quota is set.
     out.cost_quota_mode = form.costQuotaMode;
   }

@@ -75,6 +75,8 @@ function PromoContent() {
     { name: "discountValue", label: t("adminPromos.value") },
     { name: "currency", label: t("adminCommon.currency") },
     { name: "maxUses", label: t("adminPromos.maxUses"), type: "number" },
+    { name: "perUserLimit", label: t("adminPromos.perUserLimit"), type: "number" },
+    { name: "minOrderAmount", label: t("adminPromos.minOrderAmount") },
     {
       name: "status",
       label: t("adminCommon.status"),
@@ -111,6 +113,17 @@ function PromoContent() {
         <span className="font-mono text-srapi-text-tertiary tabular">
           {p.used_count ?? 0}
           {p.max_uses ? ` / ${p.max_uses}` : ""}
+        </span>
+      ),
+    },
+    {
+      key: "limits",
+      header: t("adminPromos.limits"),
+      hideOnMobile: true,
+      render: (p) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {p.per_user_limit ? `${p.per_user_limit}/user` : "—"}
+          {p.min_order_amount ? ` · ≥ ${p.min_order_amount}` : ""}
         </span>
       ),
     },

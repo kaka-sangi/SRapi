@@ -15,7 +15,6 @@ import {
   completeSetup as sdkCompleteSetup,
   requestPasswordReset as sdkRequestPasswordReset,
   confirmPasswordReset as sdkConfirmPasswordReset,
-  register as sdkRegister,
   getAuthCaptchaConfig as sdkGetAuthCaptchaConfig,
   getCurrentUser as sdkGetCurrentUser,
   getCurrentUserUsage as sdkGetCurrentUserUsage,
@@ -181,6 +180,26 @@ type LiveSlo = Partial<SloSummary> & {
 
 type LiveModel = {
   canonical_name?: string;
+};
+
+export type SiteConfig = {
+  site_name: string;
+  logo_url: string;
+  version_label: string;
+  custom_menus: JsonObject[];
+  user_agreement: string;
+  privacy_policy: string;
+};
+
+export type CurrentUserAttribute = {
+  definition_id: number;
+  key: string;
+  name: string;
+  data_type: 'string' | 'number' | 'boolean' | 'select';
+  options?: string[];
+  required?: boolean;
+  value?: string;
+  updated_at?: string;
 };
 
 function configuredApiBaseUrl(): string {
@@ -370,6 +389,16 @@ export const apiService = {
     };
   },
 
+  async getSiteConfig(): Promise<SiteConfig> {
+    const response = await fetchApiJSON<{ data: SiteConfig }>('/api/v1/site-config');
+    return response.data;
+  },
+
+  async listRegistrationAttributes(): Promise<CurrentUserAttribute[]> {
+    const response = await fetchApiJSON<{ data: CurrentUserAttribute[] }>('/api/v1/auth/registration-attributes');
+    return response.data || [];
+  },
+
   async shouldUseLiveAPI(): Promise<boolean> {
     return this.isBackendConnected();
   },
@@ -409,18 +438,54 @@ export const apiService = {
   // Public self-service sign-up. Gated server-side by Security.RegistrationEnabled
   // (403 "registration disabled" when off). On success the backend returns a
   // session, mirroring login, so the new account is signed in immediately.
-  async register(email: string, name: string, password: string, captchaToken?: string) {
-    configureSDKClient();
-    const response = await sdkRegister({
-      body: { email, name, password },
+  async register(
+    email: string,
+    name: string,
+    password: string,
+    captchaToken?: string,
+    attributes?: Array<{ definition_id: number; value: string }>,
+  ) {
+    const response = await fetchApiJSON<{
+      data?: { user?: LiveUser; csrf_token?: string; expires_at?: string };
+    }>('/api/v1/auth/register', {
+      method: 'POST',
       headers: captchaToken ? { 'X-Captcha-Token': captchaToken } : undefined,
-      throwOnError: true,
+      body: JSON.stringify({ email, name, password, attributes: attributes || [] }),
     });
-    const session = response.data?.data;
+    const session = response.data;
     if (!session?.user) {
       throw new Error('Registration did not return a session.');
     }
     const mappedUser = mapLiveUser(session.user, email);
+    storeSession(mappedUser, session.csrf_token);
+    return mappedUser;
+  },
+
+  async requestPasswordlessCode(
+    email: string,
+    name?: string,
+    attributes?: Array<{ definition_id: number; value: string }>,
+    captchaToken?: string,
+  ): Promise<void> {
+    await fetchApiJSON('/api/v1/auth/passwordless/request', {
+      method: 'POST',
+      headers: captchaToken ? { 'X-Captcha-Token': captchaToken } : undefined,
+      body: JSON.stringify({ email, name, attributes: attributes || [] }),
+    });
+  },
+
+  async passwordlessLogin(token: string): Promise<CurrentUser> {
+    const response = await fetchApiJSON<{
+      data?: { user?: LiveUser; csrf_token?: string };
+    }>('/api/v1/auth/passwordless/login', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+    const session = response.data;
+    if (!session?.user) {
+      throw new Error('Passwordless sign-in failed.');
+    }
+    const mappedUser = mapLiveUser(session.user, session.user.email || '');
     storeSession(mappedUser, session.csrf_token);
     return mappedUser;
   },
@@ -605,6 +670,21 @@ export const apiService = {
     const mappedUser = mapLiveUser(user, user.email);
     storeSession(mappedUser, getStoredCSRFToken());
     return mappedUser;
+  },
+
+  async listCurrentUserAttributes(): Promise<CurrentUserAttribute[]> {
+    const response = await fetchApiJSON<{ data: CurrentUserAttribute[] }>('/api/v1/me/attributes');
+    return response.data || [];
+  },
+
+  async updateCurrentUserAttributes(
+    values: Array<{ definition_id: number; value: string }>,
+  ): Promise<CurrentUserAttribute[]> {
+    const response = await fetchApiJSON<{ data: CurrentUserAttribute[] }>('/api/v1/me/attributes', {
+      method: 'PUT',
+      body: JSON.stringify({ values }),
+    });
+    return response.data || [];
   },
 
   async listApiKeys(): Promise<ApiKeySummary[]> {

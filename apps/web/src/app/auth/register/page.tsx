@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import { apiService } from "@/lib/api";
+import { CurrentUserAttribute, apiService } from "@/lib/api";
 import { meErrorMessage } from "@/lib/me-api";
 import { USER_HOME_ROUTE } from "@/lib/routes";
 import { useLanguage } from "@/context/LanguageContext";
@@ -30,7 +30,27 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [site, setSite] = useState<{ site_name: string; user_agreement: string; privacy_policy: string } | null>(null);
+  const [attributes, setAttributes] = useState<CurrentUserAttribute[]>([]);
+  const [attributeValues, setAttributeValues] = useState<Record<number, string>>({});
   const captcha = useCaptcha();
+
+  useEffect(() => {
+    let active = true;
+    Promise.allSettled([
+      apiService.getSiteConfig(),
+      apiService.listRegistrationAttributes(),
+    ]).then(([siteResult, attrResult]) => {
+      if (!active) return;
+      setSite(siteResult.status === "fulfilled" ? siteResult.value : null);
+      const nextAttributes = attrResult.status === "fulfilled" ? attrResult.value : [];
+      setAttributes(nextAttributes);
+      setAttributeValues(Object.fromEntries(nextAttributes.map((item) => [item.definition_id, ""])));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -39,9 +59,17 @@ export default function RegisterPage() {
       setError(t("authRegister.invalid"));
       return;
     }
+    const values = attributes.map((item) => ({
+      definition_id: item.definition_id,
+      value: attributeValues[item.definition_id] || "",
+    }));
+    if (attributes.some((item) => item.required && !attributeValues[item.definition_id]?.trim())) {
+      setError(t("authRegister.invalid"));
+      return;
+    }
     setSubmitting(true);
     try {
-      await apiService.register(email, name.trim(), password, captcha.token);
+      await apiService.register(email, name.trim(), password, captcha.token, values);
       router.replace(USER_HOME_ROUTE);
     } catch (err) {
       setError(meErrorMessage(err));
@@ -53,7 +81,7 @@ export default function RegisterPage() {
     <div className="relative flex min-h-dvh flex-col">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
         <Link href="/" className="font-serif text-2xl leading-none text-srapi-text-primary">
-          SRapi
+          {site?.site_name || "SRapi"}
         </Link>
         <div className="flex items-center gap-2">
           <LanguageToggle />
@@ -110,6 +138,44 @@ export default function RegisterPage() {
                   {t("authRegister.passwordHint")}
                 </p>
               </div>
+              {attributes.map((item) => (
+                <div key={item.definition_id}>
+                  <Label htmlFor={`reg-attr-${item.definition_id}`}>
+                    {item.name}{item.required ? " *" : ""}
+                  </Label>
+                  {item.data_type === "boolean" ? (
+                    <select
+                      id={`reg-attr-${item.definition_id}`}
+                      className="mt-1 h-10 w-full rounded-lg border border-srapi-border bg-srapi-card px-3 text-sm"
+                      value={attributeValues[item.definition_id] || ""}
+                      onChange={(event) => setAttributeValues((prev) => ({ ...prev, [item.definition_id]: event.target.value }))}
+                    >
+                      <option value="">Unset</option>
+                      <option value="true">True</option>
+                      <option value="false">False</option>
+                    </select>
+                  ) : item.data_type === "select" ? (
+                    <select
+                      id={`reg-attr-${item.definition_id}`}
+                      className="mt-1 h-10 w-full rounded-lg border border-srapi-border bg-srapi-card px-3 text-sm"
+                      value={attributeValues[item.definition_id] || ""}
+                      onChange={(event) => setAttributeValues((prev) => ({ ...prev, [item.definition_id]: event.target.value }))}
+                    >
+                      <option value="">Unset</option>
+                      {(item.options || []).map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input
+                      id={`reg-attr-${item.definition_id}`}
+                      type={item.data_type === "number" ? "number" : "text"}
+                      value={attributeValues[item.definition_id] || ""}
+                      onChange={(event) => setAttributeValues((prev) => ({ ...prev, [item.definition_id]: event.target.value }))}
+                    />
+                  )}
+                </div>
+              ))}
               {error && (
                 <p role="alert" className="text-sm text-srapi-error">
                   {error}
@@ -126,6 +192,20 @@ export default function RegisterPage() {
                 {submitting ? t("authRegister.submitting") : t("authRegister.cta")}
               </Button>
             </form>
+            {(site?.user_agreement || site?.privacy_policy) ? (
+              <div className="mt-4 flex justify-center gap-3 text-2xs text-srapi-text-tertiary">
+                {site.user_agreement ? (
+                  <a href={site.user_agreement} className="underline-offset-4 hover:underline">
+                    User agreement
+                  </a>
+                ) : null}
+                {site.privacy_policy ? (
+                  <a href={site.privacy_policy} className="underline-offset-4 hover:underline">
+                    Privacy policy
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
             <p className="mt-6 text-center text-sm text-srapi-text-secondary">
               {t("authRegister.haveAccount")}{" "}
               <Link href="/" className="text-srapi-primary underline-offset-4 hover:underline">

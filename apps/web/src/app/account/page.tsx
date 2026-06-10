@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
@@ -29,6 +29,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FormSkeleton } from "@/components/charts/chart-skeleton";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { apiService, type CurrentUserAttribute } from "@/lib/api";
 import { meErrorMessage } from "@/lib/me-api";
 import type { User } from "@/lib/sdk-types";
 
@@ -59,7 +60,12 @@ function AccountContent() {
         </TabsList>
         <TabsContent value="profile">
           <PageQueryState query={profile} skeleton={<FormSkeleton rows={3} className="p-5" />}>
-            {(user) => <ProfileForm user={user} />}
+            {(user) => (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <ProfileForm user={user} />
+                <UserAttributesCard />
+              </div>
+            )}
           </PageQueryState>
         </TabsContent>
         <TabsContent value="security">
@@ -75,6 +81,117 @@ function AccountContent() {
         </TabsContent>
       </Tabs>
     </>
+  );
+}
+
+function UserAttributesCard() {
+  const { toast } = useToast();
+  const [items, setItems] = useState<CurrentUserAttribute[]>([]);
+  const [values, setValues] = useState<Record<number, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    apiService.listCurrentUserAttributes()
+      .then((next) => {
+        if (!active) return;
+        setItems(next);
+        setValues(Object.fromEntries(next.map((item) => [item.definition_id, item.value || ""])));
+      })
+      .catch((err) => {
+        if (active) setError(meErrorMessage(err));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await apiService.updateCurrentUserAttributes(
+        items.map((item) => ({ definition_id: item.definition_id, value: values[item.definition_id] || "" })),
+      );
+      setItems(updated);
+      setValues(Object.fromEntries(updated.map((item) => [item.definition_id, item.value || ""])));
+      toast({ title: "Saved", tone: "success" });
+    } catch (err) {
+      setError(meErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardContent className="space-y-4">
+        <h3 className="font-serif text-lg text-srapi-text-primary">Profile attributes</h3>
+        {items.map((item) => (
+          <div key={item.definition_id}>
+            <Label htmlFor={`attr-${item.definition_id}`}>{item.name}</Label>
+            {item.data_type === "boolean" ? (
+              <select
+                id={`attr-${item.definition_id}`}
+                className="mt-1 h-10 w-full rounded-lg border border-srapi-border bg-srapi-card px-3 text-sm"
+                value={values[item.definition_id] || ""}
+                onChange={(event) => setValues((prev) => ({ ...prev, [item.definition_id]: event.target.value }))}
+              >
+                <option value="">Unset</option>
+                <option value="true">True</option>
+                <option value="false">False</option>
+              </select>
+            ) : item.data_type === "select" ? (
+              <select
+                id={`attr-${item.definition_id}`}
+                className="mt-1 h-10 w-full rounded-lg border border-srapi-border bg-srapi-card px-3 text-sm"
+                value={values[item.definition_id] || ""}
+                onChange={(event) => setValues((prev) => ({ ...prev, [item.definition_id]: event.target.value }))}
+              >
+                <option value="">Unset</option>
+                {(item.options || []).map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            ) : (
+              <Input
+                id={`attr-${item.definition_id}`}
+                type={item.data_type === "number" ? "number" : "text"}
+                value={values[item.definition_id] || ""}
+                onChange={(event) => setValues((prev) => ({ ...prev, [item.definition_id]: event.target.value }))}
+              />
+            )}
+          </div>
+        ))}
+        {error ? <p className="text-sm text-srapi-error">{error}</p> : null}
+        <div className="flex justify-end">
+          <Button variant="primary" loading={saving} onClick={save}>
+            Save attributes
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { ChevronDown, KeyRound, Upload } from "lucide-react";
+import { ChevronDown, KeyRound } from "lucide-react";
 import {
   AccountOAuthAuthorizeDialog,
   type AccountOAuthFlowMode,
@@ -21,6 +21,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { KeyValueEditor } from "@/components/ui/key-value-editor";
 import { TagInput } from "@/components/ui/tag-input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { useTlsProfiles } from "@/hooks/admin-queries";
 import {
   Select,
   SelectTrigger,
@@ -36,6 +38,7 @@ import { cn } from "@/lib/cn";
 import { adminErrorMessage } from "@/lib/admin-api";
 import {
   ACCOUNT_RUNTIME_CLASSES,
+  ACCOUNT_RISK_LEVELS,
   ACCOUNT_STATUSES,
   emptyAccountForm,
   accountFormFromAccount,
@@ -116,8 +119,6 @@ interface CredSpec {
   template?: string;
   /** kind "fields": one labeled input per credential key */
   fields?: CredFieldSpec[];
-  /** kind "json": offer a ".json" file upload that fills the box */
-  upload?: boolean;
 }
 const OAUTH_FIELDS: CredFieldSpec[] = [
   { key: "access_token", cred: "accessToken", secret: true },
@@ -126,13 +127,10 @@ const OAUTH_FIELDS: CredFieldSpec[] = [
 const CREDENTIAL_SPECS: Record<RuntimeClass, CredSpec> = {
   api_key: { kind: "password", credKey: "api_key", cred: "apiKey" },
   cli_client_token: { kind: "password", credKey: "access_token", cred: "accessToken" },
-  desktop_client_token: { kind: "password", credKey: "access_token", cred: "accessToken" },
-  ide_plugin_token: { kind: "password", credKey: "access_token", cred: "accessToken" },
   custom_reverse_proxy: { kind: "password", credKey: "access_token", cred: "accessToken" },
   web_session_cookie: { kind: "textarea", credKey: "cookie", cred: "cookie" },
   oauth_refresh: { kind: "fields", cred: "oauth", fields: OAUTH_FIELDS },
   oauth_device_code: { kind: "fields", cred: "oauth", fields: OAUTH_FIELDS },
-  service_account_json: { kind: "json", cred: "serviceAccount", template: "{\n  \n}", upload: true },
 };
 
 function specFor(rc: RuntimeClass): CredSpec {
@@ -210,12 +208,13 @@ export function AccountFormDialog({
 }) {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const tlsProfiles = useTlsProfiles();
 
   const initial =
     mode === "edit" && target ? accountFormFromAccount(target) : emptyAccountForm(defaultProviderId);
 
-  // Map provider id → its allowed auth methods. A provider with no allowlist
-  // (legacy / manually-created) maps to the full set: no restriction.
+  // Map provider id to its accepted auth methods. If the backend omits the
+  // allowlist, expose the canonical runtime set.
   const allowedFor = useCallback(
     (id: string): RuntimeClass[] => {
       const match = providerOptions.find((opt) => opt.value === id);
@@ -253,10 +252,9 @@ export function AccountFormDialog({
     return groups;
   }, [providerOptions]);
 
-  // On create, start from a runtime class the default provider actually accepts
-  // (e.g. Antigravity has no api_key). On edit, keep the account's real class.
+  // Start from a runtime class the selected provider actually accepts.
   const initialRuntimeClass: RuntimeClass =
-    mode === "create" && !allowedFor(initial.providerId).includes(initial.runtimeClass)
+    !allowedFor(initial.providerId).includes(initial.runtimeClass)
       ? (allowedFor(initial.providerId)[0] ?? initial.runtimeClass)
       : initial.runtimeClass;
 
@@ -266,6 +264,7 @@ export function AccountFormDialog({
   const [credInput, setCredInput] = useState(defaultCredInput(initialRuntimeClass));
   const [credFields, setCredFields] = useState<Record<string, string>>({});
   const [status, setStatus] = useState(initial.status);
+  const [riskLevel, setRiskLevel] = useState(initial.riskLevel);
   const [priority, setPriority] = useState(initial.priority);
   const [weight, setWeight] = useState(initial.weight);
   const [upstreamClient, setUpstreamClient] = useState(initial.upstreamClient);
@@ -278,6 +277,14 @@ export function AccountFormDialog({
   const template = useMemo(
     () => getProviderTemplate(providerOptions, providerId),
     [providerOptions, providerId],
+  );
+  const metadataHints = useMemo(
+    () => ({ tls_profile: t("adminAccounts.tlsProfileMetadataHint"), ...(template?.metadata_hints ?? {}) }),
+    [t, template],
+  );
+  const enabledTlsProfiles = useMemo(
+    () => (tlsProfiles.data?.data ?? []).filter((profile) => profile.enabled),
+    [tlsProfiles.data],
   );
 
   // Map the OAuth runtime class to its provisioning flow: refresh-token runtimes
@@ -307,6 +314,7 @@ export function AccountFormDialog({
   const modelMappingKey = "model_mapping";
   const supportedModelsKey = "supported_models";
   const excludedModelsKey = "excluded_models";
+  const tlsProfileKey = "tls_profile";
   const rawModelMapping = metadata[modelMappingKey];
   const modelMapping =
     rawModelMapping && typeof rawModelMapping === "object" && !Array.isArray(rawModelMapping)
@@ -314,17 +322,22 @@ export function AccountFormDialog({
       : {};
   const supportedModels = metadataStringList(metadata[supportedModelsKey]);
   const excludedModels = metadataStringList(metadata[excludedModelsKey]);
+  const selectedTlsProfile =
+    typeof metadata[tlsProfileKey] === "string" ? String(metadata[tlsProfileKey]).trim() : "";
+  const tlsProfileEnabled = selectedTlsProfile.length > 0;
   // The generic metadata editor shows everything except the dedicated keys.
   const metadataWithoutDedicated: Record<string, unknown> = { ...metadata };
   delete metadataWithoutDedicated[modelMappingKey];
   delete metadataWithoutDedicated[supportedModelsKey];
   delete metadataWithoutDedicated[excludedModelsKey];
+  delete metadataWithoutDedicated[tlsProfileKey];
   // Re-attach the dedicated keys (only when non-empty) onto a base object.
   const withDedicated = (base: Record<string, unknown>): Record<string, unknown> => {
     const next = { ...base };
     if (Object.keys(modelMapping).length > 0) next[modelMappingKey] = modelMapping;
     if (supportedModels.length > 0) next[supportedModelsKey] = supportedModels;
     if (excludedModels.length > 0) next[excludedModelsKey] = excludedModels;
+    if (selectedTlsProfile) next[tlsProfileKey] = selectedTlsProfile;
     return next;
   };
   const updateMetadataFields = (next: Record<string, unknown>) => setMetadata(withDedicated(next));
@@ -344,13 +357,14 @@ export function AccountFormDialog({
     else delete base[key];
     setMetadata(base);
   };
+  const updateTlsProfile = (profileName: string) => {
+    const base = withDedicated(metadataWithoutDedicated);
+    if (profileName.trim()) base[tlsProfileKey] = profileName.trim();
+    else delete base[tlsProfileKey];
+    setMetadata(base);
+  };
 
-  // Auth methods the selected provider accepts. Always keep the current
-  // selection visible so editing a legacy account never hides its real value.
-  const availableRuntimeClasses = allowedFor(providerId);
-  const runtimeClassOptions = availableRuntimeClasses.includes(runtimeClass)
-    ? availableRuntimeClasses
-    : [runtimeClass, ...availableRuntimeClasses];
+  const runtimeClassOptions = allowedFor(providerId);
 
   function changeRuntime(rc: RuntimeClass) {
     setRuntimeClass(rc);
@@ -387,11 +401,6 @@ export function AccountFormDialog({
     setCredFields((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function onUploadCredential(file: File | null) {
-    if (!file) return;
-    setCredInput(await file.text());
-  }
-
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -407,6 +416,7 @@ export function AccountFormDialog({
       credential: buildCredentialJson(runtimeClass, credInput, credFields),
       proxyId: "",
       status,
+      riskLevel,
       priority,
       weight,
       metadata,
@@ -576,29 +586,6 @@ export function AccountFormDialog({
                     <Label htmlFor={credId} className="mb-0">
                       {credLabel}
                     </Label>
-                    {spec.upload ? (
-                      <label
-                        htmlFor="cred-upload"
-                        className={cn(
-                          "inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-srapi-border px-2.5 py-1 text-2xs text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:text-srapi-text-primary",
-                          busy && "pointer-events-none opacity-50",
-                        )}
-                      >
-                        <Upload className="size-3.5" />
-                        {t("adminAccounts.cred.uploadFile")}
-                        <input
-                          id="cred-upload"
-                          type="file"
-                          accept="application/json,.json"
-                          className="sr-only"
-                          disabled={busy}
-                          onChange={(e) => {
-                            void onUploadCredential(e.target.files?.[0] ?? null);
-                            e.target.value = "";
-                          }}
-                        />
-                      </label>
-                    ) : null}
                   </div>
                   {spec.kind === "password" ? (
                     <Input
@@ -689,6 +676,25 @@ export function AccountFormDialog({
                     </Select>
                   </div>
                   <div>
+                    <Label htmlFor="account-risk-level">{t("adminAccounts.riskLevel")}</Label>
+                    <Select
+                      value={riskLevel}
+                      onValueChange={(v) => setRiskLevel(v as typeof riskLevel)}
+                      disabled={busy}
+                    >
+                      <SelectTrigger id="account-risk-level">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ACCOUNT_RISK_LEVELS.map((level) => (
+                          <SelectItem key={level} value={level}>
+                            {t(`adminAccounts.risk.${level}`)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
                     <Label htmlFor="account-upstream">{t("adminAccounts.upstreamClient")}</Label>
                     <Input
                       id="account-upstream"
@@ -697,6 +703,56 @@ export function AccountFormDialog({
                       onChange={(e) => setUpstreamClient(e.target.value)}
                     />
                   </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="account-tls-profile-enabled"
+                        checked={tlsProfileEnabled}
+                        disabled={busy || enabledTlsProfiles.length === 0}
+                        onCheckedChange={(checked) =>
+                          updateTlsProfile(
+                            checked ? (selectedTlsProfile || enabledTlsProfiles[0]?.name || "") : "",
+                          )
+                        }
+                      />
+                      <Label htmlFor="account-tls-profile-enabled" className="mb-0">
+                        {t("adminAccounts.tlsProfile")}
+                      </Label>
+                    </div>
+                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                      {t("adminAccounts.tlsProfileHint")}
+                    </p>
+                    {tlsProfileEnabled ? (
+                      <Select
+                        value={selectedTlsProfile || enabledTlsProfiles[0]?.name}
+                        onValueChange={updateTlsProfile}
+                        disabled={busy || enabledTlsProfiles.length === 0}
+                      >
+                        <SelectTrigger id="account-tls-profile" className="mt-1.5">
+                          <SelectValue placeholder={t("adminAccounts.tlsProfilePlaceholder")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {enabledTlsProfiles.map((profile) => (
+                            <SelectItem key={profile.id} value={profile.name}>
+                              {profile.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                  </div>
+                  {Object.keys(metadataHints).length > 0 ? (
+                    <div>
+                      <Label>{t("adminAccounts.metadataHints")}</Label>
+                      <div className="mt-1.5 space-y-1 text-2xs text-srapi-text-tertiary">
+                        {Object.entries(metadataHints).map(([key, hint]) => (
+                          <p key={key}>
+                            <span className="font-mono text-srapi-text-secondary">{key}</span>: {hint}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <div>
                     <Label>{t("adminCommon.metadata")}</Label>
                     <div className="mt-1.5">

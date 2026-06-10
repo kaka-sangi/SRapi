@@ -60,10 +60,15 @@ export default function OAuthCallbackPage() {
           setPhase("error");
       }
     } catch {
-      setError(t("oauthCallback.expired"));
-      setPhase("error");
+      try {
+        const user = await apiService.getLiveCurrentUser();
+        goHome(user.role);
+      } catch {
+        setError(t("oauthCallback.expired"));
+        setPhase("error");
+      }
     }
-  }, [t]);
+  }, [goHome, t]);
 
   const started = useRef(false);
   useEffect(() => {

@@ -41,6 +41,8 @@ export interface PromoCodeFormState {
   discountValue: string;
   currency: string;
   maxUses: string;
+  perUserLimit: string;
+  minOrderAmount: string;
   status: PromoCodeStatus;
   startsAtLocal: string;
   expiresAtLocal: string;
@@ -86,6 +88,8 @@ export function emptyPromoCodeForm(): PromoCodeFormState {
     discountValue: "0",
     currency: "USD",
     maxUses: "1",
+    perUserLimit: "0",
+    minOrderAmount: "",
     status: "active",
     startsAtLocal: "",
     expiresAtLocal: "",
@@ -99,6 +103,8 @@ export function promoFormFromCode(promo: PromoCode): PromoCodeFormState {
     discountValue: promo.discount_value,
     currency: promo.currency,
     maxUses: String(promo.max_uses),
+    perUserLimit: String(promo.per_user_limit ?? 0),
+    minOrderAmount: promo.min_order_amount ?? "",
     status: promo.status,
     startsAtLocal: isoToLocalDateTime(promo.starts_at),
     expiresAtLocal: isoToLocalDateTime(promo.expires_at),
@@ -150,8 +156,13 @@ export function buildPromoCodeBody(
     discount_value: parsePromoDiscountValue(form.discountType, form.discountValue),
     currency: requiredText(form.currency, "Currency").toUpperCase(),
     max_uses: parsePositiveInteger(form.maxUses, "Max uses"),
+    per_user_limit: parseNonNegativeInteger(form.perUserLimit, "Per-user limit"),
     status: form.status,
   };
+  const minOrderAmount = optionalText(form.minOrderAmount);
+  if (minOrderAmount) {
+    body.min_order_amount = parseDecimalString(minOrderAmount, "Minimum order amount");
+  }
   const startsAt = localDateTimeToIso(form.startsAtLocal, "Starts at");
   const expiresAt = localDateTimeToIso(form.expiresAtLocal, "Expires at");
   if (startsAt) {
@@ -206,6 +217,10 @@ function parseDecimalString(value: string, fieldName: string): string {
 
 function parsePositiveInteger(value: string, fieldName: string): number {
   return parseBoundedInteger(value, fieldName, 1, Number.MAX_SAFE_INTEGER);
+}
+
+function parseNonNegativeInteger(value: string, fieldName: string): number {
+  return parseBoundedInteger(value, fieldName, 0, Number.MAX_SAFE_INTEGER);
 }
 
 function parseBoundedInteger(value: string, fieldName: string, min: number, max: number): number {

@@ -22,6 +22,7 @@ export const queryKeys = {
     paymentMethods: () => ["me", "payment-methods"] as const,
     subscriptions: () => ["me", "subscriptions"] as const,
     affiliate: () => ["me", "affiliate"] as const,
+    affiliateInviteCodes: () => ["me", "affiliate-invite-codes"] as const,
     affiliateLedger: (params?: unknown) => ["me", "affiliate-ledger", params ?? {}] as const,
     announcements: () => ["me", "announcements"] as const,
     playgroundModels: () => ["me", "playground-models"] as const,
@@ -32,6 +33,8 @@ export const queryKeys = {
   },
   admin: {
     dashboardSnapshot: (params?: unknown) => ["admin", "dashboard-snapshot", params ?? {}] as const,
+    schedulerOverview: () => ["admin", "scheduler", "overview"] as const,
+    schedulerStrategies: () => ["admin", "scheduler", "strategies"] as const,
     opsOverview: (params?: unknown) => ["admin", "ops", "overview", params ?? {}] as const,
     opsThroughput: (params?: unknown) => ["admin", "ops", "throughput", params ?? {}] as const,
     opsErrorTrend: (params?: unknown) => ["admin", "ops", "error-trend", params ?? {}] as const,
@@ -73,8 +76,10 @@ export const queryKeys = {
     affiliateRebates: (params?: unknown) => ["admin", "affiliates", "rebates", params ?? {}] as const,
     affiliateTransfers: (params?: unknown) =>
       ["admin", "affiliates", "transfers", params ?? {}] as const,
+    affiliateRules: (params?: unknown) => ["admin", "affiliates", "rules", params ?? {}] as const,
     paymentProviders: (params?: unknown) => ["admin", "payment-providers", params ?? {}] as const,
     paymentOrders: (params?: unknown) => ["admin", "payment-orders", params ?? {}] as const,
+    paymentOrderAuditLogs: (id: string) => ["admin", "payment-orders", id, "audit-logs"] as const,
     subscriptionPlans: (params?: unknown) =>
       ["admin", "subscription-plans", params ?? {}] as const,
     userSubscriptions: (params?: unknown) =>
@@ -96,6 +101,7 @@ export const queryKeys = {
     channelMonitorTemplates: () => ["admin", "channel-monitor-templates"] as const,
     tlsProfiles: () => ["admin", "tls-profiles"] as const,
     roles: () => ["admin", "roles"] as const,
+    permissionCatalog: () => ["admin", "permission-catalog"] as const,
     userAttributes: () => ["admin", "user-attributes"] as const,
     notificationEmailTemplates: () => ["admin", "notification-email-templates"] as const,
     accountsAvailability: (days?: number) => ["admin", "accounts-availability", days ?? 7] as const,
@@ -103,6 +109,7 @@ export const queryKeys = {
     riskConfig: () => ["admin", "risk-config"] as const,
     riskStatus: () => ["admin", "risk-status"] as const,
     riskLogs: (params?: unknown) => ["admin", "risk-logs", params ?? {}] as const,
+    contentSafetyConfig: () => ["admin", "content-safety-config"] as const,
     settings: () => ["admin", "settings"] as const,
     configSnapshot: () => ["admin", "config-snapshot"] as const,
     copilotConfig: () => ["admin", "copilot-config"] as const,

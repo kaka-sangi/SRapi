@@ -17,13 +17,15 @@ export function SubscriptionUsageBars({
   subscription: UserSubscription;
   labels: SubscriptionUsageLabels;
 }) {
-  const quota = monthlyCostQuota(subscription.entitlements_snapshot);
+  const dailyQuota = costQuota(subscription.entitlements_snapshot, "daily_cost_quota");
+  const weeklyQuota = costQuota(subscription.entitlements_snapshot, "weekly_cost_quota");
+  const monthlyQuota = costQuota(subscription.entitlements_snapshot, "monthly_cost_quota");
 
   return (
     <div className="min-w-48 space-y-1.5">
-      <UsageBar label={labels.daily} value={subscription.daily_usage_usd} />
-      <UsageBar label={labels.weekly} value={subscription.weekly_usage_usd} />
-      <UsageBar label={labels.monthly} value={subscription.monthly_usage_usd} limit={quota} emptyLimit={labels.noQuota} />
+      <UsageBar label={labels.daily} value={subscription.daily_usage_usd} limit={dailyQuota} emptyLimit={labels.noQuota} />
+      <UsageBar label={labels.weekly} value={subscription.weekly_usage_usd} limit={weeklyQuota} emptyLimit={labels.noQuota} />
+      <UsageBar label={labels.monthly} value={subscription.monthly_usage_usd} limit={monthlyQuota} emptyLimit={labels.noQuota} />
     </div>
   );
 }
@@ -60,8 +62,8 @@ function UsageBar({
   );
 }
 
-function monthlyCostQuota(entitlements: Record<string, unknown>): string | undefined {
-  const value = entitlements.monthly_cost_quota;
+function costQuota(entitlements: Record<string, unknown>, key: "daily_cost_quota" | "weekly_cost_quota" | "monthly_cost_quota"): string | undefined {
+  const value = entitlements[key];
   if (typeof value === "string" && value.trim() !== "") {
     return value;
   }

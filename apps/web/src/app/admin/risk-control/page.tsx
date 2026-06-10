@@ -6,7 +6,14 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
-import { useRiskStatus, useRiskLogs, useRiskConfig, useUpdateRiskConfig } from "@/hooks/admin-queries";
+import {
+  useContentSafetyConfig,
+  useRiskStatus,
+  useRiskLogs,
+  useRiskConfig,
+  useUpdateContentSafetyConfig,
+  useUpdateRiskConfig,
+} from "@/hooks/admin-queries";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useLanguage } from "@/context/LanguageContext";
@@ -22,6 +29,11 @@ import {
   buildRiskControlConfig,
   type RiskControlFormState,
 } from "@/lib/admin-risk-control-form";
+import {
+  buildContentSafetyConfig,
+  createContentSafetyForm,
+  type ContentSafetyFormState,
+} from "@/lib/admin-content-safety-form";
 import { countryOptions } from "@/lib/countries";
 import type { RiskControlLog } from "@/lib/sdk-types";
 
@@ -39,8 +51,11 @@ function RiskContent() {
   const status = useRiskStatus();
   const logs = useRiskLogs();
   const config = useRiskConfig();
+  const contentSafety = useContentSafetyConfig();
   const updateConfig = useUpdateRiskConfig();
+  const updateContentSafety = useUpdateContentSafetyConfig();
   const [editing, setEditing] = useState(false);
+  const [editingContentSafety, setEditingContentSafety] = useState(false);
 
   const configFields: FieldConfig<RiskControlFormState>[] = [
     { name: "enabled", label: t("adminRisk.enabled"), type: "switch" },
@@ -104,6 +119,44 @@ function RiskContent() {
       key: "severity",
       header: t("adminRisk.severity"),
       render: (r) => <QuietBadge status={quietStatusFor(r.level)} label={statusLabel(t, r.level)} />,
+    },
+  ];
+
+  const contentSafetyFields: FieldConfig<ContentSafetyFormState>[] = [
+    { name: "enabled", label: t("adminRisk.contentSafetyEnabled"), type: "switch" },
+    {
+      name: "mode",
+      label: t("adminRisk.contentSafetyMode"),
+      type: "select",
+      options: [
+        { value: "monitor", label: "monitor" },
+        { value: "enforce", label: "enforce" },
+      ],
+    },
+    { name: "redactPii", label: t("adminRisk.redactPii"), type: "switch" },
+    { name: "blockPii", label: t("adminRisk.blockPii"), type: "switch" },
+    {
+      name: "blockPromptInjection",
+      label: t("adminRisk.blockPromptInjection"),
+      type: "switch",
+    },
+    {
+      name: "blockCustomKeywords",
+      label: t("adminRisk.blockCustomKeywords"),
+      type: "switch",
+    },
+    {
+      name: "customKeywords",
+      label: t("adminRisk.customKeywords"),
+      type: "tags",
+      placeholder: t("adminRisk.customKeywordsPlaceholder"),
+    },
+    {
+      name: "modelScopes",
+      label: t("adminRisk.modelScopes"),
+      type: "tags",
+      placeholder: t("adminRisk.modelScopesPlaceholder"),
+      hint: t("adminRisk.modelScopesHint"),
     },
   ];
 
@@ -179,6 +232,67 @@ function RiskContent() {
         </Card>
       ) : null}
 
+      {contentSafety.isLoading ? (
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-x-12 gap-y-4">
+            <DialogListSkeleton rows={1} />
+            <Skeleton className="h-8 w-12" />
+            <Skeleton className="h-8 w-12" />
+          </CardContent>
+        </Card>
+      ) : contentSafety.data ? (
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-x-12 gap-y-4">
+            <div>
+              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+                {t("adminRisk.contentSafetyTitle")}
+              </div>
+              <div className="mt-2">
+                <QuietBadge
+                  status={contentSafety.data.enabled ? "active" : "disabled"}
+                  label={statusLabel(t, contentSafety.data.enabled ? "active" : "disabled")}
+                />
+              </div>
+            </div>
+            <div>
+              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+                {t("adminRisk.contentSafetyMode")}
+              </div>
+              <div className="mt-2">
+                <QuietBadge
+                  status={quietStatusFor(contentSafety.data.mode)}
+                  label={statusLabel(t, contentSafety.data.mode)}
+                />
+              </div>
+            </div>
+            <div>
+              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+                {t("adminRisk.customKeywordCount")}
+              </div>
+              <div className="mt-1 font-serif text-3xl text-srapi-text-primary tabular">
+                {formatInteger(contentSafety.data.custom_keywords.length)}
+              </div>
+            </div>
+            <div>
+              <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+                {t("adminRisk.modelScopeCount")}
+              </div>
+              <div className="mt-1 font-serif text-3xl text-srapi-text-primary tabular">
+                {formatInteger(contentSafety.data.model_scopes.length)}
+              </div>
+            </div>
+            <Button
+              className="ml-auto"
+              variant="outline"
+              size="sm"
+              onClick={() => setEditingContentSafety(true)}
+            >
+              {t("adminRisk.editContentSafety")}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <AdminListView
         query={logs}
         columns={columns}
@@ -201,6 +315,20 @@ function RiskContent() {
           submit={(body) => updateConfig.mutateAsync(body)}
           successMessage={t("feedback.saved")}
           isPending={updateConfig.isPending}
+        />
+      ) : null}
+
+      {editingContentSafety && contentSafety.data ? (
+        <ResourceFormDialog
+          open
+          onOpenChange={setEditingContentSafety}
+          title={t("adminRisk.editContentSafety")}
+          fields={contentSafetyFields}
+          initial={createContentSafetyForm(contentSafety.data)}
+          buildBody={buildContentSafetyConfig}
+          submit={(body) => updateContentSafety.mutateAsync(body)}
+          successMessage={t("feedback.saved")}
+          isPending={updateContentSafety.isPending}
         />
       ) : null}
     </>

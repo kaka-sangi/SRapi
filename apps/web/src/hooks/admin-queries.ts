@@ -278,6 +278,14 @@ export function useAdminPaymentOrders(params?: P<typeof adminApi.listPaymentOrde
   });
 }
 
+export function useAdminPaymentOrderAuditLogs(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.admin.paymentOrderAuditLogs(id ?? ""),
+    queryFn: () => adminApi.listPaymentOrderAuditLogs(id as string),
+    enabled: Boolean(id),
+  });
+}
+
 export function useAdminPaymentProviders(params?: P<typeof adminApi.listPaymentProviders>) {
   return useQuery({
     queryKey: queryKeys.admin.paymentProviders(params),
@@ -326,6 +334,13 @@ export function useAffiliateTransfers(params?: P<typeof adminApi.listAffiliateTr
   return useQuery({
     queryKey: queryKeys.admin.affiliateTransfers(params),
     queryFn: () => adminApi.listAffiliateTransfers(params),
+  });
+}
+
+export function useAffiliateRules(params?: P<typeof adminApi.listAffiliateRules>) {
+  return useQuery({
+    queryKey: queryKeys.admin.affiliateRules(params),
+    queryFn: () => adminApi.listAffiliateRules(params),
   });
 }
 
@@ -412,6 +427,12 @@ export function useAdminRoles() {
   return useQuery({
     queryKey: queryKeys.admin.roles(),
     queryFn: () => adminApi.listRoles(),
+  });
+}
+export function useAdminPermissionCatalog() {
+  return useQuery({
+    queryKey: queryKeys.admin.permissionCatalog(),
+    queryFn: () => adminApi.listPermissionCatalog(),
   });
 }
 export function useCreateAdminRole() {
@@ -644,6 +665,13 @@ export function useRiskConfig() {
   });
 }
 
+export function useContentSafetyConfig() {
+  return useQuery({
+    queryKey: queryKeys.admin.contentSafetyConfig(),
+    queryFn: () => adminApi.getContentSafetyConfig(),
+  });
+}
+
 // ============================================================
 // Mutations (create / update / delete). Each invalidates the broad
 // ["admin", <resource>] prefix so every param-scoped query variant
@@ -662,6 +690,14 @@ function useAdminMutation<TVars, TData>(
     mutationFn,
     onSuccess: () => qc.invalidateQueries({ queryKey: invalidate }),
   });
+}
+
+export function useUpdateContentSafetyConfig() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.updateContentSafetyConfig>) =>
+      adminApi.updateContentSafetyConfig(body),
+    ["admin", "content-safety-config"],
+  );
 }
 
 // Users
@@ -1137,6 +1173,21 @@ export function useDeletePromoCode() {
   );
 }
 
+export function useCreateAffiliateRule() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createAffiliateRule>) => adminApi.createAffiliateRule(body),
+    ["admin", "affiliates", "rules"],
+  );
+}
+
+export function useUpdateAffiliateRule() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateAffiliateRule> }) =>
+      adminApi.updateAffiliateRule(vars.id, vars.body),
+    ["admin", "affiliates", "rules"],
+  );
+}
+
 // Redeem codes
 export function useCreateRedeemCode() {
   return useAdminMutation(
@@ -1372,6 +1423,56 @@ export function useImportConfigSnapshot() {
 }
 
 // Scheduler strategy replay
+export function useSchedulerOverview() {
+  return useQuery({
+    queryKey: queryKeys.admin.schedulerOverview(),
+    queryFn: () => adminApi.schedulerOverview(),
+  });
+}
+
+export function useSchedulerStrategies() {
+  return useQuery({
+    queryKey: queryKeys.admin.schedulerStrategies(),
+    queryFn: () => adminApi.listSchedulerStrategies(),
+  });
+}
+
+export function useCreateSchedulerStrategy() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createSchedulerStrategy>) => adminApi.createSchedulerStrategy(body),
+    ["admin", "scheduler"],
+  );
+}
+
+export function useUpdateSchedulerStrategy() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateSchedulerStrategy> }) =>
+      adminApi.updateSchedulerStrategy(vars.id, vars.body),
+    ["admin", "scheduler"],
+  );
+}
+
+export function useDeprecateSchedulerStrategy() {
+  return useAdminMutation(
+    (id: string) => adminApi.deprecateSchedulerStrategy(id),
+    ["admin", "scheduler"],
+  );
+}
+
+export function useActivateSchedulerStrategy() {
+  return useAdminMutation(
+    (id: string) => adminApi.activateSchedulerStrategy(id),
+    ["admin", "scheduler"],
+  );
+}
+
+export function useSimulateSchedulerStrategy() {
+  return useMutation({
+    mutationFn: (body: P<typeof adminApi.simulateSchedulerStrategy>) =>
+      adminApi.simulateSchedulerStrategy(body),
+  });
+}
+
 export function useReplaySchedulerStrategy() {
   return useMutation({
     mutationFn: (body: P<typeof adminApi.replaySchedulerStrategy>) =>

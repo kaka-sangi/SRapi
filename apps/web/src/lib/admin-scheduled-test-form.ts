@@ -13,6 +13,7 @@ export interface ScheduledTestFormState {
   scopeId: string;
   intervalSeconds: string;
   cronExpression: string;
+  probeModel: string;
   maxResults: string;
   autoRecover: boolean;
   enabled: boolean;
@@ -25,6 +26,7 @@ export function emptyScheduledTestForm(): ScheduledTestFormState {
     scopeId: "",
     intervalSeconds: "3600",
     cronExpression: "",
+    probeModel: "",
     maxResults: "0",
     autoRecover: false,
     enabled: true,
@@ -38,6 +40,7 @@ export function scheduledTestFormFromPlan(plan: ScheduledTestPlan): ScheduledTes
     scopeId: plan.scope_id != null ? String(plan.scope_id) : "",
     intervalSeconds: String(plan.interval_seconds ?? 3600),
     cronExpression: plan.cron_expression ?? "",
+    probeModel: plan.probe_model ?? "",
     maxResults: String(plan.max_results ?? 0),
     autoRecover: plan.auto_recover,
     enabled: plan.enabled,
@@ -57,6 +60,7 @@ export function buildScheduledTestBody(
     scope_type: form.scopeType,
     interval_seconds: parsePositiveInt(form.intervalSeconds, 3600),
     cron_expression: form.cronExpression.trim(),
+    probe_model: form.probeModel.trim(),
     max_results: parsePositiveInt(form.maxResults, 0),
     auto_recover: form.autoRecover,
   };

@@ -24,6 +24,7 @@ import {
   UserPlus,
   Coins,
   ArrowLeftRight,
+  Percent,
   Shield,
   ShieldCheck,
   Megaphone,
@@ -118,6 +119,7 @@ const ADMIN_AFFILIATE_SECTION: NavSection = {
       labelKey: "nav.adminAffiliatesTransfers",
       icon: ArrowLeftRight,
     },
+    { href: ADMIN_ROUTES.affiliatesRules, labelKey: "nav.adminAffiliatesRules", icon: Percent },
   ],
 };
 

@@ -38,7 +38,7 @@ import {
   type SubscriptionUsageLabels,
 } from "@/components/features/subscription-usage-bars";
 import { meErrorMessage } from "@/lib/me-api";
-import type { PaymentOrder, UserSubscription } from "@/lib/sdk-types";
+import type { PaymentMethod, PaymentOrder, UserSubscription } from "@/lib/sdk-types";
 
 export default function BillingPage() {
   return (
@@ -85,6 +85,9 @@ function BalanceTab() {
   const methods = usePaymentMethods();
   const createMut = useCreateOrder();
   const [amount, setAmount] = useState("10");
+  const [payerOpenID, setPayerOpenID] = useState("");
+  const [payerClientIP, setPayerClientIP] = useState("");
+  const [createdOrder, setCreatedOrder] = useState<PaymentOrder | null>(null);
   // Holds the chosen provider_instance_id (unique), not the method type — two
   // instances can share a method type, which would give Radix Select duplicate
   // values and break selection.
@@ -92,22 +95,30 @@ function BalanceTab() {
   const [error, setError] = useState<string | null>(null);
 
   const methodList = methods.data?.data ?? [];
+  const selected =
+    methodList.find((m) => m.provider_instance_id === instanceId) ?? methodList[0] ?? null;
+  const feePreview = selected ? paymentFeePreview(amount, selected) : null;
+  const paymentCurrency = balance.data?.currency ?? "USD";
+  const needsWeChatPayer = selected
+    ? selected.provider === "wechat" && /jsapi|h5/i.test(selected.method)
+    : false;
 
   async function topUp(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
-    const selected =
-      methodList.find((m) => m.provider_instance_id === instanceId) ?? methodList[0];
     if (!selected) {
       setError(t("billing.noMethods"));
       return;
     }
     try {
-      await createMut.mutateAsync({
+      const order = await createMut.mutateAsync({
         method: selected.method,
         amount: amount.trim(),
         product_type: "balance_credit",
+        payer_openid: optionalTrim(payerOpenID),
+        payer_client_ip: optionalTrim(payerClientIP),
       });
+      setCreatedOrder(order);
       toast({ title: t("feedback.created"), tone: "success" });
     } catch (err) {
       setError(meErrorMessage(err));
@@ -167,6 +178,70 @@ function BalanceTab() {
                 </Select>
               )}
             </div>
+            {selected ? (
+              <dl className="rounded-lg border border-srapi-border bg-srapi-card-muted px-3.5 py-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <dt className="text-srapi-text-tertiary">Top-up credit</dt>
+                  <dd className="font-mono text-srapi-text-secondary tabular">
+                    {formatMoney(amount, paymentCurrency)}
+                  </dd>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between">
+                  <dt className="text-srapi-text-tertiary">Channel fee</dt>
+                  <dd className="font-mono text-srapi-text-secondary tabular">
+                    {feePreview ? formatMoney(feePreview.fee, paymentCurrency) : "-"}
+                  </dd>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between">
+                  <dt className="text-srapi-text-tertiary">Payable amount</dt>
+                  <dd className="font-mono text-srapi-text-primary tabular">
+                    {feePreview ? formatMoney(feePreview.payable, paymentCurrency) : "-"}
+                  </dd>
+                </div>
+              </dl>
+            ) : null}
+            {needsWeChatPayer ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="payer-openid">WeChat OpenID</Label>
+                  <Input
+                    id="payer-openid"
+                    value={payerOpenID}
+                    onChange={(e) => setPayerOpenID(e.target.value)}
+                    disabled={createMut.isPending}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="payer-client-ip">Client IP</Label>
+                  <Input
+                    id="payer-client-ip"
+                    value={payerClientIP}
+                    onChange={(e) => setPayerClientIP(e.target.value)}
+                    disabled={createMut.isPending}
+                  />
+                </div>
+              </div>
+            ) : null}
+            {createdOrder ? (
+              <dl className="rounded-lg border border-srapi-border bg-srapi-card px-3.5 py-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <dt className="text-srapi-text-tertiary">Created order</dt>
+                  <dd className="font-mono text-srapi-text-secondary">{createdOrder.order_no}</dd>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between">
+                  <dt className="text-srapi-text-tertiary">Fee</dt>
+                  <dd className="font-mono text-srapi-text-secondary tabular">
+                    {formatMoney(createdOrder.fee_amount, createdOrder.currency)}
+                  </dd>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between">
+                  <dt className="text-srapi-text-tertiary">Payable</dt>
+                  <dd className="font-mono text-srapi-text-primary tabular">
+                    {formatMoney(createdOrder.payable_amount, createdOrder.currency)}
+                  </dd>
+                </div>
+              </dl>
+            ) : null}
             {error ? (
               <p role="alert" className="text-sm text-srapi-error">
                 {error}
@@ -185,6 +260,46 @@ function BalanceTab() {
       </Card>
     </div>
   );
+}
+
+function optionalTrim(value: string): string | undefined {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function paymentFeePreview(amount: string, method: PaymentMethod): { fee: string; payable: string } | null {
+  const rate = typeof method.metadata?.fee_rate === "string" ? method.metadata.fee_rate : "0";
+  const amountUnits = parseDecimalToUnits(amount, 8);
+  const rateUnits = parseDecimalToUnits(rate, 8);
+  if (amountUnits === null || rateUnits === null || amountUnits <= BigInt(0) || rateUnits < BigInt(0)) {
+    return null;
+  }
+  const scale = BigInt(10) ** BigInt(8);
+  const feeUnits = (amountUnits * rateUnits) / scale;
+  return {
+    fee: formatUnits(feeUnits, 8),
+    payable: formatUnits(amountUnits + feeUnits, 8),
+  };
+}
+
+function parseDecimalToUnits(value: string, scale: number): bigint | null {
+  const trimmed = value.trim();
+  if (!/^[0-9]+(\.[0-9]+)?$/.test(trimmed)) {
+    return null;
+  }
+  const [whole, fractional = ""] = trimmed.split(".");
+  if (fractional.length > scale) {
+    return null;
+  }
+  const padded = fractional.padEnd(scale, "0").slice(0, scale);
+  return BigInt(`${whole}${padded}`.replace(/^0+(?=\d)/, "") || "0");
+}
+
+function formatUnits(units: bigint, scale: number): string {
+  const raw = units.toString().padStart(scale + 1, "0");
+  const whole = raw.slice(0, -scale);
+  const fractional = raw.slice(-scale);
+  return `${whole}.${fractional}`;
 }
 
 function OrdersTab() {

@@ -310,11 +310,29 @@ function UsageBreakdown() {
               value: row.request_count,
             }));
             return (
-              <BarSeries
-                data={series}
-                ariaLabel={t("adminUsage.requests")}
-                formatValue={(v) => formatInteger(v)}
-              />
+              <div className="space-y-4">
+                <BarSeries
+                  data={series}
+                  ariaLabel={t("adminUsage.requests")}
+                  formatValue={(v) => formatInteger(v)}
+                />
+                <div className="grid gap-2 md:grid-cols-2">
+                  {top.slice(0, 4).map((row) => (
+                    <div key={row.aggregate_id} className="rounded-md border border-srapi-border/70 p-3 text-2xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate font-mono text-srapi-text-primary">{row.aggregate_id}</span>
+                        <span className="font-mono text-srapi-text-secondary">{formatMoney(row.total_cost, row.currency)}</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-srapi-text-tertiary">
+                        <span>in {formatMoney(row.input_cost ?? "0", row.currency)}</span>
+                        <span>out {formatMoney(row.output_cost ?? "0", row.currency)}</span>
+                        <span>cache r {formatMoney(row.cache_read_cost ?? "0", row.currency)}</span>
+                        <span>cache w {formatMoney(row.cache_write_cost ?? "0", row.currency)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             );
           }}
         </PageQueryState>

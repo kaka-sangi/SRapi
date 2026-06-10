@@ -19,7 +19,10 @@ import {
   createPaymentOrder,
   cancelPaymentOrder,
   getCurrentUserAffiliate,
+  listCurrentUserAffiliateInviteCodes,
+  createCurrentUserAffiliateInviteCode,
   listCurrentUserAffiliateLedger,
+  requestCurrentUserAffiliateWithdrawal,
   transferCurrentUserAffiliateToBalance,
   listCurrentUserAnnouncements,
   markCurrentUserAnnouncementRead,
@@ -39,6 +42,8 @@ import {
 } from "../../../../packages/sdk/typescript/src/index";
 import type {
   AffiliateTransferToBalanceRequest,
+  AffiliateWithdrawalRequest,
+  CreateAffiliateInviteCodeRequest,
   PlaygroundModel,
   ChangeCurrentUserPasswordRequest,
   CreatePaymentOrderRequest,
@@ -194,12 +199,27 @@ export const meApi = {
   getAffiliate() {
     return unwrapData(() => getCurrentUserAffiliate({ throwOnError: true }));
   },
+  listAffiliateInviteCodes() {
+    return unwrapList(() => listCurrentUserAffiliateInviteCodes({ throwOnError: true }));
+  },
+  createAffiliateInviteCode(body?: CreateAffiliateInviteCodeRequest) {
+    return unwrapData(() => createCurrentUserAffiliateInviteCode({ body, throwOnError: true }));
+  },
   listAffiliateLedger(query?: ListCurrentUserAffiliateLedgerData["query"]) {
     return unwrapList(() => listCurrentUserAffiliateLedger({ query, throwOnError: true }));
   },
   transferToBalance(body: AffiliateTransferToBalanceRequest) {
     return unwrapData(() =>
       transferCurrentUserAffiliateToBalance({
+        body,
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+        throwOnError: true,
+      }),
+    );
+  },
+  requestAffiliateWithdrawal(body: AffiliateWithdrawalRequest) {
+    return unwrapData(() =>
+      requestCurrentUserAffiliateWithdrawal({
         body,
         headers: { "Idempotency-Key": crypto.randomUUID() },
         throwOnError: true,

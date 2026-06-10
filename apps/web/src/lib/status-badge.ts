@@ -9,10 +9,10 @@ export function quietStatusFor(status: string | null | undefined): QuietStatus {
   if (["active", "published", "paid", "fulfilled", "resolved", "ok", "healthy", "enabled", "enforce"].includes(s)) {
     return "active";
   }
-  if (["limited", "pending", "draft", "suspended", "firing", "warning", "warn", "burning", "monitor"].includes(s)) {
+  if (["limited", "pending", "draft", "suspended", "firing", "warning", "warn", "burning", "monitor", "refunding"].includes(s)) {
     return "limited";
   }
-  if (["failed", "error", "breached", "critical", "canceled", "cancelled", "refunded", "dead", "block"].includes(s)) {
+  if (["failed", "refund_failed", "error", "breached", "critical", "canceled", "cancelled", "refunded", "dead", "block"].includes(s)) {
     return "error";
   }
   return "disabled";

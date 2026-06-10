@@ -11,6 +11,10 @@ import type {
   UpdateAdminAccountData,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
+export type AccountRiskLevel = NonNullable<CreateAdminAccountData["body"]["risk_level"]>;
+
+export const ACCOUNT_RISK_LEVELS: AccountRiskLevel[] = ["normal", "medium", "high"];
+
 export const ACCOUNT_RUNTIME_CLASSES: RuntimeClass[] = [
   "api_key",
   "oauth_refresh",
@@ -36,6 +40,7 @@ export interface AdminAccountFormState {
   credential: string;
   proxyId: string;
   status: ProviderAccountStatus;
+  riskLevel: AccountRiskLevel;
   priority: string;
   weight: string;
   metadata: Record<string, unknown>;
@@ -51,6 +56,7 @@ export function emptyAccountForm(defaultProviderId = ""): AdminAccountFormState 
     credential: '{\n  "api_key": ""\n}',
     proxyId: "",
     status: "active",
+    riskLevel: "normal",
     priority: "0",
     weight: "1",
     metadata: {},
@@ -67,6 +73,7 @@ export function accountFormFromAccount(account: ProviderAccount): AdminAccountFo
     credential: "",
     proxyId: "",
     status: account.status,
+    riskLevel: normalizeRiskLevel(account.risk_level),
     priority: String(account.priority),
     weight: String(account.weight),
     metadata: (account.metadata ?? {}) as Record<string, unknown>,
@@ -96,6 +103,7 @@ export function buildCreateAccountBody(form: AdminAccountFormState): CreateAdmin
     credential: parseJsonObject(form.credential, "Credential"),
     proxy_id: nullableTrim(form.proxyId),
     status: form.status,
+    risk_level: form.riskLevel,
     priority: Number(form.priority || 0),
     weight: Number(form.weight || 1),
     metadata: form.metadata,
@@ -108,6 +116,7 @@ export function buildUpdateAccountBody(form: AdminAccountFormState): UpdateAdmin
     runtime_class: form.runtimeClass,
     upstream_client: nullableTrim(form.upstreamClient),
     status: form.status,
+    risk_level: form.riskLevel,
     priority: Number(form.priority || 0),
     weight: Number(form.weight || 1),
     metadata: form.metadata,
@@ -122,6 +131,12 @@ export function buildUpdateAccountBody(form: AdminAccountFormState): UpdateAdmin
   }
 
   return body;
+}
+
+function normalizeRiskLevel(value: string | null | undefined): AccountRiskLevel {
+  return ACCOUNT_RISK_LEVELS.includes(value as AccountRiskLevel)
+    ? (value as AccountRiskLevel)
+    : "normal";
 }
 
 export function diffAccountGroupIds(currentGroupIds: Id[], nextGroupIds: Id[]) {

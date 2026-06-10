@@ -94,6 +94,16 @@ function PlansContent() {
       hint: t("adminSubscriptions.quotaUnlimitedHint"),
     },
     {
+      name: "dailyCostQuota",
+      label: t("adminSubscriptions.dailyCostQuota"),
+      hint: t("adminSubscriptions.quotaUnlimitedHint"),
+    },
+    {
+      name: "weeklyCostQuota",
+      label: t("adminSubscriptions.weeklyCostQuota"),
+      hint: t("adminSubscriptions.quotaUnlimitedHint"),
+    },
+    {
       name: "monthlyCostQuota",
       label: t("adminSubscriptions.monthlyCostQuota"),
       hint: t("adminSubscriptions.quotaUnlimitedHint"),

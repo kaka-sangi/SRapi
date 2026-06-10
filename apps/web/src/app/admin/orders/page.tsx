@@ -5,7 +5,7 @@ import { ShoppingCart } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
-import { RowActionsMenu } from "@/components/admin/row-actions";
+import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
@@ -21,12 +21,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAdminPaymentOrders, useRefundPaymentOrder } from "@/hooks/admin-queries";
+import {
+  useAdminPaymentOrderAuditLogs,
+  useAdminPaymentOrders,
+  useRefundPaymentOrder,
+} from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { quietStatusFor } from "@/lib/status-badge";
-import { formatMoney } from "@/lib/admin-format";
+import { formatDateTime, formatMoney, safeJson } from "@/lib/admin-format";
 import { adminErrorMessage } from "@/lib/admin-api";
 import {
   isRefundableOrder,
@@ -34,7 +38,7 @@ import {
   buildRefundPaymentOrderBody,
   type RefundOrderFormState,
 } from "@/lib/admin-orders-form";
-import type { PaymentOrder } from "@/lib/sdk-types";
+import type { PaymentAuditLog, PaymentOrder } from "@/lib/sdk-types";
 
 export default function AdminOrdersPage() {
   return (
@@ -49,7 +53,9 @@ const ORDER_STATUSES: PaymentOrder["status"][] = [
   "paid",
   "fulfilled",
   "partially_refunded",
+  "refunding",
   "refunded",
+  "refund_failed",
   "expired",
   "canceled",
   "failed",
@@ -76,6 +82,7 @@ function OrdersContent() {
     status: statusFilter,
   });
   const [refundTarget, setRefundTarget] = useState<PaymentOrder | null>(null);
+  const [auditTarget, setAuditTarget] = useState<PaymentOrder | null>(null);
 
   const columns: Column<PaymentOrder>[] = [
     {
@@ -164,25 +171,88 @@ function OrdersContent() {
           total: orders.data?.pagination?.total ?? orders.data?.data.length ?? 0,
           onPageChange: list.setPage,
         }}
-        rowActions={(o) =>
-          isRefundableOrder(o) ? (
-            <RowActionsMenu
-              actions={[
-                {
-                  label: t("adminOrders.refund"),
-                  destructive: true,
-                  onSelect: () => setRefundTarget(o),
-                },
-              ]}
-            />
-          ) : null
-        }
+        rowActions={(o) => {
+          const actions: RowAction[] = [
+            {
+              label: "Audit timeline",
+              onSelect: () => setAuditTarget(o),
+            },
+          ];
+          if (isRefundableOrder(o)) {
+            actions.push({
+              label: t("adminOrders.refund"),
+              destructive: true,
+              onSelect: () => setRefundTarget(o),
+            });
+          }
+          return <RowActionsMenu actions={actions} />;
+        }}
       />
 
       {refundTarget ? (
         <RefundDialog order={refundTarget} onClose={() => setRefundTarget(null)} />
       ) : null}
+      {auditTarget ? (
+        <AuditDialog order={auditTarget} onClose={() => setAuditTarget(null)} />
+      ) : null}
     </>
+  );
+}
+
+function AuditDialog({ order, onClose }: { order: PaymentOrder; onClose: () => void }) {
+  const logs = useAdminPaymentOrderAuditLogs(order.id);
+  return (
+    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Audit timeline</DialogTitle>
+          <DialogDescription>{order.order_no}</DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+          {logs.isLoading ? (
+            <p className="text-sm text-srapi-text-tertiary">Loading...</p>
+          ) : logs.isError ? (
+            <p role="alert" className="text-sm text-srapi-error">Failed to load audit logs.</p>
+          ) : (logs.data?.data.length ?? 0) === 0 ? (
+            <p className="text-sm text-srapi-text-tertiary">No audit logs.</p>
+          ) : (
+            logs.data!.data.map((log) => <AuditLogItem key={log.id} log={log} />)
+          )}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AuditLogItem({ log }: { log: PaymentAuditLog }) {
+  return (
+    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-mono text-xs text-srapi-text-primary">{log.event_type}</span>
+        <QuietBadge
+          status={log.signature_valid ? "active" : "error"}
+          label={log.signature_valid ? "signature valid" : "signature invalid"}
+        />
+      </div>
+      <dl className="mt-2 grid gap-1 text-2xs text-srapi-text-tertiary sm:grid-cols-2">
+        <div>
+          <dt>Idempotency key</dt>
+          <dd className="break-all font-mono text-srapi-text-secondary">{log.idempotency_key}</dd>
+        </div>
+        <div>
+          <dt>Created</dt>
+          <dd className="font-mono text-srapi-text-secondary">{formatDateTime(log.created_at)}</dd>
+        </div>
+      </dl>
+      <pre className="mt-2 max-h-48 overflow-auto rounded-md border border-srapi-border bg-srapi-card px-3 py-2 text-2xs text-srapi-text-secondary">
+        {safeJson(log.payload)}
+      </pre>
+    </div>
   );
 }
 

@@ -103,6 +103,7 @@ export function statusBadgeVariant(status: string | null | undefined): BadgeProp
       "warning",
       "warn",
       "monitor",
+      "refunding",
     ].includes(normalized)
   ) {
     return "warning";
@@ -116,6 +117,7 @@ export function statusBadgeVariant(status: string | null | undefined): BadgeProp
       "canceled",
       "cancelled",
       "failed",
+      "refund_failed",
       "dead",
       "critical",
       "block",

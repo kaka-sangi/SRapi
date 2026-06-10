@@ -379,6 +379,12 @@ export function useRedeemCode() {
 export function useAffiliate() {
   return useQuery({ queryKey: queryKeys.me.affiliate(), queryFn: () => meApi.getAffiliate() });
 }
+export function useAffiliateInviteCodes() {
+  return useQuery({
+    queryKey: queryKeys.me.affiliateInviteCodes(),
+    queryFn: () => meApi.listAffiliateInviteCodes(),
+  });
+}
 export function useAffiliateLedger() {
   return useQuery({
     queryKey: queryKeys.me.affiliateLedger(),
@@ -392,6 +398,28 @@ export function useTransferToBalance() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.me.affiliate() });
       qc.invalidateQueries({ queryKey: queryKeys.me.balance() });
+    },
+  });
+}
+export function useRequestAffiliateWithdrawal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MeP<typeof meApi.requestAffiliateWithdrawal>) =>
+      meApi.requestAffiliateWithdrawal(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.me.affiliate() });
+      qc.invalidateQueries({ queryKey: queryKeys.me.affiliateLedger() });
+    },
+  });
+}
+export function useCreateAffiliateInviteCode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: MeP<typeof meApi.createAffiliateInviteCode>) =>
+      meApi.createAffiliateInviteCode(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.me.affiliate() });
+      qc.invalidateQueries({ queryKey: queryKeys.me.affiliateInviteCodes() });
     },
   });
 }

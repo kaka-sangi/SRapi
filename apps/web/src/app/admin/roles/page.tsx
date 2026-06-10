@@ -16,6 +16,7 @@ import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import {
   useAdminRoles,
+  useAdminPermissionCatalog,
   useCreateAdminRole,
   useUpdateAdminRole,
   useDeleteAdminRole,
@@ -55,6 +56,7 @@ function RolesContent() {
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-roles", ["created"]);
   const all = useAdminRoles();
+  const permissionCatalog = useAdminPermissionCatalog();
   const { query, total } = useClientPagedList(all, list, { match: roleMatch, compare: roleCompare });
   const createMut = useCreateAdminRole();
   const updateMut = useUpdateAdminRole();
@@ -67,8 +69,14 @@ function RolesContent() {
   const permissionsField: FieldConfig<RoleFormState> = {
     name: "permissions",
     label: t("adminRoles.permissions"),
-    type: "tags",
+    type: "combobox",
+    options: (permissionCatalog.data ?? []).map((permission) => ({
+      value: permission.permission,
+      label: `${permission.permission} · ${permission.description}`,
+    })),
     placeholder: t("adminRoles.permissionsPlaceholder"),
+    searchPlaceholder: t("adminRoles.permissionsPlaceholder"),
+    emptyText: t("adminCommon.noResults"),
     hint: t("adminRoles.permissionsHint"),
   };
 

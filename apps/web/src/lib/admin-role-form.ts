@@ -8,9 +8,8 @@ export function isBuiltInRole(name: string): boolean {
   return BUILT_IN_ROLES.includes(name);
 }
 
-/** Flat draft for the create-role dialog. Permissions are free-form
- * `resource:action` keys (e.g. `usage:read`) — there is no enumeration endpoint,
- * so the form collects them as tags. */
+/** Flat draft for the create-role dialog. Permissions come from the backend
+ * catalog endpoint and are submitted as resource:action keys. */
 export interface RoleFormState {
   name: string;
   description: string;
