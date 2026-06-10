@@ -318,14 +318,14 @@ Stage 1 complete - auth allowlist guard
 - This would fail on the previous preset state because `service_account_json`, `desktop_client_token`, and `ide_plugin_token` were exposed by default presets but are outside the signable set.
 
 Stage 2 complete - P0 auth method cleanup
-- Removed `service_account_json` from the Anthropic and Bedrock provider presets; the runtime enum remains for legacy stored accounts, with no default UI exposure.
+- Removed `service_account_json` from the Anthropic and Bedrock provider presets. Later batch11 removed the runtime enum/API/frontend surface entirely.
 - Removed unsupported first-party OpenAI and Gemini OAuth runtimes from their presets and OAuth metadata.
 - Added provider-adapter `not_supported` handling for manually configured first-party OpenAI/Gemini OAuth accounts.
 
 Stage 3 complete - P1 auth method cleanup
 - Merged Antigravity default desktop/IDE token exposure into `oauth_refresh`; the preset now templates `upstream_client=antigravity_desktop` so built-in refresh settings resolve.
 - Added `chatgpt-web` provider preset installed as `reverse-proxy-chatgpt-web`, exposing `web_session_cookie` and `custom_reverse_proxy`.
-- Removed `desktop_client_token`, `ide_plugin_token`, and `service_account_json` from the frontend account-create fallback runtime list; legacy account edit still preserves the existing runtime class.
+- Removed `desktop_client_token`, `ide_plugin_token`, and `service_account_json` from the frontend account-create fallback runtime list. Later batch11 removed those runtime classes entirely rather than preserving legacy edit compatibility.
 - Removed OpenAI OAuth from Quick Setup's static preset list.
 
 Stage 4 complete - regression, docs, and broad gates
@@ -335,11 +335,11 @@ Stage 4 complete - regression, docs, and broad gates
 - Anthropic OAuth preset accounts now template `upstream_client=claude_code_cli`; Antigravity templates `upstream_client=antigravity_desktop`.
 - `chatgpt-web` is the default web-cookie preset. `reverse-proxy-claude-web` remains roadmap/manual and is not exposed as a default preset.
 
-Final auth class disposition:
-- `service_account_json`: kept as legacy runtime enum only; removed from Anthropic/Bedrock preset allowlists and account-create fallback UI.
+Final auth class disposition after batch11 cleanup:
+- `service_account_json`: removed from OpenAPI, Go, TypeScript SDK, provider presets, and frontend runtime class surfaces.
 - `oauth_refresh` / `oauth_device_code`: retained only for presets with provisioning defaults and built-in refresh paths; first-party OpenAI/Gemini presets exclude OAuth and manual OAuth accounts return `not_supported`.
-- `desktop_client_token` / `ide_plugin_token`: kept as legacy runtime enums only; removed from Antigravity preset allowlist and fallback UI, with Antigravity defaulting to `oauth_refresh`.
-- `web_session_cookie`: preset-reachable through `chatgpt-web` installed as `reverse-proxy-chatgpt-web`; fallback/manual account editing still preserves existing runtime classes.
+- `desktop_client_token` / `ide_plugin_token`: removed from OpenAPI, Go, TypeScript SDK, provider presets, and frontend runtime class surfaces; Antigravity uses `oauth_refresh`.
+- `web_session_cookie`: preset-reachable through `chatgpt-web` installed as `reverse-proxy-chatgpt-web`.
 - `custom_reverse_proxy`, `api_key`, `cli_client_token`: unchanged where already wired.
 
 Evidence:
@@ -353,3 +353,348 @@ Evidence:
 
 Next:
 - Batch7 behavior is implemented and verified. Per-stage commits and a clean `git status` were not produced because the shared worktree already contains cumulative batch1-batch6 dirty changes plus untracked generated files; committing only batch7 would mix unrelated prior changes in files touched across batches.
+
+SRapi sub2api parity batch8 progress
+
+Stage 1 complete - affiliate invite/rule backend contract and handlers
+- Added OpenAPI-first contract for:
+  - GET/POST `/api/v1/me/affiliate/invite-codes`.
+  - GET/POST `/api/v1/admin/affiliate-rules`.
+  - PATCH `/api/v1/admin/affiliate-rules/{id}`.
+- Regenerated Go OpenAPI types, Copilot OpenAPI spec, and TypeScript SDK.
+- Added affiliate store/service methods for listing current-user invite codes and listing/updating affiliate rules in both memory and Ent stores.
+- Extended `/api/v1/me/affiliate` summary with `invite_codes` and `invited_count`.
+- Added current-user invite-code handlers with real `CreateInviteCode` writes.
+- Added admin affiliate-rule list/create/update handlers with real `CreateRule`/`UpdateRule` writes.
+- Added focused HTTP tests proving invite-code create/list/summary exposure and affiliate-rule create/update/list routes work.
+- Added optional `invite_code` to public registration and prevalidated/bound it through `ValidateInviteCode` + `BindInvite`.
+- Added focused registration test proving a real affiliate relationship is created when registration includes an invite code.
+- Added OpenAPI-first affiliate ledger producers:
+  - POST `/api/v1/me/affiliate/withdrawals` creates a pending `LedgerTypeWithdraw` request and reserves affiliate balance atomically.
+  - POST `/api/v1/admin/affiliates/withdrawals/{id}/approve` settles a pending withdrawal.
+  - POST `/api/v1/admin/affiliates/withdrawals/{id}/cancel` cancels a pending withdrawal and releases the reserved balance.
+  - POST `/api/v1/admin/affiliates/manual-adjustments` writes `LedgerTypeManualAdjustment`.
+- Added affiliate service/store methods for atomic withdrawal reserve, admin approval/cancel, and manual adjustment with idempotent ledger references.
+- Removed the orphan `settle` affiliate ledger enum and `settled_amount` summary/API field instead of keeping a zero-producing compatibility surface.
+- Added focused service, Ent store, and HTTP tests proving withdrawal pending -> settled/canceled state transitions, balance reservation/release, duplicate approval conflict, summary `WithdrawnAmount`, and manual adjustment real ledger writes.
+- Added promo-code backend support for `per_user_limit` and `min_order_amount` in the admin promo contract, API DTOs, generated Go/TS clients, and service validation.
+- Enforced promo per-user/minimum-order constraints in memory and Ent admin-control promo preview/finalize paths.
+- Added promo usage release support and wired payment cancel/expire transitions to release pending-order promo usage instead of leaking `UsedCount`.
+- Marked released promo applications in metadata while preserving usage history.
+- Added frontend admin promo form/list fields for `per_user_limit` and `min_order_amount`.
+- Added current-user affiliate invite-code SDK/hooks and UI for code generation, copyable code/link, and invited count on `/affiliate`.
+- Added current-user affiliate withdrawal request wrapper/hook and withdrawal form on `/affiliate`.
+- Added admin affiliate rule SDK/hooks, route/nav entry, form helper, and `/admin/affiliates/rules` page for list/create/edit of active rule fields.
+- Added `TestAffiliateInviteRuleAndAccrualFlow`, proving HTTP invite generation -> HTTP registration with `invite_code` -> HTTP admin rule creation -> `AccrueRebate Applied:true` -> accrue ledger write.
+
+Evidence:
+- make openapi-codegen-check: exit 0.
+- make openapi-ts-codegen-check: exit 0.
+- cd apps/api && go build ./... && go vet ./...: exit 0.
+- cd apps/api && go test ./internal/modules/affiliate/... ./internal/persistence/entstore/affiliate -count=1: exit 0.
+- cd apps/api && go test ./internal/httpserver -run 'Test(AdminAffiliateListsExposeRealDomainRecords|CurrentUserAffiliateSummaryLedgerAndTransfer)' -count=1: exit 0.
+- cd apps/api && go test ./internal/httpserver -run 'TestRegister(WithInviteCodeBindsAffiliateRelationship|CreatesSessionWhenEnabled|RejectsDuplicateWithoutLeakingUserState)' -count=1: exit 0.
+- cd apps/api && go test ./internal/httpserver -run 'Test(AdminAffiliateListsExposeRealDomainRecords|CurrentUserAffiliateSummaryLedgerAndTransfer|RegisterWithInviteCodeBindsAffiliateRelationship)' -count=1: exit 0.
+- cd apps/api && go build ./... && go vet ./...: exit 0.
+- make openapi-codegen-check: exit 0.
+- make openapi-ts-codegen-check: exit 0.
+- make openapi-lint: valid, with the existing 3 public-endpoint 4xx warnings.
+- cd apps/api && go test ./internal/modules/admin_control/... ./internal/persistence/entstore/admincontrol -count=1: exit 0.
+- cd apps/api && go test ./internal/modules/payments/... ./internal/persistence/entstore/payments -run 'Test(CreateOrderAppliesPromoCodeBeforeCheckout|PaymentOrderStatusMachineRejectsIllegalTransitions|CancelOrderReleasesPromoUsage|ExpirePendingOrdersMarksExpiredOrdersAndWritesAudit|ExpirePendingOrdersReleasesPromoUsage|StoreCreatesDiscountedOrderAndPromoApplicationAtomically|StorePromoLimitsAndRelease)' -count=1: exit 0.
+- cd apps/api && go test ./internal/httpserver -run 'Test(AdminAffiliateListsExposeRealDomainRecords|CurrentUserAffiliateSummaryLedgerAndTransfer|AffiliateInviteRuleAndAccrualFlow|RegisterWithInviteCodeBindsAffiliateRelationship)' -count=1: exit 0.
+- cd apps/web && npm run typecheck: exit 0.
+- cd apps/web && npm run lint: exit 0, with 12 existing unused Skeleton warnings outside this batch8 slice.
+- npm run -w apps/web tsc: exit 1 because the root package has no npm workspaces; used `cd apps/web && npm run typecheck` instead.
+- cd apps/api && go test ./...: exit 0; internal/httpserver passed in 438.760s.
+- make openapi-codegen-check: exit 0 after regenerating with oapi-codegen v2.7.0.
+- make openapi-ts-codegen-check: exit 0.
+- make openapi-lint: valid with the existing 3 public-endpoint 4xx warnings.
+- cd apps/api && go build ./...: exit 0.
+- cd apps/api && go vet ./...: exit 0.
+- cd apps/api && go test ./internal/modules/affiliate/... ./internal/persistence/entstore/affiliate -count=1: exit 0.
+- cd apps/api && go test ./internal/httpserver -run 'Test(CurrentUserAffiliateSummaryLedgerAndTransfer|AdminAffiliateListsExposeRealDomainRecords|AffiliateInviteRuleAndAccrualFlow|RegisterWithInviteCodeBindsAffiliateRelationship)' -count=1: exit 0.
+- cd apps/api && go test ./...: exit 0; internal/httpserver passed in 309.016s.
+- cd apps/web && npm run typecheck: exit 0.
+- cd apps/web && npm run lint: exit 0, with 12 existing unused Skeleton warnings outside this batch8 slice.
+- git diff --check: exit 0.
+
+Remaining batch8 work:
+- No browser screenshot verification by current user instruction; no browser download or browser validation was performed after this update.
+- No compatibility shim remains for orphan affiliate `settle`; the enum/API summary field was removed. `manual_adjustment` and `withdraw` now have real producers.
+
+SRapi sub2api parity batch9 progress
+
+Stage 1 complete - RBAC admin routes and role management
+- Added real admin RBAC handlers instead of leaving role/permission UI backed by partial surfaces.
+- Added role form/API/query wiring in the frontend admin area.
+- Tightened user contract/service/store behavior around roles and permissions.
+- Added focused HTTP, module, and store tests for admin role flows.
+
+Stage 2 complete - risk control enforcement path
+- Added risk-control admin handler split and tests.
+- Wired configured risk controls into gateway/runtime decision points instead of keeping admin settings as inert metadata.
+- Updated frontend risk-control form/page/i18n wiring.
+
+Stage 3 complete - content safety configuration and enforcement
+- Added content-safety contract/service updates with tests.
+- Wired content-safety findings into gateway behavior and audit output.
+- Split content-safety gateway helpers from `runtime_gateway_core.go` into `runtime_gateway_content_safety.go` to keep the runtime core file under the 2200-line quality gate.
+- Added frontend content-safety form wiring and i18n.
+
+Evidence:
+- Focused backend RBAC, risk-control, and content-safety tests passed before batch10 work continued.
+- `cd apps/api && go build ./...`: exit 0 after batch10 cleanup.
+- `cd apps/api && go vet ./...`: exit 0 after batch10 cleanup.
+- `cd apps/api && go test ./internal/architecture ./internal/codequality -count=1`: exit 0 after the gateway helper split.
+- `cd apps/web && npm run typecheck`: exit 0 after batch10 frontend changes.
+- `cd apps/web && npm run lint`: exit 0, with 12 existing unused Skeleton warnings only.
+
+Next:
+- Batch9 behavior is implemented and verified by focused checks. Browser validation was skipped per current user instruction.
+- No compatibility shim was kept for fake admin surfaces; settings now either feed enforcement paths or are represented as real CRUD/configuration surfaces.
+
+SRapi sub2api parity batch10 progress
+
+Stage 1 complete - scheduler `priority` compatibility removed
+- Replaced scheduler strategy `priority` weight with `quality`.
+- Seeded strategies now use `quality`; scheduling score consumption reads `weights["quality"]`.
+- Strategy loader rejects the old `priority` key instead of aliasing it.
+
+Stage 2 complete - scheduler strategy CRUD, cache, and lifecycle
+- Added typed strategy status/scope contracts, mutation DTOs, and store APIs.
+- Added scheduler service CRUD for create/update/activate/deprecate with config hash, lifecycle timestamps, validation, and cache invalidation.
+- Scheduler strategy loading now caches active strategies and refreshes on TTL/dirty state instead of hitting persistence for every schedule call.
+- Strategy resolution supports global, API key, account group, and user scopes.
+- Memory and Ent scheduler stores now list/get/create/update scoped strategies and active scoped registries.
+
+Stage 3 complete - all active strategy scopes load into scheduler
+- `ListActiveStrategies` now loads active scoped strategies instead of only global entries.
+- Schedule resolution checks request scopes and falls back to global strategies deterministically.
+- Scoped strategy tests cover API-key overrides without leaking into non-matching requests.
+
+Stage 4 complete - scheduled-test cron and probe model
+- Added real cron parsing for 5-field expressions using local stdlib code, not a new dependency.
+- `NextRunAt` uses cron when valid and falls back to interval for invalid expressions.
+- Added `probe_model` to scheduled-test contracts, OpenAPI, Ent schema/generated surface, memory/Ent stores, HTTP handlers, TypeScript SDK, and frontend form/list UI.
+- The scheduled-test runner now probes `plan.ProbeModel` first, then falls back to account metadata/config.
+- Runs with selected accounts but zero probed accounts now record `warning`.
+- Added migration `000039_scheduled_test_probe_model.sql` and updated `atlas.sum`.
+
+Stage 5 complete - scheduler and scheduled-test admin frontend
+- Replaced the orphan strategy page with live strategy overview, registry, create/update/deprecate/activate controls, simulate, and replay views.
+- Added scheduler admin API wrappers, hooks, query keys, SDK exports, and i18n strings.
+- Scheduled-test UI now exposes `probe_model`, shows warning status, searches by probe model, and updates cron copy.
+
+Manual generated-code note:
+- Ent generation could not be rerun offline because the local Go toolchain is 1.26.2 while the module requires 1.26.3, and the generator path wanted uncached modules. Per user instruction, no download was performed.
+- The single new Ent field surface for `scheduled_test_plans.probe_model` was updated manually and validated with build, tests, migration checks, and generated-contract drift checks.
+
+Evidence:
+- Scheduler focused tests passed:
+  `cd apps/api && go test ./internal/modules/scheduler/service ./internal/persistence/entstore/scheduler ./internal/modules/scheduled_tests/service ./internal/workers/scheduled_test ./internal/httpserver -run 'TestServiceCRUDStrategyFlowsIntoScheduleAndDeprecates|TestScopedStrategyOverridesOnlyMatchingRequestScope|TestStrategyLoaderRejectsPriorityWeightKey|TestStoreListsActiveStrategiesAcrossScopes|TestAdminSchedulerStrategiesReflectActivePersistentStrategy|TestAdminSchedulerStrategyCRUDLifecycle|TestAdminSchedulerSimulationIsDryRun|TestAdminSchedulerReplayUsesPersistedSnapshots|TestNextRunAtUsesCronExpressionWhenValid|TestNextRunAtUsesCronDayOfMonthOrWeekdaySemantics|TestNextRunAtFallsBackToIntervalForInvalidCron|TestRunPlanProbeModelOverridesMetadata|TestRunPlanWithoutProbeModelRecordsWarning|TestAdminScheduledTestPlanProbeModelRoundTrip' -count=1`: exit 0.
+- `npm_config_offline=true make openapi-ts-codegen-check OPENAPI_TS='npx --offline @hey-api/openapi-ts@0.97.2'`: exit 0.
+- `npm_config_offline=true make sdk-ts-typecheck TSC='npx --offline -p typescript@5.9.3 tsc'`: exit 0.
+- Local cached OpenAPI Go generation comparison with `oapi-codegen v2.7.0`: exit 0.
+- `make migration-check`: exit 0.
+- `make diff-check`: exit 0.
+- `cd apps/api && go build ./...`: exit 0.
+- `cd apps/api && go vet ./...`: exit 0.
+- `cd apps/api && go test ./internal/architecture ./internal/codequality -count=1`: exit 0.
+- `cd apps/web && npm run typecheck`: exit 0.
+- `cd apps/web && npm run lint`: exit 0, with 12 existing unused Skeleton warnings only.
+
+Not run:
+- Browser validation and screenshots were skipped per current user instruction.
+- No downloads were performed.
+- Broad `go test` over the full httpserver surface was not rerun for batch10; one broad scheduled-tests/httpserver package run hung and was killed, then replaced with focused HTTP/module/store tests plus build/vet/architecture/codequality checks.
+- Per-stage commits were not created because the shared worktree already contains cumulative dirty changes from multiple batches.
+
+Next:
+- Continue with batch11 from OpenAPI/schema and local-context inspection. Use local cached tooling only.
+
+SRapi sub2api parity batch11 progress
+
+Stage 1 complete - account runtime class cleanup and risk_level contract
+- Removed fake runtime classes from OpenAPI/Go/TypeScript/frontend runtime class surfaces: `service_account_json`, `desktop_client_token`, and `ide_plugin_token`.
+- Reverse proxy auth injection no longer falls through to Bearer for unknown runtime classes; OAuth paths use the real `oauth_refresh` / `oauth_device_code` classes.
+- Added `risk_level` to account Create/Update/import contract paths and frontend account form state.
+- Accounts service validates `risk_level` (`normal`, `medium`, `high`) and runtime class on create/update.
+- Scheduler risk penalty test now proves high/medium account risk affects scoring.
+
+Stage 2 complete - quota credits persistence and Antigravity quota config
+- `QuotaReport` plan/credits are persisted to account metadata and provider-credit snapshots from both manual fetch and the quota refresh worker.
+- Added Codex `account_plan.*` fixture coverage for plan/credits mapping.
+- Antigravity preset now carries a real `QuotaConfig` with project header expansion and returns `Supported=true` in quota fetch tests.
+
+Stage 3 complete - channel monitor service runner and worker
+- Moved monitor target resolution, probe metadata overlay, ProbeAccount execution, and run recording out of HTTP into `channel_monitors/service`.
+- Manual `/run` now rejects disabled monitors.
+- Added `workers/channel_monitor` and wired it into app start/shutdown; it runs enabled due definitions and records `Trigger=scheduled`.
+- Added service and worker tests for disabled skip, interval due selection, scheduled trigger, and probe execution.
+
+Stage 4 complete - TLS profile and risk UI
+- Account form now has a dedicated `risk_level` select.
+- Account form now has a first-class TLS fingerprint profile switch/dropdown that writes `metadata.tls_profile`.
+- Provider account template metadata hints now include `tls_profile`.
+- Channel detail TLS panel now aggregates profiles actually bound by accounts under that channel instead of rendering all TLS profiles.
+
+Evidence:
+- `rg -n "desktop_client_token|ide_plugin_token|service_account_json" apps/api/internal apps/web/src packages/openapi/openapi.yaml packages/sdk/typescript/src --glob '!**/node_modules/**'`: exit 1, no matches.
+- `cd apps/api && go test ./internal/modules/accounts/service ./internal/modules/scheduler/service ./internal/modules/provider_adapters/service ./internal/workers/quota_refresh ./internal/modules/reverse_proxy/service -run 'TestAccountRiskLevelCreateUpdateAndValidation|TestScheduleAppliesConfiguredAccountRiskPenalty|TestFetchAccountQuotaMapsCodexAccountPlanCredits|TestFetchAccountQuotaAntigravityUsesProjectHeaderAndSupportsQuota|TestWorkerPersistsQuotaReportCreditsAndMetadata|TestRuntimeInjectsAntigravityOAuthTokenAndDefaultUserAgent' -count=1`: exit 0.
+- `cd apps/api && go test ./internal/modules/providers/preset ./internal/modules/channel_monitors/service ./internal/workers/channel_monitor ./internal/httpserver ./internal/app ./internal/architecture -run 'TestInstallDefaultProvidersFromPresets|TestRunDefinitionRejectsDisabledMonitor|TestRunDueSkipsDisabledAndNotDueAndRecordsScheduled|TestWorkerRunsDueEnabledMonitorWithScheduledTrigger|TestChannelMonitorCRUDAndRun|TestAppBootstrapOnlyImportsBootstrapPackages|TestWorkersOnlyDependOnContractsAndServices' -count=1`: exit 0.
+- `npm_config_offline=true npx --offline @hey-api/openapi-ts@0.97.2 -i packages/openapi/openapi.yaml -o packages/sdk/typescript/src -c @hey-api/client-fetch -p @hey-api/typescript @hey-api/sdk --no-log-file`: exit 0.
+- Local cached oapi-codegen v2.7.0 generation: exit 0.
+- `cd apps/web && npm run typecheck`: exit 0.
+- `cd apps/web && npm run lint`: exit 0, with 12 existing unused Skeleton warnings outside this batch11 slice.
+- `cd apps/api && go test ./internal/modules/accounts/service ./internal/modules/scheduler/service ./internal/modules/provider_adapters/service ./internal/workers/quota_refresh ./internal/modules/reverse_proxy/service ./internal/modules/providers/preset ./internal/modules/channel_monitors/service ./internal/workers/channel_monitor ./internal/httpserver ./internal/app ./internal/architecture ./internal/codequality -run 'Test(AccountRiskLevelCreateUpdateAndValidation|ScheduleAppliesConfiguredAccountRiskPenalty|FetchAccountQuotaMapsCodexAccountPlanCredits|FetchAccountQuotaAntigravityUsesProjectHeaderAndSupportsQuota|WorkerPersistsQuotaReportCreditsAndMetadata|RuntimeInjectsAntigravityOAuthTokenAndDefaultUserAgent|InstallDefaultProvidersFromPresets|RunDefinitionRejectsDisabledMonitor|RunDueSkipsDisabledAndNotDueAndRecordsScheduled|WorkerRunsDueEnabledMonitorWithScheduledTrigger|ChannelMonitorCRUDAndRun|ProviderAccountAuthMethodsScopedByProvider|AppBootstrapOnlyImportsBootstrapPackages|WorkersOnlyDependOnContractsAndServices|HTTPRuntimeFilesStayPartitioned|GoFilesDoNotExceedLineLimit|FunctionsStaySmall)' -count=1`: exit 0.
+- `git diff --check`: exit 0.
+- `cd apps/api && go build ./...`: exit 0.
+- `cd apps/api && go vet ./...`: exit 0.
+
+Not run:
+- Browser validation/screenshots skipped per current user instruction.
+- No downloads were performed.
+
+Next:
+- Continue into batch12 using the subagent audit notes. Browser validation remains skipped per current instruction.
+
+SRapi sub2api parity batch12-batch19 final progress
+
+Batch12 complete - payment upstream truth
+- Extended checkout providers with real `Refund` / `QueryOrder` contracts and implementations for Stripe, WeChat, Alipay, EasyPay, and generic checkout paths.
+- `RequestRefund` now transitions through `refunding` and only completes local balance clawback after upstream refund success or confirmed refund webhook state; failures land `refund_failed` with audit evidence instead of pretending local success.
+- Added `payment_reconcile` worker for pending order reconciliation through provider `QueryOrder`.
+- Added provider instance `fee_rate` and weighted selection, order `fee_amount` / `payable_amount`, typed `payer_openid` / `payer_client_ip`, and admin-readable `PaymentAuditLog` timeline.
+- Airwallex remains intentionally not implemented in this slice because the product/provider target is not confirmed; no fake provider surface was added.
+
+Batch13 complete - billing dimensions and daily/weekly quotas
+- Pricing rules now support service-tier multipliers, cache-write 5m/1h pricing, image-output pricing, long-context threshold/multiplier, and billing model source selection.
+- Billing and gateway pricing consume those dimensions with string + big.Rat fixed-precision money.
+- Subscription/user platform quotas now include daily and weekly cost limits and materialized usage surfaces.
+- Usage aggregation includes cost breakdowns, and LiteLLM pricing sync is wired as a guarded worker.
+- `quality_tier` is consumed as scheduler/quality metadata instead of remaining misleading UI-only copy.
+
+Batch14 complete - end-user auth and platform settings
+- Removed fake wechat/dingtalk login exposure rather than keeping non-working buttons.
+- OAuth callback now short-circuits already-bound identities into a real session without forcing password rebinding.
+- Added passwordless email-code registration/login flow, public site config, `/me/attributes`, self-delete enforcement, console idempotency, captcha settings, backup worker, audit/system-log retention cleanup, and WeChat Pay openid helper path.
+- SecuritySecret was not introduced as a second vault; encrypted `Setting.value_ciphertext` remains the single storage path for these configurable secrets.
+
+Batch15 complete - architecture and debt cleanup
+- Split hot runtime/provider files and shared repeated helpers instead of adding compatibility layers.
+- Current line counts: `runtime_gateway_core.go` 1602, `conversation_protocols.go` 1172, `provider_adapters/service.go` 969, `runtime_api_mapping.go` 1696, `scheduler/service.go` 1648.
+- Extracted metadata coercion and quota persistence helpers, cleaned scheduler strategy/pricing legacy key handling, removed dead Codex quota code, and added usage/cost coverage.
+- Runtime fake classes `service_account_json`, `desktop_client_token`, and `ide_plugin_token` are removed from OpenAPI, Go, TypeScript SDK, and frontend surfaces.
+
+Batch16 complete - worker concurrency
+- Added DB-backed leader gate and `runonceguard` plumbing for periodic workers.
+- Wired guarded single-run behavior through balance charger, outbox, idempotency cleanup, payment reconcile, backup, retention, availability rollup, LiteLLM pricing, channel monitor, scheduled test, SLO evaluator, and other periodic workers.
+- Preserved existing multi-replica correctness semantics for billing claim and Redis Lua concurrency paths.
+
+Batch17 complete - deploy/readiness/runtime resources
+- Redis pool/min-idle/read/write/pool timeouts are configurable and validated.
+- `/readyz` now uses explicit dependency pingers; missing pingers report `not_configured`, failed probes report unavailable.
+- Release-mode config rejects memory storage and development secrets.
+- Docker Compose has restart/resource/healthcheck baselines; k8s API deployment skeleton includes `/readyz` readiness and resources.
+- Web build uses Next standalone output and runtime `SRAPI_API_PROXY_TARGET`.
+
+Batch18 complete - gateway hot path performance
+- Gateway admission and usage paths use scoped summaries/list methods instead of broad List-then-filter scans.
+- Gateway account snapshot and usage side effects are moved through durable outbox processing where correctness requires eventual side effects.
+- Pricing and usage summary APIs use scoped store methods; SSE and gateway compatibility behavior remains covered by tests.
+
+Batch19 complete - capacity/observability/read retention
+- Added bounded cleanup/retention surfaces for usage and system logs, guarded retention worker, availability rollup worker, and process-local monotonic runtime counters for metrics.
+- Added/readied capacity indexes and migration hash through `000041_payment_upstream_truth.sql`.
+- Admin ops surfaces can inspect domain outbox and bounded cleanup results without reintroducing full-table hot-path scans.
+
+Final verification on 2026-06-10:
+- `cd apps/api && go test ./... -count=1 -timeout=20m`: exit 0.
+- `cd apps/api && go vet ./...`: exit 0.
+- `cd apps/api && go build ./...`: exit 0.
+- `cd apps/api && go test ./internal/architecture ./internal/codequality -count=1`: exit 0.
+- `make migration-check`: exit 0.
+- `make diff-check`: exit 0.
+- `git diff --check`: exit 0.
+- `make openapi-codegen-check`: exit 0.
+- `npm_config_offline=true make openapi-ts-codegen-check OPENAPI_TS='npx --offline @hey-api/openapi-ts@0.97.2'`: exit 0.
+- `npm_config_offline=true make sdk-ts-typecheck TSC='npx --offline -p typescript@5.9.3 tsc'`: exit 0.
+- `cd apps/web && npm run typecheck`: exit 0.
+- `cd apps/web && npm run lint`: exit 0, with 11 existing unused `Skeleton` warnings.
+- `rg -n "desktop_client_token|ide_plugin_token|service_account_json" apps/api/internal apps/web/src packages/openapi/openapi.yaml packages/sdk/typescript/src --glob '!**/node_modules/**'`: exit 1, no matches.
+
+Not run:
+- Browser validation/screenshots were skipped per current user instruction.
+- No dependency download was intentionally performed. OpenAPI/TypeScript generation used local cached tooling; Go OpenAPI was regenerated with the repository Makefile command after local drift was detected.
+
+SRapi sub2api parity batch20 progress
+
+Batch20 correction scope complete - metrics / retention / indexes / scheduler N+1
+- `/metrics` scrape-time usage/scheduler/account scans were removed. Gateway usage and Scheduler decisions now update process-local monotonic metric state on the write path; scrape reads the in-process snapshot plus realtime/reverse-proxy/ops state.
+- Provider probe metric collection now reads materialized `AccountAvailabilityRollup` rows through `health_rollups.ListRecent`, not `accounts.List` plus per-account latest snapshots.
+- Scheduler active lease gauge now uses `ActiveLeaseCount`; memory, Ent, and Redis scheduler stores implement count-specific paths.
+- Retention cleanup now carries `BatchLimit` through config/service/worker/store, deletes by limited ID batches, and reports `Limited`.
+- Added `DATA_RETENTION_BATCH_LIMIT` to config, `.env.example`, and Compose.
+- Added PostgreSQL migrations and Ent indexes for `usage_logs(provider_id, created_at)` and `account_availability_rollups(bucket_date, provider_id)`.
+- Gateway candidate and `/v1/models` account-group filtering now batch account group lookups via `ListGroupIDsByAccounts`.
+
+Batch20 correction scope complete - settings and deployment consistency
+- `invitation_rebate_enabled` is consumed by the outbox payment-paid handler; disabled rebate accrual now records audit action `affiliate.rebate.skipped` with reason `invitation_rebate_disabled`.
+- `request_shaper_enabled` controls operator payload-transform rules on gateway requests. Internal Anthropic spoof-session compatibility transform remains active.
+- Existing consumers for `balance_low_notify_enabled`, `subscription_expiry_notify_enabled`, and `account_quota_notify_enabled` were verified and covered by focused worker tests.
+- Kubernetes API deployment now defaults to `replicas: 1`; HPA min replicas is 1 with scale-up comments. Compose documents the `--scale api=N` guard.
+
+Batch20 generated-code and verification evidence
+- `make ent-generate`: exit 0.
+- `make ent-generate-check`: exit 0.
+- `make migration-hash`: exit 0.
+- `make migration-check`: exit 0.
+- `make openapi-codegen-check`: exit 0.
+- `make openapi-ts-codegen-check`: exit 0.
+- `cd apps/web && npm run typecheck && npm run lint`: exit 0; lint reported 11 existing unused `Skeleton` warnings.
+- `cd apps/api && go test ./... -count=1`: exit 0.
+- `cd apps/api && go vet ./...`: exit 0.
+- `cd apps/api && go build ./...`: exit 0.
+- `cd apps/api && go test ./internal/config ./internal/architecture ./internal/app ./internal/platform/crypto ./internal/platform/db ./internal/platform/logger ./internal/platform/redis ./internal/modules/providers/preset ./internal/persistence/entstore/... ./internal/persistence/redisstore/... ./internal/workers/... ./internal/httpserver -count=1`: exit 0.
+- `cd apps/api && go test ./internal/codequality -count=1`: exit 0.
+- `make diff-check`: exit 0.
+- `make secret-scan`: exit 0.
+- Static grep: `rg -n "usage\\.List\\(|ListDecisions\\(|ListLeases\\(|\\.List\\(c\\.ctx\\)|LatestHealthSnapshotByAccount\\(c\\.ctx|accounts\\.List\\(c\\.ctx\\)" apps/api/internal/httpserver/runtime_metrics.go` returns no matches.
+- Static grep: all five batch20 settings keys have backend consumers or tests: invitation rebate in outbox, request shaper in gateway payload rules, low-balance in balance_charger, subscription expiry in subscription_expirer, account quota in account_quota_alert.
+
+Next:
+- Run browser verification and save screenshots under `specs/plans/parity/evidence/batch20/`.
+- Commit batch20 and existing parity work in reviewable domain commits, then push.
+
+SRapi sub2api parity batch20 browser verification
+
+Browser verification complete on 2026-06-10:
+- Local test stack: API started with `STORAGE_BACKEND=memory SERVER_MODE=local SERVER_PORT=8080`; Web started with `SRAPI_API_PROXY_TARGET=http://127.0.0.1:8080 PORT=3000 npm run dev`.
+- Browser runner: Playwright Chromium, headless, through real `http://localhost:3000` pages and same-origin `/api` proxy.
+- Evidence: `specs/plans/parity/evidence/batch20/` contains 19 screenshots plus `browser-smoke-results.json`.
+- Result JSON: 46 checks, 0 failed, checked_at `2026-06-10T16:49:32.117Z`.
+
+Browser walk-through coverage:
+- Login -> admin dashboard: `01-login-page.png`, `02-admin-dashboard-after-login.png`.
+- Affiliate chain surfaces: admin rules, user affiliate withdrawal surface, admin transfer queue, admin rebate ledger: `03-admin-affiliate-rules.png` through `06-admin-affiliate-rebates.png`.
+- Scheduler strategy CRUD/simulate surface: registry page and successful simulate result showing current/shadow winner and winner-changed fields: `07-scheduler-strategy.png`, `08-scheduler-strategy-simulated.png`.
+- Risk control enforce surface: risk mode/edit controls visible: `09-risk-control.png`.
+- Payment order/refund state surface: orders page/status filter visible in empty memory stack: `10-payment-orders-refund.png`.
+- Settings switches: invitation rebate, request shaper, low-balance alerts, subscription expiry alerts, and account quota alerts visible in settings tabs: `12-settings-features-switches.png`, `13-settings-gateway-request-shaper.png`, `14-settings-email-notification-switches.png`.
+- `/me/attributes` Required/admin registration surface: user attribute Required control and register page loaded: `15-user-attributes-required.png`, `16-user-attributes-required-dialog.png`, `17-register-required-attributes.png`.
+- Scheduled-test `probe_model`: scheduled test plan page and create dialog show Probe model field: `18-scheduled-tests-probe-model.png`, `19-scheduled-tests-probe-model-dialog.png`.
+
+Browser-found correction:
+- The first settings browser pass showed `balance_low_notify_enabled`, `subscription_expiry_notify_enabled`, and `account_quota_notify_enabled` were consumed by workers but omitted from the default admin-settings GET response because their pointer fields were nil. That made the switches invisible in the real settings UI.
+- Fixed `defaultAdminSettings` and `normalizeAdminSettings` to materialize those three notification switches as explicit `true` values, preserving existing worker default behavior while making the UI honest.
+- Added `TestAdminSettingsEmailNotificationSwitchesDefaultVisible` to lock the default/update behavior.
+
+Additional verification after browser-found correction:
+- `cd apps/api && go test ./internal/modules/admin_control/service -run TestAdminSettingsEmailNotificationSwitchesDefaultVisible -count=1`: exit 0.
+- `cd apps/api && go test ./internal/modules/admin_control/service ./internal/httpserver -run 'TestAdminSettingsEmailNotificationSwitchesDefaultVisible|TestAdminControlPlaneV1EndpointsAndAudit|TestMetricsExposeBaselineSRapiSignals|TestGatewaySkipsPayloadRulesWhenRequestShaperDisabled' -count=1`: exit 0.
+- `cd apps/web && npm run typecheck`: exit 0.
+- `node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync('specs/plans/parity/evidence/batch20/browser-smoke-results.json','utf8')); const failed=j.checks.filter(c=>!c.ok); console.log(JSON.stringify({checks:j.checks.length,failed:failed.length,checked_at:j.checked_at}, null, 2)); if(failed.length) process.exit(1);"`: exit 0.
+
+Next:
+- Run final gates after the browser-found correction.
+- Commit batch20 and existing parity work in reviewable domain commits, then push.

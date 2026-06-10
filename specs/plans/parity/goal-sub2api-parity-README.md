@@ -28,15 +28,16 @@
 | **第八批** | [batch8](./goal-sub2api-parity-batch8.md) | **分销与促销资金链闭环（消灭最大整片摆设）** | 无强依赖·可先行 |
 | **第九批** | [batch9](./goal-sub2api-parity-batch9.md) | **RBAC 真实化 + 风控/内容安全接强制点** | 接 batch8 后 |
 | **第十批** | [batch10](./goal-sub2api-parity-batch10.md) | **调度策略 CRUD + 探测真实性 + 孤儿端点接线** | 独立 |
-| **第十一批** | [batch11](./goal-sub2api-parity-batch11.md) | **账号认证/配额/TLS 绑定摆设清除 + 上游配额补全** | 独立 |
-| **第十二批** | [batch12](./goal-sub2api-parity-batch12.md) | **支付上游真实性（退款/对账/手续费/负载均衡）** | 独立 |
-| **第十三批** | [batch13](./goal-sub2api-parity-batch13.md) | **计费维度深化（service_tier/cache/长上下文/图片token）+ daily-weekly 配额** | 接 batch12 后 |
-| **第十四批** | [batch14](./goal-sub2api-parity-batch14.md) | **端用户登录摆设清除 + 平台自助/配置补全** | 接 batch12/13 后 |
-| **第十五批** | [batch15](./goal-sub2api-parity-batch15.md) | **架构与技术债清理（拆巨文件/消重/死码/补测/性能）** | 穿插进行（见下） |
-| **第十六批** | [batch16](./goal-sub2api-parity-batch16.md) | **【NFR·并发】worker leader-gate + balance_charger/outbox/idempotency 竞态收口** | 开多副本前置 |
-| **第十七批** | [batch17](./goal-sub2api-parity-batch17.md) | **【NFR·部署】Redis 连接护栏 + 真实 readiness + 资源/HA 基线 + standalone 镜像** | 依赖 batch16 |
-| **第十八批** | [batch18](./goal-sub2api-parity-batch18.md) | **【NFR·性能】热路径去全表扫（网关主链不再每请求扫 usage_logs/accounts）** | 单副本扩容前置 |
-| **第十九批** | [batch19](./goal-sub2api-parity-batch19.md) | **【NFR·容量】可观测/读路径去全表扫 + 全表 retention + 分批删除 + 索引** | 接 batch18 |
+| **第十一批** | [batch11](./goal-sub2api-parity-batch11.md) | **账号认证/配额/TLS 绑定摆设清除 + 上游配额补全** | ✅ 已落地并验证 |
+| **第十二批** | [batch12](./goal-sub2api-parity-batch12.md) | **支付上游真实性（退款/对账/手续费/负载均衡）** | ✅ 已落地并验证 |
+| **第十三批** | [batch13](./goal-sub2api-parity-batch13.md) | **计费维度深化（service_tier/cache/长上下文/图片token）+ daily-weekly 配额** | ✅ 已落地并验证 |
+| **第十四批** | [batch14](./goal-sub2api-parity-batch14.md) | **端用户登录摆设清除 + 平台自助/配置补全** | ✅ 已落地并验证 |
+| **第十五批** | [batch15](./goal-sub2api-parity-batch15.md) | **架构与技术债清理（拆巨文件/消重/死码/补测/性能）** | ✅ 已落地并验证 |
+| **第十六批** | [batch16](./goal-sub2api-parity-batch16.md) | **【NFR·并发】worker leader-gate + balance_charger/outbox/idempotency 竞态收口** | ✅ 已落地并验证 |
+| **第十七批** | [batch17](./goal-sub2api-parity-batch17.md) | **【NFR·部署】Redis 连接护栏 + 真实 readiness + 资源/HA 基线 + standalone 镜像** | ✅ 已落地并验证 |
+| **第十八批** | [batch18](./goal-sub2api-parity-batch18.md) | **【NFR·性能】热路径去全表扫（网关主链不再每请求扫 usage_logs/accounts）** | ✅ 已落地并验证 |
+| **第十九批** | [batch19](./goal-sub2api-parity-batch19.md) | **【NFR·容量】可观测/读路径去全表扫 + 全表 retention + 分批删除 + 索引** | ✅ 已落地并验证 |
+| **第二十批** | [batch20](./goal-sub2api-parity-batch20.md) | **【收口】虚报修正、摆设复核、生成码对账、部署护栏、浏览器证据** | ✅ 已落地并验证 |
 
 > **batch15 拆文件须穿插：** `runtime_gateway_core.go` 仅余 ~44 行就触 2200 红线。任何会给核心文件增行的功能批次（8-14、18）开工前，应先做 batch15 对应的拆文件子项，否则架构测试会红。建议：batch8/9 先行（不大动核心文件）→ 穿插 batch15 拆文件 → 再做 batch10-14。
 
@@ -44,10 +45,10 @@
 
 > 来源：2026-06-09 NFR 专项审计（9-agent，4 维 + 对抗核查）。结论详见各批文档；要点如下。
 
-**生产就绪判定（已核查）：当前不能直接多副本部署，但正确性地基扎实。**
+**生产就绪判定（2026-06-10 batch20 收口复核）：默认部署仍以单副本为上线护栏，多副本需要先跑 scale-up runbook，但已清掉此前确认的 `/metrics`/retention/group N+1 虚报项。**
 - ✅ **不是问题（勿动）**：计费 `ChargeUsage` 用 Serializable + `charged_at IS NULL` 两端条件 claim + 行数校验，**多副本不会重复扣费**（`billing/store.go:133/220`）；限流/并发槽/调度租约全 Redis 原子 Lua；到期/退款/返佣条件更新+ReferenceID 幂等；outbox `(event_id,consumer)` 去重；DB 迁移 `pg_advisory_lock`（→ batch16 leader-gate 可复用此范式）；连接池有界 + 优雅关停 + OTel 齐备。
-- ❌ **多副本硬阻塞**：① 14 个 worker 无 leader-gate（`app.go:613` 无条件全启）→ 多副本 N 倍打上游探测触发风控封号（最高优先）；② `/metrics` 多副本各报全表聚合 + counter 倒退，`rate()` 语义错乱。
-- ❌ **单副本容量天花板 = usage_logs 行数**：每个成功请求同步全表扫 usage_logs 生成账号快照（`recordGatewayUsage→recordGatewayAccountSnapshots`），~50-100 万行起 p99 秒级、连接池打满。**确定性劣化**。
+- ✅ **batch20 已修正**：`/metrics` 抓取路径不再扫 `usage_logs` / scheduler decisions / leases / accounts；网关与调度路径写入进程内单调指标状态，健康探针指标读 availability rollup；retention 删除按配置批大小执行；新增 `usage_logs(provider_id, created_at)` 与 `account_availability_rollups(bucket_date, provider_id)` 索引；候选账号组过滤使用批量 `ListGroupIDsByAccounts`。
+- ⚠️ **多副本护栏**：k8s/compose 默认仍锁单副本。解锁多副本前必须验证 `/metrics` 单调性、worker leader-gate skip/run 行为、`replicas * DATABASE_MAX_OPEN_CONNS` 与 Redis pool 容量。
 - 对照 sub2api：它有 `SchedulerCache`（Redis 快照桶）+ `ops_repo_preagg` 预聚合 + outbox 异步记账 —— SRapi 这三处缺，是主要性能差距。
 
 **已确认的执行决策（2026-06-09，用户拍板）：**
@@ -197,18 +198,18 @@
 
 ## 认证矩阵基线（防回归 · 已逐格 trace 网关签发路径核查）
 
-当前落地矩阵见 [`PROVIDER_AUTH_MATRIX.md`](../../../docs/constraints/PROVIDER_AUTH_MATRIX.md)。第七批后，preset `auth_methods` 只暴露真实可签发集合：
+当前落地矩阵见 [`PROVIDER_AUTH_MATRIX.md`](../../../docs/constraints/PROVIDER_AUTH_MATRIX.md)。preset `auth_methods` 只暴露真实可签发集合：
 
-- `service_account_json` 已从 anthropic/bedrock preset 下架，仅作为 legacy enum 保留（batch11 rank27 收尾删枚举或实接 Vertex）。
+- `service_account_json` 已从 OpenAPI / Go / TypeScript / 前端 runtime class 表面移除，不保留 legacy enum。
 - OpenAI/Gemini preset OAuth 已下架；手工误配会返回 `not_supported`。
-- Antigravity 的 `desktop_client_token` / `ide_plugin_token` 已并入 preset `oauth_refresh` 路径（batch11 rank28 收尾）。
+- Antigravity 的 `desktop_client_token` / `ide_plugin_token` 已移除，真实路径统一使用 `oauth_refresh`。
 - `chatgpt-web` preset 已补齐，默认暴露 `web_session_cookie` 并安装为 `reverse-proxy-chatgpt-web`。
 - CI 守门为 `TestPresetRuntimeAllowlistsOnlyExposeSignableAuthMethods`。
 
 ### 端用户登录（userauthidentity，与上游认证是两张表）
 
-✅ 真有效：password、totp、email(仅验证+找回)、oidc、google、github、linuxdo（一条通用 OAuth2/OIDC 流水线）。
-⬜ 摆设/缺失：wechat、dingtalk（仅通用 Bearer-userinfo）、微信支付 OAuth、邮箱验证码注册登录、OAuth 免密快速通道 → **已全部编入 batch14（不再是后续）**。
+✅ 真有效：password、totp、email 验证/找回、passwordless 邮箱验证码注册/登录、oidc、google、github、linuxdo、OAuth 已绑定身份免密返回、微信支付 openid 获取。
+已下架摆设入口：wechat、dingtalk 登录按钮/配置不再作为可用登录入口暴露，避免“点了登不进”的伪能力。
 
 ### 关系建模（一句话）
 

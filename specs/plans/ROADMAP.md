@@ -158,5 +158,4 @@ This roadmap's package enumeration stops at WP-360. The program kept going well 
 
 ### Roadmap / not yet implemented
 
-Genuinely deferred items (tracked in `STATUS.md` and the relevant `docs/`) include Batch / Fine-tuning API families, full JA3/JA4 + HTTP/2 fingerprinting, and affiliate withdrawal. Everything else enumerated in the phases above is delivered.
-
+Genuinely deferred items (tracked in `STATUS.md` and the relevant `docs/`) include Batch / Fine-tuning API families and full JA3/JA4 + HTTP/2 fingerprinting. Everything else enumerated in the phases above is delivered.

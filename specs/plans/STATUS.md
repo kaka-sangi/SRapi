@@ -7,7 +7,7 @@
 ## Current Snapshot
 
 status_version: 2
-updated_at: 2026-06-06
+updated_at: 2026-06-10
 
 last_completed:
 
@@ -31,8 +31,8 @@ last_completed:
 - WP-180: Subscription and pricing foundations now include subscription plans, user subscriptions, decimal-safe pricing rules, Gateway entitlement/pricing admission, billing metadata linkage, admin/current-user control-plane APIs, and generated SDK/OpenAPI parity.
 - WP-190: Payment order foundations now include encrypted provider instances, current-user order APIs, signed/idempotent webhooks, refund hooks, fulfillment into billing/subscription state, audit/outbox evidence, Ent/Postgres persistence, and generated SDK/OpenAPI parity.
 - WP-200: Affiliate rebate Phase 2 now includes invite codes, invite relationships, affiliate rules, idempotent payment-paid accrual, refund compensation ledgers, transfer-to-balance accounting, user-facing affiliate summary/ledger/transfer APIs, audit/outbox evidence, Ent/Postgres persistence, generated SDK/OpenAPI parity, and migration/data-model parity.
-- WP-210: Production operations now includes baseline Prometheus `/metrics`, release-mode weak secret/default admin password rejection, data retention cleanup worker, PostgreSQL backup/restore targets, release smoke script coverage, and deployment/config docs.
-- C2.1: `/metrics` now uses `github.com/prometheus/client_golang` with a scrape-time custom collector, standard Prometheus counters/gauges/histograms, expanded Gateway latency buckets `0.05/0.1/0.25/0.5/1/2.5/5/10/+Inf`, and provider probe latency histogram evidence from latest account health snapshots.
+- WP-210: Production operations now includes process-local monotonic Prometheus `/metrics`, release-mode weak secret/default admin password rejection, bounded data retention cleanup, PostgreSQL backup/restore targets, release smoke script coverage, and deployment/config docs.
+- C2.1: `/metrics` now uses `github.com/prometheus/client_golang` with a scrape-time custom collector, process-local gateway/scheduler counters, expanded Gateway latency buckets `0.05/0.1/0.25/0.5/1/2.5/5/10/+Inf`, and provider probe signal buckets derived from materialized availability rollups rather than scrape-time account/snapshot scans.
 - WP-220: Anthropic-compatible upstream adapter now dispatches Messages payloads to `/messages`, parses non-streaming and SSE usage, classifies Anthropic error objects, preserves reverse-proxy runtime dispatch, and proves provider aliases record Scheduler/usage evidence.
 - WP-230: Gemini-native Gateway route foundation now exposes GenerateContent and StreamGenerateContent routes, converts Gemini requests to Canonical AI Request, renders Gemini JSON/SSE responses, returns Google-style errors, and proves Gateway auth/model policy/Scheduler/usage evidence.
 - WP-240: Gemini-compatible/native-gemini upstream adapter now dispatches GenerateContent and StreamGenerateContent payloads to Gemini APIs, parses usage metadata, classifies Google errors, preserves reverse-proxy Gemini runtime dispatch, and proves Gateway Gemini routes schedule Gemini-compatible upstream accounts.
@@ -378,8 +378,8 @@ notes:
 - WP-190 added current-user and admin payment APIs, encrypted payment provider config, legal order state transitions, signed/idempotent webhook handling, fulfillment-side billing/subscription/audit/outbox effects, refund hooks, Ent/Postgres persistence, migration drift coverage, and generated SDK/OpenAPI parity.
 - WP-200 added the affiliate module, Ent schemas and PostgreSQL tables for invite/affiliate ledgers, payment outbox dispatch into affiliate accrual/compensation, refund compensation capping, and transfer-to-balance tests proving affiliate ledger, billing ledger, user balance, and audit evidence stay aligned.
 - WP-200 added current-user affiliate APIs for summary, ledger, and transfer-to-balance with CSRF plus `Idempotency-Key` protection, generated Go/TypeScript OpenAPI artifacts, and HTTP regressions proving current-user ledger isolation and duplicate-transfer idempotency. Frontend visuals remain deferred per explicit user instruction.
-- WP-210 added `/metrics` baseline samples from usage logs, scheduler decisions/leases, and reverse-proxy runtime signals; release smoke checks health/readiness/metrics plus mock Gateway flow.
-- WP-210 added retention cleanup for usage logs, scheduler decisions/feedbacks, audit logs, and account health snapshots; financial ledgers, payment records, affiliate ledgers, credentials, and user state remain excluded from automatic cleanup.
+- WP-210 `/metrics` samples now come from process-local gateway/scheduler metric state, realtime/reverse-proxy runtime state, ops alert state, and availability rollups; release smoke checks health/readiness/metrics plus mock Gateway flow.
+- WP-210 retention cleanup is bounded by `DATA_RETENTION_BATCH_LIMIT` for usage logs, scheduler decisions/feedbacks, audit logs, and account health snapshots; financial ledgers, payment records, affiliate ledgers, credentials, and user state remain excluded from automatic cleanup.
 - WP-210 added `make backup-postgres` and `make restore-postgres` with checksum support; secret material such as `SRAPI_MASTER_KEY` remains outside database backups and must be backed up through the deployment secret store.
 - WP-210 Docker Compose smoke could not be executed in this environment because `docker compose` and `docker-compose` are unavailable.
 - WP-220 added Anthropic-compatible Adapter dispatch for API-key and reverse-proxy accounts, including `x-api-key`/`anthropic-version` API-key headers, `/messages` endpoint derivation, Anthropic usage/cache token parsing, SSE aggregation, and Anthropic error classification.
