@@ -128,6 +128,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{AccountAvailabilityRollupsColumns[3]},
 			},
+			{
+				Name:    "accountavailabilityrollup_bucket_date_provider_id",
+				Unique:  false,
+				Columns: []*schema.Column{AccountAvailabilityRollupsColumns[5], AccountAvailabilityRollupsColumns[4]},
+			},
 		},
 	}
 	// AccountGroupsColumns holds the columns for the "account_groups" table.
@@ -1357,6 +1362,8 @@ var (
 		{Name: "provider_instance_id", Type: field.TypeInt},
 		{Name: "original_amount", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "discount_amount", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "fee_amount", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "payable_amount", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "promo_code_id", Type: field.TypeInt, Nullable: true},
 		{Name: "amount", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "currency", Type: field.TypeString, Default: "USD"},
@@ -1389,12 +1396,12 @@ var (
 			{
 				Name:    "paymentorder_status_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentOrdersColumns[11], PaymentOrdersColumns[1]},
+				Columns: []*schema.Column{PaymentOrdersColumns[13], PaymentOrdersColumns[1]},
 			},
 			{
 				Name:    "paymentorder_provider_transaction_id",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentOrdersColumns[14]},
+				Columns: []*schema.Column{PaymentOrdersColumns[16]},
 			},
 			{
 				Name:    "paymentorder_provider_instance_id_created_at",
@@ -1404,12 +1411,12 @@ var (
 			{
 				Name:    "paymentorder_promo_code_id",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentOrdersColumns[8]},
+				Columns: []*schema.Column{PaymentOrdersColumns[10]},
 			},
 			{
 				Name:    "paymentorder_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentOrdersColumns[16]},
+				Columns: []*schema.Column{PaymentOrdersColumns[18]},
 			},
 		},
 	}
@@ -1427,6 +1434,8 @@ var (
 		{Name: "supported_methods_json", Type: field.TypeJSON, Nullable: true},
 		{Name: "limits_json", Type: field.TypeJSON, Nullable: true},
 		{Name: "sort_order", Type: field.TypeInt, Default: 0},
+		{Name: "fee_rate", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "weight", Type: field.TypeInt, Default: 1},
 		{Name: "metadata_json", Type: field.TypeJSON, Nullable: true},
 	}
 	// PaymentProviderInstancesTable holds the schema information for the "payment_provider_instances" table.
@@ -1550,13 +1559,20 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "model_id", Type: field.TypeInt},
+		{Name: "model_family", Type: field.TypeString, Default: ""},
 		{Name: "provider_id", Type: field.TypeInt},
 		{Name: "billing_mode", Type: field.TypeString, Default: "token"},
 		{Name: "input_price_per_million", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "output_price_per_million", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "cache_read_price_per_million", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "cache_write_price_per_million", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "cache_write_5m_price_per_million", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "cache_write_1h_price_per_million", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "image_output_price_per_million", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "per_request_price", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "service_tier_multipliers_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "long_context_threshold_tokens", Type: field.TypeInt, Nullable: true},
+		{Name: "long_context_multiplier", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "currency", Type: field.TypeString, Default: "USD"},
 		{Name: "effective_from", Type: field.TypeTime, Nullable: true},
 		{Name: "effective_to", Type: field.TypeTime, Nullable: true},
@@ -1570,17 +1586,17 @@ var (
 			{
 				Name:    "pricingrule_model_id_provider_id",
 				Unique:  false,
-				Columns: []*schema.Column{PricingRulesColumns[3], PricingRulesColumns[4]},
+				Columns: []*schema.Column{PricingRulesColumns[3], PricingRulesColumns[5]},
 			},
 			{
 				Name:    "pricingrule_billing_mode",
 				Unique:  false,
-				Columns: []*schema.Column{PricingRulesColumns[5]},
+				Columns: []*schema.Column{PricingRulesColumns[6]},
 			},
 			{
 				Name:    "pricingrule_effective_from_effective_to",
 				Unique:  false,
-				Columns: []*schema.Column{PricingRulesColumns[12], PricingRulesColumns[13]},
+				Columns: []*schema.Column{PricingRulesColumns[19], PricingRulesColumns[20]},
 			},
 		},
 	}
@@ -1826,6 +1842,7 @@ var (
 		{Name: "scope_id", Type: field.TypeInt, Nullable: true},
 		{Name: "interval_seconds", Type: field.TypeInt, Default: 3600},
 		{Name: "cron_expression", Type: field.TypeString, Nullable: true},
+		{Name: "probe_model", Type: field.TypeString, Default: ""},
 		{Name: "max_results", Type: field.TypeInt, Default: 0},
 		{Name: "auto_recover", Type: field.TypeBool, Default: false},
 		{Name: "last_run_at", Type: field.TypeTime, Nullable: true},
@@ -2238,6 +2255,11 @@ var (
 				Name:    "usagelog_api_key_id_created_at",
 				Unique:  false,
 				Columns: []*schema.Column{UsageLogsColumns[6], UsageLogsColumns[1]},
+			},
+			{
+				Name:    "usagelog_provider_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[7], UsageLogsColumns[1]},
 			},
 			{
 				Name:    "usagelog_account_id_created_at",

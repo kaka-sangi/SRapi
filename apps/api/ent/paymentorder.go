@@ -32,6 +32,10 @@ type PaymentOrder struct {
 	OriginalAmount string `json:"original_amount,omitempty"`
 	// DiscountAmount holds the value of the "discount_amount" field.
 	DiscountAmount string `json:"discount_amount,omitempty"`
+	// FeeAmount holds the value of the "fee_amount" field.
+	FeeAmount string `json:"fee_amount,omitempty"`
+	// PayableAmount holds the value of the "payable_amount" field.
+	PayableAmount string `json:"payable_amount,omitempty"`
 	// PromoCodeID holds the value of the "promo_code_id" field.
 	PromoCodeID *int `json:"promo_code_id,omitempty"`
 	// Amount holds the value of the "amount" field.
@@ -68,7 +72,7 @@ func (*PaymentOrder) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case paymentorder.FieldID, paymentorder.FieldUserID, paymentorder.FieldProviderInstanceID, paymentorder.FieldPromoCodeID:
 			values[i] = new(sql.NullInt64)
-		case paymentorder.FieldOrderNo, paymentorder.FieldOriginalAmount, paymentorder.FieldDiscountAmount, paymentorder.FieldAmount, paymentorder.FieldCurrency, paymentorder.FieldStatus, paymentorder.FieldProductType, paymentorder.FieldProductID, paymentorder.FieldProviderTransactionID:
+		case paymentorder.FieldOrderNo, paymentorder.FieldOriginalAmount, paymentorder.FieldDiscountAmount, paymentorder.FieldFeeAmount, paymentorder.FieldPayableAmount, paymentorder.FieldAmount, paymentorder.FieldCurrency, paymentorder.FieldStatus, paymentorder.FieldProductType, paymentorder.FieldProductID, paymentorder.FieldProviderTransactionID:
 			values[i] = new(sql.NullString)
 		case paymentorder.FieldCreatedAt, paymentorder.FieldUpdatedAt, paymentorder.FieldExpiresAt, paymentorder.FieldPaidAt, paymentorder.FieldClosedAt:
 			values[i] = new(sql.NullTime)
@@ -134,6 +138,18 @@ func (_m *PaymentOrder) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field discount_amount", values[i])
 			} else if value.Valid {
 				_m.DiscountAmount = value.String
+			}
+		case paymentorder.FieldFeeAmount:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field fee_amount", values[i])
+			} else if value.Valid {
+				_m.FeeAmount = value.String
+			}
+		case paymentorder.FieldPayableAmount:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field payable_amount", values[i])
+			} else if value.Valid {
+				_m.PayableAmount = value.String
 			}
 		case paymentorder.FieldPromoCodeID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -272,6 +288,12 @@ func (_m *PaymentOrder) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("discount_amount=")
 	builder.WriteString(_m.DiscountAmount)
+	builder.WriteString(", ")
+	builder.WriteString("fee_amount=")
+	builder.WriteString(_m.FeeAmount)
+	builder.WriteString(", ")
+	builder.WriteString("payable_amount=")
+	builder.WriteString(_m.PayableAmount)
 	builder.WriteString(", ")
 	if v := _m.PromoCodeID; v != nil {
 		builder.WriteString("promo_code_id=")

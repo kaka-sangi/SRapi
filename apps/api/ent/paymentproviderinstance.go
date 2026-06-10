@@ -40,6 +40,10 @@ type PaymentProviderInstance struct {
 	LimitsJSON map[string]interface{} `json:"limits_json,omitempty"`
 	// SortOrder holds the value of the "sort_order" field.
 	SortOrder int `json:"sort_order,omitempty"`
+	// FeeRate holds the value of the "fee_rate" field.
+	FeeRate string `json:"fee_rate,omitempty"`
+	// Weight holds the value of the "weight" field.
+	Weight int `json:"weight,omitempty"`
 	// MetadataJSON holds the value of the "metadata_json" field.
 	MetadataJSON map[string]interface{} `json:"metadata_json,omitempty"`
 	selectValues sql.SelectValues
@@ -52,9 +56,9 @@ func (*PaymentProviderInstance) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case paymentproviderinstance.FieldConfigCiphertext, paymentproviderinstance.FieldSupportedMethodsJSON, paymentproviderinstance.FieldLimitsJSON, paymentproviderinstance.FieldMetadataJSON:
 			values[i] = new([]byte)
-		case paymentproviderinstance.FieldID, paymentproviderinstance.FieldConfigVersion, paymentproviderinstance.FieldSortOrder:
+		case paymentproviderinstance.FieldID, paymentproviderinstance.FieldConfigVersion, paymentproviderinstance.FieldSortOrder, paymentproviderinstance.FieldWeight:
 			values[i] = new(sql.NullInt64)
-		case paymentproviderinstance.FieldProvider, paymentproviderinstance.FieldName, paymentproviderinstance.FieldStatus:
+		case paymentproviderinstance.FieldProvider, paymentproviderinstance.FieldName, paymentproviderinstance.FieldStatus, paymentproviderinstance.FieldFeeRate:
 			values[i] = new(sql.NullString)
 		case paymentproviderinstance.FieldCreatedAt, paymentproviderinstance.FieldUpdatedAt, paymentproviderinstance.FieldDeletedAt:
 			values[i] = new(sql.NullTime)
@@ -150,6 +154,18 @@ func (_m *PaymentProviderInstance) assignValues(columns []string, values []any) 
 			} else if value.Valid {
 				_m.SortOrder = int(value.Int64)
 			}
+		case paymentproviderinstance.FieldFeeRate:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field fee_rate", values[i])
+			} else if value.Valid {
+				_m.FeeRate = value.String
+			}
+		case paymentproviderinstance.FieldWeight:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field weight", values[i])
+			} else if value.Valid {
+				_m.Weight = int(value.Int64)
+			}
 		case paymentproviderinstance.FieldMetadataJSON:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field metadata_json", values[i])
@@ -227,6 +243,12 @@ func (_m *PaymentProviderInstance) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("sort_order=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SortOrder))
+	builder.WriteString(", ")
+	builder.WriteString("fee_rate=")
+	builder.WriteString(_m.FeeRate)
+	builder.WriteString(", ")
+	builder.WriteString("weight=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Weight))
 	builder.WriteString(", ")
 	builder.WriteString("metadata_json=")
 	builder.WriteString(fmt.Sprintf("%v", _m.MetadataJSON))

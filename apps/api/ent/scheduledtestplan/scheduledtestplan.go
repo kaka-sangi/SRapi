@@ -29,6 +29,8 @@ const (
 	FieldIntervalSeconds = "interval_seconds"
 	// FieldCronExpression holds the string denoting the cron_expression field in the database.
 	FieldCronExpression = "cron_expression"
+	// FieldProbeModel holds the string denoting the probe_model field in the database.
+	FieldProbeModel = "probe_model"
 	// FieldMaxResults holds the string denoting the max_results field in the database.
 	FieldMaxResults = "max_results"
 	// FieldAutoRecover holds the string denoting the auto_recover field in the database.
@@ -54,6 +56,7 @@ var Columns = []string{
 	FieldScopeID,
 	FieldIntervalSeconds,
 	FieldCronExpression,
+	FieldProbeModel,
 	FieldMaxResults,
 	FieldAutoRecover,
 	FieldLastRunAt,
@@ -86,6 +89,8 @@ var (
 	DefaultScopeType string
 	// DefaultIntervalSeconds holds the default value on creation for the "interval_seconds" field.
 	DefaultIntervalSeconds int
+	// DefaultProbeModel holds the default value on creation for the "probe_model" field.
+	DefaultProbeModel string
 	// DefaultMaxResults holds the default value on creation for the "max_results" field.
 	DefaultMaxResults int
 	// DefaultAutoRecover holds the default value on creation for the "auto_recover" field.
@@ -142,6 +147,11 @@ func ByIntervalSeconds(opts ...sql.OrderTermOption) OrderOption {
 // ByCronExpression orders the results by the cron_expression field.
 func ByCronExpression(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCronExpression, opts...).ToFunc()
+}
+
+// ByProbeModel orders the results by the probe_model field.
+func ByProbeModel(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProbeModel, opts...).ToFunc()
 }
 
 // ByMaxResults orders the results by the max_results field.

@@ -134,6 +134,34 @@ func (_c *PaymentProviderInstanceCreate) SetNillableSortOrder(v *int) *PaymentPr
 	return _c
 }
 
+// SetFeeRate sets the "fee_rate" field.
+func (_c *PaymentProviderInstanceCreate) SetFeeRate(v string) *PaymentProviderInstanceCreate {
+	_c.mutation.SetFeeRate(v)
+	return _c
+}
+
+// SetNillableFeeRate sets the "fee_rate" field if the given value is not nil.
+func (_c *PaymentProviderInstanceCreate) SetNillableFeeRate(v *string) *PaymentProviderInstanceCreate {
+	if v != nil {
+		_c.SetFeeRate(*v)
+	}
+	return _c
+}
+
+// SetWeight sets the "weight" field.
+func (_c *PaymentProviderInstanceCreate) SetWeight(v int) *PaymentProviderInstanceCreate {
+	_c.mutation.SetWeight(v)
+	return _c
+}
+
+// SetNillableWeight sets the "weight" field if the given value is not nil.
+func (_c *PaymentProviderInstanceCreate) SetNillableWeight(v *int) *PaymentProviderInstanceCreate {
+	if v != nil {
+		_c.SetWeight(*v)
+	}
+	return _c
+}
+
 // SetMetadataJSON sets the "metadata_json" field.
 func (_c *PaymentProviderInstanceCreate) SetMetadataJSON(v map[string]interface{}) *PaymentProviderInstanceCreate {
 	_c.mutation.SetMetadataJSON(v)
@@ -195,6 +223,14 @@ func (_c *PaymentProviderInstanceCreate) defaults() {
 		v := paymentproviderinstance.DefaultSortOrder
 		_c.mutation.SetSortOrder(v)
 	}
+	if _, ok := _c.mutation.FeeRate(); !ok {
+		v := paymentproviderinstance.DefaultFeeRate
+		_c.mutation.SetFeeRate(v)
+	}
+	if _, ok := _c.mutation.Weight(); !ok {
+		v := paymentproviderinstance.DefaultWeight
+		_c.mutation.SetWeight(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -229,6 +265,12 @@ func (_c *PaymentProviderInstanceCreate) check() error {
 	}
 	if _, ok := _c.mutation.SortOrder(); !ok {
 		return &ValidationError{Name: "sort_order", err: errors.New(`ent: missing required field "PaymentProviderInstance.sort_order"`)}
+	}
+	if _, ok := _c.mutation.FeeRate(); !ok {
+		return &ValidationError{Name: "fee_rate", err: errors.New(`ent: missing required field "PaymentProviderInstance.fee_rate"`)}
+	}
+	if _, ok := _c.mutation.Weight(); !ok {
+		return &ValidationError{Name: "weight", err: errors.New(`ent: missing required field "PaymentProviderInstance.weight"`)}
 	}
 	return nil
 }
@@ -299,6 +341,14 @@ func (_c *PaymentProviderInstanceCreate) createSpec() (*PaymentProviderInstance,
 	if value, ok := _c.mutation.SortOrder(); ok {
 		_spec.SetField(paymentproviderinstance.FieldSortOrder, field.TypeInt, value)
 		_node.SortOrder = value
+	}
+	if value, ok := _c.mutation.FeeRate(); ok {
+		_spec.SetField(paymentproviderinstance.FieldFeeRate, field.TypeString, value)
+		_node.FeeRate = value
+	}
+	if value, ok := _c.mutation.Weight(); ok {
+		_spec.SetField(paymentproviderinstance.FieldWeight, field.TypeInt, value)
+		_node.Weight = value
 	}
 	if value, ok := _c.mutation.MetadataJSON(); ok {
 		_spec.SetField(paymentproviderinstance.FieldMetadataJSON, field.TypeJSON, value)

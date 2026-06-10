@@ -94,6 +94,34 @@ func (_c *PaymentOrderCreate) SetNillableDiscountAmount(v *string) *PaymentOrder
 	return _c
 }
 
+// SetFeeAmount sets the "fee_amount" field.
+func (_c *PaymentOrderCreate) SetFeeAmount(v string) *PaymentOrderCreate {
+	_c.mutation.SetFeeAmount(v)
+	return _c
+}
+
+// SetNillableFeeAmount sets the "fee_amount" field if the given value is not nil.
+func (_c *PaymentOrderCreate) SetNillableFeeAmount(v *string) *PaymentOrderCreate {
+	if v != nil {
+		_c.SetFeeAmount(*v)
+	}
+	return _c
+}
+
+// SetPayableAmount sets the "payable_amount" field.
+func (_c *PaymentOrderCreate) SetPayableAmount(v string) *PaymentOrderCreate {
+	_c.mutation.SetPayableAmount(v)
+	return _c
+}
+
+// SetNillablePayableAmount sets the "payable_amount" field if the given value is not nil.
+func (_c *PaymentOrderCreate) SetNillablePayableAmount(v *string) *PaymentOrderCreate {
+	if v != nil {
+		_c.SetPayableAmount(*v)
+	}
+	return _c
+}
+
 // SetPromoCodeID sets the "promo_code_id" field.
 func (_c *PaymentOrderCreate) SetPromoCodeID(v int) *PaymentOrderCreate {
 	_c.mutation.SetPromoCodeID(v)
@@ -289,6 +317,14 @@ func (_c *PaymentOrderCreate) defaults() {
 		v := paymentorder.DefaultDiscountAmount
 		_c.mutation.SetDiscountAmount(v)
 	}
+	if _, ok := _c.mutation.FeeAmount(); !ok {
+		v := paymentorder.DefaultFeeAmount
+		_c.mutation.SetFeeAmount(v)
+	}
+	if _, ok := _c.mutation.PayableAmount(); !ok {
+		v := paymentorder.DefaultPayableAmount
+		_c.mutation.SetPayableAmount(v)
+	}
 	if _, ok := _c.mutation.Amount(); !ok {
 		v := paymentorder.DefaultAmount
 		_c.mutation.SetAmount(v)
@@ -334,6 +370,12 @@ func (_c *PaymentOrderCreate) check() error {
 	}
 	if _, ok := _c.mutation.DiscountAmount(); !ok {
 		return &ValidationError{Name: "discount_amount", err: errors.New(`ent: missing required field "PaymentOrder.discount_amount"`)}
+	}
+	if _, ok := _c.mutation.FeeAmount(); !ok {
+		return &ValidationError{Name: "fee_amount", err: errors.New(`ent: missing required field "PaymentOrder.fee_amount"`)}
+	}
+	if _, ok := _c.mutation.PayableAmount(); !ok {
+		return &ValidationError{Name: "payable_amount", err: errors.New(`ent: missing required field "PaymentOrder.payable_amount"`)}
 	}
 	if _, ok := _c.mutation.Amount(); !ok {
 		return &ValidationError{Name: "amount", err: errors.New(`ent: missing required field "PaymentOrder.amount"`)}
@@ -408,6 +450,14 @@ func (_c *PaymentOrderCreate) createSpec() (*PaymentOrder, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.DiscountAmount(); ok {
 		_spec.SetField(paymentorder.FieldDiscountAmount, field.TypeString, value)
 		_node.DiscountAmount = value
+	}
+	if value, ok := _c.mutation.FeeAmount(); ok {
+		_spec.SetField(paymentorder.FieldFeeAmount, field.TypeString, value)
+		_node.FeeAmount = value
+	}
+	if value, ok := _c.mutation.PayableAmount(); ok {
+		_spec.SetField(paymentorder.FieldPayableAmount, field.TypeString, value)
+		_node.PayableAmount = value
 	}
 	if value, ok := _c.mutation.PromoCodeID(); ok {
 		_spec.SetField(paymentorder.FieldPromoCodeID, field.TypeInt, value)

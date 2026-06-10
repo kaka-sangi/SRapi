@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -23,6 +24,8 @@ type PricingRule struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 	// ModelID holds the value of the "model_id" field.
 	ModelID int `json:"model_id,omitempty"`
+	// ModelFamily holds the value of the "model_family" field.
+	ModelFamily string `json:"model_family,omitempty"`
 	// ProviderID holds the value of the "provider_id" field.
 	ProviderID int `json:"provider_id,omitempty"`
 	// BillingMode holds the value of the "billing_mode" field.
@@ -35,8 +38,20 @@ type PricingRule struct {
 	CacheReadPricePerMillion string `json:"cache_read_price_per_million,omitempty"`
 	// CacheWritePricePerMillion holds the value of the "cache_write_price_per_million" field.
 	CacheWritePricePerMillion string `json:"cache_write_price_per_million,omitempty"`
+	// CacheWrite5mPricePerMillion holds the value of the "cache_write_5m_price_per_million" field.
+	CacheWrite5mPricePerMillion string `json:"cache_write_5m_price_per_million,omitempty"`
+	// CacheWrite1hPricePerMillion holds the value of the "cache_write_1h_price_per_million" field.
+	CacheWrite1hPricePerMillion string `json:"cache_write_1h_price_per_million,omitempty"`
+	// ImageOutputPricePerMillion holds the value of the "image_output_price_per_million" field.
+	ImageOutputPricePerMillion string `json:"image_output_price_per_million,omitempty"`
 	// PerRequestPrice holds the value of the "per_request_price" field.
 	PerRequestPrice string `json:"per_request_price,omitempty"`
+	// ServiceTierMultipliersJSON holds the value of the "service_tier_multipliers_json" field.
+	ServiceTierMultipliersJSON map[string]string `json:"service_tier_multipliers_json,omitempty"`
+	// LongContextThresholdTokens holds the value of the "long_context_threshold_tokens" field.
+	LongContextThresholdTokens *int `json:"long_context_threshold_tokens,omitempty"`
+	// LongContextMultiplier holds the value of the "long_context_multiplier" field.
+	LongContextMultiplier string `json:"long_context_multiplier,omitempty"`
 	// Currency holds the value of the "currency" field.
 	Currency string `json:"currency,omitempty"`
 	// EffectiveFrom holds the value of the "effective_from" field.
@@ -51,9 +66,11 @@ func (*PricingRule) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case pricingrule.FieldID, pricingrule.FieldModelID, pricingrule.FieldProviderID:
+		case pricingrule.FieldServiceTierMultipliersJSON:
+			values[i] = new([]byte)
+		case pricingrule.FieldID, pricingrule.FieldModelID, pricingrule.FieldProviderID, pricingrule.FieldLongContextThresholdTokens:
 			values[i] = new(sql.NullInt64)
-		case pricingrule.FieldBillingMode, pricingrule.FieldInputPricePerMillion, pricingrule.FieldOutputPricePerMillion, pricingrule.FieldCacheReadPricePerMillion, pricingrule.FieldCacheWritePricePerMillion, pricingrule.FieldPerRequestPrice, pricingrule.FieldCurrency:
+		case pricingrule.FieldModelFamily, pricingrule.FieldBillingMode, pricingrule.FieldInputPricePerMillion, pricingrule.FieldOutputPricePerMillion, pricingrule.FieldCacheReadPricePerMillion, pricingrule.FieldCacheWritePricePerMillion, pricingrule.FieldCacheWrite5mPricePerMillion, pricingrule.FieldCacheWrite1hPricePerMillion, pricingrule.FieldImageOutputPricePerMillion, pricingrule.FieldPerRequestPrice, pricingrule.FieldLongContextMultiplier, pricingrule.FieldCurrency:
 			values[i] = new(sql.NullString)
 		case pricingrule.FieldCreatedAt, pricingrule.FieldUpdatedAt, pricingrule.FieldEffectiveFrom, pricingrule.FieldEffectiveTo:
 			values[i] = new(sql.NullTime)
@@ -96,6 +113,12 @@ func (_m *PricingRule) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ModelID = int(value.Int64)
 			}
+		case pricingrule.FieldModelFamily:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field model_family", values[i])
+			} else if value.Valid {
+				_m.ModelFamily = value.String
+			}
 		case pricingrule.FieldProviderID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field provider_id", values[i])
@@ -132,11 +155,50 @@ func (_m *PricingRule) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.CacheWritePricePerMillion = value.String
 			}
+		case pricingrule.FieldCacheWrite5mPricePerMillion:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cache_write_5m_price_per_million", values[i])
+			} else if value.Valid {
+				_m.CacheWrite5mPricePerMillion = value.String
+			}
+		case pricingrule.FieldCacheWrite1hPricePerMillion:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cache_write_1h_price_per_million", values[i])
+			} else if value.Valid {
+				_m.CacheWrite1hPricePerMillion = value.String
+			}
+		case pricingrule.FieldImageOutputPricePerMillion:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field image_output_price_per_million", values[i])
+			} else if value.Valid {
+				_m.ImageOutputPricePerMillion = value.String
+			}
 		case pricingrule.FieldPerRequestPrice:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field per_request_price", values[i])
 			} else if value.Valid {
 				_m.PerRequestPrice = value.String
+			}
+		case pricingrule.FieldServiceTierMultipliersJSON:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field service_tier_multipliers_json", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.ServiceTierMultipliersJSON); err != nil {
+					return fmt.Errorf("unmarshal field service_tier_multipliers_json: %w", err)
+				}
+			}
+		case pricingrule.FieldLongContextThresholdTokens:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field long_context_threshold_tokens", values[i])
+			} else if value.Valid {
+				_m.LongContextThresholdTokens = new(int)
+				*_m.LongContextThresholdTokens = int(value.Int64)
+			}
+		case pricingrule.FieldLongContextMultiplier:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field long_context_multiplier", values[i])
+			} else if value.Valid {
+				_m.LongContextMultiplier = value.String
 			}
 		case pricingrule.FieldCurrency:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -203,6 +265,9 @@ func (_m *PricingRule) String() string {
 	builder.WriteString("model_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ModelID))
 	builder.WriteString(", ")
+	builder.WriteString("model_family=")
+	builder.WriteString(_m.ModelFamily)
+	builder.WriteString(", ")
 	builder.WriteString("provider_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ProviderID))
 	builder.WriteString(", ")
@@ -221,8 +286,28 @@ func (_m *PricingRule) String() string {
 	builder.WriteString("cache_write_price_per_million=")
 	builder.WriteString(_m.CacheWritePricePerMillion)
 	builder.WriteString(", ")
+	builder.WriteString("cache_write_5m_price_per_million=")
+	builder.WriteString(_m.CacheWrite5mPricePerMillion)
+	builder.WriteString(", ")
+	builder.WriteString("cache_write_1h_price_per_million=")
+	builder.WriteString(_m.CacheWrite1hPricePerMillion)
+	builder.WriteString(", ")
+	builder.WriteString("image_output_price_per_million=")
+	builder.WriteString(_m.ImageOutputPricePerMillion)
+	builder.WriteString(", ")
 	builder.WriteString("per_request_price=")
 	builder.WriteString(_m.PerRequestPrice)
+	builder.WriteString(", ")
+	builder.WriteString("service_tier_multipliers_json=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ServiceTierMultipliersJSON))
+	builder.WriteString(", ")
+	if v := _m.LongContextThresholdTokens; v != nil {
+		builder.WriteString("long_context_threshold_tokens=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("long_context_multiplier=")
+	builder.WriteString(_m.LongContextMultiplier)
 	builder.WriteString(", ")
 	builder.WriteString("currency=")
 	builder.WriteString(_m.Currency)

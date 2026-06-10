@@ -206,6 +206,27 @@ func (e AdminTestResultStatus) Valid() bool {
 	}
 }
 
+// Defines values for AffiliateInviteCodeStatus.
+const (
+	AffiliateInviteCodeStatusActive   AffiliateInviteCodeStatus = "active"
+	AffiliateInviteCodeStatusDisabled AffiliateInviteCodeStatus = "disabled"
+	AffiliateInviteCodeStatusExpired  AffiliateInviteCodeStatus = "expired"
+)
+
+// Valid indicates whether the value is a known member of the AffiliateInviteCodeStatus enum.
+func (e AffiliateInviteCodeStatus) Valid() bool {
+	switch e {
+	case AffiliateInviteCodeStatusActive:
+		return true
+	case AffiliateInviteCodeStatusDisabled:
+		return true
+	case AffiliateInviteCodeStatusExpired:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AffiliateLedgerEntryStatus.
 const (
 	AffiliateLedgerEntryStatusCanceled    AffiliateLedgerEntryStatus = "canceled"
@@ -235,7 +256,6 @@ const (
 	Accrue             AffiliateLedgerEntryType = "accrue"
 	ManualAdjustment   AffiliateLedgerEntryType = "manual_adjustment"
 	RefundCompensation AffiliateLedgerEntryType = "refund_compensation"
-	Settle             AffiliateLedgerEntryType = "settle"
 	TransferToBalance  AffiliateLedgerEntryType = "transfer_to_balance"
 	Withdraw           AffiliateLedgerEntryType = "withdraw"
 )
@@ -248,8 +268,6 @@ func (e AffiliateLedgerEntryType) Valid() bool {
 	case ManualAdjustment:
 		return true
 	case RefundCompensation:
-		return true
-	case Settle:
 		return true
 	case TransferToBalance:
 		return true
@@ -272,6 +290,42 @@ func (e AffiliateRelationshipStatus) Valid() bool {
 	case AffiliateRelationshipStatusActive:
 		return true
 	case AffiliateRelationshipStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AffiliateRuleStatus.
+const (
+	AffiliateRuleStatusActive   AffiliateRuleStatus = "active"
+	AffiliateRuleStatusArchived AffiliateRuleStatus = "archived"
+	AffiliateRuleStatusDisabled AffiliateRuleStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the AffiliateRuleStatus enum.
+func (e AffiliateRuleStatus) Valid() bool {
+	switch e {
+	case AffiliateRuleStatusActive:
+		return true
+	case AffiliateRuleStatusArchived:
+		return true
+	case AffiliateRuleStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AffiliateRuleTriggerType.
+const (
+	PaymentPaid AffiliateRuleTriggerType = "payment_paid"
+)
+
+// Valid indicates whether the value is a known member of the AffiliateRuleTriggerType enum.
+func (e AffiliateRuleTriggerType) Valid() bool {
+	switch e {
+	case PaymentPaid:
 		return true
 	default:
 		return false
@@ -710,6 +764,27 @@ func (e CapabilityDescriptorStatus) Valid() bool {
 	}
 }
 
+// Defines values for CaptchaSettingsProvider.
+const (
+	Hcaptcha  CaptchaSettingsProvider = "hcaptcha"
+	Recaptcha CaptchaSettingsProvider = "recaptcha"
+	Turnstile CaptchaSettingsProvider = "turnstile"
+)
+
+// Valid indicates whether the value is a known member of the CaptchaSettingsProvider enum.
+func (e CaptchaSettingsProvider) Valid() bool {
+	switch e {
+	case Hcaptcha:
+		return true
+	case Recaptcha:
+		return true
+	case Turnstile:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ChannelMonitorScope.
 const (
 	ChannelMonitorScopeAccount  ChannelMonitorScope = "account"
@@ -830,6 +905,24 @@ func (e ContentBlockType) Valid() bool {
 	}
 }
 
+// Defines values for ContentSafetyMode.
+const (
+	ContentSafetyModeEnforce ContentSafetyMode = "enforce"
+	ContentSafetyModeMonitor ContentSafetyMode = "monitor"
+)
+
+// Valid indicates whether the value is a known member of the ContentSafetyMode enum.
+func (e ContentSafetyMode) Valid() bool {
+	switch e {
+	case ContentSafetyModeEnforce:
+		return true
+	case ContentSafetyModeMonitor:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateErrorPassthroughRuleRequestAction.
 const (
 	CreateErrorPassthroughRuleRequestActionExpose CreateErrorPassthroughRuleRequestAction = "expose"
@@ -863,6 +956,27 @@ func (e CreatePayloadRuleRequestAction) Valid() bool {
 	case CreatePayloadRuleRequestActionFilter:
 		return true
 	case CreatePayloadRuleRequestActionOverride:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateProviderAccountRequestRiskLevel.
+const (
+	CreateProviderAccountRequestRiskLevelHigh   CreateProviderAccountRequestRiskLevel = "high"
+	CreateProviderAccountRequestRiskLevelMedium CreateProviderAccountRequestRiskLevel = "medium"
+	CreateProviderAccountRequestRiskLevelNormal CreateProviderAccountRequestRiskLevel = "normal"
+)
+
+// Valid indicates whether the value is a known member of the CreateProviderAccountRequestRiskLevel enum.
+func (e CreateProviderAccountRequestRiskLevel) Valid() bool {
+	switch e {
+	case CreateProviderAccountRequestRiskLevelHigh:
+		return true
+	case CreateProviderAccountRequestRiskLevelMedium:
+		return true
+	case CreateProviderAccountRequestRiskLevelNormal:
 		return true
 	default:
 		return false
@@ -1820,7 +1934,9 @@ const (
 	PaymentOrderStatusPaid              PaymentOrderStatus = "paid"
 	PaymentOrderStatusPartiallyRefunded PaymentOrderStatus = "partially_refunded"
 	PaymentOrderStatusPending           PaymentOrderStatus = "pending"
+	PaymentOrderStatusRefundFailed      PaymentOrderStatus = "refund_failed"
 	PaymentOrderStatusRefunded          PaymentOrderStatus = "refunded"
+	PaymentOrderStatusRefunding         PaymentOrderStatus = "refunding"
 )
 
 // Valid indicates whether the value is a known member of the PaymentOrderStatus enum.
@@ -1840,7 +1956,11 @@ func (e PaymentOrderStatus) Valid() bool {
 		return true
 	case PaymentOrderStatusPending:
 		return true
+	case PaymentOrderStatusRefundFailed:
+		return true
 	case PaymentOrderStatusRefunded:
+		return true
+	case PaymentOrderStatusRefunding:
 		return true
 	default:
 		return false
@@ -1898,6 +2018,24 @@ func (e PendingOAuthIntent) Valid() bool {
 	case PendingOAuthIntentBindCurrentUser:
 		return true
 	case PendingOAuthIntentLogin:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PermissionDefinitionAction.
+const (
+	Read  PermissionDefinitionAction = "read"
+	Write PermissionDefinitionAction = "write"
+)
+
+// Valid indicates whether the value is a known member of the PermissionDefinitionAction enum.
+func (e PermissionDefinitionAction) Valid() bool {
+	switch e {
+	case Read:
+		return true
+	case Write:
 		return true
 	default:
 		return false
@@ -2009,6 +2147,48 @@ func (e PromoDiscountType) Valid() bool {
 	case Amount:
 		return true
 	case Percent:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProviderAccountExportItemRiskLevel.
+const (
+	ProviderAccountExportItemRiskLevelHigh   ProviderAccountExportItemRiskLevel = "high"
+	ProviderAccountExportItemRiskLevelMedium ProviderAccountExportItemRiskLevel = "medium"
+	ProviderAccountExportItemRiskLevelNormal ProviderAccountExportItemRiskLevel = "normal"
+)
+
+// Valid indicates whether the value is a known member of the ProviderAccountExportItemRiskLevel enum.
+func (e ProviderAccountExportItemRiskLevel) Valid() bool {
+	switch e {
+	case ProviderAccountExportItemRiskLevelHigh:
+		return true
+	case ProviderAccountExportItemRiskLevelMedium:
+		return true
+	case ProviderAccountExportItemRiskLevelNormal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProviderAccountImportItemRiskLevel.
+const (
+	ProviderAccountImportItemRiskLevelHigh   ProviderAccountImportItemRiskLevel = "high"
+	ProviderAccountImportItemRiskLevelMedium ProviderAccountImportItemRiskLevel = "medium"
+	ProviderAccountImportItemRiskLevelNormal ProviderAccountImportItemRiskLevel = "normal"
+)
+
+// Valid indicates whether the value is a known member of the ProviderAccountImportItemRiskLevel enum.
+func (e ProviderAccountImportItemRiskLevel) Valid() bool {
+	switch e {
+	case ProviderAccountImportItemRiskLevelHigh:
+		return true
+	case ProviderAccountImportItemRiskLevelMedium:
+		return true
+	case ProviderAccountImportItemRiskLevelNormal:
 		return true
 	default:
 		return false
@@ -2338,16 +2518,16 @@ func (e RiskControlLogLevel) Valid() bool {
 
 // Defines values for RiskControlMode.
 const (
-	Enforce RiskControlMode = "enforce"
-	Monitor RiskControlMode = "monitor"
+	RiskControlModeEnforce RiskControlMode = "enforce"
+	RiskControlModeMonitor RiskControlMode = "monitor"
 )
 
 // Valid indicates whether the value is a known member of the RiskControlMode enum.
 func (e RiskControlMode) Valid() bool {
 	switch e {
-	case Enforce:
+	case RiskControlModeEnforce:
 		return true
-	case Monitor:
+	case RiskControlModeMonitor:
 		return true
 	default:
 		return false
@@ -2359,11 +2539,8 @@ const (
 	RuntimeClassApiKey             RuntimeClass = "api_key"
 	RuntimeClassCliClientToken     RuntimeClass = "cli_client_token"
 	RuntimeClassCustomReverseProxy RuntimeClass = "custom_reverse_proxy"
-	RuntimeClassDesktopClientToken RuntimeClass = "desktop_client_token"
-	RuntimeClassIdePluginToken     RuntimeClass = "ide_plugin_token"
 	RuntimeClassOauthDeviceCode    RuntimeClass = "oauth_device_code"
 	RuntimeClassOauthRefresh       RuntimeClass = "oauth_refresh"
-	RuntimeClassServiceAccountJson RuntimeClass = "service_account_json"
 	RuntimeClassWebSessionCookie   RuntimeClass = "web_session_cookie"
 )
 
@@ -2376,15 +2553,9 @@ func (e RuntimeClass) Valid() bool {
 		return true
 	case RuntimeClassCustomReverseProxy:
 		return true
-	case RuntimeClassDesktopClientToken:
-		return true
-	case RuntimeClassIdePluginToken:
-		return true
 	case RuntimeClassOauthDeviceCode:
 		return true
 	case RuntimeClassOauthRefresh:
-		return true
-	case RuntimeClassServiceAccountJson:
 		return true
 	case RuntimeClassWebSessionCookie:
 		return true
@@ -2531,21 +2702,18 @@ func (e SchedulerSimulationStickyStrength) Valid() bool {
 	}
 }
 
-// Defines values for SchedulerStrategyStatus.
+// Defines values for SchedulerStrategySource.
 const (
-	SchedulerStrategyStatusActive     SchedulerStrategyStatus = "active"
-	SchedulerStrategyStatusDeprecated SchedulerStrategyStatus = "deprecated"
-	SchedulerStrategyStatusDraft      SchedulerStrategyStatus = "draft"
+	Database SchedulerStrategySource = "database"
+	Seed     SchedulerStrategySource = "seed"
 )
 
-// Valid indicates whether the value is a known member of the SchedulerStrategyStatus enum.
-func (e SchedulerStrategyStatus) Valid() bool {
+// Valid indicates whether the value is a known member of the SchedulerStrategySource enum.
+func (e SchedulerStrategySource) Valid() bool {
 	switch e {
-	case SchedulerStrategyStatusActive:
+	case Database:
 		return true
-	case SchedulerStrategyStatusDeprecated:
-		return true
-	case SchedulerStrategyStatusDraft:
+	case Seed:
 		return true
 	default:
 		return false
@@ -2579,6 +2747,51 @@ func (e SchedulerStrategyName) Valid() bool {
 	case SchedulerStrategyNameQuotaProtect:
 		return true
 	case SchedulerStrategyNameStickyFirst:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SchedulerStrategyScopeType.
+const (
+	SchedulerStrategyScopeTypeAccountGroup SchedulerStrategyScopeType = "account_group"
+	SchedulerStrategyScopeTypeApiKey       SchedulerStrategyScopeType = "api_key"
+	SchedulerStrategyScopeTypeGlobal       SchedulerStrategyScopeType = "global"
+	SchedulerStrategyScopeTypeUser         SchedulerStrategyScopeType = "user"
+)
+
+// Valid indicates whether the value is a known member of the SchedulerStrategyScopeType enum.
+func (e SchedulerStrategyScopeType) Valid() bool {
+	switch e {
+	case SchedulerStrategyScopeTypeAccountGroup:
+		return true
+	case SchedulerStrategyScopeTypeApiKey:
+		return true
+	case SchedulerStrategyScopeTypeGlobal:
+		return true
+	case SchedulerStrategyScopeTypeUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SchedulerStrategyStatus.
+const (
+	SchedulerStrategyStatusActive     SchedulerStrategyStatus = "active"
+	SchedulerStrategyStatusDeprecated SchedulerStrategyStatus = "deprecated"
+	SchedulerStrategyStatusDraft      SchedulerStrategyStatus = "draft"
+)
+
+// Valid indicates whether the value is a known member of the SchedulerStrategyStatus enum.
+func (e SchedulerStrategyStatus) Valid() bool {
+	switch e {
+	case SchedulerStrategyStatusActive:
+		return true
+	case SchedulerStrategyStatusDeprecated:
+		return true
+	case SchedulerStrategyStatusDraft:
 		return true
 	default:
 		return false
@@ -2639,6 +2852,27 @@ func (e UpdatePayloadRuleRequestAction) Valid() bool {
 	case Filter:
 		return true
 	case Override:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateProviderAccountRequestRiskLevel.
+const (
+	UpdateProviderAccountRequestRiskLevelHigh   UpdateProviderAccountRequestRiskLevel = "high"
+	UpdateProviderAccountRequestRiskLevelMedium UpdateProviderAccountRequestRiskLevel = "medium"
+	UpdateProviderAccountRequestRiskLevelNormal UpdateProviderAccountRequestRiskLevel = "normal"
+)
+
+// Valid indicates whether the value is a known member of the UpdateProviderAccountRequestRiskLevel enum.
+func (e UpdateProviderAccountRequestRiskLevel) Valid() bool {
+	switch e {
+	case UpdateProviderAccountRequestRiskLevelHigh:
+		return true
+	case UpdateProviderAccountRequestRiskLevelMedium:
+		return true
+	case UpdateProviderAccountRequestRiskLevelNormal:
 		return true
 	default:
 		return false
@@ -3361,6 +3595,25 @@ type AccountsAvailabilitySummaryResponse struct {
 	RequestId  RequestId                    `json:"request_id"`
 }
 
+// AdminAffiliateManualAdjustmentRequest defines model for AdminAffiliateManualAdjustmentRequest.
+type AdminAffiliateManualAdjustmentRequest struct {
+	// Amount Decimal string amount to adjust. Positive credits balance; negative debits balance.
+	Amount   string      `json:"amount"`
+	Currency *string     `json:"currency,omitempty"`
+	Metadata *JsonObject `json:"metadata,omitempty"`
+	Reason   string      `json:"reason"`
+
+	// ReferenceId Optional admin-supplied idempotency reference.
+	ReferenceId *string `json:"reference_id,omitempty"`
+	UserId      Id      `json:"user_id"`
+}
+
+// AdminAffiliateWithdrawalDecisionRequest defines model for AdminAffiliateWithdrawalDecisionRequest.
+type AdminAffiliateWithdrawalDecisionRequest struct {
+	// Reason Optional admin note recorded on the withdrawal ledger metadata.
+	Reason *string `json:"reason,omitempty"`
+}
+
 // AdminCopilotApproval defines model for AdminCopilotApproval.
 type AdminCopilotApproval struct {
 	Approved   bool   `json:"approved"`
@@ -3541,8 +3794,12 @@ type AdminDashboardUsers struct {
 type AdminOverview struct {
 	AccountCount           int     `json:"account_count"`
 	ActiveAccountCount     int     `json:"active_account_count"`
+	CacheReadCost          *string `json:"cache_read_cost,omitempty"`
+	CacheWriteCost         *string `json:"cache_write_cost,omitempty"`
 	Currency               string  `json:"currency"`
+	InputCost              *string `json:"input_cost,omitempty"`
 	ModelCount             int     `json:"model_count"`
+	OutputCost             *string `json:"output_cost,omitempty"`
 	ProviderCount          int     `json:"provider_count"`
 	RequestSuccessRate     float32 `json:"request_success_rate"`
 	SchedulerDecisionCount int     `json:"scheduler_decision_count"`
@@ -3813,10 +4070,36 @@ type AffiliateCurrencySummary struct {
 	Currency                   string `json:"currency"`
 	ManualAdjustmentAmount     string `json:"manual_adjustment_amount"`
 	RefundCompensatedAmount    string `json:"refund_compensated_amount"`
-	SettledAmount              string `json:"settled_amount"`
 	TransferredToBalanceAmount string `json:"transferred_to_balance_amount"`
 	WithdrawnAmount            string `json:"withdrawn_amount"`
 }
+
+// AffiliateInviteCode defines model for AffiliateInviteCode.
+type AffiliateInviteCode struct {
+	Code      string                    `json:"code"`
+	CreatedAt Timestamp                 `json:"created_at"`
+	ExpiresAt *time.Time                `json:"expires_at,omitempty"`
+	Id        Id                        `json:"id"`
+	Status    AffiliateInviteCodeStatus `json:"status"`
+	UpdatedAt Timestamp                 `json:"updated_at"`
+	UserId    Id                        `json:"user_id"`
+}
+
+// AffiliateInviteCodeListResponse defines model for AffiliateInviteCodeListResponse.
+type AffiliateInviteCodeListResponse struct {
+	Data       []AffiliateInviteCode `json:"data"`
+	Pagination Pagination            `json:"pagination"`
+	RequestId  RequestId             `json:"request_id"`
+}
+
+// AffiliateInviteCodeResponse defines model for AffiliateInviteCodeResponse.
+type AffiliateInviteCodeResponse struct {
+	Data      AffiliateInviteCode `json:"data"`
+	RequestId RequestId           `json:"request_id"`
+}
+
+// AffiliateInviteCodeStatus defines model for AffiliateInviteCodeStatus.
+type AffiliateInviteCodeStatus string
 
 // AffiliateInviteRecord defines model for AffiliateInviteRecord.
 type AffiliateInviteRecord struct {
@@ -3862,6 +4145,12 @@ type AffiliateLedgerEntryListResponse struct {
 	RequestId  RequestId              `json:"request_id"`
 }
 
+// AffiliateLedgerEntryResponse defines model for AffiliateLedgerEntryResponse.
+type AffiliateLedgerEntryResponse struct {
+	Data      AffiliateLedgerEntry `json:"data"`
+	RequestId RequestId            `json:"request_id"`
+}
+
 // AffiliateLedgerEntryStatus defines model for AffiliateLedgerEntryStatus.
 type AffiliateLedgerEntryStatus string
 
@@ -3871,10 +4160,48 @@ type AffiliateLedgerEntryType string
 // AffiliateRelationshipStatus defines model for AffiliateRelationshipStatus.
 type AffiliateRelationshipStatus string
 
+// AffiliateRule defines model for AffiliateRule.
+type AffiliateRule struct {
+	CreatedAt       Timestamp                `json:"created_at"`
+	Currency        string                   `json:"currency"`
+	FixedAmount     string                   `json:"fixed_amount"`
+	Id              Id                       `json:"id"`
+	MaxRebateAmount string                   `json:"max_rebate_amount"`
+	Metadata        JsonObject               `json:"metadata"`
+	Name            string                   `json:"name"`
+	Rate            string                   `json:"rate"`
+	Status          AffiliateRuleStatus      `json:"status"`
+	TriggerType     AffiliateRuleTriggerType `json:"trigger_type"`
+	UpdatedAt       Timestamp                `json:"updated_at"`
+	ValidFrom       *time.Time               `json:"valid_from,omitempty"`
+	ValidTo         *time.Time               `json:"valid_to,omitempty"`
+}
+
+// AffiliateRuleListResponse defines model for AffiliateRuleListResponse.
+type AffiliateRuleListResponse struct {
+	Data       []AffiliateRule `json:"data"`
+	Pagination Pagination      `json:"pagination"`
+	RequestId  RequestId       `json:"request_id"`
+}
+
+// AffiliateRuleResponse defines model for AffiliateRuleResponse.
+type AffiliateRuleResponse struct {
+	Data      AffiliateRule `json:"data"`
+	RequestId RequestId     `json:"request_id"`
+}
+
+// AffiliateRuleStatus defines model for AffiliateRuleStatus.
+type AffiliateRuleStatus string
+
+// AffiliateRuleTriggerType defines model for AffiliateRuleTriggerType.
+type AffiliateRuleTriggerType string
+
 // AffiliateSummary defines model for AffiliateSummary.
 type AffiliateSummary struct {
-	Balances []AffiliateCurrencySummary `json:"balances"`
-	UserId   Id                         `json:"user_id"`
+	Balances     []AffiliateCurrencySummary `json:"balances"`
+	InviteCodes  []AffiliateInviteCode      `json:"invite_codes"`
+	InvitedCount int                        `json:"invited_count"`
+	UserId       Id                         `json:"user_id"`
 }
 
 // AffiliateSummaryResponse defines model for AffiliateSummaryResponse.
@@ -3904,6 +4231,16 @@ type AffiliateTransferToBalanceResult struct {
 	BalanceBefore   string               `json:"balance_before"`
 	BillingLedgerId Id                   `json:"billing_ledger_id"`
 	Reason          *string              `json:"reason,omitempty"`
+}
+
+// AffiliateWithdrawalRequest defines model for AffiliateWithdrawalRequest.
+type AffiliateWithdrawalRequest struct {
+	// Amount Decimal string amount to withdraw from affiliate balance.
+	Amount   string  `json:"amount"`
+	Currency *string `json:"currency,omitempty"`
+
+	// Destination Optional withdrawal destination label or account reference.
+	Destination *string `json:"destination,omitempty"`
 }
 
 // Announcement defines model for Announcement.
@@ -4517,6 +4854,28 @@ type CaptchaConfigResponse struct {
 	RequestId RequestId     `json:"request_id"`
 }
 
+// CaptchaSettings defines model for CaptchaSettings.
+type CaptchaSettings struct {
+	Enabled bool `json:"enabled"`
+
+	// Managed When true, admin settings override environment captcha config.
+	Managed             bool                    `json:"managed"`
+	Provider            CaptchaSettingsProvider `json:"provider"`
+	SecretKey           *string                 `json:"secret_key,omitempty"`
+	SecretKeyConfigured *bool                   `json:"secret_key_configured,omitempty"`
+	SiteKey             string                  `json:"site_key"`
+	VerifyUrl           string                  `json:"verify_url"`
+}
+
+// CaptchaSettingsProvider defines model for CaptchaSettings.Provider.
+type CaptchaSettingsProvider string
+
+// CaptchaSettingsResponse defines model for CaptchaSettingsResponse.
+type CaptchaSettingsResponse struct {
+	Data      CaptchaSettings `json:"data"`
+	RequestId RequestId       `json:"request_id"`
+}
+
 // ChangeCurrentUserPasswordRequest defines model for ChangeCurrentUserPasswordRequest.
 type ChangeCurrentUserPasswordRequest struct {
 	CurrentPassword string `json:"current_password"`
@@ -4852,6 +5211,29 @@ type ContentBlock struct {
 // ContentBlockType defines model for ContentBlock.Type.
 type ContentBlockType string
 
+// ContentSafetyConfig defines model for ContentSafetyConfig.
+type ContentSafetyConfig struct {
+	BlockCustomKeywords  bool              `json:"block_custom_keywords"`
+	BlockPii             bool              `json:"block_pii"`
+	BlockPromptInjection bool              `json:"block_prompt_injection"`
+	CustomKeywords       []string          `json:"custom_keywords"`
+	Enabled              bool              `json:"enabled"`
+	Mode                 ContentSafetyMode `json:"mode"`
+
+	// ModelScopes Canonical model names or prefix scopes ending in '*'. Empty means all models.
+	ModelScopes []string `json:"model_scopes"`
+	RedactPii   bool     `json:"redact_pii"`
+}
+
+// ContentSafetyConfigResponse defines model for ContentSafetyConfigResponse.
+type ContentSafetyConfigResponse struct {
+	Data      ContentSafetyConfig `json:"data"`
+	RequestId RequestId           `json:"request_id"`
+}
+
+// ContentSafetyMode defines model for ContentSafetyMode.
+type ContentSafetyMode string
+
 // CopilotConversation A saved copilot conversation with its full transcript.
 type CopilotConversation struct {
 	CreatedAt time.Time             `json:"created_at"`
@@ -4914,6 +5296,27 @@ type CreateAdminUserRequest struct {
 	Roles    *[]UserRole         `json:"roles,omitempty"`
 	RpmLimit *int                `json:"rpm_limit,omitempty"`
 	Status   *UserStatus         `json:"status,omitempty"`
+}
+
+// CreateAffiliateInviteCodeRequest defines model for CreateAffiliateInviteCodeRequest.
+type CreateAffiliateInviteCodeRequest struct {
+	// Code Optional custom code. When omitted, SRapi generates one.
+	Code      *string    `json:"code,omitempty"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+}
+
+// CreateAffiliateRuleRequest defines model for CreateAffiliateRuleRequest.
+type CreateAffiliateRuleRequest struct {
+	Currency        *string                  `json:"currency,omitempty"`
+	FixedAmount     *string                  `json:"fixed_amount,omitempty"`
+	MaxRebateAmount *string                  `json:"max_rebate_amount,omitempty"`
+	Metadata        *JsonObject              `json:"metadata,omitempty"`
+	Name            string                   `json:"name"`
+	Rate            *string                  `json:"rate,omitempty"`
+	Status          *AffiliateRuleStatus     `json:"status,omitempty"`
+	TriggerType     AffiliateRuleTriggerType `json:"trigger_type"`
+	ValidFrom       *time.Time               `json:"valid_from,omitempty"`
+	ValidTo         *time.Time               `json:"valid_to,omitempty"`
 }
 
 // CreateAnnouncementRequest defines model for CreateAnnouncementRequest.
@@ -5083,11 +5486,17 @@ type CreatePayloadRuleRequestAction string
 
 // CreatePaymentOrderRequest defines model for CreatePaymentOrderRequest.
 type CreatePaymentOrderRequest struct {
-	Amount      string             `json:"amount"`
-	Currency    *string            `json:"currency,omitempty"`
-	ExpiresAt   *time.Time         `json:"expires_at,omitempty"`
-	Metadata    *JsonObject        `json:"metadata,omitempty"`
-	Method      string             `json:"method"`
+	Amount    string      `json:"amount"`
+	Currency  *string     `json:"currency,omitempty"`
+	ExpiresAt *time.Time  `json:"expires_at,omitempty"`
+	Metadata  *JsonObject `json:"metadata,omitempty"`
+	Method    string      `json:"method"`
+
+	// PayerClientIp Payer client IP for WeChat H5/native scene info. Defaults from request headers when omitted.
+	PayerClientIp *string `json:"payer_client_ip,omitempty"`
+
+	// PayerOpenid WeChat JSAPI payer OpenID. Prefer this typed field over metadata.
+	PayerOpenid *string            `json:"payer_openid,omitempty"`
 	ProductId   *string            `json:"product_id,omitempty"`
 	ProductType PaymentProductType `json:"product_type"`
 	PromoCode   *string            `json:"promo_code,omitempty"`
@@ -5096,6 +5505,7 @@ type CreatePaymentOrderRequest struct {
 // CreatePaymentProviderInstanceRequest defines model for CreatePaymentProviderInstanceRequest.
 type CreatePaymentProviderInstanceRequest struct {
 	Config           JsonObject             `json:"config"`
+	FeeRate          *string                `json:"fee_rate,omitempty"`
 	Limits           *JsonObject            `json:"limits,omitempty"`
 	Metadata         *JsonObject            `json:"metadata,omitempty"`
 	Name             string                 `json:"name"`
@@ -5103,22 +5513,29 @@ type CreatePaymentProviderInstanceRequest struct {
 	SortOrder        *int                   `json:"sort_order,omitempty"`
 	Status           *PaymentProviderStatus `json:"status,omitempty"`
 	SupportedMethods *[]string              `json:"supported_methods,omitempty"`
+	Weight           *int                   `json:"weight,omitempty"`
 }
 
 // CreatePricingRuleRequest defines model for CreatePricingRuleRequest.
 type CreatePricingRuleRequest struct {
-	BillingMode                     *BillingMode            `json:"billing_mode,omitempty"`
-	CacheReadPricePerMillionTokens  string                  `json:"cache_read_price_per_million_tokens"`
-	CacheWritePricePerMillionTokens string                  `json:"cache_write_price_per_million_tokens"`
-	Currency                        string                  `json:"currency"`
-	EffectiveFrom                   *time.Time              `json:"effective_from,omitempty"`
-	EffectiveTo                     *time.Time              `json:"effective_to,omitempty"`
-	InputPricePerMillionTokens      string                  `json:"input_price_per_million_tokens"`
-	Intervals                       *[]PricingIntervalInput `json:"intervals,omitempty"`
-	ModelId                         Id                      `json:"model_id"`
-	OutputPricePerMillionTokens     string                  `json:"output_price_per_million_tokens"`
-	PerRequestPrice                 *string                 `json:"per_request_price,omitempty"`
-	ProviderId                      Id                      `json:"provider_id"`
+	BillingMode                       *BillingMode            `json:"billing_mode,omitempty"`
+	CacheReadPricePerMillionTokens    string                  `json:"cache_read_price_per_million_tokens"`
+	CacheWrite1hPricePerMillionTokens *string                 `json:"cache_write_1h_price_per_million_tokens,omitempty"`
+	CacheWrite5mPricePerMillionTokens *string                 `json:"cache_write_5m_price_per_million_tokens,omitempty"`
+	CacheWritePricePerMillionTokens   string                  `json:"cache_write_price_per_million_tokens"`
+	Currency                          string                  `json:"currency"`
+	EffectiveFrom                     *time.Time              `json:"effective_from,omitempty"`
+	EffectiveTo                       *time.Time              `json:"effective_to,omitempty"`
+	ImageOutputPricePerMillionTokens  *string                 `json:"image_output_price_per_million_tokens,omitempty"`
+	InputPricePerMillionTokens        string                  `json:"input_price_per_million_tokens"`
+	Intervals                         *[]PricingIntervalInput `json:"intervals,omitempty"`
+	LongContextMultiplier             *string                 `json:"long_context_multiplier,omitempty"`
+	LongContextThresholdTokens        *int                    `json:"long_context_threshold_tokens,omitempty"`
+	ModelId                           Id                      `json:"model_id"`
+	OutputPricePerMillionTokens       string                  `json:"output_price_per_million_tokens"`
+	PerRequestPrice                   *string                 `json:"per_request_price,omitempty"`
+	ProviderId                        Id                      `json:"provider_id"`
+	ServiceTierMultipliers            *map[string]string      `json:"service_tier_multipliers,omitempty"`
 }
 
 // CreatePromoCodeRequest defines model for CreatePromoCodeRequest.
@@ -5129,24 +5546,34 @@ type CreatePromoCodeRequest struct {
 	DiscountValue string            `json:"discount_value"`
 	ExpiresAt     *Timestamp        `json:"expires_at,omitempty"`
 	MaxUses       *int              `json:"max_uses,omitempty"`
-	StartsAt      *Timestamp        `json:"starts_at,omitempty"`
-	Status        *PromoCodeStatus  `json:"status,omitempty"`
+
+	// MinOrderAmount Minimum original order amount required before the discount applies. Omit for no minimum.
+	MinOrderAmount *string `json:"min_order_amount,omitempty"`
+
+	// PerUserLimit Maximum active uses per user. Zero means no per-user limit.
+	PerUserLimit *int             `json:"per_user_limit,omitempty"`
+	StartsAt     *Timestamp       `json:"starts_at,omitempty"`
+	Status       *PromoCodeStatus `json:"status,omitempty"`
 }
 
 // CreateProviderAccountRequest defines model for CreateProviderAccountRequest.
 type CreateProviderAccountRequest struct {
 	// Credential Write-only credential payload. It must be encrypted before persistence.
-	Credential     *map[string]interface{} `json:"credential,omitempty"`
-	Metadata       *JsonObject             `json:"metadata,omitempty"`
-	Name           string                  `json:"name"`
-	Priority       *int                    `json:"priority,omitempty"`
-	ProviderId     Id                      `json:"provider_id"`
-	ProxyId        *string                 `json:"proxy_id,omitempty"`
-	RuntimeClass   RuntimeClass            `json:"runtime_class"`
-	Status         *ProviderAccountStatus  `json:"status,omitempty"`
-	UpstreamClient *string                 `json:"upstream_client,omitempty"`
-	Weight         *float32                `json:"weight,omitempty"`
+	Credential     *map[string]interface{}                `json:"credential,omitempty"`
+	Metadata       *JsonObject                            `json:"metadata,omitempty"`
+	Name           string                                 `json:"name"`
+	Priority       *int                                   `json:"priority,omitempty"`
+	ProviderId     Id                                     `json:"provider_id"`
+	ProxyId        *string                                `json:"proxy_id,omitempty"`
+	RiskLevel      *CreateProviderAccountRequestRiskLevel `json:"risk_level,omitempty"`
+	RuntimeClass   RuntimeClass                           `json:"runtime_class"`
+	Status         *ProviderAccountStatus                 `json:"status,omitempty"`
+	UpstreamClient *string                                `json:"upstream_client,omitempty"`
+	Weight         *float32                               `json:"weight,omitempty"`
 }
+
+// CreateProviderAccountRequestRiskLevel defines model for CreateProviderAccountRequest.RiskLevel.
+type CreateProviderAccountRequestRiskLevel string
 
 // CreateProviderRequest defines model for CreateProviderRequest.
 type CreateProviderRequest struct {
@@ -5199,6 +5626,7 @@ type CreateScheduledTestPlanRequest struct {
 	IntervalSeconds *int64                                  `json:"interval_seconds,omitempty"`
 	MaxResults      *int64                                  `json:"max_results,omitempty"`
 	Name            string                                  `json:"name"`
+	ProbeModel      *string                                 `json:"probe_model,omitempty"`
 	ScopeId         *int64                                  `json:"scope_id,omitempty"`
 	ScopeType       CreateScheduledTestPlanRequestScopeType `json:"scope_type"`
 }
@@ -5512,16 +5940,20 @@ type GatewayErrorResponse struct {
 
 // GatewayUsageModel defines model for GatewayUsageModel.
 type GatewayUsageModel struct {
-	CachedTokens int    `json:"cached_tokens"`
-	Cost         string `json:"cost"`
-	Currency     string `json:"currency"`
-	ErrorCount   int    `json:"error_count"`
-	InputTokens  int    `json:"input_tokens"`
-	Model        string `json:"model"`
-	OutputTokens int    `json:"output_tokens"`
-	Requests     int    `json:"requests"`
-	SuccessCount int    `json:"success_count"`
-	TotalTokens  int    `json:"total_tokens"`
+	CacheReadCost  *string `json:"cache_read_cost,omitempty"`
+	CacheWriteCost *string `json:"cache_write_cost,omitempty"`
+	CachedTokens   int     `json:"cached_tokens"`
+	Cost           string  `json:"cost"`
+	Currency       string  `json:"currency"`
+	ErrorCount     int     `json:"error_count"`
+	InputCost      *string `json:"input_cost,omitempty"`
+	InputTokens    int     `json:"input_tokens"`
+	Model          string  `json:"model"`
+	OutputCost     *string `json:"output_cost,omitempty"`
+	OutputTokens   int     `json:"output_tokens"`
+	Requests       int     `json:"requests"`
+	SuccessCount   int     `json:"success_count"`
+	TotalTokens    int     `json:"total_tokens"`
 }
 
 // GatewayUsageRequest defines model for GatewayUsageRequest.
@@ -5581,29 +6013,37 @@ type GatewayUsageResponseObject string
 
 // GatewayUsageTotals defines model for GatewayUsageTotals.
 type GatewayUsageTotals struct {
-	CachedTokens int    `json:"cached_tokens"`
-	Cost         string `json:"cost"`
-	Currency     string `json:"currency"`
-	ErrorCount   int    `json:"error_count"`
-	InputTokens  int    `json:"input_tokens"`
-	OutputTokens int    `json:"output_tokens"`
-	Requests     int    `json:"requests"`
-	SuccessCount int    `json:"success_count"`
-	TotalTokens  int    `json:"total_tokens"`
+	CacheReadCost  *string `json:"cache_read_cost,omitempty"`
+	CacheWriteCost *string `json:"cache_write_cost,omitempty"`
+	CachedTokens   int     `json:"cached_tokens"`
+	Cost           string  `json:"cost"`
+	Currency       string  `json:"currency"`
+	ErrorCount     int     `json:"error_count"`
+	InputCost      *string `json:"input_cost,omitempty"`
+	InputTokens    int     `json:"input_tokens"`
+	OutputCost     *string `json:"output_cost,omitempty"`
+	OutputTokens   int     `json:"output_tokens"`
+	Requests       int     `json:"requests"`
+	SuccessCount   int     `json:"success_count"`
+	TotalTokens    int     `json:"total_tokens"`
 }
 
 // GatewayUsageWindow defines model for GatewayUsageWindow.
 type GatewayUsageWindow struct {
-	CachedTokens int                `json:"cached_tokens"`
-	Cost         string             `json:"cost"`
-	Currency     string             `json:"currency"`
-	Date         openapi_types.Date `json:"date"`
-	ErrorCount   int                `json:"error_count"`
-	InputTokens  int                `json:"input_tokens"`
-	OutputTokens int                `json:"output_tokens"`
-	Requests     int                `json:"requests"`
-	SuccessCount int                `json:"success_count"`
-	TotalTokens  int                `json:"total_tokens"`
+	CacheReadCost  *string            `json:"cache_read_cost,omitempty"`
+	CacheWriteCost *string            `json:"cache_write_cost,omitempty"`
+	CachedTokens   int                `json:"cached_tokens"`
+	Cost           string             `json:"cost"`
+	Currency       string             `json:"currency"`
+	Date           openapi_types.Date `json:"date"`
+	ErrorCount     int                `json:"error_count"`
+	InputCost      *string            `json:"input_cost,omitempty"`
+	InputTokens    int                `json:"input_tokens"`
+	OutputCost     *string            `json:"output_cost,omitempty"`
+	OutputTokens   int                `json:"output_tokens"`
+	Requests       int                `json:"requests"`
+	SuccessCount   int                `json:"success_count"`
+	TotalTokens    int                `json:"total_tokens"`
 }
 
 // GeminiCandidate defines model for GeminiCandidate.
@@ -6825,6 +7265,19 @@ type PasswordResetAcceptedResponse struct {
 	RequestId RequestId             `json:"request_id"`
 }
 
+// PasswordlessLoginRequest defines model for PasswordlessLoginRequest.
+type PasswordlessLoginRequest struct {
+	Token string `json:"token"`
+}
+
+// PasswordlessRequest defines model for PasswordlessRequest.
+type PasswordlessRequest struct {
+	Attributes *[]UserAttributeValueInput `json:"attributes,omitempty"`
+	Email      openapi_types.Email        `json:"email"`
+	InviteCode *string                    `json:"invite_code,omitempty"`
+	Name       *string                    `json:"name,omitempty"`
+}
+
 // PayloadRule defines model for PayloadRule.
 type PayloadRule struct {
 	Action        PayloadRuleAction      `json:"action"`
@@ -6855,6 +7308,25 @@ type PayloadRuleResponse struct {
 	RequestId RequestId   `json:"request_id"`
 }
 
+// PaymentAuditLog defines model for PaymentAuditLog.
+type PaymentAuditLog struct {
+	CreatedAt          Timestamp  `json:"created_at"`
+	EventType          string     `json:"event_type"`
+	Id                 Id         `json:"id"`
+	IdempotencyKey     string     `json:"idempotency_key"`
+	OrderId            Id         `json:"order_id"`
+	Payload            JsonObject `json:"payload"`
+	ProviderInstanceId Id         `json:"provider_instance_id"`
+	SignatureValid     bool       `json:"signature_valid"`
+}
+
+// PaymentAuditLogListResponse defines model for PaymentAuditLogListResponse.
+type PaymentAuditLogListResponse struct {
+	Data       []PaymentAuditLog `json:"data"`
+	Pagination Pagination        `json:"pagination"`
+	RequestId  RequestId         `json:"request_id"`
+}
+
 // PaymentMethod defines model for PaymentMethod.
 type PaymentMethod struct {
 	Metadata           JsonObject `json:"metadata"`
@@ -6879,11 +7351,13 @@ type PaymentOrder struct {
 	Currency              string             `json:"currency"`
 	DiscountAmount        string             `json:"discount_amount"`
 	ExpiresAt             *time.Time         `json:"expires_at,omitempty"`
+	FeeAmount             string             `json:"fee_amount"`
 	Id                    Id                 `json:"id"`
 	Metadata              JsonObject         `json:"metadata"`
 	OrderNo               string             `json:"order_no"`
 	OriginalAmount        string             `json:"original_amount"`
 	PaidAt                *time.Time         `json:"paid_at,omitempty"`
+	PayableAmount         string             `json:"payable_amount"`
 	ProductId             string             `json:"product_id"`
 	ProductType           PaymentProductType `json:"product_type"`
 	PromoCodeId           *Id                `json:"promo_code_id,omitempty"`
@@ -6916,8 +7390,11 @@ type PaymentProductType string
 
 // PaymentProviderInstance defines model for PaymentProviderInstance.
 type PaymentProviderInstance struct {
-	ConfigVersion    int                   `json:"config_version"`
-	CreatedAt        Timestamp             `json:"created_at"`
+	ConfigVersion int       `json:"config_version"`
+	CreatedAt     Timestamp `json:"created_at"`
+
+	// FeeRate Decimal payment-channel fee rate added to the payable amount.
+	FeeRate          string                `json:"fee_rate"`
 	Id               Id                    `json:"id"`
 	Limits           JsonObject            `json:"limits"`
 	Metadata         JsonObject            `json:"metadata"`
@@ -6927,6 +7404,9 @@ type PaymentProviderInstance struct {
 	Status           PaymentProviderStatus `json:"status"`
 	SupportedMethods []string              `json:"supported_methods"`
 	UpdatedAt        Timestamp             `json:"updated_at"`
+
+	// Weight Relative round-robin selection weight.
+	Weight int `json:"weight"`
 }
 
 // PaymentProviderInstanceListResponse defines model for PaymentProviderInstanceListResponse.
@@ -7027,6 +7507,23 @@ type PendingOAuthEmailCompletionRequest struct {
 // PendingOAuthIntent defines model for PendingOAuthIntent.
 type PendingOAuthIntent string
 
+// PermissionCatalogResponse defines model for PermissionCatalogResponse.
+type PermissionCatalogResponse struct {
+	Data      []PermissionDefinition `json:"data"`
+	RequestId RequestId              `json:"request_id"`
+}
+
+// PermissionDefinition defines model for PermissionDefinition.
+type PermissionDefinition struct {
+	Action      PermissionDefinitionAction `json:"action"`
+	Description string                     `json:"description"`
+	Permission  string                     `json:"permission"`
+	Resource    string                     `json:"resource"`
+}
+
+// PermissionDefinitionAction defines model for PermissionDefinition.Action.
+type PermissionDefinitionAction string
+
 // PlatformFamily Upstream protocol/platform family a provider preset belongs to.
 type PlatformFamily string
 
@@ -7110,21 +7607,27 @@ type PricingIntervalInput struct {
 
 // PricingRule defines model for PricingRule.
 type PricingRule struct {
-	BillingMode                     BillingMode       `json:"billing_mode"`
-	CacheReadPricePerMillionTokens  string            `json:"cache_read_price_per_million_tokens"`
-	CacheWritePricePerMillionTokens string            `json:"cache_write_price_per_million_tokens"`
-	CreatedAt                       Timestamp         `json:"created_at"`
-	Currency                        string            `json:"currency"`
-	EffectiveFrom                   *time.Time        `json:"effective_from,omitempty"`
-	EffectiveTo                     *time.Time        `json:"effective_to,omitempty"`
-	Id                              Id                `json:"id"`
-	InputPricePerMillionTokens      string            `json:"input_price_per_million_tokens"`
-	Intervals                       []PricingInterval `json:"intervals"`
-	ModelId                         Id                `json:"model_id"`
-	OutputPricePerMillionTokens     string            `json:"output_price_per_million_tokens"`
-	PerRequestPrice                 string            `json:"per_request_price"`
-	ProviderId                      Id                `json:"provider_id"`
-	UpdatedAt                       Timestamp         `json:"updated_at"`
+	BillingMode                       BillingMode        `json:"billing_mode"`
+	CacheReadPricePerMillionTokens    string             `json:"cache_read_price_per_million_tokens"`
+	CacheWrite1hPricePerMillionTokens *string            `json:"cache_write_1h_price_per_million_tokens,omitempty"`
+	CacheWrite5mPricePerMillionTokens *string            `json:"cache_write_5m_price_per_million_tokens,omitempty"`
+	CacheWritePricePerMillionTokens   string             `json:"cache_write_price_per_million_tokens"`
+	CreatedAt                         Timestamp          `json:"created_at"`
+	Currency                          string             `json:"currency"`
+	EffectiveFrom                     *time.Time         `json:"effective_from,omitempty"`
+	EffectiveTo                       *time.Time         `json:"effective_to,omitempty"`
+	Id                                Id                 `json:"id"`
+	ImageOutputPricePerMillionTokens  *string            `json:"image_output_price_per_million_tokens,omitempty"`
+	InputPricePerMillionTokens        string             `json:"input_price_per_million_tokens"`
+	Intervals                         []PricingInterval  `json:"intervals"`
+	LongContextMultiplier             *string            `json:"long_context_multiplier,omitempty"`
+	LongContextThresholdTokens        *int               `json:"long_context_threshold_tokens,omitempty"`
+	ModelId                           Id                 `json:"model_id"`
+	OutputPricePerMillionTokens       string             `json:"output_price_per_million_tokens"`
+	PerRequestPrice                   string             `json:"per_request_price"`
+	ProviderId                        Id                 `json:"provider_id"`
+	ServiceTierMultipliers            *map[string]string `json:"service_tier_multipliers,omitempty"`
+	UpdatedAt                         Timestamp          `json:"updated_at"`
 }
 
 // PricingRuleListResponse defines model for PricingRuleListResponse.
@@ -7150,10 +7653,16 @@ type PromoCode struct {
 	ExpiresAt     *Timestamp        `json:"expires_at,omitempty"`
 	Id            Id                `json:"id"`
 	MaxUses       int               `json:"max_uses"`
-	StartsAt      *Timestamp        `json:"starts_at,omitempty"`
-	Status        PromoCodeStatus   `json:"status"`
-	UpdatedAt     Timestamp         `json:"updated_at"`
-	UsedCount     int               `json:"used_count"`
+
+	// MinOrderAmount Minimum original order amount required before the discount applies. Blank means no minimum.
+	MinOrderAmount string `json:"min_order_amount"`
+
+	// PerUserLimit Maximum active uses per user. Zero means no per-user limit.
+	PerUserLimit int             `json:"per_user_limit"`
+	StartsAt     *Timestamp      `json:"starts_at,omitempty"`
+	Status       PromoCodeStatus `json:"status"`
+	UpdatedAt    Timestamp       `json:"updated_at"`
+	UsedCount    int             `json:"used_count"`
 }
 
 // PromoCodeListResponse defines model for PromoCodeListResponse.
@@ -7236,18 +7745,22 @@ type ProviderAccount struct {
 // ProviderAccountExportItem defines model for ProviderAccountExportItem.
 type ProviderAccountExportItem struct {
 	// CredentialExported Always false for this endpoint; credentials are never exported.
-	CredentialExported bool                  `json:"credential_exported"`
-	GroupIds           *[]Id                 `json:"group_ids,omitempty"`
-	Metadata           *JsonObject           `json:"metadata,omitempty"`
-	Name               string                `json:"name"`
-	Priority           int                   `json:"priority"`
-	ProviderId         Id                    `json:"provider_id"`
-	ProxyId            *string               `json:"proxy_id,omitempty"`
-	RuntimeClass       RuntimeClass          `json:"runtime_class"`
-	Status             ProviderAccountStatus `json:"status"`
-	UpstreamClient     *string               `json:"upstream_client,omitempty"`
-	Weight             float32               `json:"weight"`
+	CredentialExported bool                                `json:"credential_exported"`
+	GroupIds           *[]Id                               `json:"group_ids,omitempty"`
+	Metadata           *JsonObject                         `json:"metadata,omitempty"`
+	Name               string                              `json:"name"`
+	Priority           int                                 `json:"priority"`
+	ProviderId         Id                                  `json:"provider_id"`
+	ProxyId            *string                             `json:"proxy_id,omitempty"`
+	RiskLevel          *ProviderAccountExportItemRiskLevel `json:"risk_level,omitempty"`
+	RuntimeClass       RuntimeClass                        `json:"runtime_class"`
+	Status             ProviderAccountStatus               `json:"status"`
+	UpstreamClient     *string                             `json:"upstream_client,omitempty"`
+	Weight             float32                             `json:"weight"`
 }
+
+// ProviderAccountExportItemRiskLevel defines model for ProviderAccountExportItem.RiskLevel.
+type ProviderAccountExportItemRiskLevel string
 
 // ProviderAccountExportResponse defines model for ProviderAccountExportResponse.
 type ProviderAccountExportResponse struct {
@@ -7258,18 +7771,22 @@ type ProviderAccountExportResponse struct {
 // ProviderAccountImportItem defines model for ProviderAccountImportItem.
 type ProviderAccountImportItem struct {
 	// Credential Write-only credential payload. Exports intentionally omit this field.
-	Credential     *map[string]interface{} `json:"credential,omitempty"`
-	GroupIds       *[]Id                   `json:"group_ids,omitempty"`
-	Metadata       *JsonObject             `json:"metadata,omitempty"`
-	Name           string                  `json:"name"`
-	Priority       *int                    `json:"priority,omitempty"`
-	ProviderId     Id                      `json:"provider_id"`
-	ProxyId        *string                 `json:"proxy_id,omitempty"`
-	RuntimeClass   RuntimeClass            `json:"runtime_class"`
-	Status         *ProviderAccountStatus  `json:"status,omitempty"`
-	UpstreamClient *string                 `json:"upstream_client,omitempty"`
-	Weight         *float32                `json:"weight,omitempty"`
+	Credential     *map[string]interface{}             `json:"credential,omitempty"`
+	GroupIds       *[]Id                               `json:"group_ids,omitempty"`
+	Metadata       *JsonObject                         `json:"metadata,omitempty"`
+	Name           string                              `json:"name"`
+	Priority       *int                                `json:"priority,omitempty"`
+	ProviderId     Id                                  `json:"provider_id"`
+	ProxyId        *string                             `json:"proxy_id,omitempty"`
+	RiskLevel      *ProviderAccountImportItemRiskLevel `json:"risk_level,omitempty"`
+	RuntimeClass   RuntimeClass                        `json:"runtime_class"`
+	Status         *ProviderAccountStatus              `json:"status,omitempty"`
+	UpstreamClient *string                             `json:"upstream_client,omitempty"`
+	Weight         *float32                            `json:"weight,omitempty"`
 }
+
+// ProviderAccountImportItemRiskLevel defines model for ProviderAccountImportItem.RiskLevel.
+type ProviderAccountImportItemRiskLevel string
 
 // ProviderAccountImportRequest defines model for ProviderAccountImportRequest.
 type ProviderAccountImportRequest struct {
@@ -7519,9 +8036,14 @@ type RefundPaymentOrderRequest struct {
 
 // RegisterRequest defines model for RegisterRequest.
 type RegisterRequest struct {
-	Email    openapi_types.Email `json:"email"`
-	Name     string              `json:"name"`
-	Password string              `json:"password"`
+	// Attributes Current-user attribute values required at registration when enabled definitions are marked required.
+	Attributes *[]UserAttributeValueInput `json:"attributes,omitempty"`
+	Email      openapi_types.Email        `json:"email"`
+
+	// InviteCode Optional affiliate invite code to bind to the new account.
+	InviteCode *string `json:"invite_code,omitempty"`
+	Name       string  `json:"name"`
+	Password   string  `json:"password"`
 }
 
 // RequestEmailVerificationRequest defines model for RequestEmailVerificationRequest.
@@ -7754,6 +8276,7 @@ type ScheduledTestPlan struct {
 	LastSummary     string                     `json:"last_summary"`
 	MaxResults      int64                      `json:"max_results"`
 	Name            string                     `json:"name"`
+	ProbeModel      string                     `json:"probe_model"`
 	ScopeId         *int64                     `json:"scope_id,omitempty"`
 	ScopeType       ScheduledTestPlanScopeType `json:"scope_type"`
 	UpdatedAt       time.Time                  `json:"updated_at"`
@@ -8097,18 +8620,25 @@ type SchedulerSimulationStickyStrength string
 
 // SchedulerStrategy defines model for SchedulerStrategy.
 type SchedulerStrategy struct {
-	ActivatedAt *time.Time              `json:"activated_at,omitempty"`
-	Config      JsonObject              `json:"config"`
-	ConfigHash  string                  `json:"config_hash"`
-	CreatedAt   Timestamp               `json:"created_at"`
-	Id          Id                      `json:"id"`
-	Name        SchedulerStrategyName   `json:"name"`
-	Status      SchedulerStrategyStatus `json:"status"`
-	Version     string                  `json:"version"`
+	ActivatedAt  *time.Time                 `json:"activated_at,omitempty"`
+	Config       JsonObject                 `json:"config"`
+	ConfigHash   string                     `json:"config_hash"`
+	CreatedAt    Timestamp                  `json:"created_at"`
+	CreatedBy    *Id                        `json:"created_by,omitempty"`
+	DeprecatedAt *time.Time                 `json:"deprecated_at,omitempty"`
+	Description  *string                    `json:"description,omitempty"`
+	Id           Id                         `json:"id"`
+	Name         SchedulerStrategyName      `json:"name"`
+	ScopeId      *Id                        `json:"scope_id,omitempty"`
+	ScopeType    SchedulerStrategyScopeType `json:"scope_type"`
+	Source       SchedulerStrategySource    `json:"source"`
+	Status       SchedulerStrategyStatus    `json:"status"`
+	Version      string                     `json:"version"`
+	Weights      SchedulerStrategyWeights   `json:"weights"`
 }
 
-// SchedulerStrategyStatus defines model for SchedulerStrategy.Status.
-type SchedulerStrategyStatus string
+// SchedulerStrategySource defines model for SchedulerStrategy.Source.
+type SchedulerStrategySource string
 
 // SchedulerStrategyListResponse defines model for SchedulerStrategyListResponse.
 type SchedulerStrategyListResponse struct {
@@ -8117,8 +8647,35 @@ type SchedulerStrategyListResponse struct {
 	RequestId  RequestId           `json:"request_id"`
 }
 
+// SchedulerStrategyMutationRequest defines model for SchedulerStrategyMutationRequest.
+type SchedulerStrategyMutationRequest struct {
+	Config      *JsonObject                `json:"config,omitempty"`
+	Description *string                    `json:"description,omitempty"`
+	Name        SchedulerStrategyName      `json:"name"`
+	ScopeId     *Id                        `json:"scope_id,omitempty"`
+	ScopeType   SchedulerStrategyScopeType `json:"scope_type"`
+	Status      SchedulerStrategyStatus    `json:"status"`
+	Version     string                     `json:"version"`
+	Weights     SchedulerStrategyWeights   `json:"weights"`
+}
+
 // SchedulerStrategyName defines model for SchedulerStrategyName.
 type SchedulerStrategyName string
+
+// SchedulerStrategyResponse defines model for SchedulerStrategyResponse.
+type SchedulerStrategyResponse struct {
+	Data      SchedulerStrategy `json:"data"`
+	RequestId RequestId         `json:"request_id"`
+}
+
+// SchedulerStrategyScopeType defines model for SchedulerStrategyScopeType.
+type SchedulerStrategyScopeType string
+
+// SchedulerStrategyStatus defines model for SchedulerStrategyStatus.
+type SchedulerStrategyStatus string
+
+// SchedulerStrategyWeights defines model for SchedulerStrategyWeights.
+type SchedulerStrategyWeights map[string]float32
 
 // SecretConfigured defines model for SecretConfigured.
 type SecretConfigured struct {
@@ -8158,6 +8715,22 @@ type SetupStatus struct {
 type SetupStatusResponse struct {
 	Data      SetupStatus `json:"data"`
 	RequestId RequestId   `json:"request_id"`
+}
+
+// SiteConfig defines model for SiteConfig.
+type SiteConfig struct {
+	CustomMenus   []map[string]interface{} `json:"custom_menus"`
+	LogoUrl       string                   `json:"logo_url"`
+	PrivacyPolicy string                   `json:"privacy_policy"`
+	SiteName      string                   `json:"site_name"`
+	UserAgreement string                   `json:"user_agreement"`
+	VersionLabel  string                   `json:"version_label"`
+}
+
+// SiteConfigResponse defines model for SiteConfigResponse.
+type SiteConfigResponse struct {
+	Data      SiteConfig `json:"data"`
+	RequestId RequestId  `json:"request_id"`
 }
 
 // SnapshotGroupRateLimit defines model for SnapshotGroupRateLimit.
@@ -8334,6 +8907,20 @@ type UpdateAdminUserRequest struct {
 	Status   *UserStatus          `json:"status,omitempty"`
 }
 
+// UpdateAffiliateRuleRequest defines model for UpdateAffiliateRuleRequest.
+type UpdateAffiliateRuleRequest struct {
+	Currency        *string                   `json:"currency,omitempty"`
+	FixedAmount     *string                   `json:"fixed_amount,omitempty"`
+	MaxRebateAmount *string                   `json:"max_rebate_amount,omitempty"`
+	Metadata        *JsonObject               `json:"metadata,omitempty"`
+	Name            *string                   `json:"name,omitempty"`
+	Rate            *string                   `json:"rate,omitempty"`
+	Status          *AffiliateRuleStatus      `json:"status,omitempty"`
+	TriggerType     *AffiliateRuleTriggerType `json:"trigger_type,omitempty"`
+	ValidFrom       *time.Time                `json:"valid_from,omitempty"`
+	ValidTo         *time.Time                `json:"valid_to,omitempty"`
+}
+
 // UpdateAnnouncementRequest defines model for UpdateAnnouncementRequest.
 type UpdateAnnouncementRequest = CreateAnnouncementRequest
 
@@ -8383,6 +8970,11 @@ type UpdateChannelMonitorTemplateRequest struct {
 
 	// Request Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
 	Request *ChannelMonitorRequest `json:"request,omitempty"`
+}
+
+// UpdateCurrentUserAttributesRequest defines model for UpdateCurrentUserAttributesRequest.
+type UpdateCurrentUserAttributesRequest struct {
+	Values []UserAttributeValueInput `json:"values"`
 }
 
 // UpdateCurrentUserProfileRequest defines model for UpdateCurrentUserProfileRequest.
@@ -8475,26 +9067,34 @@ type UpdatePayloadRuleRequestAction string
 // UpdatePaymentProviderInstanceRequest defines model for UpdatePaymentProviderInstanceRequest.
 type UpdatePaymentProviderInstanceRequest struct {
 	Config           *JsonObject            `json:"config,omitempty"`
+	FeeRate          *string                `json:"fee_rate,omitempty"`
 	Limits           *JsonObject            `json:"limits,omitempty"`
 	Metadata         *JsonObject            `json:"metadata,omitempty"`
 	Name             *string                `json:"name,omitempty"`
 	SortOrder        *int                   `json:"sort_order,omitempty"`
 	Status           *PaymentProviderStatus `json:"status,omitempty"`
 	SupportedMethods *[]string              `json:"supported_methods,omitempty"`
+	Weight           *int                   `json:"weight,omitempty"`
 }
 
 // UpdatePricingRuleRequest defines model for UpdatePricingRuleRequest.
 type UpdatePricingRuleRequest struct {
-	BillingMode                     *BillingMode            `json:"billing_mode,omitempty"`
-	CacheReadPricePerMillionTokens  *string                 `json:"cache_read_price_per_million_tokens,omitempty"`
-	CacheWritePricePerMillionTokens *string                 `json:"cache_write_price_per_million_tokens,omitempty"`
-	Currency                        *string                 `json:"currency,omitempty"`
-	EffectiveFrom                   *time.Time              `json:"effective_from,omitempty"`
-	EffectiveTo                     *time.Time              `json:"effective_to,omitempty"`
-	InputPricePerMillionTokens      *string                 `json:"input_price_per_million_tokens,omitempty"`
-	Intervals                       *[]PricingIntervalInput `json:"intervals,omitempty"`
-	OutputPricePerMillionTokens     *string                 `json:"output_price_per_million_tokens,omitempty"`
-	PerRequestPrice                 *string                 `json:"per_request_price,omitempty"`
+	BillingMode                       *BillingMode            `json:"billing_mode,omitempty"`
+	CacheReadPricePerMillionTokens    *string                 `json:"cache_read_price_per_million_tokens,omitempty"`
+	CacheWrite1hPricePerMillionTokens *string                 `json:"cache_write_1h_price_per_million_tokens,omitempty"`
+	CacheWrite5mPricePerMillionTokens *string                 `json:"cache_write_5m_price_per_million_tokens,omitempty"`
+	CacheWritePricePerMillionTokens   *string                 `json:"cache_write_price_per_million_tokens,omitempty"`
+	Currency                          *string                 `json:"currency,omitempty"`
+	EffectiveFrom                     *time.Time              `json:"effective_from,omitempty"`
+	EffectiveTo                       *time.Time              `json:"effective_to,omitempty"`
+	ImageOutputPricePerMillionTokens  *string                 `json:"image_output_price_per_million_tokens,omitempty"`
+	InputPricePerMillionTokens        *string                 `json:"input_price_per_million_tokens,omitempty"`
+	Intervals                         *[]PricingIntervalInput `json:"intervals,omitempty"`
+	LongContextMultiplier             *string                 `json:"long_context_multiplier,omitempty"`
+	LongContextThresholdTokens        *int                    `json:"long_context_threshold_tokens,omitempty"`
+	OutputPricePerMillionTokens       *string                 `json:"output_price_per_million_tokens,omitempty"`
+	PerRequestPrice                   *string                 `json:"per_request_price,omitempty"`
+	ServiceTierMultipliers            *map[string]string      `json:"service_tier_multipliers,omitempty"`
 }
 
 // UpdatePromoCodeRequest defines model for UpdatePromoCodeRequest.
@@ -8503,16 +9103,20 @@ type UpdatePromoCodeRequest = CreatePromoCodeRequest
 // UpdateProviderAccountRequest defines model for UpdateProviderAccountRequest.
 type UpdateProviderAccountRequest struct {
 	// Credential Write-only replacement credential payload. It must be encrypted before persistence.
-	Credential     *map[string]interface{} `json:"credential,omitempty"`
-	Metadata       *JsonObject             `json:"metadata,omitempty"`
-	Name           *string                 `json:"name,omitempty"`
-	Priority       *int                    `json:"priority,omitempty"`
-	ProxyId        *string                 `json:"proxy_id,omitempty"`
-	RuntimeClass   *RuntimeClass           `json:"runtime_class,omitempty"`
-	Status         *ProviderAccountStatus  `json:"status,omitempty"`
-	UpstreamClient *string                 `json:"upstream_client,omitempty"`
-	Weight         *float32                `json:"weight,omitempty"`
+	Credential     *map[string]interface{}                `json:"credential,omitempty"`
+	Metadata       *JsonObject                            `json:"metadata,omitempty"`
+	Name           *string                                `json:"name,omitempty"`
+	Priority       *int                                   `json:"priority,omitempty"`
+	ProxyId        *string                                `json:"proxy_id,omitempty"`
+	RiskLevel      *UpdateProviderAccountRequestRiskLevel `json:"risk_level,omitempty"`
+	RuntimeClass   *RuntimeClass                          `json:"runtime_class,omitempty"`
+	Status         *ProviderAccountStatus                 `json:"status,omitempty"`
+	UpstreamClient *string                                `json:"upstream_client,omitempty"`
+	Weight         *float32                               `json:"weight,omitempty"`
 }
+
+// UpdateProviderAccountRequestRiskLevel defines model for UpdateProviderAccountRequest.RiskLevel.
+type UpdateProviderAccountRequestRiskLevel string
 
 // UpdateProviderRequest defines model for UpdateProviderRequest.
 type UpdateProviderRequest struct {
@@ -8549,6 +9153,7 @@ type UpdateScheduledTestPlanRequest struct {
 	IntervalSeconds *int64                                   `json:"interval_seconds,omitempty"`
 	MaxResults      *int64                                   `json:"max_results,omitempty"`
 	Name            *string                                  `json:"name,omitempty"`
+	ProbeModel      *string                                  `json:"probe_model,omitempty"`
 	ScopeId         *int64                                   `json:"scope_id,omitempty"`
 	ScopeType       *UpdateScheduledTestPlanRequestScopeType `json:"scope_type,omitempty"`
 }
@@ -8641,17 +9246,21 @@ type UpsertUserPlatformQuotaRequest struct {
 
 // UsageAggregate defines model for UsageAggregate.
 type UsageAggregate struct {
-	AggregateId   string                  `json:"aggregate_id"`
-	AggregateType UsageAggregateDimension `json:"aggregate_type"`
-	CachedTokens  int                     `json:"cached_tokens"`
-	Currency      string                  `json:"currency"`
-	ErrorCount    int                     `json:"error_count"`
-	InputTokens   int                     `json:"input_tokens"`
-	OutputTokens  int                     `json:"output_tokens"`
-	RequestCount  int                     `json:"request_count"`
-	SuccessCount  int                     `json:"success_count"`
-	TotalCost     string                  `json:"total_cost"`
-	TotalTokens   int                     `json:"total_tokens"`
+	AggregateId    string                  `json:"aggregate_id"`
+	AggregateType  UsageAggregateDimension `json:"aggregate_type"`
+	CacheReadCost  *string                 `json:"cache_read_cost,omitempty"`
+	CacheWriteCost *string                 `json:"cache_write_cost,omitempty"`
+	CachedTokens   int                     `json:"cached_tokens"`
+	Currency       string                  `json:"currency"`
+	ErrorCount     int                     `json:"error_count"`
+	InputCost      *string                 `json:"input_cost,omitempty"`
+	InputTokens    int                     `json:"input_tokens"`
+	OutputCost     *string                 `json:"output_cost,omitempty"`
+	OutputTokens   int                     `json:"output_tokens"`
+	RequestCount   int                     `json:"request_count"`
+	SuccessCount   int                     `json:"success_count"`
+	TotalCost      string                  `json:"total_cost"`
+	TotalTokens    int                     `json:"total_tokens"`
 }
 
 // UsageAggregateDimension defines model for UsageAggregateDimension.
@@ -8839,8 +9448,16 @@ type UserAttributeValue struct {
 	DefinitionId int64      `json:"definition_id"`
 	Key          string     `json:"key"`
 	Name         string     `json:"name"`
+	Options      []string   `json:"options"`
+	Required     bool       `json:"required"`
 	UpdatedAt    *time.Time `json:"updated_at,omitempty"`
 	Value        string     `json:"value"`
+}
+
+// UserAttributeValueInput defines model for UserAttributeValueInput.
+type UserAttributeValueInput struct {
+	DefinitionId int64  `json:"definition_id"`
+	Value        string `json:"value"`
 }
 
 // UserAttributeValueListResponse defines model for UserAttributeValueListResponse.
@@ -9106,6 +9723,12 @@ type ListAdminAccountsAvailabilityParams struct {
 // GetAdminAccountAvailabilityParams defines parameters for GetAdminAccountAvailability.
 type GetAdminAccountAvailabilityParams struct {
 	Days *int `form:"days,omitempty" json:"days,omitempty"`
+}
+
+// ListAdminAffiliateRulesParams defines parameters for ListAdminAffiliateRules.
+type ListAdminAffiliateRulesParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
 // ListAdminAffiliateInvitesParams defines parameters for ListAdminAffiliateInvites.
@@ -9513,6 +10136,12 @@ type TransferCurrentUserAffiliateToBalanceParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// RequestCurrentUserAffiliateWithdrawalParams defines parameters for RequestCurrentUserAffiliateWithdrawal.
+type RequestCurrentUserAffiliateWithdrawalParams struct {
+	// IdempotencyKey Idempotency key for financial write operations.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // ListCurrentUserAnnouncementsParams defines parameters for ListCurrentUserAnnouncements.
 type ListCurrentUserAnnouncementsParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
@@ -9787,6 +10416,21 @@ type DiscoverAdminAccountModelsJSONRequestBody = DiscoverAccountModelsRequest
 // BindAdminAccountProxyJSONRequestBody defines body for BindAdminAccountProxy for application/json ContentType.
 type BindAdminAccountProxyJSONRequestBody = BindProviderAccountProxyRequest
 
+// CreateAdminAffiliateRuleJSONRequestBody defines body for CreateAdminAffiliateRule for application/json ContentType.
+type CreateAdminAffiliateRuleJSONRequestBody = CreateAffiliateRuleRequest
+
+// UpdateAdminAffiliateRuleJSONRequestBody defines body for UpdateAdminAffiliateRule for application/json ContentType.
+type UpdateAdminAffiliateRuleJSONRequestBody = UpdateAffiliateRuleRequest
+
+// CreateAdminAffiliateManualAdjustmentJSONRequestBody defines body for CreateAdminAffiliateManualAdjustment for application/json ContentType.
+type CreateAdminAffiliateManualAdjustmentJSONRequestBody = AdminAffiliateManualAdjustmentRequest
+
+// ApproveAdminAffiliateWithdrawalJSONRequestBody defines body for ApproveAdminAffiliateWithdrawal for application/json ContentType.
+type ApproveAdminAffiliateWithdrawalJSONRequestBody = AdminAffiliateWithdrawalDecisionRequest
+
+// CancelAdminAffiliateWithdrawalJSONRequestBody defines body for CancelAdminAffiliateWithdrawal for application/json ContentType.
+type CancelAdminAffiliateWithdrawalJSONRequestBody = AdminAffiliateWithdrawalDecisionRequest
+
 // CreateAdminAnnouncementJSONRequestBody defines body for CreateAdminAnnouncement for application/json ContentType.
 type CreateAdminAnnouncementJSONRequestBody = CreateAnnouncementRequest
 
@@ -9813,6 +10457,9 @@ type UpdateAdminChannelMonitorJSONRequestBody = UpdateChannelMonitorRequest
 
 // ImportAdminConfigSnapshotJSONRequestBody defines body for ImportAdminConfigSnapshot for application/json ContentType.
 type ImportAdminConfigSnapshotJSONRequestBody = ConfigImportRequest
+
+// UpdateAdminContentSafetyConfigJSONRequestBody defines body for UpdateAdminContentSafetyConfig for application/json ContentType.
+type UpdateAdminContentSafetyConfigJSONRequestBody = ContentSafetyConfig
 
 // CreateAdminCopilotChatJSONRequestBody defines body for CreateAdminCopilotChat for application/json ContentType.
 type CreateAdminCopilotChatJSONRequestBody = AdminCopilotChatRequest
@@ -9949,8 +10596,17 @@ type ReplaySchedulerStrategyJSONRequestBody = SchedulerReplayRequest
 // SimulateSchedulerStrategyJSONRequestBody defines body for SimulateSchedulerStrategy for application/json ContentType.
 type SimulateSchedulerStrategyJSONRequestBody = SchedulerSimulationRequest
 
+// CreateSchedulerStrategyJSONRequestBody defines body for CreateSchedulerStrategy for application/json ContentType.
+type CreateSchedulerStrategyJSONRequestBody = SchedulerStrategyMutationRequest
+
+// UpdateSchedulerStrategyJSONRequestBody defines body for UpdateSchedulerStrategy for application/json ContentType.
+type UpdateSchedulerStrategyJSONRequestBody = SchedulerStrategyMutationRequest
+
 // UpdateAdminSettingsJSONRequestBody defines body for UpdateAdminSettings for application/json ContentType.
 type UpdateAdminSettingsJSONRequestBody = AdminSettings
+
+// UpdateAdminCaptchaSettingsJSONRequestBody defines body for UpdateAdminCaptchaSettings for application/json ContentType.
+type UpdateAdminCaptchaSettingsJSONRequestBody = CaptchaSettings
 
 // SendAdminTestEmailJSONRequestBody defines body for SendAdminTestEmail for application/json ContentType.
 type SendAdminTestEmailJSONRequestBody = AdminSendTestEmailRequest
@@ -10042,14 +10698,29 @@ type ConfirmPasswordResetJSONRequestBody = ConfirmPasswordResetRequest
 // RequestPasswordResetJSONRequestBody defines body for RequestPasswordReset for application/json ContentType.
 type RequestPasswordResetJSONRequestBody = RequestPasswordResetRequest
 
+// CompletePasswordlessLoginJSONRequestBody defines body for CompletePasswordlessLogin for application/json ContentType.
+type CompletePasswordlessLoginJSONRequestBody = PasswordlessLoginRequest
+
+// RequestPasswordlessLoginJSONRequestBody defines body for RequestPasswordlessLogin for application/json ContentType.
+type RequestPasswordlessLoginJSONRequestBody = PasswordlessRequest
+
 // RegisterJSONRequestBody defines body for Register for application/json ContentType.
 type RegisterJSONRequestBody = RegisterRequest
 
 // UpdateCurrentUserProfileJSONRequestBody defines body for UpdateCurrentUserProfile for application/json ContentType.
 type UpdateCurrentUserProfileJSONRequestBody = UpdateCurrentUserProfileRequest
 
+// CreateCurrentUserAffiliateInviteCodeJSONRequestBody defines body for CreateCurrentUserAffiliateInviteCode for application/json ContentType.
+type CreateCurrentUserAffiliateInviteCodeJSONRequestBody = CreateAffiliateInviteCodeRequest
+
 // TransferCurrentUserAffiliateToBalanceJSONRequestBody defines body for TransferCurrentUserAffiliateToBalance for application/json ContentType.
 type TransferCurrentUserAffiliateToBalanceJSONRequestBody = AffiliateTransferToBalanceRequest
+
+// RequestCurrentUserAffiliateWithdrawalJSONRequestBody defines body for RequestCurrentUserAffiliateWithdrawal for application/json ContentType.
+type RequestCurrentUserAffiliateWithdrawalJSONRequestBody = AffiliateWithdrawalRequest
+
+// UpdateCurrentUserAttributesJSONRequestBody defines body for UpdateCurrentUserAttributes for application/json ContentType.
+type UpdateCurrentUserAttributesJSONRequestBody = UpdateCurrentUserAttributesRequest
 
 // UploadCurrentUserAvatarMultipartRequestBody defines body for UploadCurrentUserAvatar for multipart/form-data ContentType.
 type UploadCurrentUserAvatarMultipartRequestBody UploadCurrentUserAvatarMultipartBody
@@ -16595,15 +17266,33 @@ type ServerInterface interface {
 	// Test provider account configuration.
 	// (POST /api/v1/admin/accounts/{id}/test)
 	TestAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
+	// List affiliate rebate rules.
+	// (GET /api/v1/admin/affiliate-rules)
+	ListAdminAffiliateRules(w http.ResponseWriter, r *http.Request, params ListAdminAffiliateRulesParams)
+	// Create an affiliate rebate rule.
+	// (POST /api/v1/admin/affiliate-rules)
+	CreateAdminAffiliateRule(w http.ResponseWriter, r *http.Request)
+	// Update an affiliate rebate rule.
+	// (PATCH /api/v1/admin/affiliate-rules/{id})
+	UpdateAdminAffiliateRule(w http.ResponseWriter, r *http.Request, id Id)
 	// List affiliate invite relationships.
 	// (GET /api/v1/admin/affiliates/invites)
 	ListAdminAffiliateInvites(w http.ResponseWriter, r *http.Request, params ListAdminAffiliateInvitesParams)
+	// Create an affiliate ledger manual adjustment.
+	// (POST /api/v1/admin/affiliates/manual-adjustments)
+	CreateAdminAffiliateManualAdjustment(w http.ResponseWriter, r *http.Request)
 	// List affiliate rebate ledger entries.
 	// (GET /api/v1/admin/affiliates/rebates)
 	ListAdminAffiliateRebates(w http.ResponseWriter, r *http.Request, params ListAdminAffiliateRebatesParams)
 	// List affiliate transfer ledger entries.
 	// (GET /api/v1/admin/affiliates/transfers)
 	ListAdminAffiliateTransfers(w http.ResponseWriter, r *http.Request, params ListAdminAffiliateTransfersParams)
+	// Approve a pending affiliate withdrawal.
+	// (POST /api/v1/admin/affiliates/withdrawals/{id}/approve)
+	ApproveAdminAffiliateWithdrawal(w http.ResponseWriter, r *http.Request, id Id)
+	// Cancel a pending affiliate withdrawal.
+	// (POST /api/v1/admin/affiliates/withdrawals/{id}/cancel)
+	CancelAdminAffiliateWithdrawal(w http.ResponseWriter, r *http.Request, id Id)
 	// List announcements.
 	// (GET /api/v1/admin/announcements)
 	ListAdminAnnouncements(w http.ResponseWriter, r *http.Request, params ListAdminAnnouncementsParams)
@@ -16676,6 +17365,12 @@ type ServerInterface interface {
 	// Import the portable sections of a config snapshot.
 	// (POST /api/v1/admin/config-snapshot/import)
 	ImportAdminConfigSnapshot(w http.ResponseWriter, r *http.Request, params ImportAdminConfigSnapshotParams)
+	// Get content-safety configuration.
+	// (GET /api/v1/admin/content-safety/config)
+	GetAdminContentSafetyConfig(w http.ResponseWriter, r *http.Request)
+	// Update content-safety configuration.
+	// (PUT /api/v1/admin/content-safety/config)
+	UpdateAdminContentSafetyConfig(w http.ResponseWriter, r *http.Request)
 	// Drive one admin AI copilot turn (SSE stream of events).
 	// (POST /api/v1/admin/copilot/chat)
 	CreateAdminCopilotChat(w http.ResponseWriter, r *http.Request)
@@ -16871,6 +17566,9 @@ type ServerInterface interface {
 	// Update a payload-transform rule.
 	// (PATCH /api/v1/admin/payload-rules/{id})
 	UpdateAdminPayloadRule(w http.ResponseWriter, r *http.Request, id Id)
+	// List payment order audit timeline.
+	// (GET /api/v1/admin/payment-orders/{id}/audit-logs)
+	ListAdminPaymentOrderAuditLogs(w http.ResponseWriter, r *http.Request, id Id)
 	// List payment orders.
 	// (GET /api/v1/admin/payments/orders)
 	ListAdminPaymentOrders(w http.ResponseWriter, r *http.Request, params ListAdminPaymentOrdersParams)
@@ -16892,6 +17590,9 @@ type ServerInterface interface {
 	// Test a payment provider instance configuration without charging.
 	// (POST /api/v1/admin/payments/providers/{id}/test)
 	TestAdminPaymentProvider(w http.ResponseWriter, r *http.Request, id Id)
+	// List assignable admin permissions.
+	// (GET /api/v1/admin/permission-catalog)
+	GetAdminPermissionCatalog(w http.ResponseWriter, r *http.Request)
 	// List pricing rules.
 	// (GET /api/v1/admin/pricing-rules)
 	ListAdminPricingRules(w http.ResponseWriter, r *http.Request, params ListAdminPricingRulesParams)
@@ -17030,12 +17731,30 @@ type ServerInterface interface {
 	// List scheduler strategies.
 	// (GET /api/v1/admin/scheduler/strategies)
 	ListSchedulerStrategies(w http.ResponseWriter, r *http.Request, params ListSchedulerStrategiesParams)
+	// Create a scheduler strategy.
+	// (POST /api/v1/admin/scheduler/strategies)
+	CreateSchedulerStrategy(w http.ResponseWriter, r *http.Request)
+	// Deprecate a scheduler strategy.
+	// (DELETE /api/v1/admin/scheduler/strategies/{id})
+	DeprecateSchedulerStrategy(w http.ResponseWriter, r *http.Request, id Id)
+	// Update a scheduler strategy.
+	// (PATCH /api/v1/admin/scheduler/strategies/{id})
+	UpdateSchedulerStrategy(w http.ResponseWriter, r *http.Request, id Id)
+	// Activate a scheduler strategy.
+	// (POST /api/v1/admin/scheduler/strategies/{id}/activate)
+	ActivateSchedulerStrategy(w http.ResponseWriter, r *http.Request, id Id)
 	// Get typed system settings.
 	// (GET /api/v1/admin/settings)
 	GetAdminSettings(w http.ResponseWriter, r *http.Request)
 	// Update typed system settings.
 	// (PUT /api/v1/admin/settings)
 	UpdateAdminSettings(w http.ResponseWriter, r *http.Request)
+	// Get captcha runtime settings.
+	// (GET /api/v1/admin/settings/captcha)
+	GetAdminCaptchaSettings(w http.ResponseWriter, r *http.Request)
+	// Update captcha runtime settings.
+	// (PUT /api/v1/admin/settings/captcha)
+	UpdateAdminCaptchaSettings(w http.ResponseWriter, r *http.Request)
 	// Send a test email to verify SMTP credentials.
 	// (POST /api/v1/admin/settings/send-test-email)
 	SendAdminTestEmail(w http.ResponseWriter, r *http.Request)
@@ -17210,12 +17929,24 @@ type ServerInterface interface {
 	// Request a console password reset token.
 	// (POST /api/v1/auth/password-reset/request)
 	RequestPasswordReset(w http.ResponseWriter, r *http.Request)
+	// Consume a one-time email sign-in token.
+	// (POST /api/v1/auth/passwordless/login)
+	CompletePasswordlessLogin(w http.ResponseWriter, r *http.Request)
+	// Send a one-time email sign-in link.
+	// (POST /api/v1/auth/passwordless/request)
+	RequestPasswordlessLogin(w http.ResponseWriter, r *http.Request)
 	// Register a console user account.
 	// (POST /api/v1/auth/register)
 	Register(w http.ResponseWriter, r *http.Request)
+	// List enabled custom attributes required or accepted during public registration.
+	// (GET /api/v1/auth/registration-attributes)
+	ListRegistrationAttributes(w http.ResponseWriter, r *http.Request)
 	// Check API health.
 	// (GET /api/v1/health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+	// Delete the current console user.
+	// (DELETE /api/v1/me)
+	DeleteCurrentUser(w http.ResponseWriter, r *http.Request)
 	// Get current console user.
 	// (GET /api/v1/me)
 	GetCurrentUser(w http.ResponseWriter, r *http.Request)
@@ -17225,18 +17956,33 @@ type ServerInterface interface {
 	// Get current user affiliate summary.
 	// (GET /api/v1/me/affiliate)
 	GetCurrentUserAffiliate(w http.ResponseWriter, r *http.Request)
+	// List invite codes generated by the current user.
+	// (GET /api/v1/me/affiliate/invite-codes)
+	ListCurrentUserAffiliateInviteCodes(w http.ResponseWriter, r *http.Request)
+	// Create an invite code for the current user.
+	// (POST /api/v1/me/affiliate/invite-codes)
+	CreateCurrentUserAffiliateInviteCode(w http.ResponseWriter, r *http.Request)
 	// List affiliate ledger entries for the current user.
 	// (GET /api/v1/me/affiliate/ledger)
 	ListCurrentUserAffiliateLedger(w http.ResponseWriter, r *http.Request, params ListCurrentUserAffiliateLedgerParams)
 	// Transfer current user affiliate balance into gateway balance.
 	// (POST /api/v1/me/affiliate/transfer-to-balance)
 	TransferCurrentUserAffiliateToBalance(w http.ResponseWriter, r *http.Request, params TransferCurrentUserAffiliateToBalanceParams)
+	// Create a pending affiliate balance withdrawal request.
+	// (POST /api/v1/me/affiliate/withdrawals)
+	RequestCurrentUserAffiliateWithdrawal(w http.ResponseWriter, r *http.Request, params RequestCurrentUserAffiliateWithdrawalParams)
 	// List current user announcements.
 	// (GET /api/v1/me/announcements)
 	ListCurrentUserAnnouncements(w http.ResponseWriter, r *http.Request, params ListCurrentUserAnnouncementsParams)
 	// Mark a current user announcement as read.
 	// (POST /api/v1/me/announcements/{id}/read)
 	MarkCurrentUserAnnouncementRead(w http.ResponseWriter, r *http.Request, id Id)
+	// List enabled custom attributes for the current user.
+	// (GET /api/v1/me/attributes)
+	ListCurrentUserAttributes(w http.ResponseWriter, r *http.Request)
+	// Update current user custom attributes.
+	// (PUT /api/v1/me/attributes)
+	UpdateCurrentUserAttributes(w http.ResponseWriter, r *http.Request)
 	// List current console user sign-in identities.
 	// (GET /api/v1/me/auth-identities)
 	ListCurrentUserAuthIdentities(w http.ResponseWriter, r *http.Request)
@@ -17339,6 +18085,9 @@ type ServerInterface interface {
 	// Report whether first-run setup is required.
 	// (GET /api/v1/setup/status)
 	GetSetupStatus(w http.ResponseWriter, r *http.Request)
+	// Public site branding and agreement configuration.
+	// (GET /api/v1/site-config)
+	GetSiteConfig(w http.ResponseWriter, r *http.Request)
 	// Get a console user avatar image.
 	// (GET /api/v1/users/{id}/avatar)
 	GetUserAvatar(w http.ResponseWriter, r *http.Request, id Id)
@@ -19299,6 +20048,114 @@ func (siw *ServerInterfaceWrapper) TestAdminAccount(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminAffiliateRules operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminAffiliateRules(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminAffiliateRulesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminAffiliateRules(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminAffiliateRule operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminAffiliateRule(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminAffiliateRule(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminAffiliateRule operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminAffiliateRule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminAffiliateRule(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminAffiliateInvites operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminAffiliateInvites(w http.ResponseWriter, r *http.Request) {
 
@@ -19342,6 +20199,28 @@ func (siw *ServerInterfaceWrapper) ListAdminAffiliateInvites(w http.ResponseWrit
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminAffiliateInvites(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminAffiliateManualAdjustment operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminAffiliateManualAdjustment(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminAffiliateManualAdjustment(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -19472,6 +20351,74 @@ func (siw *ServerInterfaceWrapper) ListAdminAffiliateTransfers(w http.ResponseWr
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminAffiliateTransfers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApproveAdminAffiliateWithdrawal operation middleware
+func (siw *ServerInterfaceWrapper) ApproveAdminAffiliateWithdrawal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApproveAdminAffiliateWithdrawal(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelAdminAffiliateWithdrawal operation middleware
+func (siw *ServerInterfaceWrapper) CancelAdminAffiliateWithdrawal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelAdminAffiliateWithdrawal(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -20450,6 +21397,48 @@ func (siw *ServerInterfaceWrapper) ImportAdminConfigSnapshot(w http.ResponseWrit
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ImportAdminConfigSnapshot(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminContentSafetyConfig operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminContentSafetyConfig(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminContentSafetyConfig(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminContentSafetyConfig operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminContentSafetyConfig(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminContentSafetyConfig(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -22848,6 +23837,38 @@ func (siw *ServerInterfaceWrapper) UpdateAdminPayloadRule(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminPaymentOrderAuditLogs operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminPaymentOrderAuditLogs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminPaymentOrderAuditLogs(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminPaymentOrders operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminPaymentOrders(w http.ResponseWriter, r *http.Request) {
 
@@ -23127,6 +24148,26 @@ func (siw *ServerInterfaceWrapper) TestAdminPaymentProvider(w http.ResponseWrite
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.TestAdminPaymentProvider(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminPermissionCatalog operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminPermissionCatalog(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminPermissionCatalog(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -24751,6 +25792,130 @@ func (siw *ServerInterfaceWrapper) ListSchedulerStrategies(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// CreateSchedulerStrategy operation middleware
+func (siw *ServerInterfaceWrapper) CreateSchedulerStrategy(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSchedulerStrategy(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeprecateSchedulerStrategy operation middleware
+func (siw *ServerInterfaceWrapper) DeprecateSchedulerStrategy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeprecateSchedulerStrategy(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateSchedulerStrategy operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSchedulerStrategy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSchedulerStrategy(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ActivateSchedulerStrategy operation middleware
+func (siw *ServerInterfaceWrapper) ActivateSchedulerStrategy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ActivateSchedulerStrategy(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAdminSettings operation middleware
 func (siw *ServerInterfaceWrapper) GetAdminSettings(w http.ResponseWriter, r *http.Request) {
 
@@ -24784,6 +25949,48 @@ func (siw *ServerInterfaceWrapper) UpdateAdminSettings(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAdminSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminCaptchaSettings operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminCaptchaSettings(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminCaptchaSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminCaptchaSettings operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminCaptchaSettings(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminCaptchaSettings(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -26694,6 +27901,34 @@ func (siw *ServerInterfaceWrapper) RequestPasswordReset(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// CompletePasswordlessLogin operation middleware
+func (siw *ServerInterfaceWrapper) CompletePasswordlessLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompletePasswordlessLogin(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RequestPasswordlessLogin operation middleware
+func (siw *ServerInterfaceWrapper) RequestPasswordlessLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestPasswordlessLogin(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // Register operation middleware
 func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Request) {
 
@@ -26708,11 +27943,47 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// ListRegistrationAttributes operation middleware
+func (siw *ServerInterfaceWrapper) ListRegistrationAttributes(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRegistrationAttributes(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteCurrentUser operation middleware
+func (siw *ServerInterfaceWrapper) DeleteCurrentUser(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteCurrentUser(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -26775,6 +28046,48 @@ func (siw *ServerInterfaceWrapper) GetCurrentUserAffiliate(w http.ResponseWriter
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetCurrentUserAffiliate(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCurrentUserAffiliateInviteCodes operation middleware
+func (siw *ServerInterfaceWrapper) ListCurrentUserAffiliateInviteCodes(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCurrentUserAffiliateInviteCodes(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateCurrentUserAffiliateInviteCode operation middleware
+func (siw *ServerInterfaceWrapper) CreateCurrentUserAffiliateInviteCode(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateCurrentUserAffiliateInviteCode(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -26889,6 +28202,59 @@ func (siw *ServerInterfaceWrapper) TransferCurrentUserAffiliateToBalance(w http.
 	handler.ServeHTTP(w, r)
 }
 
+// RequestCurrentUserAffiliateWithdrawal operation middleware
+func (siw *ServerInterfaceWrapper) RequestCurrentUserAffiliateWithdrawal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RequestCurrentUserAffiliateWithdrawalParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestCurrentUserAffiliateWithdrawal(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListCurrentUserAnnouncements operation middleware
 func (siw *ServerInterfaceWrapper) ListCurrentUserAnnouncements(w http.ResponseWriter, r *http.Request) {
 
@@ -26966,6 +28332,48 @@ func (siw *ServerInterfaceWrapper) MarkCurrentUserAnnouncementRead(w http.Respon
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.MarkCurrentUserAnnouncementRead(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCurrentUserAttributes operation middleware
+func (siw *ServerInterfaceWrapper) ListCurrentUserAttributes(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCurrentUserAttributes(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateCurrentUserAttributes operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCurrentUserAttributes(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateCurrentUserAttributes(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -27850,6 +29258,20 @@ func (siw *ServerInterfaceWrapper) GetSetupStatus(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetSetupStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSiteConfig operation middleware
+func (siw *ServerInterfaceWrapper) GetSiteConfig(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSiteConfig(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -29603,9 +31025,15 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/reset-quota", wrapper.ResetAdminAccountQuota)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/rpm-status", wrapper.GetAdminAccountRpmStatus)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/test", wrapper.TestAdminAccount)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliate-rules", wrapper.ListAdminAffiliateRules)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/affiliate-rules", wrapper.CreateAdminAffiliateRule)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/affiliate-rules/{id}", wrapper.UpdateAdminAffiliateRule)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliates/invites", wrapper.ListAdminAffiliateInvites)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/affiliates/manual-adjustments", wrapper.CreateAdminAffiliateManualAdjustment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliates/rebates", wrapper.ListAdminAffiliateRebates)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliates/transfers", wrapper.ListAdminAffiliateTransfers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/affiliates/withdrawals/{id}/approve", wrapper.ApproveAdminAffiliateWithdrawal)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/affiliates/withdrawals/{id}/cancel", wrapper.CancelAdminAffiliateWithdrawal)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/announcements", wrapper.ListAdminAnnouncements)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/announcements", wrapper.CreateAdminAnnouncement)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/announcements/{id}", wrapper.DeleteAdminAnnouncement)
@@ -29630,6 +31058,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/channel-monitors/{id}/runs", wrapper.ListAdminChannelMonitorRuns)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/config-snapshot", wrapper.GetAdminConfigSnapshot)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/config-snapshot/import", wrapper.ImportAdminConfigSnapshot)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/content-safety/config", wrapper.GetAdminContentSafetyConfig)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/content-safety/config", wrapper.UpdateAdminContentSafetyConfig)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/copilot/chat", wrapper.CreateAdminCopilotChat)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/copilot/config", wrapper.GetAdminCopilotConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/copilot/conversations", wrapper.ListAdminCopilotConversations)
@@ -29695,6 +31125,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payload-rules", wrapper.CreateAdminPayloadRule)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/payload-rules/{id}", wrapper.DeleteAdminPayloadRule)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/payload-rules/{id}", wrapper.UpdateAdminPayloadRule)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payment-orders/{id}/audit-logs", wrapper.ListAdminPaymentOrderAuditLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/orders", wrapper.ListAdminPaymentOrders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/orders/{id}/refund", wrapper.RefundAdminPaymentOrder)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/providers", wrapper.ListAdminPaymentProviders)
@@ -29702,6 +31133,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/payments/providers/{id}", wrapper.DeleteAdminPaymentProvider)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/payments/providers/{id}", wrapper.UpdateAdminPaymentProvider)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/providers/{id}/test", wrapper.TestAdminPaymentProvider)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/permission-catalog", wrapper.GetAdminPermissionCatalog)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.ListAdminPricingRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.CreateAdminPricingRule)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/pricing-rules/{id}", wrapper.DeleteAdminPricingRule)
@@ -29748,8 +31180,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/scheduler/replay", wrapper.ReplaySchedulerStrategy)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/scheduler/simulate", wrapper.SimulateSchedulerStrategy)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/strategies", wrapper.ListSchedulerStrategies)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/scheduler/strategies", wrapper.CreateSchedulerStrategy)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/scheduler/strategies/{id}", wrapper.DeprecateSchedulerStrategy)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/scheduler/strategies/{id}", wrapper.UpdateSchedulerStrategy)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/scheduler/strategies/{id}/activate", wrapper.ActivateSchedulerStrategy)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/settings", wrapper.GetAdminSettings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/settings", wrapper.UpdateAdminSettings)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/settings/captcha", wrapper.GetAdminCaptchaSettings)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/settings/captcha", wrapper.UpdateAdminCaptchaSettings)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/settings/send-test-email", wrapper.SendAdminTestEmail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/subscription-plans", wrapper.ListAdminSubscriptionPlans)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/subscription-plans", wrapper.CreateAdminSubscriptionPlan)
@@ -29808,15 +31246,24 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/auth/oauth/{provider}/start", wrapper.StartOAuthAuthorization)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/password-reset/confirm", wrapper.ConfirmPasswordReset)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/password-reset/request", wrapper.RequestPasswordReset)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/passwordless/login", wrapper.CompletePasswordlessLogin)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/passwordless/request", wrapper.RequestPasswordlessLogin)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/register", wrapper.Register)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/auth/registration-attributes", wrapper.ListRegistrationAttributes)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/health", wrapper.GetHealth)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/me", wrapper.DeleteCurrentUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me", wrapper.GetCurrentUser)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/me", wrapper.UpdateCurrentUserProfile)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/affiliate", wrapper.GetCurrentUserAffiliate)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/affiliate/invite-codes", wrapper.ListCurrentUserAffiliateInviteCodes)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/affiliate/invite-codes", wrapper.CreateCurrentUserAffiliateInviteCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/affiliate/ledger", wrapper.ListCurrentUserAffiliateLedger)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/affiliate/transfer-to-balance", wrapper.TransferCurrentUserAffiliateToBalance)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/affiliate/withdrawals", wrapper.RequestCurrentUserAffiliateWithdrawal)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/announcements", wrapper.ListCurrentUserAnnouncements)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/announcements/{id}/read", wrapper.MarkCurrentUserAnnouncementRead)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/attributes", wrapper.ListCurrentUserAttributes)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/me/attributes", wrapper.UpdateCurrentUserAttributes)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/auth-identities", wrapper.ListCurrentUserAuthIdentities)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/me/auth-identities/{id}", wrapper.UnbindCurrentUserAuthIdentity)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/available-models", wrapper.ListCurrentUserAvailableModels)
@@ -29851,6 +31298,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/payment/orders/{id}/cancel", wrapper.CancelPaymentOrder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/setup", wrapper.CompleteSetup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/setup/status", wrapper.GetSetupStatus)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/site-config", wrapper.GetSiteConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/users/{id}/avatar", wrapper.GetUserAvatar)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/webhooks/payments/{provider}", wrapper.HandlePaymentWebhook)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grok/v1/audio/speech", wrapper.CreateGrokAudioSpeechAlias)

@@ -61,6 +61,7 @@ func (UsageLog) Indexes() []ent.Index {
 		index.Fields("user_id", "created_at"),
 		index.Fields("charged_at", "success", "created_at"),
 		index.Fields("api_key_id", "created_at"),
+		index.Fields("provider_id", "created_at"),
 		index.Fields("account_id", "created_at"),
 		index.Fields("source_endpoint", "created_at"),
 		index.Fields("model", "created_at"),

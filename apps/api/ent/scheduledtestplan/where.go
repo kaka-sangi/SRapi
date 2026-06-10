@@ -94,6 +94,11 @@ func CronExpression(v string) predicate.ScheduledTestPlan {
 	return predicate.ScheduledTestPlan(sql.FieldEQ(FieldCronExpression, v))
 }
 
+// ProbeModel applies equality check predicate on the "probe_model" field. It's identical to ProbeModelEQ.
+func ProbeModel(v string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldEQ(FieldProbeModel, v))
+}
+
 // MaxResults applies equality check predicate on the "max_results" field. It's identical to MaxResultsEQ.
 func MaxResults(v int) predicate.ScheduledTestPlan {
 	return predicate.ScheduledTestPlan(sql.FieldEQ(FieldMaxResults, v))
@@ -502,6 +507,71 @@ func CronExpressionEqualFold(v string) predicate.ScheduledTestPlan {
 // CronExpressionContainsFold applies the ContainsFold predicate on the "cron_expression" field.
 func CronExpressionContainsFold(v string) predicate.ScheduledTestPlan {
 	return predicate.ScheduledTestPlan(sql.FieldContainsFold(FieldCronExpression, v))
+}
+
+// ProbeModelEQ applies the EQ predicate on the "probe_model" field.
+func ProbeModelEQ(v string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldEQ(FieldProbeModel, v))
+}
+
+// ProbeModelNEQ applies the NEQ predicate on the "probe_model" field.
+func ProbeModelNEQ(v string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldNEQ(FieldProbeModel, v))
+}
+
+// ProbeModelIn applies the In predicate on the "probe_model" field.
+func ProbeModelIn(vs ...string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldIn(FieldProbeModel, vs...))
+}
+
+// ProbeModelNotIn applies the NotIn predicate on the "probe_model" field.
+func ProbeModelNotIn(vs ...string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldNotIn(FieldProbeModel, vs...))
+}
+
+// ProbeModelGT applies the GT predicate on the "probe_model" field.
+func ProbeModelGT(v string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldGT(FieldProbeModel, v))
+}
+
+// ProbeModelGTE applies the GTE predicate on the "probe_model" field.
+func ProbeModelGTE(v string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldGTE(FieldProbeModel, v))
+}
+
+// ProbeModelLT applies the LT predicate on the "probe_model" field.
+func ProbeModelLT(v string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldLT(FieldProbeModel, v))
+}
+
+// ProbeModelLTE applies the LTE predicate on the "probe_model" field.
+func ProbeModelLTE(v string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldLTE(FieldProbeModel, v))
+}
+
+// ProbeModelContains applies the Contains predicate on the "probe_model" field.
+func ProbeModelContains(v string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldContains(FieldProbeModel, v))
+}
+
+// ProbeModelHasPrefix applies the HasPrefix predicate on the "probe_model" field.
+func ProbeModelHasPrefix(v string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldHasPrefix(FieldProbeModel, v))
+}
+
+// ProbeModelHasSuffix applies the HasSuffix predicate on the "probe_model" field.
+func ProbeModelHasSuffix(v string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldHasSuffix(FieldProbeModel, v))
+}
+
+// ProbeModelEqualFold applies the EqualFold predicate on the "probe_model" field.
+func ProbeModelEqualFold(v string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldEqualFold(FieldProbeModel, v))
+}
+
+// ProbeModelContainsFold applies the ContainsFold predicate on the "probe_model" field.
+func ProbeModelContainsFold(v string) predicate.ScheduledTestPlan {
+	return predicate.ScheduledTestPlan(sql.FieldContainsFold(FieldProbeModel, v))
 }
 
 // MaxResultsEQ applies the EQ predicate on the "max_results" field.

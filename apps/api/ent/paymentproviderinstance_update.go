@@ -181,6 +181,41 @@ func (_u *PaymentProviderInstanceUpdate) AddSortOrder(v int) *PaymentProviderIns
 	return _u
 }
 
+// SetFeeRate sets the "fee_rate" field.
+func (_u *PaymentProviderInstanceUpdate) SetFeeRate(v string) *PaymentProviderInstanceUpdate {
+	_u.mutation.SetFeeRate(v)
+	return _u
+}
+
+// SetNillableFeeRate sets the "fee_rate" field if the given value is not nil.
+func (_u *PaymentProviderInstanceUpdate) SetNillableFeeRate(v *string) *PaymentProviderInstanceUpdate {
+	if v != nil {
+		_u.SetFeeRate(*v)
+	}
+	return _u
+}
+
+// SetWeight sets the "weight" field.
+func (_u *PaymentProviderInstanceUpdate) SetWeight(v int) *PaymentProviderInstanceUpdate {
+	_u.mutation.ResetWeight()
+	_u.mutation.SetWeight(v)
+	return _u
+}
+
+// SetNillableWeight sets the "weight" field if the given value is not nil.
+func (_u *PaymentProviderInstanceUpdate) SetNillableWeight(v *int) *PaymentProviderInstanceUpdate {
+	if v != nil {
+		_u.SetWeight(*v)
+	}
+	return _u
+}
+
+// AddWeight adds value to the "weight" field.
+func (_u *PaymentProviderInstanceUpdate) AddWeight(v int) *PaymentProviderInstanceUpdate {
+	_u.mutation.AddWeight(v)
+	return _u
+}
+
 // SetMetadataJSON sets the "metadata_json" field.
 func (_u *PaymentProviderInstanceUpdate) SetMetadataJSON(v map[string]interface{}) *PaymentProviderInstanceUpdate {
 	_u.mutation.SetMetadataJSON(v)
@@ -313,6 +348,15 @@ func (_u *PaymentProviderInstanceUpdate) sqlSave(ctx context.Context) (_node int
 	}
 	if value, ok := _u.mutation.AddedSortOrder(); ok {
 		_spec.AddField(paymentproviderinstance.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.FeeRate(); ok {
+		_spec.SetField(paymentproviderinstance.FieldFeeRate, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Weight(); ok {
+		_spec.SetField(paymentproviderinstance.FieldWeight, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedWeight(); ok {
+		_spec.AddField(paymentproviderinstance.FieldWeight, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.MetadataJSON(); ok {
 		_spec.SetField(paymentproviderinstance.FieldMetadataJSON, field.TypeJSON, value)
@@ -492,6 +536,41 @@ func (_u *PaymentProviderInstanceUpdateOne) AddSortOrder(v int) *PaymentProvider
 	return _u
 }
 
+// SetFeeRate sets the "fee_rate" field.
+func (_u *PaymentProviderInstanceUpdateOne) SetFeeRate(v string) *PaymentProviderInstanceUpdateOne {
+	_u.mutation.SetFeeRate(v)
+	return _u
+}
+
+// SetNillableFeeRate sets the "fee_rate" field if the given value is not nil.
+func (_u *PaymentProviderInstanceUpdateOne) SetNillableFeeRate(v *string) *PaymentProviderInstanceUpdateOne {
+	if v != nil {
+		_u.SetFeeRate(*v)
+	}
+	return _u
+}
+
+// SetWeight sets the "weight" field.
+func (_u *PaymentProviderInstanceUpdateOne) SetWeight(v int) *PaymentProviderInstanceUpdateOne {
+	_u.mutation.ResetWeight()
+	_u.mutation.SetWeight(v)
+	return _u
+}
+
+// SetNillableWeight sets the "weight" field if the given value is not nil.
+func (_u *PaymentProviderInstanceUpdateOne) SetNillableWeight(v *int) *PaymentProviderInstanceUpdateOne {
+	if v != nil {
+		_u.SetWeight(*v)
+	}
+	return _u
+}
+
+// AddWeight adds value to the "weight" field.
+func (_u *PaymentProviderInstanceUpdateOne) AddWeight(v int) *PaymentProviderInstanceUpdateOne {
+	_u.mutation.AddWeight(v)
+	return _u
+}
+
 // SetMetadataJSON sets the "metadata_json" field.
 func (_u *PaymentProviderInstanceUpdateOne) SetMetadataJSON(v map[string]interface{}) *PaymentProviderInstanceUpdateOne {
 	_u.mutation.SetMetadataJSON(v)
@@ -654,6 +733,15 @@ func (_u *PaymentProviderInstanceUpdateOne) sqlSave(ctx context.Context) (_node 
 	}
 	if value, ok := _u.mutation.AddedSortOrder(); ok {
 		_spec.AddField(paymentproviderinstance.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.FeeRate(); ok {
+		_spec.SetField(paymentproviderinstance.FieldFeeRate, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Weight(); ok {
+		_spec.SetField(paymentproviderinstance.FieldWeight, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedWeight(); ok {
+		_spec.AddField(paymentproviderinstance.FieldWeight, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.MetadataJSON(); ok {
 		_spec.SetField(paymentproviderinstance.FieldMetadataJSON, field.TypeJSON, value)

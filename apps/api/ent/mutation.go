@@ -35580,6 +35580,8 @@ type PaymentOrderMutation struct {
 	addprovider_instance_id *int
 	original_amount         *string
 	discount_amount         *string
+	fee_amount              *string
+	payable_amount          *string
 	promo_code_id           *int
 	addpromo_code_id        *int
 	amount                  *string
@@ -35987,6 +35989,78 @@ func (m *PaymentOrderMutation) OldDiscountAmount(ctx context.Context) (v string,
 // ResetDiscountAmount resets all changes to the "discount_amount" field.
 func (m *PaymentOrderMutation) ResetDiscountAmount() {
 	m.discount_amount = nil
+}
+
+// SetFeeAmount sets the "fee_amount" field.
+func (m *PaymentOrderMutation) SetFeeAmount(s string) {
+	m.fee_amount = &s
+}
+
+// FeeAmount returns the value of the "fee_amount" field in the mutation.
+func (m *PaymentOrderMutation) FeeAmount() (r string, exists bool) {
+	v := m.fee_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFeeAmount returns the old "fee_amount" field's value of the PaymentOrder entity.
+// If the PaymentOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentOrderMutation) OldFeeAmount(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFeeAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFeeAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFeeAmount: %w", err)
+	}
+	return oldValue.FeeAmount, nil
+}
+
+// ResetFeeAmount resets all changes to the "fee_amount" field.
+func (m *PaymentOrderMutation) ResetFeeAmount() {
+	m.fee_amount = nil
+}
+
+// SetPayableAmount sets the "payable_amount" field.
+func (m *PaymentOrderMutation) SetPayableAmount(s string) {
+	m.payable_amount = &s
+}
+
+// PayableAmount returns the value of the "payable_amount" field in the mutation.
+func (m *PaymentOrderMutation) PayableAmount() (r string, exists bool) {
+	v := m.payable_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPayableAmount returns the old "payable_amount" field's value of the PaymentOrder entity.
+// If the PaymentOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentOrderMutation) OldPayableAmount(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPayableAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPayableAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPayableAmount: %w", err)
+	}
+	return oldValue.PayableAmount, nil
+}
+
+// ResetPayableAmount resets all changes to the "payable_amount" field.
+func (m *PaymentOrderMutation) ResetPayableAmount() {
+	m.payable_amount = nil
 }
 
 // SetPromoCodeID sets the "promo_code_id" field.
@@ -36567,7 +36641,7 @@ func (m *PaymentOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PaymentOrderMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 21)
 	if m.created_at != nil {
 		fields = append(fields, paymentorder.FieldCreatedAt)
 	}
@@ -36588,6 +36662,12 @@ func (m *PaymentOrderMutation) Fields() []string {
 	}
 	if m.discount_amount != nil {
 		fields = append(fields, paymentorder.FieldDiscountAmount)
+	}
+	if m.fee_amount != nil {
+		fields = append(fields, paymentorder.FieldFeeAmount)
+	}
+	if m.payable_amount != nil {
+		fields = append(fields, paymentorder.FieldPayableAmount)
 	}
 	if m.promo_code_id != nil {
 		fields = append(fields, paymentorder.FieldPromoCodeID)
@@ -36647,6 +36727,10 @@ func (m *PaymentOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.OriginalAmount()
 	case paymentorder.FieldDiscountAmount:
 		return m.DiscountAmount()
+	case paymentorder.FieldFeeAmount:
+		return m.FeeAmount()
+	case paymentorder.FieldPayableAmount:
+		return m.PayableAmount()
 	case paymentorder.FieldPromoCodeID:
 		return m.PromoCodeID()
 	case paymentorder.FieldAmount:
@@ -36694,6 +36778,10 @@ func (m *PaymentOrderMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldOriginalAmount(ctx)
 	case paymentorder.FieldDiscountAmount:
 		return m.OldDiscountAmount(ctx)
+	case paymentorder.FieldFeeAmount:
+		return m.OldFeeAmount(ctx)
+	case paymentorder.FieldPayableAmount:
+		return m.OldPayableAmount(ctx)
 	case paymentorder.FieldPromoCodeID:
 		return m.OldPromoCodeID(ctx)
 	case paymentorder.FieldAmount:
@@ -36775,6 +36863,20 @@ func (m *PaymentOrderMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetDiscountAmount(v)
+		return nil
+	case paymentorder.FieldFeeAmount:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFeeAmount(v)
+		return nil
+	case paymentorder.FieldPayableAmount:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPayableAmount(v)
 		return nil
 	case paymentorder.FieldPromoCodeID:
 		v, ok := value.(int)
@@ -37014,6 +37116,12 @@ func (m *PaymentOrderMutation) ResetField(name string) error {
 	case paymentorder.FieldDiscountAmount:
 		m.ResetDiscountAmount()
 		return nil
+	case paymentorder.FieldFeeAmount:
+		m.ResetFeeAmount()
+		return nil
+	case paymentorder.FieldPayableAmount:
+		m.ResetPayableAmount()
+		return nil
 	case paymentorder.FieldPromoCodeID:
 		m.ResetPromoCodeID()
 		return nil
@@ -37122,6 +37230,9 @@ type PaymentProviderInstanceMutation struct {
 	limits_json                  *map[string]interface{}
 	sort_order                   *int
 	addsort_order                *int
+	fee_rate                     *string
+	weight                       *int
+	addweight                    *int
 	metadata_json                *map[string]interface{}
 	clearedFields                map[string]struct{}
 	done                         bool
@@ -37731,6 +37842,98 @@ func (m *PaymentProviderInstanceMutation) ResetSortOrder() {
 	m.addsort_order = nil
 }
 
+// SetFeeRate sets the "fee_rate" field.
+func (m *PaymentProviderInstanceMutation) SetFeeRate(s string) {
+	m.fee_rate = &s
+}
+
+// FeeRate returns the value of the "fee_rate" field in the mutation.
+func (m *PaymentProviderInstanceMutation) FeeRate() (r string, exists bool) {
+	v := m.fee_rate
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFeeRate returns the old "fee_rate" field's value of the PaymentProviderInstance entity.
+// If the PaymentProviderInstance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentProviderInstanceMutation) OldFeeRate(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFeeRate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFeeRate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFeeRate: %w", err)
+	}
+	return oldValue.FeeRate, nil
+}
+
+// ResetFeeRate resets all changes to the "fee_rate" field.
+func (m *PaymentProviderInstanceMutation) ResetFeeRate() {
+	m.fee_rate = nil
+}
+
+// SetWeight sets the "weight" field.
+func (m *PaymentProviderInstanceMutation) SetWeight(i int) {
+	m.weight = &i
+	m.addweight = nil
+}
+
+// Weight returns the value of the "weight" field in the mutation.
+func (m *PaymentProviderInstanceMutation) Weight() (r int, exists bool) {
+	v := m.weight
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWeight returns the old "weight" field's value of the PaymentProviderInstance entity.
+// If the PaymentProviderInstance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentProviderInstanceMutation) OldWeight(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWeight: %w", err)
+	}
+	return oldValue.Weight, nil
+}
+
+// AddWeight adds i to the "weight" field.
+func (m *PaymentProviderInstanceMutation) AddWeight(i int) {
+	if m.addweight != nil {
+		*m.addweight += i
+	} else {
+		m.addweight = &i
+	}
+}
+
+// AddedWeight returns the value that was added to the "weight" field in this mutation.
+func (m *PaymentProviderInstanceMutation) AddedWeight() (r int, exists bool) {
+	v := m.addweight
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetWeight resets all changes to the "weight" field.
+func (m *PaymentProviderInstanceMutation) ResetWeight() {
+	m.weight = nil
+	m.addweight = nil
+}
+
 // SetMetadataJSON sets the "metadata_json" field.
 func (m *PaymentProviderInstanceMutation) SetMetadataJSON(value map[string]interface{}) {
 	m.metadata_json = &value
@@ -37814,7 +38017,7 @@ func (m *PaymentProviderInstanceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PaymentProviderInstanceMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 14)
 	if m.created_at != nil {
 		fields = append(fields, paymentproviderinstance.FieldCreatedAt)
 	}
@@ -37847,6 +38050,12 @@ func (m *PaymentProviderInstanceMutation) Fields() []string {
 	}
 	if m.sort_order != nil {
 		fields = append(fields, paymentproviderinstance.FieldSortOrder)
+	}
+	if m.fee_rate != nil {
+		fields = append(fields, paymentproviderinstance.FieldFeeRate)
+	}
+	if m.weight != nil {
+		fields = append(fields, paymentproviderinstance.FieldWeight)
 	}
 	if m.metadata_json != nil {
 		fields = append(fields, paymentproviderinstance.FieldMetadataJSON)
@@ -37881,6 +38090,10 @@ func (m *PaymentProviderInstanceMutation) Field(name string) (ent.Value, bool) {
 		return m.LimitsJSON()
 	case paymentproviderinstance.FieldSortOrder:
 		return m.SortOrder()
+	case paymentproviderinstance.FieldFeeRate:
+		return m.FeeRate()
+	case paymentproviderinstance.FieldWeight:
+		return m.Weight()
 	case paymentproviderinstance.FieldMetadataJSON:
 		return m.MetadataJSON()
 	}
@@ -37914,6 +38127,10 @@ func (m *PaymentProviderInstanceMutation) OldField(ctx context.Context, name str
 		return m.OldLimitsJSON(ctx)
 	case paymentproviderinstance.FieldSortOrder:
 		return m.OldSortOrder(ctx)
+	case paymentproviderinstance.FieldFeeRate:
+		return m.OldFeeRate(ctx)
+	case paymentproviderinstance.FieldWeight:
+		return m.OldWeight(ctx)
 	case paymentproviderinstance.FieldMetadataJSON:
 		return m.OldMetadataJSON(ctx)
 	}
@@ -38002,6 +38219,20 @@ func (m *PaymentProviderInstanceMutation) SetField(name string, value ent.Value)
 		}
 		m.SetSortOrder(v)
 		return nil
+	case paymentproviderinstance.FieldFeeRate:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFeeRate(v)
+		return nil
+	case paymentproviderinstance.FieldWeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWeight(v)
+		return nil
 	case paymentproviderinstance.FieldMetadataJSON:
 		v, ok := value.(map[string]interface{})
 		if !ok {
@@ -38023,6 +38254,9 @@ func (m *PaymentProviderInstanceMutation) AddedFields() []string {
 	if m.addsort_order != nil {
 		fields = append(fields, paymentproviderinstance.FieldSortOrder)
 	}
+	if m.addweight != nil {
+		fields = append(fields, paymentproviderinstance.FieldWeight)
+	}
 	return fields
 }
 
@@ -38035,6 +38269,8 @@ func (m *PaymentProviderInstanceMutation) AddedField(name string) (ent.Value, bo
 		return m.AddedConfigVersion()
 	case paymentproviderinstance.FieldSortOrder:
 		return m.AddedSortOrder()
+	case paymentproviderinstance.FieldWeight:
+		return m.AddedWeight()
 	}
 	return nil, false
 }
@@ -38057,6 +38293,13 @@ func (m *PaymentProviderInstanceMutation) AddField(name string, value ent.Value)
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddSortOrder(v)
+		return nil
+	case paymentproviderinstance.FieldWeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWeight(v)
 		return nil
 	}
 	return fmt.Errorf("unknown PaymentProviderInstance numeric field %s", name)
@@ -38150,6 +38393,12 @@ func (m *PaymentProviderInstanceMutation) ResetField(name string) error {
 		return nil
 	case paymentproviderinstance.FieldSortOrder:
 		m.ResetSortOrder()
+		return nil
+	case paymentproviderinstance.FieldFeeRate:
+		m.ResetFeeRate()
+		return nil
+	case paymentproviderinstance.FieldWeight:
+		m.ResetWeight()
 		return nil
 	case paymentproviderinstance.FieldMetadataJSON:
 		m.ResetMetadataJSON()
@@ -40468,28 +40717,36 @@ func (m *PricingIntervalMutation) ResetEdge(name string) error {
 // PricingRuleMutation represents an operation that mutates the PricingRule nodes in the graph.
 type PricingRuleMutation struct {
 	config
-	op                            Op
-	typ                           string
-	id                            *int
-	created_at                    *time.Time
-	updated_at                    *time.Time
-	model_id                      *int
-	addmodel_id                   *int
-	provider_id                   *int
-	addprovider_id                *int
-	billing_mode                  *string
-	input_price_per_million       *string
-	output_price_per_million      *string
-	cache_read_price_per_million  *string
-	cache_write_price_per_million *string
-	per_request_price             *string
-	currency                      *string
-	effective_from                *time.Time
-	effective_to                  *time.Time
-	clearedFields                 map[string]struct{}
-	done                          bool
-	oldValue                      func(context.Context) (*PricingRule, error)
-	predicates                    []predicate.PricingRule
+	op                               Op
+	typ                              string
+	id                               *int
+	created_at                       *time.Time
+	updated_at                       *time.Time
+	model_id                         *int
+	addmodel_id                      *int
+	model_family                     *string
+	provider_id                      *int
+	addprovider_id                   *int
+	billing_mode                     *string
+	input_price_per_million          *string
+	output_price_per_million         *string
+	cache_read_price_per_million     *string
+	cache_write_price_per_million    *string
+	cache_write_5m_price_per_million *string
+	cache_write_1h_price_per_million *string
+	image_output_price_per_million   *string
+	per_request_price                *string
+	service_tier_multipliers_json    *map[string]string
+	long_context_threshold_tokens    *int
+	addlong_context_threshold_tokens *int
+	long_context_multiplier          *string
+	currency                         *string
+	effective_from                   *time.Time
+	effective_to                     *time.Time
+	clearedFields                    map[string]struct{}
+	done                             bool
+	oldValue                         func(context.Context) (*PricingRule, error)
+	predicates                       []predicate.PricingRule
 }
 
 var _ ent.Mutation = (*PricingRuleMutation)(nil)
@@ -40716,6 +40973,42 @@ func (m *PricingRuleMutation) AddedModelID() (r int, exists bool) {
 func (m *PricingRuleMutation) ResetModelID() {
 	m.model_id = nil
 	m.addmodel_id = nil
+}
+
+// SetModelFamily sets the "model_family" field.
+func (m *PricingRuleMutation) SetModelFamily(s string) {
+	m.model_family = &s
+}
+
+// ModelFamily returns the value of the "model_family" field in the mutation.
+func (m *PricingRuleMutation) ModelFamily() (r string, exists bool) {
+	v := m.model_family
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldModelFamily returns the old "model_family" field's value of the PricingRule entity.
+// If the PricingRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingRuleMutation) OldModelFamily(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldModelFamily is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldModelFamily requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldModelFamily: %w", err)
+	}
+	return oldValue.ModelFamily, nil
+}
+
+// ResetModelFamily resets all changes to the "model_family" field.
+func (m *PricingRuleMutation) ResetModelFamily() {
+	m.model_family = nil
 }
 
 // SetProviderID sets the "provider_id" field.
@@ -40954,6 +41247,114 @@ func (m *PricingRuleMutation) ResetCacheWritePricePerMillion() {
 	m.cache_write_price_per_million = nil
 }
 
+// SetCacheWrite5mPricePerMillion sets the "cache_write_5m_price_per_million" field.
+func (m *PricingRuleMutation) SetCacheWrite5mPricePerMillion(s string) {
+	m.cache_write_5m_price_per_million = &s
+}
+
+// CacheWrite5mPricePerMillion returns the value of the "cache_write_5m_price_per_million" field in the mutation.
+func (m *PricingRuleMutation) CacheWrite5mPricePerMillion() (r string, exists bool) {
+	v := m.cache_write_5m_price_per_million
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheWrite5mPricePerMillion returns the old "cache_write_5m_price_per_million" field's value of the PricingRule entity.
+// If the PricingRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingRuleMutation) OldCacheWrite5mPricePerMillion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheWrite5mPricePerMillion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheWrite5mPricePerMillion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheWrite5mPricePerMillion: %w", err)
+	}
+	return oldValue.CacheWrite5mPricePerMillion, nil
+}
+
+// ResetCacheWrite5mPricePerMillion resets all changes to the "cache_write_5m_price_per_million" field.
+func (m *PricingRuleMutation) ResetCacheWrite5mPricePerMillion() {
+	m.cache_write_5m_price_per_million = nil
+}
+
+// SetCacheWrite1hPricePerMillion sets the "cache_write_1h_price_per_million" field.
+func (m *PricingRuleMutation) SetCacheWrite1hPricePerMillion(s string) {
+	m.cache_write_1h_price_per_million = &s
+}
+
+// CacheWrite1hPricePerMillion returns the value of the "cache_write_1h_price_per_million" field in the mutation.
+func (m *PricingRuleMutation) CacheWrite1hPricePerMillion() (r string, exists bool) {
+	v := m.cache_write_1h_price_per_million
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheWrite1hPricePerMillion returns the old "cache_write_1h_price_per_million" field's value of the PricingRule entity.
+// If the PricingRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingRuleMutation) OldCacheWrite1hPricePerMillion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheWrite1hPricePerMillion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheWrite1hPricePerMillion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheWrite1hPricePerMillion: %w", err)
+	}
+	return oldValue.CacheWrite1hPricePerMillion, nil
+}
+
+// ResetCacheWrite1hPricePerMillion resets all changes to the "cache_write_1h_price_per_million" field.
+func (m *PricingRuleMutation) ResetCacheWrite1hPricePerMillion() {
+	m.cache_write_1h_price_per_million = nil
+}
+
+// SetImageOutputPricePerMillion sets the "image_output_price_per_million" field.
+func (m *PricingRuleMutation) SetImageOutputPricePerMillion(s string) {
+	m.image_output_price_per_million = &s
+}
+
+// ImageOutputPricePerMillion returns the value of the "image_output_price_per_million" field in the mutation.
+func (m *PricingRuleMutation) ImageOutputPricePerMillion() (r string, exists bool) {
+	v := m.image_output_price_per_million
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImageOutputPricePerMillion returns the old "image_output_price_per_million" field's value of the PricingRule entity.
+// If the PricingRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingRuleMutation) OldImageOutputPricePerMillion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImageOutputPricePerMillion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImageOutputPricePerMillion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImageOutputPricePerMillion: %w", err)
+	}
+	return oldValue.ImageOutputPricePerMillion, nil
+}
+
+// ResetImageOutputPricePerMillion resets all changes to the "image_output_price_per_million" field.
+func (m *PricingRuleMutation) ResetImageOutputPricePerMillion() {
+	m.image_output_price_per_million = nil
+}
+
 // SetPerRequestPrice sets the "per_request_price" field.
 func (m *PricingRuleMutation) SetPerRequestPrice(s string) {
 	m.per_request_price = &s
@@ -40988,6 +41389,161 @@ func (m *PricingRuleMutation) OldPerRequestPrice(ctx context.Context) (v string,
 // ResetPerRequestPrice resets all changes to the "per_request_price" field.
 func (m *PricingRuleMutation) ResetPerRequestPrice() {
 	m.per_request_price = nil
+}
+
+// SetServiceTierMultipliersJSON sets the "service_tier_multipliers_json" field.
+func (m *PricingRuleMutation) SetServiceTierMultipliersJSON(value map[string]string) {
+	m.service_tier_multipliers_json = &value
+}
+
+// ServiceTierMultipliersJSON returns the value of the "service_tier_multipliers_json" field in the mutation.
+func (m *PricingRuleMutation) ServiceTierMultipliersJSON() (r map[string]string, exists bool) {
+	v := m.service_tier_multipliers_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldServiceTierMultipliersJSON returns the old "service_tier_multipliers_json" field's value of the PricingRule entity.
+// If the PricingRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingRuleMutation) OldServiceTierMultipliersJSON(ctx context.Context) (v map[string]string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldServiceTierMultipliersJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldServiceTierMultipliersJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldServiceTierMultipliersJSON: %w", err)
+	}
+	return oldValue.ServiceTierMultipliersJSON, nil
+}
+
+// ClearServiceTierMultipliersJSON clears the value of the "service_tier_multipliers_json" field.
+func (m *PricingRuleMutation) ClearServiceTierMultipliersJSON() {
+	m.service_tier_multipliers_json = nil
+	m.clearedFields[pricingrule.FieldServiceTierMultipliersJSON] = struct{}{}
+}
+
+// ServiceTierMultipliersJSONCleared returns if the "service_tier_multipliers_json" field was cleared in this mutation.
+func (m *PricingRuleMutation) ServiceTierMultipliersJSONCleared() bool {
+	_, ok := m.clearedFields[pricingrule.FieldServiceTierMultipliersJSON]
+	return ok
+}
+
+// ResetServiceTierMultipliersJSON resets all changes to the "service_tier_multipliers_json" field.
+func (m *PricingRuleMutation) ResetServiceTierMultipliersJSON() {
+	m.service_tier_multipliers_json = nil
+	delete(m.clearedFields, pricingrule.FieldServiceTierMultipliersJSON)
+}
+
+// SetLongContextThresholdTokens sets the "long_context_threshold_tokens" field.
+func (m *PricingRuleMutation) SetLongContextThresholdTokens(i int) {
+	m.long_context_threshold_tokens = &i
+	m.addlong_context_threshold_tokens = nil
+}
+
+// LongContextThresholdTokens returns the value of the "long_context_threshold_tokens" field in the mutation.
+func (m *PricingRuleMutation) LongContextThresholdTokens() (r int, exists bool) {
+	v := m.long_context_threshold_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLongContextThresholdTokens returns the old "long_context_threshold_tokens" field's value of the PricingRule entity.
+// If the PricingRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingRuleMutation) OldLongContextThresholdTokens(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLongContextThresholdTokens is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLongContextThresholdTokens requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLongContextThresholdTokens: %w", err)
+	}
+	return oldValue.LongContextThresholdTokens, nil
+}
+
+// AddLongContextThresholdTokens adds i to the "long_context_threshold_tokens" field.
+func (m *PricingRuleMutation) AddLongContextThresholdTokens(i int) {
+	if m.addlong_context_threshold_tokens != nil {
+		*m.addlong_context_threshold_tokens += i
+	} else {
+		m.addlong_context_threshold_tokens = &i
+	}
+}
+
+// AddedLongContextThresholdTokens returns the value that was added to the "long_context_threshold_tokens" field in this mutation.
+func (m *PricingRuleMutation) AddedLongContextThresholdTokens() (r int, exists bool) {
+	v := m.addlong_context_threshold_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearLongContextThresholdTokens clears the value of the "long_context_threshold_tokens" field.
+func (m *PricingRuleMutation) ClearLongContextThresholdTokens() {
+	m.long_context_threshold_tokens = nil
+	m.addlong_context_threshold_tokens = nil
+	m.clearedFields[pricingrule.FieldLongContextThresholdTokens] = struct{}{}
+}
+
+// LongContextThresholdTokensCleared returns if the "long_context_threshold_tokens" field was cleared in this mutation.
+func (m *PricingRuleMutation) LongContextThresholdTokensCleared() bool {
+	_, ok := m.clearedFields[pricingrule.FieldLongContextThresholdTokens]
+	return ok
+}
+
+// ResetLongContextThresholdTokens resets all changes to the "long_context_threshold_tokens" field.
+func (m *PricingRuleMutation) ResetLongContextThresholdTokens() {
+	m.long_context_threshold_tokens = nil
+	m.addlong_context_threshold_tokens = nil
+	delete(m.clearedFields, pricingrule.FieldLongContextThresholdTokens)
+}
+
+// SetLongContextMultiplier sets the "long_context_multiplier" field.
+func (m *PricingRuleMutation) SetLongContextMultiplier(s string) {
+	m.long_context_multiplier = &s
+}
+
+// LongContextMultiplier returns the value of the "long_context_multiplier" field in the mutation.
+func (m *PricingRuleMutation) LongContextMultiplier() (r string, exists bool) {
+	v := m.long_context_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLongContextMultiplier returns the old "long_context_multiplier" field's value of the PricingRule entity.
+// If the PricingRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PricingRuleMutation) OldLongContextMultiplier(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLongContextMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLongContextMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLongContextMultiplier: %w", err)
+	}
+	return oldValue.LongContextMultiplier, nil
+}
+
+// ResetLongContextMultiplier resets all changes to the "long_context_multiplier" field.
+func (m *PricingRuleMutation) ResetLongContextMultiplier() {
+	m.long_context_multiplier = nil
 }
 
 // SetCurrency sets the "currency" field.
@@ -41158,7 +41714,7 @@ func (m *PricingRuleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PricingRuleMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 20)
 	if m.created_at != nil {
 		fields = append(fields, pricingrule.FieldCreatedAt)
 	}
@@ -41167,6 +41723,9 @@ func (m *PricingRuleMutation) Fields() []string {
 	}
 	if m.model_id != nil {
 		fields = append(fields, pricingrule.FieldModelID)
+	}
+	if m.model_family != nil {
+		fields = append(fields, pricingrule.FieldModelFamily)
 	}
 	if m.provider_id != nil {
 		fields = append(fields, pricingrule.FieldProviderID)
@@ -41186,8 +41745,26 @@ func (m *PricingRuleMutation) Fields() []string {
 	if m.cache_write_price_per_million != nil {
 		fields = append(fields, pricingrule.FieldCacheWritePricePerMillion)
 	}
+	if m.cache_write_5m_price_per_million != nil {
+		fields = append(fields, pricingrule.FieldCacheWrite5mPricePerMillion)
+	}
+	if m.cache_write_1h_price_per_million != nil {
+		fields = append(fields, pricingrule.FieldCacheWrite1hPricePerMillion)
+	}
+	if m.image_output_price_per_million != nil {
+		fields = append(fields, pricingrule.FieldImageOutputPricePerMillion)
+	}
 	if m.per_request_price != nil {
 		fields = append(fields, pricingrule.FieldPerRequestPrice)
+	}
+	if m.service_tier_multipliers_json != nil {
+		fields = append(fields, pricingrule.FieldServiceTierMultipliersJSON)
+	}
+	if m.long_context_threshold_tokens != nil {
+		fields = append(fields, pricingrule.FieldLongContextThresholdTokens)
+	}
+	if m.long_context_multiplier != nil {
+		fields = append(fields, pricingrule.FieldLongContextMultiplier)
 	}
 	if m.currency != nil {
 		fields = append(fields, pricingrule.FieldCurrency)
@@ -41212,6 +41789,8 @@ func (m *PricingRuleMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdatedAt()
 	case pricingrule.FieldModelID:
 		return m.ModelID()
+	case pricingrule.FieldModelFamily:
+		return m.ModelFamily()
 	case pricingrule.FieldProviderID:
 		return m.ProviderID()
 	case pricingrule.FieldBillingMode:
@@ -41224,8 +41803,20 @@ func (m *PricingRuleMutation) Field(name string) (ent.Value, bool) {
 		return m.CacheReadPricePerMillion()
 	case pricingrule.FieldCacheWritePricePerMillion:
 		return m.CacheWritePricePerMillion()
+	case pricingrule.FieldCacheWrite5mPricePerMillion:
+		return m.CacheWrite5mPricePerMillion()
+	case pricingrule.FieldCacheWrite1hPricePerMillion:
+		return m.CacheWrite1hPricePerMillion()
+	case pricingrule.FieldImageOutputPricePerMillion:
+		return m.ImageOutputPricePerMillion()
 	case pricingrule.FieldPerRequestPrice:
 		return m.PerRequestPrice()
+	case pricingrule.FieldServiceTierMultipliersJSON:
+		return m.ServiceTierMultipliersJSON()
+	case pricingrule.FieldLongContextThresholdTokens:
+		return m.LongContextThresholdTokens()
+	case pricingrule.FieldLongContextMultiplier:
+		return m.LongContextMultiplier()
 	case pricingrule.FieldCurrency:
 		return m.Currency()
 	case pricingrule.FieldEffectiveFrom:
@@ -41247,6 +41838,8 @@ func (m *PricingRuleMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldUpdatedAt(ctx)
 	case pricingrule.FieldModelID:
 		return m.OldModelID(ctx)
+	case pricingrule.FieldModelFamily:
+		return m.OldModelFamily(ctx)
 	case pricingrule.FieldProviderID:
 		return m.OldProviderID(ctx)
 	case pricingrule.FieldBillingMode:
@@ -41259,8 +41852,20 @@ func (m *PricingRuleMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldCacheReadPricePerMillion(ctx)
 	case pricingrule.FieldCacheWritePricePerMillion:
 		return m.OldCacheWritePricePerMillion(ctx)
+	case pricingrule.FieldCacheWrite5mPricePerMillion:
+		return m.OldCacheWrite5mPricePerMillion(ctx)
+	case pricingrule.FieldCacheWrite1hPricePerMillion:
+		return m.OldCacheWrite1hPricePerMillion(ctx)
+	case pricingrule.FieldImageOutputPricePerMillion:
+		return m.OldImageOutputPricePerMillion(ctx)
 	case pricingrule.FieldPerRequestPrice:
 		return m.OldPerRequestPrice(ctx)
+	case pricingrule.FieldServiceTierMultipliersJSON:
+		return m.OldServiceTierMultipliersJSON(ctx)
+	case pricingrule.FieldLongContextThresholdTokens:
+		return m.OldLongContextThresholdTokens(ctx)
+	case pricingrule.FieldLongContextMultiplier:
+		return m.OldLongContextMultiplier(ctx)
 	case pricingrule.FieldCurrency:
 		return m.OldCurrency(ctx)
 	case pricingrule.FieldEffectiveFrom:
@@ -41296,6 +41901,13 @@ func (m *PricingRuleMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetModelID(v)
+		return nil
+	case pricingrule.FieldModelFamily:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModelFamily(v)
 		return nil
 	case pricingrule.FieldProviderID:
 		v, ok := value.(int)
@@ -41339,12 +41951,54 @@ func (m *PricingRuleMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCacheWritePricePerMillion(v)
 		return nil
+	case pricingrule.FieldCacheWrite5mPricePerMillion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheWrite5mPricePerMillion(v)
+		return nil
+	case pricingrule.FieldCacheWrite1hPricePerMillion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheWrite1hPricePerMillion(v)
+		return nil
+	case pricingrule.FieldImageOutputPricePerMillion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImageOutputPricePerMillion(v)
+		return nil
 	case pricingrule.FieldPerRequestPrice:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPerRequestPrice(v)
+		return nil
+	case pricingrule.FieldServiceTierMultipliersJSON:
+		v, ok := value.(map[string]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetServiceTierMultipliersJSON(v)
+		return nil
+	case pricingrule.FieldLongContextThresholdTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLongContextThresholdTokens(v)
+		return nil
+	case pricingrule.FieldLongContextMultiplier:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLongContextMultiplier(v)
 		return nil
 	case pricingrule.FieldCurrency:
 		v, ok := value.(string)
@@ -41381,6 +42035,9 @@ func (m *PricingRuleMutation) AddedFields() []string {
 	if m.addprovider_id != nil {
 		fields = append(fields, pricingrule.FieldProviderID)
 	}
+	if m.addlong_context_threshold_tokens != nil {
+		fields = append(fields, pricingrule.FieldLongContextThresholdTokens)
+	}
 	return fields
 }
 
@@ -41393,6 +42050,8 @@ func (m *PricingRuleMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedModelID()
 	case pricingrule.FieldProviderID:
 		return m.AddedProviderID()
+	case pricingrule.FieldLongContextThresholdTokens:
+		return m.AddedLongContextThresholdTokens()
 	}
 	return nil, false
 }
@@ -41416,6 +42075,13 @@ func (m *PricingRuleMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddProviderID(v)
 		return nil
+	case pricingrule.FieldLongContextThresholdTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLongContextThresholdTokens(v)
+		return nil
 	}
 	return fmt.Errorf("unknown PricingRule numeric field %s", name)
 }
@@ -41424,6 +42090,12 @@ func (m *PricingRuleMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *PricingRuleMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(pricingrule.FieldServiceTierMultipliersJSON) {
+		fields = append(fields, pricingrule.FieldServiceTierMultipliersJSON)
+	}
+	if m.FieldCleared(pricingrule.FieldLongContextThresholdTokens) {
+		fields = append(fields, pricingrule.FieldLongContextThresholdTokens)
+	}
 	if m.FieldCleared(pricingrule.FieldEffectiveFrom) {
 		fields = append(fields, pricingrule.FieldEffectiveFrom)
 	}
@@ -41444,6 +42116,12 @@ func (m *PricingRuleMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *PricingRuleMutation) ClearField(name string) error {
 	switch name {
+	case pricingrule.FieldServiceTierMultipliersJSON:
+		m.ClearServiceTierMultipliersJSON()
+		return nil
+	case pricingrule.FieldLongContextThresholdTokens:
+		m.ClearLongContextThresholdTokens()
+		return nil
 	case pricingrule.FieldEffectiveFrom:
 		m.ClearEffectiveFrom()
 		return nil
@@ -41467,6 +42145,9 @@ func (m *PricingRuleMutation) ResetField(name string) error {
 	case pricingrule.FieldModelID:
 		m.ResetModelID()
 		return nil
+	case pricingrule.FieldModelFamily:
+		m.ResetModelFamily()
+		return nil
 	case pricingrule.FieldProviderID:
 		m.ResetProviderID()
 		return nil
@@ -41485,8 +42166,26 @@ func (m *PricingRuleMutation) ResetField(name string) error {
 	case pricingrule.FieldCacheWritePricePerMillion:
 		m.ResetCacheWritePricePerMillion()
 		return nil
+	case pricingrule.FieldCacheWrite5mPricePerMillion:
+		m.ResetCacheWrite5mPricePerMillion()
+		return nil
+	case pricingrule.FieldCacheWrite1hPricePerMillion:
+		m.ResetCacheWrite1hPricePerMillion()
+		return nil
+	case pricingrule.FieldImageOutputPricePerMillion:
+		m.ResetImageOutputPricePerMillion()
+		return nil
 	case pricingrule.FieldPerRequestPrice:
 		m.ResetPerRequestPrice()
+		return nil
+	case pricingrule.FieldServiceTierMultipliersJSON:
+		m.ResetServiceTierMultipliersJSON()
+		return nil
+	case pricingrule.FieldLongContextThresholdTokens:
+		m.ResetLongContextThresholdTokens()
+		return nil
+	case pricingrule.FieldLongContextMultiplier:
+		m.ResetLongContextMultiplier()
 		return nil
 	case pricingrule.FieldCurrency:
 		m.ResetCurrency()
@@ -47742,6 +48441,7 @@ type ScheduledTestPlanMutation struct {
 	interval_seconds    *int
 	addinterval_seconds *int
 	cron_expression     *string
+	probe_model         *string
 	max_results         *int
 	addmax_results      *int
 	auto_recover        *bool
@@ -48207,6 +48907,42 @@ func (m *ScheduledTestPlanMutation) ResetCronExpression() {
 	delete(m.clearedFields, scheduledtestplan.FieldCronExpression)
 }
 
+// SetProbeModel sets the "probe_model" field.
+func (m *ScheduledTestPlanMutation) SetProbeModel(s string) {
+	m.probe_model = &s
+}
+
+// ProbeModel returns the value of the "probe_model" field in the mutation.
+func (m *ScheduledTestPlanMutation) ProbeModel() (r string, exists bool) {
+	v := m.probe_model
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProbeModel returns the old "probe_model" field's value of the ScheduledTestPlan entity.
+// If the ScheduledTestPlan object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScheduledTestPlanMutation) OldProbeModel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProbeModel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProbeModel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProbeModel: %w", err)
+	}
+	return oldValue.ProbeModel, nil
+}
+
+// ResetProbeModel resets all changes to the "probe_model" field.
+func (m *ScheduledTestPlanMutation) ResetProbeModel() {
+	m.probe_model = nil
+}
+
 // SetMaxResults sets the "max_results" field.
 func (m *ScheduledTestPlanMutation) SetMaxResults(i int) {
 	m.max_results = &i
@@ -48454,7 +49190,7 @@ func (m *ScheduledTestPlanMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ScheduledTestPlanMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.created_at != nil {
 		fields = append(fields, scheduledtestplan.FieldCreatedAt)
 	}
@@ -48478,6 +49214,9 @@ func (m *ScheduledTestPlanMutation) Fields() []string {
 	}
 	if m.cron_expression != nil {
 		fields = append(fields, scheduledtestplan.FieldCronExpression)
+	}
+	if m.probe_model != nil {
+		fields = append(fields, scheduledtestplan.FieldProbeModel)
 	}
 	if m.max_results != nil {
 		fields = append(fields, scheduledtestplan.FieldMaxResults)
@@ -48518,6 +49257,8 @@ func (m *ScheduledTestPlanMutation) Field(name string) (ent.Value, bool) {
 		return m.IntervalSeconds()
 	case scheduledtestplan.FieldCronExpression:
 		return m.CronExpression()
+	case scheduledtestplan.FieldProbeModel:
+		return m.ProbeModel()
 	case scheduledtestplan.FieldMaxResults:
 		return m.MaxResults()
 	case scheduledtestplan.FieldAutoRecover:
@@ -48553,6 +49294,8 @@ func (m *ScheduledTestPlanMutation) OldField(ctx context.Context, name string) (
 		return m.OldIntervalSeconds(ctx)
 	case scheduledtestplan.FieldCronExpression:
 		return m.OldCronExpression(ctx)
+	case scheduledtestplan.FieldProbeModel:
+		return m.OldProbeModel(ctx)
 	case scheduledtestplan.FieldMaxResults:
 		return m.OldMaxResults(ctx)
 	case scheduledtestplan.FieldAutoRecover:
@@ -48627,6 +49370,13 @@ func (m *ScheduledTestPlanMutation) SetField(name string, value ent.Value) error
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCronExpression(v)
+		return nil
+	case scheduledtestplan.FieldProbeModel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProbeModel(v)
 		return nil
 	case scheduledtestplan.FieldMaxResults:
 		v, ok := value.(int)
@@ -48795,6 +49545,9 @@ func (m *ScheduledTestPlanMutation) ResetField(name string) error {
 		return nil
 	case scheduledtestplan.FieldCronExpression:
 		m.ResetCronExpression()
+		return nil
+	case scheduledtestplan.FieldProbeModel:
+		m.ResetProbeModel()
 		return nil
 	case scheduledtestplan.FieldMaxResults:
 		m.ResetMaxResults()

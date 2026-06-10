@@ -33,6 +33,8 @@ type ScheduledTestPlan struct {
 	IntervalSeconds int `json:"interval_seconds,omitempty"`
 	// CronExpression holds the value of the "cron_expression" field.
 	CronExpression string `json:"cron_expression,omitempty"`
+	// ProbeModel holds the value of the "probe_model" field.
+	ProbeModel string `json:"probe_model,omitempty"`
 	// MaxResults holds the value of the "max_results" field.
 	MaxResults int `json:"max_results,omitempty"`
 	// AutoRecover holds the value of the "auto_recover" field.
@@ -55,7 +57,7 @@ func (*ScheduledTestPlan) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case scheduledtestplan.FieldID, scheduledtestplan.FieldScopeID, scheduledtestplan.FieldIntervalSeconds, scheduledtestplan.FieldMaxResults:
 			values[i] = new(sql.NullInt64)
-		case scheduledtestplan.FieldName, scheduledtestplan.FieldScopeType, scheduledtestplan.FieldCronExpression, scheduledtestplan.FieldLastStatus, scheduledtestplan.FieldLastSummary:
+		case scheduledtestplan.FieldName, scheduledtestplan.FieldScopeType, scheduledtestplan.FieldCronExpression, scheduledtestplan.FieldProbeModel, scheduledtestplan.FieldLastStatus, scheduledtestplan.FieldLastSummary:
 			values[i] = new(sql.NullString)
 		case scheduledtestplan.FieldCreatedAt, scheduledtestplan.FieldUpdatedAt, scheduledtestplan.FieldLastRunAt:
 			values[i] = new(sql.NullTime)
@@ -128,6 +130,12 @@ func (_m *ScheduledTestPlan) assignValues(columns []string, values []any) error 
 				return fmt.Errorf("unexpected type %T for field cron_expression", values[i])
 			} else if value.Valid {
 				_m.CronExpression = value.String
+			}
+		case scheduledtestplan.FieldProbeModel:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field probe_model", values[i])
+			} else if value.Valid {
+				_m.ProbeModel = value.String
 			}
 		case scheduledtestplan.FieldMaxResults:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -221,6 +229,9 @@ func (_m *ScheduledTestPlan) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("cron_expression=")
 	builder.WriteString(_m.CronExpression)
+	builder.WriteString(", ")
+	builder.WriteString("probe_model=")
+	builder.WriteString(_m.ProbeModel)
 	builder.WriteString(", ")
 	builder.WriteString("max_results=")
 	builder.WriteString(fmt.Sprintf("%v", _m.MaxResults))

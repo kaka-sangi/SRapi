@@ -144,6 +144,20 @@ func (_u *ScheduledTestPlanUpdate) ClearCronExpression() *ScheduledTestPlanUpdat
 	return _u
 }
 
+// SetProbeModel sets the "probe_model" field.
+func (_u *ScheduledTestPlanUpdate) SetProbeModel(v string) *ScheduledTestPlanUpdate {
+	_u.mutation.SetProbeModel(v)
+	return _u
+}
+
+// SetNillableProbeModel sets the "probe_model" field if the given value is not nil.
+func (_u *ScheduledTestPlanUpdate) SetNillableProbeModel(v *string) *ScheduledTestPlanUpdate {
+	if v != nil {
+		_u.SetProbeModel(*v)
+	}
+	return _u
+}
+
 // SetMaxResults sets the "max_results" field.
 func (_u *ScheduledTestPlanUpdate) SetMaxResults(v int) *ScheduledTestPlanUpdate {
 	_u.mutation.ResetMaxResults()
@@ -323,6 +337,9 @@ func (_u *ScheduledTestPlanUpdate) sqlSave(ctx context.Context) (_node int, err 
 	if _u.mutation.CronExpressionCleared() {
 		_spec.ClearField(scheduledtestplan.FieldCronExpression, field.TypeString)
 	}
+	if value, ok := _u.mutation.ProbeModel(); ok {
+		_spec.SetField(scheduledtestplan.FieldProbeModel, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.MaxResults(); ok {
 		_spec.SetField(scheduledtestplan.FieldMaxResults, field.TypeInt, value)
 	}
@@ -477,6 +494,20 @@ func (_u *ScheduledTestPlanUpdateOne) SetNillableCronExpression(v *string) *Sche
 // ClearCronExpression clears the value of the "cron_expression" field.
 func (_u *ScheduledTestPlanUpdateOne) ClearCronExpression() *ScheduledTestPlanUpdateOne {
 	_u.mutation.ClearCronExpression()
+	return _u
+}
+
+// SetProbeModel sets the "probe_model" field.
+func (_u *ScheduledTestPlanUpdateOne) SetProbeModel(v string) *ScheduledTestPlanUpdateOne {
+	_u.mutation.SetProbeModel(v)
+	return _u
+}
+
+// SetNillableProbeModel sets the "probe_model" field if the given value is not nil.
+func (_u *ScheduledTestPlanUpdateOne) SetNillableProbeModel(v *string) *ScheduledTestPlanUpdateOne {
+	if v != nil {
+		_u.SetProbeModel(*v)
+	}
 	return _u
 }
 
@@ -688,6 +719,9 @@ func (_u *ScheduledTestPlanUpdateOne) sqlSave(ctx context.Context) (_node *Sched
 	}
 	if _u.mutation.CronExpressionCleared() {
 		_spec.ClearField(scheduledtestplan.FieldCronExpression, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProbeModel(); ok {
+		_spec.SetField(scheduledtestplan.FieldProbeModel, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.MaxResults(); ok {
 		_spec.SetField(scheduledtestplan.FieldMaxResults, field.TypeInt, value)

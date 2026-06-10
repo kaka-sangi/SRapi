@@ -19,6 +19,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// FieldModelID holds the string denoting the model_id field in the database.
 	FieldModelID = "model_id"
+	// FieldModelFamily holds the string denoting the model_family field in the database.
+	FieldModelFamily = "model_family"
 	// FieldProviderID holds the string denoting the provider_id field in the database.
 	FieldProviderID = "provider_id"
 	// FieldBillingMode holds the string denoting the billing_mode field in the database.
@@ -31,8 +33,20 @@ const (
 	FieldCacheReadPricePerMillion = "cache_read_price_per_million"
 	// FieldCacheWritePricePerMillion holds the string denoting the cache_write_price_per_million field in the database.
 	FieldCacheWritePricePerMillion = "cache_write_price_per_million"
+	// FieldCacheWrite5mPricePerMillion holds the string denoting the cache_write_5m_price_per_million field in the database.
+	FieldCacheWrite5mPricePerMillion = "cache_write_5m_price_per_million"
+	// FieldCacheWrite1hPricePerMillion holds the string denoting the cache_write_1h_price_per_million field in the database.
+	FieldCacheWrite1hPricePerMillion = "cache_write_1h_price_per_million"
+	// FieldImageOutputPricePerMillion holds the string denoting the image_output_price_per_million field in the database.
+	FieldImageOutputPricePerMillion = "image_output_price_per_million"
 	// FieldPerRequestPrice holds the string denoting the per_request_price field in the database.
 	FieldPerRequestPrice = "per_request_price"
+	// FieldServiceTierMultipliersJSON holds the string denoting the service_tier_multipliers_json field in the database.
+	FieldServiceTierMultipliersJSON = "service_tier_multipliers_json"
+	// FieldLongContextThresholdTokens holds the string denoting the long_context_threshold_tokens field in the database.
+	FieldLongContextThresholdTokens = "long_context_threshold_tokens"
+	// FieldLongContextMultiplier holds the string denoting the long_context_multiplier field in the database.
+	FieldLongContextMultiplier = "long_context_multiplier"
 	// FieldCurrency holds the string denoting the currency field in the database.
 	FieldCurrency = "currency"
 	// FieldEffectiveFrom holds the string denoting the effective_from field in the database.
@@ -49,13 +63,20 @@ var Columns = []string{
 	FieldCreatedAt,
 	FieldUpdatedAt,
 	FieldModelID,
+	FieldModelFamily,
 	FieldProviderID,
 	FieldBillingMode,
 	FieldInputPricePerMillion,
 	FieldOutputPricePerMillion,
 	FieldCacheReadPricePerMillion,
 	FieldCacheWritePricePerMillion,
+	FieldCacheWrite5mPricePerMillion,
+	FieldCacheWrite1hPricePerMillion,
+	FieldImageOutputPricePerMillion,
 	FieldPerRequestPrice,
+	FieldServiceTierMultipliersJSON,
+	FieldLongContextThresholdTokens,
+	FieldLongContextMultiplier,
 	FieldCurrency,
 	FieldEffectiveFrom,
 	FieldEffectiveTo,
@@ -78,6 +99,8 @@ var (
 	DefaultUpdatedAt func() time.Time
 	// UpdateDefaultUpdatedAt holds the default value on update for the "updated_at" field.
 	UpdateDefaultUpdatedAt func() time.Time
+	// DefaultModelFamily holds the default value on creation for the "model_family" field.
+	DefaultModelFamily string
 	// DefaultBillingMode holds the default value on creation for the "billing_mode" field.
 	DefaultBillingMode string
 	// DefaultInputPricePerMillion holds the default value on creation for the "input_price_per_million" field.
@@ -88,8 +111,16 @@ var (
 	DefaultCacheReadPricePerMillion string
 	// DefaultCacheWritePricePerMillion holds the default value on creation for the "cache_write_price_per_million" field.
 	DefaultCacheWritePricePerMillion string
+	// DefaultCacheWrite5mPricePerMillion holds the default value on creation for the "cache_write_5m_price_per_million" field.
+	DefaultCacheWrite5mPricePerMillion string
+	// DefaultCacheWrite1hPricePerMillion holds the default value on creation for the "cache_write_1h_price_per_million" field.
+	DefaultCacheWrite1hPricePerMillion string
+	// DefaultImageOutputPricePerMillion holds the default value on creation for the "image_output_price_per_million" field.
+	DefaultImageOutputPricePerMillion string
 	// DefaultPerRequestPrice holds the default value on creation for the "per_request_price" field.
 	DefaultPerRequestPrice string
+	// DefaultLongContextMultiplier holds the default value on creation for the "long_context_multiplier" field.
+	DefaultLongContextMultiplier string
 	// DefaultCurrency holds the default value on creation for the "currency" field.
 	DefaultCurrency string
 )
@@ -115,6 +146,11 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByModelID orders the results by the model_id field.
 func ByModelID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldModelID, opts...).ToFunc()
+}
+
+// ByModelFamily orders the results by the model_family field.
+func ByModelFamily(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldModelFamily, opts...).ToFunc()
 }
 
 // ByProviderID orders the results by the provider_id field.
@@ -147,9 +183,34 @@ func ByCacheWritePricePerMillion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCacheWritePricePerMillion, opts...).ToFunc()
 }
 
+// ByCacheWrite5mPricePerMillion orders the results by the cache_write_5m_price_per_million field.
+func ByCacheWrite5mPricePerMillion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheWrite5mPricePerMillion, opts...).ToFunc()
+}
+
+// ByCacheWrite1hPricePerMillion orders the results by the cache_write_1h_price_per_million field.
+func ByCacheWrite1hPricePerMillion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheWrite1hPricePerMillion, opts...).ToFunc()
+}
+
+// ByImageOutputPricePerMillion orders the results by the image_output_price_per_million field.
+func ByImageOutputPricePerMillion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImageOutputPricePerMillion, opts...).ToFunc()
+}
+
 // ByPerRequestPrice orders the results by the per_request_price field.
 func ByPerRequestPrice(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPerRequestPrice, opts...).ToFunc()
+}
+
+// ByLongContextThresholdTokens orders the results by the long_context_threshold_tokens field.
+func ByLongContextThresholdTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLongContextThresholdTokens, opts...).ToFunc()
+}
+
+// ByLongContextMultiplier orders the results by the long_context_multiplier field.
+func ByLongContextMultiplier(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLongContextMultiplier, opts...).ToFunc()
 }
 
 // ByCurrency orders the results by the currency field.

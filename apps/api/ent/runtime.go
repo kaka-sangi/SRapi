@@ -1354,24 +1354,32 @@ func init() {
 	paymentorderDescDiscountAmount := paymentorderFields[4].Descriptor()
 	// paymentorder.DefaultDiscountAmount holds the default value on creation for the discount_amount field.
 	paymentorder.DefaultDiscountAmount = paymentorderDescDiscountAmount.Default.(string)
+	// paymentorderDescFeeAmount is the schema descriptor for fee_amount field.
+	paymentorderDescFeeAmount := paymentorderFields[5].Descriptor()
+	// paymentorder.DefaultFeeAmount holds the default value on creation for the fee_amount field.
+	paymentorder.DefaultFeeAmount = paymentorderDescFeeAmount.Default.(string)
+	// paymentorderDescPayableAmount is the schema descriptor for payable_amount field.
+	paymentorderDescPayableAmount := paymentorderFields[6].Descriptor()
+	// paymentorder.DefaultPayableAmount holds the default value on creation for the payable_amount field.
+	paymentorder.DefaultPayableAmount = paymentorderDescPayableAmount.Default.(string)
 	// paymentorderDescAmount is the schema descriptor for amount field.
-	paymentorderDescAmount := paymentorderFields[6].Descriptor()
+	paymentorderDescAmount := paymentorderFields[8].Descriptor()
 	// paymentorder.DefaultAmount holds the default value on creation for the amount field.
 	paymentorder.DefaultAmount = paymentorderDescAmount.Default.(string)
 	// paymentorderDescCurrency is the schema descriptor for currency field.
-	paymentorderDescCurrency := paymentorderFields[7].Descriptor()
+	paymentorderDescCurrency := paymentorderFields[9].Descriptor()
 	// paymentorder.DefaultCurrency holds the default value on creation for the currency field.
 	paymentorder.DefaultCurrency = paymentorderDescCurrency.Default.(string)
 	// paymentorderDescStatus is the schema descriptor for status field.
-	paymentorderDescStatus := paymentorderFields[8].Descriptor()
+	paymentorderDescStatus := paymentorderFields[10].Descriptor()
 	// paymentorder.DefaultStatus holds the default value on creation for the status field.
 	paymentorder.DefaultStatus = paymentorderDescStatus.Default.(string)
 	// paymentorderDescProductType is the schema descriptor for product_type field.
-	paymentorderDescProductType := paymentorderFields[9].Descriptor()
+	paymentorderDescProductType := paymentorderFields[11].Descriptor()
 	// paymentorder.ProductTypeValidator is a validator for the "product_type" field. It is called by the builders before save.
 	paymentorder.ProductTypeValidator = paymentorderDescProductType.Validators[0].(func(string) error)
 	// paymentorderDescProductID is the schema descriptor for product_id field.
-	paymentorderDescProductID := paymentorderFields[10].Descriptor()
+	paymentorderDescProductID := paymentorderFields[12].Descriptor()
 	// paymentorder.DefaultProductID holds the default value on creation for the product_id field.
 	paymentorder.DefaultProductID = paymentorderDescProductID.Default.(string)
 	paymentproviderinstanceMixin := schema.PaymentProviderInstance{}.Mixin()
@@ -1409,6 +1417,14 @@ func init() {
 	paymentproviderinstanceDescSortOrder := paymentproviderinstanceFields[7].Descriptor()
 	// paymentproviderinstance.DefaultSortOrder holds the default value on creation for the sort_order field.
 	paymentproviderinstance.DefaultSortOrder = paymentproviderinstanceDescSortOrder.Default.(int)
+	// paymentproviderinstanceDescFeeRate is the schema descriptor for fee_rate field.
+	paymentproviderinstanceDescFeeRate := paymentproviderinstanceFields[8].Descriptor()
+	// paymentproviderinstance.DefaultFeeRate holds the default value on creation for the fee_rate field.
+	paymentproviderinstance.DefaultFeeRate = paymentproviderinstanceDescFeeRate.Default.(string)
+	// paymentproviderinstanceDescWeight is the schema descriptor for weight field.
+	paymentproviderinstanceDescWeight := paymentproviderinstanceFields[9].Descriptor()
+	// paymentproviderinstance.DefaultWeight holds the default value on creation for the weight field.
+	paymentproviderinstance.DefaultWeight = paymentproviderinstanceDescWeight.Default.(int)
 	pendingoauthsessionMixin := schema.PendingOAuthSession{}.Mixin()
 	pendingoauthsessionMixinFields0 := pendingoauthsessionMixin[0].Fields()
 	_ = pendingoauthsessionMixinFields0
@@ -1530,32 +1546,52 @@ func init() {
 	pricingrule.DefaultUpdatedAt = pricingruleDescUpdatedAt.Default.(func() time.Time)
 	// pricingrule.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	pricingrule.UpdateDefaultUpdatedAt = pricingruleDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// pricingruleDescModelFamily is the schema descriptor for model_family field.
+	pricingruleDescModelFamily := pricingruleFields[1].Descriptor()
+	// pricingrule.DefaultModelFamily holds the default value on creation for the model_family field.
+	pricingrule.DefaultModelFamily = pricingruleDescModelFamily.Default.(string)
 	// pricingruleDescBillingMode is the schema descriptor for billing_mode field.
-	pricingruleDescBillingMode := pricingruleFields[2].Descriptor()
+	pricingruleDescBillingMode := pricingruleFields[3].Descriptor()
 	// pricingrule.DefaultBillingMode holds the default value on creation for the billing_mode field.
 	pricingrule.DefaultBillingMode = pricingruleDescBillingMode.Default.(string)
 	// pricingruleDescInputPricePerMillion is the schema descriptor for input_price_per_million field.
-	pricingruleDescInputPricePerMillion := pricingruleFields[3].Descriptor()
+	pricingruleDescInputPricePerMillion := pricingruleFields[4].Descriptor()
 	// pricingrule.DefaultInputPricePerMillion holds the default value on creation for the input_price_per_million field.
 	pricingrule.DefaultInputPricePerMillion = pricingruleDescInputPricePerMillion.Default.(string)
 	// pricingruleDescOutputPricePerMillion is the schema descriptor for output_price_per_million field.
-	pricingruleDescOutputPricePerMillion := pricingruleFields[4].Descriptor()
+	pricingruleDescOutputPricePerMillion := pricingruleFields[5].Descriptor()
 	// pricingrule.DefaultOutputPricePerMillion holds the default value on creation for the output_price_per_million field.
 	pricingrule.DefaultOutputPricePerMillion = pricingruleDescOutputPricePerMillion.Default.(string)
 	// pricingruleDescCacheReadPricePerMillion is the schema descriptor for cache_read_price_per_million field.
-	pricingruleDescCacheReadPricePerMillion := pricingruleFields[5].Descriptor()
+	pricingruleDescCacheReadPricePerMillion := pricingruleFields[6].Descriptor()
 	// pricingrule.DefaultCacheReadPricePerMillion holds the default value on creation for the cache_read_price_per_million field.
 	pricingrule.DefaultCacheReadPricePerMillion = pricingruleDescCacheReadPricePerMillion.Default.(string)
 	// pricingruleDescCacheWritePricePerMillion is the schema descriptor for cache_write_price_per_million field.
-	pricingruleDescCacheWritePricePerMillion := pricingruleFields[6].Descriptor()
+	pricingruleDescCacheWritePricePerMillion := pricingruleFields[7].Descriptor()
 	// pricingrule.DefaultCacheWritePricePerMillion holds the default value on creation for the cache_write_price_per_million field.
 	pricingrule.DefaultCacheWritePricePerMillion = pricingruleDescCacheWritePricePerMillion.Default.(string)
+	// pricingruleDescCacheWrite5mPricePerMillion is the schema descriptor for cache_write_5m_price_per_million field.
+	pricingruleDescCacheWrite5mPricePerMillion := pricingruleFields[8].Descriptor()
+	// pricingrule.DefaultCacheWrite5mPricePerMillion holds the default value on creation for the cache_write_5m_price_per_million field.
+	pricingrule.DefaultCacheWrite5mPricePerMillion = pricingruleDescCacheWrite5mPricePerMillion.Default.(string)
+	// pricingruleDescCacheWrite1hPricePerMillion is the schema descriptor for cache_write_1h_price_per_million field.
+	pricingruleDescCacheWrite1hPricePerMillion := pricingruleFields[9].Descriptor()
+	// pricingrule.DefaultCacheWrite1hPricePerMillion holds the default value on creation for the cache_write_1h_price_per_million field.
+	pricingrule.DefaultCacheWrite1hPricePerMillion = pricingruleDescCacheWrite1hPricePerMillion.Default.(string)
+	// pricingruleDescImageOutputPricePerMillion is the schema descriptor for image_output_price_per_million field.
+	pricingruleDescImageOutputPricePerMillion := pricingruleFields[10].Descriptor()
+	// pricingrule.DefaultImageOutputPricePerMillion holds the default value on creation for the image_output_price_per_million field.
+	pricingrule.DefaultImageOutputPricePerMillion = pricingruleDescImageOutputPricePerMillion.Default.(string)
 	// pricingruleDescPerRequestPrice is the schema descriptor for per_request_price field.
-	pricingruleDescPerRequestPrice := pricingruleFields[7].Descriptor()
+	pricingruleDescPerRequestPrice := pricingruleFields[11].Descriptor()
 	// pricingrule.DefaultPerRequestPrice holds the default value on creation for the per_request_price field.
 	pricingrule.DefaultPerRequestPrice = pricingruleDescPerRequestPrice.Default.(string)
+	// pricingruleDescLongContextMultiplier is the schema descriptor for long_context_multiplier field.
+	pricingruleDescLongContextMultiplier := pricingruleFields[14].Descriptor()
+	// pricingrule.DefaultLongContextMultiplier holds the default value on creation for the long_context_multiplier field.
+	pricingrule.DefaultLongContextMultiplier = pricingruleDescLongContextMultiplier.Default.(string)
 	// pricingruleDescCurrency is the schema descriptor for currency field.
-	pricingruleDescCurrency := pricingruleFields[8].Descriptor()
+	pricingruleDescCurrency := pricingruleFields[15].Descriptor()
 	// pricingrule.DefaultCurrency holds the default value on creation for the currency field.
 	pricingrule.DefaultCurrency = pricingruleDescCurrency.Default.(string)
 	providerMixin := schema.Provider{}.Mixin()
@@ -1807,20 +1843,24 @@ func init() {
 	scheduledtestplanDescIntervalSeconds := scheduledtestplanFields[4].Descriptor()
 	// scheduledtestplan.DefaultIntervalSeconds holds the default value on creation for the interval_seconds field.
 	scheduledtestplan.DefaultIntervalSeconds = scheduledtestplanDescIntervalSeconds.Default.(int)
+	// scheduledtestplanDescProbeModel is the schema descriptor for probe_model field.
+	scheduledtestplanDescProbeModel := scheduledtestplanFields[6].Descriptor()
+	// scheduledtestplan.DefaultProbeModel holds the default value on creation for the probe_model field.
+	scheduledtestplan.DefaultProbeModel = scheduledtestplanDescProbeModel.Default.(string)
 	// scheduledtestplanDescMaxResults is the schema descriptor for max_results field.
-	scheduledtestplanDescMaxResults := scheduledtestplanFields[6].Descriptor()
+	scheduledtestplanDescMaxResults := scheduledtestplanFields[7].Descriptor()
 	// scheduledtestplan.DefaultMaxResults holds the default value on creation for the max_results field.
 	scheduledtestplan.DefaultMaxResults = scheduledtestplanDescMaxResults.Default.(int)
 	// scheduledtestplanDescAutoRecover is the schema descriptor for auto_recover field.
-	scheduledtestplanDescAutoRecover := scheduledtestplanFields[7].Descriptor()
+	scheduledtestplanDescAutoRecover := scheduledtestplanFields[8].Descriptor()
 	// scheduledtestplan.DefaultAutoRecover holds the default value on creation for the auto_recover field.
 	scheduledtestplan.DefaultAutoRecover = scheduledtestplanDescAutoRecover.Default.(bool)
 	// scheduledtestplanDescLastStatus is the schema descriptor for last_status field.
-	scheduledtestplanDescLastStatus := scheduledtestplanFields[9].Descriptor()
+	scheduledtestplanDescLastStatus := scheduledtestplanFields[10].Descriptor()
 	// scheduledtestplan.DefaultLastStatus holds the default value on creation for the last_status field.
 	scheduledtestplan.DefaultLastStatus = scheduledtestplanDescLastStatus.Default.(string)
 	// scheduledtestplanDescLastSummary is the schema descriptor for last_summary field.
-	scheduledtestplanDescLastSummary := scheduledtestplanFields[10].Descriptor()
+	scheduledtestplanDescLastSummary := scheduledtestplanFields[11].Descriptor()
 	// scheduledtestplan.DefaultLastSummary holds the default value on creation for the last_summary field.
 	scheduledtestplan.DefaultLastSummary = scheduledtestplanDescLastSummary.Default.(string)
 	scheduledtestplanrunFields := schema.ScheduledTestPlanRun{}.Fields()

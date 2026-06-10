@@ -24,6 +24,8 @@ func (PaymentProviderInstance) Fields() []ent.Field {
 		field.JSON("supported_methods_json", []string{}).Optional(),
 		field.JSON("limits_json", map[string]any{}).Optional(),
 		field.Int("sort_order").Default(0),
+		field.String("fee_rate").Default("0.00000000"),
+		field.Int("weight").Default(1),
 		field.JSON("metadata_json", map[string]any{}).Optional(),
 	}
 }

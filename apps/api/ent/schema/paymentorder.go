@@ -21,6 +21,8 @@ func (PaymentOrder) Fields() []ent.Field {
 		field.Int("provider_instance_id"),
 		field.String("original_amount").Default("0.00000000"),
 		field.String("discount_amount").Default("0.00000000"),
+		field.String("fee_amount").Default("0.00000000"),
+		field.String("payable_amount").Default("0.00000000"),
 		field.Int("promo_code_id").Optional().Nillable(),
 		field.String("amount").Default("0.00000000"),
 		field.String("currency").Default("USD"),

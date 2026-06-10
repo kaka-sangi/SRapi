@@ -35,6 +35,10 @@ const (
 	FieldLimitsJSON = "limits_json"
 	// FieldSortOrder holds the string denoting the sort_order field in the database.
 	FieldSortOrder = "sort_order"
+	// FieldFeeRate holds the string denoting the fee_rate field in the database.
+	FieldFeeRate = "fee_rate"
+	// FieldWeight holds the string denoting the weight field in the database.
+	FieldWeight = "weight"
 	// FieldMetadataJSON holds the string denoting the metadata_json field in the database.
 	FieldMetadataJSON = "metadata_json"
 	// Table holds the table name of the paymentproviderinstance in the database.
@@ -55,6 +59,8 @@ var Columns = []string{
 	FieldSupportedMethodsJSON,
 	FieldLimitsJSON,
 	FieldSortOrder,
+	FieldFeeRate,
+	FieldWeight,
 	FieldMetadataJSON,
 }
 
@@ -85,6 +91,10 @@ var (
 	DefaultConfigVersion int
 	// DefaultSortOrder holds the default value on creation for the "sort_order" field.
 	DefaultSortOrder int
+	// DefaultFeeRate holds the default value on creation for the "fee_rate" field.
+	DefaultFeeRate string
+	// DefaultWeight holds the default value on creation for the "weight" field.
+	DefaultWeight int
 )
 
 // OrderOption defines the ordering options for the PaymentProviderInstance queries.
@@ -133,4 +143,14 @@ func ByConfigVersion(opts ...sql.OrderTermOption) OrderOption {
 // BySortOrder orders the results by the sort_order field.
 func BySortOrder(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSortOrder, opts...).ToFunc()
+}
+
+// ByFeeRate orders the results by the fee_rate field.
+func ByFeeRate(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFeeRate, opts...).ToFunc()
+}
+
+// ByWeight orders the results by the weight field.
+func ByWeight(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWeight, opts...).ToFunc()
 }

@@ -34,5 +34,6 @@ func (AccountAvailabilityRollup) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("account_id", "bucket_date").Unique(),
 		index.Fields("account_id"),
+		index.Fields("bucket_date", "provider_id"),
 	}
 }

@@ -124,6 +124,20 @@ func (_c *ScheduledTestPlanCreate) SetNillableCronExpression(v *string) *Schedul
 	return _c
 }
 
+// SetProbeModel sets the "probe_model" field.
+func (_c *ScheduledTestPlanCreate) SetProbeModel(v string) *ScheduledTestPlanCreate {
+	_c.mutation.SetProbeModel(v)
+	return _c
+}
+
+// SetNillableProbeModel sets the "probe_model" field if the given value is not nil.
+func (_c *ScheduledTestPlanCreate) SetNillableProbeModel(v *string) *ScheduledTestPlanCreate {
+	if v != nil {
+		_c.SetProbeModel(*v)
+	}
+	return _c
+}
+
 // SetMaxResults sets the "max_results" field.
 func (_c *ScheduledTestPlanCreate) SetMaxResults(v int) *ScheduledTestPlanCreate {
 	_c.mutation.SetMaxResults(v)
@@ -249,6 +263,10 @@ func (_c *ScheduledTestPlanCreate) defaults() {
 		v := scheduledtestplan.DefaultIntervalSeconds
 		_c.mutation.SetIntervalSeconds(v)
 	}
+	if _, ok := _c.mutation.ProbeModel(); !ok {
+		v := scheduledtestplan.DefaultProbeModel
+		_c.mutation.SetProbeModel(v)
+	}
 	if _, ok := _c.mutation.MaxResults(); !ok {
 		v := scheduledtestplan.DefaultMaxResults
 		_c.mutation.SetMaxResults(v)
@@ -291,6 +309,9 @@ func (_c *ScheduledTestPlanCreate) check() error {
 	}
 	if _, ok := _c.mutation.IntervalSeconds(); !ok {
 		return &ValidationError{Name: "interval_seconds", err: errors.New(`ent: missing required field "ScheduledTestPlan.interval_seconds"`)}
+	}
+	if _, ok := _c.mutation.ProbeModel(); !ok {
+		return &ValidationError{Name: "probe_model", err: errors.New(`ent: missing required field "ScheduledTestPlan.probe_model"`)}
 	}
 	if _, ok := _c.mutation.MaxResults(); !ok {
 		return &ValidationError{Name: "max_results", err: errors.New(`ent: missing required field "ScheduledTestPlan.max_results"`)}
@@ -361,6 +382,10 @@ func (_c *ScheduledTestPlanCreate) createSpec() (*ScheduledTestPlan, *sqlgraph.C
 	if value, ok := _c.mutation.CronExpression(); ok {
 		_spec.SetField(scheduledtestplan.FieldCronExpression, field.TypeString, value)
 		_node.CronExpression = value
+	}
+	if value, ok := _c.mutation.ProbeModel(); ok {
+		_spec.SetField(scheduledtestplan.FieldProbeModel, field.TypeString, value)
+		_node.ProbeModel = value
 	}
 	if value, ok := _c.mutation.MaxResults(); ok {
 		_spec.SetField(scheduledtestplan.FieldMaxResults, field.TypeInt, value)

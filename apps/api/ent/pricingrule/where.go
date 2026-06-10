@@ -69,6 +69,11 @@ func ModelID(v int) predicate.PricingRule {
 	return predicate.PricingRule(sql.FieldEQ(FieldModelID, v))
 }
 
+// ModelFamily applies equality check predicate on the "model_family" field. It's identical to ModelFamilyEQ.
+func ModelFamily(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldModelFamily, v))
+}
+
 // ProviderID applies equality check predicate on the "provider_id" field. It's identical to ProviderIDEQ.
 func ProviderID(v int) predicate.PricingRule {
 	return predicate.PricingRule(sql.FieldEQ(FieldProviderID, v))
@@ -99,9 +104,34 @@ func CacheWritePricePerMillion(v string) predicate.PricingRule {
 	return predicate.PricingRule(sql.FieldEQ(FieldCacheWritePricePerMillion, v))
 }
 
+// CacheWrite5mPricePerMillion applies equality check predicate on the "cache_write_5m_price_per_million" field. It's identical to CacheWrite5mPricePerMillionEQ.
+func CacheWrite5mPricePerMillion(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldCacheWrite5mPricePerMillion, v))
+}
+
+// CacheWrite1hPricePerMillion applies equality check predicate on the "cache_write_1h_price_per_million" field. It's identical to CacheWrite1hPricePerMillionEQ.
+func CacheWrite1hPricePerMillion(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldCacheWrite1hPricePerMillion, v))
+}
+
+// ImageOutputPricePerMillion applies equality check predicate on the "image_output_price_per_million" field. It's identical to ImageOutputPricePerMillionEQ.
+func ImageOutputPricePerMillion(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldImageOutputPricePerMillion, v))
+}
+
 // PerRequestPrice applies equality check predicate on the "per_request_price" field. It's identical to PerRequestPriceEQ.
 func PerRequestPrice(v string) predicate.PricingRule {
 	return predicate.PricingRule(sql.FieldEQ(FieldPerRequestPrice, v))
+}
+
+// LongContextThresholdTokens applies equality check predicate on the "long_context_threshold_tokens" field. It's identical to LongContextThresholdTokensEQ.
+func LongContextThresholdTokens(v int) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldLongContextThresholdTokens, v))
+}
+
+// LongContextMultiplier applies equality check predicate on the "long_context_multiplier" field. It's identical to LongContextMultiplierEQ.
+func LongContextMultiplier(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldLongContextMultiplier, v))
 }
 
 // Currency applies equality check predicate on the "currency" field. It's identical to CurrencyEQ.
@@ -237,6 +267,71 @@ func ModelIDLT(v int) predicate.PricingRule {
 // ModelIDLTE applies the LTE predicate on the "model_id" field.
 func ModelIDLTE(v int) predicate.PricingRule {
 	return predicate.PricingRule(sql.FieldLTE(FieldModelID, v))
+}
+
+// ModelFamilyEQ applies the EQ predicate on the "model_family" field.
+func ModelFamilyEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldModelFamily, v))
+}
+
+// ModelFamilyNEQ applies the NEQ predicate on the "model_family" field.
+func ModelFamilyNEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNEQ(FieldModelFamily, v))
+}
+
+// ModelFamilyIn applies the In predicate on the "model_family" field.
+func ModelFamilyIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldIn(FieldModelFamily, vs...))
+}
+
+// ModelFamilyNotIn applies the NotIn predicate on the "model_family" field.
+func ModelFamilyNotIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNotIn(FieldModelFamily, vs...))
+}
+
+// ModelFamilyGT applies the GT predicate on the "model_family" field.
+func ModelFamilyGT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGT(FieldModelFamily, v))
+}
+
+// ModelFamilyGTE applies the GTE predicate on the "model_family" field.
+func ModelFamilyGTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGTE(FieldModelFamily, v))
+}
+
+// ModelFamilyLT applies the LT predicate on the "model_family" field.
+func ModelFamilyLT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLT(FieldModelFamily, v))
+}
+
+// ModelFamilyLTE applies the LTE predicate on the "model_family" field.
+func ModelFamilyLTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLTE(FieldModelFamily, v))
+}
+
+// ModelFamilyContains applies the Contains predicate on the "model_family" field.
+func ModelFamilyContains(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContains(FieldModelFamily, v))
+}
+
+// ModelFamilyHasPrefix applies the HasPrefix predicate on the "model_family" field.
+func ModelFamilyHasPrefix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasPrefix(FieldModelFamily, v))
+}
+
+// ModelFamilyHasSuffix applies the HasSuffix predicate on the "model_family" field.
+func ModelFamilyHasSuffix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasSuffix(FieldModelFamily, v))
+}
+
+// ModelFamilyEqualFold applies the EqualFold predicate on the "model_family" field.
+func ModelFamilyEqualFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEqualFold(FieldModelFamily, v))
+}
+
+// ModelFamilyContainsFold applies the ContainsFold predicate on the "model_family" field.
+func ModelFamilyContainsFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContainsFold(FieldModelFamily, v))
 }
 
 // ProviderIDEQ applies the EQ predicate on the "provider_id" field.
@@ -604,6 +699,201 @@ func CacheWritePricePerMillionContainsFold(v string) predicate.PricingRule {
 	return predicate.PricingRule(sql.FieldContainsFold(FieldCacheWritePricePerMillion, v))
 }
 
+// CacheWrite5mPricePerMillionEQ applies the EQ predicate on the "cache_write_5m_price_per_million" field.
+func CacheWrite5mPricePerMillionEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldCacheWrite5mPricePerMillion, v))
+}
+
+// CacheWrite5mPricePerMillionNEQ applies the NEQ predicate on the "cache_write_5m_price_per_million" field.
+func CacheWrite5mPricePerMillionNEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNEQ(FieldCacheWrite5mPricePerMillion, v))
+}
+
+// CacheWrite5mPricePerMillionIn applies the In predicate on the "cache_write_5m_price_per_million" field.
+func CacheWrite5mPricePerMillionIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldIn(FieldCacheWrite5mPricePerMillion, vs...))
+}
+
+// CacheWrite5mPricePerMillionNotIn applies the NotIn predicate on the "cache_write_5m_price_per_million" field.
+func CacheWrite5mPricePerMillionNotIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNotIn(FieldCacheWrite5mPricePerMillion, vs...))
+}
+
+// CacheWrite5mPricePerMillionGT applies the GT predicate on the "cache_write_5m_price_per_million" field.
+func CacheWrite5mPricePerMillionGT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGT(FieldCacheWrite5mPricePerMillion, v))
+}
+
+// CacheWrite5mPricePerMillionGTE applies the GTE predicate on the "cache_write_5m_price_per_million" field.
+func CacheWrite5mPricePerMillionGTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGTE(FieldCacheWrite5mPricePerMillion, v))
+}
+
+// CacheWrite5mPricePerMillionLT applies the LT predicate on the "cache_write_5m_price_per_million" field.
+func CacheWrite5mPricePerMillionLT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLT(FieldCacheWrite5mPricePerMillion, v))
+}
+
+// CacheWrite5mPricePerMillionLTE applies the LTE predicate on the "cache_write_5m_price_per_million" field.
+func CacheWrite5mPricePerMillionLTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLTE(FieldCacheWrite5mPricePerMillion, v))
+}
+
+// CacheWrite5mPricePerMillionContains applies the Contains predicate on the "cache_write_5m_price_per_million" field.
+func CacheWrite5mPricePerMillionContains(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContains(FieldCacheWrite5mPricePerMillion, v))
+}
+
+// CacheWrite5mPricePerMillionHasPrefix applies the HasPrefix predicate on the "cache_write_5m_price_per_million" field.
+func CacheWrite5mPricePerMillionHasPrefix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasPrefix(FieldCacheWrite5mPricePerMillion, v))
+}
+
+// CacheWrite5mPricePerMillionHasSuffix applies the HasSuffix predicate on the "cache_write_5m_price_per_million" field.
+func CacheWrite5mPricePerMillionHasSuffix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasSuffix(FieldCacheWrite5mPricePerMillion, v))
+}
+
+// CacheWrite5mPricePerMillionEqualFold applies the EqualFold predicate on the "cache_write_5m_price_per_million" field.
+func CacheWrite5mPricePerMillionEqualFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEqualFold(FieldCacheWrite5mPricePerMillion, v))
+}
+
+// CacheWrite5mPricePerMillionContainsFold applies the ContainsFold predicate on the "cache_write_5m_price_per_million" field.
+func CacheWrite5mPricePerMillionContainsFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContainsFold(FieldCacheWrite5mPricePerMillion, v))
+}
+
+// CacheWrite1hPricePerMillionEQ applies the EQ predicate on the "cache_write_1h_price_per_million" field.
+func CacheWrite1hPricePerMillionEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldCacheWrite1hPricePerMillion, v))
+}
+
+// CacheWrite1hPricePerMillionNEQ applies the NEQ predicate on the "cache_write_1h_price_per_million" field.
+func CacheWrite1hPricePerMillionNEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNEQ(FieldCacheWrite1hPricePerMillion, v))
+}
+
+// CacheWrite1hPricePerMillionIn applies the In predicate on the "cache_write_1h_price_per_million" field.
+func CacheWrite1hPricePerMillionIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldIn(FieldCacheWrite1hPricePerMillion, vs...))
+}
+
+// CacheWrite1hPricePerMillionNotIn applies the NotIn predicate on the "cache_write_1h_price_per_million" field.
+func CacheWrite1hPricePerMillionNotIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNotIn(FieldCacheWrite1hPricePerMillion, vs...))
+}
+
+// CacheWrite1hPricePerMillionGT applies the GT predicate on the "cache_write_1h_price_per_million" field.
+func CacheWrite1hPricePerMillionGT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGT(FieldCacheWrite1hPricePerMillion, v))
+}
+
+// CacheWrite1hPricePerMillionGTE applies the GTE predicate on the "cache_write_1h_price_per_million" field.
+func CacheWrite1hPricePerMillionGTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGTE(FieldCacheWrite1hPricePerMillion, v))
+}
+
+// CacheWrite1hPricePerMillionLT applies the LT predicate on the "cache_write_1h_price_per_million" field.
+func CacheWrite1hPricePerMillionLT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLT(FieldCacheWrite1hPricePerMillion, v))
+}
+
+// CacheWrite1hPricePerMillionLTE applies the LTE predicate on the "cache_write_1h_price_per_million" field.
+func CacheWrite1hPricePerMillionLTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLTE(FieldCacheWrite1hPricePerMillion, v))
+}
+
+// CacheWrite1hPricePerMillionContains applies the Contains predicate on the "cache_write_1h_price_per_million" field.
+func CacheWrite1hPricePerMillionContains(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContains(FieldCacheWrite1hPricePerMillion, v))
+}
+
+// CacheWrite1hPricePerMillionHasPrefix applies the HasPrefix predicate on the "cache_write_1h_price_per_million" field.
+func CacheWrite1hPricePerMillionHasPrefix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasPrefix(FieldCacheWrite1hPricePerMillion, v))
+}
+
+// CacheWrite1hPricePerMillionHasSuffix applies the HasSuffix predicate on the "cache_write_1h_price_per_million" field.
+func CacheWrite1hPricePerMillionHasSuffix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasSuffix(FieldCacheWrite1hPricePerMillion, v))
+}
+
+// CacheWrite1hPricePerMillionEqualFold applies the EqualFold predicate on the "cache_write_1h_price_per_million" field.
+func CacheWrite1hPricePerMillionEqualFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEqualFold(FieldCacheWrite1hPricePerMillion, v))
+}
+
+// CacheWrite1hPricePerMillionContainsFold applies the ContainsFold predicate on the "cache_write_1h_price_per_million" field.
+func CacheWrite1hPricePerMillionContainsFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContainsFold(FieldCacheWrite1hPricePerMillion, v))
+}
+
+// ImageOutputPricePerMillionEQ applies the EQ predicate on the "image_output_price_per_million" field.
+func ImageOutputPricePerMillionEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldImageOutputPricePerMillion, v))
+}
+
+// ImageOutputPricePerMillionNEQ applies the NEQ predicate on the "image_output_price_per_million" field.
+func ImageOutputPricePerMillionNEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNEQ(FieldImageOutputPricePerMillion, v))
+}
+
+// ImageOutputPricePerMillionIn applies the In predicate on the "image_output_price_per_million" field.
+func ImageOutputPricePerMillionIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldIn(FieldImageOutputPricePerMillion, vs...))
+}
+
+// ImageOutputPricePerMillionNotIn applies the NotIn predicate on the "image_output_price_per_million" field.
+func ImageOutputPricePerMillionNotIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNotIn(FieldImageOutputPricePerMillion, vs...))
+}
+
+// ImageOutputPricePerMillionGT applies the GT predicate on the "image_output_price_per_million" field.
+func ImageOutputPricePerMillionGT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGT(FieldImageOutputPricePerMillion, v))
+}
+
+// ImageOutputPricePerMillionGTE applies the GTE predicate on the "image_output_price_per_million" field.
+func ImageOutputPricePerMillionGTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGTE(FieldImageOutputPricePerMillion, v))
+}
+
+// ImageOutputPricePerMillionLT applies the LT predicate on the "image_output_price_per_million" field.
+func ImageOutputPricePerMillionLT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLT(FieldImageOutputPricePerMillion, v))
+}
+
+// ImageOutputPricePerMillionLTE applies the LTE predicate on the "image_output_price_per_million" field.
+func ImageOutputPricePerMillionLTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLTE(FieldImageOutputPricePerMillion, v))
+}
+
+// ImageOutputPricePerMillionContains applies the Contains predicate on the "image_output_price_per_million" field.
+func ImageOutputPricePerMillionContains(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContains(FieldImageOutputPricePerMillion, v))
+}
+
+// ImageOutputPricePerMillionHasPrefix applies the HasPrefix predicate on the "image_output_price_per_million" field.
+func ImageOutputPricePerMillionHasPrefix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasPrefix(FieldImageOutputPricePerMillion, v))
+}
+
+// ImageOutputPricePerMillionHasSuffix applies the HasSuffix predicate on the "image_output_price_per_million" field.
+func ImageOutputPricePerMillionHasSuffix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasSuffix(FieldImageOutputPricePerMillion, v))
+}
+
+// ImageOutputPricePerMillionEqualFold applies the EqualFold predicate on the "image_output_price_per_million" field.
+func ImageOutputPricePerMillionEqualFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEqualFold(FieldImageOutputPricePerMillion, v))
+}
+
+// ImageOutputPricePerMillionContainsFold applies the ContainsFold predicate on the "image_output_price_per_million" field.
+func ImageOutputPricePerMillionContainsFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContainsFold(FieldImageOutputPricePerMillion, v))
+}
+
 // PerRequestPriceEQ applies the EQ predicate on the "per_request_price" field.
 func PerRequestPriceEQ(v string) predicate.PricingRule {
 	return predicate.PricingRule(sql.FieldEQ(FieldPerRequestPrice, v))
@@ -667,6 +957,131 @@ func PerRequestPriceEqualFold(v string) predicate.PricingRule {
 // PerRequestPriceContainsFold applies the ContainsFold predicate on the "per_request_price" field.
 func PerRequestPriceContainsFold(v string) predicate.PricingRule {
 	return predicate.PricingRule(sql.FieldContainsFold(FieldPerRequestPrice, v))
+}
+
+// ServiceTierMultipliersJSONIsNil applies the IsNil predicate on the "service_tier_multipliers_json" field.
+func ServiceTierMultipliersJSONIsNil() predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldIsNull(FieldServiceTierMultipliersJSON))
+}
+
+// ServiceTierMultipliersJSONNotNil applies the NotNil predicate on the "service_tier_multipliers_json" field.
+func ServiceTierMultipliersJSONNotNil() predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNotNull(FieldServiceTierMultipliersJSON))
+}
+
+// LongContextThresholdTokensEQ applies the EQ predicate on the "long_context_threshold_tokens" field.
+func LongContextThresholdTokensEQ(v int) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldLongContextThresholdTokens, v))
+}
+
+// LongContextThresholdTokensNEQ applies the NEQ predicate on the "long_context_threshold_tokens" field.
+func LongContextThresholdTokensNEQ(v int) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNEQ(FieldLongContextThresholdTokens, v))
+}
+
+// LongContextThresholdTokensIn applies the In predicate on the "long_context_threshold_tokens" field.
+func LongContextThresholdTokensIn(vs ...int) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldIn(FieldLongContextThresholdTokens, vs...))
+}
+
+// LongContextThresholdTokensNotIn applies the NotIn predicate on the "long_context_threshold_tokens" field.
+func LongContextThresholdTokensNotIn(vs ...int) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNotIn(FieldLongContextThresholdTokens, vs...))
+}
+
+// LongContextThresholdTokensGT applies the GT predicate on the "long_context_threshold_tokens" field.
+func LongContextThresholdTokensGT(v int) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGT(FieldLongContextThresholdTokens, v))
+}
+
+// LongContextThresholdTokensGTE applies the GTE predicate on the "long_context_threshold_tokens" field.
+func LongContextThresholdTokensGTE(v int) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGTE(FieldLongContextThresholdTokens, v))
+}
+
+// LongContextThresholdTokensLT applies the LT predicate on the "long_context_threshold_tokens" field.
+func LongContextThresholdTokensLT(v int) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLT(FieldLongContextThresholdTokens, v))
+}
+
+// LongContextThresholdTokensLTE applies the LTE predicate on the "long_context_threshold_tokens" field.
+func LongContextThresholdTokensLTE(v int) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLTE(FieldLongContextThresholdTokens, v))
+}
+
+// LongContextThresholdTokensIsNil applies the IsNil predicate on the "long_context_threshold_tokens" field.
+func LongContextThresholdTokensIsNil() predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldIsNull(FieldLongContextThresholdTokens))
+}
+
+// LongContextThresholdTokensNotNil applies the NotNil predicate on the "long_context_threshold_tokens" field.
+func LongContextThresholdTokensNotNil() predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNotNull(FieldLongContextThresholdTokens))
+}
+
+// LongContextMultiplierEQ applies the EQ predicate on the "long_context_multiplier" field.
+func LongContextMultiplierEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEQ(FieldLongContextMultiplier, v))
+}
+
+// LongContextMultiplierNEQ applies the NEQ predicate on the "long_context_multiplier" field.
+func LongContextMultiplierNEQ(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNEQ(FieldLongContextMultiplier, v))
+}
+
+// LongContextMultiplierIn applies the In predicate on the "long_context_multiplier" field.
+func LongContextMultiplierIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldIn(FieldLongContextMultiplier, vs...))
+}
+
+// LongContextMultiplierNotIn applies the NotIn predicate on the "long_context_multiplier" field.
+func LongContextMultiplierNotIn(vs ...string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldNotIn(FieldLongContextMultiplier, vs...))
+}
+
+// LongContextMultiplierGT applies the GT predicate on the "long_context_multiplier" field.
+func LongContextMultiplierGT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGT(FieldLongContextMultiplier, v))
+}
+
+// LongContextMultiplierGTE applies the GTE predicate on the "long_context_multiplier" field.
+func LongContextMultiplierGTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldGTE(FieldLongContextMultiplier, v))
+}
+
+// LongContextMultiplierLT applies the LT predicate on the "long_context_multiplier" field.
+func LongContextMultiplierLT(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLT(FieldLongContextMultiplier, v))
+}
+
+// LongContextMultiplierLTE applies the LTE predicate on the "long_context_multiplier" field.
+func LongContextMultiplierLTE(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldLTE(FieldLongContextMultiplier, v))
+}
+
+// LongContextMultiplierContains applies the Contains predicate on the "long_context_multiplier" field.
+func LongContextMultiplierContains(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContains(FieldLongContextMultiplier, v))
+}
+
+// LongContextMultiplierHasPrefix applies the HasPrefix predicate on the "long_context_multiplier" field.
+func LongContextMultiplierHasPrefix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasPrefix(FieldLongContextMultiplier, v))
+}
+
+// LongContextMultiplierHasSuffix applies the HasSuffix predicate on the "long_context_multiplier" field.
+func LongContextMultiplierHasSuffix(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldHasSuffix(FieldLongContextMultiplier, v))
+}
+
+// LongContextMultiplierEqualFold applies the EqualFold predicate on the "long_context_multiplier" field.
+func LongContextMultiplierEqualFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldEqualFold(FieldLongContextMultiplier, v))
+}
+
+// LongContextMultiplierContainsFold applies the ContainsFold predicate on the "long_context_multiplier" field.
+func LongContextMultiplierContainsFold(v string) predicate.PricingRule {
+	return predicate.PricingRule(sql.FieldContainsFold(FieldLongContextMultiplier, v))
 }
 
 // CurrencyEQ applies the EQ predicate on the "currency" field.

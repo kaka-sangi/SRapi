@@ -54,6 +54,20 @@ func (_c *PricingRuleCreate) SetModelID(v int) *PricingRuleCreate {
 	return _c
 }
 
+// SetModelFamily sets the "model_family" field.
+func (_c *PricingRuleCreate) SetModelFamily(v string) *PricingRuleCreate {
+	_c.mutation.SetModelFamily(v)
+	return _c
+}
+
+// SetNillableModelFamily sets the "model_family" field if the given value is not nil.
+func (_c *PricingRuleCreate) SetNillableModelFamily(v *string) *PricingRuleCreate {
+	if v != nil {
+		_c.SetModelFamily(*v)
+	}
+	return _c
+}
+
 // SetProviderID sets the "provider_id" field.
 func (_c *PricingRuleCreate) SetProviderID(v int) *PricingRuleCreate {
 	_c.mutation.SetProviderID(v)
@@ -130,6 +144,48 @@ func (_c *PricingRuleCreate) SetNillableCacheWritePricePerMillion(v *string) *Pr
 	return _c
 }
 
+// SetCacheWrite5mPricePerMillion sets the "cache_write_5m_price_per_million" field.
+func (_c *PricingRuleCreate) SetCacheWrite5mPricePerMillion(v string) *PricingRuleCreate {
+	_c.mutation.SetCacheWrite5mPricePerMillion(v)
+	return _c
+}
+
+// SetNillableCacheWrite5mPricePerMillion sets the "cache_write_5m_price_per_million" field if the given value is not nil.
+func (_c *PricingRuleCreate) SetNillableCacheWrite5mPricePerMillion(v *string) *PricingRuleCreate {
+	if v != nil {
+		_c.SetCacheWrite5mPricePerMillion(*v)
+	}
+	return _c
+}
+
+// SetCacheWrite1hPricePerMillion sets the "cache_write_1h_price_per_million" field.
+func (_c *PricingRuleCreate) SetCacheWrite1hPricePerMillion(v string) *PricingRuleCreate {
+	_c.mutation.SetCacheWrite1hPricePerMillion(v)
+	return _c
+}
+
+// SetNillableCacheWrite1hPricePerMillion sets the "cache_write_1h_price_per_million" field if the given value is not nil.
+func (_c *PricingRuleCreate) SetNillableCacheWrite1hPricePerMillion(v *string) *PricingRuleCreate {
+	if v != nil {
+		_c.SetCacheWrite1hPricePerMillion(*v)
+	}
+	return _c
+}
+
+// SetImageOutputPricePerMillion sets the "image_output_price_per_million" field.
+func (_c *PricingRuleCreate) SetImageOutputPricePerMillion(v string) *PricingRuleCreate {
+	_c.mutation.SetImageOutputPricePerMillion(v)
+	return _c
+}
+
+// SetNillableImageOutputPricePerMillion sets the "image_output_price_per_million" field if the given value is not nil.
+func (_c *PricingRuleCreate) SetNillableImageOutputPricePerMillion(v *string) *PricingRuleCreate {
+	if v != nil {
+		_c.SetImageOutputPricePerMillion(*v)
+	}
+	return _c
+}
+
 // SetPerRequestPrice sets the "per_request_price" field.
 func (_c *PricingRuleCreate) SetPerRequestPrice(v string) *PricingRuleCreate {
 	_c.mutation.SetPerRequestPrice(v)
@@ -140,6 +196,40 @@ func (_c *PricingRuleCreate) SetPerRequestPrice(v string) *PricingRuleCreate {
 func (_c *PricingRuleCreate) SetNillablePerRequestPrice(v *string) *PricingRuleCreate {
 	if v != nil {
 		_c.SetPerRequestPrice(*v)
+	}
+	return _c
+}
+
+// SetServiceTierMultipliersJSON sets the "service_tier_multipliers_json" field.
+func (_c *PricingRuleCreate) SetServiceTierMultipliersJSON(v map[string]string) *PricingRuleCreate {
+	_c.mutation.SetServiceTierMultipliersJSON(v)
+	return _c
+}
+
+// SetLongContextThresholdTokens sets the "long_context_threshold_tokens" field.
+func (_c *PricingRuleCreate) SetLongContextThresholdTokens(v int) *PricingRuleCreate {
+	_c.mutation.SetLongContextThresholdTokens(v)
+	return _c
+}
+
+// SetNillableLongContextThresholdTokens sets the "long_context_threshold_tokens" field if the given value is not nil.
+func (_c *PricingRuleCreate) SetNillableLongContextThresholdTokens(v *int) *PricingRuleCreate {
+	if v != nil {
+		_c.SetLongContextThresholdTokens(*v)
+	}
+	return _c
+}
+
+// SetLongContextMultiplier sets the "long_context_multiplier" field.
+func (_c *PricingRuleCreate) SetLongContextMultiplier(v string) *PricingRuleCreate {
+	_c.mutation.SetLongContextMultiplier(v)
+	return _c
+}
+
+// SetNillableLongContextMultiplier sets the "long_context_multiplier" field if the given value is not nil.
+func (_c *PricingRuleCreate) SetNillableLongContextMultiplier(v *string) *PricingRuleCreate {
+	if v != nil {
+		_c.SetLongContextMultiplier(*v)
 	}
 	return _c
 }
@@ -229,6 +319,10 @@ func (_c *PricingRuleCreate) defaults() {
 		v := pricingrule.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.ModelFamily(); !ok {
+		v := pricingrule.DefaultModelFamily
+		_c.mutation.SetModelFamily(v)
+	}
 	if _, ok := _c.mutation.BillingMode(); !ok {
 		v := pricingrule.DefaultBillingMode
 		_c.mutation.SetBillingMode(v)
@@ -249,9 +343,25 @@ func (_c *PricingRuleCreate) defaults() {
 		v := pricingrule.DefaultCacheWritePricePerMillion
 		_c.mutation.SetCacheWritePricePerMillion(v)
 	}
+	if _, ok := _c.mutation.CacheWrite5mPricePerMillion(); !ok {
+		v := pricingrule.DefaultCacheWrite5mPricePerMillion
+		_c.mutation.SetCacheWrite5mPricePerMillion(v)
+	}
+	if _, ok := _c.mutation.CacheWrite1hPricePerMillion(); !ok {
+		v := pricingrule.DefaultCacheWrite1hPricePerMillion
+		_c.mutation.SetCacheWrite1hPricePerMillion(v)
+	}
+	if _, ok := _c.mutation.ImageOutputPricePerMillion(); !ok {
+		v := pricingrule.DefaultImageOutputPricePerMillion
+		_c.mutation.SetImageOutputPricePerMillion(v)
+	}
 	if _, ok := _c.mutation.PerRequestPrice(); !ok {
 		v := pricingrule.DefaultPerRequestPrice
 		_c.mutation.SetPerRequestPrice(v)
+	}
+	if _, ok := _c.mutation.LongContextMultiplier(); !ok {
+		v := pricingrule.DefaultLongContextMultiplier
+		_c.mutation.SetLongContextMultiplier(v)
 	}
 	if _, ok := _c.mutation.Currency(); !ok {
 		v := pricingrule.DefaultCurrency
@@ -269,6 +379,9 @@ func (_c *PricingRuleCreate) check() error {
 	}
 	if _, ok := _c.mutation.ModelID(); !ok {
 		return &ValidationError{Name: "model_id", err: errors.New(`ent: missing required field "PricingRule.model_id"`)}
+	}
+	if _, ok := _c.mutation.ModelFamily(); !ok {
+		return &ValidationError{Name: "model_family", err: errors.New(`ent: missing required field "PricingRule.model_family"`)}
 	}
 	if _, ok := _c.mutation.ProviderID(); !ok {
 		return &ValidationError{Name: "provider_id", err: errors.New(`ent: missing required field "PricingRule.provider_id"`)}
@@ -288,8 +401,20 @@ func (_c *PricingRuleCreate) check() error {
 	if _, ok := _c.mutation.CacheWritePricePerMillion(); !ok {
 		return &ValidationError{Name: "cache_write_price_per_million", err: errors.New(`ent: missing required field "PricingRule.cache_write_price_per_million"`)}
 	}
+	if _, ok := _c.mutation.CacheWrite5mPricePerMillion(); !ok {
+		return &ValidationError{Name: "cache_write_5m_price_per_million", err: errors.New(`ent: missing required field "PricingRule.cache_write_5m_price_per_million"`)}
+	}
+	if _, ok := _c.mutation.CacheWrite1hPricePerMillion(); !ok {
+		return &ValidationError{Name: "cache_write_1h_price_per_million", err: errors.New(`ent: missing required field "PricingRule.cache_write_1h_price_per_million"`)}
+	}
+	if _, ok := _c.mutation.ImageOutputPricePerMillion(); !ok {
+		return &ValidationError{Name: "image_output_price_per_million", err: errors.New(`ent: missing required field "PricingRule.image_output_price_per_million"`)}
+	}
 	if _, ok := _c.mutation.PerRequestPrice(); !ok {
 		return &ValidationError{Name: "per_request_price", err: errors.New(`ent: missing required field "PricingRule.per_request_price"`)}
+	}
+	if _, ok := _c.mutation.LongContextMultiplier(); !ok {
+		return &ValidationError{Name: "long_context_multiplier", err: errors.New(`ent: missing required field "PricingRule.long_context_multiplier"`)}
 	}
 	if _, ok := _c.mutation.Currency(); !ok {
 		return &ValidationError{Name: "currency", err: errors.New(`ent: missing required field "PricingRule.currency"`)}
@@ -332,6 +457,10 @@ func (_c *PricingRuleCreate) createSpec() (*PricingRule, *sqlgraph.CreateSpec) {
 		_spec.SetField(pricingrule.FieldModelID, field.TypeInt, value)
 		_node.ModelID = value
 	}
+	if value, ok := _c.mutation.ModelFamily(); ok {
+		_spec.SetField(pricingrule.FieldModelFamily, field.TypeString, value)
+		_node.ModelFamily = value
+	}
 	if value, ok := _c.mutation.ProviderID(); ok {
 		_spec.SetField(pricingrule.FieldProviderID, field.TypeInt, value)
 		_node.ProviderID = value
@@ -356,9 +485,33 @@ func (_c *PricingRuleCreate) createSpec() (*PricingRule, *sqlgraph.CreateSpec) {
 		_spec.SetField(pricingrule.FieldCacheWritePricePerMillion, field.TypeString, value)
 		_node.CacheWritePricePerMillion = value
 	}
+	if value, ok := _c.mutation.CacheWrite5mPricePerMillion(); ok {
+		_spec.SetField(pricingrule.FieldCacheWrite5mPricePerMillion, field.TypeString, value)
+		_node.CacheWrite5mPricePerMillion = value
+	}
+	if value, ok := _c.mutation.CacheWrite1hPricePerMillion(); ok {
+		_spec.SetField(pricingrule.FieldCacheWrite1hPricePerMillion, field.TypeString, value)
+		_node.CacheWrite1hPricePerMillion = value
+	}
+	if value, ok := _c.mutation.ImageOutputPricePerMillion(); ok {
+		_spec.SetField(pricingrule.FieldImageOutputPricePerMillion, field.TypeString, value)
+		_node.ImageOutputPricePerMillion = value
+	}
 	if value, ok := _c.mutation.PerRequestPrice(); ok {
 		_spec.SetField(pricingrule.FieldPerRequestPrice, field.TypeString, value)
 		_node.PerRequestPrice = value
+	}
+	if value, ok := _c.mutation.ServiceTierMultipliersJSON(); ok {
+		_spec.SetField(pricingrule.FieldServiceTierMultipliersJSON, field.TypeJSON, value)
+		_node.ServiceTierMultipliersJSON = value
+	}
+	if value, ok := _c.mutation.LongContextThresholdTokens(); ok {
+		_spec.SetField(pricingrule.FieldLongContextThresholdTokens, field.TypeInt, value)
+		_node.LongContextThresholdTokens = &value
+	}
+	if value, ok := _c.mutation.LongContextMultiplier(); ok {
+		_spec.SetField(pricingrule.FieldLongContextMultiplier, field.TypeString, value)
+		_node.LongContextMultiplier = value
 	}
 	if value, ok := _c.mutation.Currency(); ok {
 		_spec.SetField(pricingrule.FieldCurrency, field.TypeString, value)

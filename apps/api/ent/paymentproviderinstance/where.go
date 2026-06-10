@@ -99,6 +99,16 @@ func SortOrder(v int) predicate.PaymentProviderInstance {
 	return predicate.PaymentProviderInstance(sql.FieldEQ(FieldSortOrder, v))
 }
 
+// FeeRate applies equality check predicate on the "fee_rate" field. It's identical to FeeRateEQ.
+func FeeRate(v string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldEQ(FieldFeeRate, v))
+}
+
+// Weight applies equality check predicate on the "weight" field. It's identical to WeightEQ.
+func Weight(v int) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldEQ(FieldWeight, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.PaymentProviderInstance {
 	return predicate.PaymentProviderInstance(sql.FieldEQ(FieldCreatedAt, v))
@@ -572,6 +582,111 @@ func SortOrderLT(v int) predicate.PaymentProviderInstance {
 // SortOrderLTE applies the LTE predicate on the "sort_order" field.
 func SortOrderLTE(v int) predicate.PaymentProviderInstance {
 	return predicate.PaymentProviderInstance(sql.FieldLTE(FieldSortOrder, v))
+}
+
+// FeeRateEQ applies the EQ predicate on the "fee_rate" field.
+func FeeRateEQ(v string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldEQ(FieldFeeRate, v))
+}
+
+// FeeRateNEQ applies the NEQ predicate on the "fee_rate" field.
+func FeeRateNEQ(v string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldNEQ(FieldFeeRate, v))
+}
+
+// FeeRateIn applies the In predicate on the "fee_rate" field.
+func FeeRateIn(vs ...string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldIn(FieldFeeRate, vs...))
+}
+
+// FeeRateNotIn applies the NotIn predicate on the "fee_rate" field.
+func FeeRateNotIn(vs ...string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldNotIn(FieldFeeRate, vs...))
+}
+
+// FeeRateGT applies the GT predicate on the "fee_rate" field.
+func FeeRateGT(v string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldGT(FieldFeeRate, v))
+}
+
+// FeeRateGTE applies the GTE predicate on the "fee_rate" field.
+func FeeRateGTE(v string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldGTE(FieldFeeRate, v))
+}
+
+// FeeRateLT applies the LT predicate on the "fee_rate" field.
+func FeeRateLT(v string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldLT(FieldFeeRate, v))
+}
+
+// FeeRateLTE applies the LTE predicate on the "fee_rate" field.
+func FeeRateLTE(v string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldLTE(FieldFeeRate, v))
+}
+
+// FeeRateContains applies the Contains predicate on the "fee_rate" field.
+func FeeRateContains(v string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldContains(FieldFeeRate, v))
+}
+
+// FeeRateHasPrefix applies the HasPrefix predicate on the "fee_rate" field.
+func FeeRateHasPrefix(v string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldHasPrefix(FieldFeeRate, v))
+}
+
+// FeeRateHasSuffix applies the HasSuffix predicate on the "fee_rate" field.
+func FeeRateHasSuffix(v string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldHasSuffix(FieldFeeRate, v))
+}
+
+// FeeRateEqualFold applies the EqualFold predicate on the "fee_rate" field.
+func FeeRateEqualFold(v string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldEqualFold(FieldFeeRate, v))
+}
+
+// FeeRateContainsFold applies the ContainsFold predicate on the "fee_rate" field.
+func FeeRateContainsFold(v string) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldContainsFold(FieldFeeRate, v))
+}
+
+// WeightEQ applies the EQ predicate on the "weight" field.
+func WeightEQ(v int) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldEQ(FieldWeight, v))
+}
+
+// WeightNEQ applies the NEQ predicate on the "weight" field.
+func WeightNEQ(v int) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldNEQ(FieldWeight, v))
+}
+
+// WeightIn applies the In predicate on the "weight" field.
+func WeightIn(vs ...int) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldIn(FieldWeight, vs...))
+}
+
+// WeightNotIn applies the NotIn predicate on the "weight" field.
+func WeightNotIn(vs ...int) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldNotIn(FieldWeight, vs...))
+}
+
+// WeightGT applies the GT predicate on the "weight" field.
+func WeightGT(v int) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldGT(FieldWeight, v))
+}
+
+// WeightGTE applies the GTE predicate on the "weight" field.
+func WeightGTE(v int) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldGTE(FieldWeight, v))
+}
+
+// WeightLT applies the LT predicate on the "weight" field.
+func WeightLT(v int) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldLT(FieldWeight, v))
+}
+
+// WeightLTE applies the LTE predicate on the "weight" field.
+func WeightLTE(v int) predicate.PaymentProviderInstance {
+	return predicate.PaymentProviderInstance(sql.FieldLTE(FieldWeight, v))
 }
 
 // MetadataJSONIsNil applies the IsNil predicate on the "metadata_json" field.

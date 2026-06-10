@@ -89,6 +89,18 @@ export type Role = {
     updated_at: Timestamp;
 };
 
+export type PermissionDefinition = {
+    permission: string;
+    resource: string;
+    action: 'read' | 'write';
+    description: string;
+};
+
+export type PermissionCatalogResponse = {
+    data: Array<PermissionDefinition>;
+    request_id: RequestId;
+};
+
 export type CreateRoleRequest = {
     name: UserRole;
     description?: string;
@@ -457,6 +469,41 @@ export type RegisterRequest = {
     email: string;
     name: string;
     password: string;
+    /**
+     * Optional affiliate invite code to bind to the new account.
+     */
+    invite_code?: string;
+    /**
+     * Current-user attribute values required at registration when enabled definitions are marked required.
+     */
+    attributes?: Array<UserAttributeValueInput>;
+};
+
+export type PasswordlessRequest = {
+    email: string;
+    name?: string;
+    invite_code?: string;
+    attributes?: Array<UserAttributeValueInput>;
+};
+
+export type PasswordlessLoginRequest = {
+    token: string;
+};
+
+export type SiteConfig = {
+    site_name: string;
+    logo_url: string;
+    version_label: string;
+    custom_menus: Array<{
+        [key: string]: unknown;
+    }>;
+    user_agreement: string;
+    privacy_policy: string;
+};
+
+export type SiteConfigResponse = {
+    data: SiteConfig;
+    request_id: RequestId;
 };
 
 export type SetupStatus = {
@@ -856,7 +903,7 @@ export type ApiKeyResponse = {
 
 export type PaymentProviderStatus = 'active' | 'disabled' | 'archived';
 
-export type PaymentOrderStatus = 'pending' | 'paid' | 'fulfilled' | 'partially_refunded' | 'refunded' | 'expired' | 'canceled' | 'failed';
+export type PaymentOrderStatus = 'pending' | 'paid' | 'fulfilled' | 'partially_refunded' | 'refunding' | 'refunded' | 'refund_failed' | 'expired' | 'canceled' | 'failed';
 
 export type PaymentProductType = 'balance_credit' | 'subscription_plan';
 
@@ -883,6 +930,14 @@ export type PaymentProviderInstance = {
     supported_methods: Array<string>;
     limits: JsonObject;
     sort_order: number;
+    /**
+     * Decimal payment-channel fee rate added to the payable amount.
+     */
+    fee_rate: string;
+    /**
+     * Relative round-robin selection weight.
+     */
+    weight: number;
     metadata: JsonObject;
     created_at: Timestamp;
     updated_at: Timestamp;
@@ -896,6 +951,8 @@ export type CreatePaymentProviderInstanceRequest = {
     supported_methods?: Array<string>;
     limits?: JsonObject;
     sort_order?: number;
+    fee_rate?: string;
+    weight?: number;
     metadata?: JsonObject;
 };
 
@@ -906,6 +963,8 @@ export type UpdatePaymentProviderInstanceRequest = {
     supported_methods?: Array<string>;
     limits?: JsonObject;
     sort_order?: number;
+    fee_rate?: string;
+    weight?: number;
     metadata?: JsonObject;
 };
 
@@ -927,6 +986,8 @@ export type PaymentOrder = {
     provider_instance_id: Id;
     original_amount: string;
     discount_amount: string;
+    fee_amount: string;
+    payable_amount: string;
     promo_code_id?: Id;
     amount: string;
     currency: string;
@@ -951,6 +1012,14 @@ export type CreatePaymentOrderRequest = {
     product_id?: string;
     promo_code?: string;
     expires_at?: string;
+    /**
+     * WeChat JSAPI payer OpenID. Prefer this typed field over metadata.
+     */
+    payer_openid?: string;
+    /**
+     * Payer client IP for WeChat H5/native scene info. Defaults from request headers when omitted.
+     */
+    payer_client_ip?: string;
     metadata?: JsonObject;
 };
 
@@ -961,6 +1030,23 @@ export type PaymentOrderResponse = {
 
 export type PaymentOrderListResponse = {
     data: Array<PaymentOrder>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type PaymentAuditLog = {
+    id: Id;
+    order_id: Id;
+    provider_instance_id: Id;
+    event_type: string;
+    idempotency_key: string;
+    payload: JsonObject;
+    signature_valid: boolean;
+    created_at: Timestamp;
+};
+
+export type PaymentAuditLogListResponse = {
+    data: Array<PaymentAuditLog>;
     pagination: Pagination;
     request_id: RequestId;
 };
@@ -1118,7 +1204,15 @@ export type PricingRule = {
     output_price_per_million_tokens: string;
     cache_read_price_per_million_tokens: string;
     cache_write_price_per_million_tokens: string;
+    cache_write_5m_price_per_million_tokens?: string;
+    cache_write_1h_price_per_million_tokens?: string;
+    image_output_price_per_million_tokens?: string;
     per_request_price: string;
+    service_tier_multipliers?: {
+        [key: string]: string;
+    };
+    long_context_threshold_tokens?: number | null;
+    long_context_multiplier?: string;
     intervals: Array<PricingInterval>;
     currency: string;
     effective_from?: string | null;
@@ -1135,7 +1229,15 @@ export type CreatePricingRuleRequest = {
     output_price_per_million_tokens: string;
     cache_read_price_per_million_tokens: string;
     cache_write_price_per_million_tokens: string;
+    cache_write_5m_price_per_million_tokens?: string;
+    cache_write_1h_price_per_million_tokens?: string;
+    image_output_price_per_million_tokens?: string;
     per_request_price?: string;
+    service_tier_multipliers?: {
+        [key: string]: string;
+    };
+    long_context_threshold_tokens?: number | null;
+    long_context_multiplier?: string;
     intervals?: Array<PricingIntervalInput>;
     currency: string;
     effective_from?: string | null;
@@ -1148,7 +1250,15 @@ export type UpdatePricingRuleRequest = {
     output_price_per_million_tokens?: string;
     cache_read_price_per_million_tokens?: string;
     cache_write_price_per_million_tokens?: string;
+    cache_write_5m_price_per_million_tokens?: string;
+    cache_write_1h_price_per_million_tokens?: string;
+    image_output_price_per_million_tokens?: string;
     per_request_price?: string;
+    service_tier_multipliers?: {
+        [key: string]: string;
+    };
+    long_context_threshold_tokens?: number | null;
+    long_context_multiplier?: string;
     intervals?: Array<PricingIntervalInput>;
     currency?: string;
     effective_from?: string | null;
@@ -1411,7 +1521,7 @@ export type ModelProviderMappingListResponse = {
     request_id: RequestId;
 };
 
-export type RuntimeClass = 'api_key' | 'oauth_refresh' | 'oauth_device_code' | 'web_session_cookie' | 'desktop_client_token' | 'cli_client_token' | 'ide_plugin_token' | 'service_account_json' | 'custom_reverse_proxy';
+export type RuntimeClass = 'api_key' | 'oauth_refresh' | 'oauth_device_code' | 'web_session_cookie' | 'cli_client_token' | 'custom_reverse_proxy';
 
 /**
  * Upstream protocol/platform family a provider preset belongs to.
@@ -1507,6 +1617,7 @@ export type CreateProviderAccountRequest = {
     status?: ProviderAccountStatus;
     priority?: number;
     weight?: number;
+    risk_level?: 'normal' | 'medium' | 'high';
     metadata?: JsonObject;
 };
 
@@ -1518,6 +1629,7 @@ export type UpdateProviderAccountRequest = {
     status?: ProviderAccountStatus;
     priority?: number;
     weight?: number;
+    risk_level?: 'normal' | 'medium' | 'high';
     metadata?: JsonObject;
 };
 
@@ -1581,6 +1693,7 @@ export type ProviderAccountExportItem = {
     priority: number;
     weight: number;
     metadata?: JsonObject;
+    risk_level?: 'normal' | 'medium' | 'high';
     group_ids?: Array<Id>;
     /**
      * Always false for this endpoint; credentials are never exported.
@@ -1600,6 +1713,7 @@ export type ProviderAccountImportItem = {
     upstream_client?: string | null;
     proxy_id?: string | null;
     status?: ProviderAccountStatus;
+    risk_level?: 'normal' | 'medium' | 'high';
     priority?: number;
     weight?: number;
     metadata?: JsonObject;
@@ -1909,6 +2023,10 @@ export type AdminOverview = {
     total_request_count: number;
     total_token_count: number;
     total_cost: string;
+    input_cost?: string;
+    output_cost?: string;
+    cache_read_cost?: string;
+    cache_write_cost?: string;
     currency: string;
 };
 
@@ -2873,6 +2991,23 @@ export type CaptchaConfigResponse = {
     request_id: RequestId;
 };
 
+export type CaptchaSettings = {
+    /**
+     * When true, admin settings override environment captcha config.
+     */
+    managed: boolean;
+    enabled: boolean;
+    provider: 'turnstile' | 'hcaptcha' | 'recaptcha';
+    site_key: string;
+    readonly secret_key_configured: boolean;
+    verify_url: string;
+};
+
+export type CaptchaSettingsResponse = {
+    data: CaptchaSettings;
+    request_id: RequestId;
+};
+
 export type RedeemCodeStatus = 'active' | 'redeemed' | 'disabled' | 'expired';
 
 export type RedeemCodeType = 'balance' | 'subscription';
@@ -2990,6 +3125,14 @@ export type PromoCode = {
     discount_value: string;
     currency: string;
     max_uses: number;
+    /**
+     * Maximum active uses per user. Zero means no per-user limit.
+     */
+    per_user_limit: number;
+    /**
+     * Minimum original order amount required before the discount applies. Blank means no minimum.
+     */
+    min_order_amount: string;
     used_count: number;
     starts_at?: Timestamp;
     expires_at?: Timestamp;
@@ -3003,6 +3146,14 @@ export type CreatePromoCodeRequest = {
     discount_value: string;
     currency?: string;
     max_uses?: number;
+    /**
+     * Maximum active uses per user. Zero means no per-user limit.
+     */
+    per_user_limit?: number;
+    /**
+     * Minimum original order amount required before the discount applies. Omit for no minimum.
+     */
+    min_order_amount?: string;
     status?: PromoCodeStatus;
     starts_at?: Timestamp;
     expires_at?: Timestamp;
@@ -3086,6 +3237,27 @@ export type RiskControlLogListResponse = {
     request_id: RequestId;
 };
 
+export type ContentSafetyMode = 'monitor' | 'enforce';
+
+export type ContentSafetyConfig = {
+    enabled: boolean;
+    mode: ContentSafetyMode;
+    redact_pii: boolean;
+    block_pii: boolean;
+    block_prompt_injection: boolean;
+    block_custom_keywords: boolean;
+    custom_keywords: Array<string>;
+    /**
+     * Canonical model names or prefix scopes ending in '*'. Empty means all models.
+     */
+    model_scopes: Array<string>;
+};
+
+export type ContentSafetyConfigResponse = {
+    data: ContentSafetyConfig;
+    request_id: RequestId;
+};
+
 export type UsageAggregateDimension = 'day' | 'model' | 'user' | 'account';
 
 export type UsageAggregate = {
@@ -3099,6 +3271,10 @@ export type UsageAggregate = {
     cached_tokens: number;
     total_tokens: number;
     total_cost: string;
+    input_cost?: string;
+    output_cost?: string;
+    cache_read_cost?: string;
+    cache_write_cost?: string;
     currency: string;
 };
 
@@ -3253,9 +3429,97 @@ export type BillingLedgerListResponse = {
 
 export type AffiliateRelationshipStatus = 'active' | 'disabled';
 
-export type AffiliateLedgerEntryType = 'accrue' | 'settle' | 'transfer_to_balance' | 'withdraw' | 'refund_compensation' | 'manual_adjustment';
+export type AffiliateLedgerEntryType = 'accrue' | 'transfer_to_balance' | 'withdraw' | 'refund_compensation' | 'manual_adjustment';
 
 export type AffiliateLedgerEntryStatus = 'pending' | 'settled' | 'canceled' | 'compensated';
+
+export type AffiliateInviteCodeStatus = 'active' | 'disabled' | 'expired';
+
+export type AffiliateRuleStatus = 'active' | 'disabled' | 'archived';
+
+export type AffiliateRuleTriggerType = 'payment_paid';
+
+export type AffiliateInviteCode = {
+    id: Id;
+    user_id: Id;
+    code: string;
+    status: AffiliateInviteCodeStatus;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+    expires_at?: string | null;
+};
+
+export type CreateAffiliateInviteCodeRequest = {
+    /**
+     * Optional custom code. When omitted, SRapi generates one.
+     */
+    code?: string;
+    expires_at?: string | null;
+};
+
+export type AffiliateInviteCodeResponse = {
+    data: AffiliateInviteCode;
+    request_id: RequestId;
+};
+
+export type AffiliateInviteCodeListResponse = {
+    data: Array<AffiliateInviteCode>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type AffiliateRule = {
+    id: Id;
+    name: string;
+    status: AffiliateRuleStatus;
+    trigger_type: AffiliateRuleTriggerType;
+    rate: string;
+    fixed_amount: string;
+    currency: string;
+    max_rebate_amount: string;
+    valid_from?: string | null;
+    valid_to?: string | null;
+    metadata: JsonObject;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreateAffiliateRuleRequest = {
+    name: string;
+    status?: AffiliateRuleStatus;
+    trigger_type: AffiliateRuleTriggerType;
+    rate?: string;
+    fixed_amount?: string;
+    currency?: string;
+    max_rebate_amount?: string;
+    valid_from?: string | null;
+    valid_to?: string | null;
+    metadata?: JsonObject;
+};
+
+export type UpdateAffiliateRuleRequest = {
+    name?: string;
+    status?: AffiliateRuleStatus;
+    trigger_type?: AffiliateRuleTriggerType;
+    rate?: string;
+    fixed_amount?: string;
+    currency?: string;
+    max_rebate_amount?: string;
+    valid_from?: string | null;
+    valid_to?: string | null;
+    metadata?: JsonObject;
+};
+
+export type AffiliateRuleResponse = {
+    data: AffiliateRule;
+    request_id: RequestId;
+};
+
+export type AffiliateRuleListResponse = {
+    data: Array<AffiliateRule>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
 
 export type AffiliateInviteRecord = {
     id: Id;
@@ -3297,6 +3561,11 @@ export type AffiliateLedgerEntryListResponse = {
     request_id: RequestId;
 };
 
+export type AffiliateLedgerEntryResponse = {
+    data: AffiliateLedgerEntry;
+    request_id: RequestId;
+};
+
 export type AffiliateCurrencySummary = {
     currency: string;
     /**
@@ -3306,7 +3575,6 @@ export type AffiliateCurrencySummary = {
     accrued_amount: string;
     refund_compensated_amount: string;
     transferred_to_balance_amount: string;
-    settled_amount: string;
     withdrawn_amount: string;
     manual_adjustment_amount: string;
 };
@@ -3314,6 +3582,8 @@ export type AffiliateCurrencySummary = {
 export type AffiliateSummary = {
     user_id: Id;
     balances: Array<AffiliateCurrencySummary>;
+    invite_codes: Array<AffiliateInviteCode>;
+    invited_count: number;
 };
 
 export type AffiliateSummaryResponse = {
@@ -3327,6 +3597,40 @@ export type AffiliateTransferToBalanceRequest = {
      */
     amount: string;
     currency?: string;
+};
+
+export type AffiliateWithdrawalRequest = {
+    /**
+     * Decimal string amount to withdraw from affiliate balance.
+     */
+    amount: string;
+    currency?: string;
+    /**
+     * Optional withdrawal destination label or account reference.
+     */
+    destination?: string;
+};
+
+export type AdminAffiliateWithdrawalDecisionRequest = {
+    /**
+     * Optional admin note recorded on the withdrawal ledger metadata.
+     */
+    reason?: string;
+};
+
+export type AdminAffiliateManualAdjustmentRequest = {
+    user_id: Id;
+    /**
+     * Decimal string amount to adjust. Positive credits balance; negative debits balance.
+     */
+    amount: string;
+    currency?: string;
+    reason: string;
+    /**
+     * Optional admin-supplied idempotency reference.
+     */
+    reference_id?: string;
+    metadata?: JsonObject;
 };
 
 export type AffiliateTransferToBalanceResult = {
@@ -3706,11 +4010,23 @@ export type SchedulerStrategy = {
     id: Id;
     name: SchedulerStrategyName;
     version: string;
-    status: 'active' | 'draft' | 'deprecated';
+    status: SchedulerStrategyStatus;
+    scope_type: SchedulerStrategyScopeType;
+    scope_id?: Id;
+    description?: string;
     config_hash: string;
     config: JsonObject;
+    weights: SchedulerStrategyWeights;
+    source: 'seed' | 'database';
+    created_by?: Id;
     created_at: Timestamp;
     activated_at?: string | null;
+    deprecated_at?: string | null;
+};
+
+export type SchedulerStrategyResponse = {
+    data: SchedulerStrategy;
+    request_id: RequestId;
 };
 
 export type SchedulerStrategyListResponse = {
@@ -3720,6 +4036,25 @@ export type SchedulerStrategyListResponse = {
 };
 
 export type SchedulerStrategyName = 'balanced' | 'cost_saver' | 'latency_first' | 'quota_protect' | 'sticky_first' | 'cache_affinity_first' | 'premium_quality';
+
+export type SchedulerStrategyStatus = 'active' | 'draft' | 'deprecated';
+
+export type SchedulerStrategyScopeType = 'global' | 'api_key' | 'account_group' | 'user';
+
+export type SchedulerStrategyWeights = {
+    [key: string]: number;
+};
+
+export type SchedulerStrategyMutationRequest = {
+    name: SchedulerStrategyName;
+    version: string;
+    status: SchedulerStrategyStatus;
+    scope_type: SchedulerStrategyScopeType;
+    scope_id?: Id;
+    description?: string;
+    config?: JsonObject;
+    weights: SchedulerStrategyWeights;
+};
 
 export type SchedulerSimulationStickyStrength = 'none' | 'soft' | 'hard';
 
@@ -3977,6 +4312,10 @@ export type GatewayUsageTotals = {
     cached_tokens: number;
     total_tokens: number;
     cost: string;
+    input_cost?: string;
+    output_cost?: string;
+    cache_read_cost?: string;
+    cache_write_cost?: string;
     currency: string;
 };
 
@@ -4830,6 +5169,7 @@ export type ScheduledTestPlan = {
     scope_id?: number | null;
     interval_seconds: number;
     cron_expression: string;
+    probe_model: string;
     max_results: number;
     auto_recover: boolean;
     last_run_at?: string | null;
@@ -4846,6 +5186,7 @@ export type CreateScheduledTestPlanRequest = {
     scope_id?: number | null;
     interval_seconds?: number;
     cron_expression?: string;
+    probe_model?: string;
     max_results?: number;
     auto_recover?: boolean;
 };
@@ -4857,6 +5198,7 @@ export type UpdateScheduledTestPlanRequest = {
     scope_id?: number | null;
     interval_seconds?: number;
     cron_expression?: string;
+    probe_model?: string;
     max_results?: number;
     auto_recover?: boolean;
 };
@@ -5072,12 +5414,23 @@ export type UserAttributeValue = {
     key: string;
     name: string;
     data_type: string;
+    options: Array<string>;
+    required: boolean;
     value: string;
     updated_at?: string;
 };
 
 export type SetUserAttributeValueRequest = {
     value?: string;
+};
+
+export type UserAttributeValueInput = {
+    definition_id: number;
+    value: string;
+};
+
+export type UpdateCurrentUserAttributesRequest = {
+    values: Array<UserAttributeValueInput>;
 };
 
 export type UserAttributeDefinitionResponse = {
@@ -5269,6 +5622,7 @@ export type CreateProviderAccountRequestWritable = {
     status?: ProviderAccountStatus;
     priority?: number;
     weight?: number;
+    risk_level?: 'normal' | 'medium' | 'high';
     metadata?: JsonObject;
 };
 
@@ -5286,6 +5640,7 @@ export type UpdateProviderAccountRequestWritable = {
     status?: ProviderAccountStatus;
     priority?: number;
     weight?: number;
+    risk_level?: 'normal' | 'medium' | 'high';
     metadata?: JsonObject;
 };
 
@@ -5324,6 +5679,7 @@ export type ProviderAccountImportItemWritable = {
     };
     proxy_id?: string | null;
     status?: ProviderAccountStatus;
+    risk_level?: 'normal' | 'medium' | 'high';
     priority?: number;
     weight?: number;
     metadata?: JsonObject;
@@ -5423,6 +5779,23 @@ export type AdminSettingsCopilotWritable = {
 
 export type AdminSettingsResponseWritable = {
     data: AdminSettingsWritable;
+    request_id: RequestId;
+};
+
+export type CaptchaSettingsWritable = {
+    /**
+     * When true, admin settings override environment captcha config.
+     */
+    managed: boolean;
+    enabled: boolean;
+    provider: 'turnstile' | 'hcaptcha' | 'recaptcha';
+    site_key: string;
+    secret_key?: string;
+    verify_url: string;
+};
+
+export type CaptchaSettingsResponseWritable = {
+    data: CaptchaSettingsWritable;
     request_id: RequestId;
 };
 
@@ -5530,6 +5903,31 @@ export type Bucket = 'hour' | 'day';
  */
 export type GeminiModel = string;
 
+export type GetSiteConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/site-config';
+};
+
+export type GetSiteConfigErrors = {
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetSiteConfigError = GetSiteConfigErrors[keyof GetSiteConfigErrors];
+
+export type GetSiteConfigResponses = {
+    /**
+     * Public site configuration.
+     */
+    200: SiteConfigResponse;
+};
+
+export type GetSiteConfigResponse = GetSiteConfigResponses[keyof GetSiteConfigResponses];
+
 export type GetHealthData = {
     body?: never;
     path?: never;
@@ -5628,6 +6026,31 @@ export type RegisterResponses = {
 };
 
 export type RegisterResponse = RegisterResponses[keyof RegisterResponses];
+
+export type ListRegistrationAttributesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/registration-attributes';
+};
+
+export type ListRegistrationAttributesErrors = {
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListRegistrationAttributesError = ListRegistrationAttributesErrors[keyof ListRegistrationAttributesErrors];
+
+export type ListRegistrationAttributesResponses = {
+    /**
+     * Registration attributes.
+     */
+    200: UserAttributeValueListResponse;
+};
+
+export type ListRegistrationAttributesResponse = ListRegistrationAttributesResponses[keyof ListRegistrationAttributesResponses];
 
 export type GetSetupStatusData = {
     body?: never;
@@ -6252,6 +6675,76 @@ export type ConfirmEmailVerificationResponses = {
 
 export type ConfirmEmailVerificationResponse = ConfirmEmailVerificationResponses[keyof ConfirmEmailVerificationResponses];
 
+export type RequestPasswordlessLoginData = {
+    body: PasswordlessRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/passwordless/request';
+};
+
+export type RequestPasswordlessLoginErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RequestPasswordlessLoginError = RequestPasswordlessLoginErrors[keyof RequestPasswordlessLoginErrors];
+
+export type RequestPasswordlessLoginResponses = {
+    /**
+     * Passwordless request accepted without exposing account discovery.
+     */
+    202: EmailVerificationAcceptedResponse;
+};
+
+export type RequestPasswordlessLoginResponse = RequestPasswordlessLoginResponses[keyof RequestPasswordlessLoginResponses];
+
+export type CompletePasswordlessLoginData = {
+    body: PasswordlessLoginRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/passwordless/login';
+};
+
+export type CompletePasswordlessLoginErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CompletePasswordlessLoginError = CompletePasswordlessLoginErrors[keyof CompletePasswordlessLoginErrors];
+
+export type CompletePasswordlessLoginResponses = {
+    /**
+     * Login succeeded and session cookie was set.
+     */
+    200: LoginResponse;
+};
+
+export type CompletePasswordlessLoginResponse = CompletePasswordlessLoginResponses[keyof CompletePasswordlessLoginResponses];
+
 export type LoginTwoFactorData = {
     body: LoginTwoFactorRequest;
     path?: never;
@@ -6376,6 +6869,39 @@ export type UnsubscribeNotificationEmailResponses = {
 
 export type UnsubscribeNotificationEmailResponse = UnsubscribeNotificationEmailResponses[keyof UnsubscribeNotificationEmailResponses];
 
+export type DeleteCurrentUserData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me';
+};
+
+export type DeleteCurrentUserErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteCurrentUserError = DeleteCurrentUserErrors[keyof DeleteCurrentUserErrors];
+
+export type DeleteCurrentUserResponses = {
+    /**
+     * Current user deleted and console session cleared.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteCurrentUserResponse = DeleteCurrentUserResponses[keyof DeleteCurrentUserResponses];
+
 export type GetCurrentUserData = {
     body?: never;
     path?: never;
@@ -6441,6 +6967,72 @@ export type UpdateCurrentUserProfileResponses = {
 };
 
 export type UpdateCurrentUserProfileResponse = UpdateCurrentUserProfileResponses[keyof UpdateCurrentUserProfileResponses];
+
+export type ListCurrentUserAttributesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/attributes';
+};
+
+export type ListCurrentUserAttributesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListCurrentUserAttributesError = ListCurrentUserAttributesErrors[keyof ListCurrentUserAttributesErrors];
+
+export type ListCurrentUserAttributesResponses = {
+    /**
+     * Current user attributes.
+     */
+    200: UserAttributeValueListResponse;
+};
+
+export type ListCurrentUserAttributesResponse = ListCurrentUserAttributesResponses[keyof ListCurrentUserAttributesResponses];
+
+export type UpdateCurrentUserAttributesData = {
+    body: UpdateCurrentUserAttributesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/attributes';
+};
+
+export type UpdateCurrentUserAttributesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateCurrentUserAttributesError = UpdateCurrentUserAttributesErrors[keyof UpdateCurrentUserAttributesErrors];
+
+export type UpdateCurrentUserAttributesResponses = {
+    /**
+     * Updated current user attributes.
+     */
+    200: UserAttributeValueListResponse;
+};
+
+export type UpdateCurrentUserAttributesResponse = UpdateCurrentUserAttributesResponses[keyof UpdateCurrentUserAttributesResponses];
 
 export type ListCurrentUserAuthIdentitiesData = {
     body?: never;
@@ -7390,6 +7982,76 @@ export type GetCurrentUserAffiliateResponses = {
 };
 
 export type GetCurrentUserAffiliateResponse = GetCurrentUserAffiliateResponses[keyof GetCurrentUserAffiliateResponses];
+
+export type ListCurrentUserAffiliateInviteCodesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/affiliate/invite-codes';
+};
+
+export type ListCurrentUserAffiliateInviteCodesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListCurrentUserAffiliateInviteCodesError = ListCurrentUserAffiliateInviteCodesErrors[keyof ListCurrentUserAffiliateInviteCodesErrors];
+
+export type ListCurrentUserAffiliateInviteCodesResponses = {
+    /**
+     * Current user affiliate invite codes.
+     */
+    200: AffiliateInviteCodeListResponse;
+};
+
+export type ListCurrentUserAffiliateInviteCodesResponse = ListCurrentUserAffiliateInviteCodesResponses[keyof ListCurrentUserAffiliateInviteCodesResponses];
+
+export type CreateCurrentUserAffiliateInviteCodeData = {
+    body?: CreateAffiliateInviteCodeRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/affiliate/invite-codes';
+};
+
+export type CreateCurrentUserAffiliateInviteCodeErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateCurrentUserAffiliateInviteCodeError = CreateCurrentUserAffiliateInviteCodeErrors[keyof CreateCurrentUserAffiliateInviteCodeErrors];
+
+export type CreateCurrentUserAffiliateInviteCodeResponses = {
+    /**
+     * Affiliate invite code created.
+     */
+    201: AffiliateInviteCodeResponse;
+};
+
+export type CreateCurrentUserAffiliateInviteCodeResponse = CreateCurrentUserAffiliateInviteCodeResponses[keyof CreateCurrentUserAffiliateInviteCodeResponses];
 
 export type ListCurrentUserAffiliateLedgerData = {
     body?: never;
@@ -8357,6 +9019,39 @@ export type CreateAdminRoleResponses = {
 };
 
 export type CreateAdminRoleResponse = CreateAdminRoleResponses[keyof CreateAdminRoleResponses];
+
+export type GetAdminPermissionCatalogData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/permission-catalog';
+};
+
+export type GetAdminPermissionCatalogErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminPermissionCatalogError = GetAdminPermissionCatalogErrors[keyof GetAdminPermissionCatalogErrors];
+
+export type GetAdminPermissionCatalogResponses = {
+    /**
+     * Permission catalog.
+     */
+    200: PermissionCatalogResponse;
+};
+
+export type GetAdminPermissionCatalogResponse = GetAdminPermissionCatalogResponses[keyof GetAdminPermissionCatalogResponses];
 
 export type DeleteAdminRoleData = {
     body?: never;
@@ -11213,6 +11908,53 @@ export type ListAdminBillingLedgerResponses = {
 
 export type ListAdminBillingLedgerResponse = ListAdminBillingLedgerResponses[keyof ListAdminBillingLedgerResponses];
 
+export type RequestCurrentUserAffiliateWithdrawalData = {
+    body: AffiliateWithdrawalRequest;
+    headers: {
+        /**
+         * Idempotency key for financial write operations.
+         */
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/affiliate/withdrawals';
+};
+
+export type RequestCurrentUserAffiliateWithdrawalErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RequestCurrentUserAffiliateWithdrawalError = RequestCurrentUserAffiliateWithdrawalErrors[keyof RequestCurrentUserAffiliateWithdrawalErrors];
+
+export type RequestCurrentUserAffiliateWithdrawalResponses = {
+    /**
+     * Pending affiliate withdrawal ledger created.
+     */
+    201: AffiliateLedgerEntryResponse;
+};
+
+export type RequestCurrentUserAffiliateWithdrawalResponse = RequestCurrentUserAffiliateWithdrawalResponses[keyof RequestCurrentUserAffiliateWithdrawalResponses];
+
 export type ListAdminAffiliateInvitesData = {
     body?: never;
     path?: never;
@@ -11322,6 +12064,257 @@ export type ListAdminAffiliateTransfersResponses = {
 };
 
 export type ListAdminAffiliateTransfersResponse = ListAdminAffiliateTransfersResponses[keyof ListAdminAffiliateTransfersResponses];
+
+export type CreateAdminAffiliateManualAdjustmentData = {
+    body: AdminAffiliateManualAdjustmentRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/affiliates/manual-adjustments';
+};
+
+export type CreateAdminAffiliateManualAdjustmentErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminAffiliateManualAdjustmentError = CreateAdminAffiliateManualAdjustmentErrors[keyof CreateAdminAffiliateManualAdjustmentErrors];
+
+export type CreateAdminAffiliateManualAdjustmentResponses = {
+    /**
+     * Affiliate manual adjustment ledger created.
+     */
+    201: AffiliateLedgerEntryResponse;
+};
+
+export type CreateAdminAffiliateManualAdjustmentResponse = CreateAdminAffiliateManualAdjustmentResponses[keyof CreateAdminAffiliateManualAdjustmentResponses];
+
+export type ApproveAdminAffiliateWithdrawalData = {
+    body: AdminAffiliateWithdrawalDecisionRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/affiliates/withdrawals/{id}/approve';
+};
+
+export type ApproveAdminAffiliateWithdrawalErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ApproveAdminAffiliateWithdrawalError = ApproveAdminAffiliateWithdrawalErrors[keyof ApproveAdminAffiliateWithdrawalErrors];
+
+export type ApproveAdminAffiliateWithdrawalResponses = {
+    /**
+     * Affiliate withdrawal approved.
+     */
+    200: AffiliateLedgerEntryResponse;
+};
+
+export type ApproveAdminAffiliateWithdrawalResponse = ApproveAdminAffiliateWithdrawalResponses[keyof ApproveAdminAffiliateWithdrawalResponses];
+
+export type CancelAdminAffiliateWithdrawalData = {
+    body: AdminAffiliateWithdrawalDecisionRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/affiliates/withdrawals/{id}/cancel';
+};
+
+export type CancelAdminAffiliateWithdrawalErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CancelAdminAffiliateWithdrawalError = CancelAdminAffiliateWithdrawalErrors[keyof CancelAdminAffiliateWithdrawalErrors];
+
+export type CancelAdminAffiliateWithdrawalResponses = {
+    /**
+     * Affiliate withdrawal canceled.
+     */
+    200: AffiliateLedgerEntryResponse;
+};
+
+export type CancelAdminAffiliateWithdrawalResponse = CancelAdminAffiliateWithdrawalResponses[keyof CancelAdminAffiliateWithdrawalResponses];
+
+export type ListAdminAffiliateRulesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/admin/affiliate-rules';
+};
+
+export type ListAdminAffiliateRulesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminAffiliateRulesError = ListAdminAffiliateRulesErrors[keyof ListAdminAffiliateRulesErrors];
+
+export type ListAdminAffiliateRulesResponses = {
+    /**
+     * Affiliate rule list.
+     */
+    200: AffiliateRuleListResponse;
+};
+
+export type ListAdminAffiliateRulesResponse = ListAdminAffiliateRulesResponses[keyof ListAdminAffiliateRulesResponses];
+
+export type CreateAdminAffiliateRuleData = {
+    body: CreateAffiliateRuleRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/affiliate-rules';
+};
+
+export type CreateAdminAffiliateRuleErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminAffiliateRuleError = CreateAdminAffiliateRuleErrors[keyof CreateAdminAffiliateRuleErrors];
+
+export type CreateAdminAffiliateRuleResponses = {
+    /**
+     * Affiliate rule created.
+     */
+    201: AffiliateRuleResponse;
+};
+
+export type CreateAdminAffiliateRuleResponse = CreateAdminAffiliateRuleResponses[keyof CreateAdminAffiliateRuleResponses];
+
+export type UpdateAdminAffiliateRuleData = {
+    body: UpdateAffiliateRuleRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/affiliate-rules/{id}';
+};
+
+export type UpdateAdminAffiliateRuleErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminAffiliateRuleError = UpdateAdminAffiliateRuleErrors[keyof UpdateAdminAffiliateRuleErrors];
+
+export type UpdateAdminAffiliateRuleResponses = {
+    /**
+     * Affiliate rule updated.
+     */
+    200: AffiliateRuleResponse;
+};
+
+export type UpdateAdminAffiliateRuleResponse = UpdateAdminAffiliateRuleResponses[keyof UpdateAdminAffiliateRuleResponses];
 
 export type ListAdminPaymentProvidersData = {
     body?: never;
@@ -11601,6 +12594,45 @@ export type RefundAdminPaymentOrderResponses = {
 };
 
 export type RefundAdminPaymentOrderResponse = RefundAdminPaymentOrderResponses[keyof RefundAdminPaymentOrderResponses];
+
+export type ListAdminPaymentOrderAuditLogsData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/payment-orders/{id}/audit-logs';
+};
+
+export type ListAdminPaymentOrderAuditLogsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminPaymentOrderAuditLogsError = ListAdminPaymentOrderAuditLogsErrors[keyof ListAdminPaymentOrderAuditLogsErrors];
+
+export type ListAdminPaymentOrderAuditLogsResponses = {
+    /**
+     * Payment order audit timeline.
+     */
+    200: PaymentAuditLogListResponse;
+};
+
+export type ListAdminPaymentOrderAuditLogsResponse = ListAdminPaymentOrderAuditLogsResponses[keyof ListAdminPaymentOrderAuditLogsResponses];
 
 export type ListAdminSubscriptionPlansData = {
     body?: never;
@@ -13114,6 +14146,68 @@ export type UpdateAdminSettingsResponses = {
 
 export type UpdateAdminSettingsResponse = UpdateAdminSettingsResponses[keyof UpdateAdminSettingsResponses];
 
+export type GetAdminCaptchaSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/settings/captcha';
+};
+
+export type GetAdminCaptchaSettingsErrors = {
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminCaptchaSettingsError = GetAdminCaptchaSettingsErrors[keyof GetAdminCaptchaSettingsErrors];
+
+export type GetAdminCaptchaSettingsResponses = {
+    /**
+     * Captcha settings.
+     */
+    200: CaptchaSettingsResponse;
+};
+
+export type GetAdminCaptchaSettingsResponse = GetAdminCaptchaSettingsResponses[keyof GetAdminCaptchaSettingsResponses];
+
+export type UpdateAdminCaptchaSettingsData = {
+    body: CaptchaSettingsWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/settings/captcha';
+};
+
+export type UpdateAdminCaptchaSettingsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminCaptchaSettingsError = UpdateAdminCaptchaSettingsErrors[keyof UpdateAdminCaptchaSettingsErrors];
+
+export type UpdateAdminCaptchaSettingsResponses = {
+    /**
+     * Captcha settings updated.
+     */
+    200: CaptchaSettingsResponse;
+};
+
+export type UpdateAdminCaptchaSettingsResponse = UpdateAdminCaptchaSettingsResponses[keyof UpdateAdminCaptchaSettingsResponses];
+
 export type SendAdminTestEmailData = {
     body?: AdminSendTestEmailRequest;
     path?: never;
@@ -14404,6 +15498,76 @@ export type ListAdminRiskControlLogsResponses = {
 
 export type ListAdminRiskControlLogsResponse = ListAdminRiskControlLogsResponses[keyof ListAdminRiskControlLogsResponses];
 
+export type GetAdminContentSafetyConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/content-safety/config';
+};
+
+export type GetAdminContentSafetyConfigErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminContentSafetyConfigError = GetAdminContentSafetyConfigErrors[keyof GetAdminContentSafetyConfigErrors];
+
+export type GetAdminContentSafetyConfigResponses = {
+    /**
+     * Content-safety configuration.
+     */
+    200: ContentSafetyConfigResponse;
+};
+
+export type GetAdminContentSafetyConfigResponse = GetAdminContentSafetyConfigResponses[keyof GetAdminContentSafetyConfigResponses];
+
+export type UpdateAdminContentSafetyConfigData = {
+    body: ContentSafetyConfig;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/content-safety/config';
+};
+
+export type UpdateAdminContentSafetyConfigErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminContentSafetyConfigError = UpdateAdminContentSafetyConfigErrors[keyof UpdateAdminContentSafetyConfigErrors];
+
+export type UpdateAdminContentSafetyConfigResponses = {
+    /**
+     * Content-safety configuration updated.
+     */
+    200: ContentSafetyConfigResponse;
+};
+
+export type UpdateAdminContentSafetyConfigResponse = UpdateAdminContentSafetyConfigResponses[keyof UpdateAdminContentSafetyConfigResponses];
+
 export type ListAdminCapabilitiesData = {
     body?: never;
     path?: never;
@@ -14550,6 +15714,172 @@ export type ListSchedulerStrategiesResponses = {
 };
 
 export type ListSchedulerStrategiesResponse = ListSchedulerStrategiesResponses[keyof ListSchedulerStrategiesResponses];
+
+export type CreateSchedulerStrategyData = {
+    body: SchedulerStrategyMutationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/scheduler/strategies';
+};
+
+export type CreateSchedulerStrategyErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateSchedulerStrategyError = CreateSchedulerStrategyErrors[keyof CreateSchedulerStrategyErrors];
+
+export type CreateSchedulerStrategyResponses = {
+    /**
+     * Scheduler strategy created.
+     */
+    201: SchedulerStrategyResponse;
+};
+
+export type CreateSchedulerStrategyResponse = CreateSchedulerStrategyResponses[keyof CreateSchedulerStrategyResponses];
+
+export type DeprecateSchedulerStrategyData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/scheduler/strategies/{id}';
+};
+
+export type DeprecateSchedulerStrategyErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeprecateSchedulerStrategyError = DeprecateSchedulerStrategyErrors[keyof DeprecateSchedulerStrategyErrors];
+
+export type DeprecateSchedulerStrategyResponses = {
+    /**
+     * Scheduler strategy deprecated.
+     */
+    200: SchedulerStrategyResponse;
+};
+
+export type DeprecateSchedulerStrategyResponse = DeprecateSchedulerStrategyResponses[keyof DeprecateSchedulerStrategyResponses];
+
+export type UpdateSchedulerStrategyData = {
+    body: SchedulerStrategyMutationRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/scheduler/strategies/{id}';
+};
+
+export type UpdateSchedulerStrategyErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateSchedulerStrategyError = UpdateSchedulerStrategyErrors[keyof UpdateSchedulerStrategyErrors];
+
+export type UpdateSchedulerStrategyResponses = {
+    /**
+     * Scheduler strategy updated.
+     */
+    200: SchedulerStrategyResponse;
+};
+
+export type UpdateSchedulerStrategyResponse = UpdateSchedulerStrategyResponses[keyof UpdateSchedulerStrategyResponses];
+
+export type ActivateSchedulerStrategyData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/scheduler/strategies/{id}/activate';
+};
+
+export type ActivateSchedulerStrategyErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ActivateSchedulerStrategyError = ActivateSchedulerStrategyErrors[keyof ActivateSchedulerStrategyErrors];
+
+export type ActivateSchedulerStrategyResponses = {
+    /**
+     * Scheduler strategy activated.
+     */
+    200: SchedulerStrategyResponse;
+};
+
+export type ActivateSchedulerStrategyResponse = ActivateSchedulerStrategyResponses[keyof ActivateSchedulerStrategyResponses];
 
 export type SimulateSchedulerStrategyData = {
     body: SchedulerSimulationRequestWritable;

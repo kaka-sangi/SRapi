@@ -83,6 +83,26 @@ x-srapi-contract-harness:
     - listModels
     - createChatCompletion
 paths:
+  /api/v1/site-config:
+    get:
+      tags:
+        - Auth
+      operationId: getSiteConfig
+      summary: Public site branding and agreement configuration.
+      security: []
+      responses:
+        "200":
+          description: Public site configuration.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SiteConfigResponse"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/health:
     get:
       tags:
@@ -190,6 +210,23 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "403":
           $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/registration-attributes:
+    get:
+      tags:
+        - Auth
+      operationId: listRegistrationAttributes
+      summary: List enabled custom attributes required or accepted during public registration.
+      security: []
+      responses:
+        "200":
+          description: Registration attributes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAttributeValueListResponse"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -786,6 +823,72 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/auth/passwordless/request:
+    post:
+      tags:
+        - Auth
+      operationId: requestPasswordlessLogin
+      summary: Send a one-time email sign-in link.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordlessRequest"
+      responses:
+        "202":
+          description: Passwordless request accepted without exposing account discovery.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailVerificationAcceptedResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/passwordless/login:
+    post:
+      tags:
+        - Auth
+      operationId: completePasswordlessLogin
+      summary: Consume a one-time email sign-in token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordlessLoginRequest"
+      responses:
+        "200":
+          description: Login succeeded and session cookie was set.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            Set-Cookie:
+              description: HttpOnly console session cookie.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/auth/login/2fa:
     post:
       tags:
@@ -954,6 +1057,78 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - CurrentUser
+      operationId: deleteCurrentUser
+      summary: Delete the current console user.
+      description: Self-service account deletion. Server-side gated by Users.UserSelfDeleteEnabled and protected by CSRF.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      responses:
+        "200":
+          description: Current user deleted and console session cleared.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/attributes:
+    get:
+      tags:
+        - CurrentUser
+      operationId: listCurrentUserAttributes
+      summary: List enabled custom attributes for the current user.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user attributes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAttributeValueListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+    put:
+      tags:
+        - CurrentUser
+      operationId: updateCurrentUserAttributes
+      summary: Update current user custom attributes.
+      description: Values must satisfy all enabled required attribute definitions.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCurrentUserAttributesRequest"
+      responses:
+        "200":
+          description: Updated current user attributes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAttributeValueListResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -1793,6 +1968,63 @@ paths:
                 $ref: "#/components/schemas/AffiliateSummaryResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/affiliate/invite-codes:
+    get:
+      tags:
+        - CurrentUser
+      operationId: listCurrentUserAffiliateInviteCodes
+      summary: List invite codes generated by the current user.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user affiliate invite codes.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateInviteCodeListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - CurrentUser
+      operationId: createCurrentUserAffiliateInviteCode
+      summary: Create an invite code for the current user.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAffiliateInviteCodeRequest"
+      responses:
+        "201":
+          description: Affiliate invite code created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateInviteCodeResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -2665,6 +2897,34 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/permission-catalog:
+    get:
+      tags:
+        - AdminUsers
+      operationId: getAdminPermissionCatalog
+      summary: List assignable admin permissions.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      responses:
+        "200":
+          description: Permission catalog.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PermissionCatalogResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -5459,6 +5719,44 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/me/affiliate/withdrawals:
+    post:
+      tags:
+        - CurrentUser
+      operationId: requestCurrentUserAffiliateWithdrawal
+      summary: Create a pending affiliate balance withdrawal request.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AffiliateWithdrawalRequest"
+      responses:
+        "201":
+          description: Pending affiliate withdrawal ledger created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateLedgerEntryResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/affiliates/invites:
     get:
       tags:
@@ -5557,6 +5855,250 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/affiliates/manual-adjustments:
+    post:
+      tags:
+        - AdminAffiliates
+      operationId: createAdminAffiliateManualAdjustment
+      summary: Create an affiliate ledger manual adjustment.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminAffiliateManualAdjustmentRequest"
+      responses:
+        "201":
+          description: Affiliate manual adjustment ledger created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateLedgerEntryResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/affiliates/withdrawals/{id}/approve:
+    post:
+      tags:
+        - AdminAffiliates
+      operationId: approveAdminAffiliateWithdrawal
+      summary: Approve a pending affiliate withdrawal.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminAffiliateWithdrawalDecisionRequest"
+      responses:
+        "200":
+          description: Affiliate withdrawal approved.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateLedgerEntryResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/affiliates/withdrawals/{id}/cancel:
+    post:
+      tags:
+        - AdminAffiliates
+      operationId: cancelAdminAffiliateWithdrawal
+      summary: Cancel a pending affiliate withdrawal.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminAffiliateWithdrawalDecisionRequest"
+      responses:
+        "200":
+          description: Affiliate withdrawal canceled.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateLedgerEntryResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/affiliate-rules:
+    get:
+      tags:
+        - AdminAffiliates
+      operationId: listAdminAffiliateRules
+      summary: List affiliate rebate rules.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Affiliate rule list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateRuleListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminAffiliates
+      operationId: createAdminAffiliateRule
+      summary: Create an affiliate rebate rule.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAffiliateRuleRequest"
+      responses:
+        "201":
+          description: Affiliate rule created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateRuleResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/affiliate-rules/{id}:
+    patch:
+      tags:
+        - AdminAffiliates
+      operationId: updateAdminAffiliateRule
+      summary: Update an affiliate rebate rule.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAffiliateRuleRequest"
+      responses:
+        "200":
+          description: Affiliate rule updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateRuleResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -5759,7 +6301,7 @@ paths:
       x-srapi-rbac:
         owner: read
         admin: read
-        permission: payment_order:read
+        permission: payment:read
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PageSize"
@@ -5824,6 +6366,43 @@ paths:
                 $ref: "#/components/schemas/PaymentOrderResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/payment-orders/{id}/audit-logs:
+    get:
+      tags:
+        - AdminPayments
+      operationId: listAdminPaymentOrderAuditLogs
+      summary: List payment order audit timeline.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        permission: payment:read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Payment order audit timeline.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentAuditLogListResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -7259,6 +7838,53 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/settings/captcha:
+    get:
+      tags:
+        - AdminSettings
+      operationId: getAdminCaptchaSettings
+      summary: Get captcha runtime settings.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Captcha settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaptchaSettingsResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    put:
+      tags:
+        - AdminSettings
+      operationId: updateAdminCaptchaSettings
+      summary: Update captcha runtime settings.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaptchaSettings"
+      responses:
+        "200":
+          description: Captcha settings updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaptchaSettingsResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/settings/send-test-email:
     post:
       tags:
@@ -8454,6 +9080,70 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/content-safety/config:
+    get:
+      tags:
+        - AdminContentSafety
+      operationId: getAdminContentSafetyConfig
+      summary: Get content-safety configuration.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: Content-safety configuration.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentSafetyConfigResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    put:
+      tags:
+        - AdminContentSafety
+      operationId: updateAdminContentSafetyConfig
+      summary: Update content-safety configuration.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContentSafetyConfig"
+      responses:
+        "200":
+          description: Content-safety configuration updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentSafetyConfigResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/capabilities:
     get:
       tags:
@@ -8594,6 +9284,162 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminScheduler
+      operationId: createSchedulerStrategy
+      summary: Create a scheduler strategy.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SchedulerStrategyMutationRequest"
+      responses:
+        "201":
+          description: Scheduler strategy created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerStrategyResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/scheduler/strategies/{id}:
+    patch:
+      tags:
+        - AdminScheduler
+      operationId: updateSchedulerStrategy
+      summary: Update a scheduler strategy.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SchedulerStrategyMutationRequest"
+      responses:
+        "200":
+          description: Scheduler strategy updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerStrategyResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminScheduler
+      operationId: deprecateSchedulerStrategy
+      summary: Deprecate a scheduler strategy.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Scheduler strategy deprecated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerStrategyResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/scheduler/strategies/{id}/activate:
+    post:
+      tags:
+        - AdminScheduler
+      operationId: activateSchedulerStrategy
+      summary: Activate a scheduler strategy.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Scheduler strategy activated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerStrategyResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -14219,6 +15065,40 @@ components:
         updated_at:
           $ref: "#/components/schemas/Timestamp"
 
+    PermissionDefinition:
+      type: object
+      required:
+        - permission
+        - resource
+        - action
+        - description
+      properties:
+        permission:
+          type: string
+          pattern: "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$"
+        resource:
+          type: string
+        action:
+          type: string
+          enum:
+            - read
+            - write
+        description:
+          type: string
+
+    PermissionCatalogResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PermissionDefinition"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     CreateRoleRequest:
       type: object
       required:
@@ -14962,6 +15842,79 @@ components:
           type: string
           format: password
           minLength: 8
+        invite_code:
+          type: string
+          minLength: 1
+          description: Optional affiliate invite code to bind to the new account.
+        attributes:
+          type: array
+          description: Current-user attribute values required at registration when enabled definitions are marked required.
+          items:
+            $ref: "#/components/schemas/UserAttributeValueInput"
+
+    PasswordlessRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          minLength: 1
+        invite_code:
+          type: string
+        attributes:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserAttributeValueInput"
+
+    PasswordlessLoginRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          minLength: 1
+
+    SiteConfig:
+      type: object
+      required:
+        - site_name
+        - logo_url
+        - version_label
+        - custom_menus
+        - user_agreement
+        - privacy_policy
+      properties:
+        site_name:
+          type: string
+        logo_url:
+          type: string
+        version_label:
+          type: string
+        custom_menus:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        user_agreement:
+          type: string
+        privacy_policy:
+          type: string
+
+    SiteConfigResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/SiteConfig"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
 
     SetupStatus:
       type: object
@@ -15854,7 +16807,9 @@ components:
         - paid
         - fulfilled
         - partially_refunded
+        - refunding
         - refunded
+        - refund_failed
         - expired
         - canceled
         - failed
@@ -15912,6 +16867,8 @@ components:
         - supported_methods
         - limits
         - sort_order
+        - fee_rate
+        - weight
         - metadata
         - created_at
         - updated_at
@@ -15935,6 +16892,14 @@ components:
           $ref: "#/components/schemas/JsonObject"
         sort_order:
           type: integer
+        fee_rate:
+          type: string
+          example: "0.03000000"
+          description: Decimal payment-channel fee rate added to the payable amount.
+        weight:
+          type: integer
+          minimum: 1
+          description: Relative round-robin selection weight.
         metadata:
           $ref: "#/components/schemas/JsonObject"
         created_at:
@@ -15967,6 +16932,12 @@ components:
           $ref: "#/components/schemas/JsonObject"
         sort_order:
           type: integer
+        fee_rate:
+          type: string
+          example: "0.03000000"
+        weight:
+          type: integer
+          minimum: 1
         metadata:
           $ref: "#/components/schemas/JsonObject"
 
@@ -15988,6 +16959,12 @@ components:
           $ref: "#/components/schemas/JsonObject"
         sort_order:
           type: integer
+        fee_rate:
+          type: string
+          example: "0.03000000"
+        weight:
+          type: integer
+          minimum: 1
         metadata:
           $ref: "#/components/schemas/JsonObject"
 
@@ -16027,6 +17004,8 @@ components:
         - provider_instance_id
         - original_amount
         - discount_amount
+        - fee_amount
+        - payable_amount
         - amount
         - currency
         - status
@@ -16051,6 +17030,12 @@ components:
         discount_amount:
           type: string
           example: "1.00000000"
+        fee_amount:
+          type: string
+          example: "0.30000000"
+        payable_amount:
+          type: string
+          example: "10.30000000"
         promo_code_id:
           $ref: "#/components/schemas/Id"
           nullable: true
@@ -16116,6 +17101,14 @@ components:
         expires_at:
           type: string
           format: date-time
+        payer_openid:
+          type: string
+          minLength: 1
+          description: WeChat JSAPI payer OpenID. Prefer this typed field over metadata.
+        payer_client_ip:
+          type: string
+          minLength: 1
+          description: Payer client IP for WeChat H5/native scene info. Defaults from request headers when omitted.
         metadata:
           $ref: "#/components/schemas/JsonObject"
 
@@ -16141,6 +17134,51 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PaymentOrder"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    PaymentAuditLog:
+      type: object
+      required:
+        - id
+        - order_id
+        - provider_instance_id
+        - event_type
+        - idempotency_key
+        - payload
+        - signature_valid
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        order_id:
+          $ref: "#/components/schemas/Id"
+        provider_instance_id:
+          $ref: "#/components/schemas/Id"
+        event_type:
+          type: string
+        idempotency_key:
+          type: string
+        payload:
+          $ref: "#/components/schemas/JsonObject"
+        signature_valid:
+          type: boolean
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    PaymentAuditLogListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentAuditLog"
         pagination:
           $ref: "#/components/schemas/Pagination"
         request_id:
@@ -16493,9 +17531,32 @@ components:
         cache_write_price_per_million_tokens:
           type: string
           example: "0.20000000"
+        cache_write_5m_price_per_million_tokens:
+          type: string
+          example: "0.20000000"
+        cache_write_1h_price_per_million_tokens:
+          type: string
+          example: "0.40000000"
+        image_output_price_per_million_tokens:
+          type: string
+          example: "5.00000000"
         per_request_price:
           type: string
           example: "0.05000000"
+        service_tier_multipliers:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            priority: "2.00000000"
+            flex: "0.50000000"
+        long_context_threshold_tokens:
+          type: integer
+          nullable: true
+          minimum: 1
+        long_context_multiplier:
+          type: string
+          example: "2.00000000"
         intervals:
           type: array
           items:
@@ -16548,9 +17609,29 @@ components:
         cache_write_price_per_million_tokens:
           type: string
           example: "0.20000000"
+        cache_write_5m_price_per_million_tokens:
+          type: string
+          example: "0.20000000"
+        cache_write_1h_price_per_million_tokens:
+          type: string
+          example: "0.40000000"
+        image_output_price_per_million_tokens:
+          type: string
+          example: "5.00000000"
         per_request_price:
           type: string
           example: "0.05000000"
+        service_tier_multipliers:
+          type: object
+          additionalProperties:
+            type: string
+        long_context_threshold_tokens:
+          type: integer
+          nullable: true
+          minimum: 1
+        long_context_multiplier:
+          type: string
+          example: "2.00000000"
         intervals:
           type: array
           items:
@@ -16587,9 +17668,29 @@ components:
         cache_write_price_per_million_tokens:
           type: string
           example: "0.20000000"
+        cache_write_5m_price_per_million_tokens:
+          type: string
+          example: "0.20000000"
+        cache_write_1h_price_per_million_tokens:
+          type: string
+          example: "0.40000000"
+        image_output_price_per_million_tokens:
+          type: string
+          example: "5.00000000"
         per_request_price:
           type: string
           example: "0.05000000"
+        service_tier_multipliers:
+          type: object
+          additionalProperties:
+            type: string
+        long_context_threshold_tokens:
+          type: integer
+          nullable: true
+          minimum: 1
+        long_context_multiplier:
+          type: string
+          example: "2.00000000"
         intervals:
           type: array
           items:
@@ -17313,10 +18414,7 @@ components:
         - oauth_refresh
         - oauth_device_code
         - web_session_cookie
-        - desktop_client_token
         - cli_client_token
-        - ide_plugin_token
-        - service_account_json
         - custom_reverse_proxy
 
     PlatformFamily:
@@ -17579,6 +18677,13 @@ components:
           type: number
           minimum: 0
           default: 1
+        risk_level:
+          type: string
+          enum:
+            - normal
+            - medium
+            - high
+          default: normal
         metadata:
           $ref: "#/components/schemas/JsonObject"
 
@@ -17609,6 +18714,12 @@ components:
         weight:
           type: number
           minimum: 0
+        risk_level:
+          type: string
+          enum:
+            - normal
+            - medium
+            - high
         metadata:
           $ref: "#/components/schemas/JsonObject"
 
@@ -17764,6 +18875,12 @@ components:
           minimum: 0
         metadata:
           $ref: "#/components/schemas/JsonObject"
+        risk_level:
+          type: string
+          enum:
+            - normal
+            - medium
+            - high
         group_ids:
           type: array
           items:
@@ -17813,6 +18930,10 @@ components:
           nullable: true
         status:
           $ref: "#/components/schemas/ProviderAccountStatus"
+        risk_level:
+          type: string
+          enum: [normal, medium, high]
+          default: normal
         priority:
           type: integer
           default: 0
@@ -18582,6 +19703,14 @@ components:
           type: integer
           minimum: 0
         total_cost:
+          type: string
+        input_cost:
+          type: string
+        output_cost:
+          type: string
+        cache_read_cost:
+          type: string
+        cache_write_cost:
           type: string
         currency:
           type: string
@@ -20781,6 +21910,46 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    CaptchaSettings:
+      type: object
+      required:
+        - managed
+        - enabled
+        - provider
+        - site_key
+        - secret_key_configured
+        - verify_url
+      properties:
+        managed:
+          type: boolean
+          description: When true, admin settings override environment captcha config.
+        enabled:
+          type: boolean
+        provider:
+          type: string
+          enum: [turnstile, hcaptcha, recaptcha]
+        site_key:
+          type: string
+        secret_key:
+          type: string
+          writeOnly: true
+        secret_key_configured:
+          type: boolean
+          readOnly: true
+        verify_url:
+          type: string
+
+    CaptchaSettingsResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/CaptchaSettings"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     RedeemCodeStatus:
       type: string
       enum:
@@ -21082,6 +22251,8 @@ components:
         - discount_value
         - currency
         - max_uses
+        - per_user_limit
+        - min_order_amount
         - used_count
         - created_at
         - updated_at
@@ -21106,6 +22277,14 @@ components:
         max_uses:
           type: integer
           minimum: 1
+        per_user_limit:
+          type: integer
+          minimum: 0
+          description: Maximum active uses per user. Zero means no per-user limit.
+        min_order_amount:
+          type: string
+          pattern: "^[0-9]+(\\.[0-9]+)?$"
+          description: Minimum original order amount required before the discount applies. Blank means no minimum.
         used_count:
           type: integer
           minimum: 0
@@ -21145,6 +22324,15 @@ components:
           type: integer
           minimum: 1
           default: 1
+        per_user_limit:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Maximum active uses per user. Zero means no per-user limit.
+        min_order_amount:
+          type: string
+          pattern: "^[0-9]+(\\.[0-9]+)?$"
+          description: Minimum original order amount required before the discount applies. Omit for no minimum.
         status:
           $ref: "#/components/schemas/PromoCodeStatus"
         starts_at:
@@ -21364,6 +22552,57 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    ContentSafetyMode:
+      type: string
+      enum:
+        - monitor
+        - enforce
+
+    ContentSafetyConfig:
+      type: object
+      required:
+        - enabled
+        - mode
+        - redact_pii
+        - block_pii
+        - block_prompt_injection
+        - block_custom_keywords
+        - custom_keywords
+        - model_scopes
+      properties:
+        enabled:
+          type: boolean
+        mode:
+          $ref: "#/components/schemas/ContentSafetyMode"
+        redact_pii:
+          type: boolean
+        block_pii:
+          type: boolean
+        block_prompt_injection:
+          type: boolean
+        block_custom_keywords:
+          type: boolean
+        custom_keywords:
+          type: array
+          items:
+            type: string
+        model_scopes:
+          type: array
+          description: Canonical model names or prefix scopes ending in '*'. Empty means all models.
+          items:
+            type: string
+
+    ContentSafetyConfigResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/ContentSafetyConfig"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     UsageAggregateDimension:
       type: string
       enum:
@@ -21413,6 +22652,14 @@ components:
           type: integer
           minimum: 0
         total_cost:
+          type: string
+        input_cost:
+          type: string
+        output_cost:
+          type: string
+        cache_read_cost:
+          type: string
+        cache_write_cost:
           type: string
         currency:
           type: string
@@ -21853,7 +23100,6 @@ components:
       type: string
       enum:
         - accrue
-        - settle
         - transfer_to_balance
         - withdraw
         - refund_compensation
@@ -21866,6 +23112,228 @@ components:
         - settled
         - canceled
         - compensated
+
+    AffiliateInviteCodeStatus:
+      type: string
+      enum:
+        - active
+        - disabled
+        - expired
+
+    AffiliateRuleStatus:
+      type: string
+      enum:
+        - active
+        - disabled
+        - archived
+
+    AffiliateRuleTriggerType:
+      type: string
+      enum:
+        - payment_paid
+
+    AffiliateInviteCode:
+      type: object
+      required:
+        - id
+        - user_id
+        - code
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        user_id:
+          $ref: "#/components/schemas/Id"
+        code:
+          type: string
+        status:
+          $ref: "#/components/schemas/AffiliateInviteCodeStatus"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateAffiliateInviteCodeRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 4
+          maxLength: 80
+          description: Optional custom code. When omitted, SRapi generates one.
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    AffiliateInviteCodeResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AffiliateInviteCode"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AffiliateInviteCodeListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AffiliateInviteCode"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AffiliateRule:
+      type: object
+      required:
+        - id
+        - name
+        - status
+        - trigger_type
+        - rate
+        - fixed_amount
+        - currency
+        - max_rebate_amount
+        - metadata
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/AffiliateRuleStatus"
+        trigger_type:
+          $ref: "#/components/schemas/AffiliateRuleTriggerType"
+        rate:
+          type: string
+        fixed_amount:
+          type: string
+        currency:
+          type: string
+        max_rebate_amount:
+          type: string
+        valid_from:
+          type: string
+          format: date-time
+          nullable: true
+        valid_to:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateAffiliateRuleRequest:
+      type: object
+      required:
+        - name
+        - trigger_type
+      properties:
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/AffiliateRuleStatus"
+        trigger_type:
+          $ref: "#/components/schemas/AffiliateRuleTriggerType"
+        rate:
+          type: string
+          default: "0.00000000"
+        fixed_amount:
+          type: string
+          default: "0.00000000"
+        currency:
+          type: string
+          default: USD
+        max_rebate_amount:
+          type: string
+          default: "0.00000000"
+        valid_from:
+          type: string
+          format: date-time
+          nullable: true
+        valid_to:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+
+    UpdateAffiliateRuleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/AffiliateRuleStatus"
+        trigger_type:
+          $ref: "#/components/schemas/AffiliateRuleTriggerType"
+        rate:
+          type: string
+        fixed_amount:
+          type: string
+        currency:
+          type: string
+        max_rebate_amount:
+          type: string
+        valid_from:
+          type: string
+          format: date-time
+          nullable: true
+        valid_to:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+
+    AffiliateRuleResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AffiliateRule"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AffiliateRuleListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AffiliateRule"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
 
     AffiliateInviteRecord:
       type: object
@@ -21977,6 +23445,17 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    AffiliateLedgerEntryResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AffiliateLedgerEntry"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     AffiliateCurrencySummary:
       type: object
       required:
@@ -21985,7 +23464,6 @@ components:
         - accrued_amount
         - refund_compensated_amount
         - transferred_to_balance_amount
-        - settled_amount
         - withdrawn_amount
         - manual_adjustment_amount
       properties:
@@ -22000,8 +23478,6 @@ components:
           type: string
         transferred_to_balance_amount:
           type: string
-        settled_amount:
-          type: string
         withdrawn_amount:
           type: string
         manual_adjustment_amount:
@@ -22012,6 +23488,8 @@ components:
       required:
         - user_id
         - balances
+        - invite_codes
+        - invited_count
       properties:
         user_id:
           $ref: "#/components/schemas/Id"
@@ -22019,6 +23497,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AffiliateCurrencySummary"
+        invite_codes:
+          type: array
+          items:
+            $ref: "#/components/schemas/AffiliateInviteCode"
+        invited_count:
+          type: integer
+          minimum: 0
 
     AffiliateSummaryResponse:
       type: object
@@ -22042,6 +23527,52 @@ components:
         currency:
           type: string
           default: USD
+
+    AffiliateWithdrawalRequest:
+      type: object
+      required:
+        - amount
+      properties:
+        amount:
+          type: string
+          description: Decimal string amount to withdraw from affiliate balance.
+        currency:
+          type: string
+          default: USD
+        destination:
+          type: string
+          description: Optional withdrawal destination label or account reference.
+
+    AdminAffiliateWithdrawalDecisionRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: Optional admin note recorded on the withdrawal ledger metadata.
+
+    AdminAffiliateManualAdjustmentRequest:
+      type: object
+      required:
+        - user_id
+        - amount
+        - reason
+      properties:
+        user_id:
+          $ref: "#/components/schemas/Id"
+        amount:
+          type: string
+          description: Decimal string amount to adjust. Positive credits balance; negative debits balance.
+        currency:
+          type: string
+          default: USD
+        reason:
+          type: string
+          minLength: 1
+        reference_id:
+          type: string
+          description: Optional admin-supplied idempotency reference.
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
 
     AffiliateTransferToBalanceResult:
       type: object
@@ -23033,8 +24564,11 @@ components:
         - name
         - version
         - status
+        - scope_type
         - config_hash
         - config
+        - weights
+        - source
         - created_at
       properties:
         id:
@@ -23045,21 +24579,49 @@ components:
           type: string
           example: v1
         status:
+          $ref: "#/components/schemas/SchedulerStrategyStatus"
+        scope_type:
+          $ref: "#/components/schemas/SchedulerStrategyScopeType"
+        scope_id:
+          $ref: "#/components/schemas/Id"
+          nullable: true
+        description:
           type: string
-          enum:
-            - active
-            - draft
-            - deprecated
         config_hash:
           type: string
         config:
           $ref: "#/components/schemas/JsonObject"
+        weights:
+          $ref: "#/components/schemas/SchedulerStrategyWeights"
+        source:
+          type: string
+          enum:
+            - seed
+            - database
+        created_by:
+          $ref: "#/components/schemas/Id"
+          nullable: true
         created_at:
           $ref: "#/components/schemas/Timestamp"
         activated_at:
           type: string
           format: date-time
           nullable: true
+        deprecated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    SchedulerStrategyResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/SchedulerStrategy"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
 
     SchedulerStrategyListResponse:
       type: object
@@ -23087,6 +24649,68 @@ components:
         - sticky_first
         - cache_affinity_first
         - premium_quality
+
+    SchedulerStrategyStatus:
+      type: string
+      enum:
+        - active
+        - draft
+        - deprecated
+
+    SchedulerStrategyScopeType:
+      type: string
+      enum:
+        - global
+        - api_key
+        - account_group
+        - user
+
+    SchedulerStrategyWeights:
+      type: object
+      additionalProperties:
+        type: number
+        minimum: 0
+        maximum: 1
+      example:
+        health: 0.3
+        quota: 0.2
+        latency: 0.15
+        sticky: 0.1
+        cache: 0.1
+        cost: 0.1
+        fairness: 0.05
+        quality: 0
+
+    SchedulerStrategyMutationRequest:
+      type: object
+      required:
+        - name
+        - version
+        - status
+        - scope_type
+        - weights
+      properties:
+        name:
+          $ref: "#/components/schemas/SchedulerStrategyName"
+        version:
+          type: string
+          minLength: 1
+          maxLength: 64
+        status:
+          $ref: "#/components/schemas/SchedulerStrategyStatus"
+        scope_type:
+          $ref: "#/components/schemas/SchedulerStrategyScopeType"
+        scope_id:
+          $ref: "#/components/schemas/Id"
+          nullable: true
+        description:
+          type: string
+          maxLength: 512
+          default: ""
+        config:
+          $ref: "#/components/schemas/JsonObject"
+        weights:
+          $ref: "#/components/schemas/SchedulerStrategyWeights"
 
     SchedulerSimulationStickyStrength:
       type: string
@@ -23802,6 +25426,14 @@ components:
           type: integer
           minimum: 0
         cost:
+          type: string
+        input_cost:
+          type: string
+        output_cost:
+          type: string
+        cache_read_cost:
+          type: string
+        cache_write_cost:
           type: string
         currency:
           type: string
@@ -25927,6 +27559,7 @@ components:
         - scope_type
         - interval_seconds
         - cron_expression
+        - probe_model
         - max_results
         - auto_recover
         - last_status
@@ -25955,6 +27588,8 @@ components:
           type: integer
           format: int64
         cron_expression:
+          type: string
+        probe_model:
           type: string
         max_results:
           type: integer
@@ -26000,6 +27635,8 @@ components:
           format: int64
         cron_expression:
           type: string
+        probe_model:
+          type: string
         max_results:
           type: integer
           format: int64
@@ -26026,6 +27663,8 @@ components:
           type: integer
           format: int64
         cron_expression:
+          type: string
+        probe_model:
           type: string
         max_results:
           type: integer
@@ -26562,6 +28201,8 @@ components:
         - key
         - name
         - data_type
+        - options
+        - required
         - value
       properties:
         definition_id:
@@ -26573,6 +28214,12 @@ components:
           type: string
         data_type:
           type: string
+        options:
+          type: array
+          items:
+            type: string
+        required:
+          type: boolean
         value:
           type: string
         updated_at:
@@ -26583,6 +28230,26 @@ components:
       properties:
         value:
           type: string
+    UserAttributeValueInput:
+      type: object
+      required:
+        - definition_id
+        - value
+      properties:
+        definition_id:
+          type: integer
+          format: int64
+        value:
+          type: string
+    UpdateCurrentUserAttributesRequest:
+      type: object
+      required:
+        - values
+      properties:
+        values:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserAttributeValueInput"
     UserAttributeDefinitionResponse:
       type: object
       required:

@@ -118,6 +118,34 @@ func (_u *PaymentOrderUpdate) SetNillableDiscountAmount(v *string) *PaymentOrder
 	return _u
 }
 
+// SetFeeAmount sets the "fee_amount" field.
+func (_u *PaymentOrderUpdate) SetFeeAmount(v string) *PaymentOrderUpdate {
+	_u.mutation.SetFeeAmount(v)
+	return _u
+}
+
+// SetNillableFeeAmount sets the "fee_amount" field if the given value is not nil.
+func (_u *PaymentOrderUpdate) SetNillableFeeAmount(v *string) *PaymentOrderUpdate {
+	if v != nil {
+		_u.SetFeeAmount(*v)
+	}
+	return _u
+}
+
+// SetPayableAmount sets the "payable_amount" field.
+func (_u *PaymentOrderUpdate) SetPayableAmount(v string) *PaymentOrderUpdate {
+	_u.mutation.SetPayableAmount(v)
+	return _u
+}
+
+// SetNillablePayableAmount sets the "payable_amount" field if the given value is not nil.
+func (_u *PaymentOrderUpdate) SetNillablePayableAmount(v *string) *PaymentOrderUpdate {
+	if v != nil {
+		_u.SetPayableAmount(*v)
+	}
+	return _u
+}
+
 // SetPromoCodeID sets the "promo_code_id" field.
 func (_u *PaymentOrderUpdate) SetPromoCodeID(v int) *PaymentOrderUpdate {
 	_u.mutation.ResetPromoCodeID()
@@ -411,6 +439,12 @@ func (_u *PaymentOrderUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if value, ok := _u.mutation.DiscountAmount(); ok {
 		_spec.SetField(paymentorder.FieldDiscountAmount, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.FeeAmount(); ok {
+		_spec.SetField(paymentorder.FieldFeeAmount, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.PayableAmount(); ok {
+		_spec.SetField(paymentorder.FieldPayableAmount, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.PromoCodeID(); ok {
 		_spec.SetField(paymentorder.FieldPromoCodeID, field.TypeInt, value)
 	}
@@ -577,6 +611,34 @@ func (_u *PaymentOrderUpdateOne) SetDiscountAmount(v string) *PaymentOrderUpdate
 func (_u *PaymentOrderUpdateOne) SetNillableDiscountAmount(v *string) *PaymentOrderUpdateOne {
 	if v != nil {
 		_u.SetDiscountAmount(*v)
+	}
+	return _u
+}
+
+// SetFeeAmount sets the "fee_amount" field.
+func (_u *PaymentOrderUpdateOne) SetFeeAmount(v string) *PaymentOrderUpdateOne {
+	_u.mutation.SetFeeAmount(v)
+	return _u
+}
+
+// SetNillableFeeAmount sets the "fee_amount" field if the given value is not nil.
+func (_u *PaymentOrderUpdateOne) SetNillableFeeAmount(v *string) *PaymentOrderUpdateOne {
+	if v != nil {
+		_u.SetFeeAmount(*v)
+	}
+	return _u
+}
+
+// SetPayableAmount sets the "payable_amount" field.
+func (_u *PaymentOrderUpdateOne) SetPayableAmount(v string) *PaymentOrderUpdateOne {
+	_u.mutation.SetPayableAmount(v)
+	return _u
+}
+
+// SetNillablePayableAmount sets the "payable_amount" field if the given value is not nil.
+func (_u *PaymentOrderUpdateOne) SetNillablePayableAmount(v *string) *PaymentOrderUpdateOne {
+	if v != nil {
+		_u.SetPayableAmount(*v)
 	}
 	return _u
 }
@@ -903,6 +965,12 @@ func (_u *PaymentOrderUpdateOne) sqlSave(ctx context.Context) (_node *PaymentOrd
 	}
 	if value, ok := _u.mutation.DiscountAmount(); ok {
 		_spec.SetField(paymentorder.FieldDiscountAmount, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FeeAmount(); ok {
+		_spec.SetField(paymentorder.FieldFeeAmount, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.PayableAmount(); ok {
+		_spec.SetField(paymentorder.FieldPayableAmount, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.PromoCodeID(); ok {
 		_spec.SetField(paymentorder.FieldPromoCodeID, field.TypeInt, value)

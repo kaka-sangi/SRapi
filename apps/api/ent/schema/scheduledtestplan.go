@@ -31,6 +31,8 @@ func (ScheduledTestPlan) Fields() []ent.Field {
 		// cron_expression is an optional human-facing label / future cron source;
 		// when present and parseable it overrides interval_seconds for due math.
 		field.String("cron_expression").Optional(),
+		// probe_model overrides account/provider metadata probe model keys.
+		field.String("probe_model").Default(""),
 		// max_results bounds how many accounts a single run probes (0 = unbounded).
 		field.Int("max_results").Default(0),
 		// auto_recover flips a recovered-but-cooled account back to active.
