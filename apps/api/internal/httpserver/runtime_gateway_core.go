@@ -754,6 +754,7 @@ func (rt *runtimeState) fillCandidateRuntimeStates(ctx context.Context, candidat
 				state.QuotaRemainingRatio = &remainingRatio
 				state.QuotaExhausted = state.QuotaExhausted || constrained.RemainingRatio <= 0
 			}
+			state.QuotaAutoPaused = state.QuotaAutoPaused || quotaAutoPausedByMetadata(account.Metadata, quotas, now)
 		}
 		// Live in-flight concurrency makes load-aware scoring (saturation penalty,
 		// concurrency-full reject) reflect real traffic instead of always seeing 0,
@@ -785,6 +786,78 @@ func providerIDsForMappings(mappings []modelcontract.ModelProviderMapping) []int
 		out = append(out, mapping.ProviderID)
 	}
 	return out
+}
+
+const quotaAutoPauseSnapshotStaleAfter = 2 * time.Hour
+
+func quotaAutoPausedByMetadata(metadata map[string]any, snapshots []accountcontract.AccountQuotaSnapshot, now time.Time) bool {
+	if len(metadata) == 0 || len(snapshots) == 0 {
+		return false
+	}
+	for _, snapshot := range snapshots {
+		if accountcontract.IsSyntheticQuotaSnapshot(snapshot) || quotaSnapshotWindowReset(snapshot, now) || quotaSnapshotStaleForAutoPause(snapshot, now) {
+			continue
+		}
+		threshold, ok := quotaAutoPauseThreshold(metadata, snapshot.QuotaType)
+		if !ok || threshold <= 0 {
+			continue
+		}
+		utilization := 1 - float64(snapshot.RemainingRatio)
+		if utilization >= threshold {
+			return true
+		}
+	}
+	return false
+}
+
+func quotaAutoPauseThreshold(metadata map[string]any, quotaType string) (float64, bool) {
+	window := quotaAutoPauseWindow(quotaType)
+	if window != "" && metadataBool(metadata, "auto_pause_"+window+"_disabled") {
+		return 0, false
+	}
+	keys := []string{}
+	if window != "" {
+		keys = append(keys, "auto_pause_"+window+"_threshold", "quota_auto_pause_"+window+"_threshold")
+	}
+	keys = append(keys, "quota_auto_pause_threshold", "auto_pause_quota_threshold")
+	value := metadataOptionalFloat(metadata, keys...)
+	if value == nil {
+		return 0, false
+	}
+	return clampFloat64(*value, 0, 1), true
+}
+
+func quotaAutoPauseWindow(quotaType string) string {
+	normalized := strings.ToLower(strings.TrimSpace(quotaType))
+	switch {
+	case strings.Contains(normalized, "5h") || strings.Contains(normalized, "five_hour"):
+		return "5h"
+	case strings.Contains(normalized, "7d") || strings.Contains(normalized, "seven_day"):
+		return "7d"
+	default:
+		return ""
+	}
+}
+
+func quotaSnapshotWindowReset(snapshot accountcontract.AccountQuotaSnapshot, now time.Time) bool {
+	return snapshot.ResetAt != nil && !now.Before(snapshot.ResetAt.UTC())
+}
+
+func quotaSnapshotStaleForAutoPause(snapshot accountcontract.AccountQuotaSnapshot, now time.Time) bool {
+	if snapshot.SnapshotAt.IsZero() {
+		return false
+	}
+	return now.Sub(snapshot.SnapshotAt.UTC()) >= quotaAutoPauseSnapshotStaleAfter
+}
+
+func clampFloat64(value float64, min float64, max float64) float64 {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }
 
 func intersectsInt(left []int, right []int) bool {

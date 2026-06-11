@@ -148,7 +148,12 @@ type StrategyRollout struct {
 }
 
 type RuntimeState struct {
-	QuotaExhausted      bool
+	QuotaExhausted bool
+	// QuotaAutoPaused means the gateway runtime intentionally withheld this
+	// account because a recent upstream quota window crossed an operator
+	// configured threshold. Scheduler treats it like quota_exhausted while
+	// keeping the source explicit for diagnostics.
+	QuotaAutoPaused     bool
 	HealthScore         *float64
 	QuotaRemainingRatio *float64
 	LatencyP95MS        *int

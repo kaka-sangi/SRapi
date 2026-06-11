@@ -1049,7 +1049,7 @@ func rejectReason(candidate contract.Candidate, req contract.ScheduleRequest) st
 	if strings.TrimSpace(candidate.Account.CredentialCiphertext) == "" {
 		return "credential_invalid"
 	}
-	if candidate.RuntimeState.QuotaExhausted {
+	if candidate.RuntimeState.QuotaExhausted || candidate.RuntimeState.QuotaAutoPaused {
 		return "quota_exhausted"
 	}
 	if quotaProtected(candidate, req) {
@@ -1151,7 +1151,7 @@ func healthScore(candidate contract.Candidate) float64 {
 }
 
 func quotaScore(candidate contract.Candidate) float64 {
-	if candidate.RuntimeState.QuotaExhausted {
+	if candidate.RuntimeState.QuotaExhausted || candidate.RuntimeState.QuotaAutoPaused {
 		return 0
 	}
 	if candidate.RuntimeState.QuotaRemainingRatio == nil {

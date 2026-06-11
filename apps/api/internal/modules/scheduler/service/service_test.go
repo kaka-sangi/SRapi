@@ -61,6 +61,7 @@ func TestScheduleReturnsNoAvailableAccountWithStructuredReasons(t *testing.T) {
 		candidate(3, noOptions(), withCooldownActive(), withCapabilities(capabilitiescontract.KeyStreaming)),
 		candidate(4, noOptions(), noRuntime(), withAccountStatus(accountcontract.StatusNeedsReauth), withCapabilities(capabilitiescontract.KeyStreaming)),
 		candidate(5, noOptions(), noRuntime(), withCredential(""), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(6, noOptions(), withQuotaAutoPaused(), withCapabilities(capabilitiescontract.KeyStreaming)),
 	}
 
 	result, err := svc.Schedule(context.Background(), req)
@@ -75,11 +76,12 @@ func TestScheduleReturnsNoAvailableAccountWithStructuredReasons(t *testing.T) {
 	assertRejectReason(t, result.Decision.RejectReasons, 3, "cooldown_active")
 	assertRejectReason(t, result.Decision.RejectReasons, 4, "needs_reauth")
 	assertRejectReason(t, result.Decision.RejectReasons, 5, "credential_invalid")
+	assertRejectReason(t, result.Decision.RejectReasons, 6, "quota_exhausted")
 	if result.Decision.SelectedAccountID != nil {
 		t.Fatalf("expected no selected account, got %+v", result.Decision.SelectedAccountID)
 	}
 	if !strings.Contains(result.Decision.SelectionRationale, "No account selected") ||
-		!strings.Contains(result.Decision.SelectionRationale, "5 of 5 candidates were rejected") {
+		!strings.Contains(result.Decision.SelectionRationale, "6 of 6 candidates were rejected") {
 		t.Fatalf("expected rejected decision rationale, got %q", result.Decision.SelectionRationale)
 	}
 }
@@ -1738,6 +1740,10 @@ func withTPMUsed(value int) candidateOption {
 
 func withQuotaExhausted() candidateOption {
 	return func(candidate *contract.Candidate) { candidate.RuntimeState.QuotaExhausted = true }
+}
+
+func withQuotaAutoPaused() candidateOption {
+	return func(candidate *contract.Candidate) { candidate.RuntimeState.QuotaAutoPaused = true }
 }
 
 func withHealth(value float64) candidateOption {

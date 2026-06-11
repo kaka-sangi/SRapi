@@ -486,6 +486,82 @@ func TestAccountSchedulerRuntimeStateIgnoresSyntheticQuotaSnapshots(t *testing.T
 	}
 }
 
+func TestAccountSchedulerRuntimeStateAutoPausesByQuotaThreshold(t *testing.T) {
+	ctx := context.Background()
+	accounts, err := accountservice.New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new account service: %v", err)
+	}
+	account, err := accounts.Create(ctx, accountcontract.CreateRequest{
+		ProviderID:   13,
+		Name:         "auto-pause-quota-account",
+		RuntimeClass: accountcontract.RuntimeClassCliClientToken,
+		Credential:   map[string]any{"cli_client_token": "secret"},
+		Metadata: map[string]any{
+			"auto_pause_5h_threshold": 0.90,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	now := time.Now().UTC()
+	resetAt := now.Add(time.Hour)
+	if _, err := accounts.RecordQuotaSnapshot(ctx, accountcontract.AccountQuotaSnapshot{
+		AccountID:      account.ID,
+		ProviderID:     account.ProviderID,
+		QuotaType:      "codex_5h_percent",
+		Remaining:      "5",
+		Used:           "95",
+		QuotaLimit:     "100",
+		RemainingRatio: 0.05,
+		ResetAt:        &resetAt,
+		SnapshotAt:     now.Add(-time.Minute),
+	}); err != nil {
+		t.Fatalf("record quota: %v", err)
+	}
+	rt := &runtimeState{accounts: accounts}
+
+	candidates := []schedulercontract.Candidate{{Account: account}}
+	rt.fillCandidateRuntimeStates(ctx, candidates)
+	state := candidates[0].RuntimeState
+	if !state.QuotaAutoPaused {
+		t.Fatalf("expected quota auto pause, got %+v", state)
+	}
+	if state.QuotaExhausted {
+		t.Fatalf("auto pause should not rewrite real exhaustion state, got %+v", state)
+	}
+}
+
+func TestQuotaAutoPauseSkipsDisabledResetAndStaleSnapshots(t *testing.T) {
+	now := time.Date(2026, 6, 11, 10, 0, 0, 0, time.UTC)
+	futureReset := now.Add(time.Hour)
+	pastReset := now.Add(-time.Minute)
+	base := accountcontract.AccountQuotaSnapshot{
+		AccountID:      1,
+		ProviderID:     2,
+		QuotaType:      "codex_5h_percent",
+		RemainingRatio: 0.01,
+		ResetAt:        &futureReset,
+		SnapshotAt:     now.Add(-time.Minute),
+	}
+
+	if quotaAutoPausedByMetadata(map[string]any{"auto_pause_5h_threshold": 0.95, "auto_pause_5h_disabled": true}, []accountcontract.AccountQuotaSnapshot{base}, now) {
+		t.Fatal("disabled 5h auto-pause should not pause")
+	}
+
+	resetSnapshot := base
+	resetSnapshot.ResetAt = &pastReset
+	if quotaAutoPausedByMetadata(map[string]any{"auto_pause_5h_threshold": 0.95}, []accountcontract.AccountQuotaSnapshot{resetSnapshot}, now) {
+		t.Fatal("reset quota window should not pause")
+	}
+
+	staleSnapshot := base
+	staleSnapshot.SnapshotAt = now.Add(-3 * time.Hour)
+	if quotaAutoPausedByMetadata(map[string]any{"auto_pause_5h_threshold": 0.95}, []accountcontract.AccountQuotaSnapshot{staleSnapshot}, now) {
+		t.Fatal("stale quota snapshot should not pause")
+	}
+}
+
 func TestRecordGatewayUsageAppliesAccountGroupRateMultiplier(t *testing.T) {
 	ctx := context.Background()
 	accounts, err := accountservice.New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
