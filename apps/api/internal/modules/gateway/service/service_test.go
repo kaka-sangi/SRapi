@@ -571,6 +571,9 @@ func TestNormalizeGeminiGenerateContentProducesCanonicalRequest(t *testing.T) {
 			MaxOutputTokens:  ptrInt(32),
 			ResponseMimeType: ptrString("application/json"),
 			TopK:             ptrInt(40),
+			AdditionalProperties: map[string]any{
+				"thinkingConfig": map[string]any{"thinkingBudget": float64(8192), "includeThoughts": true},
+			},
 		},
 		SafetySettings: &[]apiopenapi.JsonObject{{"category": "HARM_CATEGORY_DANGEROUS_CONTENT"}},
 	}
@@ -592,6 +595,14 @@ func TestNormalizeGeminiGenerateContentProducesCanonicalRequest(t *testing.T) {
 	if canonical.MaxOutputTokens == nil || *canonical.MaxOutputTokens != 32 || canonical.ResponseFormat["type"] != "application/json" {
 		t.Fatalf("expected generation config fields, got %+v", canonical)
 	}
+	if _, ok := canonical.ResponseFormat["thinkingConfig"]; ok {
+		t.Fatalf("did not expect Gemini thinkingConfig to be treated as response format, got %+v", canonical.ResponseFormat)
+	}
+	if canonical.Reasoning["effort"] != "medium" ||
+		canonical.Reasoning["budget_tokens"] != 8192 ||
+		canonical.Reasoning["type"] != "enabled" {
+		t.Fatalf("expected Gemini thinkingConfig to be preserved as canonical reasoning, got %+v", canonical.Reasoning)
+	}
 	for _, warning := range []string{"safety_settings_ignored", "top_k_ignored"} {
 		if !stringSliceContains(canonical.CompatibilityWarnings, warning) {
 			t.Fatalf("expected warning %s, got %+v", warning, canonical.CompatibilityWarnings)
@@ -600,7 +611,10 @@ func TestNormalizeGeminiGenerateContentProducesCanonicalRequest(t *testing.T) {
 	if len(canonical.Messages) != 3 || len(canonical.Messages[1].Content) != 2 || canonical.Messages[1].Content[1].MediaBase64 != "abc" || canonical.Messages[1].Content[1].MIMEType != "image/png" {
 		t.Fatalf("expected Gemini inline media to be preserved, got %+v", canonical.Messages)
 	}
-	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStreaming) || !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyVisionInput) || !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStructuredOutput) {
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStreaming) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyVisionInput) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStructuredOutput) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyReasoningControl) {
 		t.Fatalf("expected request capabilities, got %+v", canonical.RequestCapabilities)
 	}
 }

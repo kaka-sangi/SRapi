@@ -216,6 +216,7 @@ func (s *Service) NormalizeGeminiGenerateContent(req apiopenapi.GeminiGenerateCo
 		canonical.MaxOutputTokens = cloneInt(cfg.MaxOutputTokens)
 		canonical.Stop = cloneStringSlicePtr(cfg.StopSequences)
 		canonical.ResponseFormat = geminiResponseFormat(cfg)
+		canonical.Reasoning = geminiReasoning(cfg)
 	}
 	canonical.Tools = cloneJSONMaps(req.Tools)
 	if len(canonical.Tools) > 0 {
@@ -1535,6 +1536,9 @@ func geminiResponseFormat(cfg *apiopenapi.GeminiGenerationConfig) map[string]any
 		out["schema"] = cloneMap(*cfg.ResponseSchema)
 	}
 	for key, item := range cfg.AdditionalProperties {
+		if key == "thinkingConfig" || key == "thinking_config" {
+			continue
+		}
 		if _, ok := out[key]; !ok {
 			out[key] = cloneAny(item)
 		}
@@ -1543,6 +1547,157 @@ func geminiResponseFormat(cfg *apiopenapi.GeminiGenerationConfig) map[string]any
 		return nil
 	}
 	return out
+}
+
+func geminiReasoning(cfg *apiopenapi.GeminiGenerationConfig) map[string]any {
+	if cfg == nil {
+		return nil
+	}
+	raw, ok := cfg.AdditionalProperties["thinkingConfig"]
+	if !ok {
+		raw, ok = cfg.AdditionalProperties["thinking_config"]
+	}
+	if !ok {
+		return nil
+	}
+	thinkingConfig, ok := jsonObjectMap(raw)
+	if !ok || len(thinkingConfig) == 0 {
+		return nil
+	}
+	out := map[string]any{}
+	if level := strings.ToLower(strings.TrimSpace(firstNonEmpty(
+		mapStringAny(thinkingConfig, "thinkingLevel"),
+		mapStringAny(thinkingConfig, "thinking_level"),
+		mapStringAny(thinkingConfig, "level"),
+		mapStringAny(thinkingConfig, "effort"),
+	))); level != "" {
+		out["effort"] = level
+		switch level {
+		case "none":
+			out["type"] = "disabled"
+		case "auto":
+			out["type"] = "adaptive"
+		default:
+			out["type"] = "enabled"
+			if budget, ok := reasoningBudgetForEffort(level); ok {
+				out["budget_tokens"] = budget
+			}
+		}
+	}
+	if budget, ok := mapIntAny(thinkingConfig, "thinkingBudget"); ok {
+		setGeminiReasoningBudget(out, budget)
+	} else if budget, ok := mapIntAny(thinkingConfig, "thinking_budget"); ok {
+		setGeminiReasoningBudget(out, budget)
+	}
+	if len(out) == 0 && (mapBoolAny(thinkingConfig, "includeThoughts") || mapBoolAny(thinkingConfig, "include_thoughts")) {
+		out["type"] = "enabled"
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func jsonObjectMap(value any) (map[string]any, bool) {
+	switch typed := cloneAny(value).(type) {
+	case map[string]any:
+		return typed, true
+	case apiopenapi.JsonObject:
+		return cloneMap(typed), true
+	default:
+		return nil, false
+	}
+}
+
+func setGeminiReasoningBudget(out map[string]any, budget int) {
+	out["budget_tokens"] = budget
+	if _, ok := out["effort"]; !ok {
+		if effort, ok := reasoningEffortForBudget(budget); ok {
+			out["effort"] = effort
+		}
+	}
+	switch {
+	case budget == 0:
+		out["type"] = "disabled"
+	case budget == -1:
+		out["type"] = "adaptive"
+	default:
+		if _, ok := out["type"]; !ok {
+			out["type"] = "enabled"
+		}
+	}
+}
+
+func reasoningBudgetForEffort(effort string) (int, bool) {
+	switch strings.ToLower(strings.TrimSpace(effort)) {
+	case "none":
+		return 0, true
+	case "auto":
+		return -1, true
+	case "minimal":
+		return 512, true
+	case "low":
+		return 1024, true
+	case "medium":
+		return 8192, true
+	case "high":
+		return 24576, true
+	case "xhigh":
+		return 32768, true
+	case "max":
+		return 128000, true
+	default:
+		return 0, false
+	}
+}
+
+func reasoningEffortForBudget(budget int) (string, bool) {
+	switch {
+	case budget < -1:
+		return "", false
+	case budget == -1:
+		return "auto", true
+	case budget == 0:
+		return "none", true
+	case budget <= 512:
+		return "minimal", true
+	case budget <= 1024:
+		return "low", true
+	case budget <= 8192:
+		return "medium", true
+	case budget <= 24576:
+		return "high", true
+	default:
+		return "xhigh", true
+	}
+}
+
+func mapIntAny(values map[string]any, key string) (int, bool) {
+	if values == nil {
+		return 0, false
+	}
+	value, ok := values[key]
+	if !ok || value == nil {
+		return 0, false
+	}
+	switch typed := value.(type) {
+	case int:
+		return typed, true
+	case int8:
+		return int(typed), true
+	case int16:
+		return int(typed), true
+	case int32:
+		return int(typed), true
+	case int64:
+		return int(typed), true
+	case float32:
+		return int(typed), true
+	case float64:
+		return int(typed), true
+	default:
+		return 0, false
+	}
 }
 
 func geminiToolChoice(value *apiopenapi.JsonObject) any {
