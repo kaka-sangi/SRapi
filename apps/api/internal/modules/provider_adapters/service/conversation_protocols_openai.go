@@ -710,6 +710,9 @@ type openAIUsage struct {
 	PromptTokensDetails *struct {
 		CachedTokens *int `json:"cached_tokens"`
 	} `json:"prompt_tokens_details"`
+	OutputTokensDetails *struct {
+		ImageTokens *int `json:"image_tokens"`
+	} `json:"output_tokens_details"`
 }
 
 func (u openAIUsage) ToUsage(text string) contract.Usage {
@@ -720,6 +723,10 @@ func (u openAIUsage) ToUsage(text string) contract.Usage {
 	output := valueOrZero(u.OutputTokens)
 	if output == 0 {
 		output = valueOrZero(u.CompletionTokens)
+	}
+	imageOutput := 0
+	if u.OutputTokensDetails != nil {
+		imageOutput = valueOrZero(u.OutputTokensDetails.ImageTokens)
 	}
 	cached := valueOrZero(u.CachedTokens)
 	if cached == 0 && u.InputTokensDetails != nil {
@@ -735,14 +742,18 @@ func (u openAIUsage) ToUsage(text string) contract.Usage {
 	if total > 0 && output == 0 {
 		output = max(0, total-input-cached)
 	}
-	if input == 0 && output == 0 && cached == 0 {
+	if output < imageOutput {
+		output = imageOutput
+	}
+	if input == 0 && output == 0 && cached == 0 && imageOutput == 0 {
 		return estimatedUsage(text)
 	}
 	return contract.Usage{
-		InputTokens:  input,
-		OutputTokens: output,
-		CachedTokens: cached,
-		Estimated:    false,
+		InputTokens:       input,
+		OutputTokens:      output,
+		ImageOutputTokens: imageOutput,
+		CachedTokens:      cached,
+		Estimated:         false,
 	}
 }
 
@@ -774,7 +785,8 @@ func (u openAIUsage) HasTokenUsage() bool {
 		u.OutputTokens != nil ||
 		u.CachedTokens != nil ||
 		(u.InputTokensDetails != nil && u.InputTokensDetails.CachedTokens != nil) ||
-		(u.PromptTokensDetails != nil && u.PromptTokensDetails.CachedTokens != nil)
+		(u.PromptTokensDetails != nil && u.PromptTokensDetails.CachedTokens != nil) ||
+		(u.OutputTokensDetails != nil && u.OutputTokensDetails.ImageTokens != nil)
 }
 
 func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.ConversationResponse, error) {

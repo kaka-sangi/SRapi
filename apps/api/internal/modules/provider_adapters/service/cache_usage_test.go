@@ -65,3 +65,21 @@ func TestOpenAIUsageHasNoCacheCreation(t *testing.T) {
 		t.Fatalf("cache-creation tokens = %d, want 0 (OpenAI has no cache writes)", usage.CacheCreationTokens)
 	}
 }
+
+func TestOpenAIUsagePreservesImageOutputTokens(t *testing.T) {
+	imageOutput := 18
+	usage := openAIUsage{
+		OutputTokensDetails: &struct {
+			ImageTokens *int `json:"image_tokens"`
+		}{
+			ImageTokens: &imageOutput,
+		},
+	}.ToUsage("draw a quiet control room")
+
+	if usage.Estimated {
+		t.Fatal("usage should not be estimated when image output tokens are present")
+	}
+	if usage.OutputTokens != 18 || usage.ImageOutputTokens != 18 {
+		t.Fatalf("unexpected image usage: %+v", usage)
+	}
+}

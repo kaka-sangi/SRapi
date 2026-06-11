@@ -1284,7 +1284,7 @@ func TestOpenAICompatibleAdapterInvokesImageGenerationsUpstream(t *testing.T) {
 			t.Fatalf("expected image conversion fields, got %+v", payload)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"created":1710000000,"data":[{"url":"https://example.test/image-1.png","revised_prompt":"draw a precise test image, revised"},{"b64_json":"aW1hZ2UtMg=="}],"model":"image-upstream","usage":{"prompt_tokens":11,"completion_tokens":2,"total_tokens":13}}`))
+		_, _ = w.Write([]byte(`{"created":1710000000,"data":[{"url":"https://example.test/image-1.png","revised_prompt":"draw a precise test image, revised"},{"b64_json":"aW1hZ2UtMg=="}],"model":"image-upstream","usage":{"prompt_tokens":11,"completion_tokens":2,"total_tokens":13,"output_tokens_details":{"image_tokens":2}}}`))
 	}))
 	defer upstream.Close()
 
@@ -1318,7 +1318,7 @@ func TestOpenAICompatibleAdapterInvokesImageGenerationsUpstream(t *testing.T) {
 	if resp.Model != "image-upstream" || resp.Created != 1710000000 || len(resp.Data) != 2 || resp.Data[0].URL == "" || resp.Data[1].Base64JSON == "" {
 		t.Fatalf("unexpected image generation response: %+v", resp)
 	}
-	if resp.Usage.Estimated || resp.Usage.InputTokens != 11 || resp.Usage.OutputTokens != 2 {
+	if resp.Usage.Estimated || resp.Usage.InputTokens != 11 || resp.Usage.OutputTokens != 2 || resp.Usage.ImageOutputTokens != 2 {
 		t.Fatalf("unexpected image usage: %+v", resp.Usage)
 	}
 }
@@ -7377,7 +7377,7 @@ func TestReverseProxyCodexCLIAdapterBridgesImageGenerationToResponses(t *testing
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"ig_1\",\"type\":\"image_generation_call\",\"status\":\"completed\",\"result\":\"aW1hZ2U=\",\"revised_prompt\":\"paint a quiet control room, revised\",\"output_format\":\"png\"}}\n\n" +
-					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_img\",\"status\":\"completed\",\"model\":\"gpt-5.4\",\"usage\":{\"input_tokens\":12,\"output_tokens\":24},\"output\":[]}}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_img\",\"status\":\"completed\",\"model\":\"gpt-5.4\",\"usage\":{\"input_tokens\":12,\"output_tokens\":24,\"output_tokens_details\":{\"image_tokens\":18}},\"output\":[]}}\n\n" +
 					"data: [DONE]\n\n",
 			),
 		},
@@ -7475,7 +7475,7 @@ func TestReverseProxyCodexCLIAdapterBridgesImageGenerationToResponses(t *testing
 		payload.Tools[0].PartialImages != 2 {
 		t.Fatalf("unexpected codex image tool: %+v", payload.Tools)
 	}
-	if len(resp.Data) != 1 || resp.Data[0].Base64JSON != "aW1hZ2U=" || resp.Data[0].RevisedPrompt != "paint a quiet control room, revised" || resp.Model != "gpt-5.4" || resp.Usage.InputTokens != 12 || resp.Usage.OutputTokens != 24 {
+	if len(resp.Data) != 1 || resp.Data[0].Base64JSON != "aW1hZ2U=" || resp.Data[0].RevisedPrompt != "paint a quiet control room, revised" || resp.Model != "gpt-5.4" || resp.Usage.InputTokens != 12 || resp.Usage.OutputTokens != 24 || resp.Usage.ImageOutputTokens != 18 {
 		t.Fatalf("unexpected codex image response: %+v", resp)
 	}
 }
@@ -7608,7 +7608,7 @@ func TestReverseProxyCodexCLIAdapterStreamsImageGenerationEvents(t *testing.T) {
 			Body: io.NopCloser(strings.NewReader(
 				"data: {\"type\":\"response.created\",\"response\":{\"created_at\":1710000001,\"tools\":[{\"type\":\"image_generation\",\"model\":\"gpt-image-2\",\"background\":\"auto\",\"output_format\":\"png\",\"quality\":\"high\",\"size\":\"1024x1024\"}]}}\n\n" +
 					"data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\",\"background\":\"auto\"}\n\n" +
-					"data: {\"type\":\"response.completed\",\"response\":{\"created_at\":1710000001,\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"total_tokens\":14},\"tools\":[{\"type\":\"image_generation\",\"model\":\"gpt-image-2\",\"background\":\"auto\",\"output_format\":\"png\",\"quality\":\"high\",\"size\":\"1024x1024\"}],\"output\":[{\"type\":\"image_generation_call\",\"result\":\"ZmluYWw=\",\"output_format\":\"png\"}]}}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"created_at\":1710000001,\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"total_tokens\":14,\"output_tokens_details\":{\"image_tokens\":7}},\"tools\":[{\"type\":\"image_generation\",\"model\":\"gpt-image-2\",\"background\":\"auto\",\"output_format\":\"png\",\"quality\":\"high\",\"size\":\"1024x1024\"}],\"output\":[{\"type\":\"image_generation_call\",\"result\":\"ZmluYWw=\",\"output_format\":\"png\"}]}}\n\n" +
 					"data: [DONE]\n\n",
 			)),
 		},
@@ -7667,7 +7667,7 @@ func TestReverseProxyCodexCLIAdapterStreamsImageGenerationEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse rendered image stream: %v", err)
 	}
-	if len(parsed.Data) != 1 || parsed.Data[0].URL != "data:image/png;base64,ZmluYWw=" || parsed.Data[0].Base64JSON != "ZmluYWw=" || parsed.Usage.InputTokens != 5 || parsed.Usage.OutputTokens != 9 || parsed.Usage.Estimated {
+	if len(parsed.Data) != 1 || parsed.Data[0].URL != "data:image/png;base64,ZmluYWw=" || parsed.Data[0].Base64JSON != "ZmluYWw=" || parsed.Usage.InputTokens != 5 || parsed.Usage.OutputTokens != 9 || parsed.Usage.ImageOutputTokens != 7 || parsed.Usage.Estimated {
 		t.Fatalf("unexpected parsed rendered image stream: %+v", parsed)
 	}
 	if !runtime.request.ExpectStream || runtime.request.URL != "https://upstream.example/backend-api/codex/responses" {

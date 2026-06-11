@@ -499,6 +499,9 @@ func codexImageGenerationUsagePayload(usage openAIUsage) map[string]any {
 	if usage.PromptTokensDetails != nil {
 		payload["prompt_tokens_details"] = usage.PromptTokensDetails
 	}
+	if usage.OutputTokensDetails != nil {
+		payload["output_tokens_details"] = usage.OutputTokensDetails
+	}
 	return payload
 }
 
