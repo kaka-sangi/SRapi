@@ -4162,17 +4162,25 @@ func TestAnthropicCompatibleAdapterRectifiesThinkingBudget(t *testing.T) {
 	}
 }
 
-func TestAnthropicCompatibleAdapterDoesNotSendOpenAIReasoningAsThinking(t *testing.T) {
+func TestAnthropicCompatibleAdapterMapsOpenAIReasoningEffortToThinking(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var payload map[string]any
+		var payload struct {
+			MaxTokens int            `json:"max_tokens"`
+			Thinking  map[string]any `json:"thinking"`
+		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode upstream request: %v", err)
 		}
-		if _, ok := payload["thinking"]; ok {
-			t.Fatalf("did not expect OpenAI reasoning shape to be sent as Anthropic thinking, got %+v", payload)
+		if payload.MaxTokens != 25576 ||
+			payload.Thinking["type"] != "enabled" ||
+			payload.Thinking["budget_tokens"] != float64(24576) {
+			t.Fatalf("expected OpenAI reasoning effort to become Anthropic thinking, got %+v", payload)
+		}
+		if _, ok := payload.Thinking["effort"]; ok {
+			t.Fatalf("did not expect OpenAI reasoning shape to leak into Anthropic thinking, got %+v", payload)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"reasoning ignored"}],"usage":{"input_tokens":2,"output_tokens":1}}`))
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"reasoning mapped"}],"usage":{"input_tokens":2,"output_tokens":1}}`))
 	}))
 	defer upstream.Close()
 

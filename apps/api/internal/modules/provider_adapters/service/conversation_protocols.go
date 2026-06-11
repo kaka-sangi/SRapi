@@ -30,10 +30,7 @@ type anthropicMessage struct {
 }
 
 func anthropicCompatiblePayload(req contract.ConversationRequest) anthropicMessagesRequest {
-	maxTokens := 1024
-	if req.MaxOutputTokens != nil && *req.MaxOutputTokens > 0 {
-		maxTokens = *req.MaxOutputTokens
-	}
+	maxTokens := anthropicCompatibleMaxTokens(req)
 	return anthropicMessagesRequest{
 		Model:             req.Mapping.UpstreamModelName,
 		Messages:          anthropicCompatibleMessages(req),
@@ -48,6 +45,17 @@ func anthropicCompatiblePayload(req contract.ConversationRequest) anthropicMessa
 		Tools:             anthropicCompatibleTools(req.Tools),
 		ToolChoice:        anthropicCompatibleToolChoice(req.ToolChoice),
 	}
+}
+
+func anthropicCompatibleMaxTokens(req contract.ConversationRequest) int {
+	if req.MaxOutputTokens != nil && *req.MaxOutputTokens > 0 {
+		return *req.MaxOutputTokens
+	}
+	maxTokens := 1024
+	if budget, ok := anthropicThinkingBudget(req.Reasoning); ok && budget >= maxTokens {
+		return budget + 1000
+	}
+	return maxTokens
 }
 
 func anthropicCompatibleRequestBody(req contract.ConversationRequest) ([]byte, error) {
@@ -72,25 +80,80 @@ func anthropicCompatibleThinking(reasoning map[string]any, maxTokens int) map[st
 	thinkingType := strings.ToLower(strings.TrimSpace(metadataString(reasoning, "type")))
 	switch thinkingType {
 	case "enabled":
+		return anthropicEnabledThinking(reasoning, maxTokens)
 	case "adaptive":
-		out := cloneMap(reasoning)
-		out["type"] = "adaptive"
-		delete(out, "budget_tokens")
-		return out
-	default:
+		return map[string]any{"type": "adaptive"}
+	case "disabled":
+		return map[string]any{"type": "disabled"}
+	}
+
+	effort := strings.ToLower(strings.TrimSpace(metadataString(reasoning, "effort")))
+	if effort == "" {
+		effort = strings.ToLower(strings.TrimSpace(metadataString(reasoning, "level")))
+	}
+	if effort == "" {
 		return nil
 	}
-	out := cloneMap(reasoning)
-	out["type"] = "enabled"
-	budget := positiveIntValue(out["budget_tokens"])
+	switch effort {
+	case "none":
+		return map[string]any{"type": "disabled"}
+	case "auto":
+		return map[string]any{"type": "enabled"}
+	default:
+		budget, ok := anthropicThinkingBudgetForEffort(effort)
+		if !ok {
+			return nil
+		}
+		return anthropicEnabledThinking(map[string]any{"budget_tokens": budget}, maxTokens)
+	}
+}
+
+func anthropicEnabledThinking(reasoning map[string]any, maxTokens int) map[string]any {
+	budget := positiveIntValue(reasoning["budget_tokens"])
 	if budget <= 0 || budget >= maxTokens {
 		budget = maxTokens - 1
 	}
 	if budget < 1024 {
 		return nil
 	}
-	out["budget_tokens"] = budget
-	return out
+	return map[string]any{
+		"type":          "enabled",
+		"budget_tokens": budget,
+	}
+}
+
+func anthropicThinkingBudget(reasoning map[string]any) (int, bool) {
+	if budget := positiveIntValue(reasoning["budget_tokens"]); budget > 0 {
+		return budget, true
+	}
+	effort := strings.ToLower(strings.TrimSpace(metadataString(reasoning, "effort")))
+	if effort == "" {
+		effort = strings.ToLower(strings.TrimSpace(metadataString(reasoning, "level")))
+	}
+	return anthropicThinkingBudgetForEffort(effort)
+}
+
+func anthropicThinkingBudgetForEffort(effort string) (int, bool) {
+	switch strings.ToLower(strings.TrimSpace(effort)) {
+	case "none":
+		return 0, true
+	case "auto":
+		return -1, true
+	case "minimal":
+		return 512, true
+	case "low":
+		return 1024, true
+	case "medium":
+		return 8192, true
+	case "high":
+		return 24576, true
+	case "xhigh":
+		return 32768, true
+	case "max":
+		return 128000, true
+	default:
+		return 0, false
+	}
 }
 
 func positiveIntValue(value any) int {
