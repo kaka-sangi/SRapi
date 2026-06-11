@@ -118,3 +118,70 @@ func TestCodexResponsesPayloadKeepsOnlyPriorityServiceTier(t *testing.T) {
 		})
 	}
 }
+
+func TestCodexResponsesPayloadNormalizesBuiltinToolAliases(t *testing.T) {
+	payload, _, err := codexResponsesPayload(contract.ConversationRequest{
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		RawBody: []byte(`{
+			"model":"codex-local",
+			"input":"find latest model news",
+			"tools":[
+				{"type":"web_search_preview_2025_03_11"}
+			],
+			"tool_choice":{
+				"type":"allowed_tools",
+				"tools":[
+					{"type":"web_search_preview"},
+					{"type":"web_search_preview_2025_03_11"}
+				]
+			}
+		}`),
+		Mapping: modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+	})
+	if err != nil {
+		t.Fatalf("build codex responses payload: %v", err)
+	}
+	tools, ok := payload["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("expected one tool, got %+v", payload["tools"])
+	}
+	tool, _ := tools[0].(map[string]any)
+	if tool["type"] != "web_search" {
+		t.Fatalf("tools.0.type = %v, want web_search", tool["type"])
+	}
+	choice, ok := payload["tool_choice"].(map[string]any)
+	if !ok || choice["type"] != "allowed_tools" {
+		t.Fatalf("expected allowed_tools tool_choice, got %+v", payload["tool_choice"])
+	}
+	choiceTools, ok := choice["tools"].([]any)
+	if !ok || len(choiceTools) != 2 {
+		t.Fatalf("expected two allowed tools, got %+v", choice["tools"])
+	}
+	for i, rawTool := range choiceTools {
+		choiceTool, _ := rawTool.(map[string]any)
+		if choiceTool["type"] != "web_search" {
+			t.Fatalf("tool_choice.tools.%d.type = %v, want web_search", i, choiceTool["type"])
+		}
+	}
+}
+
+func TestCodexResponsesPayloadNormalizesTopLevelBuiltinToolChoiceAlias(t *testing.T) {
+	payload, _, err := codexResponsesPayload(contract.ConversationRequest{
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		RawBody: []byte(`{
+			"model":"codex-local",
+			"input":"find latest model news",
+			"tool_choice":{"type":"web_search_preview_2025_03_11"}
+		}`),
+		Mapping: modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+	})
+	if err != nil {
+		t.Fatalf("build codex responses payload: %v", err)
+	}
+	choice, ok := payload["tool_choice"].(map[string]any)
+	if !ok || choice["type"] != "web_search" {
+		t.Fatalf("expected web_search tool_choice, got %+v", payload["tool_choice"])
+	}
+}

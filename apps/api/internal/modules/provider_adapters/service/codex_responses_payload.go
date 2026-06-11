@@ -720,6 +720,7 @@ func codexNormalizeResponsesTools(payload map[string]any) {
 	}
 	codexMigrateLegacyFunctionFields(payload)
 	normalizeOpenAIResponsesImageGenerationTools(payload)
+	codexNormalizeResponsesBuiltinTools(payload)
 	codexNormalizeResponsesToolSchemas(payload)
 	codexNormalizeResponsesToolChoice(payload)
 }
@@ -873,6 +874,61 @@ func codexNormalizeResponsesFunctionTool(tool map[string]any) (map[string]any, b
 	return out, true, changed
 }
 
+func codexNormalizeResponsesBuiltinTools(payload map[string]any) {
+	if tools, ok := codexAnySlice(payload["tools"]); ok {
+		modified := false
+		for _, rawTool := range tools {
+			tool, ok := rawTool.(map[string]any)
+			if !ok {
+				continue
+			}
+			modified = codexNormalizeResponsesBuiltinTool(tool) || modified
+		}
+		if modified {
+			payload["tools"] = tools
+		}
+	}
+	choiceMap, ok := payload["tool_choice"].(map[string]any)
+	if !ok {
+		return
+	}
+	codexNormalizeResponsesBuiltinTool(choiceMap)
+	tools, ok := codexAnySlice(choiceMap["tools"])
+	if !ok {
+		return
+	}
+	modified := false
+	for _, rawTool := range tools {
+		tool, ok := rawTool.(map[string]any)
+		if !ok {
+			continue
+		}
+		modified = codexNormalizeResponsesBuiltinTool(tool) || modified
+	}
+	if modified {
+		choiceMap["tools"] = tools
+	}
+}
+
+func codexNormalizeResponsesBuiltinTool(tool map[string]any) bool {
+	current := strings.TrimSpace(codexStringValue(tool["type"]))
+	normalized := codexNormalizeResponsesBuiltinToolType(current)
+	if normalized == "" {
+		return false
+	}
+	tool["type"] = normalized
+	return true
+}
+
+func codexNormalizeResponsesBuiltinToolType(toolType string) string {
+	switch strings.TrimSpace(toolType) {
+	case "web_search_preview", "web_search_preview_2025_03_11":
+		return "web_search"
+	default:
+		return ""
+	}
+}
+
 func codexNormalizeResponsesToolChoice(payload map[string]any) {
 	choice, ok := payload["tool_choice"]
 	if !ok || choice == nil {
@@ -885,6 +941,9 @@ func codexNormalizeResponsesToolChoice(payload map[string]any) {
 	choiceType := strings.TrimSpace(codexStringValue(choiceMap["type"]))
 	if choiceType == "" {
 		payload["tool_choice"] = "auto"
+		return
+	}
+	if choiceType == "allowed_tools" || codexResponsesBuiltinToolChoiceType(choiceType) {
 		return
 	}
 	if choiceType == "function" {
@@ -904,6 +963,10 @@ func codexNormalizeResponsesToolChoice(payload map[string]any) {
 	if !codexResponsesToolsContainType(payload["tools"], choiceType) {
 		payload["tool_choice"] = "auto"
 	}
+}
+
+func codexResponsesBuiltinToolChoiceType(toolType string) bool {
+	return strings.TrimSpace(toolType) == "web_search"
 }
 
 func codexResponsesToolsContainFunction(tools any, name string) bool {
