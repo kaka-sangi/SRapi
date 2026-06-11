@@ -106,8 +106,32 @@ func TestDeriveGatewaySessionAffinityCascade(t *testing.T) {
 		httpReq := httptest.NewRequest("POST", "/v1/chat/completions", nil)
 		httpReq.Header.Set("X-Session-Id", "abc")
 		key, source := deriveGatewaySessionAffinity(httpReq, req)
-		if !strings.HasPrefix(key, "sid:hdr:") || source != "derived:session_header" {
+		if !strings.HasPrefix(key, "sid:hdr:") || source != "derived:x_session_id" {
 			t.Fatalf("expected session header key, got key=%q source=%q", key, source)
+		}
+	})
+
+	t.Run("cli session headers", func(t *testing.T) {
+		for _, tc := range []struct {
+			name   string
+			header string
+			source string
+		}{
+			{name: "codex underscore session", header: "Session_id", source: "derived:session_id"},
+			{name: "amp thread", header: "X-Amp-Thread-Id", source: "derived:amp_thread_id"},
+			{name: "client request", header: "X-Client-Request-Id", source: "derived:client_request_id"},
+			{name: "conversation underscore", header: "Conversation_id", source: "derived:conversation_id"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				req := conversational
+				req.RawBody = []byte(`{}`)
+				httpReq := httptest.NewRequest("POST", "/v1/chat/completions", nil)
+				httpReq.Header.Set(tc.header, "cli-session-123")
+				key, source := deriveGatewaySessionAffinity(httpReq, req)
+				if !strings.HasPrefix(key, "sid:hdr:") || source != tc.source {
+					t.Fatalf("expected %s key, got key=%q source=%q", tc.source, key, source)
+				}
+			})
 		}
 	})
 
