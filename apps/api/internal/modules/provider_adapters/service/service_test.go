@@ -2568,7 +2568,7 @@ func TestGeminiCompatibleAdapterInvokesGenerateContentUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke gemini upstream: %v", err)
 	}
-	if conversationResponseText(resp) != "gemini says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 9 || resp.Usage.OutputTokens != 10 || resp.Usage.CachedTokens != 1 {
+	if conversationResponseText(resp) != "gemini says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 8 || resp.Usage.OutputTokens != 10 || resp.Usage.CachedTokens != 1 {
 		t.Fatalf("unexpected gemini response: %+v", resp)
 	}
 }

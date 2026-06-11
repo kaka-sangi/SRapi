@@ -99,8 +99,24 @@ func TestGeminiUsageIncludesThoughtsTokensInOutput(t *testing.T) {
 	if usage.Estimated {
 		t.Fatal("usage should not be estimated when Gemini token counts are present")
 	}
-	if usage.InputTokens != 100 || usage.OutputTokens != 70 || usage.CachedTokens != 10 {
+	if usage.InputTokens != 90 || usage.OutputTokens != 70 || usage.CachedTokens != 10 {
 		t.Fatalf("unexpected gemini usage: %+v", usage)
+	}
+}
+
+func TestGeminiUsageClampsInputWhenCachedTokensExceedPromptTokens(t *testing.T) {
+	prompt := 8
+	cached := 10
+	usage := geminiUsageMetadata{
+		PromptTokenCount:        &prompt,
+		CachedContentTokenCount: &cached,
+	}.ToUsage("gemini response")
+
+	if usage.Estimated {
+		t.Fatal("usage should not be estimated when Gemini cache tokens are present")
+	}
+	if usage.InputTokens != 0 || usage.CachedTokens != 10 {
+		t.Fatalf("unexpected clamped gemini cache usage: %+v", usage)
 	}
 }
 

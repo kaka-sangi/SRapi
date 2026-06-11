@@ -618,9 +618,9 @@ type geminiUsageMetadata struct {
 }
 
 func (u geminiUsageMetadata) ToUsage(text string) contract.Usage {
-	input := valueOrZero(u.PromptTokenCount)
-	output := valueOrZero(u.CandidatesTokenCount) + valueOrZero(u.ThoughtsTokenCount)
 	cached := valueOrZero(u.CachedContentTokenCount)
+	input := max(0, valueOrZero(u.PromptTokenCount)-cached)
+	output := valueOrZero(u.CandidatesTokenCount) + valueOrZero(u.ThoughtsTokenCount)
 	total := input + output + cached
 	if u.TotalTokenCount != nil && *u.TotalTokenCount > 0 && total == 0 {
 		total = *u.TotalTokenCount
