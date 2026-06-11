@@ -244,10 +244,14 @@ func QuotaCreditSnapshotFromReport(account ProviderAccount, report QuotaCreditRe
 	if remaining == "" && used == "" && limit == "" {
 		return AccountQuotaSnapshot{}, false
 	}
+	if _, ok := creditRemainingRatio(remaining, used, limit); !ok {
+		return AccountQuotaSnapshot{}, false
+	}
 	snapshotAt := report.FetchedAt
 	if snapshotAt.IsZero() {
 		snapshotAt = time.Now().UTC()
 	}
+	remainingRatio, _ := creditRemainingRatio(remaining, used, limit)
 	return AccountQuotaSnapshot{
 		AccountID:      account.ID,
 		ProviderID:     account.ProviderID,
@@ -255,22 +259,22 @@ func QuotaCreditSnapshotFromReport(account ProviderAccount, report QuotaCreditRe
 		Remaining:      remaining,
 		Used:           used,
 		QuotaLimit:     limit,
-		RemainingRatio: creditRemainingRatio(remaining, used, limit),
+		RemainingRatio: remainingRatio,
 		SnapshotAt:     snapshotAt.UTC(),
 	}, true
 }
 
-func creditRemainingRatio(remaining string, used string, limit string) float32 {
+func creditRemainingRatio(remaining string, used string, limit string) (float32, bool) {
 	remainingValue, remainingOK := parseQuotaFloat(remaining)
 	limitValue, limitOK := parseQuotaFloat(limit)
 	if remainingOK && limitOK && limitValue > 0 {
-		return clampQuotaRatio(float32(remainingValue / limitValue))
+		return clampQuotaRatio(float32(remainingValue / limitValue)), true
 	}
 	usedValue, usedOK := parseQuotaFloat(used)
 	if remainingOK && usedOK && remainingValue+usedValue > 0 {
-		return clampQuotaRatio(float32(remainingValue / (remainingValue + usedValue)))
+		return clampQuotaRatio(float32(remainingValue / (remainingValue + usedValue))), true
 	}
-	return 0
+	return 0, false
 }
 
 func parseQuotaFloat(value string) (float64, bool) {

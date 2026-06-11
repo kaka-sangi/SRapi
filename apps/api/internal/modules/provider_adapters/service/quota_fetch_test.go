@@ -345,6 +345,62 @@ func TestFetchAccountQuotaAntigravityUsesProjectHeaderAndSupportsQuota(t *testin
 	}
 }
 
+func TestFetchAccountQuotaAntigravityMapsPaidTierCreditsFallback(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"currentTier": {"id": "free-tier", "name": "Free"},
+			"paidTier": {
+				"id": "g1-pro-tier",
+				"name": "Google One Pro",
+				"availableCredits": [
+					{"creditType": "OTHER", "creditAmount": "10", "minimumCreditAmountForUsage": "1"},
+					{"creditType": "GOOGLE_ONE_AI", "creditAmount": "25000", "minimumCreditAmountForUsage": "50"}
+				]
+			}
+		}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	report, err := svc.FetchAccountQuota(context.Background(), contract.ProbeRequest{
+		Provider: providercontract.Provider{
+			ID:          3,
+			Name:        "antigravity",
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "gemini-compatible",
+			Status:      providercontract.StatusActive,
+			ConfigSchema: map[string]any{
+				"quota_url": upstream.URL + "/v1internal:loadCodeAssist",
+				"auth_mode": "bearer",
+			},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           31,
+			ProviderID:   3,
+			Name:         "antigravity-oauth",
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Status:       accountcontract.StatusActive,
+			Metadata:     map[string]any{},
+		},
+		Credential: map[string]any{"access_token": "antigravity-access-token"},
+	})
+	if err != nil {
+		t.Fatalf("fetch antigravity quota: %v", err)
+	}
+	if !report.Supported ||
+		report.Plan != "g1-pro-tier" ||
+		report.CreditsRemaining != "25000" ||
+		report.CreditsUsed != "" ||
+		report.CreditsLimit != "" ||
+		report.Currency != "GOOGLE_ONE_AI" {
+		t.Fatalf("unexpected antigravity paid tier quota report: %+v", report)
+	}
+}
+
 func anthropicQuotaProbeRequest(quotaURL string) contract.ProbeRequest {
 	return contract.ProbeRequest{
 		Provider: providercontract.Provider{

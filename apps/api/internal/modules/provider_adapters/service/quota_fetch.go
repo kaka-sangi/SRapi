@@ -85,6 +85,9 @@ func (s *Service) fetchAccountQuotaUncached(ctx context.Context, req contract.Pr
 		if isCodexQuotaProbe(req) {
 			applyCodexAccountsCheckQuotaFallback(parsed, req, &report)
 		}
+		if isAntigravityQuotaProbe(req) {
+			applyAntigravityCreditsQuotaFallback(parsed, &report)
+		}
 	}
 
 	// Fold in provider header signals (e.g. Codex rate-limit windows) so the
@@ -395,6 +398,70 @@ func mapStringAccount(value any) (map[string]any, bool) {
 
 func isCodexQuotaProbe(req contract.ProbeRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-codex-cli")
+}
+
+func isAntigravityQuotaProbe(req contract.ProbeRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-antigravity")
+}
+
+func applyAntigravityCreditsQuotaFallback(parsed any, report *contract.QuotaReport) {
+	if report == nil {
+		return
+	}
+	root, ok := parsed.(map[string]any)
+	if !ok {
+		return
+	}
+	paidTier, ok := root["paidTier"].(map[string]any)
+	if !ok {
+		if plan := mapString(root, "paidTier"); plan != "" && strings.TrimSpace(report.Plan) == "" {
+			report.Plan = plan
+		}
+		return
+	}
+	if strings.TrimSpace(report.Plan) == "" {
+		report.Plan = firstNonEmpty(mapString(paidTier, "id"), mapString(paidTier, "name"))
+	}
+	if strings.TrimSpace(report.CreditsRemaining) != "" {
+		return
+	}
+	credit := antigravityCreditRecord(paidTier["availableCredits"])
+	if credit == nil {
+		return
+	}
+	if amount := mapString(credit, "creditAmount"); amount != "" {
+		report.CreditsRemaining = amount
+	}
+	if currency := mapString(credit, "creditType"); currency != "" && strings.TrimSpace(report.Currency) == "" {
+		report.Currency = currency
+	}
+	if strings.TrimSpace(report.CreditsLimit) == "" {
+		report.CreditsLimit = firstNonEmpty(mapString(credit, "creditLimit"), mapString(credit, "limit"))
+	}
+	if strings.TrimSpace(report.CreditsUsed) == "" {
+		report.CreditsUsed = firstNonEmpty(mapString(credit, "creditUsed"), mapString(credit, "used"))
+	}
+}
+
+func antigravityCreditRecord(value any) map[string]any {
+	credits, ok := value.([]any)
+	if !ok || len(credits) == 0 {
+		return nil
+	}
+	var first map[string]any
+	for _, raw := range credits {
+		credit, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if first == nil {
+			first = credit
+		}
+		if strings.EqualFold(mapString(credit, "creditType"), "GOOGLE_ONE_AI") {
+			return credit
+		}
+	}
+	return first
 }
 
 func codexAccountsCheckEndpoint(req contract.ProbeRequest) string {

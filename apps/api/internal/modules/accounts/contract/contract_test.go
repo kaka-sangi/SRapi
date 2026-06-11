@@ -61,3 +61,37 @@ func TestShouldRefreshOAuthCredential(t *testing.T) {
 		})
 	}
 }
+
+func TestQuotaCreditSnapshotFromReport(t *testing.T) {
+	account := ProviderAccount{ID: 10, ProviderID: 20}
+	fetchedAt := time.Date(2026, 6, 11, 1, 2, 3, 0, time.UTC)
+
+	snapshot, ok := QuotaCreditSnapshotFromReport(account, QuotaCreditReport{
+		CreditsRemaining: "900",
+		CreditsUsed:      "100",
+		CreditsLimit:     "1000",
+		FetchedAt:        fetchedAt,
+	})
+	if !ok {
+		t.Fatal("expected provider credits snapshot")
+	}
+	if snapshot.QuotaType != QuotaTypeProviderCredits ||
+		snapshot.Remaining != "900" ||
+		snapshot.Used != "100" ||
+		snapshot.QuotaLimit != "1000" ||
+		snapshot.RemainingRatio != 0.9 ||
+		!snapshot.SnapshotAt.Equal(fetchedAt) {
+		t.Fatalf("unexpected provider credits snapshot: %+v", snapshot)
+	}
+}
+
+func TestQuotaCreditSnapshotFromReportSkipsUnknownCreditRatio(t *testing.T) {
+	account := ProviderAccount{ID: 10, ProviderID: 20}
+
+	if snapshot, ok := QuotaCreditSnapshotFromReport(account, QuotaCreditReport{
+		CreditsRemaining: "25000",
+		Currency:         "GOOGLE_ONE_AI",
+	}); ok {
+		t.Fatalf("expected unknown credit ratio to skip provider credits snapshot, got %+v", snapshot)
+	}
+}
