@@ -10,17 +10,18 @@ import (
 )
 
 type openAIChatCompletionRequest struct {
-	Model          string               `json:"model"`
-	Messages       []openAIChatMessage  `json:"messages"`
-	Stream         bool                 `json:"stream"`
-	StreamOptions  *openAIStreamOptions `json:"stream_options,omitempty"`
-	Temperature    *float32             `json:"temperature,omitempty"`
-	TopP           *float32             `json:"top_p,omitempty"`
-	MaxTokens      *int                 `json:"max_tokens,omitempty"`
-	Stop           []string             `json:"stop,omitempty"`
-	Tools          []map[string]any     `json:"tools,omitempty"`
-	ToolChoice     any                  `json:"tool_choice,omitempty"`
-	ResponseFormat map[string]any       `json:"response_format,omitempty"`
+	Model           string               `json:"model"`
+	Messages        []openAIChatMessage  `json:"messages"`
+	Stream          bool                 `json:"stream"`
+	StreamOptions   *openAIStreamOptions `json:"stream_options,omitempty"`
+	ReasoningEffort string               `json:"reasoning_effort,omitempty"`
+	Temperature     *float32             `json:"temperature,omitempty"`
+	TopP            *float32             `json:"top_p,omitempty"`
+	MaxTokens       *int                 `json:"max_tokens,omitempty"`
+	Stop            []string             `json:"stop,omitempty"`
+	Tools           []map[string]any     `json:"tools,omitempty"`
+	ToolChoice      any                  `json:"tool_choice,omitempty"`
+	ResponseFormat  map[string]any       `json:"response_format,omitempty"`
 }
 
 type openAIEmbeddingRequest struct {
@@ -78,6 +79,9 @@ func openAICompatiblePayload(req contract.ConversationRequest) openAIChatComplet
 		Tools:          cloneMapSlice(req.Tools),
 		ToolChoice:     cloneAny(req.ToolChoice),
 		ResponseFormat: cloneMap(req.ResponseFormat),
+	}
+	if effort := strings.TrimSpace(metadataString(req.Reasoning, "effort")); effort != "" {
+		payload.ReasoningEffort = effort
 	}
 	if req.Stream {
 		payload.StreamOptions = &openAIStreamOptions{IncludeUsage: true}

@@ -29,6 +29,7 @@ func TestNormalizeChatCompletionsProducesCanonicalRequest(t *testing.T) {
 		},
 		ResponseFormat: &apiopenapi.JsonObject{"type": "json_object"},
 	}
+	req.Set("reasoning_effort", "high")
 
 	canonical := svc.NormalizeChatCompletions(req, RequestMeta{
 		RequestID:      "req_1",
@@ -53,7 +54,12 @@ func TestNormalizeChatCompletionsProducesCanonicalRequest(t *testing.T) {
 	if canonical.ResponseFormat["type"] != "json_object" {
 		t.Fatalf("expected response format to be preserved, got %+v", canonical.ResponseFormat)
 	}
-	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyVisionInput) || !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStructuredOutput) {
+	if canonical.Reasoning["effort"] != "high" {
+		t.Fatalf("expected reasoning_effort to be preserved, got %+v", canonical.Reasoning)
+	}
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyVisionInput) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStructuredOutput) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyReasoningControl) {
 		t.Fatalf("expected request capabilities, got %+v", canonical.RequestCapabilities)
 	}
 }

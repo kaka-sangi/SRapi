@@ -417,6 +417,42 @@ func TestOpenAICompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleAdapterSendsCanonicalReasoningEffort(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload["reasoning_effort"] != "high" {
+			t.Fatalf("expected reasoning_effort from canonical reasoning, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"reasoned ok"}}],"usage":{"prompt_tokens":2,"completion_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_openai_reasoning_effort",
+		Model:      "gpt-local",
+		InputParts: textParts("think"),
+		Reasoning:  map[string]any{"effort": "high"},
+		Provider:   providercontract.Provider{AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke OpenAI upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "reasoned ok" {
+		t.Fatalf("unexpected OpenAI reasoning response: %+v", resp)
+	}
+}
+
 func TestOpenAICompatibleAdapterDoesNotUseResponsesRawBodyForChatUpstream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {

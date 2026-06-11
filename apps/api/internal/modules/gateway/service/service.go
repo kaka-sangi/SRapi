@@ -52,6 +52,7 @@ func (s *Service) NormalizeChatCompletions(req apiopenapi.ChatCompletionRequest,
 	canonical.Tools = toolDefinitionsToMaps(req.Tools)
 	canonical.ToolChoice = chatToolChoice(req.ToolChoice)
 	canonical.ResponseFormat = cloneJSONMap(req.ResponseFormat)
+	canonical.Reasoning = chatReasoningFromAdditionalProperties(req.AdditionalProperties)
 	refreshRequestCapabilities(&canonical)
 	return canonical
 }
@@ -1561,6 +1562,14 @@ func cloneJSONMaps(values *[]apiopenapi.JsonObject) []map[string]any {
 		out = append(out, cloneMap(value))
 	}
 	return out
+}
+
+func chatReasoningFromAdditionalProperties(values map[string]any) map[string]any {
+	effort := strings.TrimSpace(mapStringAny(values, "reasoning_effort"))
+	if effort == "" {
+		return nil
+	}
+	return map[string]any{"effort": effort}
 }
 
 func cloneStringSlicePtr(value *[]string) []string {
