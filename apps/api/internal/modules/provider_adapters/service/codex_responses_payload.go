@@ -291,14 +291,20 @@ func codexNormalizeResponsesText(payload map[string]any) {
 
 func codexNormalizeServiceTier(req contract.ConversationRequest, payload map[string]any) {
 	if value, ok := payload["service_tier"].(string); ok {
-		if strings.EqualFold(strings.TrimSpace(value), "fast") {
+		switch {
+		case strings.EqualFold(strings.TrimSpace(value), "fast"):
 			payload["service_tier"] = "priority"
+		case !strings.EqualFold(strings.TrimSpace(value), "priority"):
+			delete(payload, "service_tier")
 		}
 		return
 	}
 	if serviceTier := requestSetting(req, "codex_service_tier", "service_tier"); serviceTier != "" {
-		if strings.EqualFold(serviceTier, "fast") {
+		switch {
+		case strings.EqualFold(serviceTier, "fast"):
 			serviceTier = "priority"
+		case !strings.EqualFold(serviceTier, "priority"):
+			return
 		}
 		payload["service_tier"] = serviceTier
 	}
