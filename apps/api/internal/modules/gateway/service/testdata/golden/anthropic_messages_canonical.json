@@ -80,6 +80,7 @@
   "tool_choice": "auto",
   "reasoning": {
     "budget_tokens": 128,
+    "effort": "minimal",
     "type": "enabled"
   },
   "prompt": "system: You are careful.\n[image]\nuser: Draft a response.\n[image]\nassistant: Existing context.",
