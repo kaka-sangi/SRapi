@@ -310,8 +310,9 @@ export function AccountFormDialog({
 
   // These keys live inside metadata but each gets a dedicated editor below; keep
   // them out of the generic metadata editor so the editors never overwrite each
-  // other. model_mapping is a map; supported_models/excluded_models are lists.
+  // other. model_mapping/compact_model_mapping are maps; supported_models/excluded_models are lists.
   const modelMappingKey = "model_mapping";
+  const compactModelMappingKey = "compact_model_mapping";
   const supportedModelsKey = "supported_models";
   const excludedModelsKey = "excluded_models";
   const tlsProfileKey = "tls_profile";
@@ -319,6 +320,11 @@ export function AccountFormDialog({
   const modelMapping =
     rawModelMapping && typeof rawModelMapping === "object" && !Array.isArray(rawModelMapping)
       ? (rawModelMapping as Record<string, unknown>)
+      : {};
+  const rawCompactModelMapping = metadata[compactModelMappingKey];
+  const compactModelMapping =
+    rawCompactModelMapping && typeof rawCompactModelMapping === "object" && !Array.isArray(rawCompactModelMapping)
+      ? (rawCompactModelMapping as Record<string, unknown>)
       : {};
   const supportedModels = metadataStringList(metadata[supportedModelsKey]);
   const excludedModels = metadataStringList(metadata[excludedModelsKey]);
@@ -328,6 +334,7 @@ export function AccountFormDialog({
   // The generic metadata editor shows everything except the dedicated keys.
   const metadataWithoutDedicated: Record<string, unknown> = { ...metadata };
   delete metadataWithoutDedicated[modelMappingKey];
+  delete metadataWithoutDedicated[compactModelMappingKey];
   delete metadataWithoutDedicated[supportedModelsKey];
   delete metadataWithoutDedicated[excludedModelsKey];
   delete metadataWithoutDedicated[tlsProfileKey];
@@ -335,6 +342,7 @@ export function AccountFormDialog({
   const withDedicated = (base: Record<string, unknown>): Record<string, unknown> => {
     const next = { ...base };
     if (Object.keys(modelMapping).length > 0) next[modelMappingKey] = modelMapping;
+    if (Object.keys(compactModelMapping).length > 0) next[compactModelMappingKey] = compactModelMapping;
     if (supportedModels.length > 0) next[supportedModelsKey] = supportedModels;
     if (excludedModels.length > 0) next[excludedModelsKey] = excludedModels;
     if (selectedTlsProfile) next[tlsProfileKey] = selectedTlsProfile;
@@ -348,6 +356,16 @@ export function AccountFormDialog({
         : (() => {
             const base = withDedicated(metadataWithoutDedicated);
             delete base[modelMappingKey];
+            return base;
+          })(),
+    );
+  const updateCompactModelMapping = (next: Record<string, unknown>) =>
+    setMetadata(
+      Object.keys(next).length > 0
+        ? { ...withDedicated(metadataWithoutDedicated), [compactModelMappingKey]: next }
+        : (() => {
+            const base = withDedicated(metadataWithoutDedicated);
+            delete base[compactModelMappingKey];
             return base;
           })(),
     );
@@ -777,6 +795,22 @@ export function AccountFormDialog({
                         keyPlaceholder={t("adminAccounts.modelMappingKeyPlaceholder")}
                         valuePlaceholder={t("adminAccounts.modelMappingValuePlaceholder")}
                         addLabel={t("adminAccounts.addModelMapping")}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>{t("adminAccounts.compactModelMapping")}</Label>
+                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                      {t("adminAccounts.compactModelMappingHint")}
+                    </p>
+                    <div className="mt-1.5">
+                      <KeyValueEditor
+                        value={compactModelMapping}
+                        onChange={updateCompactModelMapping}
+                        disabled={busy}
+                        keyPlaceholder={t("adminAccounts.modelMappingKeyPlaceholder")}
+                        valuePlaceholder={t("adminAccounts.modelMappingValuePlaceholder")}
+                        addLabel={t("adminAccounts.addCompactModelMapping")}
                       />
                     </div>
                   </div>

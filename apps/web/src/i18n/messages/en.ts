@@ -559,6 +559,10 @@ export const en = {
     modelMappingKeyPlaceholder: "catalog model",
     modelMappingValuePlaceholder: "upstream model",
     addModelMapping: "Add mapping",
+    compactModelMapping: "Compact model mapping",
+    compactModelMappingHint:
+      "Compact-only override for /v1/responses/compact. Supports * patterns and does not affect normal Responses or chat requests.",
+    addCompactModelMapping: "Add compact mapping",
     supportedModels: "Supported models",
     supportedModelsHint:
       "Inclusion whitelist (exact upstream model names). When set, this account only serves these models; leave empty to serve all.",

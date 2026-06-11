@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +27,7 @@ import (
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	"github.com/srapi/srapi/apps/api/internal/pkg/money"
+	"github.com/srapi/srapi/apps/api/internal/platform/glob"
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 )
 
@@ -166,7 +168,7 @@ func (rt *runtimeState) scheduleGatewayRequest(ctx context.Context, req schedule
 	if rt.metrics != nil {
 		rt.metrics.RecordSchedulerDecision(result.Decision)
 	}
-	return applyAccountModelMapping(result, req.Model), nil
+	return applyAccountModelMapping(result, req.Model, req.SourceEndpoint), nil
 }
 
 // accountModelMappingMetadataKey is the provider-account metadata key holding a
@@ -175,12 +177,18 @@ func (rt *runtimeState) scheduleGatewayRequest(ctx context.Context, req schedule
 // different upstream model names (sub2api per-channel model_mapping parity).
 const accountModelMappingMetadataKey = "model_mapping"
 
+// accountCompactModelMappingMetadataKey is the provider-account metadata key
+// holding compact-only upstream model overrides. It is evaluated only for
+// /responses/compact requests, matching sub2api's compact_model_mapping
+// behavior without changing normal /responses or chat traffic.
+const accountCompactModelMappingMetadataKey = "compact_model_mapping"
+
 // applyAccountModelMapping overrides the scheduled candidate's upstream model
 // name when its account carries a per-account model_mapping override for the
 // requested canonical model. The failover loop re-schedules on every attempt,
 // so applying to result.Candidate here covers each attempt's chosen account.
-func applyAccountModelMapping(result schedulercontract.ScheduleResult, canonicalModel string) schedulercontract.ScheduleResult {
-	if override := accountModelOverride(result.Candidate.Account, canonicalModel); override != "" {
+func applyAccountModelMapping(result schedulercontract.ScheduleResult, canonicalModel string, sourceEndpoint string) schedulercontract.ScheduleResult {
+	if override := accountModelOverride(result.Candidate.Account, canonicalModel, sourceEndpoint); override != "" {
 		result.Candidate.Mapping.UpstreamModelName = override
 	}
 	return result
@@ -188,17 +196,102 @@ func applyAccountModelMapping(result schedulercontract.ScheduleResult, canonical
 
 // accountModelOverride returns the per-account upstream model name configured
 // for canonicalModel, or "" when the account has no (valid, non-blank) override.
-func accountModelOverride(account accountcontract.ProviderAccount, canonicalModel string) string {
+func accountModelOverride(account accountcontract.ProviderAccount, canonicalModel string, sourceEndpoint string) string {
 	model := strings.TrimSpace(canonicalModel)
 	if model == "" || len(account.Metadata) == 0 {
 		return ""
 	}
-	mapping, ok := account.Metadata[accountModelMappingMetadataKey].(map[string]any)
-	if !ok {
+	if gatewaySourceEndpointIsResponsesCompact(sourceEndpoint) {
+		if override := accountModelOverrideFromMetadata(account.Metadata, accountCompactModelMappingMetadataKey, model); override != "" {
+			return override
+		}
+	}
+	return accountModelOverrideFromMetadata(account.Metadata, accountModelMappingMetadataKey, model)
+}
+
+func accountModelOverrideFromMetadata(metadata map[string]any, key string, model string) string {
+	if metadata == nil {
 		return ""
 	}
-	override, _ := mapping[model].(string)
-	return strings.TrimSpace(override)
+	mapping := accountModelMappingFromMetadataValue(metadata[key])
+	if len(mapping) == 0 {
+		return ""
+	}
+	if override := accountModelExactOverride(mapping, model); override != "" {
+		return override
+	}
+	return accountModelWildcardOverride(mapping, model)
+}
+
+func accountModelMappingFromMetadataValue(value any) map[string]any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return typed
+	case map[string]string:
+		out := make(map[string]any, len(typed))
+		for key, item := range typed {
+			out[key] = item
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func accountModelExactOverride(mapping map[string]any, model string) string {
+	if override, ok := mapping[model].(string); ok {
+		return strings.TrimSpace(override)
+	}
+	for pattern, raw := range mapping {
+		if !strings.EqualFold(strings.TrimSpace(pattern), model) {
+			continue
+		}
+		override, ok := raw.(string)
+		if !ok {
+			continue
+		}
+		if trimmed := strings.TrimSpace(override); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func accountModelWildcardOverride(mapping map[string]any, model string) string {
+	type wildcardMatch struct {
+		pattern  string
+		override string
+	}
+	matches := make([]wildcardMatch, 0)
+	for pattern, raw := range mapping {
+		pattern = strings.TrimSpace(pattern)
+		if pattern == "" || !strings.Contains(pattern, "*") || !glob.Match(pattern, model) {
+			continue
+		}
+		override, ok := raw.(string)
+		if !ok {
+			continue
+		}
+		override = strings.TrimSpace(override)
+		if override == "" {
+			continue
+		}
+		matches = append(matches, wildcardMatch{pattern: pattern, override: override})
+	}
+	if len(matches) == 0 {
+		return ""
+	}
+	sort.Slice(matches, func(i, j int) bool {
+		if len(matches[i].pattern) != len(matches[j].pattern) {
+			return len(matches[i].pattern) > len(matches[j].pattern)
+		}
+		return matches[i].pattern < matches[j].pattern
+	})
+	return matches[0].override
+}
+
+func gatewaySourceEndpointIsResponsesCompact(sourceEndpoint string) bool {
+	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(sourceEndpoint)), "/responses/compact")
 }
 
 // Gateway balance-gate and entitlement-error mapping helpers live in

@@ -558,6 +558,10 @@ export const zh: Messages = {
     modelMappingKeyPlaceholder: "目录模型",
     modelMappingValuePlaceholder: "上游模型",
     addModelMapping: "添加映射",
+    compactModelMapping: "Compact 模型映射",
+    compactModelMappingHint:
+      "仅用于 /v1/responses/compact 的账号级覆盖，支持 * 通配符，不影响普通 Responses 或 Chat 请求。",
+    addCompactModelMapping: "添加 Compact 映射",
     supportedModels: "支持的模型",
     supportedModelsHint:
       "白名单（上游模型名，精确匹配）。设置后本账号仅服务这些模型；留空表示全部服务。",
