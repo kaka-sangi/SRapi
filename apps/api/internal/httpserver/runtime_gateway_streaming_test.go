@@ -115,6 +115,52 @@ func TestGatewayChatCompletionsStreamsSameProtocolSSEIncrementally(t *testing.T)
 	}
 }
 
+func TestGatewayChatCompletionsStreamEmitsKeepaliveDuringUpstreamGap(t *testing.T) {
+	t.Setenv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", "4")
+	t.Setenv("GATEWAY_STREAM_KEEPALIVE_INTERVAL_SECONDS", "1")
+	chunk1 := "data: {\"id\":\"chunk_1\",\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n"
+	chunk2 := "data: {\"id\":\"chunk_2\",\"choices\":[{\"delta\":{\"content\":\" world\"},\"finish_reason\":\"stop\"}]}\n\n"
+	done := "data: [DONE]\n\n"
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		_, _ = io.WriteString(w, chunk1)
+		if flusher != nil {
+			flusher.Flush()
+		}
+		time.Sleep(1500 * time.Millisecond)
+		_, _ = io.WriteString(w, chunk2+done)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"stream-keepalive-provider","display_name":"Stream Keepalive Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"stream-keepalive-model","display_name":"Stream Keepalive Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"stream-keepalive-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"stream-keepalive-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"stream-keepalive-model","stream":true,"messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	rec := &flushCapturingWriter{header: http.Header{}, release: make(chan struct{})}
+	handler.ServeHTTP(rec, req)
+
+	body := rec.body.String()
+	if !strings.Contains(body, "\n\n:\n\n") {
+		t.Fatalf("expected SSE keepalive comment between upstream chunks, got: %q", body)
+	}
+	if !strings.Contains(body, "chunk_2") || !strings.Contains(body, "[DONE]") {
+		t.Fatalf("expected stream to complete after keepalive, got: %q", body)
+	}
+}
+
 func TestGatewayCodexImageGenerationStreamsTransformedEventsIncrementally(t *testing.T) {
 	partial := "data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\",\"background\":\"auto\"}\n\n"
 	completed := "data: {\"type\":\"response.completed\",\"response\":{\"created_at\":1710000001,\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"total_tokens\":14},\"tools\":[{\"type\":\"image_generation\",\"model\":\"gpt-image-2\",\"background\":\"auto\",\"output_format\":\"png\",\"quality\":\"high\",\"size\":\"1024x1024\"}],\"output\":[{\"type\":\"image_generation_call\",\"result\":\"ZmluYWw=\",\"output_format\":\"png\"}]}}\n\n"
@@ -180,6 +226,56 @@ func TestGatewayCodexImageGenerationStreamsTransformedEventsIncrementally(t *tes
 	}
 	if strings.Contains(rec.firstFlushBody, "image_generation.completed") {
 		t.Fatalf("image stream was buffered: first flush already contained completion: %q", rec.firstFlushBody)
+	}
+}
+
+func TestGatewayImageGenerationStreamEmitsKeepaliveDuringUpstreamGap(t *testing.T) {
+	t.Setenv("GATEWAY_IMAGE_STREAM_IDLE_TIMEOUT_SECONDS", "4")
+	t.Setenv("GATEWAY_IMAGE_STREAM_KEEPALIVE_INTERVAL_SECONDS", "1")
+
+	partial := "data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\"}\n\n"
+	completed := "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"total_tokens\":14},\"output\":[{\"type\":\"image_generation_call\",\"result\":\"ZmluYWw=\",\"output_format\":\"png\"}]}}\n\n"
+	done := "data: [DONE]\n\n"
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		_, _ = io.WriteString(w, partial)
+		if flusher != nil {
+			flusher.Flush()
+		}
+		time.Sleep(1500 * time.Millisecond)
+		_, _ = io.WriteString(w, completed+done)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-image-keepalive-provider","display_name":"Codex Image Keepalive","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-image-keepalive-model","display_name":"Codex Image Keepalive Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gpt-image-2","status":"active","capability_override":[{"key":"images","level":"required","status":"stable","version":"v1"},{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"codex-image-keepalive-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(`{"model":"codex-image-keepalive-model","prompt":"draw a cat","stream":true,"response_format":"url"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	rec := &flushCapturingWriter{header: http.Header{}, release: make(chan struct{})}
+	handler.ServeHTTP(rec, req)
+
+	body := rec.body.String()
+	if !strings.Contains(body, "\n\n:\n\n") {
+		t.Fatalf("expected SSE keepalive comment between image events, got: %q", body)
+	}
+	if !strings.Contains(body, "event: image_generation.completed") || !strings.Contains(body, "data: [DONE]") {
+		t.Fatalf("expected image stream to complete after keepalive, got: %q", body)
 	}
 }
 

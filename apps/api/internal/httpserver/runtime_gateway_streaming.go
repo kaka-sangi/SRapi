@@ -47,6 +47,49 @@ func (c *streamLeaseCloser) Close() error {
 	return err
 }
 
+func newStreamTimer(interval time.Duration) (*time.Timer, <-chan time.Time) {
+	if interval <= 0 {
+		return nil, nil
+	}
+	timer := time.NewTimer(interval)
+	return timer, timer.C
+}
+
+func resetStreamTimer(timer *time.Timer, interval time.Duration) {
+	if timer == nil || interval <= 0 {
+		return
+	}
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+	timer.Reset(interval)
+}
+
+func stopStreamTimer(timer *time.Timer) {
+	if timer == nil {
+		return
+	}
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+}
+
+func writeSSEKeepalive(w http.ResponseWriter, flusher http.Flusher) error {
+	if _, err := io.WriteString(w, ":\n\n"); err != nil {
+		return err
+	}
+	if flusher != nil {
+		flusher.Flush()
+	}
+	return nil
+}
+
 // writeConversationStreamPassthrough streams a same-protocol upstream response
 // to the client incrementally (flushing each chunk for low time-to-first-byte),
 // tees a bounded copy to recover usage via the same parser the buffered path
@@ -79,6 +122,11 @@ func (s *Server) writeConversationStreamPassthrough(
 	// upstream must not hold the client connection open indefinitely.
 	idle := s.cfg.Gateway.StreamIdleTimeout
 	idleTimedOut := false
+	idleTimer, idleCh := newStreamTimer(idle)
+	defer stopStreamTimer(idleTimer)
+	keepalive := s.cfg.Gateway.StreamKeepaliveInterval
+	keepaliveTimer, keepaliveCh := newStreamTimer(keepalive)
+	defer stopStreamTimer(keepaliveTimer)
 
 	type streamChunk struct {
 		data []byte
@@ -112,42 +160,43 @@ func (s *Server) writeConversationStreamPassthrough(
 	interrupted := false
 readLoop:
 	for {
-		var sc streamChunk
-		if idle > 0 {
-			timer := time.NewTimer(idle)
-			select {
-			case sc = <-chunkCh:
-				timer.Stop()
-			case <-timer.C:
-				idleTimedOut = true
-				interrupted = true
-				_ = providerResp.StreamBody.Close()
+		select {
+		case sc := <-chunkCh:
+			resetStreamTimer(idleTimer, idle)
+			if len(sc.data) > 0 {
+				if remaining := maxStreamMeterBytes - meter.Len(); remaining > 0 {
+					if len(sc.data) <= remaining {
+						meter.Write(sc.data)
+					} else {
+						meter.Write(sc.data[:remaining])
+					}
+				}
+				if _, writeErr := w.Write(sc.data); writeErr != nil {
+					interrupted = true
+					break readLoop
+				}
+				if flusher != nil {
+					flusher.Flush()
+				}
+				resetStreamTimer(keepaliveTimer, keepalive)
+			}
+			if sc.err != nil {
+				if sc.err != io.EOF {
+					interrupted = true
+				}
 				break readLoop
 			}
-		} else {
-			sc = <-chunkCh
-		}
-		if len(sc.data) > 0 {
-			if remaining := maxStreamMeterBytes - meter.Len(); remaining > 0 {
-				if len(sc.data) <= remaining {
-					meter.Write(sc.data)
-				} else {
-					meter.Write(sc.data[:remaining])
-				}
-			}
-			if _, writeErr := w.Write(sc.data); writeErr != nil {
+		case <-idleCh:
+			idleTimedOut = true
+			interrupted = true
+			_ = providerResp.StreamBody.Close()
+			break readLoop
+		case <-keepaliveCh:
+			if err := writeSSEKeepalive(w, flusher); err != nil {
 				interrupted = true
-				break
+				break readLoop
 			}
-			if flusher != nil {
-				flusher.Flush()
-			}
-		}
-		if sc.err != nil {
-			if sc.err != io.EOF {
-				interrupted = true
-			}
-			break
+			resetStreamTimer(keepaliveTimer, keepalive)
 		}
 	}
 
@@ -223,6 +272,11 @@ func (s *Server) writeImageGenerationStreamPassthrough(
 
 	idle := s.cfg.Gateway.ImageStreamIdleTimeout
 	idleTimedOut := false
+	idleTimer, idleCh := newStreamTimer(idle)
+	defer stopStreamTimer(idleTimer)
+	keepalive := s.cfg.Gateway.ImageStreamKeepaliveInterval
+	keepaliveTimer, keepaliveCh := newStreamTimer(keepalive)
+	defer stopStreamTimer(keepaliveTimer)
 	type streamChunk struct {
 		data []byte
 		err  error
@@ -255,42 +309,43 @@ func (s *Server) writeImageGenerationStreamPassthrough(
 	interrupted := false
 readLoop:
 	for {
-		var sc streamChunk
-		if idle > 0 {
-			timer := time.NewTimer(idle)
-			select {
-			case sc = <-chunkCh:
-				timer.Stop()
-			case <-timer.C:
-				idleTimedOut = true
-				interrupted = true
-				_ = providerResp.StreamBody.Close()
+		select {
+		case sc := <-chunkCh:
+			resetStreamTimer(idleTimer, idle)
+			if len(sc.data) > 0 {
+				if remaining := maxStreamMeterBytes - meter.Len(); remaining > 0 {
+					if len(sc.data) <= remaining {
+						meter.Write(sc.data)
+					} else {
+						meter.Write(sc.data[:remaining])
+					}
+				}
+				if _, writeErr := w.Write(sc.data); writeErr != nil {
+					interrupted = true
+					break readLoop
+				}
+				if flusher != nil {
+					flusher.Flush()
+				}
+				resetStreamTimer(keepaliveTimer, keepalive)
+			}
+			if sc.err != nil {
+				if sc.err != io.EOF {
+					interrupted = true
+				}
 				break readLoop
 			}
-		} else {
-			sc = <-chunkCh
-		}
-		if len(sc.data) > 0 {
-			if remaining := maxStreamMeterBytes - meter.Len(); remaining > 0 {
-				if len(sc.data) <= remaining {
-					meter.Write(sc.data)
-				} else {
-					meter.Write(sc.data[:remaining])
-				}
-			}
-			if _, writeErr := w.Write(sc.data); writeErr != nil {
+		case <-idleCh:
+			idleTimedOut = true
+			interrupted = true
+			_ = providerResp.StreamBody.Close()
+			break readLoop
+		case <-keepaliveCh:
+			if err := writeSSEKeepalive(w, flusher); err != nil {
 				interrupted = true
-				break
+				break readLoop
 			}
-			if flusher != nil {
-				flusher.Flush()
-			}
-		}
-		if sc.err != nil {
-			if sc.err != io.EOF {
-				interrupted = true
-			}
-			break
+			resetStreamTimer(keepaliveTimer, keepalive)
 		}
 	}
 

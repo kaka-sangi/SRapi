@@ -114,12 +114,14 @@ type DependencyConfig struct {
 }
 
 type GatewayConfig struct {
-	MaxBodySize                int64
-	RequestTimeout             time.Duration
-	StreamIdleTimeout          time.Duration
-	ImageStreamIdleTimeout     time.Duration
-	RealtimeMaxOpenSlots       int
-	RealtimeMaxOpenSlotsPerKey int
+	MaxBodySize                  int64
+	RequestTimeout               time.Duration
+	StreamIdleTimeout            time.Duration
+	StreamKeepaliveInterval      time.Duration
+	ImageStreamIdleTimeout       time.Duration
+	ImageStreamKeepaliveInterval time.Duration
+	RealtimeMaxOpenSlots         int
+	RealtimeMaxOpenSlotsPerKey   int
 	// RequirePositiveBalance, when true, synchronously rejects balance-billed
 	// gateway requests (pay-go users, or allowance-mode subscription overage)
 	// from users whose balance no longer covers the request, closing the
@@ -273,13 +275,15 @@ func Load() Config {
 			PoolTimeoutSeconds:  getIntEnv("REDIS_POOL_TIMEOUT_SECONDS", 3),
 		},
 		Gateway: GatewayConfig{
-			MaxBodySize:                int64(getIntEnv("GATEWAY_MAX_BODY_SIZE", defaultGatewayBodySize)),
-			RequestTimeout:             time.Duration(getIntEnv("GATEWAY_REQUEST_TIMEOUT_SECONDS", 600)) * time.Second,
-			StreamIdleTimeout:          time.Duration(getIntEnv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", 120)) * time.Second,
-			ImageStreamIdleTimeout:     time.Duration(getIntEnv("GATEWAY_IMAGE_STREAM_IDLE_TIMEOUT_SECONDS", 900)) * time.Second,
-			RealtimeMaxOpenSlots:       getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS", 0),
-			RealtimeMaxOpenSlotsPerKey: getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS_PER_API_KEY", 0),
-			RequirePositiveBalance:     getBoolEnv("GATEWAY_REQUIRE_POSITIVE_BALANCE", false),
+			MaxBodySize:                  int64(getIntEnv("GATEWAY_MAX_BODY_SIZE", defaultGatewayBodySize)),
+			RequestTimeout:               time.Duration(getIntEnv("GATEWAY_REQUEST_TIMEOUT_SECONDS", 600)) * time.Second,
+			StreamIdleTimeout:            time.Duration(getIntEnv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", 120)) * time.Second,
+			StreamKeepaliveInterval:      time.Duration(getIntEnv("GATEWAY_STREAM_KEEPALIVE_INTERVAL_SECONDS", 10)) * time.Second,
+			ImageStreamIdleTimeout:       time.Duration(getIntEnv("GATEWAY_IMAGE_STREAM_IDLE_TIMEOUT_SECONDS", 900)) * time.Second,
+			ImageStreamKeepaliveInterval: time.Duration(getIntEnv("GATEWAY_IMAGE_STREAM_KEEPALIVE_INTERVAL_SECONDS", 10)) * time.Second,
+			RealtimeMaxOpenSlots:         getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS", 0),
+			RealtimeMaxOpenSlotsPerKey:   getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS_PER_API_KEY", 0),
+			RequirePositiveBalance:       getBoolEnv("GATEWAY_REQUIRE_POSITIVE_BALANCE", false),
 		},
 		Security: securityConfigFromEnv(),
 		Bootstrap: BootstrapConfig{
@@ -412,8 +416,14 @@ func (c Config) Validate() error {
 	if c.Gateway.StreamIdleTimeout <= 0 {
 		return fmt.Errorf("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS must be positive")
 	}
+	if c.Gateway.StreamKeepaliveInterval < 0 {
+		return fmt.Errorf("GATEWAY_STREAM_KEEPALIVE_INTERVAL_SECONDS must be zero or positive")
+	}
 	if c.Gateway.ImageStreamIdleTimeout <= 0 {
 		return fmt.Errorf("GATEWAY_IMAGE_STREAM_IDLE_TIMEOUT_SECONDS must be positive")
+	}
+	if c.Gateway.ImageStreamKeepaliveInterval < 0 {
+		return fmt.Errorf("GATEWAY_IMAGE_STREAM_KEEPALIVE_INTERVAL_SECONDS must be zero or positive")
 	}
 	if c.Gateway.RealtimeMaxOpenSlots < 0 {
 		return fmt.Errorf("GATEWAY_REALTIME_MAX_OPEN_SLOTS must be zero or positive")
