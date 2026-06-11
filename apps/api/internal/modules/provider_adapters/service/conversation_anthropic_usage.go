@@ -25,6 +25,7 @@ type anthropicUsage struct {
 	OutputTokens               *int                         `json:"output_tokens"`
 	CacheCreationInputTokens   *int                         `json:"cache_creation_input_tokens"`
 	CacheReadInputTokens       *int                         `json:"cache_read_input_tokens"`
+	CachedTokens               *int                         `json:"cached_tokens"`
 	CacheCreation5mInputTokens *int                         `json:"cache_creation_ephemeral_5m_input_tokens"`
 	CacheCreation1hInputTokens *int                         `json:"cache_creation_ephemeral_1h_input_tokens"`
 	CacheCreation              *anthropicCacheCreationUsage `json:"cache_creation"`
@@ -42,6 +43,9 @@ func (u anthropicUsage) ToUsage(text string) contract.Usage {
 	// creation (write) vs read separately. Keep them distinct so they bill at
 	// their (different) rates: writes cost more than input, reads less.
 	cacheRead := valueOrZero(u.CacheReadInputTokens)
+	if cacheRead == 0 {
+		cacheRead = valueOrZero(u.CachedTokens)
+	}
 	cacheCreation := valueOrZero(u.CacheCreationInputTokens)
 	cacheCreation5m, cacheCreation1h := u.cacheCreationBuckets(cacheCreation)
 	if input == 0 && output == 0 && cacheRead == 0 && cacheCreation == 0 {
@@ -89,6 +93,9 @@ func (u *anthropicUsage) Merge(next anthropicUsage) {
 	}
 	if next.CacheReadInputTokens != nil {
 		u.CacheReadInputTokens = cloneIntPtr(next.CacheReadInputTokens)
+	}
+	if next.CachedTokens != nil {
+		u.CachedTokens = cloneIntPtr(next.CachedTokens)
 	}
 	if next.CacheCreation5mInputTokens != nil {
 		u.CacheCreation5mInputTokens = cloneIntPtr(next.CacheCreation5mInputTokens)

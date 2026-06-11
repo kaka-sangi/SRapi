@@ -48,6 +48,40 @@ func TestAnthropicUsageFallsBackCacheCreationToFiveMinutes(t *testing.T) {
 	}
 }
 
+func TestAnthropicUsageFallsBackCacheReadToCachedTokens(t *testing.T) {
+	in := 12
+	out := 7
+	cached := 4
+	usage := anthropicUsage{
+		InputTokens:  &in,
+		OutputTokens: &out,
+		CachedTokens: &cached,
+	}.ToUsage("")
+
+	if usage.Estimated {
+		t.Fatal("usage should not be estimated when cached_tokens is present")
+	}
+	if usage.InputTokens != 12 || usage.OutputTokens != 7 || usage.CachedTokens != 4 {
+		t.Fatalf("unexpected Anthropic cached_tokens fallback usage: %+v", usage)
+	}
+	if usage.CacheCreationTokens != 0 {
+		t.Fatalf("cache-creation tokens = %d, want 0", usage.CacheCreationTokens)
+	}
+}
+
+func TestAnthropicUsagePrefersCacheReadInputTokensOverCachedTokens(t *testing.T) {
+	cacheRead := 7
+	cached := 99
+	usage := anthropicUsage{
+		CacheReadInputTokens: &cacheRead,
+		CachedTokens:         &cached,
+	}.ToUsage("")
+
+	if usage.CachedTokens != 7 {
+		t.Fatalf("cached tokens = %d, want cache_read_input_tokens value 7", usage.CachedTokens)
+	}
+}
+
 func TestOpenAIUsageHasNoCacheCreation(t *testing.T) {
 	prompt := 100
 	completion := 40
