@@ -39,6 +39,18 @@ func TestGatewayEmptyCompletionErrorClassIsRetryable(t *testing.T) {
 	}
 }
 
+func TestGatewayQuotaExhaustedErrorClass(t *testing.T) {
+	if got := gatewayErrorTypeForProviderClass("quota_exhausted"); got != "rate_limit_error" {
+		t.Fatalf("expected quota_exhausted to map to rate_limit_error, got %q", got)
+	}
+	if got := providerGatewayMessage("quota_exhausted"); got != "provider quota exhausted" {
+		t.Fatalf("unexpected quota_exhausted gateway message %q", got)
+	}
+	if !gatewayShouldFailover("quota_exhausted", http.StatusBadRequest, 0, 2, defaultGatewayFailoverAttempts) {
+		t.Fatal("expected quota_exhausted to be eligible for failover")
+	}
+}
+
 func TestGatewayProviderPublicMessageRequiresMetadataOptIn(t *testing.T) {
 	err := provideradaptercontract.ProviderError{
 		Class:      "invalid_request",

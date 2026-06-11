@@ -63,6 +63,9 @@ func streamProviderError(protocol string, errorType string, status string, messa
 		statusCode = http.StatusBadGateway
 	}
 	class := streamProviderErrorClass(protocol, errorType, status, statusCode)
+	if providerErrorBodyIndicatesQuotaExhausted(nil, message+" "+errorType+" "+status) {
+		class = "quota_exhausted"
+	}
 	if statusCode == http.StatusBadGateway {
 		statusCode = providerStatusCodeForClass(class)
 	}

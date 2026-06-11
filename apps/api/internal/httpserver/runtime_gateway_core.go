@@ -1781,7 +1781,7 @@ func gatewayErrorTypeForProviderClass(errorClass string) apiopenapi.GatewayError
 	switch errorClass {
 	case "invalid_request":
 		return apiopenapi.InvalidRequestError
-	case "rate_limit", "rpm_limit_exceeded", "tpm_limit_exceeded", "concurrency_limit_exceeded", "platform_quota_exceeded":
+	case "rate_limit", "quota_exhausted", "rpm_limit_exceeded", "tpm_limit_exceeded", "concurrency_limit_exceeded", "platform_quota_exceeded":
 		return apiopenapi.RateLimitError
 	case "auth_failed", "auth_error", "permission_denied", "session_invalid", "account_locked", "account_banned", "abuse_detected", "device_unrecognized":
 		return apiopenapi.PermissionError
@@ -1819,6 +1819,8 @@ func providerGatewayMessage(errorClass string) string {
 	switch errorClass {
 	case "rate_limit":
 		return "provider rate limit"
+	case "quota_exhausted":
+		return "provider quota exhausted"
 	case "rpm_limit_exceeded":
 		return "provider account RPM limit exceeded"
 	case "tpm_limit_exceeded":

@@ -26,6 +26,9 @@ func classifyProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, b
 	if statusCode == http.StatusForbidden {
 		class, metadata = classifyForbiddenProviderError(body, message)
 	}
+	if providerErrorBodyIndicatesQuotaExhausted(body, message) {
+		class = "quota_exhausted"
+	}
 	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, RetryAfter: providerRetryAfter(headers, body, time.Now()), Metadata: metadata}
 }
 
@@ -76,6 +79,9 @@ func classifyGeminiProviderHTTPErrorWithHeaders(statusCode int, headers http.Hea
 	if message == "" {
 		message = http.StatusText(statusCode)
 	}
+	if providerErrorBodyIndicatesQuotaExhausted(body, message) {
+		class = "quota_exhausted"
+	}
 	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, RetryAfter: providerRetryAfter(headers, body, time.Now())}
 }
 
@@ -95,6 +101,36 @@ func providerClassForGeminiStatus(status string, statusCode int) string {
 		return "provider_5xx"
 	}
 	return providerClassForHTTPStatus(statusCode)
+}
+
+func providerErrorBodyIndicatesQuotaExhausted(body []byte, message string) bool {
+	text := strings.ToLower(strings.TrimSpace(message + " " + string(body)))
+	if text == "" {
+		return false
+	}
+	for _, keyword := range []string{
+		"quota_exhausted",
+		"quota exhausted",
+		"insufficient_quota",
+		"insufficient quota",
+		"google_one_ai",
+		"insufficient credit",
+		"insufficient credits",
+		"not enough credit",
+		"not enough credits",
+		"credit exhausted",
+		"credits exhausted",
+		"credit balance",
+		"minimumcreditamountforusage",
+		"minimum credit amount for usage",
+		"minimum credit",
+		"resource has been exhausted",
+	} {
+		if strings.Contains(text, keyword) {
+			return true
+		}
+	}
+	return false
 }
 
 func providerClassForAnthropicError(errorType string, statusCode int) string {

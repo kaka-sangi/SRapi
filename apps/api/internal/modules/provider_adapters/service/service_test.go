@@ -3473,7 +3473,31 @@ func TestGeminiCompatibleAdapterClassifiesGoogleError(t *testing.T) {
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
 		Credential: map[string]any{"api_key": "gemini-secret"},
 	})
-	assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	assertProviderError(t, err, "quota_exhausted", http.StatusTooManyRequests)
+}
+
+func TestGeminiCompatibleAdapterClassifiesCreditsExhausted(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"code":429,"message":"Resource has been exhausted: GOOGLE_ONE_AI credit balance is below minimumCreditAmountForUsage","status":"RESOURCE_EXHAUSTED"}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_credits_exhausted",
+		Model:      "gemini-local",
+		InputParts: textParts("hello"),
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	assertProviderError(t, err, "quota_exhausted", http.StatusTooManyRequests)
 }
 
 func TestGeminiCompatibleAdapterExtractsQuotaResetDelay(t *testing.T) {
@@ -3499,7 +3523,7 @@ func TestGeminiCompatibleAdapterExtractsQuotaResetDelay(t *testing.T) {
 		Credential: map[string]any{"api_key": "gemini-secret"},
 	})
 	after := time.Now().UTC().Add(time.Hour)
-	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	providerErr := assertProviderError(t, err, "quota_exhausted", http.StatusTooManyRequests)
 	if providerErr.RetryAfter == nil {
 		t.Fatalf("expected Gemini quota reset delay to set RetryAfter, got %+v", providerErr)
 	}
@@ -3530,7 +3554,7 @@ func TestGeminiCompatibleAdapterExtractsQuotaResetTimestamp(t *testing.T) {
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
 		Credential: map[string]any{"api_key": "gemini-secret"},
 	})
-	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	providerErr := assertProviderError(t, err, "quota_exhausted", http.StatusTooManyRequests)
 	if providerErr.RetryAfter == nil || !providerErr.RetryAfter.Equal(resetAt) {
 		t.Fatalf("expected RetryAfter %s from quotaResetTimeStamp, got %+v", resetAt.Format(time.RFC3339), providerErr)
 	}
@@ -3589,7 +3613,7 @@ func TestGeminiCompatibleAdapterClassifiesStreamErrorFrame(t *testing.T) {
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
 		Credential: map[string]any{"api_key": "gemini-secret"},
 	})
-	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	providerErr := assertProviderError(t, err, "quota_exhausted", http.StatusTooManyRequests)
 	if providerErr.Message != "quota exhausted" {
 		t.Fatalf("expected Gemini stream error message to be preserved, got %+v", providerErr)
 	}
