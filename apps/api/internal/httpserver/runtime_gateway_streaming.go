@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"sync"
@@ -339,6 +340,7 @@ readLoop:
 			idleTimedOut = true
 			interrupted = true
 			_ = providerResp.StreamBody.Close()
+			_ = writeImageGenerationStreamError(w, flusher, "upstream image stream idle timeout", "stream_idle_timeout", http.StatusGatewayTimeout)
 			break readLoop
 		case <-keepaliveCh:
 			if err := writeSSEKeepalive(w, flusher); err != nil {
@@ -391,6 +393,35 @@ readLoop:
 		}
 	}
 	s.runtime.recordGatewayUsage(r.Context(), record)
+}
+
+func writeImageGenerationStreamError(w http.ResponseWriter, flusher http.Flusher, message string, code string, statusCode int) error {
+	payload := map[string]any{
+		"type":        "error",
+		"status_code": statusCode,
+		"error": map[string]any{
+			"message": message,
+			"type":    code,
+			"code":    code,
+		},
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte("event: error\ndata: ")); err != nil {
+		return err
+	}
+	if _, err := w.Write(raw); err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte("\n\n")); err != nil {
+		return err
+	}
+	if flusher != nil {
+		flusher.Flush()
+	}
+	return nil
 }
 
 func statusOrOK(status int) int {

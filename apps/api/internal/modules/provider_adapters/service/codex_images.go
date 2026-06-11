@@ -277,6 +277,13 @@ func transformCodexImageGenerationStream(upstream io.Reader, downstream io.Write
 			emittedDone = true
 			break
 		}
+		if providerErr, ok := codexImageGenerationIncompleteEventError(event); ok {
+			if err := writeCodexImageGenerationErrorFrame(downstream, providerErr); err != nil {
+				return err
+			}
+			emittedDone = true
+			break
+		}
 		codexMergeImageGenerationEventMeta(&streamMeta, event)
 		if event.Response != nil {
 			if event.Response.Usage.HasTokenUsage() {
@@ -493,6 +500,29 @@ func codexImageGenerationUsagePayload(usage openAIUsage) map[string]any {
 		payload["prompt_tokens_details"] = usage.PromptTokensDetails
 	}
 	return payload
+}
+
+func codexImageGenerationIncompleteEventError(event codexResponsesEvent) (contract.ProviderError, bool) {
+	if !strings.EqualFold(strings.TrimSpace(event.Type), "response.incomplete") {
+		return contract.ProviderError{}, false
+	}
+	reason := ""
+	if event.Response != nil && event.Response.IncompleteDetails != nil {
+		reason = strings.TrimSpace(event.Response.IncompleteDetails.Reason)
+	}
+	message := "codex image stream incomplete"
+	if reason != "" {
+		message += ": " + reason
+	}
+	return contract.ProviderError{
+		Class:      "incomplete",
+		StatusCode: http.StatusBadGateway,
+		Message:    message,
+		Metadata: map[string]any{
+			"type": "incomplete",
+			"code": firstNonEmpty(reason, "incomplete"),
+		},
+	}, true
 }
 
 func codexImageGenerationPartialIndex(value any) int {

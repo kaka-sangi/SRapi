@@ -7675,6 +7675,67 @@ func TestReverseProxyCodexCLIAdapterStreamsImageGenerationEvents(t *testing.T) {
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterStreamsImageGenerationIncompleteAsError(t *testing.T) {
+	runtime := capturingRuntime{
+		streamResponse: reverseproxycontract.StreamResponse{
+			StatusCode: http.StatusOK,
+			Body: io.NopCloser(strings.NewReader(
+				"data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\"}\n\n" +
+					"data: {\"type\":\"response.incomplete\",\"response\":{\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"max_output_tokens\"},\"usage\":{\"input_tokens\":5,\"output_tokens\":9}}}\n\n" +
+					"data: [DONE]\n\n",
+			)),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.StreamImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID:      "req_codex_image_incomplete_stream",
+		Model:          "gpt-image-2",
+		Prompt:         "draw a cat",
+		Stream:         true,
+		ResponseFormat: "url",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-image-2"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("stream codex image generation: %v", err)
+	}
+	raw, err := io.ReadAll(resp.StreamBody)
+	if err != nil {
+		t.Fatalf("read codex image stream: %v", err)
+	}
+	body := string(raw)
+	for _, expected := range []string{
+		"event: image_generation.partial_image",
+		"event: error",
+		`"message":"codex image stream incomplete: max_output_tokens"`,
+		`"type":"incomplete"`,
+		`"code":"max_output_tokens"`,
+		"data: [DONE]",
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected transformed image stream to contain %q, got %s", expected, body)
+		}
+	}
+	if _, err := resp.StreamParse(raw, resp.StatusCode); err == nil {
+		t.Fatalf("expected rendered image stream parser to return provider error")
+	} else {
+		assertProviderError(t, err, "incomplete", http.StatusBadGateway)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterUsesConfiguredOriginator(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
