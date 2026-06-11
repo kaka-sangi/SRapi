@@ -129,6 +129,32 @@ func TestNormalizeResponsesRequiresWebSearchCapability(t *testing.T) {
 	}
 }
 
+func TestNormalizeImageGenerationConsumesStreamLocally(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	req := apiopenapi.ImageGenerationRequest{
+		Model:  "gpt-image-2",
+		Prompt: "draw a cat",
+		AdditionalProperties: map[string]any{
+			"stream":         true,
+			"partial_images": float64(2),
+		},
+	}
+
+	canonical, err := svc.NormalizeImageGeneration(req, RequestMeta{SourceEndpoint: "/v1/images/generations"})
+	if err != nil {
+		t.Fatalf("normalize image generation: %v", err)
+	}
+	if canonical.ImageExtra["stream"] != nil {
+		t.Fatalf("stream should be consumed by gateway and not forwarded upstream, got %+v", canonical.ImageExtra)
+	}
+	if canonical.ImageExtra["partial_images"] != float64(2) {
+		t.Fatalf("expected non-stream image extra to be preserved, got %+v", canonical.ImageExtra)
+	}
+}
+
 func TestNormalizeResponsesCompactRequiresCompactCapability(t *testing.T) {
 	svc, err := New()
 	if err != nil {

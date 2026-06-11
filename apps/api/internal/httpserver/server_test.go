@@ -6656,6 +6656,62 @@ func TestGatewayImageGenerationRouteTargetsOpenAICompatibleUpstream(t *testing.T
 	}
 }
 
+func TestGatewayImageGenerationStreamReturnsSSE(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if _, ok := payload["stream"]; ok {
+			t.Fatalf("expected stream to stay local, got payload %+v", payload)
+		}
+		if payload["model"] != "image-generation-stream-upstream" || payload["prompt"] != "stream image generation" {
+			t.Fatalf("unexpected upstream image generation payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000700,"data":[{"b64_json":"c3RyZWFtLWdlbmVyYXRpb24=","revised_prompt":"streamed generation"}],"model":"image-generation-stream-upstream","usage":{"input_tokens":31,"output_tokens":8,"total_tokens":39}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp530-openai","display_name":"WP530 OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp530-image-generation-stream-model","display_name":"WP530 Image Generation Stream Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"image-generation-stream-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp530-image-generation-stream-account","runtime_class":"api_key","credential":{"api_key":"image-generation-stream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/images/generations", `{"model":"wp530-image-generation-stream-model","prompt":"stream image generation","stream":true,"response_format":"b64_json"}`)
+	if got := rec.Header().Get("Content-Type"); got != "text/event-stream" {
+		t.Fatalf("expected event stream content type, got %q", got)
+	}
+	body := rec.Body.String()
+	for _, expected := range []string{"data:", "image.generation.result", "streamed generation", "data: [DONE]"} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected SSE body to contain %q, got %s", expected, body)
+		}
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=wp530-image-generation-stream-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d", usageRec.Code)
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one stream image generation usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success || usage.SourceEndpoint != "/v1/images/generations" || usage.ProviderId == nil || *usage.ProviderId != string(providerResp.Data.Id) || usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) || usage.TotalTokens != 39 {
+		t.Fatalf("unexpected stream image generation usage evidence: %+v", usage)
+	}
+}
+
 func TestGatewayImageGenerationPoolModeRetriesThenFailsOver(t *testing.T) {
 	var (
 		mu             sync.Mutex

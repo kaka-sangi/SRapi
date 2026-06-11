@@ -273,6 +273,7 @@ func (s *Service) NormalizeImageGeneration(req apiopenapi.ImageGenerationRequest
 		canonical.ImageUser = strings.TrimSpace(*req.User)
 	}
 	canonical.ImageExtra = cloneMap(req.AdditionalProperties)
+	delete(canonical.ImageExtra, "stream")
 	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyImages, Version: "v1"})
 	return canonical, nil
 }

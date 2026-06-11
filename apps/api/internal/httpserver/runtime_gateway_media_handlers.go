@@ -173,7 +173,18 @@ func (s *Server) handleCreateImageGeneration(w http.ResponseWriter, r *http.Requ
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
 	})
+	if imageGenerationStreamRequested(body) {
+		writeSSEEvents(w, s.runtime.gateway.RenderImageGenerationStreamEvents(canonicalResp))
+		return
+	}
 	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderImageGeneration(canonicalResp))
+}
+
+func imageGenerationStreamRequested(body apiopenapi.ImageGenerationRequest) bool {
+	if body.AdditionalProperties == nil {
+		return false
+	}
+	return boolValue(body.AdditionalProperties["stream"])
 }
 
 func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
