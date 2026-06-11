@@ -20,6 +20,10 @@ const (
 	codexDefaultVersion                     = "0.125.0"
 	codexDefaultUserAgent                   = codexOriginator + "/" + codexDefaultVersion
 	codexDefaultInstructions                = "You are a concise assistant."
+	codexImageGenerationBridgeMarker        = "<srapi-codex-image-generation>"
+	codexImageGenerationBridgeText          = codexImageGenerationBridgeMarker + "\nWhen the user asks for raster image generation or editing, use the OpenAI Responses native `image_generation` tool attached to this request. The local Codex client may not expose an `image_gen` namespace, but image generation is still available through this tool.\n</srapi-codex-image-generation>"
+	codexSparkImageUnsupportedMarker        = "<srapi-codex-spark-image-unsupported>"
+	codexSparkImageUnsupportedText          = codexSparkImageUnsupportedMarker + "\nThe current model is gpt-5.3-codex-spark, which does not support image generation, image editing, image input, the `image_generation` tool, or Codex `image_gen` workflows. If the user asks for image generation or image editing, explain this model limitation and ask them to switch to a non-Spark Codex model such as gpt-5.3-codex or gpt-5.4.\n</srapi-codex-spark-image-unsupported>"
 	codexResponsesBetaHeaderValue           = "responses=experimental"
 	codexResponsesWebsocketBetaHeaderValue  = "responses_websockets=2026-02-06"
 	codexDefaultAccountSessionIDPrefix      = "srapi-codex-account-"

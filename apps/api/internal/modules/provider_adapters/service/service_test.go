@@ -8177,6 +8177,11 @@ func TestReverseProxyCodexCLIAdapterNormalizesRawImageGenerationToolAliases(t *t
 	if _, ok := tool["compression"]; ok {
 		t.Fatalf("legacy compression field should be removed, got %+v", tool)
 	}
+	instructions, _ := payload["instructions"].(string)
+	if !strings.Contains(instructions, "<srapi-codex-image-generation>") ||
+		!strings.Contains(instructions, "Responses native `image_generation` tool") {
+		t.Fatalf("expected Codex image_generation bridge instructions, got %q", instructions)
+	}
 }
 
 func TestReverseProxyCodexCLIAdapterNormalizesCanonicalImageGenerationToolAliases(t *testing.T) {
@@ -8231,6 +8236,66 @@ func TestReverseProxyCodexCLIAdapterNormalizesCanonicalImageGenerationToolAliase
 	}
 	if _, ok := tool["compression"]; ok {
 		t.Fatalf("legacy compression field should be removed, got %+v", tool)
+	}
+	instructions, _ := payload["instructions"].(string)
+	if !strings.Contains(instructions, "<srapi-codex-image-generation>") {
+		t.Fatalf("expected Codex image_generation bridge instructions, got %q", instructions)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterAddsSparkImageUnsupportedInstructions(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"spark\"}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_spark_image_unsupported",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		Model:          "codex-local",
+		RawBody: []byte(`{
+			"model":"gpt-5.3-codex-spark",
+			"input":"draw",
+			"instructions":"existing instructions",
+			"tools":[{"type":"image_generation","format":"png"}]
+		}`),
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             27,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.3-codex-spark"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode codex payload: %v", err)
+	}
+	instructions, _ := payload["instructions"].(string)
+	if !strings.Contains(instructions, "existing instructions") ||
+		!strings.Contains(instructions, "<srapi-codex-spark-image-unsupported>") ||
+		!strings.Contains(instructions, "does not support image generation") {
+		t.Fatalf("expected Codex Spark image unsupported instructions, got %q", instructions)
+	}
+	if strings.Contains(instructions, "<srapi-codex-image-generation>") {
+		t.Fatalf("Spark instructions should not include image bridge marker, got %q", instructions)
 	}
 }
 

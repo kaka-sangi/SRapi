@@ -236,6 +236,7 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 	codexNormalizeResponsesTools(payload)
 	if !codexResponsesCompactRequest(req) {
 		codexEnsureResponsesInstructions(req, payload)
+		codexApplyImageGenerationInstructions(payload)
 		codexEnsureReasoningEncryptedInclude(payload)
 		payload["stream"] = true
 		payload["store"] = codexResponsesDefaultInternalStoreValue
@@ -255,6 +256,32 @@ func codexEnsureResponsesInstructions(req contract.ConversationRequest, payload 
 		return
 	}
 	payload["instructions"] = codexDefaultInstructions
+}
+
+func codexApplyImageGenerationInstructions(payload map[string]any) {
+	if payload == nil {
+		return
+	}
+	if contract.NormalizeCodexUpstreamModelName(codexStringValue(payload["model"])) == "gpt-5.3-codex-spark" {
+		codexAppendInstructionsOnce(payload, codexSparkImageUnsupportedMarker, codexSparkImageUnsupportedText)
+		return
+	}
+	if !codexResponsesToolsContainType(payload["tools"], "image_generation") {
+		return
+	}
+	codexAppendInstructionsOnce(payload, codexImageGenerationBridgeMarker, codexImageGenerationBridgeText)
+}
+
+func codexAppendInstructionsOnce(payload map[string]any, marker string, text string) {
+	existing := strings.TrimRight(codexStringValue(payload["instructions"]), " \t\r\n")
+	if strings.Contains(existing, marker) {
+		return
+	}
+	if strings.TrimSpace(existing) == "" {
+		payload["instructions"] = text
+		return
+	}
+	payload["instructions"] = existing + "\n\n" + text
 }
 
 func codexEnsureReasoningEncryptedInclude(payload map[string]any) {
