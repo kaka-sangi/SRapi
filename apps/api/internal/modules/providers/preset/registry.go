@@ -178,7 +178,7 @@ func codexCLIPreset() Preset {
 		AccountTemplate: &AccountTemplate{
 			UpstreamClient:  "codex_cli",
 			DefaultMetadata: map[string]any{"base_url": "https://chatgpt.com/backend-api/codex"},
-			ModelCatalog:    []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest"},
+			ModelCatalog:    []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "codex-auto-review", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest"},
 			MetadataHints: map[string]string{
 				"base_url":           "Codex upstream (adapter appends /responses)",
 				"chatgpt_account_id": "From session JWT (optional)",

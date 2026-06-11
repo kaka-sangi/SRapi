@@ -315,6 +315,11 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if len(codexPreset.AccountTemplate.ModelCatalog) == 0 {
 		t.Fatalf("expected codex-cli template to have a model catalog")
 	}
+	for _, want := range []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "codex-auto-review"} {
+		if !containsString(codexPreset.AccountTemplate.ModelCatalog, want) {
+			t.Fatalf("expected codex-cli model catalog to include %s, got %+v", want, codexPreset.AccountTemplate.ModelCatalog)
+		}
+	}
 	if codexPreset.OAuthConfig == nil || codexPreset.OAuthConfig.ClientID == "" || codexPreset.OAuthConfig.TokenURL == "" {
 		t.Fatalf("expected codex-cli to include OAuth defaults")
 	}
