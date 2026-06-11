@@ -1,8 +1,11 @@
 package service
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -43,6 +46,53 @@ func (s *Service) invokeReverseProxyCodexImageGeneration(ctx context.Context, re
 		return contract.ImageGenerationResponse{}, classifyCodexProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	return parseCodexImageGenerationResponse(runtimeResp.Body, runtimeResp.StatusCode, req)
+}
+
+func (s *Service) StreamImageGeneration(ctx context.Context, req contract.ImageGenerationRequest) (contract.ImageGenerationResponse, error) {
+	if !req.Stream || !isCodexImageGenerationReverseProxy(req) {
+		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
+	}
+	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" || strings.TrimSpace(req.Prompt) == "" {
+		return contract.ImageGenerationResponse{}, ErrInvalidInput
+	}
+	streamer, ok := s.reverseProxy.(reverseproxycontract.StreamRuntime)
+	if !ok {
+		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
+	}
+	baseURL := upstreamBaseURLImages(req)
+	if baseURL == "" {
+		return contract.ImageGenerationResponse{}, contract.ErrStreamingUnsupported
+	}
+	if codexImageGenerationRuntimeIsAPIKey(req) {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "codex reverse proxy requires OAuth/session/client-token runtime credentials"}
+	}
+	payload, err := codexImageGenerationResponsesPayload(req)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	runtimeResp, err := streamer.DoStream(ctx, reverseproxycontract.Request{
+		Account:      codexImageGenerationReverseProxyAccount(req),
+		Method:       http.MethodPost,
+		URL:          strings.TrimRight(baseURL, "/") + "/responses",
+		Headers:      codexImageGenerationHeaders(req, payload),
+		Body:         raw,
+		ExpectStream: true,
+	})
+	if err != nil {
+		return contract.ImageGenerationResponse{}, providerErrorFromReverseProxy(err)
+	}
+	return contract.ImageGenerationResponse{
+		StatusCode: runtimeResp.StatusCode,
+		Headers:    runtimeResp.Headers,
+		StreamBody: newCodexImageGenerationStreamBody(runtimeResp.Body, req),
+		StreamParse: func(body []byte, statusCode int) (contract.ImageGenerationResponse, error) {
+			return parseCodexImageGenerationRenderedStream(body, statusCode, req)
+		},
+	}, nil
 }
 
 func codexImageGenerationResponsesPayload(req contract.ImageGenerationRequest) (map[string]any, error) {
@@ -188,6 +238,395 @@ func parseCodexImageGenerationResponse(body []byte, statusCode int, req contract
 		StatusCode: statusCode,
 		Usage:      parsed.Usage,
 	}, nil
+}
+
+func newCodexImageGenerationStreamBody(upstream io.ReadCloser, req contract.ImageGenerationRequest) io.ReadCloser {
+	reader, writer := io.Pipe()
+	go func() {
+		defer upstream.Close()
+		err := transformCodexImageGenerationStream(upstream, writer, req)
+		_ = writer.CloseWithError(err)
+	}()
+	return reader
+}
+
+func transformCodexImageGenerationStream(upstream io.Reader, downstream io.Writer, req contract.ImageGenerationRequest) error {
+	scanner := bufio.NewScanner(upstream)
+	scanner.Buffer(make([]byte, 0, 64*1024), 52_428_800)
+	pending := make([]codexResponsesOutputItem, 0, 1)
+	streamMeta := codexImageGenerationStreamMetaFromRequest(req)
+	createdAt := time.Now().Unix()
+	emittedDone := false
+	for scanner.Scan() {
+		line := strings.TrimRight(scanner.Text(), "\r")
+		if !strings.HasPrefix(strings.TrimSpace(line), "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "data:"))
+		if data == "" || data == "[DONE]" {
+			continue
+		}
+		var event codexResponsesEvent
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			return contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "codex image stream returned invalid json"}
+		}
+		if providerErr, ok := codexEventProviderError(event); ok {
+			if err := writeCodexImageGenerationErrorFrame(downstream, providerErr); err != nil {
+				return err
+			}
+			emittedDone = true
+			break
+		}
+		codexMergeImageGenerationEventMeta(&streamMeta, event)
+		if event.Response != nil {
+			if event.Response.Usage.HasTokenUsage() {
+				streamMeta.usage = event.Response.Usage
+			}
+			if created := codexImageGenerationCreatedAt(event.Response); created > 0 {
+				createdAt = created
+			}
+		}
+		switch event.Type {
+		case "response.image_generation_call.partial_image":
+			if strings.TrimSpace(event.PartialImage) == "" {
+				continue
+			}
+			if err := writeCodexImageGenerationFrame(downstream, "image_generation.partial_image", codexImageGenerationPartialPayload(req, event, streamMeta, createdAt)); err != nil {
+				return err
+			}
+		case "response.output_item.done":
+			if event.Item != nil && codexImageGenerationItemHasResult(*event.Item) {
+				pending = append(pending, *event.Item)
+			}
+		case "response.completed":
+			items := pending
+			if event.Response != nil && len(event.Response.Output) > 0 {
+				items = event.Response.Output
+			}
+			if len(items) == 0 {
+				return contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "codex image stream contained no final images"}
+			}
+			for _, item := range items {
+				if !codexImageGenerationItemHasResult(item) {
+					continue
+				}
+				if err := writeCodexImageGenerationFrame(downstream, "image_generation.completed", codexImageGenerationCompletedPayload(req, item, streamMeta, createdAt)); err != nil {
+					return err
+				}
+			}
+			emittedDone = true
+			break
+		}
+		if emittedDone {
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(downstream, "data: [DONE]\n\n"); err != nil {
+		return err
+	}
+	return nil
+}
+
+type codexImageGenerationStreamMeta struct {
+	model        string
+	outputFormat string
+	background   string
+	quality      string
+	size         string
+	usage        openAIUsage
+}
+
+func codexImageGenerationStreamMetaFromRequest(req contract.ImageGenerationRequest) codexImageGenerationStreamMeta {
+	return codexImageGenerationStreamMeta{
+		model:        strings.TrimSpace(codexImageGenerationToolModel(req)),
+		outputFormat: strings.TrimSpace(codexStringValue(req.Extra["output_format"])),
+		background:   strings.TrimSpace(codexStringValue(req.Extra["background"])),
+		quality:      strings.TrimSpace(req.Quality),
+		size:         strings.TrimSpace(req.Size),
+	}
+}
+
+func codexMergeImageGenerationEventMeta(meta *codexImageGenerationStreamMeta, event codexResponsesEvent) {
+	if meta == nil {
+		return
+	}
+	if value := strings.TrimSpace(event.OutputFormat); value != "" {
+		meta.outputFormat = value
+	}
+	if value := strings.TrimSpace(event.Background); value != "" {
+		meta.background = value
+	}
+	if event.Response == nil {
+		return
+	}
+	if value := strings.TrimSpace(event.Response.Model); value != "" && meta.model == "" {
+		meta.model = value
+	}
+	for _, tool := range event.Response.Tools {
+		codexMergeImageGenerationToolMeta(meta, tool)
+	}
+	for _, item := range event.Response.Output {
+		codexMergeImageGenerationItemMeta(meta, item)
+	}
+}
+
+func codexMergeImageGenerationToolMeta(meta *codexImageGenerationStreamMeta, tool map[string]any) {
+	if meta == nil || !strings.EqualFold(mapString(tool, "type"), "image_generation") {
+		return
+	}
+	if value := mapString(tool, "model"); value != "" {
+		meta.model = value
+	}
+	if value := mapString(tool, "output_format"); value != "" {
+		meta.outputFormat = value
+	}
+	if value := mapString(tool, "background"); value != "" {
+		meta.background = value
+	}
+	if value := mapString(tool, "quality"); value != "" {
+		meta.quality = value
+	}
+	if value := mapString(tool, "size"); value != "" {
+		meta.size = value
+	}
+}
+
+func codexMergeImageGenerationItemMeta(meta *codexImageGenerationStreamMeta, item codexResponsesOutputItem) {
+	if meta == nil {
+		return
+	}
+	if value := strings.TrimSpace(item.OutputFormat); value != "" {
+		meta.outputFormat = value
+	}
+}
+
+func codexImageGenerationCreatedAt(response *codexResponsesResponse) int64 {
+	if response == nil {
+		return 0
+	}
+	if response.CreatedAt > 0 {
+		return response.CreatedAt
+	}
+	return response.Created
+}
+
+func codexImageGenerationPartialPayload(req contract.ImageGenerationRequest, event codexResponsesEvent, meta codexImageGenerationStreamMeta, createdAt int64) map[string]any {
+	payload := codexImageGenerationBaseStreamPayload("image_generation.partial_image", req, meta, createdAt)
+	payload["partial_image_index"] = codexImageGenerationPartialIndex(event.PartialIndex)
+	codexImageGenerationSetImagePayload(payload, req, strings.TrimSpace(event.PartialImage), meta.outputFormat)
+	return payload
+}
+
+func codexImageGenerationCompletedPayload(req contract.ImageGenerationRequest, item codexResponsesOutputItem, meta codexImageGenerationStreamMeta, createdAt int64) map[string]any {
+	codexMergeImageGenerationItemMeta(&meta, item)
+	payload := codexImageGenerationBaseStreamPayload("image_generation.completed", req, meta, createdAt)
+	codexImageGenerationSetImagePayload(payload, req, strings.TrimSpace(item.Result), firstNonEmpty(strings.TrimSpace(item.OutputFormat), meta.outputFormat))
+	if value := strings.TrimSpace(item.RevisedPrompt); value != "" {
+		payload["revised_prompt"] = value
+	}
+	if usage := codexImageGenerationUsagePayload(meta.usage); len(usage) > 0 {
+		payload["usage"] = usage
+	}
+	return payload
+}
+
+func codexImageGenerationBaseStreamPayload(eventType string, req contract.ImageGenerationRequest, meta codexImageGenerationStreamMeta, createdAt int64) map[string]any {
+	payload := map[string]any{"type": eventType}
+	if createdAt > 0 {
+		payload["created_at"] = createdAt
+	}
+	if value := strings.TrimSpace(meta.model); value != "" {
+		payload["model"] = value
+	}
+	if value := strings.TrimSpace(meta.outputFormat); value != "" {
+		payload["output_format"] = value
+	}
+	if value := strings.TrimSpace(meta.background); value != "" {
+		payload["background"] = value
+	}
+	if value := strings.TrimSpace(meta.quality); value != "" {
+		payload["quality"] = value
+	}
+	if value := strings.TrimSpace(meta.size); value != "" {
+		payload["size"] = value
+	}
+	return payload
+}
+
+func codexImageGenerationSetImagePayload(payload map[string]any, req contract.ImageGenerationRequest, b64 string, outputFormat string) {
+	if b64 == "" {
+		return
+	}
+	payload["b64_json"] = b64
+	if strings.EqualFold(strings.TrimSpace(req.ResponseFormat), "url") {
+		payload["url"] = "data:" + codexImageGenerationMIMEType(outputFormat) + ";base64," + b64
+	}
+}
+
+func codexImageGenerationUsagePayload(usage openAIUsage) map[string]any {
+	payload := map[string]any{}
+	if usage.InputTokens != nil {
+		payload["input_tokens"] = *usage.InputTokens
+	}
+	if usage.OutputTokens != nil {
+		payload["output_tokens"] = *usage.OutputTokens
+	}
+	if usage.PromptTokens != nil {
+		payload["prompt_tokens"] = *usage.PromptTokens
+	}
+	if usage.CompletionTokens != nil {
+		payload["completion_tokens"] = *usage.CompletionTokens
+	}
+	if usage.TotalTokens != nil {
+		payload["total_tokens"] = *usage.TotalTokens
+	}
+	if usage.CachedTokens != nil {
+		payload["cached_tokens"] = *usage.CachedTokens
+	}
+	if usage.InputTokensDetails != nil {
+		payload["input_tokens_details"] = usage.InputTokensDetails
+	}
+	if usage.PromptTokensDetails != nil {
+		payload["prompt_tokens_details"] = usage.PromptTokensDetails
+	}
+	return payload
+}
+
+func codexImageGenerationPartialIndex(value any) int {
+	if parsed, ok := codexImageGenerationIntValue(value); ok {
+		return parsed
+	}
+	return 0
+}
+
+func codexImageGenerationItemHasResult(item codexResponsesOutputItem) bool {
+	return strings.EqualFold(strings.TrimSpace(item.Type), "image_generation_call") && strings.TrimSpace(item.Result) != ""
+}
+
+func writeCodexImageGenerationFrame(w io.Writer, eventName string, payload map[string]any) error {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", eventName, raw)
+	return err
+}
+
+func writeCodexImageGenerationErrorFrame(w io.Writer, providerErr contract.ProviderError) error {
+	errorType := strings.TrimSpace(providerErr.Class)
+	errorCode := errorType
+	if providerErr.Metadata != nil {
+		if value := mapString(providerErr.Metadata, "type"); value != "" {
+			errorType = value
+		}
+		if value := mapString(providerErr.Metadata, "code"); value != "" {
+			errorCode = value
+		}
+	}
+	payload := map[string]any{
+		"type": "error",
+		"error": map[string]any{
+			"message": providerErr.Message,
+			"type":    errorType,
+			"code":    errorCode,
+		},
+	}
+	if providerErr.StatusCode > 0 {
+		payload["status_code"] = providerErr.StatusCode
+	}
+	return writeCodexImageGenerationFrame(w, "error", payload)
+}
+
+func parseCodexImageGenerationRenderedStream(body []byte, statusCode int, req contract.ImageGenerationRequest) (contract.ImageGenerationResponse, error) {
+	frames, err := parseSSEFrames(body)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider image stream parse failed"}
+	}
+	images := make([]contract.Image, 0)
+	var usage openAIUsage
+	var created int64
+	model := strings.TrimSpace(req.Mapping.UpstreamModelName)
+	for _, frame := range frames {
+		if strings.TrimSpace(frame.Data) == "[DONE]" {
+			continue
+		}
+		var payload map[string]any
+		if err := json.Unmarshal([]byte(frame.Data), &payload); err != nil {
+			continue
+		}
+		eventType := frame.EventType(mapString(payload, "type"))
+		if eventType == "error" {
+			return contract.ImageGenerationResponse{}, codexImageGenerationStreamError(payload)
+		}
+		if eventType != "image_generation.completed" {
+			continue
+		}
+		if created == 0 {
+			if value, ok := codexImageGenerationIntValue(payload["created_at"]); ok {
+				created = int64(value)
+			}
+		}
+		if value := mapString(payload, "model"); value != "" {
+			model = value
+		}
+		image := contract.Image{
+			URL:           strings.TrimSpace(mapString(payload, "url")),
+			Base64JSON:    strings.TrimSpace(mapString(payload, "b64_json")),
+			RevisedPrompt: strings.TrimSpace(mapString(payload, "revised_prompt")),
+			Metadata:      cloneMap(payload),
+		}
+		delete(image.Metadata, "type")
+		delete(image.Metadata, "url")
+		delete(image.Metadata, "b64_json")
+		delete(image.Metadata, "revised_prompt")
+		delete(image.Metadata, "usage")
+		if image.URL != "" || image.Base64JSON != "" {
+			images = append(images, image)
+		}
+		if usageValue, ok := payload["usage"]; ok {
+			raw, _ := json.Marshal(usageValue)
+			_ = json.Unmarshal(raw, &usage)
+		}
+	}
+	if len(images) == 0 {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider image stream contained no final images"}
+	}
+	if created == 0 {
+		created = time.Now().Unix()
+	}
+	return contract.ImageGenerationResponse{
+		Created:    created,
+		Data:       images,
+		Model:      model,
+		StatusCode: statusCode,
+		Usage:      usage.ToImageUsage(req),
+	}, nil
+}
+
+func codexImageGenerationStreamError(payload map[string]any) contract.ProviderError {
+	errPayload, _ := payload["error"].(map[string]any)
+	message := mapString(errPayload, "message")
+	if message == "" {
+		message = mapString(payload, "message")
+	}
+	class := mapString(errPayload, "type")
+	if class == "" {
+		class = mapString(errPayload, "code")
+	}
+	if class == "" {
+		class = "upstream_error"
+	}
+	statusCode := http.StatusBadGateway
+	if value, ok := codexImageGenerationIntValue(payload["status_code"]); ok && value > 0 {
+		statusCode = value
+	}
+	if message == "" {
+		message = class
+	}
+	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message}
 }
 
 func isCodexImageGenerationReverseProxy(req contract.ImageGenerationRequest) bool {

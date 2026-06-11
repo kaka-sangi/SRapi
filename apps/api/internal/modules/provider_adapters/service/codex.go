@@ -83,6 +83,10 @@ type codexResponsesResponse struct {
 	ID                string                     `json:"id"`
 	Object            string                     `json:"object"`
 	Model             string                     `json:"model"`
+	CreatedAt         int64                      `json:"created_at"`
+	Created           int64                      `json:"created"`
+	Tools             []map[string]any           `json:"tools"`
+	ToolUsage         map[string]any             `json:"tool_usage"`
 	Output            []codexResponsesOutputItem `json:"output"`
 	OutputText        string                     `json:"output_text"`
 	InputTokens       *int                       `json:"input_tokens"`
@@ -1675,8 +1679,20 @@ func codexProviderError(err codexResponsesError) contract.ProviderError {
 	}
 	class, statusCode := codexProviderErrorClassAndStatus(err, message)
 	metadata := map[string]any(nil)
+	if value := strings.TrimSpace(err.Type); value != "" {
+		metadata = map[string]any{"type": value}
+	}
+	if value := strings.TrimSpace(err.Code); value != "" {
+		if metadata == nil {
+			metadata = map[string]any{}
+		}
+		metadata["code"] = value
+	}
 	if planType := strings.TrimSpace(err.PlanType); planType != "" {
-		metadata = map[string]any{"plan_type": planType}
+		if metadata == nil {
+			metadata = map[string]any{}
+		}
+		metadata["plan_type"] = planType
 	}
 	return contract.ProviderError{
 		Class:      class,

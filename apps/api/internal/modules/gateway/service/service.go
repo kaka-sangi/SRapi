@@ -261,6 +261,7 @@ func (s *Service) NormalizeImageGeneration(req apiopenapi.ImageGenerationRequest
 	}
 	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, req.Model, "", false, prompt, nil, imageContentBlocks(prompt), "", nil)
 	canonical.ImagePrompt = prompt
+	canonical.ImageStream = imageGenerationStreamValue(req)
 	canonical.ImageCount = count
 	canonical.ImageSize = enumString(req.Size)
 	canonical.ImageQuality = enumString(req.Quality)
@@ -276,6 +277,10 @@ func (s *Service) NormalizeImageGeneration(req apiopenapi.ImageGenerationRequest
 	delete(canonical.ImageExtra, "stream")
 	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyImages, Version: "v1"})
 	return canonical, nil
+}
+
+func imageGenerationStreamValue(req apiopenapi.ImageGenerationRequest) bool {
+	return mapBoolAny(req.AdditionalProperties, "stream")
 }
 
 func (s *Service) NormalizeImageEdit(req apiopenapi.ImageEditRequest, meta RequestMeta) (gatewaycontract.CanonicalRequest, error) {

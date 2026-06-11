@@ -102,6 +102,7 @@ func providerImageGenerationRequest(req gatewaycontract.CanonicalRequest, candid
 		SourceEndpoint: req.SourceEndpoint,
 		Model:          req.CanonicalModel,
 		Prompt:         req.ImagePrompt,
+		Stream:         req.ImageStream,
 		Count:          req.ImageCount,
 		Size:           req.ImageSize,
 		Quality:        req.ImageQuality,

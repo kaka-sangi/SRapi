@@ -7600,6 +7600,81 @@ func TestReverseProxyCodexCLIAdapterReturnsDataURLForImageURLResponseFormat(t *t
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterStreamsImageGenerationEvents(t *testing.T) {
+	runtime := capturingRuntime{
+		streamResponse: reverseproxycontract.StreamResponse{
+			StatusCode: http.StatusOK,
+			Headers:    http.Header{"X-Request-Id": {"req_img_stream"}},
+			Body: io.NopCloser(strings.NewReader(
+				"data: {\"type\":\"response.created\",\"response\":{\"created_at\":1710000001,\"tools\":[{\"type\":\"image_generation\",\"model\":\"gpt-image-2\",\"background\":\"auto\",\"output_format\":\"png\",\"quality\":\"high\",\"size\":\"1024x1024\"}]}}\n\n" +
+					"data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\",\"background\":\"auto\"}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"created_at\":1710000001,\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"total_tokens\":14},\"tools\":[{\"type\":\"image_generation\",\"model\":\"gpt-image-2\",\"background\":\"auto\",\"output_format\":\"png\",\"quality\":\"high\",\"size\":\"1024x1024\"}],\"output\":[{\"type\":\"image_generation_call\",\"result\":\"ZmluYWw=\",\"output_format\":\"png\"}]}}\n\n" +
+					"data: [DONE]\n\n",
+			)),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.StreamImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID:      "req_codex_image_stream",
+		Model:          "gpt-image-2",
+		Prompt:         "draw a cat",
+		Stream:         true,
+		ResponseFormat: "url",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-image-2"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("stream codex image generation: %v", err)
+	}
+	raw, err := io.ReadAll(resp.StreamBody)
+	if err != nil {
+		t.Fatalf("read codex image stream: %v", err)
+	}
+	body := string(raw)
+	for _, expected := range []string{
+		"event: image_generation.partial_image",
+		`"type":"image_generation.partial_image"`,
+		`"b64_json":"cGFydGlhbA=="`,
+		`"url":"data:image/png;base64,cGFydGlhbA=="`,
+		`"model":"gpt-image-2"`,
+		`"quality":"high"`,
+		`"size":"1024x1024"`,
+		"event: image_generation.completed",
+		`"b64_json":"ZmluYWw="`,
+		`"url":"data:image/png;base64,ZmluYWw="`,
+		`"input_tokens":5`,
+		`"output_tokens":9`,
+		"data: [DONE]",
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected transformed image stream to contain %q, got %s", expected, body)
+		}
+	}
+	parsed, err := resp.StreamParse(raw, resp.StatusCode)
+	if err != nil {
+		t.Fatalf("parse rendered image stream: %v", err)
+	}
+	if len(parsed.Data) != 1 || parsed.Data[0].URL != "data:image/png;base64,ZmluYWw=" || parsed.Data[0].Base64JSON != "ZmluYWw=" || parsed.Usage.InputTokens != 5 || parsed.Usage.OutputTokens != 9 || parsed.Usage.Estimated {
+		t.Fatalf("unexpected parsed rendered image stream: %+v", parsed)
+	}
+	if !runtime.request.ExpectStream || runtime.request.URL != "https://upstream.example/backend-api/codex/responses" {
+		t.Fatalf("expected codex image DoStream request, got %+v", runtime.request)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterUsesConfiguredOriginator(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
@@ -10009,9 +10084,10 @@ func (legacyUpstreamErrorRuntime) ManagedEgressClient(reverseproxycontract.Accou
 }
 
 type capturingRuntime struct {
-	request  reverseproxycontract.Request
-	response reverseproxycontract.Response
-	err      error
+	request        reverseproxycontract.Request
+	response       reverseproxycontract.Response
+	streamResponse reverseproxycontract.StreamResponse
+	err            error
 }
 
 func (r *capturingRuntime) Do(_ context.Context, req reverseproxycontract.Request) (reverseproxycontract.Response, error) {
@@ -10020,6 +10096,21 @@ func (r *capturingRuntime) Do(_ context.Context, req reverseproxycontract.Reques
 		return reverseproxycontract.Response{}, r.err
 	}
 	return r.response, nil
+}
+
+func (r *capturingRuntime) DoStream(_ context.Context, req reverseproxycontract.Request) (reverseproxycontract.StreamResponse, error) {
+	r.request = req
+	if r.err != nil {
+		return reverseproxycontract.StreamResponse{}, r.err
+	}
+	if r.streamResponse.Body != nil {
+		return r.streamResponse, nil
+	}
+	return reverseproxycontract.StreamResponse{
+		StatusCode: r.response.StatusCode,
+		Headers:    r.response.Headers,
+		Body:       io.NopCloser(bytes.NewReader(r.response.Body)),
+	}, nil
 }
 
 func (r *capturingRuntime) ManagedEgressClient(reverseproxycontract.AccountRuntime) (*http.Client, bool, error) {

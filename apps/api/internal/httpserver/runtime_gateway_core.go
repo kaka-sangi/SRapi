@@ -1122,8 +1122,39 @@ func (rt *runtimeState) invokeProviderImageGeneration(ctx context.Context, req p
 	if err != nil {
 		return provideradaptercontract.ImageGenerationResponse{}, err
 	}
-	defer rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
+	releaseLeases := true
+	defer func() {
+		if releaseLeases {
+			rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
+		}
+	}()
 	req.Credential = dispatch.credential
+	if req.Stream {
+		streamed, streamErr := rt.adapters.StreamImageGeneration(ctx, req)
+		if streamErr == nil {
+			leases := dispatch.concurrencyLeases
+			streamed.StreamBody = newStreamLeaseCloser(streamed.StreamBody, func() {
+				rt.releaseGatewayConcurrency(leases)
+			})
+			releaseLeases = false
+			return streamed, nil
+		}
+		if !errors.Is(streamErr, provideradaptercontract.ErrStreamingUnsupported) {
+			if refreshed, retried := rt.retryAfterAuthRefresh(ctx, req.Account, dispatch.credential, streamErr); retried {
+				req.Credential = refreshed
+				if streamed2, streamErr2 := rt.adapters.StreamImageGeneration(ctx, req); streamErr2 == nil {
+					leases := dispatch.concurrencyLeases
+					streamed2.StreamBody = newStreamLeaseCloser(streamed2.StreamBody, func() {
+						rt.releaseGatewayConcurrency(leases)
+					})
+					releaseLeases = false
+					return streamed2, nil
+				}
+			}
+			rt.applyProviderAccountProtection(ctx, req.Account, streamErr)
+			return provideradaptercontract.ImageGenerationResponse{}, streamErr
+		}
+	}
 	resp, err := rt.adapters.InvokeImageGeneration(ctx, req)
 	if err != nil {
 		rt.applyProviderAccountProtection(ctx, req.Account, err)

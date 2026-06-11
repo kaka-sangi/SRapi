@@ -176,6 +176,7 @@ type ImageGenerationRequest struct {
 	SourceEndpoint string
 	Model          string
 	Prompt         string
+	Stream         bool
 	Count          int
 	Size           string
 	Quality        string
@@ -331,6 +332,17 @@ type ImageGenerationResponse struct {
 	Model      string
 	StatusCode int
 	Usage      Usage
+
+	// Headers carries upstream response headers for live streaming paths. Nil
+	// when the adapter buffers and re-renders the response.
+	Headers http.Header
+	// StreamBody, when non-nil, carries a live response stream already rendered
+	// into the caller-facing Images SSE protocol. The caller MUST Close it after
+	// streaming to the client.
+	StreamBody io.ReadCloser
+	// StreamParse extracts final images and usage from the fully-streamed
+	// caller-facing SSE bytes. Only set when StreamBody is non-nil.
+	StreamParse func(body []byte, statusCode int) (ImageGenerationResponse, error)
 }
 
 type ModerationResult struct {
@@ -621,6 +633,7 @@ type EmbeddingAdapter interface {
 // ImageGenerationAdapter invokes provider image generation.
 type ImageGenerationAdapter interface {
 	InvokeImageGeneration(ctx context.Context, req ImageGenerationRequest) (ImageGenerationResponse, error)
+	StreamImageGeneration(ctx context.Context, req ImageGenerationRequest) (ImageGenerationResponse, error)
 }
 
 // ImageEditAdapter invokes provider image editing.

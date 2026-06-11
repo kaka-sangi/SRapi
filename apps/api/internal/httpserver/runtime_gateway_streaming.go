@@ -203,6 +203,141 @@ readLoop:
 	s.runtime.recordGatewayUsage(r.Context(), record)
 }
 
+func (s *Server) writeImageGenerationStreamPassthrough(
+	w http.ResponseWriter,
+	r *http.Request,
+	authed apikeycontract.AuthResult,
+	canonical gatewaycontract.CanonicalRequest,
+	result schedulercontract.ScheduleResult,
+	providerResp provideradaptercontract.ImageGenerationResponse,
+	admission gatewayAdmission,
+	modelID int,
+	startedAt time.Time,
+) {
+	defer func() { _ = providerResp.StreamBody.Close() }()
+
+	setSSEResponseHeaders(w)
+	forwardUpstreamResponseHeaders(w, providerResp.Headers, s.gatewayPassthroughHeaderConfig(r.Context()))
+	w.Header().Set("X-Accel-Buffering", "no")
+	flusher, _ := w.(http.Flusher)
+
+	idle := s.cfg.Gateway.StreamIdleTimeout
+	idleTimedOut := false
+	type streamChunk struct {
+		data []byte
+		err  error
+	}
+	chunkCh := make(chan streamChunk)
+	readerDone := make(chan struct{})
+	defer close(readerDone)
+	go func() {
+		for {
+			b := make([]byte, 32*1024)
+			n, err := providerResp.StreamBody.Read(b)
+			if n > 0 {
+				select {
+				case chunkCh <- streamChunk{data: b[:n]}:
+				case <-readerDone:
+					return
+				}
+			}
+			if err != nil {
+				select {
+				case chunkCh <- streamChunk{err: err}:
+				case <-readerDone:
+				}
+				return
+			}
+		}
+	}()
+
+	var meter bytes.Buffer
+	interrupted := false
+readLoop:
+	for {
+		var sc streamChunk
+		if idle > 0 {
+			timer := time.NewTimer(idle)
+			select {
+			case sc = <-chunkCh:
+				timer.Stop()
+			case <-timer.C:
+				idleTimedOut = true
+				interrupted = true
+				_ = providerResp.StreamBody.Close()
+				break readLoop
+			}
+		} else {
+			sc = <-chunkCh
+		}
+		if len(sc.data) > 0 {
+			if remaining := maxStreamMeterBytes - meter.Len(); remaining > 0 {
+				if len(sc.data) <= remaining {
+					meter.Write(sc.data)
+				} else {
+					meter.Write(sc.data[:remaining])
+				}
+			}
+			if _, writeErr := w.Write(sc.data); writeErr != nil {
+				interrupted = true
+				break
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		if sc.err != nil {
+			if sc.err != io.EOF {
+				interrupted = true
+			}
+			break
+		}
+	}
+
+	usage := admission.EstimatedUsage
+	usageEstimated := true
+	if providerResp.StreamParse != nil && meter.Len() > 0 {
+		if parsed, parseErr := providerResp.StreamParse(meter.Bytes(), statusOrOK(providerResp.StatusCode)); parseErr == nil {
+			parsedUsage := gatewayUsageFromImageProvider(parsed)
+			usage = parsedUsage
+			usageEstimated = parsedUsage.Estimated
+		}
+	}
+
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(modelID, result.Candidate, canonical, usage), usage.Estimated)
+	record := gatewayUsageRecord{
+		RequestID:             canonical.RequestID,
+		Authed:                authed,
+		DecisionID:            result.Decision.ID,
+		AttemptNo:             result.Decision.AttemptNo,
+		ProviderID:            ptrInt(result.Candidate.Provider.ID),
+		AccountID:             ptrInt(result.Candidate.Account.ID),
+		SourceProtocol:        string(canonical.SourceProtocol),
+		SourceEndpoint:        canonical.SourceEndpoint,
+		TargetProtocol:        result.Candidate.Provider.Protocol,
+		Model:                 canonical.CanonicalModel,
+		RequestedModel:        gatewayUsageRequestedSnapshot(canonical, result.Candidate),
+		UpstreamModel:         gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
+		Success:               !interrupted,
+		StatusCode:            ptrInt(http.StatusOK),
+		LatencyMS:             elapsedMillis(startedAt),
+		InputTokens:           usage.InputTokens,
+		OutputTokens:          usage.OutputTokens,
+		CachedTokens:          usage.CachedTokens,
+		UsageEstimated:        usageEstimated,
+		Pricing:               pricing,
+		CompatibilityWarnings: canonical.CompatibilityWarnings,
+	}
+	if interrupted {
+		if idleTimedOut {
+			record.ErrorClass = ptrStringValue("stream_idle_timeout")
+		} else {
+			record.ErrorClass = ptrStringValue("stream_interrupted")
+		}
+	}
+	s.runtime.recordGatewayUsage(r.Context(), record)
+}
+
 func statusOrOK(status int) int {
 	if status <= 0 {
 		return http.StatusOK

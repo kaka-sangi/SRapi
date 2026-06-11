@@ -109,6 +109,7 @@ type CanonicalRequest struct {
 	ImageQuality          string
 	ImageStyle            string
 	ImageResponseFormat   string
+	ImageStream           bool
 	ImageUser             string
 	ImageExtra            map[string]any
 	AudioFileName         string

@@ -147,6 +147,9 @@ func TestNormalizeImageGenerationConsumesStreamLocally(t *testing.T) {
 	if err != nil {
 		t.Fatalf("normalize image generation: %v", err)
 	}
+	if !canonical.ImageStream {
+		t.Fatalf("expected image generation stream flag to be retained internally")
+	}
 	if canonical.ImageExtra["stream"] != nil {
 		t.Fatalf("stream should be consumed by gateway and not forwarded upstream, got %+v", canonical.ImageExtra)
 	}
