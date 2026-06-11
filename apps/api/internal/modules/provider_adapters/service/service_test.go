@@ -2384,6 +2384,77 @@ func TestOpenAICompatibleAdapterClassifiesRateLimit(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleAdapterCapturesCodexQuotaSignalsFromRateLimitHeaders(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Codex-Primary-Used-Percent", "100")
+		w.Header().Set("X-Codex-Primary-Reset-After-Seconds", "604800")
+		w.Header().Set("X-Codex-Primary-Window-Minutes", "10080")
+		w.Header().Set("X-Codex-Secondary-Used-Percent", "3")
+		w.Header().Set("X-Codex-Secondary-Reset-After-Seconds", "18000")
+		w.Header().Set("X-Codex-Secondary-Window-Minutes", "300")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"too many requests"}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_rate_limit_codex_headers",
+		Model:      "gpt-local",
+		InputParts: textParts("hello"),
+		Account: accountcontract.ProviderAccount{
+			Metadata: map[string]any{"base_url": upstream.URL + "/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+
+	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	if len(providerErr.QuotaSignals) != 2 {
+		t.Fatalf("expected Codex quota signals on provider error, got %+v", providerErr.QuotaSignals)
+	}
+	assertQuotaSignal(t, providerErr.QuotaSignals, "codex_5h_percent", "3", "97", "100", 0.97)
+	assertQuotaSignal(t, providerErr.QuotaSignals, "codex_7d_percent", "100", "0", "100", 0)
+}
+
+func TestAnthropicCompatibleAdapterCapturesQuotaSignalsFromErrorHeaders(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("anthropic-ratelimit-unified-5h", "remaining=25; limit=100; reset_after_seconds=300")
+		w.Header().Set("anthropic-ratelimit-unified-7d", "used=40; limit=100; reset_after_seconds=600")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"too many requests"}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_anthropic_rate_limit_headers",
+		Model:      "claude-local",
+		InputParts: textParts("hello"),
+		Provider:   providercontract.Provider{Protocol: "anthropic-compatible"},
+		Account: accountcontract.ProviderAccount{
+			Metadata: map[string]any{"base_url": upstream.URL},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+
+	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	if len(providerErr.QuotaSignals) != 2 {
+		t.Fatalf("expected Anthropic quota signals on provider error, got %+v", providerErr.QuotaSignals)
+	}
+	assertQuotaSignal(t, providerErr.QuotaSignals, "anthropic_5h", "75", "25", "100", 0.25)
+	assertQuotaSignal(t, providerErr.QuotaSignals, "anthropic_7d", "40", "60", "100", 0.6)
+}
+
 func TestOpenAICompatibleAdapterClassifiesRateLimitResetsInSeconds(t *testing.T) {
 	before := time.Now().UTC()
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

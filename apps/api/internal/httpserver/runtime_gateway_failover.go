@@ -557,6 +557,7 @@ func (s *Server) recordGatewayProviderAttemptFailure(r *http.Request, authed api
 		UsageEstimated:        true,
 		Pricing:               admission.Pricing,
 		CompatibilityWarnings: canonical.CompatibilityWarnings,
+		ProviderQuotaSignals:  providerQuotaSignalsFromError(providerErr),
 		ProviderRetryAfter:    providerRetryAfterFromError(providerErr),
 		ProviderErrorMessage:  providerErrorMessage(providerErr),
 	})
@@ -591,6 +592,23 @@ func providerRetryAfterFromError(err error) *time.Time {
 	}
 	retryAfter := providerErr.RetryAfter.UTC()
 	return &retryAfter
+}
+
+func providerQuotaSignalsFromError(err error) []provideradaptercontract.QuotaSignal {
+	var providerErr provideradaptercontract.ProviderError
+	if !errors.As(err, &providerErr) || len(providerErr.QuotaSignals) == 0 {
+		return nil
+	}
+	out := make([]provideradaptercontract.QuotaSignal, 0, len(providerErr.QuotaSignals))
+	for _, signal := range providerErr.QuotaSignals {
+		if signal.QuotaType == "" {
+			continue
+		}
+		cloned := signal
+		cloned.ResetAt = cloneTimePtr(signal.ResetAt)
+		out = append(out, cloned)
+	}
+	return out
 }
 
 func providerErrorMessage(err error) string {

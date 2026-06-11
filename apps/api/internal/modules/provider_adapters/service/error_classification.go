@@ -17,6 +17,7 @@ func classifyProviderHTTPError(statusCode int, body []byte) contract.ProviderErr
 }
 
 func classifyProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, body []byte) contract.ProviderError {
+	now := time.Now()
 	message := strings.TrimSpace(string(body))
 	if message == "" {
 		message = http.StatusText(statusCode)
@@ -29,7 +30,7 @@ func classifyProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, b
 	if providerErrorBodyIndicatesQuotaExhausted(body, message) {
 		class = "quota_exhausted"
 	}
-	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, RetryAfter: providerRetryAfter(headers, body, time.Now()), Metadata: metadata}
+	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, RetryAfter: providerRetryAfter(headers, body, now), Metadata: metadata, QuotaSignals: providerQuotaSignalsFromErrorHeaders(headers, now)}
 }
 
 func classifyAnthropicProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
@@ -60,6 +61,7 @@ func classifyGeminiProviderHTTPError(statusCode int, body []byte) contract.Provi
 }
 
 func classifyGeminiProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, body []byte) contract.ProviderError {
+	now := time.Now()
 	var decoded struct {
 		Error struct {
 			Status  string `json:"status"`
@@ -82,7 +84,16 @@ func classifyGeminiProviderHTTPErrorWithHeaders(statusCode int, headers http.Hea
 	if providerErrorBodyIndicatesQuotaExhausted(body, message) {
 		class = "quota_exhausted"
 	}
-	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, RetryAfter: providerRetryAfter(headers, body, time.Now())}
+	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, RetryAfter: providerRetryAfter(headers, body, now), QuotaSignals: providerQuotaSignalsFromErrorHeaders(headers, now)}
+}
+
+func providerQuotaSignalsFromErrorHeaders(headers http.Header, now time.Time) []contract.QuotaSignal {
+	if headers == nil {
+		return nil
+	}
+	signals := codexQuotaSignalsFromHeaders(headers, now)
+	signals = append(signals, anthropicQuotaSignalsFromHeaders(headers, now)...)
+	return signals
 }
 
 func providerClassForGeminiStatus(status string, statusCode int) string {

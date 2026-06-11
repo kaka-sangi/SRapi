@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -21,7 +22,10 @@ import (
 	billingmemory "github.com/srapi/srapi/apps/api/internal/modules/billing/store/memory"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
+	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
+	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
@@ -317,6 +321,149 @@ func TestRecordGatewayUsagePersistsProviderQuotaSignals(t *testing.T) {
 	}
 	if !foundRefreshEvent {
 		t.Fatalf("expected deferred account snapshot refresh event, got %+v", outboxRows)
+	}
+}
+
+func TestProviderQuotaSignalsFromErrorClonesSignals(t *testing.T) {
+	resetAt := time.Date(2026, 6, 12, 12, 0, 0, 0, time.UTC)
+	wantResetAt := resetAt
+	snapshotAt := resetAt.Add(-time.Minute)
+	err := provideradaptercontract.ProviderError{
+		Class:      "rate_limit",
+		StatusCode: http.StatusTooManyRequests,
+		Message:    "too many requests",
+		QuotaSignals: []provideradaptercontract.QuotaSignal{{
+			QuotaType:      "codex_5h_percent",
+			Remaining:      "0",
+			Used:           "100",
+			QuotaLimit:     "100",
+			RemainingRatio: 0,
+			ResetAt:        &resetAt,
+			SnapshotAt:     snapshotAt,
+		}},
+	}
+
+	signals := providerQuotaSignalsFromError(err)
+	if len(signals) != 1 {
+		t.Fatalf("expected one quota signal, got %+v", signals)
+	}
+	if signals[0].QuotaType != "codex_5h_percent" || signals[0].ResetAt == nil || !signals[0].ResetAt.Equal(resetAt) || !signals[0].SnapshotAt.Equal(snapshotAt) {
+		t.Fatalf("unexpected quota signal cloned from provider error: %+v", signals[0])
+	}
+	*err.QuotaSignals[0].ResetAt = resetAt.Add(time.Hour)
+	if !signals[0].ResetAt.Equal(wantResetAt) {
+		t.Fatalf("expected cloned reset time to be independent, got %+v", signals[0].ResetAt)
+	}
+}
+
+func TestRecordGatewayProviderAttemptFailureIncludesProviderQuotaSignals(t *testing.T) {
+	ctx := context.Background()
+	accounts, err := accountservice.New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new account service: %v", err)
+	}
+	usage, err := usageservice.New(usagememory.New(), nil)
+	if err != nil {
+		t.Fatalf("new usage service: %v", err)
+	}
+	events, err := eventsservice.New(eventsmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	scheduler, err := schedulerservice.New(schedulermemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new scheduler service: %v", err)
+	}
+	rt := &runtimeState{
+		logger:    slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		accounts:  accounts,
+		usage:     usage,
+		events:    events,
+		scheduler: scheduler,
+	}
+	server := &Server{runtime: rt}
+	resetAt := time.Date(2026, 6, 12, 12, 0, 0, 0, time.UTC)
+	account := accountcontract.ProviderAccount{ID: 42, ProviderID: 7}
+	providerErr := provideradaptercontract.ProviderError{
+		Class:      "rate_limit",
+		StatusCode: http.StatusTooManyRequests,
+		Message:    "too many requests",
+		QuotaSignals: []provideradaptercontract.QuotaSignal{{
+			QuotaType:      "codex_5h_percent",
+			Remaining:      "0",
+			Used:           "100",
+			QuotaLimit:     "100",
+			RemainingRatio: 0,
+			ResetAt:        &resetAt,
+			SnapshotAt:     resetAt.Add(-time.Minute),
+		}},
+	}
+
+	req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/v1/responses", nil)
+	server.recordGatewayProviderAttemptFailure(
+		req,
+		apikeycontract.AuthResult{UserID: 1, Key: apikeycontract.APIKey{ID: 2}},
+		gatewaycontract.CanonicalRequest{
+			RequestID:      "req_failed_quota_signal",
+			SourceProtocol: gatewaycontract.ProtocolOpenAICompatible,
+			SourceEndpoint: string(gatewaycontract.EndpointResponses),
+			CanonicalModel: "codex-model",
+		},
+		schedulercontract.ScheduleResult{
+			Decision: schedulercontract.Decision{ID: 99, AttemptNo: 1},
+			Candidate: schedulercontract.Candidate{
+				Account: account,
+				Provider: providercontract.Provider{
+					ID:       7,
+					Protocol: "openai-compatible",
+				},
+				Mapping: modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+			},
+		},
+		providerErr,
+		"rate_limit",
+		http.StatusTooManyRequests,
+		12,
+		gatewayAdmission{},
+	)
+
+	rows, err := events.ListOutbox(ctx)
+	if err != nil {
+		t.Fatalf("list outbox: %v", err)
+	}
+	var refreshPayload map[string]any
+	for _, row := range rows {
+		if row.EventType == "GatewayAccountSnapshotRefreshRequested" {
+			refreshPayload = row.Payload
+			break
+		}
+	}
+	if refreshPayload == nil {
+		t.Fatalf("expected account snapshot refresh outbox event, got %+v", rows)
+	}
+	signals := quotaSignalPayloadsForTest(refreshPayload["quota_signals"])
+	if len(signals) != 1 {
+		t.Fatalf("expected quota signal payload, got %+v", refreshPayload["quota_signals"])
+	}
+	if signals[0]["quota_type"] != "codex_5h_percent" || signals[0]["used"] != "100" || signals[0]["remaining"] != "0" {
+		t.Fatalf("unexpected quota signal payload: %+v", signals[0])
+	}
+}
+
+func quotaSignalPayloadsForTest(value any) []map[string]any {
+	switch typed := value.(type) {
+	case []map[string]any:
+		return typed
+	case []any:
+		out := make([]map[string]any, 0, len(typed))
+		for _, item := range typed {
+			if mapped, ok := item.(map[string]any); ok {
+				out = append(out, mapped)
+			}
+		}
+		return out
+	default:
+		return nil
 	}
 }
 

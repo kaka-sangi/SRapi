@@ -1706,6 +1706,7 @@ func codexProviderError(err codexResponsesError) contract.ProviderError {
 }
 
 func classifyCodexProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, body []byte) contract.ProviderError {
+	now := time.Now()
 	err := codexErrorFromHTTPBody(body)
 	message := codexHTTPErrorMessage(body, statusCode, err)
 	class, effectiveStatus := codexHTTPErrorClassAndStatus(statusCode, body, err, message)
@@ -1714,11 +1715,12 @@ func classifyCodexProviderHTTPErrorWithHeaders(statusCode int, headers http.Head
 		metadata = map[string]any{"plan_type": strings.TrimSpace(err.PlanType)}
 	}
 	return contract.ProviderError{
-		Class:      class,
-		StatusCode: effectiveStatus,
-		Message:    message,
-		RetryAfter: providerRetryAfter(headers, body, time.Now()),
-		Metadata:   metadata,
+		Class:        class,
+		StatusCode:   effectiveStatus,
+		Message:      message,
+		RetryAfter:   providerRetryAfter(headers, body, now),
+		Metadata:     metadata,
+		QuotaSignals: providerQuotaSignalsFromErrorHeaders(headers, now),
 	}
 }
 

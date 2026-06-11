@@ -564,6 +564,10 @@ type ProviderError struct {
 	Message    string
 	RetryAfter *time.Time
 	Metadata   map[string]any
+	// QuotaSignals carries normalized provider quota observations discovered on
+	// failed upstream responses, so gateway failure handling can persist the same
+	// account quota windows as successful responses.
+	QuotaSignals []QuotaSignal
 }
 
 // QuotaErrorMetadata returns account metadata fields that preserve a structured
