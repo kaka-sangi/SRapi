@@ -305,6 +305,74 @@ func (s *Store) CountAccountConcurrency(ctx context.Context, accountID int) (int
 	return value, nil
 }
 
+// CountAccountConcurrencyBatch resolves live lease counts for many accounts in
+// one MGET round trip. Accounts without a marker (or with an unparsable one)
+// are absent from the result. Implements contract.AccountRuntimeBatchReader.
+func (s *Store) CountAccountConcurrencyBatch(ctx context.Context, accountIDs []int) (map[int]int, error) {
+	out := make(map[int]int, len(accountIDs))
+	values, err := s.mgetAccountValues(ctx, accountIDs, s.accountConcurrencyKey)
+	if err != nil {
+		return nil, err
+	}
+	for accountID, raw := range values {
+		if value, err := strconv.Atoi(raw); err == nil && value > 0 {
+			out[accountID] = value
+		}
+	}
+	return out, nil
+}
+
+// AccountLastUsedBatch resolves last-used markers (epoch ms) for many accounts
+// in one MGET round trip. Accounts without a marker are absent from the
+// result. Implements contract.AccountRuntimeBatchReader.
+func (s *Store) AccountLastUsedBatch(ctx context.Context, accountIDs []int) (map[int]int64, error) {
+	out := make(map[int]int64, len(accountIDs))
+	values, err := s.mgetAccountValues(ctx, accountIDs, s.accountLastUsedKey)
+	if err != nil {
+		return nil, err
+	}
+	for accountID, raw := range values {
+		if value, err := strconv.ParseInt(raw, 10, 64); err == nil && value > 0 {
+			out[accountID] = value
+		}
+	}
+	return out, nil
+}
+
+// mgetAccountValues MGETs one key per account and maps present string values
+// back to their account IDs.
+func (s *Store) mgetAccountValues(ctx context.Context, accountIDs []int, key func(int) string) (map[int]string, error) {
+	if s == nil || s.client == nil || len(accountIDs) == 0 {
+		return map[int]string{}, nil
+	}
+	keys := make([]string, 0, len(accountIDs))
+	ids := make([]int, 0, len(accountIDs))
+	for _, accountID := range accountIDs {
+		if accountID <= 0 {
+			continue
+		}
+		keys = append(keys, key(accountID))
+		ids = append(ids, accountID)
+	}
+	if len(keys) == 0 {
+		return map[int]string{}, nil
+	}
+	values, err := s.client.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int]string, len(ids))
+	for i, value := range values {
+		if i >= len(ids) || value == nil {
+			continue
+		}
+		if raw, ok := value.(string); ok {
+			out[ids[i]] = raw
+		}
+	}
+	return out, nil
+}
+
 func ttlMillis(value time.Duration) int64 {
 	if value <= 0 {
 		return int64(time.Millisecond)

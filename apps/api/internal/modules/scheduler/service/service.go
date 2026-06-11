@@ -427,6 +427,55 @@ func (s *Service) AccountLastUsed(ctx context.Context, accountID int) int64 {
 	return last
 }
 
+// AccountConcurrencyBatch resolves live in-flight lease counts for many
+// accounts at once, preferring the store's batched reader (one round trip)
+// over per-account reads. Best-effort like AccountConcurrency: store errors
+// degrade to missing entries rather than failing scheduling.
+func (s *Service) AccountConcurrencyBatch(ctx context.Context, accountIDs []int) map[int]int {
+	if s == nil || len(accountIDs) == 0 {
+		return map[int]int{}
+	}
+	if reader, ok := s.store.(contract.AccountRuntimeBatchReader); ok {
+		if counts, err := reader.CountAccountConcurrencyBatch(ctx, accountIDs); err == nil {
+			return counts
+		}
+	}
+	out := make(map[int]int, len(accountIDs))
+	if _, ok := s.store.(contract.AccountConcurrencyCounter); !ok {
+		return out
+	}
+	for _, accountID := range accountIDs {
+		if count := s.AccountConcurrency(ctx, accountID); count > 0 {
+			out[accountID] = count
+		}
+	}
+	return out
+}
+
+// AccountLastUsedBatch resolves last-used markers (epoch ms) for many accounts
+// at once, preferring the store's batched reader over per-account reads.
+// Best-effort: errors degrade to missing entries.
+func (s *Service) AccountLastUsedBatch(ctx context.Context, accountIDs []int) map[int]int64 {
+	if s == nil || len(accountIDs) == 0 {
+		return map[int]int64{}
+	}
+	if reader, ok := s.store.(contract.AccountRuntimeBatchReader); ok {
+		if marks, err := reader.AccountLastUsedBatch(ctx, accountIDs); err == nil {
+			return marks
+		}
+	}
+	out := make(map[int]int64, len(accountIDs))
+	if _, ok := s.store.(contract.AccountLastUsedReporter); !ok {
+		return out
+	}
+	for _, accountID := range accountIDs {
+		if last := s.AccountLastUsed(ctx, accountID); last > 0 {
+			out[accountID] = last
+		}
+	}
+	return out
+}
+
 func (s *Service) acquireLease(ctx context.Context, req contract.ScheduleRequest, attemptNo int, selected contract.Candidate) (contract.Lease, error) {
 	ttl := req.LeaseTTL
 	if ttl <= 0 {

@@ -452,10 +452,18 @@ func (s *Store) RecordQuotaSnapshot(ctx context.Context, snapshot contract.Accou
 	return toQuotaSnapshot(created), nil
 }
 
+// quotaSnapshotScanCap bounds how many rows a per-account quota listing will
+// pull before the per-type limit is applied in Go. Snapshots are ordered
+// newest-first, so the cap only drops history far beyond what any caller pages
+// through; without it a busy account makes this query fetch its entire
+// snapshot history.
+const quotaSnapshotScanCap = 1000
+
 func (s *Store) ListQuotaSnapshotsByAccount(ctx context.Context, accountID int, limit int) ([]contract.AccountQuotaSnapshot, error) {
 	query := s.client.AccountQuotaSnapshot.Query().
 		Where(entaccountquotasnapshot.AccountIDEQ(accountID)).
-		Order(ent.Desc(entaccountquotasnapshot.FieldSnapshotAt), ent.Desc(entaccountquotasnapshot.FieldID))
+		Order(ent.Desc(entaccountquotasnapshot.FieldSnapshotAt), ent.Desc(entaccountquotasnapshot.FieldID)).
+		Limit(quotaSnapshotScanCap)
 	rows, err := query.All(ctx)
 	if err != nil {
 		return nil, err

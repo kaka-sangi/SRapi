@@ -454,6 +454,16 @@ type AccountConcurrencyCounter interface {
 	CountAccountConcurrency(ctx context.Context, accountID int) (int, error)
 }
 
+// AccountRuntimeBatchReader is an optional capability of a Store that resolves
+// live concurrency and last-used markers for many accounts in a constant
+// number of round trips (e.g. one Redis MGET per signal). The gateway
+// scheduling hot path prefers it over per-account reads when assembling
+// candidate runtime state. Accounts without a marker are absent from the maps.
+type AccountRuntimeBatchReader interface {
+	CountAccountConcurrencyBatch(ctx context.Context, accountIDs []int) (map[int]int, error)
+	AccountLastUsedBatch(ctx context.Context, accountIDs []int) (map[int]int64, error)
+}
+
 // ActiveLeaseCounter reports live pending scheduler leases without materializing
 // every historical lease row. Stores that cannot report it may omit this.
 type ActiveLeaseCounter interface {

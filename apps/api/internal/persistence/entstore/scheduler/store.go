@@ -667,6 +667,46 @@ func (s *Store) AccountLastUsed(ctx context.Context, accountID int) (int64, erro
 	return reporter.AccountLastUsed(ctx, accountID)
 }
 
+// CountAccountConcurrencyBatch forwards to the lease store's batched reader
+// (one Redis MGET) when available, degrading to per-account reads and then to
+// an empty result. Implements contract.AccountRuntimeBatchReader.
+func (s *Store) CountAccountConcurrencyBatch(ctx context.Context, accountIDs []int) (map[int]int, error) {
+	if reader, ok := s.leaseStore.(contract.AccountRuntimeBatchReader); ok {
+		return reader.CountAccountConcurrencyBatch(ctx, accountIDs)
+	}
+	out := make(map[int]int, len(accountIDs))
+	if _, ok := s.leaseStore.(contract.AccountConcurrencyCounter); !ok {
+		return out, nil
+	}
+	for _, accountID := range accountIDs {
+		count, err := s.CountAccountConcurrency(ctx, accountID)
+		if err == nil && count > 0 {
+			out[accountID] = count
+		}
+	}
+	return out, nil
+}
+
+// AccountLastUsedBatch forwards to the lease store's batched reader (one Redis
+// MGET) when available, degrading to per-account reads and then to an empty
+// result. Implements contract.AccountRuntimeBatchReader.
+func (s *Store) AccountLastUsedBatch(ctx context.Context, accountIDs []int) (map[int]int64, error) {
+	if reader, ok := s.leaseStore.(contract.AccountRuntimeBatchReader); ok {
+		return reader.AccountLastUsedBatch(ctx, accountIDs)
+	}
+	out := make(map[int]int64, len(accountIDs))
+	if _, ok := s.leaseStore.(contract.AccountLastUsedReporter); !ok {
+		return out, nil
+	}
+	for _, accountID := range accountIDs {
+		last, err := s.AccountLastUsed(ctx, accountID)
+		if err == nil && last > 0 {
+			out[accountID] = last
+		}
+	}
+	return out, nil
+}
+
 func (s *Store) ListLeases(ctx context.Context) ([]contract.Lease, error) {
 	if s.leaseStore != nil {
 		return s.leaseStore.ListLeases(ctx)

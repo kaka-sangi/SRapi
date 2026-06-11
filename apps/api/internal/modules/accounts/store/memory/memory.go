@@ -526,6 +526,65 @@ func (s *Store) ListQuotaSnapshotsByAccount(_ context.Context, accountID int, li
 	return limitQuotaSnapshotsByType(out, limit), nil
 }
 
+// LatestHealthSnapshotsByAccounts implements contract.BatchSnapshotReader.
+func (s *Store) LatestHealthSnapshotsByAccounts(_ context.Context, accountIDs []int) (map[int]contract.AccountHealthSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	wanted := make(map[int]struct{}, len(accountIDs))
+	for _, id := range accountIDs {
+		wanted[id] = struct{}{}
+	}
+	out := make(map[int]contract.AccountHealthSnapshot, len(accountIDs))
+	for _, snapshot := range s.healthSnapshotsByID {
+		if _, ok := wanted[snapshot.AccountID]; !ok {
+			continue
+		}
+		latest, found := out[snapshot.AccountID]
+		if !found || snapshot.SnapshotAt.After(latest.SnapshotAt) || (snapshot.SnapshotAt.Equal(latest.SnapshotAt) && snapshot.ID > latest.ID) {
+			out[snapshot.AccountID] = cloneHealthSnapshot(snapshot)
+		}
+	}
+	return out, nil
+}
+
+// LatestQuotaSnapshotsByAccounts implements contract.BatchSnapshotReader.
+func (s *Store) LatestQuotaSnapshotsByAccounts(_ context.Context, accountIDs []int) (map[int][]contract.AccountQuotaSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	wanted := make(map[int]struct{}, len(accountIDs))
+	for _, id := range accountIDs {
+		wanted[id] = struct{}{}
+	}
+	type groupKey struct {
+		accountID int
+		quotaType string
+	}
+	latestByGroup := make(map[groupKey]contract.AccountQuotaSnapshot)
+	for _, snapshot := range s.quotaSnapshotsByID {
+		if _, ok := wanted[snapshot.AccountID]; !ok {
+			continue
+		}
+		key := groupKey{snapshot.AccountID, snapshot.QuotaType}
+		latest, found := latestByGroup[key]
+		if !found || snapshot.SnapshotAt.After(latest.SnapshotAt) || (snapshot.SnapshotAt.Equal(latest.SnapshotAt) && snapshot.ID > latest.ID) {
+			latestByGroup[key] = snapshot
+		}
+	}
+	out := make(map[int][]contract.AccountQuotaSnapshot, len(accountIDs))
+	for _, snapshot := range latestByGroup {
+		out[snapshot.AccountID] = append(out[snapshot.AccountID], cloneQuotaSnapshot(snapshot))
+	}
+	for _, snapshots := range out {
+		sort.Slice(snapshots, func(i, j int) bool {
+			if snapshots[i].SnapshotAt.Equal(snapshots[j].SnapshotAt) {
+				return snapshots[i].ID > snapshots[j].ID
+			}
+			return snapshots[i].SnapshotAt.After(snapshots[j].SnapshotAt)
+		})
+	}
+	return out, nil
+}
+
 func limitQuotaSnapshotsByType(snapshots []contract.AccountQuotaSnapshot, limit int) []contract.AccountQuotaSnapshot {
 	if limit <= 0 {
 		return snapshots

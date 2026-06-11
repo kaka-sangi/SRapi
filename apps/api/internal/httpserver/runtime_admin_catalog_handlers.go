@@ -1526,13 +1526,25 @@ func (s *Server) handleAdminAccountsHealthSummary(w http.ResponseWriter, r *http
 		return
 	}
 	now := time.Now().UTC()
+	accountIDs := make([]int, 0, len(accounts))
+	for _, account := range accounts {
+		accountIDs = append(accountIDs, account.ID)
+	}
+	latestHealthByAccount, err := s.runtime.accounts.LatestHealthSnapshotsByAccounts(r.Context(), accountIDs)
+	if err != nil {
+		latestHealthByAccount = nil
+	}
+	latestQuotasByAccount, err := s.runtime.accounts.LatestQuotaSnapshotsByAccounts(r.Context(), accountIDs)
+	if err != nil {
+		latestQuotasByAccount = nil
+	}
 	snapshots := make([]apiopenapi.AccountHealthSnapshot, 0, len(accounts))
 	for _, account := range accounts {
 		snap := buildAccountHealthSnapshot(account, usageLogsForAccount(usageLogs, account.ID), now)
-		if latest, err := s.runtime.accounts.LatestHealthSnapshotByAccount(r.Context(), account.ID); err == nil {
+		if latest, ok := latestHealthByAccount[account.ID]; ok {
 			overlayAccountHealthSnapshot(&snap, latest)
 		}
-		if quotas, err := s.runtime.accounts.ListQuotaSnapshotsByAccount(r.Context(), account.ID, 1); err == nil && len(quotas) > 0 {
+		if quotas := latestQuotasByAccount[account.ID]; len(quotas) > 0 {
 			overlayAccountQuotaWindowsOnHealth(&snap, quotas)
 			if constrained, ok := mostConstrainedRealQuotaSnapshot(quotas); ok {
 				overlayAccountQuotaOnHealth(&snap, constrained)

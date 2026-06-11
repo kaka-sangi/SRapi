@@ -690,7 +690,6 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 			if len(apiKey.GroupIDs) > 0 && !intersectsInt(apiKey.GroupIDs, groupIDsByAccount[account.ID]) {
 				continue
 			}
-			runtimeState := rt.accountSchedulerRuntimeState(ctx, account)
 			candidates = append(candidates, schedulercontract.Candidate{
 				Account:               account,
 				Provider:              provider,
@@ -698,12 +697,78 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 				ModelFamily:           optionalStringValue(model.Family),
 				QualityTier:           optionalStringValue(model.QualityTier),
 				EffectiveCapabilities: effectiveCapabilities(model, mapping, provider, account),
-				RuntimeState:          runtimeState,
 				Limits:                schedulerRuntimeLimits(account.Metadata),
 			})
 		}
 	}
+	rt.fillCandidateRuntimeStates(ctx, candidates)
 	return candidates, nil
+}
+
+// fillCandidateRuntimeStates populates Candidate.RuntimeState for every
+// candidate using a constant number of batched reads (latest health and quota
+// snapshots, live concurrency, last-used markers) instead of four round trips
+// per candidate. Candidates sharing an account share the same resolved state.
+func (rt *runtimeState) fillCandidateRuntimeStates(ctx context.Context, candidates []schedulercontract.Candidate) {
+	if len(candidates) == 0 {
+		return
+	}
+	accountIDs := make([]int, 0, len(candidates))
+	seen := make(map[int]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		if _, ok := seen[candidate.Account.ID]; ok {
+			continue
+		}
+		seen[candidate.Account.ID] = struct{}{}
+		accountIDs = append(accountIDs, candidate.Account.ID)
+	}
+	healthByAccount, err := rt.accounts.LatestHealthSnapshotsByAccounts(ctx, accountIDs)
+	if err != nil {
+		healthByAccount = nil
+	}
+	quotasByAccount, err := rt.accounts.LatestQuotaSnapshotsByAccounts(ctx, accountIDs)
+	if err != nil {
+		quotasByAccount = nil
+	}
+	var concurrencyByAccount map[int]int
+	var lastUsedByAccount map[int]int64
+	if rt.scheduler != nil {
+		concurrencyByAccount = rt.scheduler.AccountConcurrencyBatch(ctx, accountIDs)
+		lastUsedByAccount = rt.scheduler.AccountLastUsedBatch(ctx, accountIDs)
+	}
+	now := time.Now().UTC()
+	for i := range candidates {
+		account := candidates[i].Account
+		state := schedulerRuntimeState(account.Metadata)
+		if latest, ok := healthByAccount[account.ID]; ok {
+			healthScore := float64(latest.SuccessRate)
+			state.HealthScore = &healthScore
+			p95 := latest.LatencyP95MS
+			state.LatencyP95MS = &p95
+			state.CircuitOpen = state.CircuitOpen || strings.EqualFold(latest.CircuitState, "open")
+			state.CooldownActive = state.CooldownActive || (latest.CooldownUntil != nil && latest.CooldownUntil.After(now))
+		}
+		if quotas := quotasByAccount[account.ID]; len(quotas) > 0 {
+			if constrained, ok := mostConstrainedRealQuotaSnapshot(quotas); ok {
+				remainingRatio := float64(constrained.RemainingRatio)
+				state.QuotaRemainingRatio = &remainingRatio
+				state.QuotaExhausted = state.QuotaExhausted || constrained.RemainingRatio <= 0
+			}
+		}
+		// Live in-flight concurrency makes load-aware scoring (saturation penalty,
+		// concurrency-full reject) reflect real traffic instead of always seeing 0,
+		// so the scheduler spreads load across equally-capable accounts under
+		// pressure rather than hammering one until its hard cap fails. Take the max
+		// with any metadata-provided value so a manual override/floor is preserved.
+		if live := concurrencyByAccount[account.ID]; live > state.CurrentConcurrency {
+			state.CurrentConcurrency = live
+		}
+		// Least-recently-used marker for fair rotation across equal-scored accounts.
+		if lastUsed := lastUsedByAccount[account.ID]; lastUsed > state.LastUsedUnixMs {
+			state.LastUsedUnixMs = lastUsed
+		}
+		candidates[i].RuntimeState = state
+	}
 }
 
 func providerIDsForMappings(mappings []modelcontract.ModelProviderMapping) []int {
@@ -720,40 +785,6 @@ func providerIDsForMappings(mappings []modelcontract.ModelProviderMapping) []int
 		out = append(out, mapping.ProviderID)
 	}
 	return out
-}
-
-func (rt *runtimeState) accountSchedulerRuntimeState(ctx context.Context, account accountcontract.ProviderAccount) schedulercontract.RuntimeState {
-	state := schedulerRuntimeState(account.Metadata)
-	if latest, err := rt.accounts.LatestHealthSnapshotByAccount(ctx, account.ID); err == nil {
-		healthScore := float64(latest.SuccessRate)
-		state.HealthScore = &healthScore
-		p95 := latest.LatencyP95MS
-		state.LatencyP95MS = &p95
-		state.CircuitOpen = state.CircuitOpen || strings.EqualFold(latest.CircuitState, "open")
-		state.CooldownActive = state.CooldownActive || (latest.CooldownUntil != nil && latest.CooldownUntil.After(time.Now().UTC()))
-	}
-	if quotas, err := rt.accounts.ListQuotaSnapshotsByAccount(ctx, account.ID, 1); err == nil && len(quotas) > 0 {
-		if constrained, ok := mostConstrainedRealQuotaSnapshot(quotas); ok {
-			remainingRatio := float64(constrained.RemainingRatio)
-			state.QuotaRemainingRatio = &remainingRatio
-			state.QuotaExhausted = state.QuotaExhausted || constrained.RemainingRatio <= 0
-		}
-	}
-	// Live in-flight concurrency makes load-aware scoring (saturation penalty,
-	// concurrency-full reject) reflect real traffic instead of always seeing 0,
-	// so the scheduler spreads load across equally-capable accounts under
-	// pressure rather than hammering one until its hard cap fails. Take the max
-	// with any metadata-provided value so a manual override/floor is preserved.
-	if rt.scheduler != nil {
-		if live := rt.scheduler.AccountConcurrency(ctx, account.ID); live > state.CurrentConcurrency {
-			state.CurrentConcurrency = live
-		}
-		// Least-recently-used marker for fair rotation across equal-scored accounts.
-		if lastUsed := rt.scheduler.AccountLastUsed(ctx, account.ID); lastUsed > state.LastUsedUnixMs {
-			state.LastUsedUnixMs = lastUsed
-		}
-	}
-	return state
 }
 
 func intersectsInt(left []int, right []int) bool {

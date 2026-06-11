@@ -487,3 +487,19 @@ type Store interface {
 	ListQuotaSnapshotsByAccount(ctx context.Context, accountID int, limit int) ([]AccountQuotaSnapshot, error)
 	Delete(ctx context.Context, id int) error
 }
+
+// BatchSnapshotReader is an optional Store capability that resolves the latest
+// health and quota snapshots for many accounts in a constant number of
+// queries. The gateway scheduling hot path uses it to assemble candidate
+// runtime state without one query per candidate account; stores that do not
+// implement it fall back to the per-account readers.
+type BatchSnapshotReader interface {
+	// LatestHealthSnapshotsByAccounts returns each account's most recent
+	// health snapshot keyed by account ID; accounts without snapshots are
+	// absent.
+	LatestHealthSnapshotsByAccounts(ctx context.Context, accountIDs []int) (map[int]AccountHealthSnapshot, error)
+	// LatestQuotaSnapshotsByAccounts returns, per account, the most recent
+	// quota snapshot of each quota type (the batched equivalent of
+	// ListQuotaSnapshotsByAccount with limit 1).
+	LatestQuotaSnapshotsByAccounts(ctx context.Context, accountIDs []int) (map[int][]AccountQuotaSnapshot, error)
+}

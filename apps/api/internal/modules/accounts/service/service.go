@@ -861,6 +861,67 @@ func (s *Service) ListQuotaSnapshotsByAccount(ctx context.Context, accountID int
 	return s.store.ListQuotaSnapshotsByAccount(ctx, accountID, limit)
 }
 
+// LatestHealthSnapshotsByAccounts resolves the most recent health snapshot for
+// every given account, preferring the store's batched reader and falling back
+// to per-account reads for stores without one. Accounts without snapshots are
+// absent from the result.
+func (s *Service) LatestHealthSnapshotsByAccounts(ctx context.Context, accountIDs []int) (map[int]contract.AccountHealthSnapshot, error) {
+	accountIDs = dedupePositiveIDs(accountIDs)
+	if len(accountIDs) == 0 {
+		return map[int]contract.AccountHealthSnapshot{}, nil
+	}
+	if reader, ok := s.store.(contract.BatchSnapshotReader); ok {
+		return reader.LatestHealthSnapshotsByAccounts(ctx, accountIDs)
+	}
+	out := make(map[int]contract.AccountHealthSnapshot, len(accountIDs))
+	for _, accountID := range accountIDs {
+		snapshot, err := s.store.LatestHealthSnapshotByAccount(ctx, accountID)
+		if err != nil {
+			continue
+		}
+		out[accountID] = snapshot
+	}
+	return out, nil
+}
+
+// LatestQuotaSnapshotsByAccounts resolves, per account, the most recent quota
+// snapshot of each quota type, preferring the store's batched reader and
+// falling back to per-account reads for stores without one.
+func (s *Service) LatestQuotaSnapshotsByAccounts(ctx context.Context, accountIDs []int) (map[int][]contract.AccountQuotaSnapshot, error) {
+	accountIDs = dedupePositiveIDs(accountIDs)
+	if len(accountIDs) == 0 {
+		return map[int][]contract.AccountQuotaSnapshot{}, nil
+	}
+	if reader, ok := s.store.(contract.BatchSnapshotReader); ok {
+		return reader.LatestQuotaSnapshotsByAccounts(ctx, accountIDs)
+	}
+	out := make(map[int][]contract.AccountQuotaSnapshot, len(accountIDs))
+	for _, accountID := range accountIDs {
+		snapshots, err := s.store.ListQuotaSnapshotsByAccount(ctx, accountID, 1)
+		if err != nil || len(snapshots) == 0 {
+			continue
+		}
+		out[accountID] = snapshots
+	}
+	return out, nil
+}
+
+func dedupePositiveIDs(ids []int) []int {
+	seen := make(map[int]struct{}, len(ids))
+	out := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
+}
+
 func (s *Service) DecryptCredential(ctx context.Context, id int) (map[string]any, error) {
 	if id <= 0 {
 		return nil, ErrInvalidInput

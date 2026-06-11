@@ -22,6 +22,7 @@ import (
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
+	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
@@ -474,7 +475,9 @@ func TestAccountSchedulerRuntimeStateIgnoresSyntheticQuotaSnapshots(t *testing.T
 	}
 	rt := &runtimeState{accounts: accounts}
 
-	state := rt.accountSchedulerRuntimeState(ctx, account)
+	candidates := []schedulercontract.Candidate{{Account: account}}
+	rt.fillCandidateRuntimeStates(ctx, candidates)
+	state := candidates[0].RuntimeState
 	if state.QuotaRemainingRatio == nil || math.Abs(*state.QuotaRemainingRatio-0.42) > 0.000001 {
 		t.Fatalf("expected scheduler to use real quota ratio 0.42, got %+v", state.QuotaRemainingRatio)
 	}
