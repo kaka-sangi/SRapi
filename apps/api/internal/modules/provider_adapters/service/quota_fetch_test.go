@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -15,6 +16,24 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 )
+
+func assertQuotaSignalWithoutReset(t *testing.T, signals []contract.QuotaSignal, quotaType string, used string, remaining string, limit string, remainingRatio float32) {
+	t.Helper()
+	for _, signal := range signals {
+		if signal.QuotaType != quotaType {
+			continue
+		}
+		if signal.Used != used ||
+			signal.Remaining != remaining ||
+			signal.QuotaLimit != limit ||
+			math.Abs(float64(signal.RemainingRatio-remainingRatio)) > 0.000001 ||
+			signal.SnapshotAt.IsZero() {
+			t.Fatalf("unexpected quota signal for %s: %+v", quotaType, signal)
+		}
+		return
+	}
+	t.Fatalf("missing quota signal %q in %+v", quotaType, signals)
+}
 
 func TestFetchAccountQuotaMapsAnthropicUsageAndCachesSuccess(t *testing.T) {
 	var calls atomic.Int32
@@ -399,6 +418,56 @@ func TestFetchAccountQuotaAntigravityMapsPaidTierCreditsFallback(t *testing.T) {
 		report.Currency != "GOOGLE_ONE_AI" {
 		t.Fatalf("unexpected antigravity paid tier quota report: %+v", report)
 	}
+	assertQuotaSignalWithoutReset(t, report.QuotaSignals, "antigravity_google_one_ai_credits", "0", "25000", "50", 1)
+}
+
+func TestFetchAccountQuotaAntigravityCreditSignalBelowMinimum(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"paidTier": {
+				"id": "g1-pro-tier",
+				"availableCredits": [
+					{"creditType": "GOOGLE_ONE_AI", "creditAmount": "25", "minimumCreditAmountForUsage": "50"}
+				]
+			}
+		}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	report, err := svc.FetchAccountQuota(context.Background(), contract.ProbeRequest{
+		Provider: providercontract.Provider{
+			ID:          3,
+			Name:        "antigravity",
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "gemini-compatible",
+			Status:      providercontract.StatusActive,
+			ConfigSchema: map[string]any{
+				"quota_url": upstream.URL + "/v1internal:loadCodeAssist",
+				"auth_mode": "bearer",
+			},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           32,
+			ProviderID:   3,
+			Name:         "antigravity-oauth",
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Status:       accountcontract.StatusActive,
+			Metadata:     map[string]any{},
+		},
+		Credential: map[string]any{"access_token": "antigravity-access-token"},
+	})
+	if err != nil {
+		t.Fatalf("fetch antigravity quota: %v", err)
+	}
+	if !report.Supported || report.CreditsRemaining != "25" || report.Currency != "GOOGLE_ONE_AI" {
+		t.Fatalf("unexpected antigravity paid tier quota report: %+v", report)
+	}
+	assertQuotaSignalWithoutReset(t, report.QuotaSignals, "antigravity_google_one_ai_credits", "25", "25", "50", 0.5)
 }
 
 func anthropicQuotaProbeRequest(quotaURL string) contract.ProbeRequest {

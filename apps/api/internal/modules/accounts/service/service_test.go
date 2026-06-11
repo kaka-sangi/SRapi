@@ -10,6 +10,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	accountmemory "github.com/srapi/srapi/apps/api/internal/modules/accounts/store/memory"
+	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	"github.com/srapi/srapi/apps/api/internal/testsupport/oteltest"
 )
 
@@ -390,6 +391,69 @@ func TestAccountOperationsManageGroupsProxyRecoveryAndSnapshots(t *testing.T) {
 		t.Fatalf("list quota snapshots: %v", err)
 	}
 	if len(quotas) != 1 || quotas[0].ID != quota.ID || quotas[0].RemainingRatio != 0.8 {
+		t.Fatalf("unexpected quota snapshots: %+v", quotas)
+	}
+}
+
+func TestApplyQuotaReportPersistsProviderCreditSignals(t *testing.T) {
+	store := accountmemory.New()
+	now := time.Date(2026, 6, 9, 1, 2, 3, 0, time.UTC)
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	account, err := svc.Create(ctx, contract.CreateRequest{
+		ProviderID:   3,
+		Name:         "antigravity-oauth",
+		RuntimeClass: contract.RuntimeClassOauthRefresh,
+		Credential:   map[string]any{"access_token": "secret-value"},
+		Metadata:     map[string]any{"existing": "kept"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	signals, err := svc.ApplyQuotaReport(ctx, account, provideradaptercontract.QuotaReport{
+		Supported:        true,
+		Plan:             "g1-pro-tier",
+		CreditsRemaining: "25",
+		Currency:         "GOOGLE_ONE_AI",
+		FetchedAt:        now,
+		QuotaSignals: []provideradaptercontract.QuotaSignal{{
+			QuotaType:      "antigravity_google_one_ai_credits",
+			Remaining:      "25",
+			Used:           "25",
+			QuotaLimit:     "50",
+			RemainingRatio: 0.5,
+			SnapshotAt:     now,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("apply quota report: %v", err)
+	}
+	if signals != 1 {
+		t.Fatalf("expected one persisted quota signal, got %d", signals)
+	}
+	stored, err := svc.FindByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("find account: %v", err)
+	}
+	if stored.Metadata["existing"] != "kept" ||
+		stored.Metadata["last_quota_plan"] != "g1-pro-tier" ||
+		stored.Metadata["last_quota_credits_remaining"] != "25" ||
+		stored.Metadata["last_quota_currency"] != "GOOGLE_ONE_AI" {
+		t.Fatalf("unexpected quota metadata: %+v", stored.Metadata)
+	}
+	quotas, err := svc.ListQuotaSnapshotsByAccount(ctx, account.ID, 10)
+	if err != nil {
+		t.Fatalf("list quota snapshots: %v", err)
+	}
+	if len(quotas) != 1 ||
+		quotas[0].QuotaType != "antigravity_google_one_ai_credits" ||
+		quotas[0].Remaining != "25" ||
+		quotas[0].Used != "25" ||
+		quotas[0].QuotaLimit != "50" ||
+		quotas[0].RemainingRatio != 0.5 {
 		t.Fatalf("unexpected quota snapshots: %+v", quotas)
 	}
 }

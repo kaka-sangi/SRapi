@@ -86,13 +86,15 @@ func (s *Service) fetchAccountQuotaUncached(ctx context.Context, req contract.Pr
 			applyCodexAccountsCheckQuotaFallback(parsed, req, &report)
 		}
 		if isAntigravityQuotaProbe(req) {
-			applyAntigravityCreditsQuotaFallback(parsed, &report)
+			applyAntigravityCreditsQuotaFallback(parsed, now, &report)
 		}
 	}
 
 	// Fold in provider header signals (e.g. Codex rate-limit windows) so the
 	// report carries the same QuotaSignals the gateway records in-band.
-	report.QuotaSignals = codexQuotaSignalsFromHeaders(respHeaders, now)
+	quotaSignals := report.QuotaSignals
+	quotaSignals = append(quotaSignals, codexQuotaSignalsFromHeaders(respHeaders, now)...)
+	report.QuotaSignals = quotaSignals
 	report.QuotaSignals = append(report.QuotaSignals, anthropicQuotaSignalsFromUsageBody(parsed, now)...)
 	return report, nil
 }
@@ -404,7 +406,7 @@ func isAntigravityQuotaProbe(req contract.ProbeRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-antigravity")
 }
 
-func applyAntigravityCreditsQuotaFallback(parsed any, report *contract.QuotaReport) {
+func applyAntigravityCreditsQuotaFallback(parsed any, now time.Time, report *contract.QuotaReport) {
 	if report == nil {
 		return
 	}
@@ -422,14 +424,11 @@ func applyAntigravityCreditsQuotaFallback(parsed any, report *contract.QuotaRepo
 	if strings.TrimSpace(report.Plan) == "" {
 		report.Plan = firstNonEmpty(mapString(paidTier, "id"), mapString(paidTier, "name"))
 	}
-	if strings.TrimSpace(report.CreditsRemaining) != "" {
-		return
-	}
 	credit := antigravityCreditRecord(paidTier["availableCredits"])
 	if credit == nil {
 		return
 	}
-	if amount := mapString(credit, "creditAmount"); amount != "" {
+	if amount := mapString(credit, "creditAmount"); amount != "" && strings.TrimSpace(report.CreditsRemaining) == "" {
 		report.CreditsRemaining = amount
 	}
 	if currency := mapString(credit, "creditType"); currency != "" && strings.TrimSpace(report.Currency) == "" {
@@ -441,6 +440,30 @@ func applyAntigravityCreditsQuotaFallback(parsed any, report *contract.QuotaRepo
 	if strings.TrimSpace(report.CreditsUsed) == "" {
 		report.CreditsUsed = firstNonEmpty(mapString(credit, "creditUsed"), mapString(credit, "used"))
 	}
+	if signal, ok := antigravityCreditAvailabilitySignal(credit, now); ok {
+		report.QuotaSignals = append(report.QuotaSignals, signal)
+	}
+}
+
+func antigravityCreditAvailabilitySignal(credit map[string]any, now time.Time) (contract.QuotaSignal, bool) {
+	amount, amountOK := numericField(credit, "creditAmount")
+	minimum, minimumOK := numericField(credit, "minimumCreditAmountForUsage")
+	if !amountOK || !minimumOK || minimum <= 0 || math.IsNaN(amount) || math.IsNaN(minimum) || math.IsInf(amount, 0) || math.IsInf(minimum, 0) {
+		return contract.QuotaSignal{}, false
+	}
+	remainingRatio := clampFloat(amount/minimum, 0, 1)
+	used := minimum - amount
+	if used < 0 {
+		used = 0
+	}
+	return contract.QuotaSignal{
+		QuotaType:      "antigravity_google_one_ai_credits",
+		Remaining:      formatPercentQuotaValue(amount),
+		Used:           formatPercentQuotaValue(used),
+		QuotaLimit:     formatPercentQuotaValue(minimum),
+		RemainingRatio: float32(remainingRatio),
+		SnapshotAt:     now.UTC(),
+	}, true
 }
 
 func antigravityCreditRecord(value any) map[string]any {
