@@ -225,7 +225,12 @@ func accountModelOverrideFromMetadata(metadata map[string]any, key string, model
 	if override := accountModelExactOverride(mapping, model); override != "" {
 		return override
 	}
-	return accountModelWildcardOverride(mapping, model)
+	suffix := accountModelSuffix(model)
+	baseModel := strings.TrimSpace(strings.TrimSuffix(model, suffix))
+	if override := accountModelExactOverride(mapping, baseModel); override != "" {
+		return accountModelApplySuffix(override, suffix)
+	}
+	return accountModelApplySuffix(accountModelWildcardOverride(mapping, baseModel), suffix)
 }
 
 func accountModelMappingFromMetadataValue(value any) map[string]any {
@@ -293,6 +298,26 @@ func accountModelWildcardOverride(mapping map[string]any, model string) string {
 		return matches[i].pattern < matches[j].pattern
 	})
 	return matches[0].override
+}
+
+func accountModelSuffix(model string) string {
+	model = strings.TrimSpace(model)
+	if model == "" || !strings.HasSuffix(model, ")") {
+		return ""
+	}
+	open := strings.LastIndex(model, "(")
+	if open <= 0 || open == len(model)-2 {
+		return ""
+	}
+	return model[open:]
+}
+
+func accountModelApplySuffix(override string, suffix string) string {
+	override = strings.TrimSpace(override)
+	if override == "" || suffix == "" || accountModelSuffix(override) != "" {
+		return override
+	}
+	return override + suffix
 }
 
 func gatewaySourceEndpointIsResponsesCompact(sourceEndpoint string) bool {
