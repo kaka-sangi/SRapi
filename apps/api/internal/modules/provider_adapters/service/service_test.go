@@ -3471,6 +3471,66 @@ func TestGeminiCompatibleAdapterExtractsQuotaResetDelay(t *testing.T) {
 	}
 }
 
+func TestGeminiCompatibleAdapterExtractsQuotaResetTimestamp(t *testing.T) {
+	resetAt := time.Now().UTC().Add(37 * time.Minute).Truncate(time.Second)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"code":429,"message":"quota exhausted","status":"RESOURCE_EXHAUSTED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","metadata":{"quotaResetTimeStamp":"` + resetAt.Format(time.RFC3339) + `"}}]}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_reset_timestamp",
+		Model:      "gemini-local",
+		InputParts: textParts("hello"),
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	if providerErr.RetryAfter == nil || !providerErr.RetryAfter.Equal(resetAt) {
+		t.Fatalf("expected RetryAfter %s from quotaResetTimeStamp, got %+v", resetAt.Format(time.RFC3339), providerErr)
+	}
+}
+
+func TestGeminiCompatibleAdapterExtractsHumanQuotaResetDelay(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"code":429,"message":"You have exhausted your capacity on this model. Your quota will reset after 1h43m56s.","status":"RESOURCE_EXHAUSTED"}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	before := time.Now().UTC().Add(time.Hour + 43*time.Minute + 56*time.Second)
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_human_reset_delay",
+		Model:      "gemini-local",
+		InputParts: textParts("hello"),
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	after := time.Now().UTC().Add(time.Hour + 43*time.Minute + 56*time.Second)
+	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	if providerErr.RetryAfter == nil {
+		t.Fatalf("expected human quota reset delay to set RetryAfter, got %+v", providerErr)
+	}
+	if providerErr.RetryAfter.Before(before) || providerErr.RetryAfter.After(after) {
+		t.Fatalf("expected RetryAfter between %s and %s, got %s", before.Format(time.RFC3339), after.Format(time.RFC3339), providerErr.RetryAfter.Format(time.RFC3339))
+	}
+}
+
 func TestGeminiCompatibleAdapterClassifiesStreamErrorFrame(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")

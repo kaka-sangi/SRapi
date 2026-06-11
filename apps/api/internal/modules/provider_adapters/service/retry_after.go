@@ -92,8 +92,40 @@ func retryAfterFromGeminiErrorBody(body []byte, now time.Time) *time.Time {
 		if resetAt := retryAfterFromGoogleDuration(metadata["quotaResetDelay"], now); resetAt != nil {
 			return resetAt
 		}
+		if resetAt := retryAfterTimestampValue(metadata["quotaResetTimeStamp"], now); resetAt != nil {
+			return resetAt
+		}
+	}
+	if resetAt := retryAfterFromGoogleErrorMessage(body, now); resetAt != nil {
+		return resetAt
 	}
 	return nil
+}
+
+func retryAfterFromGoogleErrorMessage(body []byte, now time.Time) *time.Time {
+	var decoded struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		return nil
+	}
+	message := strings.ToLower(strings.TrimSpace(decoded.Error.Message))
+	if message == "" {
+		return nil
+	}
+	index := strings.LastIndex(message, "reset after ")
+	if index < 0 {
+		return nil
+	}
+	durationText := strings.TrimSpace(strings.TrimSuffix(message[index+len("reset after "):], "."))
+	duration, err := time.ParseDuration(durationText)
+	if err != nil || duration < 0 {
+		return nil
+	}
+	value := now.UTC().Add(duration)
+	return &value
 }
 
 func retryAfterFromGoogleDuration(raw any, now time.Time) *time.Time {
