@@ -719,7 +719,7 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 	clientToUpstream <- reverseproxycontract.WebSocketMessage{Type: reverseproxycontract.WebSocketMessageText, Data: session.InitialFrame}
 	close(clientToUpstream)
 	success, errorClass, statusCode, usage, terminalForwarded, turnState := s.bridgeResponsesWebSocketRelay(r.Context(), conn, upstreamToClient, relayDone)
-	s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, success, errorClass, statusCode, elapsedMillis(startedAt), admission, usage, ""))
+	s.recordResponsesWebSocketUsage(r.Context(), authed, canonical, model.ID, result, success, errorClass, statusCode, elapsedMillis(startedAt), admission, usage, "")
 	if !success && errorClass != "client_closed" && !terminalForwarded {
 		return true, turnState, provideradaptercontract.ProviderError{Class: errorClass, StatusCode: statusCode, Message: providerGatewayMessage(errorClass)}
 	}
@@ -813,6 +813,7 @@ func responsesWebSocketUsageRecord(authed apikeycontract.AuthResult, canonical g
 		InputTokens:           recordUsage.InputTokens,
 		OutputTokens:          recordUsage.OutputTokens,
 		CachedTokens:          recordUsage.CachedTokens,
+		CacheCreationTokens:   recordUsage.CacheCreationTokens,
 		UsageEstimated:        estimated,
 		Pricing:               admission.Pricing,
 		CompatibilityWarnings: canonical.CompatibilityWarnings,
@@ -828,6 +829,14 @@ func responsesWebSocketUsageRecord(authed apikeycontract.AuthResult, canonical g
 		rec.RequestedModel, rec.UpstreamModel = gatewayUsageModelSnapshot(canonical, *candidate)
 	}
 	return rec
+}
+
+func (s *Server) recordResponsesWebSocketUsage(ctx context.Context, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, modelID int, result schedulercontract.ScheduleResult, success bool, errorClass string, statusCode int, latencyMS int, admission gatewayAdmission, usage *gatewaycontract.Usage, providerMessage string) {
+	rec := responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, success, errorClass, statusCode, latencyMS, admission, usage, providerMessage)
+	if usage != nil {
+		rec.Pricing = s.runtime.gatewayPricing(ctx, gatewayPricingRequestForCanonical(modelID, result.Candidate, canonical, *usage), usage.Estimated)
+	}
+	s.runtime.recordGatewayUsage(ctx, rec)
 }
 
 func cloneHTTPHeader(headers http.Header) http.Header {
@@ -910,12 +919,25 @@ func responsesWebSocketOpenAPIRequest(payload []byte) (apiopenapi.ResponsesReque
 
 func responsesWebSocketUsage(payload []byte) (gatewaycontract.Usage, bool) {
 	type rawResponsesUsage struct {
-		InputTokens        int `json:"input_tokens"`
-		OutputTokens       int `json:"output_tokens"`
-		CachedTokens       int `json:"cached_tokens"`
-		InputTokensDetails *struct {
+		InputTokens         *int `json:"input_tokens"`
+		OutputTokens        *int `json:"output_tokens"`
+		PromptTokens        *int `json:"prompt_tokens"`
+		CompletionTokens    *int `json:"completion_tokens"`
+		CachedTokens        int  `json:"cached_tokens"`
+		CacheCreationTokens int  `json:"cache_creation_input_tokens"`
+		ImageOutputTokens   int  `json:"image_output_tokens"`
+		InputTokensDetails  *struct {
 			CachedTokens int `json:"cached_tokens"`
 		} `json:"input_tokens_details"`
+		OutputTokensDetails *struct {
+			ImageTokens int `json:"image_tokens"`
+		} `json:"output_tokens_details"`
+		PromptTokensDetails *struct {
+			CachedTokens int `json:"cached_tokens"`
+		} `json:"prompt_tokens_details"`
+		CompletionTokensDetails *struct {
+			ImageTokens int `json:"image_tokens"`
+		} `json:"completion_tokens_details"`
 	}
 	var event struct {
 		Response *struct {
@@ -933,11 +955,42 @@ func responsesWebSocketUsage(payload []byte) (gatewaycontract.Usage, bool) {
 	if rawUsage == nil {
 		return gatewaycontract.Usage{}, false
 	}
+	inputTokens, inputOK := responsesWebSocketUsageToken(rawUsage.InputTokens, rawUsage.PromptTokens)
+	outputTokens, outputOK := responsesWebSocketUsageToken(rawUsage.OutputTokens, rawUsage.CompletionTokens)
+	if !inputOK && !outputOK && rawUsage.CachedTokens == 0 && rawUsage.CacheCreationTokens == 0 && rawUsage.ImageOutputTokens == 0 {
+		return gatewaycontract.Usage{}, false
+	}
 	cachedTokens := rawUsage.CachedTokens
 	if cachedTokens == 0 && rawUsage.InputTokensDetails != nil {
 		cachedTokens = rawUsage.InputTokensDetails.CachedTokens
 	}
-	return gatewaycontract.Usage{InputTokens: max(0, rawUsage.InputTokens-cachedTokens), OutputTokens: rawUsage.OutputTokens, CachedTokens: cachedTokens}, true
+	if cachedTokens == 0 && rawUsage.PromptTokensDetails != nil {
+		cachedTokens = rawUsage.PromptTokensDetails.CachedTokens
+	}
+	imageOutputTokens := rawUsage.ImageOutputTokens
+	if imageOutputTokens == 0 && rawUsage.OutputTokensDetails != nil {
+		imageOutputTokens = rawUsage.OutputTokensDetails.ImageTokens
+	}
+	if imageOutputTokens == 0 && rawUsage.CompletionTokensDetails != nil {
+		imageOutputTokens = rawUsage.CompletionTokensDetails.ImageTokens
+	}
+	return gatewaycontract.Usage{
+		InputTokens:         max(0, inputTokens-cachedTokens),
+		OutputTokens:        outputTokens,
+		ImageOutputTokens:   imageOutputTokens,
+		CachedTokens:        cachedTokens,
+		CacheCreationTokens: rawUsage.CacheCreationTokens,
+	}, true
+}
+
+func responsesWebSocketUsageToken(primary *int, fallback *int) (int, bool) {
+	if primary != nil {
+		return *primary, true
+	}
+	if fallback != nil {
+		return *fallback, true
+	}
+	return 0, false
 }
 
 func responsesWebSocketTerminal(payload []byte) (bool, bool, string, int) {

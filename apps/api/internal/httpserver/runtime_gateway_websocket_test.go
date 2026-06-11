@@ -13,7 +13,10 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
+	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
+	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	"nhooyr.io/websocket"
 )
@@ -356,6 +359,50 @@ func TestResponsesWebSocketUsageAcceptsInputTokenDetailsCachedTokens(t *testing.
 	}
 	if usage.InputTokens != 5 || usage.OutputTokens != 9 || usage.CachedTokens != 3 {
 		t.Fatalf("unexpected websocket usage: %+v", usage)
+	}
+}
+
+func TestResponsesWebSocketUsageAcceptsChatUsageAliases(t *testing.T) {
+	usage, ok := responsesWebSocketUsage([]byte(`{"type":"response.done","response":{"usage":{"prompt_tokens":12,"completion_tokens":6,"prompt_tokens_details":{"cached_tokens":4},"completion_tokens_details":{"image_tokens":2},"cache_creation_input_tokens":5}}}`))
+	if !ok {
+		t.Fatal("expected websocket usage aliases to parse")
+	}
+	if usage.InputTokens != 8 || usage.OutputTokens != 6 || usage.CachedTokens != 4 || usage.CacheCreationTokens != 5 || usage.ImageOutputTokens != 2 {
+		t.Fatalf("unexpected websocket alias usage: %+v", usage)
+	}
+}
+
+func TestResponsesWebSocketUsageRejectsEmptyUsageObject(t *testing.T) {
+	if usage, ok := responsesWebSocketUsage([]byte(`{"type":"response.done","response":{"usage":{}}}`)); ok {
+		t.Fatalf("expected empty usage object to be ignored, got %+v", usage)
+	}
+}
+
+func TestResponsesWebSocketUsageRecordKeepsCacheCreationTokens(t *testing.T) {
+	usage := &gatewaycontract.Usage{
+		InputTokens:         8,
+		OutputTokens:        6,
+		CachedTokens:        4,
+		CacheCreationTokens: 5,
+		ImageOutputTokens:   2,
+		Estimated:           false,
+	}
+	rec := responsesWebSocketUsageRecord(
+		apikeycontract.AuthResult{},
+		gatewaycontract.CanonicalRequest{SourceEndpoint: responsesWebSocketSourceEndpoint},
+		schedulercontract.ScheduleResult{},
+		nil,
+		true,
+		"",
+		http.StatusOK,
+		12,
+		gatewayAdmission{},
+		usage,
+		"",
+	)
+
+	if rec.InputTokens != 8 || rec.OutputTokens != 6 || rec.CachedTokens != 4 || rec.CacheCreationTokens != 5 || rec.UsageEstimated {
+		t.Fatalf("unexpected websocket usage record: %+v", rec)
 	}
 }
 
