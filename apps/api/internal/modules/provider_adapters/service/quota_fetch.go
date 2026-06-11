@@ -82,6 +82,7 @@ func (s *Service) fetchAccountQuotaUncached(ctx context.Context, req contract.Pr
 		report.CreditsUsed = quotaFieldFromPaths(parsed, values, "quota_credits_used_path", "credits_used_path")
 		report.CreditsLimit = quotaFieldFromPaths(parsed, values, "quota_credits_limit_path", "credits_limit_path")
 		report.Currency = quotaFieldFromPaths(parsed, values, "quota_currency_path", "credits_currency_path")
+		applyAccountPlanQuotaFallback(parsed, &report)
 		if isCodexQuotaProbe(req) {
 			applyCodexAccountsCheckQuotaFallback(parsed, req, &report)
 		}
@@ -250,6 +251,43 @@ func decodeQuotaJSON(body []byte) any {
 		return nil
 	}
 	return parsed
+}
+
+func applyAccountPlanQuotaFallback(parsed any, report *contract.QuotaReport) {
+	if report == nil {
+		return
+	}
+	root, ok := parsed.(map[string]any)
+	if !ok {
+		return
+	}
+	accountPlan, ok := root["account_plan"].(map[string]any)
+	if !ok {
+		return
+	}
+	if strings.TrimSpace(report.Plan) == "" {
+		report.Plan = firstNonEmpty(mapString(accountPlan, "account_plan_id"), mapString(accountPlan, "plan"))
+	}
+	applySubscriptionPlanQuotaFallback(accountPlan, report)
+}
+
+func applySubscriptionPlanQuotaFallback(accountPlan map[string]any, report *contract.QuotaReport) {
+	plan, ok := accountPlan["subscription_plan"].(map[string]any)
+	if !ok {
+		return
+	}
+	if strings.TrimSpace(report.CreditsRemaining) == "" {
+		report.CreditsRemaining = firstNonEmpty(mapString(plan, "allowance"), firstNonEmpty(mapString(plan, "remaining"), mapString(plan, "credits_remaining")))
+	}
+	if strings.TrimSpace(report.CreditsUsed) == "" {
+		report.CreditsUsed = firstNonEmpty(mapString(plan, "usage"), firstNonEmpty(mapString(plan, "used"), mapString(plan, "credits_used")))
+	}
+	if strings.TrimSpace(report.CreditsLimit) == "" {
+		report.CreditsLimit = firstNonEmpty(mapString(plan, "limit"), mapString(plan, "credits_limit"))
+	}
+	if strings.TrimSpace(report.Currency) == "" {
+		report.Currency = firstNonEmpty(mapString(plan, "currency"), firstNonEmpty(mapString(plan, "credit_type"), mapString(plan, "credits_currency")))
+	}
 }
 
 func applyCodexAccountsCheckQuotaFallback(parsed any, req contract.ProbeRequest, report *contract.QuotaReport) {

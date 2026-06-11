@@ -228,6 +228,123 @@ func TestFetchAccountQuotaMapsCodexAccountPlanCredits(t *testing.T) {
 	}
 }
 
+func TestFetchAccountQuotaFallsBackAccountPlanCreditsWithoutPaths(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer codex-access-token" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"account_plan": {
+				"account_plan_id": "plus",
+				"subscription_plan": {
+					"allowance": "900",
+					"usage": "100",
+					"limit": "1000",
+					"currency": "credits"
+				}
+			}
+		}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	report, err := svc.FetchAccountQuota(context.Background(), contract.ProbeRequest{
+		Provider: providercontract.Provider{
+			ID:          21,
+			Name:        "codex-cli",
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+			Status:      providercontract.StatusActive,
+			ConfigSchema: map[string]any{
+				"quota_url": upstream.URL + "/backend-api/accounts/check/v4-2023-04-27",
+				"auth_mode": "bearer",
+			},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           21,
+			ProviderID:   21,
+			Name:         "codex-oauth",
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Status:       accountcontract.StatusActive,
+			Metadata:     map[string]any{},
+		},
+		Credential: map[string]any{"access_token": "codex-access-token"},
+	})
+	if err != nil {
+		t.Fatalf("fetch codex quota: %v", err)
+	}
+	if !report.Supported || report.Plan != "plus" || report.CreditsRemaining != "900" || report.CreditsUsed != "100" || report.CreditsLimit != "1000" || report.Currency != "credits" {
+		t.Fatalf("unexpected fallback quota report: %+v", report)
+	}
+}
+
+func TestFetchAccountQuotaExplicitPathsWinOverAccountPlanFallback(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"custom": {
+				"plan": "configured",
+				"remaining": "9",
+				"used": "1",
+				"limit": "10",
+				"currency": "configured-credits"
+			},
+			"account_plan": {
+				"account_plan_id": "fallback",
+				"subscription_plan": {
+					"allowance": "900",
+					"usage": "100",
+					"limit": "1000",
+					"currency": "credits"
+				}
+			}
+		}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	report, err := svc.FetchAccountQuota(context.Background(), contract.ProbeRequest{
+		Provider: providercontract.Provider{
+			ID:          23,
+			Name:        "codex-cli",
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+			Status:      providercontract.StatusActive,
+			ConfigSchema: map[string]any{
+				"quota_url":                    upstream.URL + "/quota",
+				"quota_plan_path":              "custom.plan",
+				"quota_credits_remaining_path": "custom.remaining",
+				"quota_credits_used_path":      "custom.used",
+				"quota_credits_limit_path":     "custom.limit",
+				"quota_currency_path":          "custom.currency",
+				"auth_mode":                    "bearer",
+			},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           23,
+			ProviderID:   23,
+			Name:         "codex-oauth",
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Status:       accountcontract.StatusActive,
+			Metadata:     map[string]any{},
+		},
+		Credential: map[string]any{"access_token": "codex-access-token"},
+	})
+	if err != nil {
+		t.Fatalf("fetch codex quota: %v", err)
+	}
+	if report.Plan != "configured" || report.CreditsRemaining != "9" || report.CreditsUsed != "1" || report.CreditsLimit != "10" || report.Currency != "configured-credits" {
+		t.Fatalf("explicit quota paths should win over fallback, got %+v", report)
+	}
+}
+
 func TestFetchAccountQuotaMapsCodexAccountsCheckPlan(t *testing.T) {
 	var gotPath string
 	var gotAuthorization string
