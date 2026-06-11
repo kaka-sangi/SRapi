@@ -178,6 +178,9 @@ func (s *Service) InvokeImageGeneration(ctx context.Context, req contract.ImageG
 	}
 	if baseURL := upstreamBaseURLImages(req); baseURL != "" {
 		if isReverseProxyImageRuntime(req) {
+			if isCodexImageGenerationReverseProxy(req) {
+				return s.invokeReverseProxyCodexImageGeneration(ctx, req, baseURL)
+			}
 			return s.invokeReverseProxyOpenAICompatibleImages(ctx, req, baseURL)
 		}
 		return s.invokeOpenAICompatibleImages(ctx, req, baseURL)

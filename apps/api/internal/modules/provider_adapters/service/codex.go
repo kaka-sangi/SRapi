@@ -96,20 +96,21 @@ type codexResponsesResponse struct {
 }
 
 type codexResponsesOutputItem struct {
-	ID           string                        `json:"id"`
-	Type         string                        `json:"type"`
-	CallID       string                        `json:"call_id"`
-	Name         string                        `json:"name"`
-	Arguments    string                        `json:"arguments"`
-	Input        string                        `json:"input"`
-	Output       *string                       `json:"output"`
-	Status       string                        `json:"status"`
-	Text         string                        `json:"text"`
-	Refusal      string                        `json:"refusal"`
-	Result       string                        `json:"result"`
-	OutputFormat string                        `json:"output_format"`
-	Content      []codexResponsesOutputContent `json:"content"`
-	Annotations  []map[string]any              `json:"-"`
+	ID            string                        `json:"id"`
+	Type          string                        `json:"type"`
+	CallID        string                        `json:"call_id"`
+	Name          string                        `json:"name"`
+	Arguments     string                        `json:"arguments"`
+	Input         string                        `json:"input"`
+	Output        *string                       `json:"output"`
+	Status        string                        `json:"status"`
+	Text          string                        `json:"text"`
+	Refusal       string                        `json:"refusal"`
+	Result        string                        `json:"result"`
+	RevisedPrompt string                        `json:"revised_prompt"`
+	OutputFormat  string                        `json:"output_format"`
+	Content       []codexResponsesOutputContent `json:"content"`
+	Annotations   []map[string]any              `json:"-"`
 }
 
 type codexResponsesOutputContent struct {
@@ -1534,6 +1535,9 @@ func codexImageGenerationPart(item codexResponsesOutputItem) (contract.ContentPa
 	}
 	if format := strings.TrimSpace(item.OutputFormat); format != "" {
 		metadata["output_format"] = format
+	}
+	if revisedPrompt := strings.TrimSpace(item.RevisedPrompt); revisedPrompt != "" {
+		metadata["revised_prompt"] = revisedPrompt
 	}
 	return contract.ContentPart{
 		Kind:           contract.ContentPartImage,

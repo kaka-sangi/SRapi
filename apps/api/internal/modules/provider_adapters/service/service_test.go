@@ -7371,6 +7371,235 @@ func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterBridgesImageGenerationToResponses(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"ig_1\",\"type\":\"image_generation_call\",\"status\":\"completed\",\"result\":\"aW1hZ2U=\",\"revised_prompt\":\"paint a quiet control room, revised\",\"output_format\":\"png\"}}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_img\",\"status\":\"completed\",\"model\":\"gpt-5.4\",\"usage\":{\"input_tokens\":12,\"output_tokens\":24},\"output\":[]}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID:      "req_codex_image",
+		Model:          "gpt-image-1",
+		Prompt:         "paint a quiet control room",
+		Count:          1,
+		Size:           "1024x1024",
+		Quality:        "high",
+		ResponseFormat: "b64_json",
+		Extra: map[string]any{
+			"background":                             "transparent",
+			"codex_image_generation_responses_model": "gpt-5.4",
+			"output_format":                          "png",
+			"output_compression":                     float64(80),
+			"partial_images":                         float64(2),
+		},
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.4"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex image generation bridge: %v", err)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://upstream.example/backend-api/codex/responses" {
+		t.Fatalf("unexpected codex image runtime request: %+v", runtime.request)
+	}
+	if runtime.request.Headers.Get("Accept") != "text/event-stream" ||
+		runtime.request.Headers.Get("OpenAI-Beta") != "responses=experimental" ||
+		runtime.request.Headers.Get("Originator") != "codex_cli_rs" ||
+		runtime.request.Headers.Get("User-Agent") != "codex_cli_rs/0.125.0" ||
+		runtime.request.Headers.Get("Version") != "0.125.0" ||
+		runtime.request.Headers.Get("Session_id") != "srapi-codex-account-9" ||
+		runtime.request.Headers.Get("Authorization") != "" {
+		t.Fatalf("unexpected codex image runtime headers before auth injection: %+v", runtime.request.Headers)
+	}
+	var payload struct {
+		Model      string `json:"model"`
+		Store      bool   `json:"store"`
+		Stream     bool   `json:"stream"`
+		ToolChoice struct {
+			Type string `json:"type"`
+		} `json:"tool_choice"`
+		Input []struct {
+			Role    string `json:"role"`
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"input"`
+		Tools []struct {
+			Type              string `json:"type"`
+			Action            string `json:"action"`
+			Model             string `json:"model"`
+			Count             int    `json:"n"`
+			Size              string `json:"size"`
+			Quality           string `json:"quality"`
+			Background        string `json:"background"`
+			OutputFormat      string `json:"output_format"`
+			OutputCompression int    `json:"output_compression"`
+			PartialImages     int    `json:"partial_images"`
+		} `json:"tools"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode codex image payload: %v", err)
+	}
+	if payload.Model != "gpt-5.4" || !payload.Stream || payload.Store || payload.ToolChoice.Type != "image_generation" || len(payload.Input) != 1 || payload.Input[0].Role != "user" || payload.Input[0].Content[0].Text != "paint a quiet control room" {
+		t.Fatalf("unexpected codex image payload: %+v", payload)
+	}
+	if len(payload.Tools) != 1 ||
+		payload.Tools[0].Type != "image_generation" ||
+		payload.Tools[0].Action != "generate" ||
+		payload.Tools[0].Model != "gpt-image-1" ||
+		payload.Tools[0].Count != 1 ||
+		payload.Tools[0].Size != "1024x1024" ||
+		payload.Tools[0].Quality != "high" ||
+		payload.Tools[0].Background != "transparent" ||
+		payload.Tools[0].OutputFormat != "png" ||
+		payload.Tools[0].OutputCompression != 80 ||
+		payload.Tools[0].PartialImages != 2 {
+		t.Fatalf("unexpected codex image tool: %+v", payload.Tools)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].Base64JSON != "aW1hZ2U=" || resp.Data[0].RevisedPrompt != "paint a quiet control room, revised" || resp.Model != "gpt-5.4" || resp.Usage.InputTokens != 12 || resp.Usage.OutputTokens != 24 {
+		t.Fatalf("unexpected codex image response: %+v", resp)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterRejectsSparkImageGenerationBridge(t *testing.T) {
+	runtime := capturingRuntime{}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID: "req_codex_image_spark",
+		Model:     "gpt-image-1",
+		Prompt:    "paint a quiet control room",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.3-codex-spark"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	assertProviderError(t, err, "not_supported", http.StatusBadRequest)
+	if runtime.request.URL != "" {
+		t.Fatalf("spark image generation should be rejected before runtime dispatch, got %+v", runtime.request)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterUsesDefaultTextModelForImageOnlyMapping(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_img\",\"status\":\"completed\",\"output\":[{\"type\":\"image_generation_call\",\"result\":\"aW1hZ2U=\",\"output_format\":\"png\"}]}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID: "req_codex_image_default_model",
+		Model:     "gpt-image-2",
+		Prompt:    "paint a quiet control room",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-image-2"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex image generation bridge: %v", err)
+	}
+	var payload struct {
+		Model string `json:"model"`
+		Tools []struct {
+			Model string `json:"model"`
+		} `json:"tools"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode codex image payload: %v", err)
+	}
+	if payload.Model != "gpt-5.4-mini" || len(payload.Tools) != 1 || payload.Tools[0].Model != "gpt-image-2" {
+		t.Fatalf("unexpected codex image model split: %+v", payload)
+	}
+	if resp.Model != "gpt-image-2" || len(resp.Data) != 1 || resp.Data[0].Base64JSON != "aW1hZ2U=" {
+		t.Fatalf("unexpected codex image response: %+v", resp)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterReturnsDataURLForImageURLResponseFormat(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_img\",\"status\":\"completed\",\"output\":[{\"type\":\"image_generation_call\",\"result\":\"aW1hZ2U=\",\"output_format\":\"webp\"}]}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID:      "req_codex_image_url",
+		Model:          "gpt-image-2",
+		Prompt:         "paint a quiet control room",
+		ResponseFormat: "url",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-image-2"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex image generation bridge: %v", err)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].URL != "data:image/webp;base64,aW1hZ2U=" || resp.Data[0].Base64JSON != "" {
+		t.Fatalf("unexpected codex image url response: %+v", resp)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterUsesConfiguredOriginator(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
