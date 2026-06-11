@@ -937,7 +937,7 @@ func responsesWebSocketUsage(payload []byte) (gatewaycontract.Usage, bool) {
 	if cachedTokens == 0 && rawUsage.InputTokensDetails != nil {
 		cachedTokens = rawUsage.InputTokensDetails.CachedTokens
 	}
-	return gatewaycontract.Usage{InputTokens: rawUsage.InputTokens, OutputTokens: rawUsage.OutputTokens, CachedTokens: cachedTokens}, true
+	return gatewaycontract.Usage{InputTokens: max(0, rawUsage.InputTokens-cachedTokens), OutputTokens: rawUsage.OutputTokens, CachedTokens: cachedTokens}, true
 }
 
 func responsesWebSocketTerminal(payload []byte) (bool, bool, string, int) {

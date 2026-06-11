@@ -354,7 +354,7 @@ func TestResponsesWebSocketUsageAcceptsInputTokenDetailsCachedTokens(t *testing.
 	if !ok {
 		t.Fatal("expected websocket usage to parse")
 	}
-	if usage.InputTokens != 8 || usage.OutputTokens != 9 || usage.CachedTokens != 3 {
+	if usage.InputTokens != 5 || usage.OutputTokens != 9 || usage.CachedTokens != 3 {
 		t.Fatalf("unexpected websocket usage: %+v", usage)
 	}
 }
@@ -561,7 +561,7 @@ func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 	if len(usageResp.Data) != 1 ||
 		!usageResp.Data[0].Success ||
 		usageResp.Data[0].SourceEndpoint != responsesWebSocketSourceEndpoint ||
-		usageResp.Data[0].TotalTokens != 18 ||
+		usageResp.Data[0].TotalTokens != 17 ||
 		usageResp.Data[0].CachedTokens != 1 ||
 		usageResp.Data[0].UsageEstimated {
 		t.Fatalf("unexpected codex websocket usage record: %+v", usageResp.Data)
@@ -768,7 +768,7 @@ func TestGatewayResponsesWebSocketRelaysCodexMultipleTurnsOnSameConnection(t *te
 		totalTokens += item.TotalTokens
 		cachedTokens += item.CachedTokens
 	}
-	if totalTokens != 29 || cachedTokens != 3 {
+	if totalTokens != 26 || cachedTokens != 3 {
 		t.Fatalf("unexpected codex websocket usage totals: total=%d cached=%d records=%+v", totalTokens, cachedTokens, usageResp.Data)
 	}
 }
@@ -824,7 +824,7 @@ func TestGatewayResponsesWebSocketForwardsFailedTerminalWithoutSyntheticError(t 
 		usageResp.Data[0].Success ||
 		usageResp.Data[0].ErrorClass == nil ||
 		*usageResp.Data[0].ErrorClass != "provider_5xx" ||
-		usageResp.Data[0].TotalTokens != 8 ||
+		usageResp.Data[0].TotalTokens != 7 ||
 		usageResp.Data[0].CachedTokens != 1 ||
 		usageResp.Data[0].UsageEstimated {
 		t.Fatalf("unexpected failed codex websocket usage record: %+v", usageResp.Data)

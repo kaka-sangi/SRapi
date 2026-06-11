@@ -583,7 +583,7 @@ func TestNativeOpenAIAdapterUsesResponsesEndpoint(t *testing.T) {
 	if string(resp.Raw) != rawResponse {
 		t.Fatalf("expected raw native Responses JSON, got %q", string(resp.Raw))
 	}
-	if resp.Usage.InputTokens != 3 || resp.Usage.OutputTokens != 2 || resp.Usage.CachedTokens != 1 || resp.Usage.Estimated {
+	if resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 2 || resp.Usage.CachedTokens != 1 || resp.Usage.Estimated {
 		t.Fatalf("expected native Responses usage, got %+v", resp.Usage)
 	}
 }
@@ -989,7 +989,7 @@ func TestReverseProxyOpenAICompatibleAdapterUsesResponsesEndpointWhenOptedIn(t *
 	if conversationResponseText(resp) != "native responses" {
 		t.Fatalf("unexpected native Responses stream text: %+v", resp)
 	}
-	if resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 2 || resp.Usage.CachedTokens != 1 || resp.Usage.Estimated {
+	if resp.Usage.InputTokens != 3 || resp.Usage.OutputTokens != 2 || resp.Usage.CachedTokens != 1 || resp.Usage.Estimated {
 		t.Fatalf("expected native Responses stream usage, got %+v", resp.Usage)
 	}
 	if len(resp.StreamEvents) != 4 {
@@ -1856,7 +1856,7 @@ func TestOpenAICompatibleAdapterStreamsUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke stream upstream: %v", err)
 	}
-	if conversationResponseText(resp) != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 || resp.Usage.CachedTokens != 2 {
+	if conversationResponseText(resp) != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 3 || resp.Usage.OutputTokens != 6 || resp.Usage.CachedTokens != 2 {
 		t.Fatalf("unexpected stream response: %+v", resp)
 	}
 	if string(resp.Raw) != rawSSE {
@@ -1877,7 +1877,7 @@ func TestOpenAICompatibleAdapterStreamsUpstream(t *testing.T) {
 	if resp.StreamEvents[1].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[1].Delta.Text != " stream" {
 		t.Fatalf("expected second OpenAI content delta preserving leading space, got %+v", resp.StreamEvents[1])
 	}
-	if resp.StreamEvents[2].Type != contract.ConversationStreamEventUsage || resp.StreamEvents[2].Usage.InputTokens != 5 {
+	if resp.StreamEvents[2].Type != contract.ConversationStreamEventUsage || resp.StreamEvents[2].Usage.InputTokens != 3 {
 		t.Fatalf("expected OpenAI usage stream event, got %+v", resp.StreamEvents[2])
 	}
 	if resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
@@ -2089,7 +2089,7 @@ func TestGenericReverseProxyAdapterInvokesConfiguredChatUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke generic chat upstream: %v", err)
 	}
-	if conversationResponseText(resp) != "generic says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 6 || resp.Usage.OutputTokens != 7 || resp.Usage.CachedTokens != 2 {
+	if conversationResponseText(resp) != "generic says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 7 || resp.Usage.CachedTokens != 2 {
 		t.Fatalf("unexpected generic chat response: %+v", resp)
 	}
 }
@@ -5497,7 +5497,7 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 	if err != nil {
 		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
 	}
-	if conversationResponseText(resp) != "codex response" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 || resp.Usage.CachedTokens != 1 {
+	if conversationResponseText(resp) != "codex response" || resp.Usage.Estimated || resp.Usage.InputTokens != 3 || resp.Usage.OutputTokens != 5 || resp.Usage.CachedTokens != 1 {
 		t.Fatalf("unexpected codex response: %+v", resp)
 	}
 	if string(resp.Raw) != "data: {\"type\":\"response.output_text.delta\",\"delta\":\"ignored \"}\n\n"+
@@ -5512,7 +5512,7 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 	if resp.StreamEvents[0].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[0].Delta.Text != "ignored " {
 		t.Fatalf("expected Codex text delta event, got %+v", resp.StreamEvents[0])
 	}
-	if resp.StreamEvents[1].Type != contract.ConversationStreamEventUsage || resp.StreamEvents[1].Usage.InputTokens != 4 || resp.StreamEvents[1].Usage.OutputTokens != 5 || resp.StreamEvents[1].Usage.CachedTokens != 1 {
+	if resp.StreamEvents[1].Type != contract.ConversationStreamEventUsage || resp.StreamEvents[1].Usage.InputTokens != 3 || resp.StreamEvents[1].Usage.OutputTokens != 5 || resp.StreamEvents[1].Usage.CachedTokens != 1 {
 		t.Fatalf("expected Codex usage event, got %+v", resp.StreamEvents[1])
 	}
 	if resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
@@ -6033,7 +6033,7 @@ func TestReverseProxyCodexCLIAdapterStreamsMultilineSSEData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
 	}
-	if conversationResponseText(resp) != "codex" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 || resp.Usage.CachedTokens != 2 {
+	if conversationResponseText(resp) != "codex" || resp.Usage.Estimated || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 5 || resp.Usage.CachedTokens != 2 {
 		t.Fatalf("unexpected codex multiline stream response: %+v", resp)
 	}
 	if string(resp.Raw) != rawSSE {
@@ -6090,7 +6090,7 @@ func TestReverseProxyCodexCLIAdapterUsesNamedSSEEventType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
 	}
-	if conversationResponseText(resp) != "named" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 || resp.Usage.CachedTokens != 2 {
+	if conversationResponseText(resp) != "named" || resp.Usage.Estimated || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 5 || resp.Usage.CachedTokens != 2 {
 		t.Fatalf("unexpected codex named stream response: %+v", resp)
 	}
 	if string(resp.Raw) != rawSSE {
@@ -6225,7 +6225,7 @@ func TestReverseProxyCodexCLIAdapterStreamsIncompleteTerminalUsage(t *testing.T)
 	if conversationResponseText(resp) != "partial" ||
 		resp.StopReason != contract.StopReasonMaxTokens ||
 		resp.Usage.Estimated ||
-		resp.Usage.InputTokens != 4 ||
+		resp.Usage.InputTokens != 2 ||
 		resp.Usage.OutputTokens != 5 ||
 		resp.Usage.CachedTokens != 2 {
 		t.Fatalf("unexpected codex incomplete stream response: %+v", resp)
@@ -6288,7 +6288,7 @@ func TestReverseProxyCodexCLIAdapterPreservesFailedTerminalStream(t *testing.T) 
 	}
 	if resp.StopReason != contract.StopReasonContentFilter ||
 		resp.Usage.Estimated ||
-		resp.Usage.InputTokens != 4 ||
+		resp.Usage.InputTokens != 2 ||
 		resp.Usage.OutputTokens != 5 ||
 		resp.Usage.CachedTokens != 2 {
 		t.Fatalf("unexpected codex failed stream response: %+v", resp)
@@ -6350,7 +6350,7 @@ func TestReverseProxyCodexCLIAdapterPreservesNestedFailedTerminalError(t *testin
 	}
 	if resp.StopReason != contract.StopReasonContentFilter ||
 		resp.Usage.Estimated ||
-		resp.Usage.InputTokens != 4 ||
+		resp.Usage.InputTokens != 2 ||
 		resp.Usage.OutputTokens != 5 ||
 		resp.Usage.CachedTokens != 2 {
 		t.Fatalf("unexpected codex nested failed stream response: %+v", resp)
@@ -6809,7 +6809,7 @@ func TestReverseProxyCodexCLIAdapterPreservesRefusalDeltas(t *testing.T) {
 		resp.Parts[0].Text != "I can't help" ||
 		resp.StopReason != contract.StopReasonRefusal ||
 		resp.Usage.Estimated ||
-		resp.Usage.InputTokens != 4 ||
+		resp.Usage.InputTokens != 3 ||
 		resp.Usage.OutputTokens != 2 ||
 		resp.Usage.CachedTokens != 1 {
 		t.Fatalf("unexpected Codex refusal response: %+v", resp)

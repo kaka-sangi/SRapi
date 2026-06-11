@@ -716,9 +716,9 @@ type openAIUsage struct {
 }
 
 func (u openAIUsage) ToUsage(text string) contract.Usage {
-	input := valueOrZero(u.InputTokens)
-	if input == 0 {
-		input = valueOrZero(u.PromptTokens)
+	rawInput := valueOrZero(u.InputTokens)
+	if rawInput == 0 {
+		rawInput = valueOrZero(u.PromptTokens)
 	}
 	output := valueOrZero(u.OutputTokens)
 	if output == 0 {
@@ -735,6 +735,7 @@ func (u openAIUsage) ToUsage(text string) contract.Usage {
 	if cached == 0 && u.PromptTokensDetails != nil {
 		cached = valueOrZero(u.PromptTokensDetails.CachedTokens)
 	}
+	input := max(0, rawInput-cached)
 	total := input + output + cached
 	if u.TotalTokens != nil && *u.TotalTokens > 0 && total == 0 {
 		total = *u.TotalTokens

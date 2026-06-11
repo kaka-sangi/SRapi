@@ -58,11 +58,34 @@ func TestOpenAIUsageHasNoCacheCreation(t *testing.T) {
 		CachedTokens:     &cached,
 	}.ToUsage("")
 
+	if usage.InputTokens != 70 {
+		t.Fatalf("input tokens = %d, want 70 (OpenAI prompt tokens include cached tokens)", usage.InputTokens)
+	}
 	if usage.CachedTokens != 30 {
 		t.Fatalf("cached (read) tokens = %d, want 30", usage.CachedTokens)
 	}
 	if usage.CacheCreationTokens != 0 {
 		t.Fatalf("cache-creation tokens = %d, want 0 (OpenAI has no cache writes)", usage.CacheCreationTokens)
+	}
+}
+
+func TestOpenAIUsageClampsInputWhenCachedTokensExceedInputTokens(t *testing.T) {
+	input := 8
+	cached := 10
+	usage := openAIUsage{
+		InputTokens: &input,
+		InputTokensDetails: &struct {
+			CachedTokens *int `json:"cached_tokens"`
+		}{
+			CachedTokens: &cached,
+		},
+	}.ToUsage("cached response")
+
+	if usage.Estimated {
+		t.Fatal("usage should not be estimated when OpenAI cache tokens are present")
+	}
+	if usage.InputTokens != 0 || usage.CachedTokens != 10 {
+		t.Fatalf("unexpected clamped OpenAI cache usage: %+v", usage)
 	}
 }
 
