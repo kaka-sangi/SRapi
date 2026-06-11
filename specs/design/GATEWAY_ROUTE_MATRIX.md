@@ -74,14 +74,13 @@ Antigravity preset:
 
 `{alias}` 来自 `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md` 的 `route_aliases`；`{gemini_alias}` 来自同一 preset 的 Gemini model-action aliases。例如 `/api/provider/deepseek/v1/chat/completions` 强制 `provider_key=deepseek`，但仍复用标准 Gateway runtime、API Key policy、model visibility、Scheduler、usage 和 decision 记录。
 
-Root legacy aliases（例如 `/openai/v1/chat/completions`、`/anthropic/v1/messages`、`/grok/v1/chat/completions`、`/antigravity/v1/messages` 和 `/antigravity/v1beta/models/{model}:generateContent`）也按同一规则处理：只强制对应 `provider_key`，并把原始 root alias path 写入 usage log 与 scheduler decision 的 `source_endpoint` 证据。
+Provider alias 只通过 `/api/provider/{provider_key}` 路由族暴露。所有 alias 只强制对应 `provider_key`，并把原始 alias path 写入 usage log 与 scheduler decision 的 `source_endpoint` 证据。
 
 ## 4. Provider alias 路由
 
 ### 4.1 OpenAI / OpenAI-compatible
 
 ```txt
-/openai/v1/*
 /api/provider/openai/*
 /api/provider/openai/v1/*
 /api/provider/openai-compatible/*
@@ -102,7 +101,6 @@ Root legacy aliases（例如 `/openai/v1/chat/completions`、`/anthropic/v1/mess
 ### 4.2 Anthropic / Anthropic-compatible
 
 ```txt
-/anthropic/v1/*
 /api/provider/anthropic/*
 /api/provider/anthropic/v1/*
 /api/provider/claude-compatible/*
@@ -127,7 +125,7 @@ Anthropic-compatible preset 的 auth、base_url、model catalog 由 `COMPATIBLE_
 /api/provider/gemini/v1beta1/*
 ```
 
-Gemini 原生错误必须渲染为 Google-compatible 形状；通过 `/v1/messages` 或 `/v1/chat/completions` 进入的请求则按客户端源协议渲染。Gemini-shaped 路由的 Gateway API key 可来自 `x-goog-api-key`、`Authorization: Bearer`、`x-api-key` 或 `key` query 参数；`api_key` query 参数按 Google-style `INVALID_ARGUMENT` 拒绝，避免把废弃形式继续扩散。
+Gemini 原生错误必须渲染为 Google-compatible 形状；通过 `/v1/messages` 或 `/v1/chat/completions` 进入的请求则按客户端源协议渲染。Gemini-shaped 路由的 Gateway API key 可来自 `x-goog-api-key`、`Authorization: Bearer`、`x-api-key` 或 `key` query 参数；其他查询参数不参与 Gateway 鉴权。
 
 已实现的 Gemini-native 路由：
 
@@ -144,7 +142,6 @@ POST /v1beta/models/{model}:countTokens
 ### 4.4 Grok
 
 ```txt
-/grok/v1/*
 /api/provider/grok/*
 /api/provider/grok/v1/*
 ```
@@ -154,8 +151,6 @@ Grok API-key/upstream 与 Grok Web session 都归属 `grok` provider，但 runti
 ### 4.5 Antigravity
 
 ```txt
-/antigravity/v1/*
-/antigravity/v1beta/*
 /api/provider/antigravity/*
 /api/provider/antigravity/v1/*
 /api/provider/antigravity/v1beta/*
@@ -168,12 +163,9 @@ Antigravity 可承载 Claude-shaped 和 Gemini-shaped 端点，必须在 route m
 Scheduler / Provider Adapter / Reverse Proxy Runtime。WP-450 起，上游请求由 Provider Adapter
 转换为 Antigravity / Google Cloud Code `v1internal` official-client shape；`provider.protocol`
 只决定下游协议归一化和响应渲染。
-WP-360 起，Antigravity 文本 alias 已实现：`/antigravity/v1/chat/completions`、
-`/api/provider/antigravity/v1/chat/completions`、`/antigravity/v1/messages` 和
+Antigravity 文本 alias 已实现：`/api/provider/antigravity/v1/chat/completions` 和
 `/api/provider/antigravity/v1/messages` 强制 `provider_key=antigravity`，仍复用标准
-Gateway runtime。WP-370 起，Antigravity Gemini model-action alias 已实现：
-`/antigravity/v1beta/models/{model}:generateContent`、
-`/antigravity/v1beta/models/{model}:streamGenerateContent`、
+Gateway runtime。Antigravity Gemini model-action alias 已实现：
 `/api/provider/antigravity/v1beta/models/{model}:generateContent` 和
 `/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent` 强制
 `provider_key=antigravity`，并复用标准 Gemini-native Gateway handler。

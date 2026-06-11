@@ -107,7 +107,6 @@ gemini-compatible    -> models/{model}:generateContent
 registry 为 Antigravity 暴露 text alias：
 
 ```txt
-/antigravity/v1
 /api/provider/antigravity
 /api/provider/antigravity/v1
 ```
@@ -115,7 +114,6 @@ registry 为 Antigravity 暴露 text alias：
 并暴露 Gemini model-action alias（`GeminiRouteAliases`）：
 
 ```txt
-/antigravity/v1beta
 /api/provider/antigravity/v1beta
 ```
 
@@ -140,7 +138,7 @@ handler，并保留 alias source endpoint 作为 usage log 与 scheduler decisio
 | `chatgpt-web` | ChatGPT Web session/cookie reverse proxy | `https://chatgpt.com` |
 
 允许的 runtime class 为 `web_session_cookie` 与 `custom_reverse_proxy`。route alias：
-`/chatgpt-web/v1`、`/api/provider/chatgpt-web`、`/api/provider/chatgpt-web/v1`。
+`/api/provider/chatgpt-web`、`/api/provider/chatgpt-web/v1`。
 
 ## 6b. Bedrock Anthropic preset
 
@@ -151,8 +149,7 @@ handler，并保留 alias source endpoint 作为 usage log 与 scheduler decisio
 | `bedrock` | Amazon Bedrock 上的 Anthropic Messages 上游 | `https://bedrock-runtime.us-east-1.amazonaws.com` |
 
 `bedrock` 复用 Anthropic capability 集合，auth mode 为 `custom_header`（SigV4 header），允许的
-runtime class 为 `api_key`。route alias：`/bedrock/v1`、
-`/api/provider/bedrock`、`/api/provider/bedrock/v1`。
+runtime class 为 `api_key`。route alias：`/api/provider/bedrock`、`/api/provider/bedrock/v1`。
 
 ## 7. Preset Schema
 

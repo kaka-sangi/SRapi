@@ -97,7 +97,7 @@ POST /v1beta/models/{model}:streamGenerateContent
 POST /v1beta/models/{model}:countTokens
 ```
 
-这些路由完成客户端侧 Gemini GenerateContent 与 Canonical AI Request / Response 的转换，并复用 Gateway API Key、模型策略、Scheduler、Provider Adapter、usage 和 decision 记录。Gemini-shaped 下游入口接受 Google SDK / REST 常用的 `x-goog-api-key`、`Authorization: Bearer`、`x-api-key` 和 `key` query 参数；废弃的 `api_key` query 参数返回 Google-style `INVALID_ARGUMENT`。该兼容只作用于 `/v1beta/models*` 及其 Gemini alias 路由，不改变 OpenAI / Anthropic 入口只用 Bearer API key 的语义。WP-240 起，目标 Provider 为 `gemini-compatible` / `native-gemini` / `reverse-proxy-gemini-cli` 时，Provider Adapter 会调用 Gemini `generateContent` 或 `streamGenerateContent` 上游。
+这些路由完成客户端侧 Gemini GenerateContent 与 Canonical AI Request / Response 的转换，并复用 Gateway API Key、模型策略、Scheduler、Provider Adapter、usage 和 decision 记录。Gemini-shaped 下游入口接受 Google SDK / REST 常用的 `x-goog-api-key`、`Authorization: Bearer`、`x-api-key` 和 `key` query 参数；其他查询参数不参与 Gateway 鉴权。该兼容只作用于 `/v1beta/models*` 及其 Gemini alias 路由，不改变 OpenAI / Anthropic 入口只用 Bearer API key 的语义。WP-240 起，目标 Provider 为 `gemini-compatible` / `native-gemini` / `reverse-proxy-gemini-cli` 时，Provider Adapter 会调用 Gemini `generateContent` 或 `streamGenerateContent` 上游。
 
 WP-540 起，`GET /v1beta/models` 返回 Gemini `models.list` 兼容的 `{models,nextPageToken}`，只基于 SRapi model registry 和 Gateway API Key 可见性渲染 active models。响应 model name 使用 `models/{canonical_name}`，并包含 `baseModelId`、`version`、`displayName`、`inputTokenLimit`、`outputTokenLimit` 和 `supportedGenerationMethods`；`supportedGenerationMethods` 至少包含 `generateContent`，并按模型能力追加 `streamGenerateContent` 与 `countTokens`。`pageSize` / `pageToken` 非法时返回 Google-style `INVALID_ARGUMENT`。该目录路由不进入 Scheduler、不读取 Provider Account 凭证、也不做上游模型发现。
 

@@ -95,7 +95,7 @@ type Registry struct {
 
 func Default() *Registry {
 	return New(
-		anthropicPreset("anthropic", "Anthropic", "https://api.anthropic.com/v1", []string{"/anthropic/v1", "/api/provider/anthropic", "/api/provider/anthropic/v1"}),
+		anthropicPreset("anthropic", "Anthropic", "https://api.anthropic.com/v1", []string{"/api/provider/anthropic", "/api/provider/anthropic/v1"}),
 		anthropicPreset("anthropic-compatible", "Anthropic Compatible", "https://api.anthropic.com/v1", []string{"/api/provider/anthropic-compatible", "/api/provider/anthropic-compatible/v1", "/api/provider/claude-compatible", "/api/provider/claude-compatible/v1"}),
 		antigravityPreset(),
 		bedrockPreset(),
@@ -110,11 +110,11 @@ func Default() *Registry {
 		openAIPreset("cerebras", "Cerebras", "https://api.cerebras.ai/v1", providerAliases("cerebras")),
 		openAIPreset("deepseek", "DeepSeek", "https://api.deepseek.com", providerAliases("deepseek")),
 		openAIPreset("groq", "Groq", "https://api.groq.com/openai/v1", providerAliases("groq")),
-		openAIPreset("grok", "Grok", "https://api.x.ai/v1", []string{"/grok/v1", "/api/provider/grok", "/api/provider/grok/v1"}),
+		openAIPreset("grok", "Grok", "https://api.x.ai/v1", []string{"/api/provider/grok", "/api/provider/grok/v1"}),
 		openAIPreset("kimi", "Kimi", "https://api.moonshot.ai/v1", providerAliases("kimi")),
 		openAIPreset("mistral", "Mistral", "https://api.mistral.ai/v1", providerAliases("mistral")),
 		openAIPreset("moonshot", "Moonshot", "https://api.moonshot.ai/v1", providerAliases("moonshot")),
-		openAIPreset("openai", "OpenAI", "https://api.openai.com/v1", []string{"/openai/v1", "/api/provider/openai", "/api/provider/openai/v1"}),
+		openAIPreset("openai", "OpenAI", "https://api.openai.com/v1", []string{"/api/provider/openai", "/api/provider/openai/v1"}),
 		openAIPreset("openai-compatible", "OpenAI Compatible", "https://api.openai.com/v1", []string{"/api/provider/openai-compatible", "/api/provider/openai-compatible/v1"}),
 		openAIPreset("openrouter", "OpenRouter", "https://openrouter.ai/api/v1", providerAliases("openrouter")),
 		openAIPreset("qwen", "通义千问", "https://dashscope.aliyuncs.com/compatible-mode/v1", append(providerAliases("qwen"), providerAliases("tongyi")...)),
@@ -166,7 +166,7 @@ func codexCLIPreset() Preset {
 		ProviderKey:    "codex-cli",
 		PlatformFamily: PlatformFamilyCodexCLI,
 		DisplayName:    "Codex CLI",
-		RouteAliases:   []string{"/api/provider/codex-cli", "/api/provider/codex-cli/v1", "/backend-api/codex"},
+		RouteAliases:   []string{"/api/provider/codex-cli", "/api/provider/codex-cli/v1"},
 		DefaultBaseURL: "https://chatgpt.com/backend-api/codex",
 		AuthModes:      []AuthMode{AuthModeBearer},
 		RuntimeClassAllowlist: []accountscontract.RuntimeClass{
@@ -236,7 +236,7 @@ func geminiPreset() Preset {
 		ProviderKey:       "gemini",
 		PlatformFamily:    PlatformFamilyGeminiCompatible,
 		DisplayName:       "Gemini",
-		RouteAliases:      []string{"/gemini/v1beta", "/api/provider/gemini/v1beta"},
+		RouteAliases:      []string{"/api/provider/gemini/v1beta"},
 		DefaultBaseURL:    "https://generativelanguage.googleapis.com/v1beta",
 		AuthModes:         []AuthMode{AuthModeAPIKeyQuery, AuthModeBearer, AuthModeCustomHeader},
 		ModelCatalogOwner: "gemini",
@@ -261,10 +261,10 @@ func antigravityPreset() Preset {
 		PlatformFamilyReverseProxyAntigravity,
 		"Antigravity",
 		"",
-		[]string{"/antigravity/v1", "/api/provider/antigravity", "/api/provider/antigravity/v1"},
+		[]string{"/api/provider/antigravity", "/api/provider/antigravity/v1"},
 		antigravityCapabilities(),
 	)
-	preset.GeminiRouteAliases = []string{"/antigravity/v1beta", "/api/provider/antigravity/v1beta"}
+	preset.GeminiRouteAliases = []string{"/api/provider/antigravity/v1beta"}
 	preset.AuthModes = []AuthMode{AuthModeBearer, AuthModeCustomHeader}
 	preset.RuntimeClassAllowlist = []accountscontract.RuntimeClass{
 		accountscontract.RuntimeClassOauthRefresh,
@@ -300,7 +300,7 @@ func chatGPTWebPreset() Preset {
 		ProviderKey:    "chatgpt-web",
 		PlatformFamily: PlatformFamilyOpenAICompatible,
 		DisplayName:    "ChatGPT Web",
-		RouteAliases:   []string{"/chatgpt-web/v1", "/api/provider/chatgpt-web", "/api/provider/chatgpt-web/v1"},
+		RouteAliases:   []string{"/api/provider/chatgpt-web", "/api/provider/chatgpt-web/v1"},
 		DefaultBaseURL: "https://chatgpt.com",
 		AuthModes:      []AuthMode{AuthModeBearer, AuthModeCustomHeader},
 		RuntimeClassAllowlist: []accountscontract.RuntimeClass{
@@ -338,7 +338,7 @@ func bedrockPreset() Preset {
 		ProviderKey:       "bedrock",
 		PlatformFamily:    PlatformFamilyBedrockAnthropic,
 		DisplayName:       "Amazon Bedrock",
-		RouteAliases:      []string{"/bedrock/v1", "/api/provider/bedrock", "/api/provider/bedrock/v1"},
+		RouteAliases:      []string{"/api/provider/bedrock", "/api/provider/bedrock/v1"},
 		DefaultBaseURL:    "https://bedrock-runtime.us-east-1.amazonaws.com",
 		AuthModes:         []AuthMode{AuthModeCustomHeader},
 		ModelCatalogOwner: "bedrock",

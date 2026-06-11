@@ -1469,7 +1469,7 @@ func TestConsoleWriteRoutesRequireCSRF(t *testing.T) {
 		{http.MethodPost, "/api/v1/admin/accounts", `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"blocked-account","runtime_class":"api_key","credential":{"api_key":"secret"},"status":"active"}`},
 		{http.MethodPost, "/api/v1/admin/accounts/import", `{"accounts":[{"provider_id":"` + string(providerResp.Data.Id) + `","name":"blocked-import","runtime_class":"api_key","credential":{"api_key":"secret"},"status":"active"}]}`},
 		{http.MethodPatch, "/api/v1/admin/accounts/" + string(accountResp.Data.Id), `{"name":"blocked-account"}`},
-		{http.MethodPatch, "/api/v1/admin/accounts/" + string(accountResp.Data.Id) + "/proxy", `{"proxy_id":"proxy-blocked"}`},
+		{http.MethodPatch, "/api/v1/admin/accounts/" + string(accountResp.Data.Id) + "/proxy", `{"proxy_id":"1"}`},
 		{http.MethodPost, "/api/v1/admin/accounts/" + string(accountResp.Data.Id) + "/test", `{}`},
 		{http.MethodPost, "/api/v1/admin/accounts/" + string(accountResp.Data.Id) + "/disable", `{}`},
 		{http.MethodPost, "/api/v1/admin/accounts/" + string(accountResp.Data.Id) + "/enable", `{}`},
@@ -4963,20 +4963,20 @@ func TestGatewayGeminiAuthAcceptsGoogleAPIKeyForms(t *testing.T) {
 	}
 }
 
-func TestGatewayGeminiAuthRejectsDeprecatedAPIKeyQuery(t *testing.T) {
+func TestGatewayGeminiAuthRejectsAPIKeyQuery(t *testing.T) {
 	handler := New(config.Load(), nil)
-	req := httptest.NewRequest(http.MethodGet, "/v1beta/models?api_key=deprecated", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1beta/models?api_key=unsupported", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected deprecated api_key query to return 400, got %d body=%s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unsupported api_key query to return 401, got %d body=%s", rec.Code, rec.Body.String())
 	}
 	var resp apiopenapi.GeminiErrorResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode Gemini error response: %v", err)
 	}
-	if resp.Error.Status != "INVALID_ARGUMENT" || !strings.Contains(resp.Error.Message, "api_key is deprecated") {
-		t.Fatalf("unexpected deprecated api_key error: %+v", resp.Error)
+	if resp.Error.Status != "UNAUTHENTICATED" || resp.Error.Message != "invalid API key" {
+		t.Fatalf("unexpected api_key query error: %+v", resp.Error)
 	}
 }
 
@@ -5275,7 +5275,31 @@ func TestGatewayProviderAliasForcesProviderContext(t *testing.T) {
 	}
 }
 
-func TestGatewayRootLegacyOpenAIAliasForcesProviderContext(t *testing.T) {
+func TestGatewayRootProviderAliasesAreNotRegistered(t *testing.T) {
+	handler := New(config.Load(), nil)
+	paths := []string{
+		"/openai/v1/chat/completions",
+		"/anthropic/v1/messages",
+		"/grok/v1/chat/completions",
+		"/antigravity/v1/messages",
+		"/antigravity/v1beta/models/gemini-pro:generateContent",
+		"/gemini/v1beta/models/gemini-pro:generateContent",
+		"/chatgpt-web/v1/chat/completions",
+		"/bedrock/v1/messages",
+		"/backend-api/codex/responses",
+	}
+	for _, path := range paths {
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected %s to be unregistered, got %d body=%s", path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestGatewayOpenAIProviderAliasForcesProviderContext(t *testing.T) {
 	var upstreamCalls int
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCalls++
@@ -5302,27 +5326,27 @@ func TestGatewayRootLegacyOpenAIAliasForcesProviderContext(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	openaiProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"openai","display_name":"OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
-	fallbackProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"root-openai-fallback","display_name":"Root OpenAI Fallback","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
-	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"root-openai-alias-model","display_name":"Root OpenAI Alias Model","status":"active"}`)
+	fallbackProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"openai-provider-fallback","display_name":"OpenAI Provider Fallback","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"openai-provider-alias-model","display_name":"OpenAI Provider Alias Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-upstream","status":"active"}`)
-	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"root-openai-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":100}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"openai-provider-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":100}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Data.Id)+`","upstream_model_name":"root-openai-upstream","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(openaiProvider.Data.Id)+`","name":"root-openai-account","runtime_class":"api_key","credential":{"api_key":"root-openai-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":10}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(openaiProvider.Data.Id)+`","name":"openai-provider-account","runtime_class":"api_key","credential":{"api_key":"root-openai-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":10}`)
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 
-	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/openai/v1/chat/completions", `{"model":"root-openai-alias-model","messages":[{"role":"user","content":"root alias"}]}`)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/api/provider/openai/v1/chat/completions", `{"model":"openai-provider-alias-model","messages":[{"role":"user","content":"provider alias"}]}`)
 	var chatResp apiopenapi.ChatCompletionResponse
 	if err := json.NewDecoder(rec.Body).Decode(&chatResp); err != nil {
-		t.Fatalf("decode root alias chat response: %v", err)
+		t.Fatalf("decode OpenAI provider alias chat response: %v", err)
 	}
 	if len(chatResp.Choices) != 1 || decodeChatMessageText(t, chatResp.Choices[0].Message.Content) != "root alias ok" {
-		t.Fatalf("unexpected root alias chat response: %+v", chatResp)
+		t.Fatalf("unexpected OpenAI provider alias chat response: %+v", chatResp)
 	}
 	if upstreamCalls != 1 {
-		t.Fatalf("expected one root alias upstream call, got %d", upstreamCalls)
+		t.Fatalf("expected one OpenAI provider alias upstream call, got %d", upstreamCalls)
 	}
 
-	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=root-openai-alias-model", nil)
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=openai-provider-alias-model", nil)
 	decisionsReq.AddCookie(sessionCookie)
 	decisionsRec := httptest.NewRecorder()
 	handler.ServeHTTP(decisionsRec, decisionsReq)
@@ -5334,14 +5358,14 @@ func TestGatewayRootLegacyOpenAIAliasForcesProviderContext(t *testing.T) {
 		t.Fatalf("decode decisions: %v", err)
 	}
 	if len(decisionsResp.Data) != 1 {
-		t.Fatalf("expected one root alias decision, got %+v", decisionsResp.Data)
+		t.Fatalf("expected one OpenAI provider alias decision, got %+v", decisionsResp.Data)
 	}
 	decision := decisionsResp.Data[0]
-	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(openaiProvider.Data.Id) || decision.CandidateCount != 1 || decision.SourceEndpoint != "/openai/v1/chat/completions" {
-		t.Fatalf("expected root alias to force openai provider and record source endpoint, got %+v", decision)
+	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(openaiProvider.Data.Id) || decision.CandidateCount != 1 || decision.SourceEndpoint != "/api/provider/openai/v1/chat/completions" {
+		t.Fatalf("expected OpenAI provider alias to force provider and record source endpoint, got %+v", decision)
 	}
 
-	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=root-openai-alias-model", nil)
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=openai-provider-alias-model", nil)
 	usageReq.AddCookie(sessionCookie)
 	usageRec := httptest.NewRecorder()
 	handler.ServeHTTP(usageRec, usageReq)
@@ -5358,11 +5382,11 @@ func TestGatewayRootLegacyOpenAIAliasForcesProviderContext(t *testing.T) {
 		*usageResp.Data[0].ProviderId != string(openaiProvider.Data.Id) ||
 		usageResp.Data[0].AccountId == nil ||
 		*usageResp.Data[0].AccountId != string(accountResp.Data.Id) ||
-		usageResp.Data[0].SourceEndpoint != "/openai/v1/chat/completions" ||
+		usageResp.Data[0].SourceEndpoint != "/api/provider/openai/v1/chat/completions" ||
 		usageResp.Data[0].TargetProtocol == nil ||
 		*usageResp.Data[0].TargetProtocol != "openai-compatible" ||
 		usageResp.Data[0].TotalTokens != 7 {
-		t.Fatalf("expected root alias usage evidence, got %+v", usageResp.Data)
+		t.Fatalf("expected OpenAI provider alias usage evidence, got %+v", usageResp.Data)
 	}
 }
 
@@ -8625,32 +8649,34 @@ func TestGatewayPoolModeSkipsAccountCooldownWithoutCustomCodes(t *testing.T) {
 	}
 }
 
-func TestCreateAccountNormalizesLegacyErrorPolicyCredentialMetadata(t *testing.T) {
+func TestCreateAccountDoesNotPromoteCredentialPolicyMetadata(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"legacy-policy-provider","display_name":"Legacy Policy Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"credential-policy-provider","display_name":"Credential Policy Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
 
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"legacy-policy-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret","pool_mode":true,"custom_error_codes_enabled":true,"custom_error_codes":[401,429]},"status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"credential-policy-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret","pool_mode":true,"custom_error_codes_enabled":true,"custom_error_codes":[401,429]},"status":"active"}`)
 	if accountResp.Data.Metadata == nil {
-		t.Fatalf("expected normalized metadata, got nil")
+		return
 	}
 	metadata := *accountResp.Data.Metadata
-	if metadata["pool_mode"] != true || metadata["custom_error_codes_enabled"] != true {
-		t.Fatalf("expected legacy policy booleans normalized into metadata, got %+v", metadata)
+	if _, ok := metadata["pool_mode"]; ok {
+		t.Fatalf("expected credential pool_mode to stay out of metadata, got %+v", metadata)
 	}
-	codes, ok := metadata["custom_error_codes"].([]any)
-	if !ok || len(codes) != 2 {
-		t.Fatalf("expected custom_error_codes normalized into metadata, got %+v", metadata["custom_error_codes"])
+	if _, ok := metadata["custom_error_codes_enabled"]; ok {
+		t.Fatalf("expected credential custom_error_codes_enabled to stay out of metadata, got %+v", metadata)
+	}
+	if _, ok := metadata["custom_error_codes"]; ok {
+		t.Fatalf("expected credential custom_error_codes to stay out of metadata, got %+v", metadata)
 	}
 }
 
-func TestUpdateAccountNormalizesLegacyErrorPolicyCredentialMetadata(t *testing.T) {
+func TestUpdateAccountDoesNotPromoteCredentialPolicyMetadata(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"legacy-update-policy-provider","display_name":"Legacy Update Policy Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"legacy-update-policy-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"https://example.invalid/v1"},"status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"credential-update-policy-provider","display_name":"Credential Update Policy Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"credential-update-policy-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"https://example.invalid/v1"},"status":"active"}`)
 
-	updateReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), strings.NewReader(`{"credential":{"api_key":"upstream-secret-2","pool_mode":true}}`))
+	updateReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), strings.NewReader(`{"credential":{"api_key":"upstream-secret-2","pool_mode":true,"custom_error_codes_enabled":true,"custom_error_codes":[401]}}`))
 	updateReq.Header.Set("Content-Type", "application/json")
 	updateReq.AddCookie(sessionCookie)
 	updateReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
@@ -8664,11 +8690,20 @@ func TestUpdateAccountNormalizesLegacyErrorPolicyCredentialMetadata(t *testing.T
 		t.Fatalf("decode account update: %v", err)
 	}
 	if updateResp.Data.Metadata == nil {
-		t.Fatalf("expected normalized metadata, got nil")
+		t.Fatalf("expected existing metadata, got nil")
 	}
 	metadata := *updateResp.Data.Metadata
-	if metadata["base_url"] != "https://example.invalid/v1" || metadata["pool_mode"] != true {
-		t.Fatalf("expected merged normalized metadata, got %+v", metadata)
+	if metadata["base_url"] != "https://example.invalid/v1" {
+		t.Fatalf("expected existing metadata to remain, got %+v", metadata)
+	}
+	if _, ok := metadata["pool_mode"]; ok {
+		t.Fatalf("expected credential pool_mode to stay out of metadata, got %+v", metadata)
+	}
+	if _, ok := metadata["custom_error_codes_enabled"]; ok {
+		t.Fatalf("expected credential custom_error_codes_enabled to stay out of metadata, got %+v", metadata)
+	}
+	if _, ok := metadata["custom_error_codes"]; ok {
+		t.Fatalf("expected credential custom_error_codes to stay out of metadata, got %+v", metadata)
 	}
 }
 

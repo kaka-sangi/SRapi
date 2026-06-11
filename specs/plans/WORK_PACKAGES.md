@@ -1323,7 +1323,7 @@ Owns:
 
 - Provider preset registry entry for `antigravity`
 - capability-driven provider alias route registration
-- Antigravity text aliases for `/antigravity/v1/*`, `/api/provider/antigravity/*`, and `/api/provider/antigravity/v1/*`
+- Antigravity text aliases for `/api/provider/antigravity/*` and `/api/provider/antigravity/v1/*`
 - OpenAPI representative contracts for `/api/provider/antigravity/v1/chat/completions` and `/api/provider/antigravity/v1/messages`
 - Gateway regressions proving Antigravity aliases force the `antigravity` provider key and still route through Scheduler, Provider Adapter, and Reverse Proxy Runtime
 - route matrix/provider registry/compatibility docs and status updates
@@ -1331,11 +1331,11 @@ Owns:
 Definition of Done:
 
 - `provider_key = antigravity` is seeded with text route aliases, `reverse_proxy_antigravity` platform metadata, and desktop/IDE reverse-proxy account type allowlist.
-- `/api/provider/antigravity/v1/chat/completions` and `/antigravity/v1/chat/completions` schedule only Provider records named `antigravity` and dispatch OpenAI-compatible payloads through `reverse-proxy-antigravity` when the selected provider uses `protocol = openai-compatible`.
+- `/api/provider/antigravity/v1/chat/completions` schedules only Provider records named `antigravity` and dispatches OpenAI-compatible payloads through `reverse-proxy-antigravity` when the selected provider uses `protocol = openai-compatible`.
 - `/api/provider/antigravity/v1/messages` schedules only Provider records named `antigravity` and dispatches Anthropic Messages payloads through `reverse-proxy-antigravity` when the selected provider uses `protocol = anthropic-compatible`.
 - Gateway usage logs and Scheduler decisions preserve the alias source endpoint and selected Provider/Account evidence.
 - No Gateway-local Antigravity request/response DTO is introduced; `provider.protocol` continues to select the target upstream protocol.
-- Gemini `/antigravity/v1beta/models/{model}:generateContent` aliases remain a follow-up route-parser package unless this package explicitly adds Gemini model-action alias parsing.
+- Gemini `/api/provider/antigravity/v1beta/models/{model}:generateContent` aliases remain a follow-up route-parser package unless this package explicitly adds Gemini model-action alias parsing.
 - No frontend visuals are added.
 
 Required gates:
@@ -1373,7 +1373,7 @@ Read first:
 Owns:
 
 - Antigravity Gemini model-action alias metadata in the provider preset registry
-- HTTP route registration for `/antigravity/v1beta/models/{model}:generateContent`, `/antigravity/v1beta/models/{model}:streamGenerateContent`, `/api/provider/antigravity/v1beta/models/{model}:generateContent`, and `/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent`
+- HTTP route registration for `/api/provider/antigravity/v1beta/models/{model}:generateContent` and `/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent`
 - OpenAPI representative contracts for `/api/provider/antigravity/v1beta/models/{model}:generateContent` and `/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent`
 - Gateway regressions proving Antigravity Gemini aliases force `provider_key=antigravity`, preserve alias source endpoints, and still dispatch through `reverse-proxy-antigravity` using `provider.protocol = gemini-compatible`
 - route matrix/provider registry/compatibility docs and status updates

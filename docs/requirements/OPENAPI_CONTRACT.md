@@ -1012,35 +1012,6 @@ POST /v1/responses
 GET  /v1/responses/{response_id}/input_items
 POST /v1/responses/compact
 POST /v1/messages
-POST /openai/v1/chat/completions
-POST /openai/v1/responses
-GET  /openai/v1/responses/{response_id}/input_items
-POST /openai/v1/responses/compact
-POST /openai/v1/messages
-POST /openai/v1/embeddings
-POST /openai/v1/images/generations
-POST /openai/v1/images/edits
-POST /openai/v1/images/variations
-POST /openai/v1/audio/transcriptions
-POST /openai/v1/audio/speech
-POST /openai/v1/moderations
-POST /anthropic/v1/messages
-POST /anthropic/v1/messages/count_tokens
-POST /grok/v1/chat/completions
-POST /grok/v1/responses
-GET  /grok/v1/responses/{response_id}/input_items
-POST /grok/v1/messages
-POST /grok/v1/embeddings
-POST /grok/v1/images/generations
-POST /grok/v1/images/edits
-POST /grok/v1/images/variations
-POST /grok/v1/audio/transcriptions
-POST /grok/v1/audio/speech
-POST /grok/v1/moderations
-POST /antigravity/v1/chat/completions
-POST /antigravity/v1/messages
-POST /antigravity/v1beta/models/{model}:generateContent
-POST /antigravity/v1beta/models/{model}:streamGenerateContent
 POST /api/provider/openai-compatible/v1/chat/completions
 POST /api/provider/openai-compatible/v1/responses
 GET  /api/provider/openai-compatible/v1/responses/{response_id}/input_items
@@ -1059,7 +1030,7 @@ POST /api/provider/antigravity/v1beta/models/{model}:generateContent
 POST /api/provider/antigravity/v1beta/models/{model}:streamGenerateContent
 ```
 
-标准 Gateway 入口（chat completions、responses、messages、models）与所有已暴露的 Provider alias 复用同一 Gateway runtime，只改变 provider context。Root legacy aliases（例如 `/openai/v1/*`、`/anthropic/v1/*`、`/grok/v1/*` 和 `/antigravity/v1*`）同样只改变 provider context，并保留原始 alias path 作为 usage / scheduler evidence。
+标准 Gateway 入口（chat completions、responses、messages、models）与所有已暴露的 Provider alias 复用同一 Gateway runtime，只改变 provider context。Provider alias 仅通过 `/api/provider/{provider_key}` 路由族暴露，并保留原始 alias path 作为 usage / scheduler evidence。
 
 embeddings、images、audio、moderations、rerank、countTokens、Gemini native (`/v1beta/...`)、Responses WebSocket 和 Realtime WebSocket 路由均已上线。完整的 Provider alias、passthrough 与路由族边界以 `GATEWAY_ROUTE_MATRIX.md` 为准。
 

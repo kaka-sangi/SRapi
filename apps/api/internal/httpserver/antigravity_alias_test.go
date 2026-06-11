@@ -174,7 +174,7 @@ func TestGatewayAntigravityProviderAliasTargetsAnthropicReverseProxy(t *testing.
 	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-messages-account","runtime_class":"oauth_refresh","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active","priority":10}`)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
-	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/antigravity/v1/messages", `{"model":"antigravity-messages-model","system":"be direct","max_tokens":48,"messages":[{"role":"user","content":"alias messages"}]}`)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/api/provider/antigravity/v1/messages", `{"model":"antigravity-messages-model","system":"be direct","max_tokens":48,"messages":[{"role":"user","content":"alias messages"}]}`)
 	var resp apiopenapi.AnthropicMessagesResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode messages response: %v", err)
@@ -201,7 +201,7 @@ func TestGatewayAntigravityProviderAliasTargetsAnthropicReverseProxy(t *testing.
 		t.Fatalf("unexpected Antigravity Messages upstream call: %+v", call)
 	}
 
-	assertAntigravityAliasEvidence(t, handler, sessionCookie, "antigravity-messages-model", string(providerResp.Data.Id), string(accountResp.Data.Id), "/antigravity/v1/messages", "anthropic-compatible", 11)
+	assertAntigravityAliasEvidence(t, handler, sessionCookie, "antigravity-messages-model", string(providerResp.Data.Id), string(accountResp.Data.Id), "/api/provider/antigravity/v1/messages", "anthropic-compatible", 11)
 }
 
 func TestGatewayAntigravityGeminiAliasTargetsReverseProxy(t *testing.T) {
@@ -336,7 +336,7 @@ func TestGatewayAntigravityGeminiStreamAliasTargetsReverseProxy(t *testing.T) {
 	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-gemini-stream-account","runtime_class":"oauth_refresh","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active","priority":10}`)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
-	path := "/antigravity/v1beta/models/antigravity-gemini-stream-model:streamGenerateContent"
+	path := "/api/provider/antigravity/v1beta/models/antigravity-gemini-stream-model:streamGenerateContent"
 	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, path, `{"contents":[{"role":"user","parts":[{"text":"stream alias"}]}]}`)
 	if got := rec.Header().Get("Content-Type"); got != "text/event-stream" {
 		t.Fatalf("expected event stream content type, got %q", got)

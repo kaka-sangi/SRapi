@@ -99,3 +99,41 @@ func TestAdminProxyRegistryBindsAccountByProxyID(t *testing.T) {
 		t.Fatalf("expected account bound to proxy id %s, got %+v", proxyResp.Data.Id, quality.Data.ProxyId)
 	}
 }
+
+func TestAdminAccountRejectsRawProxyIDValues(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"proxy-reject-provider","display_name":"Proxy Reject Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	rawProxyURL := "https://proxy-user:proxy-pass@example.invalid:8443"
+
+	createAccountReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts", strings.NewReader(`{"provider_id":"`+string(providerResp.Data.Id)+`","name":"raw-proxy-account","runtime_class":"api_key","credential":{"api_key":"secret"},"proxy_id":"`+rawProxyURL+`","status":"active"}`))
+	createAccountReq.Header.Set("Content-Type", "application/json")
+	createAccountReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	createAccountReq.AddCookie(sessionCookie)
+	createAccountRec := httptest.NewRecorder()
+	handler.ServeHTTP(createAccountRec, createAccountReq)
+	if createAccountRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected raw proxy_id create 400, got %d body=%s", createAccountRec.Code, createAccountRec.Body.String())
+	}
+
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"proxy-reject-account","runtime_class":"api_key","credential":{"api_key":"secret"},"status":"active"}`)
+	updateAccountReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), strings.NewReader(`{"proxy_id":"proxy-us"}`))
+	updateAccountReq.Header.Set("Content-Type", "application/json")
+	updateAccountReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	updateAccountReq.AddCookie(sessionCookie)
+	updateAccountRec := httptest.NewRecorder()
+	handler.ServeHTTP(updateAccountRec, updateAccountReq)
+	if updateAccountRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected non-numeric proxy_id update 400, got %d body=%s", updateAccountRec.Code, updateAccountRec.Body.String())
+	}
+
+	bindReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/proxy", strings.NewReader(`{"proxy_id":"`+rawProxyURL+`"}`))
+	bindReq.Header.Set("Content-Type", "application/json")
+	bindReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	bindReq.AddCookie(sessionCookie)
+	bindRec := httptest.NewRecorder()
+	handler.ServeHTTP(bindRec, bindReq)
+	if bindRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected raw proxy_id bind 400, got %d body=%s", bindRec.Code, bindRec.Body.String())
+	}
+}

@@ -74,16 +74,19 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		t.Fatalf("expected realtime_websocket to require explicit provider/account capability opt-in")
 	}
 
-	rootOpenAIPreset, ok := registry.Lookup("openai")
+	openAIProviderPreset, ok := registry.Lookup("openai")
 	if !ok {
 		t.Fatalf("missing openai preset")
 	}
-	if !rootOpenAIPreset.MatchesPath("/openai/v1/chat/completions") {
-		t.Fatalf("expected root OpenAI legacy route alias to match path")
+	if openAIProviderPreset.MatchesPath("/openai/v1/chat/completions") {
+		t.Fatalf("expected root OpenAI alias to be unregistered")
 	}
-	if containsRuntimeClass(rootOpenAIPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) ||
-		containsRuntimeClass(rootOpenAIPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthDeviceCode) {
-		t.Fatalf("expected root OpenAI preset to exclude unsupported OAuth runtimes")
+	if !openAIProviderPreset.MatchesPath("/api/provider/openai/v1/chat/completions") {
+		t.Fatalf("expected OpenAI provider route alias to match path")
+	}
+	if containsRuntimeClass(openAIProviderPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) ||
+		containsRuntimeClass(openAIProviderPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthDeviceCode) {
+		t.Fatalf("expected OpenAI preset to exclude unsupported OAuth runtimes")
 	}
 
 	anthropicPreset, ok := registry.Lookup("anthropic-compatible")
@@ -100,18 +103,21 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		t.Fatalf("expected anthropic-compatible auth modes to include custom_header")
 	}
 
-	rootAnthropicPreset, ok := registry.Lookup("anthropic")
+	anthropicProviderPreset, ok := registry.Lookup("anthropic")
 	if !ok {
 		t.Fatalf("missing anthropic preset")
 	}
-	if !rootAnthropicPreset.MatchesPath("/anthropic/v1/messages") {
-		t.Fatalf("expected root Anthropic legacy route alias to match path")
+	if anthropicProviderPreset.MatchesPath("/anthropic/v1/messages") {
+		t.Fatalf("expected root Anthropic alias to be unregistered")
 	}
-	if containsRuntimeClass(rootAnthropicPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassCustomReverseProxy) {
-		t.Fatalf("unexpected root Anthropic runtime class allowlist: %+v", rootAnthropicPreset.RuntimeClassAllowlist)
+	if !anthropicProviderPreset.MatchesPath("/api/provider/anthropic/v1/messages") {
+		t.Fatalf("expected Anthropic provider route alias to match path")
 	}
-	if rootAnthropicPreset.AccountTemplate == nil || rootAnthropicPreset.AccountTemplate.UpstreamClient != "claude_code_cli" {
-		t.Fatalf("expected root Anthropic template upstream_client=claude_code_cli, got %+v", rootAnthropicPreset.AccountTemplate)
+	if containsRuntimeClass(anthropicProviderPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassCustomReverseProxy) {
+		t.Fatalf("unexpected Anthropic runtime class allowlist: %+v", anthropicProviderPreset.RuntimeClassAllowlist)
+	}
+	if anthropicProviderPreset.AccountTemplate == nil || anthropicProviderPreset.AccountTemplate.UpstreamClient != "claude_code_cli" {
+		t.Fatalf("expected Anthropic template upstream_client=claude_code_cli, got %+v", anthropicProviderPreset.AccountTemplate)
 	}
 
 	antigravityPreset, ok := registry.Lookup("antigravity")
@@ -124,10 +130,13 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if antigravityPreset.DefaultBaseURL != "" {
 		t.Fatalf("expected antigravity preset to require account base_url, got %q", antigravityPreset.DefaultBaseURL)
 	}
-	if !antigravityPreset.MatchesPath("/api/provider/antigravity/v1/chat/completions") || !antigravityPreset.MatchesPath("/antigravity/v1/messages") {
+	if !antigravityPreset.MatchesPath("/api/provider/antigravity/v1/chat/completions") {
 		t.Fatalf("expected antigravity text route aliases to match paths")
 	}
-	if !reflect.DeepEqual(antigravityPreset.GeminiRouteAliases, []string{"/antigravity/v1beta", "/api/provider/antigravity/v1beta"}) {
+	if antigravityPreset.MatchesPath("/antigravity/v1/messages") {
+		t.Fatalf("expected root Antigravity alias to be unregistered")
+	}
+	if !reflect.DeepEqual(antigravityPreset.GeminiRouteAliases, []string{"/api/provider/antigravity/v1beta"}) {
 		t.Fatalf("unexpected antigravity Gemini aliases: %v", antigravityPreset.GeminiRouteAliases)
 	}
 	if !containsRuntimeClass(antigravityPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) {
@@ -172,6 +181,9 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 	if !chatGPTWebPreset.MatchesPath("/api/provider/chatgpt-web/v1/chat/completions") {
 		t.Fatalf("expected chatgpt-web route alias to match path")
+	}
+	if chatGPTWebPreset.MatchesPath("/chatgpt-web/v1/chat/completions") {
+		t.Fatalf("expected root ChatGPT Web alias to be unregistered")
 	}
 	if !containsRuntimeClass(chatGPTWebPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassWebSessionCookie) ||
 		containsRuntimeClass(chatGPTWebPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) ||
@@ -259,6 +271,12 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !codexPreset.Capabilities["responses"] || !codexPreset.Capabilities["responses_compact"] || !codexPreset.Capabilities["streaming"] {
 		t.Fatalf("unexpected codex-cli capabilities: %+v", codexPreset.Capabilities)
 	}
+	if codexPreset.MatchesPath("/backend-api/codex/responses") {
+		t.Fatalf("expected Codex backend root alias to be unregistered")
+	}
+	if !codexPreset.MatchesPath("/api/provider/codex-cli/v1/responses") {
+		t.Fatalf("expected Codex provider route alias to match path")
+	}
 	if codexPreset.AccountTemplate == nil {
 		t.Fatalf("expected codex-cli to have an account template")
 	}
@@ -278,6 +296,12 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 	if geminiPreset.PlatformFamily != PlatformFamilyGeminiCompatible || geminiPreset.DefaultBaseURL != "https://generativelanguage.googleapis.com/v1beta" {
 		t.Fatalf("unexpected gemini preset: %+v", geminiPreset)
+	}
+	if geminiPreset.MatchesPath("/gemini/v1beta/models/gemini-pro:generateContent") {
+		t.Fatalf("expected root Gemini alias to be unregistered")
+	}
+	if !geminiPreset.MatchesPath("/api/provider/gemini/v1beta/models/gemini-pro:generateContent") {
+		t.Fatalf("expected Gemini provider route alias to match path")
 	}
 	if containsRuntimeClass(geminiPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) ||
 		containsRuntimeClass(geminiPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthDeviceCode) ||

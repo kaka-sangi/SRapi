@@ -32,8 +32,7 @@ import (
 )
 
 var (
-	errGatewayConcurrencyLimited   = errors.New("gateway concurrency limit exceeded")
-	errGeminiDeprecatedAPIKeyQuery = errors.New("gemini api_key query parameter is deprecated")
+	errGatewayConcurrencyLimited = errors.New("gateway concurrency limit exceeded")
 )
 
 type gatewayConcurrencyLimitError struct {
@@ -321,9 +320,6 @@ func (s *Server) requireGatewayKey(r *http.Request) (apikeycontract.AuthResult, 
 }
 
 func (s *Server) requireGeminiGatewayKey(r *http.Request) (apikeycontract.AuthResult, error) {
-	if strings.TrimSpace(r.URL.Query().Get("api_key")) != "" {
-		return apikeycontract.AuthResult{}, errGeminiDeprecatedAPIKeyQuery
-	}
 	if apiKey := strings.TrimSpace(r.Header.Get("x-goog-api-key")); apiKey != "" {
 		return s.requireGatewayKeyPlaintext(r, apiKey)
 	}
@@ -555,8 +551,6 @@ func writeGeminiGatewayAuthError(w http.ResponseWriter, err error) {
 	case errors.As(err, &concurrencyErr):
 		setRetryAfterFromDecision(w, concurrencyErr.decision)
 		writeGeminiGatewayError(w, http.StatusTooManyRequests, "RESOURCE_EXHAUSTED", "API key concurrency limit exceeded")
-	case errors.Is(err, errGeminiDeprecatedAPIKeyQuery):
-		writeGeminiGatewayError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "Query parameter api_key is deprecated. Use x-goog-api-key, Authorization Bearer, or key instead.")
 	case errors.Is(err, errGatewayKeyIPNotAllowed):
 		writeGeminiGatewayError(w, http.StatusForbidden, "PERMISSION_DENIED", "API key not permitted from this IP address")
 	case errors.Is(err, errGatewayRiskControlBlocked):

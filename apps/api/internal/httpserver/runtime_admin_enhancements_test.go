@@ -116,7 +116,20 @@ func TestAdminAccountManagementEnhancements(t *testing.T) {
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"enhance-provider","display_name":"Enhance Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
 	resetAt := time.Now().UTC().Add(time.Minute).Format(time.RFC3339)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"enhance-account","runtime_class":"api_key","credential":{"api_key":"secret"},"proxy_id":"proxy-us","metadata":{"rpm_used":4,"rpm_limit":10,"rpm_window_seconds":60,"rpm_reset_at":"`+resetAt+`","last_error_class":"rate_limit","last_error_message":"too many requests","cooldown_active":true,"proxy_region":"us-east","egress_ip_hash":"hash","proxy_sample_count":5,"proxy_success_rate":0.8,"proxy_error_rate":0.2,"proxy_latency_p95_ms":321},"status":"active"}`)
+	proxyReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/proxies", strings.NewReader(`{"name":"enhance-egress","type":"https","url":"https://proxy-user:proxy-pass@example.invalid:8443","status":"active"}`))
+	proxyReq.Header.Set("Content-Type", "application/json")
+	proxyReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	proxyReq.AddCookie(sessionCookie)
+	proxyRec := httptest.NewRecorder()
+	handler.ServeHTTP(proxyRec, proxyReq)
+	if proxyRec.Code != http.StatusCreated {
+		t.Fatalf("expected proxy create 201, got %d body=%s", proxyRec.Code, proxyRec.Body.String())
+	}
+	var proxyResp apiopenapi.ProxyDefinitionResponse
+	if err := json.NewDecoder(proxyRec.Body).Decode(&proxyResp); err != nil {
+		t.Fatalf("decode proxy response: %v", err)
+	}
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"enhance-account","runtime_class":"api_key","credential":{"api_key":"secret"},"proxy_id":"`+string(proxyResp.Data.Id)+`","metadata":{"rpm_used":4,"rpm_limit":10,"rpm_window_seconds":60,"rpm_reset_at":"`+resetAt+`","last_error_class":"rate_limit","last_error_message":"too many requests","cooldown_active":true,"proxy_region":"us-east","egress_ip_hash":"hash","proxy_sample_count":5,"proxy_success_rate":0.8,"proxy_error_rate":0.2,"proxy_latency_p95_ms":321},"status":"active"}`)
 
 	rpmReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/rpm-status", nil)
 	rpmReq.AddCookie(sessionCookie)
@@ -144,7 +157,7 @@ func TestAdminAccountManagementEnhancements(t *testing.T) {
 	if err := json.NewDecoder(qualityRec.Body).Decode(&qualityResp); err != nil {
 		t.Fatalf("decode proxy quality: %v", err)
 	}
-	if qualityResp.Data.ProxyId == nil || *qualityResp.Data.ProxyId != "proxy-us" || qualityResp.Data.SampleCount != 5 || qualityResp.Data.LatencyP95Ms != 321 {
+	if qualityResp.Data.ProxyId == nil || *qualityResp.Data.ProxyId != string(proxyResp.Data.Id) || qualityResp.Data.SampleCount != 5 || qualityResp.Data.LatencyP95Ms != 321 {
 		t.Fatalf("unexpected proxy quality: %+v", qualityResp.Data)
 	}
 	if qualityResp.Data.Metadata == nil || (*qualityResp.Data.Metadata)["proxy_region"] != "us-east" {

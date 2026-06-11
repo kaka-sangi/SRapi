@@ -87,6 +87,10 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 		}
 		riskLevel = normalized
 	}
+	proxyID, err := normalizeProxyID(req.ProxyID)
+	if err != nil {
+		return contract.ProviderAccount{}, err
+	}
 
 	stored, err := s.store.Create(ctx, contract.CreateStoredAccount{
 		ProviderID:           req.ProviderID,
@@ -95,7 +99,7 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 		CredentialCiphertext: credentialCiphertext,
 		CredentialVersion:    credentialVersionV1,
 		Metadata:             cloneMap(req.Metadata),
-		ProxyID:              req.ProxyID,
+		ProxyID:              proxyID,
 		Status:               status,
 		Priority:             priority,
 		Weight:               weight,
@@ -461,7 +465,11 @@ func (s *Service) Update(ctx context.Context, id int, req contract.UpdateRequest
 		account.Metadata = cloneMap(*req.Metadata)
 	}
 	if req.ProxyID != nil {
-		account.ProxyID = cloneString(*req.ProxyID)
+		proxyID, err := normalizeProxyID(*req.ProxyID)
+		if err != nil {
+			return contract.ProviderAccount{}, err
+		}
+		account.ProxyID = proxyID
 	}
 	if req.Status != nil {
 		account.Status = *req.Status
@@ -633,14 +641,9 @@ func (s *Service) BindProxy(ctx context.Context, id int, proxyID *string) (contr
 	if id <= 0 {
 		return contract.ProviderAccount{}, ErrInvalidInput
 	}
-	normalized := cloneString(proxyID)
-	if normalized != nil {
-		trimmed := strings.TrimSpace(*normalized)
-		if trimmed == "" {
-			normalized = nil
-		} else {
-			normalized = &trimmed
-		}
+	normalized, err := normalizeProxyID(proxyID)
+	if err != nil {
+		return contract.ProviderAccount{}, err
 	}
 	return s.Update(ctx, id, contract.UpdateRequest{ProxyID: &normalized})
 }
@@ -654,10 +657,7 @@ func (s *Service) ResolveProxyURL(ctx context.Context, proxyID *string) (*string
 		return nil, nil
 	}
 	if strings.Contains(trimmed, "://") {
-		if _, err := url.ParseRequestURI(trimmed); err != nil {
-			return nil, ErrInvalidInput
-		}
-		return &trimmed, nil
+		return nil, ErrInvalidInput
 	}
 	id, err := strconv.Atoi(trimmed)
 	if err != nil || id <= 0 {
@@ -1380,6 +1380,21 @@ func cloneString(value *string) *string {
 	}
 	cloned := *value
 	return &cloned
+}
+
+func normalizeProxyID(value *string) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil, nil
+	}
+	id, err := strconv.Atoi(trimmed)
+	if err != nil || id <= 0 {
+		return nil, ErrInvalidInput
+	}
+	return &trimmed, nil
 }
 
 func normalizePositiveIDs(values []int) []int {

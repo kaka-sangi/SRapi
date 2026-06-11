@@ -137,6 +137,11 @@ func TestProxyRegistryEncryptsURLAndResolvesRuntimeURL(t *testing.T) {
 		t.Fatalf("unexpected runtime proxy url: %v", runtimeURL)
 	}
 
+	rawProxyID := "https://proxy-user:proxy-pass@example.invalid:8443"
+	if _, err := svc.ResolveProxyURL(ctx, &rawProxyID); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected raw proxy_id URL to be rejected, got %v", err)
+	}
+
 	disabled := contract.ProxyStatusDisabled
 	if _, err := svc.UpdateProxy(ctx, proxy.ID, contract.UpdateProxyRequest{Status: &disabled}); err != nil {
 		t.Fatalf("disable proxy: %v", err)
@@ -224,6 +229,43 @@ func TestProxyRegistryRejectsMismatchedScheme(t *testing.T) {
 	}
 }
 
+func TestAccountProxyIDRejectsRawURLAndNonNumericValues(t *testing.T) {
+	svc, err := New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	rawURL := "https://proxy-user:proxy-pass@example.invalid:8443"
+	if _, err := svc.Create(ctx, contract.CreateRequest{
+		ProviderID:   1,
+		Name:         "raw-url-proxy",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret-value"},
+		ProxyID:      &rawURL,
+	}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected raw URL proxy_id to fail create, got %v", err)
+	}
+
+	account, err := svc.Create(ctx, contract.CreateRequest{
+		ProviderID:   1,
+		Name:         "valid-account",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret-value"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	for _, proxyID := range []string{"proxy-us", rawURL, "0"} {
+		if _, err := svc.BindProxy(ctx, account.ID, &proxyID); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("expected invalid proxy_id %q to fail bind, got %v", proxyID, err)
+		}
+		updateProxyID := &proxyID
+		if _, err := svc.Update(ctx, account.ID, contract.UpdateRequest{ProxyID: &updateProxyID}); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("expected invalid proxy_id %q to fail update, got %v", proxyID, err)
+		}
+	}
+}
+
 func TestAccountOperationsManageGroupsProxyRecoveryAndSnapshots(t *testing.T) {
 	svc, err := New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
 	if err != nil {
@@ -277,7 +319,15 @@ func TestAccountOperationsManageGroupsProxyRecoveryAndSnapshots(t *testing.T) {
 		t.Fatalf("unexpected batched group ids: %v", groupIDsByAccount)
 	}
 
-	proxyID := "proxy-us-east"
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name: "group-egress",
+		Type: contract.ProxyTypeHTTPS,
+		URL:  "https://proxy-user:proxy-pass@example.invalid:8443",
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+	proxyID := strconv.Itoa(proxy.ID)
 	withProxy, err := svc.BindProxy(ctx, account.ID, &proxyID)
 	if err != nil {
 		t.Fatalf("bind proxy: %v", err)
@@ -520,7 +570,15 @@ func TestAdminAccountLifecycleHelpers(t *testing.T) {
 		t.Fatalf("new service: %v", err)
 	}
 	ctx := context.Background()
-	proxyID := "proxy-us"
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name: "admin-egress",
+		Type: contract.ProxyTypeHTTPS,
+		URL:  "https://proxy-user:proxy-pass@example.invalid:8443",
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+	proxyID := strconv.Itoa(proxy.ID)
 	resetAt := time.Now().UTC().Add(time.Minute).Truncate(time.Second)
 	account, err := svc.Create(ctx, contract.CreateRequest{
 		ProviderID:   9,

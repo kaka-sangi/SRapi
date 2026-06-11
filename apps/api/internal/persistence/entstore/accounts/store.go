@@ -239,8 +239,8 @@ func (s *Store) SoftDeleteProxy(ctx context.Context, id int) error {
 	if affected == 0 {
 		return errors.New("proxy not found")
 	}
-	// Clear bindings: accounts referencing this proxy by id fall back to a direct
-	// connection (raw-URL proxy_id values won't match the numeric id).
+	// Clear bindings: accounts referencing this proxy fall back to a direct
+	// connection.
 	if _, err := s.client.ProviderAccount.Update().
 		Where(entaccount.ProxyIDEQ(strconv.Itoa(id))).
 		ClearProxyID().

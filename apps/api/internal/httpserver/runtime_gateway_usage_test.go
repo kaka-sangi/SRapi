@@ -99,7 +99,7 @@ func TestGatewayConfiguredErrorCooldownRulesMatchCanonicalAndLegacyMetadata(t *t
 			wantWindow:      90 * time.Second,
 		},
 		{
-			name: "legacy temp unschedulable rule",
+			name: "legacy temp unschedulable metadata ignored",
 			metadata: map[string]any{
 				"temp_unschedulable_enabled": true,
 				"temp_unschedulable_rules": []any{
@@ -113,8 +113,8 @@ func TestGatewayConfiguredErrorCooldownRulesMatchCanonicalAndLegacyMetadata(t *t
 			errorClass:      "auth_failed",
 			statusCode:      http.StatusUnauthorized,
 			providerMessage: "unauthorized",
-			wantReason:      "temp_unschedulable",
-			wantWindow:      10 * time.Minute,
+			wantReason:      "auth_failed",
+			wantWindow:      authFailureCooldownWindow,
 		},
 	}
 
@@ -160,7 +160,15 @@ func TestGatewayAccountFailureStatusHandled(t *testing.T) {
 			want:       false,
 		},
 		{
-			name: "legacy custom codes hit",
+			name: "unrecognized account error status alias does not filter statuses",
+			metadata: map[string]any{
+				"account_error_status_codes": []any{float64(429)},
+			},
+			statusCode: ptrInt(http.StatusServiceUnavailable),
+			want:       true,
+		},
+		{
+			name: "unrecognized custom codes metadata falls back to default",
 			metadata: map[string]any{
 				"custom_error_codes_enabled": true,
 				"custom_error_codes":         []any{float64(403)},
@@ -169,16 +177,16 @@ func TestGatewayAccountFailureStatusHandled(t *testing.T) {
 			want:       true,
 		},
 		{
-			name: "legacy custom codes miss",
+			name: "unrecognized custom codes metadata does not filter statuses",
 			metadata: map[string]any{
 				"custom_error_codes_enabled": true,
 				"custom_error_codes":         []any{float64(429)},
 			},
 			statusCode: ptrInt(http.StatusServiceUnavailable),
-			want:       false,
+			want:       true,
 		},
 		{
-			name: "pool mode skips without custom codes",
+			name: "pool mode skips without handled list",
 			metadata: map[string]any{
 				"pool_mode": true,
 			},
@@ -186,14 +194,23 @@ func TestGatewayAccountFailureStatusHandled(t *testing.T) {
 			want:       false,
 		},
 		{
-			name: "pool mode custom codes take precedence",
+			name: "pool mode ignores unrecognized custom codes metadata",
 			metadata: map[string]any{
 				"pool_mode":                  true,
 				"custom_error_codes_enabled": true,
 				"custom_error_codes":         []any{float64(401)},
 			},
 			statusCode: ptrInt(http.StatusUnauthorized),
-			want:       true,
+			want:       false,
+		},
+		{
+			name: "pool mode ignores unrecognized account error status alias",
+			metadata: map[string]any{
+				"pool_mode":                  true,
+				"account_error_status_codes": []any{float64(401)},
+			},
+			statusCode: ptrInt(http.StatusUnauthorized),
+			want:       false,
 		},
 		{
 			name: "empty configured list handles all",

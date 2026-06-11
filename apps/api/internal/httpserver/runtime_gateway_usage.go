@@ -402,19 +402,8 @@ func gatewayAccountFailureStatusHandled(metadata map[string]any, statusCode *int
 	if statusCode == nil || *statusCode <= 0 {
 		return true
 	}
-	if value, ok := metacoerce.Value(metadata, "handled_error_status_codes", "account_error_status_codes"); ok {
+	if value, ok := metacoerce.Value(metadata, "handled_error_status_codes"); ok {
 		return gatewayStatusCodeAllowed(gatewayStatusCodeList(value), statusCode)
-	}
-	if metadataBool(metadata, "custom_error_codes_enabled") {
-		value, ok := metacoerce.Value(metadata, "custom_error_codes")
-		if !ok {
-			return true
-		}
-		statusCodes := gatewayStatusCodeList(value)
-		if len(statusCodes) == 0 {
-			return true
-		}
-		return gatewayStatusCodeAllowed(statusCodes, statusCode)
 	}
 	if metadataBool(metadata, "pool_mode") {
 		return false
@@ -518,23 +507,17 @@ func gatewayConfiguredErrorCooldownRules(metadata map[string]any) []gatewayError
 	if metadata == nil {
 		return nil
 	}
-	var rules []gatewayErrorCooldownRule
-	rules = append(rules, parseGatewayErrorCooldownRules(metadata["error_cooldown_rules"], false)...)
-	rules = append(rules, parseGatewayErrorCooldownRules(metadata["temporary_cooldown_rules"], false)...)
-	if metadataBool(metadata, "temp_unschedulable_enabled") {
-		rules = append(rules, parseGatewayErrorCooldownRules(metadata["temp_unschedulable_rules"], true)...)
-	}
-	return rules
+	return parseGatewayErrorCooldownRules(metadata["error_cooldown_rules"])
 }
 
-func parseGatewayErrorCooldownRules(value any, legacyTempRule bool) []gatewayErrorCooldownRule {
+func parseGatewayErrorCooldownRules(value any) []gatewayErrorCooldownRule {
 	items := mapList(value)
 	if len(items) == 0 {
 		return nil
 	}
 	rules := make([]gatewayErrorCooldownRule, 0, len(items))
 	for _, item := range items {
-		rule, ok := parseGatewayErrorCooldownRule(item, legacyTempRule)
+		rule, ok := parseGatewayErrorCooldownRule(item)
 		if ok {
 			rules = append(rules, rule)
 		}
@@ -542,14 +525,14 @@ func parseGatewayErrorCooldownRules(value any, legacyTempRule bool) []gatewayErr
 	return rules
 }
 
-func parseGatewayErrorCooldownRule(values map[string]any, legacyTempRule bool) (gatewayErrorCooldownRule, bool) {
+func parseGatewayErrorCooldownRule(values map[string]any) (gatewayErrorCooldownRule, bool) {
 	if len(values) == 0 {
 		return gatewayErrorCooldownRule{}, false
 	}
 	statusCode := metadataOptionalInt(values, "status_code", "error_code", "http_status")
 	errorClass := metadataString(values, "error_class")
 	keywords, _ := metadataStringList(values, "keywords")
-	window := gatewayConfiguredCooldownWindow(values, legacyTempRule)
+	window := gatewayConfiguredCooldownWindow(values)
 	if window <= 0 {
 		return gatewayErrorCooldownRule{}, false
 	}
@@ -561,18 +544,15 @@ func parseGatewayErrorCooldownRule(values map[string]any, legacyTempRule bool) (
 		ErrorClass: errorClass,
 		Keywords:   nonEmptyStrings(keywords),
 		Window:     window,
-		Reason:     gatewayConfiguredCooldownReason(values, legacyTempRule),
+		Reason:     gatewayConfiguredCooldownReason(values),
 	}
 	return rule, true
 }
 
-func gatewayConfiguredCooldownWindow(values map[string]any, legacyTempRule bool) time.Duration {
+func gatewayConfiguredCooldownWindow(values map[string]any) time.Duration {
 	seconds := metadataInt(values, "cooldown_seconds", "duration_seconds")
 	if seconds <= 0 {
 		minutes := metadataInt(values, "cooldown_minutes", "duration_minutes")
-		if minutes <= 0 && legacyTempRule {
-			minutes = 10
-		}
 		seconds = minutes * 60
 	}
 	if seconds <= 0 {
@@ -585,16 +565,10 @@ func gatewayConfiguredCooldownWindow(values map[string]any, legacyTempRule bool)
 	return window
 }
 
-func gatewayConfiguredCooldownReason(values map[string]any, legacyTempRule bool) string {
+func gatewayConfiguredCooldownReason(values map[string]any) string {
 	reason := metadataString(values, "reason")
 	if reason == "" {
 		reason = metadataString(values, "cooldown_reason")
-	}
-	if reason == "" && legacyTempRule {
-		reason = metadataString(values, "description")
-	}
-	if reason == "" && legacyTempRule {
-		return "temp_unschedulable"
 	}
 	return sanitizeGatewayCooldownReason(reason)
 }

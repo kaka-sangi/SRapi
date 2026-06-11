@@ -266,8 +266,8 @@ func (s *Store) SoftDeleteProxy(_ context.Context, id int) error {
 	proxy.UpdatedAt = now
 	s.proxiesByID[id] = proxy
 	delete(s.proxiesByName, strings.ToLower(proxy.Name))
-	// Clear bindings: accounts whose proxy_id points at this proxy by id fall
-	// back to a direct connection (raw-URL proxy_id values are left intact).
+	// Clear bindings: accounts whose proxy_id points at this proxy fall back to
+	// a direct connection.
 	target := strconv.Itoa(id)
 	for accountID, account := range s.byID {
 		if account.ProxyID != nil && *account.ProxyID == target {

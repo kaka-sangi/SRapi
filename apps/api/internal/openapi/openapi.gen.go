@@ -3179,42 +3179,6 @@ func (e StartOAuthAuthorizationParamsIntent) Valid() bool {
 	}
 }
 
-// Defines values for ListGrokResponseInputItemsAliasParamsOrder.
-const (
-	ListGrokResponseInputItemsAliasParamsOrderAsc  ListGrokResponseInputItemsAliasParamsOrder = "asc"
-	ListGrokResponseInputItemsAliasParamsOrderDesc ListGrokResponseInputItemsAliasParamsOrder = "desc"
-)
-
-// Valid indicates whether the value is a known member of the ListGrokResponseInputItemsAliasParamsOrder enum.
-func (e ListGrokResponseInputItemsAliasParamsOrder) Valid() bool {
-	switch e {
-	case ListGrokResponseInputItemsAliasParamsOrderAsc:
-		return true
-	case ListGrokResponseInputItemsAliasParamsOrderDesc:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ListOpenAIResponseInputItemsAliasParamsOrder.
-const (
-	ListOpenAIResponseInputItemsAliasParamsOrderAsc  ListOpenAIResponseInputItemsAliasParamsOrder = "asc"
-	ListOpenAIResponseInputItemsAliasParamsOrderDesc ListOpenAIResponseInputItemsAliasParamsOrder = "desc"
-)
-
-// Valid indicates whether the value is a known member of the ListOpenAIResponseInputItemsAliasParamsOrder enum.
-func (e ListOpenAIResponseInputItemsAliasParamsOrder) Valid() bool {
-	switch e {
-	case ListOpenAIResponseInputItemsAliasParamsOrderAsc:
-		return true
-	case ListOpenAIResponseInputItemsAliasParamsOrderDesc:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for ConnectRealtimeWebSocketParamsStickyStrength.
 const (
 	ConnectRealtimeWebSocketParamsStickyStrengthHard ConnectRealtimeWebSocketParamsStickyStrength = "hard"
@@ -3541,9 +3505,11 @@ type AccountProxyQuality struct {
 	LastCheckedAt *time.Time  `json:"last_checked_at,omitempty"`
 	LatencyP95Ms  int         `json:"latency_p95_ms"`
 	Metadata      *JsonObject `json:"metadata,omitempty"`
-	ProxyId       *string     `json:"proxy_id"`
-	SampleCount   int         `json:"sample_count"`
-	SuccessRate   float32     `json:"success_rate"`
+
+	// ProxyId Registered proxy definition id currently bound to the account.
+	ProxyId     *string `json:"proxy_id"`
+	SampleCount int     `json:"sample_count"`
+	SuccessRate float32 `json:"success_rate"`
 }
 
 // AccountProxyQualityResponse defines model for AccountProxyQualityResponse.
@@ -3898,8 +3864,10 @@ type AdminQuickSetupRequest struct {
 	Name *string `json:"name,omitempty"`
 
 	// Platform Built-in provider preset key, such as openai, anthropic, or codex-cli.
-	Platform     string        `json:"platform"`
-	Priority     *int          `json:"priority,omitempty"`
+	Platform string `json:"platform"`
+	Priority *int   `json:"priority,omitempty"`
+
+	// ProxyId Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
 	ProxyId      *string       `json:"proxy_id,omitempty"`
 	RuntimeClass *RuntimeClass `json:"runtime_class,omitempty"`
 	Weight       *float32      `json:"weight,omitempty"`
@@ -4873,7 +4841,7 @@ type BillingMode string
 
 // BindProviderAccountProxyRequest defines model for BindProviderAccountProxyRequest.
 type BindProviderAccountProxyRequest struct {
-	// ProxyId Proxy definition id. Set to null or an empty string to clear proxy binding. Existing raw proxy URLs remain accepted for backward-compatible imports.
+	// ProxyId Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first. Set null or an empty string to clear proxy binding.
 	ProxyId *string `json:"proxy_id"`
 }
 
@@ -5212,10 +5180,12 @@ type CodexSessionImportRequest struct {
 	GroupIds *[]Id  `json:"group_ids,omitempty"`
 
 	// Name Optional base account name. When multiple sessions are imported a "#N" suffix is appended; when omitted the email/account id from the session is used.
-	Name       *string                `json:"name,omitempty"`
-	ProviderId Id                     `json:"provider_id"`
-	ProxyId    *string                `json:"proxy_id,omitempty"`
-	Status     *ProviderAccountStatus `json:"status,omitempty"`
+	Name       *string `json:"name,omitempty"`
+	ProviderId Id      `json:"provider_id"`
+
+	// ProxyId Registered proxy definition id to bind to imported accounts. Raw proxy URLs are rejected; create a proxy definition first.
+	ProxyId *string                `json:"proxy_id,omitempty"`
+	Status  *ProviderAccountStatus `json:"status,omitempty"`
 
 	// UpdateExisting When an account with a matching identity already exists, update its credential instead of skipping. Defaults to true.
 	UpdateExisting *bool `json:"update_existing,omitempty"`
@@ -5664,11 +5634,13 @@ type CreatePromoCodeRequest struct {
 // CreateProviderAccountRequest defines model for CreateProviderAccountRequest.
 type CreateProviderAccountRequest struct {
 	// Credential Write-only credential payload. It must be encrypted before persistence.
-	Credential     *map[string]interface{}                `json:"credential,omitempty"`
-	Metadata       *JsonObject                            `json:"metadata,omitempty"`
-	Name           string                                 `json:"name"`
-	Priority       *int                                   `json:"priority,omitempty"`
-	ProviderId     Id                                     `json:"provider_id"`
+	Credential *map[string]interface{} `json:"credential,omitempty"`
+	Metadata   *JsonObject             `json:"metadata,omitempty"`
+	Name       string                  `json:"name"`
+	Priority   *int                    `json:"priority,omitempty"`
+	ProviderId Id                      `json:"provider_id"`
+
+	// ProxyId Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
 	ProxyId        *string                                `json:"proxy_id,omitempty"`
 	RiskLevel      *CreateProviderAccountRequestRiskLevel `json:"risk_level,omitempty"`
 	RuntimeClass   RuntimeClass                           `json:"runtime_class"`
@@ -7850,18 +7822,20 @@ type ProviderAccount struct {
 // ProviderAccountExportItem defines model for ProviderAccountExportItem.
 type ProviderAccountExportItem struct {
 	// CredentialExported Always false for this endpoint; credentials are never exported.
-	CredentialExported bool                                `json:"credential_exported"`
-	GroupIds           *[]Id                               `json:"group_ids,omitempty"`
-	Metadata           *JsonObject                         `json:"metadata,omitempty"`
-	Name               string                              `json:"name"`
-	Priority           int                                 `json:"priority"`
-	ProviderId         Id                                  `json:"provider_id"`
-	ProxyId            *string                             `json:"proxy_id,omitempty"`
-	RiskLevel          *ProviderAccountExportItemRiskLevel `json:"risk_level,omitempty"`
-	RuntimeClass       RuntimeClass                        `json:"runtime_class"`
-	Status             ProviderAccountStatus               `json:"status"`
-	UpstreamClient     *string                             `json:"upstream_client,omitempty"`
-	Weight             float32                             `json:"weight"`
+	CredentialExported bool        `json:"credential_exported"`
+	GroupIds           *[]Id       `json:"group_ids,omitempty"`
+	Metadata           *JsonObject `json:"metadata,omitempty"`
+	Name               string      `json:"name"`
+	Priority           int         `json:"priority"`
+	ProviderId         Id          `json:"provider_id"`
+
+	// ProxyId Registered proxy definition id, when the exported account is bound to one.
+	ProxyId        *string                             `json:"proxy_id,omitempty"`
+	RiskLevel      *ProviderAccountExportItemRiskLevel `json:"risk_level,omitempty"`
+	RuntimeClass   RuntimeClass                        `json:"runtime_class"`
+	Status         ProviderAccountStatus               `json:"status"`
+	UpstreamClient *string                             `json:"upstream_client,omitempty"`
+	Weight         float32                             `json:"weight"`
 }
 
 // ProviderAccountExportItemRiskLevel defines model for ProviderAccountExportItem.RiskLevel.
@@ -7876,12 +7850,14 @@ type ProviderAccountExportResponse struct {
 // ProviderAccountImportItem defines model for ProviderAccountImportItem.
 type ProviderAccountImportItem struct {
 	// Credential Write-only credential payload. Exports intentionally omit this field.
-	Credential     *map[string]interface{}             `json:"credential,omitempty"`
-	GroupIds       *[]Id                               `json:"group_ids,omitempty"`
-	Metadata       *JsonObject                         `json:"metadata,omitempty"`
-	Name           string                              `json:"name"`
-	Priority       *int                                `json:"priority,omitempty"`
-	ProviderId     Id                                  `json:"provider_id"`
+	Credential *map[string]interface{} `json:"credential,omitempty"`
+	GroupIds   *[]Id                   `json:"group_ids,omitempty"`
+	Metadata   *JsonObject             `json:"metadata,omitempty"`
+	Name       string                  `json:"name"`
+	Priority   *int                    `json:"priority,omitempty"`
+	ProviderId Id                      `json:"provider_id"`
+
+	// ProxyId Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
 	ProxyId        *string                             `json:"proxy_id,omitempty"`
 	RiskLevel      *ProviderAccountImportItemRiskLevel `json:"risk_level,omitempty"`
 	RuntimeClass   RuntimeClass                        `json:"runtime_class"`
@@ -9208,10 +9184,12 @@ type UpdatePromoCodeRequest = CreatePromoCodeRequest
 // UpdateProviderAccountRequest defines model for UpdateProviderAccountRequest.
 type UpdateProviderAccountRequest struct {
 	// Credential Write-only replacement credential payload. It must be encrypted before persistence.
-	Credential     *map[string]interface{}                `json:"credential,omitempty"`
-	Metadata       *JsonObject                            `json:"metadata,omitempty"`
-	Name           *string                                `json:"name,omitempty"`
-	Priority       *int                                   `json:"priority,omitempty"`
+	Credential *map[string]interface{} `json:"credential,omitempty"`
+	Metadata   *JsonObject             `json:"metadata,omitempty"`
+	Name       *string                 `json:"name,omitempty"`
+	Priority   *int                    `json:"priority,omitempty"`
+
+	// ProxyId Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first. Set null or an empty string to clear proxy binding.
 	ProxyId        *string                                `json:"proxy_id,omitempty"`
 	RiskLevel      *UpdateProviderAccountRequestRiskLevel `json:"risk_level,omitempty"`
 	RuntimeClass   *RuntimeClass                          `json:"runtime_class,omitempty"`
@@ -10287,32 +10265,6 @@ type ListPaymentOrdersParams struct {
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
-// ListGrokResponseInputItemsAliasParams defines parameters for ListGrokResponseInputItemsAlias.
-type ListGrokResponseInputItemsAliasParams struct {
-	// Model Canonical model or model alias used for SRapi policy and scheduling.
-	Model   string                                      `form:"model" json:"model"`
-	After   *string                                     `form:"after,omitempty" json:"after,omitempty"`
-	Include *[]string                                   `form:"include,omitempty" json:"include,omitempty"`
-	Limit   *int                                        `form:"limit,omitempty" json:"limit,omitempty"`
-	Order   *ListGrokResponseInputItemsAliasParamsOrder `form:"order,omitempty" json:"order,omitempty"`
-}
-
-// ListGrokResponseInputItemsAliasParamsOrder defines parameters for ListGrokResponseInputItemsAlias.
-type ListGrokResponseInputItemsAliasParamsOrder string
-
-// ListOpenAIResponseInputItemsAliasParams defines parameters for ListOpenAIResponseInputItemsAlias.
-type ListOpenAIResponseInputItemsAliasParams struct {
-	// Model Canonical model or model alias used for SRapi policy and scheduling.
-	Model   string                                        `form:"model" json:"model"`
-	After   *string                                       `form:"after,omitempty" json:"after,omitempty"`
-	Include *[]string                                     `form:"include,omitempty" json:"include,omitempty"`
-	Limit   *int                                          `form:"limit,omitempty" json:"limit,omitempty"`
-	Order   *ListOpenAIResponseInputItemsAliasParamsOrder `form:"order,omitempty" json:"order,omitempty"`
-}
-
-// ListOpenAIResponseInputItemsAliasParamsOrder defines parameters for ListOpenAIResponseInputItemsAlias.
-type ListOpenAIResponseInputItemsAliasParamsOrder string
-
 // CreateChatCompletionParams defines parameters for CreateChatCompletion.
 type CreateChatCompletionParams struct {
 	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
@@ -10403,24 +10355,6 @@ type ListGeminiModelsParams struct {
 	// PageToken Opaque pagination token returned by a previous listGeminiModels response.
 	PageToken *string `form:"pageToken,omitempty" json:"pageToken,omitempty"`
 }
-
-// CreateAnthropicMessageAliasJSONRequestBody defines body for CreateAnthropicMessageAlias for application/json ContentType.
-type CreateAnthropicMessageAliasJSONRequestBody = AnthropicMessagesRequest
-
-// CountAnthropicMessageTokensAliasJSONRequestBody defines body for CountAnthropicMessageTokensAlias for application/json ContentType.
-type CountAnthropicMessageTokensAliasJSONRequestBody = AnthropicCountTokensRequest
-
-// CreateAntigravityRootChatCompletionAliasJSONRequestBody defines body for CreateAntigravityRootChatCompletionAlias for application/json ContentType.
-type CreateAntigravityRootChatCompletionAliasJSONRequestBody = ChatCompletionRequest
-
-// CreateAntigravityRootMessageAliasJSONRequestBody defines body for CreateAntigravityRootMessageAlias for application/json ContentType.
-type CreateAntigravityRootMessageAliasJSONRequestBody = AnthropicMessagesRequest
-
-// GenerateAntigravityRootGeminiContentAliasJSONRequestBody defines body for GenerateAntigravityRootGeminiContentAlias for application/json ContentType.
-type GenerateAntigravityRootGeminiContentAliasJSONRequestBody = GeminiGenerateContentRequest
-
-// StreamAntigravityRootGeminiContentAliasJSONRequestBody defines body for StreamAntigravityRootGeminiContentAlias for application/json ContentType.
-type StreamAntigravityRootGeminiContentAliasJSONRequestBody = GeminiGenerateContentRequest
 
 // CreateAnthropicCompatibleMessageAliasJSONRequestBody defines body for CreateAnthropicCompatibleMessageAlias for application/json ContentType.
 type CreateAnthropicCompatibleMessageAliasJSONRequestBody = AnthropicMessagesRequest
@@ -10880,75 +10814,6 @@ type CompleteSetupJSONRequestBody = CompleteSetupRequest
 
 // HandlePaymentWebhookJSONRequestBody defines body for HandlePaymentWebhook for application/json ContentType.
 type HandlePaymentWebhookJSONRequestBody = PaymentWebhookRequest
-
-// CreateGrokAudioSpeechAliasJSONRequestBody defines body for CreateGrokAudioSpeechAlias for application/json ContentType.
-type CreateGrokAudioSpeechAliasJSONRequestBody = AudioSpeechRequest
-
-// CreateGrokAudioTranscriptionAliasMultipartRequestBody defines body for CreateGrokAudioTranscriptionAlias for multipart/form-data ContentType.
-type CreateGrokAudioTranscriptionAliasMultipartRequestBody = AudioTranscriptionRequest
-
-// CreateGrokChatCompletionAliasJSONRequestBody defines body for CreateGrokChatCompletionAlias for application/json ContentType.
-type CreateGrokChatCompletionAliasJSONRequestBody = ChatCompletionRequest
-
-// CreateGrokEmbeddingAliasJSONRequestBody defines body for CreateGrokEmbeddingAlias for application/json ContentType.
-type CreateGrokEmbeddingAliasJSONRequestBody = EmbeddingRequest
-
-// CreateGrokImageEditAliasJSONRequestBody defines body for CreateGrokImageEditAlias for application/json ContentType.
-type CreateGrokImageEditAliasJSONRequestBody = ImageEditJsonRequest
-
-// CreateGrokImageEditAliasMultipartRequestBody defines body for CreateGrokImageEditAlias for multipart/form-data ContentType.
-type CreateGrokImageEditAliasMultipartRequestBody = ImageEditRequest
-
-// CreateGrokImageGenerationAliasJSONRequestBody defines body for CreateGrokImageGenerationAlias for application/json ContentType.
-type CreateGrokImageGenerationAliasJSONRequestBody = ImageGenerationRequest
-
-// CreateGrokImageVariationAliasMultipartRequestBody defines body for CreateGrokImageVariationAlias for multipart/form-data ContentType.
-type CreateGrokImageVariationAliasMultipartRequestBody = ImageVariationRequest
-
-// CreateGrokMessageAliasJSONRequestBody defines body for CreateGrokMessageAlias for application/json ContentType.
-type CreateGrokMessageAliasJSONRequestBody = AnthropicMessagesRequest
-
-// CreateGrokModerationAliasJSONRequestBody defines body for CreateGrokModerationAlias for application/json ContentType.
-type CreateGrokModerationAliasJSONRequestBody = ModerationRequest
-
-// CreateGrokResponseAliasJSONRequestBody defines body for CreateGrokResponseAlias for application/json ContentType.
-type CreateGrokResponseAliasJSONRequestBody = ResponsesRequest
-
-// CreateOpenAIAudioSpeechAliasJSONRequestBody defines body for CreateOpenAIAudioSpeechAlias for application/json ContentType.
-type CreateOpenAIAudioSpeechAliasJSONRequestBody = AudioSpeechRequest
-
-// CreateOpenAIAudioTranscriptionAliasMultipartRequestBody defines body for CreateOpenAIAudioTranscriptionAlias for multipart/form-data ContentType.
-type CreateOpenAIAudioTranscriptionAliasMultipartRequestBody = AudioTranscriptionRequest
-
-// CreateOpenAIChatCompletionAliasJSONRequestBody defines body for CreateOpenAIChatCompletionAlias for application/json ContentType.
-type CreateOpenAIChatCompletionAliasJSONRequestBody = ChatCompletionRequest
-
-// CreateOpenAIEmbeddingAliasJSONRequestBody defines body for CreateOpenAIEmbeddingAlias for application/json ContentType.
-type CreateOpenAIEmbeddingAliasJSONRequestBody = EmbeddingRequest
-
-// CreateOpenAIImageEditAliasJSONRequestBody defines body for CreateOpenAIImageEditAlias for application/json ContentType.
-type CreateOpenAIImageEditAliasJSONRequestBody = ImageEditJsonRequest
-
-// CreateOpenAIImageEditAliasMultipartRequestBody defines body for CreateOpenAIImageEditAlias for multipart/form-data ContentType.
-type CreateOpenAIImageEditAliasMultipartRequestBody = ImageEditRequest
-
-// CreateOpenAIImageGenerationAliasJSONRequestBody defines body for CreateOpenAIImageGenerationAlias for application/json ContentType.
-type CreateOpenAIImageGenerationAliasJSONRequestBody = ImageGenerationRequest
-
-// CreateOpenAIImageVariationAliasMultipartRequestBody defines body for CreateOpenAIImageVariationAlias for multipart/form-data ContentType.
-type CreateOpenAIImageVariationAliasMultipartRequestBody = ImageVariationRequest
-
-// CreateOpenAIMessageAliasJSONRequestBody defines body for CreateOpenAIMessageAlias for application/json ContentType.
-type CreateOpenAIMessageAliasJSONRequestBody = AnthropicMessagesRequest
-
-// CreateOpenAIModerationAliasJSONRequestBody defines body for CreateOpenAIModerationAlias for application/json ContentType.
-type CreateOpenAIModerationAliasJSONRequestBody = ModerationRequest
-
-// CreateOpenAIResponseAliasJSONRequestBody defines body for CreateOpenAIResponseAlias for application/json ContentType.
-type CreateOpenAIResponseAliasJSONRequestBody = ResponsesRequest
-
-// CreateOpenAIResponseCompactAliasJSONRequestBody defines body for CreateOpenAIResponseCompactAlias for application/json ContentType.
-type CreateOpenAIResponseCompactAliasJSONRequestBody = ResponsesRequest
 
 // CreateAudioSpeechJSONRequestBody defines body for CreateAudioSpeech for application/json ContentType.
 type CreateAudioSpeechJSONRequestBody = AudioSpeechRequest
@@ -17194,24 +17059,6 @@ func (t *BulkImportAdminPricingRulesJSONBody) UnmarshalJSON(b []byte) error {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Create an Anthropic Messages-compatible message with Anthropic provider context.
-	// (POST /anthropic/v1/messages)
-	CreateAnthropicMessageAlias(w http.ResponseWriter, r *http.Request)
-	// Count Anthropic Messages-compatible input tokens with Anthropic provider context.
-	// (POST /anthropic/v1/messages/count_tokens)
-	CountAnthropicMessageTokensAlias(w http.ResponseWriter, r *http.Request)
-	// Create an OpenAI-compatible chat completion with Antigravity provider context.
-	// (POST /antigravity/v1/chat/completions)
-	CreateAntigravityRootChatCompletionAlias(w http.ResponseWriter, r *http.Request)
-	// Create an Anthropic Messages-compatible message with Antigravity provider context.
-	// (POST /antigravity/v1/messages)
-	CreateAntigravityRootMessageAlias(w http.ResponseWriter, r *http.Request)
-	// Generate Gemini-compatible content with Antigravity provider context.
-	// (POST /antigravity/v1beta/models/{model}:generateContent)
-	GenerateAntigravityRootGeminiContentAlias(w http.ResponseWriter, r *http.Request, model GeminiModel)
-	// Stream Gemini-compatible content with Antigravity provider context.
-	// (POST /antigravity/v1beta/models/{model}:streamGenerateContent)
-	StreamAntigravityRootGeminiContentAlias(w http.ResponseWriter, r *http.Request, model GeminiModel)
 	// Create an Anthropic Messages-compatible message with anthropic-compatible provider context.
 	// (POST /api/provider/anthropic-compatible/v1/messages)
 	CreateAnthropicCompatibleMessageAlias(w http.ResponseWriter, r *http.Request)
@@ -18217,75 +18064,6 @@ type ServerInterface interface {
 	// Handle a signed payment provider webhook.
 	// (POST /api/v1/webhooks/payments/{provider})
 	HandlePaymentWebhook(w http.ResponseWriter, r *http.Request, provider string)
-	// Create speech audio with Grok provider context.
-	// (POST /grok/v1/audio/speech)
-	CreateGrokAudioSpeechAlias(w http.ResponseWriter, r *http.Request)
-	// Create an audio transcription with Grok provider context.
-	// (POST /grok/v1/audio/transcriptions)
-	CreateGrokAudioTranscriptionAlias(w http.ResponseWriter, r *http.Request)
-	// Create an OpenAI-compatible chat completion with Grok provider context.
-	// (POST /grok/v1/chat/completions)
-	CreateGrokChatCompletionAlias(w http.ResponseWriter, r *http.Request)
-	// Create OpenAI-compatible embeddings with Grok provider context.
-	// (POST /grok/v1/embeddings)
-	CreateGrokEmbeddingAlias(w http.ResponseWriter, r *http.Request)
-	// Create OpenAI-compatible image edits with Grok provider context.
-	// (POST /grok/v1/images/edits)
-	CreateGrokImageEditAlias(w http.ResponseWriter, r *http.Request)
-	// Create OpenAI-compatible image generations with Grok provider context.
-	// (POST /grok/v1/images/generations)
-	CreateGrokImageGenerationAlias(w http.ResponseWriter, r *http.Request)
-	// Create OpenAI-compatible image variations with Grok provider context.
-	// (POST /grok/v1/images/variations)
-	CreateGrokImageVariationAlias(w http.ResponseWriter, r *http.Request)
-	// Create an Anthropic Messages-compatible message with Grok provider context.
-	// (POST /grok/v1/messages)
-	CreateGrokMessageAlias(w http.ResponseWriter, r *http.Request)
-	// Create OpenAI-compatible moderation classifications with Grok provider context.
-	// (POST /grok/v1/moderations)
-	CreateGrokModerationAlias(w http.ResponseWriter, r *http.Request)
-	// Create an OpenAI Responses-compatible response with Grok provider context.
-	// (POST /grok/v1/responses)
-	CreateGrokResponseAlias(w http.ResponseWriter, r *http.Request)
-	// List Responses input items with Grok provider context.
-	// (GET /grok/v1/responses/{response_id}/input_items)
-	ListGrokResponseInputItemsAlias(w http.ResponseWriter, r *http.Request, responseId string, params ListGrokResponseInputItemsAliasParams)
-	// Create speech audio with OpenAI provider context.
-	// (POST /openai/v1/audio/speech)
-	CreateOpenAIAudioSpeechAlias(w http.ResponseWriter, r *http.Request)
-	// Create an audio transcription with OpenAI provider context.
-	// (POST /openai/v1/audio/transcriptions)
-	CreateOpenAIAudioTranscriptionAlias(w http.ResponseWriter, r *http.Request)
-	// Create an OpenAI-compatible chat completion with OpenAI provider context.
-	// (POST /openai/v1/chat/completions)
-	CreateOpenAIChatCompletionAlias(w http.ResponseWriter, r *http.Request)
-	// Create OpenAI-compatible embeddings with OpenAI provider context.
-	// (POST /openai/v1/embeddings)
-	CreateOpenAIEmbeddingAlias(w http.ResponseWriter, r *http.Request)
-	// Create OpenAI-compatible image edits with OpenAI provider context.
-	// (POST /openai/v1/images/edits)
-	CreateOpenAIImageEditAlias(w http.ResponseWriter, r *http.Request)
-	// Create OpenAI-compatible image generations with OpenAI provider context.
-	// (POST /openai/v1/images/generations)
-	CreateOpenAIImageGenerationAlias(w http.ResponseWriter, r *http.Request)
-	// Create OpenAI-compatible image variations with OpenAI provider context.
-	// (POST /openai/v1/images/variations)
-	CreateOpenAIImageVariationAlias(w http.ResponseWriter, r *http.Request)
-	// Create an Anthropic Messages-compatible message with OpenAI provider context.
-	// (POST /openai/v1/messages)
-	CreateOpenAIMessageAlias(w http.ResponseWriter, r *http.Request)
-	// Create OpenAI-compatible moderation classifications with OpenAI provider context.
-	// (POST /openai/v1/moderations)
-	CreateOpenAIModerationAlias(w http.ResponseWriter, r *http.Request)
-	// Create an OpenAI Responses-compatible response with OpenAI provider context.
-	// (POST /openai/v1/responses)
-	CreateOpenAIResponseAlias(w http.ResponseWriter, r *http.Request)
-	// Compact an OpenAI Responses-compatible conversation context with OpenAI provider context.
-	// (POST /openai/v1/responses/compact)
-	CreateOpenAIResponseCompactAlias(w http.ResponseWriter, r *http.Request)
-	// List Responses input items with OpenAI provider context.
-	// (GET /openai/v1/responses/{response_id}/input_items)
-	ListOpenAIResponseInputItemsAlias(w http.ResponseWriter, r *http.Request, responseId string, params ListOpenAIResponseInputItemsAliasParams)
 	// Create OpenAI-compatible speech audio.
 	// (POST /v1/audio/speech)
 	CreateAudioSpeech(w http.ResponseWriter, r *http.Request)
@@ -18365,150 +18143,6 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
-
-// CreateAnthropicMessageAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateAnthropicMessageAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateAnthropicMessageAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CountAnthropicMessageTokensAlias operation middleware
-func (siw *ServerInterfaceWrapper) CountAnthropicMessageTokensAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CountAnthropicMessageTokensAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateAntigravityRootChatCompletionAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateAntigravityRootChatCompletionAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateAntigravityRootChatCompletionAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateAntigravityRootMessageAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateAntigravityRootMessageAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateAntigravityRootMessageAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GenerateAntigravityRootGeminiContentAlias operation middleware
-func (siw *ServerInterfaceWrapper) GenerateAntigravityRootGeminiContentAlias(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "model" -------------
-	var model GeminiModel
-
-	err = runtime.BindStyledParameterWithOptions("simple", "model", r.PathValue("model"), &model, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GenerateAntigravityRootGeminiContentAlias(w, r, model)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// StreamAntigravityRootGeminiContentAlias operation middleware
-func (siw *ServerInterfaceWrapper) StreamAntigravityRootGeminiContentAlias(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "model" -------------
-	var model GeminiModel
-
-	err = runtime.BindStyledParameterWithOptions("simple", "model", r.PathValue("model"), &model, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.StreamAntigravityRootGeminiContentAlias(w, r, model)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
 
 // CreateAnthropicCompatibleMessageAlias operation middleware
 func (siw *ServerInterfaceWrapper) CreateAnthropicCompatibleMessageAlias(w http.ResponseWriter, r *http.Request) {
@@ -29526,626 +29160,6 @@ func (siw *ServerInterfaceWrapper) HandlePaymentWebhook(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
-// CreateGrokAudioSpeechAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateGrokAudioSpeechAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateGrokAudioSpeechAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateGrokAudioTranscriptionAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateGrokAudioTranscriptionAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateGrokAudioTranscriptionAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateGrokChatCompletionAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateGrokChatCompletionAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateGrokChatCompletionAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateGrokEmbeddingAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateGrokEmbeddingAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateGrokEmbeddingAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateGrokImageEditAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateGrokImageEditAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateGrokImageEditAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateGrokImageGenerationAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateGrokImageGenerationAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateGrokImageGenerationAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateGrokImageVariationAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateGrokImageVariationAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateGrokImageVariationAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateGrokMessageAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateGrokMessageAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateGrokMessageAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateGrokModerationAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateGrokModerationAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateGrokModerationAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateGrokResponseAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateGrokResponseAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateGrokResponseAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListGrokResponseInputItemsAlias operation middleware
-func (siw *ServerInterfaceWrapper) ListGrokResponseInputItemsAlias(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "response_id" -------------
-	var responseId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "response_id", r.PathValue("response_id"), &responseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "response_id", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListGrokResponseInputItemsAliasParams
-
-	// ------------- Required query parameter "model" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, true, "model", r.URL.Query(), &params.Model, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "model"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "after" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "after", r.URL.Query(), &params.After, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "after"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "after", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "include" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "include", r.URL.Query(), &params.Include, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "include"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "limit" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "order" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "order", r.URL.Query(), &params.Order, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "order"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "order", Err: err})
-		}
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListGrokResponseInputItemsAlias(w, r, responseId, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateOpenAIAudioSpeechAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateOpenAIAudioSpeechAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAIAudioSpeechAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateOpenAIAudioTranscriptionAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateOpenAIAudioTranscriptionAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAIAudioTranscriptionAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateOpenAIChatCompletionAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateOpenAIChatCompletionAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAIChatCompletionAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateOpenAIEmbeddingAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateOpenAIEmbeddingAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAIEmbeddingAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateOpenAIImageEditAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateOpenAIImageEditAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAIImageEditAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateOpenAIImageGenerationAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateOpenAIImageGenerationAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAIImageGenerationAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateOpenAIImageVariationAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateOpenAIImageVariationAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAIImageVariationAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateOpenAIMessageAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateOpenAIMessageAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAIMessageAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateOpenAIModerationAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateOpenAIModerationAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAIModerationAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateOpenAIResponseAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateOpenAIResponseAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAIResponseAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateOpenAIResponseCompactAlias operation middleware
-func (siw *ServerInterfaceWrapper) CreateOpenAIResponseCompactAlias(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAIResponseCompactAlias(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListOpenAIResponseInputItemsAlias operation middleware
-func (siw *ServerInterfaceWrapper) ListOpenAIResponseInputItemsAlias(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "response_id" -------------
-	var responseId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "response_id", r.PathValue("response_id"), &responseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "response_id", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListOpenAIResponseInputItemsAliasParams
-
-	// ------------- Required query parameter "model" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, true, "model", r.URL.Query(), &params.Model, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "model"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "after" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "after", r.URL.Query(), &params.After, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "after"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "after", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "include" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "include", r.URL.Query(), &params.Include, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "include"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "limit" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "order" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "order", r.URL.Query(), &params.Order, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "order"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "order", Err: err})
-		}
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListOpenAIResponseInputItemsAlias(w, r, responseId, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // CreateAudioSpeech operation middleware
 func (siw *ServerInterfaceWrapper) CreateAudioSpeech(w http.ResponseWriter, r *http.Request) {
 
@@ -31150,12 +30164,6 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/anthropic/v1/messages", wrapper.CreateAnthropicMessageAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/anthropic/v1/messages/count_tokens", wrapper.CountAnthropicMessageTokensAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/antigravity/v1/chat/completions", wrapper.CreateAntigravityRootChatCompletionAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/antigravity/v1/messages", wrapper.CreateAntigravityRootMessageAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/antigravity/v1beta/models/{model}:generateContent", wrapper.GenerateAntigravityRootGeminiContentAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/antigravity/v1beta/models/{model}:streamGenerateContent", wrapper.StreamAntigravityRootGeminiContentAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/anthropic-compatible/v1/messages", wrapper.CreateAnthropicCompatibleMessageAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/anthropic-compatible/v1/messages/count_tokens", wrapper.CountAnthropicCompatibleMessageTokensAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/antigravity/v1/chat/completions", wrapper.CreateAntigravityChatCompletionAlias)
@@ -31491,29 +30499,6 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/site-config", wrapper.GetSiteConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/users/{id}/avatar", wrapper.GetUserAvatar)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/webhooks/payments/{provider}", wrapper.HandlePaymentWebhook)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grok/v1/audio/speech", wrapper.CreateGrokAudioSpeechAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grok/v1/audio/transcriptions", wrapper.CreateGrokAudioTranscriptionAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grok/v1/chat/completions", wrapper.CreateGrokChatCompletionAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grok/v1/embeddings", wrapper.CreateGrokEmbeddingAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grok/v1/images/edits", wrapper.CreateGrokImageEditAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grok/v1/images/generations", wrapper.CreateGrokImageGenerationAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grok/v1/images/variations", wrapper.CreateGrokImageVariationAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grok/v1/messages", wrapper.CreateGrokMessageAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grok/v1/moderations", wrapper.CreateGrokModerationAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grok/v1/responses", wrapper.CreateGrokResponseAlias)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/grok/v1/responses/{response_id}/input_items", wrapper.ListGrokResponseInputItemsAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/openai/v1/audio/speech", wrapper.CreateOpenAIAudioSpeechAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/openai/v1/audio/transcriptions", wrapper.CreateOpenAIAudioTranscriptionAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/openai/v1/chat/completions", wrapper.CreateOpenAIChatCompletionAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/openai/v1/embeddings", wrapper.CreateOpenAIEmbeddingAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/openai/v1/images/edits", wrapper.CreateOpenAIImageEditAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/openai/v1/images/generations", wrapper.CreateOpenAIImageGenerationAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/openai/v1/images/variations", wrapper.CreateOpenAIImageVariationAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/openai/v1/messages", wrapper.CreateOpenAIMessageAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/openai/v1/moderations", wrapper.CreateOpenAIModerationAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/openai/v1/responses", wrapper.CreateOpenAIResponseAlias)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/openai/v1/responses/compact", wrapper.CreateOpenAIResponseCompactAlias)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/openai/v1/responses/{response_id}/input_items", wrapper.ListOpenAIResponseInputItemsAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/audio/speech", wrapper.CreateAudioSpeech)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/audio/transcriptions", wrapper.CreateAudioTranscription)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/chat/completions", wrapper.CreateChatCompletion)
