@@ -183,6 +183,58 @@ func TestGatewayCodexImageGenerationStreamsTransformedEventsIncrementally(t *tes
 	}
 }
 
+func TestGatewayImageGenerationStreamUsesImageIdleTimeout(t *testing.T) {
+	t.Setenv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", "1")
+	t.Setenv("GATEWAY_IMAGE_STREAM_IDLE_TIMEOUT_SECONDS", "3")
+
+	partial := "data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\"}\n\n"
+	completed := "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"total_tokens\":14},\"output\":[{\"type\":\"image_generation_call\",\"result\":\"ZmluYWw=\",\"output_format\":\"png\"}]}}\n\n"
+	done := "data: [DONE]\n\n"
+
+	release := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		_, _ = io.WriteString(w, partial)
+		if flusher != nil {
+			flusher.Flush()
+		}
+		select {
+		case <-release:
+		case <-time.After(2 * time.Second):
+		}
+		time.Sleep(1500 * time.Millisecond)
+		_, _ = io.WriteString(w, completed+done)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-image-idle-provider","display_name":"Codex Image Idle","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-image-idle-model","display_name":"Codex Image Idle Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gpt-image-2","status":"active","capability_override":[{"key":"images","level":"required","status":"stable","version":"v1"},{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"codex-image-idle-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(`{"model":"codex-image-idle-model","prompt":"draw a cat","stream":true,"response_format":"url"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	rec := &flushCapturingWriter{header: http.Header{}, release: release}
+	handler.ServeHTTP(rec, req)
+
+	body := rec.body.String()
+	if !strings.Contains(body, "event: image_generation.completed") || !strings.Contains(body, "data: [DONE]") {
+		t.Fatalf("expected image stream to outlive ordinary stream timeout, got: %s", body)
+	}
+}
+
 // TestGatewayChatCompletionStreamIdleTimeoutCutsHungUpstream proves the
 // configured StreamIdleTimeout is actually enforced: when an upstream delivers
 // one chunk then stalls forever, the gateway cuts the stream (rather than

@@ -221,7 +221,7 @@ func (s *Server) writeImageGenerationStreamPassthrough(
 	w.Header().Set("X-Accel-Buffering", "no")
 	flusher, _ := w.(http.Flusher)
 
-	idle := s.cfg.Gateway.StreamIdleTimeout
+	idle := s.cfg.Gateway.ImageStreamIdleTimeout
 	idleTimedOut := false
 	type streamChunk struct {
 		data []byte

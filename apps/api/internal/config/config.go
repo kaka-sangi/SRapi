@@ -117,6 +117,7 @@ type GatewayConfig struct {
 	MaxBodySize                int64
 	RequestTimeout             time.Duration
 	StreamIdleTimeout          time.Duration
+	ImageStreamIdleTimeout     time.Duration
 	RealtimeMaxOpenSlots       int
 	RealtimeMaxOpenSlotsPerKey int
 	// RequirePositiveBalance, when true, synchronously rejects balance-billed
@@ -275,6 +276,7 @@ func Load() Config {
 			MaxBodySize:                int64(getIntEnv("GATEWAY_MAX_BODY_SIZE", defaultGatewayBodySize)),
 			RequestTimeout:             time.Duration(getIntEnv("GATEWAY_REQUEST_TIMEOUT_SECONDS", 600)) * time.Second,
 			StreamIdleTimeout:          time.Duration(getIntEnv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", 120)) * time.Second,
+			ImageStreamIdleTimeout:     time.Duration(getIntEnv("GATEWAY_IMAGE_STREAM_IDLE_TIMEOUT_SECONDS", 900)) * time.Second,
 			RealtimeMaxOpenSlots:       getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS", 0),
 			RealtimeMaxOpenSlotsPerKey: getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS_PER_API_KEY", 0),
 			RequirePositiveBalance:     getBoolEnv("GATEWAY_REQUIRE_POSITIVE_BALANCE", false),
@@ -409,6 +411,9 @@ func (c Config) Validate() error {
 	}
 	if c.Gateway.StreamIdleTimeout <= 0 {
 		return fmt.Errorf("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS must be positive")
+	}
+	if c.Gateway.ImageStreamIdleTimeout <= 0 {
+		return fmt.Errorf("GATEWAY_IMAGE_STREAM_IDLE_TIMEOUT_SECONDS must be positive")
 	}
 	if c.Gateway.RealtimeMaxOpenSlots < 0 {
 		return fmt.Errorf("GATEWAY_REALTIME_MAX_OPEN_SLOTS must be zero or positive")

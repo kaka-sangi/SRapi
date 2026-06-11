@@ -151,6 +151,7 @@ func TestGatewayTimeoutDefaultsAndOverrides(t *testing.T) {
 	t.Setenv("GATEWAY_MAX_BODY_SIZE", "")
 	t.Setenv("GATEWAY_REQUEST_TIMEOUT_SECONDS", "")
 	t.Setenv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", "")
+	t.Setenv("GATEWAY_IMAGE_STREAM_IDLE_TIMEOUT_SECONDS", "")
 	t.Setenv("GATEWAY_REALTIME_MAX_OPEN_SLOTS", "")
 	t.Setenv("GATEWAY_REALTIME_MAX_OPEN_SLOTS_PER_API_KEY", "")
 	cfg := Load()
@@ -163,6 +164,9 @@ func TestGatewayTimeoutDefaultsAndOverrides(t *testing.T) {
 	if cfg.Gateway.StreamIdleTimeout != 120*time.Second {
 		t.Fatalf("expected default gateway stream idle timeout 120s, got %s", cfg.Gateway.StreamIdleTimeout)
 	}
+	if cfg.Gateway.ImageStreamIdleTimeout != 900*time.Second {
+		t.Fatalf("expected default gateway image stream idle timeout 900s, got %s", cfg.Gateway.ImageStreamIdleTimeout)
+	}
 	if cfg.Gateway.RealtimeMaxOpenSlots != 0 || cfg.Gateway.RealtimeMaxOpenSlotsPerKey != 0 {
 		t.Fatalf("expected realtime slot limits disabled by default, got %+v", cfg.Gateway)
 	}
@@ -170,6 +174,7 @@ func TestGatewayTimeoutDefaultsAndOverrides(t *testing.T) {
 	t.Setenv("GATEWAY_MAX_BODY_SIZE", "12345")
 	t.Setenv("GATEWAY_REQUEST_TIMEOUT_SECONDS", "42")
 	t.Setenv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", "7")
+	t.Setenv("GATEWAY_IMAGE_STREAM_IDLE_TIMEOUT_SECONDS", "11")
 	t.Setenv("GATEWAY_REALTIME_MAX_OPEN_SLOTS", "100")
 	t.Setenv("GATEWAY_REALTIME_MAX_OPEN_SLOTS_PER_API_KEY", "5")
 	cfg = Load()
@@ -181,6 +186,9 @@ func TestGatewayTimeoutDefaultsAndOverrides(t *testing.T) {
 	}
 	if cfg.Gateway.StreamIdleTimeout != 7*time.Second {
 		t.Fatalf("expected overridden gateway stream idle timeout 7s, got %s", cfg.Gateway.StreamIdleTimeout)
+	}
+	if cfg.Gateway.ImageStreamIdleTimeout != 11*time.Second {
+		t.Fatalf("expected overridden gateway image stream idle timeout 11s, got %s", cfg.Gateway.ImageStreamIdleTimeout)
 	}
 	if cfg.Gateway.RealtimeMaxOpenSlots != 100 || cfg.Gateway.RealtimeMaxOpenSlotsPerKey != 5 {
 		t.Fatalf("expected overridden realtime limits, got %+v", cfg.Gateway)
@@ -260,6 +268,12 @@ func TestValidateRejectsInvalidGatewayTimeouts(t *testing.T) {
 	cfg.Gateway.StreamIdleTimeout = 0
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS") {
 		t.Fatalf("expected gateway stream timeout rejection, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.Gateway.ImageStreamIdleTimeout = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "GATEWAY_IMAGE_STREAM_IDLE_TIMEOUT_SECONDS") {
+		t.Fatalf("expected gateway image stream timeout rejection, got %v", err)
 	}
 
 	cfg = Load()
