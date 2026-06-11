@@ -782,6 +782,9 @@ func TestNormalizeAnthropicMessagesPreservesContextManagement(t *testing.T) {
 	if canonical.Reasoning["type"] != "enabled" {
 		t.Fatalf("expected thinking config to remain preserved, got %+v", canonical.Reasoning)
 	}
+	if canonical.Reasoning["effort"] != "medium" {
+		t.Fatalf("expected thinking budget to derive reasoning effort, got %+v", canonical.Reasoning)
+	}
 	edits, ok := canonical.ContextManagement["edits"].([]any)
 	if !ok || len(edits) != 1 {
 		t.Fatalf("expected context_management edits, got %+v", canonical.ContextManagement)

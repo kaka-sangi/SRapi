@@ -164,7 +164,7 @@ func (s *Service) NormalizeAnthropicMessages(req apiopenapi.AnthropicMessagesReq
 	canonical.MaxOutputTokens = positiveIntPtr(req.MaxTokens)
 	canonical.Tools = anthropicToolsToOpenAITools(req.Tools)
 	canonical.ToolChoice = anthropicToolChoice(req.ToolChoice)
-	canonical.Reasoning = cloneJSONMap(req.Thinking)
+	canonical.Reasoning = anthropicReasoning(req.Thinking)
 	switch contextManagement := req.AdditionalProperties["context_management"].(type) {
 	case map[string]any:
 		canonical.ContextManagement = cloneMap(contextManagement)
@@ -1522,6 +1522,29 @@ func anthropicToolChoice(value *apiopenapi.JsonObject) any {
 		}
 	}
 	return raw
+}
+
+func anthropicReasoning(value *apiopenapi.JsonObject) map[string]any {
+	out := cloneJSONMap(value)
+	if len(out) == 0 {
+		return nil
+	}
+	if _, ok := out["effort"]; !ok {
+		if budget, ok := mapIntAny(out, "budget_tokens"); ok {
+			if effort, ok := reasoningEffortForBudget(budget); ok {
+				out["effort"] = effort
+			}
+		} else {
+			thinkingType := strings.ToLower(strings.TrimSpace(mapStringAny(out, "type")))
+			switch thinkingType {
+			case "disabled":
+				out["effort"] = "none"
+			case "adaptive":
+				out["effort"] = "auto"
+			}
+		}
+	}
+	return out
 }
 
 func geminiResponseFormat(cfg *apiopenapi.GeminiGenerationConfig) map[string]any {

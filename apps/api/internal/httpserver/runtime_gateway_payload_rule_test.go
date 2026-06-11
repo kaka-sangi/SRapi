@@ -286,3 +286,52 @@ func TestGatewayChatReasoningEffortReachesAnthropicThinking(t *testing.T) {
 		t.Fatalf("did not expect OpenAI effort field to leak into Anthropic thinking, got %s", sent)
 	}
 }
+
+func TestGatewayAnthropicThinkingReachesOpenAIReasoningEffort(t *testing.T) {
+	bodyCh := make(chan []byte, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		select {
+		case bodyCh <- raw:
+		default:
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"x","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"openai from anthropic ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"anthropic-to-chat-thinking-provider","display_name":"Anthropic To Chat Thinking","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"anthropic-to-chat-thinking-model","display_name":"Anthropic To Chat Thinking Model","status":"active","capabilities":[{"key":"reasoning_control","level":"optional","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"openai-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"anthropic-to-chat-thinking-account","runtime_class":"api_key","credential":{"api_key":"openai-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	body := `{"model":"anthropic-to-chat-thinking-model","max_tokens":4096,"thinking":{"type":"enabled","budget_tokens":2048},"messages":[{"role":"user","content":"think"}]}`
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/messages", body)
+	var resp apiopenapi.AnthropicMessagesResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode Anthropic response: %v", err)
+	}
+	if len(resp.Content) != 1 || resp.Content[0].Text == nil || *resp.Content[0].Text != "openai from anthropic ok" {
+		t.Fatalf("unexpected Anthropic response: %+v", resp)
+	}
+
+	var sent []byte
+	select {
+	case sent = <-bodyCh:
+	default:
+		t.Fatal("upstream did not receive a request body")
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(sent, &doc); err != nil {
+		t.Fatalf("decode upstream body %q: %v", sent, err)
+	}
+	if doc["reasoning_effort"] != "medium" {
+		t.Fatalf("expected Anthropic thinking budget to reach OpenAI reasoning_effort=medium, got %s", sent)
+	}
+	if _, ok := doc["thinking"]; ok {
+		t.Fatalf("did not expect Anthropic thinking object to leak into OpenAI body, got %s", sent)
+	}
+}
