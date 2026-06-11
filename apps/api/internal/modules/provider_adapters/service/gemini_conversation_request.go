@@ -294,6 +294,8 @@ func geminiThinkingBudgetForEffort(effort string) (int, bool) {
 		return 24576, true
 	case "xhigh":
 		return 32768, true
+	case "max":
+		return 128000, true
 	default:
 		return 0, false
 	}

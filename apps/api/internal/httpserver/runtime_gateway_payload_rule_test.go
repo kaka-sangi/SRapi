@@ -335,3 +335,51 @@ func TestGatewayAnthropicThinkingReachesOpenAIReasoningEffort(t *testing.T) {
 		t.Fatalf("did not expect Anthropic thinking object to leak into OpenAI body, got %s", sent)
 	}
 }
+
+func TestGatewayAnthropicThinkingReachesGeminiThinkingConfig(t *testing.T) {
+	bodyCh := make(chan []byte, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		select {
+		case bodyCh <- raw:
+		default:
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"gemini from anthropic ok"}]}}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1,"totalTokenCount":3}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"anthropic-to-gemini-thinking-provider","display_name":"Anthropic To Gemini Thinking","adapter_type":"gemini-compatible","protocol":"gemini-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"anthropic-to-gemini-thinking-model","display_name":"Anthropic To Gemini Thinking Model","status":"active","capabilities":[{"key":"reasoning_control","level":"optional","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"models/gemini-pro","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"anthropic-to-gemini-thinking-account","runtime_class":"api_key","credential":{"api_key":"gemini-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1beta"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	body := `{"model":"anthropic-to-gemini-thinking-model","max_tokens":4096,"thinking":{"type":"enabled","budget_tokens":2048},"messages":[{"role":"user","content":"think"}]}`
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/messages", body)
+	var resp apiopenapi.AnthropicMessagesResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode Anthropic response: %v", err)
+	}
+	if len(resp.Content) != 1 || resp.Content[0].Text == nil || *resp.Content[0].Text != "gemini from anthropic ok" {
+		t.Fatalf("unexpected Anthropic response: %+v", resp)
+	}
+
+	var sent []byte
+	select {
+	case sent = <-bodyCh:
+	default:
+		t.Fatal("upstream did not receive a request body")
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(sent, &doc); err != nil {
+		t.Fatalf("decode upstream body %q: %v", sent, err)
+	}
+	generationConfig, _ := doc["generationConfig"].(map[string]any)
+	thinkingConfig, _ := generationConfig["thinkingConfig"].(map[string]any)
+	if thinkingConfig["thinkingBudget"] != float64(2048) || thinkingConfig["includeThoughts"] != true {
+		t.Fatalf("expected Anthropic thinking budget to reach Gemini thinkingConfig, got %s", sent)
+	}
+}

@@ -2648,6 +2648,44 @@ func TestGeminiCompatibleAdapterSendsCanonicalReasoningBudgetDisabled(t *testing
 	}
 }
 
+func TestGeminiCompatibleAdapterSendsCanonicalReasoningMaxEffort(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		generationConfig, _ := payload["generationConfig"].(map[string]any)
+		thinkingConfig, _ := generationConfig["thinkingConfig"].(map[string]any)
+		if thinkingConfig["thinkingBudget"] != float64(128000) || thinkingConfig["includeThoughts"] != true {
+			t.Fatalf("expected max reasoning effort as Gemini thinking budget, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"gemini max thoughts ok"}]}}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_reasoning_max_effort",
+		Model:      "gemini-local",
+		InputParts: textParts("think"),
+		Reasoning:  map[string]any{"effort": "max"},
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke Gemini upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "gemini max thoughts ok" {
+		t.Fatalf("unexpected Gemini reasoning response: %+v", resp)
+	}
+}
+
 func TestGeminiCompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload map[string]any
