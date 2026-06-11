@@ -251,7 +251,15 @@ func TestFetchAccountQuotaMapsCodexAccountsCheckPlan(t *testing.T) {
 				},
 				"team-account": {
 					"account": {"id": "team-account", "plan_type": "team", "is_default": false},
-					"entitlement": {"subscription_plan": "team", "expires_at": "2026-05-02T20:32:12Z"}
+					"entitlement": {"subscription_plan": "team", "expires_at": "2026-05-02T20:32:12Z"},
+					"account_plan": {
+						"subscription_plan": {
+							"allowance": 1200,
+							"usage": 300,
+							"limit": 1500,
+							"currency": "credits"
+						}
+					}
 				}
 			}
 		}`))
@@ -296,7 +304,12 @@ func TestFetchAccountQuotaMapsCodexAccountsCheckPlan(t *testing.T) {
 	if gotAuthorization != "Bearer codex-access-token" || gotAccountID != "team-account" || gotOrigin != "https://chatgpt.com" || gotReferer != "https://chatgpt.com/" || gotUserAgent != "codex-cli/test" {
 		t.Fatalf("unexpected Codex quota headers auth=%q account=%q origin=%q referer=%q ua=%q", gotAuthorization, gotAccountID, gotOrigin, gotReferer, gotUserAgent)
 	}
-	if !report.Supported || report.Plan != "team" {
+	if !report.Supported ||
+		report.Plan != "team" ||
+		report.CreditsRemaining != "1200" ||
+		report.CreditsUsed != "300" ||
+		report.CreditsLimit != "1500" ||
+		report.Currency != "credits" {
 		t.Fatalf("unexpected codex accounts/check quota report: %+v", report)
 	}
 }

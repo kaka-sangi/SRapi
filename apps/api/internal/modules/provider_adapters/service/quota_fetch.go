@@ -253,7 +253,7 @@ func decodeQuotaJSON(body []byte) any {
 }
 
 func applyCodexAccountsCheckQuotaFallback(parsed any, req contract.ProbeRequest, report *contract.QuotaReport) {
-	if report == nil || strings.TrimSpace(report.Plan) != "" {
+	if report == nil {
 		return
 	}
 	root, ok := parsed.(map[string]any)
@@ -268,7 +268,25 @@ func applyCodexAccountsCheckQuotaFallback(parsed any, req contract.ProbeRequest,
 	if account == nil {
 		return
 	}
-	report.Plan = codexAccountsCheckPlan(account)
+	if strings.TrimSpace(report.Plan) == "" {
+		report.Plan = codexAccountsCheckPlan(account)
+	}
+	plan := codexAccountsCheckSubscriptionPlan(account)
+	if plan == nil {
+		return
+	}
+	if strings.TrimSpace(report.CreditsRemaining) == "" {
+		report.CreditsRemaining = firstNonEmpty(mapString(plan, "allowance"), firstNonEmpty(mapString(plan, "remaining"), mapString(plan, "credits_remaining")))
+	}
+	if strings.TrimSpace(report.CreditsUsed) == "" {
+		report.CreditsUsed = firstNonEmpty(mapString(plan, "usage"), firstNonEmpty(mapString(plan, "used"), mapString(plan, "credits_used")))
+	}
+	if strings.TrimSpace(report.CreditsLimit) == "" {
+		report.CreditsLimit = firstNonEmpty(mapString(plan, "limit"), mapString(plan, "credits_limit"))
+	}
+	if strings.TrimSpace(report.Currency) == "" {
+		report.Currency = firstNonEmpty(mapString(plan, "currency"), firstNonEmpty(mapString(plan, "credit_type"), mapString(plan, "credits_currency")))
+	}
 }
 
 func selectCodexAccountsCheckAccount(accounts map[string]any, req contract.ProbeRequest) map[string]any {
@@ -373,6 +391,23 @@ func codexAccountsCheckPlan(account map[string]any) string {
 		}
 	}
 	return ""
+}
+
+func codexAccountsCheckSubscriptionPlan(account map[string]any) map[string]any {
+	if nested, ok := account["account_plan"].(map[string]any); ok {
+		if plan, ok := nested["subscription_plan"].(map[string]any); ok {
+			return plan
+		}
+	}
+	if nested, ok := account["entitlement"].(map[string]any); ok {
+		if plan, ok := nested["subscription_plan"].(map[string]any); ok {
+			return plan
+		}
+	}
+	if plan, ok := account["subscription_plan"].(map[string]any); ok {
+		return plan
+	}
+	return nil
 }
 
 func nestedBoolField(value map[string]any, objectKey string, fieldKey string) bool {
