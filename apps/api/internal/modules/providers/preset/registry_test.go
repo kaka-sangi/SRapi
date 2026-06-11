@@ -148,6 +148,12 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if antigravityPreset.AccountTemplate.MetadataHints["tls_profile"] == "" {
 		t.Fatalf("expected antigravity template to expose tls_profile metadata hint")
 	}
+	if antigravityPreset.AccountTemplate.MetadataHints["antigravity_credits_enabled"] == "" {
+		t.Fatalf("expected antigravity template to expose antigravity_credits_enabled metadata hint")
+	}
+	if antigravityPreset.AccountTemplate.DefaultMetadata["antigravity_credits_enabled"] != false {
+		t.Fatalf("expected antigravity credits overage to default off, got %+v", antigravityPreset.AccountTemplate.DefaultMetadata["antigravity_credits_enabled"])
+	}
 	antigravityModelMapping, ok := antigravityPreset.AccountTemplate.DefaultMetadata["model_mapping"].(map[string]string)
 	if !ok {
 		t.Fatalf("expected antigravity template to include default model_mapping, got %+v", antigravityPreset.AccountTemplate.DefaultMetadata["model_mapping"])

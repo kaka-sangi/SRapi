@@ -24,12 +24,13 @@ const (
 )
 
 type antigravityRequest struct {
-	Project     string                         `json:"project"`
-	RequestID   string                         `json:"requestId"`
-	UserAgent   string                         `json:"userAgent"`
-	RequestType string                         `json:"requestType"`
-	Model       string                         `json:"model"`
-	Request     antigravityGenerateTextRequest `json:"request"`
+	Project            string                         `json:"project"`
+	RequestID          string                         `json:"requestId"`
+	UserAgent          string                         `json:"userAgent"`
+	RequestType        string                         `json:"requestType"`
+	Model              string                         `json:"model"`
+	EnabledCreditTypes []string                       `json:"enabledCreditTypes,omitempty"`
+	Request            antigravityGenerateTextRequest `json:"request"`
 }
 
 type antigravityGenerateTextRequest struct {
@@ -106,14 +107,18 @@ func antigravityPayload(req contract.ConversationRequest) (antigravityRequest, e
 		return antigravityRequest{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "antigravity reverse proxy project_id missing"}
 	}
 	inner := antigravityInnerRequest(req)
-	return antigravityRequest{
+	payload := antigravityRequest{
 		Project:     projectID,
 		RequestID:   antigravityRequestID(req),
 		UserAgent:   "antigravity",
 		RequestType: antigravityRequestType(req),
 		Model:       req.Mapping.UpstreamModelName,
 		Request:     inner,
-	}, nil
+	}
+	if antigravityCreditsEnabled(req) {
+		payload.EnabledCreditTypes = []string{"GOOGLE_ONE_AI"}
+	}
+	return payload, nil
 }
 
 func antigravityInnerRequest(req contract.ConversationRequest) antigravityGenerateTextRequest {
@@ -359,6 +364,17 @@ func antigravityReverseProxyAccount(req contract.ConversationRequest) reversepro
 
 func isAntigravityReverseProxy(req contract.ConversationRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-antigravity")
+}
+
+func antigravityCreditsEnabled(req contract.ConversationRequest) bool {
+	for _, values := range []map[string]any{req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range []string{"antigravity_credits_enabled", "antigravity_credits", "antigravity-credits"} {
+			if mapBool(values, key) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func antigravityReverseProxyRuntimeIsAPIKey(req contract.ConversationRequest) bool {

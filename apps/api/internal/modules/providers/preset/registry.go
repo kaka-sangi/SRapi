@@ -273,17 +273,19 @@ func antigravityPreset() Preset {
 	preset.AccountTemplate = &AccountTemplate{
 		UpstreamClient: "antigravity_desktop",
 		DefaultMetadata: map[string]any{
-			"project_id":       "",
-			"model_mapping":    antigravityDefaultModelMapping(),
-			"supported_models": antigravityDefaultSupportedModels(),
+			"project_id":                  "",
+			"antigravity_credits_enabled": false,
+			"model_mapping":               antigravityDefaultModelMapping(),
+			"supported_models":            antigravityDefaultSupportedModels(),
 		},
 		ModelCatalog: []string{"gemini-3-pro-preview", "claude-sonnet-4-6", "claude-haiku-4-5"},
 		MetadataHints: map[string]string{
-			"base_url":         "Antigravity / Google Cloud Code upstream URL",
-			"project_id":       "Google Cloud project id for Antigravity requests",
-			"tls_profile":      "Optional outbound TLS profile for Antigravity traffic",
-			"model_mapping":    "Request model to Antigravity upstream model map",
-			"supported_models": "Antigravity upstream allowlist after model_mapping",
+			"base_url":                    "Antigravity / Google Cloud Code upstream URL",
+			"project_id":                  "Google Cloud project id for Antigravity requests",
+			"antigravity_credits_enabled": "Enable Google One AI credits overage requests with enabledCreditTypes",
+			"tls_profile":                 "Optional outbound TLS profile for Antigravity traffic",
+			"model_mapping":               "Request model to Antigravity upstream model map",
+			"supported_models":            "Antigravity upstream allowlist after model_mapping",
 		},
 	}
 	preset.QuotaConfig = map[string]string{

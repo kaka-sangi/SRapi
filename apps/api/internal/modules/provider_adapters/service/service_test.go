@@ -8713,12 +8713,13 @@ func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing
 		t.Fatalf("expected antigravity OAuth runtime context, got %+v", runtime.request.Account)
 	}
 	var payload struct {
-		Project     string `json:"project"`
-		RequestID   string `json:"requestId"`
-		UserAgent   string `json:"userAgent"`
-		RequestType string `json:"requestType"`
-		Model       string `json:"model"`
-		Request     struct {
+		Project            string   `json:"project"`
+		RequestID          string   `json:"requestId"`
+		UserAgent          string   `json:"userAgent"`
+		RequestType        string   `json:"requestType"`
+		Model              string   `json:"model"`
+		EnabledCreditTypes []string `json:"enabledCreditTypes"`
+		Request            struct {
 			SessionID        string `json:"sessionId"`
 			GenerationConfig struct {
 				MaxOutputTokens int `json:"maxOutputTokens"`
@@ -8738,6 +8739,7 @@ func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing
 		t.Fatalf("decode antigravity openai payload: %v", err)
 	}
 	if payload.Project != "project-1" ||
+		len(payload.EnabledCreditTypes) != 0 ||
 		!strings.HasPrefix(payload.RequestID, "agent-") ||
 		payload.UserAgent != "antigravity" ||
 		payload.RequestType != "agent" ||
@@ -8751,6 +8753,57 @@ func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing
 		len(payload.Request.SafetySettings) == 0 ||
 		payload.Request.SafetySettings[0].Threshold != "OFF" {
 		t.Fatalf("unexpected antigravity openai payload: %+v", payload)
+	}
+}
+
+func TestReverseProxyAntigravityAdapterInjectsEnabledCreditTypesWhenConfigured(t *testing.T) {
+	for name, metadata := range map[string]map[string]any{
+		"canonical": {"antigravity_credits_enabled": true},
+		"legacy":    {"antigravity-credits": "true"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			runtime := capturingRuntime{
+				response: reverseproxycontract.Response{
+					StatusCode: http.StatusOK,
+					Body:       []byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"credits response"}]}}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":3}}}`),
+				},
+			}
+			svc, err := service.NewWithReverseProxy(nil, &runtime)
+			if err != nil {
+				t.Fatalf("create service: %v", err)
+			}
+			metadata["base_url"] = "https://antigravity.example"
+			metadata["project_id"] = "project-1"
+			_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+				RequestID:  "req_antigravity_credits",
+				Model:      "antigravity-local",
+				InputParts: textParts("hello"),
+				Provider: providercontract.Provider{
+					AdapterType: "reverse-proxy-antigravity",
+					Protocol:    "openai-compatible",
+				},
+				Account: accountcontract.ProviderAccount{
+					ID:             19,
+					RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+					UpstreamClient: ptrString("antigravity_desktop"),
+					Metadata:       metadata,
+				},
+				Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "antigravity-openai-upstream"},
+				Credential: map[string]any{"access_token": "antigravity-token"},
+			})
+			if err != nil {
+				t.Fatalf("invoke antigravity credits adapter: %v", err)
+			}
+			var payload struct {
+				EnabledCreditTypes []string `json:"enabledCreditTypes"`
+			}
+			if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+				t.Fatalf("decode antigravity credits payload: %v", err)
+			}
+			if len(payload.EnabledCreditTypes) != 1 || payload.EnabledCreditTypes[0] != "GOOGLE_ONE_AI" {
+				t.Fatalf("expected Google One AI enabled credit type, got %+v", payload.EnabledCreditTypes)
+			}
+		})
 	}
 }
 
