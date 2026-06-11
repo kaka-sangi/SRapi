@@ -713,8 +713,12 @@ type openAIUsage struct {
 	PromptTokensDetails *struct {
 		CachedTokens *int `json:"cached_tokens"`
 	} `json:"prompt_tokens_details"`
+	CompletionTokensDetails *struct {
+		ReasoningTokens *int `json:"reasoning_tokens"`
+	} `json:"completion_tokens_details"`
 	OutputTokensDetails *struct {
-		ImageTokens *int `json:"image_tokens"`
+		ImageTokens     *int `json:"image_tokens"`
+		ReasoningTokens *int `json:"reasoning_tokens"`
 	} `json:"output_tokens_details"`
 }
 
@@ -730,6 +734,13 @@ func (u openAIUsage) ToUsage(text string) contract.Usage {
 	imageOutput := 0
 	if u.OutputTokensDetails != nil {
 		imageOutput = valueOrZero(u.OutputTokensDetails.ImageTokens)
+	}
+	reasoningOutput := 0
+	if u.OutputTokensDetails != nil {
+		reasoningOutput = valueOrZero(u.OutputTokensDetails.ReasoningTokens)
+	}
+	if reasoningOutput == 0 && u.CompletionTokensDetails != nil {
+		reasoningOutput = valueOrZero(u.CompletionTokensDetails.ReasoningTokens)
 	}
 	cached := valueOrZero(u.CachedTokens)
 	if cached == 0 && u.InputTokensDetails != nil {
@@ -756,7 +767,10 @@ func (u openAIUsage) ToUsage(text string) contract.Usage {
 	if output < imageOutput {
 		output = imageOutput
 	}
-	if input == 0 && output == 0 && cached == 0 && imageOutput == 0 && cacheCreation == 0 {
+	if output < reasoningOutput {
+		output = reasoningOutput
+	}
+	if input == 0 && output == 0 && cached == 0 && imageOutput == 0 && reasoningOutput == 0 && cacheCreation == 0 {
 		return estimatedUsage(text)
 	}
 	return contract.Usage{
@@ -813,7 +827,8 @@ func (u openAIUsage) HasTokenUsage() bool {
 		u.CacheCreation1hTokens != nil ||
 		(u.InputTokensDetails != nil && u.InputTokensDetails.CachedTokens != nil) ||
 		(u.PromptTokensDetails != nil && u.PromptTokensDetails.CachedTokens != nil) ||
-		(u.OutputTokensDetails != nil && u.OutputTokensDetails.ImageTokens != nil)
+		(u.CompletionTokensDetails != nil && u.CompletionTokensDetails.ReasoningTokens != nil) ||
+		(u.OutputTokensDetails != nil && (u.OutputTokensDetails.ImageTokens != nil || u.OutputTokensDetails.ReasoningTokens != nil))
 }
 
 func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.ConversationResponse, error) {

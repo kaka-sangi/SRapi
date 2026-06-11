@@ -145,7 +145,8 @@ func TestOpenAIUsagePreservesImageOutputTokens(t *testing.T) {
 	imageOutput := 18
 	usage := openAIUsage{
 		OutputTokensDetails: &struct {
-			ImageTokens *int `json:"image_tokens"`
+			ImageTokens     *int `json:"image_tokens"`
+			ReasoningTokens *int `json:"reasoning_tokens"`
 		}{
 			ImageTokens: &imageOutput,
 		},
@@ -156,6 +157,43 @@ func TestOpenAIUsagePreservesImageOutputTokens(t *testing.T) {
 	}
 	if usage.OutputTokens != 18 || usage.ImageOutputTokens != 18 {
 		t.Fatalf("unexpected image usage: %+v", usage)
+	}
+}
+
+func TestOpenAIUsagePreservesReasoningOutputTokens(t *testing.T) {
+	reasoningOutput := 21
+	usage := openAIUsage{
+		CompletionTokensDetails: &struct {
+			ReasoningTokens *int `json:"reasoning_tokens"`
+		}{
+			ReasoningTokens: &reasoningOutput,
+		},
+	}.ToUsage("think silently")
+
+	if usage.Estimated {
+		t.Fatal("usage should not be estimated when reasoning output tokens are present")
+	}
+	if usage.OutputTokens != 21 {
+		t.Fatalf("output tokens = %d, want reasoning tokens 21: %+v", usage.OutputTokens, usage)
+	}
+}
+
+func TestOpenAIUsagePreservesOutputDetailsReasoningTokens(t *testing.T) {
+	reasoningOutput := 13
+	usage := openAIUsage{
+		OutputTokensDetails: &struct {
+			ImageTokens     *int `json:"image_tokens"`
+			ReasoningTokens *int `json:"reasoning_tokens"`
+		}{
+			ReasoningTokens: &reasoningOutput,
+		},
+	}.ToUsage("think silently")
+
+	if usage.Estimated {
+		t.Fatal("usage should not be estimated when output details reasoning tokens are present")
+	}
+	if usage.OutputTokens != 13 {
+		t.Fatalf("output tokens = %d, want reasoning tokens 13: %+v", usage.OutputTokens, usage)
 	}
 }
 

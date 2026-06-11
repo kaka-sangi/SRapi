@@ -193,10 +193,19 @@ func genericReverseProxyOpenAIUsage(usage map[string]any) openAIUsage {
 			CachedTokens *int `json:"cached_tokens"`
 		}{CachedTokens: genericIntPtr(details["cached_tokens"])}
 	}
+	if details, ok := usage["completion_tokens_details"].(map[string]any); ok {
+		parsed.CompletionTokensDetails = &struct {
+			ReasoningTokens *int `json:"reasoning_tokens"`
+		}{ReasoningTokens: genericIntPtr(details["reasoning_tokens"])}
+	}
 	if details, ok := usage["output_tokens_details"].(map[string]any); ok {
 		parsed.OutputTokensDetails = &struct {
-			ImageTokens *int `json:"image_tokens"`
-		}{ImageTokens: genericIntPtr(details["image_tokens"])}
+			ImageTokens     *int `json:"image_tokens"`
+			ReasoningTokens *int `json:"reasoning_tokens"`
+		}{
+			ImageTokens:     genericIntPtr(details["image_tokens"]),
+			ReasoningTokens: genericIntPtr(details["reasoning_tokens"]),
+		}
 	}
 	return parsed
 }
