@@ -125,7 +125,7 @@ func (e gatewayPricingEvidence) withDefaults() gatewayPricingEvidence {
 }
 
 func (rt *runtimeState) scheduleGatewayRequest(ctx context.Context, req schedulercontract.ScheduleRequest, modelID int, forcedProviderKey string, apiKey apikeycontract.APIKey) (schedulercontract.ScheduleResult, error) {
-	candidates, err := rt.gatewayCandidates(ctx, modelID, forcedProviderKey, apiKey)
+	candidates, err := rt.gatewayCandidates(ctx, modelID, forcedProviderKey, apiKey, req.SourceEndpoint)
 	if err != nil {
 		return schedulercontract.ScheduleResult{}, err
 	}
@@ -188,10 +188,15 @@ const accountCompactModelMappingMetadataKey = "compact_model_mapping"
 // requested canonical model. The failover loop re-schedules on every attempt,
 // so applying to result.Candidate here covers each attempt's chosen account.
 func applyAccountModelMapping(result schedulercontract.ScheduleResult, canonicalModel string, sourceEndpoint string) schedulercontract.ScheduleResult {
-	if override := accountModelOverride(result.Candidate.Account, canonicalModel, sourceEndpoint); override != "" {
-		result.Candidate.Mapping.UpstreamModelName = override
-	}
+	result.Candidate.Mapping = accountEffectiveModelMapping(result.Candidate.Mapping, result.Candidate.Account, canonicalModel, sourceEndpoint)
 	return result
+}
+
+func accountEffectiveModelMapping(mapping modelcontract.ModelProviderMapping, account accountcontract.ProviderAccount, canonicalModel string, sourceEndpoint string) modelcontract.ModelProviderMapping {
+	if override := accountModelOverride(account, canonicalModel, sourceEndpoint); override != "" {
+		mapping.UpstreamModelName = override
+	}
+	return mapping
 }
 
 // accountModelOverride returns the per-account upstream model name configured
@@ -633,7 +638,7 @@ func accountSupportsUpstreamModel(metadata map[string]any, upstreamModelName str
 	return false
 }
 
-func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forcedProviderKey string, apiKey apikeycontract.APIKey) ([]schedulercontract.Candidate, error) {
+func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forcedProviderKey string, apiKey apikeycontract.APIKey, sourceEndpoint string) ([]schedulercontract.Candidate, error) {
 	model, err := rt.models.FindByID(ctx, modelID)
 	if err != nil {
 		return nil, err
@@ -681,10 +686,11 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 			if account.ProviderID != mapping.ProviderID {
 				continue
 			}
-			if accountExcludesModel(account.Metadata, model.CanonicalName, mapping.UpstreamModelName) {
+			effectiveMapping := accountEffectiveModelMapping(mapping, account, model.CanonicalName, sourceEndpoint)
+			if accountExcludesModel(account.Metadata, model.CanonicalName, effectiveMapping.UpstreamModelName) {
 				continue
 			}
-			if !accountSupportsUpstreamModel(account.Metadata, mapping.UpstreamModelName) {
+			if !accountSupportsUpstreamModel(account.Metadata, effectiveMapping.UpstreamModelName) {
 				continue
 			}
 			if len(apiKey.GroupIDs) > 0 && !intersectsInt(apiKey.GroupIDs, groupIDsByAccount[account.ID]) {
@@ -693,7 +699,7 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 			candidates = append(candidates, schedulercontract.Candidate{
 				Account:               account,
 				Provider:              provider,
-				Mapping:               mapping,
+				Mapping:               effectiveMapping,
 				ModelFamily:           optionalStringValue(model.Family),
 				QualityTier:           optionalStringValue(model.QualityTier),
 				EffectiveCapabilities: effectiveCapabilities(model, mapping, provider, account),

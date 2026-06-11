@@ -101,8 +101,9 @@ func TestGatewayAppliesAccountModelMapping(t *testing.T) {
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"map-model","display_name":"Map Model","status":"active","capabilities":[{"key":"streaming","level":"optional","status":"stable","version":"v1"}]}`)
 	// Channel default maps the catalog model to "provider-default-upstream"...
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"provider-default-upstream","status":"active"}`)
-	// ...but this account overrides it to "account-override-upstream".
-	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"map-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","model_mapping":{"map-model":"account-override-upstream"}},"status":"active"}`)
+	// ...but this account only supports the mapped upstream model. Candidate
+	// filtering must evaluate supported_models after model_mapping is applied.
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"map-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","supported_models":["account-override-upstream"],"model_mapping":{"map-model":"account-override-upstream"}},"status":"active"}`)
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 
 	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"map-model","messages":[{"role":"user","content":"hello"}]}`)

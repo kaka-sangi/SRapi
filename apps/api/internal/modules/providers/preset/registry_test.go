@@ -148,6 +148,29 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if antigravityPreset.AccountTemplate.MetadataHints["tls_profile"] == "" {
 		t.Fatalf("expected antigravity template to expose tls_profile metadata hint")
 	}
+	antigravityModelMapping, ok := antigravityPreset.AccountTemplate.DefaultMetadata["model_mapping"].(map[string]string)
+	if !ok {
+		t.Fatalf("expected antigravity template to include default model_mapping, got %+v", antigravityPreset.AccountTemplate.DefaultMetadata["model_mapping"])
+	}
+	for from, want := range map[string]string{
+		"gemini-3-pro-preview":       "gemini-3-pro-high",
+		"claude-haiku-4-5":           "claude-sonnet-4-6",
+		"claude-opus-4-5-20251101":   "claude-opus-4-6-thinking",
+		"gemini-3-pro-image-preview": "gemini-3.1-flash-image",
+	} {
+		if got := antigravityModelMapping[from]; got != want {
+			t.Fatalf("unexpected antigravity default mapping %s=%q, want %q", from, got, want)
+		}
+	}
+	antigravitySupportedModels, ok := antigravityPreset.AccountTemplate.DefaultMetadata["supported_models"].([]string)
+	if !ok {
+		t.Fatalf("expected antigravity template to include supported_models, got %+v", antigravityPreset.AccountTemplate.DefaultMetadata["supported_models"])
+	}
+	for _, want := range []string{"gemini-3-pro-high", "claude-sonnet-4-6", "gemini-3.1-flash-image"} {
+		if !containsString(antigravitySupportedModels, want) {
+			t.Fatalf("expected antigravity supported_models to include %s, got %+v", want, antigravitySupportedModels)
+		}
+	}
 	if !antigravityPreset.Capabilities["chat_completions"] || !antigravityPreset.Capabilities["messages"] || antigravityPreset.Capabilities["embeddings"] {
 		t.Fatalf("unexpected antigravity capabilities: %+v", antigravityPreset.Capabilities)
 	}
@@ -372,6 +395,15 @@ func containsRuntimeClass(values []accountscontract.RuntimeClass, target account
 }
 
 func containsAuthMode(values []AuthMode, target AuthMode) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func containsString(values []string, target string) bool {
 	for _, value := range values {
 		if value == target {
 			return true

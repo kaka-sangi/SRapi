@@ -124,7 +124,11 @@ func (rt *runtimeState) testAccount(ctx context.Context, provider providercontra
 // to this provider/account, matching the gateway scheduling surface.
 func (rt *runtimeState) testAccountLiveProbe(ctx context.Context, provider providercontract.Provider, account accountcontract.ProviderAccount, credential map[string]any, startedAt time.Time, opts adminAccountTestOptions, checks map[string]any) apiopenapi.AdminTestResult {
 	checks["mode"] = adminAccountTestModeLive
-	selection, err := rt.selectAccountTestModel(ctx, provider, account, opts.Model)
+	sourceEndpoint := string(gatewaycontract.EndpointChatCompletions)
+	if strings.EqualFold(strings.TrimSpace(provider.AdapterType), "reverse-proxy-codex-cli") {
+		sourceEndpoint = string(gatewaycontract.EndpointResponses)
+	}
+	selection, err := rt.selectAccountTestModel(ctx, provider, account, opts.Model, sourceEndpoint)
 	if err != nil {
 		checks["live_probe"] = "skipped_no_model"
 		checks["missing_requirements"] = []string{"model"}
@@ -135,10 +139,8 @@ func (rt *runtimeState) testAccountLiveProbe(ctx context.Context, provider provi
 	checks["probe_upstream_model"] = selection.Mapping.UpstreamModelName
 	prompt := adminAccountTestPrompt(opts.Prompt)
 
-	sourceEndpoint := string(gatewaycontract.EndpointChatCompletions)
 	var raw []byte
-	if strings.EqualFold(strings.TrimSpace(provider.AdapterType), "reverse-proxy-codex-cli") {
-		sourceEndpoint = string(gatewaycontract.EndpointResponses)
+	if sourceEndpoint == string(gatewaycontract.EndpointResponses) {
 		checks["live_probe_endpoint"] = sourceEndpoint
 	} else {
 		var err error
@@ -203,7 +205,7 @@ func (rt *runtimeState) testAccountLiveProbe(ctx context.Context, provider provi
 
 func (rt *runtimeState) testAccountResponsesCompact(ctx context.Context, provider providercontract.Provider, account accountcontract.ProviderAccount, credential map[string]any, startedAt time.Time, opts adminAccountTestOptions, checks map[string]any) apiopenapi.AdminTestResult {
 	checks["mode"] = adminAccountTestModeResponsesCompact
-	selection, err := rt.selectAccountTestModel(ctx, provider, account, opts.Model)
+	selection, err := rt.selectAccountTestModel(ctx, provider, account, opts.Model, string(gatewaycontract.EndpointResponsesCompact))
 	if err != nil {
 		checks["missing_requirements"] = []string{"model"}
 		checks["error"] = err.Error()
@@ -302,14 +304,14 @@ func (rt *runtimeState) persistResponsesCompactProbe(ctx context.Context, accoun
 	return err
 }
 
-func (rt *runtimeState) selectAccountTestModel(ctx context.Context, provider providercontract.Provider, account accountcontract.ProviderAccount, requested string) (accountTestModelSelection, error) {
+func (rt *runtimeState) selectAccountTestModel(ctx context.Context, provider providercontract.Provider, account accountcontract.ProviderAccount, requested string, sourceEndpoint string) (accountTestModelSelection, error) {
 	requested = strings.TrimSpace(requested)
 	if requested != "" {
 		resolution, err := rt.models.ResolveModelReference(ctx, requested)
 		if err != nil || resolution.Model.Status != modelcontract.StatusActive {
 			return accountTestModelSelection{}, fmt.Errorf("requested model is not a registered active model")
 		}
-		mapping, err := activeProviderMappingForModel(ctx, rt.models, resolution.Model.ID, provider.ID, account.Metadata, resolution.Model.CanonicalName)
+		mapping, err := activeProviderMappingForModel(ctx, rt.models, resolution.Model.ID, provider.ID, account, resolution.Model.CanonicalName, sourceEndpoint)
 		if err != nil {
 			return accountTestModelSelection{}, err
 		}
@@ -327,7 +329,7 @@ func (rt *runtimeState) selectAccountTestModel(ctx context.Context, provider pro
 		if model.Status != modelcontract.StatusActive {
 			continue
 		}
-		mapping, err := activeProviderMappingForModel(ctx, rt.models, model.ID, provider.ID, account.Metadata, model.CanonicalName)
+		mapping, err := activeProviderMappingForModel(ctx, rt.models, model.ID, provider.ID, account, model.CanonicalName, sourceEndpoint)
 		if err == nil {
 			return accountTestModelSelection{Model: model, Mapping: mapping}, nil
 		}
@@ -337,7 +339,7 @@ func (rt *runtimeState) selectAccountTestModel(ctx context.Context, provider pro
 
 func activeProviderMappingForModel(ctx context.Context, models interface {
 	ListMappingsByModel(context.Context, int) ([]modelcontract.ModelProviderMapping, error)
-}, modelID int, providerID int, accountMetadata map[string]any, canonicalName string) (modelcontract.ModelProviderMapping, error) {
+}, modelID int, providerID int, account accountcontract.ProviderAccount, canonicalName string, sourceEndpoint string) (modelcontract.ModelProviderMapping, error) {
 	mappings, err := models.ListMappingsByModel(ctx, modelID)
 	if err != nil {
 		return modelcontract.ModelProviderMapping{}, fmt.Errorf("model mapping list failed")
@@ -346,13 +348,14 @@ func activeProviderMappingForModel(ctx context.Context, models interface {
 		if mapping.ProviderID != providerID || mapping.Status != modelcontract.StatusActive || strings.TrimSpace(mapping.UpstreamModelName) == "" {
 			continue
 		}
-		if accountExcludesModel(accountMetadata, canonicalName, mapping.UpstreamModelName) {
+		effectiveMapping := accountEffectiveModelMapping(mapping, account, canonicalName, sourceEndpoint)
+		if accountExcludesModel(account.Metadata, canonicalName, effectiveMapping.UpstreamModelName) {
 			continue
 		}
-		if !accountSupportsUpstreamModel(accountMetadata, mapping.UpstreamModelName) {
+		if !accountSupportsUpstreamModel(account.Metadata, effectiveMapping.UpstreamModelName) {
 			continue
 		}
-		return mapping, nil
+		return effectiveMapping, nil
 	}
 	return modelcontract.ModelProviderMapping{}, fmt.Errorf("registered model is not mapped to this provider")
 }

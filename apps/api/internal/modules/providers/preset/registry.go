@@ -273,12 +273,17 @@ func antigravityPreset() Preset {
 	preset.AccountTemplate = &AccountTemplate{
 		UpstreamClient: "antigravity_desktop",
 		DefaultMetadata: map[string]any{
-			"project_id": "",
+			"project_id":       "",
+			"model_mapping":    antigravityDefaultModelMapping(),
+			"supported_models": antigravityDefaultSupportedModels(),
 		},
-		ModelCatalog: []string{"gemini-3-pro-preview", "claude-sonnet-4-6"},
+		ModelCatalog: []string{"gemini-3-pro-preview", "claude-sonnet-4-6", "claude-haiku-4-5"},
 		MetadataHints: map[string]string{
-			"base_url":   "Antigravity / Google Cloud Code upstream URL",
-			"project_id": "Google Cloud project id for Antigravity requests",
+			"base_url":         "Antigravity / Google Cloud Code upstream URL",
+			"project_id":       "Google Cloud project id for Antigravity requests",
+			"tls_profile":      "Optional outbound TLS profile for Antigravity traffic",
+			"model_mapping":    "Request model to Antigravity upstream model map",
+			"supported_models": "Antigravity upstream allowlist after model_mapping",
 		},
 	}
 	preset.QuotaConfig = map[string]string{
@@ -293,6 +298,64 @@ func antigravityPreset() Preset {
 	}
 	preset.OAuthConfig = googleOAuthConfig()
 	return preset
+}
+
+func antigravityDefaultModelMapping() map[string]string {
+	return map[string]string{
+		"claude-fable-5":                 "claude-fable-5",
+		"claude-opus-4-8":                "claude-opus-4-8",
+		"claude-opus-4-7":                "claude-opus-4-7",
+		"claude-opus-4-6-thinking":       "claude-opus-4-6-thinking",
+		"claude-opus-4-6":                "claude-opus-4-6-thinking",
+		"claude-opus-4-5-thinking":       "claude-opus-4-6-thinking",
+		"claude-sonnet-4-6":              "claude-sonnet-4-6",
+		"claude-sonnet-4-5":              "claude-sonnet-4-5",
+		"claude-sonnet-4-5-thinking":     "claude-sonnet-4-5-thinking",
+		"claude-opus-4-5-20251101":       "claude-opus-4-6-thinking",
+		"claude-sonnet-4-5-20250929":     "claude-sonnet-4-5",
+		"claude-haiku-4-5":               "claude-sonnet-4-6",
+		"claude-haiku-4-5-20251001":      "claude-sonnet-4-6",
+		"gemini-2.5-flash":               "gemini-2.5-flash",
+		"gemini-2.5-flash-image":         "gemini-2.5-flash-image",
+		"gemini-2.5-flash-image-preview": "gemini-2.5-flash-image",
+		"gemini-2.5-flash-lite":          "gemini-2.5-flash-lite",
+		"gemini-2.5-flash-thinking":      "gemini-2.5-flash-thinking",
+		"gemini-2.5-pro":                 "gemini-2.5-pro",
+		"gemini-3-flash":                 "gemini-3-flash",
+		"gemini-3-pro-high":              "gemini-3-pro-high",
+		"gemini-3-pro-low":               "gemini-3-pro-low",
+		"gemini-3-flash-preview":         "gemini-3-flash",
+		"gemini-3-pro-preview":           "gemini-3-pro-high",
+		"gemini-3.1-pro-high":            "gemini-3.1-pro-high",
+		"gemini-3.1-pro-low":             "gemini-3.1-pro-low",
+		"gemini-3.1-pro-preview":         "gemini-3.1-pro-high",
+		"gemini-3.1-flash-image":         "gemini-3.1-flash-image",
+		"gemini-3.1-flash-image-preview": "gemini-3.1-flash-image",
+		"gemini-3-pro-image":             "gemini-3.1-flash-image",
+		"gemini-3-pro-image-preview":     "gemini-3.1-flash-image",
+		"gpt-oss-120b-medium":            "gpt-oss-120b-medium",
+		"tab_flash_lite_preview":         "tab_flash_lite_preview",
+	}
+}
+
+func antigravityDefaultSupportedModels() []string {
+	values := antigravityDefaultModelMapping()
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, model := range values {
+		model = strings.TrimSpace(model)
+		if model == "" {
+			continue
+		}
+		key := strings.ToLower(model)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, model)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func chatGPTWebPreset() Preset {
