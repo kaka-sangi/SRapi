@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
@@ -39,6 +40,7 @@ type geminiGenerationConfig struct {
 	StopSequences    []string       `json:"stopSequences,omitempty"`
 	ResponseMimeType string         `json:"responseMimeType,omitempty"`
 	ResponseSchema   map[string]any `json:"responseSchema,omitempty"`
+	ThinkingConfig   map[string]any `json:"thinkingConfig,omitempty"`
 }
 
 func geminiCompatiblePayload(req contract.ConversationRequest) geminiGenerateContentRequest {
@@ -230,10 +232,101 @@ func geminiCompatibleGenerationConfig(req contract.ConversationRequest) *geminiG
 		cfg.ResponseMimeType = geminiResponseMimeType(req.ResponseFormat)
 		cfg.ResponseSchema = geminiResponseSchema(req.ResponseFormat)
 	}
-	if cfg.Temperature == nil && cfg.TopP == nil && cfg.MaxOutputTokens == nil && len(cfg.StopSequences) == 0 && cfg.ResponseMimeType == "" && len(cfg.ResponseSchema) == 0 {
+	cfg.ThinkingConfig = geminiThinkingConfig(req.Reasoning)
+	if cfg.Temperature == nil && cfg.TopP == nil && cfg.MaxOutputTokens == nil && len(cfg.StopSequences) == 0 && cfg.ResponseMimeType == "" && len(cfg.ResponseSchema) == 0 && len(cfg.ThinkingConfig) == 0 {
 		return nil
 	}
 	return cfg
+}
+
+func geminiThinkingConfig(reasoning map[string]any) map[string]any {
+	if len(reasoning) == 0 {
+		return nil
+	}
+	if budget, ok := geminiThinkingBudget(reasoning); ok {
+		return map[string]any{
+			"thinkingBudget":  budget,
+			"includeThoughts": budget != 0,
+		}
+	}
+	effort := strings.ToLower(strings.TrimSpace(firstNonEmpty(
+		metadataString(reasoning, "effort"),
+		metadataString(reasoning, "level"),
+	)))
+	if effort == "" {
+		return nil
+	}
+	if effort == "none" {
+		return map[string]any{
+			"thinkingBudget":  0,
+			"includeThoughts": false,
+		}
+	}
+	if budget, ok := geminiThinkingBudgetForEffort(effort); ok {
+		return map[string]any{
+			"thinkingBudget":  budget,
+			"includeThoughts": true,
+		}
+	}
+	return nil
+}
+
+func geminiThinkingBudget(reasoning map[string]any) (int, bool) {
+	for _, key := range []string{"budget_tokens", "thinking_budget", "thinkingBudget", "budget"} {
+		if budget, ok := intFromAny(reasoning[key]); ok && budget >= -1 {
+			return budget, true
+		}
+	}
+	return 0, false
+}
+
+func geminiThinkingBudgetForEffort(effort string) (int, bool) {
+	switch strings.ToLower(strings.TrimSpace(effort)) {
+	case "auto":
+		return -1, true
+	case "minimal":
+		return 512, true
+	case "low":
+		return 1024, true
+	case "medium":
+		return 8192, true
+	case "high":
+		return 24576, true
+	case "xhigh":
+		return 32768, true
+	default:
+		return 0, false
+	}
+}
+
+func intFromAny(value any) (int, bool) {
+	switch typed := value.(type) {
+	case int:
+		return typed, true
+	case int8:
+		return int(typed), true
+	case int16:
+		return int(typed), true
+	case int32:
+		return int(typed), true
+	case int64:
+		return int(typed), true
+	case float32:
+		return int(typed), true
+	case float64:
+		return int(typed), true
+	case json.Number:
+		parsed, err := typed.Int64()
+		if err == nil {
+			return int(parsed), true
+		}
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(typed))
+		if err == nil {
+			return parsed, true
+		}
+	}
+	return 0, false
 }
 
 func geminiResponseMimeType(format map[string]any) string {

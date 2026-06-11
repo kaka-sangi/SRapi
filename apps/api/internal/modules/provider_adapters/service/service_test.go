@@ -2572,6 +2572,82 @@ func TestGeminiPresetOAuthRuntimeIsNotSupported(t *testing.T) {
 	assertProviderError(t, err, "not_supported", http.StatusBadRequest)
 }
 
+func TestGeminiCompatibleAdapterSendsCanonicalReasoningEffort(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		generationConfig, _ := payload["generationConfig"].(map[string]any)
+		thinkingConfig, _ := generationConfig["thinkingConfig"].(map[string]any)
+		if thinkingConfig["thinkingBudget"] != float64(8192) || thinkingConfig["includeThoughts"] != true {
+			t.Fatalf("expected medium reasoning effort as Gemini thinking budget, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"gemini reasoned ok"}]}}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_reasoning_effort",
+		Model:      "gemini-local",
+		InputParts: textParts("think"),
+		Reasoning:  map[string]any{"effort": "medium"},
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke Gemini upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "gemini reasoned ok" {
+		t.Fatalf("unexpected Gemini reasoning response: %+v", resp)
+	}
+}
+
+func TestGeminiCompatibleAdapterSendsCanonicalReasoningBudgetDisabled(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		generationConfig, _ := payload["generationConfig"].(map[string]any)
+		thinkingConfig, _ := generationConfig["thinkingConfig"].(map[string]any)
+		if thinkingConfig["thinkingBudget"] != float64(0) || thinkingConfig["includeThoughts"] != false {
+			t.Fatalf("expected zero reasoning budget to disable Gemini thoughts, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"gemini no thoughts ok"}]}}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_reasoning_budget_disabled",
+		Model:      "gemini-local",
+		InputParts: textParts("think"),
+		Reasoning:  map[string]any{"budget_tokens": 0},
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke Gemini upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "gemini no thoughts ok" {
+		t.Fatalf("unexpected Gemini reasoning response: %+v", resp)
+	}
+}
+
 func TestGeminiCompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload map[string]any
