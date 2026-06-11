@@ -31,7 +31,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { FormSkeleton } from "@/components/charts/chart-skeleton";
 import { TagInput } from "@/components/ui/tag-input";
 import { MultiSelect, type MultiSelectOption } from "@/components/ui/multi-select";

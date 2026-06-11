@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { CheckCircle2, XCircle, Loader2, Play, ShieldCheck } from "lucide-react";
 import {
   Dialog,
@@ -10,10 +11,25 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/admin-format";
-import type { AdminTestResult } from "@/lib/sdk-types";
+import type { AdminAccountTestRequest, AdminTestResult, Model } from "@/lib/sdk-types";
+
+const MODEL_AUTO = "__auto__";
+const DEFAULT_MODE: NonNullable<AdminAccountTestRequest["mode"]> = "live";
+const DEFAULT_PROMPT = "Reply with OK.";
+
+type AccountTestMode = NonNullable<AdminAccountTestRequest["mode"]>;
 
 function formatLatency(ms: number | undefined): string {
   if (ms == null) return "—";
@@ -49,14 +65,14 @@ function resultToText(name: string, result: AdminTestResult | undefined, error: 
  * AccountTestDialog — presents a provider-account connectivity/capability test
  * (status, latency, message, per-check breakdown) in a terminal-style panel,
  * instead of a bare ok/fail badge. Purely presentational: the parent owns the
- * mutation and kicks it off when opening (so there's no fetch-in-effect), and
- * passes its live state in. The footer "run again" button re-triggers `onRun`.
+ * mutation; this dialog only builds the selected mode/model/prompt request.
  */
 export function AccountTestDialog({
   open,
   onOpenChange,
   accountName,
   onRun,
+  models,
   result,
   errorMessage,
   isPending,
@@ -64,24 +80,42 @@ export function AccountTestDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accountName: string;
-  onRun: () => void;
+  onRun: (body: AdminAccountTestRequest) => void;
+  models: Model[];
   result?: AdminTestResult;
   errorMessage?: string | null;
   isPending: boolean;
 }) {
   const { t } = useLanguage();
+  const activeModels = useMemo(
+    () =>
+      models
+        .filter((model) => model.status === "active")
+        .sort((a, b) => a.canonical_name.localeCompare(b.canonical_name)),
+    [models],
+  );
+  const [mode, setMode] = useState<AccountTestMode>(DEFAULT_MODE);
+  const [model, setModel] = useState(MODEL_AUTO);
+  const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
 
   const error = errorMessage ?? null;
-  // "Nothing yet" (just opened, mutation not flushed) reads as loading so the
-  // panel never flashes an empty/idle frame.
-  const loading = isPending || (!result && !error);
+  const loading = isPending;
   const ok = !loading && !error && result?.ok === true;
   const failed = !loading && (error != null || result?.ok === false);
   const checks = (result?.checks as Record<string, unknown> | undefined) ?? undefined;
+  const promptDisabled = mode === "default";
+
+  function run() {
+    const body: AdminAccountTestRequest = { mode };
+    if (model !== MODEL_AUTO) body.model = model;
+    const trimmedPrompt = prompt.trim();
+    if (mode !== "default" && trimmedPrompt) body.prompt = trimmedPrompt;
+    onRun(body);
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShieldCheck className="size-4 text-srapi-text-tertiary" />
@@ -91,6 +125,50 @@ export function AccountTestDialog({
             {accountName}
           </DialogDescription>
         </DialogHeader>
+
+        <div className="grid gap-3 rounded-lg border border-srapi-border bg-srapi-card-muted p-3.5 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="account-test-mode">{t("providers.testMode")}</Label>
+            <Select value={mode} onValueChange={(next) => setMode(next as AccountTestMode)}>
+              <SelectTrigger id="account-test-mode" className="rounded-lg bg-srapi-card">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="live">{t("providers.testModeLive")}</SelectItem>
+                <SelectItem value="responses_compact">{t("providers.testModeCompact")}</SelectItem>
+                <SelectItem value="default">{t("providers.testModeDefault")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="account-test-model">{t("providers.testModel")}</Label>
+            <Select value={model} onValueChange={setModel} disabled={mode === "default"}>
+              <SelectTrigger id="account-test-model" className="rounded-lg bg-srapi-card">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={MODEL_AUTO}>{t("providers.testModelAuto")}</SelectItem>
+                {activeModels.map((item) => (
+                  <SelectItem key={item.id} value={item.canonical_name}>
+                    {item.display_name || item.canonical_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="account-test-prompt">{t("providers.testPrompt")}</Label>
+            <Textarea
+              id="account-test-prompt"
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              disabled={promptDisabled}
+              maxLength={4000}
+              className="min-h-24 rounded-lg bg-srapi-card"
+              placeholder={DEFAULT_PROMPT}
+            />
+          </div>
+        </div>
 
         {/* Result panel — mono, status-tinted */}
         <div className="overflow-hidden rounded-lg border border-srapi-border bg-srapi-card-muted p-3.5 font-mono text-xs">
@@ -118,7 +196,9 @@ export function AccountTestDialog({
                   {formatLatency(result?.latency_ms)}
                 </span>
               </>
-            ) : null}
+            ) : (
+              <span className="text-srapi-text-tertiary">{t("providers.testReady")}</span>
+            )}
           </div>
 
           {!loading && (error || result?.message) ? (
@@ -156,9 +236,9 @@ export function AccountTestDialog({
 
         <div className="flex items-center justify-end gap-2">
           <CopyButton value={resultToText(accountName, result, error)} label={t("common.copy")} />
-          <Button variant="outline" size="sm" onClick={onRun} loading={isPending}>
+          <Button variant="primary" size="sm" onClick={run} loading={isPending}>
             <Play className="size-3.5" />
-            {!loading ? t("providers.testRerun") : t("providers.test")}
+            {result || error ? t("providers.testRerun") : t("providers.test")}
           </Button>
         </div>
       </DialogContent>

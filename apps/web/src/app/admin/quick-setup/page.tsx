@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -21,35 +20,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAdminProxies, useDiscoverAccountModels } from "@/hooks/admin-queries";
+import {
+  useAdminProxies,
+  useDiscoverAccountModels,
+  useRunQuickSetup,
+} from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { cn } from "@/lib/cn";
 import { ADMIN_ROUTES } from "@/lib/routes";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface QuickSetupBody {
-  platform: string;
-  credential: Record<string, string>;
-  name?: string;
-  runtime_class?: string;
-  model_catalog?: string[];
-  proxy_id?: string;
-  priority?: number;
-  weight?: number;
-}
-
-interface QuickSetupResult {
-  provider: Record<string, unknown>;
-  account: Record<string, unknown>;
-  models_created: number;
-  mappings_created: number;
-  model_names?: string[];
-  warnings?: string[];
-}
+import type { AdminQuickSetupRequestWritable, AdminQuickSetupResult } from "@/lib/sdk-types";
 
 // ---------------------------------------------------------------------------
 // Platform presets (mirrors backend provider/preset registry)
@@ -134,41 +114,6 @@ const PLATFORMS: PlatformPreset[] = [
     defaultModels: ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro", "deepseek/deepseek-r1", "meta-llama/llama-4-scout"],
   },
 ];
-
-// ---------------------------------------------------------------------------
-// Raw admin fetch (endpoint not yet in the generated SDK)
-// ---------------------------------------------------------------------------
-
-const CSRF_KEY = "srapi_csrf_token";
-
-function baseUrl(): string {
-  return (process.env.NEXT_PUBLIC_SRAPI_BASE_URL || "").replace(/\/+$/, "");
-}
-
-function csrfToken(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem(CSRF_KEY) ?? "";
-}
-
-async function postQuickSetup(body: QuickSetupBody): Promise<QuickSetupResult> {
-  const res = await fetch(`${baseUrl()}/api/v1/admin/quick-setup`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRF-Token": csrfToken(),
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const json = (await res.json().catch(() => null)) as {
-      error?: { message?: string };
-    } | null;
-    throw new Error(json?.error?.message || `Quick setup failed (${res.status})`);
-  }
-  const json = (await res.json()) as { data: QuickSetupResult };
-  return json.data;
-}
 
 // ---------------------------------------------------------------------------
 // Platform icon abbreviations
@@ -271,7 +216,7 @@ function QuickSetupContent() {
   const [step, setStep] = useState<Step>("platform");
   const [platform, setPlatform] = useState<PlatformPreset | null>(null);
   const [authType, setAuthType] = useState<AuthType>("api_key");
-  const [result, setResult] = useState<QuickSetupResult | null>(null);
+  const [result, setResult] = useState<AdminQuickSetupResult | null>(null);
 
   // Credential fields
   const [apiKey, setApiKey] = useState("");
@@ -286,21 +231,34 @@ function QuickSetupContent() {
   const [weight, setWeight] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const mutation = useMutation({
-    mutationFn: postQuickSetup,
-    onSuccess: (data) => {
-      setResult(data);
-      setStep("result");
-      toast({ title: t("adminQuickSetup.success"), tone: "success" });
-    },
-    onError: (err: Error) => {
-      toast({
-        title: t("feedback.failed"),
-        description: err.message,
-        tone: "error",
-      });
-    },
-  });
+  const mutation = useRunQuickSetup();
+
+  function handleSuccess(data: AdminQuickSetupResult) {
+    setResult(data);
+    setStep("result");
+    toast({ title: t("adminQuickSetup.success"), tone: "success" });
+  }
+
+  function handleError(err: Error) {
+    toast({
+      title: t("feedback.failed"),
+      description: err.message,
+      tone: "error",
+    });
+  }
+
+  function submitQuickSetup(body: AdminQuickSetupRequestWritable) {
+    mutation.mutate(body, {
+      onSuccess: handleSuccess,
+      onError: handleError,
+    });
+  }
+
+  function resetMutation() {
+    mutation.reset();
+  }
+
+  const isSubmitting = mutation.isPending;
 
   function selectPlatform(p: PlatformPreset) {
     setPlatform(p);
@@ -329,7 +287,7 @@ function QuickSetupContent() {
   function handleSubmit() {
     if (!platform) return;
 
-    const credential: Record<string, string> =
+    const credential: AdminQuickSetupRequestWritable["credential"] =
       authType === "oauth_refresh"
         ? { access_token: accessToken, refresh_token: refreshToken }
         : { api_key: apiKey };
@@ -341,7 +299,7 @@ function QuickSetupContent() {
           ? [...platform.defaultModels]
           : undefined;
 
-    const body: QuickSetupBody = {
+    const body: AdminQuickSetupRequestWritable = {
       platform: platform.key,
       credential,
       name: accountName || undefined,
@@ -353,7 +311,7 @@ function QuickSetupContent() {
     if (priority) body.priority = parseInt(priority, 10);
     if (weight) body.weight = parseFloat(weight);
 
-    mutation.mutate(body);
+    submitQuickSetup(body);
   }
 
   function reset() {
@@ -369,7 +327,7 @@ function QuickSetupContent() {
     setPriority("");
     setWeight("");
     setShowAdvanced(false);
-    mutation.reset();
+    resetMutation();
   }
 
   return (
@@ -415,7 +373,7 @@ function QuickSetupContent() {
           onWeightChange={setWeight}
           showAdvanced={showAdvanced}
           onToggleAdvanced={() => setShowAdvanced((v) => !v)}
-          isPending={mutation.isPending}
+          isPending={isSubmitting}
           onSubmit={handleSubmit}
           onBack={() => setStep("platform")}
           t={t}
@@ -428,7 +386,6 @@ function QuickSetupContent() {
     </>
   );
 }
-
 // ---------------------------------------------------------------------------
 // Step 1: Platform grid
 // ---------------------------------------------------------------------------
@@ -836,7 +793,7 @@ function ResultView({
   onReset,
   t,
 }: {
-  result: QuickSetupResult;
+  result: AdminQuickSetupResult;
   onReset: () => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
 }) {

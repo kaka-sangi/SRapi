@@ -28,8 +28,14 @@ const (
 )
 
 type adminAccountTestOptions struct {
-	Mode  string
-	Model string
+	Mode   string
+	Model  string
+	Prompt string
+}
+
+type accountTestModelSelection struct {
+	Model   modelcontract.Model
+	Mapping modelcontract.ModelProviderMapping
 }
 
 func (rt *runtimeState) testProvider(ctx context.Context, provider providercontract.Provider, startedAt time.Time) apiopenapi.AdminTestResult {
@@ -112,40 +118,51 @@ func (rt *runtimeState) testAccount(ctx context.Context, provider providercontra
 	return adminTestResult(true, message, startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
 }
 
-// testAccountLiveProbe issues a real minimal chat-completions round-trip through
-// the same adapter the gateway uses, so OAuth/reverse-proxy/api_key accounts are
-// verified against the real upstream (closing the "fake green light" gap where
-// the default test only inspected fields). The model comes from opts.Model or an
-// account/provider probe-model hint; without one the probe is skipped.
+// testAccountLiveProbe issues a real minimal round-trip through the same adapter
+// the gateway uses, so OAuth/reverse-proxy/api_key accounts are verified against
+// the real upstream. The model is selected from registered active models mapped
+// to this provider/account, matching the gateway scheduling surface.
 func (rt *runtimeState) testAccountLiveProbe(ctx context.Context, provider providercontract.Provider, account accountcontract.ProviderAccount, credential map[string]any, startedAt time.Time, opts adminAccountTestOptions, checks map[string]any) apiopenapi.AdminTestResult {
 	checks["mode"] = adminAccountTestModeLive
-	model := responsesCompactProbeModel(opts.Model, account, provider)
-	if model == "" {
+	selection, err := rt.selectAccountTestModel(ctx, provider, account, opts.Model)
+	if err != nil {
 		checks["live_probe"] = "skipped_no_model"
 		checks["missing_requirements"] = []string{"model"}
-		return adminTestResult(false, "live account test requires a model (pass \"model\" or set account metadata test_model)", startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
+		checks["error"] = err.Error()
+		return adminTestResult(false, "live account test requires a registered active model mapped to this provider", startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
 	}
-	checks["probe_model"] = model
+	checks["probe_model"] = selection.Model.CanonicalName
+	checks["probe_upstream_model"] = selection.Mapping.UpstreamModelName
+	prompt := adminAccountTestPrompt(opts.Prompt)
 
-	raw, err := json.Marshal(map[string]any{
-		"model":    model,
-		"messages": []map[string]any{{"role": "user", "content": "Reply with OK."}},
-	})
-	if err != nil {
-		checks["error"] = "live_probe_payload_failed"
-		return adminTestResult(false, "live account test failed", startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
+	sourceEndpoint := string(gatewaycontract.EndpointChatCompletions)
+	var raw []byte
+	if strings.EqualFold(strings.TrimSpace(provider.AdapterType), "reverse-proxy-codex-cli") {
+		sourceEndpoint = string(gatewaycontract.EndpointResponses)
+		checks["live_probe_endpoint"] = sourceEndpoint
+	} else {
+		var err error
+		raw, err = json.Marshal(map[string]any{
+			"model":    selection.Mapping.UpstreamModelName,
+			"messages": []map[string]any{{"role": "user", "content": prompt}},
+		})
+		if err != nil {
+			checks["error"] = "live_probe_payload_failed"
+			return adminTestResult(false, "live account test failed", startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
+		}
+		checks["live_probe_endpoint"] = sourceEndpoint
 	}
 	resp, err := rt.adapters.InvokeConversation(ctx, provideradaptercontract.ConversationRequest{
 		RequestID:      fmt.Sprintf("admin_account_%d_live_test", account.ID),
 		SourceProtocol: string(gatewaycontract.ProtocolOpenAICompatible),
-		SourceEndpoint: string(gatewaycontract.EndpointChatCompletions),
+		SourceEndpoint: sourceEndpoint,
 		TargetProtocol: provider.Protocol,
-		Model:          model,
-		InputParts:     []provideradaptercontract.ContentPart{{Kind: provideradaptercontract.ContentPartText, Text: "Reply with OK."}},
+		Model:          selection.Model.CanonicalName,
+		InputParts:     []provideradaptercontract.ContentPart{{Kind: provideradaptercontract.ContentPartText, Text: prompt}},
 		RawBody:        raw,
 		Provider:       provider,
 		Account:        account,
-		Mapping:        responsesCompactProbeMapping(model),
+		Mapping:        selection.Mapping,
 		Credential:     credential,
 	})
 	if err == nil {
@@ -156,6 +173,10 @@ func (rt *runtimeState) testAccountLiveProbe(ctx context.Context, provider provi
 		checks["live_probe"] = "ok"
 		checks["upstream_reachable"] = true
 		checks["upstream_status"] = statusCode
+		if len(resp.QuotaSignals) > 0 {
+			rt.recordProviderQuotaSignals(ctx, account, resp.QuotaSignals, time.Now().UTC())
+			checks["quota_signals_persisted"] = len(resp.QuotaSignals)
+		}
 		return adminTestResult(true, "provider account verified against upstream", startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
 	}
 
@@ -182,16 +203,19 @@ func (rt *runtimeState) testAccountLiveProbe(ctx context.Context, provider provi
 
 func (rt *runtimeState) testAccountResponsesCompact(ctx context.Context, provider providercontract.Provider, account accountcontract.ProviderAccount, credential map[string]any, startedAt time.Time, opts adminAccountTestOptions, checks map[string]any) apiopenapi.AdminTestResult {
 	checks["mode"] = adminAccountTestModeResponsesCompact
-	model := responsesCompactProbeModel(opts.Model, account, provider)
-	if model == "" {
+	selection, err := rt.selectAccountTestModel(ctx, provider, account, opts.Model)
+	if err != nil {
 		checks["missing_requirements"] = []string{"model"}
-		return adminTestResult(false, "responses compact account test requires model", startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
+		checks["error"] = err.Error()
+		return adminTestResult(false, "responses compact account test requires a registered active model mapped to this provider", startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
 	}
-	checks["probe_model"] = model
+	checks["probe_model"] = selection.Model.CanonicalName
+	checks["probe_upstream_model"] = selection.Mapping.UpstreamModelName
+	prompt := adminAccountTestPrompt(opts.Prompt)
 
 	raw, err := json.Marshal(map[string]any{
-		"model": model,
-		"input": "Respond with OK.",
+		"model": selection.Mapping.UpstreamModelName,
+		"input": prompt,
 	})
 	if err != nil {
 		checks["error"] = "compact_probe_payload_failed"
@@ -202,15 +226,15 @@ func (rt *runtimeState) testAccountResponsesCompact(ctx context.Context, provide
 		SourceProtocol: string(gatewaycontract.ProtocolOpenAICompatible),
 		SourceEndpoint: string(gatewaycontract.EndpointResponsesCompact),
 		TargetProtocol: provider.Protocol,
-		Model:          model,
+		Model:          selection.Model.CanonicalName,
 		InputParts: []provideradaptercontract.ContentPart{{
 			Kind: provideradaptercontract.ContentPartText,
-			Text: "Respond with OK.",
+			Text: prompt,
 		}},
 		RawBody:    raw,
 		Provider:   provider,
 		Account:    account,
-		Mapping:    responsesCompactProbeMapping(model),
+		Mapping:    selection.Mapping,
 		Credential: credential,
 	})
 	if err == nil {
@@ -225,6 +249,10 @@ func (rt *runtimeState) testAccountResponsesCompact(ctx context.Context, provide
 			return adminTestResult(false, "responses compact probe succeeded but metadata update failed", startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
 		}
 		checks["metadata_persisted"] = true
+		if len(resp.QuotaSignals) > 0 {
+			rt.recordProviderQuotaSignals(ctx, account, resp.QuotaSignals, time.Now().UTC())
+			checks["quota_signals_persisted"] = len(resp.QuotaSignals)
+		}
 		return adminTestResult(true, "provider account supports responses compact", startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), ptrID(account.ID), checks)
 	}
 
@@ -274,22 +302,59 @@ func (rt *runtimeState) persistResponsesCompactProbe(ctx context.Context, accoun
 	return err
 }
 
-func responsesCompactProbeModel(requested string, account accountcontract.ProviderAccount, provider providercontract.Provider) string {
-	if model := strings.TrimSpace(requested); model != "" {
-		return model
+func (rt *runtimeState) selectAccountTestModel(ctx context.Context, provider providercontract.Provider, account accountcontract.ProviderAccount, requested string) (accountTestModelSelection, error) {
+	requested = strings.TrimSpace(requested)
+	if requested != "" {
+		resolution, err := rt.models.ResolveModelReference(ctx, requested)
+		if err != nil || resolution.Model.Status != modelcontract.StatusActive {
+			return accountTestModelSelection{}, fmt.Errorf("requested model is not a registered active model")
+		}
+		mapping, err := activeProviderMappingForModel(ctx, rt.models, resolution.Model.ID, provider.ID, account.Metadata, resolution.Model.CanonicalName)
+		if err != nil {
+			return accountTestModelSelection{}, err
+		}
+		return accountTestModelSelection{Model: resolution.Model, Mapping: mapping}, nil
 	}
-	for _, values := range []map[string]any{account.Metadata, provider.ConfigSchema, provider.Capabilities} {
-		for _, key := range []string{"responses_compact_probe_model", "compact_probe_model", "test_model"} {
-			if value := mapString(values, key); value != "" {
-				return value
-			}
+
+	models, err := rt.models.List(ctx)
+	if err != nil {
+		return accountTestModelSelection{}, fmt.Errorf("model list failed")
+	}
+	sort.Slice(models, func(i, j int) bool {
+		return strings.ToLower(models[i].CanonicalName) < strings.ToLower(models[j].CanonicalName)
+	})
+	for _, model := range models {
+		if model.Status != modelcontract.StatusActive {
+			continue
+		}
+		mapping, err := activeProviderMappingForModel(ctx, rt.models, model.ID, provider.ID, account.Metadata, model.CanonicalName)
+		if err == nil {
+			return accountTestModelSelection{Model: model, Mapping: mapping}, nil
 		}
 	}
-	return ""
+	return accountTestModelSelection{}, fmt.Errorf("no registered active model is mapped to this provider")
 }
 
-func responsesCompactProbeMapping(model string) modelcontract.ModelProviderMapping {
-	return modelcontract.ModelProviderMapping{UpstreamModelName: model}
+func activeProviderMappingForModel(ctx context.Context, models interface {
+	ListMappingsByModel(context.Context, int) ([]modelcontract.ModelProviderMapping, error)
+}, modelID int, providerID int, accountMetadata map[string]any, canonicalName string) (modelcontract.ModelProviderMapping, error) {
+	mappings, err := models.ListMappingsByModel(ctx, modelID)
+	if err != nil {
+		return modelcontract.ModelProviderMapping{}, fmt.Errorf("model mapping list failed")
+	}
+	for _, mapping := range mappings {
+		if mapping.ProviderID != providerID || mapping.Status != modelcontract.StatusActive || strings.TrimSpace(mapping.UpstreamModelName) == "" {
+			continue
+		}
+		if accountExcludesModel(accountMetadata, canonicalName, mapping.UpstreamModelName) {
+			continue
+		}
+		if !accountSupportsUpstreamModel(accountMetadata, mapping.UpstreamModelName) {
+			continue
+		}
+		return mapping, nil
+	}
+	return modelcontract.ModelProviderMapping{}, fmt.Errorf("registered model is not mapped to this provider")
 }
 
 func responsesCompactUnsupported(statusCode int, message string) bool {
@@ -314,6 +379,8 @@ func normalizeAdminAccountTestMode(mode string) (string, bool) {
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case "", adminAccountTestModeDefault:
 		return adminAccountTestModeDefault, true
+	case adminAccountTestModeLive:
+		return adminAccountTestModeLive, true
 	case adminAccountTestModeResponsesCompact, "compact":
 		return adminAccountTestModeResponsesCompact, true
 	default:
@@ -327,6 +394,14 @@ func truncateAdminTestMessage(value string, limit int) string {
 		return value
 	}
 	return value[:limit]
+}
+
+func adminAccountTestPrompt(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "Reply with OK."
+	}
+	return value
 }
 
 func adminTestResult(ok bool, message string, startedAt time.Time, providerID apiopenapi.Id, accountID *apiopenapi.Id, checks map[string]any) apiopenapi.AdminTestResult {
@@ -357,6 +432,12 @@ func accountTestMissingRequirements(provider providercontract.Provider, account 
 	if account.RuntimeClass == accountcontract.RuntimeClassAPIKey {
 		if mapString(credential, "api_key") == "" {
 			missing = append(missing, "credential.api_key")
+		}
+		return missing
+	}
+	if strings.EqualFold(strings.TrimSpace(provider.AdapterType), "reverse-proxy-codex-cli") && mapString(credential, "cli_client_token") != "" {
+		if account.UpstreamClient == nil || strings.TrimSpace(*account.UpstreamClient) == "" {
+			missing = append(missing, "upstream_client")
 		}
 		return missing
 	}

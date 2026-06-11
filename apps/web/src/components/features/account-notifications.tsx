@@ -18,7 +18,6 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { PageQueryState } from "@/components/layout/page-query-state";

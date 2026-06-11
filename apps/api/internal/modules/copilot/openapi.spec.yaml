@@ -100,6 +100,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SiteConfigResponse"
+        "429":
+          $ref: "#/components/responses/StandardError"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -227,6 +229,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserAttributeValueListResponse"
+        "429":
+          $ref: "#/components/responses/StandardError"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -248,6 +252,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SetupStatusResponse"
+        "429":
+          $ref: "#/components/responses/StandardError"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -300,6 +306,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EnabledOAuthProviderListResponse"
+        "429":
+          $ref: "#/components/responses/StandardError"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -321,6 +329,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CaptchaConfigResponse"
+        "429":
+          $ref: "#/components/responses/StandardError"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -2574,6 +2584,47 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/quick-setup:
+    post:
+      tags:
+        - AdminProviders
+      operationId: runAdminQuickSetup
+      summary: Create a provider account from a built-in platform preset.
+      description: >-
+        Creates or activates the matching provider, creates one provider
+        account with write-only credentials, and optionally creates model
+        registry entries plus provider mappings from a model catalog.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminQuickSetupRequest"
+      responses:
+        "200":
+          description: Provider account quick setup result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminQuickSetupResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/providers/{id}:
     patch:
       tags:
@@ -3613,6 +3664,47 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/models/quick-map:
+    post:
+      tags:
+        - AdminModels
+      operationId: quickMapAdminModels
+      summary: Bulk create model registry entries and provider mappings.
+      description: >-
+        For each model name, creates the model registry entry when missing and
+        creates a provider mapping that uses the same upstream model name.
+        Existing models or mappings are skipped.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminQuickMapModelsRequest"
+      responses:
+        "200":
+          description: Model quick-map result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminQuickMapModelsResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/models/{id}:
     patch:
       tags:
@@ -4417,6 +4509,39 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/accounts/health-summary:
+    get:
+      tags:
+        - AdminAccounts
+      operationId: getAdminAccountsHealthSummary
+      summary: List provider account health snapshots.
+      description: >-
+        Returns the latest synthesized health snapshot for every provider
+        account, including recent usage-derived health and stored health/quota
+        overlays when available.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: Provider account health summary.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountHealthSummaryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/accounts/{id}:
     get:
       tags:
@@ -4754,6 +4879,12 @@ paths:
           required: true
           schema:
             $ref: "#/components/schemas/Id"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminAccountTestRequest"
       responses:
         "200":
           description: Provider account test result.
@@ -18023,6 +18154,90 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    AdminQuickSetupRequest:
+      type: object
+      required:
+        - platform
+        - credential
+      properties:
+        platform:
+          type: string
+          minLength: 1
+          description: Built-in provider preset key, such as openai, anthropic, or codex-cli.
+        credential:
+          type: object
+          description: Write-only credential payload accepted by the selected platform/runtime class.
+          writeOnly: true
+          minProperties: 1
+          additionalProperties: true
+        name:
+          type: string
+          minLength: 1
+          description: Optional provider account name. Defaults to the preset display name.
+        runtime_class:
+          $ref: "#/components/schemas/RuntimeClass"
+        model_catalog:
+          type: array
+          description: Optional model names to create and map to the selected provider.
+          items:
+            type: string
+            minLength: 1
+          default: []
+        discover_models:
+          type: boolean
+          default: false
+          description: Accepted for forward compatibility; current quick setup uses model_catalog or the preset catalog.
+        proxy_id:
+          type: string
+          nullable: true
+        priority:
+          type: integer
+          default: 0
+        weight:
+          type: number
+          minimum: 0
+          default: 1
+
+    AdminQuickSetupResult:
+      type: object
+      required:
+        - provider
+        - account
+        - models_created
+        - mappings_created
+      properties:
+        provider:
+          $ref: "#/components/schemas/Provider"
+        account:
+          $ref: "#/components/schemas/ProviderAccount"
+        models_created:
+          type: integer
+          minimum: 0
+        mappings_created:
+          type: integer
+          minimum: 0
+        model_names:
+          type: array
+          items:
+            type: string
+          default: []
+        warnings:
+          type: array
+          items:
+            type: string
+          default: []
+
+    AdminQuickSetupResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminQuickSetupResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     ProviderOAuthConfig:
       type: object
       required:
@@ -18075,6 +18290,28 @@ components:
           $ref: "#/components/schemas/JsonObject"
         checked_at:
           $ref: "#/components/schemas/Timestamp"
+
+    AdminAccountTestRequest:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+            - default
+            - live
+            - responses_compact
+          default: default
+          description: Use `live` for a real upstream round-trip; default only validates local configuration.
+        model:
+          type: string
+          description: Optional registered canonical model name or alias for live/compact probes.
+        model_id:
+          type: string
+          description: Backward-compatible alias for `model`.
+        prompt:
+          type: string
+          maxLength: 4000
+          description: Optional user prompt for live/compact probes. When omitted, SRapi uses a minimal OK probe.
 
     AdminTestResultResponse:
       type: object
@@ -18404,6 +18641,52 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ModelProviderMapping"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AdminQuickMapModelsRequest:
+      type: object
+      required:
+        - provider_id
+        - models
+      properties:
+        provider_id:
+          $ref: "#/components/schemas/Id"
+        models:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+
+    AdminQuickMapModelsResult:
+      type: object
+      required:
+        - models_created
+        - mappings_created
+        - warnings
+      properties:
+        models_created:
+          type: integer
+          minimum: 0
+        mappings_created:
+          type: integer
+          minimum: 0
+        warnings:
+          type: array
+          items:
+            type: string
+          default: []
+
+    AdminQuickMapModelsResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminQuickMapModelsResult"
         request_id:
           $ref: "#/components/schemas/RequestId"
 
@@ -22773,6 +23056,11 @@ components:
           maximum: 1
         quota_exhausted:
           type: boolean
+        quota_windows:
+          type: array
+          description: Latest per-window quota snapshots for this account, when available.
+          items:
+            $ref: "#/components/schemas/AccountQuotaSnapshot"
         rate_limit_count:
           type: integer
           minimum: 0
@@ -22799,6 +23087,19 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/AccountHealthSnapshot"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AccountHealthSummaryResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountHealthSnapshot"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

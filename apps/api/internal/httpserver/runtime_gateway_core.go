@@ -640,10 +640,10 @@ func (rt *runtimeState) accountSchedulerRuntimeState(ctx context.Context, accoun
 		state.CooldownActive = state.CooldownActive || (latest.CooldownUntil != nil && latest.CooldownUntil.After(time.Now().UTC()))
 	}
 	if quotas, err := rt.accounts.ListQuotaSnapshotsByAccount(ctx, account.ID, 1); err == nil && len(quotas) > 0 {
-		if latest, ok := latestRealQuotaSnapshot(quotas); ok {
-			remainingRatio := float64(latest.RemainingRatio)
+		if constrained, ok := mostConstrainedRealQuotaSnapshot(quotas); ok {
+			remainingRatio := float64(constrained.RemainingRatio)
 			state.QuotaRemainingRatio = &remainingRatio
-			state.QuotaExhausted = state.QuotaExhausted || latest.RemainingRatio <= 0
+			state.QuotaExhausted = state.QuotaExhausted || constrained.RemainingRatio <= 0
 		}
 	}
 	// Live in-flight concurrency makes load-aware scoring (saturation penalty,
@@ -1028,7 +1028,7 @@ func (rt *runtimeState) forceRefreshReverseProxyCredential(ctx context.Context, 
 }
 
 func (rt *runtimeState) refreshReverseProxyCredential(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any) (map[string]any, bool, error) {
-	if !shouldRefreshCredential(account, credential) {
+	if !accountcontract.ShouldRefreshOAuthCredential(account, credential, time.Now().UTC()) {
 		return credential, false, nil
 	}
 	return rt.doRefreshReverseProxyCredential(ctx, account, credential)
@@ -1102,21 +1102,6 @@ func (rt *runtimeState) retryAfterAuthRefresh(ctx context.Context, account accou
 		return nil, false
 	}
 	return refreshed, true
-}
-
-func shouldRefreshCredential(account accountcontract.ProviderAccount, credential map[string]any) bool {
-	if account.RuntimeClass != accountcontract.RuntimeClassOauthRefresh && account.RuntimeClass != accountcontract.RuntimeClassOauthDeviceCode {
-		return false
-	}
-	if metadataBool(account.Metadata, "force_refresh") || metadataBool(account.Metadata, "access_token_expired") {
-		return true
-	}
-	expiresAt := mapString(credential, "expires_at")
-	if expiresAt == "" {
-		return mapString(credential, "access_token") == ""
-	}
-	parsed, err := time.Parse(time.RFC3339, expiresAt)
-	return err == nil && time.Now().UTC().After(parsed.Add(-30*time.Second))
 }
 
 func errorClassName(err error) string {

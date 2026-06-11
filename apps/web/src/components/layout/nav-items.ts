@@ -33,6 +33,7 @@ import {
   Tags,
   Mail,
   Bot,
+  Cpu,
   Webhook,
   Zap,
   type LucideIcon,
@@ -90,6 +91,7 @@ const ADMIN_GATEWAY_SECTION: NavSection = {
   items: [
     { href: ADMIN_ROUTES.quickSetup, labelKey: "nav.adminQuickSetup", icon: Zap },
     { href: ADMIN_ROUTES.providers, labelKey: "nav.adminProviders", icon: Plug },
+    { href: ADMIN_ROUTES.models, labelKey: "nav.adminModels", icon: Cpu },
     { href: ADMIN_ROUTES.channelsPricing, labelKey: "nav.adminChannelsPricing", icon: Tag },
     { href: ADMIN_ROUTES.accounts, labelKey: "nav.adminAccounts", icon: Server },
     { href: ADMIN_ROUTES.groups, labelKey: "nav.adminGroups", icon: Boxes },

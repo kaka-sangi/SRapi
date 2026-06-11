@@ -42,8 +42,10 @@ Required when changing HTTP routes, request/response schemas, error envelopes, a
 make openapi-lint
 make openapi-bundle
 make openapi-codegen-check
+make openapi-admin-coverage-check
 make openapi-ts-codegen-check
 make sdk-ts-typecheck
+make web-admin-sdk-route-check
 ```
 
 Rules:
@@ -51,6 +53,8 @@ Rules:
 - Edit `packages/openapi/openapi.yaml` first.
 - Do not manually edit `apps/api/internal/openapi/openapi.gen.go`.
 - Do not manually edit generated files under `packages/sdk/typescript/src`.
+- Every registered `/api/v1/admin/...` route must have a matching OpenAPI operation so the admin SDK and copilot catalog cannot drift.
+- Frontend calls to managed admin SDK routes must go through `adminApi` / the generated TypeScript SDK, not raw `fetch` URL strings.
 - Gateway-compatible endpoints must preserve source protocol error shapes.
 
 ## 3. Ent And Migration Gates
@@ -230,6 +234,7 @@ Required when `apps/web` exists and frontend code changes:
 ```bash
 npm run typecheck --workspace apps/web
 npm run lint --workspace apps/web
+make web-admin-sdk-route-check
 ```
 
 If scripts differ, use the repository's configured equivalents.
@@ -241,6 +246,7 @@ Browser verification is required for substantial UI work:
 - no text overlap
 - no horizontal page overflow except contained data tables
 - generated SDK is used for API calls
+- managed admin SDK routes are not hard-coded outside the frontend API wrapper
 
 ## 10. Examples And Migration Guide Gates
 

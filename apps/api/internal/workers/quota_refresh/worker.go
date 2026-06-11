@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 	provideradapterservice "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
+	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
+	reverseproxyservice "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/service"
 	"github.com/srapi/srapi/apps/api/internal/workers/runonceguard"
 )
 
@@ -32,7 +35,10 @@ type Config struct {
 	MasterKey     string
 	Clock         accountservice.Clock
 	Adapter       provideradaptercontract.AccountQuotaFetcher
-	RunGuard      runonceguard.Guard
+	Refresher     reverseproxycontract.Refresher
+	// BlockPrivateEgress should match the runtime reverse-proxy SSRF policy.
+	BlockPrivateEgress bool
+	RunGuard           runonceguard.Guard
 }
 
 // Result summarizes one refresh pass.
@@ -50,6 +56,7 @@ type Worker struct {
 	accounts      *accountservice.Service
 	providers     *providerservice.Service
 	adapter       provideradaptercontract.AccountQuotaFetcher
+	refresher     reverseproxycontract.Refresher
 	logger        *slog.Logger
 	interval      time.Duration
 	timeout       time.Duration
@@ -86,10 +93,19 @@ func New(accounts accountcontract.Store, providers providercontract.Store, logge
 		}
 		adapter = svc
 	}
+	refresher := cfg.Refresher
+	if refresher == nil {
+		svc, err := reverseproxyservice.New(nil, reverseproxyservice.WithBlockedPrivateEgress(cfg.BlockPrivateEgress))
+		if err != nil {
+			return nil, err
+		}
+		refresher = svc
+	}
 	return &Worker{
 		accounts:      accountsSvc,
 		providers:     providersSvc,
 		adapter:       adapter,
+		refresher:     refresher,
 		logger:        logger,
 		interval:      durationOrDefault(cfg.Interval, defaultInterval),
 		timeout:       durationOrDefault(cfg.Timeout, defaultTimeout),
@@ -258,11 +274,31 @@ func (w *Worker) refreshOne(parent context.Context, account accountcontract.Prov
 		mu.Unlock()
 		return
 	}
+	if refreshed, ok, err := w.refreshCredential(ctx, account, credential); err != nil {
+		w.persistQuotaProviderError(ctx, account, err)
+		mu.Lock()
+		result.Failed++
+		*firstErr = errors.Join(*firstErr, err)
+		mu.Unlock()
+		return
+	} else if ok {
+		credential = refreshed
+	}
 	report, err := w.adapter.FetchAccountQuota(ctx, provideradaptercontract.ProbeRequest{
 		Provider:   provider,
 		Account:    account,
 		Credential: credential,
 	})
+	if err != nil {
+		if refreshed, retried := w.retryAfterAuthRefresh(ctx, account, credential, err); retried {
+			credential = refreshed
+			report, err = w.adapter.FetchAccountQuota(ctx, provideradaptercontract.ProbeRequest{
+				Provider:   provider,
+				Account:    account,
+				Credential: credential,
+			})
+		}
+	}
 	if err != nil {
 		w.persistQuotaProviderError(ctx, account, err)
 		mu.Lock()
@@ -284,6 +320,48 @@ func (w *Worker) refreshOne(parent context.Context, account accountcontract.Prov
 	mu.Unlock()
 }
 
+func (w *Worker) refreshCredential(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any) (map[string]any, bool, error) {
+	if !accountcontract.ShouldRefreshOAuthCredential(account, credential, time.Now().UTC()) {
+		return credential, false, nil
+	}
+	return w.forceRefreshCredential(ctx, account, credential)
+}
+
+func (w *Worker) retryAfterAuthRefresh(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any, upstreamErr error) (map[string]any, bool) {
+	if account.RuntimeClass != accountcontract.RuntimeClassOauthRefresh && account.RuntimeClass != accountcontract.RuntimeClassOauthDeviceCode {
+		return nil, false
+	}
+	class := errorClassName(upstreamErr)
+	if class != "session_invalid" && class != "auth_failed" && class != "auth_error" {
+		return nil, false
+	}
+	if mapString(credential, "refresh_token") == "" {
+		return nil, false
+	}
+	refreshed, ok, err := w.forceRefreshCredential(ctx, account, credential)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return refreshed, true
+}
+
+func (w *Worker) forceRefreshCredential(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any) (map[string]any, bool, error) {
+	if w.refresher == nil {
+		return credential, false, nil
+	}
+	response, err := w.refresher.Refresh(ctx, reverseproxycontract.RefreshRequest{
+		Account: reverseProxyAccountRuntime(account, credential),
+	})
+	if err != nil {
+		return credential, false, err
+	}
+	refreshed := response.Credential
+	if _, err := w.accounts.Update(ctx, account.ID, accountcontract.UpdateRequest{Credential: &refreshed}); err != nil {
+		return credential, false, err
+	}
+	return refreshed, true, nil
+}
+
 func (w *Worker) persistQuotaProviderError(ctx context.Context, account accountcontract.ProviderAccount, err error) {
 	if updateErr := w.accounts.ApplyQuotaProviderError(ctx, account, err); updateErr != nil {
 		w.logger.Warn("failed to persist account quota error metadata", "account_id", account.ID, "error", updateErr)
@@ -302,4 +380,44 @@ func positiveOrDefault(value int, fallback int) int {
 		return fallback
 	}
 	return value
+}
+
+func errorClassName(err error) string {
+	var providerErr provideradaptercontract.ProviderError
+	if errors.As(err, &providerErr) && providerErr.Class != "" {
+		return providerErr.Class
+	}
+	var runtimeErr reverseproxycontract.RuntimeError
+	if errors.As(err, &runtimeErr) && runtimeErr.Class != "" {
+		return runtimeErr.Class
+	}
+	return "unknown"
+}
+
+func reverseProxyAccountRuntime(account accountcontract.ProviderAccount, credential map[string]any) reverseproxycontract.AccountRuntime {
+	return reverseproxycontract.AccountRuntime{
+		AccountID:      account.ID,
+		RuntimeClass:   string(account.RuntimeClass),
+		UpstreamClient: account.UpstreamClient,
+		ProxyID:        account.ProxyID,
+		UserAgent:      mapString(account.Metadata, "user_agent"),
+		Metadata:       account.Metadata,
+		Credential:     credential,
+	}
+}
+
+func mapString(values map[string]any, key string) string {
+	if values == nil {
+		return ""
+	}
+	value, ok := values[key]
+	if !ok || value == nil {
+		return ""
+	}
+	switch value := value.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	default:
+		return ""
+	}
 }

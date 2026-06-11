@@ -107,6 +107,27 @@ func (e AccountOAuthPendingStatus) Valid() bool {
 	}
 }
 
+// Defines values for AdminAccountTestRequestMode.
+const (
+	AdminAccountTestRequestModeDefault          AdminAccountTestRequestMode = "default"
+	AdminAccountTestRequestModeLive             AdminAccountTestRequestMode = "live"
+	AdminAccountTestRequestModeResponsesCompact AdminAccountTestRequestMode = "responses_compact"
+)
+
+// Valid indicates whether the value is a known member of the AdminAccountTestRequestMode enum.
+func (e AdminAccountTestRequestMode) Valid() bool {
+	switch e {
+	case AdminAccountTestRequestModeDefault:
+		return true
+	case AdminAccountTestRequestModeLive:
+		return true
+	case AdminAccountTestRequestModeResponsesCompact:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AdminCopilotChatRequestReasoningEffort.
 const (
 	AdminCopilotChatRequestReasoningEffortHigh   AdminCopilotChatRequestReasoningEffort = "high"
@@ -2839,19 +2860,19 @@ func (e UpdateErrorPassthroughRuleRequestAction) Valid() bool {
 
 // Defines values for UpdatePayloadRuleRequestAction.
 const (
-	Default  UpdatePayloadRuleRequestAction = "default"
-	Filter   UpdatePayloadRuleRequestAction = "filter"
-	Override UpdatePayloadRuleRequestAction = "override"
+	UpdatePayloadRuleRequestActionDefault  UpdatePayloadRuleRequestAction = "default"
+	UpdatePayloadRuleRequestActionFilter   UpdatePayloadRuleRequestAction = "filter"
+	UpdatePayloadRuleRequestActionOverride UpdatePayloadRuleRequestAction = "override"
 )
 
 // Valid indicates whether the value is a known member of the UpdatePayloadRuleRequestAction enum.
 func (e UpdatePayloadRuleRequestAction) Valid() bool {
 	switch e {
-	case Default:
+	case UpdatePayloadRuleRequestActionDefault:
 		return true
-	case Filter:
+	case UpdatePayloadRuleRequestActionFilter:
 		return true
-	case Override:
+	case UpdatePayloadRuleRequestActionOverride:
 		return true
 	default:
 		return false
@@ -3348,23 +3369,32 @@ type AccountHealthResponse struct {
 
 // AccountHealthSnapshot defines model for AccountHealthSnapshot.
 type AccountHealthSnapshot struct {
-	AccountId           Id           `json:"account_id"`
-	CircuitState        string       `json:"circuit_state"`
-	CooldownReason      *string      `json:"cooldown_reason,omitempty"`
-	CooldownUntil       *time.Time   `json:"cooldown_until,omitempty"`
-	ErrorClass          *string      `json:"error_class,omitempty"`
-	ErrorRate           float32      `json:"error_rate"`
-	LatencyP50Ms        int          `json:"latency_p50_ms"`
-	LatencyP95Ms        int          `json:"latency_p95_ms"`
-	ProviderId          Id           `json:"provider_id"`
-	QuotaExhausted      bool         `json:"quota_exhausted"`
-	QuotaRemainingRatio float32      `json:"quota_remaining_ratio"`
-	RateLimitCount      int          `json:"rate_limit_count"`
-	RuntimeClass        RuntimeClass `json:"runtime_class"`
-	SnapshotAt          Timestamp    `json:"snapshot_at"`
-	Status              string       `json:"status"`
-	SuccessRate         float32      `json:"success_rate"`
-	TimeoutCount        int          `json:"timeout_count"`
+	AccountId           Id         `json:"account_id"`
+	CircuitState        string     `json:"circuit_state"`
+	CooldownReason      *string    `json:"cooldown_reason,omitempty"`
+	CooldownUntil       *time.Time `json:"cooldown_until,omitempty"`
+	ErrorClass          *string    `json:"error_class,omitempty"`
+	ErrorRate           float32    `json:"error_rate"`
+	LatencyP50Ms        int        `json:"latency_p50_ms"`
+	LatencyP95Ms        int        `json:"latency_p95_ms"`
+	ProviderId          Id         `json:"provider_id"`
+	QuotaExhausted      bool       `json:"quota_exhausted"`
+	QuotaRemainingRatio float32    `json:"quota_remaining_ratio"`
+
+	// QuotaWindows Latest per-window quota snapshots for this account, when available.
+	QuotaWindows   *[]AccountQuotaSnapshot `json:"quota_windows,omitempty"`
+	RateLimitCount int                     `json:"rate_limit_count"`
+	RuntimeClass   RuntimeClass            `json:"runtime_class"`
+	SnapshotAt     Timestamp               `json:"snapshot_at"`
+	Status         string                  `json:"status"`
+	SuccessRate    float32                 `json:"success_rate"`
+	TimeoutCount   int                     `json:"timeout_count"`
+}
+
+// AccountHealthSummaryResponse defines model for AccountHealthSummaryResponse.
+type AccountHealthSummaryResponse struct {
+	Data      []AccountHealthSnapshot `json:"data"`
+	RequestId RequestId               `json:"request_id"`
 }
 
 // AccountModelDiscovery defines model for AccountModelDiscovery.
@@ -3595,6 +3625,24 @@ type AccountsAvailabilitySummaryResponse struct {
 	RequestId  RequestId                    `json:"request_id"`
 }
 
+// AdminAccountTestRequest defines model for AdminAccountTestRequest.
+type AdminAccountTestRequest struct {
+	// Mode Use `live` for a real upstream round-trip; default only validates local configuration.
+	Mode *AdminAccountTestRequestMode `json:"mode,omitempty"`
+
+	// Model Optional registered canonical model name or alias for live/compact probes.
+	Model *string `json:"model,omitempty"`
+
+	// ModelId Backward-compatible alias for `model`.
+	ModelId *string `json:"model_id,omitempty"`
+
+	// Prompt Optional user prompt for live/compact probes. When omitted, SRapi uses a minimal OK probe.
+	Prompt *string `json:"prompt,omitempty"`
+}
+
+// AdminAccountTestRequestMode Use `live` for a real upstream round-trip; default only validates local configuration.
+type AdminAccountTestRequestMode string
+
 // AdminAffiliateManualAdjustmentRequest defines model for AdminAffiliateManualAdjustmentRequest.
 type AdminAffiliateManualAdjustmentRequest struct {
 	// Amount Decimal string amount to adjust. Positive credits balance; negative debits balance.
@@ -3814,6 +3862,63 @@ type AdminOverview struct {
 type AdminOverviewResponse struct {
 	Data      AdminOverview `json:"data"`
 	RequestId RequestId     `json:"request_id"`
+}
+
+// AdminQuickMapModelsRequest defines model for AdminQuickMapModelsRequest.
+type AdminQuickMapModelsRequest struct {
+	Models     []string `json:"models"`
+	ProviderId Id       `json:"provider_id"`
+}
+
+// AdminQuickMapModelsResponse defines model for AdminQuickMapModelsResponse.
+type AdminQuickMapModelsResponse struct {
+	Data      AdminQuickMapModelsResult `json:"data"`
+	RequestId RequestId                 `json:"request_id"`
+}
+
+// AdminQuickMapModelsResult defines model for AdminQuickMapModelsResult.
+type AdminQuickMapModelsResult struct {
+	MappingsCreated int      `json:"mappings_created"`
+	ModelsCreated   int      `json:"models_created"`
+	Warnings        []string `json:"warnings"`
+}
+
+// AdminQuickSetupRequest defines model for AdminQuickSetupRequest.
+type AdminQuickSetupRequest struct {
+	// Credential Write-only credential payload accepted by the selected platform/runtime class.
+	Credential *map[string]interface{} `json:"credential,omitempty"`
+
+	// DiscoverModels Accepted for forward compatibility; current quick setup uses model_catalog or the preset catalog.
+	DiscoverModels *bool `json:"discover_models,omitempty"`
+
+	// ModelCatalog Optional model names to create and map to the selected provider.
+	ModelCatalog *[]string `json:"model_catalog,omitempty"`
+
+	// Name Optional provider account name. Defaults to the preset display name.
+	Name *string `json:"name,omitempty"`
+
+	// Platform Built-in provider preset key, such as openai, anthropic, or codex-cli.
+	Platform     string        `json:"platform"`
+	Priority     *int          `json:"priority,omitempty"`
+	ProxyId      *string       `json:"proxy_id,omitempty"`
+	RuntimeClass *RuntimeClass `json:"runtime_class,omitempty"`
+	Weight       *float32      `json:"weight,omitempty"`
+}
+
+// AdminQuickSetupResponse defines model for AdminQuickSetupResponse.
+type AdminQuickSetupResponse struct {
+	Data      AdminQuickSetupResult `json:"data"`
+	RequestId RequestId             `json:"request_id"`
+}
+
+// AdminQuickSetupResult defines model for AdminQuickSetupResult.
+type AdminQuickSetupResult struct {
+	Account         ProviderAccount `json:"account"`
+	MappingsCreated int             `json:"mappings_created"`
+	ModelNames      *[]string       `json:"model_names,omitempty"`
+	ModelsCreated   int             `json:"models_created"`
+	Provider        Provider        `json:"provider"`
+	Warnings        *[]string       `json:"warnings,omitempty"`
 }
 
 // AdminSendTestEmailRequest defines model for AdminSendTestEmailRequest.
@@ -10416,6 +10521,9 @@ type DiscoverAdminAccountModelsJSONRequestBody = DiscoverAccountModelsRequest
 // BindAdminAccountProxyJSONRequestBody defines body for BindAdminAccountProxy for application/json ContentType.
 type BindAdminAccountProxyJSONRequestBody = BindProviderAccountProxyRequest
 
+// TestAdminAccountJSONRequestBody defines body for TestAdminAccount for application/json ContentType.
+type TestAdminAccountJSONRequestBody = AdminAccountTestRequest
+
 // CreateAdminAffiliateRuleJSONRequestBody defines body for CreateAdminAffiliateRule for application/json ContentType.
 type CreateAdminAffiliateRuleJSONRequestBody = CreateAffiliateRuleRequest
 
@@ -10487,6 +10595,9 @@ type UpsertAdminModelRateLimitJSONRequestBody = UpsertModelRateLimitRequest
 
 // CreateAdminModelJSONRequestBody defines body for CreateAdminModel for application/json ContentType.
 type CreateAdminModelJSONRequestBody = CreateModelRequest
+
+// QuickMapAdminModelsJSONRequestBody defines body for QuickMapAdminModels for application/json ContentType.
+type QuickMapAdminModelsJSONRequestBody = AdminQuickMapModelsRequest
 
 // UpdateAdminModelJSONRequestBody defines body for UpdateAdminModel for application/json ContentType.
 type UpdateAdminModelJSONRequestBody = UpdateModelRequest
@@ -10565,6 +10676,9 @@ type CreateAdminProxyJSONRequestBody = CreateProxyDefinitionRequest
 
 // UpdateAdminProxyJSONRequestBody defines body for UpdateAdminProxy for application/json ContentType.
 type UpdateAdminProxyJSONRequestBody = UpdateProxyDefinitionRequest
+
+// RunAdminQuickSetupJSONRequestBody defines body for RunAdminQuickSetup for application/json ContentType.
+type RunAdminQuickSetupJSONRequestBody = AdminQuickSetupRequest
 
 // CreateAdminRedeemCodeJSONRequestBody defines body for CreateAdminRedeemCode for application/json ContentType.
 type CreateAdminRedeemCodeJSONRequestBody = CreateRedeemCodeRequest
@@ -17194,6 +17308,9 @@ type ServerInterface interface {
 	// Export provider account metadata without credentials.
 	// (GET /api/v1/admin/accounts/export)
 	ExportAdminAccounts(w http.ResponseWriter, r *http.Request)
+	// List provider account health snapshots.
+	// (GET /api/v1/admin/accounts/health-summary)
+	GetAdminAccountsHealthSummary(w http.ResponseWriter, r *http.Request)
 	// Import provider account metadata and write-only credentials.
 	// (POST /api/v1/admin/accounts/import)
 	ImportAdminAccounts(w http.ResponseWriter, r *http.Request)
@@ -17437,6 +17554,9 @@ type ServerInterface interface {
 	// Create a model registry entry.
 	// (POST /api/v1/admin/models)
 	CreateAdminModel(w http.ResponseWriter, r *http.Request)
+	// Bulk create model registry entries and provider mappings.
+	// (POST /api/v1/admin/models/quick-map)
+	QuickMapAdminModels(w http.ResponseWriter, r *http.Request)
 	// Delete a model (cascades its aliases and provider mappings).
 	// (DELETE /api/v1/admin/models/{id})
 	DeleteAdminModel(w http.ResponseWriter, r *http.Request, id Id)
@@ -17656,6 +17776,9 @@ type ServerInterface interface {
 	// Update an encrypted egress proxy definition.
 	// (PATCH /api/v1/admin/proxies/{id})
 	UpdateAdminProxy(w http.ResponseWriter, r *http.Request, id Id)
+	// Create a provider account from a built-in platform preset.
+	// (POST /api/v1/admin/quick-setup)
+	RunAdminQuickSetup(w http.ResponseWriter, r *http.Request)
 	// List redeem codes.
 	// (GET /api/v1/admin/redeem-codes)
 	ListAdminRedeemCodes(w http.ResponseWriter, r *http.Request, params ListAdminRedeemCodesParams)
@@ -19293,6 +19416,26 @@ func (siw *ServerInterfaceWrapper) ExportAdminAccounts(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ExportAdminAccounts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminAccountsHealthSummary operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminAccountsHealthSummary(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminAccountsHealthSummary(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -22091,6 +22234,28 @@ func (siw *ServerInterfaceWrapper) CreateAdminModel(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAdminModel(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// QuickMapAdminModels operation middleware
+func (siw *ServerInterfaceWrapper) QuickMapAdminModels(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.QuickMapAdminModels(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -24949,6 +25114,28 @@ func (siw *ServerInterfaceWrapper) UpdateAdminProxy(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAdminProxy(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RunAdminQuickSetup operation middleware
+func (siw *ServerInterfaceWrapper) RunAdminQuickSetup(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RunAdminQuickSetup(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -31001,6 +31188,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/batch", wrapper.BatchUpdateAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-action", wrapper.BatchActionAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/export", wrapper.ExportAdminAccounts)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/health-summary", wrapper.GetAdminAccountsHealthSummary)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import", wrapper.ImportAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import/codex-session", wrapper.ImportAdminCodexSession)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/authorize-url", wrapper.StartAdminAccountOAuthAuthorizeUrl)
@@ -31082,6 +31270,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/model-rate-limits/{modelId}", wrapper.DeleteAdminModelRateLimit)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/models", wrapper.ListAdminModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models", wrapper.CreateAdminModel)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models/quick-map", wrapper.QuickMapAdminModels)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/models/{id}", wrapper.DeleteAdminModel)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/models/{id}", wrapper.UpdateAdminModel)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/models/{id}/aliases", wrapper.ListAdminModelAliases)
@@ -31155,6 +31344,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/proxies", wrapper.CreateAdminProxy)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/proxies/{id}", wrapper.DeleteAdminProxy)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/proxies/{id}", wrapper.UpdateAdminProxy)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/quick-setup", wrapper.RunAdminQuickSetup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/redeem-codes", wrapper.ListAdminRedeemCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes", wrapper.CreateAdminRedeemCode)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-disable", wrapper.BatchDisableAdminRedeemCodes)

@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
@@ -114,9 +115,12 @@ type codexResponsesOutputContent struct {
 }
 
 type codexResponsesError struct {
-	Message string `json:"message"`
-	Code    string `json:"code"`
-	Type    string `json:"type"`
+	Message         string `json:"message"`
+	Code            string `json:"code"`
+	Type            string `json:"type"`
+	PlanType        string `json:"plan_type"`
+	ResetsAt        any    `json:"resets_at"`
+	ResetsInSeconds any    `json:"resets_in_seconds"`
 }
 
 func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
@@ -138,7 +142,7 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 		Account:      codexReverseProxyAccount(req),
 		Method:       http.MethodPost,
 		URL:          codexResponsesEndpoint(baseURL, req),
-		Headers:      codexResponsesHeaders(req, stream),
+		Headers:      codexResponsesHeaders(req, stream, payload),
 		Body:         raw,
 		ExpectStream: stream,
 	})
@@ -155,7 +159,7 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 				Account:      codexReverseProxyAccount(req),
 				Method:       http.MethodPost,
 				URL:          codexResponsesEndpoint(baseURL, req),
-				Headers:      codexResponsesHeaders(req, stream),
+				Headers:      codexResponsesHeaders(req, stream, retryPayload),
 				Body:         retryRaw,
 				ExpectStream: stream,
 			})
@@ -169,9 +173,9 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 				}
 				return withCodexQuotaSignals(parsed, retryResp.Headers), nil
 			}
-			return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(retryResp.StatusCode, retryResp.Headers, retryResp.Body)
+			return contract.ConversationResponse{}, classifyCodexProviderHTTPErrorWithHeaders(retryResp.StatusCode, retryResp.Headers, retryResp.Body)
 		}
-		return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
+		return contract.ConversationResponse{}, classifyCodexProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	parsed, err := parseCodexResponsesBody(runtimeResp.Body, runtimeResp.StatusCode)
 	if err != nil {
@@ -197,7 +201,7 @@ func (s *Service) invokeReverseProxyCodexResponseInputItems(ctx context.Context,
 		return contract.ResponseInputItemsResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.ResponseInputItemsResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
+		return contract.ResponseInputItemsResponse{}, classifyCodexProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	return withCodexInputItemsQuotaSignals(contract.ResponseInputItemsResponse{Raw: append([]byte(nil), bytes.TrimSpace(runtimeResp.Body)...), StatusCode: runtimeResp.StatusCode}, runtimeResp.Headers), nil
 }
@@ -213,15 +217,16 @@ func (s *Service) prepareCodexRealtime(_ context.Context, req contract.RealtimeR
 	if err != nil {
 		return contract.RealtimeSession{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
-	headers := codexRealtimeHeaders(req)
+	initialFrame := codexRealtimeInitialFrame(req)
+	headers := codexRealtimeHeaders(req, initialFrame)
 	return contract.RealtimeSession{
 		URL:          wsURL,
 		Headers:      headers,
-		InitialFrame: codexRealtimeInitialFrame(req),
+		InitialFrame: initialFrame,
 	}, nil
 }
 
-func codexResponsesHeaders(req contract.ConversationRequest, stream bool) http.Header {
+func codexResponsesHeaders(req contract.ConversationRequest, stream bool, payload map[string]any) http.Header {
 	accept := "application/json"
 	if stream {
 		accept = "text/event-stream"
@@ -252,11 +257,15 @@ func codexResponsesHeaders(req contract.ConversationRequest, stream bool) http.H
 	} else if strings.TrimSpace(req.RequestID) != "" {
 		headers.Set("X-Client-Request-Id", strings.TrimSpace(req.RequestID))
 	}
+	promptCacheKey := codexPayloadPromptCacheKey(payload)
 	if sessionID := requestSetting(req, "codex_session_id", "session_id", "Session_id"); sessionID != "" {
 		headers.Set("Session_id", sessionID)
+	} else if promptCacheKey != "" {
+		headers.Set("Session_id", promptCacheKey)
 	} else if req.Account.ID > 0 {
 		headers.Set("Session_id", codexDefaultAccountSessionID(req.Account.ID))
 	}
+	codexApplySessionIdentityHeaders(headers, promptCacheKey)
 	return headers
 }
 
@@ -361,11 +370,12 @@ func responseInputItemsSetting(req contract.ResponseInputItemsRequest, keys ...s
 	return ""
 }
 
-func codexRealtimeHeaders(req contract.RealtimeRequest) http.Header {
+func codexRealtimeHeaders(req contract.RealtimeRequest, initialFrame []byte) http.Header {
 	headers := http.Header{
 		"OpenAI-Beta": {codexResponsesWebsocketBetaHeaderValue},
 	}
 	headers.Set("Originator", codexRealtimeOriginator(req))
+	headers.Set("User-Agent", codexRealtimeUserAgent(req))
 	if accountID := realtimeSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
 		headers.Set("ChatGPT-Account-ID", accountID)
 	}
@@ -374,6 +384,8 @@ func codexRealtimeHeaders(req contract.RealtimeRequest) http.Header {
 	}
 	if version := realtimeSetting(req, "codex_version", "version", "Version"); version != "" {
 		headers.Set("Version", version)
+	} else {
+		headers.Set("Version", codexDefaultVersion)
 	}
 	if turnMetadata := realtimeSetting(req, "codex_turn_metadata", "x_codex_turn_metadata", "X-Codex-Turn-Metadata"); turnMetadata != "" {
 		headers.Set("X-Codex-Turn-Metadata", turnMetadata)
@@ -386,12 +398,25 @@ func codexRealtimeHeaders(req contract.RealtimeRequest) http.Header {
 	if includeTiming := realtimeSetting(req, "x_responsesapi_include_timing_metrics", "X-ResponsesAPI-Include-Timing-Metrics"); includeTiming != "" {
 		headers.Set("X-ResponsesAPI-Include-Timing-Metrics", includeTiming)
 	}
+	promptCacheKey := codexInitialFramePromptCacheKey(initialFrame)
 	if sessionID := realtimeSetting(req, "codex_session_id", "session_id", "Session_id"); sessionID != "" {
 		headers.Set("session_id", sessionID)
 	} else if strings.Contains(realtimeSetting(req, "user_agent"), "Mac OS") && strings.TrimSpace(req.RequestID) != "" {
 		headers.Set("session_id", strings.TrimSpace(req.RequestID))
+	} else if promptCacheKey != "" {
+		headers.Set("session_id", promptCacheKey)
+	} else if req.Account.ID > 0 {
+		headers.Set("session_id", codexDefaultAccountSessionID(req.Account.ID))
 	}
+	codexApplySessionIdentityHeaders(headers, promptCacheKey)
 	return headers
+}
+
+func codexRealtimeUserAgent(req contract.RealtimeRequest) string {
+	if userAgent := realtimeSetting(req, "user_agent"); userAgent != "" {
+		return userAgent
+	}
+	return codexDefaultUserAgent
 }
 
 func codexRealtimeOriginator(req contract.RealtimeRequest) string {
@@ -414,6 +439,31 @@ func codexRealtimeInitialFrame(req contract.RealtimeRequest) []byte {
 		return append([]byte(nil), req.RequestPayload...)
 	}
 	return encoded
+}
+
+func codexPayloadPromptCacheKey(payload map[string]any) string {
+	if payload == nil {
+		return ""
+	}
+	return codexStringValue(payload["prompt_cache_key"])
+}
+
+func codexInitialFramePromptCacheKey(frame []byte) string {
+	var payload map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(frame), &payload); err != nil {
+		return ""
+	}
+	return codexPayloadPromptCacheKey(payload)
+}
+
+func codexApplySessionIdentityHeaders(headers http.Header, promptCacheKey string) {
+	promptCacheKey = strings.TrimSpace(promptCacheKey)
+	if promptCacheKey == "" {
+		return
+	}
+	headers.Set("Conversation_id", promptCacheKey)
+	headers.Set("Thread-Id", promptCacheKey)
+	headers.Set("X-Codex-Window-Id", promptCacheKey+":0")
 }
 
 func codexRealtimeConversationRequest(req contract.RealtimeRequest) contract.ConversationRequest {
@@ -1614,14 +1664,134 @@ func codexProviderError(err codexResponsesError) contract.ProviderError {
 	if message == "" {
 		message = "codex upstream returned an error"
 	}
-	class := "provider_5xx"
-	lowerCode := strings.ToLower(strings.TrimSpace(err.Code))
-	lowerMessage := strings.ToLower(message)
-	if strings.Contains(lowerCode, "context") ||
-		strings.Contains(lowerMessage, "context length") ||
-		strings.Contains(lowerMessage, "context window") ||
-		strings.Contains(lowerMessage, "too many tokens") {
-		class = "invalid_request"
+	class, statusCode := codexProviderErrorClassAndStatus(err, message)
+	metadata := map[string]any(nil)
+	if planType := strings.TrimSpace(err.PlanType); planType != "" {
+		metadata = map[string]any{"plan_type": planType}
 	}
-	return contract.ProviderError{Class: class, StatusCode: http.StatusBadGateway, Message: message}
+	return contract.ProviderError{
+		Class:      class,
+		StatusCode: statusCode,
+		Message:    message,
+		RetryAfter: codexRetryAfterFromError(err, time.Now()),
+		Metadata:   metadata,
+	}
+}
+
+func classifyCodexProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, body []byte) contract.ProviderError {
+	err := codexErrorFromHTTPBody(body)
+	message := codexHTTPErrorMessage(body, statusCode, err)
+	class, effectiveStatus := codexHTTPErrorClassAndStatus(statusCode, body, err, message)
+	metadata := map[string]any(nil)
+	if err != nil && strings.TrimSpace(err.PlanType) != "" {
+		metadata = map[string]any{"plan_type": strings.TrimSpace(err.PlanType)}
+	}
+	return contract.ProviderError{
+		Class:      class,
+		StatusCode: effectiveStatus,
+		Message:    message,
+		RetryAfter: providerRetryAfter(headers, body, time.Now()),
+		Metadata:   metadata,
+	}
+}
+
+func codexErrorFromHTTPBody(body []byte) *codexResponsesError {
+	var decoded struct {
+		Error codexResponsesError `json:"error"`
+	}
+	if err := json.Unmarshal(bytes.TrimSpace(body), &decoded); err != nil {
+		return nil
+	}
+	if strings.TrimSpace(decoded.Error.Message) == "" &&
+		strings.TrimSpace(decoded.Error.Code) == "" &&
+		strings.TrimSpace(decoded.Error.Type) == "" {
+		return nil
+	}
+	return &decoded.Error
+}
+
+func codexHTTPErrorMessage(body []byte, statusCode int, err *codexResponsesError) string {
+	if err != nil {
+		for _, value := range []string{err.Message, err.Code, err.Type} {
+			if trimmed := strings.TrimSpace(value); trimmed != "" {
+				return trimmed
+			}
+		}
+	}
+	var decoded struct {
+		Message string `json:"message"`
+		Code    string `json:"code"`
+		Type    string `json:"type"`
+	}
+	if json.Unmarshal(bytes.TrimSpace(body), &decoded) == nil {
+		for _, value := range []string{decoded.Message, decoded.Code, decoded.Type} {
+			if trimmed := strings.TrimSpace(value); trimmed != "" {
+				return trimmed
+			}
+		}
+	}
+	if message := strings.TrimSpace(string(body)); message != "" {
+		return message
+	}
+	return http.StatusText(statusCode)
+}
+
+func codexHTTPErrorClassAndStatus(statusCode int, body []byte, err *codexResponsesError, message string) (string, int) {
+	if err != nil {
+		class, effectiveStatus := codexProviderErrorClassAndStatus(*err, message)
+		if class != "provider_5xx" {
+			return class, effectiveStatus
+		}
+	}
+	if codexHTTPBodyIsCapacityError(body) {
+		return "rate_limit", http.StatusTooManyRequests
+	}
+	return providerClassForHTTPStatus(statusCode), statusCode
+}
+
+func codexProviderErrorClassAndStatus(err codexResponsesError, message string) (string, int) {
+	lowerCode := strings.ToLower(strings.TrimSpace(err.Code))
+	lowerType := strings.ToLower(strings.TrimSpace(err.Type))
+	lowerMessage := strings.ToLower(strings.TrimSpace(message))
+	lowerCombined := strings.Join([]string{lowerCode, lowerType, lowerMessage}, " ")
+	switch {
+	case strings.Contains(lowerCombined, "usage_limit_reached") ||
+		strings.Contains(lowerCombined, "rate_limit") ||
+		strings.Contains(lowerCombined, "too many requests") ||
+		strings.Contains(lowerCombined, "selected model is at capacity") ||
+		strings.Contains(lowerCombined, "model is at capacity"):
+		return "rate_limit", http.StatusTooManyRequests
+	case strings.Contains(lowerCombined, "context") ||
+		strings.Contains(lowerCombined, "too many tokens") ||
+		strings.Contains(lowerCombined, "previous_response_not_found") ||
+		strings.Contains(lowerCombined, "previous_response_id") && strings.Contains(lowerCombined, "not found") ||
+		strings.Contains(lowerCombined, "invalid signature in thinking block") ||
+		strings.Contains(lowerCombined, "invalid_encrypted_content"):
+		return "invalid_request", http.StatusBadRequest
+	case strings.Contains(lowerCombined, "authentication") ||
+		strings.Contains(lowerCombined, "unauthorized") ||
+		strings.Contains(lowerCombined, "invalid_api_key") ||
+		strings.Contains(lowerCombined, "invalid or expired token") ||
+		strings.Contains(lowerCombined, "refresh_token_reused"):
+		return "auth_failed", http.StatusUnauthorized
+	default:
+		return "provider_5xx", http.StatusBadGateway
+	}
+}
+
+func codexHTTPBodyIsCapacityError(body []byte) bool {
+	lower := strings.ToLower(strings.TrimSpace(string(body)))
+	return strings.Contains(lower, "selected model is at capacity") ||
+		strings.Contains(lower, "model is at capacity. please try a different model")
+}
+
+func codexRetryAfterFromError(err codexResponsesError, now time.Time) *time.Time {
+	if resetAt := retryAfterTimestampValue(err.ResetsAt, now); resetAt != nil {
+		return resetAt
+	}
+	if seconds, ok := positiveInt64(err.ResetsInSeconds); ok {
+		value := now.UTC().Add(time.Duration(seconds) * time.Second)
+		return &value
+	}
+	return nil
 }

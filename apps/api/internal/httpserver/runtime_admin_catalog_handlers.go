@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -1389,20 +1390,35 @@ func (s *Server) handleTestAdminAccount(w http.ResponseWriter, r *http.Request) 
 	opts := adminAccountTestOptions{}
 	if r.Body != nil {
 		var body struct {
-			Mode  string `json:"mode"`
-			Model string `json:"model"`
+			Mode    string `json:"mode"`
+			Model   string `json:"model"`
+			ModelID string `json:"model_id"`
+			Prompt  string `json:"prompt"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account test request body", requestID)
+			return
+		} else {
 			opts.Mode = strings.TrimSpace(body.Mode)
-			opts.Model = strings.TrimSpace(body.Model)
+			opts.Model = strings.TrimSpace(firstNonEmpty(body.Model, body.ModelID))
+			opts.Prompt = strings.TrimSpace(body.Prompt)
 		}
 	}
 	if opts.Mode == "" {
 		opts.Mode = strings.TrimSpace(r.URL.Query().Get("mode"))
 	}
 	if opts.Model == "" {
-		opts.Model = strings.TrimSpace(r.URL.Query().Get("model"))
+		opts.Model = strings.TrimSpace(firstNonEmpty(r.URL.Query().Get("model"), r.URL.Query().Get("model_id")))
 	}
+	if opts.Prompt == "" {
+		opts.Prompt = strings.TrimSpace(r.URL.Query().Get("prompt"))
+	}
+	mode, ok := normalizeAdminAccountTestMode(opts.Mode)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account test mode", requestID)
+		return
+	}
+	opts.Mode = mode
 	startedAt := time.Now()
 	result := s.runtime.testAccount(r.Context(), provider, account, startedAt, opts)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.test", "provider_account", strconv.Itoa(account.ID), nil, map[string]any{
@@ -1543,8 +1559,9 @@ func (s *Server) handleAdminAccountsHealthSummary(w http.ResponseWriter, r *http
 			overlayAccountHealthSnapshot(&snap, latest)
 		}
 		if quotas, err := s.runtime.accounts.ListQuotaSnapshotsByAccount(r.Context(), account.ID, 1); err == nil && len(quotas) > 0 {
-			if latest, ok := latestRealQuotaSnapshot(quotas); ok {
-				overlayAccountQuotaOnHealth(&snap, latest)
+			overlayAccountQuotaWindowsOnHealth(&snap, quotas)
+			if constrained, ok := mostConstrainedRealQuotaSnapshot(quotas); ok {
+				overlayAccountQuotaOnHealth(&snap, constrained)
 			}
 		}
 		snapshots = append(snapshots, snap)
@@ -1581,8 +1598,9 @@ func (s *Server) handleAdminAccountHealth(w http.ResponseWriter, r *http.Request
 		overlayAccountHealthSnapshot(&snapshot, latest)
 	}
 	if quotas, err := s.runtime.accounts.ListQuotaSnapshotsByAccount(r.Context(), account.ID, 1); err == nil && len(quotas) > 0 {
-		if latest, ok := latestRealQuotaSnapshot(quotas); ok {
-			overlayAccountQuotaOnHealth(&snapshot, latest)
+		overlayAccountQuotaWindowsOnHealth(&snapshot, quotas)
+		if constrained, ok := mostConstrainedRealQuotaSnapshot(quotas); ok {
+			overlayAccountQuotaOnHealth(&snapshot, constrained)
 		}
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.AccountHealthResponse{

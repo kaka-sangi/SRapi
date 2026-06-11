@@ -676,11 +676,12 @@ func quotaRefreshWorker(cfg config.Config, stores *entstore.Stores, logger *slog
 		return nil, nil
 	}
 	return quotarefreshworker.New(stores.Accounts, stores.Providers, logger, quotarefreshworker.Config{
-		Interval:      cfg.QuotaRefresh.Interval,
-		Timeout:       cfg.QuotaRefresh.Timeout,
-		MaxConcurrent: cfg.QuotaRefresh.MaxConcurrent,
-		MasterKey:     cfg.Security.MasterKey,
-		RunGuard:      optionalWorkerGuard(guards...),
+		Interval:           cfg.QuotaRefresh.Interval,
+		Timeout:            cfg.QuotaRefresh.Timeout,
+		MaxConcurrent:      cfg.QuotaRefresh.MaxConcurrent,
+		MasterKey:          cfg.Security.MasterKey,
+		BlockPrivateEgress: cfg.Server.Mode != "local",
+		RunGuard:           optionalWorkerGuard(guards...),
 	})
 }
 

@@ -209,6 +209,79 @@ func TestFetchAccountQuotaMapsCodexAccountPlanCredits(t *testing.T) {
 	}
 }
 
+func TestFetchAccountQuotaMapsCodexAccountsCheckPlan(t *testing.T) {
+	var gotPath string
+	var gotAuthorization string
+	var gotAccountID string
+	var gotOrigin string
+	var gotReferer string
+	var gotUserAgent string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAuthorization = r.Header.Get("Authorization")
+		gotAccountID = r.Header.Get("ChatGPT-Account-ID")
+		gotOrigin = r.Header.Get("Origin")
+		gotReferer = r.Header.Get("Referer")
+		gotUserAgent = r.Header.Get("User-Agent")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"accounts": {
+				"personal": {
+					"account": {"id": "personal", "plan_type": "free", "is_default": true},
+					"entitlement": {"subscription_plan": "free"}
+				},
+				"team-account": {
+					"account": {"id": "team-account", "plan_type": "team", "is_default": false},
+					"entitlement": {"subscription_plan": "team", "expires_at": "2026-05-02T20:32:12Z"}
+				}
+			}
+		}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	report, err := svc.FetchAccountQuota(context.Background(), contract.ProbeRequest{
+		Provider: providercontract.Provider{
+			ID:          22,
+			Name:        "codex-cli",
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+			Status:      providercontract.StatusActive,
+			ConfigSchema: map[string]any{
+				"auth_mode": "bearer",
+			},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           220,
+			ProviderID:   22,
+			Name:         "codex-oauth",
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Status:       accountcontract.StatusActive,
+			Metadata: map[string]any{
+				"base_url":           upstream.URL + "/backend-api/codex",
+				"chatgpt_account_id": "team-account",
+				"user_agent":         "codex-cli/test",
+			},
+		},
+		Credential: map[string]any{"access_token": "codex-access-token"},
+	})
+	if err != nil {
+		t.Fatalf("fetch codex quota: %v", err)
+	}
+	if gotPath != "/backend-api/accounts/check/v4-2023-04-27" {
+		t.Fatalf("unexpected quota path %s", gotPath)
+	}
+	if gotAuthorization != "Bearer codex-access-token" || gotAccountID != "team-account" || gotOrigin != "https://chatgpt.com" || gotReferer != "https://chatgpt.com/" || gotUserAgent != "codex-cli/test" {
+		t.Fatalf("unexpected Codex quota headers auth=%q account=%q origin=%q referer=%q ua=%q", gotAuthorization, gotAccountID, gotOrigin, gotReferer, gotUserAgent)
+	}
+	if !report.Supported || report.Plan != "team" {
+		t.Fatalf("unexpected codex accounts/check quota report: %+v", report)
+	}
+}
+
 func TestFetchAccountQuotaAntigravityUsesProjectHeaderAndSupportsQuota(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer antigravity-access-token" {

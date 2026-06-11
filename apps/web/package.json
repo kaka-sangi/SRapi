@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "NODE_OPTIONS=--no-deprecation next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -17,7 +17,7 @@
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
     "test:e2e:install-deps": "playwright install --with-deps chromium",
-    "analyze": "ANALYZE=1 next build"
+    "analyze": "ANALYZE=1 NODE_OPTIONS=--no-deprecation next build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

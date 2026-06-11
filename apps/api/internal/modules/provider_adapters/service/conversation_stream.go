@@ -324,7 +324,7 @@ func (s *Service) streamReverseProxyCodexResponses(ctx context.Context, streamer
 		Account:      codexReverseProxyAccount(req),
 		Method:       http.MethodPost,
 		URL:          codexResponsesEndpoint(baseURL, req),
-		Headers:      codexResponsesHeaders(req, stream),
+		Headers:      codexResponsesHeaders(req, stream, payload),
 		Body:         raw,
 		ExpectStream: stream,
 	})

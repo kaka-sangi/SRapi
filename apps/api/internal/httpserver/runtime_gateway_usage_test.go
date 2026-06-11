@@ -434,6 +434,18 @@ func TestAccountSchedulerRuntimeStateIgnoresSyntheticQuotaSnapshots(t *testing.T
 	if _, err := accounts.RecordQuotaSnapshot(ctx, accountcontract.AccountQuotaSnapshot{
 		AccountID:      account.ID,
 		ProviderID:     account.ProviderID,
+		QuotaType:      "codex_7d_percent",
+		Remaining:      "75",
+		Used:           "25",
+		QuotaLimit:     "100",
+		RemainingRatio: 0.75,
+		SnapshotAt:     now.Add(-30 * time.Second),
+	}); err != nil {
+		t.Fatalf("record second real quota: %v", err)
+	}
+	if _, err := accounts.RecordQuotaSnapshot(ctx, accountcontract.AccountQuotaSnapshot{
+		AccountID:      account.ID,
+		ProviderID:     account.ProviderID,
 		QuotaType:      accountcontract.QuotaTypeSyntheticMonthlyTokens,
 		Remaining:      "unlimited",
 		Used:           "1",

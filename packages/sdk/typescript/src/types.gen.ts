@@ -1378,6 +1378,43 @@ export type ProviderListResponse = {
     request_id: RequestId;
 };
 
+export type AdminQuickSetupRequest = {
+    /**
+     * Built-in provider preset key, such as openai, anthropic, or codex-cli.
+     */
+    platform: string;
+    /**
+     * Optional provider account name. Defaults to the preset display name.
+     */
+    name?: string;
+    runtime_class?: RuntimeClass;
+    /**
+     * Optional model names to create and map to the selected provider.
+     */
+    model_catalog?: Array<string>;
+    /**
+     * Accepted for forward compatibility; current quick setup uses model_catalog or the preset catalog.
+     */
+    discover_models?: boolean;
+    proxy_id?: string | null;
+    priority?: number;
+    weight?: number;
+};
+
+export type AdminQuickSetupResult = {
+    provider: Provider;
+    account: ProviderAccount;
+    models_created: number;
+    mappings_created: number;
+    model_names?: Array<string>;
+    warnings?: Array<string>;
+};
+
+export type AdminQuickSetupResponse = {
+    data: AdminQuickSetupResult;
+    request_id: RequestId;
+};
+
 export type ProviderOAuthConfig = {
     provider_id: Id;
     provider_name: string;
@@ -1398,6 +1435,25 @@ export type AdminTestResult = {
     message?: string;
     checks?: JsonObject;
     checked_at: Timestamp;
+};
+
+export type AdminAccountTestRequest = {
+    /**
+     * Use `live` for a real upstream round-trip; default only validates local configuration.
+     */
+    mode?: 'default' | 'live' | 'responses_compact';
+    /**
+     * Optional registered canonical model name or alias for live/compact probes.
+     */
+    model?: string;
+    /**
+     * Backward-compatible alias for `model`.
+     */
+    model_id?: string;
+    /**
+     * Optional user prompt for live/compact probes. When omitted, SRapi uses a minimal OK probe.
+     */
+    prompt?: string;
 };
 
 export type AdminTestResultResponse = {
@@ -1518,6 +1574,22 @@ export type ModelProviderMappingResponse = {
 
 export type ModelProviderMappingListResponse = {
     data: Array<ModelProviderMapping>;
+    request_id: RequestId;
+};
+
+export type AdminQuickMapModelsRequest = {
+    provider_id: Id;
+    models: Array<string>;
+};
+
+export type AdminQuickMapModelsResult = {
+    models_created: number;
+    mappings_created: number;
+    warnings: Array<string>;
+};
+
+export type AdminQuickMapModelsResponse = {
+    data: AdminQuickMapModelsResult;
     request_id: RequestId;
 };
 
@@ -3310,6 +3382,10 @@ export type AccountHealthSnapshot = {
     latency_p95_ms: number;
     quota_remaining_ratio: number;
     quota_exhausted: boolean;
+    /**
+     * Latest per-window quota snapshots for this account, when available.
+     */
+    quota_windows?: Array<AccountQuotaSnapshot>;
     rate_limit_count: number;
     timeout_count: number;
     cooldown_until?: string | null;
@@ -3320,6 +3396,11 @@ export type AccountHealthSnapshot = {
 
 export type AccountHealthResponse = {
     data: AccountHealthSnapshot;
+    request_id: RequestId;
+};
+
+export type AccountHealthSummaryResponse = {
+    data: Array<AccountHealthSnapshot>;
     request_id: RequestId;
 };
 
@@ -5607,6 +5688,35 @@ export type ConfigImportResponse = {
     request_id: RequestId;
 };
 
+export type AdminQuickSetupRequestWritable = {
+    /**
+     * Built-in provider preset key, such as openai, anthropic, or codex-cli.
+     */
+    platform: string;
+    /**
+     * Write-only credential payload accepted by the selected platform/runtime class.
+     */
+    credential: {
+        [key: string]: unknown;
+    };
+    /**
+     * Optional provider account name. Defaults to the preset display name.
+     */
+    name?: string;
+    runtime_class?: RuntimeClass;
+    /**
+     * Optional model names to create and map to the selected provider.
+     */
+    model_catalog?: Array<string>;
+    /**
+     * Accepted for forward compatibility; current quick setup uses model_catalog or the preset catalog.
+     */
+    discover_models?: boolean;
+    proxy_id?: string | null;
+    priority?: number;
+    weight?: number;
+};
+
 export type CreateProviderAccountRequestWritable = {
     provider_id: Id;
     name: string;
@@ -5914,6 +6024,10 @@ export type GetSiteConfigErrors = {
     /**
      * Standard SRapi error.
      */
+    429: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
     default: ErrorResponse;
 };
 
@@ -6038,6 +6152,10 @@ export type ListRegistrationAttributesErrors = {
     /**
      * Standard SRapi error.
      */
+    429: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
     default: ErrorResponse;
 };
 
@@ -6060,6 +6178,10 @@ export type GetSetupStatusData = {
 };
 
 export type GetSetupStatusErrors = {
+    /**
+     * Standard SRapi error.
+     */
+    429: ErrorResponse;
     /**
      * Standard SRapi error.
      */
@@ -6121,6 +6243,10 @@ export type ListEnabledOAuthProvidersErrors = {
     /**
      * Standard SRapi error.
      */
+    429: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
     default: ErrorResponse;
 };
 
@@ -6143,6 +6269,10 @@ export type GetAuthCaptchaConfigData = {
 };
 
 export type GetAuthCaptchaConfigErrors = {
+    /**
+     * Standard SRapi error.
+     */
+    429: ErrorResponse;
     /**
      * Standard SRapi error.
      */
@@ -8676,6 +8806,43 @@ export type InstallAdminProviderPresetsResponses = {
 
 export type InstallAdminProviderPresetsResponse = InstallAdminProviderPresetsResponses[keyof InstallAdminProviderPresetsResponses];
 
+export type RunAdminQuickSetupData = {
+    body: AdminQuickSetupRequestWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/quick-setup';
+};
+
+export type RunAdminQuickSetupErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RunAdminQuickSetupError = RunAdminQuickSetupErrors[keyof RunAdminQuickSetupErrors];
+
+export type RunAdminQuickSetupResponses = {
+    /**
+     * Provider account quick setup result.
+     */
+    200: AdminQuickSetupResponse;
+};
+
+export type RunAdminQuickSetupResponse = RunAdminQuickSetupResponses[keyof RunAdminQuickSetupResponses];
+
 export type DeleteAdminProviderData = {
     body?: never;
     path: {
@@ -9771,6 +9938,43 @@ export type CreateAdminModelResponses = {
 
 export type CreateAdminModelResponse = CreateAdminModelResponses[keyof CreateAdminModelResponses];
 
+export type QuickMapAdminModelsData = {
+    body: AdminQuickMapModelsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/models/quick-map';
+};
+
+export type QuickMapAdminModelsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type QuickMapAdminModelsError = QuickMapAdminModelsErrors[keyof QuickMapAdminModelsErrors];
+
+export type QuickMapAdminModelsResponses = {
+    /**
+     * Model quick-map result.
+     */
+    200: AdminQuickMapModelsResponse;
+};
+
+export type QuickMapAdminModelsResponse = QuickMapAdminModelsResponses[keyof QuickMapAdminModelsResponses];
+
 export type DeleteAdminModelData = {
     body?: never;
     path: {
@@ -10568,6 +10772,39 @@ export type BatchActionAdminAccountsResponses = {
 
 export type BatchActionAdminAccountsResponse = BatchActionAdminAccountsResponses[keyof BatchActionAdminAccountsResponses];
 
+export type GetAdminAccountsHealthSummaryData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/health-summary';
+};
+
+export type GetAdminAccountsHealthSummaryErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminAccountsHealthSummaryError = GetAdminAccountsHealthSummaryErrors[keyof GetAdminAccountsHealthSummaryErrors];
+
+export type GetAdminAccountsHealthSummaryResponses = {
+    /**
+     * Provider account health summary.
+     */
+    200: AccountHealthSummaryResponse;
+};
+
+export type GetAdminAccountsHealthSummaryResponse = GetAdminAccountsHealthSummaryResponses[keyof GetAdminAccountsHealthSummaryResponses];
+
 export type DeleteAdminAccountData = {
     body?: never;
     path: {
@@ -10893,7 +11130,7 @@ export type UpdateAdminProxyResponses = {
 export type UpdateAdminProxyResponse = UpdateAdminProxyResponses[keyof UpdateAdminProxyResponses];
 
 export type TestAdminAccountData = {
-    body?: never;
+    body?: AdminAccountTestRequest;
     path: {
         id: Id;
     };

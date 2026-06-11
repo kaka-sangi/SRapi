@@ -9,6 +9,8 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -80,6 +82,9 @@ func (s *Service) fetchAccountQuotaUncached(ctx context.Context, req contract.Pr
 		report.CreditsUsed = quotaFieldFromPaths(parsed, values, "quota_credits_used_path", "credits_used_path")
 		report.CreditsLimit = quotaFieldFromPaths(parsed, values, "quota_credits_limit_path", "credits_limit_path")
 		report.Currency = quotaFieldFromPaths(parsed, values, "quota_currency_path", "credits_currency_path")
+		if isCodexQuotaProbe(req) {
+			applyCodexAccountsCheckQuotaFallback(parsed, req, &report)
+		}
 	}
 
 	// Fold in provider header signals (e.g. Codex rate-limit windows) so the
@@ -117,6 +122,9 @@ func (s *Service) QuotaConfigured(req contract.ProbeRequest) bool {
 }
 
 func quotaHeaders(req contract.ProbeRequest, endpoint *string) (http.Header, error) {
+	if isCodexQuotaProbe(req) {
+		return codexQuotaHeaders(req)
+	}
 	if probeSource(req) == "anthropic" {
 		accessToken := firstCredentialString(req.Credential, "access_token", "oauth_access_token")
 		if accessToken != "" {
@@ -131,6 +139,26 @@ func quotaHeaders(req contract.ProbeRequest, endpoint *string) (http.Header, err
 		}
 	}
 	return probeHeaders(req, endpoint)
+}
+
+func codexQuotaHeaders(req contract.ProbeRequest) (http.Header, error) {
+	accessToken := firstCredentialString(req.Credential, "access_token", "oauth_access_token", "cli_client_token")
+	sessionCookie := firstCredentialString(req.Credential, "session_cookie", "cookie")
+	headers := http.Header{"Accept": {"application/json"}}
+	if accessToken != "" {
+		headers.Set("Authorization", "Bearer "+accessToken)
+	} else if sessionCookie != "" {
+		headers.Set("Cookie", sessionCookie)
+	} else {
+		return nil, contract.ProviderError{Class: "auth_failed", StatusCode: http.StatusUnauthorized, Message: "provider access token missing"}
+	}
+	headers.Set("Origin", "https://chatgpt.com")
+	headers.Set("Referer", "https://chatgpt.com/")
+	headers.Set("User-Agent", firstNonEmpty(codexQuotaSetting(req, "user_agent"), codexDefaultUserAgent))
+	if accountID := codexQuotaSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
+		headers.Set("ChatGPT-Account-ID", accountID)
+	}
+	return headers, nil
 }
 
 func quotaConfigMaps(req contract.ProbeRequest) []map[string]any {
@@ -190,7 +218,14 @@ func expandQuotaHeaderValue(value string, req contract.ProbeRequest) string {
 
 func quotaEndpoint(req contract.ProbeRequest) string {
 	endpoint := firstMapString(quotaConfigMaps(req), "quota_url", "subscription_url", "credits_url", "quota_endpoint")
-	return strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	endpoint = strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	if endpoint != "" {
+		return endpoint
+	}
+	if isCodexQuotaProbe(req) {
+		return codexAccountsCheckEndpoint(req)
+	}
+	return ""
 }
 
 func quotaFieldFromPaths(parsed any, values []map[string]any, keys ...string) string {
@@ -210,6 +245,192 @@ func decodeQuotaJSON(body []byte) any {
 		return nil
 	}
 	return parsed
+}
+
+func applyCodexAccountsCheckQuotaFallback(parsed any, req contract.ProbeRequest, report *contract.QuotaReport) {
+	if report == nil || strings.TrimSpace(report.Plan) != "" {
+		return
+	}
+	root, ok := parsed.(map[string]any)
+	if !ok {
+		return
+	}
+	rawAccounts, ok := root["accounts"].(map[string]any)
+	if !ok {
+		return
+	}
+	account := selectCodexAccountsCheckAccount(rawAccounts, req)
+	if account == nil {
+		return
+	}
+	report.Plan = codexAccountsCheckPlan(account)
+}
+
+func selectCodexAccountsCheckAccount(accounts map[string]any, req contract.ProbeRequest) map[string]any {
+	if len(accounts) == 0 {
+		return nil
+	}
+	candidateIDs := codexAccountsCheckCandidateIDs(req)
+	for _, candidateID := range candidateIDs {
+		if account, ok := mapStringAccount(accounts[candidateID]); ok && codexAccountsCheckPlan(account) != "" {
+			return account
+		}
+	}
+	keys := sortedMapKeys(accounts)
+	for _, candidateID := range candidateIDs {
+		for _, key := range keys {
+			account, ok := mapStringAccount(accounts[key])
+			if ok && codexAccountsCheckPlan(account) != "" && codexAccountsCheckAccountMatches(account, candidateID) {
+				return account
+			}
+		}
+	}
+
+	var defaultAccount map[string]any
+	var paidAccount map[string]any
+	var anyAccount map[string]any
+	for _, key := range keys {
+		account, ok := mapStringAccount(accounts[key])
+		if !ok {
+			continue
+		}
+		plan := codexAccountsCheckPlan(account)
+		if plan == "" {
+			continue
+		}
+		if anyAccount == nil {
+			anyAccount = account
+		}
+		if paidAccount == nil && !strings.EqualFold(plan, "free") {
+			paidAccount = account
+		}
+		if nestedBoolField(account, "account", "is_default") {
+			defaultAccount = account
+		}
+	}
+	switch {
+	case defaultAccount != nil:
+		return defaultAccount
+	case paidAccount != nil:
+		return paidAccount
+	default:
+		return anyAccount
+	}
+}
+
+func codexAccountsCheckCandidateIDs(req contract.ProbeRequest) []string {
+	values := append([]map[string]any{req.Credential}, quotaConfigMaps(req)...)
+	seen := map[string]bool{}
+	out := []string{}
+	for _, valuesMap := range values {
+		for _, key := range []string{"chatgpt_account_id", "account_id", "organization_id", "org_id", "poid"} {
+			value := mapString(valuesMap, key)
+			if value == "" || seen[value] {
+				continue
+			}
+			seen[value] = true
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func codexAccountsCheckAccountMatches(account map[string]any, candidateID string) bool {
+	if strings.TrimSpace(candidateID) == "" {
+		return false
+	}
+	for _, key := range []string{"id", "account_id"} {
+		if mapString(account, key) == candidateID {
+			return true
+		}
+	}
+	nested, ok := account["account"].(map[string]any)
+	if !ok {
+		return false
+	}
+	for _, key := range []string{"id", "account_id"} {
+		if mapString(nested, key) == candidateID {
+			return true
+		}
+	}
+	return false
+}
+
+func codexAccountsCheckPlan(account map[string]any) string {
+	if nested, ok := account["account"].(map[string]any); ok {
+		if plan := mapString(nested, "plan_type"); plan != "" {
+			return plan
+		}
+	}
+	if nested, ok := account["entitlement"].(map[string]any); ok {
+		if plan := mapString(nested, "subscription_plan"); plan != "" {
+			return plan
+		}
+	}
+	return ""
+}
+
+func nestedBoolField(value map[string]any, objectKey string, fieldKey string) bool {
+	nested, ok := value[objectKey].(map[string]any)
+	if !ok {
+		return false
+	}
+	raw, ok := nested[fieldKey].(bool)
+	return ok && raw
+}
+
+func sortedMapKeys(values map[string]any) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func mapStringAccount(value any) (map[string]any, bool) {
+	account, ok := value.(map[string]any)
+	return account, ok
+}
+
+func isCodexQuotaProbe(req contract.ProbeRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-codex-cli")
+}
+
+func codexAccountsCheckEndpoint(req contract.ProbeRequest) string {
+	const defaultEndpoint = "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27"
+	baseURL := firstMapString(quotaConfigMaps(req), "base_url", "upstream_base_url")
+	if baseURL == "" {
+		return defaultEndpoint
+	}
+	parsed, err := url.Parse(strings.TrimRight(strings.TrimSpace(baseURL), "/"))
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return defaultEndpoint
+	}
+	path := strings.TrimRight(parsed.Path, "/")
+	switch {
+	case strings.HasSuffix(path, "/backend-api/codex"):
+		parsed.Path = strings.TrimSuffix(path, "/codex") + "/accounts/check/v4-2023-04-27"
+	case path == "/backend-api":
+		parsed.Path = path + "/accounts/check/v4-2023-04-27"
+	case strings.HasPrefix(path, "/backend-api/"):
+		parsed.Path = "/backend-api/accounts/check/v4-2023-04-27"
+	case path == "" || path == "/":
+		parsed.Path = "/backend-api/accounts/check/v4-2023-04-27"
+	default:
+		if !strings.EqualFold(parsed.Host, "chatgpt.com") {
+			return defaultEndpoint
+		}
+		parsed.Path = "/backend-api/accounts/check/v4-2023-04-27"
+	}
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String()
+}
+
+func codexQuotaSetting(req contract.ProbeRequest, keys ...string) string {
+	values := append([]map[string]any{req.Credential}, quotaConfigMaps(req)...)
+	return firstMapString(values, keys...)
 }
 
 type quotaFetchCache struct {

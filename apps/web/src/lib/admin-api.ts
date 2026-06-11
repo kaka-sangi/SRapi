@@ -115,6 +115,7 @@ import {
   exportAdminAccounts,
   getAdminAccountHealth,
   getAdminAccountProxyQuality,
+  getAdminAccountsHealthSummary,
   fetchAdminAccountQuota,
   getAdminAccountQuota,
   getAdminAccountRpmStatus,
@@ -152,6 +153,7 @@ import {
   listAdminModels,
   createAdminModel,
   createAdminModelAlias,
+  quickMapAdminModels,
   listAdminModelAliases,
   deleteAdminModelAlias,
   createAdminModelMapping,
@@ -193,6 +195,7 @@ import {
   simulateSchedulerStrategy,
   recoverAdminAccount,
   resetAdminAccountQuota,
+  runAdminQuickSetup,
   sendAdminTestEmail,
   testAdminAccount,
   testAdminPaymentProvider,
@@ -226,6 +229,9 @@ import type {
   AdminDashboardSnapshot,
   AdminSendTestEmailRequest,
   AdminSettings,
+  AdminAccountTestRequest,
+  AdminQuickMapModelsResult,
+  AdminQuickSetupResult,
   AdminTestResult,
   AdminUpdateApiKeyRequest,
   ApiKey,
@@ -373,6 +379,7 @@ import type {
   ProviderAccountImportResult,
   ProviderAccountStatus,
   ProxyDefinition,
+  QuickMapAdminModelsData,
   RealtimeActiveSlot,
   RedeemCode,
   RedeemCodeStats,
@@ -388,6 +395,7 @@ import type {
   SchedulerReplayResult,
   SchedulerSimulationResult,
   SubscriptionPlan,
+  RunAdminQuickSetupData,
   UpdateAccountGroupRequest,
   UpdateAdminAccountData,
   UpdateAdminOpsSloData,
@@ -656,12 +664,20 @@ export const adminApi = {
     return unwrapData(() => installAdminProviderPresets({ throwOnError: true }));
   },
 
+  runQuickSetup(body: RunAdminQuickSetupData["body"]): Promise<AdminQuickSetupResult> {
+    return unwrapData(() => runAdminQuickSetup({ body, throwOnError: true }));
+  },
+
   getProviderOAuthConfig(id: Id): Promise<ProviderOAuthConfig> {
     return unwrapData(() => getAdminProviderOAuthConfig({ path: { id }, throwOnError: true }));
   },
 
   listModels(query?: ListAdminModelsData["query"]): Promise<AdminListResult<Model>> {
     return unwrapList(() => listAdminModels({ query, throwOnError: true }));
+  },
+
+  quickMapModels(body: QuickMapAdminModelsData["body"]): Promise<AdminQuickMapModelsResult> {
+    return unwrapData(() => quickMapAdminModels({ body, throwOnError: true }));
   },
 
   createModel(body: Parameters<typeof createAdminModel>[0]["body"]): Promise<Model> {
@@ -794,8 +810,8 @@ export const adminApi = {
     return unwrapData(() => enableAdminAccount({ path: { id }, throwOnError: true }));
   },
 
-  testAccount(id: Id): Promise<AdminTestResult> {
-    return unwrapData(() => testAdminAccount({ path: { id }, throwOnError: true }));
+  testAccount(id: Id, body?: AdminAccountTestRequest): Promise<AdminTestResult> {
+    return unwrapData(() => testAdminAccount({ path: { id }, body, throwOnError: true }));
   },
 
   discoverAccountModels(
@@ -833,16 +849,8 @@ export const adminApi = {
     return unwrapData(() => getAdminAccountProxyQuality({ path: { id }, throwOnError: true }));
   },
 
-  async getAccountsHealthSummary(): Promise<AccountHealthSnapshot[]> {
-    configureAdminClient();
-    const base = configuredApiBaseUrl();
-    const res = await fetch(`${base}/api/v1/admin/accounts/health-summary`, {
-      credentials: "include",
-      headers: { "X-CSRF-Token": getStoredCSRFToken() ?? "" },
-    });
-    if (!res.ok) throw new Error("Failed to fetch accounts health summary");
-    const json = (await res.json()) as { data: AccountHealthSnapshot[] };
-    return json.data;
+  getAccountsHealthSummary(): Promise<AccountHealthSnapshot[]> {
+    return unwrapData(() => getAdminAccountsHealthSummary({ throwOnError: true }));
   },
 
   getAccountHealth(id: Id): Promise<AccountHealthSnapshot> {

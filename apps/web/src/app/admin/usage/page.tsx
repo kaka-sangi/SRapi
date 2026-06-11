@@ -26,7 +26,6 @@ import { QuietBadge } from "@/components/ui/quiet-badge";
 import { TrendChart } from "@/components/charts/trend-chart";
 import { BarSeries, type BarDatum } from "@/components/charts/bar-series";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
 import { BarChartSkeleton } from "@/components/charts/chart-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatMoney, formatDateTime, formatInteger } from "@/lib/admin-format";

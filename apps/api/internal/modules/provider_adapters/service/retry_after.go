@@ -11,7 +11,7 @@ import (
 )
 
 func providerRetryAfter(headers http.Header, body []byte, now time.Time) *time.Time {
-	if resetAt := retryAfterFromOpenAIErrorBody(body); resetAt != nil {
+	if resetAt := retryAfterFromOpenAIErrorBody(body, now); resetAt != nil {
 		return resetAt
 	}
 	if resetAt := retryAfterFromGeminiErrorBody(body, now); resetAt != nil {
@@ -45,17 +45,31 @@ func retryAfterFromHeader(headers http.Header, now time.Time) *time.Time {
 	return nil
 }
 
-func retryAfterFromOpenAIErrorBody(body []byte) *time.Time {
+func retryAfterFromOpenAIErrorBody(body []byte, now time.Time) *time.Time {
 	var decoded struct {
 		Error struct {
-			ResetsAt int64 `json:"resets_at"`
+			Type            string `json:"type"`
+			Code            string `json:"code"`
+			ResetsAt        any    `json:"resets_at"`
+			ResetsInSeconds any    `json:"resets_in_seconds"`
 		} `json:"error"`
 	}
-	if err := json.Unmarshal(body, &decoded); err != nil || decoded.Error.ResetsAt <= 0 {
+	if err := json.Unmarshal(body, &decoded); err != nil {
 		return nil
 	}
-	resetAt := time.Unix(decoded.Error.ResetsAt, 0).UTC()
-	return &resetAt
+	errorType := strings.TrimSpace(decoded.Error.Type)
+	errorCode := strings.TrimSpace(decoded.Error.Code)
+	if errorType != "usage_limit_reached" && errorType != "rate_limit_exceeded" && errorCode != "usage_limit_reached" && errorCode != "rate_limit_exceeded" {
+		return nil
+	}
+	if resetAt := retryAfterTimestampValue(decoded.Error.ResetsAt, now); resetAt != nil {
+		return resetAt
+	}
+	if seconds, ok := positiveInt64(decoded.Error.ResetsInSeconds); ok {
+		resetAt := now.UTC().Add(time.Duration(seconds) * time.Second)
+		return &resetAt
+	}
+	return nil
 }
 
 func retryAfterFromGeminiErrorBody(body []byte, now time.Time) *time.Time {
@@ -101,6 +115,34 @@ func retryAfterFromGoogleDuration(raw any, now time.Time) *time.Time {
 	return nil
 }
 
+func retryAfterTimestampValue(value any, now time.Time) *time.Time {
+	if unixSeconds, ok := positiveInt64(value); ok {
+		resetAt := time.Unix(unixSeconds, 0).UTC()
+		if resetAt.After(now.UTC()) {
+			return &resetAt
+		}
+	}
+	if text, ok := value.(string); ok {
+		trimmed := strings.TrimSpace(text)
+		if trimmed == "" {
+			return nil
+		}
+		if parsed, err := time.Parse(time.RFC3339, trimmed); err == nil {
+			resetAt := parsed.UTC()
+			if resetAt.After(now.UTC()) {
+				return &resetAt
+			}
+		}
+		if parsed, err := http.ParseTime(trimmed); err == nil {
+			resetAt := parsed.UTC()
+			if resetAt.After(now.UTC()) {
+				return &resetAt
+			}
+		}
+	}
+	return nil
+}
+
 func codexRetryAfterFromHeaders(headers http.Header, now time.Time) *time.Time {
 	signals := codexQuotaSignalsFromHeaders(headers, now)
 	var resetAt *time.Time
@@ -114,4 +156,24 @@ func codexRetryAfterFromHeaders(headers http.Header, now time.Time) *time.Time {
 		}
 	}
 	return resetAt
+}
+
+func positiveInt64(value any) (int64, bool) {
+	switch typed := value.(type) {
+	case float64:
+		if typed > 0 && !math.IsNaN(typed) && !math.IsInf(typed, 0) {
+			return int64(typed), true
+		}
+	case int64:
+		return typed, typed > 0
+	case int:
+		return int64(typed), typed > 0
+	case json.Number:
+		parsed, err := typed.Int64()
+		return parsed, err == nil && parsed > 0
+	case string:
+		parsed, err := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
+		return parsed, err == nil && parsed > 0
+	}
+	return 0, false
 }

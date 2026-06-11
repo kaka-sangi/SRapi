@@ -143,12 +143,29 @@ func (s *Server) handleAdminAccountQuotaFetch(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to load account credential", requestID)
 		return
 	}
+	if refreshed, ok, err := s.runtime.refreshReverseProxyCredential(r.Context(), account, credential); err != nil {
+		s.persistQuotaProviderError(r, account, err)
+		writeStandardError(w, http.StatusBadGateway, apiopenapi.INTERNALERROR, "quota fetch credential refresh failed", requestID)
+		return
+	} else if ok {
+		credential = refreshed
+	}
 
 	report, err := s.runtime.adapters.FetchAccountQuota(r.Context(), provideradaptercontract.ProbeRequest{
 		Provider:   provider,
 		Account:    account,
 		Credential: credential,
 	})
+	if err != nil {
+		if refreshed, retried := s.runtime.retryAfterAuthRefresh(r.Context(), account, credential, err); retried {
+			credential = refreshed
+			report, err = s.runtime.adapters.FetchAccountQuota(r.Context(), provideradaptercontract.ProbeRequest{
+				Provider:   provider,
+				Account:    account,
+				Credential: credential,
+			})
+		}
+	}
 	if err != nil {
 		s.persistQuotaProviderError(r, account, err)
 		writeStandardError(w, http.StatusBadGateway, apiopenapi.INTERNALERROR, "quota fetch failed", requestID)

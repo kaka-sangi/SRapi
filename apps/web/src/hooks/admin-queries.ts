@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/admin-api";
 import { queryKeys } from "@/lib/query-keys";
-import type { User, ProviderAccountStatus } from "../../../../packages/sdk/typescript/src/types.gen";
+import type { User, ProviderAccountStatus, AdminAccountTestRequest } from "../../../../packages/sdk/typescript/src/types.gen";
 
 /**
  * Admin data hooks. Pages consume ONLY these (never useEffect+fetch).
@@ -90,23 +90,37 @@ export function useAdminAccounts(params?: P<typeof adminApi.listAccounts>) {
 }
 
 type AccountList = Awaited<ReturnType<typeof adminApi.listAccounts>>;
+const ACCOUNT_LIST_KEY = ["admin", "accounts"] as const;
+
+function isAccountListQuery(query: { queryKey: readonly unknown[] }) {
+  const key = query.queryKey;
+  return key.length === 3 && key[0] === "admin" && key[1] === "accounts" && isRecord(key[2]);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 export function useSetAccountStatus() {
   const qc = useQueryClient();
+  const accountListFilter = { queryKey: ACCOUNT_LIST_KEY, predicate: isAccountListQuery };
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: ProviderAccountStatus }) =>
       adminApi.setAccountStatus(id, status),
     // 联动: flip the account row instantly; rollback on error, reconcile on settle.
     onMutate: async ({ id, status }) => {
-      await qc.cancelQueries({ queryKey: ["admin", "accounts"] });
-      const prev = qc.getQueriesData<AccountList>({ queryKey: ["admin", "accounts"] });
-      qc.setQueriesData<AccountList>({ queryKey: ["admin", "accounts"] }, (old) =>
+      await qc.cancelQueries(accountListFilter);
+      const prev = qc.getQueriesData<AccountList>(accountListFilter);
+      qc.setQueriesData<AccountList>(accountListFilter, (old) =>
         old ? { ...old, data: old.data.map((a) => (a.id === id ? { ...a, status } : a)) } : old,
       );
       return { prev };
     },
     onError: (_e, _v, ctx) => ctx?.prev?.forEach(([key, data]) => qc.setQueryData(key, data)),
-    onSettled: () => qc.invalidateQueries({ queryKey: ["admin", "accounts"] }),
+    onSettled: () => {
+      qc.invalidateQueries(accountListFilter);
+      qc.invalidateQueries({ queryKey: queryKeys.admin.accountsHealthSummary() });
+    },
   });
 }
 
@@ -115,8 +129,13 @@ export function useTestAccount() {
   return useMutation({
     // A connectivity test can flip the account status (e.g. needs_reauth/dead on
     // auth failure), so refetch the list to reflect the new state.
-    mutationFn: (id: string) => adminApi.testAccount(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "accounts"] }),
+    mutationFn: ({ id, body }: { id: string; body?: AdminAccountTestRequest }) =>
+      adminApi.testAccount(id, body),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: ["admin", "accounts"] });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.accountHealth(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.accountsHealthSummary() });
+    },
   });
 }
 
@@ -150,8 +169,11 @@ export function useFetchAccountQuota() {
   return useMutation({
     mutationFn: (id: string) => adminApi.fetchAccountQuota(id),
     // A live pull refreshes the stored snapshots, so re-read them for this account.
-    onSuccess: (_data, id) =>
-      qc.invalidateQueries({ queryKey: queryKeys.admin.accountQuota(id) }),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ["admin", "accounts"] });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.accountQuota(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.accountsHealthSummary() });
+    },
   });
 }
 export function useAccountRpmStatus(id: string | null) {
@@ -849,6 +871,19 @@ export function useInstallProviderPresets() {
   );
 }
 
+export function useRunQuickSetup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: P<typeof adminApi.runQuickSetup>) => adminApi.runQuickSetup(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "providers"] });
+      qc.invalidateQueries({ queryKey: ["admin", "accounts"] });
+      qc.invalidateQueries({ queryKey: ["admin", "models"] });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.accountsHealthSummary() });
+    },
+  });
+}
+
 // Models (model registry)
 export function useCreateModel() {
   return useAdminMutation(
@@ -865,6 +900,12 @@ export function useUpdateModel() {
 }
 export function useDeleteModel() {
   return useAdminMutation((id: string) => adminApi.deleteModel(id), ["admin", "models"]);
+}
+export function useQuickMapModels() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.quickMapModels>) => adminApi.quickMapModels(body),
+    ["admin", "models"],
+  );
 }
 export function useCreateModelAlias() {
   return useAdminMutation(

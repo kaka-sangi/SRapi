@@ -14,29 +14,41 @@ type codexQuotaHeaderWindow struct {
 	windowMin    int
 }
 
+type codexQuotaWindowKind string
+
+const (
+	codexQuotaWindow5h codexQuotaWindowKind = "5h"
+	codexQuotaWindow7d codexQuotaWindowKind = "7d"
+)
+
+type codexQuotaHeaderMapping struct {
+	kind   codexQuotaWindowKind
+	window codexQuotaHeaderWindow
+}
+
 func codexQuotaSignalsFromHeaders(headers http.Header, now time.Time) []contract.QuotaSignal {
 	if headers == nil {
 		return nil
 	}
 	now = now.UTC()
-	windows := []codexQuotaHeaderWindow{
+	windows := codexQuotaHeaderMappings(
 		codexQuotaHeaderWindowFromHeaders(headers, "x-codex-primary"),
 		codexQuotaHeaderWindowFromHeaders(headers, "x-codex-secondary"),
-	}
+	)
 	signals := make([]contract.QuotaSignal, 0, len(windows))
-	for _, window := range windows {
-		if !codexQuotaHeaderWindowValid(window) {
+	for _, mapping := range windows {
+		if !codexQuotaHeaderWindowValid(mapping.window) {
 			continue
 		}
-		quotaType := codexQuotaTypeForWindow(window.windowMin)
+		quotaType := codexQuotaTypeForWindow(mapping.kind)
 		if quotaType == "" {
 			continue
 		}
-		used := clampFloat(window.usedPercent, 0, 100)
+		used := codexQuotaUsedPercent(mapping.window, mapping.kind)
 		remaining := 100 - used
 		var resetAt *time.Time
-		if window.resetSeconds != nil {
-			seconds := *window.resetSeconds
+		if mapping.window.resetSeconds != nil {
+			seconds := *mapping.window.resetSeconds
 			if seconds < 0 {
 				seconds = 0
 			}
@@ -74,17 +86,64 @@ func codexQuotaHeaderWindowValid(window codexQuotaHeaderWindow) bool {
 	return !math.IsNaN(window.usedPercent)
 }
 
-func codexQuotaTypeForWindow(windowMin int) string {
-	switch windowMin {
-	case 0:
-		return ""
-	case 300:
+func codexQuotaHeaderMappings(primary codexQuotaHeaderWindow, secondary codexQuotaHeaderWindow) []codexQuotaHeaderMapping {
+	primaryValid := codexQuotaHeaderWindowValid(primary)
+	secondaryValid := codexQuotaHeaderWindowValid(secondary)
+	if !primaryValid && !secondaryValid {
+		return nil
+	}
+	if primary.windowMin > 0 && secondary.windowMin > 0 && primary.windowMin != secondary.windowMin {
+		if primary.windowMin < secondary.windowMin {
+			return []codexQuotaHeaderMapping{{kind: codexQuotaWindow5h, window: primary}, {kind: codexQuotaWindow7d, window: secondary}}
+		}
+		return []codexQuotaHeaderMapping{{kind: codexQuotaWindow7d, window: primary}, {kind: codexQuotaWindow5h, window: secondary}}
+	}
+	if primary.windowMin > 0 {
+		primaryKind := codexQuotaKindForWindowMinutes(primary.windowMin)
+		secondaryKind := codexQuotaOppositeKind(primaryKind)
+		return []codexQuotaHeaderMapping{{kind: primaryKind, window: primary}, {kind: secondaryKind, window: secondary}}
+	}
+	if secondary.windowMin > 0 {
+		secondaryKind := codexQuotaKindForWindowMinutes(secondary.windowMin)
+		primaryKind := codexQuotaOppositeKind(secondaryKind)
+		return []codexQuotaHeaderMapping{{kind: primaryKind, window: primary}, {kind: secondaryKind, window: secondary}}
+	}
+	// Older Codex responses omitted window minutes; sub2api treats primary as
+	// the long window and secondary as the short 5h window in that legacy shape.
+	return []codexQuotaHeaderMapping{{kind: codexQuotaWindow7d, window: primary}, {kind: codexQuotaWindow5h, window: secondary}}
+}
+
+func codexQuotaKindForWindowMinutes(minutes int) codexQuotaWindowKind {
+	if minutes <= 360 {
+		return codexQuotaWindow5h
+	}
+	return codexQuotaWindow7d
+}
+
+func codexQuotaOppositeKind(kind codexQuotaWindowKind) codexQuotaWindowKind {
+	if kind == codexQuotaWindow5h {
+		return codexQuotaWindow7d
+	}
+	return codexQuotaWindow5h
+}
+
+func codexQuotaTypeForWindow(kind codexQuotaWindowKind) string {
+	switch kind {
+	case codexQuotaWindow5h:
 		return "codex_5h_percent"
-	case 10080:
+	case codexQuotaWindow7d:
 		return "codex_7d_percent"
 	default:
 		return ""
 	}
+}
+
+func codexQuotaUsedPercent(window codexQuotaHeaderWindow, kind codexQuotaWindowKind) float64 {
+	used := clampFloat(window.usedPercent, 0, 100)
+	if kind == codexQuotaWindow5h {
+		return 100 - used
+	}
+	return used
 }
 
 func withCodexQuotaSignals(resp contract.ConversationResponse, headers http.Header) contract.ConversationResponse {

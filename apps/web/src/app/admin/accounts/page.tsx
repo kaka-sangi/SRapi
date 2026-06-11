@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { Server } from "lucide-react";
+import { LayoutGrid, List, SearchX, Server } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { PageQueryState } from "@/components/layout/page-query-state";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -19,6 +21,7 @@ import { AccountDetailSheet } from "@/components/admin/account-detail-sheet";
 import { AccountTestDialog } from "@/components/features/account-test-dialog";
 import {
   useAdminAccounts,
+  useAdminModels,
   useAdminProviders,
   useAdminProxies,
   useSetAccountStatus,
@@ -38,9 +41,14 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Pagination } from "@/components/ui/pagination";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
-import { adminErrorMessage } from "@/lib/admin-api";
+import { adminErrorMessage, type AdminListResult } from "@/lib/admin-api";
 import {
   ACCOUNT_STATUSES,
   buildBatchAccountActionBody,
@@ -49,6 +57,25 @@ import {
 import { AccountImportDialog } from "@/components/admin/account-import-dialog";
 import type { Provider, ProviderAccount, AccountHealthSnapshot } from "@/lib/sdk-types";
 import { cn } from "@/lib/cn";
+import { latestQuotaWindows, quotaWindowDisplayLabel, quotaWindowTiming } from "@/lib/quota-display";
+
+type AccountListMode = "cards" | "table";
+
+interface AccountSelection {
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  onTogglePage: (ids: string[], checked: boolean) => void;
+  bulkActions?: ReactNode;
+}
+
+interface AccountPagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}
+
+const EMPTY_FILL = "min-h-[55vh] justify-center";
 
 function extractAccountTemplate(p: Provider) {
   const schema = p.config_schema as Record<string, unknown> | undefined;
@@ -95,6 +122,7 @@ function AccountsContent() {
     status: statusFilter,
     provider_id: providerFilter,
   });
+  const models = useAdminModels({ page: 1, page_size: 200, status: "active" });
   const providers = useAdminProviders();
   const proxies = useAdminProxies();
   const setStatus = useSetAccountStatus();
@@ -120,6 +148,7 @@ function AccountsContent() {
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProviderAccount | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [listMode, setListMode] = useState<AccountListMode>("cards");
 
   const providerOptions = (providers.data?.data ?? []).map((p) => ({
     value: p.id,
@@ -209,6 +238,17 @@ function AccountsContent() {
     }
   }
 
+  function toggleAccountStatus(account: ProviderAccount) {
+    void runAction(
+      () =>
+        setStatus.mutateAsync({
+          id: account.id,
+          status: account.status === "disabled" ? "active" : "disabled",
+        }),
+      t("feedback.saved"),
+    );
+  }
+
   const columns: Column<ProviderAccount>[] = [
     {
       key: "name",
@@ -238,7 +278,13 @@ function AccountsContent() {
     {
       key: "status",
       header: t("common.active"),
-      render: (a) => <AccountStatusCell account={a} />,
+      render: (a) => (
+        <AccountStatusCell
+          account={a}
+          busy={setStatus.isPending}
+          onToggle={readOnlyHealthView ? undefined : () => toggleAccountStatus(a)}
+        />
+      ),
     },
     {
       key: "health",
@@ -255,6 +301,135 @@ function AccountsContent() {
       render: (a) => <AccountQuotaCell health={healthById.get(a.id)} />,
     },
   ];
+
+  const bulkActions = (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        loading={setStatus.isPending}
+        onClick={() => void applyBulkStatus("active")}
+      >
+        {t("common.enable")}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        loading={setStatus.isPending}
+        onClick={() => setBulkDisableOpen(true)}
+      >
+        {t("common.disable")}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        loading={batchAction.isPending}
+        onClick={() => void applyBulkAction("clear_error")}
+      >
+        {t("adminAccounts.clearError")}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        loading={batchAction.isPending}
+        onClick={() => void applyBulkAction("recover")}
+      >
+        {t("adminAccounts.recover")}
+      </Button>
+    </>
+  );
+
+  const selection = readOnlyHealthView
+    ? undefined
+    : {
+        selected: list.selected,
+        onToggle: list.toggle,
+        onTogglePage: list.togglePage,
+        bulkActions,
+      };
+
+  const pagination = {
+    page: list.page,
+    pageSize: list.pageSize,
+    total: accounts.data?.pagination?.total ?? accounts.data?.data.length ?? 0,
+    onPageChange: list.setPage,
+  };
+
+  const toolbar = (
+    <ListToolbar>
+      <FilterSelect
+        value={statusFilter}
+        onChange={(v) => list.setFilter("status", v)}
+        options={enumOptions(ACCOUNT_STATUSES)}
+        allLabel={t("adminCommon.allStatuses")}
+      />
+      {providerOptions.length > 0 ? (
+        <FilterSelect
+          value={providerFilter}
+          onChange={(v) => list.setFilter("providerId", v)}
+          options={providerOptions}
+          allLabel={t("adminAccounts.allProviders")}
+        />
+      ) : null}
+      <div className="flex items-center gap-2 sm:ml-auto">
+        <ViewModeToggle mode={listMode} onChange={setListMode} />
+        {listMode === "table" ? (
+          <ColumnToggle
+            columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
+            visibility={colVis}
+          />
+        ) : null}
+      </div>
+    </ListToolbar>
+  );
+
+  function renderRowActions(a: ProviderAccount) {
+    const actions: RowAction[] = [
+      { label: t("adminAccounts.details"), onSelect: () => setDetailTarget(a) },
+      {
+        label: t("adminAccounts.test"),
+        onSelect: () => {
+          test.reset();
+          setTestTarget(a);
+        },
+      },
+    ];
+    if (readOnlyHealthView) {
+      return <RowActionsMenu actions={actions} />;
+    }
+    actions.splice(1, 0, { label: t("adminAccounts.edit"), onSelect: () => setFormTarget(a) });
+    actions.push(
+      { label: t("adminAccounts.discoverModels"), onSelect: () => void runDiscover(a.id) },
+      { label: t("adminAccounts.bindProxy"), onSelect: () => setProxyTarget(a) },
+    );
+    if (isRecoverable(a.status)) {
+      actions.push(
+        {
+          label: t("adminAccounts.clearError"),
+          onSelect: () =>
+            void runAction(() => clearErr.mutateAsync(a.id), t("feedback.saved")),
+        },
+        {
+          label: t("adminAccounts.recover"),
+          onSelect: () =>
+            void runAction(() => recover.mutateAsync(a.id), t("feedback.saved")),
+        },
+      );
+    }
+    if (hasQuotaError(a)) {
+      actions.push({
+        label: t("adminAccounts.quotaReset"),
+        onSelect: () =>
+          void runAction(() => resetQuota.mutateAsync(a.id), t("adminAccounts.quotaResetDone")),
+      });
+    }
+    actions.push({
+      label: t("common.delete"),
+      destructive: true,
+      onSelect: () => setDeleteTarget(a),
+    });
+    return <RowActionsMenu actions={actions} />;
+  }
 
   return (
     <>
@@ -290,164 +465,69 @@ function AccountsContent() {
           </div>
         }
       />
-      <AdminListView
-        query={accounts}
-        columns={columns}
-        columnVisibility={colVis}
-        getRowId={(a) => a.id}
-        emptyIcon={Server}
-        emptyTitle={t("adminAccounts.emptyTitle")}
-        emptyBody={t("adminAccounts.emptyBody")}
-        emptyAction={
-          readOnlyHealthView ? undefined :
-          <div className="flex gap-2">
-            <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
-              + {t("adminAccounts.create")}
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <a href={ADMIN_ROUTES.quickSetup}>{t("adminAccounts.emptyQuickSetup")}</a>
-            </Button>
-          </div>
-        }
-        dimRow={(a) => a.status === "disabled"}
-        isFiltered={isFiltered}
-        onClearFilters={list.clearFilters}
-        sort={list.sort}
-        onSort={list.toggleSort}
-        toolbar={
-          <ListToolbar>
-            <FilterSelect
-              value={statusFilter}
-              onChange={(v) => list.setFilter("status", v)}
-              options={enumOptions(ACCOUNT_STATUSES)}
-              allLabel={t("adminCommon.allStatuses")}
+      {listMode === "cards" ? (
+        <AccountsCardView
+          query={accounts}
+          providerNameById={providerNameById}
+          healthById={healthById}
+          toolbar={toolbar}
+          selection={selection}
+          pagination={pagination}
+          isFiltered={isFiltered}
+          onClearFilters={list.clearFilters}
+          emptyAction={
+            readOnlyHealthView ? undefined : (
+              <div className="flex gap-2">
+                <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
+                  + {t("adminAccounts.create")}
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <a href={ADMIN_ROUTES.quickSetup}>{t("adminAccounts.emptyQuickSetup")}</a>
+                </Button>
+              </div>
+            )
+          }
+          renderActions={renderRowActions}
+          renderStatus={(a) => (
+            <AccountStatusCell
+              account={a}
+              busy={setStatus.isPending}
+              onToggle={readOnlyHealthView ? undefined : () => toggleAccountStatus(a)}
             />
-            {providerOptions.length > 0 ? (
-              <FilterSelect
-                value={providerFilter}
-                onChange={(v) => list.setFilter("providerId", v)}
-                options={providerOptions}
-                allLabel={t("adminAccounts.allProviders")}
-              />
-            ) : null}
-            <ColumnToggle
-              columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
-              visibility={colVis}
-            />
-          </ListToolbar>
-        }
-        pagination={{
-          page: list.page,
-          pageSize: list.pageSize,
-          total: accounts.data?.pagination?.total ?? accounts.data?.data.length ?? 0,
-          onPageChange: list.setPage,
-        }}
-        selection={
-          readOnlyHealthView
-            ? undefined
-            : {
-                selected: list.selected,
-                onToggle: list.toggle,
-                onTogglePage: list.togglePage,
-                bulkActions: (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      loading={setStatus.isPending}
-                      onClick={() => void applyBulkStatus("active")}
-                    >
-                      {t("common.enable")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      loading={setStatus.isPending}
-                      onClick={() => setBulkDisableOpen(true)}
-                    >
-                      {t("common.disable")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      loading={batchAction.isPending}
-                      onClick={() => void applyBulkAction("clear_error")}
-                    >
-                      {t("adminAccounts.clearError")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      loading={batchAction.isPending}
-                      onClick={() => void applyBulkAction("recover")}
-                    >
-                      {t("adminAccounts.recover")}
-                    </Button>
-                  </>
-                ),
-              }
-        }
-        rowActions={(a) => {
-          const actions: RowAction[] = [
-            { label: t("adminAccounts.details"), onSelect: () => setDetailTarget(a) },
-            {
-              label: t("adminAccounts.test"),
-              onSelect: () => {
-                setTestTarget(a);
-                test.mutate(a.id);
-              },
-            },
-          ];
-          if (readOnlyHealthView) {
-            return <RowActionsMenu actions={actions} />;
+          )}
+        />
+      ) : (
+        <AdminListView
+          query={accounts}
+          columns={columns}
+          columnVisibility={colVis}
+          getRowId={(a) => a.id}
+          emptyIcon={Server}
+          emptyTitle={t("adminAccounts.emptyTitle")}
+          emptyBody={t("adminAccounts.emptyBody")}
+          emptyAction={
+            readOnlyHealthView ? undefined : (
+              <div className="flex gap-2">
+                <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
+                  + {t("adminAccounts.create")}
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <a href={ADMIN_ROUTES.quickSetup}>{t("adminAccounts.emptyQuickSetup")}</a>
+                </Button>
+              </div>
+            )
           }
-          actions.splice(1, 0, { label: t("adminAccounts.edit"), onSelect: () => setFormTarget(a) });
-          actions.push(
-            { label: t("adminAccounts.discoverModels"), onSelect: () => void runDiscover(a.id) },
-            { label: t("adminAccounts.bindProxy"), onSelect: () => setProxyTarget(a) },
-          );
-          if (isRecoverable(a.status)) {
-            actions.push(
-              {
-                label: t("adminAccounts.clearError"),
-                onSelect: () =>
-                  void runAction(() => clearErr.mutateAsync(a.id), t("feedback.saved")),
-              },
-              {
-                label: t("adminAccounts.recover"),
-                onSelect: () =>
-                  void runAction(() => recover.mutateAsync(a.id), t("feedback.saved")),
-              },
-            );
-          }
-          if (hasQuotaError(a)) {
-            actions.push({
-              label: t("adminAccounts.quotaReset"),
-              onSelect: () =>
-                void runAction(() => resetQuota.mutateAsync(a.id), t("adminAccounts.quotaResetDone")),
-            });
-          }
-          actions.push({
-            label: a.status === "disabled" ? t("common.enable") : t("common.disable"),
-            destructive: a.status !== "disabled",
-            onSelect: () =>
-              void runAction(
-                () =>
-                  setStatus.mutateAsync({
-                    id: a.id,
-                    status: a.status === "disabled" ? "active" : "disabled",
-                  }),
-                t("feedback.saved"),
-              ),
-          });
-          actions.push({
-            label: t("common.delete"),
-            destructive: true,
-            onSelect: () => setDeleteTarget(a),
-          });
-          return <RowActionsMenu actions={actions} />;
-        }}
-      />
+          dimRow={(a) => a.status === "disabled"}
+          isFiltered={isFiltered}
+          onClearFilters={list.clearFilters}
+          sort={list.sort}
+          onSort={list.toggleSort}
+          toolbar={toolbar}
+          pagination={pagination}
+          selection={selection}
+          rowActions={renderRowActions}
+        />
+      )}
 
       {formTarget === "new" ? (
         <AccountFormDialog
@@ -487,10 +567,14 @@ function AccountsContent() {
         <AccountTestDialog
           open
           onOpenChange={(open) => {
-            if (!open) setTestTarget(null);
+            if (!open) {
+              setTestTarget(null);
+              test.reset();
+            }
           }}
           accountName={testTarget.name}
-          onRun={() => test.mutate(testTarget.id)}
+          models={models.data?.data ?? []}
+          onRun={(body) => test.mutate({ id: testTarget.id, body })}
           result={test.data}
           errorMessage={test.error instanceof Error ? test.error.message : null}
           isPending={test.isPending}
@@ -573,13 +657,363 @@ function AccountHealthCell({ health }: { health?: AccountHealthSnapshot }) {
   );
 }
 
-function AccountStatusCell({ account }: { account: ProviderAccount }) {
+function ViewModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: AccountListMode;
+  onChange: (mode: AccountListMode) => void;
+}) {
+  const { t } = useLanguage();
+  return (
+    <div className="inline-flex h-9 rounded-lg border border-srapi-border-strong bg-srapi-card p-0.5">
+      <Button
+        type="button"
+        variant={mode === "cards" ? "outline" : "ghost"}
+        size="sm"
+        className={cn(
+          "h-7 rounded-md border-0 px-2.5 shadow-none",
+          mode !== "cards" && "text-srapi-text-secondary",
+        )}
+        aria-pressed={mode === "cards"}
+        onClick={() => onChange("cards")}
+      >
+        <LayoutGrid className="size-3.5" />
+        <span className="hidden sm:inline">{t("adminAccounts.viewCards")}</span>
+      </Button>
+      <Button
+        type="button"
+        variant={mode === "table" ? "outline" : "ghost"}
+        size="sm"
+        className={cn(
+          "h-7 rounded-md border-0 px-2.5 shadow-none",
+          mode !== "table" && "text-srapi-text-secondary",
+        )}
+        aria-pressed={mode === "table"}
+        onClick={() => onChange("table")}
+      >
+        <List className="size-3.5" />
+        <span className="hidden sm:inline">{t("adminAccounts.viewTable")}</span>
+      </Button>
+    </div>
+  );
+}
+
+function AccountsCardView({
+  query,
+  providerNameById,
+  healthById,
+  toolbar,
+  selection,
+  pagination,
+  isFiltered,
+  onClearFilters,
+  emptyAction,
+  renderActions,
+  renderStatus,
+}: {
+  query: UseQueryResult<AdminListResult<ProviderAccount>>;
+  providerNameById: Map<string, string>;
+  healthById: Map<string, AccountHealthSnapshot>;
+  toolbar: ReactNode;
+  selection?: AccountSelection;
+  pagination: AccountPagination;
+  isFiltered: boolean;
+  onClearFilters: () => void;
+  emptyAction?: ReactNode;
+  renderActions: (account: ProviderAccount) => ReactNode;
+  renderStatus: (account: ProviderAccount) => ReactNode;
+}) {
+  const { t } = useLanguage();
+
+  return (
+    <Card className="anim-rise-sm overflow-hidden">
+      {toolbar}
+      {selection && selection.selected.size > 0 ? (
+        <AccountBulkBar
+          count={selection.selected.size}
+          onClear={() => selection.onTogglePage([...selection.selected], false)}
+        >
+          {selection.bulkActions}
+        </AccountBulkBar>
+      ) : null}
+      <PageQueryState
+        query={query}
+        isEmpty={(d) => d.data.length === 0}
+        skeleton={<AccountCardSkeleton />}
+      >
+        {(data) =>
+          data.data.length === 0 ? (
+            isFiltered ? (
+              <EmptyState
+                className={EMPTY_FILL}
+                icon={SearchX}
+                title={t("adminCommon.noResults")}
+                description={t("adminCommon.noResultsBody")}
+                action={
+                  <Button variant="outline" size="sm" onClick={onClearFilters}>
+                    {t("adminCommon.clearFilters")}
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                className={EMPTY_FILL}
+                icon={Server}
+                title={t("adminAccounts.emptyTitle")}
+                description={t("adminAccounts.emptyBody")}
+                action={emptyAction}
+              />
+            )
+          ) : (
+            <AccountCardGrid
+              accounts={data.data}
+              providerNameById={providerNameById}
+              healthById={healthById}
+              selection={selection}
+              renderActions={renderActions}
+              renderStatus={renderStatus}
+            />
+          )
+        }
+      </PageQueryState>
+      {pagination.total > pagination.pageSize ? (
+        <div className="border-t border-srapi-border">
+          <Pagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            onPageChange={pagination.onPageChange}
+            labelFor={(from, to, total) => t("adminCommon.pageLabel", { from, to, total })}
+          />
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+function AccountCardGrid({
+  accounts,
+  providerNameById,
+  healthById,
+  selection,
+  renderActions,
+  renderStatus,
+}: {
+  accounts: ProviderAccount[];
+  providerNameById: Map<string, string>;
+  healthById: Map<string, AccountHealthSnapshot>;
+  selection?: AccountSelection;
+  renderActions: (account: ProviderAccount) => ReactNode;
+  renderStatus: (account: ProviderAccount) => ReactNode;
+}) {
+  const pageIds = accounts.map((a) => a.id);
+  const allOnPage = pageIds.length > 0 && pageIds.every((id) => selection?.selected.has(id));
+  const someOnPage = pageIds.some((id) => selection?.selected.has(id));
+
+  return (
+    <div>
+      {selection ? (
+        <div className="flex items-center gap-2 border-b border-srapi-border px-4 py-2.5">
+          <Checkbox
+            aria-label="select all"
+            checked={allOnPage}
+            indeterminate={!allOnPage && someOnPage}
+            onChange={(e) => selection.onTogglePage(pageIds, e.target.checked)}
+          />
+        </div>
+      ) : null}
+      <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3">
+        {accounts.map((account) => (
+          <AccountCard
+            key={account.id}
+            account={account}
+            providerName={providerNameById.get(String(account.provider_id)) || account.provider_id}
+            health={healthById.get(account.id)}
+            selected={selection?.selected.has(account.id) ?? false}
+            onSelect={selection ? () => selection.onToggle(account.id) : undefined}
+            actions={renderActions(account)}
+            status={renderStatus(account)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AccountCard({
+  account,
+  providerName,
+  health,
+  selected,
+  onSelect,
+  actions,
+  status,
+}: {
+  account: ProviderAccount;
+  providerName: string;
+  health?: AccountHealthSnapshot;
+  selected: boolean;
+  onSelect?: () => void;
+  actions: ReactNode;
+  status: ReactNode;
+}) {
+  const { t } = useLanguage();
+  return (
+    <article
+      className={cn(
+        "rounded-lg border border-srapi-border bg-srapi-card px-4 py-3.5 transition-colors",
+        account.status === "disabled" && "opacity-60",
+        selected && "border-srapi-primary/50 bg-srapi-card-muted",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        {onSelect ? (
+          <Checkbox
+            aria-label="select row"
+            checked={selected}
+            onChange={() => onSelect()}
+            className="mt-1"
+          />
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="truncate text-sm font-medium text-srapi-text-primary">{account.name}</h3>
+              <p className="mt-1 truncate text-xs text-srapi-text-secondary">{providerName}</p>
+            </div>
+            <div className="shrink-0">{actions}</div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {status}
+            <span className="font-mono text-2xs text-srapi-text-tertiary">{account.runtime_class}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 border-t border-srapi-border/70 pt-3">
+        <AccountCardMetric label={t("adminAccounts.healthTitle")}>
+          <AccountHealthCell health={health} />
+        </AccountCardMetric>
+        <AccountCardMetric label={t("adminAccounts.quotaTitle")}>
+          <AccountQuotaCell health={health} />
+        </AccountCardMetric>
+      </div>
+    </article>
+  );
+}
+
+function AccountCardMetric({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <div className="mb-1.5 text-2xs text-srapi-text-tertiary">{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function AccountBulkBar({
+  count,
+  onClear,
+  children,
+}: {
+  count: number;
+  onClear: () => void;
+  children?: ReactNode;
+}) {
+  const { t } = useLanguage();
+  return (
+    <div className="anim-rise-sm flex flex-wrap items-center gap-3 border-b border-srapi-border bg-srapi-card-muted px-4 py-2.5">
+      <span className="font-mono text-2xs text-srapi-text-secondary">
+        {t("adminCommon.selectedCount", { count })}
+      </span>
+      <button
+        type="button"
+        onClick={onClear}
+        className="text-2xs text-srapi-text-tertiary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+      >
+        {t("adminCommon.clearSelection")}
+      </button>
+      <div className="ml-auto flex flex-wrap items-center gap-2">{children}</div>
+    </div>
+  );
+}
+
+function AccountCardSkeleton() {
+  return (
+    <div className="min-h-[55vh] p-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="rounded-lg border border-srapi-border px-4 py-3.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+              <Skeleton className="h-8 w-8" />
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AccountStatusCell({
+  account,
+  busy = false,
+  onToggle,
+}: {
+  account: ProviderAccount;
+  busy?: boolean;
+  onToggle?: () => void;
+}) {
   const { t } = useLanguage();
   const quotaClass = metadataString(account.metadata, "last_quota_error_class");
   const validationURL = metadataString(account.metadata, "validation_url");
+  const tone = quietStatusFor(account.status);
+  const label = statusLabel(t, account.status);
+  const actionLabel = account.status === "disabled" ? t("common.enable") : t("common.disable");
+
+  const statusBadge = onToggle ? (
+    <button
+      type="button"
+      disabled={busy}
+      aria-label={actionLabel}
+      title={actionLabel}
+      onClick={onToggle}
+      className={cn(
+        "inline-flex h-7 items-center gap-1.5 rounded-md border border-srapi-border px-2 font-mono text-2xs text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:bg-srapi-card-muted hover:text-srapi-text-primary disabled:pointer-events-none disabled:opacity-50",
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "text-[0.7em] leading-none",
+          tone === "active"
+            ? "text-srapi-success"
+            : tone === "limited"
+              ? "text-srapi-warning"
+              : tone === "error"
+                ? "text-srapi-error"
+                : "text-srapi-text-tertiary",
+        )}
+      >
+        {tone === "active" ? "●" : tone === "disabled" ? "○" : "■"}
+      </span>
+      {label}
+    </button>
+  ) : (
+    <QuietBadge status={tone} label={label} />
+  );
+
   return (
     <span className="flex flex-wrap items-center gap-1.5">
-      <QuietBadge status={quietStatusFor(account.status)} label={statusLabel(t, account.status)} />
+      {statusBadge}
       {quotaClass ? (
         <QuietBadge
           status={quotaClass === "validation_required" ? "limited" : "error"}
@@ -601,7 +1035,61 @@ function AccountStatusCell({ account }: { account: ProviderAccount }) {
 }
 
 function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot }) {
+  const { t } = useLanguage();
   if (!health) return <span className="text-2xs text-srapi-text-tertiary">—</span>;
+  const windows = latestQuotaWindows(health.quota_windows ?? []);
+  if (windows.length > 0) {
+    const title = windows
+      .map(
+        (window) =>
+          `${quotaWindowDisplayLabel(window, t)} ${Math.round(window.remainingPercent)}% · ${quotaWindowTiming(window, t)}`,
+      )
+      .join("\n");
+    return (
+      <span className="flex min-w-44 flex-col gap-1" title={title}>
+        {windows.map((window) => {
+          const ratio = window.remainingPercent / 100;
+          const exhausted = window.remainingPercent <= 0;
+          const pct = Math.round(window.remainingPercent);
+          return (
+            <span
+              key={window.snapshot.quota_type}
+              className="grid grid-cols-[3rem_minmax(4rem,1fr)_2.5rem] items-center gap-1.5"
+            >
+              <span className="truncate font-mono text-[10px] uppercase leading-none text-srapi-text-tertiary">
+                {quotaWindowDisplayLabel(window, t)}
+              </span>
+              <span className="relative h-1.5 min-w-16 overflow-hidden rounded-full bg-srapi-border">
+                <span
+                  className={cn(
+                    "absolute inset-y-0 left-0 rounded-full transition-all",
+                    exhausted
+                      ? "bg-srapi-error"
+                      : ratio <= 0.2
+                        ? "bg-srapi-warning"
+                        : "bg-srapi-success",
+                  )}
+                  style={{ width: `${Math.max(pct, 2)}%` }}
+                />
+              </span>
+              <span
+                className={cn(
+                  "text-right font-mono text-[10px] leading-none tabular text-srapi-text-tertiary",
+                  exhausted
+                    ? "text-srapi-error"
+                    : window.remainingPercent <= 20
+                      ? "text-srapi-warning"
+                      : undefined,
+                )}
+              >
+                {pct}%
+              </span>
+            </span>
+          );
+        })}
+      </span>
+    );
+  }
   const ratio = health.quota_remaining_ratio;
   const exhausted = health.quota_exhausted;
   const pct = Math.round(ratio * 100);

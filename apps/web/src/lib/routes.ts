@@ -67,6 +67,7 @@ export const ADMIN_ROUTE_SMOKE_TARGETS = [
   { path: "/admin/groups", heading: "Group Management" },
   { path: "/admin/subscriptions", heading: "Subscription Management" },
   { path: "/admin/accounts", heading: "Account Pool" },
+  { path: "/admin/models", heading: "Model Registry" },
   { path: "/admin/announcements", heading: "Announcement Management" },
   { path: "/admin/proxies", heading: "Proxy Management" },
   { path: "/admin/risk-control", heading: "Risk Control" },

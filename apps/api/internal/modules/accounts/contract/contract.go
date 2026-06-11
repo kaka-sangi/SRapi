@@ -2,6 +2,7 @@ package contract
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +32,29 @@ const (
 	// the row is kept so historical usage/audit references stay intact.
 	StatusArchived Status = "archived"
 )
+
+// ShouldRefreshOAuthCredential reports whether an OAuth-style account should
+// refresh its access token before an upstream request.
+func ShouldRefreshOAuthCredential(account ProviderAccount, credential map[string]any, now time.Time) bool {
+	if account.RuntimeClass != RuntimeClassOauthRefresh && account.RuntimeClass != RuntimeClassOauthDeviceCode {
+		return false
+	}
+	if metadataBool(account.Metadata, "force_refresh") || metadataBool(account.Metadata, "access_token_expired") {
+		return true
+	}
+	expiresAt := metadataString(credential, "expires_at")
+	if expiresAt == "" {
+		return metadataString(credential, "access_token") == ""
+	}
+	parsed, err := time.Parse(time.RFC3339, expiresAt)
+	if err != nil {
+		return false
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	return now.UTC().After(parsed.Add(-30 * time.Second))
+}
 
 type GroupStatus string
 
@@ -276,6 +300,41 @@ func cloneMetadata(value map[string]any) map[string]any {
 		out[key] = item
 	}
 	return out
+}
+
+func metadataString(values map[string]any, key string) string {
+	if values == nil {
+		return ""
+	}
+	value, ok := values[key]
+	if !ok || value == nil {
+		return ""
+	}
+	switch value := value.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	default:
+		return strings.TrimSpace(fmt.Sprint(value))
+	}
+}
+
+func metadataBool(values map[string]any, key string) bool {
+	if values == nil {
+		return false
+	}
+	value, ok := values[key]
+	if !ok || value == nil {
+		return false
+	}
+	switch value := value.(type) {
+	case bool:
+		return value
+	case string:
+		value = strings.TrimSpace(value)
+		return strings.EqualFold(value, "true") || value == "1"
+	default:
+		return false
+	}
 }
 
 type BatchUpdateResult struct {

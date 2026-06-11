@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/table";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Skeleton } from "@/components/ui/skeleton";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import {
   DropdownMenu,

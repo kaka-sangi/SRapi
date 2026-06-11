@@ -186,6 +186,7 @@ func codexCLIPreset() Preset {
 		},
 		QuotaConfig: map[string]string{
 			"quota_url":                    "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27",
+			"quota_headers":                `{"Origin":"https://chatgpt.com","Referer":"https://chatgpt.com/","User-Agent":"{{user_agent}}","ChatGPT-Account-ID":"{{chatgpt_account_id}}"}`,
 			"quota_plan_path":              "account_plan.account_plan_id",
 			"quota_credits_remaining_path": "account_plan.subscription_plan.allowance",
 			"quota_credits_used_path":      "account_plan.subscription_plan.usage",

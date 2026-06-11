@@ -2311,6 +2311,48 @@ func TestOpenAICompatibleAdapterClassifiesRateLimit(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleAdapterClassifiesRateLimitResetsInSeconds(t *testing.T) {
+	before := time.Now().UTC()
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"type":"usage_limit_reached","message":"too many requests","resets_in_seconds":123}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_rate_limit_seconds",
+		Model:      "gpt-local",
+		InputParts: textParts("hello"),
+		Account: accountcontract.ProviderAccount{
+			Metadata: map[string]any{"base_url": upstream.URL + "/v1"},
+		},
+		Mapping: modelcontract.ModelProviderMapping{
+			UpstreamModelName: "gpt-upstream",
+		},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err == nil {
+		t.Fatal("expected provider error")
+	}
+	providerErr, ok := err.(contract.ProviderError)
+	if !ok {
+		t.Fatalf("expected ProviderError, got %T", err)
+	}
+	if providerErr.Class != "rate_limit" || providerErr.StatusCode != http.StatusTooManyRequests || providerErr.RetryAfter == nil {
+		t.Fatalf("unexpected provider error: %+v", providerErr)
+	}
+	minResetAt := before.Add(123 * time.Second)
+	maxResetAt := time.Now().UTC().Add(123 * time.Second)
+	if providerErr.RetryAfter.Before(minResetAt) || providerErr.RetryAfter.After(maxResetAt) {
+		t.Fatalf("expected retry hint about 123s from now, got %+v", providerErr.RetryAfter)
+	}
+}
+
 func TestOpenAICompatibleAdapterClassifiesProvider5xx(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "provider failed", http.StatusBadGateway)
@@ -5232,7 +5274,7 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 	if len(resp.QuotaSignals) != 2 {
 		t.Fatalf("expected Codex quota signals, got %+v", resp.QuotaSignals)
 	}
-	assertQuotaSignal(t, resp.QuotaSignals, "codex_5h_percent", "12", "88", "100", 0.88)
+	assertQuotaSignal(t, resp.QuotaSignals, "codex_5h_percent", "88", "12", "100", 0.12)
 	assertQuotaSignal(t, resp.QuotaSignals, "codex_7d_percent", "34", "66", "100", 0.66)
 	if upstreamHeaders.Get("Authorization") != "Bearer codex-token" {
 		t.Fatalf("expected runtime to inject codex auth, got %+v", upstreamHeaders)
@@ -7276,7 +7318,10 @@ func TestReverseProxyCodexCLIAdapterPreservesRawResponsesPayload(t *testing.T) {
 	}
 	if runtime.request.Headers.Get("OpenAI-Beta") != "responses=experimental" ||
 		runtime.request.Headers.Get("User-Agent") != "codex_cli_rs/0.125.0" ||
-		runtime.request.Headers.Get("Session_id") != "srapi-codex-account-16" {
+		runtime.request.Headers.Get("Session_id") != "cache-123" ||
+		runtime.request.Headers.Get("Conversation_id") != "cache-123" ||
+		runtime.request.Headers.Get("Thread-Id") != "cache-123" ||
+		runtime.request.Headers.Get("X-Codex-Window-Id") != "cache-123:0" {
 		t.Fatalf("unexpected raw codex headers: %+v", runtime.request.Headers)
 	}
 	var payload map[string]any
@@ -7461,6 +7506,127 @@ func TestReverseProxyCodexCLIAdapterDoesNotRetryPreviousResponseNotFoundForCompa
 	}
 	if len(runtime.requests) != 1 {
 		t.Fatalf("expected no recovery retry for compact, got %d requests", len(runtime.requests))
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterClassifiesUsageLimitWithRFC3339Retry(t *testing.T) {
+	resetAt := time.Now().UTC().Add(2 * time.Hour).Truncate(time.Second)
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusTooManyRequests,
+			Body: []byte(`{"error":{"type":"usage_limit_reached","message":"weekly limit reached","plan_type":"free","resets_at":"` +
+				resetAt.Format(time.RFC3339) + `"}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_usage_limit_rfc3339",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		Model:          "codex-local",
+		RawBody:        []byte(`{"model":"codex-local","input":"hello","stream":true}`),
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             32,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"access_token": "oauth-token"},
+	})
+	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	if providerErr.RetryAfter == nil || !providerErr.RetryAfter.Equal(resetAt) {
+		t.Fatalf("expected RFC3339 retry hint %v, got %+v", resetAt, providerErr)
+	}
+	if providerErr.Metadata["plan_type"] != "free" {
+		t.Fatalf("expected Codex plan_type metadata, got %+v", providerErr.Metadata)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterClassifiesCapacityAsRateLimit(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusServiceUnavailable,
+			Body:       []byte(`{"error":{"message":"Selected model is at capacity. Please try a different model."}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_capacity",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		Model:          "codex-local",
+		RawBody:        []byte(`{"model":"codex-local","input":"hello","stream":true}`),
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             33,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"access_token": "oauth-token"},
+	})
+	assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+}
+
+func TestReverseProxyCodexCLIAdapterPinsSessionHeadersToPromptCacheKey(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_prompt_cache_headers",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		Model:          "codex-local",
+		RawBody:        []byte(`{"model":"codex-local","input":"hello","prompt_cache_key":"cache-abc","stream":true}`),
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             34,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"access_token": "oauth-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke raw codex reverse proxy adapter: %v", err)
+	}
+	if conversationResponseText(resp) != "ok" {
+		t.Fatalf("unexpected codex response: %+v", resp)
+	}
+	if headerValue(runtime.request.Headers, "Session_id") != "cache-abc" ||
+		headerValue(runtime.request.Headers, "Conversation_id") != "cache-abc" ||
+		headerValue(runtime.request.Headers, "Thread-Id") != "cache-abc" ||
+		headerValue(runtime.request.Headers, "X-Codex-Window-Id") != "cache-abc:0" {
+		t.Fatalf("expected prompt_cache_key session headers, got %+v", runtime.request.Headers)
 	}
 }
 
@@ -8031,6 +8197,46 @@ func TestReverseProxyCodexCLIPrepareRealtimeUsesConfiguredOriginator(t *testing.
 	}
 }
 
+func TestReverseProxyCodexCLIPrepareRealtimePinsSessionHeadersToPromptCacheKey(t *testing.T) {
+	svc, err := service.New(nil)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	session, err := svc.PrepareRealtime(context.Background(), contract.RealtimeRequest{
+		RequestID:      "req_codex_ws_prompt_cache",
+		Model:          "codex-local",
+		RequestPayload: []byte(`{"model":"codex-local","input":"hello","prompt_cache_key":"cache-ws","stream":true}`),
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             35,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://chatgpt.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("prepare codex realtime: %v", err)
+	}
+	if headerValue(session.Headers, "session_id") != "cache-ws" ||
+		headerValue(session.Headers, "Conversation_id") != "cache-ws" ||
+		headerValue(session.Headers, "Thread-Id") != "cache-ws" ||
+		headerValue(session.Headers, "X-Codex-Window-Id") != "cache-ws:0" {
+		t.Fatalf("expected prompt_cache_key websocket session headers, got %+v", session.Headers)
+	}
+	var frame map[string]any
+	if err := json.Unmarshal(session.InitialFrame, &frame); err != nil {
+		t.Fatalf("decode initial frame: %v", err)
+	}
+	if frame["prompt_cache_key"] != "cache-ws" || frame["type"] != "response.create" {
+		t.Fatalf("expected prompt_cache_key to stay in initial frame, got %+v", frame)
+	}
+}
+
 func TestReverseProxyCodexCLIRejectsAPIKeyRuntime(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
@@ -8119,7 +8325,7 @@ func TestReverseProxyCodexCLIResponseInputItemsCapturesQuotaSignals(t *testing.T
 	if runtime.request.URL != "https://upstream.example/backend-api/codex/responses/resp_quota/input_items" {
 		t.Fatalf("unexpected input_items upstream URL: %s", runtime.request.URL)
 	}
-	assertQuotaSignal(t, resp.QuotaSignals, "codex_5h_percent", "1", "99", "100", 0.99)
+	assertQuotaSignal(t, resp.QuotaSignals, "codex_5h_percent", "99", "1", "100", 0.01)
 	assertQuotaSignal(t, resp.QuotaSignals, "codex_7d_percent", "100", "0", "100", 0)
 }
 

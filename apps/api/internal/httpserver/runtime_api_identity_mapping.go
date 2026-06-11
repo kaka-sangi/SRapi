@@ -371,16 +371,33 @@ func overlayAccountHealthSnapshot(target *apiopenapi.AccountHealthSnapshot, late
 	target.SnapshotAt = latest.SnapshotAt
 }
 
-func overlayAccountQuotaOnHealth(target *apiopenapi.AccountHealthSnapshot, latest accountcontract.AccountQuotaSnapshot) {
-	target.QuotaRemainingRatio = latest.RemainingRatio
-	target.QuotaExhausted = latest.RemainingRatio <= 0
+func overlayAccountQuotaOnHealth(target *apiopenapi.AccountHealthSnapshot, snapshot accountcontract.AccountQuotaSnapshot) {
+	target.QuotaRemainingRatio = snapshot.RemainingRatio
+	target.QuotaExhausted = snapshot.RemainingRatio <= 0
 }
 
-func latestRealQuotaSnapshot(snapshots []accountcontract.AccountQuotaSnapshot) (accountcontract.AccountQuotaSnapshot, bool) {
+func overlayAccountQuotaWindowsOnHealth(target *apiopenapi.AccountHealthSnapshot, snapshots []accountcontract.AccountQuotaSnapshot) {
+	windows := make([]apiopenapi.AccountQuotaSnapshot, 0, len(snapshots))
 	for _, snapshot := range snapshots {
-		if !accountcontract.IsSyntheticQuotaSnapshot(snapshot) {
-			return snapshot, true
+		windows = append(windows, toAPIAccountQuotaSnapshot(snapshot))
+	}
+	target.QuotaWindows = &windows
+}
+
+func mostConstrainedRealQuotaSnapshot(snapshots []accountcontract.AccountQuotaSnapshot) (accountcontract.AccountQuotaSnapshot, bool) {
+	var selected accountcontract.AccountQuotaSnapshot
+	found := false
+	for _, snapshot := range snapshots {
+		if accountcontract.IsSyntheticQuotaSnapshot(snapshot) {
+			continue
 		}
+		if !found || snapshot.RemainingRatio < selected.RemainingRatio {
+			selected = snapshot
+			found = true
+		}
+	}
+	if found {
+		return selected, true
 	}
 	return accountcontract.AccountQuotaSnapshot{}, false
 }

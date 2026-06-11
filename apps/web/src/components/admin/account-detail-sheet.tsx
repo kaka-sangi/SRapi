@@ -3,7 +3,6 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import {
   useAccountHealth,
@@ -16,6 +15,13 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { cn } from "@/lib/cn";
+import {
+  latestQuotaWindows,
+  quotaWindowDisplayLabel,
+  quotaWindowTiming,
+  quotaWindowValue,
+  type QuotaDisplayWindow,
+} from "@/lib/quota-display";
 import type { ProviderAccount } from "@/lib/sdk-types";
 
 function pct(ratio: number): string {
@@ -27,6 +33,50 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="flex items-baseline justify-between gap-4 py-1.5">
       <span className="text-2xs uppercase tracking-wide text-srapi-text-tertiary">{label}</span>
       <span className="font-mono text-xs text-srapi-text-primary tabular">{value}</span>
+    </div>
+  );
+}
+
+function QuotaWindowRow({ window }: { window: QuotaDisplayWindow }) {
+  const { t } = useLanguage();
+  const level =
+    window.remainingPercent <= 10 ? "crit" : window.remainingPercent <= 30 ? "warn" : "ok";
+  return (
+    <div className="space-y-1.5 py-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="font-mono text-2xs uppercase tracking-wide text-srapi-text-secondary">
+          {quotaWindowDisplayLabel(window, t)}
+        </span>
+        <span
+          className={cn(
+            "font-mono text-xs tabular",
+            level === "crit"
+              ? "text-srapi-error"
+              : level === "warn"
+                ? "text-srapi-warning"
+                : "text-srapi-text-primary",
+          )}
+        >
+          {Math.round(window.remainingPercent)}%
+        </span>
+      </div>
+      <div className="relative h-1.5 overflow-hidden rounded-full bg-srapi-border">
+        <div
+          className={cn(
+            "h-full rounded-full transition-all",
+            level === "crit"
+              ? "bg-srapi-error"
+              : level === "warn"
+                ? "bg-srapi-warning"
+                : "bg-srapi-success",
+          )}
+          style={{ width: `${Math.max(window.remainingPercent, 2)}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-3 font-mono text-2xs text-srapi-text-tertiary">
+        <span>{quotaWindowValue(window)}</span>
+        <span>{quotaWindowTiming(window, t)}</span>
+      </div>
     </div>
   );
 }
@@ -159,11 +209,8 @@ export function AccountDetailSheet({
                 <p className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>
               ) : (
                 <div className="space-y-2">
-                  {q.data.map((snap, i) => (
-                    <div key={`${snap.quota_type}-${i}`}>
-                      <Row label={snap.quota_type} value={`${snap.used} / ${snap.quota_limit}`} />
-                      <Row label={t("dashboard.quotaLeft")} value={pct(snap.remaining_ratio)} />
-                    </div>
+                  {latestQuotaWindows(q.data).map((window) => (
+                    <QuotaWindowRow key={window.snapshot.quota_type} window={window} />
                   ))}
                 </div>
               )

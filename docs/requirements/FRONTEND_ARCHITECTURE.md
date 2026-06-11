@@ -151,11 +151,12 @@ AuthGate (client)      ──> 兜底守卫 + 注入 user / runtimeStatus 到子
 
 `make web-check` 串行执行：
 
-1. `npm run typecheck` — `tsc --noEmit`
-2. `npm run lint` — eslint（next + 严格规则）
-3. `npm run test` — vitest run（当前 3 个单测文件 `cn` / `i18n-translate` / `messages`，共约 7 个用例；i18n 文件对齐由 `messages.test.ts` 断言）
-4. `npm run build` — `next build`（同时验证 CSP 头）
-5. `node tools/bundle-budget.mjs` — 读 `apps/web/bundle-budget.json` 校验 chunk 大小（脚本位于仓库根的 `tools/bundle-budget.mjs`，由 `tools/web-check.mjs` 串起）
+1. `make web-admin-sdk-route-check` — 禁止受管后台 SDK 路由在页面/组件里重新硬编码裸 URL
+2. `npm run typecheck` — `tsc --noEmit`
+3. `npm run lint` — eslint（next + 严格规则）
+4. `npm run test` — vitest run（当前 3 个单测文件 `cn` / `i18n-translate` / `messages`，共约 7 个用例；i18n 文件对齐由 `messages.test.ts` 断言）
+5. `npm run build` — `next build`（同时验证 CSP 头）
+6. `node tools/bundle-budget.mjs` — 读 `apps/web/bundle-budget.json` 校验 chunk 大小（脚本位于仓库根的 `tools/bundle-budget.mjs`，由 `tools/web-check.mjs` 串起）
 
 `make web-check-e2e` 单独跑（成本高）：
 

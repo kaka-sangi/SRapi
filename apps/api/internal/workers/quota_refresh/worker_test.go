@@ -2,6 +2,7 @@ package quotarefresh
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	adaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providermemory "github.com/srapi/srapi/apps/api/internal/modules/providers/store/memory"
+	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 )
 
 const testMasterKey = "0123456789abcdef0123456789abcdef"
@@ -177,6 +179,89 @@ func TestWorkerPersistsQuotaReportCreditsAndMetadata(t *testing.T) {
 	}
 }
 
+func TestWorkerRefreshesOAuthCredentialBeforeQuotaFetch(t *testing.T) {
+	ctx := context.Background()
+	accountStore := accountmemory.New()
+	providerStore := providermemory.New()
+	provider, err := providerStore.Create(ctx, providercontract.CreateStoredProvider{
+		Name:        "codex-cli-refresh",
+		DisplayName: "Codex CLI Refresh",
+		AdapterType: "reverse-proxy-codex-cli",
+		Protocol:    "openai-compatible",
+		Status:      providercontract.StatusActive,
+		ConfigSchema: map[string]any{
+			"quota_url": "https://example.invalid/quota",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+	accountsSvc, err := accountservice.New(accountStore, testMasterKey, nil)
+	if err != nil {
+		t.Fatalf("new account service: %v", err)
+	}
+	upstreamClient := "codex_cli"
+	account, err := accountsSvc.Create(ctx, accountcontract.CreateRequest{
+		ProviderID:     provider.ID,
+		Name:           "codex-oauth-refresh",
+		RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+		UpstreamClient: &upstreamClient,
+		Credential:     map[string]any{"access_token": "expired-token", "refresh_token": "old-refresh", "expires_at": "2000-01-01T00:00:00Z"},
+		Metadata:       map[string]any{"user_agent": "codex-cli/test"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	adapter := recordingQuotaAdapter{
+		report: adaptercontract.QuotaReport{
+			Provider:         "codex-cli-refresh",
+			Supported:        true,
+			Source:           "endpoint",
+			CreditsRemaining: "9",
+			CreditsUsed:      "1",
+			CreditsLimit:     "10",
+			FetchedAt:        time.Date(2026, 6, 9, 1, 2, 3, 0, time.UTC),
+		},
+	}
+	refresher := stubRefresher{
+		credential: map[string]any{
+			"access_token":  "fresh-token",
+			"refresh_token": "new-refresh",
+			"expires_at":    "2099-01-01T00:00:00Z",
+		},
+	}
+	worker, err := New(accountStore, providerStore, slog.Default(), Config{
+		MasterKey:     testMasterKey,
+		MaxConcurrent: 1,
+		Adapter:       &adapter,
+		Refresher:     &refresher,
+	})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+
+	result, err := worker.RunOnce(ctx)
+	if err != nil {
+		t.Fatalf("run worker: %v", err)
+	}
+	if result.Refreshed != 1 || result.Failed != 0 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if refresher.accountID != account.ID || refresher.refreshToken != "old-refresh" {
+		t.Fatalf("unexpected refresh input account=%d token=%q", refresher.accountID, refresher.refreshToken)
+	}
+	if adapter.accessToken != "fresh-token" {
+		t.Fatalf("quota fetch used access token %q, want fresh-token", adapter.accessToken)
+	}
+	storedCredential, err := accountsSvc.DecryptCredential(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("decrypt stored credential: %v", err)
+	}
+	if storedCredential["access_token"] != "fresh-token" || storedCredential["refresh_token"] != "new-refresh" {
+		t.Fatalf("refreshed credential was not persisted: %+v", storedCredential)
+	}
+}
+
 type forbiddenQuotaAdapter struct {
 	err error
 }
@@ -199,4 +284,37 @@ func (a quotaReportAdapter) FetchAccountQuota(context.Context, adaptercontract.P
 
 func (a quotaReportAdapter) QuotaConfigured(adaptercontract.ProbeRequest) bool {
 	return true
+}
+
+type recordingQuotaAdapter struct {
+	report      adaptercontract.QuotaReport
+	accessToken string
+}
+
+func (a *recordingQuotaAdapter) FetchAccountQuota(_ context.Context, req adaptercontract.ProbeRequest) (adaptercontract.QuotaReport, error) {
+	token, ok := req.Credential["access_token"].(string)
+	if !ok || token == "" {
+		return adaptercontract.QuotaReport{}, errors.New("missing access token")
+	}
+	a.accessToken = token
+	return a.report, nil
+}
+
+func (a *recordingQuotaAdapter) QuotaConfigured(adaptercontract.ProbeRequest) bool {
+	return true
+}
+
+type stubRefresher struct {
+	credential   map[string]any
+	accountID    int
+	refreshToken string
+}
+
+func (s *stubRefresher) Refresh(_ context.Context, req reverseproxycontract.RefreshRequest) (reverseproxycontract.RefreshResponse, error) {
+	s.accountID = req.Account.AccountID
+	s.refreshToken, _ = req.Account.Credential["refresh_token"].(string)
+	return reverseproxycontract.RefreshResponse{
+		AccountID:  req.Account.AccountID,
+		Credential: s.credential,
+	}, nil
 }

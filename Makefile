@@ -13,6 +13,8 @@ ENT ?= go run entgo.io/ent/cmd/ent@v0.14.6
 ATLAS ?= npx --yes @ariga/atlas@1.2.0
 EXAMPLES_CHECK ?= node tools/examples-check.mjs
 OBSERVABILITY_RULES_CHECK ?= node tools/observability-rules-check.mjs
+ADMIN_OPENAPI_COVERAGE_CHECK ?= node tools/admin-openapi-coverage-check.mjs
+WEB_ADMIN_SDK_ROUTE_CHECK ?= node tools/web-admin-sdk-route-check.mjs
 BOOTSTRAP_ENV ?= node tools/bootstrap-env.mjs
 ENV_CHECK ?= node tools/env-check.mjs
 DEPLOY_PREFLIGHT ?= node tools/deploy-preflight.mjs
@@ -46,7 +48,7 @@ TEMPO_QUERY_PORT ?= 13201
 TEMPO_QUERY_TIMEOUT_SECONDS ?= 20
 TEMPO_SMOKE_TIMEOUT ?= 90s
 
-.PHONY: help bootstrap-env env-check deploy-preflight openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-payment-stripe smoke-payment-alipay smoke-payment-wechat smoke-release smoke-jaeger-trace smoke-tempo-trace rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check observability-rules-check secret-scan architecture-check code-quality-check diff-check web-install web-install-ci web-dev web-check web-check-e2e check
+.PHONY: help bootstrap-env env-check deploy-preflight openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-admin-coverage-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-payment-stripe smoke-payment-alipay smoke-payment-wechat smoke-release smoke-jaeger-trace smoke-tempo-trace rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check observability-rules-check secret-scan architecture-check code-quality-check diff-check web-install web-install-ci web-dev web-admin-sdk-route-check web-check web-check-e2e check
 
 help:
 	@printf '%s\n' \
@@ -58,6 +60,7 @@ help:
 		'  make openapi-bundle  Bundle OpenAPI contract into build/openapi/' \
 		'  make openapi-codegen Generate Go OpenAPI types/server interfaces' \
 		'  make openapi-codegen-check Check generated Go OpenAPI code is current' \
+		'  make openapi-admin-coverage-check  Check registered admin routes are in OpenAPI' \
 		'  make openapi-ts-codegen Generate TypeScript SDK from OpenAPI' \
 		'  make openapi-ts-codegen-check Check generated TypeScript SDK is current' \
 		'  make sdk-ts-typecheck Typecheck generated TypeScript SDK' \
@@ -91,6 +94,7 @@ help:
 		'  make architecture-check  Run architecture and startup harness tests' \
 		'  make code-quality-check  Run repository code-quality harness tests' \
 		'  make diff-check     Check staged and unstaged diff whitespace' \
+		'  make web-admin-sdk-route-check  Check managed admin frontend routes use generated SDK' \
 		'  make secret-scan     Scan source files for committed secrets' \
 		'  make check           Run current contract and API checks'
 
@@ -122,6 +126,9 @@ openapi-codegen-check:
 	cmp -s "$$tmp" "$(OPENAPI_GO_OUTPUT)" || (echo "$(OPENAPI_GO_OUTPUT) is out of date; run make openapi-codegen" >&2; rm -f "$$tmp"; exit 1); \
 	rm -f "$$tmp"
 	@cmp -s "$(OPENAPI)" "$(OPENAPI_COPILOT_SPEC)" || (echo "$(OPENAPI_COPILOT_SPEC) is out of date; run make openapi-codegen" >&2; exit 1)
+
+openapi-admin-coverage-check:
+	$(ADMIN_OPENAPI_COVERAGE_CHECK)
 
 openapi-ts-codegen:
 	$(OPENAPI_TS) -i $(OPENAPI) -o $(OPENAPI_TS_OUTPUT) -c @hey-api/client-fetch -p @hey-api/typescript @hey-api/sdk --no-log-file
@@ -350,10 +357,13 @@ web-install-ci:
 web-dev:
 	npm --prefix $(WEB_DIR) run dev
 
-web-check:
+web-admin-sdk-route-check:
+	$(WEB_ADMIN_SDK_ROUTE_CHECK)
+
+web-check: web-admin-sdk-route-check
 	$(WEB_CHECK)
 
 web-check-e2e:
 	$(WEB_CHECK_E2E)
 
-check: diff-check openapi-lint openapi-bundle openapi-codegen-check openapi-ts-codegen-check sdk-ts-typecheck ent-generate-check migration-check architecture-check code-quality-check examples-check observability-rules-check api-test secret-scan web-check
+check: diff-check openapi-lint openapi-bundle openapi-codegen-check openapi-admin-coverage-check openapi-ts-codegen-check sdk-ts-typecheck ent-generate-check migration-check architecture-check code-quality-check examples-check observability-rules-check api-test secret-scan web-check
