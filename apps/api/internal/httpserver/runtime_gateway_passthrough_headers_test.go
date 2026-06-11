@@ -171,6 +171,52 @@ func TestGatewayBufferedRenderedResponseForwardsAllowlistedUpstreamHeaders(t *te
 	}
 }
 
+func TestGatewayPassthroughDefaultAllowlistForwardsCodexQuotaHeaders(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Codex-Primary-Used-Percent", "12")
+		w.Header().Set("X-Codex-Primary-Reset-After-Seconds", "600")
+		w.Header().Set("X-Codex-Primary-Window-Minutes", "300")
+		w.Header().Set("X-Codex-Secondary-Used-Percent", "34")
+		w.Header().Set("X-Codex-Secondary-Reset-After-Seconds", "86400")
+		w.Header().Set("X-Codex-Secondary-Window-Minutes", "10080")
+		w.Header().Set("X-Codex-Primary-Over-Secondary-Limit-Percent", "110")
+		w.Header().Set("X-Secret-Token", "should-not-leak")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"codex quota headers ok"}}],"usage":{"prompt_tokens":2,"completion_tokens":3,"total_tokens":5}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustEnableGatewayPassthroughHeadersWithDefaultAllowlist(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"default-header-provider","display_name":"Default Header Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"default-header-model","display_name":"Default Header Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"default-header-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"default-header-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"default-header-model","messages":[{"role":"user","content":"hi"}]}`)
+	for name, want := range map[string]string{
+		"X-Codex-Primary-Used-Percent":                 "12",
+		"X-Codex-Primary-Reset-After-Seconds":          "600",
+		"X-Codex-Primary-Window-Minutes":               "300",
+		"X-Codex-Secondary-Used-Percent":               "34",
+		"X-Codex-Secondary-Reset-After-Seconds":        "86400",
+		"X-Codex-Secondary-Window-Minutes":             "10080",
+		"X-Codex-Primary-Over-Secondary-Limit-Percent": "110",
+	} {
+		if got := rec.Header().Get(name); got != want {
+			t.Fatalf("expected %s to be forwarded as %q, got %q", name, want, got)
+		}
+	}
+	if got := rec.Header().Get("X-Secret-Token"); got != "" {
+		t.Fatalf("non-allowlisted header leaked: %q", got)
+	}
+}
+
 func mustEnableGatewayPassthroughHeaders(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken string, allowlist []string) {
 	t.Helper()
 	settings := mustGetAdminSettings(t, handler, sessionCookie)
@@ -204,5 +250,35 @@ func mustEnableGatewayPassthroughHeaders(t *testing.T, handler http.Handler, ses
 		if got != allowlist[i] {
 			t.Fatalf("allowlist[%d] = %q, want %q; full=%s", i, got, allowlist[i], fmt.Sprint(*updated.Data.Gateway.PassthroughHeaderAllowlist))
 		}
+	}
+}
+
+func mustEnableGatewayPassthroughHeadersWithDefaultAllowlist(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken string) {
+	t.Helper()
+	settings := mustGetAdminSettings(t, handler, sessionCookie)
+	enabled := true
+	settings.Data.Gateway.PassthroughUpstreamHeaders = &enabled
+	body, err := json.Marshal(settings.Data)
+	if err != nil {
+		t.Fatalf("marshal settings: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected settings update 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var updated apiopenapi.AdminSettingsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&updated); err != nil {
+		t.Fatalf("decode settings update: %v", err)
+	}
+	if updated.Data.Gateway.PassthroughUpstreamHeaders == nil || !*updated.Data.Gateway.PassthroughUpstreamHeaders {
+		t.Fatalf("passthrough headers setting was not enabled: %+v", updated.Data.Gateway)
+	}
+	if updated.Data.Gateway.PassthroughHeaderAllowlist == nil || len(*updated.Data.Gateway.PassthroughHeaderAllowlist) == 0 {
+		t.Fatalf("default passthrough allowlist was not saved: %+v", updated.Data.Gateway)
 	}
 }

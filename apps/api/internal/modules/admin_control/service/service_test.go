@@ -91,6 +91,33 @@ func TestUpdateAdminSettingsNormalizesPassthroughHeaderAllowlist(t *testing.T) {
 	}
 }
 
+func TestDefaultAdminSettingsIncludesSafePassthroughHeaderAllowlist(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 12, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	if settings.Gateway.PassthroughUpstreamHeaders {
+		t.Fatalf("passthrough should default off")
+	}
+	for _, want := range []string{
+		"retry-after",
+		"x-ratelimit-*",
+		"anthropic-ratelimit-*",
+		"x-codex-primary-used-percent",
+		"x-codex-secondary-used-percent",
+		"x-codex-primary-over-secondary-limit-percent",
+	} {
+		if !stringSliceContains(settings.Gateway.PassthroughHeaderAllowlist, want) {
+			t.Fatalf("default passthrough allowlist missing %q: %+v", want, settings.Gateway.PassthroughHeaderAllowlist)
+		}
+	}
+}
+
 func TestGetAdminSettingsCacheReturnsIndependentCopies(t *testing.T) {
 	store := admincontrolmemory.New()
 	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 11, 10, 0, 0, 0, time.UTC)})
@@ -110,7 +137,7 @@ func TestGetAdminSettingsCacheReturnsIndependentCopies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload admin settings: %v", err)
 	}
-	if len(reloaded.Features.EnabledChannels) != 0 || len(reloaded.Gateway.PassthroughHeaderAllowlist) != 0 {
+	if len(reloaded.Features.EnabledChannels) != 0 || stringSliceContains(reloaded.Gateway.PassthroughHeaderAllowlist, "x-mutated") {
 		t.Fatalf("cached slices were mutated: %+v", reloaded)
 	}
 	if _, ok := reloaded.Email.Templates["welcome"]; ok {
@@ -119,6 +146,15 @@ func TestGetAdminSettingsCacheReturnsIndependentCopies(t *testing.T) {
 	if reloaded.Email.BalanceLowNotifyEnabled == nil || !*reloaded.Email.BalanceLowNotifyEnabled {
 		t.Fatalf("cached bool pointer was mutated: %+v", reloaded.Email.BalanceLowNotifyEnabled)
 	}
+}
+
+func stringSliceContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func TestAdminSettingsEmailNotificationSwitchesDefaultVisible(t *testing.T) {

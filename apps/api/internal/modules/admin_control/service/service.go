@@ -48,6 +48,23 @@ const (
 
 var emailSuffixDomainPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$`)
 
+var defaultGatewayPassthroughHeaderAllowlist = []string{
+	"retry-after",
+	"request-id",
+	"x-request-id",
+	"x-upstream-request-id",
+	"x-ratelimit-*",
+	"ratelimit-*",
+	"anthropic-ratelimit-*",
+	"x-codex-primary-used-percent",
+	"x-codex-primary-reset-after-seconds",
+	"x-codex-primary-window-minutes",
+	"x-codex-secondary-used-percent",
+	"x-codex-secondary-reset-after-seconds",
+	"x-codex-secondary-window-minutes",
+	"x-codex-primary-over-secondary-limit-percent",
+}
+
 type Clock interface {
 	Now() time.Time
 }
@@ -1144,7 +1161,7 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 			SchedulerStrategyRolloutModels:       []string{},
 			SchedulerStrategyRolloutAPIKeyHashes: []string{},
 			PassthroughUpstreamHeaders:           false,
-			PassthroughHeaderAllowlist:           []string{},
+			PassthroughHeaderAllowlist:           cloneStringSlice(defaultGatewayPassthroughHeaderAllowlist),
 		},
 		Payment: admincontrol.AdminSettingsPayment{
 			Enabled:                  false,
