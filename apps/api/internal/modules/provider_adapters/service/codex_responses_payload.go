@@ -233,6 +233,9 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 	codexLiftInstructionInputItems(payload)
 	codexNormalizeResponsesText(payload)
 	codexNormalizeServiceTier(req, payload)
+	if !codexResponsesCompactRequest(req) {
+		codexApplyImageGenerationBridgeTool(req, payload)
+	}
 	codexNormalizeResponsesTools(payload)
 	if !codexResponsesCompactRequest(req) {
 		codexEnsureResponsesInstructions(req, payload)
@@ -270,6 +273,49 @@ func codexApplyImageGenerationInstructions(payload map[string]any) {
 		return
 	}
 	codexAppendInstructionsOnce(payload, codexImageGenerationBridgeMarker, codexImageGenerationBridgeText)
+}
+
+func codexApplyImageGenerationBridgeTool(req contract.ConversationRequest, payload map[string]any) {
+	if payload == nil || !codexImageGenerationBridgeEnabled(req) {
+		return
+	}
+	if contract.NormalizeCodexUpstreamModelName(codexStringValue(payload["model"])) == "gpt-5.3-codex-spark" {
+		return
+	}
+	if codexResponsesToolsContainType(payload["tools"], "image_generation") {
+		return
+	}
+	tool := map[string]any{
+		"type":          "image_generation",
+		"output_format": "png",
+	}
+	switch tools := payload["tools"].(type) {
+	case []any:
+		payload["tools"] = append(tools, tool)
+	case []map[string]any:
+		payload["tools"] = append(tools, tool)
+	default:
+		payload["tools"] = []any{tool}
+	}
+}
+
+func codexImageGenerationBridgeEnabled(req contract.ConversationRequest) bool {
+	for _, values := range []map[string]any{
+		req.Account.Metadata,
+		req.Provider.ConfigSchema,
+		req.Provider.Capabilities,
+	} {
+		if values == nil {
+			continue
+		}
+		for _, key := range []string{"codex_image_generation_bridge", "codex_image_generation_bridge_enabled"} {
+			if _, ok := values[key]; !ok {
+				continue
+			}
+			return mapBool(values, key)
+		}
+	}
+	return false
 }
 
 func codexAppendInstructionsOnce(payload map[string]any, marker string, text string) {

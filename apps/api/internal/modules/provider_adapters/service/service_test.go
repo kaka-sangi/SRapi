@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -79,6 +80,34 @@ func stringSliceContains(values []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func codexResponseTestToolsContainType(tools any, toolType string) bool {
+	items, ok := tools.([]any)
+	if !ok {
+		return false
+	}
+	for _, item := range items {
+		tool, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if strings.TrimSpace(mapStringForTest(tool, "type")) == toolType {
+			return true
+		}
+	}
+	return false
+}
+
+func mapStringForTest(values map[string]any, key string) string {
+	value, ok := values[key]
+	if !ok || value == nil {
+		return ""
+	}
+	if text, ok := value.(string); ok {
+		return strings.TrimSpace(text)
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
 }
 
 func imageURLPart(url string) contract.ContentPart {
@@ -8243,6 +8272,111 @@ func TestReverseProxyCodexCLIAdapterNormalizesCanonicalImageGenerationToolAliase
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterInjectsImageGenerationToolWhenBridgeEnabled(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"bridge\"}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_inject_image_tool",
+		Model:      "codex-local",
+		InputParts: textParts("draw"),
+		Provider: providercontract.Provider{
+			AdapterType:  "reverse-proxy-codex-cli",
+			Protocol:     "openai-compatible",
+			ConfigSchema: map[string]any{"codex_image_generation_bridge_enabled": true},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             2601,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.4"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode codex payload: %v", err)
+	}
+	tools, ok := payload["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("expected injected image_generation tool, got %+v", payload["tools"])
+	}
+	tool, _ := tools[0].(map[string]any)
+	if tool["type"] != "image_generation" || tool["output_format"] != "png" {
+		t.Fatalf("unexpected injected image_generation tool: %+v", tool)
+	}
+	instructions, _ := payload["instructions"].(string)
+	if !strings.Contains(instructions, "<srapi-codex-image-generation>") {
+		t.Fatalf("expected image_generation bridge instructions, got %q", instructions)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterAccountCanDisableProviderImageGenerationBridge(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"no bridge\"}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_disable_image_bridge",
+		Model:      "codex-local",
+		InputParts: textParts("plain text"),
+		Provider: providercontract.Provider{
+			AdapterType:  "reverse-proxy-codex-cli",
+			Protocol:     "openai-compatible",
+			ConfigSchema: map[string]any{"codex_image_generation_bridge_enabled": true},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             2602,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata: map[string]any{
+				"base_url":                         "https://upstream.example/backend-api/codex",
+				"codex_image_generation_bridge":    false,
+				"codex_image_generation_bridge_id": "ignored-extra-field",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.4"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode codex payload: %v", err)
+	}
+	if codexResponseTestToolsContainType(payload["tools"], "image_generation") {
+		t.Fatalf("account override should disable injected image_generation tool, got %+v", payload["tools"])
+	}
+	instructions, _ := payload["instructions"].(string)
+	if strings.Contains(instructions, "<srapi-codex-image-generation>") {
+		t.Fatalf("account override should disable bridge instructions, got %q", instructions)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterAddsSparkImageUnsupportedInstructions(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
@@ -8296,6 +8430,55 @@ func TestReverseProxyCodexCLIAdapterAddsSparkImageUnsupportedInstructions(t *tes
 	}
 	if strings.Contains(instructions, "<srapi-codex-image-generation>") {
 		t.Fatalf("Spark instructions should not include image bridge marker, got %q", instructions)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterBridgeEnabledDoesNotInjectImageToolForSpark(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"spark bridge\"}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_spark_bridge_disabled",
+		Model:      "codex-local",
+		InputParts: textParts("draw"),
+		Provider: providercontract.Provider{
+			AdapterType:  "reverse-proxy-codex-cli",
+			Protocol:     "openai-compatible",
+			ConfigSchema: map[string]any{"codex_image_generation_bridge": true},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             2603,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.3-codex-spark"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode codex payload: %v", err)
+	}
+	if codexResponseTestToolsContainType(payload["tools"], "image_generation") {
+		t.Fatalf("Spark bridge should not inject image_generation tool, got %+v", payload["tools"])
+	}
+	instructions, _ := payload["instructions"].(string)
+	if !strings.Contains(instructions, "<srapi-codex-spark-image-unsupported>") ||
+		strings.Contains(instructions, "<srapi-codex-image-generation>") {
+		t.Fatalf("expected Spark unsupported instructions only, got %q", instructions)
 	}
 }
 
