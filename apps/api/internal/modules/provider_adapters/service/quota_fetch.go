@@ -487,40 +487,63 @@ func applyAntigravityCreditsQuotaFallback(parsed any, now time.Time, report *con
 	if !ok {
 		return
 	}
-	paidTier, ok := root["paidTier"].(map[string]any)
-	if !ok {
-		if plan := mapString(root, "paidTier"); plan != "" && strings.TrimSpace(report.Plan) == "" {
-			report.Plan = plan
-		}
-		return
-	}
 	if strings.TrimSpace(report.Plan) == "" {
-		report.Plan = firstNonEmpty(mapString(paidTier, "id"), mapString(paidTier, "name"))
+		report.Plan = antigravityQuotaPlan(root)
 	}
-	credit := antigravityCreditRecord(paidTier["availableCredits"])
+	credit := antigravityQuotaCreditRecord(root)
 	if credit == nil {
 		return
 	}
-	if amount := mapString(credit, "creditAmount"); amount != "" && strings.TrimSpace(report.CreditsRemaining) == "" {
+	if amount := firstNonEmpty(mapString(credit, "creditAmount"), firstNonEmpty(mapString(credit, "credit_amount"), mapString(credit, "amount"))); amount != "" && strings.TrimSpace(report.CreditsRemaining) == "" {
 		report.CreditsRemaining = amount
 	}
-	if currency := mapString(credit, "creditType"); currency != "" && strings.TrimSpace(report.Currency) == "" {
+	if currency := firstNonEmpty(mapString(credit, "creditType"), firstNonEmpty(mapString(credit, "credit_type"), mapString(credit, "type"))); currency != "" && strings.TrimSpace(report.Currency) == "" {
 		report.Currency = currency
 	}
 	if strings.TrimSpace(report.CreditsLimit) == "" {
-		report.CreditsLimit = firstNonEmpty(mapString(credit, "creditLimit"), mapString(credit, "limit"))
+		report.CreditsLimit = firstNonEmpty(mapString(credit, "creditLimit"), firstNonEmpty(mapString(credit, "credit_limit"), mapString(credit, "limit")))
 	}
 	if strings.TrimSpace(report.CreditsUsed) == "" {
-		report.CreditsUsed = firstNonEmpty(mapString(credit, "creditUsed"), mapString(credit, "used"))
+		report.CreditsUsed = firstNonEmpty(mapString(credit, "creditUsed"), firstNonEmpty(mapString(credit, "credit_used"), mapString(credit, "used")))
 	}
 	if signal, ok := antigravityCreditAvailabilitySignal(credit, now); ok {
 		report.QuotaSignals = append(report.QuotaSignals, signal)
 	}
 }
 
+func antigravityQuotaPlan(root map[string]any) string {
+	if paidTier, ok := root["paidTier"].(map[string]any); ok {
+		return firstNonEmpty(mapString(paidTier, "id"), mapString(paidTier, "name"))
+	}
+	if paidTier, ok := root["paid_tier"].(map[string]any); ok {
+		return firstNonEmpty(mapString(paidTier, "id"), mapString(paidTier, "name"))
+	}
+	return firstNonEmpty(mapString(root, "paidTier"), firstNonEmpty(mapString(root, "paid_tier"), firstNonEmpty(mapString(root, "subscription_tier"), mapString(root, "subscriptionTier"))))
+}
+
+func antigravityQuotaCreditRecord(root map[string]any) map[string]any {
+	for _, key := range []string{"ai_credits", "availableCredits", "available_credits", "credits"} {
+		if credit := antigravityCreditRecord(root[key]); credit != nil {
+			return credit
+		}
+	}
+	for _, tierKey := range []string{"paidTier", "paid_tier", "currentTier", "current_tier"} {
+		tier, ok := root[tierKey].(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, key := range []string{"availableCredits", "available_credits", "ai_credits", "credits"} {
+			if credit := antigravityCreditRecord(tier[key]); credit != nil {
+				return credit
+			}
+		}
+	}
+	return nil
+}
+
 func antigravityCreditAvailabilitySignal(credit map[string]any, now time.Time) (contract.QuotaSignal, bool) {
-	amount, amountOK := numericField(credit, "creditAmount")
-	minimum, minimumOK := numericField(credit, "minimumCreditAmountForUsage")
+	amount, amountOK := numericField(credit, "creditAmount", "credit_amount", "amount")
+	minimum, minimumOK := numericField(credit, "minimumCreditAmountForUsage", "minimum_credit_amount_for_usage", "minimumBalance", "minimum_balance")
 	if !amountOK || !minimumOK || minimum <= 0 || math.IsNaN(amount) || math.IsNaN(minimum) || math.IsInf(amount, 0) || math.IsInf(minimum, 0) {
 		return contract.QuotaSignal{}, false
 	}
@@ -553,7 +576,7 @@ func antigravityCreditRecord(value any) map[string]any {
 		if first == nil {
 			first = credit
 		}
-		if strings.EqualFold(mapString(credit, "creditType"), "GOOGLE_ONE_AI") {
+		if strings.EqualFold(firstNonEmpty(mapString(credit, "creditType"), mapString(credit, "credit_type")), "GOOGLE_ONE_AI") {
 			return credit
 		}
 	}

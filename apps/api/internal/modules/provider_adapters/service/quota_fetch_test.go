@@ -551,6 +551,59 @@ func TestFetchAccountQuotaAntigravityMapsPaidTierCreditsFallback(t *testing.T) {
 	assertQuotaSignalWithoutReset(t, report.QuotaSignals, "antigravity_google_one_ai_credits", "0", "25000", "50", 1)
 }
 
+func TestFetchAccountQuotaAntigravityMapsAICreditsArrayFallback(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"subscription_tier": "GOOGLE_ONE_PRO",
+			"ai_credits": [
+				{"credit_type": "OTHER", "amount": 10, "minimum_balance": 1},
+				{"credit_type": "GOOGLE_ONE_AI", "amount": 25, "minimum_balance": 50}
+			]
+		}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	report, err := svc.FetchAccountQuota(context.Background(), contract.ProbeRequest{
+		Provider: providercontract.Provider{
+			ID:          33,
+			Name:        "antigravity",
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "gemini-compatible",
+			Status:      providercontract.StatusActive,
+			ConfigSchema: map[string]any{
+				"quota_url": upstream.URL + "/v1internal:loadCodeAssist",
+				"auth_mode": "bearer",
+			},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           33,
+			ProviderID:   33,
+			Name:         "antigravity-oauth",
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Status:       accountcontract.StatusActive,
+			Metadata:     map[string]any{},
+		},
+		Credential: map[string]any{"access_token": "antigravity-access-token"},
+	})
+	if err != nil {
+		t.Fatalf("fetch antigravity quota: %v", err)
+	}
+	if !report.Supported ||
+		report.Plan != "GOOGLE_ONE_PRO" ||
+		report.CreditsRemaining != "25" ||
+		report.CreditsUsed != "" ||
+		report.CreditsLimit != "" ||
+		report.Currency != "GOOGLE_ONE_AI" {
+		t.Fatalf("unexpected antigravity ai credits quota report: %+v", report)
+	}
+	assertQuotaSignalWithoutReset(t, report.QuotaSignals, "antigravity_google_one_ai_credits", "25", "25", "50", 0.5)
+}
+
 func TestFetchAccountQuotaAntigravityCreditSignalBelowMinimum(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
