@@ -295,6 +295,7 @@ func parseAntigravityResponse(body []byte) (geminiGenerateContentResponse, error
 func geminiUsageMetadataPresent(usage geminiUsageMetadata) bool {
 	return usage.PromptTokenCount != nil ||
 		usage.CandidatesTokenCount != nil ||
+		usage.ThoughtsTokenCount != nil ||
 		usage.TotalTokenCount != nil ||
 		usage.CachedContentTokenCount != nil
 }

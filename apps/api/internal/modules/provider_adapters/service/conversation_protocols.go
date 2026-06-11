@@ -612,13 +612,14 @@ func geminiStopReason(reason string, parts []geminiPart) contract.StopReason {
 type geminiUsageMetadata struct {
 	PromptTokenCount        *int `json:"promptTokenCount"`
 	CandidatesTokenCount    *int `json:"candidatesTokenCount"`
+	ThoughtsTokenCount      *int `json:"thoughtsTokenCount"`
 	TotalTokenCount         *int `json:"totalTokenCount"`
 	CachedContentTokenCount *int `json:"cachedContentTokenCount"`
 }
 
 func (u geminiUsageMetadata) ToUsage(text string) contract.Usage {
 	input := valueOrZero(u.PromptTokenCount)
-	output := valueOrZero(u.CandidatesTokenCount)
+	output := valueOrZero(u.CandidatesTokenCount) + valueOrZero(u.ThoughtsTokenCount)
 	cached := valueOrZero(u.CachedContentTokenCount)
 	total := input + output + cached
 	if u.TotalTokenCount != nil && *u.TotalTokenCount > 0 && total == 0 {
@@ -648,6 +649,9 @@ func (u *geminiUsageMetadata) Merge(next geminiUsageMetadata) {
 	if next.CandidatesTokenCount != nil {
 		u.CandidatesTokenCount = cloneIntPtr(next.CandidatesTokenCount)
 	}
+	if next.ThoughtsTokenCount != nil {
+		u.ThoughtsTokenCount = cloneIntPtr(next.ThoughtsTokenCount)
+	}
 	if next.TotalTokenCount != nil {
 		u.TotalTokenCount = cloneIntPtr(next.TotalTokenCount)
 	}
@@ -659,6 +663,7 @@ func (u *geminiUsageMetadata) Merge(next geminiUsageMetadata) {
 func (u geminiUsageMetadata) HasTokenUsage() bool {
 	return u.PromptTokenCount != nil ||
 		u.CandidatesTokenCount != nil ||
+		u.ThoughtsTokenCount != nil ||
 		u.TotalTokenCount != nil ||
 		u.CachedContentTokenCount != nil
 }

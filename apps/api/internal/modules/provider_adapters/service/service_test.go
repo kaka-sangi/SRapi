@@ -2529,7 +2529,7 @@ func TestGeminiCompatibleAdapterInvokesGenerateContentUpstream(t *testing.T) {
 			t.Fatalf("expected one Gemini tool wrapper, got %+v", payload.Tools)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"gemini says hi"}]}}],"usageMetadata":{"promptTokenCount":9,"candidatesTokenCount":4,"totalTokenCount":14,"cachedContentTokenCount":1}}`))
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"gemini says hi"}]}}],"usageMetadata":{"promptTokenCount":9,"candidatesTokenCount":4,"thoughtsTokenCount":6,"totalTokenCount":20,"cachedContentTokenCount":1}}`))
 	}))
 	defer upstream.Close()
 
@@ -2568,7 +2568,7 @@ func TestGeminiCompatibleAdapterInvokesGenerateContentUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke gemini upstream: %v", err)
 	}
-	if conversationResponseText(resp) != "gemini says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 9 || resp.Usage.OutputTokens != 4 || resp.Usage.CachedTokens != 1 {
+	if conversationResponseText(resp) != "gemini says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 9 || resp.Usage.OutputTokens != 10 || resp.Usage.CachedTokens != 1 {
 		t.Fatalf("unexpected gemini response: %+v", resp)
 	}
 }
@@ -9283,7 +9283,7 @@ func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
 			StatusCode: http.StatusOK,
-			Body:       []byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"antigravity openai response"}]}}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":3}},"traceId":"trace-1"}`),
+			Body:       []byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"antigravity openai response"}]}}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":3,"thoughtsTokenCount":4}},"traceId":"trace-1"}`),
 		},
 	}
 	svc, err := service.NewWithReverseProxy(nil, &runtime)
@@ -9310,7 +9310,7 @@ func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing
 	if err != nil {
 		t.Fatalf("invoke antigravity openai adapter: %v", err)
 	}
-	if conversationResponseText(resp) != "antigravity openai response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
+	if conversationResponseText(resp) != "antigravity openai response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 7 {
 		t.Fatalf("unexpected antigravity openai response: %+v", resp)
 	}
 	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/v1internal:generateContent" {

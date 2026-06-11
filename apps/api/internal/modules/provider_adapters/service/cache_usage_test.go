@@ -83,3 +83,37 @@ func TestOpenAIUsagePreservesImageOutputTokens(t *testing.T) {
 		t.Fatalf("unexpected image usage: %+v", usage)
 	}
 }
+
+func TestGeminiUsageIncludesThoughtsTokensInOutput(t *testing.T) {
+	prompt := 100
+	candidates := 20
+	thoughts := 50
+	cached := 10
+	usage := geminiUsageMetadata{
+		PromptTokenCount:        &prompt,
+		CandidatesTokenCount:    &candidates,
+		ThoughtsTokenCount:      &thoughts,
+		CachedContentTokenCount: &cached,
+	}.ToUsage("gemini response")
+
+	if usage.Estimated {
+		t.Fatal("usage should not be estimated when Gemini token counts are present")
+	}
+	if usage.InputTokens != 100 || usage.OutputTokens != 70 || usage.CachedTokens != 10 {
+		t.Fatalf("unexpected gemini usage: %+v", usage)
+	}
+}
+
+func TestGeminiUsageTreatsThoughtsOnlyAsRealUsage(t *testing.T) {
+	thoughts := 50
+	usage := geminiUsageMetadata{
+		ThoughtsTokenCount: &thoughts,
+	}.ToUsage("gemini thinking")
+
+	if usage.Estimated {
+		t.Fatal("usage should not be estimated when Gemini thoughts tokens are present")
+	}
+	if usage.InputTokens != 0 || usage.OutputTokens != 50 || usage.CachedTokens != 0 {
+		t.Fatalf("unexpected thoughts-only gemini usage: %+v", usage)
+	}
+}
