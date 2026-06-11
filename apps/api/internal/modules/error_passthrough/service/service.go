@@ -5,22 +5,36 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/ttlcache"
 )
 
 // ErrInvalidInput is returned for malformed rules.
 var ErrInvalidInput = errors.New("invalid error passthrough rule")
 
+// resolveCacheTTL bounds staleness of the enabled-rule snapshot Resolve serves
+// from; Resolve runs on the gateway error path for every upstream failure.
+// Same-instance rule writes invalidate immediately; cross-instance writes
+// converge within the TTL.
+const resolveCacheTTL = 3 * time.Second
+
 type Service struct {
 	store contract.Store
+	// enabledRules caches the enabled rules pre-sorted by (priority, id). The
+	// cached slice is shared across requests and must be treated as read-only.
+	enabledRules *ttlcache.Value[[]contract.Rule]
 }
 
 func New(store contract.Store) (*Service, error) {
 	if store == nil {
 		return nil, ErrInvalidInput
 	}
-	return &Service{store: store}, nil
+	return &Service{
+		store:        store,
+		enabledRules: ttlcache.New[[]contract.Rule](resolveCacheTTL, nil),
+	}, nil
 }
 
 func (s *Service) ListRules(ctx context.Context) ([]contract.Rule, error) {
@@ -39,7 +53,11 @@ func (s *Service) CreateRule(ctx context.Context, input contract.CreateRule) (co
 	input.Classes = cleanStrings(input.Classes)
 	input.Keywords = cleanStrings(input.Keywords)
 	input.StatusCodes = cleanStatusCodes(input.StatusCodes)
-	return s.store.CreateRule(ctx, input)
+	rule, err := s.store.CreateRule(ctx, input)
+	if err == nil {
+		s.enabledRules.Invalidate()
+	}
+	return rule, err
 }
 
 func (s *Service) UpdateRule(ctx context.Context, id int, input contract.UpdateRule) (contract.Rule, error) {
@@ -72,37 +90,34 @@ func (s *Service) UpdateRule(ctx context.Context, id int, input contract.UpdateR
 		codes := cleanStatusCodes(*input.StatusCodes)
 		input.StatusCodes = &codes
 	}
-	return s.store.UpdateRule(ctx, id, input)
+	rule, err := s.store.UpdateRule(ctx, id, input)
+	if err == nil {
+		s.enabledRules.Invalidate()
+	}
+	return rule, err
 }
 
 func (s *Service) DeleteRule(ctx context.Context, id int) error {
 	if id <= 0 {
 		return ErrInvalidInput
 	}
-	return s.store.DeleteRule(ctx, id)
+	err := s.store.DeleteRule(ctx, id)
+	if err == nil {
+		s.enabledRules.Invalidate()
+	}
+	return err
 }
 
 // Resolve evaluates enabled rules in priority order and returns the action of
 // the first rule that matches the given error class, upstream status, and raw
 // message. matched is false when no rule applies, in which case the caller
-// should fall back to its existing per-account behavior.
+// should fall back to its existing per-account behavior. Rules are served from
+// a short-TTL snapshot so the per-failure cost is pure in-memory matching.
 func (s *Service) Resolve(ctx context.Context, errorClass string, upstreamStatus int, message string) (contract.Action, bool) {
-	rules, err := s.store.ListRules(ctx)
+	enabled, err := s.enabledRules.Get(ctx, s.loadEnabledRules)
 	if err != nil {
 		return "", false
 	}
-	enabled := make([]contract.Rule, 0, len(rules))
-	for _, rule := range rules {
-		if rule.Enabled {
-			enabled = append(enabled, rule)
-		}
-	}
-	sort.SliceStable(enabled, func(i, j int) bool {
-		if enabled[i].Priority != enabled[j].Priority {
-			return enabled[i].Priority < enabled[j].Priority
-		}
-		return enabled[i].ID < enabled[j].ID
-	})
 	lowerMessage := strings.ToLower(message)
 	for _, rule := range enabled {
 		if !statusMatches(rule.StatusCodes, upstreamStatus) {
@@ -117,6 +132,34 @@ func (s *Service) Resolve(ctx context.Context, errorClass string, upstreamStatus
 		return rule.Action, true
 	}
 	return "", false
+}
+
+// loadEnabledRules snapshots the enabled rules pre-sorted by (priority, id).
+func (s *Service) loadEnabledRules(ctx context.Context) ([]contract.Rule, error) {
+	rules, err := s.store.ListRules(ctx)
+	if err != nil {
+		return nil, err
+	}
+	enabled := make([]contract.Rule, 0, len(rules))
+	for _, rule := range rules {
+		if rule.Enabled {
+			enabled = append(enabled, cloneRule(rule))
+		}
+	}
+	sort.SliceStable(enabled, func(i, j int) bool {
+		if enabled[i].Priority != enabled[j].Priority {
+			return enabled[i].Priority < enabled[j].Priority
+		}
+		return enabled[i].ID < enabled[j].ID
+	})
+	return enabled, nil
+}
+
+func cloneRule(rule contract.Rule) contract.Rule {
+	rule.StatusCodes = append([]int(nil), rule.StatusCodes...)
+	rule.Classes = append([]string(nil), rule.Classes...)
+	rule.Keywords = append([]string(nil), rule.Keywords...)
+	return rule
 }
 
 func statusMatches(codes []int, status int) bool {

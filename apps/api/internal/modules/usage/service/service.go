@@ -134,7 +134,15 @@ func (s *Service) List(ctx context.Context) ([]contract.UsageLog, error) {
 	return s.store.List(ctx)
 }
 
+// listFilteredScanCap bounds how many rows a window-scoped admin read may
+// materialize (newest kept). It is a memory guard for very large windows on
+// busy gateways, far above what any dashboard meaningfully aggregates.
+const listFilteredScanCap = 200_000
+
 func (s *Service) ListFiltered(ctx context.Context, filter contract.QueryFilter) ([]contract.UsageLog, error) {
+	if reader, ok := s.store.(contract.WindowReader); ok {
+		return reader.ListWindow(ctx, filter, listFilteredScanCap)
+	}
 	logs, err := s.store.List(ctx)
 	if err != nil {
 		return nil, err

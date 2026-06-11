@@ -211,3 +211,13 @@ type Store interface {
 	// the matched/deleted counts so the caller can report whether the cap was hit.
 	CleanupLogs(ctx context.Context, filter CleanupFilter) (CleanupResult, error)
 }
+
+// WindowReader is an optional Store capability that lists usage logs inside a
+// time window with the predicates applied by the store (instead of loading the
+// whole table and filtering in memory). Start is inclusive and End exclusive,
+// matching QueryFilter semantics. A positive limit caps the result at the
+// `limit` newest matching rows; rows are returned in ascending id order either
+// way. Admin reporting surfaces prefer this reader when present.
+type WindowReader interface {
+	ListWindow(ctx context.Context, filter QueryFilter, limit int) ([]UsageLog, error)
+}

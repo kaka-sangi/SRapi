@@ -15,6 +15,7 @@ import (
 
 	admincontrol "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/ttlcache"
 )
 
 const (
@@ -35,6 +36,14 @@ const (
 	maxSystemLogCleanupMax     = 10000
 
 	oauthTokenAuthMethodNone = "none"
+
+	// adminSettingsCacheTTL bounds how long a cached admin-settings read may be
+	// served. The gateway consults these settings several times per request
+	// (retry policy, channel filter, request shaper, passthrough headers), so
+	// reads come from this cache instead of the settings store. Same-instance
+	// updates invalidate immediately; cross-instance updates converge within
+	// the TTL.
+	adminSettingsCacheTTL = 3 * time.Second
 )
 
 var emailSuffixDomainPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$`)
@@ -50,6 +59,10 @@ func (SystemClock) Now() time.Time { return time.Now().UTC() }
 type Service struct {
 	store admincontrol.Store
 	clock Clock
+	// settingsCache holds the last loaded AdminSettings. The cached value is
+	// shared across goroutines and must be treated as immutable — every write
+	// path already builds new nested maps/slices instead of mutating in place.
+	settingsCache *ttlcache.Value[admincontrol.AdminSettings]
 }
 
 func New(store admincontrol.Store, clock Clock) (*Service, error) {
@@ -59,10 +72,20 @@ func New(store admincontrol.Store, clock Clock) (*Service, error) {
 	if clock == nil {
 		clock = SystemClock{}
 	}
-	return &Service{store: store, clock: clock}, nil
+	svc := &Service{store: store, clock: clock}
+	svc.settingsCache = ttlcache.New[admincontrol.AdminSettings](adminSettingsCacheTTL, svc.clock.Now)
+	return svc, nil
 }
 
 func (s *Service) GetAdminSettings(ctx context.Context) (admincontrol.AdminSettings, error) {
+	settings, err := s.settingsCache.Get(ctx, s.loadAdminSettings)
+	if err != nil {
+		return admincontrol.AdminSettings{}, err
+	}
+	return cloneAdminSettings(settings), nil
+}
+
+func (s *Service) loadAdminSettings(ctx context.Context) (admincontrol.AdminSettings, error) {
 	settings := defaultAdminSettings(s.clock.Now())
 	if err := s.loadTyped(ctx, settingsKeyAdminSettings, &settings); err != nil {
 		return admincontrol.AdminSettings{}, err
@@ -86,7 +109,8 @@ func (s *Service) UpdateAdminSettings(ctx context.Context, settings admincontrol
 	if err := s.saveTyped(ctx, settingsKeyAdminSettings, normalized, actorUserID); err != nil {
 		return admincontrol.AdminSettings{}, err
 	}
-	return normalized, nil
+	s.settingsCache.Invalidate()
+	return cloneAdminSettings(normalized), nil
 }
 
 func (s *Service) GetOpsSettings(ctx context.Context) (admincontrol.OpsSettings, error) {
@@ -1827,6 +1851,71 @@ func cloneStringMap(value map[string]string) map[string]string {
 		out[key] = item
 	}
 	return out
+}
+
+func cloneAdminSettings(settings admincontrol.AdminSettings) admincontrol.AdminSettings {
+	settings.General.CustomMenus = cloneAnyMapSlice(settings.General.CustomMenus)
+	settings.Features.EnabledChannels = cloneStringSlice(settings.Features.EnabledChannels)
+	settings.Security.RegistrationEmailSuffixAllowlist = cloneStringSlice(settings.Security.RegistrationEmailSuffixAllowlist)
+	settings.Security.OAuthProviders = cloneStringSlice(settings.Security.OAuthProviders)
+	settings.Security.OAuthProviderConfigs = cloneOAuthProviderConfigs(settings.Security.OAuthProviderConfigs)
+	settings.Gateway.SchedulerStrategyRolloutModels = cloneStringSlice(settings.Gateway.SchedulerStrategyRolloutModels)
+	settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes = cloneStringSlice(settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes)
+	settings.Gateway.PassthroughHeaderAllowlist = cloneStringSlice(settings.Gateway.PassthroughHeaderAllowlist)
+	settings.Payment.Providers = cloneStringSlice(settings.Payment.Providers)
+	settings.Email.Templates = cloneStringMap(settings.Email.Templates)
+	settings.Email.BalanceLowNotifyEnabled = cloneBoolPtr(settings.Email.BalanceLowNotifyEnabled)
+	settings.Email.SubscriptionExpiryNotifyEnabled = cloneBoolPtr(settings.Email.SubscriptionExpiryNotifyEnabled)
+	settings.Email.AccountQuotaNotifyEnabled = cloneBoolPtr(settings.Email.AccountQuotaNotifyEnabled)
+	settings.Backup.LastBackupAt = cloneTimePtr(settings.Backup.LastBackupAt)
+	settings.Copilot.Models = cloneStringSlice(settings.Copilot.Models)
+	return settings
+}
+
+func cloneAnyMapSlice(values []map[string]any) []map[string]any {
+	if values == nil {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(values))
+	for _, value := range values {
+		out = append(out, cloneAnyMap(value))
+	}
+	return out
+}
+
+func cloneOAuthProviderConfigs(values []admincontrol.OAuthProviderConfig) []admincontrol.OAuthProviderConfig {
+	if values == nil {
+		return nil
+	}
+	out := make([]admincontrol.OAuthProviderConfig, 0, len(values))
+	for _, value := range values {
+		value.Scopes = cloneStringSlice(value.Scopes)
+		out = append(out, value)
+	}
+	return out
+}
+
+func cloneStringSlice(values []string) []string {
+	if values == nil {
+		return nil
+	}
+	return append([]string(nil), values...)
+}
+
+func cloneBoolPtr(value *bool) *bool {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func cloneTimePtr(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 func pageItems[T any](items []T, opts admincontrol.ListOptions) []T {

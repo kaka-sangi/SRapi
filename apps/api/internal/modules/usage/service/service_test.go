@@ -159,6 +159,38 @@ func TestAggregateAndExportUsage(t *testing.T) {
 	}
 }
 
+func TestListFilteredUsesWindowBoundsAndPreservesOrdering(t *testing.T) {
+	store := usagememory.New()
+	svc, err := service.New(store, nil)
+	if err != nil {
+		t.Fatalf("new usage service: %v", err)
+	}
+	ctx := t.Context()
+	start := time.Date(2026, time.June, 11, 10, 0, 0, 0, time.UTC)
+	end := start.Add(time.Hour)
+	for _, log := range []contract.UsageLog{
+		{RequestID: "before", UserID: 1, APIKeyID: 1, SourceEndpoint: "/v1/chat/completions", Model: "m", CreatedAt: start.Add(-time.Second)},
+		{RequestID: "at-start", UserID: 1, APIKeyID: 1, SourceEndpoint: "/v1/chat/completions", Model: "m", CreatedAt: start},
+		{RequestID: "inside", UserID: 1, APIKeyID: 1, SourceEndpoint: "/v1/chat/completions", Model: "m", CreatedAt: start.Add(30 * time.Minute)},
+		{RequestID: "at-end", UserID: 1, APIKeyID: 1, SourceEndpoint: "/v1/chat/completions", Model: "m", CreatedAt: end},
+	} {
+		if _, err := store.Create(ctx, log); err != nil {
+			t.Fatalf("seed usage: %v", err)
+		}
+	}
+
+	logs, err := svc.ListFiltered(ctx, contract.QueryFilter{Start: &start, End: &end})
+	if err != nil {
+		t.Fatalf("list filtered: %v", err)
+	}
+	if len(logs) != 2 || logs[0].RequestID != "at-start" || logs[1].RequestID != "inside" {
+		t.Fatalf("unexpected filtered logs: %+v", logs)
+	}
+	if !logs[0].CreatedAt.Equal(start) || !logs[1].CreatedAt.Before(end) {
+		t.Fatalf("window bounds not honored: %+v", logs)
+	}
+}
+
 func TestSummarizeAPIKeyIsScopedAndAggregated(t *testing.T) {
 	clock := fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
 	store := usagememory.New()

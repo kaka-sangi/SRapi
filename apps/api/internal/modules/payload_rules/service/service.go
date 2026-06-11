@@ -5,23 +5,37 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/payload_rules/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/ttlcache"
 	"github.com/srapi/srapi/apps/api/internal/platform/glob"
 )
 
 // ErrInvalidInput is returned for malformed rules.
 var ErrInvalidInput = errors.New("invalid payload rule")
 
+// resolveCacheTTL bounds staleness of the enabled-rule snapshot Resolve serves
+// from. Resolve runs on every gateway dispatch, so it must not re-read and
+// re-sort the rule table per request. Same-instance rule writes invalidate
+// immediately; cross-instance writes converge within the TTL.
+const resolveCacheTTL = 3 * time.Second
+
 type Service struct {
 	store contract.Store
+	// enabledRules caches the enabled rules pre-sorted by (priority, id). The
+	// cached slice is shared across requests and must be treated as read-only.
+	enabledRules *ttlcache.Value[[]contract.Rule]
 }
 
 func New(store contract.Store) (*Service, error) {
 	if store == nil {
 		return nil, ErrInvalidInput
 	}
-	return &Service{store: store}, nil
+	return &Service{
+		store:        store,
+		enabledRules: ttlcache.New[[]contract.Rule](resolveCacheTTL, nil),
+	}, nil
 }
 
 func (s *Service) ListRules(ctx context.Context) ([]contract.Rule, error) {
@@ -43,7 +57,11 @@ func (s *Service) CreateRule(ctx context.Context, input contract.CreateRule) (co
 	if len(input.Params) == 0 {
 		return contract.Rule{}, ErrInvalidInput
 	}
-	return s.store.CreateRule(ctx, input)
+	rule, err := s.store.CreateRule(ctx, input)
+	if err == nil {
+		s.enabledRules.Invalidate()
+	}
+	return rule, err
 }
 
 func (s *Service) UpdateRule(ctx context.Context, id int, input contract.UpdateRule) (contract.Rule, error) {
@@ -79,36 +97,33 @@ func (s *Service) UpdateRule(ctx context.Context, id int, input contract.UpdateR
 		}
 		input.Params = &params
 	}
-	return s.store.UpdateRule(ctx, id, input)
+	rule, err := s.store.UpdateRule(ctx, id, input)
+	if err == nil {
+		s.enabledRules.Invalidate()
+	}
+	return rule, err
 }
 
 func (s *Service) DeleteRule(ctx context.Context, id int) error {
 	if id <= 0 {
 		return ErrInvalidInput
 	}
-	return s.store.DeleteRule(ctx, id)
+	err := s.store.DeleteRule(ctx, id)
+	if err == nil {
+		s.enabledRules.Invalidate()
+	}
+	return err
 }
 
 // Resolve flattens every enabled rule that matches the upstream model + protocol
 // into an ordered list of transforms (priority asc, then id). Returns nil when
-// nothing matches, so the gateway leaves the body untouched.
+// nothing matches, so the gateway leaves the body untouched. Rules are served
+// from a short-TTL snapshot so the per-request cost is pure in-memory matching.
 func (s *Service) Resolve(ctx context.Context, model, protocol string) []contract.ResolvedTransform {
-	rules, err := s.store.ListRules(ctx)
+	enabled, err := s.enabledRules.Get(ctx, s.loadEnabledRules)
 	if err != nil {
 		return nil
 	}
-	enabled := make([]contract.Rule, 0, len(rules))
-	for _, rule := range rules {
-		if rule.Enabled {
-			enabled = append(enabled, rule)
-		}
-	}
-	sort.SliceStable(enabled, func(i, j int) bool {
-		if enabled[i].Priority != enabled[j].Priority {
-			return enabled[i].Priority < enabled[j].Priority
-		}
-		return enabled[i].ID < enabled[j].ID
-	})
 	var out []contract.ResolvedTransform
 	for _, rule := range enabled {
 		if !glob.Match(rule.MatchModel, model) {
@@ -130,6 +145,32 @@ func (s *Service) Resolve(ctx context.Context, model, protocol string) []contrac
 		}
 	}
 	return out
+}
+
+// loadEnabledRules snapshots the enabled rules pre-sorted by (priority, id).
+func (s *Service) loadEnabledRules(ctx context.Context) ([]contract.Rule, error) {
+	rules, err := s.store.ListRules(ctx)
+	if err != nil {
+		return nil, err
+	}
+	enabled := make([]contract.Rule, 0, len(rules))
+	for _, rule := range rules {
+		if rule.Enabled {
+			enabled = append(enabled, cloneRule(rule))
+		}
+	}
+	sort.SliceStable(enabled, func(i, j int) bool {
+		if enabled[i].Priority != enabled[j].Priority {
+			return enabled[i].Priority < enabled[j].Priority
+		}
+		return enabled[i].ID < enabled[j].ID
+	})
+	return enabled, nil
+}
+
+func cloneRule(rule contract.Rule) contract.Rule {
+	rule.Params = cleanParams(rule.Params)
+	return rule
 }
 
 func normalizeAction(action contract.Action) contract.Action {

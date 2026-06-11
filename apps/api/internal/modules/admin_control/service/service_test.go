@@ -91,6 +91,36 @@ func TestUpdateAdminSettingsNormalizesPassthroughHeaderAllowlist(t *testing.T) {
 	}
 }
 
+func TestGetAdminSettingsCacheReturnsIndependentCopies(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 11, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.Features.EnabledChannels = append(settings.Features.EnabledChannels, "mutated")
+	settings.Gateway.PassthroughHeaderAllowlist = append(settings.Gateway.PassthroughHeaderAllowlist, "x-mutated")
+	settings.Email.Templates["welcome"] = "mutated"
+	*settings.Email.BalanceLowNotifyEnabled = false
+
+	reloaded, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("reload admin settings: %v", err)
+	}
+	if len(reloaded.Features.EnabledChannels) != 0 || len(reloaded.Gateway.PassthroughHeaderAllowlist) != 0 {
+		t.Fatalf("cached slices were mutated: %+v", reloaded)
+	}
+	if _, ok := reloaded.Email.Templates["welcome"]; ok {
+		t.Fatalf("cached template map was mutated: %+v", reloaded.Email.Templates)
+	}
+	if reloaded.Email.BalanceLowNotifyEnabled == nil || !*reloaded.Email.BalanceLowNotifyEnabled {
+		t.Fatalf("cached bool pointer was mutated: %+v", reloaded.Email.BalanceLowNotifyEnabled)
+	}
+}
+
 func TestAdminSettingsEmailNotificationSwitchesDefaultVisible(t *testing.T) {
 	store := admincontrolmemory.New()
 	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 10, 10, 0, 0, 0, time.UTC)})

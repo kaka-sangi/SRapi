@@ -79,6 +79,28 @@ func (s *Store) List(_ context.Context) ([]contract.UsageLog, error) {
 	return out, nil
 }
 
+// ListWindow implements contract.WindowReader: window predicates applied while
+// scanning, positive limit keeps the newest rows, ascending id output.
+func (s *Store) ListWindow(_ context.Context, filter contract.QueryFilter, limit int) ([]contract.UsageLog, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.UsageLog, 0, len(s.byID))
+	for _, log := range s.byID {
+		if filter.Start != nil && log.CreatedAt.Before(*filter.Start) {
+			continue
+		}
+		if filter.End != nil && !log.CreatedAt.Before(*filter.End) {
+			continue
+		}
+		out = append(out, cloneLog(log))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	if limit > 0 && len(out) > limit {
+		out = out[len(out)-limit:]
+	}
+	return out, nil
+}
+
 func (s *Store) ListByUser(_ context.Context, userID int) ([]contract.UsageLog, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -83,6 +83,32 @@ func (s *Store) List(ctx context.Context) ([]contract.UsageLog, error) {
 	return toUsageLogs(rows), nil
 }
 
+// ListWindow lists usage logs inside [Start, End) with the predicates applied
+// in SQL. A positive limit keeps the newest matching rows; output is ascending
+// by id either way. Implements contract.WindowReader.
+func (s *Store) ListWindow(ctx context.Context, filter contract.QueryFilter, limit int) ([]contract.UsageLog, error) {
+	query := s.client.UsageLog.Query()
+	if filter.Start != nil {
+		query = query.Where(entusagelog.CreatedAtGTE(*filter.Start))
+	}
+	if filter.End != nil {
+		query = query.Where(entusagelog.CreatedAtLT(*filter.End))
+	}
+	query = query.Order(ent.Desc(entusagelog.FieldID))
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := toUsageLogs(rows)
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out, nil
+}
+
 func (s *Store) ListByUser(ctx context.Context, userID int) ([]contract.UsageLog, error) {
 	rows, err := s.client.UsageLog.Query().
 		Where(entusagelog.UserIDEQ(userID)).
