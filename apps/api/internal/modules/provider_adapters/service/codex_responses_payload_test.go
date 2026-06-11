@@ -185,3 +185,65 @@ func TestCodexResponsesPayloadNormalizesTopLevelBuiltinToolChoiceAlias(t *testin
 		t.Fatalf("expected web_search tool_choice, got %+v", payload["tool_choice"])
 	}
 }
+
+func TestCodexResponsesPayloadAddsCodexResponseRuntimeDefaults(t *testing.T) {
+	payload, stream, err := codexResponsesPayload(contract.ConversationRequest{
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		RawBody: []byte(`{
+			"model":"codex-local",
+			"input":"hello",
+			"parallel_tool_calls":false,
+			"include":["file_search_call.results"]
+		}`),
+		Mapping: modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+	})
+	if err != nil {
+		t.Fatalf("build codex responses payload: %v", err)
+	}
+	if !stream {
+		t.Fatal("codex responses payload should stream")
+	}
+	if payload["parallel_tool_calls"] != true {
+		t.Fatalf("parallel_tool_calls = %v, want true", payload["parallel_tool_calls"])
+	}
+	if payload["store"] != false || payload["stream"] != true {
+		t.Fatalf("expected stream=true and store=false, got %+v", payload)
+	}
+	include, ok := payload["include"].([]any)
+	if !ok {
+		t.Fatalf("include = %T(%v), want []any", payload["include"], payload["include"])
+	}
+	if !containsStringAny(include, "file_search_call.results") || !containsStringAny(include, codexResponsesEncryptedReasoningInclude) {
+		t.Fatalf("include did not preserve existing values and add encrypted reasoning: %+v", include)
+	}
+}
+
+func TestCodexResponsesCompactPayloadSkipsResponseRuntimeDefaults(t *testing.T) {
+	payload, _, err := codexResponsesPayload(contract.ConversationRequest{
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses/compact",
+		RawBody: []byte(`{
+			"model":"codex-local",
+			"input":"hello"
+		}`),
+		Mapping: modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+	})
+	if err != nil {
+		t.Fatalf("build codex compact payload: %v", err)
+	}
+	for _, field := range []string{"parallel_tool_calls", "include", "stream", "store"} {
+		if _, ok := payload[field]; ok {
+			t.Fatalf("compact payload should not inject %s: %+v", field, payload)
+		}
+	}
+}
+
+func containsStringAny(values []any, want string) bool {
+	for _, value := range values {
+		if text, ok := value.(string); ok && text == want {
+			return true
+		}
+	}
+	return false
+}

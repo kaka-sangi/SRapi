@@ -24,6 +24,7 @@ const (
 	codexResponsesWebsocketBetaHeaderValue  = "responses_websockets=2026-02-06"
 	codexDefaultAccountSessionIDPrefix      = "srapi-codex-account-"
 	codexResponsesDefaultInternalStoreValue = false
+	codexResponsesEncryptedReasoningInclude = "reasoning.encrypted_content"
 )
 
 type codexResponsesInputItem struct {

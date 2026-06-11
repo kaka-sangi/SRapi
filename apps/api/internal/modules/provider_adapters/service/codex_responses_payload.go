@@ -236,8 +236,10 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 	codexNormalizeResponsesTools(payload)
 	if !codexResponsesCompactRequest(req) {
 		codexEnsureResponsesInstructions(req, payload)
+		codexEnsureReasoningEncryptedInclude(payload)
 		payload["stream"] = true
 		payload["store"] = codexResponsesDefaultInternalStoreValue
+		payload["parallel_tool_calls"] = true
 	}
 	for _, field := range codexUnsupportedResponsesFields() {
 		delete(payload, field)
@@ -253,6 +255,33 @@ func codexEnsureResponsesInstructions(req contract.ConversationRequest, payload 
 		return
 	}
 	payload["instructions"] = codexDefaultInstructions
+}
+
+func codexEnsureReasoningEncryptedInclude(payload map[string]any) {
+	if payload == nil {
+		return
+	}
+	switch include := payload["include"].(type) {
+	case nil:
+		payload["include"] = []any{codexResponsesEncryptedReasoningInclude}
+	case []any:
+		for _, item := range include {
+			if strings.TrimSpace(codexStringValue(item)) == codexResponsesEncryptedReasoningInclude {
+				return
+			}
+		}
+		payload["include"] = append(include, codexResponsesEncryptedReasoningInclude)
+	case []string:
+		for _, item := range include {
+			if strings.TrimSpace(item) == codexResponsesEncryptedReasoningInclude {
+				return
+			}
+		}
+		next := make([]string, 0, len(include)+1)
+		next = append(next, include...)
+		next = append(next, codexResponsesEncryptedReasoningInclude)
+		payload["include"] = next
+	}
 }
 
 func codexUnsupportedResponsesFields() []string {
