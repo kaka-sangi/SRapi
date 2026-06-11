@@ -41,7 +41,7 @@ func (s *Service) invokeGenericReverseProxyText(ctx context.Context, req contrac
 		return contract.ConversationResponse{}, providerErrorFromGenericReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	if req.Stream {
 		resp, err := parseOpenAICompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
@@ -76,7 +76,7 @@ func (s *Service) invokeGenericReverseProxyEmbeddings(ctx context.Context, req c
 		return contract.EmbeddingResponse{}, providerErrorFromGenericReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.EmbeddingResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.EmbeddingResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	return parseOpenAICompatibleEmbeddings(runtimeResp.Body, runtimeResp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
 }

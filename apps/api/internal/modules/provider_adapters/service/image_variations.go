@@ -63,7 +63,7 @@ func (s *Service) invokeOpenAICompatibleImageVariation(ctx context.Context, req 
 		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.ImageGenerationResponse{}, classifyProviderHTTPError(resp.StatusCode, raw)
+		return contract.ImageGenerationResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, raw)
 	}
 	parsed, err := parseOpenAICompatibleImageVariation(raw, resp.StatusCode, req)
 	if err != nil {
@@ -102,7 +102,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleImageVariation(ctx context.C
 		return contract.ImageGenerationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.ImageGenerationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.ImageGenerationResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	parsed, err := parseOpenAICompatibleImageVariation(runtimeResp.Body, runtimeResp.StatusCode, req)
 	if err != nil {

@@ -43,7 +43,7 @@ func (s *Service) invokeOpenAICompatibleEmbeddings(ctx context.Context, req cont
 		return contract.EmbeddingResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.EmbeddingResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
+		return contract.EmbeddingResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
 	return parseOpenAICompatibleEmbeddings(body, resp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
 }
@@ -77,7 +77,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleEmbeddings(ctx context.Conte
 		return contract.EmbeddingResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.EmbeddingResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.EmbeddingResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	return parseOpenAICompatibleEmbeddings(runtimeResp.Body, runtimeResp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
 }
@@ -112,7 +112,7 @@ func (s *Service) invokeOpenAICompatibleImages(ctx context.Context, req contract
 		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.ImageGenerationResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
+		return contract.ImageGenerationResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
 	parsed, err := parseOpenAICompatibleImages(body, resp.StatusCode, req.Mapping.UpstreamModelName, req)
 	if err != nil {
@@ -151,7 +151,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleImages(ctx context.Context, 
 		return contract.ImageGenerationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.ImageGenerationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.ImageGenerationResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	parsed, err := parseOpenAICompatibleImages(runtimeResp.Body, runtimeResp.StatusCode, req.Mapping.UpstreamModelName, req)
 	if err != nil {
@@ -456,7 +456,7 @@ func (s *Service) invokeReverseProxyOpenAIResponseInputItems(ctx context.Context
 		return contract.ResponseInputItemsResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.ResponseInputItemsResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.ResponseInputItemsResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	return contract.ResponseInputItemsResponse{Raw: append([]byte(nil), bytes.TrimSpace(runtimeResp.Body)...), StatusCode: runtimeResp.StatusCode}, nil
 }
@@ -719,7 +719,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleResponsesCompact(ctx context
 		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	parsed, err := parseOpenAIResponsesCompactJSON(runtimeResp.Body, runtimeResp.StatusCode)
 	if err != nil {
@@ -756,7 +756,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleResponses(ctx context.Contex
 		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	parsed, err := parseOpenAIResponsesBodyWithOptions(runtimeResp.Body, runtimeResp.StatusCode, openAIResponsesRequireTerminalEvent(req))
 	if err != nil {

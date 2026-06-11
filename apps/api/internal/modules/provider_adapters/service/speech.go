@@ -61,7 +61,7 @@ func (s *Service) invokeOpenAICompatibleAudioSpeech(ctx context.Context, req con
 		return contract.AudioSpeechResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.AudioSpeechResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
+		return contract.AudioSpeechResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
 	return parseOpenAICompatibleAudioSpeech(body, resp.Header.Get("Content-Type"), resp.StatusCode, req)
 }
@@ -95,7 +95,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleAudioSpeech(ctx context.Cont
 		return contract.AudioSpeechResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.AudioSpeechResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.AudioSpeechResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	return parseOpenAICompatibleAudioSpeech(runtimeResp.Body, runtimeResp.Headers.Get("Content-Type"), runtimeResp.StatusCode, req)
 }

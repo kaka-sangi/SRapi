@@ -2421,6 +2421,82 @@ func TestOpenAICompatibleAdapterCapturesCodexQuotaSignalsFromRateLimitHeaders(t 
 	assertQuotaSignal(t, providerErr.QuotaSignals, "codex_7d_percent", "100", "0", "100", 0)
 }
 
+func TestOpenAICompatibleEmbeddingsCapturesQuotaSignalsFromErrorHeaders(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/embeddings" {
+			t.Fatalf("unexpected embeddings path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Codex-Primary-Used-Percent", "99")
+		w.Header().Set("X-Codex-Primary-Reset-After-Seconds", "120")
+		w.Header().Set("X-Codex-Primary-Window-Minutes", "300")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"embeddings limited"}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeEmbeddings(context.Background(), contract.EmbeddingRequest{
+		RequestID: "req_embeddings_rate_limit_headers",
+		Model:     "embedding-local",
+		Input:     []string{"hello"},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "embedding-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+
+	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	assertQuotaSignal(t, providerErr.QuotaSignals, "codex_5h_percent", "99", "1", "100", 0.01)
+}
+
+func TestReverseProxyOpenAICompatibleEmbeddingsCapturesQuotaSignalsFromErrorHeaders(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("X-Codex-Primary-Used-Percent", "98")
+	headers.Set("X-Codex-Primary-Reset-After-Seconds", "180")
+	headers.Set("X-Codex-Primary-Window-Minutes", "300")
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusTooManyRequests,
+			Headers:    headers,
+			Body:       []byte(`{"error":{"type":"rate_limit_error","message":"runtime embeddings limited"}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeEmbeddings(context.Background(), contract.EmbeddingRequest{
+		RequestID: "req_reverse_proxy_embeddings_rate_limit_headers",
+		Model:     "embedding-local",
+		Input:     []string{"hello"},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:       9,
+			Metadata: map[string]any{"base_url": "https://upstream.example/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "embedding-upstream"},
+		Credential: map[string]any{"access_token": "runtime-token"},
+	})
+
+	if runtime.request.URL != "https://upstream.example/v1/embeddings" {
+		t.Fatalf("unexpected runtime embeddings URL: %s", runtime.request.URL)
+	}
+	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	assertQuotaSignal(t, providerErr.QuotaSignals, "codex_5h_percent", "98", "2", "100", 0.02)
+}
+
 func TestAnthropicCompatibleAdapterCapturesQuotaSignalsFromErrorHeaders(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

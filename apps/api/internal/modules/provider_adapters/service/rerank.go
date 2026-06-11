@@ -63,7 +63,7 @@ func (s *Service) invokeRerankCompatible(ctx context.Context, req contract.Reran
 		return contract.RerankResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.RerankResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
+		return contract.RerankResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
 	return parseRerankCompatibleResponse(body, resp.StatusCode, req)
 }
@@ -97,7 +97,7 @@ func (s *Service) invokeReverseProxyRerankCompatible(ctx context.Context, req co
 		return contract.RerankResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.RerankResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.RerankResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	return parseRerankCompatibleResponse(runtimeResp.Body, runtimeResp.StatusCode, req)
 }

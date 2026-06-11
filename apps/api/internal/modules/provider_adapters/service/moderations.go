@@ -61,7 +61,7 @@ func (s *Service) invokeOpenAICompatibleModerations(ctx context.Context, req con
 		return contract.ModerationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.ModerationResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
+		return contract.ModerationResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
 	return parseOpenAICompatibleModerations(body, resp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
 }
@@ -95,7 +95,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleModerations(ctx context.Cont
 		return contract.ModerationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.ModerationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.ModerationResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	return parseOpenAICompatibleModerations(runtimeResp.Body, runtimeResp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
 }
