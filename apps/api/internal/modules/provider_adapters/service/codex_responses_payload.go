@@ -257,6 +257,7 @@ func codexEnsureResponsesInstructions(req contract.ConversationRequest, payload 
 
 func codexUnsupportedResponsesFields() []string {
 	return []string{
+		"context_management",
 		"frequency_penalty",
 		"max_completion_tokens",
 		"max_output_tokens",
@@ -268,6 +269,7 @@ func codexUnsupportedResponsesFields() []string {
 		"stream_options",
 		"temperature",
 		"top_p",
+		"truncation",
 		"user",
 	}
 }
