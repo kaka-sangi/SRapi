@@ -67,6 +67,54 @@ func TestGatewayProviderPublicMessageRequiresMetadataOptIn(t *testing.T) {
 	}
 }
 
+func TestGatewayProviderPublicErrorResponseSupportsMetadataOverrides(t *testing.T) {
+	err := provideradaptercontract.ProviderError{
+		Class:      "invalid_request",
+		StatusCode: http.StatusBadRequest,
+		Message:    `{"error":{"message":"schema mismatch: field temperature is unsupported"}}`,
+	}
+	candidate := schedulercontract.Candidate{
+		Account: accountcontract.ProviderAccount{Metadata: map[string]any{
+			"provider_error_passthrough_enabled":       true,
+			"provider_error_passthrough_status_codes":  []any{http.StatusBadRequest},
+			"provider_error_passthrough_classes":       []any{"invalid_request"},
+			"provider_error_passthrough_keywords":      []any{"temperature"},
+			"provider_error_passthrough_response_code": "422",
+			"provider_error_passthrough_message":       "upstream rejected request",
+		}},
+	}
+
+	got := gatewayProviderPublicErrorResponse(err, "invalid_request", http.StatusBadRequest, &candidate)
+	if got.Status != http.StatusUnprocessableEntity {
+		t.Fatalf("expected custom status 422, got %+v", got)
+	}
+	if got.Message != "upstream rejected request" {
+		t.Fatalf("expected custom message, got %+v", got)
+	}
+}
+
+func TestGatewayProviderPublicErrorResponseOverridesRequireOptIn(t *testing.T) {
+	err := provideradaptercontract.ProviderError{
+		Class:      "invalid_request",
+		StatusCode: http.StatusBadRequest,
+		Message:    `{"error":{"message":"schema mismatch: field temperature is unsupported"}}`,
+	}
+	candidate := schedulercontract.Candidate{
+		Account: accountcontract.ProviderAccount{Metadata: map[string]any{
+			"provider_error_passthrough_response_code": http.StatusUnprocessableEntity,
+			"provider_error_passthrough_message":       "upstream rejected request",
+		}},
+	}
+
+	got := gatewayProviderPublicErrorResponse(err, "invalid_request", http.StatusBadRequest, &candidate)
+	if got.Status != http.StatusBadRequest {
+		t.Fatalf("expected default mapped status 400 without opt-in, got %+v", got)
+	}
+	if got.Message != "provider rejected request" {
+		t.Fatalf("expected default message without opt-in, got %+v", got)
+	}
+}
+
 func TestGatewayProviderPublicMessageRejectsSensitiveText(t *testing.T) {
 	err := provideradaptercontract.ProviderError{
 		Class:      "auth_failed",

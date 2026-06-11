@@ -4704,18 +4704,28 @@ func TestGatewayProviderErrorMessagePassthroughMetadata(t *testing.T) {
 		name           string
 		slug           string
 		metadataSuffix string
+		wantStatus     int
 		wantMessage    string
 	}{
 		{
 			name:        "default generic message",
 			slug:        "default",
+			wantStatus:  http.StatusBadRequest,
 			wantMessage: "provider rejected request",
 		},
 		{
 			name:           "metadata exposes sanitized upstream message",
 			slug:           "exposed",
 			metadataSuffix: `,"expose_provider_error_messages":true,"provider_error_passthrough_status_codes":[400],"provider_error_passthrough_classes":["invalid_request"],"provider_error_passthrough_keywords":["schema"]`,
+			wantStatus:     http.StatusBadRequest,
 			wantMessage:    "invalid schema from upstream",
+		},
+		{
+			name:           "metadata overrides exposed upstream response",
+			slug:           "custom",
+			metadataSuffix: `,"provider_error_passthrough_enabled":true,"provider_error_passthrough_status_codes":[400],"provider_error_passthrough_classes":["invalid_request"],"provider_error_passthrough_keywords":["schema"],"provider_error_passthrough_response_code":422,"provider_error_passthrough_message":"upstream rejected schema"`,
+			wantStatus:     http.StatusUnprocessableEntity,
+			wantMessage:    "upstream rejected schema",
 		},
 	}
 
@@ -4746,8 +4756,8 @@ func TestGatewayProviderErrorMessagePassthroughMetadata(t *testing.T) {
 			req.Header.Set("Authorization", "Bearer "+apiKey)
 			rec := httptest.NewRecorder()
 			handler.ServeHTTP(rec, req)
-			if rec.Code != http.StatusBadRequest {
-				t.Fatalf("expected provider rejection 400, got %d body=%s", rec.Code, rec.Body.String())
+			if rec.Code != tc.wantStatus {
+				t.Fatalf("expected provider rejection %d, got %d body=%s", tc.wantStatus, rec.Code, rec.Body.String())
 			}
 			var errResp apiopenapi.GatewayErrorResponse
 			if err := json.NewDecoder(rec.Body).Decode(&errResp); err != nil {

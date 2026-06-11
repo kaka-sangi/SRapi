@@ -143,7 +143,8 @@ func (s *Server) writeProviderGatewayError(w http.ResponseWriter, err error) {
 
 func (s *Server) writeProviderGatewayErrorForCandidate(w http.ResponseWriter, err error, candidate *schedulercontract.Candidate) {
 	errorClass, upstreamStatus, errorType := providerGatewayError(err)
-	writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, s.gatewayPublicMessage(err, errorClass, upstreamStatus, candidate), errorClass)
+	response := s.gatewayPublicErrorResponse(err, errorClass, upstreamStatus, candidate)
+	writeGatewayError(w, response.Status, errorType, response.Message, errorClass)
 }
 
 func (s *Server) writeGeminiProviderGatewayError(w http.ResponseWriter, err error) {
@@ -152,25 +153,39 @@ func (s *Server) writeGeminiProviderGatewayError(w http.ResponseWriter, err erro
 
 func (s *Server) writeGeminiProviderGatewayErrorForCandidate(w http.ResponseWriter, err error, candidate *schedulercontract.Candidate) {
 	errorClass, upstreamStatus, _ := providerGatewayError(err)
-	status := providerGatewayHTTPStatus(upstreamStatus)
-	writeGeminiGatewayError(w, status, geminiStatusForGatewayErrorClass(errorClass, status), s.gatewayPublicMessage(err, errorClass, upstreamStatus, candidate))
+	response := s.gatewayPublicErrorResponse(err, errorClass, upstreamStatus, candidate)
+	writeGeminiGatewayError(w, response.Status, geminiStatusForGatewayErrorClass(errorClass, response.Status), response.Message)
 }
 
 // gatewayPublicMessage decides the caller-facing message. Global admin-managed
 // error-passthrough rules take precedence; when no rule matches it falls back to
 // the per-account / per-provider metadata behavior in gatewayProviderPublicMessage.
 func (s *Server) gatewayPublicMessage(err error, errorClass string, upstreamStatus int, candidate *schedulercontract.Candidate) string {
+	return s.gatewayPublicErrorResponse(err, errorClass, upstreamStatus, candidate).Message
+}
+
+type gatewayPublicErrorResponse struct {
+	Status  int
+	Message string
+}
+
+func (s *Server) gatewayPublicErrorResponse(err error, errorClass string, upstreamStatus int, candidate *schedulercontract.Candidate) gatewayPublicErrorResponse {
+	response := gatewayPublicErrorResponse{
+		Status:  providerGatewayHTTPStatus(upstreamStatus),
+		Message: providerGatewayMessage(errorClass),
+	}
 	if s.runtime != nil && s.runtime.errorPassthrough != nil {
 		if raw := gatewayProviderErrorMessage(err); raw != "" {
 			if action, matched := s.runtime.errorPassthrough.Resolve(context.Background(), errorClass, upstreamStatus, raw); matched {
 				if action == errorpassthroughcontract.ActionExpose {
-					return raw
+					response.Message = raw
+					return response
 				}
-				return providerGatewayMessage(errorClass)
+				return response
 			}
 		}
 	}
-	return gatewayProviderPublicMessage(err, errorClass, upstreamStatus, candidate)
+	return gatewayProviderPublicErrorResponse(err, errorClass, upstreamStatus, candidate)
 }
 
 func (s *Server) writeGatewayFailoverFailure(
@@ -707,6 +722,22 @@ func gatewayProviderErrorMessageEnabled(metadata map[string]any) bool {
 	return false
 }
 
+func gatewayProviderErrorMetadataAllowed(metadata map[string]any, errorClass string, upstreamStatus int, message string) bool {
+	if !gatewayProviderErrorMessageEnabled(metadata) {
+		return false
+	}
+	if !gatewayProviderErrorMessageStatusAllowed(metadata, upstreamStatus) {
+		return false
+	}
+	if !gatewayProviderErrorMessageClassAllowed(metadata, errorClass) {
+		return false
+	}
+	if !gatewayProviderErrorMessageKeywordAllowed(metadata, message) {
+		return false
+	}
+	return true
+}
+
 func gatewayProviderErrorMessageStatusAllowed(metadata map[string]any, upstreamStatus int) bool {
 	value, ok := metacoerce.Value(metadata,
 		"provider_error_passthrough_status_codes",
@@ -784,35 +815,84 @@ func gatewayProviderErrorMessageKeywordAllowed(metadata map[string]any, message 
 
 func gatewayProviderErrorMessageAllowed(candidate schedulercontract.Candidate, errorClass string, upstreamStatus int, message string) bool {
 	for _, metadata := range gatewayProviderGatewayMetadata(candidate) {
-		if !gatewayProviderErrorMessageEnabled(metadata) {
-			continue
+		if gatewayProviderErrorMetadataAllowed(metadata, errorClass, upstreamStatus, message) {
+			return true
 		}
-		if !gatewayProviderErrorMessageStatusAllowed(metadata, upstreamStatus) {
-			continue
-		}
-		if !gatewayProviderErrorMessageClassAllowed(metadata, errorClass) {
-			continue
-		}
-		if !gatewayProviderErrorMessageKeywordAllowed(metadata, message) {
-			continue
-		}
-		return true
 	}
 	return false
 }
 
-func gatewayProviderPublicMessage(err error, errorClass string, upstreamStatus int, candidate *schedulercontract.Candidate) string {
+func gatewayProviderErrorMetadataStatus(metadata map[string]any, upstreamStatus int) (int, bool) {
+	status := metadataInt(metadata,
+		"provider_error_passthrough_response_code",
+		"provider_error_response_code",
+		"upstream_error_response_code",
+		"error_passthrough_response_code",
+	)
+	if status >= 100 && status <= 599 {
+		return status, true
+	}
+	for _, key := range []string{
+		"provider_error_passthrough_code",
+		"upstream_error_status_passthrough",
+		"passthrough_provider_error_code",
+		"error_passthrough_code",
+	} {
+		if metadataBool(metadata, key) && upstreamStatus >= 100 && upstreamStatus <= 599 {
+			return upstreamStatus, true
+		}
+	}
+	return 0, false
+}
+
+func gatewayProviderErrorMetadataMessage(metadata map[string]any) (string, bool) {
+	for _, key := range []string{
+		"provider_error_passthrough_message",
+		"provider_error_passthrough_custom_message",
+		"provider_error_custom_message",
+		"upstream_error_custom_message",
+		"error_passthrough_custom_message",
+	} {
+		message := gatewayNormalizeProviderErrorMessage(metadataString(metadata, key))
+		if message == "" || gatewayProviderErrorMessageSensitive(message) {
+			continue
+		}
+		if len([]rune(message)) <= maxGatewayProviderErrorMessageLength {
+			return message, true
+		}
+		return string([]rune(message)[:maxGatewayProviderErrorMessageLength]) + "...", true
+	}
+	return "", false
+}
+
+func gatewayProviderPublicErrorResponse(err error, errorClass string, upstreamStatus int, candidate *schedulercontract.Candidate) gatewayPublicErrorResponse {
+	response := gatewayPublicErrorResponse{
+		Status:  providerGatewayHTTPStatus(upstreamStatus),
+		Message: providerGatewayMessage(errorClass),
+	}
 	if candidate == nil {
-		return providerGatewayMessage(errorClass)
+		return response
 	}
 	message := gatewayProviderErrorMessage(err)
-	if message == "" {
-		return providerGatewayMessage(errorClass)
+	for _, metadata := range gatewayProviderGatewayMetadata(*candidate) {
+		if !gatewayProviderErrorMetadataAllowed(metadata, errorClass, upstreamStatus, message) {
+			continue
+		}
+		if status, ok := gatewayProviderErrorMetadataStatus(metadata, upstreamStatus); ok {
+			response.Status = status
+		}
+		if customMessage, ok := gatewayProviderErrorMetadataMessage(metadata); ok {
+			response.Message = customMessage
+		} else if message != "" {
+			response.Message = message
+		}
+		return response
 	}
-	if gatewayProviderErrorMessageAllowed(*candidate, errorClass, upstreamStatus, message) {
-		return message
-	}
-	return providerGatewayMessage(errorClass)
+	return response
+}
+
+func gatewayProviderPublicMessage(err error, errorClass string, upstreamStatus int, candidate *schedulercontract.Candidate) string {
+	return gatewayProviderPublicErrorResponse(err, errorClass, upstreamStatus, candidate).Message
 }
 
 // gatewayRetryCredentialBudgetExhausted reports whether excluding one more
