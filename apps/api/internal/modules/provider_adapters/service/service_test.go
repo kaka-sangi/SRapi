@@ -5553,7 +5553,7 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 	if len(resp.QuotaSignals) != 2 {
 		t.Fatalf("expected Codex quota signals, got %+v", resp.QuotaSignals)
 	}
-	assertQuotaSignal(t, resp.QuotaSignals, "codex_5h_percent", "88", "12", "100", 0.12)
+	assertQuotaSignal(t, resp.QuotaSignals, "codex_5h_percent", "12", "88", "100", 0.88)
 	assertQuotaSignal(t, resp.QuotaSignals, "codex_7d_percent", "34", "66", "100", 0.66)
 	if upstreamHeaders.Get("Authorization") != "Bearer codex-token" {
 		t.Fatalf("expected runtime to inject codex auth, got %+v", upstreamHeaders)
@@ -9188,7 +9188,7 @@ func TestReverseProxyCodexCLIResponseInputItemsCapturesQuotaSignals(t *testing.T
 	if runtime.request.URL != "https://upstream.example/backend-api/codex/responses/resp_quota/input_items" {
 		t.Fatalf("unexpected input_items upstream URL: %s", runtime.request.URL)
 	}
-	assertQuotaSignal(t, resp.QuotaSignals, "codex_5h_percent", "99", "1", "100", 0.01)
+	assertQuotaSignal(t, resp.QuotaSignals, "codex_5h_percent", "1", "99", "100", 0.99)
 	assertQuotaSignal(t, resp.QuotaSignals, "codex_7d_percent", "100", "0", "100", 0)
 }
 

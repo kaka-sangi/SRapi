@@ -189,7 +189,7 @@ func TestAdminAccountLiveTestPersistsCodexQuotaSignals(t *testing.T) {
 	if err := json.NewDecoder(quotaRec.Body).Decode(&quotaResp); err != nil {
 		t.Fatalf("decode account quota: %v", err)
 	}
-	assertAccountQuotaSnapshot(t, quotaResp.Data, "codex_5h_percent", "58", "42", 0.42)
+	assertAccountQuotaSnapshot(t, quotaResp.Data, "codex_5h_percent", "42", "58", 0.58)
 	assertAccountQuotaSnapshot(t, quotaResp.Data, "codex_7d_percent", "25", "75", 0.75)
 
 	healthReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/health-summary", nil)
@@ -215,13 +215,13 @@ func TestAdminAccountLiveTestPersistsCodexQuotaSignals(t *testing.T) {
 	if health == nil {
 		t.Fatalf("expected account in health summary, got %+v", healthResp.Data)
 	}
-	if health.QuotaRemainingRatio != 0.42 {
-		t.Fatalf("expected constrained health quota ratio 0.42, got %+v", health.QuotaRemainingRatio)
+	if health.QuotaRemainingRatio != 0.58 {
+		t.Fatalf("expected constrained health quota ratio 0.58, got %+v", health.QuotaRemainingRatio)
 	}
 	if health.QuotaWindows == nil || len(*health.QuotaWindows) != 2 {
 		t.Fatalf("expected two quota windows in health summary, got %+v", health.QuotaWindows)
 	}
-	assertAccountQuotaSnapshot(t, *health.QuotaWindows, "codex_5h_percent", "58", "42", 0.42)
+	assertAccountQuotaSnapshot(t, *health.QuotaWindows, "codex_5h_percent", "42", "58", 0.58)
 	assertAccountQuotaSnapshot(t, *health.QuotaWindows, "codex_7d_percent", "25", "75", 0.75)
 }
 

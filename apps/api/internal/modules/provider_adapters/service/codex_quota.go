@@ -44,7 +44,7 @@ func codexQuotaSignalsFromHeaders(headers http.Header, now time.Time) []contract
 		if quotaType == "" {
 			continue
 		}
-		used := codexQuotaUsedPercent(mapping.window, mapping.kind)
+		used := clampFloat(mapping.window.usedPercent, 0, 100)
 		remaining := 100 - used
 		var resetAt *time.Time
 		if mapping.window.resetSeconds != nil {
@@ -136,14 +136,6 @@ func codexQuotaTypeForWindow(kind codexQuotaWindowKind) string {
 	default:
 		return ""
 	}
-}
-
-func codexQuotaUsedPercent(window codexQuotaHeaderWindow, kind codexQuotaWindowKind) float64 {
-	used := clampFloat(window.usedPercent, 0, 100)
-	if kind == codexQuotaWindow5h {
-		return 100 - used
-	}
-	return used
 }
 
 func withCodexQuotaSignals(resp contract.ConversationResponse, headers http.Header) contract.ConversationResponse {
