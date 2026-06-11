@@ -181,6 +181,7 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 				if parseErr != nil {
 					return contract.ConversationResponse{}, parseErr
 				}
+				parsed = withConversationResponseHeaders(parsed, retryResp.Headers)
 				return withCodexQuotaSignals(parsed, retryResp.Headers), nil
 			}
 			return contract.ConversationResponse{}, classifyCodexProviderHTTPErrorWithHeaders(retryResp.StatusCode, retryResp.Headers, retryResp.Body)
@@ -191,6 +192,7 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
+	parsed = withConversationResponseHeaders(parsed, runtimeResp.Headers)
 	return withCodexQuotaSignals(parsed, runtimeResp.Headers), nil
 }
 

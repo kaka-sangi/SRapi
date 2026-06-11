@@ -228,6 +228,7 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
 			return
 		}
+		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 		writeSSEJSONChunks(w, s.runtime.gateway.RenderChatStreamChunks(canonicalResp))
 		return
 	}
@@ -236,6 +237,7 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
 		return
 	}
+	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderChatCompletions(canonicalResp))
 }
 
@@ -410,6 +412,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
 			return
 		}
+		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 		writeSSEEvents(w, s.runtime.gateway.RenderResponsesStreamEvents(canonicalResp))
 		return
 	}
@@ -418,6 +421,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
 		return
 	}
+	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 	writeJSONAny(w, http.StatusOK, response)
 }
 
@@ -714,6 +718,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
 			return
 		}
+		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 		writeSSEEvents(w, s.runtime.gateway.RenderAnthropicMessagesStreamEvents(canonicalResp))
 		return
 	}
@@ -722,6 +727,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
 		return
 	}
+	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 	writeJSONAny(w, http.StatusOK, response)
 }
 
@@ -1047,6 +1053,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
 			return
 		}
+		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 		writeSSEEvents(w, s.runtime.gateway.RenderGeminiGenerateContentStreamEvents(canonicalResp))
 		return
 	}
@@ -1055,6 +1062,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
 		return
 	}
+	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderGeminiGenerateContent(canonicalResp))
 }
 

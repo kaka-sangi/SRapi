@@ -142,7 +142,11 @@ func (s *Service) invokeReverseProxyChatGPTWebConversation(ctx context.Context, 
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
-	return parseChatGPTWebConversationBody(runtimeResp.Body, runtimeResp.StatusCode)
+	parsed, err := parseChatGPTWebConversationBody(runtimeResp.Body, runtimeResp.StatusCode)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	return withConversationResponseHeaders(parsed, runtimeResp.Headers), nil
 }
 
 func chatGPTWebConversationPayload(req contract.ConversationRequest) chatGPTWebConversationRequest {

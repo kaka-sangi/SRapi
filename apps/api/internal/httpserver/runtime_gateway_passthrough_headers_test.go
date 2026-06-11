@@ -1,9 +1,16 @@
 package httpserver
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/srapi/srapi/apps/api/internal/config"
+	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
 func upstreamPassthroughHeaders() http.Header {
@@ -111,6 +118,91 @@ func TestHeaderAllowlistMatches(t *testing.T) {
 	for _, tc := range cases {
 		if got := headerAllowlistMatches(tc.name, allow); got != tc.want {
 			t.Errorf("headerAllowlistMatches(%q) = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestGatewayBufferedRenderedResponseForwardsAllowlistedUpstreamHeaders(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Retry-After", "30")
+		w.Header().Set("X-Request-Id", "req-buffered")
+		w.Header().Set("X-Upstream-Request-Id", "upstream-buffered")
+		w.Header().Set("X-RateLimit-Remaining-Requests", "12")
+		w.Header().Set("X-RateLimit-Remaining-Tokens", "345")
+		w.Header().Set("X-Secret-Token", "should-not-leak")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"buffered ok"}}],"usage":{"prompt_tokens":2,"completion_tokens":3,"total_tokens":5}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustEnableGatewayPassthroughHeaders(t, handler, sessionCookie, loginResp.Data.CsrfToken, []string{"retry-after", "x-request-id", "x-upstream-request-id", "x-ratelimit-*"})
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"buffered-header-provider","display_name":"Buffered Header Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"buffered-header-model","display_name":"Buffered Header Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"buffered-header-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"buffered-header-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"buffered-header-model","messages":[{"role":"user","content":"hi"}]}`)
+	if got := rec.Header().Get("Retry-After"); got != "30" {
+		t.Fatalf("expected Retry-After to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-Request-Id"); got == "" || got == "req-buffered" {
+		t.Fatalf("expected SRapi X-Request-Id to be preserved, got %q", got)
+	}
+	if got := rec.Header().Get("X-Upstream-Request-Id"); got != "upstream-buffered" {
+		t.Fatalf("expected X-Upstream-Request-Id to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-RateLimit-Remaining-Requests"); got != "12" {
+		t.Fatalf("expected request rate limit header to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-RateLimit-Remaining-Tokens"); got != "345" {
+		t.Fatalf("expected token rate limit header to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-Secret-Token"); got != "" {
+		t.Fatalf("non-allowlisted header leaked: %q", got)
+	}
+	if got := rec.Header().Get("Content-Type"); !strings.HasPrefix(got, "application/json") {
+		t.Fatalf("expected SRapi-rendered JSON content type, got %q", got)
+	}
+}
+
+func mustEnableGatewayPassthroughHeaders(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken string, allowlist []string) {
+	t.Helper()
+	settings := mustGetAdminSettings(t, handler, sessionCookie)
+	enabled := true
+	settings.Data.Gateway.PassthroughUpstreamHeaders = &enabled
+	settings.Data.Gateway.PassthroughHeaderAllowlist = &allowlist
+	body, err := json.Marshal(settings.Data)
+	if err != nil {
+		t.Fatalf("marshal settings: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected settings update 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var updated apiopenapi.AdminSettingsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&updated); err != nil {
+		t.Fatalf("decode settings update: %v", err)
+	}
+	if updated.Data.Gateway.PassthroughUpstreamHeaders == nil || !*updated.Data.Gateway.PassthroughUpstreamHeaders {
+		t.Fatalf("passthrough headers setting was not enabled: %+v", updated.Data.Gateway)
+	}
+	if updated.Data.Gateway.PassthroughHeaderAllowlist == nil || len(*updated.Data.Gateway.PassthroughHeaderAllowlist) != len(allowlist) {
+		t.Fatalf("passthrough header allowlist not saved: %+v", updated.Data.Gateway)
+	}
+	for i, got := range *updated.Data.Gateway.PassthroughHeaderAllowlist {
+		if got != allowlist[i] {
+			t.Fatalf("allowlist[%d] = %q, want %q; full=%s", i, got, allowlist[i], fmt.Sprint(*updated.Data.Gateway.PassthroughHeaderAllowlist))
 		}
 	}
 }

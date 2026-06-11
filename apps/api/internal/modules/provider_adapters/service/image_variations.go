@@ -65,7 +65,12 @@ func (s *Service) invokeOpenAICompatibleImageVariation(ctx context.Context, req 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return contract.ImageGenerationResponse{}, classifyProviderHTTPError(resp.StatusCode, raw)
 	}
-	return parseOpenAICompatibleImageVariation(raw, resp.StatusCode, req)
+	parsed, err := parseOpenAICompatibleImageVariation(raw, resp.StatusCode, req)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(resp.Header)
+	return parsed, nil
 }
 
 func (s *Service) invokeReverseProxyOpenAICompatibleImageVariation(ctx context.Context, req contract.ImageVariationRequest, baseURL string) (contract.ImageGenerationResponse, error) {
@@ -99,7 +104,12 @@ func (s *Service) invokeReverseProxyOpenAICompatibleImageVariation(ctx context.C
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ImageGenerationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
-	return parseOpenAICompatibleImageVariation(runtimeResp.Body, runtimeResp.StatusCode, req)
+	parsed, err := parseOpenAICompatibleImageVariation(runtimeResp.Body, runtimeResp.StatusCode, req)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	return parsed, nil
 }
 
 func openAIImageVariationMultipart(req contract.ImageVariationRequest) ([]byte, string, error) {

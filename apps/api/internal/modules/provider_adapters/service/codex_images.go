@@ -45,7 +45,12 @@ func (s *Service) invokeReverseProxyCodexImageGeneration(ctx context.Context, re
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ImageGenerationResponse{}, classifyCodexProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
-	return parseCodexImageGenerationResponse(runtimeResp.Body, runtimeResp.StatusCode, req)
+	parsed, err := parseCodexImageGenerationResponse(runtimeResp.Body, runtimeResp.StatusCode, req)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	return parsed, nil
 }
 
 func (s *Service) StreamImageGeneration(ctx context.Context, req contract.ImageGenerationRequest) (contract.ImageGenerationResponse, error) {

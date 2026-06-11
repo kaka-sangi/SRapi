@@ -71,7 +71,12 @@ func (s *Service) invokeOpenAICompatibleImageEdit(ctx context.Context, req contr
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return contract.ImageGenerationResponse{}, classifyProviderHTTPError(resp.StatusCode, raw)
 	}
-	return parseOpenAICompatibleImageEdit(raw, resp.StatusCode, req)
+	parsed, err := parseOpenAICompatibleImageEdit(raw, resp.StatusCode, req)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(resp.Header)
+	return parsed, nil
 }
 
 func (s *Service) invokeReverseProxyOpenAICompatibleImageEdit(ctx context.Context, req contract.ImageEditRequest, baseURL string) (contract.ImageGenerationResponse, error) {
@@ -105,7 +110,12 @@ func (s *Service) invokeReverseProxyOpenAICompatibleImageEdit(ctx context.Contex
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ImageGenerationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
-	return parseOpenAICompatibleImageEdit(runtimeResp.Body, runtimeResp.StatusCode, req)
+	parsed, err := parseOpenAICompatibleImageEdit(runtimeResp.Body, runtimeResp.StatusCode, req)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	return parsed, nil
 }
 
 func openAIImageEditMultipart(req contract.ImageEditRequest) ([]byte, string, error) {

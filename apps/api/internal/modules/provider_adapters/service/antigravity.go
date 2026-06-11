@@ -87,7 +87,11 @@ func (s *Service) invokeReverseProxyAntigravity(ctx context.Context, req contrac
 		return contract.ConversationResponse{}, classifyGeminiProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	if req.Stream {
-		return parseAntigravityStream(runtimeResp.Body, runtimeResp.StatusCode)
+		parsed, err := parseAntigravityStream(runtimeResp.Body, runtimeResp.StatusCode)
+		if err != nil {
+			return contract.ConversationResponse{}, err
+		}
+		return withConversationResponseHeaders(parsed, runtimeResp.Headers), nil
 	}
 	unwrapped, err := parseAntigravityResponse(runtimeResp.Body)
 	if err != nil {
@@ -98,7 +102,7 @@ func (s *Service) invokeReverseProxyAntigravity(ctx context.Context, req contrac
 		return contract.ConversationResponse{}, err
 	}
 	parsed.Raw = append([]byte(nil), runtimeResp.Body...)
-	return parsed, nil
+	return withConversationResponseHeaders(parsed, runtimeResp.Headers), nil
 }
 
 func antigravityPayload(req contract.ConversationRequest) (antigravityRequest, error) {

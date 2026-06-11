@@ -333,8 +333,8 @@ type ImageGenerationResponse struct {
 	StatusCode int
 	Usage      Usage
 
-	// Headers carries upstream response headers for live streaming paths. Nil
-	// when the adapter buffers and re-renders the response.
+	// Headers carries upstream response headers when the adapter has them
+	// available, so the gateway can optionally forward an allowlist to clients.
 	Headers http.Header
 	// StreamBody, when non-nil, carries a live response stream already rendered
 	// into the caller-facing Images SSE protocol. The caller MUST Close it after
@@ -506,11 +506,8 @@ type ConversationResponse struct {
 	StreamEvents []ConversationStreamEvent
 	QuotaSignals []QuotaSignal
 
-	// Headers carries the upstream response headers, when the adapter has them
-	// available (currently the same-protocol passthrough paths: streaming and the
-	// buffered generic reverse proxy). It lets the gateway optionally forward an
-	// allowlist of upstream response headers to the client. Nil when the adapter
-	// re-renders the response and has no upstream headers to expose.
+	// Headers carries upstream response headers when the adapter has them
+	// available, so the gateway can optionally forward an allowlist to clients.
 	Headers http.Header
 
 	// StreamBody, when non-nil, carries the live upstream response body for

@@ -114,7 +114,12 @@ func (s *Service) invokeOpenAICompatibleImages(ctx context.Context, req contract
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return contract.ImageGenerationResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
 	}
-	return parseOpenAICompatibleImages(body, resp.StatusCode, req.Mapping.UpstreamModelName, req)
+	parsed, err := parseOpenAICompatibleImages(body, resp.StatusCode, req.Mapping.UpstreamModelName, req)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(resp.Header)
+	return parsed, nil
 }
 
 func (s *Service) invokeReverseProxyOpenAICompatibleImages(ctx context.Context, req contract.ImageGenerationRequest, baseURL string) (contract.ImageGenerationResponse, error) {
@@ -148,7 +153,12 @@ func (s *Service) invokeReverseProxyOpenAICompatibleImages(ctx context.Context, 
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ImageGenerationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
-	return parseOpenAICompatibleImages(runtimeResp.Body, runtimeResp.StatusCode, req.Mapping.UpstreamModelName, req)
+	parsed, err := parseOpenAICompatibleImages(runtimeResp.Body, runtimeResp.StatusCode, req.Mapping.UpstreamModelName, req)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	return parsed, nil
 }
 
 func (s *Service) invokeGeminiCompatible(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
@@ -228,6 +238,7 @@ func (s *Service) invokeGeminiCompatible(ctx context.Context, req contract.Conve
 		if err != nil {
 			return contract.ConversationResponse{}, err
 		}
+		parsed = withConversationResponseHeaders(parsed, respHeaders)
 		if signatureDowngraded {
 			parsed = appendGeminiSignatureDowngradeWarning(parsed)
 		}
@@ -243,6 +254,7 @@ func (s *Service) invokeGeminiCompatible(ctx context.Context, req contract.Conve
 		return contract.ConversationResponse{}, err
 	}
 	parsed.Raw = append(json.RawMessage(nil), body...)
+	parsed = withConversationResponseHeaders(parsed, respHeaders)
 	if signatureDowngraded {
 		parsed = appendGeminiSignatureDowngradeWarning(parsed)
 	}
@@ -290,6 +302,7 @@ func (s *Service) invokeAnthropicCompatible(ctx context.Context, req contract.Co
 		if err != nil {
 			return contract.ConversationResponse{}, err
 		}
+		parsed = withConversationResponseHeaders(parsed, resp.Header)
 		return withAnthropicQuotaSignals(parsed, resp.Header), nil
 	}
 
@@ -297,6 +310,7 @@ func (s *Service) invokeAnthropicCompatible(ctx context.Context, req contract.Co
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
+	parsed = withConversationResponseHeaders(parsed, resp.Header)
 	return withAnthropicQuotaSignals(parsed, resp.Header), nil
 }
 
@@ -342,10 +356,18 @@ func (s *Service) invokeOpenAICompatible(ctx context.Context, req contract.Conve
 		return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
 	if req.Stream {
-		return parseOpenAICompatibleStream(body, resp.StatusCode)
+		parsed, err := parseOpenAICompatibleStream(body, resp.StatusCode)
+		if err != nil {
+			return contract.ConversationResponse{}, err
+		}
+		return withConversationResponseHeaders(parsed, resp.Header), nil
 	}
 
-	return parseOpenAICompatibleJSON(body, resp.StatusCode)
+	parsed, err := parseOpenAICompatibleJSON(body, resp.StatusCode)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	return withConversationResponseHeaders(parsed, resp.Header), nil
 }
 
 func (s *Service) invokeOpenAICompatibleResponses(ctx context.Context, req contract.ConversationRequest, baseURL string, apiKey string) (contract.ConversationResponse, error) {
@@ -380,7 +402,11 @@ func (s *Service) invokeOpenAICompatibleResponses(ctx context.Context, req contr
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
-	return parseOpenAIResponsesBodyWithOptions(body, resp.StatusCode, openAIResponsesRequireTerminalEvent(req))
+	parsed, err := parseOpenAIResponsesBodyWithOptions(body, resp.StatusCode, openAIResponsesRequireTerminalEvent(req))
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	return withConversationResponseHeaders(parsed, resp.Header), nil
 }
 
 func (s *Service) invokeOpenAIResponseInputItems(ctx context.Context, req contract.ResponseInputItemsRequest, baseURL string) (contract.ResponseInputItemsResponse, error) {
@@ -502,6 +528,7 @@ func (s *Service) invokeReverseProxyGeminiCompatible(ctx context.Context, req co
 		if err != nil {
 			return contract.ConversationResponse{}, err
 		}
+		parsed = withConversationResponseHeaders(parsed, runtimeResp.Headers)
 		if signatureDowngraded {
 			parsed = appendGeminiSignatureDowngradeWarning(parsed)
 		}
@@ -516,6 +543,7 @@ func (s *Service) invokeReverseProxyGeminiCompatible(ctx context.Context, req co
 		return contract.ConversationResponse{}, err
 	}
 	parsed.Raw = append(json.RawMessage(nil), runtimeResp.Body...)
+	parsed = withConversationResponseHeaders(parsed, runtimeResp.Headers)
 	if signatureDowngraded {
 		parsed = appendGeminiSignatureDowngradeWarning(parsed)
 	}
@@ -567,12 +595,14 @@ func (s *Service) invokeReverseProxyAnthropicCompatible(ctx context.Context, req
 		if err != nil {
 			return contract.ConversationResponse{}, err
 		}
+		parsed = withConversationResponseHeaders(parsed, runtimeResp.Headers)
 		return withAnthropicQuotaSignals(parsed, runtimeResp.Headers), nil
 	}
 	parsed, err := parseAnthropicCompatibleJSON(runtimeResp.Body, runtimeResp.StatusCode)
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
+	parsed = withConversationResponseHeaders(parsed, runtimeResp.Headers)
 	return withAnthropicQuotaSignals(parsed, runtimeResp.Headers), nil
 }
 
@@ -615,9 +645,17 @@ func (s *Service) invokeReverseProxyOpenAICompatible(ctx context.Context, req co
 		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if req.Stream {
-		return parseOpenAICompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
+		parsed, err := parseOpenAICompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
+		if err != nil {
+			return contract.ConversationResponse{}, err
+		}
+		return withConversationResponseHeaders(parsed, runtimeResp.Headers), nil
 	}
-	return parseOpenAICompatibleJSON(runtimeResp.Body, runtimeResp.StatusCode)
+	parsed, err := parseOpenAICompatibleJSON(runtimeResp.Body, runtimeResp.StatusCode)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	return withConversationResponseHeaders(parsed, runtimeResp.Headers), nil
 }
 
 func (s *Service) invokeOpenAICompatibleResponsesCompact(ctx context.Context, req contract.ConversationRequest, baseURL string, apiKey string) (contract.ConversationResponse, error) {
@@ -648,7 +686,11 @@ func (s *Service) invokeOpenAICompatibleResponsesCompact(ctx context.Context, re
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
-	return parseOpenAIResponsesCompactJSON(body, resp.StatusCode)
+	parsed, err := parseOpenAIResponsesCompactJSON(body, resp.StatusCode)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	return withConversationResponseHeaders(parsed, resp.Header), nil
 }
 
 func (s *Service) invokeReverseProxyOpenAICompatibleResponsesCompact(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
@@ -679,7 +721,11 @@ func (s *Service) invokeReverseProxyOpenAICompatibleResponsesCompact(ctx context
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
-	return parseOpenAIResponsesCompactJSON(runtimeResp.Body, runtimeResp.StatusCode)
+	parsed, err := parseOpenAIResponsesCompactJSON(runtimeResp.Body, runtimeResp.StatusCode)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	return withConversationResponseHeaders(parsed, runtimeResp.Headers), nil
 }
 
 func (s *Service) invokeReverseProxyOpenAICompatibleResponses(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
@@ -712,7 +758,11 @@ func (s *Service) invokeReverseProxyOpenAICompatibleResponses(ctx context.Contex
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
-	return parseOpenAIResponsesBodyWithOptions(runtimeResp.Body, runtimeResp.StatusCode, openAIResponsesRequireTerminalEvent(req))
+	parsed, err := parseOpenAIResponsesBodyWithOptions(runtimeResp.Body, runtimeResp.StatusCode, openAIResponsesRequireTerminalEvent(req))
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	return withConversationResponseHeaders(parsed, runtimeResp.Headers), nil
 }
 
 func openAIResponsesCompactRequest(req contract.ConversationRequest) bool {
