@@ -698,13 +698,16 @@ type openAIStreamToolCall struct {
 }
 
 type openAIUsage struct {
-	PromptTokens       *int `json:"prompt_tokens"`
-	CompletionTokens   *int `json:"completion_tokens"`
-	TotalTokens        *int `json:"total_tokens"`
-	InputTokens        *int `json:"input_tokens"`
-	OutputTokens       *int `json:"output_tokens"`
-	CachedTokens       *int `json:"cached_tokens"`
-	InputTokensDetails *struct {
+	PromptTokens             *int `json:"prompt_tokens"`
+	CompletionTokens         *int `json:"completion_tokens"`
+	TotalTokens              *int `json:"total_tokens"`
+	InputTokens              *int `json:"input_tokens"`
+	OutputTokens             *int `json:"output_tokens"`
+	CachedTokens             *int `json:"cached_tokens"`
+	CacheCreationInputTokens *int `json:"cache_creation_input_tokens"`
+	CacheCreation5mTokens    *int `json:"cache_creation_ephemeral_5m_input_tokens"`
+	CacheCreation1hTokens    *int `json:"cache_creation_ephemeral_1h_input_tokens"`
+	InputTokensDetails       *struct {
 		CachedTokens *int `json:"cached_tokens"`
 	} `json:"input_tokens_details"`
 	PromptTokensDetails *struct {
@@ -735,6 +738,13 @@ func (u openAIUsage) ToUsage(text string) contract.Usage {
 	if cached == 0 && u.PromptTokensDetails != nil {
 		cached = valueOrZero(u.PromptTokensDetails.CachedTokens)
 	}
+	cacheCreation5mRaw := valueOrZero(u.CacheCreation5mTokens)
+	cacheCreation1hRaw := valueOrZero(u.CacheCreation1hTokens)
+	cacheCreation := valueOrZero(u.CacheCreationInputTokens)
+	if cacheCreation == 0 {
+		cacheCreation = cacheCreation5mRaw + cacheCreation1hRaw
+	}
+	cacheCreation5m, cacheCreation1h := openAICacheCreationBuckets(cacheCreation, cacheCreation5mRaw, cacheCreation1hRaw)
 	input := max(0, rawInput-cached)
 	total := input + output + cached
 	if u.TotalTokens != nil && *u.TotalTokens > 0 && total == 0 {
@@ -746,16 +756,29 @@ func (u openAIUsage) ToUsage(text string) contract.Usage {
 	if output < imageOutput {
 		output = imageOutput
 	}
-	if input == 0 && output == 0 && cached == 0 && imageOutput == 0 {
+	if input == 0 && output == 0 && cached == 0 && imageOutput == 0 && cacheCreation == 0 {
 		return estimatedUsage(text)
 	}
 	return contract.Usage{
-		InputTokens:       input,
-		OutputTokens:      output,
-		ImageOutputTokens: imageOutput,
-		CachedTokens:      cached,
-		Estimated:         false,
+		InputTokens:           input,
+		OutputTokens:          output,
+		ImageOutputTokens:     imageOutput,
+		CachedTokens:          cached,
+		CacheCreationTokens:   cacheCreation,
+		CacheCreation5mTokens: cacheCreation5m,
+		CacheCreation1hTokens: cacheCreation1h,
+		Estimated:             false,
 	}
+}
+
+func openAICacheCreationBuckets(total int, fiveMinutes int, oneHour int) (int, int) {
+	if total > 0 && fiveMinutes == 0 && oneHour == 0 {
+		return total, 0
+	}
+	if fiveMinutes+oneHour < total {
+		fiveMinutes += total - fiveMinutes - oneHour
+	}
+	return fiveMinutes, oneHour
 }
 
 func (u openAIUsage) ToEmbeddingUsage(input []string) contract.Usage {
@@ -785,6 +808,9 @@ func (u openAIUsage) HasTokenUsage() bool {
 		u.InputTokens != nil ||
 		u.OutputTokens != nil ||
 		u.CachedTokens != nil ||
+		u.CacheCreationInputTokens != nil ||
+		u.CacheCreation5mTokens != nil ||
+		u.CacheCreation1hTokens != nil ||
 		(u.InputTokensDetails != nil && u.InputTokensDetails.CachedTokens != nil) ||
 		(u.PromptTokensDetails != nil && u.PromptTokensDetails.CachedTokens != nil) ||
 		(u.OutputTokensDetails != nil && u.OutputTokensDetails.ImageTokens != nil)

@@ -103,6 +103,24 @@ func TestOpenAIUsageHasNoCacheCreation(t *testing.T) {
 	}
 }
 
+func TestOpenAIUsagePreservesCacheCreationTokens(t *testing.T) {
+	create := 30
+	create5m := 10
+	create1h := 20
+	usage := openAIUsage{
+		CacheCreationInputTokens: &create,
+		CacheCreation5mTokens:    &create5m,
+		CacheCreation1hTokens:    &create1h,
+	}.ToUsage("cache write response")
+
+	if usage.Estimated {
+		t.Fatal("usage should not be estimated when OpenAI-style cache creation tokens are present")
+	}
+	if usage.CacheCreationTokens != 30 || usage.CacheCreation5mTokens != 10 || usage.CacheCreation1hTokens != 20 {
+		t.Fatalf("unexpected OpenAI-style cache creation usage: %+v", usage)
+	}
+}
+
 func TestOpenAIUsageClampsInputWhenCachedTokensExceedInputTokens(t *testing.T) {
 	input := 8
 	cached := 10

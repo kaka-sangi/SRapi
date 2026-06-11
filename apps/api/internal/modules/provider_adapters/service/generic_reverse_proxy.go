@@ -166,17 +166,39 @@ func genericReverseProxyUsage(decoded map[string]any, req contract.ConversationR
 		return usage.ToUsage(text)
 	}
 	if usage, ok := genericPath(decoded, genericReverseProxyResponsePath(req, "usage_path", "usage")).(map[string]any); ok {
-		parsed := openAIUsage{
-			PromptTokens:     genericIntPtr(usage["prompt_tokens"]),
-			CompletionTokens: genericIntPtr(usage["completion_tokens"]),
-			TotalTokens:      genericIntPtr(usage["total_tokens"]),
-			InputTokens:      genericIntPtr(usage["input_tokens"]),
-			OutputTokens:     genericIntPtr(usage["output_tokens"]),
-			CachedTokens:     genericIntPtr(usage["cached_tokens"]),
-		}
-		return parsed.ToUsage(text)
+		return genericReverseProxyOpenAIUsage(usage).ToUsage(text)
 	}
 	return estimatedUsage(text)
+}
+
+func genericReverseProxyOpenAIUsage(usage map[string]any) openAIUsage {
+	parsed := openAIUsage{
+		PromptTokens:             genericIntPtr(usage["prompt_tokens"]),
+		CompletionTokens:         genericIntPtr(usage["completion_tokens"]),
+		TotalTokens:              genericIntPtr(usage["total_tokens"]),
+		InputTokens:              genericIntPtr(usage["input_tokens"]),
+		OutputTokens:             genericIntPtr(usage["output_tokens"]),
+		CachedTokens:             genericIntPtr(usage["cached_tokens"]),
+		CacheCreationInputTokens: genericIntPtr(usage["cache_creation_input_tokens"]),
+		CacheCreation5mTokens:    genericIntPtr(usage["cache_creation_ephemeral_5m_input_tokens"]),
+		CacheCreation1hTokens:    genericIntPtr(usage["cache_creation_ephemeral_1h_input_tokens"]),
+	}
+	if details, ok := usage["input_tokens_details"].(map[string]any); ok {
+		parsed.InputTokensDetails = &struct {
+			CachedTokens *int `json:"cached_tokens"`
+		}{CachedTokens: genericIntPtr(details["cached_tokens"])}
+	}
+	if details, ok := usage["prompt_tokens_details"].(map[string]any); ok {
+		parsed.PromptTokensDetails = &struct {
+			CachedTokens *int `json:"cached_tokens"`
+		}{CachedTokens: genericIntPtr(details["cached_tokens"])}
+	}
+	if details, ok := usage["output_tokens_details"].(map[string]any); ok {
+		parsed.OutputTokensDetails = &struct {
+			ImageTokens *int `json:"image_tokens"`
+		}{ImageTokens: genericIntPtr(details["image_tokens"])}
+	}
+	return parsed
 }
 
 func genericReverseProxyHeaders(req contract.ConversationRequest, endpointKind string) http.Header {

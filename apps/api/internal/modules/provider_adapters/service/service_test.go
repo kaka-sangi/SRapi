@@ -2051,7 +2051,7 @@ func TestGenericReverseProxyAdapterInvokesConfiguredChatUpstream(t *testing.T) {
 			t.Fatalf("unexpected generic chat payload: %+v", payload)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"output":{"text":"generic says hi"},"metering":{"input_tokens":6,"output_tokens":7,"cached_tokens":2}}`))
+		_, _ = w.Write([]byte(`{"output":{"text":"generic says hi"},"metering":{"input_tokens":"9","output_tokens":7,"input_tokens_details":{"cached_tokens":"2"},"output_tokens_details":{"image_tokens":"3"},"cache_creation_input_tokens":"5","cache_creation_ephemeral_5m_input_tokens":"2","cache_creation_ephemeral_1h_input_tokens":"3"}}`))
 	}))
 	defer upstream.Close()
 
@@ -2089,7 +2089,15 @@ func TestGenericReverseProxyAdapterInvokesConfiguredChatUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke generic chat upstream: %v", err)
 	}
-	if conversationResponseText(resp) != "generic says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 7 || resp.Usage.CachedTokens != 2 {
+	if conversationResponseText(resp) != "generic says hi" ||
+		resp.Usage.Estimated ||
+		resp.Usage.InputTokens != 7 ||
+		resp.Usage.OutputTokens != 7 ||
+		resp.Usage.CachedTokens != 2 ||
+		resp.Usage.ImageOutputTokens != 3 ||
+		resp.Usage.CacheCreationTokens != 5 ||
+		resp.Usage.CacheCreation5mTokens != 2 ||
+		resp.Usage.CacheCreation1hTokens != 3 {
 		t.Fatalf("unexpected generic chat response: %+v", resp)
 	}
 }
