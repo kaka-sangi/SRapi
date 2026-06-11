@@ -226,7 +226,7 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 	if payload == nil {
 		return
 	}
-	if model := strings.TrimSpace(req.Mapping.UpstreamModelName); model != "" {
+	if model := contract.NormalizeCodexUpstreamModelName(req.Mapping.UpstreamModelName); model != "" {
 		payload["model"] = model
 	}
 	codexNormalizeResponsesInput(payload)

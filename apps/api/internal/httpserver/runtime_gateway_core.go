@@ -188,7 +188,7 @@ const accountCompactModelMappingMetadataKey = "compact_model_mapping"
 // requested canonical model. The failover loop re-schedules on every attempt,
 // so applying to result.Candidate here covers each attempt's chosen account.
 func applyAccountModelMapping(result schedulercontract.ScheduleResult, canonicalModel string, sourceEndpoint string) schedulercontract.ScheduleResult {
-	result.Candidate.Mapping = accountEffectiveModelMapping(result.Candidate.Mapping, result.Candidate.Account, canonicalModel, sourceEndpoint)
+	result.Candidate.Mapping = providerEffectiveModelMapping(result.Candidate.Provider, accountEffectiveModelMapping(result.Candidate.Mapping, result.Candidate.Account, canonicalModel, sourceEndpoint))
 	return result
 }
 
@@ -687,6 +687,7 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 				continue
 			}
 			effectiveMapping := accountEffectiveModelMapping(mapping, account, model.CanonicalName, sourceEndpoint)
+			effectiveMapping = providerEffectiveModelMapping(provider, effectiveMapping)
 			if accountExcludesModel(account.Metadata, model.CanonicalName, effectiveMapping.UpstreamModelName) {
 				continue
 			}
@@ -709,6 +710,13 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 	}
 	rt.fillCandidateRuntimeStates(ctx, candidates)
 	return candidates, nil
+}
+
+func providerEffectiveModelMapping(provider providercontract.Provider, mapping modelcontract.ModelProviderMapping) modelcontract.ModelProviderMapping {
+	if strings.EqualFold(strings.TrimSpace(provider.AdapterType), "reverse-proxy-codex-cli") {
+		mapping.UpstreamModelName = provideradaptercontract.NormalizeCodexUpstreamModelName(mapping.UpstreamModelName)
+	}
+	return mapping
 }
 
 // fillCandidateRuntimeStates populates Candidate.RuntimeState for every

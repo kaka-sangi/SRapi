@@ -39,6 +39,36 @@ func TestCodexResponsesPayloadStripsUnsupportedCompatibilityFields(t *testing.T)
 	}
 }
 
+func TestCodexResponsesPayloadNormalizesKnownModelAliases(t *testing.T) {
+	tests := []struct {
+		name     string
+		upstream string
+		want     string
+	}{
+		{name: "provider prefix and compact suffix", upstream: "openai/gpt5.4mini-openai-compact", want: "gpt-5.4-mini"},
+		{name: "removed model fallback", upstream: "gpt-5.1", want: "gpt-5.4"},
+		{name: "codex spark effort suffix", upstream: "gpt-5.3-codex-spark-high", want: "gpt-5.3-codex-spark"},
+		{name: "codex mini alias", upstream: "codex-mini-latest", want: "gpt-5.3-codex"},
+		{name: "custom model passes through", upstream: " custom-codex-model ", want: "custom-codex-model"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			payload, _, err := codexResponsesPayload(contract.ConversationRequest{
+				SourceProtocol: "openai-compatible",
+				SourceEndpoint: "/v1/responses",
+				RawBody:        []byte(`{"model":"caller-model","input":"hello"}`),
+				Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: tt.upstream},
+			})
+			if err != nil {
+				t.Fatalf("build codex responses payload: %v", err)
+			}
+			if payload["model"] != tt.want {
+				t.Fatalf("model = %v, want %s", payload["model"], tt.want)
+			}
+		})
+	}
+}
+
 func TestCodexResponsesPayloadKeepsOnlyPriorityServiceTier(t *testing.T) {
 	tests := []struct {
 		name        string
