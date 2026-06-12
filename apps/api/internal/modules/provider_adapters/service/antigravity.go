@@ -286,7 +286,7 @@ func antigravityHeaders(req contract.ConversationRequest) http.Header {
 
 func parseAntigravityResponse(body []byte) (geminiGenerateContentResponse, error) {
 	var envelope antigravityResponseEnvelope
-	if err := json.Unmarshal(body, &envelope); err == nil && (len(envelope.Response.Candidates) > 0 || geminiUsageMetadataPresent(envelope.Response.UsageMetadata)) {
+	if err := json.Unmarshal(body, &envelope); err == nil && (len(envelope.Response.Candidates) > 0 || geminiUsageMetadataPresent(envelope.Response.Usage())) {
 		return envelope.Response, nil
 	}
 	var direct geminiGenerateContentResponse
@@ -333,7 +333,7 @@ func parseAntigravityStream(body []byte, statusCode int) (contract.ConversationR
 		if reason := chunk.StopReason(); reason != contract.StopReasonEndTurn {
 			stopReason = reason
 		}
-		usage.Merge(chunk.UsageMetadata)
+		usage.Merge(chunk.Usage())
 	}
 	if !seenChunk {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before chunk"}

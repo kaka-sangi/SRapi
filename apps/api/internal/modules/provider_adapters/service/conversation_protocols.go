@@ -494,7 +494,8 @@ type geminiGenerateContentResponse struct {
 		Content      geminiContent `json:"content"`
 		FinishReason string        `json:"finishReason"`
 	} `json:"candidates"`
-	UsageMetadata geminiUsageMetadata `json:"usageMetadata"`
+	UsageMetadata      geminiUsageMetadata `json:"usageMetadata"`
+	UsageMetadataSnake geminiUsageMetadata `json:"usage_metadata"`
 }
 
 func (r geminiGenerateContentResponse) ConversationResponse(statusCode int) (contract.ConversationResponse, error) {
@@ -507,8 +508,15 @@ func (r geminiGenerateContentResponse) ConversationResponse(statusCode int) (con
 		Parts:      parts,
 		StopReason: r.StopReason(),
 		StatusCode: statusCode,
-		Usage:      r.UsageMetadata.ToUsage(text),
+		Usage:      r.Usage().ToUsage(text),
 	}, nil
+}
+
+func (r geminiGenerateContentResponse) Usage() geminiUsageMetadata {
+	if r.UsageMetadata.HasTokenUsage() || !r.UsageMetadataSnake.HasTokenUsage() {
+		return r.UsageMetadata
+	}
+	return r.UsageMetadataSnake
 }
 
 func (r geminiGenerateContentResponse) ContentParts() []contract.ContentPart {
@@ -731,8 +739,9 @@ func parseGeminiCompatibleStream(body []byte, statusCode int) (contract.Conversa
 			})
 			eventIndex++
 		}
-		usage.Merge(chunk.UsageMetadata)
-		if chunk.UsageMetadata.HasTokenUsage() {
+		chunkUsage := chunk.Usage()
+		usage.Merge(chunkUsage)
+		if chunkUsage.HasTokenUsage() {
 			streamEvents = append(streamEvents, contract.ConversationStreamEvent{
 				Index:          eventIndex,
 				Type:           contract.ConversationStreamEventUsage,

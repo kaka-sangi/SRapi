@@ -3355,6 +3355,34 @@ func TestGeminiCompatibleAdapterPreservesFinishReason(t *testing.T) {
 	}
 }
 
+func TestGeminiCompatibleAdapterParsesSnakeCaseUsageMetadata(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"snake usage"}]}}],"usage_metadata":{"promptTokenCount":13,"candidatesTokenCount":2,"thoughtsTokenCount":3,"totalTokenCount":18,"cachedContentTokenCount":4}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_snake_usage",
+		Model:      "gemini-local",
+		InputParts: textParts("short"),
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "snake usage" || resp.Usage.Estimated || resp.Usage.InputTokens != 9 || resp.Usage.OutputTokens != 5 || resp.Usage.CachedTokens != 4 {
+		t.Fatalf("unexpected snake_case Gemini usage: %+v", resp)
+	}
+}
+
 func TestGeminiCompatibleAdapterStreamsUpstream(t *testing.T) {
 	rawSSE := ": keep-alive\n" +
 		"data: {\"candidates\":[{\"content\":\n" +
@@ -9895,6 +9923,44 @@ func TestReverseProxyAntigravityAdapterStreamsMultilineSSEData(t *testing.T) {
 	}
 	if runtime.request.Headers.Get("Accept") != "text/event-stream" || runtime.request.Headers.Get("Accept-Encoding") != "identity" {
 		t.Fatalf("expected antigravity stream headers, got %+v", runtime.request.Headers)
+	}
+}
+
+func TestReverseProxyAntigravityAdapterParsesSnakeCaseStreamUsageMetadata(t *testing.T) {
+	rawSSE := "data: {\"response\":{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"antigravity snake\"}]}}],\"usage_metadata\":{\"promptTokenCount\":11,\"candidatesTokenCount\":2,\"thoughtsTokenCount\":1,\"cachedContentTokenCount\":3}}}\n\n"
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(rawSSE),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_antigravity_snake_usage",
+		Model:      "antigravity-local",
+		InputParts: textParts("hello"),
+		Stream:     true,
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "gemini-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             16,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"access_token": "antigravity-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke antigravity stream adapter: %v", err)
+	}
+	if conversationResponseText(resp) != "antigravity snake" || resp.Usage.Estimated || resp.Usage.InputTokens != 8 || resp.Usage.OutputTokens != 3 || resp.Usage.CachedTokens != 3 {
+		t.Fatalf("unexpected antigravity snake_case stream usage: %+v", resp)
 	}
 }
 
