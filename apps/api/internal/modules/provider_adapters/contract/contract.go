@@ -332,6 +332,9 @@ type ImageGenerationResponse struct {
 	Model      string
 	StatusCode int
 	Usage      Usage
+	// QuotaSignals carries normalized passive quota observations discovered
+	// from successful upstream response headers.
+	QuotaSignals []QuotaSignal
 
 	// Headers carries upstream response headers when the adapter has them
 	// available, so the gateway can optionally forward an allowlist to clients.

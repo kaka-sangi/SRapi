@@ -88,6 +88,10 @@ func classifyGeminiProviderHTTPErrorWithHeaders(statusCode int, headers http.Hea
 }
 
 func providerQuotaSignalsFromErrorHeaders(headers http.Header, now time.Time) []contract.QuotaSignal {
+	return providerQuotaSignalsFromHeaders(headers, now)
+}
+
+func providerQuotaSignalsFromHeaders(headers http.Header, now time.Time) []contract.QuotaSignal {
 	if headers == nil {
 		return nil
 	}

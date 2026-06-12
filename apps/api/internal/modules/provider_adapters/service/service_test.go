@@ -1284,6 +1284,12 @@ func TestOpenAICompatibleAdapterInvokesImageGenerationsUpstream(t *testing.T) {
 			t.Fatalf("expected image conversion fields, got %+v", payload)
 		}
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Codex-Primary-Used-Percent", "12")
+		w.Header().Set("X-Codex-Primary-Reset-After-Seconds", "3600")
+		w.Header().Set("X-Codex-Primary-Window-Minutes", "10080")
+		w.Header().Set("X-Codex-Secondary-Used-Percent", "34")
+		w.Header().Set("X-Codex-Secondary-Reset-After-Seconds", "1800")
+		w.Header().Set("X-Codex-Secondary-Window-Minutes", "300")
 		_, _ = w.Write([]byte(`{"created":1710000000,"data":[{"url":"https://example.test/image-1.png","revised_prompt":"draw a precise test image, revised"},{"b64_json":"aW1hZ2UtMg=="}],"model":"image-upstream","usage":{"prompt_tokens":11,"completion_tokens":2,"total_tokens":13,"output_tokens_details":{"image_tokens":2}}}`))
 	}))
 	defer upstream.Close()
@@ -1321,6 +1327,11 @@ func TestOpenAICompatibleAdapterInvokesImageGenerationsUpstream(t *testing.T) {
 	if resp.Usage.Estimated || resp.Usage.InputTokens != 11 || resp.Usage.OutputTokens != 2 || resp.Usage.ImageOutputTokens != 2 {
 		t.Fatalf("unexpected image usage: %+v", resp.Usage)
 	}
+	if len(resp.QuotaSignals) != 2 {
+		t.Fatalf("expected passive image quota signals, got %+v", resp.QuotaSignals)
+	}
+	assertQuotaSignal(t, resp.QuotaSignals, "codex_7d_percent", "12", "88", "100", 0.88)
+	assertQuotaSignal(t, resp.QuotaSignals, "codex_5h_percent", "34", "66", "100", 0.66)
 }
 
 func TestOpenAICompatibleAdapterInvokesImageEditsUpstream(t *testing.T) {
@@ -7783,7 +7794,15 @@ func TestReverseProxyCodexCLIAdapterStreamsImageGenerationEvents(t *testing.T) {
 	runtime := capturingRuntime{
 		streamResponse: reverseproxycontract.StreamResponse{
 			StatusCode: http.StatusOK,
-			Headers:    http.Header{"X-Request-Id": {"req_img_stream"}},
+			Headers: http.Header{
+				"X-Request-Id":                          {"req_img_stream"},
+				"X-Codex-Primary-Used-Percent":          {"22"},
+				"X-Codex-Primary-Reset-After-Seconds":   {"3600"},
+				"X-Codex-Primary-Window-Minutes":        {"300"},
+				"X-Codex-Secondary-Used-Percent":        {"44"},
+				"X-Codex-Secondary-Reset-After-Seconds": {"7200"},
+				"X-Codex-Secondary-Window-Minutes":      {"10080"},
+			},
 			Body: io.NopCloser(strings.NewReader(
 				"data: {\"type\":\"response.created\",\"response\":{\"created_at\":1710000001,\"tools\":[{\"type\":\"image_generation\",\"model\":\"gpt-image-2\",\"background\":\"auto\",\"output_format\":\"png\",\"quality\":\"high\",\"size\":\"1024x1024\"}]}}\n\n" +
 					"data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\",\"background\":\"auto\"}\n\n" +
@@ -7818,6 +7837,11 @@ func TestReverseProxyCodexCLIAdapterStreamsImageGenerationEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stream codex image generation: %v", err)
 	}
+	if len(resp.QuotaSignals) != 2 {
+		t.Fatalf("expected stream image quota signals, got %+v", resp.QuotaSignals)
+	}
+	assertQuotaSignal(t, resp.QuotaSignals, "codex_5h_percent", "22", "78", "100", 0.78)
+	assertQuotaSignal(t, resp.QuotaSignals, "codex_7d_percent", "44", "56", "100", 0.56)
 	raw, err := io.ReadAll(resp.StreamBody)
 	if err != nil {
 		t.Fatalf("read codex image stream: %v", err)
@@ -7849,6 +7873,11 @@ func TestReverseProxyCodexCLIAdapterStreamsImageGenerationEvents(t *testing.T) {
 	if len(parsed.Data) != 1 || parsed.Data[0].URL != "data:image/png;base64,ZmluYWw=" || parsed.Data[0].Base64JSON != "ZmluYWw=" || parsed.Usage.InputTokens != 5 || parsed.Usage.OutputTokens != 9 || parsed.Usage.ImageOutputTokens != 7 || parsed.Usage.Estimated {
 		t.Fatalf("unexpected parsed rendered image stream: %+v", parsed)
 	}
+	if len(parsed.QuotaSignals) != 2 {
+		t.Fatalf("expected parsed stream image quota signals, got %+v", parsed.QuotaSignals)
+	}
+	assertQuotaSignal(t, parsed.QuotaSignals, "codex_5h_percent", "22", "78", "100", 0.78)
+	assertQuotaSignal(t, parsed.QuotaSignals, "codex_7d_percent", "44", "56", "100", 0.56)
 	if !runtime.request.ExpectStream || runtime.request.URL != "https://upstream.example/backend-api/codex/responses" {
 		t.Fatalf("expected codex image DoStream request, got %+v", runtime.request)
 	}

@@ -50,6 +50,7 @@ func (s *Service) invokeReverseProxyCodexImageGeneration(ctx context.Context, re
 		return contract.ImageGenerationResponse{}, err
 	}
 	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	parsed.QuotaSignals = codexQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
 	return parsed, nil
 }
 
@@ -91,11 +92,17 @@ func (s *Service) StreamImageGeneration(ctx context.Context, req contract.ImageG
 		return contract.ImageGenerationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	return contract.ImageGenerationResponse{
-		StatusCode: runtimeResp.StatusCode,
-		Headers:    runtimeResp.Headers,
-		StreamBody: newCodexImageGenerationStreamBody(runtimeResp.Body, req),
+		StatusCode:   runtimeResp.StatusCode,
+		Headers:      runtimeResp.Headers,
+		QuotaSignals: codexQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC()),
+		StreamBody:   newCodexImageGenerationStreamBody(runtimeResp.Body, req),
 		StreamParse: func(body []byte, statusCode int) (contract.ImageGenerationResponse, error) {
-			return parseCodexImageGenerationRenderedStream(body, statusCode, req)
+			parsed, err := parseCodexImageGenerationRenderedStream(body, statusCode, req)
+			if err != nil {
+				return contract.ImageGenerationResponse{}, err
+			}
+			parsed.QuotaSignals = codexQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
+			return parsed, nil
 		},
 	}, nil
 }

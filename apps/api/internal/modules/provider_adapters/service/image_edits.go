@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"strings"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
@@ -76,6 +77,7 @@ func (s *Service) invokeOpenAICompatibleImageEdit(ctx context.Context, req contr
 		return contract.ImageGenerationResponse{}, err
 	}
 	parsed.Headers = cloneGenericHeaders(resp.Header)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(resp.Header, time.Now().UTC())
 	return parsed, nil
 }
 
@@ -115,6 +117,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleImageEdit(ctx context.Contex
 		return contract.ImageGenerationResponse{}, err
 	}
 	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
 	return parsed, nil
 }
 

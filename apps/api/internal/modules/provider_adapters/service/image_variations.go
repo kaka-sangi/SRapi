@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
@@ -70,6 +71,7 @@ func (s *Service) invokeOpenAICompatibleImageVariation(ctx context.Context, req 
 		return contract.ImageGenerationResponse{}, err
 	}
 	parsed.Headers = cloneGenericHeaders(resp.Header)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(resp.Header, time.Now().UTC())
 	return parsed, nil
 }
 
@@ -109,6 +111,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleImageVariation(ctx context.C
 		return contract.ImageGenerationResponse{}, err
 	}
 	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
 	return parsed, nil
 }
 

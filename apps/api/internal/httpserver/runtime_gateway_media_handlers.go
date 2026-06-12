@@ -176,6 +176,7 @@ func (s *Server) handleCreateImageGeneration(w http.ResponseWriter, r *http.Requ
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		ProviderQuotaSignals:  providerResp.QuotaSignals,
 	})
 	if canonical.ImageStream {
 		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
@@ -340,6 +341,7 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		ProviderQuotaSignals:  providerResp.QuotaSignals,
 	})
 	streamRequested := body.Stream != nil && *body.Stream
 	if streamRequested {
@@ -507,6 +509,7 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		ProviderQuotaSignals:  providerResp.QuotaSignals,
 	})
 	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderImageGeneration(canonicalResp))

@@ -206,7 +206,7 @@ readLoop:
 	// unavailable or the response was too large to fully meter.
 	usage := admission.EstimatedUsage
 	usageEstimated := true
-	var quotaSignals []provideradaptercontract.QuotaSignal
+	quotaSignals := providerResp.QuotaSignals
 	if providerResp.StreamParse != nil && meter.Len() > 0 {
 		if parsed, parseErr := providerResp.StreamParse(meter.Bytes(), statusOrOK(providerResp.StatusCode)); parseErr == nil {
 			parsedUsage := gatewayUsageFromProvider(parsed)
@@ -353,11 +353,13 @@ readLoop:
 
 	usage := admission.EstimatedUsage
 	usageEstimated := true
+	quotaSignals := providerResp.QuotaSignals
 	if providerResp.StreamParse != nil && meter.Len() > 0 {
 		if parsed, parseErr := providerResp.StreamParse(meter.Bytes(), statusOrOK(providerResp.StatusCode)); parseErr == nil {
 			parsedUsage := gatewayUsageFromImageProvider(parsed)
 			usage = parsedUsage
 			usageEstimated = parsedUsage.Estimated
+			quotaSignals = parsed.QuotaSignals
 		}
 	}
 
@@ -384,6 +386,7 @@ readLoop:
 		UsageEstimated:        usageEstimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonical.CompatibilityWarnings,
+		ProviderQuotaSignals:  quotaSignals,
 	}
 	if interrupted {
 		if idleTimedOut {
