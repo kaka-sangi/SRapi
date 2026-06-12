@@ -10069,21 +10069,35 @@ type alipayWebhookHTTPTestKeys struct {
 	alipayPublicKey    string
 }
 
+var (
+	alipayWebhookHTTPTestKeysOnce  sync.Once
+	alipayWebhookHTTPTestKeysCache alipayWebhookHTTPTestKeys
+	alipayWebhookHTTPTestKeysErr   error
+)
+
 func newAlipayWebhookHTTPTestKeys(t *testing.T) alipayWebhookHTTPTestKeys {
 	t.Helper()
-	merchantKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate merchant key: %v", err)
+	alipayWebhookHTTPTestKeysOnce.Do(func() {
+		merchantKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			alipayWebhookHTTPTestKeysErr = fmt.Errorf("generate merchant key: %w", err)
+			return
+		}
+		alipayKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			alipayWebhookHTTPTestKeysErr = fmt.Errorf("generate alipay key: %w", err)
+			return
+		}
+		alipayWebhookHTTPTestKeysCache = alipayWebhookHTTPTestKeys{
+			merchantPrivateKey: encodeRSAPrivateKeyForHTTPTest(merchantKey),
+			alipayPrivateKey:   encodeRSAPrivateKeyForHTTPTest(alipayKey),
+			alipayPublicKey:    encodeRSAPublicKeyForHTTPTest(t, &alipayKey.PublicKey),
+		}
+	})
+	if alipayWebhookHTTPTestKeysErr != nil {
+		t.Fatal(alipayWebhookHTTPTestKeysErr)
 	}
-	alipayKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate alipay key: %v", err)
-	}
-	return alipayWebhookHTTPTestKeys{
-		merchantPrivateKey: encodeRSAPrivateKeyForHTTPTest(merchantKey),
-		alipayPrivateKey:   encodeRSAPrivateKeyForHTTPTest(alipayKey),
-		alipayPublicKey:    encodeRSAPublicKeyForHTTPTest(t, &alipayKey.PublicKey),
-	}
+	return alipayWebhookHTTPTestKeysCache
 }
 
 func signedAlipayHTTPNotification(t *testing.T, keys alipayWebhookHTTPTestKeys, fields map[string]string) map[string]any {
@@ -10119,23 +10133,37 @@ type wechatWebhookHTTPTestKeys struct {
 	platformPublicKeyID string
 }
 
+var (
+	wechatWebhookHTTPTestKeysOnce  sync.Once
+	wechatWebhookHTTPTestKeysCache wechatWebhookHTTPTestKeys
+	wechatWebhookHTTPTestKeysErr   error
+)
+
 func newWechatWebhookHTTPTestKeys(t *testing.T) wechatWebhookHTTPTestKeys {
 	t.Helper()
-	merchantKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate wechat merchant key: %v", err)
+	wechatWebhookHTTPTestKeysOnce.Do(func() {
+		merchantKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			wechatWebhookHTTPTestKeysErr = fmt.Errorf("generate wechat merchant key: %w", err)
+			return
+		}
+		platformKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			wechatWebhookHTTPTestKeysErr = fmt.Errorf("generate wechat platform key: %w", err)
+			return
+		}
+		wechatWebhookHTTPTestKeysCache = wechatWebhookHTTPTestKeys{
+			apiV3Key:            "0123456789abcdef0123456789abcdef",
+			merchantPrivateKey:  encodeRSAPrivateKeyForHTTPTest(merchantKey),
+			platformPrivateKey:  platformKey,
+			platformPublicKey:   encodeRSAPublicKeyForHTTPTest(t, &platformKey.PublicKey),
+			platformPublicKeyID: "PUB_KEY_ID_HTTP_TEST",
+		}
+	})
+	if wechatWebhookHTTPTestKeysErr != nil {
+		t.Fatal(wechatWebhookHTTPTestKeysErr)
 	}
-	platformKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate wechat platform key: %v", err)
-	}
-	return wechatWebhookHTTPTestKeys{
-		apiV3Key:            "0123456789abcdef0123456789abcdef",
-		merchantPrivateKey:  encodeRSAPrivateKeyForHTTPTest(merchantKey),
-		platformPrivateKey:  platformKey,
-		platformPublicKey:   encodeRSAPublicKeyForHTTPTest(t, &platformKey.PublicKey),
-		platformPublicKeyID: "PUB_KEY_ID_HTTP_TEST",
-	}
+	return wechatWebhookHTTPTestKeysCache
 }
 
 func signedWechatHTTPNotification(t *testing.T, keys wechatWebhookHTTPTestKeys, transaction map[string]any) (string, map[string]string) {

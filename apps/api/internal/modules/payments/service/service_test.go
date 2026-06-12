@@ -13,10 +13,12 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"math/big"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1770,40 +1772,66 @@ type wechatTestKeys struct {
 	platformPublicKeyID string
 }
 
+var (
+	alipayTestKeysOnce  sync.Once
+	alipayTestKeysCache alipayTestKeys
+	alipayTestKeysErr   error
+
+	wechatTestKeysOnce  sync.Once
+	wechatTestKeysCache wechatTestKeys
+	wechatTestKeysErr   error
+)
+
 func newAlipayTestKeys(t *testing.T) alipayTestKeys {
 	t.Helper()
-	merchantKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate merchant key: %v", err)
+	alipayTestKeysOnce.Do(func() {
+		merchantKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			alipayTestKeysErr = fmt.Errorf("generate merchant key: %w", err)
+			return
+		}
+		alipayKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			alipayTestKeysErr = fmt.Errorf("generate alipay key: %w", err)
+			return
+		}
+		alipayTestKeysCache = alipayTestKeys{
+			merchantPrivateKey: encodePrivateKey(merchantKey),
+			alipayPrivateKey:   encodePrivateKey(alipayKey),
+			alipayPublicKey:    encodePublicKey(&alipayKey.PublicKey),
+		}
+	})
+	if alipayTestKeysErr != nil {
+		t.Fatal(alipayTestKeysErr)
 	}
-	alipayKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate alipay key: %v", err)
-	}
-	return alipayTestKeys{
-		merchantPrivateKey: encodePrivateKey(merchantKey),
-		alipayPrivateKey:   encodePrivateKey(alipayKey),
-		alipayPublicKey:    encodePublicKey(&alipayKey.PublicKey),
-	}
+	return alipayTestKeysCache
 }
 
 func newWechatTestKeys(t *testing.T) wechatTestKeys {
 	t.Helper()
-	merchantKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate wechat merchant key: %v", err)
+	wechatTestKeysOnce.Do(func() {
+		merchantKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			wechatTestKeysErr = fmt.Errorf("generate wechat merchant key: %w", err)
+			return
+		}
+		platformKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			wechatTestKeysErr = fmt.Errorf("generate wechat platform key: %w", err)
+			return
+		}
+		wechatTestKeysCache = wechatTestKeys{
+			apiV3Key:            "0123456789abcdef0123456789abcdef",
+			merchantPrivateKey:  encodePrivateKey(merchantKey),
+			platformPrivateKey:  platformKey,
+			platformPublicKey:   encodePublicKey(&platformKey.PublicKey),
+			platformPublicKeyID: "PUB_KEY_ID_123",
+		}
+	})
+	if wechatTestKeysErr != nil {
+		t.Fatal(wechatTestKeysErr)
 	}
-	platformKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate wechat platform key: %v", err)
-	}
-	return wechatTestKeys{
-		apiV3Key:            "0123456789abcdef0123456789abcdef",
-		merchantPrivateKey:  encodePrivateKey(merchantKey),
-		platformPrivateKey:  platformKey,
-		platformPublicKey:   encodePublicKey(&platformKey.PublicKey),
-		platformPublicKeyID: "PUB_KEY_ID_123",
-	}
+	return wechatTestKeysCache
 }
 
 func signedAlipayNotification(t *testing.T, keys alipayTestKeys, fields map[string]string) map[string]any {
