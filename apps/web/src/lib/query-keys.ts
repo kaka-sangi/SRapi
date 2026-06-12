@@ -4,6 +4,7 @@
  */
 export const queryKeys = {
   runtimeStatus: () => ["runtime-status"] as const,
+  siteConfig: () => ["site-config"] as const,
   smokeStatus: (model?: string) => ["smoke-status", model ?? "default"] as const,
   currentUser: () => ["current-user"] as const,
   apiKeys: () => ["api-keys"] as const,
@@ -19,6 +20,7 @@ export const queryKeys = {
     balance: () => ["me", "balance"] as const,
     platformQuotas: () => ["me", "platform-quotas"] as const,
     orders: (params?: unknown) => ["me", "orders", params ?? {}] as const,
+    order: (id: string) => ["me", "order", id] as const,
     paymentMethods: () => ["me", "payment-methods"] as const,
     subscriptions: () => ["me", "subscriptions"] as const,
     affiliate: () => ["me", "affiliate"] as const,

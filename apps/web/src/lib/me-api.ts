@@ -16,6 +16,7 @@ import {
   redeemCurrentUserRedeemCode,
   listPaymentMethods,
   listPaymentOrders,
+  getPaymentOrder,
   createPaymentOrder,
   cancelPaymentOrder,
   getCurrentUserAffiliate,
@@ -179,6 +180,9 @@ export const meApi = {
   },
   listOrders(query?: ListPaymentOrdersData["query"]) {
     return unwrapList(() => listPaymentOrders({ query, throwOnError: true }));
+  },
+  getOrder(id: string) {
+    return unwrapData(() => getPaymentOrder({ path: { id }, throwOnError: true }));
   },
   createOrder(body: CreatePaymentOrderRequest) {
     return unwrapData(() => createPaymentOrder({ body, throwOnError: true }));

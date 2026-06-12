@@ -19,6 +19,15 @@ export function useRuntimeStatus() {
   });
 }
 
+/** Public site config (name/logo/custom menus). Changes rarely — cache hard. */
+export function useSiteConfig() {
+  return useQuery({
+    queryKey: queryKeys.siteConfig(),
+    queryFn: () => apiService.getSiteConfig(),
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useApiKeys() {
   return useQuery({
     queryKey: queryKeys.apiKeys(),
@@ -344,6 +353,16 @@ export function usePaymentMethods() {
 }
 export function useMyOrders() {
   return useQuery({ queryKey: queryKeys.me.orders(), queryFn: () => meApi.listOrders() });
+}
+/** Polls one payment order while it is pending so the UI can confirm the
+ * moment the webhook lands. Stops polling on any terminal status. */
+export function usePaymentOrderStatus(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.me.order(id ?? "none"),
+    queryFn: () => meApi.getOrder(id!),
+    enabled: id !== null,
+    refetchInterval: (query) => (query.state.data?.status === "pending" ? 3000 : false),
+  });
 }
 export function useCreateOrder() {
   const qc = useQueryClient();

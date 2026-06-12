@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { ShoppingCart, CreditCard } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ShoppingCart, CreditCard, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
@@ -14,6 +15,7 @@ import {
   useCreateOrder,
   useCancelOrder,
   useMySubscriptions,
+  usePaymentOrderStatus,
 } from "@/hooks/queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -223,24 +225,7 @@ function BalanceTab() {
               </div>
             ) : null}
             {createdOrder ? (
-              <dl className="rounded-lg border border-srapi-border bg-srapi-card px-3.5 py-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <dt className="text-srapi-text-tertiary">Created order</dt>
-                  <dd className="font-mono text-srapi-text-secondary">{createdOrder.order_no}</dd>
-                </div>
-                <div className="mt-1.5 flex items-center justify-between">
-                  <dt className="text-srapi-text-tertiary">Fee</dt>
-                  <dd className="font-mono text-srapi-text-secondary tabular">
-                    {formatMoney(createdOrder.fee_amount, createdOrder.currency)}
-                  </dd>
-                </div>
-                <div className="mt-1.5 flex items-center justify-between">
-                  <dt className="text-srapi-text-tertiary">Payable</dt>
-                  <dd className="font-mono text-srapi-text-primary tabular">
-                    {formatMoney(createdOrder.payable_amount, createdOrder.currency)}
-                  </dd>
-                </div>
-              </dl>
+              <PendingOrderStatus key={createdOrder.id} order={createdOrder} />
             ) : null}
             {error ? (
               <p role="alert" className="text-sm text-srapi-error">
@@ -258,6 +243,68 @@ function BalanceTab() {
           </form>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+/** Live order panel shown after creating a top-up: a "go pay" link from the
+ * provider checkout URL, a 3s status poll while pending, and an explicit
+ * confirmation (plus balance refresh) the moment the payment lands. */
+function PendingOrderStatus({ order }: { order: PaymentOrder }) {
+  const { t } = useLanguage();
+  const qc = useQueryClient();
+  const status = usePaymentOrderStatus(order.id);
+  const live = status.data ?? order;
+  const checkoutUrl =
+    typeof live.metadata?.checkout_url === "string" ? live.metadata.checkout_url : null;
+  const settled = live.status === "paid" || live.status === "fulfilled";
+
+  // The webhook just confirmed the money: refresh balance and order history.
+  useEffect(() => {
+    if (!settled) return;
+    void qc.invalidateQueries({ queryKey: ["me", "balance"] });
+    void qc.invalidateQueries({ queryKey: ["me", "orders"] });
+  }, [settled, qc]);
+
+  return (
+    <div className="rounded-lg border border-srapi-border bg-srapi-card px-3.5 py-3 text-sm">
+      <dl>
+        <div className="flex items-center justify-between">
+          <dt className="text-srapi-text-tertiary">{t("billing.orderNo")}</dt>
+          <dd className="font-mono text-srapi-text-secondary">{live.order_no}</dd>
+        </div>
+        <div className="mt-1.5 flex items-center justify-between">
+          <dt className="text-srapi-text-tertiary">{t("billing.payable")}</dt>
+          <dd className="font-mono text-srapi-text-primary tabular">
+            {formatMoney(live.payable_amount, live.currency)}
+          </dd>
+        </div>
+      </dl>
+      {settled ? (
+        <div className="anim-pop-in mt-3 flex items-center gap-2 text-srapi-success">
+          <CheckCircle2 className="size-4 shrink-0" aria-hidden />
+          <span>{t("billing.paymentConfirmed")}</span>
+        </div>
+      ) : live.status === "pending" ? (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {checkoutUrl ? (
+            <Button asChild variant="primary" size="sm">
+              <a href={checkoutUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="size-3.5" />
+                {t("billing.goPay")}
+              </a>
+            </Button>
+          ) : null}
+          <span className="inline-flex items-center gap-1.5 text-2xs text-srapi-text-tertiary">
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            {t("billing.waitingPayment")}
+          </span>
+        </div>
+      ) : (
+        <div className="mt-3">
+          <QuietBadge status={quietStatusFor(live.status)} label={statusLabel(t, live.status)} />
+        </div>
+      )}
     </div>
   );
 }
