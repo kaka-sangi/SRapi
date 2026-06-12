@@ -563,7 +563,34 @@ func rawSameProtocolPayload(req contract.ConversationRequest, kind rawEndpointKi
 		}
 		payload["stream"] = req.Stream
 	}
+	applyRawSameProtocolReasoning(payload, req, kind)
 	return payload, true, nil
+}
+
+func applyRawSameProtocolReasoning(payload map[string]any, req contract.ConversationRequest, kind rawEndpointKind) {
+	if len(payload) == 0 || len(req.Reasoning) == 0 {
+		return
+	}
+	switch kind {
+	case rawEndpointOpenAIChatCompletions:
+		if effort := strings.TrimSpace(metadataString(req.Reasoning, "effort")); effort != "" {
+			payload["reasoning_effort"] = effort
+		}
+	case rawEndpointAnthropicMessages:
+		maxTokens := anthropicCompatibleMaxTokens(req)
+		if thinking := anthropicCompatibleThinking(req.Reasoning, maxTokens); len(thinking) > 0 {
+			payload["thinking"] = thinking
+		}
+	case rawEndpointGeminiGenerateContent:
+		if thinking := geminiThinkingConfig(req.Reasoning); len(thinking) > 0 {
+			generationConfig, _ := payload["generationConfig"].(map[string]any)
+			if generationConfig == nil {
+				generationConfig = map[string]any{}
+				payload["generationConfig"] = generationConfig
+			}
+			generationConfig["thinkingConfig"] = thinking
+		}
+	}
 }
 
 func rawEndpointMatches(req contract.ConversationRequest, kind rawEndpointKind) bool {

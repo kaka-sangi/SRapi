@@ -101,14 +101,15 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 // playground (交界地) so both bill identically.
 func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, authed apikeycontract.AuthResult, body apiopenapi.ChatCompletionRequest, rawBody []byte, sourceEndpoint, forcedProviderKey string, startedAt time.Time) {
 	requestID := requestIDFromContext(r.Context())
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
+	modelSuffix := chatRequestModelSuffix(body)
+	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelSuffix.BaseModel)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
 			Authed:         authed,
 			SourceProtocol: "openai-compatible",
 			SourceEndpoint: sourceEndpoint,
-			Model:          fallbackModelName(body.Model),
+			Model:          fallbackModelName(modelSuffix.RequestedModel),
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
@@ -141,6 +142,7 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 		CanonicalModel: model.CanonicalName,
 		RawBody:        rawBody,
 	})
+	applyGatewayModelSuffix(&canonical, modelSuffix)
 	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
@@ -284,14 +286,15 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
+	modelSuffix := responsesRequestModelSuffix(body)
+	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelSuffix.BaseModel)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
 			Authed:         authed,
 			SourceProtocol: "openai-compatible",
 			SourceEndpoint: sourceEndpoint,
-			Model:          fallbackModelName(body.Model),
+			Model:          fallbackModelName(modelSuffix.RequestedModel),
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
@@ -324,6 +327,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		CanonicalModel: model.CanonicalName,
 		RawBody:        rawBody,
 	})
+	applyGatewayModelSuffix(&canonical, modelSuffix)
 	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
@@ -590,14 +594,15 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid messages request", "invalid_request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
+	modelSuffix := gatewayModelSuffixFromModel(body.Model)
+	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelSuffix.BaseModel)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
 			Authed:         authed,
 			SourceProtocol: "anthropic-compatible",
 			SourceEndpoint: sourceEndpoint,
-			Model:          fallbackModelName(body.Model),
+			Model:          fallbackModelName(modelSuffix.RequestedModel),
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
@@ -630,6 +635,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		CanonicalModel: model.CanonicalName,
 		RawBody:        rawBody,
 	})
+	applyGatewayModelSuffix(&canonical, modelSuffix)
 	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
@@ -926,14 +932,15 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		writeGeminiGatewayError(w, jsonDecodeStatus(err), "INVALID_ARGUMENT", "invalid generateContent request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelRef)
+	modelSuffix := gatewayModelSuffixFromModel(modelRef)
+	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelSuffix.BaseModel)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
 			Authed:         authed,
 			SourceProtocol: string(gatewaycontract.ProtocolGeminiCompatible),
 			SourceEndpoint: sourceEndpoint,
-			Model:          fallbackModelName(modelRef),
+			Model:          fallbackModelName(modelSuffix.RequestedModel),
 			Success:        false,
 			ErrorClass:     ptrStringValue("model_not_found"),
 			LatencyMS:      elapsedMillis(startedAt),
@@ -966,6 +973,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		CanonicalModel: model.CanonicalName,
 		RawBody:        rawBody,
 	})
+	applyGatewayModelSuffix(&canonical, modelSuffix)
 	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{

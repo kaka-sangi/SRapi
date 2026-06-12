@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 )
 
@@ -42,6 +43,29 @@ func TestApplyPayloadTransforms(t *testing.T) {
 	}
 	if _, ok := doc["temperature"]; ok {
 		t.Fatalf("filter failed: temperature still present")
+	}
+}
+
+func TestRawSameProtocolPayloadAppliesCanonicalReasoning(t *testing.T) {
+	req := contract.ConversationRequest{
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/chat/completions",
+		TargetProtocol: "openai-compatible",
+		Stream:         true,
+		RawBody:        []byte(`{"model":"caller-model","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"low"}`),
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "upstream-model"},
+		Reasoning:      map[string]any{"effort": "high"},
+	}
+
+	payload, ok, err := rawSameProtocolPayload(req, rawEndpointOpenAIChatCompletions)
+	if err != nil {
+		t.Fatalf("rawSameProtocolPayload: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected raw payload to be used")
+	}
+	if payload["model"] != "upstream-model" || payload["stream"] != true || payload["reasoning_effort"] != "high" {
+		t.Fatalf("expected upstream model and canonical reasoning, got %+v", payload)
 	}
 }
 
