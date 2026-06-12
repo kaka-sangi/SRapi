@@ -2,9 +2,43 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ExternalLink, Link2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useLanguage } from "@/context/LanguageContext";
+import { useSiteConfig } from "@/hooks/queries";
 import { navSectionsForRole } from "./nav-items";
+
+interface CustomMenu {
+  label: string;
+  url: string;
+  external: boolean;
+}
+
+/** Normalizes the operator-authored `custom_menus` JSON (freeform objects) into
+ * renderable links. Tolerates label/name/title and url/href/link key spellings;
+ * drops entries without both a label and a usable URL. */
+function parseCustomMenus(raw: unknown): CustomMenu[] {
+  if (!Array.isArray(raw)) return [];
+  const menus: CustomMenu[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const obj = entry as Record<string, unknown>;
+    const label = firstString(obj.label, obj.name, obj.title);
+    const url = firstString(obj.url, obj.href, obj.link);
+    if (!label || !url) continue;
+    const external = /^https?:\/\//i.test(url);
+    if (!external && !url.startsWith("/")) continue;
+    menus.push({ label, url, external });
+  }
+  return menus;
+}
+
+function firstString(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim() !== "") return value.trim();
+  }
+  return "";
+}
 
 export function SidebarNav({
   role,
@@ -16,6 +50,8 @@ export function SidebarNav({
   const pathname = usePathname();
   const { t } = useLanguage();
   const sections = navSectionsForRole(role);
+  const siteConfig = useSiteConfig();
+  const customMenus = parseCustomMenus(siteConfig.data?.custom_menus);
 
   function isActive(href: string): boolean {
     if (href === "/dashboard" || href === "/admin") return pathname === href;
@@ -52,6 +88,38 @@ export function SidebarNav({
           })}
         </div>
       ))}
+      {customMenus.length > 0 ? (
+        <div>
+          <div className="px-2 pb-1 pt-4 font-mono text-2xs uppercase tracking-widest text-srapi-text-secondary">
+            {t("nav.sectionLinks")}
+          </div>
+          {customMenus.map((menu) =>
+            menu.external ? (
+              <a
+                key={`${menu.label}-${menu.url}`}
+                href={menu.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onNavigate}
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-srapi-text-secondary transition-colors hover:bg-srapi-card/60 hover:text-srapi-text-primary"
+              >
+                <ExternalLink className="size-4 shrink-0" aria-hidden />
+                <span className="truncate">{menu.label}</span>
+              </a>
+            ) : (
+              <Link
+                key={`${menu.label}-${menu.url}`}
+                href={menu.url}
+                onClick={onNavigate}
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-srapi-text-secondary transition-colors hover:bg-srapi-card/60 hover:text-srapi-text-primary"
+              >
+                <Link2 className="size-4 shrink-0" aria-hidden />
+                <span className="truncate">{menu.label}</span>
+              </Link>
+            ),
+          )}
+        </div>
+      ) : null}
     </nav>
   );
 }
