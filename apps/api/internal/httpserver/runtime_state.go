@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/srapi/srapi/apps/api/internal/config"
 	accountprovisioningservice "github.com/srapi/srapi/apps/api/internal/modules/account_provisioning/service"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -212,6 +214,10 @@ type runtimeState struct {
 	capabilities            []capabilitiescontract.Definition
 	databaseProbe           dependencyPinger
 	redisProbe              dependencyPinger
+	// credentialRefreshGroup coalesces concurrent OAuth refreshes per account so
+	// rotating refresh tokens are never consumed twice in parallel (which would
+	// invalidate the session and park the account).
+	credentialRefreshGroup singleflight.Group
 }
 
 type dependencyHealth struct {

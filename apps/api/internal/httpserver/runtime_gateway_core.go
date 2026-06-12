@@ -1295,14 +1295,54 @@ func (rt *runtimeState) materializeProviderProxy(ctx context.Context, account *a
 }
 
 func (rt *runtimeState) forceRefreshReverseProxyCredential(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any) (map[string]any, bool, error) {
-	return rt.doRefreshReverseProxyCredential(ctx, account, credential)
+	return rt.singleflightRefreshReverseProxyCredential(ctx, account, credential, true)
 }
 
 func (rt *runtimeState) refreshReverseProxyCredential(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any) (map[string]any, bool, error) {
 	if !accountcontract.ShouldRefreshOAuthCredential(account, credential, time.Now().UTC()) {
 		return credential, false, nil
 	}
-	return rt.doRefreshReverseProxyCredential(ctx, account, credential)
+	return rt.singleflightRefreshReverseProxyCredential(ctx, account, credential, false)
+}
+
+type credentialRefreshOutcome struct {
+	credential map[string]any
+	refreshed  bool
+}
+
+// singleflightRefreshReverseProxyCredential coalesces concurrent refreshes of
+// the same account: providers rotate refresh tokens, so two parallel refreshes
+// burn the same token twice and the second one invalidates the whole session
+// (parking the account). Followers share the leader's result; a caller that
+// arrives after a refresh just completed gets the already-rotated stored
+// credential instead of replaying its stale token.
+func (rt *runtimeState) singleflightRefreshReverseProxyCredential(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any, force bool) (map[string]any, bool, error) {
+	result, err, _ := rt.credentialRefreshGroup.Do(strconv.Itoa(account.ID), func() (any, error) {
+		if current, err := rt.accounts.DecryptCredential(ctx, account.ID); err == nil && len(current) > 0 {
+			currentToken := mapString(current, "access_token")
+			if force {
+				if currentToken != "" && currentToken != mapString(credential, "access_token") {
+					return credentialRefreshOutcome{credential: current, refreshed: true}, nil
+				}
+			} else if !accountcontract.ShouldRefreshOAuthCredential(account, current, time.Now().UTC()) {
+				return credentialRefreshOutcome{credential: current, refreshed: true}, nil
+			}
+			credential = current
+		}
+		refreshed, ok, err := rt.doRefreshReverseProxyCredential(ctx, account, credential)
+		if err != nil {
+			return nil, err
+		}
+		return credentialRefreshOutcome{credential: refreshed, refreshed: ok}, nil
+	})
+	if err != nil {
+		return credential, false, err
+	}
+	outcome, ok := result.(credentialRefreshOutcome)
+	if !ok {
+		return credential, false, nil
+	}
+	return outcome.credential, outcome.refreshed, nil
 }
 
 func (rt *runtimeState) doRefreshReverseProxyCredential(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any) (map[string]any, bool, error) {
