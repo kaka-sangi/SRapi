@@ -396,6 +396,10 @@ func TestRecordGatewayProviderAttemptFailureIncludesProviderQuotaSignals(t *test
 			RemainingRatio: 0,
 			ResetAt:        &resetAt,
 			SnapshotAt:     resetAt.Add(-time.Minute),
+			Metadata: map[string]any{
+				"codex_primary_over_secondary_percent": 117.5,
+				"codex_usage_updated_at":               resetAt.Format(time.RFC3339),
+			},
 		}},
 	}
 
@@ -447,6 +451,12 @@ func TestRecordGatewayProviderAttemptFailureIncludesProviderQuotaSignals(t *test
 	}
 	if signals[0]["quota_type"] != "codex_5h_percent" || signals[0]["used"] != "100" || signals[0]["remaining"] != "0" {
 		t.Fatalf("unexpected quota signal payload: %+v", signals[0])
+	}
+	metadata, ok := signals[0]["metadata"].(map[string]any)
+	if !ok ||
+		metadata["codex_primary_over_secondary_percent"] != 117.5 ||
+		metadata["codex_usage_updated_at"] != resetAt.Format(time.RFC3339) {
+		t.Fatalf("unexpected quota signal metadata payload: %+v", signals[0]["metadata"])
 	}
 }
 

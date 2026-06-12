@@ -140,6 +140,10 @@ func TestWorkerRunOnceRefreshesGatewayAccountSnapshot(t *testing.T) {
 				"remaining_ratio": 0,
 				"reset_at":        resetAt.Format(time.RFC3339Nano),
 				"snapshot_at":     resetAt.Add(-time.Hour).Format(time.RFC3339Nano),
+				"metadata": map[string]any{
+					"codex_primary_over_secondary_percent": 117.5,
+					"codex_usage_updated_at":               resetAt.Format(time.RFC3339),
+				},
 			}},
 		},
 	}); err != nil {
@@ -181,6 +185,10 @@ func TestWorkerRunOnceRefreshesGatewayAccountSnapshot(t *testing.T) {
 		updated.Metadata["quota_type"] != "codex_5h_percent" ||
 		updated.Metadata["quota_reset_at"] != resetAt.Format(time.RFC3339) {
 		t.Fatalf("expected provider quota metadata, got %+v", updated.Metadata)
+	}
+	if updated.Metadata["codex_primary_over_secondary_percent"] != 117.5 ||
+		updated.Metadata["codex_usage_updated_at"] != resetAt.Format(time.RFC3339) {
+		t.Fatalf("expected Codex quota metadata, got %+v", updated.Metadata)
 	}
 	quotas, err := accounts.ListQuotaSnapshotsByAccount(ctx, account.ID, 10)
 	if err != nil {

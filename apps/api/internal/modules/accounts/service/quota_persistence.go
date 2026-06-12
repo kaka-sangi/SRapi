@@ -56,6 +56,7 @@ func quotaSignalMetadata(current map[string]any, signals []provideradaptercontra
 	if metadata == nil {
 		metadata = map[string]any{}
 	}
+	mergeQuotaSignalMetadata(metadata, signals)
 	if len(signals) == 0 {
 		return metadata
 	}
@@ -92,6 +93,27 @@ func quotaSignalMetadata(current map[string]any, signals []provideradaptercontra
 		delete(metadata, "quota_exhausted_at")
 	}
 	return metadata
+}
+
+func mergeQuotaSignalMetadata(metadata map[string]any, signals []provideradaptercontract.QuotaSignal) {
+	for _, signal := range signals {
+		for key, value := range signal.Metadata {
+			key = strings.TrimSpace(key)
+			if key == "" {
+				continue
+			}
+			switch typed := value.(type) {
+			case string:
+				if trimmed := strings.TrimSpace(typed); trimmed != "" {
+					metadata[key] = trimmed
+				}
+			case bool, int, int64, float64:
+				metadata[key] = typed
+			case float32:
+				metadata[key] = float64(typed)
+			}
+		}
+	}
 }
 
 func lowestRemainingQuotaSignal(signals []provideradaptercontract.QuotaSignal) (provideradaptercontract.QuotaSignal, bool) {

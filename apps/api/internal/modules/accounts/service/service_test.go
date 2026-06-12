@@ -493,6 +493,11 @@ func TestApplyQuotaReportUpdatesRuntimeQuotaMetadataFromSignals(t *testing.T) {
 				RemainingRatio: 0,
 				ResetAt:        &resetAt,
 				SnapshotAt:     now,
+				Metadata: map[string]any{
+					"codex_primary_over_secondary_percent": 117.5,
+					"codex_usage_updated_at":               now.Format(time.RFC3339),
+					"nested_ignored":                       map[string]any{"unsafe": true},
+				},
 			},
 			{
 				QuotaType:      "codex_7d_percent",
@@ -522,6 +527,9 @@ func TestApplyQuotaReportUpdatesRuntimeQuotaMetadataFromSignals(t *testing.T) {
 		stored.Metadata["quota_limit"] != "100" ||
 		stored.Metadata["quota_reset_at"] != resetAt.Format(time.RFC3339) ||
 		stored.Metadata["quota_exhausted_at"] != now.Format(time.RFC3339) ||
+		stored.Metadata["codex_primary_over_secondary_percent"] != 117.5 ||
+		stored.Metadata["codex_usage_updated_at"] != now.Format(time.RFC3339) ||
+		stored.Metadata["nested_ignored"] != nil ||
 		stored.Metadata["quota_remaining_old"] != "kept" {
 		t.Fatalf("unexpected quota metadata: %+v", stored.Metadata)
 	}

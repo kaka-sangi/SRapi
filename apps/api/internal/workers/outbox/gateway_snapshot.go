@@ -173,6 +173,7 @@ func gatewayQuotaSignalsFromPayload(value any) []provideradaptercontract.QuotaSi
 			RemainingRatio: float32(payloadMapFloat(mapped, "remaining_ratio")),
 			ResetAt:        payloadMapTimePtr(mapped, "reset_at"),
 			SnapshotAt:     payloadMapTime(mapped, "snapshot_at"),
+			Metadata:       payloadMapMetadata(mapped, "metadata"),
 		}
 		if strings.TrimSpace(signal.QuotaType) != "" {
 			out = append(out, signal)
@@ -342,6 +343,40 @@ func payloadMapFloat(payload map[string]any, key string) float64 {
 		parsed, _ := strconv.ParseFloat(strings.TrimSpace(fmt.Sprint(value)), 64)
 		return parsed
 	}
+}
+
+func payloadMapMetadata(payload map[string]any, key string) map[string]any {
+	value, ok := payload[key].(map[string]any)
+	if !ok || len(value) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(value))
+	for itemKey, itemValue := range value {
+		itemKey = strings.TrimSpace(itemKey)
+		if itemKey == "" {
+			continue
+		}
+		switch typed := itemValue.(type) {
+		case string:
+			if trimmed := strings.TrimSpace(typed); trimmed != "" {
+				out[itemKey] = trimmed
+			}
+		case bool, float64:
+			out[itemKey] = typed
+		case int:
+			out[itemKey] = typed
+		case int64:
+			out[itemKey] = typed
+		case json.Number:
+			if parsed, err := typed.Float64(); err == nil {
+				out[itemKey] = parsed
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func payloadMapTime(payload map[string]any, key string) time.Time {

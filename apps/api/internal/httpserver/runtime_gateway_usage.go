@@ -759,6 +759,9 @@ func gatewayQuotaSignalsPayload(signals []provideradaptercontract.QuotaSignal) [
 		if !signal.SnapshotAt.IsZero() {
 			item["snapshot_at"] = signal.SnapshotAt.UTC().Format(time.RFC3339Nano)
 		}
+		if len(signal.Metadata) > 0 {
+			item["metadata"] = cloneAnyMap(signal.Metadata)
+		}
 		out = append(out, item)
 	}
 	return out

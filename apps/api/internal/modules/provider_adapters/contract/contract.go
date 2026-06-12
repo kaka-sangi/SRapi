@@ -475,6 +475,7 @@ type QuotaSignal struct {
 	RemainingRatio float32
 	ResetAt        *time.Time
 	SnapshotAt     time.Time
+	Metadata       map[string]any
 }
 
 // QuotaReport is a normalized, per-provider view of an account's subscription

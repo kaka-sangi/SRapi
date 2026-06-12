@@ -74,6 +74,25 @@ func assertQuotaSignal(t *testing.T, signals []contract.QuotaSignal, quotaType s
 	t.Fatalf("missing quota signal %q in %+v", quotaType, signals)
 }
 
+func assertQuotaSignalMetadata(t *testing.T, signals []contract.QuotaSignal, quotaType string, expected map[string]any) {
+	t.Helper()
+	for _, signal := range signals {
+		if signal.QuotaType != quotaType {
+			continue
+		}
+		for key, want := range expected {
+			if got := signal.Metadata[key]; got != want {
+				t.Fatalf("unexpected quota signal metadata %s for %s: got=%v want=%v metadata=%+v", key, quotaType, got, want, signal.Metadata)
+			}
+		}
+		if value := strings.TrimSpace(mapStringForTest(signal.Metadata, "codex_usage_updated_at")); value == "" {
+			t.Fatalf("expected codex_usage_updated_at metadata for %s, got %+v", quotaType, signal.Metadata)
+		}
+		return
+	}
+	t.Fatalf("missing quota signal %q in %+v", quotaType, signals)
+}
+
 func stringSliceContains(values []string, target string) bool {
 	for _, value := range values {
 		if value == target {
@@ -2519,6 +2538,7 @@ func TestOpenAICompatibleAdapterCapturesCodexQuotaSignalsFromRateLimitHeaders(t 
 		w.Header().Set("X-Codex-Secondary-Used-Percent", "3")
 		w.Header().Set("X-Codex-Secondary-Reset-After-Seconds", "18000")
 		w.Header().Set("X-Codex-Secondary-Window-Minutes", "300")
+		w.Header().Set("X-Codex-Primary-Over-Secondary-Limit-Percent", "117.5")
 		w.WriteHeader(http.StatusTooManyRequests)
 		_, _ = w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"too many requests"}}`))
 	}))
@@ -2545,6 +2565,15 @@ func TestOpenAICompatibleAdapterCapturesCodexQuotaSignalsFromRateLimitHeaders(t 
 	}
 	assertQuotaSignal(t, providerErr.QuotaSignals, "codex_5h_percent", "3", "97", "100", 0.97)
 	assertQuotaSignal(t, providerErr.QuotaSignals, "codex_7d_percent", "100", "0", "100", 0)
+	assertQuotaSignalMetadata(t, providerErr.QuotaSignals, "codex_5h_percent", map[string]any{
+		"codex_primary_used_percent":           100.0,
+		"codex_primary_reset_after_seconds":    604800,
+		"codex_primary_window_minutes":         10080,
+		"codex_secondary_used_percent":         3.0,
+		"codex_secondary_reset_after_seconds":  18000,
+		"codex_secondary_window_minutes":       300,
+		"codex_primary_over_secondary_percent": 117.5,
+	})
 }
 
 func TestOpenAICompatibleEmbeddingsCapturesQuotaSignalsFromErrorHeaders(t *testing.T) {

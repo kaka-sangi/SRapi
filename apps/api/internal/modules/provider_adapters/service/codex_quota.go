@@ -31,6 +31,7 @@ func codexQuotaSignalsFromHeaders(headers http.Header, now time.Time) []contract
 		return nil
 	}
 	now = now.UTC()
+	metadata := codexQuotaMetadataFromHeaders(headers, now)
 	windows := codexQuotaHeaderMappings(
 		codexQuotaHeaderWindowFromHeaders(headers, "x-codex-primary"),
 		codexQuotaHeaderWindowFromHeaders(headers, "x-codex-secondary"),
@@ -63,9 +64,40 @@ func codexQuotaSignalsFromHeaders(headers http.Header, now time.Time) []contract
 			RemainingRatio: float32(remaining / 100),
 			ResetAt:        resetAt,
 			SnapshotAt:     now,
+			Metadata:       cloneMap(metadata),
 		})
 	}
 	return signals
+}
+
+func codexQuotaMetadataFromHeaders(headers http.Header, now time.Time) map[string]any {
+	metadata := map[string]any{}
+	if value, ok := parseHeaderFloat(headers, "x-codex-primary-used-percent"); ok {
+		metadata["codex_primary_used_percent"] = value
+	}
+	if value, ok := parseHeaderInt(headers, "x-codex-primary-reset-after-seconds"); ok {
+		metadata["codex_primary_reset_after_seconds"] = value
+	}
+	if value, ok := parseHeaderInt(headers, "x-codex-primary-window-minutes"); ok {
+		metadata["codex_primary_window_minutes"] = value
+	}
+	if value, ok := parseHeaderFloat(headers, "x-codex-secondary-used-percent"); ok {
+		metadata["codex_secondary_used_percent"] = value
+	}
+	if value, ok := parseHeaderInt(headers, "x-codex-secondary-reset-after-seconds"); ok {
+		metadata["codex_secondary_reset_after_seconds"] = value
+	}
+	if value, ok := parseHeaderInt(headers, "x-codex-secondary-window-minutes"); ok {
+		metadata["codex_secondary_window_minutes"] = value
+	}
+	if value, ok := parseHeaderFloat(headers, "x-codex-primary-over-secondary-limit-percent"); ok {
+		metadata["codex_primary_over_secondary_percent"] = value
+	}
+	if len(metadata) == 0 {
+		return nil
+	}
+	metadata["codex_usage_updated_at"] = now.UTC().Format(time.RFC3339)
+	return metadata
 }
 
 func codexQuotaHeaderWindowFromHeaders(headers http.Header, prefix string) codexQuotaHeaderWindow {
