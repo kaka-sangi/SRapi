@@ -1182,7 +1182,7 @@ func recordRawResponsesInputValidationItem(item map[string]any, itemType string,
 			}
 			state.toolCallIDs[callID] = struct{}{}
 		}
-	case "function_call_output":
+	case "function_call_output", "tool_search_output", "custom_tool_call_output", "mcp_tool_call_output":
 		callID := rawMapString(item, "call_id")
 		if callID != "" {
 			if state.functionCallOutputIDs == nil {

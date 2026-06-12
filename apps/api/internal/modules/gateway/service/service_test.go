@@ -456,6 +456,21 @@ func TestValidateResponsesRequestRequiresFunctionCallOutputContext(t *testing.T)
 	}
 }
 
+func TestValidateResponsesRequestRequiresCustomToolOutputContext(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	err = svc.ValidateResponsesRequest([]byte(`{
+		"model":"gpt-5.4",
+		"input":[{"type":"custom_tool_call_output","call_id":"call_1","output":"ok"}]
+	}`))
+
+	if err == nil || err.Error() != "Responses function_call_output input item requires matching function_call, item_reference, or previous_response_id" {
+		t.Fatalf("expected missing custom_tool_call_output context error, got %v", err)
+	}
+}
+
 func TestValidateResponsesRequestAllowsFunctionCallOutputWithItemReference(t *testing.T) {
 	svc, err := New()
 	if err != nil {
@@ -485,6 +500,22 @@ func TestValidateResponsesRequestAllowsFunctionCallOutputWithInlineToolCall(t *t
 		]
 	}`)); err != nil {
 		t.Fatalf("expected valid function_call_output inline tool context, got %v", err)
+	}
+}
+
+func TestValidateResponsesRequestAllowsCustomToolOutputWithInlineToolCall(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if err := svc.ValidateResponsesRequest([]byte(`{
+		"model":"gpt-5.4",
+		"input":[
+			{"type":"custom_tool_call","call_id":"call_1","name":"apply_patch","input":"*** Begin Patch"},
+			{"type":"custom_tool_call_output","call_id":"call_1","output":"ok"}
+		]
+	}`)); err != nil {
+		t.Fatalf("expected valid custom_tool_call_output inline tool context, got %v", err)
 	}
 }
 
