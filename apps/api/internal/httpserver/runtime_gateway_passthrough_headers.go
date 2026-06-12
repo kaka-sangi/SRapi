@@ -25,6 +25,18 @@ var hopByHopResponseHeaders = map[string]struct{}{
 	"content-length":   {},
 	"content-encoding": {},
 	"content-type":     {},
+	// Upstream cookies belong to the upstream origin and must not leak through
+	// a shared AI gateway response.
+	"set-cookie": {},
+}
+
+var gatewayFingerprintResponseHeaderPrefixes = []string{
+	"x-litellm-",
+	"helicone-",
+	"x-portkey-",
+	"cf-aig-",
+	"x-kong-",
+	"x-bt-",
 }
 
 // gatewayPassthroughHeaderConfig is the resolved, hot-path-friendly view of the
@@ -72,12 +84,19 @@ func forwardUpstreamResponseHeaders(w http.ResponseWriter, upstream http.Header,
 		return
 	}
 	dst := w.Header()
+	connectionScoped := connectionScopedResponseHeaders(upstream)
 	for name, values := range upstream {
 		canonical := strings.ToLower(strings.TrimSpace(name))
 		if canonical == "" {
 			continue
 		}
 		if _, hop := hopByHopResponseHeaders[canonical]; hop {
+			continue
+		}
+		if _, scoped := connectionScoped[canonical]; scoped {
+			continue
+		}
+		if gatewayFingerprintResponseHeader(canonical) {
 			continue
 		}
 		if !headerAllowlistMatches(canonical, cfg.allowlist) {
@@ -91,6 +110,27 @@ func forwardUpstreamResponseHeaders(w http.ResponseWriter, upstream http.Header,
 			dst.Add(name, value)
 		}
 	}
+}
+
+func connectionScopedResponseHeaders(headers http.Header) map[string]struct{} {
+	scoped := make(map[string]struct{})
+	for _, rawValue := range headers.Values("Connection") {
+		for _, token := range strings.Split(rawValue, ",") {
+			if name := strings.ToLower(strings.TrimSpace(token)); name != "" {
+				scoped[name] = struct{}{}
+			}
+		}
+	}
+	return scoped
+}
+
+func gatewayFingerprintResponseHeader(canonical string) bool {
+	for _, prefix := range gatewayFingerprintResponseHeaderPrefixes {
+		if strings.HasPrefix(canonical, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // headerAllowlistMatches reports whether a canonical (lowercased) header name is

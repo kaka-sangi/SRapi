@@ -28,6 +28,7 @@ func upstreamPassthroughHeaders() http.Header {
 	h.Set("Connection", "keep-alive")
 	h.Set("Transfer-Encoding", "chunked")
 	h.Set("Content-Type", "application/json")
+	h.Set("Set-Cookie", "upstream_session=secret")
 	return h
 }
 
@@ -86,14 +87,55 @@ func TestForwardUpstreamResponseHeaders_HopByHopDropped(t *testing.T) {
 	// forward them.
 	cfg := gatewayPassthroughHeaderConfig{
 		enabled:   true,
-		allowlist: []string{"connection", "transfer-encoding", "content-type"},
+		allowlist: []string{"connection", "transfer-encoding", "content-type", "set-cookie"},
 	}
 	forwardUpstreamResponseHeaders(rec, upstreamPassthroughHeaders(), cfg)
 
-	for _, name := range []string{"Connection", "Transfer-Encoding", "Content-Type"} {
+	for _, name := range []string{"Connection", "Transfer-Encoding", "Content-Type", "Set-Cookie"} {
 		if got := rec.Header().Get(name); got != "" {
 			t.Fatalf("hop-by-hop/framing header %q forwarded with value %q", name, got)
 		}
+	}
+}
+
+func TestForwardUpstreamResponseHeaders_ConnectionScopedAndGatewayFingerprintsDropped(t *testing.T) {
+	upstream := http.Header{}
+	upstream.Add("Connection", "x-hop-a, x-hop-b")
+	upstream.Add("Connection", "x-hop-c")
+	upstream.Set("X-Hop-A", "a")
+	upstream.Set("X-Hop-B", "b")
+	upstream.Set("X-Hop-C", "c")
+	upstream.Set("X-LiteLLM-Call-ID", "lite")
+	upstream.Set("Helicone-Id", "helicone")
+	upstream.Set("X-Portkey-Request-Id", "portkey")
+	upstream.Set("Cf-Aig-Request-Id", "cf")
+	upstream.Set("X-Kong-Proxy-Latency", "kong")
+	upstream.Set("X-Bt-Gateway", "bt")
+	upstream.Set("X-Request-Id", "req-123")
+	rec := httptest.NewRecorder()
+	cfg := gatewayPassthroughHeaderConfig{
+		enabled: true,
+		allowlist: []string{
+			"x-hop-*",
+			"x-litellm-*",
+			"helicone-*",
+			"x-portkey-*",
+			"cf-aig-*",
+			"x-kong-*",
+			"x-bt-*",
+			"x-request-id",
+		},
+	}
+
+	forwardUpstreamResponseHeaders(rec, upstream, cfg)
+
+	for _, name := range []string{"X-Hop-A", "X-Hop-B", "X-Hop-C", "X-LiteLLM-Call-ID", "Helicone-Id", "X-Portkey-Request-Id", "Cf-Aig-Request-Id", "X-Kong-Proxy-Latency", "X-Bt-Gateway"} {
+		if got := rec.Header().Get(name); got != "" {
+			t.Fatalf("blocked upstream fingerprint/scoped header %q forwarded with value %q", name, got)
+		}
+	}
+	if got := rec.Header().Get("X-Request-Id"); got != "req-123" {
+		t.Fatalf("expected ordinary allowlisted header to be forwarded, got %q", got)
 	}
 }
 
