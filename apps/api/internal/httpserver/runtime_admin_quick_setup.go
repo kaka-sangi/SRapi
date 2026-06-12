@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	accountservice "github.com/srapi/srapi/apps/api/internal/modules/accounts/service"
@@ -155,7 +156,8 @@ func (s *Server) handleAdminQuickSetup(w http.ResponseWriter, r *http.Request) {
 		catalog = preset.AccountTemplate.ModelCatalog
 	}
 	if len(catalog) > 0 {
-		created, mapped, warnings := s.quickMapModels(r.Context(), provider.ID, catalog)
+		presetModelMapping := accountModelMappingFromMetadataValue(metadata[accountModelMappingMetadataKey])
+		created, mapped, warnings := s.quickMapModels(r.Context(), provider, catalog, presetModelMapping)
 		result.ModelsCreated = created
 		result.MappingsCreated = mapped
 		result.ModelNames = catalog
@@ -203,12 +205,13 @@ func (s *Server) handleAdminQuickMapModels(w http.ResponseWriter, r *http.Reques
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid provider_id", requestID)
 		return
 	}
-	if _, err := s.runtime.providers.FindByID(r.Context(), providerID); err != nil {
+	provider, err := s.runtime.providers.FindByID(r.Context(), providerID)
+	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "provider not found", requestID)
 		return
 	}
 
-	created, mapped, warnings := s.quickMapModels(r.Context(), providerID, body.Models)
+	created, mapped, warnings := s.quickMapModels(r.Context(), provider, body.Models, nil)
 
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model.quick_map", "model", "bulk", nil, map[string]any{
 		"provider_id":      providerID,
@@ -227,8 +230,13 @@ func (s *Server) handleAdminQuickMapModels(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-func (s *Server) quickMapModels(ctx context.Context, providerID int, modelNames []string) (modelsCreated, mappingsCreated int, warnings []string) {
+func (s *Server) quickMapModels(ctx context.Context, provider providercontract.Provider, modelNames []string, mappingOverride map[string]any) (modelsCreated, mappingsCreated int, warnings []string) {
+	defaultMapping := mappingOverride
+	if len(defaultMapping) == 0 {
+		defaultMapping = providerQuickMapModelMapping(provider)
+	}
 	for _, name := range modelNames {
+		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
 		}
@@ -253,9 +261,10 @@ func (s *Server) quickMapModels(ctx context.Context, providerID int, modelNames 
 			warnings = append(warnings, "model not found after create: "+name)
 			continue
 		}
+		upstreamModelName := quickMapUpstreamModelName(defaultMapping, name)
 		_, err = s.runtime.models.CreateMapping(ctx, model.ID, modelcontract.CreateMappingRequest{
-			ProviderID:        providerID,
-			UpstreamModelName: name,
+			ProviderID:        provider.ID,
+			UpstreamModelName: upstreamModelName,
 		})
 		if err != nil {
 			if !errors.Is(err, modelservice.ErrMappingExists) {
@@ -266,6 +275,19 @@ func (s *Server) quickMapModels(ctx context.Context, providerID int, modelNames 
 		mappingsCreated++
 	}
 	return
+}
+
+func providerQuickMapModelMapping(provider providercontract.Provider) map[string]any {
+	accountTemplate := anyMapValue(provider.ConfigSchema["account_template"])
+	defaultMetadata := anyMapValue(accountTemplate["default_metadata"])
+	return accountModelMappingFromMetadataValue(defaultMetadata[accountModelMappingMetadataKey])
+}
+
+func quickMapUpstreamModelName(mapping map[string]any, modelName string) string {
+	if override := accountModelOverrideFromMetadata(map[string]any{accountModelMappingMetadataKey: mapping}, accountModelMappingMetadataKey, modelName); override != "" {
+		return override
+	}
+	return modelName
 }
 
 func resolveQuickSetupRuntimeClass(requested string, preset providerpreset.Preset, credential map[string]any) accountcontract.RuntimeClass {
