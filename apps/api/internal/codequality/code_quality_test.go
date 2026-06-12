@@ -1,3 +1,5 @@
+//go:build codequality
+
 package codequality_test
 
 import (
@@ -12,6 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"unicode/utf8"
 )
@@ -304,7 +307,12 @@ func TestNodeScriptsParse(t *testing.T) {
 		if filepath.Ext(rel) != ".mjs" && filepath.Ext(rel) != ".js" {
 			continue
 		}
-		runCommand(t, root, "node", "--check", rel)
+		rel := rel
+		t.Run(rel, func(t *testing.T) {
+			t.Parallel()
+
+			runCommand(t, root, "node", "--check", rel)
+		})
 	}
 }
 
@@ -430,8 +438,28 @@ const (
 	productionOnly
 )
 
+var (
+	repoFilesOnce  sync.Once
+	repoFilesCache []string
+	repoFilesErr   error
+
+	goFilesOnce  [2]sync.Once
+	goFilesCache [2][]string
+	goFilesErr   [2]error
+)
+
 func goFiles(t *testing.T, root string, mode fileMode) []string {
 	t.Helper()
+	goFilesOnce[mode].Do(func() {
+		goFilesCache[mode], goFilesErr[mode] = loadGoFiles(root, mode)
+	})
+	if goFilesErr[mode] != nil {
+		t.Fatal(goFilesErr[mode])
+	}
+	return append([]string(nil), goFilesCache[mode]...)
+}
+
+func loadGoFiles(root string, mode fileMode) ([]string, error) {
 	apiRoot := filepath.Join(root, "apps", "api")
 	var files []string
 	err := filepath.WalkDir(apiRoot, func(path string, entry os.DirEntry, err error) error {
@@ -456,21 +484,31 @@ func goFiles(t *testing.T, root string, mode fileMode) []string {
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	if len(files) == 0 {
-		t.Fatal("no Go files found")
+		return nil, fmt.Errorf("no Go files found")
 	}
-	return files
+	return files, nil
 }
 
 func repoFiles(t *testing.T, root string) []string {
 	t.Helper()
+	repoFilesOnce.Do(func() {
+		repoFilesCache, repoFilesErr = loadRepoFiles(root)
+	})
+	if repoFilesErr != nil {
+		t.Fatalf("list repository files: %v", repoFilesErr)
+	}
+	return append([]string(nil), repoFilesCache...)
+}
+
+func loadRepoFiles(root string) ([]string, error) {
 	cmd := exec.Command("git", "ls-files", "--cached", "--others", "--exclude-standard")
 	cmd.Dir = root
 	out, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("list repository files: %v", err)
+		return nil, err
 	}
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 	var files []string
@@ -479,7 +517,7 @@ func repoFiles(t *testing.T, root string) []string {
 			files = append(files, filepath.Clean(line))
 		}
 	}
-	return files
+	return files, nil
 }
 
 func isGeneratedPath(path string) bool {

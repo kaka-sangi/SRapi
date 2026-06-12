@@ -196,7 +196,7 @@ architecture-check:
 	cd $(API_DIR) && go test ./internal/config ./internal/architecture ./internal/app ./internal/platform/crypto ./internal/platform/db ./internal/platform/logger ./internal/platform/redis ./internal/modules/providers/preset ./internal/persistence/entstore/... ./internal/persistence/redisstore/... ./internal/workers/... ./internal/httpserver
 
 code-quality-check:
-	cd $(API_DIR) && go test ./internal/codequality -count=1
+	cd $(API_DIR) && go test -tags=codequality ./internal/codequality -count=1
 
 diff-check:
 	git diff --check
