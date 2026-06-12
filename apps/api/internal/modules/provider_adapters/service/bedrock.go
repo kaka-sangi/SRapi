@@ -300,6 +300,28 @@ func inlineSchemaIntoBedrockMessage(message map[string]any, schemaText string) {
 	}
 }
 
+// bedrockSupportedBetaTokens is the allowlist of anthropic-beta tokens the
+// Bedrock Invoke API accepts. Tokens outside this list (output-128k, files-api,
+// structured-outputs, …) make Bedrock reject the whole request with a 400, so
+// they must be dropped rather than passed through. Source: AWS Bedrock docs +
+// litellm anthropic_beta_headers_config.json; update when AWS adds support.
+var bedrockSupportedBetaTokens = map[string]struct{}{
+	"computer-use-2025-01-24":                {},
+	"computer-use-2025-11-24":                {},
+	"context-1m-2025-08-07":                  {},
+	"context-management-2025-06-27":          {},
+	"compact-2026-01-12":                     {},
+	"fine-grained-tool-streaming-2025-05-14": {},
+	"tool-search-tool-2025-10-19":            {},
+	"tool-examples-2025-10-29":               {},
+}
+
+// bedrockBetaTokenTransforms maps generic Anthropic beta tokens to the
+// Bedrock-specific token that carries the same capability.
+var bedrockBetaTokenTransforms = map[string]string{
+	"advanced-tool-use-2025-11-20": "tool-search-tool-2025-10-19",
+}
+
 func bedrockAnthropicBetaTokens(req contract.ConversationRequest) []string {
 	raw := requestSetting(req, "anthropic_beta", "anthropic-beta", "bedrock_beta")
 	if raw == "" {
@@ -312,11 +334,23 @@ func bedrockAnthropicBetaTokens(req contract.ConversationRequest) []string {
 		if token == "" {
 			continue
 		}
+		if replacement, ok := bedrockBetaTokenTransforms[token]; ok {
+			token = replacement
+		}
+		if _, supported := bedrockSupportedBetaTokens[token]; !supported {
+			continue
+		}
 		if _, exists := seen[token]; exists {
 			continue
 		}
 		seen[token] = struct{}{}
 		out = append(out, token)
+	}
+	// tool-search-tool requires its companion examples token on Bedrock.
+	if _, hasSearch := seen["tool-search-tool-2025-10-19"]; hasSearch {
+		if _, hasExamples := seen["tool-examples-2025-10-29"]; !hasExamples {
+			out = append(out, "tool-examples-2025-10-29")
+		}
 	}
 	return out
 }
