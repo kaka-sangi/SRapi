@@ -84,6 +84,16 @@ func Action(v string) predicate.ErrorPassthroughRule {
 	return predicate.ErrorPassthroughRule(sql.FieldEQ(FieldAction, v))
 }
 
+// ResponseStatus applies equality check predicate on the "response_status" field. It's identical to ResponseStatusEQ.
+func ResponseStatus(v int) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldEQ(FieldResponseStatus, v))
+}
+
+// CustomMessage applies equality check predicate on the "custom_message" field. It's identical to CustomMessageEQ.
+func CustomMessage(v string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldEQ(FieldCustomMessage, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.ErrorPassthroughRule {
 	return predicate.ErrorPassthroughRule(sql.FieldEQ(FieldCreatedAt, v))
@@ -372,6 +382,121 @@ func MatchKeywordsIsNil() predicate.ErrorPassthroughRule {
 // MatchKeywordsNotNil applies the NotNil predicate on the "match_keywords" field.
 func MatchKeywordsNotNil() predicate.ErrorPassthroughRule {
 	return predicate.ErrorPassthroughRule(sql.FieldNotNull(FieldMatchKeywords))
+}
+
+// ResponseStatusEQ applies the EQ predicate on the "response_status" field.
+func ResponseStatusEQ(v int) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldEQ(FieldResponseStatus, v))
+}
+
+// ResponseStatusNEQ applies the NEQ predicate on the "response_status" field.
+func ResponseStatusNEQ(v int) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldNEQ(FieldResponseStatus, v))
+}
+
+// ResponseStatusIn applies the In predicate on the "response_status" field.
+func ResponseStatusIn(vs ...int) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldIn(FieldResponseStatus, vs...))
+}
+
+// ResponseStatusNotIn applies the NotIn predicate on the "response_status" field.
+func ResponseStatusNotIn(vs ...int) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldNotIn(FieldResponseStatus, vs...))
+}
+
+// ResponseStatusGT applies the GT predicate on the "response_status" field.
+func ResponseStatusGT(v int) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldGT(FieldResponseStatus, v))
+}
+
+// ResponseStatusGTE applies the GTE predicate on the "response_status" field.
+func ResponseStatusGTE(v int) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldGTE(FieldResponseStatus, v))
+}
+
+// ResponseStatusLT applies the LT predicate on the "response_status" field.
+func ResponseStatusLT(v int) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldLT(FieldResponseStatus, v))
+}
+
+// ResponseStatusLTE applies the LTE predicate on the "response_status" field.
+func ResponseStatusLTE(v int) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldLTE(FieldResponseStatus, v))
+}
+
+// ResponseStatusIsNil applies the IsNil predicate on the "response_status" field.
+func ResponseStatusIsNil() predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldIsNull(FieldResponseStatus))
+}
+
+// ResponseStatusNotNil applies the NotNil predicate on the "response_status" field.
+func ResponseStatusNotNil() predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldNotNull(FieldResponseStatus))
+}
+
+// CustomMessageEQ applies the EQ predicate on the "custom_message" field.
+func CustomMessageEQ(v string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldEQ(FieldCustomMessage, v))
+}
+
+// CustomMessageNEQ applies the NEQ predicate on the "custom_message" field.
+func CustomMessageNEQ(v string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldNEQ(FieldCustomMessage, v))
+}
+
+// CustomMessageIn applies the In predicate on the "custom_message" field.
+func CustomMessageIn(vs ...string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldIn(FieldCustomMessage, vs...))
+}
+
+// CustomMessageNotIn applies the NotIn predicate on the "custom_message" field.
+func CustomMessageNotIn(vs ...string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldNotIn(FieldCustomMessage, vs...))
+}
+
+// CustomMessageGT applies the GT predicate on the "custom_message" field.
+func CustomMessageGT(v string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldGT(FieldCustomMessage, v))
+}
+
+// CustomMessageGTE applies the GTE predicate on the "custom_message" field.
+func CustomMessageGTE(v string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldGTE(FieldCustomMessage, v))
+}
+
+// CustomMessageLT applies the LT predicate on the "custom_message" field.
+func CustomMessageLT(v string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldLT(FieldCustomMessage, v))
+}
+
+// CustomMessageLTE applies the LTE predicate on the "custom_message" field.
+func CustomMessageLTE(v string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldLTE(FieldCustomMessage, v))
+}
+
+// CustomMessageContains applies the Contains predicate on the "custom_message" field.
+func CustomMessageContains(v string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldContains(FieldCustomMessage, v))
+}
+
+// CustomMessageHasPrefix applies the HasPrefix predicate on the "custom_message" field.
+func CustomMessageHasPrefix(v string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldHasPrefix(FieldCustomMessage, v))
+}
+
+// CustomMessageHasSuffix applies the HasSuffix predicate on the "custom_message" field.
+func CustomMessageHasSuffix(v string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldHasSuffix(FieldCustomMessage, v))
+}
+
+// CustomMessageEqualFold applies the EqualFold predicate on the "custom_message" field.
+func CustomMessageEqualFold(v string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldEqualFold(FieldCustomMessage, v))
+}
+
+// CustomMessageContainsFold applies the ContainsFold predicate on the "custom_message" field.
+func CustomMessageContainsFold(v string) predicate.ErrorPassthroughRule {
+	return predicate.ErrorPassthroughRule(sql.FieldContainsFold(FieldCustomMessage, v))
 }
 
 // And groups predicates with the AND operator between them.

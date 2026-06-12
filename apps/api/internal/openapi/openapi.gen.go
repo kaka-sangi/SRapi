@@ -5469,13 +5469,18 @@ type CreateChannelMonitorTemplateRequest struct {
 
 // CreateErrorPassthroughRuleRequest defines model for CreateErrorPassthroughRuleRequest.
 type CreateErrorPassthroughRuleRequest struct {
-	Action      CreateErrorPassthroughRuleRequestAction `json:"action"`
-	Classes     *[]string                               `json:"classes,omitempty"`
-	Enabled     *bool                                   `json:"enabled,omitempty"`
-	Keywords    *[]string                               `json:"keywords,omitempty"`
-	Name        string                                  `json:"name"`
-	Priority    *int64                                  `json:"priority,omitempty"`
-	StatusCodes *[]int64                                `json:"status_codes,omitempty"`
+	Action        CreateErrorPassthroughRuleRequestAction `json:"action"`
+	Classes       *[]string                               `json:"classes,omitempty"`
+	CustomMessage *string                                 `json:"custom_message,omitempty"`
+	Enabled       *bool                                   `json:"enabled,omitempty"`
+	Keywords      *[]string                               `json:"keywords,omitempty"`
+	Name          string                                  `json:"name"`
+	Priority      *int64                                  `json:"priority,omitempty"`
+
+	// ResponseCode Alias of response_status for compatibility with sub2api-style imports.
+	ResponseCode   *int64   `json:"response_code,omitempty"`
+	ResponseStatus *int64   `json:"response_status,omitempty"`
+	StatusCodes    *[]int64 `json:"status_codes,omitempty"`
 }
 
 // CreateErrorPassthroughRuleRequestAction defines model for CreateErrorPassthroughRuleRequest.Action.
@@ -5965,16 +5970,25 @@ type ErrorObject struct {
 
 // ErrorPassthroughRule defines model for ErrorPassthroughRule.
 type ErrorPassthroughRule struct {
-	Action      ErrorPassthroughRuleAction `json:"action"`
-	Classes     []string                   `json:"classes"`
-	CreatedAt   time.Time                  `json:"created_at"`
-	Enabled     bool                       `json:"enabled"`
-	Id          int64                      `json:"id"`
-	Keywords    []string                   `json:"keywords"`
-	Name        string                     `json:"name"`
-	Priority    int64                      `json:"priority"`
-	StatusCodes []int64                    `json:"status_codes"`
-	UpdatedAt   time.Time                  `json:"updated_at"`
+	Action    ErrorPassthroughRuleAction `json:"action"`
+	Classes   []string                   `json:"classes"`
+	CreatedAt time.Time                  `json:"created_at"`
+
+	// CustomMessage Optional downstream error message returned when this rule matches. Empty string clears the override.
+	CustomMessage *string  `json:"custom_message,omitempty"`
+	Enabled       bool     `json:"enabled"`
+	Id            int64    `json:"id"`
+	Keywords      []string `json:"keywords"`
+	Name          string   `json:"name"`
+	Priority      int64    `json:"priority"`
+
+	// ResponseCode Alias of response_status for compatibility with sub2api-style imports.
+	ResponseCode *int64 `json:"response_code,omitempty"`
+
+	// ResponseStatus Optional downstream HTTP status returned when this rule matches. Use 0 in update requests to clear the override.
+	ResponseStatus *int64    `json:"response_status,omitempty"`
+	StatusCodes    []int64   `json:"status_codes"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // ErrorPassthroughRuleAction defines model for ErrorPassthroughRule.Action.
@@ -9066,13 +9080,22 @@ type UpdateCurrentUserProfileRequest struct {
 
 // UpdateErrorPassthroughRuleRequest defines model for UpdateErrorPassthroughRuleRequest.
 type UpdateErrorPassthroughRuleRequest struct {
-	Action      *UpdateErrorPassthroughRuleRequestAction `json:"action,omitempty"`
-	Classes     *[]string                                `json:"classes,omitempty"`
-	Enabled     *bool                                    `json:"enabled,omitempty"`
-	Keywords    *[]string                                `json:"keywords,omitempty"`
-	Name        *string                                  `json:"name,omitempty"`
-	Priority    *int64                                   `json:"priority,omitempty"`
-	StatusCodes *[]int64                                 `json:"status_codes,omitempty"`
+	Action  *UpdateErrorPassthroughRuleRequestAction `json:"action,omitempty"`
+	Classes *[]string                                `json:"classes,omitempty"`
+
+	// CustomMessage Set to a non-empty message, or empty string to clear the override.
+	CustomMessage *string   `json:"custom_message,omitempty"`
+	Enabled       *bool     `json:"enabled,omitempty"`
+	Keywords      *[]string `json:"keywords,omitempty"`
+	Name          *string   `json:"name,omitempty"`
+	Priority      *int64    `json:"priority,omitempty"`
+
+	// ResponseCode Alias of response_status for compatibility with sub2api-style imports.
+	ResponseCode *int64 `json:"response_code,omitempty"`
+
+	// ResponseStatus Set to a 100-599 status, or 0 to clear the override.
+	ResponseStatus *int64   `json:"response_status,omitempty"`
+	StatusCodes    *[]int64 `json:"status_codes,omitempty"`
 }
 
 // UpdateErrorPassthroughRuleRequestAction defines model for UpdateErrorPassthroughRuleRequest.Action.

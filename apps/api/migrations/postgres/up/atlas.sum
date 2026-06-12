@@ -1,4 +1,4 @@
-h1:hMxmGZLP2Alj5r1M3ooQJR9moIGbZyXPmL1EqpIxZL8=
+h1:T0rL1qEYa2vWXWoNDuCGOTyT/L9Bpv6gmM+lothiyjg=
 000001_initial_schema.sql h1:cyZ0pax3l7J4onSmEmgqPwpoJYXPXuJYXeTAGUOEHs4=
 000002_auth_sessions.sql h1:zJ6uEWQDpw4sa3JpABmlbbFR2Sy3JCceNl4UnBtcX9c=
 000003_api_key_concurrency_limit.sql h1:j/8OE2iF7+LUa5XCsyYSC4dvN1Vh2cihbc41rySg4OQ=
@@ -42,3 +42,4 @@ h1:hMxmGZLP2Alj5r1M3ooQJR9moIGbZyXPmL1EqpIxZL8=
 000041_payment_upstream_truth.sql h1:qosZTAs35F0z7DtFSI86ZbWkNDtF7ViFw0NzJAzkVPo=
 000042_usage_provider_created_at_index.sql h1:aL6NBNNecivnTUTqs/wwiXDfAB6xWpmrxP7l/ApjkSw=
 000043_availability_rollup_bucket_provider_index.sql h1:t6TfPwkW4L7SerkQQX3cB7mjKWAaHSbs1dboDlToSM4=
+000044_error_passthrough_response_overrides.sql h1:QEVf44bo3N/NB2d7GaUXCXaaIuJeH3lWj9BnkgoMe40=

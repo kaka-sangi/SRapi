@@ -26472,6 +26472,19 @@ components:
           type: array
           items:
             type: string
+        response_status:
+          type: integer
+          format: int64
+          nullable: true
+          description: Optional downstream HTTP status returned when this rule matches. Use 0 in update requests to clear the override.
+        response_code:
+          type: integer
+          format: int64
+          nullable: true
+          description: Alias of response_status for compatibility with sub2api-style imports.
+        custom_message:
+          type: string
+          description: Optional downstream error message returned when this rule matches. Empty string clears the override.
         created_at:
           type: string
           format: date-time
@@ -26509,6 +26522,17 @@ components:
           type: array
           items:
             type: string
+        response_status:
+          type: integer
+          format: int64
+          nullable: true
+        response_code:
+          type: integer
+          format: int64
+          nullable: true
+          description: Alias of response_status for compatibility with sub2api-style imports.
+        custom_message:
+          type: string
     UpdateErrorPassthroughRuleRequest:
       type: object
       properties:
@@ -26537,6 +26561,19 @@ components:
           type: array
           items:
             type: string
+        response_status:
+          type: integer
+          format: int64
+          nullable: true
+          description: Set to a 100-599 status, or 0 to clear the override.
+        response_code:
+          type: integer
+          format: int64
+          nullable: true
+          description: Alias of response_status for compatibility with sub2api-style imports.
+        custom_message:
+          type: string
+          description: Set to a non-empty message, or empty string to clear the override.
     ErrorPassthroughRuleResponse:
       type: object
       required:

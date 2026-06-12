@@ -152,6 +152,47 @@ func (_u *ErrorPassthroughRuleUpdate) ClearMatchKeywords() *ErrorPassthroughRule
 	return _u
 }
 
+// SetResponseStatus sets the "response_status" field.
+func (_u *ErrorPassthroughRuleUpdate) SetResponseStatus(v int) *ErrorPassthroughRuleUpdate {
+	_u.mutation.ResetResponseStatus()
+	_u.mutation.SetResponseStatus(v)
+	return _u
+}
+
+// SetNillableResponseStatus sets the "response_status" field if the given value is not nil.
+func (_u *ErrorPassthroughRuleUpdate) SetNillableResponseStatus(v *int) *ErrorPassthroughRuleUpdate {
+	if v != nil {
+		_u.SetResponseStatus(*v)
+	}
+	return _u
+}
+
+// AddResponseStatus adds value to the "response_status" field.
+func (_u *ErrorPassthroughRuleUpdate) AddResponseStatus(v int) *ErrorPassthroughRuleUpdate {
+	_u.mutation.AddResponseStatus(v)
+	return _u
+}
+
+// ClearResponseStatus clears the value of the "response_status" field.
+func (_u *ErrorPassthroughRuleUpdate) ClearResponseStatus() *ErrorPassthroughRuleUpdate {
+	_u.mutation.ClearResponseStatus()
+	return _u
+}
+
+// SetCustomMessage sets the "custom_message" field.
+func (_u *ErrorPassthroughRuleUpdate) SetCustomMessage(v string) *ErrorPassthroughRuleUpdate {
+	_u.mutation.SetCustomMessage(v)
+	return _u
+}
+
+// SetNillableCustomMessage sets the "custom_message" field if the given value is not nil.
+func (_u *ErrorPassthroughRuleUpdate) SetNillableCustomMessage(v *string) *ErrorPassthroughRuleUpdate {
+	if v != nil {
+		_u.SetCustomMessage(*v)
+	}
+	return _u
+}
+
 // Mutation returns the ErrorPassthroughRuleMutation object of the builder.
 func (_u *ErrorPassthroughRuleUpdate) Mutation() *ErrorPassthroughRuleMutation {
 	return _u.mutation
@@ -265,6 +306,18 @@ func (_u *ErrorPassthroughRuleUpdate) sqlSave(ctx context.Context) (_node int, e
 	}
 	if _u.mutation.MatchKeywordsCleared() {
 		_spec.ClearField(errorpassthroughrule.FieldMatchKeywords, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.ResponseStatus(); ok {
+		_spec.SetField(errorpassthroughrule.FieldResponseStatus, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedResponseStatus(); ok {
+		_spec.AddField(errorpassthroughrule.FieldResponseStatus, field.TypeInt, value)
+	}
+	if _u.mutation.ResponseStatusCleared() {
+		_spec.ClearField(errorpassthroughrule.FieldResponseStatus, field.TypeInt)
+	}
+	if value, ok := _u.mutation.CustomMessage(); ok {
+		_spec.SetField(errorpassthroughrule.FieldCustomMessage, field.TypeString, value)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -406,6 +459,47 @@ func (_u *ErrorPassthroughRuleUpdateOne) AppendMatchKeywords(v []string) *ErrorP
 // ClearMatchKeywords clears the value of the "match_keywords" field.
 func (_u *ErrorPassthroughRuleUpdateOne) ClearMatchKeywords() *ErrorPassthroughRuleUpdateOne {
 	_u.mutation.ClearMatchKeywords()
+	return _u
+}
+
+// SetResponseStatus sets the "response_status" field.
+func (_u *ErrorPassthroughRuleUpdateOne) SetResponseStatus(v int) *ErrorPassthroughRuleUpdateOne {
+	_u.mutation.ResetResponseStatus()
+	_u.mutation.SetResponseStatus(v)
+	return _u
+}
+
+// SetNillableResponseStatus sets the "response_status" field if the given value is not nil.
+func (_u *ErrorPassthroughRuleUpdateOne) SetNillableResponseStatus(v *int) *ErrorPassthroughRuleUpdateOne {
+	if v != nil {
+		_u.SetResponseStatus(*v)
+	}
+	return _u
+}
+
+// AddResponseStatus adds value to the "response_status" field.
+func (_u *ErrorPassthroughRuleUpdateOne) AddResponseStatus(v int) *ErrorPassthroughRuleUpdateOne {
+	_u.mutation.AddResponseStatus(v)
+	return _u
+}
+
+// ClearResponseStatus clears the value of the "response_status" field.
+func (_u *ErrorPassthroughRuleUpdateOne) ClearResponseStatus() *ErrorPassthroughRuleUpdateOne {
+	_u.mutation.ClearResponseStatus()
+	return _u
+}
+
+// SetCustomMessage sets the "custom_message" field.
+func (_u *ErrorPassthroughRuleUpdateOne) SetCustomMessage(v string) *ErrorPassthroughRuleUpdateOne {
+	_u.mutation.SetCustomMessage(v)
+	return _u
+}
+
+// SetNillableCustomMessage sets the "custom_message" field if the given value is not nil.
+func (_u *ErrorPassthroughRuleUpdateOne) SetNillableCustomMessage(v *string) *ErrorPassthroughRuleUpdateOne {
+	if v != nil {
+		_u.SetCustomMessage(*v)
+	}
 	return _u
 }
 
@@ -552,6 +646,18 @@ func (_u *ErrorPassthroughRuleUpdateOne) sqlSave(ctx context.Context) (_node *Er
 	}
 	if _u.mutation.MatchKeywordsCleared() {
 		_spec.ClearField(errorpassthroughrule.FieldMatchKeywords, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.ResponseStatus(); ok {
+		_spec.SetField(errorpassthroughrule.FieldResponseStatus, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedResponseStatus(); ok {
+		_spec.AddField(errorpassthroughrule.FieldResponseStatus, field.TypeInt, value)
+	}
+	if _u.mutation.ResponseStatusCleared() {
+		_spec.ClearField(errorpassthroughrule.FieldResponseStatus, field.TypeInt)
+	}
+	if value, ok := _u.mutation.CustomMessage(); ok {
+		_spec.SetField(errorpassthroughrule.FieldCustomMessage, field.TypeString, value)
 	}
 	_node = &ErrorPassthroughRule{config: _u.config}
 	_spec.Assign = _node.assignValues

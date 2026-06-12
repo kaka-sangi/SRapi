@@ -63,13 +63,16 @@ type importUserAttribute struct {
 }
 
 type importErrorRule struct {
-	Name        string   `json:"name"`
-	Enabled     *bool    `json:"enabled"`
-	Priority    int      `json:"priority"`
-	Action      string   `json:"action"`
-	StatusCodes []int    `json:"status_codes"`
-	Classes     []string `json:"classes"`
-	Keywords    []string `json:"keywords"`
+	Name           string   `json:"name"`
+	Enabled        *bool    `json:"enabled"`
+	Priority       int      `json:"priority"`
+	Action         string   `json:"action"`
+	StatusCodes    []int    `json:"status_codes"`
+	Classes        []string `json:"classes"`
+	Keywords       []string `json:"keywords"`
+	ResponseStatus *int     `json:"response_status"`
+	ResponseCode   *int     `json:"response_code"`
+	CustomMessage  string   `json:"custom_message"`
 }
 
 type importSectionResult struct {
@@ -384,6 +387,7 @@ func (s *Server) importErrorPassthroughRules(ctx context.Context, items []import
 			enabled = *item.Enabled
 		}
 		action := errorpassthroughcontract.Action(item.Action)
+		responseStatus := firstIntPtr(item.ResponseStatus, item.ResponseCode)
 		current, found := byName[item.Name]
 		if found {
 			result.Updated++
@@ -391,12 +395,14 @@ func (s *Server) importErrorPassthroughRules(ctx context.Context, items []import
 				continue
 			}
 			if _, err := s.runtime.errorPassthrough.UpdateRule(ctx, current.ID, errorpassthroughcontract.UpdateRule{
-				Enabled:     &enabled,
-				Priority:    &item.Priority,
-				Action:      &action,
-				StatusCodes: &item.StatusCodes,
-				Classes:     &item.Classes,
-				Keywords:    &item.Keywords,
+				Enabled:        &enabled,
+				Priority:       &item.Priority,
+				Action:         &action,
+				StatusCodes:    &item.StatusCodes,
+				Classes:        &item.Classes,
+				Keywords:       &item.Keywords,
+				ResponseStatus: &responseStatus,
+				CustomMessage:  &item.CustomMessage,
 			}); err != nil {
 				return result, err
 			}
@@ -407,13 +413,15 @@ func (s *Server) importErrorPassthroughRules(ctx context.Context, items []import
 			continue
 		}
 		if _, err := s.runtime.errorPassthrough.CreateRule(ctx, errorpassthroughcontract.CreateRule{
-			Name:        item.Name,
-			Enabled:     enabled,
-			Priority:    item.Priority,
-			Action:      action,
-			StatusCodes: item.StatusCodes,
-			Classes:     item.Classes,
-			Keywords:    item.Keywords,
+			Name:           item.Name,
+			Enabled:        enabled,
+			Priority:       item.Priority,
+			Action:         action,
+			StatusCodes:    item.StatusCodes,
+			Classes:        item.Classes,
+			Keywords:       item.Keywords,
+			ResponseStatus: responseStatus,
+			CustomMessage:  item.CustomMessage,
 		}); err != nil {
 			return result, err
 		}

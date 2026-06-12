@@ -10,6 +10,9 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/config"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
+	errorpassthroughservice "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/service"
+	errorpassthroughmemory "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/store/memory"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
@@ -102,6 +105,48 @@ func TestGatewayProviderPublicErrorResponseSupportsMetadataOverrides(t *testing.
 	}
 	if got.Message != "upstream rejected request" {
 		t.Fatalf("expected custom message, got %+v", got)
+	}
+}
+
+func TestGatewayGlobalErrorPassthroughOverridesStatusAndMessage(t *testing.T) {
+	store := errorpassthroughmemory.New()
+	svc, err := errorpassthroughservice.New(store)
+	if err != nil {
+		t.Fatalf("new error passthrough service: %v", err)
+	}
+	status := http.StatusUnprocessableEntity
+	if _, err := svc.CreateRule(t.Context(), errorpassthroughcontract.CreateRule{
+		Name:           "global invalid schema",
+		Enabled:        true,
+		Action:         errorpassthroughcontract.ActionMask,
+		StatusCodes:    []int{http.StatusBadRequest},
+		Classes:        []string{"invalid_request"},
+		Keywords:       []string{"temperature"},
+		ResponseStatus: &status,
+		CustomMessage:  "global upstream rejected request",
+	}); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+	err = provideradaptercontract.ProviderError{
+		Class:      "invalid_request",
+		StatusCode: http.StatusBadRequest,
+		Message:    `{"error":{"message":"schema mismatch: field temperature is unsupported"}}`,
+	}
+	candidate := schedulercontract.Candidate{
+		Account: accountcontract.ProviderAccount{Metadata: map[string]any{
+			"provider_error_passthrough_enabled":       true,
+			"provider_error_passthrough_response_code": http.StatusConflict,
+			"provider_error_passthrough_message":       "account metadata message",
+		}},
+	}
+	server := &Server{runtime: &runtimeState{errorPassthrough: svc}}
+
+	got := server.gatewayPublicErrorResponse(err, "invalid_request", http.StatusBadRequest, &candidate)
+	if got.Status != http.StatusUnprocessableEntity {
+		t.Fatalf("expected global response status 422, got %+v", got)
+	}
+	if got.Message != "global upstream rejected request" {
+		t.Fatalf("expected global custom message, got %+v", got)
 	}
 }
 

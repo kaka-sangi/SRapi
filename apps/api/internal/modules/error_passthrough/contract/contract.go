@@ -21,36 +21,49 @@ const (
 
 // Rule is one global error-passthrough rule. Empty match lists mean "match any".
 type Rule struct {
-	ID          int
-	Name        string
-	Enabled     bool
-	Priority    int
-	Action      Action
-	StatusCodes []int
-	Classes     []string
-	Keywords    []string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID             int
+	Name           string
+	Enabled        bool
+	Priority       int
+	Action         Action
+	StatusCodes    []int
+	Classes        []string
+	Keywords       []string
+	ResponseStatus *int
+	CustomMessage  string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type CreateRule struct {
-	Name        string
-	Enabled     bool
-	Priority    int
-	Action      Action
-	StatusCodes []int
-	Classes     []string
-	Keywords    []string
+	Name           string
+	Enabled        bool
+	Priority       int
+	Action         Action
+	StatusCodes    []int
+	Classes        []string
+	Keywords       []string
+	ResponseStatus *int
+	CustomMessage  string
 }
 
 type UpdateRule struct {
-	Name        *string
-	Enabled     *bool
-	Priority    *int
-	Action      *Action
-	StatusCodes *[]int
-	Classes     *[]string
-	Keywords    *[]string
+	Name           *string
+	Enabled        *bool
+	Priority       *int
+	Action         *Action
+	StatusCodes    *[]int
+	Classes        *[]string
+	Keywords       *[]string
+	ResponseStatus **int
+	CustomMessage  *string
+}
+
+// Resolution is the gateway-facing decision produced by the first matched rule.
+type Resolution struct {
+	Action         Action
+	ResponseStatus *int
+	CustomMessage  string
 }
 
 // Store persists global error-passthrough rules.

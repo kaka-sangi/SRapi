@@ -26,7 +26,7 @@ func New(client *ent.Client) (*Store, error) {
 
 func (s *Store) CreateRule(ctx context.Context, input contract.CreateRule) (contract.Rule, error) {
 	now := time.Now().UTC()
-	row, err := s.client.ErrorPassthroughRule.Create().
+	create := s.client.ErrorPassthroughRule.Create().
 		SetName(input.Name).
 		SetEnabled(input.Enabled).
 		SetPriority(input.Priority).
@@ -34,9 +34,13 @@ func (s *Store) CreateRule(ctx context.Context, input contract.CreateRule) (cont
 		SetMatchStatusCodes(cloneInts(input.StatusCodes)).
 		SetMatchClasses(cloneStrings(input.Classes)).
 		SetMatchKeywords(cloneStrings(input.Keywords)).
+		SetCustomMessage(input.CustomMessage).
 		SetCreatedAt(now).
-		SetUpdatedAt(now).
-		Save(ctx)
+		SetUpdatedAt(now)
+	if input.ResponseStatus != nil {
+		create.SetResponseStatus(*input.ResponseStatus)
+	}
+	row, err := create.Save(ctx)
 	if err != nil {
 		return contract.Rule{}, err
 	}
@@ -68,6 +72,16 @@ func (s *Store) UpdateRule(ctx context.Context, id int, input contract.UpdateRul
 	}
 	if input.Keywords != nil {
 		update.SetMatchKeywords(cloneStrings(*input.Keywords))
+	}
+	if input.ResponseStatus != nil {
+		if *input.ResponseStatus == nil {
+			update.ClearResponseStatus()
+		} else {
+			update.SetResponseStatus(**input.ResponseStatus)
+		}
+	}
+	if input.CustomMessage != nil {
+		update.SetCustomMessage(*input.CustomMessage)
 	}
 	row, err := update.Save(ctx)
 	if err != nil {
@@ -108,16 +122,18 @@ func (s *Store) ListRules(ctx context.Context) ([]contract.Rule, error) {
 
 func toRule(row *ent.ErrorPassthroughRule) contract.Rule {
 	return contract.Rule{
-		ID:          row.ID,
-		Name:        row.Name,
-		Enabled:     row.Enabled,
-		Priority:    row.Priority,
-		Action:      contract.Action(row.Action),
-		StatusCodes: cloneInts(row.MatchStatusCodes),
-		Classes:     cloneStrings(row.MatchClasses),
-		Keywords:    cloneStrings(row.MatchKeywords),
-		CreatedAt:   row.CreatedAt,
-		UpdatedAt:   row.UpdatedAt,
+		ID:             row.ID,
+		Name:           row.Name,
+		Enabled:        row.Enabled,
+		Priority:       row.Priority,
+		Action:         contract.Action(row.Action),
+		StatusCodes:    cloneInts(row.MatchStatusCodes),
+		Classes:        cloneStrings(row.MatchClasses),
+		Keywords:       cloneStrings(row.MatchKeywords),
+		ResponseStatus: cloneIntPtr(row.ResponseStatus),
+		CustomMessage:  row.CustomMessage,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
 	}
 }
 
@@ -133,4 +149,12 @@ func cloneInts(values []int) []int {
 		return nil
 	}
 	return append([]int(nil), values...)
+}
+
+func cloneIntPtr(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }

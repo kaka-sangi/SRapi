@@ -36,6 +36,10 @@ type ErrorPassthroughRule struct {
 	MatchClasses []string `json:"match_classes,omitempty"`
 	// MatchKeywords holds the value of the "match_keywords" field.
 	MatchKeywords []string `json:"match_keywords,omitempty"`
+	// ResponseStatus holds the value of the "response_status" field.
+	ResponseStatus *int `json:"response_status,omitempty"`
+	// CustomMessage holds the value of the "custom_message" field.
+	CustomMessage string `json:"custom_message,omitempty"`
 	selectValues  sql.SelectValues
 }
 
@@ -48,9 +52,9 @@ func (*ErrorPassthroughRule) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case errorpassthroughrule.FieldEnabled:
 			values[i] = new(sql.NullBool)
-		case errorpassthroughrule.FieldID, errorpassthroughrule.FieldPriority:
+		case errorpassthroughrule.FieldID, errorpassthroughrule.FieldPriority, errorpassthroughrule.FieldResponseStatus:
 			values[i] = new(sql.NullInt64)
-		case errorpassthroughrule.FieldName, errorpassthroughrule.FieldAction:
+		case errorpassthroughrule.FieldName, errorpassthroughrule.FieldAction, errorpassthroughrule.FieldCustomMessage:
 			values[i] = new(sql.NullString)
 		case errorpassthroughrule.FieldCreatedAt, errorpassthroughrule.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -135,6 +139,19 @@ func (_m *ErrorPassthroughRule) assignValues(columns []string, values []any) err
 					return fmt.Errorf("unmarshal field match_keywords: %w", err)
 				}
 			}
+		case errorpassthroughrule.FieldResponseStatus:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field response_status", values[i])
+			} else if value.Valid {
+				_m.ResponseStatus = new(int)
+				*_m.ResponseStatus = int(value.Int64)
+			}
+		case errorpassthroughrule.FieldCustomMessage:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field custom_message", values[i])
+			} else if value.Valid {
+				_m.CustomMessage = value.String
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -197,6 +214,14 @@ func (_m *ErrorPassthroughRule) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("match_keywords=")
 	builder.WriteString(fmt.Sprintf("%v", _m.MatchKeywords))
+	builder.WriteString(", ")
+	if v := _m.ResponseStatus; v != nil {
+		builder.WriteString("response_status=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("custom_message=")
+	builder.WriteString(_m.CustomMessage)
 	builder.WriteByte(')')
 	return builder.String()
 }

@@ -737,6 +737,10 @@ func init() {
 	errorpassthroughruleDescAction := errorpassthroughruleFields[3].Descriptor()
 	// errorpassthroughrule.DefaultAction holds the default value on creation for the action field.
 	errorpassthroughrule.DefaultAction = errorpassthroughruleDescAction.Default.(string)
+	// errorpassthroughruleDescCustomMessage is the schema descriptor for custom_message field.
+	errorpassthroughruleDescCustomMessage := errorpassthroughruleFields[8].Descriptor()
+	// errorpassthroughrule.DefaultCustomMessage holds the default value on creation for the custom_message field.
+	errorpassthroughrule.DefaultCustomMessage = errorpassthroughruleDescCustomMessage.Default.(string)
 	idempotencyrecordMixin := schema.IdempotencyRecord{}.Mixin()
 	idempotencyrecordMixinFields0 := idempotencyrecordMixin[0].Fields()
 	_ = idempotencyrecordMixinFields0

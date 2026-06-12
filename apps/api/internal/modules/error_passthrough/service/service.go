@@ -53,6 +53,14 @@ func (s *Service) CreateRule(ctx context.Context, input contract.CreateRule) (co
 	input.Classes = cleanStrings(input.Classes)
 	input.Keywords = cleanStrings(input.Keywords)
 	input.StatusCodes = cleanStatusCodes(input.StatusCodes)
+	if input.ResponseStatus != nil {
+		status, ok := cleanResponseStatus(input.ResponseStatus)
+		if !ok {
+			return contract.Rule{}, ErrInvalidInput
+		}
+		input.ResponseStatus = status
+	}
+	input.CustomMessage = cleanCustomMessage(input.CustomMessage)
 	rule, err := s.store.CreateRule(ctx, input)
 	if err == nil {
 		s.enabledRules.Invalidate()
@@ -90,6 +98,17 @@ func (s *Service) UpdateRule(ctx context.Context, id int, input contract.UpdateR
 		codes := cleanStatusCodes(*input.StatusCodes)
 		input.StatusCodes = &codes
 	}
+	if input.ResponseStatus != nil {
+		status, ok := cleanResponseStatus(*input.ResponseStatus)
+		if !ok {
+			return contract.Rule{}, ErrInvalidInput
+		}
+		input.ResponseStatus = &status
+	}
+	if input.CustomMessage != nil {
+		message := cleanCustomMessage(*input.CustomMessage)
+		input.CustomMessage = &message
+	}
 	rule, err := s.store.UpdateRule(ctx, id, input)
 	if err == nil {
 		s.enabledRules.Invalidate()
@@ -108,15 +127,15 @@ func (s *Service) DeleteRule(ctx context.Context, id int) error {
 	return err
 }
 
-// Resolve evaluates enabled rules in priority order and returns the action of
-// the first rule that matches the given error class, upstream status, and raw
-// message. matched is false when no rule applies, in which case the caller
-// should fall back to its existing per-account behavior. Rules are served from
-// a short-TTL snapshot so the per-failure cost is pure in-memory matching.
-func (s *Service) Resolve(ctx context.Context, errorClass string, upstreamStatus int, message string) (contract.Action, bool) {
+// Resolve evaluates enabled rules in priority order and returns the first
+// matching rule's response policy. matched is false when no rule applies, in
+// which case the caller should fall back to its existing per-account behavior.
+// Rules are served from a short-TTL snapshot so the per-failure cost is pure
+// in-memory matching.
+func (s *Service) Resolve(ctx context.Context, errorClass string, upstreamStatus int, message string) (contract.Resolution, bool) {
 	enabled, err := s.enabledRules.Get(ctx, s.loadEnabledRules)
 	if err != nil {
-		return "", false
+		return contract.Resolution{}, false
 	}
 	lowerMessage := strings.ToLower(message)
 	for _, rule := range enabled {
@@ -129,9 +148,13 @@ func (s *Service) Resolve(ctx context.Context, errorClass string, upstreamStatus
 		if !keywordMatches(rule.Keywords, lowerMessage) {
 			continue
 		}
-		return rule.Action, true
+		return contract.Resolution{
+			Action:         rule.Action,
+			ResponseStatus: cloneIntPtr(rule.ResponseStatus),
+			CustomMessage:  rule.CustomMessage,
+		}, true
 	}
-	return "", false
+	return contract.Resolution{}, false
 }
 
 // loadEnabledRules snapshots the enabled rules pre-sorted by (priority, id).
@@ -159,6 +182,7 @@ func cloneRule(rule contract.Rule) contract.Rule {
 	rule.StatusCodes = append([]int(nil), rule.StatusCodes...)
 	rule.Classes = append([]string(nil), rule.Classes...)
 	rule.Keywords = append([]string(nil), rule.Keywords...)
+	rule.ResponseStatus = cloneIntPtr(rule.ResponseStatus)
 	return rule
 }
 
@@ -241,4 +265,27 @@ func cleanStatusCodes(codes []int) []int {
 		out = append(out, code)
 	}
 	return out
+}
+
+func cleanResponseStatus(status *int) (*int, bool) {
+	if status == nil || *status == 0 {
+		return nil, true
+	}
+	if *status < 100 || *status > 599 {
+		return nil, false
+	}
+	cleaned := *status
+	return &cleaned, true
+}
+
+func cleanCustomMessage(message string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(message)), " ")
+}
+
+func cloneIntPtr(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }

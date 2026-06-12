@@ -29,19 +29,21 @@ func (s *Store) CreateRule(ctx context.Context, input contract.CreateRule) (cont
 	s.seq++
 	now := s.now()
 	rule := contract.Rule{
-		ID:          s.seq,
-		Name:        input.Name,
-		Enabled:     input.Enabled,
-		Priority:    input.Priority,
-		Action:      input.Action,
-		StatusCodes: append([]int(nil), input.StatusCodes...),
-		Classes:     append([]string(nil), input.Classes...),
-		Keywords:    append([]string(nil), input.Keywords...),
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:             s.seq,
+		Name:           input.Name,
+		Enabled:        input.Enabled,
+		Priority:       input.Priority,
+		Action:         input.Action,
+		StatusCodes:    append([]int(nil), input.StatusCodes...),
+		Classes:        append([]string(nil), input.Classes...),
+		Keywords:       append([]string(nil), input.Keywords...),
+		ResponseStatus: cloneIntPtr(input.ResponseStatus),
+		CustomMessage:  input.CustomMessage,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 	s.rules[rule.ID] = rule
-	return rule, nil
+	return cloneRule(rule), nil
 }
 
 func (s *Store) UpdateRule(ctx context.Context, id int, input contract.UpdateRule) (contract.Rule, error) {
@@ -72,9 +74,15 @@ func (s *Store) UpdateRule(ctx context.Context, id int, input contract.UpdateRul
 	if input.Keywords != nil {
 		rule.Keywords = append([]string(nil), *input.Keywords...)
 	}
+	if input.ResponseStatus != nil {
+		rule.ResponseStatus = cloneIntPtr(*input.ResponseStatus)
+	}
+	if input.CustomMessage != nil {
+		rule.CustomMessage = *input.CustomMessage
+	}
 	rule.UpdatedAt = s.now()
 	s.rules[id] = rule
-	return rule, nil
+	return cloneRule(rule), nil
 }
 
 func (s *Store) DeleteRule(ctx context.Context, id int) error {
@@ -92,7 +100,7 @@ func (s *Store) ListRules(ctx context.Context) ([]contract.Rule, error) {
 	defer s.mu.Unlock()
 	out := make([]contract.Rule, 0, len(s.rules))
 	for _, rule := range s.rules {
-		out = append(out, rule)
+		out = append(out, cloneRule(rule))
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Priority != out[j].Priority {
@@ -101,4 +109,20 @@ func (s *Store) ListRules(ctx context.Context) ([]contract.Rule, error) {
 		return out[i].ID < out[j].ID
 	})
 	return out, nil
+}
+
+func cloneRule(rule contract.Rule) contract.Rule {
+	rule.StatusCodes = append([]int(nil), rule.StatusCodes...)
+	rule.Classes = append([]string(nil), rule.Classes...)
+	rule.Keywords = append([]string(nil), rule.Keywords...)
+	rule.ResponseStatus = cloneIntPtr(rule.ResponseStatus)
+	return rule
+}
+
+func cloneIntPtr(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }

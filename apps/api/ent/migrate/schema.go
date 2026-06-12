@@ -716,6 +716,8 @@ var (
 		{Name: "match_status_codes", Type: field.TypeJSON, Nullable: true},
 		{Name: "match_classes", Type: field.TypeJSON, Nullable: true},
 		{Name: "match_keywords", Type: field.TypeJSON, Nullable: true},
+		{Name: "response_status", Type: field.TypeInt, Nullable: true},
+		{Name: "custom_message", Type: field.TypeString, Default: ""},
 	}
 	// ErrorPassthroughRulesTable holds the schema information for the "error_passthrough_rules" table.
 	ErrorPassthroughRulesTable = &schema.Table{

@@ -5228,6 +5228,18 @@ export type ErrorPassthroughRule = {
     status_codes: Array<number>;
     classes: Array<string>;
     keywords: Array<string>;
+    /**
+     * Optional downstream HTTP status returned when this rule matches. Use 0 in update requests to clear the override.
+     */
+    response_status?: number | null;
+    /**
+     * Alias of response_status for compatibility with sub2api-style imports.
+     */
+    response_code?: number | null;
+    /**
+     * Optional downstream error message returned when this rule matches. Empty string clears the override.
+     */
+    custom_message?: string;
     created_at: string;
     updated_at: string;
 };
@@ -5240,6 +5252,12 @@ export type CreateErrorPassthroughRuleRequest = {
     status_codes?: Array<number>;
     classes?: Array<string>;
     keywords?: Array<string>;
+    response_status?: number | null;
+    /**
+     * Alias of response_status for compatibility with sub2api-style imports.
+     */
+    response_code?: number | null;
+    custom_message?: string;
 };
 
 export type UpdateErrorPassthroughRuleRequest = {
@@ -5250,6 +5268,18 @@ export type UpdateErrorPassthroughRuleRequest = {
     status_codes?: Array<number>;
     classes?: Array<string>;
     keywords?: Array<string>;
+    /**
+     * Set to a 100-599 status, or 0 to clear the override.
+     */
+    response_status?: number | null;
+    /**
+     * Alias of response_status for compatibility with sub2api-style imports.
+     */
+    response_code?: number | null;
+    /**
+     * Set to a non-empty message, or empty string to clear the override.
+     */
+    custom_message?: string;
 };
 
 export type ErrorPassthroughRuleResponse = {

@@ -175,14 +175,23 @@ func (s *Server) gatewayPublicErrorResponse(err error, errorClass string, upstre
 		Message: providerGatewayMessage(errorClass),
 	}
 	if s.runtime != nil && s.runtime.errorPassthrough != nil {
-		if raw := gatewayProviderErrorMessage(err); raw != "" {
-			if action, matched := s.runtime.errorPassthrough.Resolve(context.Background(), errorClass, upstreamStatus, raw); matched {
-				if action == errorpassthroughcontract.ActionExpose {
-					response.Message = raw
-					return response
+		raw := gatewayProviderErrorMessage(err)
+		if resolution, matched := s.runtime.errorPassthrough.Resolve(context.Background(), errorClass, upstreamStatus, raw); matched {
+			if resolution.ResponseStatus != nil {
+				response.Status = *resolution.ResponseStatus
+			}
+			if customMessage := gatewayNormalizeProviderErrorMessage(resolution.CustomMessage); customMessage != "" && !gatewayProviderErrorMessageSensitive(customMessage) {
+				if len([]rune(customMessage)) > maxGatewayProviderErrorMessageLength {
+					customMessage = string([]rune(customMessage)[:maxGatewayProviderErrorMessageLength]) + "..."
 				}
+				response.Message = customMessage
 				return response
 			}
+			if resolution.Action == errorpassthroughcontract.ActionExpose && raw != "" {
+				response.Message = raw
+				return response
+			}
+			return response
 		}
 	}
 	return gatewayProviderPublicErrorResponse(err, errorClass, upstreamStatus, candidate)

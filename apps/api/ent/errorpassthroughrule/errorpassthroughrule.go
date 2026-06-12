@@ -31,6 +31,10 @@ const (
 	FieldMatchClasses = "match_classes"
 	// FieldMatchKeywords holds the string denoting the match_keywords field in the database.
 	FieldMatchKeywords = "match_keywords"
+	// FieldResponseStatus holds the string denoting the response_status field in the database.
+	FieldResponseStatus = "response_status"
+	// FieldCustomMessage holds the string denoting the custom_message field in the database.
+	FieldCustomMessage = "custom_message"
 	// Table holds the table name of the errorpassthroughrule in the database.
 	Table = "error_passthrough_rules"
 )
@@ -47,6 +51,8 @@ var Columns = []string{
 	FieldMatchStatusCodes,
 	FieldMatchClasses,
 	FieldMatchKeywords,
+	FieldResponseStatus,
+	FieldCustomMessage,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -74,6 +80,8 @@ var (
 	DefaultPriority int
 	// DefaultAction holds the default value on creation for the "action" field.
 	DefaultAction string
+	// DefaultCustomMessage holds the default value on creation for the "custom_message" field.
+	DefaultCustomMessage string
 )
 
 // OrderOption defines the ordering options for the ErrorPassthroughRule queries.
@@ -112,4 +120,14 @@ func ByPriority(opts ...sql.OrderTermOption) OrderOption {
 // ByAction orders the results by the action field.
 func ByAction(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAction, opts...).ToFunc()
+}
+
+// ByResponseStatus orders the results by the response_status field.
+func ByResponseStatus(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResponseStatus, opts...).ToFunc()
+}
+
+// ByCustomMessage orders the results by the custom_message field.
+func ByCustomMessage(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCustomMessage, opts...).ToFunc()
 }

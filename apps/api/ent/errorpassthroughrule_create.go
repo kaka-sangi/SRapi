@@ -114,6 +114,34 @@ func (_c *ErrorPassthroughRuleCreate) SetMatchKeywords(v []string) *ErrorPassthr
 	return _c
 }
 
+// SetResponseStatus sets the "response_status" field.
+func (_c *ErrorPassthroughRuleCreate) SetResponseStatus(v int) *ErrorPassthroughRuleCreate {
+	_c.mutation.SetResponseStatus(v)
+	return _c
+}
+
+// SetNillableResponseStatus sets the "response_status" field if the given value is not nil.
+func (_c *ErrorPassthroughRuleCreate) SetNillableResponseStatus(v *int) *ErrorPassthroughRuleCreate {
+	if v != nil {
+		_c.SetResponseStatus(*v)
+	}
+	return _c
+}
+
+// SetCustomMessage sets the "custom_message" field.
+func (_c *ErrorPassthroughRuleCreate) SetCustomMessage(v string) *ErrorPassthroughRuleCreate {
+	_c.mutation.SetCustomMessage(v)
+	return _c
+}
+
+// SetNillableCustomMessage sets the "custom_message" field if the given value is not nil.
+func (_c *ErrorPassthroughRuleCreate) SetNillableCustomMessage(v *string) *ErrorPassthroughRuleCreate {
+	if v != nil {
+		_c.SetCustomMessage(*v)
+	}
+	return _c
+}
+
 // Mutation returns the ErrorPassthroughRuleMutation object of the builder.
 func (_c *ErrorPassthroughRuleCreate) Mutation() *ErrorPassthroughRuleMutation {
 	return _c.mutation
@@ -169,6 +197,10 @@ func (_c *ErrorPassthroughRuleCreate) defaults() {
 		v := errorpassthroughrule.DefaultAction
 		_c.mutation.SetAction(v)
 	}
+	if _, ok := _c.mutation.CustomMessage(); !ok {
+		v := errorpassthroughrule.DefaultCustomMessage
+		_c.mutation.SetCustomMessage(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -195,6 +227,9 @@ func (_c *ErrorPassthroughRuleCreate) check() error {
 	}
 	if _, ok := _c.mutation.Action(); !ok {
 		return &ValidationError{Name: "action", err: errors.New(`ent: missing required field "ErrorPassthroughRule.action"`)}
+	}
+	if _, ok := _c.mutation.CustomMessage(); !ok {
+		return &ValidationError{Name: "custom_message", err: errors.New(`ent: missing required field "ErrorPassthroughRule.custom_message"`)}
 	}
 	return nil
 }
@@ -257,6 +292,14 @@ func (_c *ErrorPassthroughRuleCreate) createSpec() (*ErrorPassthroughRule, *sqlg
 	if value, ok := _c.mutation.MatchKeywords(); ok {
 		_spec.SetField(errorpassthroughrule.FieldMatchKeywords, field.TypeJSON, value)
 		_node.MatchKeywords = value
+	}
+	if value, ok := _c.mutation.ResponseStatus(); ok {
+		_spec.SetField(errorpassthroughrule.FieldResponseStatus, field.TypeInt, value)
+		_node.ResponseStatus = &value
+	}
+	if value, ok := _c.mutation.CustomMessage(); ok {
+		_spec.SetField(errorpassthroughrule.FieldCustomMessage, field.TypeString, value)
+		_node.CustomMessage = value
 	}
 	return _node, _spec
 }

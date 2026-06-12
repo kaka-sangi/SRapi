@@ -18985,6 +18985,9 @@ type ErrorPassthroughRuleMutation struct {
 	appendmatch_classes      []string
 	match_keywords           *[]string
 	appendmatch_keywords     []string
+	response_status          *int
+	addresponse_status       *int
+	custom_message           *string
 	clearedFields            map[string]struct{}
 	done                     bool
 	oldValue                 func(context.Context) (*ErrorPassthroughRule, error)
@@ -19520,6 +19523,112 @@ func (m *ErrorPassthroughRuleMutation) ResetMatchKeywords() {
 	delete(m.clearedFields, errorpassthroughrule.FieldMatchKeywords)
 }
 
+// SetResponseStatus sets the "response_status" field.
+func (m *ErrorPassthroughRuleMutation) SetResponseStatus(i int) {
+	m.response_status = &i
+	m.addresponse_status = nil
+}
+
+// ResponseStatus returns the value of the "response_status" field in the mutation.
+func (m *ErrorPassthroughRuleMutation) ResponseStatus() (r int, exists bool) {
+	v := m.response_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResponseStatus returns the old "response_status" field's value of the ErrorPassthroughRule entity.
+// If the ErrorPassthroughRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ErrorPassthroughRuleMutation) OldResponseStatus(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResponseStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResponseStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResponseStatus: %w", err)
+	}
+	return oldValue.ResponseStatus, nil
+}
+
+// AddResponseStatus adds i to the "response_status" field.
+func (m *ErrorPassthroughRuleMutation) AddResponseStatus(i int) {
+	if m.addresponse_status != nil {
+		*m.addresponse_status += i
+	} else {
+		m.addresponse_status = &i
+	}
+}
+
+// AddedResponseStatus returns the value that was added to the "response_status" field in this mutation.
+func (m *ErrorPassthroughRuleMutation) AddedResponseStatus() (r int, exists bool) {
+	v := m.addresponse_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearResponseStatus clears the value of the "response_status" field.
+func (m *ErrorPassthroughRuleMutation) ClearResponseStatus() {
+	m.response_status = nil
+	m.addresponse_status = nil
+	m.clearedFields[errorpassthroughrule.FieldResponseStatus] = struct{}{}
+}
+
+// ResponseStatusCleared returns if the "response_status" field was cleared in this mutation.
+func (m *ErrorPassthroughRuleMutation) ResponseStatusCleared() bool {
+	_, ok := m.clearedFields[errorpassthroughrule.FieldResponseStatus]
+	return ok
+}
+
+// ResetResponseStatus resets all changes to the "response_status" field.
+func (m *ErrorPassthroughRuleMutation) ResetResponseStatus() {
+	m.response_status = nil
+	m.addresponse_status = nil
+	delete(m.clearedFields, errorpassthroughrule.FieldResponseStatus)
+}
+
+// SetCustomMessage sets the "custom_message" field.
+func (m *ErrorPassthroughRuleMutation) SetCustomMessage(s string) {
+	m.custom_message = &s
+}
+
+// CustomMessage returns the value of the "custom_message" field in the mutation.
+func (m *ErrorPassthroughRuleMutation) CustomMessage() (r string, exists bool) {
+	v := m.custom_message
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCustomMessage returns the old "custom_message" field's value of the ErrorPassthroughRule entity.
+// If the ErrorPassthroughRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ErrorPassthroughRuleMutation) OldCustomMessage(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCustomMessage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCustomMessage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCustomMessage: %w", err)
+	}
+	return oldValue.CustomMessage, nil
+}
+
+// ResetCustomMessage resets all changes to the "custom_message" field.
+func (m *ErrorPassthroughRuleMutation) ResetCustomMessage() {
+	m.custom_message = nil
+}
+
 // Where appends a list predicates to the ErrorPassthroughRuleMutation builder.
 func (m *ErrorPassthroughRuleMutation) Where(ps ...predicate.ErrorPassthroughRule) {
 	m.predicates = append(m.predicates, ps...)
@@ -19554,7 +19663,7 @@ func (m *ErrorPassthroughRuleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ErrorPassthroughRuleMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 11)
 	if m.created_at != nil {
 		fields = append(fields, errorpassthroughrule.FieldCreatedAt)
 	}
@@ -19582,6 +19691,12 @@ func (m *ErrorPassthroughRuleMutation) Fields() []string {
 	if m.match_keywords != nil {
 		fields = append(fields, errorpassthroughrule.FieldMatchKeywords)
 	}
+	if m.response_status != nil {
+		fields = append(fields, errorpassthroughrule.FieldResponseStatus)
+	}
+	if m.custom_message != nil {
+		fields = append(fields, errorpassthroughrule.FieldCustomMessage)
+	}
 	return fields
 }
 
@@ -19608,6 +19723,10 @@ func (m *ErrorPassthroughRuleMutation) Field(name string) (ent.Value, bool) {
 		return m.MatchClasses()
 	case errorpassthroughrule.FieldMatchKeywords:
 		return m.MatchKeywords()
+	case errorpassthroughrule.FieldResponseStatus:
+		return m.ResponseStatus()
+	case errorpassthroughrule.FieldCustomMessage:
+		return m.CustomMessage()
 	}
 	return nil, false
 }
@@ -19635,6 +19754,10 @@ func (m *ErrorPassthroughRuleMutation) OldField(ctx context.Context, name string
 		return m.OldMatchClasses(ctx)
 	case errorpassthroughrule.FieldMatchKeywords:
 		return m.OldMatchKeywords(ctx)
+	case errorpassthroughrule.FieldResponseStatus:
+		return m.OldResponseStatus(ctx)
+	case errorpassthroughrule.FieldCustomMessage:
+		return m.OldCustomMessage(ctx)
 	}
 	return nil, fmt.Errorf("unknown ErrorPassthroughRule field %s", name)
 }
@@ -19707,6 +19830,20 @@ func (m *ErrorPassthroughRuleMutation) SetField(name string, value ent.Value) er
 		}
 		m.SetMatchKeywords(v)
 		return nil
+	case errorpassthroughrule.FieldResponseStatus:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResponseStatus(v)
+		return nil
+	case errorpassthroughrule.FieldCustomMessage:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCustomMessage(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ErrorPassthroughRule field %s", name)
 }
@@ -19718,6 +19855,9 @@ func (m *ErrorPassthroughRuleMutation) AddedFields() []string {
 	if m.addpriority != nil {
 		fields = append(fields, errorpassthroughrule.FieldPriority)
 	}
+	if m.addresponse_status != nil {
+		fields = append(fields, errorpassthroughrule.FieldResponseStatus)
+	}
 	return fields
 }
 
@@ -19728,6 +19868,8 @@ func (m *ErrorPassthroughRuleMutation) AddedField(name string) (ent.Value, bool)
 	switch name {
 	case errorpassthroughrule.FieldPriority:
 		return m.AddedPriority()
+	case errorpassthroughrule.FieldResponseStatus:
+		return m.AddedResponseStatus()
 	}
 	return nil, false
 }
@@ -19743,6 +19885,13 @@ func (m *ErrorPassthroughRuleMutation) AddField(name string, value ent.Value) er
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddPriority(v)
+		return nil
+	case errorpassthroughrule.FieldResponseStatus:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddResponseStatus(v)
 		return nil
 	}
 	return fmt.Errorf("unknown ErrorPassthroughRule numeric field %s", name)
@@ -19760,6 +19909,9 @@ func (m *ErrorPassthroughRuleMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(errorpassthroughrule.FieldMatchKeywords) {
 		fields = append(fields, errorpassthroughrule.FieldMatchKeywords)
+	}
+	if m.FieldCleared(errorpassthroughrule.FieldResponseStatus) {
+		fields = append(fields, errorpassthroughrule.FieldResponseStatus)
 	}
 	return fields
 }
@@ -19783,6 +19935,9 @@ func (m *ErrorPassthroughRuleMutation) ClearField(name string) error {
 		return nil
 	case errorpassthroughrule.FieldMatchKeywords:
 		m.ClearMatchKeywords()
+		return nil
+	case errorpassthroughrule.FieldResponseStatus:
+		m.ClearResponseStatus()
 		return nil
 	}
 	return fmt.Errorf("unknown ErrorPassthroughRule nullable field %s", name)
@@ -19818,6 +19973,12 @@ func (m *ErrorPassthroughRuleMutation) ResetField(name string) error {
 		return nil
 	case errorpassthroughrule.FieldMatchKeywords:
 		m.ResetMatchKeywords()
+		return nil
+	case errorpassthroughrule.FieldResponseStatus:
+		m.ResetResponseStatus()
+		return nil
+	case errorpassthroughrule.FieldCustomMessage:
+		m.ResetCustomMessage()
 		return nil
 	}
 	return fmt.Errorf("unknown ErrorPassthroughRule field %s", name)

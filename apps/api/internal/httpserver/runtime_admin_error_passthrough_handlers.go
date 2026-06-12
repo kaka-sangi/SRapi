@@ -12,36 +12,45 @@ import (
 )
 
 type errorPassthroughRulePayload struct {
-	ID          int       `json:"id"`
-	Name        string    `json:"name"`
-	Enabled     bool      `json:"enabled"`
-	Priority    int       `json:"priority"`
-	Action      string    `json:"action"`
-	StatusCodes []int     `json:"status_codes"`
-	Classes     []string  `json:"classes"`
-	Keywords    []string  `json:"keywords"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID             int       `json:"id"`
+	Name           string    `json:"name"`
+	Enabled        bool      `json:"enabled"`
+	Priority       int       `json:"priority"`
+	Action         string    `json:"action"`
+	StatusCodes    []int     `json:"status_codes"`
+	Classes        []string  `json:"classes"`
+	Keywords       []string  `json:"keywords"`
+	ResponseStatus *int      `json:"response_status,omitempty"`
+	ResponseCode   *int      `json:"response_code,omitempty"`
+	CustomMessage  string    `json:"custom_message,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type createErrorPassthroughRuleRequest struct {
-	Name        string   `json:"name"`
-	Enabled     *bool    `json:"enabled"`
-	Priority    int      `json:"priority"`
-	Action      string   `json:"action"`
-	StatusCodes []int    `json:"status_codes"`
-	Classes     []string `json:"classes"`
-	Keywords    []string `json:"keywords"`
+	Name           string   `json:"name"`
+	Enabled        *bool    `json:"enabled"`
+	Priority       int      `json:"priority"`
+	Action         string   `json:"action"`
+	StatusCodes    []int    `json:"status_codes"`
+	Classes        []string `json:"classes"`
+	Keywords       []string `json:"keywords"`
+	ResponseStatus *int     `json:"response_status"`
+	ResponseCode   *int     `json:"response_code"`
+	CustomMessage  string   `json:"custom_message"`
 }
 
 type updateErrorPassthroughRuleRequest struct {
-	Name        *string   `json:"name"`
-	Enabled     *bool     `json:"enabled"`
-	Priority    *int      `json:"priority"`
-	Action      *string   `json:"action"`
-	StatusCodes *[]int    `json:"status_codes"`
-	Classes     *[]string `json:"classes"`
-	Keywords    *[]string `json:"keywords"`
+	Name           *string   `json:"name"`
+	Enabled        *bool     `json:"enabled"`
+	Priority       *int      `json:"priority"`
+	Action         *string   `json:"action"`
+	StatusCodes    *[]int    `json:"status_codes"`
+	Classes        *[]string `json:"classes"`
+	Keywords       *[]string `json:"keywords"`
+	ResponseStatus *int      `json:"response_status"`
+	ResponseCode   *int      `json:"response_code"`
+	CustomMessage  *string   `json:"custom_message"`
 }
 
 func toErrorPassthroughRulePayload(rule errorpassthroughcontract.Rule) errorPassthroughRulePayload {
@@ -58,16 +67,19 @@ func toErrorPassthroughRulePayload(rule errorpassthroughcontract.Rule) errorPass
 		keywords = []string{}
 	}
 	return errorPassthroughRulePayload{
-		ID:          rule.ID,
-		Name:        rule.Name,
-		Enabled:     rule.Enabled,
-		Priority:    rule.Priority,
-		Action:      string(rule.Action),
-		StatusCodes: statusCodes,
-		Classes:     classes,
-		Keywords:    keywords,
-		CreatedAt:   rule.CreatedAt.UTC(),
-		UpdatedAt:   rule.UpdatedAt.UTC(),
+		ID:             rule.ID,
+		Name:           rule.Name,
+		Enabled:        rule.Enabled,
+		Priority:       rule.Priority,
+		Action:         string(rule.Action),
+		StatusCodes:    statusCodes,
+		Classes:        classes,
+		Keywords:       keywords,
+		ResponseStatus: cloneIntPtr(rule.ResponseStatus),
+		ResponseCode:   cloneIntPtr(rule.ResponseStatus),
+		CustomMessage:  rule.CustomMessage,
+		CreatedAt:      rule.CreatedAt.UTC(),
+		UpdatedAt:      rule.UpdatedAt.UTC(),
 	}
 }
 
@@ -121,6 +133,11 @@ func (s *Server) handleCreateAdminErrorPassthroughRule(w http.ResponseWriter, r 
 		StatusCodes: body.StatusCodes,
 		Classes:     body.Classes,
 		Keywords:    body.Keywords,
+		ResponseStatus: firstIntPtr(
+			body.ResponseStatus,
+			body.ResponseCode,
+		),
+		CustomMessage: body.CustomMessage,
 	})
 	if err != nil {
 		s.writeErrorPassthroughError(w, err, requestID)
@@ -166,6 +183,12 @@ func (s *Server) handleUpdateAdminErrorPassthroughRule(w http.ResponseWriter, r 
 		Classes:     body.Classes,
 		Keywords:    body.Keywords,
 	}
+	if responseStatus := firstIntPtr(body.ResponseStatus, body.ResponseCode); responseStatus != nil {
+		input.ResponseStatus = &responseStatus
+	}
+	if body.CustomMessage != nil {
+		input.CustomMessage = body.CustomMessage
+	}
 	if body.Action != nil {
 		action := errorpassthroughcontract.Action(*body.Action)
 		input.Action = &action
@@ -184,6 +207,16 @@ func (s *Server) handleUpdateAdminErrorPassthroughRule(w http.ResponseWriter, r 
 		"data":       toErrorPassthroughRulePayload(rule),
 		"request_id": requestID,
 	})
+}
+
+func firstIntPtr(values ...*int) *int {
+	for _, value := range values {
+		if value == nil {
+			continue
+		}
+		return cloneIntPtr(value)
+	}
+	return nil
 }
 
 func (s *Server) handleDeleteAdminErrorPassthroughRule(w http.ResponseWriter, r *http.Request) {
