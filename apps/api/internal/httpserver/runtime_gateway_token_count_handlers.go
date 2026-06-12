@@ -3,8 +3,10 @@ package httpserver
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
@@ -78,6 +80,10 @@ func (s *Server) handleAnthropicCountTokens(w http.ResponseWriter, r *http.Reque
 	failover := s.invokeProviderTokenCountWithFailover(r.Context(), r, authed, canonical, rawBody, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
+		if rendered, ok := s.estimatedTokenCountFallback(r, authed, canonical, failover.Err, startedAt); ok {
+			writeJSONAny(w, http.StatusOK, rendered)
+			return
+		}
 		s.writeGatewayFailoverFailure(w, r, authed, canonical, result, failover.FailureRecorded, failover.Err, admission, startedAt)
 		return
 	}
@@ -91,6 +97,33 @@ func (s *Server) handleAnthropicCountTokens(w http.ResponseWriter, r *http.Reque
 
 func readTokenCountBody(r *http.Request) ([]byte, error) {
 	return io.ReadAll(io.LimitReader(r.Body, 4<<20))
+}
+
+// estimatedTokenCountFallback answers count_tokens with a local estimate when
+// the routed upstream has no token-count surface (openai-compatible channels
+// have none). Claude Code calls count_tokens to drive its context compaction;
+// a hard 400 on such channels breaks it, while a marked estimate keeps it
+// working with roughly-right numbers.
+func (s *Server) estimatedTokenCountFallback(r *http.Request, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, failoverErr error, startedAt time.Time) (any, bool) {
+	var providerErr provideradaptercontract.ProviderError
+	if !errors.As(failoverErr, &providerErr) || !strings.Contains(providerErr.Message, "token count adapter unsupported") {
+		return nil, false
+	}
+	estimate := estimateGatewayTokens(gatewayRequestText(canonical))
+	canonicalResp := s.runtime.gateway.BuildCanonicalTokenCountResponse(canonical, estimate, nil, nil, nil, map[string]any{"srapi_estimated": true})
+	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+		RequestID:      canonical.RequestID,
+		Authed:         authed,
+		SourceProtocol: string(canonical.SourceProtocol),
+		SourceEndpoint: canonical.SourceEndpoint,
+		Model:          canonical.CanonicalModel,
+		Success:        true,
+		StatusCode:     ptrInt(http.StatusOK),
+		LatencyMS:      elapsedMillis(startedAt),
+		UsageEstimated: true,
+		Pricing:        zeroGatewayPricing(),
+	})
+	return s.runtime.gateway.RenderAnthropicCountTokens(canonicalResp), true
 }
 
 func (s *Server) recordTokenCountFailure(r *http.Request, authed apikeycontract.AuthResult, requestID string, sourceEndpoint string, sourceProtocol string, model string, errorClass string, latencyMS int, canonical *gatewaycontract.CanonicalRequest, admission gatewayAdmission) {
