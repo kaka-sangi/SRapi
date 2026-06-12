@@ -551,6 +551,72 @@ func TestFetchAccountQuotaAntigravityMapsPaidTierCreditsFallback(t *testing.T) {
 	assertQuotaSignalWithoutReset(t, report.QuotaSignals, "antigravity_google_one_ai_credits", "0", "25000", "50", 1)
 }
 
+func TestFetchAccountQuotaAntigravityFallsBackToCurrentTierPlan(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "object",
+			body: `{"currentTier":{"id":"free-tier","name":"Free"}}`,
+			want: "free-tier",
+		},
+		{
+			name: "string",
+			body: `{"currentTier":"free-tier"}`,
+			want: "free-tier",
+		},
+		{
+			name: "paid tier empty id",
+			body: `{"currentTier":{"id":"free-tier"},"paidTier":{"id":"","name":""}}`,
+			want: "free-tier",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			defer upstream.Close()
+
+			svc, err := service.New(upstream.Client())
+			if err != nil {
+				t.Fatalf("new service: %v", err)
+			}
+			report, err := svc.FetchAccountQuota(context.Background(), contract.ProbeRequest{
+				Provider: providercontract.Provider{
+					ID:          34,
+					Name:        "antigravity",
+					AdapterType: "reverse-proxy-antigravity",
+					Protocol:    "gemini-compatible",
+					Status:      providercontract.StatusActive,
+					ConfigSchema: map[string]any{
+						"quota_url": upstream.URL + "/v1internal:loadCodeAssist",
+						"auth_mode": "bearer",
+					},
+				},
+				Account: accountcontract.ProviderAccount{
+					ID:           34,
+					ProviderID:   34,
+					Name:         "antigravity-free",
+					RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+					Status:       accountcontract.StatusActive,
+					Metadata:     map[string]any{},
+				},
+				Credential: map[string]any{"access_token": "antigravity-access-token"},
+			})
+			if err != nil {
+				t.Fatalf("fetch antigravity quota: %v", err)
+			}
+			if !report.Supported || report.Plan != tc.want {
+				t.Fatalf("unexpected antigravity currentTier quota report: %+v", report)
+			}
+		})
+	}
+}
+
 func TestFetchAccountQuotaAntigravityMapsAICreditsArrayFallback(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

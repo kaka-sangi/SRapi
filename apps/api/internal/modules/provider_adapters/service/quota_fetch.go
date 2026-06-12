@@ -512,13 +512,23 @@ func applyAntigravityCreditsQuotaFallback(parsed any, now time.Time, report *con
 }
 
 func antigravityQuotaPlan(root map[string]any) string {
-	if paidTier, ok := root["paidTier"].(map[string]any); ok {
-		return firstNonEmpty(mapString(paidTier, "id"), mapString(paidTier, "name"))
+	for _, key := range []string{"paidTier", "paid_tier", "currentTier", "current_tier"} {
+		if plan := antigravityTierPlan(root[key]); plan != "" {
+			return plan
+		}
 	}
-	if paidTier, ok := root["paid_tier"].(map[string]any); ok {
-		return firstNonEmpty(mapString(paidTier, "id"), mapString(paidTier, "name"))
+	return firstNonEmpty(mapString(root, "subscription_tier"), mapString(root, "subscriptionTier"))
+}
+
+func antigravityTierPlan(value any) string {
+	switch tier := value.(type) {
+	case map[string]any:
+		return firstNonEmpty(mapString(tier, "id"), mapString(tier, "name"))
+	case string:
+		return strings.TrimSpace(tier)
+	default:
+		return ""
 	}
-	return firstNonEmpty(mapString(root, "paidTier"), firstNonEmpty(mapString(root, "paid_tier"), firstNonEmpty(mapString(root, "subscription_tier"), mapString(root, "subscriptionTier"))))
 }
 
 func antigravityQuotaCreditRecord(root map[string]any) map[string]any {
