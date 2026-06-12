@@ -215,7 +215,11 @@ func (s *Service) invokeReverseProxyCodexResponseInputItems(ctx context.Context,
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ResponseInputItemsResponse{}, classifyCodexProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
-	return withCodexInputItemsQuotaSignals(contract.ResponseInputItemsResponse{Raw: append([]byte(nil), bytes.TrimSpace(runtimeResp.Body)...), StatusCode: runtimeResp.StatusCode}, runtimeResp.Headers), nil
+	return withCodexInputItemsQuotaSignals(contract.ResponseInputItemsResponse{
+		Raw:        append([]byte(nil), bytes.TrimSpace(runtimeResp.Body)...),
+		StatusCode: runtimeResp.StatusCode,
+		Headers:    cloneGenericHeaders(runtimeResp.Headers),
+	}, runtimeResp.Headers), nil
 }
 
 func (s *Service) prepareCodexRealtime(_ context.Context, req contract.RealtimeRequest, baseURL string) (contract.RealtimeSession, error) {

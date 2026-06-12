@@ -4424,17 +4424,34 @@ func TestGatewayGeminiCountTokensSchedulesGeminiCompatibleUpstream(t *testing.T)
 		})
 		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Retry-After", "11")
+		w.Header().Set("X-Upstream-Request-Id", "gemini-count-upstream")
+		w.Header().Set("X-RateLimit-Remaining-Requests", "7")
+		w.Header().Set("X-Secret-Token", "should-not-leak")
 		_, _ = w.Write([]byte(`{"totalTokens":19,"cachedContentTokenCount":3,"promptTokensDetails":[{"modality":"TEXT","tokenCount":16}]}`))
 	}))
 	defer upstream.Close()
 
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustEnableGatewayPassthroughHeaders(t, handler, sessionCookie, loginResp.Data.CsrfToken, []string{"retry-after", "x-upstream-request-id", "x-ratelimit-*"})
 	providerResp, modelResp, accountResp := mustCreateNativeGeminiGatewayTarget(t, handler, sessionCookie, loginResp.Data.CsrfToken, upstream.URL)
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 
 	body := `{"contents":[{"role":"user","parts":[{"text":"count native gemini prompt"}]}]}`
 	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1beta/models/native-gemini-route-model:countTokens", body)
+	if got := rec.Header().Get("Retry-After"); got != "11" {
+		t.Fatalf("expected Retry-After to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-Upstream-Request-Id"); got != "gemini-count-upstream" {
+		t.Fatalf("expected upstream request id to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-RateLimit-Remaining-Requests"); got != "7" {
+		t.Fatalf("expected rate limit header to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-Secret-Token"); got != "" {
+		t.Fatalf("non-allowlisted header leaked: %q", got)
+	}
 	var resp apiopenapi.GeminiCountTokensResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode gemini count response: %v", err)
@@ -4520,12 +4537,17 @@ func TestGatewayAnthropicCountTokensSchedulesAnthropicCompatibleUpstream(t *test
 		})
 		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Retry-After", "13")
+		w.Header().Set("X-Upstream-Request-Id", "anthropic-count-upstream")
+		w.Header().Set("X-RateLimit-Remaining-Tokens", "29")
+		w.Header().Set("X-Secret-Token", "should-not-leak")
 		_, _ = w.Write([]byte(`{"input_tokens":23,"cache_creation_input_tokens":2}`))
 	}))
 	defer upstream.Close()
 
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustEnableGatewayPassthroughHeaders(t, handler, sessionCookie, loginResp.Data.CsrfToken, []string{"retry-after", "x-upstream-request-id", "x-ratelimit-*"})
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"anthropic-count-provider","display_name":"Anthropic Count Provider","adapter_type":"anthropic-compatible","protocol":"anthropic-compatible","status":"active","capabilities":{"token_counting":true}}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"anthropic-count-model","display_name":"Anthropic Count Model","status":"active","capabilities":[{"key":"token_counting","level":"required","status":"stable","version":"v1"}]}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"claude-count-upstream","status":"active"}`)
@@ -4534,6 +4556,18 @@ func TestGatewayAnthropicCountTokensSchedulesAnthropicCompatibleUpstream(t *test
 
 	body := `{"model":"anthropic-count-model","system":"count only","messages":[{"role":"user","content":"count this anthropic prompt"}]}`
 	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/messages/count_tokens", body)
+	if got := rec.Header().Get("Retry-After"); got != "13" {
+		t.Fatalf("expected Retry-After to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-Upstream-Request-Id"); got != "anthropic-count-upstream" {
+		t.Fatalf("expected upstream request id to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-RateLimit-Remaining-Tokens"); got != "29" {
+		t.Fatalf("expected rate limit header to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-Secret-Token"); got != "" {
+		t.Fatalf("non-allowlisted header leaked: %q", got)
+	}
 	var resp apiopenapi.AnthropicCountTokensResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode Anthropic count response: %v", err)
@@ -5428,12 +5462,17 @@ func TestGatewayResponsesInputItemsAliasReplaysRawUpstreamJSON(t *testing.T) {
 			t.Fatalf("expected repeated include query params, got %q", r.URL.RawQuery)
 		}
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Retry-After", "19")
+		w.Header().Set("X-Upstream-Request-Id", "input-items-upstream")
+		w.Header().Set("X-RateLimit-Remaining-Requests", "4")
+		w.Header().Set("X-Secret-Token", "should-not-leak")
 		_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"item_1","type":"message","role":"user","content":[{"type":"input_text","text":"kept raw"}]}],"first_id":"item_1","last_id":"item_1","has_more":false,"raw_marker":"input-items-upstream"}`))
 	}))
 	defer upstream.Close()
 
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustEnableGatewayPassthroughHeaders(t, handler, sessionCookie, loginResp.Data.CsrfToken, []string{"retry-after", "x-upstream-request-id", "x-ratelimit-*"})
 	openaiProvider := mustFindProviderByName(t, handler, sessionCookie, "openai-compatible")
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"input-items-alias-model","display_name":"Input Items Alias Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"input-items-upstream-model","status":"active"}`)
@@ -5445,6 +5484,18 @@ func TestGatewayResponsesInputItemsAliasReplaysRawUpstreamJSON(t *testing.T) {
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 
 	rec := mustGatewayRequest(t, handler, apiKey, http.MethodGet, "/api/provider/openai-compatible/v1/responses/resp_input_items/input_items?model=input-items-alias-model&after=item_1&limit=2&order=asc&include=file_search_call.results&include=reasoning.encrypted_content&before=drop", "")
+	if got := rec.Header().Get("Retry-After"); got != "19" {
+		t.Fatalf("expected Retry-After to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-Upstream-Request-Id"); got != "input-items-upstream" {
+		t.Fatalf("expected upstream request id to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-RateLimit-Remaining-Requests"); got != "4" {
+		t.Fatalf("expected rate limit header to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-Secret-Token"); got != "" {
+		t.Fatalf("non-allowlisted header leaked: %q", got)
+	}
 	if upstreamCalls != 1 {
 		t.Fatalf("expected one upstream input_items call, got %d", upstreamCalls)
 	}

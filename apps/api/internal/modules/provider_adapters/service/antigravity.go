@@ -177,7 +177,13 @@ func (s *Service) invokeReverseProxyAntigravityTokenCount(ctx context.Context, r
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.TokenCountResponse{}, classifyGeminiProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
-	return parseGeminiTokenCountResponse(runtimeResp.Body, runtimeResp.StatusCode)
+	parsed, err := parseGeminiTokenCountResponse(runtimeResp.Body, runtimeResp.StatusCode)
+	if err != nil {
+		return contract.TokenCountResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
+	return parsed, nil
 }
 
 func antigravityPayload(req contract.ConversationRequest) (antigravityRequest, error) {

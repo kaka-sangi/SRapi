@@ -452,7 +452,11 @@ func (s *Service) invokeOpenAIResponseInputItems(ctx context.Context, req contra
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return contract.ResponseInputItemsResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
-	return contract.ResponseInputItemsResponse{Raw: append([]byte(nil), bytes.TrimSpace(body)...), StatusCode: resp.StatusCode}, nil
+	return contract.ResponseInputItemsResponse{
+		Raw:        append([]byte(nil), bytes.TrimSpace(body)...),
+		StatusCode: resp.StatusCode,
+		Headers:    cloneGenericHeaders(resp.Header),
+	}, nil
 }
 
 func (s *Service) invokeReverseProxyOpenAIResponseInputItems(ctx context.Context, req contract.ResponseInputItemsRequest, baseURL string) (contract.ResponseInputItemsResponse, error) {
@@ -473,7 +477,11 @@ func (s *Service) invokeReverseProxyOpenAIResponseInputItems(ctx context.Context
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ResponseInputItemsResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
-	return contract.ResponseInputItemsResponse{Raw: append([]byte(nil), bytes.TrimSpace(runtimeResp.Body)...), StatusCode: runtimeResp.StatusCode}, nil
+	return contract.ResponseInputItemsResponse{
+		Raw:        append([]byte(nil), bytes.TrimSpace(runtimeResp.Body)...),
+		StatusCode: runtimeResp.StatusCode,
+		Headers:    cloneGenericHeaders(runtimeResp.Headers),
+	}, nil
 }
 
 func (s *Service) invokeReverseProxyGeminiCompatible(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {

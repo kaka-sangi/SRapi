@@ -10,6 +10,7 @@ import (
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
+	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
@@ -83,7 +84,8 @@ func (s *Server) handleAnthropicCountTokens(w http.ResponseWriter, r *http.Reque
 	providerResp := failover.Response
 	tokenCount := gatewayTokenCountFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalTokenCountResponse(canonical, tokenCount.TotalTokens, tokenCount.CachedContentTokenCount, tokenCount.PromptTokensDetails, tokenCount.CacheTokensDetails, tokenCount.Metadata)
-	s.recordTokenCountSuccess(r, authed, canonical, result, canonicalResp, elapsedMillis(startedAt))
+	s.recordTokenCountSuccess(r, authed, canonical, result, canonicalResp, elapsedMillis(startedAt), providerResp.QuotaSignals)
+	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderAnthropicCountTokens(canonicalResp))
 }
 
@@ -116,7 +118,7 @@ func (s *Server) recordTokenCountFailure(r *http.Request, authed apikeycontract.
 	s.runtime.recordGatewayUsage(r.Context(), rec)
 }
 
-func (s *Server) recordTokenCountSuccess(r *http.Request, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, resp gatewaycontract.TokenCountResponse, latencyMS int) {
+func (s *Server) recordTokenCountSuccess(r *http.Request, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, resp gatewaycontract.TokenCountResponse, latencyMS int, quotaSignals []provideradaptercontract.QuotaSignal) {
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -134,5 +136,6 @@ func (s *Server) recordTokenCountSuccess(r *http.Request, authed apikeycontract.
 		UsageEstimated:        false,
 		Pricing:               zeroGatewayPricing(),
 		CompatibilityWarnings: resp.CompatibilityWarnings,
+		ProviderQuotaSignals:  quotaSignals,
 	})
 }

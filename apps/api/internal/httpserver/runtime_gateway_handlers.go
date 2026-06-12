@@ -564,6 +564,7 @@ func (s *Server) handleListResponseInputItems(w http.ResponseWriter, r *http.Req
 		CompatibilityWarnings: canonical.CompatibilityWarnings,
 		ProviderQuotaSignals:  providerResp.QuotaSignals,
 	})
+	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 	writeRawJSONResponse(w, providerResp.StatusCode, providerResp.Raw)
 }
 
@@ -1254,7 +1255,8 @@ func (s *Server) handleGeminiCountTokens(w http.ResponseWriter, r *http.Request)
 	providerResp := failover.Response
 	tokenCount := gatewayTokenCountFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalTokenCountResponse(canonical, tokenCount.TotalTokens, tokenCount.CachedContentTokenCount, tokenCount.PromptTokensDetails, tokenCount.CacheTokensDetails, tokenCount.Metadata)
-	s.recordTokenCountSuccess(r, authed, canonical, result, canonicalResp, elapsedMillis(startedAt))
+	s.recordTokenCountSuccess(r, authed, canonical, result, canonicalResp, elapsedMillis(startedAt), providerResp.QuotaSignals)
+	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderGeminiCountTokens(canonicalResp))
 }
 

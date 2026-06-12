@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
@@ -69,7 +70,13 @@ func (s *Service) invokeGeminiTokenCount(ctx context.Context, req contract.Token
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return contract.TokenCountResponse{}, classifyGeminiProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
-	return parseGeminiTokenCountResponse(body, resp.StatusCode)
+	parsed, err := parseGeminiTokenCountResponse(body, resp.StatusCode)
+	if err != nil {
+		return contract.TokenCountResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(resp.Header)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(resp.Header, time.Now().UTC())
+	return parsed, nil
 }
 
 func (s *Service) invokeReverseProxyGeminiTokenCount(ctx context.Context, req contract.TokenCountRequest, baseURL string) (contract.TokenCountResponse, error) {
@@ -99,7 +106,13 @@ func (s *Service) invokeReverseProxyGeminiTokenCount(ctx context.Context, req co
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.TokenCountResponse{}, classifyGeminiProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
-	return parseGeminiTokenCountResponse(runtimeResp.Body, runtimeResp.StatusCode)
+	parsed, err := parseGeminiTokenCountResponse(runtimeResp.Body, runtimeResp.StatusCode)
+	if err != nil {
+		return contract.TokenCountResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
+	return parsed, nil
 }
 
 func (s *Service) invokeAnthropicTokenCount(ctx context.Context, req contract.TokenCountRequest, baseURL string) (contract.TokenCountResponse, error) {
@@ -135,7 +148,13 @@ func (s *Service) invokeAnthropicTokenCount(ctx context.Context, req contract.To
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return contract.TokenCountResponse{}, classifyAnthropicProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, respBody)
 	}
-	return parseAnthropicTokenCountResponse(respBody, resp.StatusCode)
+	parsed, err := parseAnthropicTokenCountResponse(respBody, resp.StatusCode)
+	if err != nil {
+		return contract.TokenCountResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(resp.Header)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(resp.Header, time.Now().UTC())
+	return parsed, nil
 }
 
 func (s *Service) invokeReverseProxyAnthropicTokenCount(ctx context.Context, req contract.TokenCountRequest, baseURL string) (contract.TokenCountResponse, error) {
@@ -182,7 +201,13 @@ func (s *Service) invokeReverseProxyAnthropicTokenCount(ctx context.Context, req
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.TokenCountResponse{}, classifyAnthropicProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
-	return parseAnthropicTokenCountResponse(runtimeResp.Body, runtimeResp.StatusCode)
+	parsed, err := parseAnthropicTokenCountResponse(runtimeResp.Body, runtimeResp.StatusCode)
+	if err != nil {
+		return contract.TokenCountResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
+	return parsed, nil
 }
 
 type geminiTokenCountResponse struct {

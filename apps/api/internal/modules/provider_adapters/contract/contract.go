@@ -458,6 +458,12 @@ type TokenCountResponse struct {
 	CacheTokensDetails      []ModalityTokenCount
 	StatusCode              int
 	Metadata                map[string]any
+	// QuotaSignals carries normalized passive quota observations discovered
+	// from successful upstream response headers.
+	QuotaSignals []QuotaSignal
+	// Headers carries upstream response headers when the adapter has them
+	// available, so the gateway can optionally forward an allowlist to clients.
+	Headers http.Header
 }
 
 // QuotaSignal carries sanitized provider quota observations from upstream response headers.
@@ -501,6 +507,9 @@ type ResponseInputItemsResponse struct {
 	Raw          []byte
 	StatusCode   int
 	QuotaSignals []QuotaSignal
+	// Headers carries upstream response headers when the adapter has them
+	// available, so the gateway can optionally forward an allowlist to clients.
+	Headers http.Header
 }
 
 type ModalityTokenCount struct {
