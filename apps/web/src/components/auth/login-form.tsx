@@ -273,6 +273,11 @@ export function LoginForm() {
           {t("login.signUp")}
         </a>
       </p>
+      <p className="mt-2 text-center text-2xs text-srapi-text-tertiary">
+        <a href="/key-usage" className="underline-offset-4 hover:text-srapi-text-secondary hover:underline">
+          {t("login.keyUsageLink")}
+        </a>
+      </p>
     </Card>
   );
 }
