@@ -116,8 +116,6 @@ func TestGatewayChatCompletionsStreamsSameProtocolSSEIncrementally(t *testing.T)
 }
 
 func TestGatewayChatCompletionsStreamEmitsKeepaliveDuringUpstreamGap(t *testing.T) {
-	t.Setenv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", "4")
-	t.Setenv("GATEWAY_STREAM_KEEPALIVE_INTERVAL_SECONDS", "1")
 	chunk1 := "data: {\"id\":\"chunk_1\",\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n"
 	chunk2 := "data: {\"id\":\"chunk_2\",\"choices\":[{\"delta\":{\"content\":\" world\"},\"finish_reason\":\"stop\"}]}\n\n"
 	done := "data: [DONE]\n\n"
@@ -129,7 +127,7 @@ func TestGatewayChatCompletionsStreamEmitsKeepaliveDuringUpstreamGap(t *testing.
 		if flusher != nil {
 			flusher.Flush()
 		}
-		time.Sleep(1500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		_, _ = io.WriteString(w, chunk2+done)
 		if flusher != nil {
 			flusher.Flush()
@@ -137,7 +135,10 @@ func TestGatewayChatCompletionsStreamEmitsKeepaliveDuringUpstreamGap(t *testing.
 	}))
 	defer upstream.Close()
 
-	handler := New(config.Load(), nil)
+	cfg := config.Load()
+	cfg.Gateway.StreamIdleTimeout = 300 * time.Millisecond
+	cfg.Gateway.StreamKeepaliveInterval = 25 * time.Millisecond
+	handler := New(cfg, nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"stream-keepalive-provider","display_name":"Stream Keepalive Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"stream-keepalive-model","display_name":"Stream Keepalive Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
@@ -230,9 +231,6 @@ func TestGatewayCodexImageGenerationStreamsTransformedEventsIncrementally(t *tes
 }
 
 func TestGatewayImageGenerationStreamEmitsKeepaliveDuringUpstreamGap(t *testing.T) {
-	t.Setenv("GATEWAY_IMAGE_STREAM_IDLE_TIMEOUT_SECONDS", "4")
-	t.Setenv("GATEWAY_IMAGE_STREAM_KEEPALIVE_INTERVAL_SECONDS", "1")
-
 	partial := "data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\"}\n\n"
 	completed := "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"total_tokens\":14},\"output\":[{\"type\":\"image_generation_call\",\"result\":\"ZmluYWw=\",\"output_format\":\"png\"}]}}\n\n"
 	done := "data: [DONE]\n\n"
@@ -247,7 +245,7 @@ func TestGatewayImageGenerationStreamEmitsKeepaliveDuringUpstreamGap(t *testing.
 		if flusher != nil {
 			flusher.Flush()
 		}
-		time.Sleep(1500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		_, _ = io.WriteString(w, completed+done)
 		if flusher != nil {
 			flusher.Flush()
@@ -255,7 +253,10 @@ func TestGatewayImageGenerationStreamEmitsKeepaliveDuringUpstreamGap(t *testing.
 	}))
 	defer upstream.Close()
 
-	handler := New(config.Load(), nil)
+	cfg := config.Load()
+	cfg.Gateway.ImageStreamIdleTimeout = 300 * time.Millisecond
+	cfg.Gateway.ImageStreamKeepaliveInterval = 25 * time.Millisecond
+	handler := New(cfg, nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-image-keepalive-provider","display_name":"Codex Image Keepalive","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-image-keepalive-model","display_name":"Codex Image Keepalive Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
@@ -280,9 +281,6 @@ func TestGatewayImageGenerationStreamEmitsKeepaliveDuringUpstreamGap(t *testing.
 }
 
 func TestGatewayImageGenerationStreamUsesImageIdleTimeout(t *testing.T) {
-	t.Setenv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", "1")
-	t.Setenv("GATEWAY_IMAGE_STREAM_IDLE_TIMEOUT_SECONDS", "3")
-
 	partial := "data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\"}\n\n"
 	completed := "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"total_tokens\":14},\"output\":[{\"type\":\"image_generation_call\",\"result\":\"ZmluYWw=\",\"output_format\":\"png\"}]}}\n\n"
 	done := "data: [DONE]\n\n"
@@ -302,7 +300,7 @@ func TestGatewayImageGenerationStreamUsesImageIdleTimeout(t *testing.T) {
 		case <-release:
 		case <-time.After(2 * time.Second):
 		}
-		time.Sleep(1500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		_, _ = io.WriteString(w, completed+done)
 		if flusher != nil {
 			flusher.Flush()
@@ -310,7 +308,10 @@ func TestGatewayImageGenerationStreamUsesImageIdleTimeout(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	handler := New(config.Load(), nil)
+	cfg := config.Load()
+	cfg.Gateway.StreamIdleTimeout = 50 * time.Millisecond
+	cfg.Gateway.ImageStreamIdleTimeout = 300 * time.Millisecond
+	handler := New(cfg, nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-image-idle-provider","display_name":"Codex Image Idle","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-image-idle-model","display_name":"Codex Image Idle Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
@@ -332,9 +333,6 @@ func TestGatewayImageGenerationStreamUsesImageIdleTimeout(t *testing.T) {
 }
 
 func TestGatewayImageGenerationStreamIdleTimeoutEmitsErrorEvent(t *testing.T) {
-	t.Setenv("GATEWAY_IMAGE_STREAM_IDLE_TIMEOUT_SECONDS", "1")
-	t.Setenv("GATEWAY_IMAGE_STREAM_KEEPALIVE_INTERVAL_SECONDS", "0")
-
 	partial := "data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\"}\n\n"
 	hang := make(chan struct{})
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -355,7 +353,10 @@ func TestGatewayImageGenerationStreamIdleTimeoutEmitsErrorEvent(t *testing.T) {
 	defer upstream.Close()
 	defer close(hang)
 
-	handler := New(config.Load(), nil)
+	cfg := config.Load()
+	cfg.Gateway.ImageStreamIdleTimeout = 50 * time.Millisecond
+	cfg.Gateway.ImageStreamKeepaliveInterval = 0
+	handler := New(cfg, nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-image-timeout-error-provider","display_name":"Codex Image Timeout Error","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-image-timeout-error-model","display_name":"Codex Image Timeout Error Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
@@ -386,7 +387,7 @@ func TestGatewayImageGenerationStreamIdleTimeoutEmitsErrorEvent(t *testing.T) {
 	if strings.Contains(body, "data: [DONE]") {
 		t.Fatalf("timeout stream should be interrupted without DONE, got: %s", body)
 	}
-	if elapsed > 5*time.Second {
+	if elapsed > 2*time.Second {
 		t.Fatalf("image idle timeout did not cut the hung stream promptly; elapsed=%s", elapsed)
 	}
 }
@@ -396,7 +397,6 @@ func TestGatewayImageGenerationStreamIdleTimeoutEmitsErrorEvent(t *testing.T) {
 // one chunk then stalls forever, the gateway cuts the stream (rather than
 // holding the client open indefinitely) and records a stream_idle_timeout.
 func TestGatewayChatCompletionStreamIdleTimeoutCutsHungUpstream(t *testing.T) {
-	t.Setenv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", "1")
 	chunk1 := "data: {\"id\":\"chunk_1\",\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n"
 
 	hang := make(chan struct{})
@@ -419,7 +419,9 @@ func TestGatewayChatCompletionStreamIdleTimeoutCutsHungUpstream(t *testing.T) {
 	defer upstream.Close()
 	defer close(hang)
 
-	handler := New(config.Load(), nil)
+	cfg := config.Load()
+	cfg.Gateway.StreamIdleTimeout = 50 * time.Millisecond
+	handler := New(cfg, nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"idle-provider","display_name":"Idle Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"idle-model","display_name":"Idle Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
@@ -442,8 +444,9 @@ func TestGatewayChatCompletionStreamIdleTimeoutCutsHungUpstream(t *testing.T) {
 	if strings.Contains(rec.body.String(), "[DONE]") {
 		t.Fatalf("stream should have been cut by the idle timeout, not completed: %q", rec.body.String())
 	}
-	// 1s idle timeout + scheduling slack; must be far below an unbounded hang.
-	if elapsed > 5*time.Second {
+	// The configured idle timeout plus scheduling slack must remain far below
+	// an unbounded upstream stall.
+	if elapsed > 2*time.Second {
 		t.Fatalf("idle timeout did not cut the hung stream promptly; elapsed=%s", elapsed)
 	}
 }

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"net"
@@ -62,7 +63,7 @@ func TestSchedulerLeaseStoreFallsBackLocallyWhenRedisUnavailable(t *testing.T) {
 	defer redisClient.Close()
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	store, err := schedulerLeaseStore(t.Context(), cfg, logger, redisClient)
+	store, err := schedulerLeaseStore(fastRedisUnavailableContext(t), cfg, logger, redisClient)
 	if err != nil {
 		t.Fatalf("expected local redis lease fallback without error, got %v", err)
 	}
@@ -83,7 +84,7 @@ func TestSchedulerLeaseStoreRequiresRedisInRelease(t *testing.T) {
 	defer redisClient.Close()
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	if _, err := schedulerLeaseStore(t.Context(), cfg, logger, redisClient); err == nil {
+	if _, err := schedulerLeaseStore(fastRedisUnavailableContext(t), cfg, logger, redisClient); err == nil {
 		t.Fatal("expected release mode to require redis-backed scheduler leases")
 	}
 }
@@ -160,7 +161,7 @@ func TestRealtimeSlotStoreFallsBackLocallyWhenRedisUnavailable(t *testing.T) {
 	defer redisClient.Close()
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	store, err := realtimeSlotStore(t.Context(), cfg, logger, redisClient)
+	store, err := realtimeSlotStore(fastRedisUnavailableContext(t), cfg, logger, redisClient)
 	if err != nil {
 		t.Fatalf("expected local redis realtime fallback without error, got %v", err)
 	}
@@ -181,9 +182,16 @@ func TestRealtimeSlotStoreRequiresRedisInRelease(t *testing.T) {
 	defer redisClient.Close()
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	if _, err := realtimeSlotStore(t.Context(), cfg, logger, redisClient); err == nil {
+	if _, err := realtimeSlotStore(fastRedisUnavailableContext(t), cfg, logger, redisClient); err == nil {
 		t.Fatal("expected release mode to require redis-backed realtime slots")
 	}
+}
+
+func fastRedisUnavailableContext(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	t.Cleanup(cancel)
+	return ctx
 }
 
 func TestReleaseRedisDependencyPingRetriesTransientStartupFailure(t *testing.T) {

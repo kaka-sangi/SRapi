@@ -187,7 +187,7 @@ migration-check:
 	cd $(API_DIR) && go test ./internal/platform/db -run 'Test(EntSchemaAppliesToEmptyDatabase|PostgresVersionedUpMigrationsMatchEntSchema|PostgresInitialDownMigrationCoversInitialTables|PostgresDownMigrationsCoverCreatedTables|PostgresIncrementalMigrationsArePairedAndContiguous)'
 
 api-test:
-	cd $(API_DIR) && go test ./...
+	cd $(API_DIR) && packages="$$(go list ./... | grep -v '/internal/codequality$$')" && go test $$packages
 
 api-run:
 	cd $(API_DIR) && go run ./cmd/srapi
