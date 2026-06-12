@@ -248,7 +248,7 @@ func anthropicContentFromParts(parts []contract.ContentPart) any {
 		case contract.ContentPartToolUse:
 			plainTextOnly = false
 			block := map[string]any{"type": "tool_use"}
-			setMapString(block, "id", part.ToolCallID)
+			setMapString(block, "id", sanitizeAnthropicToolUseID(part.ToolCallID))
 			setMapString(block, "name", part.ToolName)
 			if input := jsonObjectValue(part.ToolArgumentsJSON); input != nil {
 				block["input"] = input
@@ -260,7 +260,7 @@ func anthropicContentFromParts(parts []contract.ContentPart) any {
 		case contract.ContentPartToolResult:
 			plainTextOnly = false
 			block := map[string]any{"type": "tool_result"}
-			setMapString(block, "tool_use_id", firstNonEmpty(part.ToolResultForID, part.ToolCallID))
+			setMapString(block, "tool_use_id", sanitizeAnthropicToolUseID(firstNonEmpty(part.ToolResultForID, part.ToolCallID)))
 			if content := anthropicToolResultNestedContent(part); len(content) > 0 {
 				block["content"] = content
 			} else if text := strings.TrimSpace(part.Text); text != "" {
@@ -288,6 +288,30 @@ func anthropicContentFromParts(parts []contract.ContentPart) any {
 		return strings.Join(textParts, "\n")
 	}
 	return blocks
+}
+
+func sanitizeAnthropicToolUseID(id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(id))
+	for _, r := range id {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r)
+		case r >= 'A' && r <= 'Z':
+			b.WriteRune(r)
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '_' || r == '-':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('_')
+		}
+	}
+	return b.String()
 }
 
 func anthropicImageBlock(part contract.ContentPart) map[string]any {

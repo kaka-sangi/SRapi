@@ -4517,6 +4517,60 @@ func TestAnthropicCompatibleAdapterRendersBlockContentToUpstream(t *testing.T) {
 	}
 }
 
+func TestAnthropicCompatibleAdapterSanitizesToolUseIDs(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Messages []struct {
+				Role    string           `json:"role"`
+				Content []map[string]any `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if len(payload.Messages) != 2 {
+			t.Fatalf("expected assistant tool use and user tool result messages, got %+v", payload.Messages)
+		}
+		toolUse := payload.Messages[0].Content[0]
+		toolResult := payload.Messages[1].Content[0]
+		if payload.Messages[0].Role != "assistant" ||
+			toolUse["type"] != "tool_use" ||
+			toolUse["id"] != "call_bad_id_1" ||
+			payload.Messages[1].Role != "user" ||
+			toolResult["type"] != "tool_result" ||
+			toolResult["tool_use_id"] != "call_bad_id_1" {
+			t.Fatalf("expected sanitized matching Anthropic tool ids, got %+v", payload.Messages)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"done"}],"usage":{"input_tokens":5,"output_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID: "req_anthropic_tool_id_sanitize",
+		Model:     "claude-local",
+		Messages: []contract.ConversationMessage{
+			{Role: "assistant", Parts: []contract.ContentPart{
+				toolUsePart("call.bad:id 1", "lookup", `{"query":"weather"}`),
+			}},
+			{Role: "tool", Parts: []contract.ContentPart{
+				toolResultPart("call.bad:id 1", "sunny"),
+			}},
+		},
+		Provider:   providercontract.Provider{AdapterType: "anthropic-compatible", Protocol: "anthropic-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic upstream: %v", err)
+	}
+}
+
 func TestAnthropicCompatibleAdapterPreservesNestedToolResultContent(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
