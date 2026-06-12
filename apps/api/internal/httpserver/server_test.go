@@ -6597,7 +6597,7 @@ func TestGatewayImageGenerationRouteTargetsOpenAICompatibleUpstream(t *testing.T
 		})
 		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"created":1710000001,"data":[{"url":"https://example.test/wp290-image.png","revised_prompt":"polished image prompt"}],"model":"image-upstream","usage":{"prompt_tokens":12,"completion_tokens":1,"total_tokens":13}}`))
+		_, _ = w.Write([]byte(`{"created":1710000001,"data":[{"url":"https://example.test/wp290-image.png","revised_prompt":"polished image prompt"}],"model":"image-upstream","usage":{"prompt_tokens":12,"completion_tokens":3,"total_tokens":15,"output_tokens_details":{"image_tokens":2}}}`))
 	}))
 	defer upstream.Close()
 
@@ -6607,6 +6607,7 @@ func TestGatewayImageGenerationRouteTargetsOpenAICompatibleUpstream(t *testing.T
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp290-image-model","display_name":"WP290 Image Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"image-upstream","status":"active"}`)
 	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp290-image-account","runtime_class":"api_key","credential":{"api_key":"image-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	mustCreatePricingRule(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"model_id":"`+string(modelResp.Data.Id)+`","provider_id":"`+string(providerResp.Data.Id)+`","input_price_per_million_tokens":"1000","output_price_per_million_tokens":"2000","image_output_price_per_million_tokens":"5000","cache_read_price_per_million_tokens":"0","cache_write_price_per_million_tokens":"0","currency":"USD"}`)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/images/generations", `{"model":"wp290-image-model","prompt":"make a clean test image","n":1,"size":"1024x1024","quality":"high","style":"vivid","response_format":"url"}`)
@@ -6646,8 +6647,11 @@ func TestGatewayImageGenerationRouteTargetsOpenAICompatibleUpstream(t *testing.T
 		t.Fatalf("expected one image usage record, got %+v", usageResp.Data)
 	}
 	usage := usageResp.Data[0]
-	if !usage.Success || usage.SourceEndpoint != "/v1/images/generations" || usage.ProviderId == nil || *usage.ProviderId != string(providerResp.Data.Id) || usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) || usage.TotalTokens != 13 {
+	if !usage.Success || usage.SourceEndpoint != "/v1/images/generations" || usage.ProviderId == nil || *usage.ProviderId != string(providerResp.Data.Id) || usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) || usage.TotalTokens != 15 {
 		t.Fatalf("unexpected image usage evidence: %+v", usage)
+	}
+	if usage.Cost != "0.02400000" || usage.OutputCost == nil || *usage.OutputCost != "0.01200000" || usage.Currency != "USD" {
+		t.Fatalf("expected image output token pricing, got %+v", usage)
 	}
 
 	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp290-image-model", nil)

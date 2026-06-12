@@ -1594,10 +1594,11 @@ func gatewayUsageFromEmbeddingProvider(resp provideradaptercontract.EmbeddingRes
 
 func gatewayUsageFromImageProvider(resp provideradaptercontract.ImageGenerationResponse) gatewaycontract.Usage {
 	return gatewaycontract.Usage{
-		InputTokens:  resp.Usage.InputTokens,
-		OutputTokens: resp.Usage.OutputTokens,
-		CachedTokens: resp.Usage.CachedTokens,
-		Estimated:    resp.Usage.Estimated,
+		InputTokens:       resp.Usage.InputTokens,
+		OutputTokens:      resp.Usage.OutputTokens,
+		ImageOutputTokens: resp.Usage.ImageOutputTokens,
+		CachedTokens:      resp.Usage.CachedTokens,
+		Estimated:         resp.Usage.Estimated,
 	}
 }
 
