@@ -365,6 +365,103 @@ func TestGatewayAntigravityGeminiStreamAliasTargetsReverseProxy(t *testing.T) {
 	assertAntigravityAliasEvidence(t, handler, sessionCookie, "antigravity-gemini-stream-model", string(providerResp.Data.Id), string(accountResp.Data.Id), path, "gemini-compatible", 9)
 }
 
+func TestGatewayAntigravityImageGenerationTargetsNativeReverseProxy(t *testing.T) {
+	type imageCall struct {
+		Path          string
+		Authorization string
+		UserAgent     string
+		Project       string
+		RequestID     string
+		RequestType   string
+		Model         string
+		Prompt        string
+	}
+	var (
+		mu    sync.Mutex
+		calls []imageCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Project     string `json:"project"`
+			RequestID   string `json:"requestId"`
+			UserAgent   string `json:"userAgent"`
+			RequestType string `json:"requestType"`
+			Model       string `json:"model"`
+			Request     struct {
+				Contents []struct {
+					Parts []struct {
+						Text string `json:"text"`
+					} `json:"parts"`
+				} `json:"contents"`
+			} `json:"request"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream image request: %v", err)
+		}
+		call := imageCall{
+			Path:          r.URL.Path,
+			Authorization: r.Header.Get("Authorization"),
+			UserAgent:     r.Header.Get("User-Agent"),
+			Project:       payload.Project,
+			RequestID:     payload.RequestID,
+			RequestType:   payload.RequestType,
+			Model:         payload.Model,
+		}
+		if len(payload.Request.Contents) > 0 && len(payload.Request.Contents[0].Parts) > 0 {
+			call.Prompt = payload.Request.Contents[0].Parts[0].Text
+		}
+		mu.Lock()
+		calls = append(calls, call)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"response":{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"aW1hZ2U="}}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":7,"totalTokenCount":12}}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustInstallProviderPresets(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	antigravityProvider := mustFindProviderByName(t, handler, sessionCookie, "antigravity")
+	if antigravityProvider.Capabilities == nil || !jsonObjectBool(*antigravityProvider.Capabilities, "images") {
+		t.Fatalf("expected antigravity preset to expose images capability, got %+v", antigravityProvider.Capabilities)
+	}
+	updatedProvider := mustUpdateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(antigravityProvider.Id), `{"status":"active"}`)
+	antigravityProvider = updatedProvider.Data
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"antigravity-image-model","display_name":"Antigravity Image Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(antigravityProvider.Id)+`","upstream_model_name":"gemini-3.1-flash-image","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(antigravityProvider.Id)+`","name":"antigravity-image-account","runtime_class":"oauth_refresh","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active","priority":10}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/api/provider/antigravity/v1/images/generations", `{"model":"antigravity-image-model","prompt":"draw antigravity image","response_format":"b64_json"}`)
+	var imageResp apiopenapi.ImageGenerationResponse
+	if err := json.NewDecoder(rec.Body).Decode(&imageResp); err != nil {
+		t.Fatalf("decode antigravity image response: %v", err)
+	}
+	if len(imageResp.Data) != 1 || imageResp.Data[0].B64Json == nil || *imageResp.Data[0].B64Json != "aW1hZ2U=" || imageResp.Data[0].Url != nil {
+		t.Fatalf("unexpected antigravity image response: %+v", imageResp)
+	}
+
+	mu.Lock()
+	gotCalls := append([]imageCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream image call, got %+v", gotCalls)
+	}
+	call := gotCalls[0]
+	if call.Path != "/v1internal:generateContent" ||
+		call.Authorization != "Bearer desktop-token" ||
+		call.UserAgent != "Antigravity/1.0" ||
+		call.Project != "project-1" ||
+		!strings.HasPrefix(call.RequestID, "image_gen/") ||
+		call.RequestType != "image_gen" ||
+		call.Model != "gemini-3.1-flash-image" ||
+		call.Prompt != "draw antigravity image" {
+		t.Fatalf("unexpected Antigravity image upstream call: %+v", call)
+	}
+
+	assertAntigravityAliasEvidence(t, handler, sessionCookie, "antigravity-image-model", string(antigravityProvider.Id), string(accountResp.Data.Id), "/api/provider/antigravity/v1/images/generations", "openai-compatible", 12)
+}
+
 func assertAntigravityAliasEvidence(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, modelName, providerID, accountID, endpoint, targetProtocol string, totalTokens int) {
 	t.Helper()
 
@@ -405,4 +502,13 @@ func assertAntigravityAliasEvidence(t *testing.T, handler http.Handler, sessionC
 	if !usage.Success || usage.ProviderId == nil || *usage.ProviderId != providerID || usage.AccountId == nil || *usage.AccountId != accountID || usage.SourceEndpoint != endpoint || usage.TargetProtocol == nil || *usage.TargetProtocol != targetProtocol || usage.TotalTokens != totalTokens {
 		t.Fatalf("expected Antigravity usage evidence, got %+v", usage)
 	}
+}
+
+func jsonObjectBool(value apiopenapi.JsonObject, key string) bool {
+	item, ok := value[key]
+	if !ok {
+		return false
+	}
+	enabled, ok := item.(bool)
+	return ok && enabled
 }
