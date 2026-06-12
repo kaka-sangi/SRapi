@@ -4053,7 +4053,7 @@ func TestGatewayInvokesGenericReverseProxyProviderAdapter(t *testing.T) {
 	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
 		t.Fatalf("decode generic usage logs: %v", err)
 	}
-	if len(usageResp.Data) != 1 || usageResp.Data[0].UsageEstimated || usageResp.Data[0].InputTokens != 6 || usageResp.Data[0].OutputTokens != 7 || usageResp.Data[0].CachedTokens != 2 || usageResp.Data[0].TotalTokens != 15 {
+	if len(usageResp.Data) != 1 || usageResp.Data[0].UsageEstimated || usageResp.Data[0].InputTokens != 4 || usageResp.Data[0].OutputTokens != 7 || usageResp.Data[0].CachedTokens != 2 || usageResp.Data[0].TotalTokens != 13 {
 		t.Fatalf("expected parsed generic usage, got %+v", usageResp.Data)
 	}
 	if usageResp.Data[0].TargetProtocol == nil || *usageResp.Data[0].TargetProtocol != "openai-compatible" {

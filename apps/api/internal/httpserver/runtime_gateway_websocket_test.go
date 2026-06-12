@@ -396,6 +396,18 @@ func TestResponsesWebSocketUsageRejectsEmptyUsageObject(t *testing.T) {
 	}
 }
 
+func TestResponsesWebSocketUsageRejectsPartialTokenUsage(t *testing.T) {
+	if usage, ok := responsesWebSocketUsage([]byte(`{"type":"response.completed","response":{"usage":{"input_tokens_details":{"cached_tokens":2}}}}`)); ok {
+		t.Fatalf("expected cached-token-only usage to be ignored, got %+v", usage)
+	}
+	if usage, ok := responsesWebSocketUsage([]byte(`{"type":"response.completed","response":{"usage":{"input_tokens":9,"input_tokens_details":{"cached_tokens":2}}}}`)); ok {
+		t.Fatalf("expected input-only usage to be ignored, got %+v", usage)
+	}
+	if usage, ok := responsesWebSocketUsage([]byte(`{"type":"response.completed","response":{"usage":{"output_tokens":4}}}`)); ok {
+		t.Fatalf("expected output-only usage to be ignored, got %+v", usage)
+	}
+}
+
 func TestResponsesWebSocketUsageKeepsCacheCreationBreakdown(t *testing.T) {
 	usage, ok := responsesWebSocketUsage([]byte(`{"type":"response.done","response":{"usage":{"input_tokens":20,"output_tokens":4,"input_tokens_details":{"cached_tokens":5},"cache_creation_ephemeral_5m_input_tokens":7,"cache_creation_ephemeral_1h_input_tokens":11}}}`))
 	if !ok {

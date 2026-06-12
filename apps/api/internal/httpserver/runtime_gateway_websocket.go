@@ -991,12 +991,10 @@ func responsesWebSocketUsage(payload []byte) (gatewaycontract.Usage, bool) {
 		cacheCreationTokens = rawUsage.CacheCreation5m + rawUsage.CacheCreation1h
 	}
 	cacheCreation5m, cacheCreation1h := responsesWebSocketCacheCreationBuckets(cacheCreationTokens, rawUsage.CacheCreation5m, rawUsage.CacheCreation1h)
-	if !inputOK &&
-		!outputOK &&
-		cachedTokens == 0 &&
-		cacheCreationTokens == 0 &&
-		imageOutputTokens == 0 &&
-		reasoningOutputTokens == 0 {
+	if !inputOK && !outputOK && cacheCreationTokens == 0 {
+		return gatewaycontract.Usage{}, false
+	}
+	if inputOK != outputOK {
 		return gatewaycontract.Usage{}, false
 	}
 	return gatewaycontract.Usage{
