@@ -34,7 +34,8 @@ const (
 	gatewaySessionDigestMaxSegments = 24
 	// gatewaySessionDigestHashLen is the hex length of each per-turn content
 	// hash in a digest chain.
-	gatewaySessionDigestHashLen = 16
+	gatewaySessionDigestHashLen          = 16
+	gatewayPreviousResponseSessionPrefix = "sid:prev:"
 )
 
 // legacyAnthropicUserIDRegex matches Claude Code's legacy metadata.user_id
@@ -53,8 +54,9 @@ func gatewaySessionScope(apiKeyID int) string {
 // non-conversational endpoints). The priority cascade mirrors sub2api:
 //  1. Anthropic metadata.user_id session id (Claude Code),
 //  2. OpenAI/Codex prompt_cache_key and Codex window metadata,
-//  3. explicit session/conversation/thread id headers,
-//  4. a content digest chain over system + messages (longest-prefix matched).
+//  3. OpenAI Responses previous_response_id / response_id path,
+//  4. explicit session/conversation/thread id headers,
+//  5. a content digest chain over system + messages (longest-prefix matched).
 func deriveGatewaySessionAffinity(r *http.Request, canonical gatewaycontract.CanonicalRequest) (string, string) {
 	if key, source := explicitSessionIdentity(r, canonical); key != "" {
 		return key, source
@@ -70,8 +72,9 @@ func explicitSessionIdentity(r *http.Request, canonical gatewaycontract.Canonica
 		Metadata struct {
 			UserID string `json:"user_id"`
 		} `json:"metadata"`
-		PromptCacheKey string `json:"prompt_cache_key"`
-		ClientMetadata struct {
+		PromptCacheKey     string `json:"prompt_cache_key"`
+		PreviousResponseID string `json:"previous_response_id"`
+		ClientMetadata     struct {
 			CodexWindowID     string `json:"x-codex-window-id"`
 			CodexTurnMetadata string `json:"x-codex-turn-metadata"`
 		} `json:"client_metadata"`
@@ -88,7 +91,15 @@ func explicitSessionIdentity(r *http.Request, canonical gatewaycontract.Canonica
 	if key, source := codexMetadataSessionKey(probe.ClientMetadata.CodexWindowID, probe.ClientMetadata.CodexTurnMetadata); key != "" {
 		return key, source
 	}
+	if key := gatewayPreviousResponseSessionKey(probe.PreviousResponseID); key != "" {
+		return key, "derived:previous_response_id"
+	}
 	if r != nil {
+		if canonical.SourceEndpoint == string(gatewaycontract.EndpointResponseInputItems) {
+			if key := gatewayPreviousResponseSessionKey(r.PathValue("response_id")); key != "" {
+				return key, "derived:response_id_path"
+			}
+		}
 		if key, source := codexHeaderSessionKey(r.Header); key != "" {
 			return key, source
 		}
@@ -187,6 +198,14 @@ func codexTurnMetadataSessionValues(raw string) (string, string) {
 		return "", ""
 	}
 	return strings.TrimSpace(metadata.PromptCacheKey), strings.TrimSpace(metadata.WindowID)
+}
+
+func gatewayPreviousResponseSessionKey(responseID string) string {
+	responseID = strings.TrimSpace(responseID)
+	if !strings.HasPrefix(responseID, "resp_") {
+		return ""
+	}
+	return gatewayPreviousResponseSessionPrefix + shortDigest(responseID)
 }
 
 func gatewayHeaderValue(headers http.Header, key string) string {
@@ -332,9 +351,13 @@ func (rt *runtimeState) bindGatewaySessionAffinity(ctx context.Context, apiKeyID
 	// Track this conversation as active on the account for per-account session
 	// count limits (max_sessions). Re-binding the same conversation refreshes the
 	// same id, so one conversation never counts twice.
-	if sessionID := gatewayConversationSessionID(sessionKey); sessionID != "" {
+	if sessionID := gatewayAccountSessionID(sessionKey); sessionID != "" {
 		_ = rt.sessionAffinity.AddAccountSession(ctx, accountID, sessionID, gatewaySessionAffinityTTL)
 	}
+}
+
+func (rt *runtimeState) bindGatewayPreviousResponseAffinity(ctx context.Context, apiKeyID int, responseID string, accountID int) {
+	rt.bindGatewaySessionAffinity(ctx, apiKeyID, gatewayPreviousResponseSessionKey(responseID), accountID)
 }
 
 // gatewayConversationSessionID maps a session key to a stable per-conversation
@@ -369,6 +392,13 @@ func gatewayConversationSessionID(sessionKey string) string {
 		root = sessionaffinitycontract.ChainMarker + strings.Join(rootParts, "-")
 	}
 	return shortDigest(root)
+}
+
+func gatewayAccountSessionID(sessionKey string) string {
+	if strings.HasPrefix(strings.TrimSpace(sessionKey), gatewayPreviousResponseSessionPrefix) {
+		return ""
+	}
+	return gatewayConversationSessionID(sessionKey)
 }
 
 // filterCandidatesBySessionLimit drops accounts that already serve their

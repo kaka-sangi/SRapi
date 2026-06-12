@@ -564,6 +564,7 @@ func parseCodexResponsesStream(body []byte, statusCode int, options codexRespons
 	fallbackItems := []codexResponsesOutputItem{}
 	textAnnotationsByIndex := map[codexTextAnnotationKey][]map[string]any{}
 	var finalResponse *codexResponsesResponse
+	responseID := ""
 	streamEvents := make([]contract.ConversationStreamEvent, 0)
 	functionStates := newCodexFunctionCallStreamStates()
 	eventIndex := 0
@@ -601,6 +602,9 @@ func parseCodexResponsesStream(body []byte, statusCode int, options codexRespons
 		functionStates.mergeEvent(event)
 		if event.Response != nil {
 			copiedResponse := *event.Response
+			if id := strings.TrimSpace(copiedResponse.ID); id != "" {
+				responseID = id
+			}
 			if len(copiedResponse.Output) == 0 {
 				copiedResponse.Output = codexCollectedOutputItems(indexedItems, fallbackItems)
 			}
@@ -743,6 +747,7 @@ func parseCodexResponsesStream(body []byte, statusCode int, options codexRespons
 		})
 	}
 	return contract.ConversationResponse{
+		ID:           responseID,
 		Parts:        parts,
 		StopReason:   stopReason,
 		StatusCode:   statusCode,
@@ -1165,6 +1170,7 @@ func parseCodexResponsesJSON(body []byte, statusCode int) (contract.Conversation
 		if parts := codexEventParts(event); len(parts) > 0 {
 			text := contentPartsText(parts)
 			resp := contract.ConversationResponse{
+				ID:         codexEventResponseID(event),
 				Parts:      parts,
 				StopReason: codexEventStopReason(event),
 				StatusCode: statusCode,
@@ -1195,6 +1201,13 @@ func parseCodexResponsesJSON(body []byte, statusCode int) (contract.Conversation
 	}
 	resp.Raw = append(json.RawMessage(nil), body...)
 	return resp, nil
+}
+
+func codexEventResponseID(event codexResponsesEvent) string {
+	if event.Response != nil {
+		return strings.TrimSpace(event.Response.ID)
+	}
+	return ""
 }
 
 func codexResponseIsCompaction(response codexResponsesResponse) bool {
@@ -1395,6 +1408,7 @@ func (r codexResponsesResponse) ConversationResponse(statusCode int) (contract.C
 	}
 	text := contentPartsText(parts)
 	return contract.ConversationResponse{
+		ID:         strings.TrimSpace(r.ID),
 		Parts:      parts,
 		StopReason: codexStopReason(r),
 		StatusCode: statusCode,

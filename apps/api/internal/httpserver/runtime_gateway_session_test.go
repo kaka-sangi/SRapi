@@ -133,6 +133,25 @@ func TestDeriveGatewaySessionAffinityCascade(t *testing.T) {
 		}
 	})
 
+	t.Run("previous response id", func(t *testing.T) {
+		req := conversational
+		req.RawBody = []byte(`{"previous_response_id":"resp_previous"}`)
+		key, source := deriveGatewaySessionAffinity(httptest.NewRequest("POST", "/v1/responses", nil), req)
+		if !strings.HasPrefix(key, "sid:prev:") || source != "derived:previous_response_id" {
+			t.Fatalf("expected previous_response_id key, got key=%q source=%q", key, source)
+		}
+	})
+
+	t.Run("response input items path id", func(t *testing.T) {
+		req := gatewaycontract.CanonicalRequest{SourceEndpoint: string(gatewaycontract.EndpointResponseInputItems)}
+		httpReq := httptest.NewRequest("GET", "/v1/responses/resp_previous/input_items?model=gpt-5", nil)
+		httpReq.SetPathValue("response_id", "resp_previous")
+		key, source := deriveGatewaySessionAffinity(httpReq, req)
+		if !strings.HasPrefix(key, "sid:prev:") || source != "derived:response_id_path" {
+			t.Fatalf("expected response_id path key, got key=%q source=%q", key, source)
+		}
+	})
+
 	t.Run("prompt cache key matches codex turn metadata", func(t *testing.T) {
 		reqWithPromptCacheKey := conversational
 		reqWithPromptCacheKey.RawBody = []byte(`{"prompt_cache_key":"cache-1"}`)

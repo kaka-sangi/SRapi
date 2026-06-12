@@ -42,6 +42,31 @@ func TestGatewaySessionAffinityChainLongestPrefix(t *testing.T) {
 	}
 }
 
+func TestGatewayPreviousResponseAffinityBindLookupRoundTrip(t *testing.T) {
+	rt := &runtimeState{sessionAffinity: sessionaffinitymemory.New()}
+	ctx := context.Background()
+	const apiKeyID, accountID = 7, 42
+
+	rt.bindGatewayPreviousResponseAffinity(ctx, apiKeyID, "resp_previous", accountID)
+	key := gatewayPreviousResponseSessionKey("resp_previous")
+	id, ok := rt.lookupGatewaySessionAffinity(ctx, apiKeyID, key)
+	if !ok || id != accountID {
+		t.Fatalf("expected previous response account %d, got %d ok=%v", accountID, id, ok)
+	}
+
+	rt.bindGatewayPreviousResponseAffinity(ctx, apiKeyID, "chatcmpl_legacy", 99)
+	if key := gatewayPreviousResponseSessionKey("chatcmpl_legacy"); key != "" {
+		t.Fatalf("expected non-responses id to be ignored, got %q", key)
+	}
+	count, err := rt.sessionAffinity.CountAccountSessionsExcluding(ctx, accountID, "")
+	if err != nil {
+		t.Fatalf("count account sessions: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("previous response aliases must not inflate active session count, got %d", count)
+	}
+}
+
 // TestGatewaySessionAffinityNilStoreIsNoOp ensures stickiness degrades safely
 // when no binding store is configured (bind is a no-op, lookup reports nothing).
 func TestGatewaySessionAffinityNilStoreIsNoOp(t *testing.T) {

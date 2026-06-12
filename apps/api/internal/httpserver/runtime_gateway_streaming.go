@@ -213,6 +213,9 @@ readLoop:
 			usage = parsedUsage
 			usageEstimated = parsedUsage.Estimated
 			quotaSignals = parsed.QuotaSignals
+			if !interrupted {
+				s.runtime.bindGatewayPreviousResponseAffinity(r.Context(), authed.Key.ID, parsed.ID, result.Candidate.Account.ID)
+			}
 		}
 	}
 

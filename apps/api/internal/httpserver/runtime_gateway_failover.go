@@ -493,6 +493,9 @@ NextCandidate:
 				// account failed and we failed over, this overwrites the stale
 				// binding to the now-healthy account.
 				s.runtime.bindGatewaySessionAffinity(ctx, scheduleReq.APIKeyID, scheduleReq.SessionAffinityKey, result.Candidate.Account.ID)
+				if conversationResp, ok := any(response).(provideradaptercontract.ConversationResponse); ok {
+					s.runtime.bindGatewayPreviousResponseAffinity(ctx, scheduleReq.APIKeyID, conversationResp.ID, result.Candidate.Account.ID)
+				}
 				return gatewayFailoverResult[T]{Response: response, ScheduleResult: result}
 			}
 

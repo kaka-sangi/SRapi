@@ -576,6 +576,9 @@ func TestNativeOpenAIAdapterUsesResponsesEndpoint(t *testing.T) {
 	if conversationResponseText(resp) != "native responses ok" {
 		t.Fatalf("unexpected native Responses text: %+v", resp)
 	}
+	if resp.ID != "resp_native" {
+		t.Fatalf("expected native response id to be preserved, got %q", resp.ID)
+	}
 	if len(resp.Parts) != 2 {
 		t.Fatalf("expected text and function call parts, got %+v", resp.Parts)
 	}
@@ -6342,6 +6345,9 @@ func TestReverseProxyCodexCLIAdapterPreservesLifecycleStreamEvents(t *testing.T)
 	}
 	if conversationResponseText(resp) != "ok" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 2 {
 		t.Fatalf("unexpected codex lifecycle stream response: %+v", resp)
+	}
+	if resp.ID != "resp_lifecycle" {
+		t.Fatalf("expected lifecycle response id to be preserved, got %q", resp.ID)
 	}
 	if string(resp.Raw) != rawSSE {
 		t.Fatalf("expected raw Codex lifecycle stream to be preserved, got %q", string(resp.Raw))
