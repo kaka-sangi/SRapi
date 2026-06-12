@@ -31,6 +31,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { ApiKeyCreateDialog, ApiKeyFormDialog } from "@/components/features/api-key-create-dialog";
 import { ApiKeyUsageDialog } from "@/components/features/api-key-usage-dialog";
+import { ApiKeyOnboarding } from "@/components/features/api-key-onboarding";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export default function ApiKeysPage() {
   return (
@@ -48,6 +56,7 @@ function ApiKeysContent() {
   const deleteKey = useDeleteApiKey();
   const [editKey, setEditKey] = useState<ApiKeySummary | null>(null);
   const [usageKey, setUsageKey] = useState<ApiKeySummary | null>(null);
+  const [connectKey, setConnectKey] = useState<ApiKeySummary | null>(null);
 
   async function runToggle(id: string, status: "active" | "disabled") {
     try {
@@ -129,6 +138,9 @@ function ApiKeysContent() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setConnectKey(key)}>
+                                {t("apiKeys.onboardingAction")}
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setUsageKey(key)}>
                                 {t("apiKeys.usageAction")}
                               </DropdownMenuItem>
@@ -179,6 +191,30 @@ function ApiKeysContent() {
           if (!next) setUsageKey(null);
         }}
       />
+
+      <Dialog
+        open={connectKey !== null}
+        onOpenChange={(next) => {
+          if (!next) setConnectKey(null);
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{t("apiKeys.onboardingAction")}</DialogTitle>
+            <DialogDescription>
+              {connectKey ? `${connectKey.name} · ${connectKey.prefix}…` : null}
+            </DialogDescription>
+          </DialogHeader>
+          {connectKey ? (
+            <ApiKeyOnboarding
+              key={connectKey.id}
+              apiKey={null}
+              allowPaste
+              defaultModel={connectKey.allowed_models[0]}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

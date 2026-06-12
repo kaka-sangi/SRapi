@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TagInput } from "@/components/ui/tag-input";
 import { formatMoney } from "@/lib/admin-format";
+import { ApiKeyOnboarding } from "@/components/features/api-key-onboarding";
 import type { ApiKeySummary } from "@/lib/srapi-types";
 
 /** Create entry point used by the page header. */
@@ -214,7 +215,7 @@ export function ApiKeyFormDialog({
           <Button variant="primary">＋ {t("apiKeys.create")}</Button>
         </DialogTrigger>
       )}
-      <DialogContent>
+      <DialogContent className={plaintext ? "max-w-2xl" : undefined}>
         {plaintext ? (
           <>
             <DialogHeader>
@@ -227,6 +228,10 @@ export function ApiKeyFormDialog({
                 {copied ? <Check className="size-4 text-srapi-success" /> : <Copy className="size-4" />}
               </Button>
             </div>
+            <ApiKeyOnboarding
+              apiKey={plaintext}
+              defaultModel={allowedModels[0] ?? availableModels.data?.[0]?.id}
+            />
             <DialogFooter>
               <Button variant="primary" onClick={() => setOpen(false)}>
                 {t("common.close")}
