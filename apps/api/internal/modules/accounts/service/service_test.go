@@ -458,6 +458,121 @@ func TestApplyQuotaReportPersistsProviderCreditSignals(t *testing.T) {
 	}
 }
 
+func TestApplyQuotaReportUpdatesRuntimeQuotaMetadataFromSignals(t *testing.T) {
+	store := accountmemory.New()
+	now := time.Date(2026, 6, 9, 1, 2, 3, 0, time.UTC)
+	resetAt := now.Add(2 * time.Hour)
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	account, err := svc.Create(ctx, contract.CreateRequest{
+		ProviderID:   3,
+		Name:         "quota-signals",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret-value"},
+		Metadata: map[string]any{
+			"quota_exhausted":     true,
+			"quota_exhausted_at":  now.Add(-time.Hour).Format(time.RFC3339),
+			"quota_remaining_old": "kept",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	signals, err := svc.ApplyQuotaReport(ctx, account, provideradaptercontract.QuotaReport{
+		Supported: true,
+		FetchedAt: now,
+		QuotaSignals: []provideradaptercontract.QuotaSignal{
+			{
+				QuotaType:      "codex_5h_percent",
+				Remaining:      "0",
+				Used:           "100",
+				QuotaLimit:     "100",
+				RemainingRatio: 0,
+				ResetAt:        &resetAt,
+				SnapshotAt:     now,
+			},
+			{
+				QuotaType:      "codex_7d_percent",
+				Remaining:      "75",
+				Used:           "25",
+				QuotaLimit:     "100",
+				RemainingRatio: 0.75,
+				SnapshotAt:     now,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("apply quota report: %v", err)
+	}
+	if signals != 2 {
+		t.Fatalf("expected two persisted quota signals, got %d", signals)
+	}
+	stored, err := svc.FindByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("find account: %v", err)
+	}
+	if stored.Metadata["quota_remaining_ratio"] != float64(0) ||
+		stored.Metadata["quota_exhausted"] != true ||
+		stored.Metadata["quota_type"] != "codex_5h_percent" ||
+		stored.Metadata["quota_remaining"] != "0" ||
+		stored.Metadata["quota_used"] != "100" ||
+		stored.Metadata["quota_limit"] != "100" ||
+		stored.Metadata["quota_reset_at"] != resetAt.Format(time.RFC3339) ||
+		stored.Metadata["quota_exhausted_at"] != now.Format(time.RFC3339) ||
+		stored.Metadata["quota_remaining_old"] != "kept" {
+		t.Fatalf("unexpected quota metadata: %+v", stored.Metadata)
+	}
+}
+
+func TestApplyQuotaReportClearsRuntimeQuotaExhaustionWhenSignalsRecover(t *testing.T) {
+	store := accountmemory.New()
+	now := time.Date(2026, 6, 9, 1, 2, 3, 0, time.UTC)
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	account, err := svc.Create(ctx, contract.CreateRequest{
+		ProviderID:   3,
+		Name:         "quota-recovered",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret-value"},
+		Metadata: map[string]any{
+			"quota_exhausted":    true,
+			"quota_exhausted_at": now.Add(-time.Hour).Format(time.RFC3339),
+		},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	if _, err := svc.ApplyQuotaReport(ctx, account, provideradaptercontract.QuotaReport{
+		Supported: true,
+		FetchedAt: now,
+		QuotaSignals: []provideradaptercontract.QuotaSignal{{
+			QuotaType:      "codex_5h_percent",
+			Remaining:      "35",
+			Used:           "65",
+			QuotaLimit:     "100",
+			RemainingRatio: 0.35,
+			SnapshotAt:     now,
+		}},
+	}); err != nil {
+		t.Fatalf("apply quota report: %v", err)
+	}
+	stored, err := svc.FindByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("find account: %v", err)
+	}
+	if stored.Metadata["quota_remaining_ratio"] != 0.35 ||
+		stored.Metadata["quota_exhausted"] != nil ||
+		stored.Metadata["quota_exhausted_at"] != nil {
+		t.Fatalf("unexpected recovered quota metadata: %+v", stored.Metadata)
+	}
+}
+
 func TestProbeAccountOpensCircuitAfterConsecutiveFailures(t *testing.T) {
 	store := accountmemory.New()
 	now := time.Date(2026, 5, 25, 10, 0, 0, 0, time.UTC)

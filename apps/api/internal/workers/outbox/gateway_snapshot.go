@@ -39,8 +39,19 @@ func (h domainEventHandler) refreshGatewayAccountSnapshot(ctx context.Context, e
 	if err := h.updateAccountRuntimeQuotaMetadata(ctx, account, logs, now); err != nil {
 		return err
 	}
-	for _, signal := range gatewayQuotaSignalsFromPayload(event.Payload["quota_signals"]) {
-		if _, err := h.accounts.RecordQuotaSnapshot(ctx, quotaSnapshotFromSignal(account, signal, now)); err != nil {
+	signals := gatewayQuotaSignalsFromPayload(event.Payload["quota_signals"])
+	if len(signals) > 0 {
+		updated, err := h.accounts.FindByID(ctx, accountID)
+		if err != nil {
+			return err
+		}
+		account = updated
+		if _, err := h.accounts.ApplyQuotaReport(ctx, account, provideradaptercontract.QuotaReport{
+			Supported:    true,
+			Source:       "headers",
+			QuotaSignals: signals,
+			FetchedAt:    now,
+		}); err != nil {
 			return err
 		}
 	}
@@ -140,24 +151,6 @@ func buildAccountQuotaSnapshot(account accountcontract.ProviderAccount, logs []u
 		QuotaLimit:     "unlimited",
 		RemainingRatio: 1,
 		SnapshotAt:     now,
-	}
-}
-
-func quotaSnapshotFromSignal(account accountcontract.ProviderAccount, signal provideradaptercontract.QuotaSignal, now time.Time) accountcontract.AccountQuotaSnapshot {
-	snapshotAt := signal.SnapshotAt
-	if snapshotAt.IsZero() {
-		snapshotAt = now
-	}
-	return accountcontract.AccountQuotaSnapshot{
-		AccountID:      account.ID,
-		ProviderID:     account.ProviderID,
-		QuotaType:      signal.QuotaType,
-		Remaining:      signal.Remaining,
-		Used:           signal.Used,
-		QuotaLimit:     signal.QuotaLimit,
-		RemainingRatio: signal.RemainingRatio,
-		ResetAt:        cloneTimePtr(signal.ResetAt),
-		SnapshotAt:     snapshotAt,
 	}
 }
 

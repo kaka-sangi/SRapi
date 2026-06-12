@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -35,6 +36,7 @@ func (s *Service) ApplyQuotaReport(ctx context.Context, account contract.Provide
 	}
 	if report.Supported {
 		metadata := contract.QuotaMetadataFromReport(account.Metadata, creditReport)
+		metadata = quotaSignalMetadata(metadata, report.QuotaSignals, report.FetchedAt)
 		if _, err := s.Update(ctx, account.ID, contract.UpdateRequest{Metadata: &metadata}); err != nil {
 			firstErr = errors.Join(firstErr, err)
 		}
@@ -47,6 +49,67 @@ func (s *Service) ApplyQuotaReport(ctx context.Context, account contract.Provide
 		signals++
 	}
 	return signals, firstErr
+}
+
+func quotaSignalMetadata(current map[string]any, signals []provideradaptercontract.QuotaSignal, fetchedAt time.Time) map[string]any {
+	metadata := cloneMap(current)
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	if len(signals) == 0 {
+		return metadata
+	}
+	best, ok := lowestRemainingQuotaSignal(signals)
+	if !ok {
+		return metadata
+	}
+	metadata["quota_remaining_ratio"] = best.RemainingRatio
+	metadata["quota_type"] = strings.TrimSpace(best.QuotaType)
+	if best.Remaining != "" {
+		metadata["quota_remaining"] = strings.TrimSpace(best.Remaining)
+	}
+	if best.Used != "" {
+		metadata["quota_used"] = strings.TrimSpace(best.Used)
+	}
+	if best.QuotaLimit != "" {
+		metadata["quota_limit"] = strings.TrimSpace(best.QuotaLimit)
+	}
+	if best.ResetAt != nil && !best.ResetAt.IsZero() {
+		metadata["quota_reset_at"] = best.ResetAt.UTC().Format(time.RFC3339)
+	}
+	if best.RemainingRatio <= 0 {
+		metadata["quota_exhausted"] = true
+		exhaustedAt := best.SnapshotAt
+		if exhaustedAt.IsZero() {
+			exhaustedAt = fetchedAt
+		}
+		if exhaustedAt.IsZero() {
+			exhaustedAt = time.Now().UTC()
+		}
+		metadata["quota_exhausted_at"] = exhaustedAt.UTC().Format(time.RFC3339)
+	} else {
+		delete(metadata, "quota_exhausted")
+		delete(metadata, "quota_exhausted_at")
+	}
+	return metadata
+}
+
+func lowestRemainingQuotaSignal(signals []provideradaptercontract.QuotaSignal) (provideradaptercontract.QuotaSignal, bool) {
+	var best provideradaptercontract.QuotaSignal
+	ok := false
+	for _, signal := range signals {
+		if strings.TrimSpace(signal.QuotaType) == "" {
+			continue
+		}
+		if signal.RemainingRatio < 0 || signal.RemainingRatio > 1 {
+			continue
+		}
+		if !ok || signal.RemainingRatio < best.RemainingRatio {
+			best = signal
+			ok = true
+		}
+	}
+	return best, ok
 }
 
 // ApplyQuotaProviderError persists quota error metadata for operator-action

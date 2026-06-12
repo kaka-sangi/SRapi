@@ -134,10 +134,10 @@ func TestWorkerRunOnceRefreshesGatewayAccountSnapshot(t *testing.T) {
 			"provider_id": account.ProviderID,
 			"quota_signals": []any{map[string]any{
 				"quota_type":      "codex_5h_percent",
-				"remaining":       "66",
-				"used":            "34",
+				"remaining":       "0",
+				"used":            "100",
 				"quota_limit":     "100",
-				"remaining_ratio": 0.66,
+				"remaining_ratio": 0,
 				"reset_at":        resetAt.Format(time.RFC3339Nano),
 				"snapshot_at":     resetAt.Add(-time.Hour).Format(time.RFC3339Nano),
 			}},
@@ -176,6 +176,12 @@ func TestWorkerRunOnceRefreshesGatewayAccountSnapshot(t *testing.T) {
 	if testMetadataInt(updated.Metadata, "tpm_used") != 42 || testMetadataInt(updated.Metadata, "rpm_used") != 1 {
 		t.Fatalf("expected bounded runtime quota metadata, got %+v", updated.Metadata)
 	}
+	if updated.Metadata["quota_exhausted"] != true ||
+		updated.Metadata["quota_remaining_ratio"] != float64(0) ||
+		updated.Metadata["quota_type"] != "codex_5h_percent" ||
+		updated.Metadata["quota_reset_at"] != resetAt.Format(time.RFC3339) {
+		t.Fatalf("expected provider quota metadata, got %+v", updated.Metadata)
+	}
 	quotas, err := accounts.ListQuotaSnapshotsByAccount(ctx, account.ID, 10)
 	if err != nil {
 		t.Fatalf("list quota snapshots: %v", err)
@@ -185,7 +191,7 @@ func TestWorkerRunOnceRefreshesGatewayAccountSnapshot(t *testing.T) {
 	for _, quota := range quotas {
 		switch quota.QuotaType {
 		case "codex_5h_percent":
-			foundSignal = quota.ResetAt != nil && quota.ResetAt.Equal(resetAt) && quota.Used == "34"
+			foundSignal = quota.ResetAt != nil && quota.ResetAt.Equal(resetAt) && quota.Used == "100"
 		case accountcontract.QuotaTypeSyntheticMonthlyTokens:
 			foundSynthetic = quota.Used == "42"
 		}
