@@ -48,6 +48,9 @@ func (u anthropicUsage) ToUsage(text string) contract.Usage {
 	}
 	cacheCreation := valueOrZero(u.CacheCreationInputTokens)
 	cacheCreation5m, cacheCreation1h := u.cacheCreationBuckets(cacheCreation)
+	if cacheCreation == 0 {
+		cacheCreation = cacheCreation5m + cacheCreation1h
+	}
 	if input == 0 && output == 0 && cacheRead == 0 && cacheCreation == 0 {
 		return estimatedUsage(text)
 	}

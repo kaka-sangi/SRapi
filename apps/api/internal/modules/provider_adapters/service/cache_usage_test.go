@@ -48,6 +48,24 @@ func TestAnthropicUsageFallsBackCacheCreationToFiveMinutes(t *testing.T) {
 	}
 }
 
+func TestAnthropicUsageTotalsNestedCacheCreation(t *testing.T) {
+	create5m := 30
+	create1h := 70
+	usage := anthropicUsage{
+		CacheCreation: &anthropicCacheCreationUsage{
+			Ephemeral5mInputTokens: &create5m,
+			Ephemeral1hInputTokens: &create1h,
+		},
+	}.ToUsage("")
+
+	if usage.Estimated {
+		t.Fatal("usage should not be estimated when nested cache creation details are present")
+	}
+	if usage.CacheCreationTokens != 100 || usage.CacheCreation5mTokens != 30 || usage.CacheCreation1hTokens != 70 {
+		t.Fatalf("unexpected nested cache creation usage: %+v", usage)
+	}
+}
+
 func TestAnthropicUsageFallsBackCacheReadToCachedTokens(t *testing.T) {
 	in := 12
 	out := 7
