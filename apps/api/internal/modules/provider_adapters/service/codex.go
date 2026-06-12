@@ -277,7 +277,7 @@ func codexResponsesHeaders(req contract.ConversationRequest, stream bool, payloa
 	} else if req.Account.ID > 0 {
 		headers.Set("Session_id", codexDefaultAccountSessionID(req.Account.ID))
 	}
-	codexApplySessionIdentityHeaders(headers, promptCacheKey)
+	codexApplySessionIdentityHeaders(headers, promptCacheKey, requestSetting(req, "codex_window_id", "x_codex_window_id", "X-Codex-Window-Id"))
 	return headers
 }
 
@@ -372,7 +372,7 @@ func codexReverseProxyAccount(req contract.ConversationRequest) reverseproxycont
 }
 
 func responseInputItemsSetting(req contract.ResponseInputItemsRequest, keys ...string) string {
-	for _, values := range []map[string]any{req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+	for _, values := range []map[string]any{req.RequestSettings, req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
 		for _, key := range keys {
 			if value := mapString(values, key); value != "" {
 				return value
@@ -420,7 +420,7 @@ func codexRealtimeHeaders(req contract.RealtimeRequest, initialFrame []byte) htt
 	} else if req.Account.ID > 0 {
 		headers.Set("session_id", codexDefaultAccountSessionID(req.Account.ID))
 	}
-	codexApplySessionIdentityHeaders(headers, promptCacheKey)
+	codexApplySessionIdentityHeaders(headers, promptCacheKey, realtimeSetting(req, "codex_window_id", "x_codex_window_id", "X-Codex-Window-Id"))
 	return headers
 }
 
@@ -468,14 +468,21 @@ func codexInitialFramePromptCacheKey(frame []byte) string {
 	return codexPayloadPromptCacheKey(payload)
 }
 
-func codexApplySessionIdentityHeaders(headers http.Header, promptCacheKey string) {
+func codexApplySessionIdentityHeaders(headers http.Header, promptCacheKey string, requestWindowID ...string) {
 	promptCacheKey = strings.TrimSpace(promptCacheKey)
 	if promptCacheKey == "" {
 		return
 	}
 	headers.Set("Conversation_id", promptCacheKey)
 	headers.Set("Thread-Id", promptCacheKey)
-	headers.Set("X-Codex-Window-Id", promptCacheKey+":0")
+	windowID := ""
+	if len(requestWindowID) > 0 {
+		windowID = strings.TrimSpace(requestWindowID[0])
+	}
+	if windowID == "" {
+		windowID = promptCacheKey + ":0"
+	}
+	headers.Set("X-Codex-Window-Id", windowID)
 }
 
 func codexRealtimeConversationRequest(req contract.RealtimeRequest) contract.ConversationRequest {
@@ -512,7 +519,7 @@ func codexResponsesWebSocketURL(rawURL string) (string, error) {
 }
 
 func realtimeSetting(req contract.RealtimeRequest, keys ...string) string {
-	for _, values := range []map[string]any{req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+	for _, values := range []map[string]any{req.RequestSettings, req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
 		for _, key := range keys {
 			if value := mapString(values, key); value != "" {
 				return value

@@ -575,3 +575,42 @@ func TestProviderConversationRequestPreservesContextManagement(t *testing.T) {
 		t.Fatalf("expected provider context_management to be cloned, got %+v", providerReq.ContextManagement)
 	}
 }
+
+func TestProviderConversationRequestCapturesCodexRequestSettings(t *testing.T) {
+	req := gatewaycontract.CanonicalRequest{
+		RequestID:      "req_codex_settings",
+		SourceProtocol: gatewaycontract.ProtocolOpenAICompatible,
+		SourceEndpoint: "/v1/responses",
+		RawBody: []byte(`{
+			"client_metadata":{
+				"x-codex-turn-metadata":"{\"prompt_cache_key\":\"cache-1\"}",
+				"x-codex-window-id":"window-body",
+				"x-codex-installation-id":"install-body"
+			}
+		}`),
+	}
+	httpReq := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(string(req.RawBody)))
+	httpReq.Header.Set("X-Codex-Beta-Features", "feature-a")
+	httpReq.Header.Set("Version", "0.118.0")
+	httpReq.Header.Set("X-Client-Request-Id", "client-req-1")
+	httpReq.Header.Set("Session_id", "session-1")
+	httpReq.Header.Set("ChatGPT-Account-ID", "account-1")
+
+	providerReq := providerConversationRequest(req, schedulercontract.Candidate{}, httpReq)
+
+	want := map[string]string{
+		"codex_turn_metadata":     `{"prompt_cache_key":"cache-1"}`,
+		"codex_window_id":         "window-body",
+		"codex_installation_id":   "install-body",
+		"codex_beta_features":     "feature-a",
+		"codex_version":           "0.118.0",
+		"codex_client_request_id": "client-req-1",
+		"codex_session_id":        "session-1",
+		"chatgpt_account_id":      "account-1",
+	}
+	for key, expected := range want {
+		if got := strings.TrimSpace(providerReq.RequestSettings[key].(string)); got != expected {
+			t.Fatalf("request setting %s = %q, want %q; all=%+v", key, got, expected, providerReq.RequestSettings)
+		}
+	}
+}

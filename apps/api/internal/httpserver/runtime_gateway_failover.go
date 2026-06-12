@@ -247,7 +247,7 @@ func (s *Server) invokeProviderConversationWithFailover(
 ) gatewayFailoverResult[provideradaptercontract.ConversationResponse] {
 	return invokeGatewayCandidateWithFailover(s, ctx, r, authed, canonical, scheduleReq, modelID, forcedProviderKey, admission, startedAt,
 		func(ctx context.Context, candidate schedulercontract.Candidate) (provideradaptercontract.ConversationResponse, error) {
-			return s.runtime.invokeProviderConversation(ctx, providerConversationRequest(canonical, candidate))
+			return s.runtime.invokeProviderConversation(ctx, providerConversationRequest(canonical, candidate, r))
 		})
 }
 
@@ -420,7 +420,7 @@ func (s *Server) invokeProviderResponseInputItemsWithFailover(
 ) gatewayFailoverResult[provideradaptercontract.ResponseInputItemsResponse] {
 	return invokeGatewayCandidateWithFailover(s, ctx, r, authed, canonical, scheduleReq, modelID, forcedProviderKey, admission, startedAt,
 		func(ctx context.Context, candidate schedulercontract.Candidate) (provideradaptercontract.ResponseInputItemsResponse, error) {
-			return s.runtime.invokeProviderResponseInputItems(ctx, providerResponseInputItemsRequest(canonical, responseID, query, candidate))
+			return s.runtime.invokeProviderResponseInputItems(ctx, providerResponseInputItemsRequest(canonical, responseID, query, candidate, r))
 		})
 }
 

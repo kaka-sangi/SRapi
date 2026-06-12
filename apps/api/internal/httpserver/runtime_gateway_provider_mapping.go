@@ -1,6 +1,8 @@
 package httpserver
 
 import (
+	"encoding/json"
+	"net/http"
 	"strings"
 
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
@@ -8,7 +10,7 @@ import (
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 )
 
-func providerConversationRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.ConversationRequest {
+func providerConversationRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate, source ...*http.Request) provideradaptercontract.ConversationRequest {
 	return provideradaptercontract.ConversationRequest{
 		RequestID:         req.RequestID,
 		SourceProtocol:    string(req.SourceProtocol),
@@ -32,6 +34,7 @@ func providerConversationRequest(req gatewaycontract.CanonicalRequest, candidate
 		Provider:          candidate.Provider,
 		Account:           candidate.Account,
 		Mapping:           candidate.Mapping,
+		RequestSettings:   gatewayProviderRequestSettings(sourceHTTPRequest(source), req),
 		SpoofSessionID:    gatewaySpoofSessionID(candidate.Account, req),
 	}
 }
@@ -65,18 +68,88 @@ func providerTokenCountRequest(req gatewaycontract.CanonicalRequest, rawBody []b
 	}
 }
 
-func providerResponseInputItemsRequest(req gatewaycontract.CanonicalRequest, responseID string, query map[string][]string, candidate schedulercontract.Candidate) provideradaptercontract.ResponseInputItemsRequest {
-	return provideradaptercontract.ResponseInputItemsRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		ResponseID:     responseID,
-		Query:          query,
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
+func gatewayProviderRequestSettings(r *http.Request, req gatewaycontract.CanonicalRequest) map[string]any {
+	var headers http.Header
+	if r != nil {
+		headers = r.Header
 	}
+	settings := codexRequestSettings(headers, req.RawBody)
+	if len(settings) == 0 {
+		return nil
+	}
+	return settings
+}
+
+func codexRequestSettings(headers http.Header, rawBody []byte) map[string]any {
+	settings := make(map[string]any)
+	setSetting := func(key string, value string) {
+		if value = strings.TrimSpace(value); value != "" {
+			settings[key] = value
+		}
+	}
+	for _, candidate := range []struct {
+		header string
+		key    string
+	}{
+		{"ChatGPT-Account-ID", "chatgpt_account_id"},
+		{"X-Codex-Beta-Features", "codex_beta_features"},
+		{"Version", "codex_version"},
+		{"X-Codex-Turn-Metadata", "codex_turn_metadata"},
+		{"X-Codex-Window-Id", "codex_window_id"},
+		{"X-Client-Request-Id", "codex_client_request_id"},
+		{"X-ResponsesAPI-Include-Timing-Metrics", "x_responsesapi_include_timing_metrics"},
+		{"Session_id", "codex_session_id"},
+		{"session_id", "codex_session_id"},
+		{"Session-Id", "codex_session_id"},
+		{"Originator", "codex_originator"},
+	} {
+		setSetting(candidate.key, gatewayHeaderValue(headers, candidate.header))
+	}
+
+	var probe struct {
+		ClientMetadata struct {
+			CodexTurnMetadata    string `json:"x-codex-turn-metadata"`
+			CodexWindowID        string `json:"x-codex-window-id"`
+			CodexInstallationID  string `json:"x-codex-installation-id"`
+			CodexBetaFeatures    string `json:"x-codex-beta-features"`
+			ResponsesTimingValue string `json:"x-responsesapi-include-timing-metrics"`
+		} `json:"client_metadata"`
+	}
+	if len(rawBody) > 0 {
+		_ = json.Unmarshal(rawBody, &probe)
+	}
+	setSetting("codex_turn_metadata", probe.ClientMetadata.CodexTurnMetadata)
+	setSetting("codex_window_id", probe.ClientMetadata.CodexWindowID)
+	setSetting("codex_installation_id", probe.ClientMetadata.CodexInstallationID)
+	setSetting("codex_beta_features", probe.ClientMetadata.CodexBetaFeatures)
+	setSetting("x_responsesapi_include_timing_metrics", probe.ClientMetadata.ResponsesTimingValue)
+
+	if len(settings) == 0 {
+		return nil
+	}
+	return settings
+}
+
+func providerResponseInputItemsRequest(req gatewaycontract.CanonicalRequest, responseID string, query map[string][]string, candidate schedulercontract.Candidate, source ...*http.Request) provideradaptercontract.ResponseInputItemsRequest {
+	return provideradaptercontract.ResponseInputItemsRequest{
+		RequestID:       req.RequestID,
+		SourceProtocol:  string(req.SourceProtocol),
+		SourceEndpoint:  req.SourceEndpoint,
+		Model:           req.CanonicalModel,
+		ResponseID:      responseID,
+		Query:           query,
+		Provider:        candidate.Provider,
+		Account:         candidate.Account,
+		Mapping:         candidate.Mapping,
+		RequestSettings: gatewayProviderRequestSettings(sourceHTTPRequest(source), req),
+	}
+}
+
+func sourceHTTPRequest(values []*http.Request) *http.Request {
+	if len(values) == 0 {
+		return nil
+	}
+	return values[0]
 }
 
 func providerEmbeddingRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.EmbeddingRequest {

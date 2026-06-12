@@ -222,10 +222,50 @@ func codexCanonicalResponsesPayload(req contract.ConversationRequest) map[string
 	return payload
 }
 
+func codexApplyClientMetadataSettings(req contract.ConversationRequest, payload map[string]any) {
+	if payload == nil {
+		return
+	}
+	metadata := codexPayloadClientMetadata(payload)
+	setMetadata := func(key string, value string) {
+		if value = strings.TrimSpace(value); value != "" {
+			metadata[key] = value
+		}
+	}
+	setMetadata("x-codex-installation-id", requestSetting(req, "codex_installation_id", "x_codex_installation_id"))
+	setMetadata("x-codex-turn-metadata", requestSetting(req, "codex_turn_metadata", "x_codex_turn_metadata", "X-Codex-Turn-Metadata"))
+	setMetadata("x-codex-window-id", requestSetting(req, "codex_window_id", "x_codex_window_id", "X-Codex-Window-Id"))
+	if betaFeatures := requestSetting(req, "codex_beta_features", "x_codex_beta_features", "X-Codex-Beta-Features"); betaFeatures != "" {
+		setMetadata("x-codex-beta-features", betaFeatures)
+	}
+	if includeTiming := requestSetting(req, "x_responsesapi_include_timing_metrics", "X-ResponsesAPI-Include-Timing-Metrics"); includeTiming != "" {
+		setMetadata("x-responsesapi-include-timing-metrics", includeTiming)
+	}
+	if len(metadata) > 0 {
+		payload["client_metadata"] = metadata
+	}
+}
+
+func codexPayloadClientMetadata(payload map[string]any) map[string]any {
+	switch existing := payload["client_metadata"].(type) {
+	case map[string]any:
+		return existing
+	case map[string]string:
+		next := make(map[string]any, len(existing))
+		for key, value := range existing {
+			next[key] = value
+		}
+		return next
+	default:
+		return map[string]any{}
+	}
+}
+
 func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payload map[string]any) {
 	if payload == nil {
 		return
 	}
+	codexApplyClientMetadataSettings(req, payload)
 	if model := contract.NormalizeCodexUpstreamModelName(req.Mapping.UpstreamModelName); model != "" {
 		payload["model"] = model
 	}

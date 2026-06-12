@@ -523,7 +523,7 @@ func responseInputItemsReverseProxyAccount(req contract.ResponseInputItemsReques
 }
 
 func requestSetting(req contract.ConversationRequest, keys ...string) string {
-	for _, values := range []map[string]any{req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+	for _, values := range []map[string]any{req.RequestSettings, req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
 		for _, key := range keys {
 			if value := mapString(values, key); value != "" {
 				return value

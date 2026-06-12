@@ -45,6 +45,7 @@ type ConversationRequest struct {
 	Account           accountcontract.ProviderAccount
 	Mapping           modelcontract.ModelProviderMapping
 	Credential        map[string]any
+	RequestSettings   map[string]any
 	PayloadTransforms []PayloadTransform
 	// SpoofSessionID, when set, is a stable per-conversation id the adapter writes
 	// into the upstream session field (codex prompt_cache_key, Anthropic
@@ -77,16 +78,17 @@ type TokenCountRequest struct {
 }
 
 type ResponseInputItemsRequest struct {
-	RequestID      string
-	SourceProtocol string
-	SourceEndpoint string
-	Model          string
-	ResponseID     string
-	Query          url.Values
-	Provider       providercontract.Provider
-	Account        accountcontract.ProviderAccount
-	Mapping        modelcontract.ModelProviderMapping
-	Credential     map[string]any
+	RequestID       string
+	SourceProtocol  string
+	SourceEndpoint  string
+	Model           string
+	ResponseID      string
+	Query           url.Values
+	Provider        providercontract.Provider
+	Account         accountcontract.ProviderAccount
+	Mapping         modelcontract.ModelProviderMapping
+	Credential      map[string]any
+	RequestSettings map[string]any
 }
 
 type ConversationMessage struct {
@@ -543,16 +545,17 @@ type ProbeResponse struct {
 }
 
 type RealtimeRequest struct {
-	RequestID      string
-	SourceProtocol string
-	SourceEndpoint string
-	Model          string
-	RequestPayload []byte
-	Headers        http.Header
-	Provider       providercontract.Provider
-	Account        accountcontract.ProviderAccount
-	Mapping        modelcontract.ModelProviderMapping
-	Credential     map[string]any
+	RequestID       string
+	SourceProtocol  string
+	SourceEndpoint  string
+	Model           string
+	RequestPayload  []byte
+	Headers         http.Header
+	Provider        providercontract.Provider
+	Account         accountcontract.ProviderAccount
+	Mapping         modelcontract.ModelProviderMapping
+	Credential      map[string]any
+	RequestSettings map[string]any
 }
 
 type RealtimeSession struct {

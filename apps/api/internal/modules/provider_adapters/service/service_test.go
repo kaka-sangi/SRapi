@@ -8176,6 +8176,88 @@ func TestReverseProxyCodexCLIAdapterPreservesRawResponsesPayload(t *testing.T) {
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterRequestSettingsOverrideAccountDefaults(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_request_settings",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		Model:          "codex-local",
+		RawBody:        []byte(`{"model":"codex-local","input":"hello","prompt_cache_key":"cache-req","stream":true}`),
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             16,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata: map[string]any{
+				"base_url":                "https://upstream.example/backend-api/codex",
+				"chatgpt_account_id":      "account-default",
+				"codex_session_id":        "session-default",
+				"codex_beta_features":     "feature-default",
+				"codex_version":           "0.100.0",
+				"codex_turn_metadata":     `{"cwd":"/default"}`,
+				"codex_client_request_id": "client-default",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"access_token": "oauth-token"},
+		RequestSettings: map[string]any{
+			"chatgpt_account_id":                    "account-request",
+			"codex_session_id":                      "session-request",
+			"codex_beta_features":                   "feature-request",
+			"codex_version":                         "0.118.0",
+			"codex_turn_metadata":                   `{"prompt_cache_key":"cache-req","window_id":"window-request"}`,
+			"codex_window_id":                       "window-request",
+			"codex_client_request_id":               "client-request",
+			"codex_installation_id":                 "install-request",
+			"x_responsesapi_include_timing_metrics": "true",
+		},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex request settings: %v", err)
+	}
+	if resp.Usage.InputTokens != 1 || resp.Usage.OutputTokens != 1 {
+		t.Fatalf("unexpected response usage: %+v", resp.Usage)
+	}
+	if headerValue(runtime.request.Headers, "ChatGPT-Account-ID") != "account-request" ||
+		headerValue(runtime.request.Headers, "Session_id") != "session-request" ||
+		headerValue(runtime.request.Headers, "X-Codex-Beta-Features") != "feature-request" ||
+		headerValue(runtime.request.Headers, "Version") != "0.118.0" ||
+		headerValue(runtime.request.Headers, "X-Codex-Turn-Metadata") != `{"prompt_cache_key":"cache-req","window_id":"window-request"}` ||
+		headerValue(runtime.request.Headers, "X-Codex-Window-Id") != "window-request" ||
+		headerValue(runtime.request.Headers, "X-Client-Request-Id") != "client-request" {
+		t.Fatalf("request settings did not override codex headers: %+v", runtime.request.Headers)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode codex request payload: %v", err)
+	}
+	metadata, _ := payload["client_metadata"].(map[string]any)
+	if metadata["x-codex-installation-id"] != "install-request" ||
+		metadata["x-codex-turn-metadata"] != `{"prompt_cache_key":"cache-req","window_id":"window-request"}` ||
+		metadata["x-codex-window-id"] != "window-request" ||
+		metadata["x-codex-beta-features"] != "feature-request" ||
+		metadata["x-responsesapi-include-timing-metrics"] != "true" {
+		t.Fatalf("request settings did not populate client_metadata: %+v", metadata)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterRetriesPreviousResponseNotFoundWithReplayableInput(t *testing.T) {
 	runtime := sequenceRuntime{
 		responses: []reverseproxycontract.Response{

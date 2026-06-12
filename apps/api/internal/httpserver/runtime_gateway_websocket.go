@@ -268,7 +268,7 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.runtime.bindGatewaySessionAffinity(r.Context(), scheduleReq.APIKeyID, scheduleReq.SessionAffinityKey, result.Candidate.Account.ID)
-	session, credential, err := s.runtime.prepareProviderRealtime(r.Context(), providerRealtimeRequest(canonical, result.Candidate, nil, realtimeWebSocketHeaders(r)))
+	session, credential, err := s.runtime.prepareProviderRealtime(r.Context(), providerRealtimeRequest(canonical, result.Candidate, nil, r, realtimeWebSocketHeaders(r)))
 	if err != nil {
 		errorClass, upstreamStatus, _ := providerGatewayError(err)
 		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, errorClass, upstreamStatus, elapsedMillis(startedAt), admission, nil, providerErrorMessage(err)))
@@ -694,7 +694,7 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 		return true, responsesWebSocketTurnState{}, err
 	}
 	s.runtime.bindGatewaySessionAffinity(r.Context(), scheduleReq.APIKeyID, scheduleReq.SessionAffinityKey, result.Candidate.Account.ID)
-	session, credential, err := s.runtime.prepareProviderRealtime(r.Context(), providerRealtimeRequest(canonical, result.Candidate, payload))
+	session, credential, err := s.runtime.prepareProviderRealtime(r.Context(), providerRealtimeRequest(canonical, result.Candidate, payload, r))
 	if err != nil {
 		errorClass, upstreamStatus, _ := providerGatewayError(err)
 		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, errorClass, upstreamStatus, elapsedMillis(startedAt), admission, nil, providerErrorMessage(err)))
@@ -880,21 +880,22 @@ func (rt *runtimeState) prepareProviderRealtime(ctx context.Context, req provide
 	}, credential, nil
 }
 
-func providerRealtimeRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate, payload []byte, headers ...http.Header) provideradaptercontract.RealtimeRequest {
+func providerRealtimeRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate, payload []byte, source *http.Request, headers ...http.Header) provideradaptercontract.RealtimeRequest {
 	var clonedHeaders http.Header
 	if len(headers) > 0 {
 		clonedHeaders = cloneHTTPHeader(headers[0])
 	}
 	return provideradaptercontract.RealtimeRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		RequestPayload: append([]byte(nil), payload...),
-		Headers:        clonedHeaders,
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
+		RequestID:       req.RequestID,
+		SourceProtocol:  string(req.SourceProtocol),
+		SourceEndpoint:  req.SourceEndpoint,
+		Model:           req.CanonicalModel,
+		RequestPayload:  append([]byte(nil), payload...),
+		Headers:         clonedHeaders,
+		Provider:        candidate.Provider,
+		Account:         candidate.Account,
+		Mapping:         candidate.Mapping,
+		RequestSettings: gatewayProviderRequestSettings(source, req),
 	}
 }
 
