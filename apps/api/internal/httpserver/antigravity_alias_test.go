@@ -365,6 +365,190 @@ func TestGatewayAntigravityGeminiStreamAliasTargetsReverseProxy(t *testing.T) {
 	assertAntigravityAliasEvidence(t, handler, sessionCookie, "antigravity-gemini-stream-model", string(providerResp.Data.Id), string(accountResp.Data.Id), path, "gemini-compatible", 9)
 }
 
+func TestGatewayAntigravityGeminiAliasListsOnlyAntigravityMappedModels(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	antigravityProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity","display_name":"Antigravity","adapter_type":"reverse-proxy-antigravity","protocol":"gemini-compatible","status":"active"}`)
+	otherProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"plain-gemini","display_name":"Plain Gemini","adapter_type":"gemini-compatible","protocol":"gemini-compatible","status":"active"}`)
+	antigravityModel := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"antigravity-listed-gemini-model","display_name":"Antigravity Listed Gemini Model","status":"active","capabilities":[{"key":"token_counting","level":"required","status":"stable","version":"v1"}]}`)
+	otherModel := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"plain-gemini-model","display_name":"Plain Gemini Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(antigravityModel.Data.Id), `{"provider_id":"`+string(antigravityProvider.Data.Id)+`","upstream_model_name":"antigravity-listed-upstream","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(otherModel.Data.Id), `{"provider_id":"`+string(otherProvider.Data.Id)+`","upstream_model_name":"plain-upstream","status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	listRec := mustGatewayRequest(t, handler, apiKey, http.MethodGet, "/api/provider/antigravity/v1beta/models", "")
+	var listResp apiopenapi.GeminiModelList
+	if err := json.NewDecoder(listRec.Body).Decode(&listResp); err != nil {
+		t.Fatalf("decode antigravity model list: %v", err)
+	}
+	if len(listResp.Models) != 1 || listResp.Models[0].Name != "models/antigravity-listed-gemini-model" {
+		t.Fatalf("expected only antigravity mapped model, got %+v", listResp.Models)
+	}
+	if !geminiModelMethodsContain(listResp.Models[0].SupportedGenerationMethods, apiopenapi.CountTokens) {
+		t.Fatalf("expected antigravity mapped model to expose countTokens capability, got %+v", listResp.Models[0])
+	}
+
+	getRec := mustGatewayRequest(t, handler, apiKey, http.MethodGet, "/api/provider/antigravity/v1beta/models/antigravity-listed-gemini-model", "")
+	var getResp apiopenapi.GeminiModelInfo
+	if err := json.NewDecoder(getRec.Body).Decode(&getResp); err != nil {
+		t.Fatalf("decode antigravity model get: %v", err)
+	}
+	if getResp.Name != "models/antigravity-listed-gemini-model" {
+		t.Fatalf("unexpected antigravity model get response: %+v", getResp)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/provider/antigravity/v1beta/models/plain-gemini-model", nil)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected non-antigravity mapped model 404, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGatewayAntigravityGeminiCountTokensAliasTargetsReverseProxy(t *testing.T) {
+	type countCall struct {
+		Path          string
+		Authorization string
+		UserAgent     string
+		Project       string
+		RequestID     string
+		Model         string
+		CreditTypes   []string
+		Contents      []struct {
+			Role  string `json:"role"`
+			Parts []struct {
+				Text string `json:"text"`
+			} `json:"parts"`
+		}
+	}
+	var (
+		mu    sync.Mutex
+		calls []countCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Project            string   `json:"project"`
+			RequestID          string   `json:"requestId"`
+			UserAgent          string   `json:"userAgent"`
+			Model              string   `json:"model"`
+			EnabledCreditTypes []string `json:"enabledCreditTypes"`
+			Request            struct {
+				Contents []struct {
+					Role  string `json:"role"`
+					Parts []struct {
+						Text string `json:"text"`
+					} `json:"parts"`
+				} `json:"contents"`
+			} `json:"request"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream count request: %v", err)
+		}
+		mu.Lock()
+		calls = append(calls, countCall{
+			Path:          r.URL.Path,
+			Authorization: r.Header.Get("Authorization"),
+			UserAgent:     r.Header.Get("User-Agent"),
+			Project:       payload.Project,
+			RequestID:     payload.RequestID,
+			Model:         payload.Model,
+			CreditTypes:   payload.EnabledCreditTypes,
+			Contents:      payload.Request.Contents,
+		})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"totalTokens":27,"cachedContentTokenCount":3}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity","display_name":"Antigravity","adapter_type":"reverse-proxy-antigravity","protocol":"gemini-compatible","status":"active","capabilities":{"token_counting":true}}`)
+	fallbackProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-count-fallback","display_name":"Antigravity Count Fallback","adapter_type":"gemini-compatible","protocol":"gemini-compatible","status":"active","capabilities":{"token_counting":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"antigravity-gemini-count-model","display_name":"Antigravity Gemini Count Model","status":"active","capabilities":[{"key":"token_counting","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-count-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"antigravity-count-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1beta"},"status":"active","priority":100}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"antigravity-count-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-gemini-count-account","runtime_class":"oauth_refresh","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1","antigravity_credits_enabled":true},"status":"active","priority":10}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	path := "/api/provider/antigravity/v1beta/models/antigravity-gemini-count-model:countTokens"
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, path, `{"contents":[{"role":"user","parts":[{"text":"count alias"}]}]}`)
+	var resp apiopenapi.GeminiCountTokensResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode antigravity count response: %v", err)
+	}
+	if resp.TotalTokens != 27 || resp.CachedContentTokenCount == nil || *resp.CachedContentTokenCount != 3 {
+		t.Fatalf("unexpected antigravity count response: %+v", resp)
+	}
+
+	mu.Lock()
+	gotCalls := append([]countCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream count call, got %+v", gotCalls)
+	}
+	call := gotCalls[0]
+	if call.Path != "/v1internal:countTokens" ||
+		call.Authorization != "Bearer desktop-token" ||
+		call.UserAgent != "Antigravity/1.0" ||
+		call.Project != "project-1" ||
+		!strings.HasPrefix(call.RequestID, "agent-") ||
+		call.Model != "antigravity-count-upstream" ||
+		len(call.CreditTypes) != 1 ||
+		call.CreditTypes[0] != "GOOGLE_ONE_AI" {
+		t.Fatalf("unexpected Antigravity count upstream call: %+v", call)
+	}
+	if len(call.Contents) != 1 || call.Contents[0].Role != "user" || call.Contents[0].Parts[0].Text != "count alias" {
+		t.Fatalf("unexpected Antigravity count payload: %+v", call)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=antigravity-gemini-count-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one Antigravity count decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(providerResp.Data.Id) || decision.CandidateCount != 1 || decision.TargetProtocol != "gemini-compatible" || decision.SourceEndpoint != path {
+		t.Fatalf("expected Antigravity count scheduler evidence, got %+v", decision)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=antigravity-gemini-count-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one Antigravity count usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success ||
+		usage.ProviderId == nil || *usage.ProviderId != string(providerResp.Data.Id) ||
+		usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) ||
+		usage.SourceEndpoint != path ||
+		usage.TargetProtocol == nil || *usage.TargetProtocol != "gemini-compatible" ||
+		usage.TotalTokens != 0 ||
+		usage.Cost != "0.00000000" {
+		t.Fatalf("expected Antigravity count usage evidence with zero generation usage, got %+v", usage)
+	}
+}
+
 func TestGatewayAntigravityImageGenerationTargetsNativeReverseProxy(t *testing.T) {
 	type imageCall struct {
 		Path          string

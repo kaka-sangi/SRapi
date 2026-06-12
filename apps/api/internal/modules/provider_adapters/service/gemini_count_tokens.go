@@ -28,6 +28,9 @@ func (s *Service) InvokeTokenCount(ctx context.Context, req contract.TokenCountR
 		}
 		return s.invokeAnthropicTokenCount(ctx, req, baseURL)
 	}
+	if isAntigravityTokenCountReverseProxy(req) {
+		return s.invokeReverseProxyAntigravityTokenCount(ctx, req, baseURL)
+	}
 	if isGeminiTokenCountCompatible(req) {
 		if isReverseProxyTokenCountRuntime(req) {
 			return s.invokeReverseProxyGeminiTokenCount(ctx, req, baseURL)
@@ -331,6 +334,10 @@ func isGeminiTokenCountCompatible(req contract.TokenCountRequest) bool {
 		}
 	}
 	return false
+}
+
+func isAntigravityTokenCountReverseProxy(req contract.TokenCountRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-antigravity")
 }
 
 func isAnthropicTokenCountCompatible(req contract.TokenCountRequest) bool {

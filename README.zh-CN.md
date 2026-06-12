@@ -8,7 +8,7 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8.svg)](apps/api/go.mod)
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000.svg)](apps/web/package.json)
-[![OpenAPI](https://img.shields.io/badge/OpenAPI-332%20operations-6BA539.svg)](packages/openapi/openapi.yaml)
+[![OpenAPI](https://img.shields.io/badge/OpenAPI-361%20operations-6BA539.svg)](packages/openapi/openapi.yaml)
 [![Status](https://img.shields.io/badge/status-0.1.0%20release%20candidate-orange.svg)](specs/plans/STATUS.md)
 
 [English](README.md) · 简体中文
@@ -33,7 +33,7 @@ SRapi 是一个你自己部署的 AI 网关。你的应用只调用**一个 Open
   实时并发与成本对候选打分。
 - **完整的控制面。** Next.js 管理后台与自助工作台覆盖上游账号、模型、密钥、套餐、定价、支付、
   邀请返利、可观测等。
-- **OpenAPI 优先。** 单一契约（`packages/openapi/openapi.yaml`，332 个 operation）生成 Go server
+- **OpenAPI 优先。** 单一契约（`packages/openapi/openapi.yaml`，361 个 operation）生成 Go server
   类型与 TypeScript SDK，漂移在 CI 中拦截。
 
 > SRapi 是自托管运行时，只提供隔离与路由能力，**不内置**任何上游 ToS 绕过、验证码破解、cookie 抓取

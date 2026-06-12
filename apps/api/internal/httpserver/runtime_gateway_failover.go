@@ -295,7 +295,7 @@ func (s *Server) invokeProviderTokenCountWithFailover(
 ) gatewayFailoverResult[provideradaptercontract.TokenCountResponse] {
 	return invokeGatewayCandidateWithFailover(s, ctx, r, authed, canonical, scheduleReq, modelID, forcedProviderKey, admission, startedAt,
 		func(ctx context.Context, candidate schedulercontract.Candidate) (provideradaptercontract.TokenCountResponse, error) {
-			return s.runtime.invokeProviderTokenCount(ctx, providerTokenCountRequest(canonical, rawBody, candidate))
+			return s.runtime.invokeProviderTokenCount(ctx, providerTokenCountRequest(canonical, rawBody, candidate, r))
 		})
 }
 

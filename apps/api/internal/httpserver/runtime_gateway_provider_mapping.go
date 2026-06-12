@@ -55,16 +55,17 @@ func providerInstructions(req gatewaycontract.CanonicalRequest) string {
 	return instructions
 }
 
-func providerTokenCountRequest(req gatewaycontract.CanonicalRequest, rawBody []byte, candidate schedulercontract.Candidate) provideradaptercontract.TokenCountRequest {
+func providerTokenCountRequest(req gatewaycontract.CanonicalRequest, rawBody []byte, candidate schedulercontract.Candidate, source ...*http.Request) provideradaptercontract.TokenCountRequest {
 	return provideradaptercontract.TokenCountRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		RawBody:        append([]byte(nil), rawBody...),
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
+		RequestID:       req.RequestID,
+		SourceProtocol:  string(req.SourceProtocol),
+		SourceEndpoint:  req.SourceEndpoint,
+		Model:           req.CanonicalModel,
+		RawBody:         append([]byte(nil), rawBody...),
+		Provider:        candidate.Provider,
+		Account:         candidate.Account,
+		Mapping:         candidate.Mapping,
+		RequestSettings: gatewayProviderRequestSettings(sourceHTTPRequest(source), req),
 	}
 }
 

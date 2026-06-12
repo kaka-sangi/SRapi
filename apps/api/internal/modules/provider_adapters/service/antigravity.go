@@ -21,6 +21,7 @@ import (
 const (
 	antigravityGeneratePath = "/v1internal:generateContent"
 	antigravityStreamPath   = "/v1internal:streamGenerateContent"
+	antigravityCountPath    = "/v1internal:countTokens"
 )
 
 type antigravityRequest struct {
@@ -145,6 +146,40 @@ func (s *Service) invokeReverseProxyAntigravityImageGeneration(ctx context.Conte
 	return parsed, nil
 }
 
+func (s *Service) invokeReverseProxyAntigravityTokenCount(ctx context.Context, req contract.TokenCountRequest, baseURL string) (contract.TokenCountResponse, error) {
+	if s.reverseProxy == nil {
+		return contract.TokenCountResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
+	}
+	if antigravityReverseProxyTokenCountRuntimeIsAPIKey(req) {
+		return contract.TokenCountResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "antigravity reverse proxy requires OAuth/session/desktop/IDE/client-token runtime credentials"}
+	}
+	payload, err := antigravityTokenCountPayload(req)
+	if err != nil {
+		return contract.TokenCountResponse{}, err
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return contract.TokenCountResponse{}, err
+	}
+	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: antigravityReverseProxyTokenCountAccount(req),
+		Method:  http.MethodPost,
+		URL:     strings.TrimRight(strings.TrimSpace(baseURL), "/") + antigravityCountPath,
+		Headers: http.Header{
+			"Accept":       {"application/json"},
+			"Content-Type": {"application/json"},
+		},
+		Body: raw,
+	})
+	if err != nil {
+		return contract.TokenCountResponse{}, providerErrorFromReverseProxy(err)
+	}
+	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
+		return contract.TokenCountResponse{}, classifyGeminiProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
+	}
+	return parseGeminiTokenCountResponse(runtimeResp.Body, runtimeResp.StatusCode)
+}
+
 func antigravityPayload(req contract.ConversationRequest) (antigravityRequest, error) {
 	projectID := requestSetting(req, "project_id", "antigravity_project_id", "cloudaicompanion_project")
 	if projectID == "" {
@@ -163,6 +198,46 @@ func antigravityPayload(req contract.ConversationRequest) (antigravityRequest, e
 		payload.EnabledCreditTypes = []string{"GOOGLE_ONE_AI"}
 	}
 	return payload, nil
+}
+
+func antigravityTokenCountPayload(req contract.TokenCountRequest) (antigravityRequest, error) {
+	projectID := antigravityTokenCountSetting(req, "project_id", "antigravity_project_id", "cloudaicompanion_project")
+	if projectID == "" {
+		return antigravityRequest{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "antigravity reverse proxy project_id missing"}
+	}
+	inner, err := antigravityTokenCountInnerRequest(req.RawBody)
+	if err != nil {
+		return antigravityRequest{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "invalid Gemini countTokens request"}
+	}
+	payload := antigravityRequest{
+		Project:     projectID,
+		RequestID:   antigravityTokenCountRequestID(req),
+		UserAgent:   "antigravity",
+		RequestType: "agent",
+		Model:       req.Mapping.UpstreamModelName,
+		Request:     inner,
+	}
+	if antigravityTokenCountCreditsEnabled(req) {
+		payload.EnabledCreditTypes = []string{"GOOGLE_ONE_AI"}
+	}
+	return payload, nil
+}
+
+func antigravityTokenCountInnerRequest(raw []byte) (antigravityGenerateTextRequest, error) {
+	var wrapped struct {
+		GenerateContentRequest *antigravityGenerateTextRequest `json:"generateContentRequest"`
+	}
+	if err := json.Unmarshal(raw, &wrapped); err != nil {
+		return antigravityGenerateTextRequest{}, err
+	}
+	if wrapped.GenerateContentRequest != nil {
+		return *wrapped.GenerateContentRequest, nil
+	}
+	var inner antigravityGenerateTextRequest
+	if err := json.Unmarshal(raw, &inner); err != nil {
+		return antigravityGenerateTextRequest{}, err
+	}
+	return inner, nil
 }
 
 func antigravityImagePayload(req contract.ImageGenerationRequest) (antigravityRequest, error) {
@@ -503,7 +578,28 @@ func antigravityReverseProxyImageRuntimeIsAPIKey(req contract.ImageGenerationReq
 	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
 }
 
+func antigravityReverseProxyTokenCountRuntimeIsAPIKey(req contract.TokenCountRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
+}
+
 func antigravityReverseProxyImageAccount(req contract.ImageGenerationRequest) reverseproxycontract.AccountRuntime {
+	upstreamClient := req.Account.UpstreamClient
+	if upstreamClient == nil || strings.TrimSpace(*upstreamClient) == "" {
+		value := "antigravity_desktop"
+		upstreamClient = &value
+	}
+	return reverseproxycontract.AccountRuntime{
+		AccountID:      req.Account.ID,
+		RuntimeClass:   string(req.Account.RuntimeClass),
+		UpstreamClient: upstreamClient,
+		ProxyID:        req.Account.ProxyID,
+		UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+		Metadata:       req.Account.Metadata,
+		Credential:     req.Credential,
+	}
+}
+
+func antigravityReverseProxyTokenCountAccount(req contract.TokenCountRequest) reverseproxycontract.AccountRuntime {
 	upstreamClient := req.Account.UpstreamClient
 	if upstreamClient == nil || strings.TrimSpace(*upstreamClient) == "" {
 		value := "antigravity_desktop"
@@ -522,6 +618,35 @@ func antigravityReverseProxyImageAccount(req contract.ImageGenerationRequest) re
 
 func isAntigravityImageGenerationReverseProxy(req contract.ImageGenerationRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-antigravity")
+}
+
+func antigravityTokenCountSetting(req contract.TokenCountRequest, keys ...string) string {
+	for _, values := range []map[string]any{req.RequestSettings, req.Account.Metadata, req.Credential, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range keys {
+			if value := mapString(values, key); value != "" {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
+func antigravityTokenCountCreditsEnabled(req contract.TokenCountRequest) bool {
+	for _, values := range []map[string]any{req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range []string{"antigravity_credits_enabled", "antigravity_credits", "antigravity-credits"} {
+			if mapBool(values, key) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func antigravityTokenCountRequestID(req contract.TokenCountRequest) string {
+	if value := antigravityTokenCountSetting(req, "antigravity_request_id", "request_id"); value != "" {
+		return value
+	}
+	return "agent-" + randomHex(16)
 }
 
 func antigravityImageCreditsEnabled(req contract.ImageGenerationRequest) bool {

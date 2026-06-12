@@ -17293,6 +17293,148 @@ export type GetGeminiModelResponses = {
 
 export type GetGeminiModelResponse = GetGeminiModelResponses[keyof GetGeminiModelResponses];
 
+export type ListAntigravityGeminiModelsAliasData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Maximum number of models to return. Defaults to all visible Antigravity-mapped models when omitted.
+         */
+        pageSize?: number;
+        /**
+         * Opaque pagination token returned by a previous listAntigravityGeminiModelsAlias response.
+         */
+        pageToken?: string;
+    };
+    url: '/api/provider/antigravity/v1beta/models';
+};
+
+export type ListAntigravityGeminiModelsAliasErrors = {
+    /**
+     * Invalid Gemini gateway request.
+     */
+    400: GeminiErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GeminiErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    default: GeminiErrorResponse;
+};
+
+export type ListAntigravityGeminiModelsAliasError = ListAntigravityGeminiModelsAliasErrors[keyof ListAntigravityGeminiModelsAliasErrors];
+
+export type ListAntigravityGeminiModelsAliasResponses = {
+    /**
+     * Gemini-compatible model list filtered to Antigravity provider mappings.
+     */
+    200: GeminiModelList;
+};
+
+export type ListAntigravityGeminiModelsAliasResponse = ListAntigravityGeminiModelsAliasResponses[keyof ListAntigravityGeminiModelsAliasResponses];
+
+export type GetAntigravityGeminiModelAliasData = {
+    body?: never;
+    path: {
+        /**
+         * Gemini model id from the path. SRapi runtime accepts slash-qualified ids when the HTTP router passes them through.
+         */
+        model: string;
+    };
+    query?: never;
+    url: '/api/provider/antigravity/v1beta/models/{model}';
+};
+
+export type GetAntigravityGeminiModelAliasErrors = {
+    /**
+     * Invalid Gemini gateway request.
+     */
+    400: GeminiErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GeminiErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    404: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    default: GeminiErrorResponse;
+};
+
+export type GetAntigravityGeminiModelAliasError = GetAntigravityGeminiModelAliasErrors[keyof GetAntigravityGeminiModelAliasErrors];
+
+export type GetAntigravityGeminiModelAliasResponses = {
+    /**
+     * Gemini-compatible model metadata for an Antigravity-mapped model.
+     */
+    200: GeminiModelInfo;
+};
+
+export type GetAntigravityGeminiModelAliasResponse = GetAntigravityGeminiModelAliasResponses[keyof GetAntigravityGeminiModelAliasResponses];
+
+export type CountAntigravityGeminiTokensAliasData = {
+    body: GeminiCountTokensRequest;
+    path: {
+        /**
+         * Gemini model id from the path. SRapi runtime accepts slash-qualified ids when the HTTP router passes them through.
+         */
+        model: string;
+    };
+    query?: never;
+    url: '/api/provider/antigravity/v1beta/models/{model}:countTokens';
+};
+
+export type CountAntigravityGeminiTokensAliasErrors = {
+    /**
+     * Invalid Gemini gateway request.
+     */
+    400: GeminiErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GeminiErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GeminiErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GeminiErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    default: GeminiErrorResponse;
+};
+
+export type CountAntigravityGeminiTokensAliasError = CountAntigravityGeminiTokensAliasErrors[keyof CountAntigravityGeminiTokensAliasErrors];
+
+export type CountAntigravityGeminiTokensAliasResponses = {
+    /**
+     * Gemini-compatible countTokens response.
+     */
+    200: GeminiCountTokensResponse;
+};
+
+export type CountAntigravityGeminiTokensAliasResponse = CountAntigravityGeminiTokensAliasResponses[keyof CountAntigravityGeminiTokensAliasResponses];
+
 export type GenerateAntigravityGeminiContentAliasData = {
     body: GeminiGenerateContentRequest;
     path: {

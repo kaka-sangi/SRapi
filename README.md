@@ -8,7 +8,7 @@ endpoint — with built-in scheduling, quotas, billing, and audit logs.
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8.svg)](apps/api/go.mod)
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000.svg)](apps/web/package.json)
-[![OpenAPI](https://img.shields.io/badge/OpenAPI-332%20operations-6BA539.svg)](packages/openapi/openapi.yaml)
+[![OpenAPI](https://img.shields.io/badge/OpenAPI-361%20operations-6BA539.svg)](packages/openapi/openapi.yaml)
 [![Status](https://img.shields.io/badge/status-0.1.0%20release%20candidate-orange.svg)](specs/plans/STATUS.md)
 
 English · [简体中文](README.zh-CN.md)
@@ -36,7 +36,7 @@ their keys, routing, or data.
   cache affinity, session stickiness, priority tier, live concurrency, and cost.
 - **A full control plane.** A Next.js admin console and a self-service workspace cover accounts,
   models, keys, plans, pricing, payments, affiliate rebates, observability, and more.
-- **OpenAPI-first.** A single contract (`packages/openapi/openapi.yaml`, 332 operations) generates
+- **OpenAPI-first.** A single contract (`packages/openapi/openapi.yaml`, 361 operations) generates
   the Go server types and the TypeScript SDK; drift is gated in CI.
 
 > SRapi is a self-hosted runtime. It provides isolation and routing primitives only. It does **not**

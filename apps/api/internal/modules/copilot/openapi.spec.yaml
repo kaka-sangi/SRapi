@@ -10670,6 +10670,121 @@ paths:
         default:
           $ref: "#/components/responses/GeminiGatewayError"
 
+  /api/provider/antigravity/v1beta/models:
+    get:
+      tags:
+        - Gateway
+      operationId: listAntigravityGeminiModelsAlias
+      summary: List Gemini-compatible models with Antigravity provider context.
+      description: Provider alias route. It reuses the standard Gemini-compatible models.list renderer, forces the `antigravity` provider context, and returns active SRapi registry models that are visible to the gateway API key and mapped to the Antigravity provider. This endpoint does not schedule a Provider Account or touch provider credentials.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+          description: Maximum number of models to return. Defaults to all visible Antigravity-mapped models when omitted.
+        - name: pageToken
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Opaque pagination token returned by a previous listAntigravityGeminiModelsAlias response.
+      responses:
+        "200":
+          description: Gemini-compatible model list filtered to Antigravity provider mappings.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiModelList"
+        "400":
+          $ref: "#/components/responses/GeminiGatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GeminiGatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GeminiGatewayForbidden"
+        default:
+          $ref: "#/components/responses/GeminiGatewayError"
+
+  /api/provider/antigravity/v1beta/models/{model}:
+    get:
+      tags:
+        - Gateway
+      operationId: getAntigravityGeminiModelAlias
+      summary: Get Gemini-compatible model metadata with Antigravity provider context.
+      description: Provider alias route. It reuses the standard Gemini-compatible models.get renderer, forces the `antigravity` provider context, and returns metadata only when the model is visible to the gateway API key and mapped to the Antigravity provider. This endpoint does not schedule a Provider Account or touch provider credentials.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GeminiModel"
+      responses:
+        "200":
+          description: Gemini-compatible model metadata for an Antigravity-mapped model.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiModelInfo"
+        "400":
+          $ref: "#/components/responses/GeminiGatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GeminiGatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GeminiGatewayForbidden"
+        "404":
+          $ref: "#/components/responses/GeminiGatewayError"
+        default:
+          $ref: "#/components/responses/GeminiGatewayError"
+
+  /api/provider/antigravity/v1beta/models/{model}:countTokens:
+    post:
+      tags:
+        - Gateway
+      operationId: countAntigravityGeminiTokensAlias
+      summary: Count Gemini-compatible tokens with Antigravity provider context.
+      description: Provider alias route. It reuses the standard Gemini-compatible countTokens runtime, forces the `antigravity` provider context, and invokes the Antigravity official-client `v1internal:countTokens` reverse-proxy path for eligible Antigravity accounts. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GeminiModel"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeminiCountTokensRequest"
+      responses:
+        "200":
+          description: Gemini-compatible countTokens response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiCountTokensResponse"
+        "400":
+          $ref: "#/components/responses/GeminiGatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GeminiGatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GeminiGatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GeminiGatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GeminiGatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GeminiGatewayError"
+
   /api/provider/antigravity/v1beta/models/{model}:generateContent:
     post:
       tags:

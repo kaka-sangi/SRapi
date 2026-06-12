@@ -1073,15 +1073,21 @@ func (s *Server) registerGatewayAliasRouteForMethod(mux *http.ServeMux, seen map
 
 func (s *Server) registerGatewayGeminiAliasRoute(mux *http.ServeMux, seen map[string]struct{}, providerKey, prefix string) {
 	path := prefix + "/models/"
-	pattern := "POST " + path
+	s.registerGatewayGeminiAliasRouteForMethod(mux, seen, http.MethodGet, providerKey, prefix, strings.TrimRight(prefix+"/models", "/"), s.handleListGeminiModels)
+	s.registerGatewayGeminiAliasRouteForMethod(mux, seen, http.MethodGet, providerKey, prefix, path, s.handleGetGeminiModel)
+	s.registerGatewayGeminiAliasRouteForMethod(mux, seen, http.MethodPost, providerKey, prefix, path, s.handleGeminiModelAction)
+}
+
+func (s *Server) registerGatewayGeminiAliasRouteForMethod(mux *http.ServeMux, seen map[string]struct{}, method, providerKey, prefix, path string, handler http.HandlerFunc) {
+	pattern := strings.ToUpper(strings.TrimSpace(method)) + " " + path
 	if _, ok := seen[pattern]; ok {
 		return
 	}
 	seen[pattern] = struct{}{}
-	mux.HandleFunc(pattern, s.withGatewayGeminiProviderAlias(providerKey, prefix))
+	mux.HandleFunc(pattern, s.withGatewayGeminiProviderAlias(providerKey, prefix, handler))
 }
 
-func (s *Server) withGatewayGeminiProviderAlias(providerKey string, prefix string) http.HandlerFunc {
+func (s *Server) withGatewayGeminiProviderAlias(providerKey string, prefix string, handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		aliasPath := r.URL.Path
 		runtimePath := "/v1beta" + strings.TrimPrefix(aliasPath, prefix)
@@ -1095,7 +1101,7 @@ func (s *Server) withGatewayGeminiProviderAlias(providerKey string, prefix strin
 		if r.URL.RawQuery != "" {
 			cloned.RequestURI += "?" + r.URL.RawQuery
 		}
-		s.handleGeminiModelAction(w, cloned)
+		handler(w, cloned)
 	}
 }
 

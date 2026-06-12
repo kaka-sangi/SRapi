@@ -9,6 +9,7 @@ import (
 
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -24,6 +25,11 @@ func (s *Server) handleListGeminiModels(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	models, err := s.runtime.models.List(r.Context())
+	if err != nil {
+		writeGeminiGatewayError(w, http.StatusInternalServerError, "INTERNAL", "failed to list models")
+		return
+	}
+	models, err = s.filterGeminiModelsForForcedProvider(r, models)
 	if err != nil {
 		writeGeminiGatewayError(w, http.StatusInternalServerError, "INTERNAL", "failed to list models")
 		return
@@ -54,11 +60,79 @@ func (s *Server) handleGetGeminiModel(w http.ResponseWriter, r *http.Request) {
 		writeGeminiGatewayError(w, http.StatusNotFound, "NOT_FOUND", "model not found")
 		return
 	}
+	if !s.geminiModelHasForcedProviderMapping(r, modelResolution.Model.ID) {
+		writeGeminiGatewayError(w, http.StatusNotFound, "NOT_FOUND", "model not found")
+		return
+	}
 	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
 		writeGeminiGatewayError(w, http.StatusForbidden, "PERMISSION_DENIED", "model not allowed for this api key")
 		return
 	}
 	writeJSONAny(w, http.StatusOK, geminiModelInfo(modelResolution.Model))
+}
+
+func (s *Server) filterGeminiModelsForForcedProvider(r *http.Request, models []modelcontract.Model) ([]modelcontract.Model, error) {
+	forcedProviderKey := gatewayForcedProviderKey(r.Context())
+	if forcedProviderKey == "" {
+		return models, nil
+	}
+	providers, err := s.runtime.providers.List(r.Context())
+	if err != nil {
+		return nil, err
+	}
+	providerID, ok := geminiProviderIDByName(providers, forcedProviderKey)
+	if !ok {
+		return []modelcontract.Model{}, nil
+	}
+	out := make([]modelcontract.Model, 0, len(models))
+	for _, model := range models {
+		mappings, err := s.runtime.models.ListMappingsByModel(r.Context(), model.ID)
+		if err != nil {
+			return nil, err
+		}
+		if mappingsIncludeActiveProvider(mappings, providerID) {
+			out = append(out, model)
+		}
+	}
+	return out, nil
+}
+
+func (s *Server) geminiModelHasForcedProviderMapping(r *http.Request, modelID int) bool {
+	forcedProviderKey := gatewayForcedProviderKey(r.Context())
+	if forcedProviderKey == "" {
+		return true
+	}
+	providers, err := s.runtime.providers.List(r.Context())
+	if err != nil {
+		return false
+	}
+	providerID, ok := geminiProviderIDByName(providers, forcedProviderKey)
+	if !ok {
+		return false
+	}
+	mappings, err := s.runtime.models.ListMappingsByModel(r.Context(), modelID)
+	if err != nil {
+		return false
+	}
+	return mappingsIncludeActiveProvider(mappings, providerID)
+}
+
+func geminiProviderIDByName(providers []providercontract.Provider, name string) (int, bool) {
+	for _, provider := range providers {
+		if strings.EqualFold(strings.TrimSpace(provider.Name), strings.TrimSpace(name)) {
+			return provider.ID, true
+		}
+	}
+	return 0, false
+}
+
+func mappingsIncludeActiveProvider(mappings []modelcontract.ModelProviderMapping, providerID int) bool {
+	for _, mapping := range mappings {
+		if mapping.ProviderID == providerID && mapping.Status == modelcontract.StatusActive {
+			return true
+		}
+	}
+	return false
 }
 
 func geminiModelNameFromPath(escapedPath string) (string, error) {

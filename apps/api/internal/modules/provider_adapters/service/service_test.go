@@ -10261,6 +10261,91 @@ func TestReverseProxyAntigravityGeminiAdapterDispatchesThroughRuntime(t *testing
 	}
 }
 
+func TestReverseProxyAntigravityGeminiAdapterCountsTokensThroughRuntime(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"totalTokens":21,"cachedContentTokenCount":4}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeTokenCount(context.Background(), contract.TokenCountRequest{
+		RequestID: "req_antigravity_count",
+		Model:     "antigravity-local",
+		RawBody:   []byte(`{"contents":[{"role":"user","parts":[{"text":"count antigravity"}]}]}`),
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "gemini-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             18,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Metadata: map[string]any{
+				"base_url":                      "https://antigravity.example",
+				"project_id":                    "project-1",
+				"antigravity_credits_enabled":   true,
+				"antigravity_client_request_id": "metadata-ignored-for-count",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-count-upstream"},
+		Credential: map[string]any{"access_token": "antigravity-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke antigravity token count: %v", err)
+	}
+	if resp.TotalTokens != 21 || resp.CachedContentTokenCount == nil || *resp.CachedContentTokenCount != 4 {
+		t.Fatalf("unexpected antigravity token count response: %+v", resp)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/v1internal:countTokens" {
+		t.Fatalf("unexpected antigravity token count request: %+v", runtime.request)
+	}
+	if runtime.request.Headers.Get("Authorization") != "" || runtime.request.Headers.Get("Content-Type") != "application/json" || runtime.request.Headers.Get("Accept") != "application/json" {
+		t.Fatalf("adapter should leave antigravity count auth injection to runtime, got %+v", runtime.request.Headers)
+	}
+	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassOauthRefresh) ||
+		runtime.request.Account.UpstreamClient == nil ||
+		*runtime.request.Account.UpstreamClient != "antigravity_desktop" ||
+		runtime.request.Account.Credential["access_token"] != "antigravity-token" {
+		t.Fatalf("expected antigravity OAuth runtime context, got %+v", runtime.request.Account)
+	}
+	var payload struct {
+		Project            string   `json:"project"`
+		RequestID          string   `json:"requestId"`
+		UserAgent          string   `json:"userAgent"`
+		RequestType        string   `json:"requestType"`
+		Model              string   `json:"model"`
+		EnabledCreditTypes []string `json:"enabledCreditTypes"`
+		Request            struct {
+			Contents []struct {
+				Role  string `json:"role"`
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"contents"`
+		} `json:"request"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode antigravity token count payload: %v", err)
+	}
+	if payload.Project != "project-1" ||
+		!strings.HasPrefix(payload.RequestID, "agent-") ||
+		payload.UserAgent != "antigravity" ||
+		payload.RequestType != "agent" ||
+		payload.Model != "gemini-count-upstream" ||
+		len(payload.EnabledCreditTypes) != 1 ||
+		payload.EnabledCreditTypes[0] != "GOOGLE_ONE_AI" ||
+		len(payload.Request.Contents) != 1 ||
+		payload.Request.Contents[0].Role != "user" ||
+		len(payload.Request.Contents[0].Parts) != 1 ||
+		payload.Request.Contents[0].Parts[0].Text != "count antigravity" {
+		t.Fatalf("unexpected antigravity token count payload: %+v", payload)
+	}
+}
+
 func TestReverseProxyAntigravityAdapterStreamsMultilineSSEData(t *testing.T) {
 	rawSSE := "data: {\"response\":{\"candidates\":[{\"content\":\n" +
 		"data: {\"parts\":[{\"text\":\"antigravity\"}]}}],\"usageMetadata\":{\"promptTokenCount\":4,\"candidatesTokenCount\":5}}}\n\n"

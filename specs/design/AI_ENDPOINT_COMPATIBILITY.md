@@ -136,9 +136,15 @@ WP-360 起，Antigravity 文本 provider alias（例如
 OpenAI/Anthropic/Gemini 的下游协议仍由 `provider.protocol` 决定，Antigravity 上游
 统一由 adapter 转为 `v1internal` envelope。
 WP-370 起，Gemini-native Antigravity provider alias（例如
-`/api/provider/antigravity/v1beta/models/{model}:generateContent` 和
-`/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent`）复用同一个
+`/api/provider/antigravity/v1beta/models`、
+`/api/provider/antigravity/v1beta/models/{model}`、
+`/api/provider/antigravity/v1beta/models/{model}:generateContent`、
+`/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent` 和
+`/api/provider/antigravity/v1beta/models/{model}:countTokens`）复用同一个
 Gemini Gateway handler，只改写 provider context 和保留原始 alias source endpoint。
+list/get 只返回可见且映射到 `antigravity` provider 的 registry-backed model metadata；
+`countTokens` 走 Antigravity official-client `v1internal:countTokens`，成功请求 usage
+tokens 和 cost 记 0。
 
 ## 3. 端点转换架构
 

@@ -18,7 +18,7 @@ SRapi 使用 OpenAPI-first 工作流。OpenAPI 契约是前端、后端、SDK、
 
 ```txt
 packages/openapi/
-├── openapi.yaml                # 唯一契约源，~700KB，约 332 个 operationId
+├── openapi.yaml                # 唯一契约源，~700KB，约 361 个 operationId
 └── oapi-codegen.server.yaml    # 后端 server 代码生成配置
 ```
 
@@ -903,7 +903,7 @@ Provider 特有字段放入：
 
 ## 16. 主要接口一览
 
-以下是各分区的代表性接口；权威的完整接口清单（约 332 个 operationId）以 `packages/openapi/openapi.yaml` 为准。
+以下是各分区的代表性接口；权威的完整接口清单（约 361 个 operationId）以 `packages/openapi/openapi.yaml` 为准。
 
 ### 16.1 Auth
 

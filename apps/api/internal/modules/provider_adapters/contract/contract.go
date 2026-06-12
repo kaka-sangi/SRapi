@@ -66,15 +66,16 @@ type PayloadTransform struct {
 }
 
 type TokenCountRequest struct {
-	RequestID      string
-	SourceProtocol string
-	SourceEndpoint string
-	Model          string
-	RawBody        []byte
-	Provider       providercontract.Provider
-	Account        accountcontract.ProviderAccount
-	Mapping        modelcontract.ModelProviderMapping
-	Credential     map[string]any
+	RequestID       string
+	SourceProtocol  string
+	SourceEndpoint  string
+	Model           string
+	RawBody         []byte
+	Provider        providercontract.Provider
+	Account         accountcontract.ProviderAccount
+	Mapping         modelcontract.ModelProviderMapping
+	Credential      map[string]any
+	RequestSettings map[string]any
 }
 
 type ResponseInputItemsRequest struct {

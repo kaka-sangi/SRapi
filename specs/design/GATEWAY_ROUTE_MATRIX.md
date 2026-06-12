@@ -68,8 +68,11 @@ Anthropic-compatible preset:
 Antigravity preset:
   POST {alias}/v1/chat/completions
   POST {alias}/v1/messages
+  GET  {gemini_alias}/models
+  GET  {gemini_alias}/models/{model}
   POST {gemini_alias}/models/{model}:generateContent
   POST {gemini_alias}/models/{model}:streamGenerateContent
+  POST {gemini_alias}/models/{model}:countTokens
 ```
 
 `{alias}` 来自 `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md` 的 `route_aliases`；`{gemini_alias}` 来自同一 preset 的 Gemini model-action aliases。例如 `/api/provider/deepseek/v1/chat/completions` 强制 `provider_key=deepseek`，但仍复用标准 Gateway runtime、API Key policy、model visibility、Scheduler、usage 和 decision 记录。
@@ -165,10 +168,17 @@ Scheduler / Provider Adapter / Reverse Proxy Runtime。WP-450 起，上游请求
 只决定下游协议归一化和响应渲染。
 Antigravity 文本 alias 已实现：`/api/provider/antigravity/v1/chat/completions` 和
 `/api/provider/antigravity/v1/messages` 强制 `provider_key=antigravity`，仍复用标准
-Gateway runtime。Antigravity Gemini model-action alias 已实现：
-`/api/provider/antigravity/v1beta/models/{model}:generateContent` 和
-`/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent` 强制
+Gateway runtime。Antigravity Gemini model alias 已实现：
+`/api/provider/antigravity/v1beta/models` 和
+`/api/provider/antigravity/v1beta/models/{model}` 只返回可见且映射到
+`antigravity` provider 的 registry-backed model metadata；
+`/api/provider/antigravity/v1beta/models/{model}:generateContent`、
+`/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent` 和
+`/api/provider/antigravity/v1beta/models/{model}:countTokens` 强制
 `provider_key=antigravity`，并复用标准 Gemini-native Gateway handler。
+Antigravity adapter 会把生成请求转为 `v1internal:generateContent` /
+`v1internal:streamGenerateContent`，把计数请求转为 `v1internal:countTokens`；
+成功 `countTokens` 请求 usage tokens 和 cost 记 0。
 
 ## 5. Route Matrix
 
