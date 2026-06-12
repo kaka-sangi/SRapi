@@ -926,6 +926,8 @@ func responsesWebSocketUsage(payload []byte) (gatewaycontract.Usage, bool) {
 		CompletionTokens    *int `json:"completion_tokens"`
 		CachedTokens        int  `json:"cached_tokens"`
 		CacheCreationTokens int  `json:"cache_creation_input_tokens"`
+		CacheCreation5m     int  `json:"cache_creation_ephemeral_5m_input_tokens"`
+		CacheCreation1h     int  `json:"cache_creation_ephemeral_1h_input_tokens"`
 		ImageOutputTokens   int  `json:"image_output_tokens"`
 		InputTokensDetails  *struct {
 			CachedTokens int `json:"cached_tokens"`
@@ -960,9 +962,6 @@ func responsesWebSocketUsage(payload []byte) (gatewaycontract.Usage, bool) {
 	}
 	inputTokens, inputOK := responsesWebSocketUsageToken(rawUsage.InputTokens, rawUsage.PromptTokens)
 	outputTokens, outputOK := responsesWebSocketUsageToken(rawUsage.OutputTokens, rawUsage.CompletionTokens)
-	if !inputOK && !outputOK && rawUsage.CachedTokens == 0 && rawUsage.CacheCreationTokens == 0 && rawUsage.ImageOutputTokens == 0 {
-		return gatewaycontract.Usage{}, false
-	}
 	cachedTokens := rawUsage.CachedTokens
 	if cachedTokens == 0 && rawUsage.InputTokensDetails != nil {
 		cachedTokens = rawUsage.InputTokensDetails.CachedTokens
@@ -987,13 +986,41 @@ func responsesWebSocketUsage(payload []byte) (gatewaycontract.Usage, bool) {
 	if outputTokens < imageOutputTokens+reasoningOutputTokens {
 		outputTokens = imageOutputTokens + reasoningOutputTokens
 	}
+	cacheCreationTokens := rawUsage.CacheCreationTokens
+	if cacheCreationTokens == 0 {
+		cacheCreationTokens = rawUsage.CacheCreation5m + rawUsage.CacheCreation1h
+	}
+	cacheCreation5m, cacheCreation1h := responsesWebSocketCacheCreationBuckets(cacheCreationTokens, rawUsage.CacheCreation5m, rawUsage.CacheCreation1h)
+	if !inputOK &&
+		!outputOK &&
+		cachedTokens == 0 &&
+		cacheCreationTokens == 0 &&
+		imageOutputTokens == 0 &&
+		reasoningOutputTokens == 0 {
+		return gatewaycontract.Usage{}, false
+	}
 	return gatewaycontract.Usage{
-		InputTokens:         max(0, inputTokens-cachedTokens),
-		OutputTokens:        outputTokens,
-		ImageOutputTokens:   imageOutputTokens,
-		CachedTokens:        cachedTokens,
-		CacheCreationTokens: rawUsage.CacheCreationTokens,
+		InputTokens:           max(0, inputTokens-cachedTokens),
+		OutputTokens:          outputTokens,
+		ImageOutputTokens:     imageOutputTokens,
+		CachedTokens:          cachedTokens,
+		CacheCreationTokens:   cacheCreationTokens,
+		CacheCreation5mTokens: cacheCreation5m,
+		CacheCreation1hTokens: cacheCreation1h,
 	}, true
+}
+
+func responsesWebSocketCacheCreationBuckets(total int, fiveMinutes int, oneHour int) (int, int) {
+	if total > 0 && fiveMinutes == 0 && oneHour == 0 {
+		return total, 0
+	}
+	if total == 0 {
+		return fiveMinutes, oneHour
+	}
+	if fiveMinutes+oneHour == total {
+		return fiveMinutes, oneHour
+	}
+	return total, 0
 }
 
 func responsesWebSocketUsageToken(primary *int, fallback *int) (int, bool) {

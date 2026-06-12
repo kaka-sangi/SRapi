@@ -396,6 +396,37 @@ func TestResponsesWebSocketUsageRejectsEmptyUsageObject(t *testing.T) {
 	}
 }
 
+func TestResponsesWebSocketUsageKeepsCacheCreationBreakdown(t *testing.T) {
+	usage, ok := responsesWebSocketUsage([]byte(`{"type":"response.done","response":{"usage":{"input_tokens":20,"output_tokens":4,"input_tokens_details":{"cached_tokens":5},"cache_creation_ephemeral_5m_input_tokens":7,"cache_creation_ephemeral_1h_input_tokens":11}}}`))
+	if !ok {
+		t.Fatal("expected websocket cache creation usage to parse")
+	}
+	if usage.InputTokens != 15 ||
+		usage.OutputTokens != 4 ||
+		usage.CachedTokens != 5 ||
+		usage.CacheCreationTokens != 18 ||
+		usage.CacheCreation5mTokens != 7 ||
+		usage.CacheCreation1hTokens != 11 {
+		t.Fatalf("unexpected websocket cache creation breakdown: %+v", usage)
+	}
+
+	usage, ok = responsesWebSocketUsage([]byte(`{"type":"response.completed","response":{"usage":{"input_tokens":3,"output_tokens":2,"cache_creation_input_tokens":9,"cache_creation_ephemeral_5m_input_tokens":4,"cache_creation_ephemeral_1h_input_tokens":5}}}`))
+	if !ok {
+		t.Fatal("expected websocket explicit cache creation usage to parse")
+	}
+	if usage.CacheCreationTokens != 9 || usage.CacheCreation5mTokens != 4 || usage.CacheCreation1hTokens != 5 {
+		t.Fatalf("unexpected explicit websocket cache creation breakdown: %+v", usage)
+	}
+
+	usage, ok = responsesWebSocketUsage([]byte(`{"type":"response.completed","response":{"usage":{"cache_creation_ephemeral_5m_input_tokens":6}}}`))
+	if !ok {
+		t.Fatal("expected websocket cache-only usage to parse")
+	}
+	if usage.CacheCreationTokens != 6 || usage.CacheCreation5mTokens != 6 {
+		t.Fatalf("unexpected cache-only websocket usage: %+v", usage)
+	}
+}
+
 func TestResponsesWebSocketUsageRecordKeepsCacheCreationTokens(t *testing.T) {
 	usage := &gatewaycontract.Usage{
 		InputTokens:         8,
@@ -419,7 +450,11 @@ func TestResponsesWebSocketUsageRecordKeepsCacheCreationTokens(t *testing.T) {
 		"",
 	)
 
-	if rec.InputTokens != 8 || rec.OutputTokens != 6 || rec.CachedTokens != 4 || rec.CacheCreationTokens != 5 || rec.UsageEstimated {
+	if rec.InputTokens != 8 ||
+		rec.OutputTokens != 6 ||
+		rec.CachedTokens != 4 ||
+		rec.CacheCreationTokens != 5 ||
+		rec.UsageEstimated {
 		t.Fatalf("unexpected websocket usage record: %+v", rec)
 	}
 }
