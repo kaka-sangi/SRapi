@@ -56,6 +56,7 @@
 | 文档 | 作用 |
 | --- | --- |
 | `../README.md` / `../README.zh-CN.md` | 仓库总览、快速开始和能力概览（英文 / 中文）。 |
+| `../ARCHITECTURE.md` | 根目录架构入口，指向 `requirements/` 下的 canonical 架构文档。 |
 | `../CONTRIBUTING.md` | 贡献流程、本地开发和门禁约定。 |
 | `../SECURITY.md` | 安全披露流程与联系方式。 |
 | `../LICENSE` | 开源许可证。 |
