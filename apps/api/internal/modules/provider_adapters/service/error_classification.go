@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -81,7 +82,7 @@ func classifyGeminiProviderHTTPErrorWithHeaders(statusCode int, headers http.Hea
 	if message == "" {
 		message = http.StatusText(statusCode)
 	}
-	if providerErrorBodyIndicatesQuotaExhausted(body, message) {
+	if providerErrorBodyIndicatesGeminiQuotaExhausted(body, message) {
 		class = "quota_exhausted"
 	}
 	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, RetryAfter: providerRetryAfter(headers, body, now), QuotaSignals: providerQuotaSignalsFromErrorHeaders(headers, now)}
@@ -139,10 +140,57 @@ func providerErrorBodyIndicatesQuotaExhausted(body []byte, message string) bool 
 		"minimumcreditamountforusage",
 		"minimum credit amount for usage",
 		"minimum credit",
-		"resource has been exhausted",
 	} {
 		if strings.Contains(text, keyword) {
 			return true
+		}
+	}
+	return false
+}
+
+func providerErrorBodyIndicatesGeminiQuotaExhausted(body []byte, message string) bool {
+	if providerErrorBodyHasGoogleReason(body, "RATE_LIMIT_EXCEEDED", "MODEL_CAPACITY_EXHAUSTED") {
+		return false
+	}
+	return providerErrorBodyIndicatesQuotaExhausted(body, message)
+}
+
+func providerErrorBodyHasGoogleReason(body []byte, reasons ...string) bool {
+	if len(body) == 0 || len(reasons) == 0 {
+		return false
+	}
+	var decoded any
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		return false
+	}
+	wanted := make(map[string]struct{}, len(reasons))
+	for _, reason := range reasons {
+		normalized := strings.ToUpper(strings.TrimSpace(reason))
+		if normalized != "" {
+			wanted[normalized] = struct{}{}
+		}
+	}
+	return googleReasonMatches(decoded, wanted)
+}
+
+func googleReasonMatches(value any, wanted map[string]struct{}) bool {
+	switch typed := value.(type) {
+	case map[string]any:
+		if raw, ok := typed["reason"]; ok {
+			if _, ok := wanted[strings.ToUpper(strings.TrimSpace(fmt.Sprint(raw)))]; ok {
+				return true
+			}
+		}
+		for _, raw := range typed {
+			if googleReasonMatches(raw, wanted) {
+				return true
+			}
+		}
+	case []any:
+		for _, raw := range typed {
+			if googleReasonMatches(raw, wanted) {
+				return true
+			}
 		}
 	}
 	return false

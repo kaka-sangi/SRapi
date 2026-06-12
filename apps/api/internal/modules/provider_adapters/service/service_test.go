@@ -3693,6 +3693,54 @@ func TestGeminiCompatibleAdapterClassifiesCreditsExhausted(t *testing.T) {
 	assertProviderError(t, err, "quota_exhausted", http.StatusTooManyRequests)
 }
 
+func TestGeminiCompatibleAdapterKeepsRateLimitExceededAsRateLimit(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"code":429,"message":"You have exhausted your capacity on this model.","status":"RESOURCE_EXHAUSTED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"RATE_LIMIT_EXCEEDED"}]}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_rate_limit_exceeded",
+		Model:      "gemini-local",
+		InputParts: textParts("hello"),
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+}
+
+func TestGeminiCompatibleAdapterKeepsModelCapacityAsProvider5xx(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"code":503,"message":"No capacity available for model gemini-pro on the server","status":"UNAVAILABLE","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"MODEL_CAPACITY_EXHAUSTED"}]}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_model_capacity",
+		Model:      "gemini-local",
+		InputParts: textParts("hello"),
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	assertProviderError(t, err, "provider_5xx", http.StatusServiceUnavailable)
+}
+
 func TestGeminiCompatibleAdapterExtractsQuotaResetDelay(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

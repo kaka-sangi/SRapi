@@ -63,7 +63,7 @@ func streamProviderError(protocol string, errorType string, status string, messa
 		statusCode = http.StatusBadGateway
 	}
 	class := streamProviderErrorClass(protocol, errorType, status, statusCode)
-	if providerErrorBodyIndicatesQuotaExhausted(nil, message+" "+errorType+" "+status) {
+	if streamProviderErrorIndicatesQuotaExhausted(protocol, message+" "+errorType+" "+status) {
 		class = "quota_exhausted"
 	}
 	if statusCode == http.StatusBadGateway {
@@ -74,6 +74,13 @@ func streamProviderError(protocol string, errorType string, status string, messa
 		message = "provider stream returned error event"
 	}
 	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message}
+}
+
+func streamProviderErrorIndicatesQuotaExhausted(protocol string, message string) bool {
+	if strings.TrimSpace(protocol) == "gemini-compatible" {
+		return providerErrorBodyIndicatesGeminiQuotaExhausted(nil, message)
+	}
+	return providerErrorBodyIndicatesQuotaExhausted(nil, message)
 }
 
 func streamProviderErrorClass(protocol string, errorType string, status string, statusCode int) string {
