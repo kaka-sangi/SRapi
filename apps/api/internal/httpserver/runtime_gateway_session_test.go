@@ -100,6 +100,53 @@ func TestDeriveGatewaySessionAffinityCascade(t *testing.T) {
 		}
 	})
 
+	t.Run("codex client metadata", func(t *testing.T) {
+		for _, tc := range []struct {
+			name   string
+			body   string
+			source string
+		}{
+			{
+				name:   "turn metadata prompt cache key",
+				body:   `{"client_metadata":{"x-codex-turn-metadata":"{\"prompt_cache_key\":\"cache-1\",\"window_id\":\"window-1\"}"}}`,
+				source: "derived:codex_turn_metadata_prompt_cache_key",
+			},
+			{
+				name:   "turn metadata window id",
+				body:   `{"client_metadata":{"x-codex-turn-metadata":"{\"window_id\":\"window-1\"}"}}`,
+				source: "derived:codex_turn_metadata_window_id",
+			},
+			{
+				name:   "window id",
+				body:   `{"client_metadata":{"x-codex-window-id":"window-1"}}`,
+				source: "derived:codex_window_id",
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				req := conversational
+				req.RawBody = []byte(tc.body)
+				key, source := deriveGatewaySessionAffinity(httptest.NewRequest("POST", "/v1/responses", nil), req)
+				if !strings.HasPrefix(key, "sid:") || source != tc.source {
+					t.Fatalf("expected %s key, got key=%q source=%q", tc.source, key, source)
+				}
+			})
+		}
+	})
+
+	t.Run("prompt cache key matches codex turn metadata", func(t *testing.T) {
+		reqWithPromptCacheKey := conversational
+		reqWithPromptCacheKey.RawBody = []byte(`{"prompt_cache_key":"cache-1"}`)
+		promptKey, _ := deriveGatewaySessionAffinity(httptest.NewRequest("POST", "/v1/responses", nil), reqWithPromptCacheKey)
+
+		reqWithTurnMetadata := conversational
+		reqWithTurnMetadata.RawBody = []byte(`{"client_metadata":{"x-codex-turn-metadata":"{\"prompt_cache_key\":\"cache-1\"}"}}`)
+		metadataKey, source := deriveGatewaySessionAffinity(httptest.NewRequest("POST", "/v1/responses", nil), reqWithTurnMetadata)
+
+		if metadataKey != promptKey || source != "derived:codex_turn_metadata_prompt_cache_key" {
+			t.Fatalf("expected matching prompt cache key, got prompt=%q metadata=%q source=%q", promptKey, metadataKey, source)
+		}
+	})
+
 	t.Run("session header", func(t *testing.T) {
 		req := conversational
 		req.RawBody = []byte(`{}`)
@@ -118,9 +165,11 @@ func TestDeriveGatewaySessionAffinityCascade(t *testing.T) {
 			source string
 		}{
 			{name: "codex underscore session", header: "Session_id", source: "derived:session_id"},
+			{name: "codex lowercase session", header: "session_id", source: "derived:session_id"},
 			{name: "amp thread", header: "X-Amp-Thread-Id", source: "derived:amp_thread_id"},
 			{name: "client request", header: "X-Client-Request-Id", source: "derived:client_request_id"},
 			{name: "conversation underscore", header: "Conversation_id", source: "derived:conversation_id"},
+			{name: "thread", header: "Thread-Id", source: "derived:thread_id"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				req := conversational
@@ -128,10 +177,58 @@ func TestDeriveGatewaySessionAffinityCascade(t *testing.T) {
 				httpReq := httptest.NewRequest("POST", "/v1/chat/completions", nil)
 				httpReq.Header.Set(tc.header, "cli-session-123")
 				key, source := deriveGatewaySessionAffinity(httpReq, req)
-				if !strings.HasPrefix(key, "sid:hdr:") || source != tc.source {
+				if !strings.HasPrefix(key, "sid:") || source != tc.source {
 					t.Fatalf("expected %s key, got key=%q source=%q", tc.source, key, source)
 				}
 			})
+		}
+	})
+
+	t.Run("codex metadata headers", func(t *testing.T) {
+		for _, tc := range []struct {
+			name   string
+			header string
+			value  string
+			source string
+		}{
+			{
+				name:   "turn metadata prompt cache key",
+				header: "X-Codex-Turn-Metadata",
+				value:  `{"prompt_cache_key":"cache-1","window_id":"window-1"}`,
+				source: "derived:codex_turn_metadata_prompt_cache_key",
+			},
+			{
+				name:   "turn metadata window id",
+				header: "X-Codex-Turn-Metadata",
+				value:  `{"window_id":"window-1"}`,
+				source: "derived:codex_turn_metadata_window_id",
+			},
+			{
+				name:   "window id",
+				header: "X-Codex-Window-Id",
+				value:  "window-1",
+				source: "derived:codex_window_id",
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				req := conversational
+				req.RawBody = []byte(`{}`)
+				httpReq := httptest.NewRequest("POST", "/v1/responses", nil)
+				httpReq.Header.Set(tc.header, tc.value)
+				key, source := deriveGatewaySessionAffinity(httpReq, req)
+				if !strings.HasPrefix(key, "sid:") || source != tc.source {
+					t.Fatalf("expected %s key, got key=%q source=%q", tc.source, key, source)
+				}
+			})
+		}
+	})
+
+	t.Run("invalid codex turn metadata falls through", func(t *testing.T) {
+		req := conversational
+		req.RawBody = []byte(`{"client_metadata":{"x-codex-turn-metadata":"not-json"}}`)
+		key, source := deriveGatewaySessionAffinity(httptest.NewRequest("POST", "/v1/responses", nil), req)
+		if !strings.HasPrefix(key, sessionaffinitycontract.ChainMarker) || source != "derived:content_digest" {
+			t.Fatalf("expected digest chain fallback, got key=%q source=%q", key, source)
 		}
 	})
 

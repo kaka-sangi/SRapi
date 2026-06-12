@@ -52,7 +52,7 @@ func gatewaySessionScope(apiKeyID int) string {
 // and a source label, or "" when no session identity can be derived (e.g.
 // non-conversational endpoints). The priority cascade mirrors sub2api:
 //  1. Anthropic metadata.user_id session id (Claude Code),
-//  2. OpenAI/Codex prompt_cache_key,
+//  2. OpenAI/Codex prompt_cache_key and Codex window metadata,
 //  3. explicit session/conversation/thread id headers,
 //  4. a content digest chain over system + messages (longest-prefix matched).
 func deriveGatewaySessionAffinity(r *http.Request, canonical gatewaycontract.CanonicalRequest) (string, string) {
@@ -71,6 +71,10 @@ func explicitSessionIdentity(r *http.Request, canonical gatewaycontract.Canonica
 			UserID string `json:"user_id"`
 		} `json:"metadata"`
 		PromptCacheKey string `json:"prompt_cache_key"`
+		ClientMetadata struct {
+			CodexWindowID     string `json:"x-codex-window-id"`
+			CodexTurnMetadata string `json:"x-codex-turn-metadata"`
+		} `json:"client_metadata"`
 	}
 	if len(canonical.RawBody) > 0 {
 		_ = json.Unmarshal(canonical.RawBody, &probe)
@@ -81,7 +85,13 @@ func explicitSessionIdentity(r *http.Request, canonical gatewaycontract.Canonica
 	if pck := strings.TrimSpace(probe.PromptCacheKey); pck != "" {
 		return "sid:pck:" + shortDigest(pck), "derived:prompt_cache_key"
 	}
+	if key, source := codexMetadataSessionKey(probe.ClientMetadata.CodexWindowID, probe.ClientMetadata.CodexTurnMetadata); key != "" {
+		return key, source
+	}
 	if r != nil {
+		if key, source := codexHeaderSessionKey(r.Header); key != "" {
+			return key, source
+		}
 		for _, candidate := range []struct {
 			header string
 			source string
@@ -89,13 +99,15 @@ func explicitSessionIdentity(r *http.Request, canonical gatewaycontract.Canonica
 			{"X-Session-ID", "derived:x_session_id"},
 			{"Session-Id", "derived:session_id"},
 			{"Session_id", "derived:session_id"},
+			{"session_id", "derived:session_id"},
 			{"X-Amp-Thread-Id", "derived:amp_thread_id"},
 			{"X-Client-Request-Id", "derived:client_request_id"},
 			{"Conversation-Id", "derived:conversation_id"},
 			{"Conversation_id", "derived:conversation_id"},
 			{"X-Conversation-Id", "derived:conversation_id"},
+			{"Thread-Id", "derived:thread_id"},
 		} {
-			if value := strings.TrimSpace(r.Header.Get(candidate.header)); value != "" {
+			if value := gatewayHeaderValue(r.Header, candidate.header); value != "" {
 				return "sid:hdr:" + shortDigest(value), candidate.source
 			}
 		}
@@ -129,6 +141,67 @@ func anthropicSessionSeed(userID string) string {
 	}
 	if matches := legacyAnthropicUserIDRegex.FindStringSubmatch(userID); matches != nil {
 		return strings.Join([]string{matches[1], matches[2], matches[3]}, "|")
+	}
+	return ""
+}
+
+func codexMetadataSessionKey(windowID, turnMetadata string) (string, string) {
+	if promptCacheKey, windowID := codexTurnMetadataSessionValues(turnMetadata); promptCacheKey != "" {
+		return "sid:pck:" + shortDigest(promptCacheKey), "derived:codex_turn_metadata_prompt_cache_key"
+	} else if windowID != "" {
+		return "sid:win:" + shortDigest(windowID), "derived:codex_turn_metadata_window_id"
+	}
+	if windowID = strings.TrimSpace(windowID); windowID != "" {
+		return "sid:win:" + shortDigest(windowID), "derived:codex_window_id"
+	}
+	return "", ""
+}
+
+func codexHeaderSessionKey(headers http.Header) (string, string) {
+	if headers == nil {
+		return "", ""
+	}
+	if turnMetadata := gatewayHeaderValue(headers, "X-Codex-Turn-Metadata"); turnMetadata != "" {
+		if promptCacheKey, windowID := codexTurnMetadataSessionValues(turnMetadata); promptCacheKey != "" {
+			return "sid:pck:" + shortDigest(promptCacheKey), "derived:codex_turn_metadata_prompt_cache_key"
+		} else if windowID != "" {
+			return "sid:win:" + shortDigest(windowID), "derived:codex_turn_metadata_window_id"
+		}
+	}
+	if windowID := gatewayHeaderValue(headers, "X-Codex-Window-Id"); windowID != "" {
+		return "sid:win:" + shortDigest(windowID), "derived:codex_window_id"
+	}
+	return "", ""
+}
+
+func codexTurnMetadataSessionValues(raw string) (string, string) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", ""
+	}
+	var metadata struct {
+		PromptCacheKey string `json:"prompt_cache_key"`
+		WindowID       string `json:"window_id"`
+	}
+	if err := json.Unmarshal([]byte(raw), &metadata); err != nil {
+		return "", ""
+	}
+	return strings.TrimSpace(metadata.PromptCacheKey), strings.TrimSpace(metadata.WindowID)
+}
+
+func gatewayHeaderValue(headers http.Header, key string) string {
+	if headers == nil {
+		return ""
+	}
+	for existingKey, values := range headers {
+		if !strings.EqualFold(existingKey, key) {
+			continue
+		}
+		for _, value := range values {
+			if trimmed := strings.TrimSpace(value); trimmed != "" {
+				return trimmed
+			}
+		}
 	}
 	return ""
 }
