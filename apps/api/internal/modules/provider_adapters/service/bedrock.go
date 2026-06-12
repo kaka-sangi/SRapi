@@ -232,9 +232,8 @@ func bedrockAnthropicRequestBody(body []byte, req contract.ConversationRequest, 
 	if betaTokens := bedrockAnthropicBetaTokens(req); len(betaTokens) > 0 {
 		payload["anthropic_beta"] = betaTokens
 	}
-	delete(payload, "model")
-	delete(payload, "stream")
-	delete(payload, "output_config")
+	bedrockInlineOutputFormatSchema(payload)
+	removeBedrockUnsupportedTopLevelFields(payload)
 	if tools, ok := payload["tools"].([]any); ok {
 		for _, item := range tools {
 			if tool, ok := item.(map[string]any); ok {
@@ -244,6 +243,61 @@ func bedrockAnthropicRequestBody(body []byte, req contract.ConversationRequest, 
 	}
 	sanitizeBedrockCacheControl(payload, modelID)
 	return json.Marshal(payload)
+}
+
+func removeBedrockUnsupportedTopLevelFields(payload map[string]any) {
+	for _, key := range []string{
+		"model",
+		"stream",
+		"provider",
+		"metadata",
+		"service_tier",
+		"interface_geo",
+		"context_management",
+		"output_format",
+		"output_config",
+	} {
+		delete(payload, key)
+	}
+}
+
+func bedrockInlineOutputFormatSchema(payload map[string]any) {
+	outputFormat, ok := payload["output_format"].(map[string]any)
+	if !ok {
+		return
+	}
+	schema, ok := outputFormat["schema"]
+	if !ok || schema == nil {
+		return
+	}
+	schemaText, err := json.Marshal(schema)
+	if err != nil {
+		return
+	}
+	messages, ok := payload["messages"].([]any)
+	if !ok {
+		return
+	}
+	for idx := len(messages) - 1; idx >= 0; idx-- {
+		message, ok := messages[idx].(map[string]any)
+		if !ok || strings.TrimSpace(fmt.Sprint(message["role"])) != "user" {
+			continue
+		}
+		inlineSchemaIntoBedrockMessage(message, string(schemaText))
+		return
+	}
+}
+
+func inlineSchemaIntoBedrockMessage(message map[string]any, schemaText string) {
+	switch content := message["content"].(type) {
+	case []any:
+		message["content"] = append(content, map[string]any{"type": "text", "text": schemaText})
+	case string:
+		message["content"] = []any{
+			map[string]any{"type": "text", "text": content},
+			map[string]any{"type": "text", "text": schemaText},
+		}
+	}
 }
 
 func bedrockAnthropicBetaTokens(req contract.ConversationRequest) []string {

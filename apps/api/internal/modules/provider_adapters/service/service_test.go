@@ -11226,6 +11226,99 @@ func TestBedrockAnthropicAdapterParsesEventStream(t *testing.T) {
 	}
 }
 
+func TestBedrockAnthropicAdapterSanitizesClaudeCodeFields(t *testing.T) {
+	var observedPayload map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&observedPayload); err != nil {
+			t.Fatalf("decode Bedrock payload: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"bedrock sanitized"}],"usage":{"input_tokens":1,"output_tokens":2}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_bedrock_sanitize_cc_fields",
+		SourceProtocol: "anthropic-compatible",
+		SourceEndpoint: "/v1/messages",
+		TargetProtocol: "anthropic-compatible",
+		Model:          "claude-local",
+		RawBody: []byte(`{
+			"model":"claude-local",
+			"stream":true,
+			"provider":"anthropic",
+			"metadata":{"user_id":"user-1"},
+			"service_tier":"auto",
+			"interface_geo":"us",
+			"context_management":{"edits":[{"type":"clear_thinking_20251015"}]},
+			"output_format":{"type":"json_schema","schema":{"type":"object","properties":{"answer":{"type":"string"}}}},
+			"output_config":{"effort":"high"},
+			"messages":[
+				{"role":"user","content":"first"},
+				{"role":"assistant","content":[{"type":"text","text":"ok"}]},
+				{"role":"user","content":[{"type":"text","text":"return json"}]}
+			],
+			"tools":[{"name":"lookup","input_schema":{"type":"object"},"custom":{"defer_loading":true}}]
+		}`),
+		Provider: providercontract.Provider{
+			Name:        "bedrock",
+			AdapterType: "bedrock",
+			Protocol:    "anthropic-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:       14,
+			Metadata: map[string]any{"base_url": upstream.URL, "bedrock_region": "us-east-1"},
+		},
+		Mapping: modelcontract.ModelProviderMapping{UpstreamModelName: "anthropic.claude-sonnet-4-5-20250929-v1:0"},
+		Credential: map[string]any{
+			"aws_access_key_id":     "AKIDEXAMPLE",
+			"aws_secret_access_key": "SECRETEXAMPLE",
+		},
+	})
+	if err != nil {
+		t.Fatalf("invoke Bedrock upstream: %v", err)
+	}
+
+	for _, key := range []string{"model", "stream", "provider", "metadata", "service_tier", "interface_geo", "context_management", "output_format", "output_config"} {
+		if _, exists := observedPayload[key]; exists {
+			t.Fatalf("expected Bedrock payload to strip %q, got %+v", key, observedPayload)
+		}
+	}
+	if observedPayload["anthropic_version"] != "bedrock-2023-05-31" {
+		t.Fatalf("expected Bedrock anthropic_version, got %+v", observedPayload["anthropic_version"])
+	}
+	tools, ok := observedPayload["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("expected tools in Bedrock payload, got %+v", observedPayload["tools"])
+	}
+	if _, exists := tools[0].(map[string]any)["custom"]; exists {
+		t.Fatalf("expected Bedrock tool custom field stripped, got %+v", tools[0])
+	}
+	messages, ok := observedPayload["messages"].([]any)
+	if !ok || len(messages) != 3 {
+		t.Fatalf("expected Bedrock messages, got %+v", observedPayload["messages"])
+	}
+	lastUser, ok := messages[2].(map[string]any)
+	if !ok {
+		t.Fatalf("expected last user message object, got %+v", messages[2])
+	}
+	content, ok := lastUser["content"].([]any)
+	if !ok || len(content) != 2 {
+		t.Fatalf("expected schema appended to last user content, got %+v", lastUser["content"])
+	}
+	schemaBlock, ok := content[1].(map[string]any)
+	if !ok || schemaBlock["type"] != "text" {
+		t.Fatalf("expected schema text block, got %+v", content[1])
+	}
+	if !strings.Contains(fmt.Sprint(schemaBlock["text"]), `"answer":{"type":"string"}`) {
+		t.Fatalf("expected inline schema text, got %+v", schemaBlock["text"])
+	}
+}
+
 func TestBedrockAnthropicAdapterRequiresAWSCredentials(t *testing.T) {
 	svc, err := service.New(nil)
 	if err != nil {
