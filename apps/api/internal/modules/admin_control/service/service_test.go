@@ -106,7 +106,14 @@ func TestDefaultAdminSettingsIncludesSafePassthroughHeaderAllowlist(t *testing.T
 	}
 	for _, want := range []string{
 		"retry-after",
+		"cache-control",
+		"content-language",
+		"date",
+		"etag",
+		"expires",
+		"last-modified",
 		"location",
+		"vary",
 		"www-authenticate",
 		"x-ratelimit-*",
 		"anthropic-ratelimit-*",

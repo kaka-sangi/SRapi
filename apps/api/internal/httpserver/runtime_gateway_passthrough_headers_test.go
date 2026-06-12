@@ -286,7 +286,14 @@ func TestGatewayPassthroughDefaultAllowlistForwardsCodexQuotaHeaders(t *testing.
 		if r.URL.Path != "/v1/chat/completions" {
 			t.Fatalf("unexpected upstream path %s", r.URL.Path)
 		}
+		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Language", "en-US")
+		w.Header().Set("Date", "Fri, 12 Jun 2026 10:00:00 GMT")
+		w.Header().Set("Etag", `"quota-headers"`)
+		w.Header().Set("Expires", "Fri, 12 Jun 2026 10:05:00 GMT")
+		w.Header().Set("Last-Modified", "Fri, 12 Jun 2026 09:59:00 GMT")
+		w.Header().Set("Vary", "Authorization")
 		w.Header().Set("X-Codex-Primary-Used-Percent", "12")
 		w.Header().Set("X-Codex-Primary-Reset-After-Seconds", "600")
 		w.Header().Set("X-Codex-Primary-Window-Minutes", "300")
@@ -310,12 +317,19 @@ func TestGatewayPassthroughDefaultAllowlistForwardsCodexQuotaHeaders(t *testing.
 
 	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"default-header-model","messages":[{"role":"user","content":"hi"}]}`)
 	for name, want := range map[string]string{
-		"X-Codex-Primary-Used-Percent":                 "12",
-		"X-Codex-Primary-Reset-After-Seconds":          "600",
-		"X-Codex-Primary-Window-Minutes":               "300",
-		"X-Codex-Secondary-Used-Percent":               "34",
-		"X-Codex-Secondary-Reset-After-Seconds":        "86400",
-		"X-Codex-Secondary-Window-Minutes":             "10080",
+		"Cache-Control":                         "no-cache",
+		"Content-Language":                      "en-US",
+		"Date":                                  "Fri, 12 Jun 2026 10:00:00 GMT",
+		"Etag":                                  `"quota-headers"`,
+		"Expires":                               "Fri, 12 Jun 2026 10:05:00 GMT",
+		"Last-Modified":                         "Fri, 12 Jun 2026 09:59:00 GMT",
+		"Vary":                                  "Authorization",
+		"X-Codex-Primary-Used-Percent":          "12",
+		"X-Codex-Primary-Reset-After-Seconds":   "600",
+		"X-Codex-Primary-Window-Minutes":        "300",
+		"X-Codex-Secondary-Used-Percent":        "34",
+		"X-Codex-Secondary-Reset-After-Seconds": "86400",
+		"X-Codex-Secondary-Window-Minutes":      "10080",
 		"X-Codex-Primary-Over-Secondary-Limit-Percent": "110",
 	} {
 		if got := rec.Header().Get(name); got != want {
