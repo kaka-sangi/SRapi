@@ -21,6 +21,7 @@ import (
 // hidden from /v1/models when every account that could serve it excludes it.
 // Exclusion takes precedence over the supported_models inclusion whitelist.
 const accountExcludedModelsMetadataKey = "excluded_models"
+const accountExcludedModelsHyphenMetadataKey = "excluded-models"
 
 // accountExcludesModel reports whether the account's excluded_models wildcard
 // list matches any of the supplied model names (typically the catalog canonical
@@ -29,6 +30,9 @@ const accountExcludedModelsMetadataKey = "excluded_models"
 // discovery "models/" prefix so patterns work regardless of that prefix.
 func accountExcludesModel(metadata map[string]any, modelNames ...string) bool {
 	patterns, ok := metadataStringList(metadata, accountExcludedModelsMetadataKey)
+	if !ok {
+		patterns, ok = metadataStringList(metadata, accountExcludedModelsHyphenMetadataKey)
+	}
 	if !ok || len(patterns) == 0 {
 		return false
 	}

@@ -36,6 +36,7 @@ func TestAccountExcludesModel(t *testing.T) {
 		{name: "case insensitive", metadata: map[string]any{"excluded_models": []any{"GPT-4O"}}, models: []string{"gpt-4o"}, want: true},
 		{name: "models/ prefix stripped", metadata: map[string]any{"excluded_models": []any{"gemini-pro"}}, models: []string{"models/gemini-pro"}, want: true},
 		{name: "comma string form", metadata: map[string]any{"excluded_models": "gpt-4o, claude-3"}, models: []string{"claude-3"}, want: true},
+		{name: "hyphen key form", metadata: map[string]any{"excluded-models": []any{"claude-*"}}, models: []string{"claude-sonnet-4"}, want: true},
 		{name: "second name matches", metadata: map[string]any{"excluded_models": []any{"upstream-x"}}, models: []string{"catalog-model", "upstream-x"}, want: true},
 		{name: "blank name skipped", metadata: map[string]any{"excluded_models": []any{"*"}}, models: []string{"  "}, want: false},
 	}
