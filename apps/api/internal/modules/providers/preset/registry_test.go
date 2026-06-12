@@ -205,6 +205,36 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if containsRuntimeClass(bedrockPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassCustomReverseProxy) {
 		t.Fatalf("unexpected bedrock runtime class allowlist: %+v", bedrockPreset.RuntimeClassAllowlist)
 	}
+	if bedrockPreset.AccountTemplate == nil {
+		t.Fatalf("expected bedrock preset to include account template")
+	}
+	if bedrockPreset.AccountTemplate.MetadataHints["bedrock_region"] == "" {
+		t.Fatalf("expected bedrock template to expose bedrock_region metadata hint")
+	}
+	bedrockModelMapping, ok := bedrockPreset.AccountTemplate.DefaultMetadata["model_mapping"].(map[string]string)
+	if !ok {
+		t.Fatalf("expected bedrock template to include default model_mapping, got %+v", bedrockPreset.AccountTemplate.DefaultMetadata["model_mapping"])
+	}
+	for from, want := range map[string]string{
+		"claude-fable-5":             "anthropic.claude-fable-5",
+		"claude-opus-4-8":            "us.anthropic.claude-opus-4-8-v1",
+		"claude-opus-4-6-thinking":   "us.anthropic.claude-opus-4-6-v1",
+		"claude-sonnet-4-6-thinking": "us.anthropic.claude-sonnet-4-6",
+		"claude-haiku-4-5":           "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+	} {
+		if got := bedrockModelMapping[from]; got != want {
+			t.Fatalf("unexpected bedrock default mapping %s=%q, want %q", from, got, want)
+		}
+	}
+	bedrockSupportedModels, ok := bedrockPreset.AccountTemplate.DefaultMetadata["supported_models"].([]string)
+	if !ok {
+		t.Fatalf("expected bedrock template to include supported_models, got %+v", bedrockPreset.AccountTemplate.DefaultMetadata["supported_models"])
+	}
+	for _, want := range []string{"anthropic.claude-fable-5", "us.anthropic.claude-opus-4-8-v1", "us.anthropic.claude-sonnet-4-6"} {
+		if !containsString(bedrockSupportedModels, want) {
+			t.Fatalf("expected bedrock supported_models to include %s, got %+v", want, bedrockSupportedModels)
+		}
+	}
 
 	chatGPTWebPreset, ok := registry.Lookup("chatgpt-web")
 	if !ok {

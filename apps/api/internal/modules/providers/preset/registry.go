@@ -413,7 +413,61 @@ func bedrockPreset() Preset {
 			accountscontract.RuntimeClassAPIKey,
 		},
 		Capabilities: anthropicCapabilities(),
+		AccountTemplate: &AccountTemplate{
+			DefaultMetadata: map[string]any{
+				"model_mapping":    bedrockDefaultModelMapping(),
+				"supported_models": bedrockDefaultSupportedModels(),
+			},
+			ModelCatalog: []string{"claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"},
+			MetadataHints: map[string]string{
+				"bedrock_region":   "AWS Bedrock runtime region; regional model prefixes are adjusted at dispatch time",
+				"model_mapping":    "Anthropic model alias to Bedrock model id map",
+				"supported_models": "Bedrock upstream model allowlist after model_mapping",
+			},
+		},
 	}
+}
+
+func bedrockDefaultModelMapping() map[string]string {
+	return map[string]string{
+		"claude-fable-5":             "anthropic.claude-fable-5",
+		"claude-opus-4-8":            "us.anthropic.claude-opus-4-8-v1",
+		"claude-opus-4-7":            "us.anthropic.claude-opus-4-7-v1",
+		"claude-opus-4-6-thinking":   "us.anthropic.claude-opus-4-6-v1",
+		"claude-opus-4-6":            "us.anthropic.claude-opus-4-6-v1",
+		"claude-opus-4-5-thinking":   "us.anthropic.claude-opus-4-5-20251101-v1:0",
+		"claude-opus-4-5-20251101":   "us.anthropic.claude-opus-4-5-20251101-v1:0",
+		"claude-opus-4-1":            "us.anthropic.claude-opus-4-1-20250805-v1:0",
+		"claude-opus-4-20250514":     "us.anthropic.claude-opus-4-20250514-v1:0",
+		"claude-sonnet-4-6-thinking": "us.anthropic.claude-sonnet-4-6",
+		"claude-sonnet-4-6":          "us.anthropic.claude-sonnet-4-6",
+		"claude-sonnet-4-5":          "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+		"claude-sonnet-4-5-thinking": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+		"claude-sonnet-4-5-20250929": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+		"claude-sonnet-4-20250514":   "us.anthropic.claude-sonnet-4-20250514-v1:0",
+		"claude-haiku-4-5":           "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+		"claude-haiku-4-5-20251001":  "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+	}
+}
+
+func bedrockDefaultSupportedModels() []string {
+	values := bedrockDefaultModelMapping()
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, model := range values {
+		model = strings.TrimSpace(model)
+		if model == "" {
+			continue
+		}
+		key := strings.ToLower(model)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, model)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func compatiblePreset(providerKey string, platformFamily PlatformFamily, displayName string, defaultBaseURL string, routeAliases []string, capabilities map[string]bool) Preset {
