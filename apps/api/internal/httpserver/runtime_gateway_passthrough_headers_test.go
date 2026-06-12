@@ -20,6 +20,8 @@ func upstreamPassthroughHeaders() http.Header {
 	h := http.Header{}
 	h.Set("Retry-After", "30")
 	h.Set("X-Request-Id", "req-123")
+	h.Set("Location", "https://auth.example/challenge")
+	h.Set("Www-Authenticate", `Bearer realm="upstream"`)
 	h.Set("X-RateLimit-Remaining", "42")
 	h.Set("X-RateLimit-Reset", "1717000000")
 	h.Set("X-Secret-Token", "should-not-leak")
@@ -41,7 +43,7 @@ func TestForwardUpstreamResponseHeaders_AllowlistedForwarded(t *testing.T) {
 	rec := httptest.NewRecorder()
 	cfg := gatewayPassthroughHeaderConfig{
 		enabled:   true,
-		allowlist: []string{"retry-after", "x-request-id", "x-ratelimit-*"},
+		allowlist: []string{"retry-after", "location", "www-authenticate", "x-request-id", "x-ratelimit-*"},
 	}
 	forwardUpstreamResponseHeaders(rec, upstreamPassthroughHeaders(), cfg)
 
@@ -50,6 +52,12 @@ func TestForwardUpstreamResponseHeaders_AllowlistedForwarded(t *testing.T) {
 	}
 	if got := rec.Header().Get("X-Request-Id"); got != "req-123" {
 		t.Fatalf("x-request-id not forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("Location"); got != "https://auth.example/challenge" {
+		t.Fatalf("location not forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("Www-Authenticate"); got != `Bearer realm="upstream"` {
+		t.Fatalf("www-authenticate not forwarded, got %q", got)
 	}
 	if got := rec.Header().Get("X-RateLimit-Remaining"); got != "42" {
 		t.Fatalf("x-ratelimit-remaining (wildcard) not forwarded, got %q", got)
@@ -63,7 +71,7 @@ func TestForwardUpstreamResponseHeaders_NonAllowlistedDropped(t *testing.T) {
 	rec := httptest.NewRecorder()
 	cfg := gatewayPassthroughHeaderConfig{
 		enabled:   true,
-		allowlist: []string{"retry-after", "x-request-id", "x-ratelimit-*"},
+		allowlist: []string{"retry-after", "location", "www-authenticate", "x-request-id", "x-ratelimit-*"},
 	}
 	forwardUpstreamResponseHeaders(rec, upstreamPassthroughHeaders(), cfg)
 

@@ -53,6 +53,8 @@ var defaultGatewayPassthroughHeaderAllowlist = []string{
 	"request-id",
 	"x-request-id",
 	"x-upstream-request-id",
+	"location",
+	"www-authenticate",
 	"x-ratelimit-*",
 	"ratelimit-*",
 	"anthropic-ratelimit-*",
