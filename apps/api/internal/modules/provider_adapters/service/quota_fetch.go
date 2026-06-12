@@ -151,8 +151,17 @@ func quotaHeaders(req contract.ProbeRequest, endpoint *string) (http.Header, err
 			return headers, nil
 		}
 	}
-	return probeHeaders(req, endpoint)
+	headers, err := probeHeaders(req, endpoint)
+	if err != nil {
+		return nil, err
+	}
+	if isAntigravityQuotaProbe(req) && headers.Get("User-Agent") == "" {
+		headers.Set("User-Agent", firstNonEmpty(antigravityQuotaSetting(req, "user_agent"), antigravityQuotaDefaultUserAgent))
+	}
+	return headers, nil
 }
+
+const antigravityQuotaDefaultUserAgent = "antigravity/1.23.2 windows/amd64"
 
 func codexQuotaHeaders(req contract.ProbeRequest) (http.Header, error) {
 	accessToken := firstCredentialString(req.Credential, "access_token", "oauth_access_token", "cli_client_token")
@@ -636,6 +645,11 @@ func codexAccountsCheckEndpoint(req contract.ProbeRequest) string {
 }
 
 func codexQuotaSetting(req contract.ProbeRequest, keys ...string) string {
+	values := append([]map[string]any{req.Credential}, quotaConfigMaps(req)...)
+	return firstMapString(values, keys...)
+}
+
+func antigravityQuotaSetting(req contract.ProbeRequest, keys ...string) string {
 	values := append([]map[string]any{req.Credential}, quotaConfigMaps(req)...)
 	return firstMapString(values, keys...)
 }

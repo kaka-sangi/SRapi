@@ -433,7 +433,7 @@ func TestFetchAccountQuotaMapsCodexAccountsCheckPlan(t *testing.T) {
 }
 
 func TestFetchAccountQuotaAntigravityUsesProjectHeaderAndSupportsQuota(t *testing.T) {
-	var gotMethod, gotBody, gotContentType string
+	var gotMethod, gotBody, gotContentType, gotUserAgent string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer antigravity-access-token" {
 			t.Fatalf("unexpected auth header %q", got)
@@ -443,6 +443,7 @@ func TestFetchAccountQuotaAntigravityUsesProjectHeaderAndSupportsQuota(t *testin
 		}
 		gotMethod = r.Method
 		gotContentType = r.Header.Get("Content-Type")
+		gotUserAgent = r.Header.Get("User-Agent")
 		raw, _ := io.ReadAll(r.Body)
 		gotBody = string(raw)
 		w.Header().Set("Content-Type", "application/json")
@@ -502,6 +503,57 @@ func TestFetchAccountQuotaAntigravityUsesProjectHeaderAndSupportsQuota(t *testin
 	}
 	if gotMethod != http.MethodPost || gotBody != `{"metadata":{"ideType":"ANTIGRAVITY"}}` || gotContentType != "application/json" {
 		t.Fatalf("unexpected antigravity quota request method=%q content-type=%q body=%s", gotMethod, gotContentType, gotBody)
+	}
+	if gotUserAgent != "antigravity/1.23.2 windows/amd64" {
+		t.Fatalf("unexpected antigravity quota user-agent %q", gotUserAgent)
+	}
+}
+
+func TestFetchAccountQuotaAntigravityUserAgentMetadataOverridesDefault(t *testing.T) {
+	var gotUserAgent string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotUserAgent = r.Header.Get("User-Agent")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"currentTier":{"id":"free-tier"}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	report, err := svc.FetchAccountQuota(context.Background(), contract.ProbeRequest{
+		Provider: providercontract.Provider{
+			ID:          35,
+			Name:        "antigravity",
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "gemini-compatible",
+			Status:      providercontract.StatusActive,
+			ConfigSchema: map[string]any{
+				"quota_url":    upstream.URL + "/v1internal:loadCodeAssist",
+				"quota_method": "POST",
+				"quota_body":   `{"metadata":{"ideType":"ANTIGRAVITY"}}`,
+				"auth_mode":    "bearer",
+			},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           35,
+			ProviderID:   35,
+			Name:         "antigravity-custom-ua",
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Status:       accountcontract.StatusActive,
+			Metadata:     map[string]any{"user_agent": "antigravity/2.0.0 linux/amd64"},
+		},
+		Credential: map[string]any{"access_token": "antigravity-access-token"},
+	})
+	if err != nil {
+		t.Fatalf("fetch antigravity quota: %v", err)
+	}
+	if !report.Supported || report.Plan != "free-tier" {
+		t.Fatalf("unexpected antigravity quota report: %+v", report)
+	}
+	if gotUserAgent != "antigravity/2.0.0 linux/amd64" {
+		t.Fatalf("unexpected antigravity quota user-agent %q", gotUserAgent)
 	}
 }
 
