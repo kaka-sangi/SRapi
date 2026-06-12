@@ -1275,6 +1275,10 @@ func TestOpenAICompatibleAdapterInvokesEmbeddingsUpstream(t *testing.T) {
 			t.Fatalf("expected encoding/dimensions, got %+v", payload)
 		}
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Request-Id", "req-embeddings-upstream")
+		w.Header().Set("X-Codex-Primary-Used-Percent", "21")
+		w.Header().Set("X-Codex-Primary-Reset-After-Seconds", "3600")
+		w.Header().Set("X-Codex-Primary-Window-Minutes", "300")
 		_, _ = w.Write([]byte(`{"object":"list","data":[{"object":"embedding","embedding":[0.1,0.2,0.3],"index":0},{"object":"embedding","embedding":[0.4,0.5,0.6],"index":1}],"model":"embedding-upstream","usage":{"prompt_tokens":7,"total_tokens":7,"cache_read_input_tokens":2,"input_tokens_details":{"cache_creation_tokens":3}}}`))
 	}))
 	defer upstream.Close()
@@ -1314,6 +1318,10 @@ func TestOpenAICompatibleAdapterInvokesEmbeddingsUpstream(t *testing.T) {
 		resp.Usage.CacheCreationTokens != 3 {
 		t.Fatalf("unexpected embedding usage: %+v", resp.Usage)
 	}
+	if got := resp.Headers.Get("X-Request-Id"); got != "req-embeddings-upstream" {
+		t.Fatalf("expected upstream headers to be captured, got %q", got)
+	}
+	assertQuotaSignal(t, resp.QuotaSignals, "codex_5h_percent", "21", "79", "100", 0.79)
 }
 
 func TestOpenAICompatibleAdapterInvokesImageGenerationsUpstream(t *testing.T) {
@@ -2245,6 +2253,10 @@ func TestGenericReverseProxyAdapterInvokesEmbeddingsUpstream(t *testing.T) {
 			t.Fatalf("unexpected generic embeddings payload: %+v", payload)
 		}
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Request-Id", "req-generic-embeddings-upstream")
+		w.Header().Set("X-Codex-Primary-Used-Percent", "22")
+		w.Header().Set("X-Codex-Primary-Reset-After-Seconds", "1800")
+		w.Header().Set("X-Codex-Primary-Window-Minutes", "300")
 		_, _ = w.Write([]byte(`{"data":[{"embedding":[0.1,0.2],"index":0},{"embedding":[0.3,0.4],"index":1}],"model":"embedding-upstream","usage":{"prompt_tokens":8,"total_tokens":8}}`))
 	}))
 	defer upstream.Close()
@@ -2279,6 +2291,10 @@ func TestGenericReverseProxyAdapterInvokesEmbeddingsUpstream(t *testing.T) {
 	if resp.Model != "embedding-upstream" || len(resp.Data) != 2 || len(resp.Data[0].Vector) != 2 || resp.Usage.InputTokens != 8 || resp.Usage.Estimated {
 		t.Fatalf("unexpected generic embeddings response: %+v", resp)
 	}
+	if got := resp.Headers.Get("X-Request-Id"); got != "req-generic-embeddings-upstream" {
+		t.Fatalf("expected generic upstream headers to be captured, got %q", got)
+	}
+	assertQuotaSignal(t, resp.QuotaSignals, "codex_5h_percent", "22", "78", "100", 0.78)
 }
 
 func TestOpenAICompatibleAdapterClassifiesInterruptedStream(t *testing.T) {

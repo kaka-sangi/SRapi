@@ -59,13 +59,20 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	original, hadOriginal := os.LookupEnv("STORAGE_BACKEND")
+	originalStorage, hadOriginalStorage := os.LookupEnv("STORAGE_BACKEND")
+	originalHashCost, hadOriginalHashCost := os.LookupEnv("PASSWORD_HASH_COST")
 	_ = os.Setenv("STORAGE_BACKEND", config.StorageBackendMemory)
+	_ = os.Setenv("PASSWORD_HASH_COST", "4")
 	code := m.Run()
-	if hadOriginal {
-		_ = os.Setenv("STORAGE_BACKEND", original)
+	if hadOriginalStorage {
+		_ = os.Setenv("STORAGE_BACKEND", originalStorage)
 	} else {
 		_ = os.Unsetenv("STORAGE_BACKEND")
+	}
+	if hadOriginalHashCost {
+		_ = os.Setenv("PASSWORD_HASH_COST", originalHashCost)
+	} else {
+		_ = os.Unsetenv("PASSWORD_HASH_COST")
 	}
 	os.Exit(code)
 }
@@ -6465,12 +6472,18 @@ func TestGatewayEmbeddingsRouteTargetsOpenAICompatibleUpstream(t *testing.T) {
 		})
 		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Retry-After", "17")
+		w.Header().Set("X-Request-Id", "req-embedding-upstream")
+		w.Header().Set("X-Upstream-Request-Id", "upstream-embedding-route")
+		w.Header().Set("X-RateLimit-Remaining-Requests", "19")
+		w.Header().Set("X-Secret-Token", "should-not-leak")
 		_, _ = w.Write([]byte(`{"object":"list","data":[{"object":"embedding","embedding":[0.11,0.22,0.33],"index":0},{"object":"embedding","embedding":[0.44,0.55,0.66],"index":1}],"model":"embedding-upstream","usage":{"prompt_tokens":9,"total_tokens":9}}`))
 	}))
 	defer upstream.Close()
 
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustEnableGatewayPassthroughHeaders(t, handler, sessionCookie, loginResp.Data.CsrfToken, []string{"retry-after", "x-request-id", "x-upstream-request-id", "x-ratelimit-*"})
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp270-openai","display_name":"WP270 OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"embeddings":true}}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp270-embedding-model","display_name":"WP270 Embedding Model","status":"active","capabilities":[{"key":"embeddings","level":"required","status":"stable","version":"v1"}]}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"embedding-upstream","status":"active"}`)
@@ -6491,6 +6504,21 @@ func TestGatewayEmbeddingsRouteTargetsOpenAICompatibleUpstream(t *testing.T) {
 	}
 	if embeddingResp.Usage.PromptTokens == nil || *embeddingResp.Usage.PromptTokens != 9 || embeddingResp.Usage.CompletionTokens == nil || *embeddingResp.Usage.CompletionTokens != 0 {
 		t.Fatalf("expected upstream embedding usage, got %+v", embeddingResp.Usage)
+	}
+	if got := rec.Header().Get("Retry-After"); got != "17" {
+		t.Fatalf("expected Retry-After to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-Request-Id"); got == "" || got == "req-embedding-upstream" {
+		t.Fatalf("expected SRapi X-Request-Id to be preserved, got %q", got)
+	}
+	if got := rec.Header().Get("X-Upstream-Request-Id"); got != "upstream-embedding-route" {
+		t.Fatalf("expected upstream request id to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-RateLimit-Remaining-Requests"); got != "19" {
+		t.Fatalf("expected rate limit header to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-Secret-Token"); got != "" {
+		t.Fatalf("non-allowlisted header leaked: %q", got)
 	}
 
 	mu.Lock()

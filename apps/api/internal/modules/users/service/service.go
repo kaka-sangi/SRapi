@@ -32,8 +32,9 @@ func (SystemClock) Now() time.Time {
 }
 
 type Service struct {
-	store contract.Store
-	clock Clock
+	store              contract.Store
+	clock              Clock
+	passwordHasherCost int
 }
 
 type CreateRequest struct {
@@ -115,13 +116,18 @@ type BindAuthIdentityRequest struct {
 }
 
 func New(store contract.Store, clock Clock) (*Service, error) {
+	return NewWithPasswordCost(store, clock, defaultBcryptCost)
+}
+
+// NewWithPasswordCost builds a user service with an explicit bcrypt cost.
+func NewWithPasswordCost(store contract.Store, clock Clock, passwordHashCost int) (*Service, error) {
 	if store == nil {
 		return nil, ErrInvalidInput
 	}
 	if clock == nil {
 		clock = SystemClock{}
 	}
-	return &Service{store: store, clock: clock}, nil
+	return &Service{store: store, clock: clock, passwordHasherCost: normalizeBcryptCost(passwordHashCost)}, nil
 }
 
 func (s *Service) Create(ctx context.Context, req CreateRequest) (contract.StoredUser, error) {
@@ -130,7 +136,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (contract.Store
 	if email == "" || !strings.Contains(email, "@") || name == "" || len(req.Password) < 8 {
 		return contract.StoredUser{}, ErrInvalidInput
 	}
-	passwordHash, err := HashPassword(req.Password)
+	passwordHash, err := s.hashPassword(req.Password)
 	if err != nil {
 		return contract.StoredUser{}, err
 	}
@@ -399,7 +405,7 @@ func (s *Service) Update(ctx context.Context, id int, req UpdateRequest) (contra
 		input.Name = &name
 	}
 	if req.Password != nil {
-		passwordHash, err := HashPassword(*req.Password)
+		passwordHash, err := s.hashPassword(*req.Password)
 		if err != nil {
 			return contract.StoredUser{}, err
 		}
@@ -476,7 +482,7 @@ func (s *Service) ResetPassword(ctx context.Context, id int, newPassword string)
 	if user.Status == contract.StatusDisabled {
 		return contract.StoredUser{}, ErrUserDisabled
 	}
-	passwordHash, err := HashPassword(newPassword)
+	passwordHash, err := s.hashPassword(newPassword)
 	if err != nil {
 		return contract.StoredUser{}, err
 	}
@@ -508,7 +514,7 @@ func (s *Service) ChangePassword(ctx context.Context, id int, req ChangePassword
 	if err := ComparePassword(user.PasswordHash, req.CurrentPassword); err != nil {
 		return contract.StoredUser{}, ErrInvalidCredentials
 	}
-	passwordHash, err := HashPassword(req.NewPassword)
+	passwordHash, err := s.hashPassword(req.NewPassword)
 	if err != nil {
 		return contract.StoredUser{}, err
 	}
@@ -776,22 +782,37 @@ func PublicUser(user contract.StoredUser) contract.User {
 }
 
 func HashPassword(password string) (string, error) {
-	return hashPassword(password)
+	return hashPassword(password, defaultBcryptCost)
 }
 
 func ComparePassword(hash, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
 
-func hashPassword(password string) (string, error) {
+func (s *Service) hashPassword(password string) (string, error) {
+	cost := defaultBcryptCost
+	if s != nil {
+		cost = s.passwordHasherCost
+	}
+	return hashPassword(password, cost)
+}
+
+func hashPassword(password string, cost int) (string, error) {
 	if len(password) < 8 {
 		return "", ErrInvalidInput
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), defaultBcryptCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), normalizeBcryptCost(cost))
 	if err != nil {
 		return "", err
 	}
 	return string(hash), nil
+}
+
+func normalizeBcryptCost(cost int) int {
+	if cost < bcrypt.MinCost {
+		return bcrypt.MinCost
+	}
+	return cost
 }
 
 func normalizeRoles(roles []contract.Role) []contract.Role {

@@ -892,7 +892,9 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		ProviderQuotaSignals:  providerResp.QuotaSignals,
 	})
+	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderEmbeddings(canonicalResp))
 }
 

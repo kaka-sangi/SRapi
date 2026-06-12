@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
@@ -65,7 +66,13 @@ func (s *Service) invokeRerankCompatible(ctx context.Context, req contract.Reran
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return contract.RerankResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
-	return parseRerankCompatibleResponse(body, resp.StatusCode, req)
+	parsed, err := parseRerankCompatibleResponse(body, resp.StatusCode, req)
+	if err != nil {
+		return contract.RerankResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(resp.Header)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(resp.Header, time.Now().UTC())
+	return parsed, nil
 }
 
 func (s *Service) invokeReverseProxyRerankCompatible(ctx context.Context, req contract.RerankRequest, baseURL string) (contract.RerankResponse, error) {
@@ -99,7 +106,13 @@ func (s *Service) invokeReverseProxyRerankCompatible(ctx context.Context, req co
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.RerankResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
-	return parseRerankCompatibleResponse(runtimeResp.Body, runtimeResp.StatusCode, req)
+	parsed, err := parseRerankCompatibleResponse(runtimeResp.Body, runtimeResp.StatusCode, req)
+	if err != nil {
+		return contract.RerankResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
+	return parsed, nil
 }
 
 type rerankCompatibleRequest struct {

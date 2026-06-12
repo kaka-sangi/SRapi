@@ -136,6 +136,7 @@ type SecurityConfig struct {
 	MasterKey         string
 	TOTPEncryptionKey string
 	APIKeyPepper      string
+	PasswordHashCost  int
 }
 
 type BootstrapConfig struct {
@@ -579,6 +580,9 @@ func (c Config) Validate() error {
 		if weakBootstrapPassword(c.Bootstrap.AdminPassword) {
 			return fmt.Errorf("BOOTSTRAP_ADMIN_PASSWORD must be changed to a non-development value in release mode")
 		}
+		if c.Security.PasswordHashCost < 12 {
+			return fmt.Errorf("PASSWORD_HASH_COST must be at least 12 in release mode")
+		}
 	}
 	return nil
 }
@@ -632,6 +636,7 @@ func securityConfigFromEnv() SecurityConfig {
 		MasterKey:         masterKey,
 		TOTPEncryptionKey: getEnv("TOTP_ENCRYPTION_KEY", masterKey),
 		APIKeyPepper:      getEnv("API_KEY_PEPPER", "local_dev_api_key_pepper_change_me_32+"),
+		PasswordHashCost:  getIntEnv("PASSWORD_HASH_COST", 12),
 	}
 }
 

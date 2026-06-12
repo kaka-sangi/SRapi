@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 )
@@ -27,6 +28,12 @@ const (
 
 var httpMethods = []string{"get", "post", "put", "patch", "delete"}
 
+var (
+	catalogOnce sync.Once
+	catalog     *Catalog
+	catalogErr  error
+)
+
 // CatalogEntry is a compact description of one admin operation, shown to the
 // model so it knows what it can call.
 type CatalogEntry struct {
@@ -47,6 +54,13 @@ type Catalog struct {
 
 // LoadCatalog parses the embedded spec and builds the admin operation catalog.
 func LoadCatalog() (*Catalog, error) {
+	catalogOnce.Do(func() {
+		catalog, catalogErr = buildCatalog()
+	})
+	return catalog, catalogErr
+}
+
+func buildCatalog() (*Catalog, error) {
 	var root map[string]any
 	if err := yaml.Unmarshal(specYAML, &root); err != nil {
 		return nil, fmt.Errorf("copilot: parse embedded spec: %w", err)

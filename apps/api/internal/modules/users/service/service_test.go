@@ -13,14 +13,21 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/users/contract"
+	"golang.org/x/crypto/bcrypt"
 )
 
-func TestCreateHashesPasswordAndDefaultsRole(t *testing.T) {
-	store := newMemoryStore()
-	svc, err := New(store, nil)
+func newTestService(t *testing.T, store contract.Store) *Service {
+	t.Helper()
+	svc, err := NewWithPasswordCost(store, nil, bcrypt.MinCost)
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
+	return svc
+}
+
+func TestCreateHashesPasswordAndDefaultsRole(t *testing.T) {
+	store := newMemoryStore()
+	svc := newTestService(t, store)
 
 	created, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "Admin@Srapi.Local",
@@ -41,12 +48,33 @@ func TestCreateHashesPasswordAndDefaultsRole(t *testing.T) {
 	}
 }
 
-func TestAuthenticatePasswordAcceptsValidPassword(t *testing.T) {
+func TestCreateUsesConfiguredPasswordHashCost(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
+	svc, err := NewWithPasswordCost(store, nil, bcrypt.MinCost)
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
+
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "cost@srapi.local",
+		Name:     "Cost",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	cost, err := bcrypt.Cost([]byte(created.PasswordHash))
+	if err != nil {
+		t.Fatalf("read bcrypt cost: %v", err)
+	}
+	if cost != bcrypt.MinCost {
+		t.Fatalf("expected configured bcrypt cost %d, got %d", bcrypt.MinCost, cost)
+	}
+}
+
+func TestAuthenticatePasswordAcceptsValidPassword(t *testing.T) {
+	store := newMemoryStore()
+	svc := newTestService(t, store)
 	created, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "Admin@Srapi.Local",
 		Name:     "Admin",
@@ -68,10 +96,7 @@ func TestAuthenticatePasswordAcceptsValidPassword(t *testing.T) {
 
 func TestVerifyEmailSetsVerifiedAt(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	created, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "verify@srapi.local",
 		Name:     "Verify",
@@ -96,10 +121,7 @@ func TestVerifyEmailSetsVerifiedAt(t *testing.T) {
 
 func TestDeleteRemovesUserAndAllowsEmailReuse(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	created, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "delete@srapi.local",
 		Name:     "Delete",
@@ -130,10 +152,7 @@ func TestDeleteRemovesUserAndAllowsEmailReuse(t *testing.T) {
 
 func TestListAuthIdentitiesIncludesEmailAndExternalIdentities(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	created, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "identity@srapi.local",
 		Name:     "Identity User",
@@ -184,10 +203,7 @@ func TestListAuthIdentitiesIncludesEmailAndExternalIdentities(t *testing.T) {
 
 func TestBindAuthIdentityIsIdempotentAndRejectsDifferentOwner(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	first, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "first-bind@srapi.local",
 		Name:     "First Bind",
@@ -260,10 +276,7 @@ func TestBindAuthIdentityIsIdempotentAndRejectsDifferentOwner(t *testing.T) {
 
 func TestUnbindAuthIdentityRemovesExternalIdentity(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	created, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "unbind@srapi.local",
 		Name:     "Unbind User",
@@ -294,10 +307,7 @@ func TestUnbindAuthIdentityRemovesExternalIdentity(t *testing.T) {
 
 func TestUnbindAuthIdentityRejectsDerivedEmailIdentity(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	created, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "email-only@srapi.local",
 		Name:     "Email Only",
@@ -314,10 +324,7 @@ func TestUnbindAuthIdentityRejectsDerivedEmailIdentity(t *testing.T) {
 
 func TestUnbindAuthIdentityRejectsLastSignInMethod(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	user, err := store.Create(context.Background(), contract.CreateStoredUser{
 		Email:        "",
 		Name:         "External Only",
@@ -348,10 +355,7 @@ func TestUnbindAuthIdentityRejectsLastSignInMethod(t *testing.T) {
 
 func TestUpdateEmailClearsVerifiedAt(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	created, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "old-email@srapi.local",
 		Name:     "Email Change",
@@ -380,10 +384,7 @@ func TestUpdateEmailClearsVerifiedAt(t *testing.T) {
 
 func TestCustomRoleCarriesPermissions(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	role, err := svc.CreateRole(context.Background(), CreateRoleRequest{
 		Name:        "payment_reader",
 		Description: "Payment reader",
@@ -411,10 +412,7 @@ func TestCustomRoleCarriesPermissions(t *testing.T) {
 
 func TestBuiltInRolesUsePermissionCatalog(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	roles, err := svc.ListRoles(context.Background())
 	if err != nil {
 		t.Fatalf("list roles: %v", err)
@@ -467,10 +465,7 @@ func TestBuiltInRolesUsePermissionCatalog(t *testing.T) {
 
 func TestUpdateAndDeleteRole(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	ctx := context.Background()
 	created, err := svc.CreateRole(ctx, CreateRoleRequest{
 		Name:        "payment_reader",
@@ -554,10 +549,7 @@ func samePermissionSet(left, right map[string]bool) bool {
 
 func TestAuthenticatePasswordRejectsWrongPassword(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	created, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "Admin@Srapi.Local",
 		Name:     "Admin",
@@ -575,10 +567,7 @@ func TestAuthenticatePasswordRejectsWrongPassword(t *testing.T) {
 
 func TestAuthenticatePasswordRejectsDisabledUser(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	created, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "Admin@Srapi.Local",
 		Name:     "Admin",
@@ -597,10 +586,7 @@ func TestAuthenticatePasswordRejectsDisabledUser(t *testing.T) {
 
 func TestChangePasswordRequiresCurrentPasswordAndUpdatesHash(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	created, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "change-password@srapi.local",
 		Name:     "Change Password",
@@ -637,10 +623,7 @@ func TestChangePasswordRequiresCurrentPasswordAndUpdatesHash(t *testing.T) {
 
 func TestUpdateProfileOnlyChangesDisplayName(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	created, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "profile@srapi.local",
 		Name:     "Original Name",
@@ -723,10 +706,7 @@ func TestAvatarServiceRejectsInvalidAndTooLargeUploads(t *testing.T) {
 
 func TestUpdateBalanceUsesDecimalMath(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	created, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "billing@srapi.local",
 		Name:     "Billing",
@@ -814,10 +794,7 @@ func cloneAnyMap(in map[string]any) map[string]any {
 
 func TestListUpdateAndBatchUsers(t *testing.T) {
 	store := newMemoryStore()
-	svc, err := New(store, nil)
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
+	svc := newTestService(t, store)
 	first, err := svc.Create(context.Background(), CreateRequest{
 		Email:    "first@srapi.local",
 		Name:     "First",

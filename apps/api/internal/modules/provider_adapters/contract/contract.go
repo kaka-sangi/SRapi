@@ -320,6 +320,13 @@ type EmbeddingResponse struct {
 	Model      string
 	StatusCode int
 	Usage      Usage
+	// QuotaSignals carries normalized passive quota observations discovered
+	// from successful upstream response headers.
+	QuotaSignals []QuotaSignal
+
+	// Headers carries upstream response headers when the adapter has them
+	// available, so the gateway can optionally forward an allowlist to clients.
+	Headers http.Header
 }
 
 type Image struct {
@@ -364,6 +371,13 @@ type ModerationResponse struct {
 	Model      string
 	StatusCode int
 	Usage      Usage
+	// QuotaSignals carries normalized passive quota observations discovered
+	// from successful upstream response headers.
+	QuotaSignals []QuotaSignal
+
+	// Headers carries upstream response headers when the adapter has them
+	// available, so the gateway can optionally forward an allowlist to clients.
+	Headers http.Header
 }
 
 type AudioTranscriptionSegment struct {
@@ -390,6 +404,13 @@ type AudioTranscriptionResponse struct {
 	Model      string
 	StatusCode int
 	Usage      Usage
+	// QuotaSignals carries normalized passive quota observations discovered
+	// from successful upstream response headers.
+	QuotaSignals []QuotaSignal
+
+	// Headers carries upstream response headers when the adapter has them
+	// available, so the gateway can optionally forward an allowlist to clients.
+	Headers http.Header
 }
 
 type AudioSpeechResponse struct {
@@ -399,6 +420,13 @@ type AudioSpeechResponse struct {
 	Model       string
 	StatusCode  int
 	Usage       Usage
+	// QuotaSignals carries normalized passive quota observations discovered
+	// from successful upstream response headers.
+	QuotaSignals []QuotaSignal
+
+	// Headers carries upstream response headers when the adapter has them
+	// available, so the gateway can optionally forward an allowlist to clients.
+	Headers http.Header
 }
 
 type RerankResult struct {
@@ -414,6 +442,13 @@ type RerankResponse struct {
 	Model      string
 	StatusCode int
 	Usage      Usage
+	// QuotaSignals carries normalized passive quota observations discovered
+	// from successful upstream response headers.
+	QuotaSignals []QuotaSignal
+
+	// Headers carries upstream response headers when the adapter has them
+	// available, so the gateway can optionally forward an allowlist to clients.
+	Headers http.Header
 }
 
 type TokenCountResponse struct {

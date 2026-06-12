@@ -167,7 +167,9 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		ProviderQuotaSignals:  providerResp.QuotaSignals,
 	})
+	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 	writeAudioTranscriptionResponse(w, canonical.AudioResponseFormat, s.runtime.gateway.RenderAudioTranscription(canonicalResp))
 }
 
@@ -437,7 +439,9 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		ProviderQuotaSignals:  providerResp.QuotaSignals,
 	})
+	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 	writeAudioSpeechResponse(w, canonicalResp)
 }
 

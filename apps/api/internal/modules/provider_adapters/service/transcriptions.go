@@ -12,6 +12,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
@@ -65,7 +66,13 @@ func (s *Service) invokeOpenAICompatibleAudioTranscription(ctx context.Context, 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return contract.AudioTranscriptionResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, raw)
 	}
-	return parseOpenAICompatibleAudioTranscription(raw, resp.StatusCode, req)
+	parsed, err := parseOpenAICompatibleAudioTranscription(raw, resp.StatusCode, req)
+	if err != nil {
+		return contract.AudioTranscriptionResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(resp.Header)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(resp.Header, time.Now().UTC())
+	return parsed, nil
 }
 
 func (s *Service) invokeReverseProxyOpenAICompatibleAudioTranscription(ctx context.Context, req contract.AudioTranscriptionRequest, baseURL string) (contract.AudioTranscriptionResponse, error) {
@@ -99,7 +106,13 @@ func (s *Service) invokeReverseProxyOpenAICompatibleAudioTranscription(ctx conte
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.AudioTranscriptionResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
-	return parseOpenAICompatibleAudioTranscription(runtimeResp.Body, runtimeResp.StatusCode, req)
+	parsed, err := parseOpenAICompatibleAudioTranscription(runtimeResp.Body, runtimeResp.StatusCode, req)
+	if err != nil {
+		return contract.AudioTranscriptionResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
+	return parsed, nil
 }
 
 func openAIAudioTranscriptionMultipart(req contract.AudioTranscriptionRequest) ([]byte, string, error) {

@@ -50,6 +50,26 @@ func TestValidateRejectsReleaseWeakSecrets(t *testing.T) {
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "BOOTSTRAP_ADMIN_PASSWORD") {
 		t.Fatalf("expected default bootstrap admin password rejection, got %v", err)
 	}
+
+	cfg = validReleaseConfig()
+	cfg.Security.PasswordHashCost = 4
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "PASSWORD_HASH_COST") {
+		t.Fatalf("expected low password hash cost rejection, got %v", err)
+	}
+}
+
+func TestSecurityPasswordHashCostDefaultsAndOverrides(t *testing.T) {
+	t.Setenv("PASSWORD_HASH_COST", "")
+	cfg := Load()
+	if cfg.Security.PasswordHashCost != 12 {
+		t.Fatalf("expected default password hash cost 12, got %d", cfg.Security.PasswordHashCost)
+	}
+
+	t.Setenv("PASSWORD_HASH_COST", "4")
+	cfg = Load()
+	if cfg.Security.PasswordHashCost != 4 {
+		t.Fatalf("expected password hash cost override 4, got %d", cfg.Security.PasswordHashCost)
+	}
 }
 
 func TestStorageBackendDefaultsOverridesAndValidation(t *testing.T) {

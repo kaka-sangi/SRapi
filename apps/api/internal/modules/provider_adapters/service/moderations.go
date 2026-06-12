@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
@@ -63,7 +64,13 @@ func (s *Service) invokeOpenAICompatibleModerations(ctx context.Context, req con
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return contract.ModerationResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
-	return parseOpenAICompatibleModerations(body, resp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
+	parsed, err := parseOpenAICompatibleModerations(body, resp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
+	if err != nil {
+		return contract.ModerationResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(resp.Header)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(resp.Header, time.Now().UTC())
+	return parsed, nil
 }
 
 func (s *Service) invokeReverseProxyOpenAICompatibleModerations(ctx context.Context, req contract.ModerationRequest, baseURL string) (contract.ModerationResponse, error) {
@@ -97,7 +104,13 @@ func (s *Service) invokeReverseProxyOpenAICompatibleModerations(ctx context.Cont
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ModerationResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
-	return parseOpenAICompatibleModerations(runtimeResp.Body, runtimeResp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
+	parsed, err := parseOpenAICompatibleModerations(runtimeResp.Body, runtimeResp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
+	if err != nil {
+		return contract.ModerationResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
+	return parsed, nil
 }
 
 type openAIModerationRequest struct {

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
@@ -78,7 +79,13 @@ func (s *Service) invokeGenericReverseProxyEmbeddings(ctx context.Context, req c
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.EmbeddingResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
-	return parseOpenAICompatibleEmbeddings(runtimeResp.Body, runtimeResp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
+	parsed, err := parseOpenAICompatibleEmbeddings(runtimeResp.Body, runtimeResp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
+	if err != nil {
+		return contract.EmbeddingResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
+	return parsed, nil
 }
 
 func (s *Service) doGenericReverseProxy(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any, method string, endpoint string, headers http.Header, body []byte, expectStream bool) (reverseproxycontract.Response, error) {

@@ -633,7 +633,7 @@ func newAccessRuntime(cfg config.Config, opts runtimeOptions, allowMemoryStores 
 		}
 		userStore = usermemory.New()
 	}
-	usersSvc, err := usersservice.New(userStore, nil)
+	usersSvc, err := usersservice.NewWithPasswordCost(userStore, nil, cfg.Security.PasswordHashCost)
 	if err != nil {
 		return accessRuntime{}, err
 	}

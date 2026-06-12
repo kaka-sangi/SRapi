@@ -38,6 +38,14 @@ func TestLoadCatalogFindsAdminOpsAndExcludesCopilot(t *testing.T) {
 	}
 }
 
+func TestLoadCatalogReusesParsedCatalog(t *testing.T) {
+	first := mustCatalog(t)
+	second := mustCatalog(t)
+	if first != second {
+		t.Fatal("expected LoadCatalog to reuse the parsed embedded OpenAPI catalog")
+	}
+}
+
 func textResponse(text string) provideradaptercontract.ConversationResponse {
 	return provideradaptercontract.ConversationResponse{
 		Parts:      []provideradaptercontract.ContentPart{{Kind: provideradaptercontract.ContentPartText, Text: text}},
