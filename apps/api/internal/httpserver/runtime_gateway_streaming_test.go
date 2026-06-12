@@ -420,7 +420,9 @@ func TestGatewayChatCompletionStreamIdleTimeoutCutsHungUpstream(t *testing.T) {
 	defer close(hang)
 
 	cfg := config.Load()
-	cfg.Gateway.StreamIdleTimeout = 50 * time.Millisecond
+	// Leave enough room for test-server scheduling jitter so this exercises a
+	// post-chunk idle timeout instead of racing first-byte delivery.
+	cfg.Gateway.StreamIdleTimeout = 300 * time.Millisecond
 	handler := New(cfg, nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"idle-provider","display_name":"Idle Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
