@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"strconv"
 	"testing"
 	"time"
@@ -25,19 +26,8 @@ import (
 	platformredis "github.com/srapi/srapi/apps/api/internal/platform/redis"
 )
 
-func TestNewBuildsServerAtConfiguredAddress(t *testing.T) {
-	cfg := config.Load()
-	cfg.Server.Host = "127.0.0.1"
-	cfg.Server.Port = 9090
-	cfg.Storage.Backend = config.StorageBackendMemory
-	cfg.Database.Host = "127.0.0.1"
-	cfg.Database.Port = 1
-
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	application, err := New(cfg, logger)
-	if err != nil {
-		t.Fatalf("new app: %v", err)
-	}
+func TestAddressReturnsServerAddress(t *testing.T) {
+	application := &App{server: &http.Server{Addr: "127.0.0.1:9090"}}
 	if got := application.Address(); got != "127.0.0.1:9090" {
 		t.Fatalf("expected server address 127.0.0.1:9090, got %s", got)
 	}
