@@ -698,3 +698,27 @@ Additional verification after browser-found correction:
 Next:
 - Run final gates after the browser-found correction.
 - Commit batch20 and existing parity work in reviewable domain commits, then push.
+
+SRapi distinctive program — Wave 1 (frontend 特色速赢) complete on 2026-06-13
+
+Shipped (commits 0f1e742..b94f71e on main):
+- docs: specs/plans/goal-distinctive-program.md — 3-way audit synthesis (sub2api delta / first systematic CLIProxyAPI comparison / frontend differentiation), 3 waves.
+- W1-1 API key onboarding wizard: create-success panel + row-level 接入指南 with cURL/Python/Node.js/Claude Code snippets (gateway URL + key inlined) and live "test this key" probe against /v1/models. Paste field for existing keys (key stays in browser).
+- W1-2 Playground params + persistence: PlaygroundChatRequest gains system/temperature/max_tokens (OpenAPI-first, Go+TS regenerated); composer settings popover; localStorage session restore (images dropped on quota). TestBuildPlaygroundChatBodyParams locks body mapping.
+- W1-3 Payment top-up loop: PendingOrderStatus polls GET /api/v1/payment/orders/{id} every 3s while pending, surfaces metadata.checkout_url as 前往支付, confirms + refreshes balance on paid. (Previously the UI never exposed the checkout URL at all.)
+- W1-4 Public /key-usage page: login-free key-authenticated GET /v1/usage self-check (balance/spend/model stats/recent requests); linked from sign-in card.
+- W1-5 custom_menus rendering: sidebar Links section consumes general.custom_menus (label/name/title + url/href/link tolerated; external links new-tab). Was config-with-zero-consumers.
+- W1-6 /scheduler-decisions: verified NOT a dead route — proxy redirects non-admins home, admins land on /admin/ops tab. Left as-is.
+
+Browser verification (memory backend + mock SSE upstream on :8181, CDP Chrome):
+- Evidence: specs/plans/parity/evidence/distinctive-wave1/01-04*.png
+- Key created via dialog → wizard rendered with real key + selected model; 测试此密钥 → "密钥可用 — 1 个模型". Real gateway stream via curl with the key (mock upstream SSE + usage row, 21 tokens).
+- /key-usage end-to-end with that key: 有效 badge, totals, by-model, recent requests.
+- Playground: params popover (system+temperature), switched to mock-model, streamed reply, reload → conversation/model/params all restored from localStorage.
+- Sidebar renders 链接 section (external 项目文档 + internal 状态页) after setting general.custom_menus via admin settings API.
+- Billing verified render-only (no payment method configurable in memory backend; polling logic covered by types + code review).
+- Console: zero errors on all visited pages.
+
+Gates at wave end: web typecheck + lint exit 0; apps/api go build + vet + focused playground/quick-setup tests exit 0.
+
+Next: Wave 2 backend smalls — bedrock beta whitelist, refresh singleflight, claude-fable-5 completion; then W2-3/5/6 + Wave 3 大件 (playground对比模式/用量钻取/status页/成本模拟器).
