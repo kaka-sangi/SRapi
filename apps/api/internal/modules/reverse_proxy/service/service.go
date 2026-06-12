@@ -118,7 +118,7 @@ func (s *Service) Do(ctx context.Context, req contract.Request) (contract.Respon
 		s.recordError("invalid_request")
 		return contract.Response{}, err
 	}
-	httpReq.Header = sanitizeHeadersForProfile(req.Headers, profile)
+	httpReq.Header = sanitizeHeadersForProfile(req.Headers, profile, sanitizeHeaderOptionsForAccount(req.Account))
 	applyEgressStaticHeaders(httpReq.Header, profile)
 	if len(req.Body) > 0 && httpReq.Header.Get("Content-Type") == "" {
 		httpReq.Header.Set("Content-Type", "application/json")
@@ -194,7 +194,7 @@ func (s *Service) DoStream(ctx context.Context, req contract.Request) (contract.
 		s.recordError("invalid_request")
 		return contract.StreamResponse{}, err
 	}
-	httpReq.Header = sanitizeHeadersForProfile(req.Headers, profile)
+	httpReq.Header = sanitizeHeadersForProfile(req.Headers, profile, sanitizeHeaderOptionsForAccount(req.Account))
 	applyEgressStaticHeaders(httpReq.Header, profile)
 	if len(req.Body) > 0 && httpReq.Header.Get("Content-Type") == "" {
 		httpReq.Header.Set("Content-Type", "application/json")
@@ -249,7 +249,7 @@ func (s *Service) RelayWebSocket(ctx context.Context, req contract.WebSocketRela
 		s.recordError(errorClass(err))
 		return contract.WebSocketRelayResult{}, err
 	}
-	headers := sanitizeHeadersForProfile(req.Headers, profile)
+	headers := sanitizeHeadersForProfile(req.Headers, profile, sanitizeHeaderOptionsForAccount(req.Account))
 	applyEgressStaticHeaders(headers, profile)
 	injectAuth(headers, req.Account)
 	if headers.Get("User-Agent") == "" {
@@ -657,10 +657,24 @@ func sanitizeHeaders(headers http.Header) http.Header {
 	return sanitizeHeadersForProfile(headers, egressProfile{})
 }
 
-func sanitizeHeadersForProfile(headers http.Header, profile egressProfile) http.Header {
+type sanitizeHeaderOptions struct {
+	AllowStainlessHeaders bool
+}
+
+func sanitizeHeaderOptionsForAccount(account contract.AccountRuntime) sanitizeHeaderOptions {
+	return sanitizeHeaderOptions{
+		AllowStainlessHeaders: upstreamClientIs(account, "claude_code_cli"),
+	}
+}
+
+func sanitizeHeadersForProfile(headers http.Header, profile egressProfile, opts ...sanitizeHeaderOptions) http.Header {
+	options := sanitizeHeaderOptions{}
+	if len(opts) > 0 {
+		options = opts[0]
+	}
 	out := http.Header{}
 	for key, values := range headers {
-		if forbiddenHeader(key, values) || profile.forbidsHeader(key) {
+		if forbiddenHeader(key, values, options) || profile.forbidsHeader(key) {
 			continue
 		}
 		for _, value := range values {
@@ -670,7 +684,11 @@ func sanitizeHeadersForProfile(headers http.Header, profile egressProfile) http.
 	return out
 }
 
-func forbiddenHeader(key string, values []string) bool {
+func forbiddenHeader(key string, values []string, opts ...sanitizeHeaderOptions) bool {
+	options := sanitizeHeaderOptions{}
+	if len(opts) > 0 {
+		options = opts[0]
+	}
 	canonical := http.CanonicalHeaderKey(strings.TrimSpace(key))
 	lower := strings.ToLower(canonical)
 	if lower == "x-request-id" || lower == "x-forwarded-for" || lower == "x-forwarded-host" || lower == "x-forwarded-proto" || lower == "x-forwarded-port" || lower == "x-real-ip" || lower == "forwarded" || lower == "via" || lower == "server" {
@@ -691,7 +709,7 @@ func forbiddenHeader(key string, values []string) bool {
 	if strings.HasPrefix(lower, "sec-ch-") || strings.HasPrefix(lower, "sec-fetch-") {
 		return true
 	}
-	if strings.HasPrefix(lower, "x-stainless-") {
+	if strings.HasPrefix(lower, "x-stainless-") && !options.AllowStainlessHeaders {
 		return true
 	}
 	if strings.HasPrefix(lower, "x-srapi-") || strings.HasPrefix(lower, "x-gateway-") {

@@ -124,7 +124,11 @@ func TestRuntimeInjectsCliClientTokenAndDefaultClientUserAgent(t *testing.T) {
 		},
 		Method: http.MethodPost,
 		URL:    upstream.URL,
-		Body:   []byte(`{"model":"cli-model"}`),
+		Headers: http.Header{
+			"X-Stainless-Runtime": {"node"},
+			"X-Stainless-Lang":    {"js"},
+		},
+		Body: []byte(`{"model":"cli-model"}`),
 	})
 	if err != nil {
 		t.Fatalf("runtime request: %v", err)
@@ -134,6 +138,9 @@ func TestRuntimeInjectsCliClientTokenAndDefaultClientUserAgent(t *testing.T) {
 	}
 	if gotHeader.Get("User-Agent") != "Claude-Code/1.0" {
 		t.Fatalf("expected claude code user agent, got %q", gotHeader.Get("User-Agent"))
+	}
+	if gotHeader.Get("X-Stainless-Runtime") != "node" || gotHeader.Get("X-Stainless-Lang") != "js" {
+		t.Fatalf("expected Claude Code official-client stainless headers to pass, got %+v", gotHeader)
 	}
 }
 
