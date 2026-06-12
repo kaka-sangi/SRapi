@@ -31,7 +31,7 @@ func classifyProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, b
 	if providerErrorBodyIndicatesQuotaExhausted(body, message) {
 		class = "quota_exhausted"
 	}
-	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, Headers: cloneGenericHeaders(headers), RetryAfter: providerRetryAfter(headers, body, now), Metadata: metadata, QuotaSignals: providerQuotaSignalsFromErrorHeaders(headers, now)}
+	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, Headers: cloneGenericHeaders(headers), RetryAfter: providerRetryAfter(headers, body, now), Metadata: metadata, QuotaSignals: providerQuotaSignalsFromHTTPError(headers, body, now)}
 }
 
 func classifyAnthropicProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
@@ -59,7 +59,7 @@ func classifyAnthropicProviderHTTPErrorWithHeaders(statusCode int, headers http.
 	if message == "" {
 		message = http.StatusText(statusCode)
 	}
-	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, Headers: cloneGenericHeaders(headers), RetryAfter: providerRetryAfter(headers, body, now), QuotaSignals: providerQuotaSignalsFromErrorHeaders(headers, now)}
+	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, Headers: cloneGenericHeaders(headers), RetryAfter: providerRetryAfter(headers, body, now), QuotaSignals: providerQuotaSignalsFromHTTPError(headers, body, now)}
 }
 
 func classifyGeminiProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
@@ -90,11 +90,17 @@ func classifyGeminiProviderHTTPErrorWithHeaders(statusCode int, headers http.Hea
 	if providerErrorBodyIndicatesGeminiQuotaExhausted(body, message) {
 		class = "quota_exhausted"
 	}
-	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, Headers: cloneGenericHeaders(headers), RetryAfter: providerRetryAfter(headers, body, now), QuotaSignals: providerQuotaSignalsFromErrorHeaders(headers, now)}
+	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, Headers: cloneGenericHeaders(headers), RetryAfter: providerRetryAfter(headers, body, now), QuotaSignals: providerQuotaSignalsFromHTTPError(headers, body, now)}
 }
 
 func providerQuotaSignalsFromErrorHeaders(headers http.Header, now time.Time) []contract.QuotaSignal {
 	return providerQuotaSignalsFromHeaders(headers, now)
+}
+
+func providerQuotaSignalsFromHTTPError(headers http.Header, body []byte, now time.Time) []contract.QuotaSignal {
+	signals := providerQuotaSignalsFromErrorHeaders(headers, now)
+	signals = append(signals, googleModelRateLimitSignalsFromErrorBody(body, now)...)
+	return signals
 }
 
 func providerQuotaSignalsFromHeaders(headers http.Header, now time.Time) []contract.QuotaSignal {
@@ -199,6 +205,114 @@ func googleReasonMatches(value any, wanted map[string]struct{}) bool {
 		}
 	}
 	return false
+}
+
+func googleModelRateLimitSignalsFromErrorBody(body []byte, now time.Time) []contract.QuotaSignal {
+	var decoded struct {
+		Error struct {
+			Details []map[string]any `json:"details"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &decoded); err != nil || len(decoded.Error.Details) == 0 {
+		return nil
+	}
+	resetAt := googleRetryResetAtFromDetails(decoded.Error.Details, now)
+	signals := make([]contract.QuotaSignal, 0, 1)
+	for _, detail := range decoded.Error.Details {
+		if !googleDetailReasonIs(detail, "RATE_LIMIT_EXCEEDED") {
+			continue
+		}
+		metadata, _ := detail["metadata"].(map[string]any)
+		model := googleQuotaModelName(metadata)
+		quotaType := googleModelRateLimitQuotaType(model)
+		if quotaType == "" {
+			continue
+		}
+		signals = append(signals, contract.QuotaSignal{
+			QuotaType:      quotaType,
+			Remaining:      "0",
+			Used:           "100",
+			QuotaLimit:     "100",
+			RemainingRatio: 0,
+			ResetAt:        resetAt,
+			SnapshotAt:     now.UTC(),
+		})
+	}
+	return signals
+}
+
+func googleRetryResetAtFromDetails(details []map[string]any, now time.Time) *time.Time {
+	for _, detail := range details {
+		if resetAt := googleRetryResetAtFromDetail(detail, now); resetAt != nil {
+			return resetAt
+		}
+	}
+	return nil
+}
+
+func googleRetryResetAtFromDetail(detail map[string]any, now time.Time) *time.Time {
+	if resetAt := retryAfterFromGoogleDuration(detail["retryDelay"], now); resetAt != nil {
+		return resetAt
+	}
+	metadata, ok := detail["metadata"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	if resetAt := retryAfterFromGoogleDuration(metadata["quotaResetDelay"], now); resetAt != nil {
+		return resetAt
+	}
+	return retryAfterTimestampValue(metadata["quotaResetTimeStamp"], now)
+}
+
+func googleDetailReasonIs(detail map[string]any, reason string) bool {
+	return strings.EqualFold(strings.TrimSpace(fmt.Sprint(detail["reason"])), reason)
+}
+
+func googleQuotaModelName(metadata map[string]any) string {
+	if len(metadata) == 0 {
+		return ""
+	}
+	for _, key := range []string{"model", "modelName", "model_name"} {
+		value := strings.TrimSpace(fmt.Sprint(metadata[key]))
+		if value != "" && value != "<nil>" {
+			return value
+		}
+	}
+	return ""
+}
+
+func googleModelRateLimitQuotaType(model string) string {
+	normalized := normalizeGoogleQuotaTypeSegment(model)
+	if normalized == "" {
+		return ""
+	}
+	return "google_model_rate_limit_" + normalized
+}
+
+func normalizeGoogleQuotaTypeSegment(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return ""
+	}
+	var builder strings.Builder
+	lastUnderscore := false
+	for _, r := range value {
+		allowed := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+		if allowed {
+			builder.WriteRune(r)
+			lastUnderscore = false
+			continue
+		}
+		if !lastUnderscore {
+			builder.WriteByte('_')
+			lastUnderscore = true
+		}
+	}
+	normalized := strings.Trim(builder.String(), "_")
+	if len(normalized) > 96 {
+		normalized = strings.TrimRight(normalized[:96], "_")
+	}
+	return normalized
 }
 
 func providerClassForAnthropicError(errorType string, statusCode int) string {
