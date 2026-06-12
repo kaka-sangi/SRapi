@@ -372,6 +372,24 @@ func TestResponsesWebSocketUsageAcceptsChatUsageAliases(t *testing.T) {
 	}
 }
 
+func TestResponsesWebSocketUsageCountsReasoningTokens(t *testing.T) {
+	usage, ok := responsesWebSocketUsage([]byte(`{"type":"response.completed","response":{"usage":{"input_tokens":3,"output_tokens":0,"output_tokens_details":{"reasoning_tokens":11,"image_tokens":2}}}}`))
+	if !ok {
+		t.Fatal("expected websocket reasoning usage to parse")
+	}
+	if usage.InputTokens != 3 || usage.OutputTokens != 13 || usage.ImageOutputTokens != 2 {
+		t.Fatalf("unexpected websocket reasoning usage: %+v", usage)
+	}
+
+	usage, ok = responsesWebSocketUsage([]byte(`{"type":"response.done","response":{"usage":{"prompt_tokens":7,"completion_tokens":0,"completion_tokens_details":{"reasoning_tokens":5}}}}`))
+	if !ok {
+		t.Fatal("expected websocket chat reasoning usage aliases to parse")
+	}
+	if usage.InputTokens != 7 || usage.OutputTokens != 5 {
+		t.Fatalf("unexpected websocket chat reasoning usage: %+v", usage)
+	}
+}
+
 func TestResponsesWebSocketUsageRejectsEmptyUsageObject(t *testing.T) {
 	if usage, ok := responsesWebSocketUsage([]byte(`{"type":"response.done","response":{"usage":{}}}`)); ok {
 		t.Fatalf("expected empty usage object to be ignored, got %+v", usage)

@@ -931,13 +931,15 @@ func responsesWebSocketUsage(payload []byte) (gatewaycontract.Usage, bool) {
 			CachedTokens int `json:"cached_tokens"`
 		} `json:"input_tokens_details"`
 		OutputTokensDetails *struct {
-			ImageTokens int `json:"image_tokens"`
+			ImageTokens     int `json:"image_tokens"`
+			ReasoningTokens int `json:"reasoning_tokens"`
 		} `json:"output_tokens_details"`
 		PromptTokensDetails *struct {
 			CachedTokens int `json:"cached_tokens"`
 		} `json:"prompt_tokens_details"`
 		CompletionTokensDetails *struct {
-			ImageTokens int `json:"image_tokens"`
+			ImageTokens     int `json:"image_tokens"`
+			ReasoningTokens int `json:"reasoning_tokens"`
 		} `json:"completion_tokens_details"`
 	}
 	var event struct {
@@ -974,6 +976,16 @@ func responsesWebSocketUsage(payload []byte) (gatewaycontract.Usage, bool) {
 	}
 	if imageOutputTokens == 0 && rawUsage.CompletionTokensDetails != nil {
 		imageOutputTokens = rawUsage.CompletionTokensDetails.ImageTokens
+	}
+	reasoningOutputTokens := 0
+	if rawUsage.OutputTokensDetails != nil {
+		reasoningOutputTokens = rawUsage.OutputTokensDetails.ReasoningTokens
+	}
+	if reasoningOutputTokens == 0 && rawUsage.CompletionTokensDetails != nil {
+		reasoningOutputTokens = rawUsage.CompletionTokensDetails.ReasoningTokens
+	}
+	if outputTokens < imageOutputTokens+reasoningOutputTokens {
+		outputTokens = imageOutputTokens + reasoningOutputTokens
 	}
 	return gatewaycontract.Usage{
 		InputTokens:         max(0, inputTokens-cachedTokens),
