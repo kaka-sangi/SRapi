@@ -214,7 +214,7 @@ func anthropicPreset(providerKey string, displayName string, defaultBaseURL stri
 		}
 		preset.AccountTemplate = &AccountTemplate{
 			UpstreamClient: "claude_code_cli",
-			ModelCatalog:   []string{"claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"},
+			ModelCatalog:   []string{"claude-fable-5", "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"},
 		}
 		preset.QuotaConfig = map[string]string{
 			"quota_url": "https://api.anthropic.com/api/oauth/usage",
@@ -278,7 +278,7 @@ func antigravityPreset() Preset {
 			"model_mapping":               antigravityDefaultModelMapping(),
 			"supported_models":            antigravityDefaultSupportedModels(),
 		},
-		ModelCatalog: []string{"gemini-3-pro-preview", "claude-sonnet-4-6", "claude-haiku-4-5"},
+		ModelCatalog: []string{"gemini-3-pro-preview", "claude-fable-5", "claude-sonnet-4-6", "claude-haiku-4-5"},
 		MetadataHints: map[string]string{
 			"base_url":                    "Antigravity / Google Cloud Code upstream URL",
 			"project_id":                  "Google Cloud project id for Antigravity requests",
