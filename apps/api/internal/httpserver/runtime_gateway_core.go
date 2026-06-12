@@ -656,7 +656,11 @@ func accountSupportsUpstreamModel(metadata map[string]any, upstreamModelName str
 		return false
 	}
 	for _, supported := range supportedModels {
-		if strings.EqualFold(normalizeDiscoveredModelID(supported), target) {
+		pattern := normalizeDiscoveredModelID(supported)
+		if pattern == "" {
+			continue
+		}
+		if glob.Match(pattern, target) {
 			return true
 		}
 	}

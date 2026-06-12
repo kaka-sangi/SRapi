@@ -84,6 +84,30 @@ func TestAccountCompactModelOverride(t *testing.T) {
 	}
 }
 
+func TestAccountSupportsUpstreamModelWildcard(t *testing.T) {
+	cases := []struct {
+		name     string
+		metadata map[string]any
+		model    string
+		want     bool
+	}{
+		{name: "no allowlist allows all", metadata: nil, model: "gpt-4o", want: true},
+		{name: "empty allowlist rejects", metadata: map[string]any{"supported_models": []any{}}, model: "gpt-4o", want: false},
+		{name: "exact still matches", metadata: map[string]any{"supported_models": []any{"gpt-4o"}}, model: "models/gpt-4o", want: true},
+		{name: "wildcard matches normalized model", metadata: map[string]any{"supported_models": []any{"claude-*"}}, model: "models/claude-sonnet-4-5", want: true},
+		{name: "wildcard is case insensitive", metadata: map[string]any{"supported_models": []any{"GEMINI-3.*"}}, model: "gemini-3.1-pro-high", want: true},
+		{name: "wildcard miss rejects", metadata: map[string]any{"supported_models": []any{"claude-*"}}, model: "gemini-3.1-pro-high", want: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := accountSupportsUpstreamModel(tc.metadata, tc.model)
+			if got != tc.want {
+				t.Fatalf("accountSupportsUpstreamModel = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 // TestGatewayAppliesAccountModelMapping proves the wire effect: an account whose
 // metadata.model_mapping remaps the catalog model overrides the channel's
 // default upstream_model_name in the actual upstream request body.
@@ -128,6 +152,47 @@ func TestGatewayAppliesAccountModelMapping(t *testing.T) {
 	}
 	if doc["model"] != "account-override-upstream" {
 		t.Fatalf("expected per-account model override in upstream body, got model=%v body=%s", doc["model"], sent)
+	}
+}
+
+func TestGatewaySupportedModelsWildcardUsesMappedUpstreamModel(t *testing.T) {
+	bodyCh := make(chan []byte, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		select {
+		case bodyCh <- raw:
+		default:
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"x","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wildcard-supported-provider","display_name":"Wildcard Supported Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wildcard-map-model","display_name":"Wildcard Map Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"provider-default-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wildcard-supported-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","supported_models":["account-override-*"],"model_mapping":{"wildcard-map-model":"account-override-2026"}},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"wildcard-map-model","messages":[{"role":"user","content":"hello"}]}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var sent []byte
+	select {
+	case sent = <-bodyCh:
+	default:
+		t.Fatal("upstream did not receive a request body")
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(sent, &doc); err != nil {
+		t.Fatalf("decode upstream body %q: %v", sent, err)
+	}
+	if doc["model"] != "account-override-2026" {
+		t.Fatalf("expected mapped upstream model through wildcard allowlist, got model=%v body=%s", doc["model"], sent)
 	}
 }
 
