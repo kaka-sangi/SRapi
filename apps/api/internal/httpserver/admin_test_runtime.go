@@ -311,7 +311,7 @@ func (rt *runtimeState) selectAccountTestModel(ctx context.Context, provider pro
 		if err != nil || resolution.Model.Status != modelcontract.StatusActive {
 			return accountTestModelSelection{}, fmt.Errorf("requested model is not a registered active model")
 		}
-		mapping, err := activeProviderMappingForModel(ctx, rt.models, resolution.Model.ID, provider.ID, account, resolution.Model.CanonicalName, sourceEndpoint)
+		mapping, err := activeProviderMappingForModel(ctx, rt.models, resolution.Model.ID, provider, account, resolution.Model.CanonicalName, sourceEndpoint)
 		if err != nil {
 			return accountTestModelSelection{}, err
 		}
@@ -329,7 +329,7 @@ func (rt *runtimeState) selectAccountTestModel(ctx context.Context, provider pro
 		if model.Status != modelcontract.StatusActive {
 			continue
 		}
-		mapping, err := activeProviderMappingForModel(ctx, rt.models, model.ID, provider.ID, account, model.CanonicalName, sourceEndpoint)
+		mapping, err := activeProviderMappingForModel(ctx, rt.models, model.ID, provider, account, model.CanonicalName, sourceEndpoint)
 		if err == nil {
 			return accountTestModelSelection{Model: model, Mapping: mapping}, nil
 		}
@@ -339,16 +339,17 @@ func (rt *runtimeState) selectAccountTestModel(ctx context.Context, provider pro
 
 func activeProviderMappingForModel(ctx context.Context, models interface {
 	ListMappingsByModel(context.Context, int) ([]modelcontract.ModelProviderMapping, error)
-}, modelID int, providerID int, account accountcontract.ProviderAccount, canonicalName string, sourceEndpoint string) (modelcontract.ModelProviderMapping, error) {
+}, modelID int, provider providercontract.Provider, account accountcontract.ProviderAccount, canonicalName string, sourceEndpoint string) (modelcontract.ModelProviderMapping, error) {
 	mappings, err := models.ListMappingsByModel(ctx, modelID)
 	if err != nil {
 		return modelcontract.ModelProviderMapping{}, fmt.Errorf("model mapping list failed")
 	}
 	for _, mapping := range mappings {
-		if mapping.ProviderID != providerID || mapping.Status != modelcontract.StatusActive || strings.TrimSpace(mapping.UpstreamModelName) == "" {
+		if mapping.ProviderID != provider.ID || mapping.Status != modelcontract.StatusActive || strings.TrimSpace(mapping.UpstreamModelName) == "" {
 			continue
 		}
 		effectiveMapping := accountEffectiveModelMapping(mapping, account, canonicalName, sourceEndpoint)
+		effectiveMapping = providerEffectiveModelMapping(provider, effectiveMapping)
 		if accountExcludesModel(account.Metadata, canonicalName, effectiveMapping.UpstreamModelName) {
 			continue
 		}

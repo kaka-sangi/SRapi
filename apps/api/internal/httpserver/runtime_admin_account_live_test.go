@@ -251,8 +251,8 @@ func TestAdminAccountLiveTestCodexUsesRegisteredModelWhenBodyModelOmitted(t *tes
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"admin-live-codex-default-provider","display_name":"Admin Live Codex Default Provider","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-auto-test-model","display_name":"Codex Auto Test Model","status":"active"}`)
-	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"codex-auto-upstream","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"admin-live-codex-default-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex","user_agent":"codex-cli/test"},"status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"openai/gpt5.4mini-openai-compact","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"admin-live-codex-default-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex","supported_models":["gpt-5.4-mini"],"user_agent":"codex-cli/test"},"status":"active"}`)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/test", strings.NewReader(`{"mode":"live"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -267,8 +267,8 @@ func TestAdminAccountLiveTestCodexUsesRegisteredModelWhenBodyModelOmitted(t *tes
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode account test response: %v", err)
 	}
-	if !resp.Data.Ok || upstreamModel != "codex-auto-upstream" {
-		t.Fatalf("expected registered codex upstream model, got result=%+v model=%q", resp.Data, upstreamModel)
+	if !resp.Data.Ok || upstreamModel != "gpt-5.4-mini" {
+		t.Fatalf("expected normalized registered codex upstream model, got result=%+v model=%q", resp.Data, upstreamModel)
 	}
 }
 
