@@ -51,17 +51,24 @@ func TestRuntimeSanitizesHeadersAndInjectsAccountContext(t *testing.T) {
 			"X-Forwarded-Port": {"443"},
 			"X-Real-IP":        {"203.0.113.2"},
 			"Via":              {"SRapi"},
-			"Referer":          {"https://leak.example"},
-			"Http-Referer":     {"https://leak.example"},
-			"Accept-Encoding":  {"gzip, br"},
-			"Priority":         {"u=1, i"},
-			"Sec-Ch-Ua":        {`"Chromium";v="143"`},
-			"Sec-Fetch-Site":   {"same-origin"},
-			"X-Stainless-Lang": {"js"},
-			"X-Title":          {"client title"},
-			"X-SRapi-Test":     {"leak"},
-			"X-Gateway-Test":   {"leak"},
-			"User-Agent":       {"SRapi/test"},
+			"Host":             {"leak.example"},
+			"Keep-Alive":       {"timeout=5"},
+			"Proxy-Connection": {"keep-alive"},
+			"Proxy-Authorization": {
+				"Basic leaked",
+			},
+			"Proxy-Authenticate": {"Basic"},
+			"Referer":            {"https://leak.example"},
+			"Http-Referer":       {"https://leak.example"},
+			"Accept-Encoding":    {"gzip, br"},
+			"Priority":           {"u=1, i"},
+			"Sec-Ch-Ua":          {`"Chromium";v="143"`},
+			"Sec-Fetch-Site":     {"same-origin"},
+			"X-Stainless-Lang":   {"js"},
+			"X-Title":            {"client title"},
+			"X-SRapi-Test":       {"leak"},
+			"X-Gateway-Test":     {"leak"},
+			"User-Agent":         {"SRapi/test"},
 		},
 		Body: []byte(`{"model":"upstream-model","messages":[{"role":"user","content":"hello"}]}`),
 	})
@@ -74,6 +81,11 @@ func TestRuntimeSanitizesHeadersAndInjectsAccountContext(t *testing.T) {
 		"X-Forwarded-Port",
 		"X-Real-IP",
 		"Via",
+		"Host",
+		"Keep-Alive",
+		"Proxy-Connection",
+		"Proxy-Authorization",
+		"Proxy-Authenticate",
 		"Referer",
 		"Http-Referer",
 		"Accept-Encoding",
@@ -286,40 +298,52 @@ func TestRuntimeAppliesMetadataEgressProfileHeadersAndUserAgent(t *testing.T) {
 }
 
 func TestRuntimeRejectsUnsafeEgressProfileStaticHeader(t *testing.T) {
-	upstreamCalled := false
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		upstreamCalled = true
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer upstream.Close()
+	for _, tc := range []struct {
+		name   string
+		header string
+	}{
+		{name: "authorization", header: "Authorization"},
+		{name: "host", header: "Host"},
+		{name: "proxy authorization", header: "Proxy-Authorization"},
+		{name: "proxy connection", header: "Proxy-Connection"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			upstreamCalled := false
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				upstreamCalled = true
+				w.WriteHeader(http.StatusInternalServerError)
+			}))
+			defer upstream.Close()
 
-	svc, err := New(nil)
-	if err != nil {
-		t.Fatalf("create runtime: %v", err)
-	}
-	_, err = svc.Do(context.Background(), contract.Request{
-		Account: contract.AccountRuntime{
-			AccountID:    13,
-			RuntimeClass: "oauth_refresh",
-			Metadata: map[string]any{
-				"egress_profile": map[string]any{
-					"extra_static_headers": map[string]any{"Authorization": "Bearer static"},
+			svc, err := New(nil)
+			if err != nil {
+				t.Fatalf("create runtime: %v", err)
+			}
+			_, err = svc.Do(context.Background(), contract.Request{
+				Account: contract.AccountRuntime{
+					AccountID:    13,
+					RuntimeClass: "oauth_refresh",
+					Metadata: map[string]any{
+						"egress_profile": map[string]any{
+							"extra_static_headers": map[string]any{tc.header: "static"},
+						},
+					},
+					Credential: map[string]any{"access_token": "runtime-token"},
 				},
-			},
-			Credential: map[string]any{"access_token": "runtime-token"},
-		},
-		Method: http.MethodGet,
-		URL:    upstream.URL,
-	})
-	var runtimeErr contract.RuntimeError
-	if !errors.As(err, &runtimeErr) || runtimeErr.Class != "unsupported_egress_profile" {
-		t.Fatalf("expected unsupported egress profile error, got %T %v", err, err)
-	}
-	if upstreamCalled {
-		t.Fatal("unsafe egress profile should not call upstream")
-	}
-	if metrics := svc.Metrics(); metrics.RequestErrorTotal["unsupported_egress_profile"] != 1 {
-		t.Fatalf("expected unsupported egress profile metric, got %+v", metrics)
+				Method: http.MethodGet,
+				URL:    upstream.URL,
+			})
+			var runtimeErr contract.RuntimeError
+			if !errors.As(err, &runtimeErr) || runtimeErr.Class != "unsupported_egress_profile" {
+				t.Fatalf("expected unsupported egress profile error, got %T %v", err, err)
+			}
+			if upstreamCalled {
+				t.Fatal("unsafe egress profile should not call upstream")
+			}
+			if metrics := svc.Metrics(); metrics.RequestErrorTotal["unsupported_egress_profile"] != 1 {
+				t.Fatalf("expected unsupported egress profile metric, got %+v", metrics)
+			}
+		})
 	}
 }
 

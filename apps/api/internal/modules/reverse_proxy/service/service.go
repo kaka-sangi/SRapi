@@ -697,7 +697,7 @@ func forbiddenHeader(key string, values []string, opts ...sanitizeHeaderOptions)
 	if lower == "authorization" || lower == "cookie" {
 		return true
 	}
-	if lower == "connection" || lower == "upgrade" || lower == "te" || lower == "trailer" || lower == "transfer-encoding" {
+	if lower == "host" || lower == "connection" || lower == "keep-alive" || lower == "upgrade" || lower == "te" || lower == "trailer" || lower == "transfer-encoding" || lower == "proxy-authorization" || lower == "proxy-authenticate" || lower == "proxy-connection" {
 		return true
 	}
 	if lower == "accept-encoding" || lower == "http-referer" || lower == "referer" || lower == "priority" || lower == "x-title" {
