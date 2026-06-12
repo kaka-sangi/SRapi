@@ -673,7 +673,7 @@ func sanitizeHeadersForProfile(headers http.Header, profile egressProfile) http.
 func forbiddenHeader(key string, values []string) bool {
 	canonical := http.CanonicalHeaderKey(strings.TrimSpace(key))
 	lower := strings.ToLower(canonical)
-	if lower == "x-request-id" || lower == "x-forwarded-for" || lower == "x-forwarded-host" || lower == "x-forwarded-proto" || lower == "forwarded" || lower == "via" || lower == "server" {
+	if lower == "x-request-id" || lower == "x-forwarded-for" || lower == "x-forwarded-host" || lower == "x-forwarded-proto" || lower == "x-forwarded-port" || lower == "x-real-ip" || lower == "forwarded" || lower == "via" || lower == "server" {
 		return true
 	}
 	if lower == "authorization" || lower == "cookie" {
@@ -682,7 +682,16 @@ func forbiddenHeader(key string, values []string) bool {
 	if lower == "connection" || lower == "upgrade" || lower == "te" || lower == "trailer" || lower == "transfer-encoding" {
 		return true
 	}
+	if lower == "accept-encoding" || lower == "http-referer" || lower == "referer" || lower == "priority" || lower == "x-title" {
+		return true
+	}
 	if strings.HasPrefix(lower, "sec-websocket-") {
+		return true
+	}
+	if strings.HasPrefix(lower, "sec-ch-") || strings.HasPrefix(lower, "sec-fetch-") {
+		return true
+	}
+	if strings.HasPrefix(lower, "x-stainless-") {
 		return true
 	}
 	if strings.HasPrefix(lower, "x-srapi-") || strings.HasPrefix(lower, "x-gateway-") {

@@ -499,6 +499,9 @@ func validateStaticEgressHeader(key string, values []string) error {
 				return unsupportedEgressProfile("accept_encoding egress profile requires response decompression support")
 			}
 		}
+		return nil
+	case "sec-ch-ua":
+		return nil
 	}
 	if forbiddenHeader(key, values) {
 		return unsupportedEgressProfile("egress profile static header is not allowed")

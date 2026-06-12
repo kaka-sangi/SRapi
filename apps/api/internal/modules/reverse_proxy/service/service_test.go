@@ -46,19 +46,45 @@ func TestRuntimeSanitizesHeadersAndInjectsAccountContext(t *testing.T) {
 		Method: http.MethodPost,
 		URL:    upstream.URL,
 		Headers: http.Header{
-			"X-Request-ID":    {"req_leak"},
-			"X-Forwarded-For": {"203.0.113.1"},
-			"Via":             {"SRapi"},
-			"X-SRapi-Test":    {"leak"},
-			"X-Gateway-Test":  {"leak"},
-			"User-Agent":      {"SRapi/test"},
+			"X-Request-ID":     {"req_leak"},
+			"X-Forwarded-For":  {"203.0.113.1"},
+			"X-Forwarded-Port": {"443"},
+			"X-Real-IP":        {"203.0.113.2"},
+			"Via":              {"SRapi"},
+			"Referer":          {"https://leak.example"},
+			"Http-Referer":     {"https://leak.example"},
+			"Accept-Encoding":  {"gzip, br"},
+			"Priority":         {"u=1, i"},
+			"Sec-Ch-Ua":        {`"Chromium";v="143"`},
+			"Sec-Fetch-Site":   {"same-origin"},
+			"X-Stainless-Lang": {"js"},
+			"X-Title":          {"client title"},
+			"X-SRapi-Test":     {"leak"},
+			"X-Gateway-Test":   {"leak"},
+			"User-Agent":       {"SRapi/test"},
 		},
 		Body: []byte(`{"model":"upstream-model","messages":[{"role":"user","content":"hello"}]}`),
 	})
 	if err != nil {
 		t.Fatalf("runtime request: %v", err)
 	}
-	for _, key := range []string{"X-Request-ID", "X-Forwarded-For", "Via", "X-SRapi-Test", "X-Gateway-Test"} {
+	for _, key := range []string{
+		"X-Request-ID",
+		"X-Forwarded-For",
+		"X-Forwarded-Port",
+		"X-Real-IP",
+		"Via",
+		"Referer",
+		"Http-Referer",
+		"Accept-Encoding",
+		"Priority",
+		"Sec-Ch-Ua",
+		"Sec-Fetch-Site",
+		"X-Stainless-Lang",
+		"X-Title",
+		"X-SRapi-Test",
+		"X-Gateway-Test",
+	} {
 		if gotHeader.Get(key) != "" {
 			t.Fatalf("expected %s to be sanitized, got headers %+v", key, gotHeader)
 		}
@@ -204,6 +230,8 @@ func TestRuntimeAppliesMetadataEgressProfileHeadersAndUserAgent(t *testing.T) {
 				"egress_profile": map[string]any{
 					"user_agent":           "ProfileClient/2.0",
 					"accept_language":      "en-US,en;q=0.9",
+					"accept_encoding":      "identity",
+					"sec_ch_ua":            `"Chromium";v="143"`,
 					"forbidden_headers":    []any{"X-Caller-Leak"},
 					"extra_static_headers": map[string]any{"X-Egress-Client": "profile-1"},
 				},
@@ -230,7 +258,10 @@ func TestRuntimeAppliesMetadataEgressProfileHeadersAndUserAgent(t *testing.T) {
 	if gotHeader.Get("User-Agent") != "ProfileClient/2.0" {
 		t.Fatalf("expected profile user agent, got %q", gotHeader.Get("User-Agent"))
 	}
-	if gotHeader.Get("Accept-Language") != "en-US,en;q=0.9" || gotHeader.Get("X-Egress-Client") != "profile-1" {
+	if gotHeader.Get("Accept-Language") != "en-US,en;q=0.9" ||
+		gotHeader.Get("Accept-Encoding") != "identity" ||
+		gotHeader.Get("Sec-Ch-Ua") != `"Chromium";v="143"` ||
+		gotHeader.Get("X-Egress-Client") != "profile-1" {
 		t.Fatalf("expected egress profile headers, got %+v", gotHeader)
 	}
 	if gotHeader.Get("X-Caller-Leak") != "" || gotHeader.Get("X-Egress-Input") != "kept" {
