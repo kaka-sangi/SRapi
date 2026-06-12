@@ -96,6 +96,15 @@ func TestGatewayExcludedModelHiddenFromListing(t *testing.T) {
 	providerResp := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"hide-provider","display_name":"Hide Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
 	hiddenModel := mustCreateModel(t, handler, sessionCookie, csrf, `{"canonical_name":"hide-secret","display_name":"Hide Secret","status":"active","capabilities":[{"key":"streaming","level":"optional","status":"stable","version":"v1"}]}`)
 	visibleModel := mustCreateModel(t, handler, sessionCookie, csrf, `{"canonical_name":"hide-visible","display_name":"Hide Visible","status":"active","capabilities":[{"key":"streaming","level":"optional","status":"stable","version":"v1"}]}`)
+	createAliasReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/models/"+string(hiddenModel.Data.Id)+"/aliases", strings.NewReader(`{"alias":"hide-secret-alias","status":"active"}`))
+	createAliasReq.Header.Set("Content-Type", "application/json")
+	createAliasReq.AddCookie(sessionCookie)
+	createAliasReq.Header.Set("X-CSRF-Token", csrf)
+	createAliasRec := httptest.NewRecorder()
+	handler.ServeHTTP(createAliasRec, createAliasReq)
+	if createAliasRec.Code != http.StatusCreated {
+		t.Fatalf("expected hidden model alias create 201, got %d body=%s", createAliasRec.Code, createAliasRec.Body.String())
+	}
 	mustCreateMapping(t, handler, sessionCookie, csrf, string(hiddenModel.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"hide-secret","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, csrf, string(visibleModel.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"hide-visible","status":"active"}`)
 	// One account: excludes "hide-secret" but serves "hide-visible".
@@ -116,6 +125,9 @@ func TestGatewayExcludedModelHiddenFromListing(t *testing.T) {
 	}
 	if ids["hide-secret"] {
 		t.Fatalf("expected excluded model hidden from /v1/models, got list=%s", rec.Body.String())
+	}
+	if ids["hide-secret-alias"] {
+		t.Fatalf("expected excluded model alias hidden from /v1/models, got list=%s", rec.Body.String())
 	}
 	if !ids["hide-visible"] {
 		t.Fatalf("expected non-excluded sibling model visible in /v1/models, got list=%s", rec.Body.String())

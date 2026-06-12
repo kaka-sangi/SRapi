@@ -26,9 +26,10 @@ func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, http.StatusInternalServerError, apiopenapi.InternalError, "failed to list models", "internal_error")
 		return
 	}
-	gatewayModels := toGatewayModels(models)
+	hidden := s.runtime.modelsHiddenByExclusion(r.Context(), models, authed.Key)
+	gatewayModels := toGatewayModelsWithAliases(r.Context(), s.runtime.models, models, hidden)
 	gatewayModels = filterGatewayModels(gatewayModels, authed.Key.AllowedModels)
-	if hidden := s.runtime.modelsHiddenByExclusion(r.Context(), models, authed.Key); len(hidden) > 0 {
+	if len(hidden) > 0 {
 		gatewayModels = hideGatewayModels(gatewayModels, hidden)
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpenAIModelList{

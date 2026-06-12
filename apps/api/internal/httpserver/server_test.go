@@ -8153,6 +8153,58 @@ func TestGatewayModelAliasAndSessionAffinityFeedScheduler(t *testing.T) {
 	}
 }
 
+func TestGatewayModelListIncludesActiveAliases(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"alias-list-canonical","display_name":"Alias List Canonical","status":"active"}`)
+	createAliasReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/models/"+string(modelResp.Data.Id)+"/aliases", strings.NewReader(`{"alias":"alias-list-public","status":"active"}`))
+	createAliasReq.Header.Set("Content-Type", "application/json")
+	createAliasReq.AddCookie(sessionCookie)
+	createAliasReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	createAliasRec := httptest.NewRecorder()
+	handler.ServeHTTP(createAliasRec, createAliasReq)
+	if createAliasRec.Code != http.StatusCreated {
+		t.Fatalf("expected model alias create 201, got %d body=%s", createAliasRec.Code, createAliasRec.Body.String())
+	}
+
+	keyReq := httptest.NewRequest(http.MethodPost, "/api/v1/api-keys", strings.NewReader(`{"name":"gateway-alias-list","scopes":["gateway:invoke"],"allowed_models":["alias-list-public"]}`))
+	keyReq.Header.Set("Content-Type", "application/json")
+	keyReq.AddCookie(sessionCookie)
+	keyReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	keyRec := httptest.NewRecorder()
+	handler.ServeHTTP(keyRec, keyReq)
+	if keyRec.Code != http.StatusCreated {
+		t.Fatalf("expected api key create 201, got %d body=%s", keyRec.Code, keyRec.Body.String())
+	}
+	var keyResp apiopenapi.CreateApiKeyResponse
+	if err := json.NewDecoder(keyRec.Body).Decode(&keyResp); err != nil {
+		t.Fatalf("decode api key response: %v", err)
+	}
+
+	modelsReq := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	modelsReq.Header.Set("Authorization", "Bearer "+keyResp.Data.PlaintextKey)
+	modelsRec := httptest.NewRecorder()
+	handler.ServeHTTP(modelsRec, modelsReq)
+	if modelsRec.Code != http.StatusOK {
+		t.Fatalf("expected models 200, got %d body=%s", modelsRec.Code, modelsRec.Body.String())
+	}
+	var modelsResp apiopenapi.OpenAIModelList
+	if err := json.NewDecoder(modelsRec.Body).Decode(&modelsResp); err != nil {
+		t.Fatalf("decode model list: %v", err)
+	}
+	ids := map[string]bool{}
+	for _, model := range modelsResp.Data {
+		ids[model.Id] = true
+	}
+	if !ids["alias-list-public"] {
+		t.Fatalf("expected alias in /v1/models, got %+v", modelsResp.Data)
+	}
+	if ids["alias-list-canonical"] {
+		t.Fatalf("allowed_models should hide canonical when only alias is allowed, got %+v", modelsResp.Data)
+	}
+}
+
 func TestGatewayAdminSettingsApplySchedulerStrategyRollout(t *testing.T) {
 	var upstreamCalls int
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

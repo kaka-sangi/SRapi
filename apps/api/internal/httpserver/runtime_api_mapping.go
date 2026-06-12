@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -172,15 +173,77 @@ func toGatewayModels(models []modelcontract.Model) []apiopenapi.OpenAIModel {
 		if model.Status != modelcontract.StatusActive {
 			continue
 		}
-		created := int(model.CreatedAt.Unix())
-		out = append(out, apiopenapi.OpenAIModel{
-			Created: &created,
-			Id:      model.CanonicalName,
-			Object:  apiopenapi.OpenAIModelObjectModel,
-			OwnedBy: "srapi",
-		})
+		out = append(out, gatewayModelFromCatalogModel(model, model.CanonicalName))
 	}
 	return out
+}
+
+type modelAliasLister interface {
+	ListAliasesByModel(ctx context.Context, modelID int) ([]modelcontract.ModelAlias, error)
+}
+
+func toGatewayModelsWithAliases(ctx context.Context, aliasLister modelAliasLister, models []modelcontract.Model, hidden map[string]struct{}) []apiopenapi.OpenAIModel {
+	out := toGatewayModels(models)
+	if aliasLister == nil || len(out) == 0 {
+		return out
+	}
+	seen := make(map[string]struct{}, len(out))
+	modelsByID := make(map[int]apiopenapi.OpenAIModel, len(out))
+	for _, model := range out {
+		seen[model.Id] = struct{}{}
+	}
+	for _, model := range models {
+		if model.Status != modelcontract.StatusActive {
+			continue
+		}
+		if _, ok := seen[model.CanonicalName]; !ok {
+			continue
+		}
+		modelsByID[model.ID] = gatewayModelFromCatalogModel(model, model.CanonicalName)
+	}
+	for _, model := range models {
+		if model.Status != modelcontract.StatusActive {
+			continue
+		}
+		if _, ok := hidden[model.CanonicalName]; ok {
+			continue
+		}
+		base, ok := modelsByID[model.ID]
+		if !ok {
+			continue
+		}
+		aliases, err := aliasLister.ListAliasesByModel(ctx, model.ID)
+		if err != nil {
+			continue
+		}
+		for _, alias := range aliases {
+			if alias.Status != modelcontract.StatusActive {
+				continue
+			}
+			id := strings.TrimSpace(alias.Alias)
+			if id == "" {
+				continue
+			}
+			if _, ok := seen[id]; ok {
+				continue
+			}
+			aliasModel := base
+			aliasModel.Id = id
+			out = append(out, aliasModel)
+			seen[id] = struct{}{}
+		}
+	}
+	return out
+}
+
+func gatewayModelFromCatalogModel(model modelcontract.Model, id string) apiopenapi.OpenAIModel {
+	created := int(model.CreatedAt.Unix())
+	return apiopenapi.OpenAIModel{
+		Created: &created,
+		Id:      id,
+		Object:  apiopenapi.OpenAIModelObjectModel,
+		OwnedBy: "srapi",
+	}
 }
 
 func toAPIUsageLog(log usagecontract.UsageLog) apiopenapi.UsageLog {
