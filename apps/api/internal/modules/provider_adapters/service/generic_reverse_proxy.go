@@ -179,14 +179,21 @@ func genericReverseProxyOpenAIUsage(usage map[string]any) openAIUsage {
 		InputTokens:              genericIntPtr(usage["input_tokens"]),
 		OutputTokens:             genericIntPtr(usage["output_tokens"]),
 		CachedTokens:             genericIntPtr(usage["cached_tokens"]),
+		CacheReadTokens:          genericIntPtr(usage["cache_read_tokens"]),
+		CacheReadInputTokens:     genericIntPtr(usage["cache_read_input_tokens"]),
+		CacheCreationTokens:      genericIntPtr(usage["cache_creation_tokens"]),
 		CacheCreationInputTokens: genericIntPtr(usage["cache_creation_input_tokens"]),
 		CacheCreation5mTokens:    genericIntPtr(usage["cache_creation_ephemeral_5m_input_tokens"]),
 		CacheCreation1hTokens:    genericIntPtr(usage["cache_creation_ephemeral_1h_input_tokens"]),
 	}
 	if details, ok := usage["input_tokens_details"].(map[string]any); ok {
 		parsed.InputTokensDetails = &struct {
-			CachedTokens *int `json:"cached_tokens"`
-		}{CachedTokens: genericIntPtr(details["cached_tokens"])}
+			CachedTokens        *int `json:"cached_tokens"`
+			CacheCreationTokens *int `json:"cache_creation_tokens"`
+		}{
+			CachedTokens:        genericIntPtr(details["cached_tokens"]),
+			CacheCreationTokens: genericIntPtr(details["cache_creation_tokens"]),
+		}
 	}
 	if details, ok := usage["prompt_tokens_details"].(map[string]any); ok {
 		parsed.PromptTokensDetails = &struct {

@@ -121,13 +121,61 @@ func TestOpenAIUsagePreservesCacheCreationTokens(t *testing.T) {
 	}
 }
 
+func TestOpenAIUsageAcceptsCacheReadAliases(t *testing.T) {
+	input := 20
+	output := 3
+	cacheRead := 6
+	usage := openAIUsage{
+		InputTokens:          &input,
+		OutputTokens:         &output,
+		CacheReadInputTokens: &cacheRead,
+	}.ToUsage("")
+
+	if usage.InputTokens != 14 || usage.OutputTokens != 3 || usage.CachedTokens != 6 {
+		t.Fatalf("unexpected cache_read_input_tokens usage: %+v", usage)
+	}
+
+	cacheRead = 4
+	usage = openAIUsage{
+		InputTokens:     &input,
+		CacheReadTokens: &cacheRead,
+	}.ToUsage("")
+	if usage.InputTokens != 16 || usage.CachedTokens != 4 {
+		t.Fatalf("unexpected cache_read_tokens usage: %+v", usage)
+	}
+}
+
+func TestOpenAIUsageAcceptsCacheCreationAliases(t *testing.T) {
+	create := 12
+	usage := openAIUsage{
+		CacheCreationTokens: &create,
+	}.ToUsage("")
+	if usage.CacheCreationTokens != 12 || usage.CacheCreation5mTokens != 12 || usage.CacheCreation1hTokens != 0 {
+		t.Fatalf("unexpected cache_creation_tokens usage: %+v", usage)
+	}
+
+	create = 9
+	usage = openAIUsage{
+		InputTokensDetails: &struct {
+			CachedTokens        *int `json:"cached_tokens"`
+			CacheCreationTokens *int `json:"cache_creation_tokens"`
+		}{
+			CacheCreationTokens: &create,
+		},
+	}.ToUsage("")
+	if usage.CacheCreationTokens != 9 || usage.CacheCreation5mTokens != 9 {
+		t.Fatalf("unexpected input_tokens_details cache creation usage: %+v", usage)
+	}
+}
+
 func TestOpenAIUsageClampsInputWhenCachedTokensExceedInputTokens(t *testing.T) {
 	input := 8
 	cached := 10
 	usage := openAIUsage{
 		InputTokens: &input,
 		InputTokensDetails: &struct {
-			CachedTokens *int `json:"cached_tokens"`
+			CachedTokens        *int `json:"cached_tokens"`
+			CacheCreationTokens *int `json:"cache_creation_tokens"`
 		}{
 			CachedTokens: &cached,
 		},

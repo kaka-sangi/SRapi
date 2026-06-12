@@ -704,11 +704,15 @@ type openAIUsage struct {
 	InputTokens              *int `json:"input_tokens"`
 	OutputTokens             *int `json:"output_tokens"`
 	CachedTokens             *int `json:"cached_tokens"`
+	CacheReadTokens          *int `json:"cache_read_tokens"`
+	CacheReadInputTokens     *int `json:"cache_read_input_tokens"`
+	CacheCreationTokens      *int `json:"cache_creation_tokens"`
 	CacheCreationInputTokens *int `json:"cache_creation_input_tokens"`
 	CacheCreation5mTokens    *int `json:"cache_creation_ephemeral_5m_input_tokens"`
 	CacheCreation1hTokens    *int `json:"cache_creation_ephemeral_1h_input_tokens"`
 	InputTokensDetails       *struct {
-		CachedTokens *int `json:"cached_tokens"`
+		CachedTokens        *int `json:"cached_tokens"`
+		CacheCreationTokens *int `json:"cache_creation_tokens"`
 	} `json:"input_tokens_details"`
 	PromptTokensDetails *struct {
 		CachedTokens *int `json:"cached_tokens"`
@@ -742,7 +746,13 @@ func (u openAIUsage) ToUsage(text string) contract.Usage {
 	if reasoningOutput == 0 && u.CompletionTokensDetails != nil {
 		reasoningOutput = valueOrZero(u.CompletionTokensDetails.ReasoningTokens)
 	}
-	cached := valueOrZero(u.CachedTokens)
+	cached := valueOrZero(u.CacheReadInputTokens)
+	if cached == 0 {
+		cached = valueOrZero(u.CacheReadTokens)
+	}
+	if cached == 0 {
+		cached = valueOrZero(u.CachedTokens)
+	}
 	if cached == 0 && u.InputTokensDetails != nil {
 		cached = valueOrZero(u.InputTokensDetails.CachedTokens)
 	}
@@ -752,6 +762,12 @@ func (u openAIUsage) ToUsage(text string) contract.Usage {
 	cacheCreation5mRaw := valueOrZero(u.CacheCreation5mTokens)
 	cacheCreation1hRaw := valueOrZero(u.CacheCreation1hTokens)
 	cacheCreation := valueOrZero(u.CacheCreationInputTokens)
+	if cacheCreation == 0 {
+		cacheCreation = valueOrZero(u.CacheCreationTokens)
+	}
+	if cacheCreation == 0 && u.InputTokensDetails != nil {
+		cacheCreation = valueOrZero(u.InputTokensDetails.CacheCreationTokens)
+	}
 	if cacheCreation == 0 {
 		cacheCreation = cacheCreation5mRaw + cacheCreation1hRaw
 	}

@@ -1221,7 +1221,7 @@ func TestOpenAICompatibleAdapterInvokesEmbeddingsUpstream(t *testing.T) {
 			t.Fatalf("expected encoding/dimensions, got %+v", payload)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"object":"list","data":[{"object":"embedding","embedding":[0.1,0.2,0.3],"index":0},{"object":"embedding","embedding":[0.4,0.5,0.6],"index":1}],"model":"embedding-upstream","usage":{"prompt_tokens":7,"total_tokens":7}}`))
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"object":"embedding","embedding":[0.1,0.2,0.3],"index":0},{"object":"embedding","embedding":[0.4,0.5,0.6],"index":1}],"model":"embedding-upstream","usage":{"prompt_tokens":7,"total_tokens":7,"cache_read_input_tokens":2,"input_tokens_details":{"cache_creation_tokens":3}}}`))
 	}))
 	defer upstream.Close()
 
@@ -1253,7 +1253,11 @@ func TestOpenAICompatibleAdapterInvokesEmbeddingsUpstream(t *testing.T) {
 	if resp.Model != "embedding-upstream" || len(resp.Data) != 2 || len(resp.Data[0].Vector) != 3 || resp.Data[1].Index != 1 {
 		t.Fatalf("unexpected embeddings response: %+v", resp)
 	}
-	if resp.Usage.Estimated || resp.Usage.InputTokens != 7 || resp.Usage.OutputTokens != 0 {
+	if resp.Usage.Estimated ||
+		resp.Usage.InputTokens != 5 ||
+		resp.Usage.OutputTokens != 0 ||
+		resp.Usage.CachedTokens != 2 ||
+		resp.Usage.CacheCreationTokens != 3 {
 		t.Fatalf("unexpected embedding usage: %+v", resp.Usage)
 	}
 }
