@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -4254,6 +4255,12 @@ func TestReverseProxyClaudeCodeAdapterCountsTokensThroughRuntime(t *testing.T) {
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
 		Credential: map[string]any{"cli_client_token": "cli-token"},
+		RequestSettings: map[string]any{
+			"x_stainless_package_version": "0.91.0",
+			"x_stainless_runtime_version": "v24.9.0",
+			"x_stainless_os":              "Plan9",
+			"x_stainless_arch":            "wasm",
+		},
 	})
 	if err != nil {
 		t.Fatalf("invoke reverse Claude Code token count: %v", err)
@@ -4267,6 +4274,10 @@ func TestReverseProxyClaudeCodeAdapterCountsTokensThroughRuntime(t *testing.T) {
 	if headerValue(runtime.request.Headers, "Anthropic-Version") != "2023-06-01" ||
 		!strings.Contains(headerValue(runtime.request.Headers, "Anthropic-Beta"), "claude-code-20250219") ||
 		!strings.Contains(headerValue(runtime.request.Headers, "Anthropic-Beta"), "token-counting-2024-11-01") ||
+		headerValue(runtime.request.Headers, "X-Stainless-Package-Version") != "0.91.0" ||
+		headerValue(runtime.request.Headers, "X-Stainless-Runtime-Version") != "v24.9.0" ||
+		headerValue(runtime.request.Headers, "X-Stainless-Os") != "Plan9" ||
+		headerValue(runtime.request.Headers, "X-Stainless-Arch") != "wasm" ||
 		headerValue(runtime.request.Headers, "X-Claude-Code-Session-Id") != "session-123" ||
 		headerValue(runtime.request.Headers, "x-client-request-id") != "client-req-123" ||
 		headerValue(runtime.request.Headers, "Accept") != "application/json" {
@@ -5271,6 +5282,10 @@ func TestReverseProxyClaudeCodeCLIAdapterUsesOfficialClientMessagesShape(t *test
 		headerValue(runtime.request.Headers, "X-Stainless-Retry-Count") != "0" ||
 		headerValue(runtime.request.Headers, "X-Stainless-Runtime") != "node" ||
 		headerValue(runtime.request.Headers, "X-Stainless-Lang") != "js" ||
+		headerValue(runtime.request.Headers, "X-Stainless-Package-Version") != "0.74.0" ||
+		headerValue(runtime.request.Headers, "X-Stainless-Runtime-Version") != "v24.3.0" ||
+		headerValue(runtime.request.Headers, "X-Stainless-Os") != expectedClaudeCodeStainlessOS() ||
+		headerValue(runtime.request.Headers, "X-Stainless-Arch") != expectedClaudeCodeStainlessArch() ||
 		headerValue(runtime.request.Headers, "X-Stainless-Timeout") != "600" ||
 		headerValue(runtime.request.Headers, "X-Claude-Code-Session-Id") != "session-123" ||
 		headerValue(runtime.request.Headers, "x-client-request-id") != "client-req-123" ||
@@ -11178,6 +11193,34 @@ func headerValue(headers http.Header, key string) string {
 		return value
 	}
 	return ""
+}
+
+func expectedClaudeCodeStainlessOS() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "MacOS"
+	case "windows":
+		return "Windows"
+	case "linux":
+		return "Linux"
+	case "freebsd":
+		return "FreeBSD"
+	default:
+		return "Other::" + runtime.GOOS
+	}
+}
+
+func expectedClaudeCodeStainlessArch() string {
+	switch runtime.GOARCH {
+	case "amd64":
+		return "x64"
+	case "arm64":
+		return "arm64"
+	case "386":
+		return "x86"
+	default:
+		return "other::" + runtime.GOARCH
+	}
 }
 
 func ptrString(value string) *string {

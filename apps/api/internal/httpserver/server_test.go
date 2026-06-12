@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -6263,19 +6264,23 @@ func TestGatewayAnthropicProviderAliasTargetsMessagesUpstream(t *testing.T) {
 
 func TestGatewayClaudeCodeReverseProxyUsesOfficialClientMessagesShape(t *testing.T) {
 	type upstreamCall struct {
-		Path             string
-		RawQuery         string
-		Authorization    string
-		UserAgent        string
-		Version          string
-		Beta             string
-		App              string
-		StainlessRuntime string
-		StainlessLang    string
-		SessionID        string
-		ClientRequestID  string
-		Model            string
-		System           []struct {
+		Path                    string
+		RawQuery                string
+		Authorization           string
+		UserAgent               string
+		Version                 string
+		Beta                    string
+		App                     string
+		StainlessRuntime        string
+		StainlessLang           string
+		StainlessPackage        string
+		StainlessRuntimeVersion string
+		StainlessOS             string
+		StainlessArch           string
+		SessionID               string
+		ClientRequestID         string
+		Model                   string
+		System                  []struct {
 			Type string `json:"type"`
 			Text string `json:"text"`
 		}
@@ -6302,20 +6307,24 @@ func TestGatewayClaudeCodeReverseProxyUsesOfficialClientMessagesShape(t *testing
 			t.Fatalf("decode upstream request: %v", err)
 		}
 		call := upstreamCall{
-			Path:             r.URL.Path,
-			RawQuery:         r.URL.RawQuery,
-			Authorization:    r.Header.Get("Authorization"),
-			UserAgent:        r.Header.Get("User-Agent"),
-			Version:          r.Header.Get("anthropic-version"),
-			Beta:             r.Header.Get("anthropic-beta"),
-			App:              r.Header.Get("x-app"),
-			StainlessRuntime: r.Header.Get("x-stainless-runtime"),
-			StainlessLang:    r.Header.Get("x-stainless-lang"),
-			SessionID:        r.Header.Get("x-claude-code-session-id"),
-			ClientRequestID:  r.Header.Get("x-client-request-id"),
-			Model:            payload.Model,
-			System:           payload.System,
-			MaxTokens:        payload.MaxTokens,
+			Path:                    r.URL.Path,
+			RawQuery:                r.URL.RawQuery,
+			Authorization:           r.Header.Get("Authorization"),
+			UserAgent:               r.Header.Get("User-Agent"),
+			Version:                 r.Header.Get("anthropic-version"),
+			Beta:                    r.Header.Get("anthropic-beta"),
+			App:                     r.Header.Get("x-app"),
+			StainlessRuntime:        r.Header.Get("x-stainless-runtime"),
+			StainlessLang:           r.Header.Get("x-stainless-lang"),
+			StainlessPackage:        r.Header.Get("x-stainless-package-version"),
+			StainlessRuntimeVersion: r.Header.Get("x-stainless-runtime-version"),
+			StainlessOS:             r.Header.Get("x-stainless-os"),
+			StainlessArch:           r.Header.Get("x-stainless-arch"),
+			SessionID:               r.Header.Get("x-claude-code-session-id"),
+			ClientRequestID:         r.Header.Get("x-client-request-id"),
+			Model:                   payload.Model,
+			System:                  payload.System,
+			MaxTokens:               payload.MaxTokens,
 		}
 		if len(payload.Messages) > 0 {
 			call.Message = payload.Messages[0].Content
@@ -6361,6 +6370,10 @@ func TestGatewayClaudeCodeReverseProxyUsesOfficialClientMessagesShape(t *testing
 		call.App != "cli" ||
 		call.StainlessRuntime != "node" ||
 		call.StainlessLang != "js" ||
+		call.StainlessPackage != "0.74.0" ||
+		call.StainlessRuntimeVersion != "v24.3.0" ||
+		call.StainlessOS != expectedClaudeCodeGatewayStainlessOS() ||
+		call.StainlessArch != expectedClaudeCodeGatewayStainlessArch() ||
 		call.SessionID != "session-gateway-123" ||
 		call.ClientRequestID != "client-req-gateway-123" {
 		t.Fatalf("unexpected Claude Code upstream headers: %+v", call)
@@ -10738,6 +10751,34 @@ func rejectionReasonsContain(value apiopenapi.JsonObject, target string) bool {
 		}
 	}
 	return false
+}
+
+func expectedClaudeCodeGatewayStainlessOS() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "MacOS"
+	case "windows":
+		return "Windows"
+	case "linux":
+		return "Linux"
+	case "freebsd":
+		return "FreeBSD"
+	default:
+		return "Other::" + runtime.GOOS
+	}
+}
+
+func expectedClaudeCodeGatewayStainlessArch() string {
+	switch runtime.GOARCH {
+	case "amd64":
+		return "x64"
+	case "arm64":
+		return "arm64"
+	case "386":
+		return "x86"
+	default:
+		return "other::" + runtime.GOARCH
+	}
 }
 
 func TestAdminOpsAlertRulesControlPlane(t *testing.T) {

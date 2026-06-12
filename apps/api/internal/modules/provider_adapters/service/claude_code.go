@@ -7,14 +7,17 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strings"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 )
 
 const (
-	claudeCodeDefaultBeta = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,structured-outputs-2025-12-15,fast-mode-2026-02-01,redact-thinking-2026-02-12,token-efficient-tools-2026-03-28"
-	claudeCodeAgentText   = "You are Claude Code, Anthropic's official CLI for Claude."
+	claudeCodeDefaultBeta                    = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,structured-outputs-2025-12-15,fast-mode-2026-02-01,redact-thinking-2026-02-12,token-efficient-tools-2026-03-28"
+	claudeCodeDefaultStainlessPackageVersion = "0.74.0"
+	claudeCodeDefaultStainlessRuntimeVersion = "v24.3.0"
+	claudeCodeAgentText                      = "You are Claude Code, Anthropic's official CLI for Claude."
 )
 
 func isClaudeCodeReverseProxy(req contract.ConversationRequest) bool {
@@ -98,6 +101,10 @@ func claudeCodeMessagesHeaders(req contract.ConversationRequest) http.Header {
 	headers.Set("X-Stainless-Retry-Count", defaultRequestSetting(req, "0", "x_stainless_retry_count", "x-stainless-retry-count"))
 	headers.Set("X-Stainless-Runtime", defaultRequestSetting(req, "node", "x_stainless_runtime", "x-stainless-runtime"))
 	headers.Set("X-Stainless-Lang", defaultRequestSetting(req, "js", "x_stainless_lang", "x-stainless-lang"))
+	headers.Set("X-Stainless-Package-Version", defaultRequestSetting(req, claudeCodeDefaultStainlessPackageVersion, "x_stainless_package_version", "x-stainless-package-version", "X-Stainless-Package-Version", "stainless_package_version", "claude_code_stainless_package_version"))
+	headers.Set("X-Stainless-Runtime-Version", defaultRequestSetting(req, claudeCodeDefaultStainlessRuntimeVersion, "x_stainless_runtime_version", "x-stainless-runtime-version", "X-Stainless-Runtime-Version", "stainless_runtime_version", "claude_code_stainless_runtime_version"))
+	headers.Set("X-Stainless-Os", defaultRequestSetting(req, claudeCodeDefaultStainlessOS(), "x_stainless_os", "x-stainless-os", "X-Stainless-OS", "X-Stainless-Os", "stainless_os", "claude_code_stainless_os"))
+	headers.Set("X-Stainless-Arch", defaultRequestSetting(req, claudeCodeDefaultStainlessArch(), "x_stainless_arch", "x-stainless-arch", "X-Stainless-Arch", "stainless_arch", "claude_code_stainless_arch"))
 	headers.Set("X-Stainless-Timeout", defaultRequestSetting(req, "600", "x_stainless_timeout", "x-stainless-timeout"))
 	if sessionID := defaultRequestSetting(req, req.RequestID, "claude_code_session_id", "x_claude_code_session_id", "X-Claude-Code-Session-Id", "session_id"); sessionID != "" {
 		headers.Set("X-Claude-Code-Session-Id", sessionID)
@@ -139,14 +146,43 @@ func claudeCodeTokenCountPayload(req contract.TokenCountRequest, raw []byte) ([]
 
 func tokenCountTextRequest(req contract.TokenCountRequest) contract.ConversationRequest {
 	return contract.ConversationRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: req.SourceProtocol,
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.Model,
-		Provider:       req.Provider,
-		Account:        req.Account,
-		Mapping:        req.Mapping,
-		Credential:     req.Credential,
+		RequestID:       req.RequestID,
+		SourceProtocol:  req.SourceProtocol,
+		SourceEndpoint:  req.SourceEndpoint,
+		Model:           req.Model,
+		Provider:        req.Provider,
+		Account:         req.Account,
+		Mapping:         req.Mapping,
+		Credential:      req.Credential,
+		RequestSettings: req.RequestSettings,
+	}
+}
+
+func claudeCodeDefaultStainlessOS() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "MacOS"
+	case "windows":
+		return "Windows"
+	case "linux":
+		return "Linux"
+	case "freebsd":
+		return "FreeBSD"
+	default:
+		return "Other::" + runtime.GOOS
+	}
+}
+
+func claudeCodeDefaultStainlessArch() string {
+	switch runtime.GOARCH {
+	case "amd64":
+		return "x64"
+	case "arm64":
+		return "arm64"
+	case "386":
+		return "x86"
+	default:
+		return "other::" + runtime.GOARCH
 	}
 }
 
