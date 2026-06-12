@@ -10,20 +10,83 @@ import type { ReasoningEffort } from "@/components/chat/types";
 import { useLanguage } from "@/context/LanguageContext";
 import { streamPlaygroundChat, type PlaygroundMessage } from "@/lib/playground-client";
 import { fileToImagePart, imagePartToDataUrl, type CopilotImagePart } from "@/lib/image-utils";
+import {
+  PlaygroundSettings,
+  DEFAULT_PLAYGROUND_PARAMS,
+  type PlaygroundParams,
+} from "@/components/playground/playground-settings";
 import type { CSSProperties } from "react";
 
 const rise = (i: number) => ({ "--stagger-index": i }) as CSSProperties;
+
+const SESSION_STORAGE_KEY = "srapi_playground_session_v1";
+
+interface PersistedSession {
+  messages: PlaygroundMessage[];
+  model?: string;
+  effort?: ReasoningEffort;
+  params?: PlaygroundParams;
+}
+
+function readPersistedSession(): PersistedSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedSession;
+    if (!Array.isArray(parsed.messages)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedSession(session: PersistedSession) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  } catch {
+    // Quota exceeded (likely image attachments) — retry without image payloads
+    // so the text history still survives a reload.
+    try {
+      window.localStorage.setItem(
+        SESSION_STORAGE_KEY,
+        JSON.stringify({
+          ...session,
+          messages: session.messages.map(({ images: _images, ...rest }) => rest),
+        }),
+      );
+    } catch {
+      // Storage unavailable — persistence is best-effort.
+    }
+  }
+}
+
 
 /** The 交界地 chat: a billed, session-authenticated user chat. Same surface as
  * the admin copilot minus all agentic/admin capability — it can only talk. */
 export function PlaygroundChat({ models, defaultModel }: { models: string[]; defaultModel: string }) {
   const { t } = useLanguage();
-  const [messages, setMessages] = useState<PlaygroundMessage[]>([]);
+  // Lazy initializers restore the previous session (messages, model, params)
+  // so a reload never loses the conversation. The component only mounts
+  // client-side (behind AuthGate), so reading localStorage here is safe.
+  const [messages, setMessages] = useState<PlaygroundMessage[]>(
+    () => readPersistedSession()?.messages ?? [],
+  );
   const [input, setInput] = useState("");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [model, setModel] = useState(defaultModel || models[0] || "");
-  const [effort, setEffort] = useState<ReasoningEffort>("off");
+  const [model, setModel] = useState(() => {
+    const persisted = readPersistedSession()?.model;
+    if (persisted && (models.length === 0 || models.includes(persisted))) return persisted;
+    return defaultModel || models[0] || "";
+  });
+  const [effort, setEffort] = useState<ReasoningEffort>(
+    () => readPersistedSession()?.effort ?? "off",
+  );
+  const [params, setParams] = useState<PlaygroundParams>(
+    () => readPersistedSession()?.params ?? DEFAULT_PLAYGROUND_PARAMS,
+  );
   const [images, setImages] = useState<CopilotImagePart[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -32,6 +95,14 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, running]);
+
+  // Persist after a turn settles (not on every streaming delta) and whenever
+  // the picker/params change, so a reload restores the latest state. An empty
+  // conversation still persists model/effort/params.
+  useEffect(() => {
+    if (running) return;
+    writePersistedSession({ messages, model, effort, params });
+  }, [messages, running, model, effort, params]);
 
   const runTurn = useCallback(
     async (history: PlaygroundMessage[]) => {
@@ -47,11 +118,16 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
           assistantIdx = working.length - 1;
         }
       };
+      const temperature = Number.parseFloat(params.temperature);
+      const maxTokens = Number.parseInt(params.maxTokens, 10);
       try {
         await streamPlaygroundChat({
           messages: history,
           model,
           reasoningEffort: effort,
+          system: params.system.trim() || undefined,
+          temperature: Number.isFinite(temperature) ? temperature : undefined,
+          maxTokens: Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : undefined,
           signal: controller.signal,
           onDelta: (kind, text) => {
             if (!text) return;
@@ -71,7 +147,7 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
         abortRef.current = null;
       }
     },
-    [model, effort],
+    [model, effort, params],
   );
 
   function send(text?: string) {
@@ -158,6 +234,7 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
           removeImage={(idx) => setImages((prev) => prev.filter((_, i) => i !== idx))}
           onAttach={() => fileRef.current?.click()}
           placeholder={t("playground.placeholder")}
+          extraControls={<PlaygroundSettings params={params} onChange={setParams} />}
         />
         <input
           ref={fileRef}

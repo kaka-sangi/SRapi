@@ -7620,9 +7620,14 @@ type PlatformFamily string
 
 // PlaygroundChatRequest defines model for PlaygroundChatRequest.
 type PlaygroundChatRequest struct {
+	MaxTokens       *int                                  `json:"max_tokens,omitempty"`
 	Messages        []PlaygroundMessage                   `json:"messages"`
 	Model           string                                `json:"model"`
 	ReasoningEffort *PlaygroundChatRequestReasoningEffort `json:"reasoning_effort,omitempty"`
+
+	// System Optional system prompt prepended to the conversation.
+	System      *string  `json:"system,omitempty"`
+	Temperature *float64 `json:"temperature,omitempty"`
 }
 
 // PlaygroundChatRequestReasoningEffort defines model for PlaygroundChatRequest.ReasoningEffort.

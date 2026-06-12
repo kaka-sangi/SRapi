@@ -28,6 +28,7 @@ export function Composer({
   removeFile,
   onAttach,
   placeholder,
+  extraControls,
 }: {
   input: string;
   setInput: (v: string) => void;
@@ -45,6 +46,8 @@ export function Composer({
   removeFile?: (idx: number) => void;
   onAttach: () => void;
   placeholder: string;
+  /** Optional extra toolbar controls rendered after the attach button. */
+  extraControls?: React.ReactNode;
 }) {
   const { t } = useLanguage();
   const canSend = (input.trim().length > 0 || images.length > 0 || files.length > 0) && !running;
@@ -112,6 +115,7 @@ export function Composer({
           <Button variant="ghost" size="icon" className="size-8 shrink-0" onClick={onAttach} aria-label={t("chat.attach")}>
             <Paperclip className="size-4" />
           </Button>
+          {extraControls}
         </div>
         {running ? (
           <Button variant="outline" size="icon" className="size-8 rounded-full" onClick={onStop} aria-label={t("chat.stop")}>

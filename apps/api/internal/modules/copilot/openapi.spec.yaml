@@ -20411,6 +20411,17 @@ components:
             - low
             - medium
             - high
+        system:
+          type: string
+          description: Optional system prompt prepended to the conversation.
+        temperature:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 2
+        max_tokens:
+          type: integer
+          minimum: 1
 
     PlaygroundModel:
       type: object

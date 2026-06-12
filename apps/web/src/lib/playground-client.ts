@@ -30,6 +30,12 @@ export interface StreamPlaygroundOptions {
   messages: PlaygroundMessage[];
   model: string;
   reasoningEffort?: ReasoningEffort;
+  /** Optional system prompt prepended server-side. */
+  system?: string;
+  /** Sampling temperature (0–2); undefined keeps the model default. */
+  temperature?: number;
+  /** Response token cap; undefined keeps the model default. */
+  maxTokens?: number;
   signal?: AbortSignal;
   onDelta: (kind: "content" | "reasoning", text: string) => void;
   onError: (message: string) => void;
@@ -51,6 +57,9 @@ export async function streamPlaygroundChat(options: StreamPlaygroundOptions): Pr
         model: options.model,
         reasoning_effort:
           options.reasoningEffort && options.reasoningEffort !== "off" ? options.reasoningEffort : undefined,
+        system: options.system?.trim() || undefined,
+        temperature: options.temperature,
+        max_tokens: options.maxTokens,
         messages: options.messages.map((m) => ({
           role: m.role,
           content: m.content ?? "",

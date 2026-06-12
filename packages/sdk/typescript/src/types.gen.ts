@@ -2820,6 +2820,12 @@ export type PlaygroundChatRequest = {
     messages: Array<PlaygroundMessage>;
     model: string;
     reasoning_effort?: 'off' | 'low' | 'medium' | 'high';
+    /**
+     * Optional system prompt prepended to the conversation.
+     */
+    system?: string;
+    temperature?: number;
+    max_tokens?: number;
 };
 
 export type PlaygroundModel = {

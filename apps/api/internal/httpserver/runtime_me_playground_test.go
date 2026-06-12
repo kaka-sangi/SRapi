@@ -133,6 +133,76 @@ func TestCurrentUserAvailableModelsReturnsChannelStatusAndPricing(t *testing.T) 
 	}
 }
 
+// TestBuildPlaygroundChatBodyParams proves the conversation-level parameters
+// (system prompt, temperature, max_tokens) reach the gateway request body, and
+// that blank/zero values stay omitted.
+func TestBuildPlaygroundChatBodyParams(t *testing.T) {
+	system := "  be terse  "
+	temperature := 0.3
+	maxTokens := 256
+	content := "hi"
+	req := apiopenapi.PlaygroundChatRequest{
+		Model:       "pg-model",
+		Messages:    []apiopenapi.PlaygroundMessage{{Role: "user", Content: &content}},
+		System:      &system,
+		Temperature: &temperature,
+		MaxTokens:   &maxTokens,
+	}
+	rawBody, body, err := buildPlaygroundChatBody(req)
+	if err != nil {
+		t.Fatalf("buildPlaygroundChatBody: %v", err)
+	}
+	var payload struct {
+		Messages []struct {
+			Role    string `json:"role"`
+			Content any    `json:"content"`
+		} `json:"messages"`
+		Temperature *float64 `json:"temperature"`
+		MaxTokens   *int     `json:"max_tokens"`
+	}
+	if err := json.Unmarshal(rawBody, &payload); err != nil {
+		t.Fatalf("unmarshal raw body: %v", err)
+	}
+	if len(payload.Messages) != 2 || payload.Messages[0].Role != "system" || payload.Messages[0].Content != "be terse" {
+		t.Fatalf("expected trimmed system message first, got %+v", payload.Messages)
+	}
+	if payload.Temperature == nil || *payload.Temperature != 0.3 {
+		t.Fatalf("expected temperature 0.3, got %+v", payload.Temperature)
+	}
+	if payload.MaxTokens == nil || *payload.MaxTokens != 256 {
+		t.Fatalf("expected max_tokens 256, got %+v", payload.MaxTokens)
+	}
+	if body.Model != "pg-model" {
+		t.Fatalf("decoded request lost the model: %+v", body)
+	}
+
+	// Blank system and out-of-range values must stay omitted.
+	blank := "   "
+	badTemp := 9.9
+	zeroTokens := 0
+	req.System = &blank
+	req.Temperature = &badTemp
+	req.MaxTokens = &zeroTokens
+	rawBody, _, err = buildPlaygroundChatBody(req)
+	if err != nil {
+		t.Fatalf("buildPlaygroundChatBody (blank): %v", err)
+	}
+	var generic map[string]any
+	if err := json.Unmarshal(rawBody, &generic); err != nil {
+		t.Fatalf("unmarshal blank-case body: %v", err)
+	}
+	if _, ok := generic["temperature"]; ok {
+		t.Fatalf("out-of-range temperature must be omitted: %s", rawBody)
+	}
+	if _, ok := generic["max_tokens"]; ok {
+		t.Fatalf("zero max_tokens must be omitted: %s", rawBody)
+	}
+	messages, _ := generic["messages"].([]any)
+	if len(messages) != 1 {
+		t.Fatalf("blank system must not add a message: %s", rawBody)
+	}
+}
+
 // TestMePlaygroundChatRequiresAuth confirms the endpoint is session-gated.
 func TestMePlaygroundChatRequiresAuth(t *testing.T) {
 	handler := New(config.Load(), nil)

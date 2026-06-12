@@ -179,7 +179,12 @@ func (s *Server) ensurePlaygroundAuth(ctx context.Context, userID int) (apikeyco
 // OpenAI ChatCompletionRequest (raw bytes + decoded struct), mapping image
 // attachments into multimodal content parts. No tools are ever included.
 func buildPlaygroundChatBody(req apiopenapi.PlaygroundChatRequest) ([]byte, apiopenapi.ChatCompletionRequest, error) {
-	messages := make([]map[string]any, 0, len(req.Messages))
+	messages := make([]map[string]any, 0, len(req.Messages)+1)
+	if req.System != nil {
+		if system := strings.TrimSpace(*req.System); system != "" {
+			messages = append(messages, map[string]any{"role": "system", "content": system})
+		}
+	}
 	for _, m := range req.Messages {
 		text := ""
 		if m.Content != nil {
@@ -210,6 +215,12 @@ func buildPlaygroundChatBody(req apiopenapi.PlaygroundChatRequest) ([]byte, apio
 		if effort := string(*req.ReasoningEffort); effort != "" && effort != "off" {
 			payload["reasoning_effort"] = effort
 		}
+	}
+	if req.Temperature != nil && *req.Temperature >= 0 && *req.Temperature <= 2 {
+		payload["temperature"] = *req.Temperature
+	}
+	if req.MaxTokens != nil && *req.MaxTokens > 0 {
+		payload["max_tokens"] = *req.MaxTokens
 	}
 	rawBody, err := json.Marshal(payload)
 	if err != nil {
