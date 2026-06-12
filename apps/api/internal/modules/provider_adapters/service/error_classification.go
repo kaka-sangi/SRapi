@@ -31,10 +31,15 @@ func classifyProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, b
 	if providerErrorBodyIndicatesQuotaExhausted(body, message) {
 		class = "quota_exhausted"
 	}
-	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, RetryAfter: providerRetryAfter(headers, body, now), Metadata: metadata, QuotaSignals: providerQuotaSignalsFromErrorHeaders(headers, now)}
+	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, Headers: cloneGenericHeaders(headers), RetryAfter: providerRetryAfter(headers, body, now), Metadata: metadata, QuotaSignals: providerQuotaSignalsFromErrorHeaders(headers, now)}
 }
 
 func classifyAnthropicProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
+	return classifyAnthropicProviderHTTPErrorWithHeaders(statusCode, nil, body)
+}
+
+func classifyAnthropicProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, body []byte) contract.ProviderError {
+	now := time.Now()
 	var decoded struct {
 		Error struct {
 			Type    string `json:"type"`
@@ -54,7 +59,7 @@ func classifyAnthropicProviderHTTPError(statusCode int, body []byte) contract.Pr
 	if message == "" {
 		message = http.StatusText(statusCode)
 	}
-	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message}
+	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, Headers: cloneGenericHeaders(headers), RetryAfter: providerRetryAfter(headers, body, now), QuotaSignals: providerQuotaSignalsFromErrorHeaders(headers, now)}
 }
 
 func classifyGeminiProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
@@ -85,7 +90,7 @@ func classifyGeminiProviderHTTPErrorWithHeaders(statusCode int, headers http.Hea
 	if providerErrorBodyIndicatesGeminiQuotaExhausted(body, message) {
 		class = "quota_exhausted"
 	}
-	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, RetryAfter: providerRetryAfter(headers, body, now), QuotaSignals: providerQuotaSignalsFromErrorHeaders(headers, now)}
+	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, Headers: cloneGenericHeaders(headers), RetryAfter: providerRetryAfter(headers, body, now), QuotaSignals: providerQuotaSignalsFromErrorHeaders(headers, now)}
 }
 
 func providerQuotaSignalsFromErrorHeaders(headers http.Header, now time.Time) []contract.QuotaSignal {

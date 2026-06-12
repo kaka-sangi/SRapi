@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -98,6 +101,63 @@ func TestForwardUpstreamResponseHeaders_NeverOverridesExisting(t *testing.T) {
 
 	if got := rec.Header().Get("Retry-After"); got != "5" {
 		t.Fatalf("existing Retry-After overridden, got %q want 5", got)
+	}
+}
+
+func TestForwardProviderErrorHeaders_AllowlistedForwarded(t *testing.T) {
+	rec := httptest.NewRecorder()
+	cfg := gatewayPassthroughHeaderConfig{
+		enabled:   true,
+		allowlist: []string{"retry-after", "x-request-id", "x-ratelimit-*"},
+	}
+	providerErr := provideradaptercontract.ProviderError{
+		Class:      "rate_limit",
+		StatusCode: http.StatusTooManyRequests,
+		Message:    "too many requests",
+		Headers:    upstreamPassthroughHeaders(),
+	}
+
+	forwardProviderErrorHeaders(rec, providerErr, cfg)
+
+	if got := rec.Header().Get("Retry-After"); got != "30" {
+		t.Fatalf("expected Retry-After to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-Request-Id"); got != "req-123" {
+		t.Fatalf("expected X-Request-Id to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-RateLimit-Remaining"); got != "42" {
+		t.Fatalf("expected X-RateLimit-Remaining to be forwarded, got %q", got)
+	}
+	if got := rec.Header().Get("X-Secret-Token"); got != "" {
+		t.Fatalf("non-allowlisted header leaked: %q", got)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "" {
+		t.Fatalf("content type should stay owned by SRapi, got %q", got)
+	}
+}
+
+func TestGatewayProviderErrorUsesProviderRetryAfter(t *testing.T) {
+	retryAt := time.Now().Add(45 * time.Second)
+	rec := httptest.NewRecorder()
+	providerErr := provideradaptercontract.ProviderError{
+		Class:      "rate_limit",
+		StatusCode: http.StatusTooManyRequests,
+		Message:    "too many requests",
+		RetryAfter: &retryAt,
+	}
+
+	(&Server{}).writeProviderGatewayError(rec, providerErr)
+
+	got := rec.Header().Get("Retry-After")
+	if got == "" || got == "60" {
+		t.Fatalf("expected provider retry hint instead of default 60, got %q", got)
+	}
+	seconds, err := strconv.Atoi(got)
+	if err != nil {
+		t.Fatalf("expected numeric Retry-After, got %q", got)
+	}
+	if seconds < 1 || seconds > 45 {
+		t.Fatalf("expected Retry-After within provider retry window, got %d", seconds)
 	}
 }
 

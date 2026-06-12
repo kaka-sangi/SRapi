@@ -144,6 +144,8 @@ func (s *Server) writeProviderGatewayError(w http.ResponseWriter, err error) {
 func (s *Server) writeProviderGatewayErrorForCandidate(w http.ResponseWriter, err error, candidate *schedulercontract.Candidate) {
 	errorClass, upstreamStatus, errorType := providerGatewayError(err)
 	response := s.gatewayPublicErrorResponse(err, errorClass, upstreamStatus, candidate)
+	s.forwardProviderErrorHeaders(w, err)
+	setRetryAfterFromProviderError(w, err)
 	writeGatewayError(w, response.Status, errorType, response.Message, errorClass)
 }
 
@@ -154,6 +156,8 @@ func (s *Server) writeGeminiProviderGatewayError(w http.ResponseWriter, err erro
 func (s *Server) writeGeminiProviderGatewayErrorForCandidate(w http.ResponseWriter, err error, candidate *schedulercontract.Candidate) {
 	errorClass, upstreamStatus, _ := providerGatewayError(err)
 	response := s.gatewayPublicErrorResponse(err, errorClass, upstreamStatus, candidate)
+	s.forwardProviderErrorHeaders(w, err)
+	setRetryAfterFromProviderError(w, err)
 	writeGeminiGatewayError(w, response.Status, geminiStatusForGatewayErrorClass(errorClass, response.Status), response.Message)
 }
 
@@ -604,6 +608,45 @@ func providerRetryAfterFromError(err error) *time.Time {
 	}
 	retryAfter := providerErr.RetryAfter.UTC()
 	return &retryAfter
+}
+
+func (s *Server) forwardProviderErrorHeaders(w http.ResponseWriter, err error) {
+	forwardProviderErrorHeaders(w, err, s.gatewayPassthroughHeaderConfig(context.Background()))
+}
+
+func forwardProviderErrorHeaders(w http.ResponseWriter, err error, cfg gatewayPassthroughHeaderConfig) {
+	headers := providerHeadersFromError(err)
+	if len(headers) == 0 {
+		return
+	}
+	forwardUpstreamResponseHeaders(w, headers, cfg)
+}
+
+func providerHeadersFromError(err error) http.Header {
+	var providerErr provideradaptercontract.ProviderError
+	if !errors.As(err, &providerErr) || len(providerErr.Headers) == 0 {
+		return nil
+	}
+	return cloneHTTPHeader(providerErr.Headers)
+}
+
+func setRetryAfterFromProviderError(w http.ResponseWriter, err error) {
+	if w == nil || strings.TrimSpace(w.Header().Get("Retry-After")) != "" {
+		return
+	}
+	retryAfter := providerRetryAfterFromError(err)
+	if retryAfter == nil {
+		return
+	}
+	delay := time.Until(*retryAfter)
+	if delay <= 0 {
+		return
+	}
+	seconds := int((delay + time.Second - time.Nanosecond) / time.Second)
+	if seconds < 1 {
+		seconds = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
 }
 
 func providerQuotaSignalsFromError(err error) []provideradaptercontract.QuotaSignal {

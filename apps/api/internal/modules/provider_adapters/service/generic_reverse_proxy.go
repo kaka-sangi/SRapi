@@ -510,6 +510,9 @@ func providerErrorFromGenericReverseProxy(err error) error {
 }
 
 func cloneGenericHeaders(headers http.Header) http.Header {
+	if headers == nil {
+		return nil
+	}
 	out := http.Header{}
 	for key, values := range headers {
 		out[key] = append([]string(nil), values...)

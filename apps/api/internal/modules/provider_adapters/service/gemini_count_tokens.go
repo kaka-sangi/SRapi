@@ -130,7 +130,7 @@ func (s *Service) invokeAnthropicTokenCount(ctx context.Context, req contract.To
 		return contract.TokenCountResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.TokenCountResponse{}, classifyAnthropicProviderHTTPError(resp.StatusCode, respBody)
+		return contract.TokenCountResponse{}, classifyAnthropicProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, respBody)
 	}
 	return parseAnthropicTokenCountResponse(respBody, resp.StatusCode)
 }
@@ -177,7 +177,7 @@ func (s *Service) invokeReverseProxyAnthropicTokenCount(ctx context.Context, req
 		return contract.TokenCountResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.TokenCountResponse{}, classifyAnthropicProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.TokenCountResponse{}, classifyAnthropicProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	return parseAnthropicTokenCountResponse(runtimeResp.Body, runtimeResp.StatusCode)
 }

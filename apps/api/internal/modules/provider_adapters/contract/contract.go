@@ -568,6 +568,10 @@ type ProviderError struct {
 	Class      string
 	StatusCode int
 	Message    string
+	// Headers carries upstream response headers from failed provider HTTP
+	// responses. Callers must still apply their own allowlist before exposing
+	// them downstream.
+	Headers    http.Header
 	RetryAfter *time.Time
 	Metadata   map[string]any
 	// QuotaSignals carries normalized provider quota observations discovered on

@@ -75,7 +75,7 @@ func (s *Service) invokeBedrockAnthropic(ctx context.Context, req contract.Conve
 			return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return contract.ConversationResponse{}, classifyAnthropicProviderHTTPError(resp.StatusCode, body)
+			return contract.ConversationResponse{}, classifyAnthropicProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 		}
 		return parseAnthropicCompatibleStream(body, resp.StatusCode)
 	}
@@ -85,7 +85,7 @@ func (s *Service) invokeBedrockAnthropic(ctx context.Context, req contract.Conve
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.ConversationResponse{}, classifyAnthropicProviderHTTPError(resp.StatusCode, body)
+		return contract.ConversationResponse{}, classifyAnthropicProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
 	return parseAnthropicCompatibleJSON(body, resp.StatusCode)
 }

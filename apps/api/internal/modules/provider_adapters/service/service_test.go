@@ -2402,6 +2402,44 @@ func TestOpenAICompatibleAdapterClassifiesRateLimit(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleAdapterCarriesErrorResponseHeaders(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Retry-After", "45")
+		w.Header().Set("X-Request-Id", "req-upstream-error")
+		w.Header().Set("X-RateLimit-Remaining", "0")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"too many requests"}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_rate_limit_headers",
+		Model:      "gpt-local",
+		InputParts: textParts("hello"),
+		Account: accountcontract.ProviderAccount{
+			Metadata: map[string]any{"base_url": upstream.URL + "/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+
+	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	if got := providerErr.Headers.Get("Retry-After"); got != "45" {
+		t.Fatalf("expected Retry-After header to be preserved, got %q", got)
+	}
+	if got := providerErr.Headers.Get("X-Request-Id"); got != "req-upstream-error" {
+		t.Fatalf("expected upstream request id header to be preserved, got %q", got)
+	}
+	if got := providerErr.Headers.Get("X-RateLimit-Remaining"); got != "0" {
+		t.Fatalf("expected upstream rate limit header to be preserved, got %q", got)
+	}
+}
+
 func TestOpenAICompatibleAdapterCapturesCodexQuotaSignalsFromRateLimitHeaders(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

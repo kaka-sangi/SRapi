@@ -1739,6 +1739,7 @@ func classifyCodexProviderHTTPErrorWithHeaders(statusCode int, headers http.Head
 		Class:        class,
 		StatusCode:   effectiveStatus,
 		Message:      message,
+		Headers:      cloneGenericHeaders(headers),
 		RetryAfter:   providerRetryAfter(headers, body, now),
 		Metadata:     metadata,
 		QuotaSignals: providerQuotaSignalsFromErrorHeaders(headers, now),
