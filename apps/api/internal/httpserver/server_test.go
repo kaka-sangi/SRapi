@@ -6279,6 +6279,7 @@ func TestGatewayClaudeCodeReverseProxyUsesOfficialClientMessagesShape(t *testing
 		StainlessArch           string
 		SessionID               string
 		ClientRequestID         string
+		MetadataUserID          string
 		Model                   string
 		System                  []struct {
 			Type string `json:"type"`
@@ -6298,6 +6299,9 @@ func TestGatewayClaudeCodeReverseProxyUsesOfficialClientMessagesShape(t *testing
 				Type string `json:"type"`
 				Text string `json:"text"`
 			} `json:"system"`
+			Metadata struct {
+				UserID string `json:"user_id"`
+			} `json:"metadata"`
 			MaxTokens int `json:"max_tokens"`
 			Messages  []struct {
 				Content string `json:"content"`
@@ -6322,6 +6326,7 @@ func TestGatewayClaudeCodeReverseProxyUsesOfficialClientMessagesShape(t *testing
 			StainlessArch:           r.Header.Get("x-stainless-arch"),
 			SessionID:               r.Header.Get("x-claude-code-session-id"),
 			ClientRequestID:         r.Header.Get("x-client-request-id"),
+			MetadataUserID:          payload.Metadata.UserID,
 			Model:                   payload.Model,
 			System:                  payload.System,
 			MaxTokens:               payload.MaxTokens,
@@ -6342,10 +6347,10 @@ func TestGatewayClaudeCodeReverseProxyUsesOfficialClientMessagesShape(t *testing
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp420-claude-code","display_name":"WP420 Claude Code","adapter_type":"reverse-proxy-claude-code-cli","protocol":"anthropic-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp420-claude-code-model","display_name":"WP420 Claude Code Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"claude-upstream","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp420-claude-code-account","runtime_class":"cli_client_token","upstream_client":"claude_code_cli","credential":{"cli_client_token":"claude-code-token"},"metadata":{"base_url":"`+upstream.URL+`/v1","user_agent":"claude-cli/2.1.63 (external, cli)","claude_code_session_id":"session-gateway-123","claude_client_request_id":"client-req-gateway-123","claude_code_version":"2.1.63","claude_code_build":"abc123"},"status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp420-claude-code-account","runtime_class":"cli_client_token","upstream_client":"claude_code_cli","credential":{"cli_client_token":"claude-code-token"},"metadata":{"base_url":"`+upstream.URL+`/v1","user_agent":"claude-cli/2.1.63 (external, cli)","claude_code_version":"2.1.63","claude_code_build":"abc123","spoof_session_id":true},"status":"active"}`)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
-	messageRec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/messages", `{"model":"wp420-claude-code-model","system":"be direct","max_tokens":64,"messages":[{"role":"user","content":"hello claude code"}]}`)
+	messageRec := mustGatewayRequestWithHeaders(t, handler, apiKey, http.MethodPost, "/v1/messages", `{"model":"wp420-claude-code-model","system":"be direct","max_tokens":64,"messages":[{"role":"user","content":"hello claude code"}]}`, map[string]string{"X-Client-Request-Id": "client-req-gateway-123"})
 	var messageResp apiopenapi.AnthropicMessagesResponse
 	if err := json.NewDecoder(messageRec.Body).Decode(&messageResp); err != nil {
 		t.Fatalf("decode messages response: %v", err)
@@ -6374,7 +6379,7 @@ func TestGatewayClaudeCodeReverseProxyUsesOfficialClientMessagesShape(t *testing
 		call.StainlessRuntimeVersion != "v24.3.0" ||
 		call.StainlessOS != expectedClaudeCodeGatewayStainlessOS() ||
 		call.StainlessArch != expectedClaudeCodeGatewayStainlessArch() ||
-		call.SessionID != "session-gateway-123" ||
+		!strings.HasPrefix(call.SessionID, "sess_") ||
 		call.ClientRequestID != "client-req-gateway-123" {
 		t.Fatalf("unexpected Claude Code upstream headers: %+v", call)
 	}
@@ -6386,6 +6391,12 @@ func TestGatewayClaudeCodeReverseProxyUsesOfficialClientMessagesShape(t *testing
 		call.System[1].Text != "You are Claude Code, Anthropic's official CLI for Claude." ||
 		call.System[2].Text != "be direct" {
 		t.Fatalf("unexpected Claude Code system blocks: %+v", call.System)
+	}
+	if len(call.SessionID) <= len("sess_") {
+		t.Fatalf("expected non-empty spoof session id, got %+v", call)
+	}
+	if call.MetadataUserID != call.SessionID {
+		t.Fatalf("expected spoof metadata.user_id to match session header, got %+v", call)
 	}
 
 	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp420-claude-code-model", nil)
@@ -10132,9 +10143,17 @@ func geminiModelMethodsContain(methods []apiopenapi.GeminiModelInfoSupportedGene
 
 func mustGatewayRequest(t *testing.T, handler http.Handler, apiKey, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
+	return mustGatewayRequestWithHeaders(t, handler, apiKey, method, path, body, nil)
+}
+
+func mustGatewayRequestWithHeaders(t *testing.T, handler http.Handler, apiKey, method, path, body string, headers map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {

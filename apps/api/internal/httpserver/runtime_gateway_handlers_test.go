@@ -638,20 +638,23 @@ func TestProviderConversationRequestCapturesCodexRequestSettings(t *testing.T) {
 	httpReq.Header.Set("X-Codex-Beta-Features", "feature-a")
 	httpReq.Header.Set("Version", "0.118.0")
 	httpReq.Header.Set("X-Client-Request-Id", "client-req-1")
+	httpReq.Header.Set("X-Claude-Code-Session-Id", "claude-session-1")
 	httpReq.Header.Set("Session_id", "session-1")
 	httpReq.Header.Set("ChatGPT-Account-ID", "account-1")
 
 	providerReq := providerConversationRequest(req, schedulercontract.Candidate{}, httpReq)
 
 	want := map[string]string{
-		"codex_turn_metadata":     `{"prompt_cache_key":"cache-1"}`,
-		"codex_window_id":         "window-body",
-		"codex_installation_id":   "install-body",
-		"codex_beta_features":     "feature-a",
-		"codex_version":           "0.118.0",
-		"codex_client_request_id": "client-req-1",
-		"codex_session_id":        "session-1",
-		"chatgpt_account_id":      "account-1",
+		"codex_turn_metadata":      `{"prompt_cache_key":"cache-1"}`,
+		"codex_window_id":          "window-body",
+		"codex_installation_id":    "install-body",
+		"codex_beta_features":      "feature-a",
+		"codex_version":            "0.118.0",
+		"codex_client_request_id":  "client-req-1",
+		"x_client_request_id":      "client-req-1",
+		"x_claude_code_session_id": "claude-session-1",
+		"codex_session_id":         "session-1",
+		"chatgpt_account_id":       "account-1",
 	}
 	for key, expected := range want {
 		if got := strings.TrimSpace(providerReq.RequestSettings[key].(string)); got != expected {

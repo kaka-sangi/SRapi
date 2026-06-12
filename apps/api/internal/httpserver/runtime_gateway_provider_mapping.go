@@ -98,6 +98,8 @@ func codexRequestSettings(headers http.Header, rawBody []byte) map[string]any {
 		{"X-Codex-Turn-Metadata", "codex_turn_metadata"},
 		{"X-Codex-Window-Id", "codex_window_id"},
 		{"X-Client-Request-Id", "codex_client_request_id"},
+		{"X-Client-Request-Id", "x_client_request_id"},
+		{"X-Claude-Code-Session-Id", "x_claude_code_session_id"},
 		{"X-ResponsesAPI-Include-Timing-Metrics", "x_responsesapi_include_timing_metrics"},
 		{"Session_id", "codex_session_id"},
 		{"session_id", "codex_session_id"},

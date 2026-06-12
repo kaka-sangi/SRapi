@@ -106,7 +106,7 @@ func claudeCodeMessagesHeaders(req contract.ConversationRequest) http.Header {
 	headers.Set("X-Stainless-Os", defaultRequestSetting(req, claudeCodeDefaultStainlessOS(), "x_stainless_os", "x-stainless-os", "X-Stainless-OS", "X-Stainless-Os", "stainless_os", "claude_code_stainless_os"))
 	headers.Set("X-Stainless-Arch", defaultRequestSetting(req, claudeCodeDefaultStainlessArch(), "x_stainless_arch", "x-stainless-arch", "X-Stainless-Arch", "stainless_arch", "claude_code_stainless_arch"))
 	headers.Set("X-Stainless-Timeout", defaultRequestSetting(req, "600", "x_stainless_timeout", "x-stainless-timeout"))
-	if sessionID := defaultRequestSetting(req, req.RequestID, "claude_code_session_id", "x_claude_code_session_id", "X-Claude-Code-Session-Id", "session_id"); sessionID != "" {
+	if sessionID := claudeCodeSessionID(req); sessionID != "" {
 		headers.Set("X-Claude-Code-Session-Id", sessionID)
 	}
 	if clientRequestID := defaultRequestSetting(req, req.RequestID, "claude_client_request_id", "x_client_request_id", "X-Client-Request-Id", "x-client-request-id"); clientRequestID != "" {
@@ -134,10 +134,14 @@ func claudeCodeMessagesPayload(req contract.ConversationRequest, raw []byte) ([]
 		return nil, err
 	}
 	if firstSystemTextHasPrefix(payload["system"], "x-anthropic-billing-header:") {
-		return raw, nil
+		return applyPayloadTransforms(raw, req.PayloadTransforms)
 	}
 	payload["system"] = claudeCodeSystemBlocks(req, raw, payload["system"])
-	return json.Marshal(payload)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return applyPayloadTransforms(raw, req.PayloadTransforms)
 }
 
 func claudeCodeTokenCountPayload(req contract.TokenCountRequest, raw []byte) ([]byte, error) {
@@ -156,6 +160,16 @@ func tokenCountTextRequest(req contract.TokenCountRequest) contract.Conversation
 		Credential:      req.Credential,
 		RequestSettings: req.RequestSettings,
 	}
+}
+
+func claudeCodeSessionID(req contract.ConversationRequest) string {
+	if sessionID := requestSetting(req, "claude_code_session_id", "x_claude_code_session_id", "X-Claude-Code-Session-Id", "session_id"); sessionID != "" {
+		return sessionID
+	}
+	if spoof := strings.TrimSpace(req.SpoofSessionID); spoof != "" {
+		return spoof
+	}
+	return strings.TrimSpace(req.RequestID)
 }
 
 func claudeCodeDefaultStainlessOS() string {

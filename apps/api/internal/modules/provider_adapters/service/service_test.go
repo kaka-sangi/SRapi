@@ -5324,6 +5324,55 @@ func TestReverseProxyClaudeCodeCLIAdapterUsesOfficialClientMessagesShape(t *test
 	}
 }
 
+func TestReverseProxyClaudeCodeCLIAdapterUsesSpoofSessionIDFallback(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":1,"output_tokens":1}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:         "req_reverse_anthropic",
+		Model:             "claude-local",
+		InputParts:        textParts("hello"),
+		SpoofSessionID:    "sess_stable",
+		PayloadTransforms: []contract.PayloadTransform{{Action: "override", Path: "metadata.user_id", Value: "sess_stable"}},
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-claude-code-cli",
+			Protocol:    "anthropic-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             12,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("claude_code_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/v1", "user_agent": "Claude-Code/1.0"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke reverse anthropic adapter: %v", err)
+	}
+	if headerValue(runtime.request.Headers, "X-Claude-Code-Session-Id") != "sess_stable" {
+		t.Fatalf("expected spoof session header, got %+v", runtime.request.Headers)
+	}
+	var payload struct {
+		Metadata struct {
+			UserID string `json:"user_id"`
+		} `json:"metadata"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode runtime payload: %v", err)
+	}
+	if payload.Metadata.UserID != "sess_stable" {
+		t.Fatalf("expected spoof metadata.user_id, got %+v", payload.Metadata)
+	}
+}
+
 func TestReverseProxyClaudeCodeCLIRejectsAPIKeyRuntime(t *testing.T) {
 	runtime := capturingRuntime{}
 	svc, err := service.NewWithReverseProxy(nil, &runtime)
