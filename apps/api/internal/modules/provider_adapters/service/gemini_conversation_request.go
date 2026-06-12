@@ -25,6 +25,7 @@ type geminiContent struct {
 type geminiPart struct {
 	Text             string         `json:"text,omitempty"`
 	InlineData       map[string]any `json:"inlineData,omitempty"`
+	InlineDataSnake  map[string]any `json:"inline_data,omitempty"`
 	FileData         map[string]any `json:"fileData,omitempty"`
 	FunctionCall     map[string]any `json:"functionCall,omitempty"`
 	FunctionResponse map[string]any `json:"functionResponse,omitempty"`

@@ -105,6 +105,46 @@ func (s *Service) invokeReverseProxyAntigravity(ctx context.Context, req contrac
 	return withConversationResponseHeaders(parsed, runtimeResp.Headers), nil
 }
 
+func (s *Service) invokeReverseProxyAntigravityImageGeneration(ctx context.Context, req contract.ImageGenerationRequest, baseURL string) (contract.ImageGenerationResponse, error) {
+	if s.reverseProxy == nil {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
+	}
+	if antigravityReverseProxyImageRuntimeIsAPIKey(req) {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "antigravity reverse proxy requires OAuth/session/desktop/IDE/client-token runtime credentials"}
+	}
+	payload, err := antigravityImagePayload(req)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: antigravityReverseProxyImageAccount(req),
+		Method:  http.MethodPost,
+		URL:     strings.TrimRight(strings.TrimSpace(baseURL), "/") + antigravityGeneratePath,
+		Headers: http.Header{
+			"Accept":       {"application/json"},
+			"Content-Type": {"application/json"},
+		},
+		Body: raw,
+	})
+	if err != nil {
+		return contract.ImageGenerationResponse{}, providerErrorFromReverseProxy(err)
+	}
+	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
+		return contract.ImageGenerationResponse{}, classifyGeminiProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
+	}
+	parsed, err := parseAntigravityImageGenerationResponse(runtimeResp.Body, runtimeResp.StatusCode, req)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	parsed.Headers = cloneGenericHeaders(runtimeResp.Headers)
+	parsed.QuotaSignals = providerQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC())
+	return parsed, nil
+}
+
 func antigravityPayload(req contract.ConversationRequest) (antigravityRequest, error) {
 	projectID := requestSetting(req, "project_id", "antigravity_project_id", "cloudaicompanion_project")
 	if projectID == "" {
@@ -120,6 +160,31 @@ func antigravityPayload(req contract.ConversationRequest) (antigravityRequest, e
 		Request:     inner,
 	}
 	if antigravityCreditsEnabled(req) {
+		payload.EnabledCreditTypes = []string{"GOOGLE_ONE_AI"}
+	}
+	return payload, nil
+}
+
+func antigravityImagePayload(req contract.ImageGenerationRequest) (antigravityRequest, error) {
+	projectID := antigravityImageSetting(req, "project_id", "antigravity_project_id", "cloudaicompanion_project")
+	if projectID == "" {
+		return antigravityRequest{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "antigravity reverse proxy project_id missing"}
+	}
+	payload := antigravityRequest{
+		Project:     projectID,
+		RequestID:   antigravityImageRequestID(req),
+		UserAgent:   "antigravity",
+		RequestType: "image_gen",
+		Model:       req.Mapping.UpstreamModelName,
+		Request: antigravityGenerateTextRequest{
+			Contents: []geminiContent{{
+				Role:  "user",
+				Parts: []geminiPart{{Text: strings.TrimSpace(req.Prompt)}},
+			}},
+			SafetySettings: antigravitySafetySettings(),
+		},
+	}
+	if antigravityImageCreditsEnabled(req) {
 		payload.EnabledCreditTypes = []string{"GOOGLE_ONE_AI"}
 	}
 	return payload, nil
@@ -296,6 +361,54 @@ func parseAntigravityResponse(body []byte) (geminiGenerateContentResponse, error
 	return direct, nil
 }
 
+func parseAntigravityImageGenerationResponse(body []byte, statusCode int, req contract.ImageGenerationRequest) (contract.ImageGenerationResponse, error) {
+	decoded, err := parseAntigravityResponse(body)
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	images := antigravityImagesFromResponse(decoded, req)
+	if len(images) == 0 {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no images"}
+	}
+	return contract.ImageGenerationResponse{
+		Created:    time.Now().Unix(),
+		Data:       images,
+		Model:      strings.TrimSpace(req.Mapping.UpstreamModelName),
+		StatusCode: statusCode,
+		Usage:      decoded.Usage().ToImageUsage(req),
+	}, nil
+}
+
+func antigravityImagesFromResponse(resp geminiGenerateContentResponse, req contract.ImageGenerationRequest) []contract.Image {
+	images := make([]contract.Image, 0)
+	for _, candidate := range resp.Candidates {
+		for _, part := range candidate.Content.Parts {
+			inlineData := part.InlineData
+			if len(inlineData) == 0 {
+				inlineData = part.InlineDataSnake
+			}
+			data := strings.TrimSpace(mapString(inlineData, "data"))
+			if data == "" {
+				continue
+			}
+			mimeType := firstNonEmpty(mapString(inlineData, "mimeType"), mapString(inlineData, "mime_type"))
+			if mimeType == "" {
+				mimeType = "image/png"
+			}
+			image := contract.Image{
+				Metadata: map[string]any{"mime_type": mimeType},
+			}
+			if strings.EqualFold(strings.TrimSpace(req.ResponseFormat), "b64_json") {
+				image.Base64JSON = data
+			} else {
+				image.URL = "data:" + mimeType + ";base64," + data
+			}
+			images = append(images, image)
+		}
+	}
+	return images
+}
+
 func geminiUsageMetadataPresent(usage geminiUsageMetadata) bool {
 	return usage.PromptTokenCount != nil ||
 		usage.CandidatesTokenCount != nil ||
@@ -386,6 +499,42 @@ func antigravityReverseProxyRuntimeIsAPIKey(req contract.ConversationRequest) bo
 	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
 }
 
+func antigravityReverseProxyImageRuntimeIsAPIKey(req contract.ImageGenerationRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
+}
+
+func antigravityReverseProxyImageAccount(req contract.ImageGenerationRequest) reverseproxycontract.AccountRuntime {
+	upstreamClient := req.Account.UpstreamClient
+	if upstreamClient == nil || strings.TrimSpace(*upstreamClient) == "" {
+		value := "antigravity_desktop"
+		upstreamClient = &value
+	}
+	return reverseproxycontract.AccountRuntime{
+		AccountID:      req.Account.ID,
+		RuntimeClass:   string(req.Account.RuntimeClass),
+		UpstreamClient: upstreamClient,
+		ProxyID:        req.Account.ProxyID,
+		UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+		Metadata:       req.Account.Metadata,
+		Credential:     req.Credential,
+	}
+}
+
+func isAntigravityImageGenerationReverseProxy(req contract.ImageGenerationRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-antigravity")
+}
+
+func antigravityImageCreditsEnabled(req contract.ImageGenerationRequest) bool {
+	for _, values := range []map[string]any{req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range []string{"antigravity_credits_enabled", "antigravity_credits", "antigravity-credits"} {
+			if mapBool(values, key) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func antigravityRequestType(req contract.ConversationRequest) string {
 	if value := requestSetting(req, "antigravity_request_type", "request_type"); value != "" {
 		return value
@@ -406,6 +555,13 @@ func antigravityRequestID(req contract.ConversationRequest) string {
 	return "agent-" + randomHex(16)
 }
 
+func antigravityImageRequestID(req contract.ImageGenerationRequest) string {
+	if value := antigravityImageSetting(req, "antigravity_request_id", "request_id"); value != "" {
+		return value
+	}
+	return fmt.Sprintf("image_gen/%s/%s/12", strconv.FormatInt(timeNowMillis(), 10), randomHex(16))
+}
+
 func antigravitySessionID(req contract.ConversationRequest) string {
 	if value := requestSetting(req, "antigravity_session_id", "session_id"); value != "" {
 		return value
@@ -418,6 +574,17 @@ func antigravitySessionID(req contract.ConversationRequest) string {
 		}
 	}
 	return "-" + strconv.FormatInt(timeNowMillis(), 10)
+}
+
+func antigravityImageSetting(req contract.ImageGenerationRequest, keys ...string) string {
+	for _, values := range []map[string]any{req.Extra, req.Account.Metadata, req.Credential, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range keys {
+			if value := mapString(values, key); value != "" {
+				return value
+			}
+		}
+	}
+	return ""
 }
 
 func antigravityInnerContentsForSession(req contract.ConversationRequest) []string {

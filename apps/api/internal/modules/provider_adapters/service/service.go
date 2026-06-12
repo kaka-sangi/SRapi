@@ -181,6 +181,9 @@ func (s *Service) InvokeImageGeneration(ctx context.Context, req contract.ImageG
 	}
 	if baseURL := upstreamBaseURLImages(req); baseURL != "" {
 		if isReverseProxyImageRuntime(req) {
+			if isAntigravityImageGenerationReverseProxy(req) {
+				return s.invokeReverseProxyAntigravityImageGeneration(ctx, req, baseURL)
+			}
 			if isCodexImageGenerationReverseProxy(req) {
 				return s.invokeReverseProxyCodexImageGeneration(ctx, req, baseURL)
 			}

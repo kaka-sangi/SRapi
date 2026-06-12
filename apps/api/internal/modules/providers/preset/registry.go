@@ -490,6 +490,7 @@ func rerankCapabilities() map[string]bool {
 func antigravityCapabilities() map[string]bool {
 	return map[string]bool{
 		capabilitiescontract.KeyChatCompletions:  true,
+		capabilitiescontract.KeyImages:           true,
 		capabilitiescontract.KeyMessages:         true,
 		capabilitiescontract.KeyStreaming:        true,
 		capabilitiescontract.KeyToolCalling:      true,

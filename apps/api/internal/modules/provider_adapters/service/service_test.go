@@ -10419,6 +10419,123 @@ func TestReverseProxyAntigravityCleansToolSchemas(t *testing.T) {
 	}
 }
 
+func TestReverseProxyAntigravityImageGenerationDispatchesNativeImageRequest(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"response":{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"aW1hZ2U="}}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":7}}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID:      "req_antigravity_image",
+		Model:          "gemini-3-pro-image",
+		Prompt:         "draw a control room",
+		ResponseFormat: "url",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "gemini-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             16,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-3.1-flash-image"},
+		Credential: map[string]any{"access_token": "antigravity-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke antigravity image generation: %v", err)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].URL != "data:image/png;base64,aW1hZ2U=" || resp.Data[0].Base64JSON != "" {
+		t.Fatalf("unexpected antigravity image response: %+v", resp)
+	}
+	if resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 7 || resp.Usage.ImageOutputTokens != 7 || resp.Usage.Estimated {
+		t.Fatalf("unexpected antigravity image usage: %+v", resp.Usage)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/v1internal:generateContent" {
+		t.Fatalf("unexpected antigravity image request: %+v", runtime.request)
+	}
+	if runtime.request.Headers.Get("Authorization") != "" || runtime.request.Headers.Get("Content-Type") != "application/json" {
+		t.Fatalf("adapter should leave antigravity image auth injection to runtime, got %+v", runtime.request.Headers)
+	}
+	var payload struct {
+		Project     string `json:"project"`
+		RequestID   string `json:"requestId"`
+		UserAgent   string `json:"userAgent"`
+		RequestType string `json:"requestType"`
+		Model       string `json:"model"`
+		Request     struct {
+			Contents []struct {
+				Role  string `json:"role"`
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"contents"`
+			SessionID string `json:"sessionId"`
+		} `json:"request"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode antigravity image payload: %v", err)
+	}
+	if payload.Project != "project-1" ||
+		!strings.HasPrefix(payload.RequestID, "image_gen/") ||
+		payload.UserAgent != "antigravity" ||
+		payload.RequestType != "image_gen" ||
+		payload.Model != "gemini-3.1-flash-image" ||
+		payload.Request.SessionID != "" ||
+		len(payload.Request.Contents) != 1 ||
+		payload.Request.Contents[0].Role != "user" ||
+		len(payload.Request.Contents[0].Parts) != 1 ||
+		payload.Request.Contents[0].Parts[0].Text != "draw a control room" {
+		t.Fatalf("unexpected antigravity image payload: %+v", payload)
+	}
+}
+
+func TestReverseProxyAntigravityImageGenerationParsesSnakeCaseInlineData(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"response":{"candidates":[{"content":{"parts":[{"inline_data":{"mime_type":"image/webp","data":"d2VicA=="}}]}}]}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID:      "req_antigravity_image_snake",
+		Model:          "gemini-3-pro-image",
+		Prompt:         "draw a compact icon",
+		ResponseFormat: "b64_json",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "gemini-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             16,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-3.1-flash-image"},
+		Credential: map[string]any{"access_token": "antigravity-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke antigravity image generation: %v", err)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].Base64JSON != "d2VicA==" || resp.Data[0].URL != "" || resp.Data[0].Metadata["mime_type"] != "image/webp" {
+		t.Fatalf("unexpected snake_case antigravity image response: %+v", resp)
+	}
+	if !resp.Usage.Estimated {
+		t.Fatalf("expected usage to be estimated without upstream token metadata, got %+v", resp.Usage)
+	}
+}
+
 func TestReverseProxyAntigravityRejectsAPIKeyRuntime(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

@@ -647,6 +647,15 @@ func (u geminiUsageMetadata) ToUsage(text string) contract.Usage {
 	}
 }
 
+func (u geminiUsageMetadata) ToImageUsage(req contract.ImageGenerationRequest) contract.Usage {
+	usage := u.ToUsage(req.Prompt)
+	if usage.Estimated {
+		return estimatedImageUsage(req)
+	}
+	usage.ImageOutputTokens = usage.OutputTokens
+	return usage
+}
+
 func (u *geminiUsageMetadata) Merge(next geminiUsageMetadata) {
 	if u == nil {
 		return

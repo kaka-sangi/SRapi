@@ -177,7 +177,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 			t.Fatalf("expected antigravity supported_models to include %s, got %+v", want, antigravitySupportedModels)
 		}
 	}
-	if !antigravityPreset.Capabilities["chat_completions"] || !antigravityPreset.Capabilities["messages"] || antigravityPreset.Capabilities["embeddings"] {
+	if !antigravityPreset.Capabilities["chat_completions"] || !antigravityPreset.Capabilities["messages"] || !antigravityPreset.Capabilities["images"] || antigravityPreset.Capabilities["embeddings"] {
 		t.Fatalf("unexpected antigravity capabilities: %+v", antigravityPreset.Capabilities)
 	}
 
