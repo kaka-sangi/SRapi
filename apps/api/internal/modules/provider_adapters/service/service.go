@@ -176,6 +176,9 @@ func (s *Service) InvokeImageGeneration(ctx context.Context, req contract.ImageG
 	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" || strings.TrimSpace(req.Prompt) == "" {
 		return contract.ImageGenerationResponse{}, ErrInvalidInput
 	}
+	if imageGenerationDisabledForImages(req) {
+		return contract.ImageGenerationResponse{}, imageGenerationDisabledError()
+	}
 	if baseURL := upstreamBaseURLImages(req); baseURL != "" {
 		if isReverseProxyImageRuntime(req) {
 			if isCodexImageGenerationReverseProxy(req) {

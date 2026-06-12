@@ -20,6 +20,9 @@ func (s *Service) InvokeImageEdit(ctx context.Context, req contract.ImageEditReq
 	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" || strings.TrimSpace(req.Prompt) == "" || len(req.Images) == 0 {
 		return contract.ImageGenerationResponse{}, ErrInvalidInput
 	}
+	if imageGenerationDisabledForImageEdit(req) {
+		return contract.ImageGenerationResponse{}, imageGenerationDisabledError()
+	}
 	if baseURL := upstreamBaseURLImageEdits(req); baseURL != "" {
 		for _, image := range req.Images {
 			if len(image.Bytes) == 0 {

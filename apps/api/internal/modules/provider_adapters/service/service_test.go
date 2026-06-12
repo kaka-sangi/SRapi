@@ -647,6 +647,59 @@ func TestNativeOpenAIAdapterNormalizesResponsesImageGenerationToolAliases(t *tes
 	}
 }
 
+func TestNativeOpenAIAdapterDisableImageGenerationFiltersResponsesPayload(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload["tool_choice"] != nil {
+			t.Fatalf("expected image_generation tool_choice to be removed, got %+v", payload["tool_choice"])
+		}
+		tools, _ := payload["tools"].([]any)
+		if len(tools) != 1 {
+			t.Fatalf("expected only non-image tool to remain, got %+v", payload["tools"])
+		}
+		tool, _ := tools[0].(map[string]any)
+		if tool["type"] != "function" || tool["name"] != "lookup" {
+			t.Fatalf("expected function tool to remain, got %+v", tool)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"resp_no_image","object":"response","status":"completed","output_text":"ok","usage":{"input_tokens":2,"output_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_native_openai_disable_image_generation",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("draw image"),
+		RawBody: []byte(`{
+			"model":"gpt-local",
+			"input":"draw image",
+			"stream":false,
+			"tools":[{"type":"image_generation","format":"webp"},{"type":"function","name":"lookup"}],
+			"tool_choice":{"type":"image_generation"}
+		}`),
+		Provider: providercontract.Provider{AdapterType: "native-openai", Protocol: "openai-compatible"},
+		Account: accountcontract.ProviderAccount{Metadata: map[string]any{
+			"base_url":                 upstream.URL + "/v1",
+			"disable_image_generation": true,
+		}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke native OpenAI Responses upstream: %v", err)
+	}
+}
+
 func TestNativeOpenAIAdapterNormalizesCanonicalResponsesImageGenerationToolAliases(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload map[string]any
@@ -7823,6 +7876,130 @@ func TestReverseProxyCodexCLIAdapterRejectsSparkImageGenerationBridge(t *testing
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterAllowsImagesEndpointWhenImageGenerationDisabledForChat(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"ig_1\",\"type\":\"image_generation_call\",\"status\":\"completed\",\"result\":\"aW1hZ2U=\",\"output_format\":\"png\"}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID:      "req_codex_image_chat_disable_allowed",
+		SourceEndpoint: "/v1/images/generations",
+		Model:          "gpt-image-1",
+		Prompt:         "paint a quiet control room",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             903,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata: map[string]any{
+				"base_url":                 "https://upstream.example/backend-api/codex",
+				"disable_image_generation": "chat",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.4"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex image generation bridge: %v", err)
+	}
+	if runtime.request.URL != "https://upstream.example/backend-api/codex/responses" {
+		t.Fatalf("chat mode should allow images endpoint runtime dispatch, got %+v", runtime.request)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].Base64JSON != "aW1hZ2U=" {
+		t.Fatalf("unexpected codex image response: %+v", resp)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterAccountCanOverrideProviderImageGenerationDisable(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"ig_1\",\"type\":\"image_generation_call\",\"status\":\"completed\",\"result\":\"aW1hZ2U=\",\"output_format\":\"png\"}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID:      "req_codex_image_account_override_disable",
+		SourceEndpoint: "/v1/images/generations",
+		Model:          "gpt-image-1",
+		Prompt:         "paint a quiet control room",
+		Provider: providercontract.Provider{
+			AdapterType:  "reverse-proxy-codex-cli",
+			Protocol:     "openai-compatible",
+			ConfigSchema: map[string]any{"disable_image_generation": true},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             905,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata: map[string]any{
+				"base_url":                 "https://upstream.example/backend-api/codex",
+				"disable_image_generation": false,
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.4"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("account metadata should override provider image generation disable: %v", err)
+	}
+	if runtime.request.URL != "https://upstream.example/backend-api/codex/responses" {
+		t.Fatalf("account override should allow runtime dispatch, got %+v", runtime.request)
+	}
+}
+
+func TestAdapterRejectsImagesEndpointWhenImageGenerationDisabledEverywhere(t *testing.T) {
+	runtime := capturingRuntime{}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	reqAccount := accountcontract.ProviderAccount{
+		ID:             904,
+		RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+		UpstreamClient: ptrString("codex_cli"),
+		Metadata: map[string]any{
+			"base_url":                 "https://upstream.example/backend-api/codex",
+			"disable_image_generation": true,
+		},
+	}
+	_, err = svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID:      "req_codex_image_disabled_everywhere",
+		SourceEndpoint: "/v1/images/generations",
+		Model:          "gpt-image-1",
+		Prompt:         "paint a quiet control room",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account:    reqAccount,
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.4"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	assertProviderError(t, err, "not_supported", http.StatusBadRequest)
+	if runtime.request.URL != "" {
+		t.Fatalf("disabled image generation should be rejected before runtime dispatch, got %+v", runtime.request)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterUsesDefaultTextModelForImageOnlyMapping(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
@@ -9153,6 +9330,71 @@ func TestReverseProxyCodexCLIAdapterAccountCanDisableProviderImageGenerationBrid
 	instructions, _ := payload["instructions"].(string)
 	if strings.Contains(instructions, "<srapi-codex-image-generation>") {
 		t.Fatalf("account override should disable bridge instructions, got %q", instructions)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterDisableImageGenerationRemovesClientTool(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"no image tool\"}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_disable_image_generation_client_tool",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		Model:          "codex-local",
+		RawBody: []byte(`{
+			"model":"codex-local",
+			"input":"draw",
+			"tools":[{"type":"image_generation","format":"png"},{"type":"function","name":"lookup"}],
+			"tool_choice":{"type":"tool","name":"image_generation"}
+		}`),
+		Provider: providercontract.Provider{
+			AdapterType:  "reverse-proxy-codex-cli",
+			Protocol:     "openai-compatible",
+			ConfigSchema: map[string]any{"codex_image_generation_bridge_enabled": true},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             2603,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata: map[string]any{
+				"base_url":                 "https://upstream.example/backend-api/codex",
+				"disable_image_generation": true,
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.4"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode codex payload: %v", err)
+	}
+	if payload["tool_choice"] != nil {
+		t.Fatalf("expected image_generation tool_choice to be removed, got %+v", payload["tool_choice"])
+	}
+	if codexResponseTestToolsContainType(payload["tools"], "image_generation") {
+		t.Fatalf("disable_image_generation should remove image_generation tool, got %+v", payload["tools"])
+	}
+	tools, _ := payload["tools"].([]any)
+	if len(tools) != 1 {
+		t.Fatalf("expected function tool to remain, got %+v", payload["tools"])
+	}
+	instructions, _ := payload["instructions"].(string)
+	if strings.Contains(instructions, "<srapi-codex-image-generation>") {
+		t.Fatalf("disable_image_generation should suppress bridge instructions, got %q", instructions)
 	}
 }
 

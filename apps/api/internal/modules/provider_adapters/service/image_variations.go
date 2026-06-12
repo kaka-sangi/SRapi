@@ -19,6 +19,9 @@ func (s *Service) InvokeImageVariation(ctx context.Context, req contract.ImageVa
 	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" || len(req.Image.Bytes) == 0 {
 		return contract.ImageGenerationResponse{}, ErrInvalidInput
 	}
+	if imageGenerationDisabledForImageVariation(req) {
+		return contract.ImageGenerationResponse{}, imageGenerationDisabledError()
+	}
 	if baseURL := upstreamBaseURLImageVariations(req); baseURL != "" {
 		if isReverseProxyImageVariationRuntime(req) {
 			return s.invokeReverseProxyOpenAICompatibleImageVariation(ctx, req, baseURL)

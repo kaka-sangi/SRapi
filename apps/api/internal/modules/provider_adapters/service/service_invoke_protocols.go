@@ -827,6 +827,7 @@ func openAIResponsesBody(req contract.ConversationRequest) ([]byte, error) {
 			return nil, err
 		}
 		normalizeOpenAIResponsesImageGenerationTools(payload)
+		applyDisableImageGenerationToResponsesPayload(req, payload)
 		return json.Marshal(payload)
 	}
 	payload := openAICanonicalResponsesPayload(req)
@@ -835,6 +836,7 @@ func openAIResponsesBody(req contract.ConversationRequest) ([]byte, error) {
 		return nil, err
 	}
 	normalizeOpenAIResponsesImageGenerationTools(payload)
+	applyDisableImageGenerationToResponsesPayload(req, payload)
 	return json.Marshal(payload)
 }
 

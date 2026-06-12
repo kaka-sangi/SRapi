@@ -276,7 +276,9 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 	if !codexResponsesCompactRequest(req) {
 		codexApplyImageGenerationBridgeTool(req, payload)
 	}
+	applyDisableImageGenerationToResponsesPayload(req, payload)
 	codexNormalizeResponsesTools(payload)
+	applyDisableImageGenerationToResponsesPayload(req, payload)
 	if !codexResponsesCompactRequest(req) {
 		codexEnsureResponsesInstructions(req, payload)
 		codexApplyImageGenerationInstructions(payload)
@@ -316,7 +318,7 @@ func codexApplyImageGenerationInstructions(payload map[string]any) {
 }
 
 func codexApplyImageGenerationBridgeTool(req contract.ConversationRequest, payload map[string]any) {
-	if payload == nil || !codexImageGenerationBridgeEnabled(req) {
+	if payload == nil || !codexImageGenerationBridgeEnabled(req) || imageGenerationDisabledForConversation(req) {
 		return
 	}
 	if contract.NormalizeCodexUpstreamModelName(codexStringValue(payload["model"])) == "gpt-5.3-codex-spark" {
