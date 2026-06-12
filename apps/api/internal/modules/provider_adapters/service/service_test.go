@@ -2657,6 +2657,47 @@ func TestAnthropicCompatibleAdapterCapturesQuotaSignalsFromErrorHeaders(t *testi
 	assertQuotaSignal(t, providerErr.QuotaSignals, "anthropic_7d", "40", "60", "100", 0.6)
 }
 
+func TestAnthropicCompatibleAdapterCapturesSplitQuotaHeadersFromErrorHeaders(t *testing.T) {
+	reset5h := time.Now().UTC().Add(5 * time.Minute).Truncate(time.Second)
+	reset7d := time.Now().UTC().Add(30 * time.Minute).Truncate(time.Second)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("anthropic-ratelimit-unified-5h-utilization", "1.02")
+		w.Header().Set("anthropic-ratelimit-unified-5h-reset", strconv.FormatInt(reset5h.Unix(), 10))
+		w.Header().Set("anthropic-ratelimit-unified-7d-utilization", "0.32")
+		w.Header().Set("anthropic-ratelimit-unified-7d-reset", strconv.FormatInt(reset7d.Unix(), 10))
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"split quota exceeded"}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_anthropic_split_rate_limit_headers",
+		Model:      "claude-local",
+		InputParts: textParts("hello"),
+		Provider:   providercontract.Provider{Protocol: "anthropic-compatible"},
+		Account: accountcontract.ProviderAccount{
+			Metadata: map[string]any{"base_url": upstream.URL},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+
+	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	if providerErr.RetryAfter == nil || !providerErr.RetryAfter.Equal(reset5h) {
+		t.Fatalf("expected Anthropic split 5h RetryAfter %s, got %+v", reset5h.Format(time.RFC3339), providerErr)
+	}
+	if len(providerErr.QuotaSignals) != 2 {
+		t.Fatalf("expected Anthropic split quota signals on provider error, got %+v", providerErr.QuotaSignals)
+	}
+	assertQuotaSignal(t, providerErr.QuotaSignals, "anthropic_5h", "100", "0", "100", 0)
+	assertQuotaSignal(t, providerErr.QuotaSignals, "anthropic_7d", "32", "68", "100", 0.68)
+}
+
 func TestOpenAICompatibleAdapterClassifiesRateLimitResetsInSeconds(t *testing.T) {
 	before := time.Now().UTC()
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

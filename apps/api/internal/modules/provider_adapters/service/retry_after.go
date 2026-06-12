@@ -20,6 +20,9 @@ func providerRetryAfter(headers http.Header, body []byte, now time.Time) *time.T
 	if resetAt := retryAfterFromHeader(headers, now); resetAt != nil {
 		return resetAt
 	}
+	if resetAt := anthropicRetryAfterFromHeaders(headers, now); resetAt != nil {
+		return resetAt
+	}
 	return codexRetryAfterFromHeaders(headers, now)
 }
 
