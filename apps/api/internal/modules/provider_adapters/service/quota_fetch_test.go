@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"io"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -432,6 +433,7 @@ func TestFetchAccountQuotaMapsCodexAccountsCheckPlan(t *testing.T) {
 }
 
 func TestFetchAccountQuotaAntigravityUsesProjectHeaderAndSupportsQuota(t *testing.T) {
+	var gotMethod, gotBody, gotContentType string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer antigravity-access-token" {
 			t.Fatalf("unexpected auth header %q", got)
@@ -439,6 +441,10 @@ func TestFetchAccountQuotaAntigravityUsesProjectHeaderAndSupportsQuota(t *testin
 		if got := r.Header.Get("x-goog-user-project"); got != "project-1" {
 			t.Fatalf("unexpected project header %q", got)
 		}
+		gotMethod = r.Method
+		gotContentType = r.Header.Get("Content-Type")
+		raw, _ := io.ReadAll(r.Body)
+		gotBody = string(raw)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
 			"account_plan": {
@@ -473,6 +479,8 @@ func TestFetchAccountQuotaAntigravityUsesProjectHeaderAndSupportsQuota(t *testin
 				"quota_credits_limit_path":     "account_plan.subscription_plan.limit",
 				"quota_currency_path":          "account_plan.subscription_plan.currency",
 				"quota_headers":                map[string]any{"x-goog-user-project": "{{project_id}}"},
+				"quota_method":                 "POST",
+				"quota_body":                   map[string]any{"metadata": map[string]any{"ideType": "ANTIGRAVITY"}},
 				"auth_mode":                    "bearer",
 			},
 		},
@@ -491,6 +499,9 @@ func TestFetchAccountQuotaAntigravityUsesProjectHeaderAndSupportsQuota(t *testin
 	}
 	if !report.Supported || report.Source != "endpoint" || report.Plan != "antigravity-pro" || report.CreditsRemaining != "42" || report.CreditsUsed != "8" || report.CreditsLimit != "50" || report.Currency != "credits" {
 		t.Fatalf("unexpected antigravity quota report: %+v", report)
+	}
+	if gotMethod != http.MethodPost || gotBody != `{"metadata":{"ideType":"ANTIGRAVITY"}}` || gotContentType != "application/json" {
+		t.Fatalf("unexpected antigravity quota request method=%q content-type=%q body=%s", gotMethod, gotContentType, gotBody)
 	}
 }
 

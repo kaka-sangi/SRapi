@@ -62,7 +62,11 @@ func (s *Service) fetchAccountQuotaUncached(ctx context.Context, req contract.Pr
 	if method == "" {
 		method = http.MethodGet
 	}
-	status, body, respHeaders, err := s.doQuotaFetch(ctx, req.Account, method, endpoint, headers)
+	requestBody, err := quotaRequestBody(quotaConfigMaps(req))
+	if err != nil {
+		return report, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "invalid quota fetch request body"}
+	}
+	status, body, respHeaders, err := s.doQuotaFetch(ctx, req.Account, method, endpoint, headers, requestBody)
 	if err != nil {
 		return report, err
 	}
@@ -100,12 +104,15 @@ func (s *Service) fetchAccountQuotaUncached(ctx context.Context, req contract.Pr
 	return report, nil
 }
 
-func (s *Service) doQuotaFetch(ctx context.Context, account accountcontract.ProviderAccount, method, endpoint string, headers http.Header) (int, []byte, http.Header, error) {
-	httpReq, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(nil))
+func (s *Service) doQuotaFetch(ctx context.Context, account accountcontract.ProviderAccount, method, endpoint string, headers http.Header, requestBody []byte) (int, []byte, http.Header, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(requestBody))
 	if err != nil {
 		return 0, nil, nil, err
 	}
 	httpReq.Header = headers
+	if len(requestBody) > 0 && httpReq.Header.Get("Content-Type") == "" {
+		httpReq.Header.Set("Content-Type", "application/json")
+	}
 	resp, err := s.egressHTTPClient(account, nil).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -169,6 +176,10 @@ func codexQuotaHeaders(req contract.ProbeRequest) (http.Header, error) {
 
 func quotaConfigMaps(req contract.ProbeRequest) []map[string]any {
 	return []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities}
+}
+
+func quotaRequestBody(values []map[string]any) ([]byte, error) {
+	return configuredJSONBody(values, "quota body", "quota_body", "subscription_body", "credits_body")
 }
 
 func mergeQuotaHeaders(headers http.Header, req contract.ProbeRequest) {

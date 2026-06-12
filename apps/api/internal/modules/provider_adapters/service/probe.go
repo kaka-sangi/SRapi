@@ -265,7 +265,11 @@ func mergeProbeHeaders(headers http.Header, overrides map[string]string) {
 }
 
 func probeBody(values []map[string]any) ([]byte, error) {
-	raw := firstMapValue(values, "health_probe_body", "probe_body")
+	return configuredJSONBody(values, "probe body", "health_probe_body", "probe_body")
+}
+
+func configuredJSONBody(values []map[string]any, label string, keys ...string) ([]byte, error) {
+	raw := firstMapValue(values, keys...)
 	if raw == nil {
 		return nil, nil
 	}
@@ -276,12 +280,12 @@ func probeBody(values []map[string]any) ([]byte, error) {
 			return nil, nil
 		}
 		if !json.Valid([]byte(value)) {
-			return nil, errors.New("probe body must be valid json")
+			return nil, errors.New(label + " must be valid json")
 		}
 		return []byte(value), nil
 	case []byte:
 		if !json.Valid(value) {
-			return nil, errors.New("probe body must be valid json")
+			return nil, errors.New(label + " must be valid json")
 		}
 		return append([]byte(nil), value...), nil
 	default:

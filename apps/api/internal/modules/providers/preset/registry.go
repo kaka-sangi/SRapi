@@ -289,7 +289,9 @@ func antigravityPreset() Preset {
 		},
 	}
 	preset.QuotaConfig = map[string]string{
-		"quota_url":                    "https://cloudcode-pa.googleapis.com/v1internal:quota",
+		"quota_url":                    "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
+		"quota_method":                 "POST",
+		"quota_body":                   `{"metadata":{"ideType":"ANTIGRAVITY"}}`,
 		"quota_credits_remaining_path": "account_plan.subscription_plan.allowance",
 		"quota_credits_used_path":      "account_plan.subscription_plan.usage",
 		"quota_credits_limit_path":     "account_plan.subscription_plan.limit",

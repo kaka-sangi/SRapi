@@ -180,6 +180,11 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !antigravityPreset.Capabilities["chat_completions"] || !antigravityPreset.Capabilities["messages"] || !antigravityPreset.Capabilities["images"] || antigravityPreset.Capabilities["embeddings"] {
 		t.Fatalf("unexpected antigravity capabilities: %+v", antigravityPreset.Capabilities)
 	}
+	if antigravityPreset.QuotaConfig["quota_url"] != "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist" ||
+		antigravityPreset.QuotaConfig["quota_method"] != "POST" ||
+		antigravityPreset.QuotaConfig["quota_body"] != `{"metadata":{"ideType":"ANTIGRAVITY"}}` {
+		t.Fatalf("unexpected antigravity quota config: %+v", antigravityPreset.QuotaConfig)
+	}
 
 	bedrockPreset, ok := registry.Lookup("bedrock")
 	if !ok {
