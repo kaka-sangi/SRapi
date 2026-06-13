@@ -313,6 +313,16 @@ export const zh: Messages = {
     passwordHint: "至少 8 个字符。",
     submit: "创建所有者并继续",
   },
+  tour: {
+    quickSetupTitle: "快速配置",
+    quickSetupContent: "从这里开始添加第一个上游服务商。选择平台、粘贴 API Key，SRapi 帮你搞定其余一切。",
+    accountsTitle: "上游账号",
+    accountsContent: "所有上游 API 账号都在这里。一目了然地查看健康状态、配额和熔断器。",
+    modelsTitle: "模型注册",
+    modelsContent: "网关支持的全部模型。创建别名、设置速率限制、映射到不同供应商。",
+    searchTitle: "命令面板",
+    searchContent: "按 Cmd+K（或 Ctrl+K）即可跳转到任意页面。在管理控制台的任何位置都能使用。",
+  },
   diagnostics: {
     title: "运行时诊断",
     circuitBreakers: "熔断器",

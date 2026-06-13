@@ -19,6 +19,7 @@ import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { useAdminDashboard, useAccountsHealthSummary } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { ADMIN_ROUTES } from "@/lib/routes";
+import { AdminTourTrigger } from "@/components/onboarding/admin-tour";
 import { cn } from "@/lib/cn";
 import {
   formatInteger,
@@ -50,6 +51,7 @@ const rise = (i: number) => ({ "--stagger-index": i }) as CSSProperties;
 export default function AdminDashboardPage() {
   return (
     <AppShell allowedRole="admin">
+      <AdminTourTrigger />
       <DashboardContent />
     </AppShell>
   );

@@ -40,6 +40,13 @@ function firstString(...values: unknown[]): string {
   return "";
 }
 
+const TOUR_TAGS: Record<string, string> = {
+  "/admin/quick-setup": "nav-quick-setup",
+  "/admin/accounts": "nav-accounts",
+  "/admin/models": "nav-models",
+  "/admin/providers": "nav-providers",
+};
+
 export function SidebarNav({
   role,
   onNavigate,
@@ -68,12 +75,14 @@ export function SidebarNav({
           {section.items.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
+            const tourTag = TOUR_TAGS[item.href];
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
+                data-tour={tourTag}
                 className={cn(
                   "flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors",
                   active

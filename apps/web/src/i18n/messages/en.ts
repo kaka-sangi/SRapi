@@ -313,6 +313,16 @@ export const en = {
     passwordHint: "At least 8 characters.",
     submit: "Create owner & continue",
   },
+  tour: {
+    quickSetupTitle: "Quick Setup",
+    quickSetupContent: "Start here to add your first upstream provider. Pick a platform, paste an API key, and SRapi handles the rest.",
+    accountsTitle: "Provider Accounts",
+    accountsContent: "Your upstream API accounts live here. Monitor health, quota, and circuit breaker status at a glance.",
+    modelsTitle: "Model Registry",
+    modelsContent: "All models available through the gateway. Create aliases, set rate limits, and map models to providers.",
+    searchTitle: "Command Palette",
+    searchContent: "Press Cmd+K (or Ctrl+K) to jump to any page instantly. Works from anywhere in the admin console.",
+  },
   diagnostics: {
     title: "Runtime diagnostics",
     circuitBreakers: "Circuit breakers",
