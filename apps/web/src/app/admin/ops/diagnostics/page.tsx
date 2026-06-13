@@ -156,10 +156,10 @@ function DiagnosticsContent() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleReset(entry.account_id)}
-                          disabled={resetMut.isPending}
+                          loading={resetMut.isPending}
                         >
                           <RotateCcw className="mr-1 size-3" />
-                          Reset
+                          {t("common.reset")}
                         </Button>
                       )}
                     </div>

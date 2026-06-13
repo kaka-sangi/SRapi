@@ -6,6 +6,7 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { UserPlatformQuotasDialog } from "@/components/admin/user-platform-quotas-dialog";
 import { ListToolbar, SearchInput, FilterSelect } from "@/components/admin/list-toolbar";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -77,6 +78,8 @@ function UsersContent() {
   const [editTarget, setEditTarget] = useState<User | null>(null);
   const [balanceTarget, setBalanceTarget] = useState<User | null>(null);
   const [quotaTarget, setQuotaTarget] = useState<User | null>(null);
+  const [disableTarget, setDisableTarget] = useState<User | null>(null);
+  const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
 
   const isFiltered = Boolean(list.search || statusFilter);
 
@@ -237,7 +240,7 @@ function UsersContent() {
                 variant="outline"
                 size="sm"
                 loading={bulkEnabled.isPending}
-                onClick={() => runBulk(false)}
+                onClick={() => setBulkDisableOpen(true)}
               >
                 {t("adminUsers.disable")}
               </Button>
@@ -259,7 +262,8 @@ function UsersContent() {
               {
                 label: u.status === "disabled" ? t("adminUsers.enable") : t("adminUsers.disable"),
                 destructive: u.status !== "disabled",
-                onSelect: () => void toggleEnabled(u),
+                onSelect: () =>
+                  u.status === "disabled" ? void toggleEnabled(u) : setDisableTarget(u),
               },
             ]}
           />
@@ -321,6 +325,30 @@ function UsersContent() {
           onClose={() => setQuotaTarget(null)}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={disableTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDisableTarget(null);
+        }}
+        title={t("adminUsers.disable")}
+        body={disableTarget?.email}
+        confirmLabel={t("adminUsers.disable")}
+        successMessage={t("feedback.saved")}
+        isPending={setEnabled.isPending}
+        onConfirm={async () => {
+          if (disableTarget) await setEnabled.mutateAsync(disableTarget);
+        }}
+      />
+
+      <ConfirmDialog
+        open={bulkDisableOpen}
+        onOpenChange={setBulkDisableOpen}
+        title={t("adminUsers.disable")}
+        confirmLabel={t("adminUsers.disable")}
+        isPending={bulkEnabled.isPending}
+        onConfirm={() => runBulk(false)}
+      />
     </>
   );
 }

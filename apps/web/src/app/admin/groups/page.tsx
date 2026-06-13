@@ -381,10 +381,10 @@ function GroupFormDialog({
             ) : null}
           </div>
           <DialogFooter className="mt-6">
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" variant="ghost" disabled={pending} onClick={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" variant="primary" disabled={pending}>
+            <Button type="submit" variant="primary" loading={pending}>
               {t("common.save")}
             </Button>
           </DialogFooter>

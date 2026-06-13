@@ -214,6 +214,7 @@ function OrdersContent() {
 }
 
 function AuditDialog({ order, onClose }: { order: PaymentOrder; onClose: () => void }) {
+  const { t } = useLanguage();
   const logs = useAdminPaymentOrderAuditLogs(order.id);
   return (
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
@@ -224,7 +225,7 @@ function AuditDialog({ order, onClose }: { order: PaymentOrder; onClose: () => v
         </DialogHeader>
         <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
           {logs.isLoading ? (
-            <p className="text-sm text-srapi-text-tertiary">Loading...</p>
+            <p className="text-sm text-srapi-text-tertiary">{t("common.loading")}</p>
           ) : logs.isError ? (
             <p role="alert" className="text-sm text-srapi-error">Failed to load audit logs.</p>
           ) : (logs.data?.data.length ?? 0) === 0 ? (
@@ -235,7 +236,7 @@ function AuditDialog({ order, onClose }: { order: PaymentOrder; onClose: () => v
         </div>
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Close
+            {t("common.close")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -244,6 +245,7 @@ function AuditDialog({ order, onClose }: { order: PaymentOrder; onClose: () => v
 }
 
 function AuditLogItem({ log }: { log: PaymentAuditLog }) {
+  const { t } = useLanguage();
   return (
     <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -255,11 +257,11 @@ function AuditLogItem({ log }: { log: PaymentAuditLog }) {
       </div>
       <dl className="mt-2 grid gap-1 text-2xs text-srapi-text-tertiary sm:grid-cols-2">
         <div>
-          <dt>Idempotency key</dt>
+          <dt>{t("adminOutbox.idempotency")}</dt>
           <dd className="break-all font-mono text-srapi-text-secondary">{log.idempotency_key}</dd>
         </div>
         <div>
-          <dt>Created</dt>
+          <dt>{t("adminCommon.created")}</dt>
           <dd className="font-mono text-srapi-text-secondary">{formatDateTime(log.created_at)}</dd>
         </div>
       </dl>
