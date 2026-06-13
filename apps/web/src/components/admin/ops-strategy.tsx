@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import {
   useActivateSchedulerStrategy,
@@ -86,14 +85,6 @@ const DEFAULT_SIMULATION = JSON.stringify(
   null,
   2,
 );
-
-export default function OpsStrategyPage() {
-  return (
-    <AdminShell>
-      <StrategyContent />
-    </AdminShell>
-  );
-}
 
 export function StrategyContent() {
   const { t } = useLanguage();

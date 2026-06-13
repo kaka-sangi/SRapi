@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { CalendarClock } from "lucide-react";
-import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
@@ -66,14 +65,6 @@ function planMatch(
 
 const planCompare = (a: ScheduledTestPlan, b: ScheduledTestPlan) =>
   a.name.localeCompare(b.name) || a.id - b.id;
-
-export default function AdminScheduledTestsPage() {
-  return (
-    <AdminShell>
-      <ScheduledTestsContent />
-    </AdminShell>
-  );
-}
 
 export function ScheduledTestsContent() {
   const { t } = useLanguage();

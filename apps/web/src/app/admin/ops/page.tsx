@@ -44,9 +44,9 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { quietStatusFor } from "@/lib/status-badge";
 import { formatDateTime } from "@/lib/admin-format";
-import { MonitorContent } from "@/app/admin/channels/monitor/page";
-import { ScheduledTestsContent } from "@/app/admin/scheduled-tests/page";
-import { StrategyContent } from "@/app/admin/ops/strategy/page";
+import { MonitorContent } from "@/components/admin/ops-channel-monitor";
+import { ScheduledTestsContent } from "@/components/admin/ops-scheduled-tests";
+import { StrategyContent } from "@/components/admin/ops-strategy";
 import { SchedulerDecisionsPanel } from "@/components/features/scheduler-decisions-panel";
 
 export default function AdminOpsPage() {

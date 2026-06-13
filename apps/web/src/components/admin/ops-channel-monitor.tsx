@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Gauge, Radar, FileText } from "lucide-react";
-import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
@@ -68,14 +67,6 @@ import type {
 } from "@/lib/sdk-types";
 
 const WINDOW_OPTIONS = [7, 14, 30, 90];
-
-export default function AdminMonitorPage() {
-  return (
-    <AdminShell>
-      <MonitorContent />
-    </AdminShell>
-  );
-}
 
 export function MonitorContent() {
   const { t } = useLanguage();
