@@ -183,19 +183,19 @@ function BalanceTab() {
             {selected ? (
               <dl className="rounded-lg border border-srapi-border bg-srapi-card-muted px-3.5 py-3 text-sm">
                 <div className="flex items-center justify-between">
-                  <dt className="text-srapi-text-tertiary">Top-up credit</dt>
+                  <dt className="text-srapi-text-tertiary">{t("billing.feeCredit")}</dt>
                   <dd className="font-mono text-srapi-text-secondary tabular">
                     {formatMoney(amount, paymentCurrency)}
                   </dd>
                 </div>
                 <div className="mt-1.5 flex items-center justify-between">
-                  <dt className="text-srapi-text-tertiary">Channel fee</dt>
+                  <dt className="text-srapi-text-tertiary">{t("billing.feeChannel")}</dt>
                   <dd className="font-mono text-srapi-text-secondary tabular">
                     {feePreview ? formatMoney(feePreview.fee, paymentCurrency) : "-"}
                   </dd>
                 </div>
-                <div className="mt-1.5 flex items-center justify-between">
-                  <dt className="text-srapi-text-tertiary">Payable amount</dt>
+                <div className="mt-1.5 flex items-center justify-between border-t border-srapi-border pt-1.5">
+                  <dt className="font-medium text-srapi-text-primary">{t("billing.feePayable")}</dt>
                   <dd className="font-mono text-srapi-text-primary tabular">
                     {feePreview ? formatMoney(feePreview.payable, paymentCurrency) : "-"}
                   </dd>

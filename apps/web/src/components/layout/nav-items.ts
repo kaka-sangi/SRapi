@@ -1,41 +1,42 @@
 import {
-  LayoutGrid,
+  LayoutDashboard,
   KeyRound,
-  BarChart3,
-  Server,
-  GitBranch,
-  ListChecks,
+  ChartLine,
+  CloudCog,
+  Route,
+  Radio,
   Users,
-  Boxes,
-  Network,
-  Plug,
+  Group,
+  Globe,
+  Cable,
   CreditCard,
-  ShoppingCart,
-  Activity,
-  Settings,
-  UserRound,
+  ReceiptText,
+  HeartPulse,
+  SlidersHorizontal,
+  CircleUser,
   Wallet,
-  Gift,
-  Share2,
+  Gem,
+  Handshake,
   Layers,
-  Tag,
-  Landmark,
+  CircleDollarSign,
+  Building2,
   Ticket,
   UserPlus,
   Coins,
   ArrowLeftRight,
   Percent,
-  Shield,
-  ShieldCheck,
+  ShieldAlert,
+  Lock,
   Megaphone,
-  ScrollText,
+  FileSearch,
   Receipt,
-  Tags,
-  Mail,
-  Bot,
-  Cpu,
-  Webhook,
-  Zap,
+  UserCog,
+  MailCheck,
+  Compass,
+  BrainCircuit,
+  Send,
+  Sparkles,
+  Stethoscope,
   type LucideIcon,
 } from "lucide-react";
 import { ADMIN_ROUTES, USER_ROUTES, USER_HOME_ROUTE } from "@/lib/routes";
@@ -55,11 +56,11 @@ export interface NavSection {
 export const WORKSPACE_SECTION: NavSection = {
   titleKey: "nav.sectionWorkspace",
   items: [
-    { href: USER_HOME_ROUTE, labelKey: "nav.dashboard", icon: LayoutGrid },
-    { href: USER_ROUTES.playground, labelKey: "nav.playground", icon: Bot },
-    { href: USER_ROUTES.availableChannels, labelKey: "nav.availableChannels", icon: ListChecks },
+    { href: USER_HOME_ROUTE, labelKey: "nav.dashboard", icon: LayoutDashboard },
+    { href: USER_ROUTES.playground, labelKey: "nav.playground", icon: Compass },
+    { href: USER_ROUTES.availableChannels, labelKey: "nav.availableChannels", icon: Radio },
     { href: "/api-keys", labelKey: "nav.apiKeys", icon: KeyRound },
-    { href: "/usage", labelKey: "nav.usage", icon: BarChart3 },
+    { href: "/usage", labelKey: "nav.usage", icon: ChartLine },
   ],
 };
 
@@ -67,10 +68,10 @@ export const WORKSPACE_SECTION: NavSection = {
 export const ACCOUNT_SECTION: NavSection = {
   titleKey: "nav.sectionAccount",
   items: [
-    { href: USER_ROUTES.account, labelKey: "nav.account", icon: UserRound },
+    { href: USER_ROUTES.account, labelKey: "nav.account", icon: CircleUser },
     { href: USER_ROUTES.billing, labelKey: "nav.billing", icon: Wallet },
-    { href: USER_ROUTES.redeem, labelKey: "nav.redeem", icon: Gift },
-    { href: USER_ROUTES.affiliate, labelKey: "nav.affiliate", icon: Share2 },
+    { href: USER_ROUTES.redeem, labelKey: "nav.redeem", icon: Gem },
+    { href: USER_ROUTES.affiliate, labelKey: "nav.affiliate", icon: Handshake },
   ],
 };
 
@@ -80,21 +81,21 @@ export const ACCOUNT_SECTION: NavSection = {
 const ADMIN_OVERVIEW_SECTION: NavSection = {
   titleKey: "nav.sectionAdminOverview",
   items: [
-    { href: ADMIN_ROUTES.dashboard, labelKey: "nav.dashboard", icon: LayoutGrid },
+    { href: ADMIN_ROUTES.dashboard, labelKey: "nav.dashboard", icon: LayoutDashboard },
     { href: ADMIN_ROUTES.users, labelKey: "nav.adminUsers", icon: Users },
-    { href: ADMIN_ROUTES.usage, labelKey: "nav.adminUsage", icon: BarChart3 },
+    { href: ADMIN_ROUTES.usage, labelKey: "nav.adminUsage", icon: ChartLine },
   ],
 };
 
 const ADMIN_GATEWAY_SECTION: NavSection = {
   titleKey: "nav.sectionAdminGateway",
   items: [
-    { href: ADMIN_ROUTES.quickSetup, labelKey: "nav.adminQuickSetup", icon: Zap },
-    { href: ADMIN_ROUTES.providers, labelKey: "nav.adminProviders", icon: Plug },
-    { href: ADMIN_ROUTES.models, labelKey: "nav.adminModels", icon: Cpu },
-    { href: ADMIN_ROUTES.channelsPricing, labelKey: "nav.adminChannelsPricing", icon: Tag },
-    { href: ADMIN_ROUTES.accounts, labelKey: "nav.adminAccounts", icon: Server },
-    { href: ADMIN_ROUTES.groups, labelKey: "nav.adminGroups", icon: Boxes },
+    { href: ADMIN_ROUTES.quickSetup, labelKey: "nav.adminQuickSetup", icon: Sparkles },
+    { href: ADMIN_ROUTES.providers, labelKey: "nav.adminProviders", icon: Cable },
+    { href: ADMIN_ROUTES.models, labelKey: "nav.adminModels", icon: BrainCircuit },
+    { href: ADMIN_ROUTES.channelsPricing, labelKey: "nav.adminChannelsPricing", icon: CircleDollarSign },
+    { href: ADMIN_ROUTES.accounts, labelKey: "nav.adminAccounts", icon: CloudCog },
+    { href: ADMIN_ROUTES.groups, labelKey: "nav.adminGroups", icon: Group },
   ],
 };
 
@@ -103,10 +104,10 @@ const ADMIN_COMMERCE_SECTION: NavSection = {
   items: [
     { href: ADMIN_ROUTES.subscriptions, labelKey: "nav.adminSubscriptions", icon: CreditCard },
     { href: ADMIN_ROUTES.ordersPlans, labelKey: "nav.adminOrdersPlans", icon: Layers },
-    { href: ADMIN_ROUTES.orders, labelKey: "nav.adminOrders", icon: ShoppingCart },
-    { href: ADMIN_ROUTES.paymentProviders, labelKey: "nav.adminPaymentProviders", icon: Landmark },
+    { href: ADMIN_ROUTES.orders, labelKey: "nav.adminOrders", icon: ReceiptText },
+    { href: ADMIN_ROUTES.paymentProviders, labelKey: "nav.adminPaymentProviders", icon: Building2 },
     { href: ADMIN_ROUTES.promoCodes, labelKey: "nav.adminPromoCodes", icon: Ticket },
-    { href: ADMIN_ROUTES.redeem, labelKey: "nav.adminRedeem", icon: Gift },
+    { href: ADMIN_ROUTES.redeem, labelKey: "nav.adminRedeem", icon: Gem },
     { href: ADMIN_ROUTES.billingLedger, labelKey: "nav.adminBillingLedger", icon: Receipt },
   ],
 };
@@ -128,31 +129,29 @@ const ADMIN_AFFILIATE_SECTION: NavSection = {
 const ADMIN_OPS_SECTION: NavSection = {
   titleKey: "nav.sectionAdminOps",
   items: [
-    { href: ADMIN_ROUTES.ops, labelKey: "nav.adminOps", icon: Activity },
-    { href: ADMIN_ROUTES.opsStrategy, labelKey: "nav.adminOpsStrategy", icon: GitBranch },
-    { href: ADMIN_ROUTES.riskControl, labelKey: "nav.adminRiskControl", icon: Shield },
+    { href: ADMIN_ROUTES.ops, labelKey: "nav.adminOps", icon: HeartPulse },
+    { href: ADMIN_ROUTES.opsStrategy, labelKey: "nav.adminOpsStrategy", icon: Route },
+    { href: ADMIN_ROUTES.riskControl, labelKey: "nav.adminRiskControl", icon: ShieldAlert },
     { href: ADMIN_ROUTES.announcements, labelKey: "nav.adminAnnouncements", icon: Megaphone },
-    { href: ADMIN_ROUTES.eventsOutbox, labelKey: "nav.adminOutbox", icon: Webhook },
-    { href: ADMIN_ROUTES.diagnostics, labelKey: "nav.adminDiagnostics", icon: Cpu },
+    { href: ADMIN_ROUTES.eventsOutbox, labelKey: "nav.adminOutbox", icon: Send },
+    { href: ADMIN_ROUTES.diagnostics, labelKey: "nav.adminDiagnostics", icon: Stethoscope },
   ],
 };
 
 const ADMIN_SYSTEM_SECTION: NavSection = {
   titleKey: "nav.sectionAdminSystem",
   items: [
-    // The AI copilot is reached via the floating 小r pet (components/admin/
-    // copilot-pet.tsx), not a sidebar entry.
-    { href: ADMIN_ROUTES.proxies, labelKey: "nav.adminProxies", icon: Network },
-    { href: ADMIN_ROUTES.roles, labelKey: "nav.adminRoles", icon: ShieldCheck },
+    { href: ADMIN_ROUTES.proxies, labelKey: "nav.adminProxies", icon: Globe },
+    { href: ADMIN_ROUTES.roles, labelKey: "nav.adminRoles", icon: Lock },
     { href: ADMIN_ROUTES.apiKeys, labelKey: "nav.adminApiKeys", icon: KeyRound },
-    { href: ADMIN_ROUTES.auditLogs, labelKey: "nav.adminAuditLogs", icon: ScrollText },
-    { href: ADMIN_ROUTES.userAttributes, labelKey: "nav.adminUserAttributes", icon: Tags },
+    { href: ADMIN_ROUTES.auditLogs, labelKey: "nav.adminAuditLogs", icon: FileSearch },
+    { href: ADMIN_ROUTES.userAttributes, labelKey: "nav.adminUserAttributes", icon: UserCog },
     {
       href: ADMIN_ROUTES.notificationTemplates,
       labelKey: "nav.adminNotificationTemplates",
-      icon: Mail,
+      icon: MailCheck,
     },
-    { href: ADMIN_ROUTES.settings, labelKey: "nav.adminSettings", icon: Settings },
+    { href: ADMIN_ROUTES.settings, labelKey: "nav.adminSettings", icon: SlidersHorizontal },
   ],
 };
 

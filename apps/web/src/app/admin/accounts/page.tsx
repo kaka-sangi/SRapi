@@ -715,7 +715,7 @@ function AccountHealthCell({ health }: { health?: AccountHealthSnapshot }) {
   const isHalfOpen = circuit === "half-open";
   const p50 = Math.round(health.latency_p50_ms);
   return (
-    <div className="flex items-center gap-1.5 font-mono text-2xs tabular">
+    <div className="flex min-w-0 items-center gap-1.5 font-mono text-2xs tabular">
       <span
         className={cn(
           "inline-block size-1.5 shrink-0 rounded-full",
@@ -1041,10 +1041,10 @@ function AccountCard({
             <h3 className="truncate text-sm font-medium text-srapi-text-primary">{account.name}</h3>
             <div className="shrink-0">{actions}</div>
           </div>
-          <div className="mt-1.5 flex items-center gap-1.5">
+          <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
             <span className="truncate text-xs text-srapi-text-secondary">{providerName}</span>
-            <span className="text-srapi-border">·</span>
-            <span className="shrink-0 font-mono text-2xs text-srapi-text-tertiary">{account.runtime_class}</span>
+            <span className="shrink-0 text-srapi-border">·</span>
+            <span className="truncate font-mono text-2xs text-srapi-text-tertiary">{account.runtime_class}</span>
           </div>
           {baseUrl ? (
             <p className="mt-1 truncate font-mono text-2xs text-srapi-text-tertiary" title={baseUrl}>
@@ -1219,7 +1219,7 @@ function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot }) {
       )
       .join("\n");
     return (
-      <span className="flex min-w-44 flex-col gap-1" title={title}>
+      <span className="flex min-w-0 flex-col gap-1" title={title}>
         {windows.map((window) => {
           const ratio = window.remainingPercent / 100;
           const exhausted = window.remainingPercent <= 0;
@@ -1227,12 +1227,12 @@ function AccountQuotaCell({ health }: { health?: AccountHealthSnapshot }) {
           return (
             <span
               key={window.snapshot.quota_type}
-              className="grid grid-cols-[3rem_minmax(4rem,1fr)_2.5rem] items-center gap-1.5"
+              className="grid grid-cols-[2.5rem_minmax(2rem,1fr)_2.5rem] items-center gap-1.5"
             >
               <span className="truncate font-mono text-[10px] uppercase leading-none text-srapi-text-tertiary">
                 {quotaWindowDisplayLabel(window, t)}
               </span>
-              <span className="relative h-1.5 min-w-16 overflow-hidden rounded-full bg-srapi-border">
+              <span className="relative h-1.5 overflow-hidden rounded-full bg-srapi-border">
                 <span
                   className={cn(
                     "absolute inset-y-0 left-0 rounded-full transition-all",

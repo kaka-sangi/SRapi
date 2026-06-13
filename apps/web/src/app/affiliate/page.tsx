@@ -138,7 +138,7 @@ function AffiliateContent() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardContent className="flex flex-wrap items-baseline gap-x-10 gap-y-4">
+          <CardContent className="flex flex-wrap items-baseline gap-x-8 gap-y-4">
             <div>
               <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
                 {t("affiliate.available")}
@@ -151,6 +151,7 @@ function AffiliateContent() {
                 </div>
               )}
             </div>
+            <div className="hidden h-10 w-px self-center bg-srapi-border sm:block" />
             <div>
               <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
                 {t("affiliate.accrued")}
@@ -303,11 +304,11 @@ function InviteCodeRow({ code }: { code: AffiliateInviteCode }) {
 
   return (
     <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-srapi-border bg-srapi-card-muted px-3 py-2">
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <CopyableValue value={code.code} label={t("affiliate.copyCode")} />
         <div className="mt-1 flex min-w-0 items-center gap-1 text-2xs text-srapi-text-tertiary">
-          <Link2 className="size-3" aria-hidden />
-          <span className="truncate">{inviteLink}</span>
+          <Link2 className="size-3 shrink-0" aria-hidden />
+          <span className="truncate" title={inviteLink}>{inviteLink}</span>
         </div>
       </div>
       <div className="flex items-center gap-2">

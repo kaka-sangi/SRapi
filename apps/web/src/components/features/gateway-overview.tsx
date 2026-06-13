@@ -179,7 +179,7 @@ export function GatewayOverview() {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <div className="anim-rise-sm" style={rise(1)}>
             <StatCard
-              className="card-interactive h-full"
+              className="h-full"
               label={t("dashboard.requests")}
               value={totals.requests}
               format={compact}
@@ -188,7 +188,7 @@ export function GatewayOverview() {
           </div>
           <div className="anim-rise-sm" style={rise(2)}>
             <StatCard
-              className="card-interactive h-full"
+              className="h-full"
               label={t("dashboard.successRate")}
               value={totals.requests > 0 ? totals.successRate : "—"}
               format={(n) => `${Math.round(n)}%`}
@@ -196,7 +196,7 @@ export function GatewayOverview() {
           </div>
           <div className="anim-rise-sm" style={rise(3)}>
             <StatCard
-              className="card-interactive h-full"
+              className="h-full"
               label={t("dashboard.totalTokens")}
               value={totals.totalTokens}
               format={compact}
@@ -204,7 +204,7 @@ export function GatewayOverview() {
           </div>
           <div className="anim-rise-sm" style={rise(4)}>
             <StatCard
-              className="card-interactive h-full"
+              className="h-full"
               label={t("dashboard.cost")}
               value={totals.totalCost}
               format={(n) => fmtCost(n, totals.currency)}
@@ -277,13 +277,6 @@ export function GatewayOverview() {
       </Card>
       </div>
 
-      <div className="lg:hidden">
-        <Button asChild variant="outline" className="w-full">
-          <Link href="/api-keys">
-            <KeyRound className="size-4" /> {t("apiKeys.title")}
-          </Link>
-        </Button>
-      </div>
     </>
   );
 }

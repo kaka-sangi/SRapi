@@ -85,6 +85,7 @@ function AccountContent() {
 }
 
 function UserAttributesCard() {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [items, setItems] = useState<CurrentUserAttribute[]>([]);
   const [values, setValues] = useState<Record<number, string>>({});
@@ -120,7 +121,7 @@ function UserAttributesCard() {
       );
       setItems(updated);
       setValues(Object.fromEntries(updated.map((item) => [item.definition_id, item.value || ""])));
-      toast({ title: "Saved", tone: "success" });
+      toast({ title: t("feedback.saved"), tone: "success" });
     } catch (err) {
       setError(meErrorMessage(err));
     } finally {
@@ -147,7 +148,7 @@ function UserAttributesCard() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <h3 className="font-serif text-lg text-srapi-text-primary">Profile attributes</h3>
+        <h3 className="font-serif text-lg text-srapi-text-primary">{t("account.profileAttributes")}</h3>
         {items.map((item) => (
           <div key={item.definition_id}>
             <Label htmlFor={`attr-${item.definition_id}`}>{item.name}</Label>
@@ -158,9 +159,9 @@ function UserAttributesCard() {
                 value={values[item.definition_id] || ""}
                 onChange={(event) => setValues((prev) => ({ ...prev, [item.definition_id]: event.target.value }))}
               >
-                <option value="">Unset</option>
-                <option value="true">True</option>
-                <option value="false">False</option>
+                <option value="">{t("account.attrUnset")}</option>
+                <option value="true">{t("account.attrTrue")}</option>
+                <option value="false">{t("account.attrFalse")}</option>
               </select>
             ) : item.data_type === "select" ? (
               <select
@@ -169,7 +170,7 @@ function UserAttributesCard() {
                 value={values[item.definition_id] || ""}
                 onChange={(event) => setValues((prev) => ({ ...prev, [item.definition_id]: event.target.value }))}
               >
-                <option value="">Unset</option>
+                <option value="">{t("account.attrUnset")}</option>
                 {(item.options || []).map((option) => (
                   <option key={option} value={option}>{option}</option>
                 ))}
@@ -187,7 +188,7 @@ function UserAttributesCard() {
         {error ? <p className="text-sm text-srapi-error">{error}</p> : null}
         <div className="flex justify-end">
           <Button variant="primary" loading={saving} onClick={save}>
-            Save attributes
+            {t("account.saveAttributes")}
           </Button>
         </div>
       </CardContent>

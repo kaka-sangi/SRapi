@@ -187,8 +187,8 @@ function UsageBody({
                     <TableCell className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
                       {log.created_at.replace("T", " ").slice(0, 16)}
                     </TableCell>
-                    <TableCell className="text-srapi-text-primary">{log.model}</TableCell>
-                    <TableCell className="font-mono text-2xs text-srapi-text-tertiary">
+                    <TableCell className="max-w-[180px] truncate text-srapi-text-primary" title={log.model}>{log.model}</TableCell>
+                    <TableCell className="max-w-[140px] truncate font-mono text-2xs text-srapi-text-tertiary" title={log.source_endpoint}>
                       {log.source_endpoint}
                     </TableCell>
                     <TableCell>
@@ -202,7 +202,7 @@ function UsageBody({
                     </TableCell>
                     <TableCell className="text-right font-mono text-srapi-text-secondary tabular">
                       <div>{formatMoney(log.cost, log.currency)}</div>
-                      <div className="mt-1 text-2xs text-srapi-text-tertiary">
+                      <div className="mt-1 max-w-[200px] truncate text-2xs text-srapi-text-tertiary" title={usageCostBreakdown(log)}>
                         {usageCostBreakdown(log)}
                       </div>
                     </TableCell>

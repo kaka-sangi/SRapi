@@ -26,7 +26,7 @@ export function PageHeader({
             {eyebrow}
           </div>
         )}
-        <h1 className="font-serif text-3xl text-srapi-text-primary">{title}</h1>
+        <h1 className="truncate font-serif text-3xl text-srapi-text-primary" title={title}>{title}</h1>
         {description && (
           <p className="mt-1.5 max-w-prose text-sm text-srapi-text-secondary">{description}</p>
         )}

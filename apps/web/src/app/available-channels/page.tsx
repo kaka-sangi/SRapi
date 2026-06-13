@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ListChecks, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Radio } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import {
@@ -48,7 +49,7 @@ function AvailableChannelsContent() {
         {(models) =>
           models.length === 0 ? (
             <EmptyState
-              icon={ListChecks}
+              icon={Radio}
               title={t("availableChannels.emptyTitle")}
               description={t("availableChannels.emptyBody")}
             />
@@ -86,32 +87,27 @@ function AvailableModelsTable({
     );
   }, [models, search]);
   const rows = filtered.flatMap((model) => model.channels.map((channel) => ({ model, channel })));
-  const available = models.filter((m) => m.status === "available").length;
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-1 flex-wrap items-center gap-3">
-          <CardTitle>{t("availableChannels.models")}</CardTitle>
-          <div className="flex items-center gap-2 font-mono text-2xs text-srapi-text-tertiary">
-            <span className="size-1.5 rounded-full bg-srapi-success" />
-            <span>{available} {t("availableChannels.available")}</span>
-            <span className="text-srapi-border">·</span>
-            <span>{models.length} {t("dashboard.total").toLowerCase()}</span>
+        <div className="flex flex-1 items-center gap-3">
+          <div className="relative w-full sm:w-56">
+            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-srapi-text-tertiary" />
+            <Input
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={t("common.search")}
+              className="pl-8 text-xs"
+            />
           </div>
-        </div>
-        <div className="relative w-full sm:w-56">
-          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-srapi-text-tertiary" />
-          <Input
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={t("common.search")}
-            className="pl-8 text-xs"
-          />
+          <span className="ml-auto font-mono text-2xs text-srapi-text-tertiary tabular">
+            {filtered.length} / {models.length}
+          </span>
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <TableScroll minWidth={920}>
+        <TableScroll minWidth={720}>
           <Table>
             <TableHeader>
               <tr>
@@ -125,13 +121,13 @@ function AvailableModelsTable({
             <TableBody>
               {rows.map(({ model, channel }) => (
                 <TableRow key={`${model.id}:${channel.provider_id}:${channel.upstream_model}`}>
-                  <TableCell>
-                    <div className="font-medium text-srapi-text-primary">{model.name}</div>
-                    <div className="mt-1 font-mono text-2xs text-srapi-text-tertiary">{model.id}</div>
+                  <TableCell className="max-w-[180px]">
+                    <div className="truncate font-medium text-srapi-text-primary" title={model.name}>{model.name}</div>
+                    <div className="mt-1 truncate font-mono text-2xs text-srapi-text-tertiary" title={model.id}>{model.id}</div>
                   </TableCell>
-                  <TableCell>
-                    <div className="text-srapi-text-primary">{channel.provider_display_name}</div>
-                    <div className="mt-1 font-mono text-2xs text-srapi-text-tertiary">
+                  <TableCell className="max-w-[200px]">
+                    <div className="truncate text-srapi-text-primary" title={channel.provider_display_name}>{channel.provider_display_name}</div>
+                    <div className="mt-1 truncate font-mono text-2xs text-srapi-text-tertiary" title={`${channel.protocol} · ${channel.upstream_model}`}>
                       {channel.protocol} · {channel.upstream_model}
                     </div>
                   </TableCell>
