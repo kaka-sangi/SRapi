@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useClientPagedList } from "@/hooks/use-client-list";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   ResourceFormDialog,
@@ -121,6 +122,23 @@ const PAYMENT_PRESETS: PaymentPreset[] = [
   },
 ];
 
+function providerMatch(
+  provider: PaymentProviderInstance,
+  term: string,
+  filters: Record<string, string>,
+): boolean {
+  if (filters.status && provider.status !== filters.status) return false;
+  if (!term) return true;
+  return [provider.name, provider.provider, provider.status, ...provider.supported_methods]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(term);
+}
+
+const providerCompare = (a: PaymentProviderInstance, b: PaymentProviderInstance) =>
+  a.sort_order - b.sort_order || a.name.localeCompare(b.name);
+
 export default function AdminPaymentProvidersPage() {
   return (
     <AdminShell>
@@ -133,9 +151,10 @@ function PaymentProvidersContent() {
   const { t } = useLanguage();
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-payment-providers", []);
-  const providers = useAdminPaymentProviders({
-    page: list.page,
-    page_size: list.pageSize,
+  const all = useAdminPaymentProviders();
+  const { query: providers, total } = useClientPagedList(all, list, {
+    match: providerMatch,
+    compare: providerCompare,
   });
   const { toast } = useToast();
   const createMut = useCreatePaymentProvider();
@@ -270,9 +289,7 @@ function PaymentProvidersContent() {
         description={t("adminPayments.subtitle")}
         actions={
           <div className="flex items-center gap-3">
-            {providers.data ? (
-              <ListCount total={providers.data.pagination?.total ?? providers.data.data.length} />
-            ) : null}
+            {all.data ? <ListCount total={total} /> : null}
             <ColumnToggle
               columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
               visibility={colVis}
@@ -302,7 +319,7 @@ function PaymentProvidersContent() {
         pagination={{
           page: list.page,
           pageSize: list.pageSize,
-          total: providers.data?.pagination?.total ?? providers.data?.data.length ?? 0,
+          total,
           onPageChange: list.setPage,
         }}
         rowActions={(p) => (

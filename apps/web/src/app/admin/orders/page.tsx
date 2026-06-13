@@ -9,6 +9,7 @@ import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useClientPagedList } from "@/hooks/use-client-list";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import {
   Dialog,
@@ -61,6 +62,23 @@ const ORDER_STATUSES: PaymentOrder["status"][] = [
   "failed",
 ];
 
+function orderMatch(
+  order: PaymentOrder,
+  term: string,
+  filters: Record<string, string>,
+): boolean {
+  if (filters.status && order.status !== filters.status) return false;
+  if (!term) return true;
+  return [order.order_no, String(order.user_id), order.product_type, order.status]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(term);
+}
+
+const orderCompare = (a: PaymentOrder, b: PaymentOrder) =>
+  (b.created_at ?? "").localeCompare(a.created_at ?? "");
+
 function OrdersContent() {
   const { t } = useLanguage();
   const list = useAdminList();
@@ -76,10 +94,10 @@ function OrdersContent() {
   const productLabel = (p: string) => labelOr(`adminOrders.productTypes.${p}`, p.replace(/_/g, " "));
   const statusOptions = ORDER_STATUSES.map((v) => ({ value: v, label: statusLabel(v) }));
   const statusFilter = (list.filters.status as PaymentOrder["status"]) || undefined;
-  const orders = useAdminPaymentOrders({
-    page: list.page,
-    page_size: list.pageSize,
-    status: statusFilter,
+  const all = useAdminPaymentOrders();
+  const { query: orders, total } = useClientPagedList(all, list, {
+    match: orderMatch,
+    compare: orderCompare,
   });
   const [refundTarget, setRefundTarget] = useState<PaymentOrder | null>(null);
   const [auditTarget, setAuditTarget] = useState<PaymentOrder | null>(null);
@@ -132,11 +150,7 @@ function OrdersContent() {
         eyebrow={t("nav.sectionAdmin")}
         title={t("adminOrders.title")}
         description={t("adminOrders.subtitle")}
-        actions={
-          orders.data ? (
-            <ListCount total={orders.data.pagination?.total ?? orders.data.data.length} />
-          ) : undefined
-        }
+        actions={all.data ? <ListCount total={total} /> : undefined}
       />
       <AdminListView
         query={orders}
@@ -168,7 +182,7 @@ function OrdersContent() {
         pagination={{
           page: list.page,
           pageSize: list.pageSize,
-          total: orders.data?.pagination?.total ?? orders.data?.data.length ?? 0,
+          total,
           onPageChange: list.setPage,
         }}
         rowActions={(o) => {
