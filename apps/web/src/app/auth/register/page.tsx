@@ -187,6 +187,7 @@ export default function RegisterPage() {
                 variant="primary"
                 size="lg"
                 className="w-full"
+                loading={submitting}
                 disabled={submitting || (captcha.required && !captcha.token)}
               >
                 {submitting ? t("authRegister.submitting") : t("authRegister.cta")}

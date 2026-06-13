@@ -692,6 +692,7 @@ function HealthSummaryStrip({
   healthById: Map<string, AccountHealthSnapshot>;
   total: number;
 }) {
+  const { t } = useLanguage();
   if (healthById.size === 0 || total === 0) return null;
   const entries = [...healthById.values()];
   const healthy = entries.filter((h) => h.circuit_state === "closed" && h.success_rate >= 0.9).length;
@@ -699,10 +700,10 @@ function HealthSummaryStrip({
   const tripped = entries.filter((h) => h.circuit_state !== "closed").length;
   return (
     <div className="mb-4 flex items-center gap-4 font-mono text-2xs text-srapi-text-tertiary">
-      <span>{healthy} ok</span>
-      {degraded > 0 && <span>{degraded} degraded</span>}
-      {tripped > 0 && <span>{tripped} tripped</span>}
-      <span className="ml-auto">{total} total</span>
+      <span>{healthy} {t("dashboard.healthyAccounts")}</span>
+      {degraded > 0 && <span>{degraded} {t("dashboard.degradedAccounts")}</span>}
+      {tripped > 0 && <span>{tripped} {t("dashboard.trippedAccounts")}</span>}
+      <span className="ml-auto">{t("dashboard.total")} {total}</span>
     </div>
   );
 }

@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { ApiKeyCreateDialog, ApiKeyFormDialog } from "@/components/features/api-key-create-dialog";
 import { ApiKeyUsageDialog } from "@/components/features/api-key-usage-dialog";
 import { ApiKeyOnboarding } from "@/components/features/api-key-onboarding";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -57,20 +58,12 @@ function ApiKeysContent() {
   const [editKey, setEditKey] = useState<ApiKeySummary | null>(null);
   const [usageKey, setUsageKey] = useState<ApiKeySummary | null>(null);
   const [connectKey, setConnectKey] = useState<ApiKeySummary | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ApiKeySummary | null>(null);
 
   async function runToggle(id: string, status: "active" | "disabled") {
     try {
       await toggle.mutateAsync({ id, status });
       toast({ title: t("feedback.saved"), tone: "success" });
-    } catch {
-      toast({ title: t("feedback.failed"), tone: "error" });
-    }
-  }
-
-  async function runDelete(id: string) {
-    try {
-      await deleteKey.mutateAsync(id);
-      toast({ title: t("feedback.deleted"), tone: "success" });
     } catch {
       toast({ title: t("feedback.failed"), tone: "error" });
     }
@@ -154,8 +147,7 @@ function ApiKeysContent() {
                                 {key.status === "active" ? t("common.disable") : t("common.enable")}
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                disabled={deleteKey.isPending}
-                                onClick={() => void runDelete(key.id)}
+                                onClick={() => setDeleteTarget(key)}
                                 className="text-srapi-error focus:text-srapi-error"
                               >
                                 {t("common.delete")}
@@ -215,6 +207,21 @@ function ApiKeysContent() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          open
+          onOpenChange={(next) => {
+            if (!next) setDeleteTarget(null);
+          }}
+          title={t("feedback.confirmDeleteTitle", { name: deleteTarget.name })}
+          body={t("feedback.confirmDeleteBody")}
+          confirmLabel={t("common.delete")}
+          onConfirm={() => deleteKey.mutateAsync(deleteTarget.id)}
+          successMessage={t("feedback.deleted")}
+          isPending={deleteKey.isPending}
+        />
+      ) : null}
     </>
   );
 }

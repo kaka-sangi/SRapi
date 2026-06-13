@@ -213,6 +213,7 @@ export default function OAuthCallbackPage() {
                 variant="primary"
                 size="lg"
                 className="w-full"
+                loading={busy}
                 disabled={busy || !email.trim() || !password}
               >
                 {busy ? t("login.signingIn") : t("oauthCallback.linkAndSignIn")}
@@ -252,6 +253,7 @@ export default function OAuthCallbackPage() {
                 variant="primary"
                 size="lg"
                 className="w-full"
+                loading={busy}
                 disabled={busy || code.length < 6}
               >
                 {busy ? t("login.verifying") : t("login.verify")}
@@ -303,6 +305,7 @@ export default function OAuthCallbackPage() {
                 variant="primary"
                 size="lg"
                 className="w-full"
+                loading={busy}
                 disabled={busy || !password}
               >
                 {busy ? t("common.loading") : t("oauthCallback.createAccount")}
@@ -342,6 +345,7 @@ export default function OAuthCallbackPage() {
                   variant="primary"
                   size="lg"
                   className="w-full"
+                  loading={busy}
                   disabled={busy || !email.trim()}
                 >
                   {busy ? t("oauthCallback.sending") : t("oauthCallback.sendCode")}
@@ -371,6 +375,7 @@ export default function OAuthCallbackPage() {
                   variant="primary"
                   size="lg"
                   className="w-full"
+                  loading={busy}
                   disabled={busy || !token.trim()}
                 >
                   {busy ? t("common.loading") : t("oauthCallback.confirm")}

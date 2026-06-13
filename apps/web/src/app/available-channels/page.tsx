@@ -8,8 +8,9 @@ import { PageQueryState } from "@/components/layout/page-query-state";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Radio } from "lucide-react";
+import { Radio, SearchX } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import {
   Table,
@@ -107,6 +108,18 @@ function AvailableModelsTable({
         </div>
       </CardHeader>
       <CardContent className="p-0">
+        {rows.length === 0 ? (
+          <EmptyState
+            icon={SearchX}
+            title={t("adminCommon.noResults")}
+            description={t("adminCommon.noResultsBody")}
+            action={
+              <Button variant="outline" size="sm" onClick={() => onSearchChange("")}>
+                {t("adminCommon.clearFilters")}
+              </Button>
+            }
+          />
+        ) : (
         <TableScroll minWidth={720}>
           <Table>
             <TableHeader>
@@ -145,6 +158,7 @@ function AvailableModelsTable({
             </TableBody>
           </Table>
         </TableScroll>
+        )}
       </CardContent>
     </Card>
   );

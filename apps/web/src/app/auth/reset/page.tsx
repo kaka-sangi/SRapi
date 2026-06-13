@@ -162,6 +162,7 @@ function ResetForm() {
             variant="primary"
             size="lg"
             className="w-full"
+            loading={submitting}
             disabled={submitting || password.length < 8}
           >
             {submitting ? t("authReset.submitting") : t("authReset.confirmCta")}
@@ -193,6 +194,7 @@ function ResetForm() {
           variant="primary"
           size="lg"
           className="w-full"
+          loading={submitting}
           disabled={submitting || !email}
         >
           {submitting ? t("authReset.submitting") : t("authReset.requestCta")}
