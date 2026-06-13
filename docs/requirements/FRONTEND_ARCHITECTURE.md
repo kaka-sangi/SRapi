@@ -209,8 +209,7 @@ AuthGate (client)      ──> 兜底守卫 + 注入 user / runtimeStatus 到子
 
 ### 已交付
 
-- **WP-160a**（已完成）：P0–P3 + 前端 harness，组件库、TanStack Query 全量接入、AuthGate 修复 React #185、6 页全部走 hooks、API key 表单走 react-hook-form + zod、bundle 预算守门。
-- **WP-1310**（前端业务面补全 + 正确性，已完成 / 已闭环——slices 1+2）：在 `apps/web` 重写之上，把后端已具备但 UI 未暴露/未正确操作的能力补齐。涵盖：修复账号启停反向（P0）；admin 侧边栏改为 6 个分组导航使全部约 22 个页面可达；账号域死能力接线（清错/恢复/发现模型/绑代理/导出 + `allSettled` 批量 + 健康/配额/RPM/代理质量详情抽屉）；admin 仪表盘改用 `useAdminDashboard` 快照；新增 `/admin/payment-providers`；兑换码统计 + 安全批量停用；用量维度聚合；ops 告警 `status==="firing"` + 派生 SLO 健康 + SLO 增改弹窗；模型分页/筛选/搜索；部分退款上限；策略回放扩展字段；定价批量导入；API Key/订单取消的确认+toast 反馈；错误/404 页 i18n；`PageQueryState` disabled-query 修正；`statusLabel` 助手 + `status` 命名空间应用到所有状态徽章；图形化配置（capabilities 多选 chips、`TagInput`、`KeyValueEditor`）；分组成员管理端到端闭环（新增后端 `GET /api/v1/admin/account-groups/{id}/accounts` 端点 + 前端管理弹窗）；并已对照 live 栈完成浏览器验证。详见 `../../specs/plans/STATUS.md` 的 WP-1310 条目。
+本文件描述的是 `apps/web` 的**当前**结构与契约；逐个工作包的交付历史与验收叙述不在此重复。前端相关工作包（如 WP-160a 前端 harness/组件库/TanStack Query 接入、WP-1310 前端业务面补全 + 正确性闭环）的完整执行叙述见权威工作账本 `../../specs/plans/STATUS.md`。
 
 ### Roadmap / 尚未实现
 
