@@ -2002,6 +2002,9 @@ export const en = {
     sortOrder: "Sort order",
     emptyTitle: "No payment providers",
     emptyBody: "Add a payment provider so users can pay orders.",
+    selectPreset: "Select payment channel",
+    selectPresetHint: "Pick a preset to auto-fill the configuration, or set up a custom provider.",
+    customProvider: "Custom provider",
   },
   adminPricing: {
     title: "Channel pricing",

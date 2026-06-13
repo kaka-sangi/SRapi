@@ -1998,6 +1998,9 @@ export const zh: Messages = {
     sortOrder: "排序",
     emptyTitle: "暂无支付渠道",
     emptyBody: "添加支付渠道后用户才能支付订单。",
+    selectPreset: "选择支付渠道",
+    selectPresetHint: "选择预设自动填充配置，或手动设置自定义渠道。",
+    customProvider: "自定义渠道",
   },
   adminPricing: {
     title: "渠道定价",
