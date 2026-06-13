@@ -1160,7 +1160,6 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 			RateLimitCooldownSeconds:             30,
 			StreamTimeoutSeconds:                 600,
 			RequestShaperEnabled:                 true,
-			BetaStrategy:                         "allow_configured",
 			RetryCount:                           3,
 			MaxRetryCredentials:                  0,
 			MaxRetryIntervalMS:                   2000,
@@ -1204,7 +1203,6 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 			Source:            "account",
 			Models:            []string{},
 			DedicatedProtocol: "openai-compatible",
-			MaxSteps:          0, // vestigial: the copilot loop no longer enforces a per-turn step limit
 			OwnerOnly:         false,
 			AutoRunReads:      true,
 		},
@@ -1217,7 +1215,6 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	settings.General.VersionLabel = strings.TrimSpace(settings.General.VersionLabel)
 	settings.Users.DefaultBalance = strings.TrimSpace(settings.Users.DefaultBalance)
 	settings.Users.DefaultGroup = strings.TrimSpace(settings.Users.DefaultGroup)
-	settings.Gateway.BetaStrategy = strings.TrimSpace(settings.Gateway.BetaStrategy)
 	settings.Gateway.SchedulerStrategyShadowStrategy = strings.TrimSpace(settings.Gateway.SchedulerStrategyShadowStrategy)
 	settings.Email.SMTPHost = strings.TrimSpace(settings.Email.SMTPHost)
 	settings.Email.SMTPUsername = strings.TrimSpace(settings.Email.SMTPUsername)
@@ -1334,8 +1331,6 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	if settings.Copilot.ProviderAccountID < 0 {
 		settings.Copilot.ProviderAccountID = 0
 	}
-	// MaxSteps is vestigial: the copilot loop no longer enforces a per-turn step
-	// limit (only an internal runaway guard), so the value is left as-is.
 	return settings, nil
 }
 
@@ -1641,14 +1636,11 @@ func defaultOpsSettings() admincontrol.OpsSettings {
 	return admincontrol.OpsSettings{
 		AutoRefreshEnabled:     true,
 		RefreshIntervalSeconds: 15,
-		ErrorRateThreshold:     0.05,
-		LatencyP95ThresholdMS:  5000,
-		AlertRetentionDays:     30,
 	}
 }
 
 func validateOpsSettings(settings admincontrol.OpsSettings) error {
-	if settings.RefreshIntervalSeconds < 5 || settings.RefreshIntervalSeconds > 3600 || settings.ErrorRateThreshold < 0 || settings.ErrorRateThreshold > 1 || settings.LatencyP95ThresholdMS <= 0 || settings.AlertRetentionDays <= 0 || settings.AlertRetentionDays > 365 {
+	if settings.RefreshIntervalSeconds < 5 || settings.RefreshIntervalSeconds > 3600 {
 		return admincontrol.ErrInvalidInput
 	}
 	return nil

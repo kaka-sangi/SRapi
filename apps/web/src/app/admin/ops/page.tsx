@@ -125,14 +125,6 @@ function OpsOverviewContent() {
   const settingsFields: FieldConfig<OpsSettingsFormState>[] = [
     { name: "autoRefreshEnabled", label: t("adminOpsSettings.autoRefresh"), type: "switch" },
     { name: "refreshIntervalSeconds", label: t("adminOpsSettings.refreshInterval"), type: "number" },
-    {
-      name: "errorRateThreshold",
-      label: t("adminOpsSettings.errorRateThreshold"),
-      type: "number",
-      hint: t("adminOpsSettings.errorRateHint"),
-    },
-    { name: "latencyP95ThresholdMs", label: t("adminOpsSettings.latencyThreshold"), type: "number" },
-    { name: "alertRetentionDays", label: t("adminOpsSettings.alertRetention"), type: "number" },
   ];
 
   async function ackAlert(id: string) {

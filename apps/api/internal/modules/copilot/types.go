@@ -15,7 +15,6 @@ type Settings struct {
 	Models            []string
 	DedicatedProtocol string
 	DedicatedBaseURL  string
-	MaxSteps          int
 	OwnerOnly         bool
 	AutoRunReads      bool
 
@@ -108,8 +107,7 @@ type PendingActionData struct {
 // StepData announces the start of an agent step (LLM call) so the UI can show
 // live "step N / M" progress through the agentic loop.
 type StepData struct {
-	Step     int `json:"step"`
-	MaxSteps int `json:"max_steps"`
+	Step int `json:"step"`
 }
 
 // UsageData reports the token usage of one LLM step; the client accumulates it

@@ -61,7 +61,6 @@ type AdminSettingsCopilot struct {
 	DedicatedProtocol         string   `json:"dedicated_protocol"`
 	DedicatedBaseURL          string   `json:"dedicated_base_url"`
 	DedicatedAPIKeyCiphertext string   `json:"dedicated_api_key_ciphertext,omitempty"`
-	MaxSteps                  int      `json:"max_steps"`
 	OwnerOnly                 bool     `json:"owner_only"`
 	AutoRunReads              bool     `json:"auto_run_reads"`
 
@@ -121,7 +120,6 @@ type AdminSettingsGateway struct {
 	RateLimitCooldownSeconds             int      `json:"rate_limit_cooldown_seconds"`
 	StreamTimeoutSeconds                 int      `json:"stream_timeout_seconds"`
 	RequestShaperEnabled                 bool     `json:"request_shaper_enabled"`
-	BetaStrategy                         string   `json:"beta_strategy"`
 	RetryCount                           int      `json:"retry_count"`
 	MaxRetryCredentials                  int      `json:"max_retry_credentials"`
 	MaxRetryIntervalMS                   int      `json:"max_retry_interval_ms"`
@@ -171,11 +169,8 @@ type CaptchaSettings struct {
 }
 
 type OpsSettings struct {
-	AutoRefreshEnabled     bool    `json:"auto_refresh_enabled"`
-	RefreshIntervalSeconds int     `json:"refresh_interval_seconds"`
-	ErrorRateThreshold     float32 `json:"error_rate_threshold"`
-	LatencyP95ThresholdMS  int     `json:"latency_p95_threshold_ms"`
-	AlertRetentionDays     int     `json:"alert_retention_days"`
+	AutoRefreshEnabled     bool `json:"auto_refresh_enabled"`
+	RefreshIntervalSeconds int  `json:"refresh_interval_seconds"`
 }
 
 type AnnouncementStatus string

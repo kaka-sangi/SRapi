@@ -186,7 +186,6 @@ func enableDedicatedCopilot(t *testing.T, handler http.Handler, sessionCookie *h
 		"dedicated_base_url":           baseURL,
 		"dedicated_api_key":            "sk-copilot-test",
 		"dedicated_api_key_configured": false,
-		"max_steps":                    8,
 		"owner_only":                   false,
 		"auto_run_reads":               true,
 	}

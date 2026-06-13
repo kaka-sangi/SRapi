@@ -2425,9 +2425,6 @@ export type UsageCleanupResponse = {
 export type OpsSettings = {
     auto_refresh_enabled: boolean;
     refresh_interval_seconds: number;
-    error_rate_threshold: number;
-    latency_p95_threshold_ms: number;
-    alert_retention_days: number;
 };
 
 export type OpsSettingsResponse = {
@@ -2485,7 +2482,6 @@ export type AdminSettingsGateway = {
     rate_limit_cooldown_seconds: number;
     stream_timeout_seconds: number;
     request_shaper_enabled: boolean;
-    beta_strategy: string;
     /**
      * Enables deterministic real-traffic Scheduler shadow strategy rollout.
      */
@@ -2631,10 +2627,6 @@ export type AdminSettingsCopilot = {
      * True when a dedicated API key is stored.
      */
     dedicated_api_key_configured: boolean;
-    /**
-     * Maximum agent tool-calling iterations per turn.
-     */
-    max_steps: number;
     /**
      * Restrict the copilot to owner-role admins.
      */
@@ -5922,10 +5914,6 @@ export type AdminSettingsCopilotWritable = {
      * True when a dedicated API key is stored.
      */
     dedicated_api_key_configured: boolean;
-    /**
-     * Maximum agent tool-calling iterations per turn.
-     */
-    max_steps: number;
     /**
      * Restrict the copilot to owner-role admins.
      */

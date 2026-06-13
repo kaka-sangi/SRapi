@@ -647,7 +647,6 @@ func toAPIAdminSettings(in admincontrol.AdminSettings) apiopenapi.AdminSettings 
 			PaymentsEnabled:          in.Features.PaymentsEnabled,
 		},
 		Gateway: apiopenapi.AdminSettingsGateway{
-			BetaStrategy:                         in.Gateway.BetaStrategy,
 			MaxRetryCredentials:                  intPtrValueForAPI(in.Gateway.MaxRetryCredentials),
 			MaxRetryIntervalMs:                   intPtrValueForAPI(in.Gateway.MaxRetryIntervalMS),
 			OverloadCooldownSeconds:              in.Gateway.OverloadCooldownSeconds,
@@ -697,7 +696,6 @@ func toAPIAdminSettings(in admincontrol.AdminSettings) apiopenapi.AdminSettings 
 			DedicatedProtocol:         in.Copilot.DedicatedProtocol,
 			DedicatedBaseUrl:          in.Copilot.DedicatedBaseURL,
 			DedicatedApiKeyConfigured: strings.TrimSpace(in.Copilot.DedicatedAPIKeyCiphertext) != "",
-			MaxSteps:                  in.Copilot.MaxSteps,
 			OwnerOnly:                 in.Copilot.OwnerOnly,
 			AutoRunReads:              in.Copilot.AutoRunReads,
 			WebSearchEnabled:          in.Copilot.WebSearchEnabled,
@@ -749,7 +747,6 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 			PaymentsEnabled:          in.Features.PaymentsEnabled,
 		},
 		Gateway: admincontrol.AdminSettingsGateway{
-			BetaStrategy:                         in.Gateway.BetaStrategy,
 			MaxRetryCredentials:                  intFromPtr(in.Gateway.MaxRetryCredentials),
 			MaxRetryIntervalMS:                   intFromPtr(in.Gateway.MaxRetryIntervalMs),
 			OverloadCooldownSeconds:              in.Gateway.OverloadCooldownSeconds,
@@ -798,7 +795,6 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 			Models:            stringSliceFromPtr(in.Copilot.Models),
 			DedicatedProtocol: in.Copilot.DedicatedProtocol,
 			DedicatedBaseURL:  in.Copilot.DedicatedBaseUrl,
-			MaxSteps:          in.Copilot.MaxSteps,
 			OwnerOnly:         in.Copilot.OwnerOnly,
 			AutoRunReads:      in.Copilot.AutoRunReads,
 			WebSearchEnabled:  in.Copilot.WebSearchEnabled,
@@ -965,20 +961,14 @@ func schedulerStrategyNameString(value *apiopenapi.SchedulerStrategyName) string
 
 func toAPIOpsSettings(in admincontrol.OpsSettings) apiopenapi.OpsSettings {
 	return apiopenapi.OpsSettings{
-		AlertRetentionDays:     in.AlertRetentionDays,
 		AutoRefreshEnabled:     in.AutoRefreshEnabled,
-		ErrorRateThreshold:     in.ErrorRateThreshold,
-		LatencyP95ThresholdMs:  in.LatencyP95ThresholdMS,
 		RefreshIntervalSeconds: in.RefreshIntervalSeconds,
 	}
 }
 
 func opsSettingsFromAPI(in apiopenapi.OpsSettings) admincontrol.OpsSettings {
 	return admincontrol.OpsSettings{
-		AlertRetentionDays:     in.AlertRetentionDays,
 		AutoRefreshEnabled:     in.AutoRefreshEnabled,
-		ErrorRateThreshold:     in.ErrorRateThreshold,
-		LatencyP95ThresholdMS:  in.LatencyP95ThresholdMs,
 		RefreshIntervalSeconds: in.RefreshIntervalSeconds,
 	}
 }

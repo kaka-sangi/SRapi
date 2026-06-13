@@ -497,7 +497,6 @@ func (s *Server) copilotSettings(ctx context.Context) (copilot.Settings, string,
 		Models:            append([]string(nil), c.Models...),
 		DedicatedProtocol: c.DedicatedProtocol,
 		DedicatedBaseURL:  c.DedicatedBaseURL,
-		MaxSteps:          c.MaxSteps,
 		OwnerOnly:         c.OwnerOnly,
 		AutoRunReads:      c.AutoRunReads,
 

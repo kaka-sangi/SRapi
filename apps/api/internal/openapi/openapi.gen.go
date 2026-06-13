@@ -3944,9 +3944,6 @@ type AdminSettingsCopilot struct {
 	// Enabled Master switch for the copilot chat endpoint.
 	Enabled bool `json:"enabled"`
 
-	// MaxSteps Maximum agent tool-calling iterations per turn.
-	MaxSteps int `json:"max_steps"`
-
 	// Model Default upstream model the copilot calls (e.g. claude-3-5-sonnet, gpt-4o).
 	Model string `json:"model"`
 
@@ -4028,8 +4025,6 @@ type AdminSettingsFeatures struct {
 
 // AdminSettingsGateway defines model for AdminSettingsGateway.
 type AdminSettingsGateway struct {
-	BetaStrategy string `json:"beta_strategy"`
-
 	// MaxRetryCredentials Maximum distinct credentials the failover loop may exclude and retry across. 0 means unlimited (bounded only by retry_count and available candidates).
 	MaxRetryCredentials *int `json:"max_retry_credentials,omitempty"`
 
@@ -7250,11 +7245,8 @@ type OpsSLOStatus string
 
 // OpsSettings defines model for OpsSettings.
 type OpsSettings struct {
-	AlertRetentionDays     int     `json:"alert_retention_days"`
-	AutoRefreshEnabled     bool    `json:"auto_refresh_enabled"`
-	ErrorRateThreshold     float32 `json:"error_rate_threshold"`
-	LatencyP95ThresholdMs  int     `json:"latency_p95_threshold_ms"`
-	RefreshIntervalSeconds int     `json:"refresh_interval_seconds"`
+	AutoRefreshEnabled     bool `json:"auto_refresh_enabled"`
+	RefreshIntervalSeconds int  `json:"refresh_interval_seconds"`
 }
 
 // OpsSettingsResponse defines model for OpsSettingsResponse.

@@ -102,7 +102,7 @@ func TestEngineOffersAndRunsWebSearch(t *testing.T) {
 		return []SearchResult{{Title: "T", URL: "https://u", Snippet: "s"}}, nil
 	}
 	var events []Event
-	_, err := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true, MaxSteps: 8},
+	_, err := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true},
 		[]Message{{Role: RoleUser, Content: "search the web"}}, nil, llm,
 		func(context.Context, string, string, []byte) (int, []byte, error) {
 			t.Fatal("web_search must not dispatch an admin call")
@@ -138,7 +138,7 @@ func TestEngineOmitsWebSearchWhenNil(t *testing.T) {
 		}
 		return textResponse("ok"), nil
 	}
-	_, err := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true, MaxSteps: 8},
+	_, err := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true},
 		[]Message{{Role: RoleUser, Content: "hi"}}, nil, llm,
 		func(context.Context, string, string, []byte) (int, []byte, error) { return 0, nil, nil },
 		nil, func(Event) {})

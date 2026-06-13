@@ -114,7 +114,7 @@ func TestEngineReadFlowAutoRuns(t *testing.T) {
 	var events []Event
 	emit := func(e Event) { events = append(events, e) }
 
-	_, err := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true, MaxSteps: 8}, []Message{{Role: RoleUser, Content: "list users"}}, nil, llm, dispatch, nil, emit)
+	_, err := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true}, []Message{{Role: RoleUser, Content: "list users"}}, nil, llm, dispatch, nil, emit)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestEngineWriteFlowRequiresApproval(t *testing.T) {
 	var events []Event
 	emit := func(e Event) { events = append(events, e) }
 
-	settings := Settings{Enabled: true, AutoRunReads: true, MaxSteps: 8}
+	settings := Settings{Enabled: true, AutoRunReads: true}
 	history, err := eng.Run(context.Background(), settings, []Message{{Role: RoleUser, Content: "create user"}}, nil, llm, dispatch, nil, emit)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -192,7 +192,7 @@ func TestEngineWriteFlowDenied(t *testing.T) {
 		return toolUseResponse("d1", toolCallAdminAPI, `{"method":"DELETE","path":"/api/v1/admin/announcements/3"}`), nil
 	}
 	// First turn: suspend.
-	pendHistory, _ := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true, MaxSteps: 8}, []Message{{Role: RoleUser, Content: "delete it"}}, nil, llm,
+	pendHistory, _ := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true}, []Message{{Role: RoleUser, Content: "delete it"}}, nil, llm,
 		func(_ context.Context, _, _ string, _ []byte) (int, []byte, error) {
 			t.Fatal("must not dispatch")
 			return 0, nil, nil
@@ -203,7 +203,7 @@ func TestEngineWriteFlowDenied(t *testing.T) {
 		return textResponse("Okay, leaving it."), nil
 	}
 	var events []Event
-	_, err := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true, MaxSteps: 8}, pendHistory, &Approval{ToolCallID: "d1", Approved: false}, llm2,
+	_, err := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true}, pendHistory, &Approval{ToolCallID: "d1", Approved: false}, llm2,
 		func(_ context.Context, _, _ string, _ []byte) (int, []byte, error) {
 			denyDispatched = true
 			return 0, nil, nil

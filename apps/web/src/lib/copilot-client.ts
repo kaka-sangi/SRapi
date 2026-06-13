@@ -81,7 +81,7 @@ export interface CopilotConversationDetail {
 }
 
 export type CopilotEvent =
-  | { type: "step"; data: { step: number; max_steps: number } }
+  | { type: "step"; data: { step: number } }
   | { type: "usage"; data: { input_tokens: number; output_tokens: number } }
   | { type: "assistant_reasoning"; data: { text: string } }
   | { type: "assistant_delta"; data: { text: string } }
