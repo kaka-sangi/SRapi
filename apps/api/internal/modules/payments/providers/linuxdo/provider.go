@@ -38,14 +38,21 @@ func (p Provider) CreateSession(req checkoutprovider.Request) (checkoutprovider.
 		return checkoutprovider.Session{}, checkoutprovider.ErrInvalidConfig
 	}
 
+	exchangeRate := configFloat(req.Config, "exchange_rate", "rate")
+	if exchangeRate <= 0 {
+		exchangeRate = 1.0
+	}
+
 	amountCents, err := parseCreditAmount(req.Amount)
 	if err != nil {
 		return checkoutprovider.Session{}, checkoutprovider.ErrInvalidConfig
 	}
 
+	creditAmount := int(float64(amountCents) * exchangeRate)
+
 	body := map[string]any{
 		"order_no":    req.OrderNo,
-		"amount":      amountCents,
+		"amount":      creditAmount,
 		"description": "SRapi credit purchase · " + req.OrderNo,
 	}
 	if notifyURL != "" {
@@ -208,6 +215,27 @@ func appendOrderNo(rawURL string, orderNo string) string {
 
 func configString(values map[string]any, keys ...string) string {
 	return mapString(values, keys...)
+}
+
+func configFloat(values map[string]any, keys ...string) float64 {
+	for _, key := range keys {
+		if v, ok := values[key]; ok {
+			switch typed := v.(type) {
+			case float64:
+				return typed
+			case float32:
+				return float64(typed)
+			case int:
+				return float64(typed)
+			case string:
+				f, err := strconv.ParseFloat(typed, 64)
+				if err == nil {
+					return f
+				}
+			}
+		}
+	}
+	return 0
 }
 
 func mapString(values map[string]any, keys ...string) string {
