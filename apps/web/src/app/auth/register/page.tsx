@@ -150,7 +150,7 @@ export default function RegisterPage() {
                       value={attributeValues[item.definition_id] || ""}
                       onChange={(event) => setAttributeValues((prev) => ({ ...prev, [item.definition_id]: event.target.value }))}
                     >
-                      <option value="">Unset</option>
+                      <option value="">{t("account.attrUnset")}</option>
                       <option value="true">True</option>
                       <option value="false">False</option>
                     </select>
@@ -161,7 +161,7 @@ export default function RegisterPage() {
                       value={attributeValues[item.definition_id] || ""}
                       onChange={(event) => setAttributeValues((prev) => ({ ...prev, [item.definition_id]: event.target.value }))}
                     >
-                      <option value="">Unset</option>
+                      <option value="">{t("account.attrUnset")}</option>
                       {(item.options || []).map((option) => (
                         <option key={option} value={option}>{option}</option>
                       ))}
@@ -197,12 +197,12 @@ export default function RegisterPage() {
               <div className="mt-4 flex justify-center gap-3 text-2xs text-srapi-text-tertiary">
                 {site.user_agreement ? (
                   <a href={site.user_agreement} className="underline-offset-4 hover:underline">
-                    User agreement
+                    {t("authRegister.userAgreement")}
                   </a>
                 ) : null}
                 {site.privacy_policy ? (
                   <a href={site.privacy_policy} className="underline-offset-4 hover:underline">
-                    Privacy policy
+                    {t("authRegister.privacyPolicy")}
                   </a>
                 ) : null}
               </div>

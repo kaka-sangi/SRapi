@@ -283,29 +283,29 @@ function PlansContent() {
   );
 }
 
-const PLAN_PRESETS: { key: string; name: string; desc: string; form: Partial<SubscriptionPlanFormState> }[] = [
+const PLAN_PRESETS: { key: string; name: string; descKey: string; form: Partial<SubscriptionPlanFormState> }[] = [
   {
     key: "free",
     name: "Free",
-    desc: "免费体验，有限额度",
+    descKey: "adminSubscriptions.presetFreeDesc",
     form: { name: "Free", price: "0", currency: "USD", validityDays: "30", monthlyCostQuota: "1.00", costQuotaMode: "hard_cap", forSale: true, status: "active" },
   },
   {
     key: "basic",
     name: "Basic",
-    desc: "基础套餐，适合个人用户",
+    descKey: "adminSubscriptions.presetBasicDesc",
     form: { name: "Basic", price: "9.90", currency: "USD", validityDays: "30", monthlyCostQuota: "10.00", costQuotaMode: "hard_cap", forSale: true, status: "active" },
   },
   {
     key: "pro",
     name: "Pro",
-    desc: "专业套餐，更高额度",
+    descKey: "adminSubscriptions.presetProDesc",
     form: { name: "Pro", price: "29.90", currency: "USD", validityDays: "30", monthlyCostQuota: "50.00", costQuotaMode: "hard_cap", forSale: true, status: "active" },
   },
   {
     key: "enterprise",
     name: "Enterprise",
-    desc: "企业套餐，不限额度",
+    descKey: "adminSubscriptions.presetEnterpriseDesc",
     form: { name: "Enterprise", price: "99.90", currency: "USD", validityDays: "30", monthlyCostQuota: "", costQuotaMode: "hard_cap", forSale: true, status: "active" },
   },
 ];
@@ -333,7 +333,7 @@ function PlanPresetPicker({
               className="rounded-lg border border-srapi-border bg-srapi-card px-4 py-3 text-left transition-colors hover:border-srapi-border-strong hover:bg-srapi-card-muted"
             >
               <div className="text-sm font-medium text-srapi-text-primary">{p.name}</div>
-              <div className="mt-0.5 text-xs text-srapi-text-tertiary">{p.desc}</div>
+              <div className="mt-0.5 text-xs text-srapi-text-tertiary">{t(p.descKey)}</div>
               {p.form.price && p.form.price !== "0" ? (
                 <div className="mt-2 font-mono text-sm text-srapi-text-secondary">${p.form.price}/mo</div>
               ) : (

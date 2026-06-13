@@ -264,6 +264,8 @@ export const en = {
     invalid: "Enter a name, email and a password of at least 8 characters.",
     haveAccount: "Already have an account?",
     signIn: "Sign in",
+    userAgreement: "User agreement",
+    privacyPolicy: "Privacy policy",
   },
   oauthCallback: {
     signingIn: "Signing you in…",
@@ -290,6 +292,13 @@ export const en = {
     tokenHint: "Paste the token from the email we sent to {email}.",
     confirm: "Confirm",
     confirmFailed: "Invalid or expired token. Try again.",
+  },
+  passwordless: {
+    signingIn: "Signing you in...",
+    failed: "Email sign-in failed",
+    missingToken: "Missing sign-in token.",
+    expired: "Sign-in link expired or has already been used.",
+    backToSignIn: "Back to sign in",
   },
   setup: {
     checking: "Checking setup…",
@@ -1014,6 +1023,10 @@ export const en = {
     editPlan: "Edit plan",
     selectTemplate: "Choose a plan template",
     selectTemplateHint: "Pick a template to start with, or create a blank plan.",
+    presetFreeDesc: "Free trial with a limited quota",
+    presetBasicDesc: "Basic plan, suited to individual users",
+    presetProDesc: "Pro plan with a higher quota",
+    presetEnterpriseDesc: "Enterprise plan with an unlimited quota",
     deletePlanTitle: "Delete plan",
     deletePlanBody:
       "Delete plan “{name}”? It will no longer be offered for sale. Existing subscribers are unaffected — their entitlements were snapshotted at subscription time. This cannot be undone.",
@@ -1072,6 +1085,14 @@ export const en = {
     productTypes: {
       subscription: "Subscription",
       balance: "Balance",
+    },
+    audit: {
+      action: "Audit timeline",
+      title: "Audit timeline",
+      loadFailed: "Failed to load audit logs.",
+      empty: "No audit logs.",
+      signatureValid: "signature valid",
+      signatureInvalid: "signature invalid",
     },
   },
   adminPromos: {
@@ -1995,6 +2016,11 @@ export const en = {
     selectPreset: "Select payment channel",
     selectPresetHint: "Pick a preset to auto-fill the configuration, or set up a custom provider.",
     customProvider: "Custom provider",
+    feeRate: "Fee rate",
+    feeRateHint: "Decimal channel fee rate, for example 0.006 means 0.6%.",
+    feeHeader: "Fee",
+    weight: "Weight",
+    weightHint: "Positive round-robin weight used when multiple active channels support the same method.",
   },
   adminPricing: {
     title: "Channel pricing",
@@ -2028,6 +2054,7 @@ export const en = {
     emptyBody: "Add a pricing rule to bill model usage.",
     bulkImport: "Bulk import",
     bulkImportHint: "Paste a JSON array of pricing rules to upsert in one batch.",
+    bulkImportInvalidJson: "Invalid JSON",
     importResult: "Imported {count} rules",
     deleteTitle: "Delete this pricing rule?",
     deleteBody: "Usage for this model/provider will fall back to the next matching rule (or be uncharged if none). This cannot be undone.",

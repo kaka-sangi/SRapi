@@ -188,7 +188,7 @@ function OrdersContent() {
         rowActions={(o) => {
           const actions: RowAction[] = [
             {
-              label: "Audit timeline",
+              label: t("adminOrders.audit.action"),
               onSelect: () => setAuditTarget(o),
             },
           ];
@@ -220,16 +220,16 @@ function AuditDialog({ order, onClose }: { order: PaymentOrder; onClose: () => v
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Audit timeline</DialogTitle>
+          <DialogTitle>{t("adminOrders.audit.title")}</DialogTitle>
           <DialogDescription>{order.order_no}</DialogDescription>
         </DialogHeader>
         <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
           {logs.isLoading ? (
             <p className="text-sm text-srapi-text-tertiary">{t("common.loading")}</p>
           ) : logs.isError ? (
-            <p role="alert" className="text-sm text-srapi-error">Failed to load audit logs.</p>
+            <p role="alert" className="text-sm text-srapi-error">{t("adminOrders.audit.loadFailed")}</p>
           ) : (logs.data?.data.length ?? 0) === 0 ? (
-            <p className="text-sm text-srapi-text-tertiary">No audit logs.</p>
+            <p className="text-sm text-srapi-text-tertiary">{t("adminOrders.audit.empty")}</p>
           ) : (
             logs.data!.data.map((log) => <AuditLogItem key={log.id} log={log} />)
           )}
@@ -252,7 +252,7 @@ function AuditLogItem({ log }: { log: PaymentAuditLog }) {
         <span className="font-mono text-xs text-srapi-text-primary">{log.event_type}</span>
         <QuietBadge
           status={log.signature_valid ? "active" : "error"}
-          label={log.signature_valid ? "signature valid" : "signature invalid"}
+          label={log.signature_valid ? t("adminOrders.audit.signatureValid") : t("adminOrders.audit.signatureInvalid")}
         />
       </div>
       <dl className="mt-2 grid gap-1 text-2xs text-srapi-text-tertiary sm:grid-cols-2">

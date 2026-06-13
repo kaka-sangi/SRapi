@@ -264,6 +264,8 @@ export const zh: Messages = {
     invalid: "请填写名称、邮箱，以及至少 8 位的密码。",
     haveAccount: "已有账号？",
     signIn: "登录",
+    userAgreement: "用户协议",
+    privacyPolicy: "隐私政策",
   },
   oauthCallback: {
     signingIn: "正在登录…",
@@ -290,6 +292,13 @@ export const zh: Messages = {
     tokenHint: "请粘贴我们发送至 {email} 的验证令牌。",
     confirm: "确认",
     confirmFailed: "令牌无效或已过期，请重试。",
+  },
+  passwordless: {
+    signingIn: "正在登录…",
+    failed: "邮箱登录失败",
+    missingToken: "缺少登录令牌。",
+    expired: "登录链接已过期或已被使用。",
+    backToSignIn: "返回登录",
   },
   setup: {
     checking: "正在检查初始化状态…",
@@ -1000,6 +1009,10 @@ export const zh: Messages = {
     editPlan: "编辑套餐",
     selectTemplate: "选择套餐模板",
     selectTemplateHint: "选择模板快速开始，或创建空白套餐。",
+    presetFreeDesc: "免费体验，有限额度",
+    presetBasicDesc: "基础套餐，适合个人用户",
+    presetProDesc: "专业套餐，更高额度",
+    presetEnterpriseDesc: "企业套餐，不限额度",
     deletePlanTitle: "删除套餐",
     deletePlanBody: "确定要删除套餐「{name}」吗？该套餐将不再可售；已订阅的用户不受影响——权益在订阅时已快照保存。此操作不可撤销。",
     validityDays: "有效天数",
@@ -1062,6 +1075,14 @@ export const zh: Messages = {
     productTypes: {
       subscription: "订阅",
       balance: "余额",
+    },
+    audit: {
+      action: "审计时间线",
+      title: "审计时间线",
+      loadFailed: "加载审计日志失败。",
+      empty: "暂无审计日志。",
+      signatureValid: "签名有效",
+      signatureInvalid: "签名无效",
     },
   },
   adminPromos: {
@@ -1991,6 +2012,11 @@ export const zh: Messages = {
     selectPreset: "选择支付渠道",
     selectPresetHint: "选择预设自动填充配置，或手动设置自定义渠道。",
     customProvider: "自定义渠道",
+    feeRate: "费率",
+    feeRateHint: "渠道费率（小数），例如 0.006 表示 0.6%。",
+    feeHeader: "费率",
+    weight: "权重",
+    weightHint: "正整数轮询权重，当多个可用渠道支持同一支付方式时使用。",
   },
   adminPricing: {
     title: "渠道定价",
@@ -2024,6 +2050,7 @@ export const zh: Messages = {
     emptyBody: "添加定价规则后即可对模型用量计费。",
     bulkImport: "批量导入",
     bulkImportHint: "粘贴定价规则的 JSON 数组，一次性 upsert。",
+    bulkImportInvalidJson: "JSON 格式无效",
     importResult: "已导入 {count} 条规则",
     deleteTitle: "删除此定价规则？",
     deleteBody: "该模型/服务商的用量将回退到下一条匹配规则（若无则不计费）。此操作不可撤销。",

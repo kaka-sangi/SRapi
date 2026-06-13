@@ -198,15 +198,15 @@ function PaymentProvidersContent() {
     },
     {
       name: "feeRate",
-      label: "Fee rate",
+      label: t("adminPayments.feeRate"),
       type: "number",
-      hint: "Decimal channel fee rate, for example 0.006 means 0.6%.",
+      hint: t("adminPayments.feeRateHint"),
     },
     {
       name: "weight",
-      label: "Weight",
+      label: t("adminPayments.weight"),
       type: "number",
-      hint: "Positive round-robin weight used when multiple active channels support the same method.",
+      hint: t("adminPayments.weightHint"),
     },
     { name: "config", label: t("adminPayments.config"), type: "keyvalue", hint: t("adminPayments.configHint") },
     {
@@ -259,7 +259,7 @@ function PaymentProvidersContent() {
     },
     {
       key: "fee",
-      header: "Fee",
+      header: t("adminPayments.feeHeader"),
       hideOnMobile: true,
       align: "right",
       sortValue: (p) => Number(p.fee_rate),
@@ -271,7 +271,7 @@ function PaymentProvidersContent() {
     },
     {
       key: "weight",
-      header: "Weight",
+      header: t("adminPayments.weight"),
       hideOnMobile: true,
       align: "right",
       sortValue: (p) => p.weight,

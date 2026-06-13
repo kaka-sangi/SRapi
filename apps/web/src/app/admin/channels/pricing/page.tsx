@@ -84,11 +84,11 @@ function PricingContent() {
     try {
       parsed = JSON.parse(importText);
     } catch {
-      setImportError("Invalid JSON");
+      setImportError(t("adminPricing.bulkImportInvalidJson"));
       return;
     }
     if (!Array.isArray(parsed)) {
-      setImportError("Invalid JSON");
+      setImportError(t("adminPricing.bulkImportInvalidJson"));
       return;
     }
     try {
