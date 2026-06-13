@@ -27,6 +27,7 @@ type quickSetupRequest struct {
 	ProxyID        *string        `json:"proxy_id,omitempty"`
 	Priority       *int           `json:"priority,omitempty"`
 	Weight         *float32       `json:"weight,omitempty"`
+	Metadata       map[string]any `json:"metadata,omitempty"`
 }
 
 type quickSetupResponse struct {
@@ -102,7 +103,7 @@ func (s *Server) handleAdminQuickSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Step 3: Build account metadata from template.
+	// Step 3: Build account metadata from template, then overlay user-provided metadata.
 	metadata := map[string]any{}
 	var upstreamClient *string
 	if preset.AccountTemplate != nil {
@@ -113,6 +114,9 @@ func (s *Server) handleAdminQuickSetup(w http.ResponseWriter, r *http.Request) {
 			uc := preset.AccountTemplate.UpstreamClient
 			upstreamClient = &uc
 		}
+	}
+	for k, v := range body.Metadata {
+		metadata[k] = v
 	}
 
 	// Step 4: Create the account.

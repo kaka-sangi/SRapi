@@ -102,7 +102,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, authed apikeycontract.AuthResult, body apiopenapi.ChatCompletionRequest, rawBody []byte, sourceEndpoint, forcedProviderKey string, startedAt time.Time) {
 	requestID := requestIDFromContext(r.Context())
 	modelSuffix := chatRequestModelSuffix(body)
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelSuffix.BaseModel)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), modelSuffix.BaseModel)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -287,7 +287,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	modelSuffix := responsesRequestModelSuffix(body)
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelSuffix.BaseModel)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), modelSuffix.BaseModel)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -457,7 +457,7 @@ func (s *Server) handleListResponseInputItems(w http.ResponseWriter, r *http.Req
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, "response input_items requests require response_id and model", "invalid_request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelName)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), modelName)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -596,7 +596,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	modelSuffix := gatewayModelSuffixFromModel(body.Model)
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelSuffix.BaseModel)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), modelSuffix.BaseModel)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -765,7 +765,7 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid embeddings request", "invalid_request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), body.Model)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -936,7 +936,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	modelSuffix := gatewayModelSuffixFromModel(modelRef)
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelSuffix.BaseModel)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), modelSuffix.BaseModel)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -1208,7 +1208,7 @@ func (s *Server) handleGeminiCountTokens(w http.ResponseWriter, r *http.Request)
 		writeGeminiGatewayError(w, jsonDecodeStatus(err), "INVALID_ARGUMENT", "invalid countTokens request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelRef)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), modelRef)
 	if err != nil {
 		s.recordTokenCountFailure(r, authed, requestID, sourceEndpoint, string(gatewaycontract.ProtocolGeminiCompatible), modelRef, "model_not_found", elapsedMillis(startedAt), nil, gatewayAdmission{})
 		writeGeminiGatewayError(w, http.StatusNotFound, "NOT_FOUND", "model not found")

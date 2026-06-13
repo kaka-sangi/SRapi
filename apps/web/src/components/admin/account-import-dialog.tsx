@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { KeyRound } from "lucide-react";
 import {
   AccountOAuthAuthorizeDialog,
@@ -58,7 +58,7 @@ export function AccountImportDialog({
   const importMut = useImportAccounts();
   const codexImportMut = useImportCodexSession();
   const createAccountMut = useCreateAccount();
-  const [tab, setTab] = useState<"json" | "codex" | "oauth">("json");
+  const [tab, setTab] = useState<"json" | "codex" | "oauth" | "batch">("batch");
   const [json, setJson] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProviderAccountImportResult | null>(null);
@@ -73,6 +73,13 @@ export function AccountImportDialog({
   const [oauthName, setOAuthName] = useState("");
   const [oauthMode, setOAuthMode] = useState<AccountOAuthFlowMode>("authorization_code");
   const [oauthWizardOpen, setOAuthWizardOpen] = useState(false);
+  const [batchProviderId, setBatchProviderId] = useState<string>(defaultProviderId);
+  const [batchAuthType, setBatchAuthType] = useState<"api_key" | "cli_client_token" | "web_session_cookie">("api_key");
+  const [batchPrefix, setBatchPrefix] = useState("");
+  const [batchLines, setBatchLines] = useState("");
+  const [batchResult, setBatchResult] = useState<{ created: number; failed: number; errors: string[] } | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
+  const batchProgressRef = useRef<HTMLDivElement>(null);
 
   const handleFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
@@ -88,7 +95,7 @@ export function AccountImportDialog({
   }, []);
 
   function reset() {
-    setTab("json");
+    setTab("batch");
     setJson("");
     setError(null);
     setResult(null);
@@ -103,6 +110,12 @@ export function AccountImportDialog({
     setOAuthName("");
     setOAuthMode("authorization_code");
     setOAuthWizardOpen(false);
+    setBatchProviderId(defaultProviderId);
+    setBatchAuthType("api_key");
+    setBatchPrefix("");
+    setBatchLines("");
+    setBatchResult(null);
+    setBatchProgress(null);
   }
 
   async function submitJson() {
@@ -188,6 +201,75 @@ export function AccountImportDialog({
     }
   }
 
+  async function submitBatch() {
+    setError(null);
+    setBatchResult(null);
+    if (!batchProviderId) {
+      setError(t("codexImport.providerRequired"));
+      return;
+    }
+    const rawLines = batchLines
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("#"));
+    if (rawLines.length === 0) {
+      setError(t("batchAdd.linesRequired"));
+      return;
+    }
+    const entries: { baseUrl: string; apiKey: string }[] = [];
+    for (const line of rawLines) {
+      const sep = line.includes("|") ? "|" : line.includes(",") ? "," : /\s+/;
+      const parts = line.split(sep).map((p) => p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        entries.push({ baseUrl: parts[0], apiKey: parts[1] });
+      } else if (parts.length === 1) {
+        entries.push({ baseUrl: "", apiKey: parts[0] });
+      }
+    }
+    if (entries.length === 0) {
+      setError(t("batchAdd.linesRequired"));
+      return;
+    }
+    let created = 0;
+    let failed = 0;
+    const errors: string[] = [];
+    setBatchProgress({ current: 0, total: entries.length });
+    requestAnimationFrame(() => batchProgressRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const accountName = batchPrefix.trim()
+        ? `${batchPrefix.trim()}-${i + 1}`
+        : `account-${i + 1}`;
+      const metadata: Record<string, unknown> = {};
+      if (entry.baseUrl) metadata.base_url = entry.baseUrl;
+      const credKey = batchAuthType === "web_session_cookie" ? "cookie" : batchAuthType === "cli_client_token" ? "access_token" : "api_key";
+      try {
+        await createAccountMut.mutateAsync({
+          provider_id: batchProviderId as Id,
+          name: accountName,
+          runtime_class: batchAuthType as RuntimeClass,
+          credential: { [credKey]: entry.apiKey },
+          metadata,
+          status: "active",
+        });
+        created++;
+      } catch (err) {
+        failed++;
+        errors.push(`#${i + 1}: ${adminErrorMessage(err)}`);
+      }
+      setBatchProgress({ current: i + 1, total: entries.length });
+    }
+    setBatchProgress(null);
+    setBatchResult({ created, failed, errors });
+    toast({
+      title: t("batchAdd.done", { created, failed }),
+      tone: failed > 0 ? (created > 0 ? "warning" : "error") : "success",
+    });
+    if (failed === 0) {
+      onOpenChange(false);
+    }
+  }
+
   const busy =
     importMut.isPending || codexImportMut.isPending || createAccountMut.isPending;
 
@@ -215,10 +297,112 @@ export function AccountImportDialog({
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
           <TabsList className="mt-4 flex-wrap">
+            <TabsTrigger value="batch">{t("batchAdd.tab")}</TabsTrigger>
             <TabsTrigger value="json">{t("adminAccounts.importJson")}</TabsTrigger>
             <TabsTrigger value="codex">{t("codexImport.action")}</TabsTrigger>
             <TabsTrigger value="oauth">{t("accountOAuth.authorizeAccount")}</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="batch">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="batch-provider">{t("adminAccounts.provider")}</Label>
+                <Select value={batchProviderId} onValueChange={setBatchProviderId} disabled={busy}>
+                  <SelectTrigger id="batch-provider">
+                    <SelectValue placeholder={t("codexImport.providerPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {providerOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="batch-auth-type">{t("adminAccounts.authType")}</Label>
+                <Select value={batchAuthType} onValueChange={(v) => setBatchAuthType(v as typeof batchAuthType)} disabled={busy}>
+                  <SelectTrigger id="batch-auth-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="api_key">{t("adminAccounts.runtime.api_key")}</SelectItem>
+                    <SelectItem value="cli_client_token">{t("adminAccounts.runtime.cli_client_token")}</SelectItem>
+                    <SelectItem value="web_session_cookie">{t("adminAccounts.runtime.web_session_cookie")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="batch-prefix">{t("batchAdd.namePrefix")}</Label>
+                <Input
+                  id="batch-prefix"
+                  placeholder={t("batchAdd.namePrefixPlaceholder")}
+                  value={batchPrefix}
+                  onChange={(e) => setBatchPrefix(e.target.value)}
+                  disabled={busy}
+                />
+              </div>
+              <div>
+                <Label htmlFor="batch-lines">{t("batchAdd.lines")}</Label>
+                <Textarea
+                  id="batch-lines"
+                  rows={10}
+                  spellCheck={false}
+                  className="font-mono text-xs"
+                  placeholder={
+                    batchAuthType === "web_session_cookie"
+                      ? "https://api.example.com/v1|cookie-value-here\ncookie-only-value"
+                      : batchAuthType === "cli_client_token"
+                        ? "https://api.example.com/v1|eyJ...\neyJ..."
+                        : t("batchAdd.linesPlaceholder")
+                  }
+                  value={batchLines}
+                  onChange={(e) => setBatchLines(e.target.value)}
+                  disabled={busy}
+                />
+                <div className="mt-1 flex items-center justify-between">
+                  <p className="text-2xs text-srapi-text-tertiary">
+                    {t("batchAdd.linesHint")}
+                  </p>
+                  {batchLines.trim() ? (
+                    <span className="font-mono text-2xs text-srapi-text-tertiary">
+                      {t("batchAdd.lineCount", { count: batchLines.split("\n").filter((l) => l.trim() && !l.trim().startsWith("#")).length })}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              {batchProgress ? (
+                <div ref={batchProgressRef} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-2xs text-srapi-text-secondary">
+                    <span>{t("batchAdd.progress", { current: batchProgress.current, total: batchProgress.total })}</span>
+                    <span className="font-mono tabular">{Math.round((batchProgress.current / batchProgress.total) * 100)}%</span>
+                  </div>
+                  <div className="relative h-2 overflow-hidden rounded-full bg-srapi-border">
+                    <div
+                      className="h-full rounded-full bg-srapi-primary transition-all"
+                      style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+              {batchResult ? (
+                <div className="space-y-2 rounded-md border border-srapi-border bg-srapi-card-muted p-3">
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <ImportStat label={t("codexImport.created")} value={batchResult.created} tone="success" />
+                    <ImportStat label={t("codexImport.failed")} value={batchResult.failed} tone="error" />
+                  </div>
+                  {batchResult.errors.length > 0 ? (
+                    <ul className="list-disc space-y-0.5 pl-4 text-2xs text-srapi-error">
+                      {batchResult.errors.map((msg, idx) => (
+                        <li key={idx}>{msg}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </TabsContent>
 
           <TabsContent value="json">
             <div className="space-y-3">
@@ -393,7 +577,17 @@ export function AccountImportDialog({
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             {t("common.close")}
           </Button>
-          {tab === "json" ? (
+          {tab === "batch" ? (
+            <Button
+              type="button"
+              variant="primary"
+              loading={createAccountMut.isPending}
+              disabled={!batchLines.trim() || !batchProviderId || busy}
+              onClick={() => void submitBatch()}
+            >
+              {t("batchAdd.submit")}
+            </Button>
+          ) : tab === "json" ? (
             <Button
               type="button"
               variant="primary"

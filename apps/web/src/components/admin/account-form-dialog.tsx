@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { ChevronDown, KeyRound } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, KeyRound, Zap } from "lucide-react";
 import {
   AccountOAuthAuthorizeDialog,
   type AccountOAuthFlowMode,
@@ -22,7 +22,7 @@ import { KeyValueEditor } from "@/components/ui/key-value-editor";
 import { TagInput } from "@/components/ui/tag-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useTlsProfiles } from "@/hooks/admin-queries";
+import { useTlsProfiles, useTestAccount } from "@/hooks/admin-queries";
 import {
   Select,
   SelectTrigger,
@@ -82,7 +82,7 @@ const PLATFORM_FAMILY_ORDER: PlatformFamily[] = [
 const CODEX_FALLBACK_TEMPLATE: AccountTemplate = {
   upstream_client: "codex_cli",
   default_metadata: { base_url: "https://chatgpt.com/backend-api/codex" },
-  model_catalog: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest"],
+  model_catalog: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "codex-auto-review", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest"],
   metadata_hints: { base_url: "Codex upstream (adapter appends /responses)", chatgpt_account_id: "From session JWT (optional)" },
 };
 
@@ -209,6 +209,7 @@ export function AccountFormDialog({
   const { t } = useLanguage();
   const { toast } = useToast();
   const tlsProfiles = useTlsProfiles();
+  const testMut = useTestAccount();
 
   const initial =
     mode === "edit" && target ? accountFormFromAccount(target) : emptyAccountForm(defaultProviderId);
@@ -268,8 +269,16 @@ export function AccountFormDialog({
   const [priority, setPriority] = useState(initial.priority);
   const [weight, setWeight] = useState(initial.weight);
   const [upstreamClient, setUpstreamClient] = useState(initial.upstreamClient);
-  const [metadata, setMetadata] = useState<Record<string, unknown>>(initial.metadata);
+  const [baseUrl, setBaseUrl] = useState(
+    typeof initial.metadata.base_url === "string" ? (initial.metadata.base_url as string) : "",
+  );
+  const [metadata, setMetadata] = useState<Record<string, unknown>>(() => {
+    const m = { ...initial.metadata };
+    delete m.base_url;
+    return m;
+  });
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [credVisible, setCredVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [oauthWizardOpen, setOauthWizardOpen] = useState(false);
@@ -403,9 +412,14 @@ export function AccountFormDialog({
     if (template && mode === "create") {
       if (template.upstream_client) setUpstreamClient(template.upstream_client);
       if (template.default_metadata) {
+        const dm = { ...template.default_metadata };
+        if (typeof dm.base_url === "string") {
+          setBaseUrl((prev) => prev || (dm.base_url as string));
+          delete dm.base_url;
+        }
         setMetadata((prev) => {
           const next = { ...prev };
-          for (const [k, v] of Object.entries(template.default_metadata!)) {
+          for (const [k, v] of Object.entries(dm)) {
             if (!(k in next)) next[k] = v;
           }
           return next;
@@ -419,6 +433,23 @@ export function AccountFormDialog({
     setCredFields((prev) => ({ ...prev, [key]: value }));
   }
 
+  function handleTest() {
+    if (!target) return;
+    testMut.mutate(
+      { id: target.id, body: { mode: "live" } },
+      {
+        onSuccess: (result) => {
+          toast({
+            title: result?.ok ? t("adminAccounts.testOk") : t("adminAccounts.testFailed"),
+            description: result?.message || undefined,
+            tone: result?.ok ? "success" : "error",
+          });
+        },
+        onError: () => toast({ title: t("adminAccounts.testFailed"), tone: "error" }),
+      },
+    );
+  }
+
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -426,6 +457,8 @@ export function AccountFormDialog({
       setError(t("adminAccounts.credentialRequired"));
       return;
     }
+    const finalMetadata = { ...metadata };
+    if (baseUrl.trim()) finalMetadata.base_url = baseUrl.trim();
     const formState: AdminAccountFormState = {
       providerId,
       name,
@@ -437,7 +470,7 @@ export function AccountFormDialog({
       riskLevel,
       priority,
       weight,
-      metadata,
+      metadata: finalMetadata,
       groupIds: [],
     };
     let body;
@@ -491,7 +524,8 @@ export function AccountFormDialog({
             ) : null}
           </DialogHeader>
 
-          <div className="mt-4 max-h-[62vh] space-y-4 overflow-y-auto pr-1">
+          <div className="mt-4 max-h-[62vh] space-y-5 overflow-y-auto pr-1">
+            {/* ── Section: Identity ── */}
             {mode === "create" ? (
               <div>
                 <Label htmlFor="account-provider">{t("adminAccounts.provider")}</Label>
@@ -533,25 +567,27 @@ export function AccountFormDialog({
               />
             </div>
 
-            <div>
-              <Label htmlFor="account-runtime">{t("adminAccounts.authType")}</Label>
-              <Select
-                value={runtimeClass}
-                onValueChange={(v) => changeRuntime(v as RuntimeClass)}
-                disabled={busy}
-              >
-                <SelectTrigger id="account-runtime">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {runtimeClassOptions.map((rc) => (
-                    <SelectItem key={rc} value={rc}>
-                      {t(`adminAccounts.runtime.${rc}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* ── Section: Authentication ── */}
+            <div className="space-y-4 border-t border-srapi-border pt-4">
+              <div>
+                <Label htmlFor="account-runtime">{t("adminAccounts.authType")}</Label>
+                <Select
+                  value={runtimeClass}
+                  onValueChange={(v) => changeRuntime(v as RuntimeClass)}
+                  disabled={busy}
+                >
+                  <SelectTrigger id="account-runtime">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {runtimeClassOptions.map((rc) => (
+                      <SelectItem key={rc} value={rc}>
+                        {t(`adminAccounts.runtime.${rc}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
             <div>
               {spec.kind === "fields" ? (
@@ -585,15 +621,27 @@ export function AccountFormDialog({
                         >
                           {t(`adminAccounts.cred.${f.cred}Label`)}
                         </Label>
-                        <Input
-                          id={`cred-${f.key}`}
-                          type={f.secret ? "password" : "text"}
-                          autoComplete="off"
-                          className="font-mono"
-                          value={credFields[f.key] ?? ""}
-                          disabled={busy}
-                          onChange={(e) => setCredField(f.key, e.target.value)}
-                        />
+                        <div className="relative">
+                          <Input
+                            id={`cred-${f.key}`}
+                            type={f.secret && !credVisible ? "password" : "text"}
+                            autoComplete="off"
+                            className={cn("font-mono", f.secret && "pr-9")}
+                            value={credFields[f.key] ?? ""}
+                            disabled={busy}
+                            onChange={(e) => setCredField(f.key, e.target.value)}
+                          />
+                          {f.secret ? (
+                            <button
+                              type="button"
+                              tabIndex={-1}
+                              onClick={() => setCredVisible((v) => !v)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+                            >
+                              {credVisible ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -606,18 +654,28 @@ export function AccountFormDialog({
                     </Label>
                   </div>
                   {spec.kind === "password" ? (
-                    <Input
-                      id={credId}
-                      type="password"
-                      autoComplete="off"
-                      className="mt-1.5 font-mono"
-                      placeholder={
-                        spec.cred === "apiKey" ? t("adminAccounts.cred.apiKeyPlaceholder") : undefined
-                      }
-                      value={credInput}
-                      disabled={busy}
-                      onChange={(e) => setCredInput(e.target.value)}
-                    />
+                    <div className="relative mt-1.5">
+                      <Input
+                        id={credId}
+                        type={credVisible ? "text" : "password"}
+                        autoComplete="off"
+                        className="pr-9 font-mono"
+                        placeholder={
+                          spec.cred === "apiKey" ? t("adminAccounts.cred.apiKeyPlaceholder") : undefined
+                        }
+                        value={credInput}
+                        disabled={busy}
+                        onChange={(e) => setCredInput(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setCredVisible((v) => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+                      >
+                        {credVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
                   ) : (
                     <Textarea
                       id={credId}
@@ -631,6 +689,24 @@ export function AccountFormDialog({
                 </>
               )}
               <p className="mt-1 text-2xs text-srapi-text-tertiary">{credHint}</p>
+            </div>
+            </div>
+
+            {/* ── Section: Endpoint ── */}
+            <div>
+              <Label htmlFor="account-base-url">{t("adminAccounts.baseUrl")}</Label>
+              <Input
+                id="account-base-url"
+                type="url"
+                className="mt-1.5 font-mono"
+                placeholder={t("adminAccounts.baseUrlPlaceholder")}
+                value={baseUrl}
+                disabled={busy}
+                onChange={(e) => setBaseUrl(e.target.value)}
+              />
+              <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                {t("adminAccounts.baseUrlHint")}
+              </p>
             </div>
 
             {/* Advanced — everything an admin rarely touches, collapsed by default. */}
@@ -874,6 +950,18 @@ export function AccountFormDialog({
             <Button type="button" variant="ghost" disabled={busy} onClick={() => onOpenChange(false)}>
               {t("common.cancel")}
             </Button>
+            {mode === "edit" && target ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                loading={testMut.isPending}
+                onClick={handleTest}
+              >
+                <Zap className="size-3.5" />
+                {t("adminAccounts.test")}
+              </Button>
+            ) : null}
             <Button type="submit" variant="primary" loading={busy}>
               {t("common.save")}
             </Button>

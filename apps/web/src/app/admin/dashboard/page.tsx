@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { CSSProperties } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { LineChart } from "lucide-react";
+import { LineChart, Server } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
@@ -16,8 +16,9 @@ import { TokenBreakdown } from "@/components/charts/token-breakdown";
 import { ChartEmpty } from "@/components/charts/chart-empty";
 import { TrendChartSkeleton, BarChartSkeleton } from "@/components/charts/chart-skeleton";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
-import { useAdminDashboard } from "@/hooks/admin-queries";
+import { useAdminDashboard, useAccountsHealthSummary } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { ADMIN_ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/cn";
 import {
   formatInteger,
@@ -156,6 +157,9 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
     value: m.request_count,
   }));
   const tokenTrend = snapshot.token_trend.map((p) => p.token_count);
+  const requestSpark = snapshot.token_trend.map((p) => p.request_count);
+  const tokenSpark = snapshot.token_trend.map((p) => p.token_count);
+  const costSpark = snapshot.token_trend.map((p) => Number(p.cost));
   const topUsers = [...snapshot.user_usage_trend]
     .sort((a, b) => b.request_count - a.request_count)
     .slice(0, 8)
@@ -172,6 +176,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
             value={traffic.total_requests}
             format={formatCompactNumber}
             unit={t("dashboard.requests")}
+            spark={requestSpark}
             hint={`${t("dashboard.today")} ${formatCompactNumber(traffic.today_requests)} · ${t(
               "dashboard.successRate",
             )} ${successRate != null ? formatPercent(successRate) : "—"}`}
@@ -183,6 +188,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
             label={t("dashboard.totalTokens")}
             value={tokens.total_tokens}
             format={formatCompactNumber}
+            spark={tokenSpark}
             hint={`${t("dashboard.today")} ${formatCompactNumber(tokens.today_tokens)} · ${t(
               "dashboard.inputTokens",
             )} ${formatCompactNumber(tokens.input_tokens)} / ${t(
@@ -196,6 +202,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
             label={t("dashboard.cost")}
             value={Number(c.actual_cost)}
             format={(n) => formatMoney(n, c.currency)}
+            spark={costSpark}
             hint={`${t("dashboard.standardCost")} ${formatMoney(c.standard_cost, c.currency)} · ${t(
               "dashboard.accountCost",
             )} ${formatMoney(c.account_cost, c.currency)}`}
@@ -237,8 +244,11 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
         </div>
       </div>
 
+      {/* Account health overview */}
+      <AccountHealthOverview staggerIndex={6} />
+
       {/* Token composition */}
-      <Card className="anim-rise-sm" style={rise(6)}>
+      <Card className="anim-rise-sm" style={rise(7)}>
         <CardHeader>
           <CardTitle>
             {t("dashboard.tokenBreakdown")}
@@ -259,7 +269,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
       </Card>
 
       {/* Token trend over the window */}
-      <Card className="anim-rise-sm" style={rise(7)}>
+      <Card className="anim-rise-sm" style={rise(8)}>
         <CardContent>
           <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
             {t("dashboard.tokenTrend")}
@@ -282,7 +292,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
       </Card>
 
       {/* Distributions: by model + by user */}
-      <div className="anim-rise-sm grid gap-4 md:grid-cols-2" style={rise(8)}>
+      <div className="anim-rise-sm grid gap-4 md:grid-cols-2" style={rise(9)}>
         <Card>
           <CardHeader>
             <CardTitle>
@@ -319,6 +329,81 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
             )}
           </CardContent>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+function AccountHealthOverview({ staggerIndex }: { staggerIndex: number }) {
+  const { t } = useLanguage();
+  const healthSummary = useAccountsHealthSummary();
+  const data = healthSummary.data ?? [];
+  if (data.length === 0 && !healthSummary.isLoading) return null;
+
+  const healthy = data.filter((h) => h.circuit_state === "closed" && h.success_rate >= 0.9).length;
+  const degraded = data.filter((h) => h.circuit_state === "closed" && h.success_rate < 0.9).length;
+  const tripped = data.filter((h) => h.circuit_state !== "closed").length;
+  const quotaLow = data.filter((h) => h.quota_remaining_ratio < 0.2 && h.quota_remaining_ratio >= 0).length;
+
+  return (
+    <Card className="anim-rise-sm" style={rise(staggerIndex)}>
+      <CardContent>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Server className="size-4 text-srapi-text-tertiary" />
+            <span className="font-mono text-2xs uppercase tracking-wide text-srapi-text-tertiary">
+              {t("dashboard.accountHealth")}
+            </span>
+          </div>
+          <a
+            href={ADMIN_ROUTES.accounts + "?view=health"}
+            className="text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+          >
+            {t("dashboard.viewAll")} &rarr;
+          </a>
+        </div>
+        {healthSummary.isLoading ? (
+          <div className="mt-3 flex gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 flex-1" />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <HealthMiniStat label={t("dashboard.healthyAccounts")} count={healthy} tone="success" />
+            <HealthMiniStat label={t("dashboard.degradedAccounts")} count={degraded} tone="warning" />
+            <HealthMiniStat label={t("dashboard.trippedAccounts")} count={tripped} tone="error" />
+            <HealthMiniStat label={t("dashboard.quotaLow")} count={quotaLow} tone="warning" />
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function HealthMiniStat({
+  label,
+  count,
+  tone,
+}: {
+  label: string;
+  count: number;
+  tone: "success" | "warning" | "error";
+}) {
+  const dotColor =
+    tone === "success"
+      ? "bg-srapi-success"
+      : tone === "warning"
+        ? "bg-srapi-warning"
+        : "bg-srapi-error";
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-srapi-border px-3 py-2">
+      <span className={cn("size-2 rounded-full", dotColor, count === 0 && "opacity-30")} />
+      <div>
+        <div className={cn("font-mono text-sm font-semibold tabular", count === 0 && "text-srapi-text-tertiary")}>
+          {count}
+        </div>
+        <div className="text-[10px] leading-tight text-srapi-text-tertiary">{label}</div>
       </div>
     </div>
   );

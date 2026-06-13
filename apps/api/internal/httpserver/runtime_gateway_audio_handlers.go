@@ -39,7 +39,7 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 		writeGatewayError(w, audioTranscriptionDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid audio transcription request", "invalid_request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), body.Model)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -312,7 +312,7 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid audio speech request", "invalid_request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), body.Model)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,

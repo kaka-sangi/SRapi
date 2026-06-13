@@ -27,6 +27,7 @@ import (
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	"github.com/srapi/srapi/apps/api/internal/pkg/money"
+	"github.com/srapi/srapi/apps/api/internal/platform/circuitbreaker"
 	"github.com/srapi/srapi/apps/api/internal/platform/glob"
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 )
@@ -807,6 +808,17 @@ func (rt *runtimeState) fillCandidateRuntimeStates(ctx context.Context, candidat
 		if live := concurrencyByAccount[account.ID]; live > state.CurrentConcurrency {
 			state.CurrentConcurrency = live
 		}
+		// Overlay gateway-level circuit breaker state. The per-account breaker
+		// tracks recent upstream failures with exponential backoff and trips
+		// faster than the health-probe cycle, so it catches bursts of errors
+		// that the periodic probe misses.
+		rt.accountBreakersMu.RLock()
+		if b, ok := rt.accountBreakers[account.ID]; ok {
+			if b.State() == circuitbreaker.StateOpen {
+				state.CircuitOpen = true
+			}
+		}
+		rt.accountBreakersMu.RUnlock()
 		// Least-recently-used marker for fair rotation across equal-scored accounts.
 		if lastUsed := lastUsedByAccount[account.ID]; lastUsed > state.LastUsedUnixMs {
 			state.LastUsedUnixMs = lastUsed

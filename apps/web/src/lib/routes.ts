@@ -43,6 +43,7 @@ export const ADMIN_ROUTES = {
   opsScheduledTests: "/admin/ops?tab=scheduled-tests",
   opsSchedulerDecisions: "/admin/ops?tab=scheduler-decisions",
   eventsOutbox: "/admin/ops/events",
+  diagnostics: "/admin/ops/diagnostics",
   riskControl: "/admin/risk-control",
   auditLogs: "/admin/audit-logs",
   billingLedger: "/admin/billing-ledger",

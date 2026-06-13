@@ -102,6 +102,16 @@ function GroupsContent() {
       render: (g) => <span className="text-srapi-text-secondary">{g.description || "—"}</span>,
     },
     {
+      key: "strategy",
+      header: t("adminGroups.strategy"),
+      hideOnMobile: true,
+      render: (g) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary">
+          {g.strategy_hint || "default"}
+        </span>
+      ),
+    },
+    {
       key: "ratelimit",
       header: t("adminRateLimit.column"),
       hideOnMobile: true,

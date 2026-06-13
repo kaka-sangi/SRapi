@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/srapi/srapi/apps/api/internal/platform/circuitbreaker"
+
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
@@ -480,7 +482,21 @@ NextCandidate:
 			}
 			return gatewayFailoverResult[T]{ScheduleResult: result, Err: err}
 		}
+		breaker := s.runtime.accountBreaker(result.Candidate.Account.ID)
+		breakerDone, breakerErr := breaker.Allow()
+		if errors.Is(breakerErr, circuitbreaker.ErrCircuitOpen) {
+			s.runtime.logger.Info("circuit breaker open, skipping account",
+				"request_id", canonical.RequestID,
+				"account_id", result.Candidate.Account.ID,
+				"attempt_no", attemptNo)
+			excluded = append(excluded, result.Candidate.Account.ID)
+			decisionID := result.Decision.ID
+			fallbackFromDecisionID = &decisionID
+			continue
+		}
+
 		if err := s.reserveGatewayAccountQuotaForScheduledRequest(ctx, r, authed, canonical, result, admission, startedAt); err != nil {
+			breakerDone(false)
 			errorClass, upstreamStatus, _ := providerGatewayError(err)
 			lastFailure = gatewayFailoverResult[T]{
 				ScheduleResult:  result,
@@ -501,10 +517,7 @@ NextCandidate:
 		for sameCandidateRetries := 0; ; {
 			response, err := invoke(ctx, result.Candidate)
 			if err == nil {
-				// Pin this session to the account that just succeeded so the next
-				// turn reuses it (prompt-cache affinity). If an earlier sticky
-				// account failed and we failed over, this overwrites the stale
-				// binding to the now-healthy account.
+				breakerDone(true)
 				s.runtime.bindGatewaySessionAffinity(ctx, scheduleReq.APIKeyID, scheduleReq.SessionAffinityKey, result.Candidate.Account.ID)
 				if conversationResp, ok := any(response).(provideradaptercontract.ConversationResponse); ok {
 					s.runtime.bindGatewayPreviousResponseAffinity(ctx, scheduleReq.APIKeyID, conversationResp.ID, result.Candidate.Account.ID)
@@ -518,6 +531,7 @@ NextCandidate:
 				delay := gatewaySameCandidateRetryDelay(retryPolicy, sameCandidateRetries, err)
 				s.runtime.logger.Info("retrying gateway provider candidate", "request_id", canonical.RequestID, "attempt_no", result.Decision.AttemptNo, "retry_no", sameCandidateRetries, "account_id", result.Candidate.Account.ID, "provider_id", result.Candidate.Provider.ID, "error_class", errorClass, "status_code", upstreamStatus, "delay_ms", int(delay/time.Millisecond))
 				if err := sleepGatewayRetryDelay(ctx, delay); err != nil {
+					breakerDone(false)
 					s.recordGatewayProviderAttemptFailure(r, authed, canonical, result, err, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
 					return gatewayFailoverResult[T]{
 						ScheduleResult:  result,
@@ -528,6 +542,7 @@ NextCandidate:
 				continue
 			}
 
+			breakerDone(false)
 			s.recordGatewayProviderAttemptFailure(r, authed, canonical, result, err, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
 			lastFailure = gatewayFailoverResult[T]{
 				ScheduleResult:  result,

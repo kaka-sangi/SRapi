@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { LayoutGrid, List, SearchX, Server } from "lucide-react";
+import { LayoutGrid, List, RefreshCw, SearchX, Server, Timer } from "lucide-react";
+import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
@@ -109,10 +111,17 @@ function downloadJson(filename: string, data: unknown) {
 function AccountsContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const qc = useQueryClient();
   const list = useAdminList();
   const searchParams = useSearchParams();
   const readOnlyHealthView = searchParams.get("view") === "health";
   const colVis = useColumnVisibility("admin-accounts", ["created_at", "updated_at", "notes"]);
+
+  const autoRefresh = useAutoRefresh(
+    () => void qc.invalidateQueries({ queryKey: ["admin"] }),
+    { storageKey: "admin-accounts", defaultInterval: 30 },
+  );
+
   const statusFilter =
     (list.filters.status as ProviderAccount["status"]) || (readOnlyHealthView ? "active" : undefined);
   const providerFilter = list.filters.providerId || undefined;
@@ -149,6 +158,17 @@ function AccountsContent() {
   const [deleteTarget, setDeleteTarget] = useState<ProviderAccount | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [listMode, setListMode] = useState<AccountListMode>("cards");
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "n" && !readOnlyHealthView) { e.preventDefault(); setFormTarget("new"); }
+      if (e.key === "r") { e.preventDefault(); void qc.invalidateQueries({ queryKey: ["admin"] }); }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [qc, readOnlyHealthView]);
 
   const providerOptions = (providers.data?.data ?? []).map((p) => ({
     value: p.id,
@@ -266,6 +286,18 @@ function AccountsContent() {
           {providerNameById.get(String(a.provider_id)) || a.provider_id}
         </span>
       ),
+    },
+    {
+      key: "base_url",
+      header: t("adminAccounts.baseUrl"),
+      hideOnMobile: true,
+      sortValue: (a) => metadataString(a.metadata, "base_url"),
+      render: (a) => {
+        const url = metadataString(a.metadata, "base_url");
+        return url ? (
+          <span className="max-w-[12rem] truncate font-mono text-2xs text-srapi-text-tertiary" title={url}>{url}</span>
+        ) : <span className="text-2xs text-srapi-text-tertiary">—</span>;
+      },
     },
     {
       key: "type",
@@ -442,6 +474,10 @@ function AccountsContent() {
             {accounts.data ? (
               <ListCount total={accounts.data.pagination?.total ?? accounts.data.data.length} />
             ) : null}
+            {accounts.isFetching ? (
+              <RefreshCw className="size-3 animate-spin text-srapi-text-tertiary" />
+            ) : null}
+            <AutoRefreshButton autoRefresh={autoRefresh} />
             {readOnlyHealthView ? (
               <QuietBadge status="active" label={t("adminAccounts.healthView")} />
             ) : (
@@ -455,7 +491,7 @@ function AccountsContent() {
                   {t("adminAccounts.export")}
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-                  {t("adminAccounts.importAction")}
+                  {t("batchAdd.tab")} / {t("adminAccounts.importAction")}
                 </Button>
                 <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
                   + {t("adminAccounts.create")}
@@ -465,6 +501,8 @@ function AccountsContent() {
           </div>
         }
       />
+      <HealthSummaryStrip healthById={healthById} total={accounts.data?.data.length ?? 0} />
+
       {listMode === "cards" ? (
         <AccountsCardView
           query={accounts}
@@ -487,6 +525,7 @@ function AccountsContent() {
               </div>
             )
           }
+          onDetail={setDetailTarget}
           renderActions={renderRowActions}
           renderStatus={(a) => (
             <AccountStatusCell
@@ -633,12 +672,63 @@ function AccountsContent() {
   );
 }
 
+function HealthSummaryStrip({
+  healthById,
+  total,
+}: {
+  healthById: Map<string, AccountHealthSnapshot>;
+  total: number;
+}) {
+  if (healthById.size === 0 || total === 0) return null;
+  const entries = [...healthById.values()];
+  const healthy = entries.filter((h) => h.circuit_state === "closed" && h.success_rate >= 0.9).length;
+  const degraded = entries.filter((h) => h.circuit_state === "closed" && h.success_rate < 0.9 && h.success_rate > 0).length;
+  const tripped = entries.filter((h) => h.circuit_state !== "closed").length;
+  const pctH = total > 0 ? (healthy / total) * 100 : 0;
+  const pctD = total > 0 ? (degraded / total) * 100 : 0;
+  const pctT = total > 0 ? (tripped / total) * 100 : 0;
+  return (
+    <div className="mb-4 flex items-center gap-3">
+      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-srapi-border">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-srapi-success transition-all"
+          style={{ width: `${pctH}%` }}
+        />
+        <div
+          className="absolute inset-y-0 rounded-full bg-srapi-warning transition-all"
+          style={{ left: `${pctH}%`, width: `${pctD}%` }}
+        />
+        <div
+          className="absolute inset-y-0 rounded-full bg-srapi-error transition-all"
+          style={{ left: `${pctH + pctD}%`, width: `${pctT}%` }}
+        />
+      </div>
+      <span className="flex shrink-0 items-center gap-2 font-mono text-2xs text-srapi-text-tertiary">
+        <span className="flex items-center gap-1">
+          <span className="size-1.5 rounded-full bg-srapi-success" />{healthy}
+        </span>
+        {degraded > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="size-1.5 rounded-full bg-srapi-warning" />{degraded}
+          </span>
+        )}
+        {tripped > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="size-1.5 rounded-full bg-srapi-error" />{tripped}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
 function AccountHealthCell({ health }: { health?: AccountHealthSnapshot }) {
   if (!health) return <span className="text-2xs text-srapi-text-tertiary">—</span>;
   const rate = health.success_rate;
   const circuit = health.circuit_state;
   const isOpen = circuit === "open";
   const isHalfOpen = circuit === "half-open";
+  const p50 = Math.round(health.latency_p50_ms);
   return (
     <span className="flex items-center gap-1.5">
       <span
@@ -650,8 +740,16 @@ function AccountHealthCell({ health }: { health?: AccountHealthSnapshot }) {
       <span className="font-mono text-2xs tabular text-srapi-text-secondary">
         {Math.round(rate * 100)}%
       </span>
+      {p50 > 0 ? (
+        <span className="font-mono text-[10px] tabular text-srapi-text-tertiary">{p50}ms</span>
+      ) : null}
       {health.error_class ? (
         <span className="max-w-[6rem] truncate text-2xs text-srapi-error">{health.error_class}</span>
+      ) : null}
+      {health.cooldown_until ? (
+        <span className="text-[10px] text-srapi-warning" title={health.cooldown_reason ?? undefined}>
+          {health.cooldown_reason ?? "cooldown"}
+        </span>
       ) : null}
     </span>
   );
@@ -699,6 +797,73 @@ function ViewModeToggle({
   );
 }
 
+function AutoRefreshButton({
+  autoRefresh,
+}: {
+  autoRefresh: ReturnType<typeof useAutoRefresh>;
+}) {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(autoRefresh.enabled && "border-srapi-success/40")}
+      >
+        {autoRefresh.enabled ? (
+          <RefreshCw className="size-3.5 animate-spin text-srapi-success" style={{ animationDuration: `${autoRefresh.interval}s` }} />
+        ) : (
+          <Timer className="size-3.5" />
+        )}
+        <span className="hidden sm:inline">
+          {autoRefresh.enabled
+            ? `${autoRefresh.timeUntilRefresh}s`
+            : t("common.autoRefresh")}
+        </span>
+      </Button>
+      {open ? (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-50 mt-1.5 w-44 rounded-lg border border-srapi-border bg-srapi-card p-1.5 shadow-lg">
+            <button
+              type="button"
+              onClick={() => { autoRefresh.toggle(); setOpen(false); }}
+              className="flex w-full items-center justify-between rounded-md px-3 py-2 text-xs text-srapi-text-secondary transition-colors hover:bg-srapi-card-muted"
+            >
+              <span>{autoRefresh.enabled ? t("common.off") : t("common.autoRefresh")}</span>
+              {autoRefresh.enabled ? (
+                <span className="size-1.5 rounded-full bg-srapi-success" />
+              ) : null}
+            </button>
+            <div className="my-1 border-t border-srapi-border" />
+            {autoRefresh.intervalOptions.map((sec) => (
+              <button
+                key={sec}
+                type="button"
+                onClick={() => { autoRefresh.setInterval(sec); if (!autoRefresh.enabled) autoRefresh.toggle(); setOpen(false); }}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs transition-colors hover:bg-srapi-card-muted",
+                  autoRefresh.interval === sec && autoRefresh.enabled
+                    ? "font-medium text-srapi-text-primary"
+                    : "text-srapi-text-tertiary",
+                )}
+              >
+                <span>{sec}s</span>
+                {autoRefresh.interval === sec && autoRefresh.enabled ? (
+                  <span className="text-2xs text-srapi-success">&#10003;</span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function AccountsCardView({
   query,
   providerNameById,
@@ -709,6 +874,7 @@ function AccountsCardView({
   isFiltered,
   onClearFilters,
   emptyAction,
+  onDetail,
   renderActions,
   renderStatus,
 }: {
@@ -721,6 +887,7 @@ function AccountsCardView({
   isFiltered: boolean;
   onClearFilters: () => void;
   emptyAction?: ReactNode;
+  onDetail?: (account: ProviderAccount) => void;
   renderActions: (account: ProviderAccount) => ReactNode;
   renderStatus: (account: ProviderAccount) => ReactNode;
 }) {
@@ -771,6 +938,7 @@ function AccountsCardView({
               providerNameById={providerNameById}
               healthById={healthById}
               selection={selection}
+              onDetail={onDetail}
               renderActions={renderActions}
               renderStatus={renderStatus}
             />
@@ -797,6 +965,7 @@ function AccountCardGrid({
   providerNameById,
   healthById,
   selection,
+  onDetail,
   renderActions,
   renderStatus,
 }: {
@@ -804,6 +973,7 @@ function AccountCardGrid({
   providerNameById: Map<string, string>;
   healthById: Map<string, AccountHealthSnapshot>;
   selection?: AccountSelection;
+  onDetail?: (account: ProviderAccount) => void;
   renderActions: (account: ProviderAccount) => ReactNode;
   renderStatus: (account: ProviderAccount) => ReactNode;
 }) {
@@ -832,6 +1002,7 @@ function AccountCardGrid({
             health={healthById.get(account.id)}
             selected={selection?.selected.has(account.id) ?? false}
             onSelect={selection ? () => selection.onToggle(account.id) : undefined}
+            onDetail={onDetail ? () => onDetail(account) : undefined}
             actions={renderActions(account)}
             status={renderStatus(account)}
           />
@@ -841,12 +1012,38 @@ function AccountCardGrid({
   );
 }
 
+const PROVIDER_ACCENT: Record<string, string> = {
+  anthropic: "border-l-orange-400",
+  openai: "border-l-emerald-500",
+  deepseek: "border-l-blue-500",
+  gemini: "border-l-sky-400",
+  groq: "border-l-amber-500",
+  mistral: "border-l-indigo-400",
+  openrouter: "border-l-violet-500",
+  codex: "border-l-emerald-400",
+  grok: "border-l-slate-400",
+  kimi: "border-l-teal-400",
+  moonshot: "border-l-teal-400",
+  qwen: "border-l-purple-400",
+  together: "border-l-rose-400",
+  cerebras: "border-l-cyan-400",
+};
+
+function providerAccent(name: string): string {
+  const lower = name.toLowerCase();
+  for (const [key, cls] of Object.entries(PROVIDER_ACCENT)) {
+    if (lower.includes(key)) return cls;
+  }
+  return "border-l-srapi-border";
+}
+
 function AccountCard({
   account,
   providerName,
   health,
   selected,
   onSelect,
+  onDetail,
   actions,
   status,
 }: {
@@ -855,17 +1052,28 @@ function AccountCard({
   health?: AccountHealthSnapshot;
   selected: boolean;
   onSelect?: () => void;
+  onDetail?: () => void;
   actions: ReactNode;
   status: ReactNode;
 }) {
   const { t } = useLanguage();
+  const hasPriority = account.priority != null && account.priority !== 0;
+  const hasWeight = account.weight != null && account.weight !== 1;
   return (
     <article
       className={cn(
-        "rounded-lg border border-srapi-border bg-srapi-card px-4 py-3.5 transition-colors",
+        "rounded-lg border border-srapi-border border-l-[3px] bg-srapi-card px-4 py-3.5 transition-colors",
+        providerAccent(providerName),
         account.status === "disabled" && "opacity-60",
         selected && "border-srapi-primary/50 bg-srapi-card-muted",
+        onDetail && "cursor-pointer hover:bg-srapi-card-muted/50",
       )}
+      onClick={(e) => {
+        if (!onDetail) return;
+        const target = e.target as HTMLElement;
+        if (target.closest("button, input, a, [role=menuitem]")) return;
+        onDetail();
+      }}
     >
       <div className="flex items-start gap-3">
         {onSelect ? (
@@ -881,17 +1089,29 @@ function AccountCard({
             <div className="min-w-0">
               <h3 className="truncate text-sm font-medium text-srapi-text-primary">{account.name}</h3>
               <p className="mt-1 truncate text-xs text-srapi-text-secondary">{providerName}</p>
+              {metadataString(account.metadata, "base_url") ? (
+                <p className="mt-0.5 truncate font-mono text-2xs text-srapi-text-tertiary">
+                  {metadataString(account.metadata, "base_url")}
+                </p>
+              ) : null}
             </div>
             <div className="shrink-0">{actions}</div>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {status}
             <span className="font-mono text-2xs text-srapi-text-tertiary">{account.runtime_class}</span>
+            {hasPriority || hasWeight ? (
+              <span className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+                {hasPriority ? `P${account.priority}` : ""}
+                {hasPriority && hasWeight ? " · " : ""}
+                {hasWeight ? `W${account.weight}` : ""}
+              </span>
+            ) : null}
           </div>
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 border-t border-srapi-border/70 pt-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-srapi-border/70 pt-3">
         <AccountCardMetric label={t("adminAccounts.healthTitle")}>
           <AccountHealthCell health={health} />
         </AccountCardMetric>
@@ -944,7 +1164,7 @@ function AccountCardSkeleton() {
     <div className="min-h-[55vh] p-3">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-lg border border-srapi-border px-4 py-3.5">
+          <div key={i} className="rounded-lg border border-l-[3px] border-srapi-border px-4 py-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-2">
                 <Skeleton className="h-4 w-36" />
@@ -952,7 +1172,11 @@ function AccountCardSkeleton() {
               </div>
               <Skeleton className="h-8 w-8" />
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-3 flex gap-2">
+              <Skeleton className="h-6 w-16" />
+              <Skeleton className="h-6 w-20" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-srapi-border/70 pt-3">
               <Skeleton className="h-8 w-full" />
               <Skeleton className="h-8 w-full" />
             </div>

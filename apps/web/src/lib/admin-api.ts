@@ -426,6 +426,26 @@ export interface AdminTimeRange {
   end?: string;
 }
 
+export interface CircuitBreakerEntry {
+  account_id: number;
+  state: "closed" | "open" | "half-open";
+  requests: number;
+  total_successes: number;
+  total_failures: number;
+  consecutive_successes: number;
+  consecutive_failures: number;
+  success_rate: number;
+}
+
+export interface CacheStatsEntry {
+  name: string;
+  hits: number;
+  misses: number;
+  evictions: number;
+  size: number;
+  hit_rate: string;
+}
+
 export interface AdminUnsupportedSurface {
   title: string;
   contractPath?: string;
@@ -1560,6 +1580,50 @@ export const adminApi = {
   async deleteGroupRateLimit(groupId: Id): Promise<void> {
     configureAdminClient();
     await deleteAdminGroupRateLimit({ path: { groupId }, throwOnError: true });
+  },
+
+  async getCircuitBreakers(): Promise<CircuitBreakerEntry[]> {
+    const base = configuredApiBaseUrl();
+    const res = await fetch(`${base}/api/v1/admin/diagnostics/circuit-breakers`, {
+      credentials: "include",
+      headers: { "X-CSRF-Token": getStoredCSRFToken() ?? "" },
+    });
+    if (!res.ok) throw new Error("Failed to fetch circuit breaker status");
+    const json = await res.json();
+    return json.data ?? [];
+  },
+
+  async resetCircuitBreaker(accountId: number): Promise<void> {
+    const base = configuredApiBaseUrl();
+    const res = await fetch(`${base}/api/v1/admin/diagnostics/circuit-breakers/${accountId}/reset`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "X-CSRF-Token": getStoredCSRFToken() ?? "" },
+    });
+    if (!res.ok) throw new Error("Failed to reset circuit breaker");
+  },
+
+  async getCacheStats(): Promise<CacheStatsEntry[]> {
+    const base = configuredApiBaseUrl();
+    const res = await fetch(`${base}/api/v1/admin/diagnostics/cache-stats`, {
+      credentials: "include",
+      headers: { "X-CSRF-Token": getStoredCSRFToken() ?? "" },
+    });
+    if (!res.ok) throw new Error("Failed to fetch cache stats");
+    const json = await res.json();
+    return json.data ?? [];
+  },
+
+  async clearCache(): Promise<{ cleared: number }> {
+    const base = configuredApiBaseUrl();
+    const res = await fetch(`${base}/api/v1/admin/diagnostics/cache/clear`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "X-CSRF-Token": getStoredCSRFToken() ?? "" },
+    });
+    if (!res.ok) throw new Error("Failed to clear cache");
+    const json = await res.json();
+    return json.data;
   },
 };
 

@@ -133,6 +133,7 @@ const ADMIN_OPS_SECTION: NavSection = {
     { href: ADMIN_ROUTES.riskControl, labelKey: "nav.adminRiskControl", icon: Shield },
     { href: ADMIN_ROUTES.announcements, labelKey: "nav.adminAnnouncements", icon: Megaphone },
     { href: ADMIN_ROUTES.eventsOutbox, labelKey: "nav.adminOutbox", icon: Webhook },
+    { href: ADMIN_ROUTES.diagnostics, labelKey: "nav.adminDiagnostics", icon: Cpu },
   ],
 };
 

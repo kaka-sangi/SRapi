@@ -55,7 +55,7 @@ func (s *Server) handleGetGeminiModel(w http.ResponseWriter, r *http.Request) {
 		writeGeminiGatewayError(w, http.StatusBadRequest, "INVALID_ARGUMENT", err.Error())
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelRef)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), modelRef)
 	if err != nil || modelResolution.Model.Status != modelcontract.StatusActive {
 		writeGeminiGatewayError(w, http.StatusNotFound, "NOT_FOUND", "model not found")
 		return

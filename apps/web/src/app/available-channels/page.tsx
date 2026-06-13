@@ -1,12 +1,14 @@
 "use client";
 
-import { ListChecks } from "lucide-react";
+import { useState, useMemo } from "react";
+import { ListChecks, Search } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import {
   Table,
@@ -33,6 +35,7 @@ export default function AvailableChannelsPage() {
 function AvailableChannelsContent() {
   const { t } = useLanguage();
   const availableModels = useAvailableModels();
+  const [search, setSearch] = useState("");
 
   return (
     <>
@@ -50,7 +53,7 @@ function AvailableChannelsContent() {
               description={t("availableChannels.emptyBody")}
             />
           ) : (
-            <AvailableModelsTable models={models} />
+            <AvailableModelsTable models={models} search={search} onSearchChange={setSearch} />
           )
         }
       </PageQueryState>
@@ -58,17 +61,54 @@ function AvailableChannelsContent() {
   );
 }
 
-function AvailableModelsTable({ models }: { models: AvailableModelSummary[] }) {
+function AvailableModelsTable({
+  models,
+  search,
+  onSearchChange,
+}: {
+  models: AvailableModelSummary[];
+  search: string;
+  onSearchChange: (v: string) => void;
+}) {
   const { t } = useLanguage();
-  const rows = models.flatMap((model) => model.channels.map((channel) => ({ model, channel })));
+  const filtered = useMemo(() => {
+    if (!search.trim()) return models;
+    const q = search.trim().toLowerCase();
+    return models.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.id.toLowerCase().includes(q) ||
+        m.channels.some(
+          (c) =>
+            c.provider_display_name.toLowerCase().includes(q) ||
+            c.upstream_model.toLowerCase().includes(q),
+        ),
+    );
+  }, [models, search]);
+  const rows = filtered.flatMap((model) => model.channels.map((channel) => ({ model, channel })));
+  const available = models.filter((m) => m.status === "available").length;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("availableChannels.models")}</CardTitle>
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
-          {t("availableChannels.modelCount", { count: models.length })}
-        </span>
+        <div className="flex flex-1 flex-wrap items-center gap-3">
+          <CardTitle>{t("availableChannels.models")}</CardTitle>
+          <div className="flex items-center gap-2 font-mono text-2xs text-srapi-text-tertiary">
+            <span className="size-1.5 rounded-full bg-srapi-success" />
+            <span>{available} {t("availableChannels.available")}</span>
+            <span className="text-srapi-border">·</span>
+            <span>{models.length} {t("dashboard.total").toLowerCase()}</span>
+          </div>
+        </div>
+        <div className="relative w-full sm:w-56">
+          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-srapi-text-tertiary" />
+          <Input
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={t("common.search")}
+            className="pl-8 text-xs"
+          />
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         <TableScroll minWidth={920}>

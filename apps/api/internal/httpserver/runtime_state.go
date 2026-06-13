@@ -7,12 +7,15 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"golang.org/x/sync/singleflight"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	"github.com/srapi/srapi/apps/api/internal/platform/circuitbreaker"
+	"github.com/srapi/srapi/apps/api/internal/platform/localcache"
 	accountprovisioningservice "github.com/srapi/srapi/apps/api/internal/modules/account_provisioning/service"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	accountservice "github.com/srapi/srapi/apps/api/internal/modules/accounts/service"
@@ -218,6 +221,11 @@ type runtimeState struct {
 	// rotating refresh tokens are never consumed twice in parallel (which would
 	// invalidate the session and park the account).
 	credentialRefreshGroup singleflight.Group
+
+	accountBreakers   map[int]*circuitbreaker.Breaker
+	accountBreakersMu sync.RWMutex
+
+	modelResolutionCache *localcache.Cache[modelcontract.ModelResolution]
 }
 
 type dependencyHealth struct {
@@ -916,7 +924,71 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		capabilities:         seedCapabilities(),
 		databaseProbe:        opts.database,
 		redisProbe:           opts.redis,
+		accountBreakers: make(map[int]*circuitbreaker.Breaker),
+		modelResolutionCache: localcache.New[modelcontract.ModelResolution](localcache.Config{
+			MaxEntries: 512,
+			DefaultTTL: 30 * time.Second,
+		}),
 	}
+}
+
+func (rt *runtimeState) resolveModelCached(ctx context.Context, name string) (modelcontract.ModelResolution, error) {
+	if cached, ok := rt.modelResolutionCache.Get(name); ok {
+		return cached, nil
+	}
+	resolution, err := rt.models.ResolveModelReference(ctx, name)
+	if err != nil {
+		return resolution, err
+	}
+	rt.modelResolutionCache.Set(name, resolution)
+	return resolution, nil
+}
+
+func (rt *runtimeState) invalidateModelCache(names ...string) {
+	if rt.modelResolutionCache == nil {
+		return
+	}
+	for _, name := range names {
+		rt.modelResolutionCache.Delete(name)
+	}
+}
+
+func (rt *runtimeState) closeLocalCaches() {
+	if rt.modelResolutionCache != nil {
+		rt.modelResolutionCache.Close()
+	}
+}
+
+func (rt *runtimeState) accountBreaker(accountID int) *circuitbreaker.Breaker {
+	rt.accountBreakersMu.RLock()
+	b, ok := rt.accountBreakers[accountID]
+	rt.accountBreakersMu.RUnlock()
+	if ok {
+		return b
+	}
+
+	rt.accountBreakersMu.Lock()
+	defer rt.accountBreakersMu.Unlock()
+	if b, ok = rt.accountBreakers[accountID]; ok {
+		return b
+	}
+	b = circuitbreaker.New(circuitbreaker.Config{
+		FailureThreshold:    5,
+		SuccessThreshold:    2,
+		Timeout:             30 * time.Second,
+		MaxTimeout:          5 * time.Minute,
+		MaxHalfOpenRequests: 1,
+		OnStateChange: func(from, to circuitbreaker.State) {
+			if rt.logger != nil {
+				rt.logger.Info("account circuit breaker state change",
+					"account_id", accountID,
+					"from", from.String(),
+					"to", to.String())
+			}
+		},
+	})
+	rt.accountBreakers[accountID] = b
+	return b
 }
 
 func runtimeMetricsFromOptions(opts runtimeOptions) *runtimeMetricsState {

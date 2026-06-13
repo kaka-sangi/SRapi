@@ -23,6 +23,7 @@ import {
   useTestProvider,
   useDeleteProvider,
   useInstallProviderPresets,
+  useAccountsHealthSummary,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -66,6 +67,15 @@ function ProvidersContent() {
   const testMut = useTestProvider();
   const deleteMut = useDeleteProvider();
   const installMut = useInstallProviderPresets();
+  const healthSummary = useAccountsHealthSummary();
+  const accountCountByProvider = new Map<string, { active: number; total: number }>();
+  for (const h of healthSummary.data ?? []) {
+    const pid = String(h.provider_id);
+    const prev = accountCountByProvider.get(pid) ?? { active: 0, total: 0 };
+    prev.total++;
+    if (h.status === "active") prev.active++;
+    accountCountByProvider.set(pid, prev);
+  }
 
   const [formTarget, setFormTarget] = useState<Provider | "new" | null>(null);
   const [toDelete, setToDelete] = useState<Provider | null>(null);
@@ -184,6 +194,22 @@ function ProvidersContent() {
       render: (p) => (
         <span className="font-mono text-2xs text-srapi-text-tertiary">{p.protocol}</span>
       ),
+    },
+    {
+      key: "accounts",
+      header: t("dashboard.accounts"),
+      hideOnMobile: true,
+      sortValue: (p) => accountCountByProvider.get(p.id)?.total ?? 0,
+      render: (p) => {
+        const counts = accountCountByProvider.get(p.id);
+        if (!counts) return <span className="text-2xs text-srapi-text-tertiary">0</span>;
+        return (
+          <span className="flex items-center gap-1.5 font-mono text-2xs">
+            <span className="text-srapi-success">{counts.active}</span>
+            <span className="text-srapi-text-tertiary">/ {counts.total}</span>
+          </span>
+        );
+      },
     },
     {
       key: "status",

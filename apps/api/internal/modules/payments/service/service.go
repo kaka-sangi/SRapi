@@ -87,7 +87,7 @@ type Service struct {
 	deps        Dependencies
 	clock       Clock
 	selectorMu  sync.Mutex
-	selectorSeq map[string]int
+	selectorState map[string][]int
 }
 
 func New(store contract.Store, masterKey string, deps Dependencies, clock Clock) (*Service, error) {
@@ -107,7 +107,7 @@ func New(store contract.Store, masterKey string, deps Dependencies, clock Clock)
 	if deps.Checkout == nil {
 		deps.Checkout = defaultCheckoutRegistry(deps.Stripe)
 	}
-	return &Service{store: store, masterKey: derivedKey, deps: deps, clock: clock, selectorSeq: map[string]int{}}, nil
+	return &Service{store: store, masterKey: derivedKey, deps: deps, clock: clock, selectorState: map[string][]int{}}, nil
 }
 
 func (s *Service) CreateProviderInstance(ctx context.Context, req contract.CreateProviderInstanceRequest) (contract.PaymentProviderInstance, error) {
@@ -1293,25 +1293,40 @@ func (s *Service) nextProviderCandidate(method string, candidates []contract.Pay
 	if len(candidates) == 1 {
 		return candidates[0]
 	}
-	expanded := make([]contract.PaymentProviderInstance, 0, len(candidates))
-	for _, candidate := range candidates {
-		weight := candidate.Weight
-		if weight <= 0 {
-			weight = 1
-		}
-		for i := 0; i < weight; i++ {
-			expanded = append(expanded, candidate)
-		}
-	}
-	if len(expanded) == 0 {
-		return candidates[0]
-	}
 	s.selectorMu.Lock()
 	defer s.selectorMu.Unlock()
 	key := strings.ToLower(strings.TrimSpace(method))
-	idx := s.selectorSeq[key] % len(expanded)
-	s.selectorSeq[key]++
-	return expanded[idx]
+
+	state := s.selectorState[key]
+	if len(state) != len(candidates) {
+		state = make([]int, len(candidates))
+		s.selectorState[key] = state
+	}
+
+	totalWeight := 0
+	for _, c := range candidates {
+		w := c.Weight
+		if w <= 0 {
+			w = 1
+		}
+		totalWeight += w
+	}
+
+	bestIdx := 0
+	bestWeight := state[0]
+	for i, c := range candidates {
+		w := c.Weight
+		if w <= 0 {
+			w = 1
+		}
+		state[i] += w
+		if state[i] > bestWeight {
+			bestWeight = state[i]
+			bestIdx = i
+		}
+	}
+	state[bestIdx] -= totalWeight
+	return candidates[bestIdx]
 }
 
 func (s *Service) encryptConfig(provider string, name string, payload map[string]any) (string, error) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound, MoreHorizontal } from "lucide-react";
+import { KeyRound, MoreHorizontal, Copy, Check } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
@@ -115,8 +115,8 @@ function ApiKeysContent() {
                     {data.map((key) => (
                       <TableRow key={key.id} className={key.status === "disabled" ? "opacity-50" : ""}>
                         <TableCell className="text-srapi-text-primary">{key.name}</TableCell>
-                        <TableCell className="font-mono text-srapi-text-tertiary">
-                          {key.prefix}
+                        <TableCell>
+                          <KeyPrefixCopy prefix={key.prefix} />
                         </TableCell>
                         <TableCell>
                           <QuietBadge
@@ -216,6 +216,30 @@ function ApiKeysContent() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function KeyPrefixCopy({ prefix }: { prefix: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard?.writeText(prefix).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+      className="group inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-mono text-srapi-text-tertiary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-secondary"
+      title={prefix}
+    >
+      <span>{prefix}...</span>
+      {copied ? (
+        <Check className="size-3 text-srapi-success" />
+      ) : (
+        <Copy className="size-3 opacity-0 transition-opacity group-hover:opacity-100" />
+      )}
+    </button>
   );
 }
 

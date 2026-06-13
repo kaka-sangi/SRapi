@@ -1,7 +1,8 @@
 "use client";
 
 import type { UseQueryResult } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
+import { Copy, Check, RefreshCw } from "lucide-react";
+import { useState } from "react";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import {
@@ -160,6 +161,27 @@ export function AccountDetailSheet({
       <SheetContent side="right" className="w-[28rem] gap-0 overflow-y-auto p-6">
         <SheetTitle>{t("adminAccounts.detailTitle")}</SheetTitle>
         {account ? <SheetDescription className="text-sm text-srapi-text-secondary">{account.name}</SheetDescription> : null}
+        {account && typeof account.metadata?.base_url === "string" && account.metadata.base_url ? (
+          <CopyableUrl url={String(account.metadata.base_url)} />
+        ) : null}
+
+        {account ? (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <span className="rounded-md bg-srapi-bg-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-secondary">
+              {account.runtime_class}
+            </span>
+            {account.priority != null && account.priority !== 0 ? (
+              <span className="rounded-md bg-srapi-bg-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+                P{account.priority}
+              </span>
+            ) : null}
+            {account.weight != null && account.weight !== 1 ? (
+              <span className="rounded-md bg-srapi-bg-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+                W{account.weight}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="mt-5 space-y-4">
           <Section title={t("adminAccounts.healthTitle")} query={health}>
@@ -230,5 +252,29 @@ export function AccountDetailSheet({
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function CopyableUrl({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard?.writeText(url).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+      className="group mt-1 flex w-full items-center gap-1.5 truncate text-left font-mono text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+      title={url}
+    >
+      <span className="truncate">{url}</span>
+      {copied ? (
+        <Check className="size-3 shrink-0 text-srapi-success" />
+      ) : (
+        <Copy className="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+      )}
+    </button>
   );
 }

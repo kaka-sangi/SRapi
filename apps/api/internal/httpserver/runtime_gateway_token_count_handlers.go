@@ -39,7 +39,7 @@ func (s *Server) handleAnthropicCountTokens(w http.ResponseWriter, r *http.Reque
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid count_tokens request", "invalid_request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), body.Model)
 	if err != nil {
 		s.recordTokenCountFailure(r, authed, requestID, sourceEndpoint, string(gatewaycontract.ProtocolAnthropicCompatible), fallbackModelName(body.Model), "model_not_found", elapsedMillis(startedAt), nil, gatewayAdmission{})
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")

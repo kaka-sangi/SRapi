@@ -1520,3 +1520,39 @@ export function useReplaySchedulerStrategy() {
       adminApi.replaySchedulerStrategy(body),
   });
 }
+
+// ---- Diagnostics ----
+
+export function useAdminCircuitBreakers() {
+  return useQuery({
+    queryKey: ["admin", "diagnostics", "circuit-breakers"],
+    queryFn: () => adminApi.getCircuitBreakers(),
+    refetchInterval: 10_000,
+  });
+}
+
+export function useResetCircuitBreaker() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (accountId: number) => adminApi.resetCircuitBreaker(accountId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["admin", "diagnostics", "circuit-breakers"] });
+    },
+  });
+}
+
+export function useAdminCacheStats() {
+  return useQuery({
+    queryKey: ["admin", "diagnostics", "cache-stats"],
+    queryFn: () => adminApi.getCacheStats(),
+    refetchInterval: 15_000,
+  });
+}
+
+export function useClearCache() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminApi.clearCache(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "diagnostics", "cache-stats"] }),
+  });
+}

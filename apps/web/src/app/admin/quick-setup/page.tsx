@@ -22,8 +22,11 @@ import {
 } from "@/components/ui/select";
 import {
   useAdminProxies,
+  useAdminProviders,
+  useCreateAccount,
   useDiscoverAccountModels,
   useRunQuickSetup,
+  useTestAccount,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -43,6 +46,7 @@ interface PlatformPreset {
   description: string;
   authTypes: AuthType[];
   defaultModels: string[];
+  custom?: boolean;
 }
 
 const PLATFORMS: PlatformPreset[] = [
@@ -55,6 +59,7 @@ const PLATFORMS: PlatformPreset[] = [
       "gpt-5.5",
       "gpt-5.4",
       "gpt-5.4-mini",
+      "codex-auto-review",
       "gpt-5.3-codex",
       "gpt-5.3-codex-spark",
       "gpt-5.2",
@@ -83,7 +88,7 @@ const PLATFORMS: PlatformPreset[] = [
     name: "Anthropic",
     description: "Claude Opus / Sonnet / Haiku",
     authTypes: ["api_key"],
-    defaultModels: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
+    defaultModels: ["claude-fable-5", "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
   },
   {
     key: "deepseek",
@@ -107,11 +112,61 @@ const PLATFORMS: PlatformPreset[] = [
     defaultModels: ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest", "codestral-latest", "open-mistral-nemo"],
   },
   {
+    key: "gemini",
+    name: "Google Gemini",
+    description: "Gemini 2.5 Pro / Flash via API key",
+    authTypes: ["api_key"],
+    defaultModels: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
+  },
+  {
+    key: "grok",
+    name: "Grok",
+    description: "xAI Grok models via API",
+    authTypes: ["api_key"],
+    defaultModels: ["grok-3", "grok-3-mini", "grok-2"],
+  },
+  {
+    key: "kimi",
+    name: "Kimi / Moonshot",
+    description: "Moonshot AI models via API",
+    authTypes: ["api_key"],
+    defaultModels: ["moonshot-v1-128k", "moonshot-v1-32k", "moonshot-v1-8k"],
+  },
+  {
+    key: "qwen",
+    name: "Qwen",
+    description: "Alibaba Qwen models via DashScope",
+    authTypes: ["api_key"],
+    defaultModels: ["qwen-max", "qwen-plus", "qwen-turbo", "qwen-long"],
+  },
+  {
+    key: "together",
+    name: "Together AI",
+    description: "Open-source models via Together",
+    authTypes: ["api_key"],
+    defaultModels: ["meta-llama/Llama-4-Scout-17B-16E-Instruct", "meta-llama/Llama-4-Maverick-17B-128E-Instruct", "deepseek-ai/DeepSeek-R1"],
+  },
+  {
+    key: "cerebras",
+    name: "Cerebras",
+    description: "Ultra-fast inference on Cerebras hardware",
+    authTypes: ["api_key"],
+    defaultModels: ["llama-4-scout-17b-16e-instruct", "llama3.3-70b"],
+  },
+  {
     key: "openrouter",
     name: "OpenRouter",
     description: "Multi-provider aggregator",
     authTypes: ["api_key"],
     defaultModels: ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro", "deepseek/deepseek-r1", "meta-llama/llama-4-scout"],
+  },
+  {
+    key: "custom",
+    name: "Custom",
+    description: "Any OpenAI-compatible API endpoint",
+    authTypes: ["api_key"],
+    defaultModels: [],
+    custom: true,
   },
 ];
 
@@ -126,7 +181,30 @@ const PLATFORM_ICONS: Record<string, string> = {
   deepseek: "DS",
   groq: "GQ",
   mistral: "MI",
+  gemini: "GE",
+  grok: "XA",
+  kimi: "KM",
+  qwen: "QW",
+  together: "TG",
+  cerebras: "CB",
   openrouter: "OR",
+  custom: "++",
+};
+
+const PLATFORM_ICON_COLORS: Record<string, string> = {
+  "codex-cli": "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400",
+  openai: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
+  anthropic: "bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400",
+  deepseek: "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400",
+  groq: "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400",
+  mistral: "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400",
+  gemini: "bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400",
+  grok: "bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300",
+  kimi: "bg-teal-50 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400",
+  qwen: "bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400",
+  together: "bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400",
+  cerebras: "bg-cyan-50 text-cyan-600 dark:bg-cyan-950/40 dark:text-cyan-400",
+  openrouter: "bg-violet-50 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400",
 };
 
 // ---------------------------------------------------------------------------
@@ -223,6 +301,7 @@ function QuickSetupContent() {
   const [accessToken, setAccessToken] = useState("");
   const [refreshToken, setRefreshToken] = useState("");
   const [accountName, setAccountName] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
   const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
 
   // Advanced fields
@@ -232,6 +311,8 @@ function QuickSetupContent() {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const mutation = useRunQuickSetup();
+  const createMut = useCreateAccount();
+  const providers = useAdminProviders();
 
   function handleSuccess(data: AdminQuickSetupResult) {
     setResult(data);
@@ -258,7 +339,7 @@ function QuickSetupContent() {
     mutation.reset();
   }
 
-  const isSubmitting = mutation.isPending;
+  const isSubmitting = mutation.isPending || createMut.isPending;
 
   function selectPlatform(p: PlatformPreset) {
     setPlatform(p);
@@ -268,6 +349,7 @@ function QuickSetupContent() {
     setAccessToken("");
     setRefreshToken("");
     setAccountName("");
+    setBaseUrl("");
     setProxyId("");
     setPriority("");
     setWeight("");
@@ -284,8 +366,46 @@ function QuickSetupContent() {
     });
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!platform) return;
+
+    if (platform.custom) {
+      const providerList = providers.data?.data ?? [];
+      const oaiProvider = providerList.find(
+        (p) => p.platform_family === "openai_compatible",
+      ) ?? providerList[0];
+      if (!oaiProvider) {
+        toast({ title: t("adminQuickSetup.noProvider"), tone: "error" });
+        return;
+      }
+      const metadata: Record<string, unknown> = {};
+      if (baseUrl.trim()) metadata.base_url = baseUrl.trim();
+      try {
+        const account = await createMut.mutateAsync({
+          provider_id: oaiProvider.id,
+          name: accountName || "Custom Account",
+          runtime_class: "api_key",
+          credential: { api_key: apiKey },
+          metadata,
+          status: "active",
+          priority: priority ? parseInt(priority, 10) : undefined,
+          weight: weight ? parseFloat(weight) : undefined,
+          proxy_id: proxyId && proxyId !== "__none__" ? proxyId : undefined,
+        });
+        const fakeResult: AdminQuickSetupResult = {
+          provider: oaiProvider,
+          account,
+          models_created: 0,
+          mappings_created: 0,
+          model_names: [],
+          warnings: [],
+        };
+        handleSuccess(fakeResult);
+      } catch (err) {
+        handleError(err instanceof Error ? err : new Error(String(err)));
+      }
+      return;
+    }
 
     const credential: AdminQuickSetupRequestWritable["credential"] =
       authType === "oauth_refresh"
@@ -299,7 +419,7 @@ function QuickSetupContent() {
           ? [...platform.defaultModels]
           : undefined;
 
-    const body: AdminQuickSetupRequestWritable = {
+    const body: AdminQuickSetupRequestWritable & { metadata?: Record<string, unknown> } = {
       platform: platform.key,
       credential,
       name: accountName || undefined,
@@ -310,8 +430,9 @@ function QuickSetupContent() {
     if (proxyId && proxyId !== "__none__") body.proxy_id = proxyId;
     if (priority) body.priority = parseInt(priority, 10);
     if (weight) body.weight = parseFloat(weight);
+    if (baseUrl.trim()) body.metadata = { base_url: baseUrl.trim() };
 
-    submitQuickSetup(body);
+    submitQuickSetup(body as AdminQuickSetupRequestWritable);
   }
 
   function reset() {
@@ -322,6 +443,7 @@ function QuickSetupContent() {
     setAccessToken("");
     setRefreshToken("");
     setAccountName("");
+    setBaseUrl("");
     setSelectedModels(new Set());
     setProxyId("");
     setPriority("");
@@ -359,6 +481,8 @@ function QuickSetupContent() {
           onRefreshTokenChange={setRefreshToken}
           accountName={accountName}
           onAccountNameChange={setAccountName}
+          baseUrl={baseUrl}
+          onBaseUrlChange={setBaseUrl}
           selectedModels={selectedModels}
           onToggleModel={toggleModel}
           onSelectAll={() =>
@@ -374,7 +498,7 @@ function QuickSetupContent() {
           showAdvanced={showAdvanced}
           onToggleAdvanced={() => setShowAdvanced((v) => !v)}
           isPending={isSubmitting}
-          onSubmit={handleSubmit}
+          onSubmit={() => void handleSubmit()}
           onBack={() => setStep("platform")}
           t={t}
         />
@@ -415,16 +539,19 @@ function PlatformGrid({
           type="button"
           onClick={() => onSelect(p)}
           className={cn(
-            "group relative flex items-start gap-4 rounded-xl border border-srapi-border bg-srapi-card p-5 text-left transition-all",
-            "hover:border-srapi-text-tertiary hover:shadow-sm",
+            "group relative flex items-start gap-4 rounded-xl border bg-srapi-card p-5 text-left transition-all",
+            p.custom
+              ? "border-dashed border-srapi-border hover:border-srapi-primary/50 hover:bg-srapi-primary/5"
+              : "border-srapi-border hover:border-srapi-text-tertiary hover:shadow-sm",
             "active:scale-[0.985]",
           )}
         >
           <div
             className={cn(
-              "flex size-11 shrink-0 items-center justify-center rounded-lg",
-              "bg-srapi-bg-muted font-mono text-xs font-bold tracking-tight text-srapi-text-secondary",
-              "transition-colors group-hover:bg-srapi-bg-sunken group-hover:text-srapi-text-primary",
+              "flex size-11 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-bold tracking-tight transition-colors",
+              p.custom
+                ? "bg-srapi-primary/10 text-srapi-primary group-hover:bg-srapi-primary/20"
+                : PLATFORM_ICON_COLORS[p.key] ?? "bg-srapi-bg-muted text-srapi-text-secondary",
             )}
           >
             {PLATFORM_ICONS[p.key] ?? p.key.slice(0, 2).toUpperCase()}
@@ -447,7 +574,7 @@ function PlatformGrid({
               ))}
               {p.defaultModels.length > 0 && (
                 <span className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 text-2xs text-srapi-text-tertiary">
-                  {p.defaultModels.length} models
+                  {p.defaultModels.length} {t("adminAccounts.models")}
                 </span>
               )}
             </div>
@@ -474,6 +601,8 @@ function CredentialsForm({
   onRefreshTokenChange,
   accountName,
   onAccountNameChange,
+  baseUrl,
+  onBaseUrlChange,
   selectedModels,
   onToggleModel,
   onSelectAll,
@@ -502,6 +631,8 @@ function CredentialsForm({
   onRefreshTokenChange: (v: string) => void;
   accountName: string;
   onAccountNameChange: (v: string) => void;
+  baseUrl: string;
+  onBaseUrlChange: (v: string) => void;
   selectedModels: Set<string>;
   onToggleModel: (m: string) => void;
   onSelectAll: () => void;
@@ -529,7 +660,7 @@ function CredentialsForm({
 
   const canSubmit = isOAuth
     ? accessToken.trim().length > 0 && refreshToken.trim().length > 0
-    : apiKey.trim().length > 0;
+    : apiKey.trim().length > 0 && (!platform.custom || baseUrl.trim().length > 0);
 
   return (
     <div className="space-y-6">
@@ -547,7 +678,10 @@ function CredentialsForm({
         {/* ── Left column: credentials ── */}
         <div className="space-y-5">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-srapi-bg-muted font-mono text-xs font-bold tracking-tight text-srapi-text-secondary">
+            <div className={cn(
+              "flex size-10 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-bold tracking-tight",
+              PLATFORM_ICON_COLORS[platform.key] ?? "bg-srapi-bg-muted text-srapi-text-secondary",
+            )}>
               {PLATFORM_ICONS[platform.key] ?? platform.key.slice(0, 2).toUpperCase()}
             </div>
             <div>
@@ -620,6 +754,24 @@ function CredentialsForm({
             </div>
           )}
 
+          {/* Base URL — always visible for custom, in advanced for presets */}
+          {platform.custom && (
+            <div>
+              <Label htmlFor="qs-baseurl">{t("adminAccounts.baseUrl")}</Label>
+              <Input
+                id="qs-baseurl"
+                type="url"
+                className="font-mono"
+                value={baseUrl}
+                onChange={(e) => onBaseUrlChange(e.target.value)}
+                placeholder="https://api.example.com/v1"
+              />
+              <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                {t("adminAccounts.baseUrlHint")}
+              </p>
+            </div>
+          )}
+
           {/* Account name */}
           <div>
             <Label htmlFor="qs-name">{t("adminQuickSetup.accountName")}</Label>
@@ -651,6 +803,22 @@ function CredentialsForm({
 
           {showAdvanced && (
             <div className="space-y-4 rounded-lg border border-srapi-border bg-srapi-card p-4">
+              {!platform.custom && (
+                <div>
+                  <Label htmlFor="qs-baseurl-adv">{t("adminAccounts.baseUrl")}</Label>
+                  <Input
+                    id="qs-baseurl-adv"
+                    type="url"
+                    className="font-mono"
+                    value={baseUrl}
+                    onChange={(e) => onBaseUrlChange(e.target.value)}
+                    placeholder={t("adminAccounts.baseUrlPlaceholder")}
+                  />
+                  <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                    {t("adminAccounts.baseUrlHint")}
+                  </p>
+                </div>
+              )}
               <div>
                 <Label>{t("adminQuickSetup.proxy")}</Label>
                 <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
@@ -799,6 +967,7 @@ function ResultView({
 }) {
   const { toast } = useToast();
   const discoverMut = useDiscoverAccountModels();
+  const testMut = useTestAccount();
   const accountId = String(
     (result.account as { id?: string | number })?.id ?? "",
   );
@@ -844,8 +1013,11 @@ function ResultView({
               <dt className="text-srapi-text-tertiary">
                 {t("adminQuickSetup.resultAccount")}
               </dt>
-              <dd className="font-medium text-srapi-text-primary">
-                {accountName}
+              <dd className="text-right">
+                <div className="font-medium text-srapi-text-primary">{accountName}</div>
+                {accountId && (
+                  <div className="font-mono text-2xs text-srapi-text-tertiary">ID: {accountId}</div>
+                )}
               </dd>
             </div>
             <div className="flex justify-between">
@@ -903,30 +1075,54 @@ function ResultView({
           </a>
         </Button>
         {accountId && (
-          <Button
-            variant="outline"
-            size="md"
-            loading={discoverMut.isPending}
-            onClick={() =>
-              discoverMut.mutate(
-                { id: accountId },
-                {
-                  onSuccess: () =>
-                    toast({
-                      title: t("adminQuickSetup.discoverDone"),
-                      tone: "success",
-                    }),
-                  onError: () =>
-                    toast({
-                      title: t("adminQuickSetup.discoverFailed"),
-                      tone: "error",
-                    }),
-                },
-              )
-            }
-          >
-            {t("adminQuickSetup.discoverModels")}
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              size="md"
+              loading={testMut.isPending}
+              onClick={() =>
+                testMut.mutate(
+                  { id: accountId, body: { mode: "live" } },
+                  {
+                    onSuccess: (res) =>
+                      toast({
+                        title: res?.ok ? t("adminAccounts.testOk") : t("adminAccounts.testFailed"),
+                        description: res?.message || undefined,
+                        tone: res?.ok ? "success" : "error",
+                      }),
+                    onError: () =>
+                      toast({ title: t("adminAccounts.testFailed"), tone: "error" }),
+                  },
+                )
+              }
+            >
+              {t("adminAccounts.test")}
+            </Button>
+            <Button
+              variant="outline"
+              size="md"
+              loading={discoverMut.isPending}
+              onClick={() =>
+                discoverMut.mutate(
+                  { id: accountId },
+                  {
+                    onSuccess: () =>
+                      toast({
+                        title: t("adminQuickSetup.discoverDone"),
+                        tone: "success",
+                      }),
+                    onError: () =>
+                      toast({
+                        title: t("adminQuickSetup.discoverFailed"),
+                        tone: "error",
+                      }),
+                  },
+                )
+              }
+            >
+              {t("adminQuickSetup.discoverModels")}
+            </Button>
+          </>
         )}
       </div>
     </div>

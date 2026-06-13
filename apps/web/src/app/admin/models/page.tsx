@@ -303,6 +303,8 @@ function ModelsContent() {
           <RowActionsMenu
             actions={[
               { label: t("common.edit"), onSelect: () => setFormTarget(m) },
+              { label: t("adminModels.addAlias"), onSelect: () => setAliasTarget(m) },
+              { label: t("adminModels.addMapping"), onSelect: () => setMappingTarget(m) },
               { label: t("adminRateLimit.action"), onSelect: () => setRateLimitTarget(m) },
               { label: t("adminModels.manageRouting"), onSelect: () => setDetailTarget(m) },
               { label: t("common.delete"), destructive: true, onSelect: () => setDeleteTarget(m) },

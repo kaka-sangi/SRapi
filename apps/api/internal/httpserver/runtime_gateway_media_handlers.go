@@ -45,7 +45,7 @@ func (s *Server) handleCreateImageGeneration(w http.ResponseWriter, r *http.Requ
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid image generation request", "invalid_request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), body.Model)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -213,7 +213,7 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, imageEditDecodeStatus(err), apiopenapi.InvalidRequestError, imageEditDecodeMessage(err), "invalid_request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), body.Model)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -379,7 +379,7 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 		writeGatewayError(w, imageEditDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid image variation request", "invalid_request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), body.Model)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -1021,7 +1021,7 @@ func (s *Server) handleCreateModeration(w http.ResponseWriter, r *http.Request) 
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid moderation request", "invalid_request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), body.Model)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -1180,7 +1180,7 @@ func (s *Server) handleCreateRerank(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid rerank request", "invalid_request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), body.Model)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,

@@ -374,6 +374,7 @@ func (s *Server) handleCreateAdminModel(w http.ResponseWriter, r *http.Request) 
 		}
 		return
 	}
+	s.runtime.invalidateModelCache(model.CanonicalName)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model.create", "model", strconv.Itoa(model.ID), nil, map[string]any{
 		"canonical_name": model.CanonicalName,
 		"display_name":   model.DisplayName,
@@ -431,6 +432,7 @@ func (s *Server) handleUpdateAdminModel(w http.ResponseWriter, r *http.Request) 
 		}
 		return
 	}
+	s.runtime.invalidateModelCache(model.CanonicalName, before.CanonicalName)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model.update", "model", strconv.Itoa(model.ID), modelAuditSnapshot(before), modelAuditSnapshot(model)))
 	writeJSONAny(w, http.StatusOK, apiopenapi.ModelResponse{
 		Data:      toAPIModel(model),
@@ -470,6 +472,7 @@ func (s *Server) handleDeleteAdminModel(w http.ResponseWriter, r *http.Request) 
 		}
 		return
 	}
+	s.runtime.invalidateModelCache(before.CanonicalName)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model.delete", "model", strconv.Itoa(modelID), modelAuditSnapshot(before), nil))
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       map[string]any{"id": modelID, "deleted": true},
@@ -517,6 +520,7 @@ func (s *Server) handleCreateAdminModelAlias(w http.ResponseWriter, r *http.Requ
 		}
 		return
 	}
+	s.runtime.invalidateModelCache(alias.Alias)
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model_alias.create", "model_alias", strconv.Itoa(alias.ID), nil, map[string]any{
 		"alias":           alias.Alias,
 		"model_id":        alias.ModelID,

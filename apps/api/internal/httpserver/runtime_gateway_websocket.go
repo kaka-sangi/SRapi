@@ -212,7 +212,7 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, "realtime websocket model query parameter is required", "invalid_request")
 		return
 	}
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelName)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), modelName)
 	if err != nil {
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
@@ -650,7 +650,7 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 	requestID := requestIDFromContext(r.Context())
 	sourceEndpoint := responsesWebSocketSourceEndpoint
 	modelName := responsesWebSocketPayloadModel(payload, r.URL.Query().Get("model"))
-	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelName)
+	modelResolution, err := s.runtime.resolveModelCached(r.Context(), modelName)
 	if err != nil {
 		return false, responsesWebSocketTurnState{}, err
 	}
