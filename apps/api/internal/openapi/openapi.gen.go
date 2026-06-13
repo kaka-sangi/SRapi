@@ -5820,6 +5820,12 @@ type DashboardUserUsageTrend struct {
 	UserId       Id      `json:"user_id"`
 }
 
+// DeleteApiKeyResponse defines model for DeleteApiKeyResponse.
+type DeleteApiKeyResponse struct {
+	Ok        bool      `json:"ok"`
+	RequestId RequestId `json:"request_id"`
+}
+
 // DeleteResponse defines model for DeleteResponse.
 type DeleteResponse struct {
 	Data struct {
@@ -17923,6 +17929,9 @@ type ServerInterface interface {
 	// Create an API key and return its plaintext exactly once.
 	// (POST /api/v1/api-keys)
 	CreateApiKey(w http.ResponseWriter, r *http.Request)
+	// Delete one of the current user's API keys.
+	// (DELETE /api/v1/api-keys/{id})
+	DeleteApiKey(w http.ResponseWriter, r *http.Request, id Id)
 	// Update API key metadata and policy.
 	// (PATCH /api/v1/api-keys/{id})
 	UpdateApiKey(w http.ResponseWriter, r *http.Request, id Id)
@@ -27611,6 +27620,40 @@ func (siw *ServerInterfaceWrapper) CreateApiKey(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteApiKey operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteApiKey(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // UpdateApiKey operation middleware
 func (siw *ServerInterfaceWrapper) UpdateApiKey(w http.ResponseWriter, r *http.Request) {
 
@@ -30794,6 +30837,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/users/{id}/rpm-limit", wrapper.UpdateAdminUserRpmLimit)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/api-keys", wrapper.ListApiKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/api-keys", wrapper.CreateApiKey)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/api-keys/{id}", wrapper.DeleteApiKey)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/api-keys/{id}", wrapper.UpdateApiKey)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/api-keys/{id}/usage", wrapper.GetApiKeyUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/auth/captcha", wrapper.GetAuthCaptchaConfig)

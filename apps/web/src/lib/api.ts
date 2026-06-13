@@ -19,6 +19,8 @@ import {
   completeSetup as sdkCompleteSetup,
   requestPasswordReset as sdkRequestPasswordReset,
   confirmPasswordReset as sdkConfirmPasswordReset,
+  requestPasswordlessLogin as sdkRequestPasswordlessLogin,
+  completePasswordlessLogin as sdkCompletePasswordlessLogin,
   getAuthCaptchaConfig as sdkGetAuthCaptchaConfig,
   getCurrentUser as sdkGetCurrentUser,
   getCurrentUserUsage as sdkGetCurrentUserUsage,
@@ -26,6 +28,7 @@ import {
   listApiKeys as sdkListApiKeys,
   createApiKey as sdkCreateApiKey,
   updateApiKey as sdkUpdateApiKey,
+  deleteApiKey as sdkDeleteApiKey,
   getApiKeyUsage as sdkGetApiKeyUsage,
   listAdminUsageLogs as sdkListAdminUsageLogs,
   listAdminSchedulerDecisions as sdkListAdminSchedulerDecisions,
@@ -458,31 +461,24 @@ export const apiService = {
     return mappedUser;
   },
 
-  // TODO(sdk-gap): the passwordless request endpoint is not in the generated
-  // SDK, so this stays a raw fetch. Swap to the SDK function once it exists.
   async requestPasswordlessCode(
     email: string,
     name?: string,
     attributes?: Array<{ definition_id: number; value: string }>,
     captchaToken?: string,
   ): Promise<void> {
-    await fetchApiJSON('/api/v1/auth/passwordless/request', {
-      method: 'POST',
+    configureSDKClient();
+    await sdkRequestPasswordlessLogin({
+      body: { email, ...(name ? { name } : {}), attributes: attributes || [] },
       headers: captchaToken ? { 'X-Captcha-Token': captchaToken } : undefined,
-      body: JSON.stringify({ email, name, attributes: attributes || [] }),
+      throwOnError: true,
     });
   },
 
-  // TODO(sdk-gap): the passwordless login endpoint is not in the generated
-  // SDK, so this stays a raw fetch. Swap to the SDK function once it exists.
   async passwordlessLogin(token: string): Promise<CurrentUser> {
-    const response = await fetchApiJSON<{
-      data?: { user?: LiveUser; csrf_token?: string };
-    }>('/api/v1/auth/passwordless/login', {
-      method: 'POST',
-      body: JSON.stringify({ token }),
-    });
-    const session = response.data;
+    configureSDKClient();
+    const response = await sdkCompletePasswordlessLogin({ body: { token }, throwOnError: true });
+    const session = response.data?.data;
     if (!session?.user) {
       throw new Error('Passwordless sign-in failed.');
     }
@@ -889,18 +885,9 @@ export const apiService = {
     });
   },
 
-  // TODO(sdk-gap): deleteApiKey has no generated SDK function, so this stays a
-  // raw fetch. Swap to the SDK function once the endpoint is added.
   async deleteApiKey(id: string): Promise<void> {
-    const headers: Record<string, string> = {};
-    const csrf = localStorage.getItem(CSRF_STORAGE_KEY);
-    if (csrf) headers["X-CSRF-Token"] = csrf;
-    const res = await fetch(`/api/v1/api-keys/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      credentials: "include",
-      headers,
-    });
-    if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+    configureSDKClient();
+    await sdkDeleteApiKey({ path: { id }, throwOnError: true });
   },
 
   async getApiKeyUsage(id: string, days: number): Promise<GatewayUsageResponse> {

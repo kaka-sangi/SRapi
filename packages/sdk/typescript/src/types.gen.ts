@@ -901,6 +901,11 @@ export type ApiKeyResponse = {
     request_id: RequestId;
 };
 
+export type DeleteApiKeyResponse = {
+    ok: boolean;
+    request_id: RequestId;
+};
+
 export type PaymentProviderStatus = 'active' | 'disabled' | 'archived';
 
 export type PaymentOrderStatus = 'pending' | 'paid' | 'fulfilled' | 'partially_refunded' | 'refunding' | 'refunded' | 'refund_failed' | 'expired' | 'canceled' | 'failed';
@@ -8663,6 +8668,45 @@ export type CreateApiKeyResponses = {
 };
 
 export type CreateApiKeyResponse2 = CreateApiKeyResponses[keyof CreateApiKeyResponses];
+
+export type DeleteApiKeyData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/api-keys/{id}';
+};
+
+export type DeleteApiKeyErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteApiKeyError = DeleteApiKeyErrors[keyof DeleteApiKeyErrors];
+
+export type DeleteApiKeyResponses = {
+    /**
+     * API key deleted.
+     */
+    200: DeleteApiKeyResponse;
+};
+
+export type DeleteApiKeyResponse2 = DeleteApiKeyResponses[keyof DeleteApiKeyResponses];
 
 export type UpdateApiKeyData = {
     body: UpdateApiKeyRequest;

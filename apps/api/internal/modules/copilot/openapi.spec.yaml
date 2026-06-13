@@ -2439,6 +2439,38 @@ paths:
           $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - ApiKeys
+      operationId: deleteApiKey
+      summary: Delete one of the current user's API keys.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: API key deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteApiKeyResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
 
   /api/v1/api-keys/{id}/usage:
     get:
@@ -15963,6 +15995,17 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/ApiKey"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    DeleteApiKeyResponse:
+      type: object
+      required:
+        - ok
+        - request_id
+      properties:
+        ok:
+          type: boolean
         request_id:
           $ref: "#/components/schemas/RequestId"
 
