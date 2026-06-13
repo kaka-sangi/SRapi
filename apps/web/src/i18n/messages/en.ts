@@ -740,6 +740,8 @@ export const en = {
       oauthHint: "Paste the account's access and refresh tokens.",
       editBlankHint: "Leave blank to keep the existing credential.",
     },
+    setPriority: "Set priority",
+    setPriorityPrompt: "Enter priority (lower = higher priority, 0 = default):",
     baseUrl: "Base URL",
     baseUrlPlaceholder: "https://api.openai.com/v1",
     baseUrlHint: "Custom upstream API endpoint. Leave empty to use the provider default.",

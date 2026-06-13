@@ -431,6 +431,19 @@ function AccountsContent() {
     }
     actions.splice(1, 0, { label: t("adminAccounts.edit"), onSelect: () => setFormTarget(a) });
     actions.push(
+      {
+        label: t("adminAccounts.setPriority"),
+        onSelect: () => {
+          const input = prompt(t("adminAccounts.setPriorityPrompt"), String(a.priority ?? 0));
+          if (input === null) return;
+          const val = parseInt(input, 10);
+          if (Number.isNaN(val)) return;
+          void runAction(
+            () => updateMut.mutateAsync({ id: a.id, body: { priority: val } }),
+            t("feedback.saved"),
+          );
+        },
+      },
       { label: t("adminAccounts.discoverModels"), onSelect: () => void runDiscover(a.id) },
       { label: t("adminAccounts.bindProxy"), onSelect: () => setProxyTarget(a) },
     );

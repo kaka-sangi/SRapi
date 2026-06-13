@@ -736,6 +736,8 @@ export const zh: Messages = {
       oauthHint: "填写账号的访问令牌与刷新令牌。",
       editBlankHint: "留空则保持现有凭证不变。",
     },
+    setPriority: "设置优先级",
+    setPriorityPrompt: "输入优先级（数字越小优先级越高，0 = 默认）：",
     baseUrl: "Base URL",
     baseUrlPlaceholder: "https://api.openai.com/v1",
     baseUrlHint: "自定义上游 API 地址。留空则使用服务商默认地址。",
