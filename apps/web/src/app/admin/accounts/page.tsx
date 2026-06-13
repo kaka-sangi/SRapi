@@ -697,40 +697,12 @@ function HealthSummaryStrip({
   const healthy = entries.filter((h) => h.circuit_state === "closed" && h.success_rate >= 0.9).length;
   const degraded = entries.filter((h) => h.circuit_state === "closed" && h.success_rate < 0.9 && h.success_rate > 0).length;
   const tripped = entries.filter((h) => h.circuit_state !== "closed").length;
-  const pctH = total > 0 ? (healthy / total) * 100 : 0;
-  const pctD = total > 0 ? (degraded / total) * 100 : 0;
-  const pctT = total > 0 ? (tripped / total) * 100 : 0;
   return (
-    <div className="mb-4 flex items-center gap-3">
-      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-srapi-border">
-        <div
-          className="absolute inset-y-0 left-0 rounded-full bg-srapi-success transition-all"
-          style={{ width: `${pctH}%` }}
-        />
-        <div
-          className="absolute inset-y-0 rounded-full bg-srapi-warning transition-all"
-          style={{ left: `${pctH}%`, width: `${pctD}%` }}
-        />
-        <div
-          className="absolute inset-y-0 rounded-full bg-srapi-error transition-all"
-          style={{ left: `${pctH + pctD}%`, width: `${pctT}%` }}
-        />
-      </div>
-      <span className="flex shrink-0 items-center gap-2 font-mono text-2xs text-srapi-text-tertiary">
-        <span className="flex items-center gap-1">
-          <span className="size-1.5 rounded-full bg-srapi-success" />{healthy}
-        </span>
-        {degraded > 0 && (
-          <span className="flex items-center gap-1">
-            <span className="size-1.5 rounded-full bg-srapi-warning" />{degraded}
-          </span>
-        )}
-        {tripped > 0 && (
-          <span className="flex items-center gap-1">
-            <span className="size-1.5 rounded-full bg-srapi-error" />{tripped}
-          </span>
-        )}
-      </span>
+    <div className="mb-4 flex items-center gap-4 font-mono text-2xs text-srapi-text-tertiary">
+      <span>{healthy} ok</span>
+      {degraded > 0 && <span>{degraded} degraded</span>}
+      {tripped > 0 && <span>{tripped} tripped</span>}
+      <span className="ml-auto">{total} total</span>
     </div>
   );
 }
@@ -743,28 +715,21 @@ function AccountHealthCell({ health }: { health?: AccountHealthSnapshot }) {
   const isHalfOpen = circuit === "half-open";
   const p50 = Math.round(health.latency_p50_ms);
   return (
-    <span className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5 font-mono text-2xs tabular">
       <span
         className={cn(
-          "inline-block size-1.5 rounded-full",
+          "inline-block size-1.5 shrink-0 rounded-full",
           isOpen ? "bg-srapi-error" : isHalfOpen ? "bg-srapi-warning" : rate >= 0.95 ? "bg-srapi-success" : rate >= 0.8 ? "bg-srapi-warning" : "bg-srapi-error",
         )}
       />
-      <span className="font-mono text-2xs tabular text-srapi-text-secondary">
-        {Math.round(rate * 100)}%
-      </span>
+      <span className="text-srapi-text-secondary">{Math.round(rate * 100)}%</span>
       {p50 > 0 ? (
-        <span className="font-mono text-[10px] tabular text-srapi-text-tertiary">{p50}ms</span>
+        <span className="text-srapi-text-tertiary">{p50}ms</span>
       ) : null}
       {health.error_class ? (
-        <span className="max-w-[6rem] truncate text-2xs text-srapi-error">{health.error_class}</span>
+        <span className="max-w-[5rem] truncate text-srapi-text-tertiary" title={health.error_class}>{health.error_class}</span>
       ) : null}
-      {health.cooldown_until ? (
-        <span className="text-[10px] text-srapi-warning" title={health.cooldown_reason ?? undefined}>
-          {health.cooldown_reason ?? "cooldown"}
-        </span>
-      ) : null}
-    </span>
+    </div>
   );
 }
 
@@ -1025,31 +990,6 @@ function AccountCardGrid({
   );
 }
 
-const PROVIDER_ACCENT: Record<string, string> = {
-  anthropic: "border-l-orange-400",
-  openai: "border-l-emerald-500",
-  deepseek: "border-l-blue-500",
-  gemini: "border-l-sky-400",
-  groq: "border-l-amber-500",
-  mistral: "border-l-indigo-400",
-  openrouter: "border-l-violet-500",
-  codex: "border-l-emerald-400",
-  grok: "border-l-slate-400",
-  kimi: "border-l-teal-400",
-  moonshot: "border-l-teal-400",
-  qwen: "border-l-purple-400",
-  together: "border-l-rose-400",
-  cerebras: "border-l-cyan-400",
-};
-
-function providerAccent(name: string): string {
-  const lower = name.toLowerCase();
-  for (const [key, cls] of Object.entries(PROVIDER_ACCENT)) {
-    if (lower.includes(key)) return cls;
-  }
-  return "border-l-srapi-border";
-}
-
 function AccountCard({
   account,
   providerName,
@@ -1070,16 +1010,14 @@ function AccountCard({
   status: ReactNode;
 }) {
   const { t } = useLanguage();
-  const hasPriority = account.priority != null && account.priority !== 0;
-  const hasWeight = account.weight != null && account.weight !== 1;
+  const baseUrl = metadataString(account.metadata, "base_url");
   return (
     <article
       className={cn(
-        "rounded-lg border border-srapi-border border-l-[3px] bg-srapi-card px-4 py-3.5 transition-colors",
-        providerAccent(providerName),
-        account.status === "disabled" && "opacity-60",
+        "tactile-card rounded-lg border border-srapi-border bg-srapi-card transition-colors",
+        account.status === "disabled" && "opacity-55",
         selected && "border-srapi-primary/50 bg-srapi-card-muted",
-        onDetail && "cursor-pointer hover:bg-srapi-card-muted/50",
+        onDetail && "cursor-pointer hover:border-srapi-border-strong",
       )}
       onClick={(e) => {
         if (!onDetail) return;
@@ -1088,60 +1026,57 @@ function AccountCard({
         onDetail();
       }}
     >
-      <div className="flex items-start gap-3">
+      {/* Header */}
+      <div className="flex items-start gap-3 px-4 pt-4 pb-3">
         {onSelect ? (
           <Checkbox
             aria-label="select row"
             checked={selected}
             onChange={() => onSelect()}
-            className="mt-1"
+            className="mt-0.5"
           />
         ) : null}
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h3 className="truncate text-sm font-medium text-srapi-text-primary">{account.name}</h3>
-              <p className="mt-1 truncate text-xs text-srapi-text-secondary">{providerName}</p>
-              {metadataString(account.metadata, "base_url") ? (
-                <p className="mt-0.5 truncate font-mono text-2xs text-srapi-text-tertiary">
-                  {metadataString(account.metadata, "base_url")}
-                </p>
-              ) : null}
-            </div>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="truncate text-sm font-medium text-srapi-text-primary">{account.name}</h3>
             <div className="shrink-0">{actions}</div>
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {status}
-            <span className="font-mono text-2xs text-srapi-text-tertiary">{account.runtime_class}</span>
-            {hasPriority || hasWeight ? (
-              <span className="rounded-md bg-srapi-bg-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
-                {hasPriority ? `P${account.priority}` : ""}
-                {hasPriority && hasWeight ? " · " : ""}
-                {hasWeight ? `W${account.weight}` : ""}
-              </span>
-            ) : null}
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <span className="truncate text-xs text-srapi-text-secondary">{providerName}</span>
+            <span className="text-srapi-border">·</span>
+            <span className="shrink-0 font-mono text-2xs text-srapi-text-tertiary">{account.runtime_class}</span>
           </div>
+          {baseUrl ? (
+            <p className="mt-1 truncate font-mono text-2xs text-srapi-text-tertiary" title={baseUrl}>
+              {baseUrl}
+            </p>
+          ) : null}
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-srapi-border/70 pt-3">
-        <AccountCardMetric label={t("adminAccounts.healthTitle")}>
+      {/* Status row */}
+      <div className="flex items-center gap-2 border-t border-srapi-border/50 px-4 py-2.5">
+        {status}
+        {account.priority != null && account.priority !== 0 ? (
+          <span className="font-mono text-2xs text-srapi-text-tertiary">P{account.priority}</span>
+        ) : null}
+        {account.weight != null && account.weight !== 1 ? (
+          <span className="font-mono text-2xs text-srapi-text-tertiary">W{account.weight}</span>
+        ) : null}
+      </div>
+
+      {/* Metrics */}
+      <div className="grid grid-cols-2 gap-px border-t border-srapi-border/50 bg-srapi-border/30">
+        <div className="bg-srapi-card px-4 py-2.5">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-srapi-text-tertiary">{t("adminAccounts.healthTitle")}</div>
           <AccountHealthCell health={health} />
-        </AccountCardMetric>
-        <AccountCardMetric label={t("adminAccounts.quotaTitle")}>
+        </div>
+        <div className="bg-srapi-card px-4 py-2.5">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-srapi-text-tertiary">{t("adminAccounts.quotaTitle")}</div>
           <AccountQuotaCell health={health} />
-        </AccountCardMetric>
+        </div>
       </div>
     </article>
-  );
-}
-
-function AccountCardMetric({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <div className="mb-1.5 text-2xs text-srapi-text-tertiary">{label}</div>
-      {children}
-    </div>
   );
 }
 
@@ -1177,21 +1112,22 @@ function AccountCardSkeleton() {
     <div className="min-h-[55vh] p-3">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-lg border border-l-[3px] border-srapi-border px-4 py-3.5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-36" />
-                <Skeleton className="h-3 w-24" />
+          <div key={i} className="rounded-lg border border-srapi-border bg-srapi-card">
+            <div className="px-4 pt-4 pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-36" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+                <Skeleton className="size-7 rounded-md" />
               </div>
-              <Skeleton className="h-8 w-8" />
             </div>
-            <div className="mt-3 flex gap-2">
-              <Skeleton className="h-6 w-16" />
-              <Skeleton className="h-6 w-20" />
+            <div className="border-t border-srapi-border/50 px-4 py-2.5">
+              <Skeleton className="h-5 w-20" />
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-srapi-border/70 pt-3">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
+            <div className="grid grid-cols-2 gap-px border-t border-srapi-border/50">
+              <div className="px-4 py-2.5"><Skeleton className="h-6 w-full" /></div>
+              <div className="px-4 py-2.5"><Skeleton className="h-6 w-full" /></div>
             </div>
           </div>
         ))}
