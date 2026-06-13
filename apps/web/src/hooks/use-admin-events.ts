@@ -15,7 +15,9 @@ export function useAdminEventStream(
 ): { connected: boolean } {
   const [connected, setConnected] = useState(false);
   const onEventRef = useRef(onEvent);
-  onEventRef.current = onEvent;
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  });
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;

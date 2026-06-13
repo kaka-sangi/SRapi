@@ -19,7 +19,7 @@ import { useAdminEventStream } from "@/hooks/use-admin-events";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { quietStatusFor } from "@/lib/status-badge";
-import type { CircuitBreakerEntry, CacheStatsEntry } from "@/lib/admin-api";
+import type { CircuitBreakerEntry } from "@/lib/admin-api";
 
 export default function AdminDiagnosticsPage() {
   return (

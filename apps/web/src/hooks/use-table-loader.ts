@@ -214,7 +214,7 @@ export function useTableLoader<T, F = Record<string, unknown>>(
 
   const clearSelection = useCallback(() => setSelected(new Set()), []);
 
-  const data = query.data ?? [];
+  const data = useMemo(() => query.data ?? [], [query.data]);
   const isAllSelected = data.length > 0 && selected.size === data.length;
 
   // --- return --------------------------------------------------------------

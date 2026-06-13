@@ -26,7 +26,6 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/cn";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import {
   PAYMENT_PROVIDER_STATUSES,

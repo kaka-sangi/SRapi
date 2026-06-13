@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 export interface UseFormStateOptions<T extends Record<string, unknown>> {
   initialValues: T;
@@ -29,18 +29,17 @@ export function useFormState<T extends Record<string, unknown>>(
 ): UseFormStateReturn<T> {
   const { initialValues, onSubmit, validate } = options;
 
-  const initialRef = useRef(initialValues);
+  const [baseline, setBaseline] = useState<T>(initialValues);
   const [values, setValuesState] = useState<T>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<keyof T, string>>>({});
   const [touched, setTouched] = useState<Partial<Record<keyof T, boolean>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isDirty = useMemo(() => {
-    const init = initialRef.current;
-    return Object.keys(init).some(
-      (k) => values[k as keyof T] !== init[k as keyof T],
+    return Object.keys(baseline).some(
+      (k) => values[k as keyof T] !== baseline[k as keyof T],
     );
-  }, [values]);
+  }, [values, baseline]);
 
   const isValid = useMemo(() => {
     if (!validate) return true;
@@ -74,13 +73,13 @@ export function useFormState<T extends Record<string, unknown>>(
 
   const reset = useCallback(
     (next?: Partial<T>) => {
-      const base = next ? { ...initialRef.current, ...next } : initialRef.current;
-      initialRef.current = base as T;
-      setValuesState(base as T);
+      const base = (next ? { ...baseline, ...next } : baseline) as T;
+      setBaseline(base);
+      setValuesState(base);
       setErrors({});
       setTouched({});
     },
-    [],
+    [baseline],
   );
 
   const handleSubmit = useCallback(

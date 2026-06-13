@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
@@ -40,7 +41,13 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const [steps, setSteps] = useState<TourStep[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
-  const [mounted, setMounted] = useState(false);
+  // Hydration-safe client-mount flag (false on the server, true after hydration)
+  // without a setState-in-effect.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const isActive = steps.length > 0;
@@ -60,17 +67,18 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isActive) return;
-    updateRect();
+    // Defer the measurement to the next frame so the target has settled in the
+    // layout; this also keeps the setState out of the synchronous effect body.
+    const raf = requestAnimationFrame(updateRect);
     const onResize = () => updateRect();
     window.addEventListener("resize", onResize);
     window.addEventListener("scroll", onResize, true);
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("scroll", onResize, true);
     };
   }, [isActive, currentIndex, updateRect]);
-
-  useEffect(() => setMounted(true), []);
 
   const start = useCallback((newSteps: TourStep[]) => {
     if (newSteps.length === 0) return;

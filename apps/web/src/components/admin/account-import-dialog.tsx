@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCreateAccount, useImportAccounts, useImportCodexSession } from "@/hooks/admin-queries";
 import { buildImportAccountsBody } from "@/lib/admin-account-form";
 import { adminApi, adminErrorMessage } from "@/lib/admin-api";
+import type { CRSPreviewResult, CRSSyncResult } from "@/lib/admin-api";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import type {
@@ -82,10 +83,10 @@ export function AccountImportDialog({
   const [crsUser, setCrsUser] = useState("");
   const [crsPass, setCrsPass] = useState("");
   const [crsStep, setCrsStep] = useState<"input" | "preview" | "result">("input");
-  const [crsPreview, setCrsPreview] = useState<{ new_accounts: any[]; existing_accounts: any[] } | null>(null);
+  const [crsPreview, setCrsPreview] = useState<CRSPreviewResult | null>(null);
   const [crsSelected, setCrsSelected] = useState<Set<string>>(new Set());
   const [crsSyncing, setCrsSyncing] = useState(false);
-  const [crsResult, setCrsResult] = useState<{ created: number; updated: number; skipped: number; failed: number; items: any[] } | null>(null);
+  const [crsResult, setCrsResult] = useState<CRSSyncResult | null>(null);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
   const batchProgressRef = useRef<HTMLDivElement>(null);
 
@@ -445,11 +446,11 @@ export function AccountImportDialog({
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-srapi-text-primary">{t("crsSync.newAccounts")} ({crsPreview.new_accounts.length})</span>
                       <div className="flex gap-2 text-2xs">
-                        <button type="button" className="text-srapi-text-tertiary hover:text-srapi-text-secondary" onClick={() => setCrsSelected(new Set(crsPreview.new_accounts.map((a: any) => a.crs_account_id)))}>{t("adminQuickSetup.selectAll")}</button>
+                        <button type="button" className="text-srapi-text-tertiary hover:text-srapi-text-secondary" onClick={() => setCrsSelected(new Set(crsPreview.new_accounts.map((a) => a.crs_account_id)))}>{t("adminQuickSetup.selectAll")}</button>
                         <button type="button" className="text-srapi-text-tertiary hover:text-srapi-text-secondary" onClick={() => setCrsSelected(new Set())}>{t("adminQuickSetup.selectNone")}</button>
                       </div>
                     </div>
-                    {crsPreview.new_accounts.map((a: any) => (
+                    {crsPreview.new_accounts.map((a) => (
                       <label key={a.crs_account_id} className="flex items-center gap-2 rounded-md border border-srapi-border px-3 py-2 text-sm cursor-pointer hover:bg-srapi-card-muted">
                         <input type="checkbox" checked={crsSelected.has(a.crs_account_id)} onChange={() => {
                           setCrsSelected(prev => {
@@ -466,7 +467,7 @@ export function AccountImportDialog({
                       <div className="mt-3">
                         <span className="text-sm text-srapi-text-secondary">{t("crsSync.existingAccounts")} ({crsPreview.existing_accounts.length})</span>
                         <div className="mt-1 space-y-1">
-                          {crsPreview.existing_accounts.map((a: any) => (
+                          {crsPreview.existing_accounts.map((a) => (
                             <div key={a.crs_account_id} className="flex items-center gap-2 rounded-md border border-srapi-border/50 bg-srapi-card-muted px-3 py-2 text-sm opacity-60">
                               <span>{a.name}</span>
                               <span className="ml-auto font-mono text-2xs text-srapi-text-tertiary">{a.platform}</span>
@@ -707,7 +708,7 @@ export function AccountImportDialog({
                   try {
                     const preview = await adminApi.crsPreview({ base_url: crsUrl, username: crsUser, password: crsPass });
                     setCrsPreview(preview);
-                    setCrsSelected(new Set(preview.new_accounts.map((a: any) => a.crs_account_id)));
+                    setCrsSelected(new Set(preview.new_accounts.map((a) => a.crs_account_id)));
                     setCrsStep("preview");
                   } catch (err) {
                     setError(adminErrorMessage(err));

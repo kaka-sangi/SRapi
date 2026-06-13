@@ -127,9 +127,8 @@ export function useAutoRefresh(
   useEffect(() => {
     if (!enabled || !interval) return;
 
-    // Reset countdown whenever enabled/interval changes.
-    setTimeUntilRefresh(interval);
-
+    // Countdown is seeded by the state initializer and reset in toggle()/setInterval(),
+    // so this effect only owns the tick loop.
     const id = window.setInterval(() => {
       // Pause while tab is hidden.
       if (typeof document !== "undefined" && document.hidden) return;
