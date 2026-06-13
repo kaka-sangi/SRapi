@@ -9840,6 +9840,22 @@ type ListAdminAccountsAvailabilityParams struct {
 	Days *int `form:"days,omitempty" json:"days,omitempty"`
 }
 
+// SyncAdminCRSJSONBody defines parameters for SyncAdminCRS.
+type SyncAdminCRSJSONBody struct {
+	BaseUrl            string    `json:"base_url"`
+	Password           string    `json:"password"`
+	SelectedAccountIds *[]string `json:"selected_account_ids,omitempty"`
+	SyncProxies        *bool     `json:"sync_proxies,omitempty"`
+	Username           string    `json:"username"`
+}
+
+// PreviewAdminCRSSyncJSONBody defines parameters for PreviewAdminCRSSync.
+type PreviewAdminCRSSyncJSONBody struct {
+	BaseUrl  string `json:"base_url"`
+	Password string `json:"password"`
+	Username string `json:"username"`
+}
+
 // GetAdminAccountAvailabilityParams defines parameters for GetAdminAccountAvailability.
 type GetAdminAccountAvailabilityParams struct {
 	Days *int `form:"days,omitempty" json:"days,omitempty"`
@@ -10485,6 +10501,12 @@ type StartAdminAccountOAuthDeviceCodeJSONRequestBody = AccountOAuthDeviceCodeReq
 
 // ExchangeAdminAccountOAuthCodeJSONRequestBody defines body for ExchangeAdminAccountOAuthCode for application/json ContentType.
 type ExchangeAdminAccountOAuthCodeJSONRequestBody = AccountOAuthExchangeRequest
+
+// SyncAdminCRSJSONRequestBody defines body for SyncAdminCRS for application/json ContentType.
+type SyncAdminCRSJSONRequestBody SyncAdminCRSJSONBody
+
+// PreviewAdminCRSSyncJSONRequestBody defines body for PreviewAdminCRSSync for application/json ContentType.
+type PreviewAdminCRSSyncJSONRequestBody PreviewAdminCRSSyncJSONBody
 
 // UpdateAdminAccountJSONRequestBody defines body for UpdateAdminAccount for application/json ContentType.
 type UpdateAdminAccountJSONRequestBody = UpdateProviderAccountRequest
@@ -17228,6 +17250,12 @@ type ServerInterface interface {
 	// Get the status of a pending OAuth provisioning session.
 	// (GET /api/v1/admin/accounts/oauth/pending/{id})
 	GetAdminAccountOAuthPending(w http.ResponseWriter, r *http.Request, id string)
+	// Sync selected accounts from an external CRS source.
+	// (POST /api/v1/admin/accounts/sync/crs)
+	SyncAdminCRS(w http.ResponseWriter, r *http.Request)
+	// Preview accounts from an external CRS before syncing.
+	// (POST /api/v1/admin/accounts/sync/crs/preview)
+	PreviewAdminCRSSync(w http.ResponseWriter, r *http.Request)
 	// Delete a provider account.
 	// (DELETE /api/v1/admin/accounts/{id})
 	DeleteAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
@@ -17414,6 +17442,18 @@ type ServerInterface interface {
 	// Get the admin control-plane dashboard snapshot.
 	// (GET /api/v1/admin/dashboard/snapshot)
 	GetAdminDashboardSnapshot(w http.ResponseWriter, r *http.Request, params GetAdminDashboardSnapshotParams)
+	// Return hit/miss/eviction stats for internal caches.
+	// (GET /api/v1/admin/diagnostics/cache-stats)
+	GetAdminCacheStats(w http.ResponseWriter, r *http.Request)
+	// Flush all entries from the model resolution cache.
+	// (POST /api/v1/admin/diagnostics/cache/clear)
+	ClearAdminCache(w http.ResponseWriter, r *http.Request)
+	// List all active circuit breakers with counts and state.
+	// (GET /api/v1/admin/diagnostics/circuit-breakers)
+	GetAdminCircuitBreakers(w http.ResponseWriter, r *http.Request)
+	// Reset a tripped circuit breaker to closed state.
+	// (POST /api/v1/admin/diagnostics/circuit-breakers/{accountId}/reset)
+	ResetAdminCircuitBreaker(w http.ResponseWriter, r *http.Request, accountId string)
 	// List error-passthrough rules.
 	// (GET /api/v1/admin/error-passthrough-rules)
 	ListAdminErrorPassthroughRules(w http.ResponseWriter, r *http.Request)
@@ -17426,6 +17466,9 @@ type ServerInterface interface {
 	// Update an error-passthrough rule.
 	// (PATCH /api/v1/admin/error-passthrough-rules/{id})
 	UpdateAdminErrorPassthroughRule(w http.ResponseWriter, r *http.Request, id Id)
+	// Server-Sent Events stream for real-time admin notifications.
+	// (GET /api/v1/admin/events)
+	GetAdminEventStream(w http.ResponseWriter, r *http.Request)
 	// List per-account-group rate limits.
 	// (GET /api/v1/admin/group-rate-limits)
 	ListAdminGroupRateLimits(w http.ResponseWriter, r *http.Request)
@@ -19399,6 +19442,50 @@ func (siw *ServerInterfaceWrapper) GetAdminAccountOAuthPending(w http.ResponseWr
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAdminAccountOAuthPending(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SyncAdminCRS operation middleware
+func (siw *ServerInterfaceWrapper) SyncAdminCRS(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SyncAdminCRS(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PreviewAdminCRSSync operation middleware
+func (siw *ServerInterfaceWrapper) PreviewAdminCRSSync(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PreviewAdminCRSSync(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -21680,6 +21767,102 @@ func (siw *ServerInterfaceWrapper) GetAdminDashboardSnapshot(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminCacheStats operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminCacheStats(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminCacheStats(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ClearAdminCache operation middleware
+func (siw *ServerInterfaceWrapper) ClearAdminCache(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClearAdminCache(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminCircuitBreakers operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminCircuitBreakers(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminCircuitBreakers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResetAdminCircuitBreaker operation middleware
+func (siw *ServerInterfaceWrapper) ResetAdminCircuitBreaker(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "accountId" -------------
+	var accountId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "accountId", r.PathValue("accountId"), &accountId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "accountId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResetAdminCircuitBreaker(w, r, accountId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminErrorPassthroughRules operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminErrorPassthroughRules(w http.ResponseWriter, r *http.Request) {
 
@@ -21781,6 +21964,26 @@ func (siw *ServerInterfaceWrapper) UpdateAdminErrorPassthroughRule(w http.Respon
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAdminErrorPassthroughRule(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminEventStream operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminEventStream(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminEventStream(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -30372,6 +30575,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/device-code/start", wrapper.StartAdminAccountOAuthDeviceCode)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/exchange", wrapper.ExchangeAdminAccountOAuthCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/pending/{id}", wrapper.GetAdminAccountOAuthPending)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/sync/crs", wrapper.SyncAdminCRS)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/sync/crs/preview", wrapper.PreviewAdminCRSSync)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.DeleteAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.GetAdminAccount)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.UpdateAdminAccount)
@@ -30434,10 +30639,15 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/copilot/conversations/{id}", wrapper.UpdateAdminCopilotConversation)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/dashboard", wrapper.GetAdminDashboard)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/dashboard/snapshot", wrapper.GetAdminDashboardSnapshot)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/diagnostics/cache-stats", wrapper.GetAdminCacheStats)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/diagnostics/cache/clear", wrapper.ClearAdminCache)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/diagnostics/circuit-breakers", wrapper.GetAdminCircuitBreakers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/diagnostics/circuit-breakers/{accountId}/reset", wrapper.ResetAdminCircuitBreaker)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules", wrapper.ListAdminErrorPassthroughRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules", wrapper.CreateAdminErrorPassthroughRule)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules/{id}", wrapper.DeleteAdminErrorPassthroughRule)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules/{id}", wrapper.UpdateAdminErrorPassthroughRule)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/events", wrapper.GetAdminEventStream)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/group-rate-limits", wrapper.ListAdminGroupRateLimits)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/group-rate-limits", wrapper.UpsertAdminGroupRateLimit)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/group-rate-limits/{groupId}", wrapper.DeleteAdminGroupRateLimit)

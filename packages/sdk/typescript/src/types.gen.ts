@@ -20295,3 +20295,242 @@ export type ImportAdminConfigSnapshotResponses = {
 };
 
 export type ImportAdminConfigSnapshotResponse = ImportAdminConfigSnapshotResponses[keyof ImportAdminConfigSnapshotResponses];
+
+export type GetAdminCircuitBreakersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/diagnostics/circuit-breakers';
+};
+
+export type GetAdminCircuitBreakersErrors = {
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminCircuitBreakersError = GetAdminCircuitBreakersErrors[keyof GetAdminCircuitBreakersErrors];
+
+export type GetAdminCircuitBreakersResponses = {
+    /**
+     * Circuit breaker entries.
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type GetAdminCircuitBreakersResponse = GetAdminCircuitBreakersResponses[keyof GetAdminCircuitBreakersResponses];
+
+export type ResetAdminCircuitBreakerData = {
+    body?: never;
+    path: {
+        accountId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/diagnostics/circuit-breakers/{accountId}/reset';
+};
+
+export type ResetAdminCircuitBreakerErrors = {
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ResetAdminCircuitBreakerError = ResetAdminCircuitBreakerErrors[keyof ResetAdminCircuitBreakerErrors];
+
+export type ResetAdminCircuitBreakerResponses = {
+    /**
+     * Breaker reset.
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type ResetAdminCircuitBreakerResponse = ResetAdminCircuitBreakerResponses[keyof ResetAdminCircuitBreakerResponses];
+
+export type GetAdminCacheStatsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/diagnostics/cache-stats';
+};
+
+export type GetAdminCacheStatsErrors = {
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminCacheStatsError = GetAdminCacheStatsErrors[keyof GetAdminCacheStatsErrors];
+
+export type GetAdminCacheStatsResponses = {
+    /**
+     * Cache statistics.
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type GetAdminCacheStatsResponse = GetAdminCacheStatsResponses[keyof GetAdminCacheStatsResponses];
+
+export type ClearAdminCacheData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/diagnostics/cache/clear';
+};
+
+export type ClearAdminCacheErrors = {
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ClearAdminCacheError = ClearAdminCacheErrors[keyof ClearAdminCacheErrors];
+
+export type ClearAdminCacheResponses = {
+    /**
+     * Number of entries cleared.
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type ClearAdminCacheResponse = ClearAdminCacheResponses[keyof ClearAdminCacheResponses];
+
+export type GetAdminEventStreamData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/events';
+};
+
+export type GetAdminEventStreamErrors = {
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminEventStreamError = GetAdminEventStreamErrors[keyof GetAdminEventStreamErrors];
+
+export type GetAdminEventStreamResponses = {
+    /**
+     * SSE event stream.
+     */
+    200: string;
+};
+
+export type GetAdminEventStreamResponse = GetAdminEventStreamResponses[keyof GetAdminEventStreamResponses];
+
+export type PreviewAdminCrsSyncData = {
+    body: {
+        base_url: string;
+        username: string;
+        password: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/sync/crs/preview';
+};
+
+export type PreviewAdminCrsSyncErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type PreviewAdminCrsSyncError = PreviewAdminCrsSyncErrors[keyof PreviewAdminCrsSyncErrors];
+
+export type PreviewAdminCrsSyncResponses = {
+    /**
+     * Preview of new and existing accounts.
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type PreviewAdminCrsSyncResponse = PreviewAdminCrsSyncResponses[keyof PreviewAdminCrsSyncResponses];
+
+export type SyncAdminCrsData = {
+    body: {
+        base_url: string;
+        username: string;
+        password: string;
+        sync_proxies?: boolean;
+        selected_account_ids?: Array<string>;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/sync/crs';
+};
+
+export type SyncAdminCrsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type SyncAdminCrsError = SyncAdminCrsErrors[keyof SyncAdminCrsErrors];
+
+export type SyncAdminCrsResponses = {
+    /**
+     * Sync results with per-account status.
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type SyncAdminCrsResponse = SyncAdminCrsResponses[keyof SyncAdminCrsResponses];
