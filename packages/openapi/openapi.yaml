@@ -13495,6 +13495,228 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/diagnostics/circuit-breakers:
+    get:
+      tags:
+        - AdminDiagnostics
+      operationId: getAdminCircuitBreakers
+      summary: List all active circuit breakers with counts and state.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        admin: read
+      responses:
+        "200":
+          description: Circuit breaker entries.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                type: object
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/diagnostics/circuit-breakers/{accountId}/reset:
+    post:
+      tags:
+        - AdminDiagnostics
+      operationId: resetAdminCircuitBreaker
+      summary: Reset a tripped circuit breaker to closed state.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        admin: write
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Breaker reset.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                type: object
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/diagnostics/cache-stats:
+    get:
+      tags:
+        - AdminDiagnostics
+      operationId: getAdminCacheStats
+      summary: Return hit/miss/eviction stats for internal caches.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        admin: read
+      responses:
+        "200":
+          description: Cache statistics.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                type: object
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/diagnostics/cache/clear:
+    post:
+      tags:
+        - AdminDiagnostics
+      operationId: clearAdminCache
+      summary: Flush all entries from the model resolution cache.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        admin: write
+      responses:
+        "200":
+          description: Number of entries cleared.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                type: object
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/events:
+    get:
+      tags:
+        - AdminDiagnostics
+      operationId: getAdminEventStream
+      summary: Server-Sent Events stream for real-time admin notifications.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        admin: read
+      responses:
+        "200":
+          description: SSE event stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/sync/crs/preview:
+    post:
+      tags:
+        - AdminAccountSync
+      operationId: previewAdminCRSSync
+      summary: Preview accounts from an external CRS before syncing.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [base_url, username, password]
+              properties:
+                base_url:
+                  type: string
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Preview of new and existing accounts.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/sync/crs:
+    post:
+      tags:
+        - AdminAccountSync
+      operationId: syncAdminCRS
+      summary: Sync selected accounts from an external CRS source.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [base_url, username, password]
+              properties:
+                base_url:
+                  type: string
+                username:
+                  type: string
+                password:
+                  type: string
+                sync_proxies:
+                  type: boolean
+                selected_account_ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Sync results with per-account status.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
 components:
   securitySchemes:
     cookieAuth:
