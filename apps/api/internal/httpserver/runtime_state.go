@@ -15,6 +15,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/config"
 	"github.com/srapi/srapi/apps/api/internal/platform/circuitbreaker"
+	"github.com/srapi/srapi/apps/api/internal/platform/eventsub"
 	"github.com/srapi/srapi/apps/api/internal/platform/localcache"
 	accountprovisioningservice "github.com/srapi/srapi/apps/api/internal/modules/account_provisioning/service"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -226,6 +227,8 @@ type runtimeState struct {
 	accountBreakersMu sync.RWMutex
 
 	modelResolutionCache *localcache.Cache[modelcontract.ModelResolution]
+
+	eventHub *eventsub.Hub
 }
 
 type dependencyHealth struct {
@@ -929,6 +932,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 			MaxEntries: 512,
 			DefaultTTL: 30 * time.Second,
 		}),
+		eventHub: eventsub.NewHub(),
 	}
 }
 
@@ -984,6 +988,16 @@ func (rt *runtimeState) accountBreaker(accountID int) *circuitbreaker.Breaker {
 					"account_id", accountID,
 					"from", from.String(),
 					"to", to.String())
+			}
+			if rt.eventHub != nil {
+				rt.eventHub.Publish(eventsub.Event{
+					Type: "circuit_breaker",
+					Data: map[string]any{
+						"account_id": accountID,
+						"from":       from.String(),
+						"to":         to.String(),
+					},
+				})
 			}
 		},
 	})

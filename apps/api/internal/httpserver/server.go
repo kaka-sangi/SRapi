@@ -467,6 +467,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/diagnostics/circuit-breakers/{accountId}/reset", server.handleAdminResetCircuitBreaker)
 	mux.HandleFunc("GET /api/v1/admin/diagnostics/cache-stats", server.handleAdminCacheStats)
 	mux.HandleFunc("POST /api/v1/admin/diagnostics/cache/clear", server.handleAdminClearCache)
+	mux.HandleFunc("GET /api/v1/admin/events", server.handleAdminEventStream)
 	mux.HandleFunc("GET /api/v1/admin/audit-logs", server.handleListAdminAuditLogs)
 	mux.HandleFunc("GET /api/v1/admin/billing-ledger", server.handleListAdminBillingLedger)
 	mux.HandleFunc("GET /api/v1/admin/affiliates/invites", server.handleListAdminAffiliateInvites)

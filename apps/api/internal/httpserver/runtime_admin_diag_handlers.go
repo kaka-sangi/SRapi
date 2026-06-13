@@ -1,10 +1,12 @@
 package httpserver
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/srapi/srapi/apps/api/internal/platform/circuitbreaker"
+	"github.com/srapi/srapi/apps/api/internal/platform/eventsub"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -161,4 +163,48 @@ func (s *Server) handleAdminClearCache(w http.ResponseWriter, r *http.Request) {
 		"data":       map[string]any{"cleared": cleared},
 		"request_id": requestID,
 	})
+}
+
+func (s *Server) handleAdminEventStream(w http.ResponseWriter, r *http.Request) {
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestIDFromContext(r.Context()))
+		return
+	}
+
+	hub := s.runtime.eventHub
+	if hub == nil {
+		http.Error(w, "event stream not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	sub := hub.Subscribe(64)
+	defer hub.Unsubscribe(sub)
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	// Send initial ping so the client knows the connection is alive.
+	fmt.Fprint(w, "event: ping\ndata: {}\n\n")
+	flusher.Flush()
+
+	ctx := r.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-sub.Done():
+			return
+		case e := <-sub.Events():
+			w.Write(eventsub.MarshalSSE(e))
+			flusher.Flush()
+		}
+	}
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, RefreshCw, RotateCcw, Database } from "lucide-react";
+import { Activity, RefreshCw, RotateCcw, Database, Wifi, WifiOff } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
   useClearCache,
   useAdminAccounts,
 } from "@/hooks/admin-queries";
+import { useAdminEventStream } from "@/hooks/use-admin-events";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { quietStatusFor } from "@/lib/status-badge";
@@ -49,6 +50,14 @@ function DiagnosticsContent() {
   const resetMut = useResetCircuitBreaker();
   const clearCacheMut = useClearCache();
   const accounts = useAdminAccounts({ page: 1, page_size: 200 });
+
+  const { connected: streamConnected } = useAdminEventStream(
+    (event) => {
+      if (event.type === "circuit_breaker") {
+        void breakers.refetch();
+      }
+    },
+  );
   const accountNameById = new Map(
     (accounts.data?.data ?? []).map((a) => [a.id, a.name] as const),
   );
@@ -73,12 +82,21 @@ function DiagnosticsContent() {
         eyebrow={t("nav.sectionAdmin")}
         title={t("diagnostics.title")}
         actions={
-          <AutoRefreshControl
-            onRefresh={refetchAll}
-            isRefreshing={breakers.isFetching || cacheStats.isFetching}
-            storageKey="srapi.autorefresh.diagnostics"
-            defaultSec={10}
-          />
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 font-mono text-2xs text-srapi-text-tertiary">
+              {streamConnected ? (
+                <><Wifi className="size-3 text-srapi-success" /> {t("common.live")}</>
+              ) : (
+                <><WifiOff className="size-3" /> SSE</>
+              )}
+            </span>
+            <AutoRefreshControl
+              onRefresh={refetchAll}
+              isRefreshing={breakers.isFetching || cacheStats.isFetching}
+              storageKey="srapi.autorefresh.diagnostics"
+              defaultSec={10}
+            />
+          </div>
         }
       />
 
