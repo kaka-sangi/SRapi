@@ -1,7 +1,6 @@
 "use client";
 
-import type { Auth } from "../../../../packages/sdk/typescript/src/core/auth.gen";
-import { client } from "../../../../packages/sdk/typescript/src/client.gen";
+import { configureSdkClient } from "./sdk-client";
 import {
   getCurrentUser,
   updateCurrentUserProfile,
@@ -62,8 +61,6 @@ import type {
   UserPlatformQuota,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
-const CSRF_STORAGE_KEY = "srapi_csrf_token";
-
 export interface MeListResult<T> {
   data: T[];
   pagination?: Pagination;
@@ -75,26 +72,10 @@ export interface MeAnnouncementsResult {
   pagination?: Pagination;
 }
 
-function configuredApiBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_SRAPI_BASE_URL || "").replace(/\/+$/, "");
-}
-
-function getStoredCSRFToken(): string | undefined {
-  if (typeof window === "undefined") return undefined;
-  return localStorage.getItem(CSRF_STORAGE_KEY) || undefined;
-}
-
-function resolveAuthToken(auth: Auth): string | undefined {
-  return auth.name === "X-CSRF-Token" ? getStoredCSRFToken() : undefined;
-}
-
-function configureClient() {
-  client.setConfig({
-    baseUrl: configuredApiBaseUrl(),
-    credentials: "include",
-    auth: resolveAuthToken,
-  });
-}
+// SDK-client setup (base URL, cookie credentials, CSRF auth) is shared across
+// the functional clients; see ./sdk-client. Kept under the original local name
+// so the many call sites below stay untouched.
+const configureClient = configureSdkClient;
 
 async function unwrapData<T>(request: () => Promise<{ data?: { data?: T } }>): Promise<T> {
   configureClient();

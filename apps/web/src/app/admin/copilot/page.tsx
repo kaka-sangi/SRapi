@@ -11,6 +11,10 @@ import { useAdminCopilotConfig } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { ADMIN_ROUTES } from "@/lib/routes";
 
+// Kept intentionally: although this route is not in the sidebar nav, the
+// floating copilot-pet's "open full page" control links here via
+// ADMIN_ROUTES.copilot (see components/admin/copilot-pet.tsx), so the page is
+// reachable and must not be deleted.
 export default function AdminCopilotPage() {
   return (
     <AdminShell>

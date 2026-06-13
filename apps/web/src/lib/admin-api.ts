@@ -1,7 +1,10 @@
 "use client";
 
-import type { Auth } from "../../../../packages/sdk/typescript/src/core/auth.gen";
-import { client } from "../../../../packages/sdk/typescript/src/client.gen";
+import {
+  configureSdkClient,
+  configuredApiBaseUrl,
+  getStoredCSRFToken,
+} from "./sdk-client";
 import {
   acknowledgeAdminOpsAlert,
   cleanupAdminOpsSystemLogs,
@@ -414,8 +417,6 @@ import type {
   UserSubscription,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
-const CSRF_STORAGE_KEY = "srapi_csrf_token";
-
 export interface AdminListResult<T> {
   data: T[];
   pagination?: Pagination;
@@ -493,31 +494,10 @@ export interface AdminUnsupportedSurface {
   reason: string;
 }
 
-function configuredApiBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_SRAPI_BASE_URL || "").replace(/\/+$/, "");
-}
-
-function getStoredCSRFToken(): string | undefined {
-  if (typeof window === "undefined") {
-    return undefined;
-  }
-  return localStorage.getItem(CSRF_STORAGE_KEY) || undefined;
-}
-
-function resolveAuthToken(auth: Auth): string | undefined {
-  if (auth.name === "X-CSRF-Token") {
-    return getStoredCSRFToken();
-  }
-  return undefined;
-}
-
-function configureAdminClient() {
-  client.setConfig({
-    baseUrl: configuredApiBaseUrl(),
-    credentials: "include",
-    auth: resolveAuthToken,
-  });
-}
+// SDK-client setup (base URL, cookie credentials, CSRF auth) is shared across
+// the functional clients; see ./sdk-client. Kept under the original local name
+// so the many call sites below stay untouched.
+const configureAdminClient = configureSdkClient;
 
 configureAdminClient();
 
@@ -1623,6 +1603,10 @@ export const adminApi = {
     await deleteAdminGroupRateLimit({ path: { groupId }, throwOnError: true });
   },
 
+  // TODO(sdk-gap): the diagnostics (circuit-breaker / cache) and CRS-sync
+  // endpoints below are not in the generated SDK, so they stay raw fetches
+  // (auth/base-url via the shared sdk-client helpers). Swap to SDK functions
+  // once those endpoints are generated.
   async getCircuitBreakers(): Promise<CircuitBreakerEntry[]> {
     const base = configuredApiBaseUrl();
     const res = await fetch(`${base}/api/v1/admin/diagnostics/circuit-breakers`, {

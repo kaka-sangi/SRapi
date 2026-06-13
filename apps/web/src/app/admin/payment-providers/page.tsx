@@ -36,7 +36,7 @@ import {
   paymentProviderFormFromInstance,
   type PaymentProviderFormState,
 } from "@/lib/admin-orders-form";
-import type { PaymentProviderInstance } from "../../../../../../packages/sdk/typescript/src/types.gen";
+import type { PaymentProviderInstance } from "@/lib/sdk-types";
 
 interface PaymentPreset {
   key: string;

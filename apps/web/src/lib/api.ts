@@ -1,5 +1,9 @@
-import type { Auth } from '../../../../packages/sdk/typescript/src/core/auth.gen';
-import { client } from '../../../../packages/sdk/typescript/src/client.gen';
+import {
+  CSRF_STORAGE_KEY,
+  configureSdkClient,
+  configuredApiBaseUrl,
+  getStoredCSRFToken,
+} from './sdk-client';
 import {
   login as sdkLogin,
   loginTwoFactor as sdkLoginTwoFactor,
@@ -61,7 +65,6 @@ export type LoginResult =
 const DEFAULT_PROXY_TARGET = 'http://127.0.0.1:8080';
 const HEALTH_TIMEOUT_MS = 2500;
 const USER_STORAGE_KEY = 'srapi_user';
-const CSRF_STORAGE_KEY = 'srapi_csrf_token';
 
 type LiveUser = {
   id?: string;
@@ -200,10 +203,6 @@ export type CurrentUserAttribute = {
   updated_at?: string;
 };
 
-function configuredApiBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_SRAPI_BASE_URL || '').replace(/\/+$/, '');
-}
-
 function buildApiUrl(path: string): string {
   const normalized = path.startsWith('/') ? path : `/${path}`;
   const configured = configuredApiBaseUrl();
@@ -214,29 +213,10 @@ function apiBaseUrlLabel(): string {
   return configuredApiBaseUrl() || `same-origin /api proxy -> ${DEFAULT_PROXY_TARGET}`;
 }
 
-function getStoredCSRFToken(): string | undefined {
-  if (typeof window === 'undefined') {
-    return undefined;
-  }
-  return localStorage.getItem(CSRF_STORAGE_KEY) || undefined;
-}
-
-function resolveAuthToken(auth: Auth): string | undefined {
-  if (auth.name === 'X-CSRF-Token') {
-    return getStoredCSRFToken();
-  }
-
-  // Browser cookies are sent by fetch credentials. Do not synthesize Cookie headers.
-  return undefined;
-}
-
-function configureSDKClient() {
-  client.setConfig({
-    baseUrl: configuredApiBaseUrl(),
-    credentials: 'include',
-    auth: resolveAuthToken
-  });
-}
+// SDK-client setup (base URL, cookie credentials, CSRF auth) is shared across
+// the functional clients; see ./sdk-client. Kept under the original local name
+// so the many call sites below stay untouched.
+const configureSDKClient = configureSdkClient;
 
 configureSDKClient();
 
@@ -356,6 +336,25 @@ function isPublicHTTPSURL(url?: string) {
   }
 }
 
+/**
+ * Legacy session/auth + summary-mapping service.
+ *
+ * Domain reads/writes for the signed-in user (`/me`) and admin live in the
+ * functional SDK clients (`meApi` in ./me-api, `adminApi` in ./admin-api).
+ * What remains here is the work those SDK wrappers deliberately do NOT do:
+ *  - session lifecycle: login / 2FA / OAuth-pending / setup / register /
+ *    logout, with localStorage + presence-cookie side effects (storeSession /
+ *    clearSession / mapLiveUser);
+ *  - response mapping into the page-facing summary types in ./srapi-types
+ *    (api keys, usage logs, scheduler decisions, SLOs, available models);
+ *  - composite/diagnostic reads (runtime status, smoke checklist);
+ *  - SDK-gap raw fetches (deleteApiKey, passwordless, site-config and
+ *    registration/me attributes) marked with `// TODO(sdk-gap)`.
+ *
+ * None of these has a 1:1 SDK function already exposed by meApi/adminApi, so
+ * there is nothing safe to migrate without changing behavior or adding new SDK
+ * surface. Prefer meApi/adminApi for any genuinely 1:1 call going forward.
+ */
 export const apiService = {
   async isBackendConnected(): Promise<boolean> {
     if (typeof window === 'undefined') {
@@ -459,6 +458,8 @@ export const apiService = {
     return mappedUser;
   },
 
+  // TODO(sdk-gap): the passwordless request endpoint is not in the generated
+  // SDK, so this stays a raw fetch. Swap to the SDK function once it exists.
   async requestPasswordlessCode(
     email: string,
     name?: string,
@@ -472,6 +473,8 @@ export const apiService = {
     });
   },
 
+  // TODO(sdk-gap): the passwordless login endpoint is not in the generated
+  // SDK, so this stays a raw fetch. Swap to the SDK function once it exists.
   async passwordlessLogin(token: string): Promise<CurrentUser> {
     const response = await fetchApiJSON<{
       data?: { user?: LiveUser; csrf_token?: string };
@@ -886,6 +889,8 @@ export const apiService = {
     });
   },
 
+  // TODO(sdk-gap): deleteApiKey has no generated SDK function, so this stays a
+  // raw fetch. Swap to the SDK function once the endpoint is added.
   async deleteApiKey(id: string): Promise<void> {
     const headers: Record<string, string> = {};
     const csrf = localStorage.getItem(CSRF_STORAGE_KEY);

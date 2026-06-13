@@ -27,7 +27,7 @@ import {
   formatMoney,
   formatPercent,
 } from "@/lib/admin-format";
-import type { AdminDashboardSnapshot } from "../../../../../../packages/sdk/typescript/src/types.gen";
+import type { AdminDashboardSnapshot } from "@/lib/sdk-types";
 
 const RANGE_PRESETS = [
   { key: "1d", days: 1 },
