@@ -1018,6 +1018,8 @@ export const en = {
     deleteSubBody: "The subscription and its entitlements are removed from the user. This cannot be undone.",
     createPlan: "New plan",
     editPlan: "Edit plan",
+    selectTemplate: "Choose a plan template",
+    selectTemplateHint: "Pick a template to start with, or create a blank plan.",
     deletePlanTitle: "Delete plan",
     deletePlanBody:
       "Delete plan “{name}”? It will no longer be offered for sale. Existing subscribers are unaffected — their entitlements were snapshotted at subscription time. This cannot be undone.",

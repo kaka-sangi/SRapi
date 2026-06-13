@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CreditCard } from "lucide-react";
+import { CreditCard, Sparkles } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
@@ -55,6 +56,8 @@ function PlansContent() {
   const updateMut = useUpdateSubscriptionPlan();
   const deleteMut = useDeleteSubscriptionPlan();
   const [creating, setCreating] = useState(false);
+  const [showPresets, setShowPresets] = useState(false);
+  const [planPreset, setPlanPreset] = useState<SubscriptionPlanFormState | null>(null);
   const [editing, setEditing] = useState<SubscriptionPlan | null>(null);
   const [toDelete, setToDelete] = useState<SubscriptionPlan | null>(null);
 
@@ -191,7 +194,7 @@ function PlansContent() {
               columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
               visibility={colVis}
             />
-            <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
+            <Button variant="primary" size="sm" onClick={() => setShowPresets(true)}>
               ＋ {t("adminSubscriptions.createPlan")}
             </Button>
           </div>
@@ -206,7 +209,7 @@ function PlansContent() {
         emptyTitle={t("adminSubscriptions.emptyPlans")}
         emptyBody={t("adminSubscriptions.emptyPlansBody")}
         emptyAction={
-          <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
+          <Button variant="primary" size="sm" onClick={() => setShowPresets(true)}>
             ＋ {t("adminSubscriptions.createPlan")}
           </Button>
         }
@@ -236,13 +239,25 @@ function PlansContent() {
         }}
       />
 
+      {showPresets && !creating ? (
+        <PlanPresetPicker
+          onSelect={(preset) => {
+            setPlanPreset(preset);
+            setShowPresets(false);
+            setCreating(true);
+          }}
+          onClose={() => setShowPresets(false)}
+          t={t}
+        />
+      ) : null}
+
       {creating ? (
         <ResourceFormDialog
           open
-          onOpenChange={setCreating}
+          onOpenChange={(open) => { setCreating(open); if (!open) setPlanPreset(null); }}
           title={t("adminSubscriptions.createPlan")}
           fields={fields}
-          initial={emptySubscriptionPlanForm()}
+          initial={planPreset ?? emptySubscriptionPlanForm()}
           buildBody={buildSubscriptionPlanBody}
           submit={(body) => createMut.mutateAsync(body)}
           successMessage={t("feedback.created")}
@@ -266,5 +281,79 @@ function PlansContent() {
         />
       ) : null}
     </>
+  );
+}
+
+const PLAN_PRESETS: { key: string; name: string; desc: string; form: Partial<SubscriptionPlanFormState> }[] = [
+  {
+    key: "free",
+    name: "Free",
+    desc: "免费体验，有限额度",
+    form: { name: "Free", price: "0", currency: "USD", validityDays: "30", monthlyCostQuota: "1.00", costQuotaMode: "hard_cap", forSale: true, status: "active" },
+  },
+  {
+    key: "basic",
+    name: "Basic",
+    desc: "基础套餐，适合个人用户",
+    form: { name: "Basic", price: "9.90", currency: "USD", validityDays: "30", monthlyCostQuota: "10.00", costQuotaMode: "hard_cap", forSale: true, status: "active" },
+  },
+  {
+    key: "pro",
+    name: "Pro",
+    desc: "专业套餐，更高额度",
+    form: { name: "Pro", price: "29.90", currency: "USD", validityDays: "30", monthlyCostQuota: "50.00", costQuotaMode: "hard_cap", forSale: true, status: "active" },
+  },
+  {
+    key: "enterprise",
+    name: "Enterprise",
+    desc: "企业套餐，不限额度",
+    form: { name: "Enterprise", price: "99.90", currency: "USD", validityDays: "30", monthlyCostQuota: "", costQuotaMode: "hard_cap", forSale: true, status: "active" },
+  },
+];
+
+function PlanPresetPicker({
+  onSelect,
+  onClose,
+  t,
+}: {
+  onSelect: (form: SubscriptionPlanFormState) => void;
+  onClose: () => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="w-full max-w-md rounded-xl border border-srapi-border bg-srapi-card p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+        <h2 className="font-serif text-xl text-srapi-text-primary">{t("adminSubscriptions.selectTemplate")}</h2>
+        <p className="mt-1 text-sm text-srapi-text-secondary">{t("adminSubscriptions.selectTemplateHint")}</p>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          {PLAN_PRESETS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => onSelect({ ...emptySubscriptionPlanForm(), ...p.form })}
+              className="rounded-lg border border-srapi-border bg-srapi-card px-4 py-3 text-left transition-colors hover:border-srapi-border-strong hover:bg-srapi-card-muted"
+            >
+              <div className="text-sm font-medium text-srapi-text-primary">{p.name}</div>
+              <div className="mt-0.5 text-xs text-srapi-text-tertiary">{p.desc}</div>
+              {p.form.price && p.form.price !== "0" ? (
+                <div className="mt-2 font-mono text-sm text-srapi-text-secondary">${p.form.price}/mo</div>
+              ) : (
+                <div className="mt-2 font-mono text-sm text-srapi-text-tertiary">Free</div>
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="mt-4 flex justify-between">
+          <button
+            type="button"
+            onClick={() => onSelect(emptySubscriptionPlanForm())}
+            className="text-xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+          >
+            {t("adminPayments.customProvider")}
+          </button>
+          <Button variant="ghost" size="sm" onClick={onClose}>{t("common.cancel")}</Button>
+        </div>
+      </div>
+    </div>
   );
 }
