@@ -10,7 +10,7 @@
 | [`FINAL_STATE.md`](FINAL_STATE.md) | 最终产品与平台目标形态（总纲）。 |
 | [`design/`](#2-design--子系统最终形态) | 各子系统的目标设计规格。 |
 | [`plans/`](#3-plans--开发计划与进度) | 路线图、工作包、进度台账、历史计划。 |
-| [`plans/parity/`](#4-plansparity--sub2api-对齐批次) | sub2api / CLIProxyAPI 对齐计划的分批执行文档。 |
+| [`plans/archive/`](plans/archive/) | 历史 / 已被取代的计划文档与 sub2api 对齐批次台账（仅供追溯）。 |
 
 ## 2. design/ — 子系统最终形态
 
@@ -39,17 +39,11 @@
 | `plans/ROADMAP.md` | 通往最终平台形态的阶段计划。 |
 | `plans/WORK_PACKAGES.md` | 按阶段拆分的可执行工作包、责任范围、完成定义和门禁。 |
 | `plans/PROJECT_DEVELOPMENT_PLAN.md` | 项目定位、阶段路线图和技术方向。 |
-| `plans/COMMERCIALIZATION_PLAN.md` | （历史 / 已完成）从骨架走向生产级网关的工程计划；进度以 `plans/STATUS.md` 为准。 |
-| `plans/MVP_SPEC.md` | （历史 / 已被取代）最初 MVP 需求与验收条件；现状以 `plans/STATUS.md` 为准。 |
-| `plans/MVP_IMPLEMENTATION_PLAN.md` | （历史 / 已被取代）最初 MVP 里程碑拆解；现状以 `plans/WORK_PACKAGES.md` 与 `plans/STATUS.md` 为准。 |
+| [`plans/archive/`](plans/archive/) | 历史 / 已被取代的计划（COMMERCIALIZATION_PLAN、MVP_SPEC、MVP_IMPLEMENTATION_PLAN 等）；进度以 `plans/STATUS.md` 为准。 |
 
-## 4. plans/parity/ — sub2api 对齐批次
+## 4. plans/archive/ — 历史台账
 
-| 文档 | 作用 |
-| --- | --- |
-| `plans/parity/goal-sub2api-parity-README.md` | 对齐计划总览：批次划分、已落地与剩余差距。 |
-| `plans/parity/goal-sub2api-parity-batch1.md` … `batch19.md` | 每批次的目标、实现方案与验收门禁（batch1–7 已落地；batch8–19 为剩余计划）。 |
-| `plans/parity/batch14-end-user-platform-parity.md` | batch14 端用户平台对齐的拆解细化。 |
+已完成或已被取代的计划文档，以及 sub2api / CLIProxyAPI 对齐批次的执行台账，归档在 [`plans/archive/`](plans/archive/)，仅供追溯，不再作为当前进度来源。当前进度以 `plans/STATUS.md` 为准。
 
 ## 5. 实现 goal 的强制阅读顺序
 
@@ -57,7 +51,7 @@
 
 1. `plans/STATUS.md`
 2. [`../docs/requirements/GOAL_EXECUTION_PROTOCOL.md`](../docs/requirements/GOAL_EXECUTION_PROTOCOL.md)
-3. `plans/WORK_PACKAGES.md`（或对应 `plans/parity/` 批次文档）
+3. `plans/WORK_PACKAGES.md`
 4. [`../docs/requirements/QUALITY_GATES.md`](../docs/requirements/QUALITY_GATES.md)
 5. 所选工作包引用的 `design/` 与 `../docs/` 文档
 
@@ -83,4 +77,3 @@ Create a goal for SRapi: read specs/README.md, select the next pending work pack
 
 - 完成任何工作包必须更新 `plans/STATUS.md`，并把下一个工作包移入 `next_recommended`；不要因为单个工作包完成就把全局 goal 标记为完成。
 - 子系统行为变化必须同步对应 `design/` 规格（映射表见 [`../docs/README.md`](../docs/README.md) §7）。
-- 对齐批次的目标或验收变化必须同步 `plans/parity/` 对应批次文档。

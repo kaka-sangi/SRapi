@@ -65,3 +65,6 @@ deploy/.env
 
 # Local agent / MCP config (machine-specific, not committed)
 .mcp.json
+
+# AI agent scratch / session work logs (history lives in git, not a tracked file)
+progress.txt
