@@ -21,7 +21,9 @@ import (
 const defaultHTTPTimeout = 15 * time.Second
 
 type Provider struct {
-	HTTPClient interface{ Do(req *http.Request) (*http.Response, error) }
+	HTTPClient interface {
+		Do(req *http.Request) (*http.Response, error)
+	}
 }
 
 func New() Provider {

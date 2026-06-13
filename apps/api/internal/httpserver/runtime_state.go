@@ -14,9 +14,6 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
-	"github.com/srapi/srapi/apps/api/internal/platform/circuitbreaker"
-	"github.com/srapi/srapi/apps/api/internal/platform/eventsub"
-	"github.com/srapi/srapi/apps/api/internal/platform/localcache"
 	accountprovisioningservice "github.com/srapi/srapi/apps/api/internal/modules/account_provisioning/service"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	accountservice "github.com/srapi/srapi/apps/api/internal/modules/accounts/service"
@@ -119,6 +116,9 @@ import (
 	usersservice "github.com/srapi/srapi/apps/api/internal/modules/users/service"
 	usermemory "github.com/srapi/srapi/apps/api/internal/modules/users/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	"github.com/srapi/srapi/apps/api/internal/platform/circuitbreaker"
+	"github.com/srapi/srapi/apps/api/internal/platform/eventsub"
+	"github.com/srapi/srapi/apps/api/internal/platform/localcache"
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 	scheduledtestworker "github.com/srapi/srapi/apps/api/internal/workers/scheduled_test"
 )
@@ -927,7 +927,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		capabilities:         seedCapabilities(),
 		databaseProbe:        opts.database,
 		redisProbe:           opts.redis,
-		accountBreakers: make(map[int]*circuitbreaker.Breaker),
+		accountBreakers:      make(map[int]*circuitbreaker.Breaker),
 		modelResolutionCache: localcache.New[modelcontract.ModelResolution](localcache.Config{
 			MaxEntries: 512,
 			DefaultTTL: 30 * time.Second,

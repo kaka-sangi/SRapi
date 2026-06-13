@@ -33,11 +33,11 @@ type Watcher struct {
 	cfg      Config
 	onChange func(path string)
 
-	mu             sync.Mutex
-	last           fileState
-	cancel         context.CancelFunc
-	stopped        chan struct{}
-	debounceTimer  *time.Timer
+	mu            sync.Mutex
+	last          fileState
+	cancel        context.CancelFunc
+	stopped       chan struct{}
+	debounceTimer *time.Timer
 }
 
 // New creates a Watcher that polls the file at cfg.Path every cfg.Interval.

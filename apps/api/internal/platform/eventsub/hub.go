@@ -17,7 +17,7 @@ type Subscriber struct {
 	mu     sync.Mutex
 }
 
-func (s *Subscriber) Events() <-chan Event { return s.ch }
+func (s *Subscriber) Events() <-chan Event  { return s.ch }
 func (s *Subscriber) Done() <-chan struct{} { return s.done }
 
 func (s *Subscriber) Close() {

@@ -83,11 +83,11 @@ type Dependencies struct {
 }
 
 type Service struct {
-	store       contract.Store
-	masterKey   []byte
-	deps        Dependencies
-	clock       Clock
-	selectorMu  sync.Mutex
+	store         contract.Store
+	masterKey     []byte
+	deps          Dependencies
+	clock         Clock
+	selectorMu    sync.Mutex
 	selectorState map[string][]int
 }
 

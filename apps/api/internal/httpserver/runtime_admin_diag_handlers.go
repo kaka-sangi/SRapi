@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
+	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	"github.com/srapi/srapi/apps/api/internal/platform/circuitbreaker"
 	"github.com/srapi/srapi/apps/api/internal/platform/eventsub"
-	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
 func (s *Server) handleAdminCircuitBreakers(w http.ResponseWriter, r *http.Request) {
