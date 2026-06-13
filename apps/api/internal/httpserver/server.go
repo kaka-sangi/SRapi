@@ -379,6 +379,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/payment/orders/{id}", server.handleGetPaymentOrder)
 	mux.HandleFunc("POST /api/v1/payment/orders/{id}/cancel", server.handleCancelPaymentOrder)
 	mux.HandleFunc("POST /api/v1/webhooks/payments/{provider}", server.handlePaymentWebhook)
+	mux.HandleFunc("GET /api/v1/webhooks/payments/{provider}", server.handlePaymentWebhookGET)
 	mux.HandleFunc("GET /api/v1/api-keys", server.handleListApiKeys)
 	mux.HandleFunc("POST /api/v1/api-keys", server.withConsoleIdempotency(server.handleCreateApiKey))
 	mux.HandleFunc("PATCH /api/v1/api-keys/{id}", server.handleUpdateApiKey)

@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -823,6 +824,15 @@ func (s *Service) normalizeWebhook(ctx context.Context, provider string, req con
 	if provider == "wechat" {
 		return s.normalizeWechatWebhook(ctx, req)
 	}
+	if provider == "linuxdo" || provider == "easypay" {
+		return normalizedWebhook{
+			OrderNo:        payloadString(req.Payload, "out_trade_no", "order_no"),
+			TransactionID:  payloadString(req.Payload, "trade_no", "transaction_id"),
+			Status:         normalizeProviderStatus(payloadString(req.Payload, "trade_status", "status")),
+			IdempotencyKey: payloadString(req.Payload, "idempotency_key", "event_id"),
+			Payload:        req.Payload,
+		}, nil
+	}
 	return normalizedWebhook{
 		OrderNo:        payloadString(req.Payload, "order_no"),
 		TransactionID:  payloadString(req.Payload, "transaction_id", "trade_no", "provider_transaction_id"),
@@ -1388,7 +1398,7 @@ func configAAD(provider string, name string) []byte {
 }
 
 func verifyWebhookSignature(config map[string]any, headers map[string]string, payload map[string]any) bool {
-	secret := strings.TrimSpace(payloadString(config, "webhook_secret", "secret", "signing_secret"))
+	secret := strings.TrimSpace(payloadString(config, "webhook_secret", "secret", "signing_secret", "key"))
 	if secret == "" {
 		return false
 	}
@@ -1402,14 +1412,24 @@ func verifyWebhookSignature(config map[string]any, headers map[string]string, pa
 	if signature == "" {
 		return false
 	}
+	// Try HMAC-SHA256 first (SRapi native), then MD5 (EasyPay / LinuxDo Credit).
 	expected := signWebhookPayload(secret, payload)
-	return hmac.Equal([]byte(strings.ToLower(signature)), []byte(expected))
+	if hmac.Equal([]byte(strings.ToLower(signature)), []byte(expected)) {
+		return true
+	}
+	expectedMD5 := signWebhookPayloadMD5(secret, payload)
+	return strings.EqualFold(signature, expectedMD5)
 }
 
 func signWebhookPayload(secret string, payload map[string]any) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(canonicalPayload(payload)))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func signWebhookPayloadMD5(secret string, payload map[string]any) string {
+	sum := md5.Sum([]byte(canonicalPayload(payload) + secret))
+	return hex.EncodeToString(sum[:])
 }
 
 func canonicalPayload(payload map[string]any) string {

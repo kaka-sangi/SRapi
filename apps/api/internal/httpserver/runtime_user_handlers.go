@@ -1285,6 +1285,39 @@ func (s *Server) handleCancelPaymentOrder(w http.ResponseWriter, r *http.Request
 	})
 }
 
+func (s *Server) handlePaymentWebhookGET(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	provider := strings.TrimSpace(r.PathValue("provider"))
+	body := make(apiopenapi.PaymentWebhookRequest)
+	for key, values := range r.URL.Query() {
+		if len(values) > 0 {
+			body[key] = values[0]
+		}
+	}
+	result, err := s.runtime.payments.HandleWebhook(r.Context(), paymentcontract.WebhookRequest{
+		Provider: provider,
+		Headers:  singleValueHeaders(r.Header),
+		Payload:  map[string]any(body),
+	})
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	if provider == "linuxdo" || provider == "easypay" || provider == "alipay" {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("success"))
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentWebhookResponse{
+		Data: apiopenapi.PaymentWebhookResult{
+			Handled: result.Handled,
+			Order:   toAPIPaymentOrder(result.Order),
+		},
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	provider := strings.TrimSpace(r.PathValue("provider"))
