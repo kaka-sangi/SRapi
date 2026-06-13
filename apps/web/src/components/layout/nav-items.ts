@@ -37,6 +37,9 @@ import {
   Send,
   Sparkles,
   Stethoscope,
+  Replace,
+  OctagonAlert,
+  Fingerprint,
   type LucideIcon,
 } from "lucide-react";
 import { ADMIN_ROUTES, USER_ROUTES, USER_HOME_ROUTE } from "@/lib/routes";
@@ -94,6 +97,7 @@ const ADMIN_GATEWAY_SECTION: NavSection = {
     { href: ADMIN_ROUTES.providers, labelKey: "nav.adminProviders", icon: Cable },
     { href: ADMIN_ROUTES.models, labelKey: "nav.adminModels", icon: BrainCircuit },
     { href: ADMIN_ROUTES.channelsPricing, labelKey: "nav.adminChannelsPricing", icon: CircleDollarSign },
+    { href: ADMIN_ROUTES.payloadRules, labelKey: "nav.adminPayloadRules", icon: Replace },
     { href: ADMIN_ROUTES.accounts, labelKey: "nav.adminAccounts", icon: CloudCog },
     { href: ADMIN_ROUTES.groups, labelKey: "nav.adminGroups", icon: Group },
   ],
@@ -131,6 +135,7 @@ const ADMIN_OPS_SECTION: NavSection = {
   items: [
     { href: ADMIN_ROUTES.ops, labelKey: "nav.adminOps", icon: HeartPulse },
     { href: ADMIN_ROUTES.opsStrategy, labelKey: "nav.adminOpsStrategy", icon: Route },
+    { href: ADMIN_ROUTES.errorPassthrough, labelKey: "nav.adminErrorPassthrough", icon: OctagonAlert },
     { href: ADMIN_ROUTES.riskControl, labelKey: "nav.adminRiskControl", icon: ShieldAlert },
     { href: ADMIN_ROUTES.announcements, labelKey: "nav.adminAnnouncements", icon: Megaphone },
     { href: ADMIN_ROUTES.eventsOutbox, labelKey: "nav.adminOutbox", icon: Send },
@@ -142,6 +147,7 @@ const ADMIN_SYSTEM_SECTION: NavSection = {
   titleKey: "nav.sectionAdminSystem",
   items: [
     { href: ADMIN_ROUTES.proxies, labelKey: "nav.adminProxies", icon: Globe },
+    { href: ADMIN_ROUTES.tlsProfiles, labelKey: "nav.adminTlsProfiles", icon: Fingerprint },
     { href: ADMIN_ROUTES.roles, labelKey: "nav.adminRoles", icon: Lock },
     { href: ADMIN_ROUTES.apiKeys, labelKey: "nav.adminApiKeys", icon: KeyRound },
     { href: ADMIN_ROUTES.auditLogs, labelKey: "nav.adminAuditLogs", icon: FileSearch },
