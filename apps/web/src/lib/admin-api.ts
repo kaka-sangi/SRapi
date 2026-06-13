@@ -437,6 +437,47 @@ export interface CircuitBreakerEntry {
   success_rate: number;
 }
 
+export interface CRSPreviewRequest {
+  base_url: string;
+  username: string;
+  password: string;
+}
+
+export interface CRSPreviewAccount {
+  crs_account_id: string;
+  kind: string;
+  name: string;
+  platform: string;
+  type: string;
+}
+
+export interface CRSPreviewResult {
+  new_accounts: CRSPreviewAccount[];
+  existing_accounts: CRSPreviewAccount[];
+}
+
+export interface CRSSyncRequest {
+  base_url: string;
+  username: string;
+  password: string;
+  sync_proxies?: boolean;
+  selected_account_ids?: string[];
+}
+
+export interface CRSSyncResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  items: Array<{
+    crs_account_id: string;
+    kind: string;
+    name: string;
+    action: string;
+    error?: string;
+  }>;
+}
+
 export interface CacheStatsEntry {
   name: string;
   hits: number;
@@ -1622,6 +1663,44 @@ export const adminApi = {
       headers: { "X-CSRF-Token": getStoredCSRFToken() ?? "" },
     });
     if (!res.ok) throw new Error("Failed to clear cache");
+    const json = await res.json();
+    return json.data;
+  },
+
+  async crsPreview(body: CRSPreviewRequest): Promise<CRSPreviewResult> {
+    const base = configuredApiBaseUrl();
+    const res = await fetch(`${base}/api/v1/admin/accounts/sync/crs/preview`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": getStoredCSRFToken() ?? "",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || "CRS preview failed");
+    }
+    const json = await res.json();
+    return json.data;
+  },
+
+  async crsSync(body: CRSSyncRequest): Promise<CRSSyncResult> {
+    const base = configuredApiBaseUrl();
+    const res = await fetch(`${base}/api/v1/admin/accounts/sync/crs`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": getStoredCSRFToken() ?? "",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || "CRS sync failed");
+    }
     const json = await res.json();
     return json.data;
   },

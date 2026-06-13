@@ -743,6 +743,17 @@ export const zh: Messages = {
     progress: "{current} / {total}",
     lineCount: "{count} 行",
   },
+  crsSync: {
+    tab: "CRS 同步",
+    baseUrl: "CRS 地址",
+    username: "用户名",
+    password: "密码",
+    preview: "预览",
+    sync: "同步",
+    newAccounts: "新账号",
+    existingAccounts: "已有账号",
+    done: "已同步：创建 {created} 个，失败 {failed} 个",
+  },
   codexImport: {
     action: "导入 Codex 会话",
     title: "导入 Codex / ChatGPT 会话",

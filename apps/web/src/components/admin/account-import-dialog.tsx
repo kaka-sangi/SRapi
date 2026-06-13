@@ -32,7 +32,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCreateAccount, useImportAccounts, useImportCodexSession } from "@/hooks/admin-queries";
 import { buildImportAccountsBody } from "@/lib/admin-account-form";
-import { adminErrorMessage } from "@/lib/admin-api";
+import { adminApi, adminErrorMessage } from "@/lib/admin-api";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import type {
@@ -58,7 +58,7 @@ export function AccountImportDialog({
   const importMut = useImportAccounts();
   const codexImportMut = useImportCodexSession();
   const createAccountMut = useCreateAccount();
-  const [tab, setTab] = useState<"json" | "codex" | "oauth" | "batch">("batch");
+  const [tab, setTab] = useState<"json" | "codex" | "oauth" | "batch" | "crs">("batch");
   const [json, setJson] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProviderAccountImportResult | null>(null);
@@ -78,6 +78,14 @@ export function AccountImportDialog({
   const [batchPrefix, setBatchPrefix] = useState("");
   const [batchLines, setBatchLines] = useState("");
   const [batchResult, setBatchResult] = useState<{ created: number; failed: number; errors: string[] } | null>(null);
+  const [crsUrl, setCrsUrl] = useState("");
+  const [crsUser, setCrsUser] = useState("");
+  const [crsPass, setCrsPass] = useState("");
+  const [crsStep, setCrsStep] = useState<"input" | "preview" | "result">("input");
+  const [crsPreview, setCrsPreview] = useState<{ new_accounts: any[]; existing_accounts: any[] } | null>(null);
+  const [crsSelected, setCrsSelected] = useState<Set<string>>(new Set());
+  const [crsSyncing, setCrsSyncing] = useState(false);
+  const [crsResult, setCrsResult] = useState<{ created: number; updated: number; skipped: number; failed: number; items: any[] } | null>(null);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
   const batchProgressRef = useRef<HTMLDivElement>(null);
 
@@ -116,6 +124,14 @@ export function AccountImportDialog({
     setBatchLines("");
     setBatchResult(null);
     setBatchProgress(null);
+    setCrsUrl("");
+    setCrsUser("");
+    setCrsPass("");
+    setCrsStep("input");
+    setCrsPreview(null);
+    setCrsSelected(new Set());
+    setCrsSyncing(false);
+    setCrsResult(null);
   }
 
   async function submitJson() {
@@ -298,6 +314,7 @@ export function AccountImportDialog({
         <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
           <TabsList className="mt-4 flex-wrap">
             <TabsTrigger value="batch">{t("batchAdd.tab")}</TabsTrigger>
+            <TabsTrigger value="crs">{t("crsSync.tab")}</TabsTrigger>
             <TabsTrigger value="json">{t("adminAccounts.importJson")}</TabsTrigger>
             <TabsTrigger value="codex">{t("codexImport.action")}</TabsTrigger>
             <TabsTrigger value="oauth">{t("accountOAuth.authorizeAccount")}</TabsTrigger>
@@ -401,6 +418,76 @@ export function AccountImportDialog({
                   ) : null}
                 </div>
               ) : null}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="crs">
+            <div className="space-y-4">
+              {crsStep === "input" && (
+                <>
+                  <div>
+                    <Label htmlFor="crs-url">{t("crsSync.baseUrl")}</Label>
+                    <Input id="crs-url" placeholder="https://crs.example.com" value={crsUrl} onChange={(e) => setCrsUrl(e.target.value)} disabled={busy} />
+                  </div>
+                  <div>
+                    <Label htmlFor="crs-user">{t("crsSync.username")}</Label>
+                    <Input id="crs-user" value={crsUser} onChange={(e) => setCrsUser(e.target.value)} disabled={busy} />
+                  </div>
+                  <div>
+                    <Label htmlFor="crs-pass">{t("crsSync.password")}</Label>
+                    <Input id="crs-pass" type="password" value={crsPass} onChange={(e) => setCrsPass(e.target.value)} disabled={busy} />
+                  </div>
+                </>
+              )}
+              {crsStep === "preview" && crsPreview && (
+                <>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-srapi-text-primary">{t("crsSync.newAccounts")} ({crsPreview.new_accounts.length})</span>
+                      <div className="flex gap-2 text-2xs">
+                        <button type="button" className="text-srapi-text-tertiary hover:text-srapi-text-secondary" onClick={() => setCrsSelected(new Set(crsPreview.new_accounts.map((a: any) => a.crs_account_id)))}>{t("adminQuickSetup.selectAll")}</button>
+                        <button type="button" className="text-srapi-text-tertiary hover:text-srapi-text-secondary" onClick={() => setCrsSelected(new Set())}>{t("adminQuickSetup.selectNone")}</button>
+                      </div>
+                    </div>
+                    {crsPreview.new_accounts.map((a: any) => (
+                      <label key={a.crs_account_id} className="flex items-center gap-2 rounded-md border border-srapi-border px-3 py-2 text-sm cursor-pointer hover:bg-srapi-card-muted">
+                        <input type="checkbox" checked={crsSelected.has(a.crs_account_id)} onChange={() => {
+                          setCrsSelected(prev => {
+                            const next = new Set(prev);
+                            if (next.has(a.crs_account_id)) next.delete(a.crs_account_id); else next.add(a.crs_account_id);
+                            return next;
+                          });
+                        }} />
+                        <span className="text-srapi-text-primary">{a.name}</span>
+                        <span className="ml-auto font-mono text-2xs text-srapi-text-tertiary">{a.platform} · {a.type}</span>
+                      </label>
+                    ))}
+                    {crsPreview.existing_accounts.length > 0 && (
+                      <div className="mt-3">
+                        <span className="text-sm text-srapi-text-secondary">{t("crsSync.existingAccounts")} ({crsPreview.existing_accounts.length})</span>
+                        <div className="mt-1 space-y-1">
+                          {crsPreview.existing_accounts.map((a: any) => (
+                            <div key={a.crs_account_id} className="flex items-center gap-2 rounded-md border border-srapi-border/50 bg-srapi-card-muted px-3 py-2 text-sm opacity-60">
+                              <span>{a.name}</span>
+                              <span className="ml-auto font-mono text-2xs text-srapi-text-tertiary">{a.platform}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+              {crsStep === "result" && crsResult && (
+                <div className="space-y-2 rounded-md border border-srapi-border bg-srapi-card-muted p-3">
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <ImportStat label={t("codexImport.created")} value={crsResult.created} tone="success" />
+                    <ImportStat label={t("codexImport.updated")} value={crsResult.updated} />
+                    <ImportStat label={t("codexImport.skipped")} value={crsResult.skipped} />
+                    <ImportStat label={t("codexImport.failed")} value={crsResult.failed} tone="error" />
+                  </div>
+                </div>
+              )}
             </div>
           </TabsContent>
 
@@ -607,6 +694,62 @@ export function AccountImportDialog({
             >
               {t("codexImport.submit")}
             </Button>
+          ) : tab === "crs" ? (
+            crsStep === "input" ? (
+              <Button
+                type="button"
+                variant="primary"
+                disabled={!crsUrl.trim() || !crsUser.trim() || !crsPass.trim() || busy}
+                loading={crsSyncing}
+                onClick={async () => {
+                  setError(null);
+                  setCrsSyncing(true);
+                  try {
+                    const preview = await adminApi.crsPreview({ base_url: crsUrl, username: crsUser, password: crsPass });
+                    setCrsPreview(preview);
+                    setCrsSelected(new Set(preview.new_accounts.map((a: any) => a.crs_account_id)));
+                    setCrsStep("preview");
+                  } catch (err) {
+                    setError(adminErrorMessage(err));
+                  } finally {
+                    setCrsSyncing(false);
+                  }
+                }}
+              >
+                {t("crsSync.preview")}
+              </Button>
+            ) : crsStep === "preview" ? (
+              <Button
+                type="button"
+                variant="primary"
+                disabled={crsSelected.size === 0 || busy}
+                loading={crsSyncing}
+                onClick={async () => {
+                  setError(null);
+                  setCrsSyncing(true);
+                  try {
+                    const result = await adminApi.crsSync({
+                      base_url: crsUrl,
+                      username: crsUser,
+                      password: crsPass,
+                      selected_account_ids: [...crsSelected],
+                    });
+                    setCrsResult(result);
+                    setCrsStep("result");
+                    toast({
+                      title: t("crsSync.done", { created: result.created, failed: result.failed }),
+                      tone: result.failed > 0 ? "warning" : "success",
+                    });
+                  } catch (err) {
+                    setError(adminErrorMessage(err));
+                  } finally {
+                    setCrsSyncing(false);
+                  }
+                }}
+              >
+                {t("crsSync.sync")} ({crsSelected.size})
+              </Button>
+            ) : null
           ) : null}
         </DialogFooter>
       </DialogContent>

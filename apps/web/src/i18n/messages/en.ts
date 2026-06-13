@@ -747,6 +747,17 @@ export const en = {
     progress: "{current} / {total}",
     lineCount: "{count} lines",
   },
+  crsSync: {
+    tab: "CRS Sync",
+    baseUrl: "CRS Base URL",
+    username: "Username",
+    password: "Password",
+    preview: "Preview",
+    sync: "Sync",
+    newAccounts: "New accounts",
+    existingAccounts: "Existing accounts",
+    done: "Synced: {created} created, {failed} failed",
+  },
   codexImport: {
     action: "Import Codex session",
     title: "Import Codex / ChatGPT session",
