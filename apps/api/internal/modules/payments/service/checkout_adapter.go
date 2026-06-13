@@ -4,6 +4,7 @@ import (
 	alipayprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/alipay"
 	checkoutprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/checkout"
 	easypayprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/easypay"
+	linuxdoprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/linuxdo"
 	stripeprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/stripe"
 	wechatprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/wechat"
 )
@@ -12,6 +13,7 @@ func defaultCheckoutRegistry(stripe stripeprovider.CheckoutCreator) checkoutprov
 	return checkoutprovider.Registry{
 		"alipay":  alipayprovider.New(),
 		"easypay": easypayprovider.New(),
+		"linuxdo": linuxdoprovider.New(),
 		"stripe":  stripeCheckoutAdapter{creator: stripe},
 		"wechat":  wechatprovider.New(),
 	}

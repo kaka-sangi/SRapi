@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { apiService } from "@/lib/api";
+import { cn } from "@/lib/cn";
 import type { EnabledOAuthProvider } from "@/lib/sdk-types";
 import { ADMIN_HOME_ROUTE, USER_HOME_ROUTE } from "@/lib/routes";
 import { useLanguage } from "@/context/LanguageContext";
@@ -258,8 +259,18 @@ export function LoginForm() {
               <a
                 key={`${p.provider}:${p.provider_key}`}
                 href={startOAuthHref(p.provider, p.provider_key)}
-                className="flex h-11 w-full items-center justify-center rounded-lg border border-srapi-border-strong bg-srapi-card text-sm font-medium text-srapi-text-primary transition-colors hover:border-srapi-text-tertiary hover:bg-srapi-card-muted"
+                className={cn(
+                  "flex h-11 w-full items-center justify-center gap-2 rounded-lg border text-sm font-medium transition-colors",
+                  p.provider === "linuxdo"
+                    ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                    : p.provider === "github"
+                      ? "border-gray-300 bg-gray-50 text-gray-900 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/50 dark:text-gray-200 dark:hover:bg-gray-700/50"
+                      : "border-srapi-border-strong bg-srapi-card text-srapi-text-primary hover:border-srapi-text-tertiary hover:bg-srapi-card-muted",
+                )}
               >
+                {p.provider === "linuxdo" ? (
+                  <span className="font-mono text-xs font-bold">L</span>
+                ) : null}
                 {t("login.continueWith", { name: p.display_name })}
               </a>
             ))}
