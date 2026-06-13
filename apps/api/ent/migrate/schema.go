@@ -1602,6 +1602,46 @@ var (
 			},
 		},
 	}
+	// PromoCodesColumns holds the columns for the "promo_codes" table.
+	PromoCodesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "code", Type: field.TypeString},
+		{Name: "status", Type: field.TypeString, Default: "active"},
+		{Name: "discount_type", Type: field.TypeString},
+		{Name: "discount_value", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "currency", Type: field.TypeString, Default: "USD"},
+		{Name: "max_uses", Type: field.TypeInt, Default: 1},
+		{Name: "per_user_limit", Type: field.TypeInt, Default: 0},
+		{Name: "min_order_amount", Type: field.TypeString, Default: ""},
+		{Name: "used_count", Type: field.TypeInt, Default: 0},
+		{Name: "starts_at", Type: field.TypeTime, Nullable: true},
+		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+	}
+	// PromoCodesTable holds the schema information for the "promo_codes" table.
+	PromoCodesTable = &schema.Table{
+		Name:       "promo_codes",
+		Columns:    PromoCodesColumns,
+		PrimaryKey: []*schema.Column{PromoCodesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "promocode_code",
+				Unique:  true,
+				Columns: []*schema.Column{PromoCodesColumns[3]},
+			},
+			{
+				Name:    "promocode_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PromoCodesColumns[4], PromoCodesColumns[1]},
+			},
+			{
+				Name:    "promocode_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{PromoCodesColumns[13]},
+			},
+		},
+	}
 	// ProvidersColumns holds the columns for the "providers" table.
 	ProvidersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1808,6 +1848,43 @@ var (
 				Name:    "qualityevaluation_sample_request_hash",
 				Unique:  false,
 				Columns: []*schema.Column{QualityEvaluationsColumns[11]},
+			},
+		},
+	}
+	// RedeemCodesColumns holds the columns for the "redeem_codes" table.
+	RedeemCodesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "code", Type: field.TypeString},
+		{Name: "type", Type: field.TypeString},
+		{Name: "status", Type: field.TypeString, Default: "active"},
+		{Name: "value", Type: field.TypeString, Default: ""},
+		{Name: "currency", Type: field.TypeString, Default: "USD"},
+		{Name: "max_redemptions", Type: field.TypeInt, Default: 1},
+		{Name: "redeemed_count", Type: field.TypeInt, Default: 0},
+		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+	}
+	// RedeemCodesTable holds the schema information for the "redeem_codes" table.
+	RedeemCodesTable = &schema.Table{
+		Name:       "redeem_codes",
+		Columns:    RedeemCodesColumns,
+		PrimaryKey: []*schema.Column{RedeemCodesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "redeemcode_code",
+				Unique:  true,
+				Columns: []*schema.Column{RedeemCodesColumns[3]},
+			},
+			{
+				Name:    "redeemcode_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RedeemCodesColumns[5], RedeemCodesColumns[1]},
+			},
+			{
+				Name:    "redeemcode_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{RedeemCodesColumns[10]},
 			},
 		},
 	}
@@ -2769,11 +2846,13 @@ var (
 		PendingOauthSessionsTable,
 		PricingIntervalsTable,
 		PricingRulesTable,
+		PromoCodesTable,
 		ProvidersTable,
 		ProviderAccountsTable,
 		ProxiesTable,
 		QualityEvalSamplesTable,
 		QualityEvaluationsTable,
+		RedeemCodesTable,
 		RolesTable,
 		ScheduledTestPlansTable,
 		ScheduledTestPlanRunsTable,

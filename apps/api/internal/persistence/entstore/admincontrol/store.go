@@ -17,6 +17,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent"
 	entopssystemlog "github.com/srapi/srapi/apps/api/ent/opssystemlog"
 	"github.com/srapi/srapi/apps/api/ent/predicate"
+	entredeemcode "github.com/srapi/srapi/apps/api/ent/redeemcode"
 	entsetting "github.com/srapi/srapi/apps/api/ent/setting"
 	entsubscriptionplan "github.com/srapi/srapi/apps/api/ent/subscriptionplan"
 	entuser "github.com/srapi/srapi/apps/api/ent/user"
@@ -192,7 +193,7 @@ func (s *Store) RedeemCode(ctx context.Context, input admincontrolcontract.Redee
 	if err != nil {
 		return admincontrolcontract.RedeemCodeRedemptionResult{}, err
 	}
-	setting, err := tx.Setting.Query().Where(entsetting.KeyEQ(settingsKeyRedeemCodes)).Only(ctx)
+	row, err := tx.RedeemCode.Query().Where(entredeemcode.CodeEQ(codeValue)).Only(ctx)
 	if err != nil {
 		_ = tx.Rollback()
 		if ent.IsNotFound(err) {
@@ -200,70 +201,47 @@ func (s *Store) RedeemCode(ctx context.Context, input admincontrolcontract.Redee
 		}
 		return admincontrolcontract.RedeemCodeRedemptionResult{}, err
 	}
-	collection, err := redeemCodeCollectionFromMap(setting.ValueJSON)
+	item := redeemCodeWithDerivedStatus(toRedeemCode(row), now)
+	if existing, ok, err := findRedemption(ctx, tx.Client(), input.UserID, item.ID); err != nil {
+		_ = tx.Rollback()
+		return admincontrolcontract.RedeemCodeRedemptionResult{}, err
+	} else if ok {
+		_ = tx.Rollback()
+		return admincontrolcontract.RedeemCodeRedemptionResult{
+			Redemption:      existing,
+			RedeemCode:      item,
+			AlreadyRedeemed: true,
+		}, nil
+	}
+	if item.Status != admincontrolcontract.RedeemCodeStatusActive || item.RedeemedCount >= item.MaxRedemptions {
+		_ = tx.Rollback()
+		return admincontrolcontract.RedeemCodeRedemptionResult{}, admincontrolcontract.ErrConflict
+	}
+	redemption, err := fulfillRedeemCode(ctx, tx.Client(), input.UserID, item, now)
 	if err != nil {
 		_ = tx.Rollback()
 		return admincontrolcontract.RedeemCodeRedemptionResult{}, err
 	}
-	for idx, item := range collection.Items {
-		item = redeemCodeWithDerivedStatus(item, now)
-		if item.Code != codeValue {
-			collection.Items[idx] = item
-			continue
-		}
-		if existing, ok, err := findRedemption(ctx, tx.Client(), input.UserID, item.ID); err != nil {
-			_ = tx.Rollback()
-			return admincontrolcontract.RedeemCodeRedemptionResult{}, err
-		} else if ok {
-			_ = tx.Rollback()
-			return admincontrolcontract.RedeemCodeRedemptionResult{
-				Redemption:      existing,
-				RedeemCode:      item,
-				AlreadyRedeemed: true,
-			}, nil
-		}
-		if item.Status != admincontrolcontract.RedeemCodeStatusActive || item.RedeemedCount >= item.MaxRedemptions {
-			collection.Items[idx] = item
-			if err := saveRedeemCodeSetting(ctx, tx.Client(), setting.ID, collection); err != nil {
-				_ = tx.Rollback()
-				return admincontrolcontract.RedeemCodeRedemptionResult{}, err
-			}
-			if err := tx.Commit(); err != nil {
-				return admincontrolcontract.RedeemCodeRedemptionResult{}, err
-			}
-			return admincontrolcontract.RedeemCodeRedemptionResult{}, admincontrolcontract.ErrConflict
-		}
-		redemption, err := fulfillRedeemCode(ctx, tx.Client(), input.UserID, item, now)
-		if err != nil {
-			_ = tx.Rollback()
-			return admincontrolcontract.RedeemCodeRedemptionResult{}, err
-		}
-		item.RedeemedCount++
-		item.UpdatedAt = now
-		if item.RedeemedCount >= item.MaxRedemptions {
-			item.Status = admincontrolcontract.RedeemCodeStatusRedeemed
-		}
-		collection.Items[idx] = item
-		if err := saveRedeemCodeSetting(ctx, tx.Client(), setting.ID, collection); err != nil {
-			_ = tx.Rollback()
-			return admincontrolcontract.RedeemCodeRedemptionResult{}, err
-		}
-		if err := tx.Commit(); err != nil {
-			return admincontrolcontract.RedeemCodeRedemptionResult{}, err
-		}
-		return admincontrolcontract.RedeemCodeRedemptionResult{
-			Redemption: redemption,
-			RedeemCode: item,
-		}, nil
+	item.RedeemedCount++
+	item.UpdatedAt = now
+	if item.RedeemedCount >= item.MaxRedemptions {
+		item.Status = admincontrolcontract.RedeemCodeStatusRedeemed
 	}
-	if err := saveRedeemCodeSetting(ctx, tx.Client(), setting.ID, collection); err != nil {
+	if _, err := tx.RedeemCode.UpdateOneID(item.ID).
+		SetRedeemedCount(item.RedeemedCount).
+		SetStatus(string(item.Status)).
+		SetUpdatedAt(now).
+		Save(ctx); err != nil {
 		_ = tx.Rollback()
 		return admincontrolcontract.RedeemCodeRedemptionResult{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return admincontrolcontract.RedeemCodeRedemptionResult{}, err
 	}
-	return admincontrolcontract.RedeemCodeRedemptionResult{}, admincontrolcontract.ErrNotFound
+	return admincontrolcontract.RedeemCodeRedemptionResult{
+		Redemption: redemption,
+		RedeemCode: item,
+	}, nil
 }
 
 func (s *Store) PreviewPromoCode(ctx context.Context, input admincontrolcontract.PromoCodePreviewInput) (admincontrolcontract.PromoCodeApplication, error) {
@@ -418,48 +396,6 @@ func cloneMap(value map[string]any) map[string]any {
 		out[key] = item
 	}
 	return out
-}
-
-const settingsKeyRedeemCodes = "admin_control.redeem_codes"
-
-type redeemCodeCollection struct {
-	NextID int                               `json:"next_id"`
-	Items  []admincontrolcontract.RedeemCode `json:"items"`
-}
-
-func redeemCodeCollectionFromMap(value map[string]any) (redeemCodeCollection, error) {
-	var collection redeemCodeCollection
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return redeemCodeCollection{}, err
-	}
-	if err := json.Unmarshal(raw, &collection); err != nil {
-		return redeemCodeCollection{}, err
-	}
-	return collection, nil
-}
-
-func saveRedeemCodeSetting(ctx context.Context, client *ent.Client, settingID int, collection redeemCodeCollection) error {
-	value, err := redeemCodeCollectionToMap(collection)
-	if err != nil {
-		return err
-	}
-	_, err = client.Setting.UpdateOneID(settingID).
-		SetValueJSON(value).
-		Save(ctx)
-	return err
-}
-
-func redeemCodeCollectionToMap(collection redeemCodeCollection) (map[string]any, error) {
-	raw, err := json.Marshal(collection)
-	if err != nil {
-		return nil, err
-	}
-	var value map[string]any
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return nil, err
-	}
-	return value, nil
 }
 
 func findRedemption(ctx context.Context, client *ent.Client, userID int, redeemCodeID int) (admincontrolcontract.RedeemCodeRedemption, bool, error) {

@@ -14,16 +14,14 @@ import (
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 )
 
-const settingsKeyRedeemCodes = "admin_control.redeem_codes"
-
 func (s *Service) ListRedeemCodes(ctx context.Context, opts admincontrol.ListOptions) (admincontrol.RedeemCodeList, error) {
-	var collection redeemCodeCollection
-	if err := s.loadTyped(ctx, settingsKeyRedeemCodes, &collection); err != nil {
+	stored, err := s.store.ListRedeemCodes(ctx)
+	if err != nil {
 		return admincontrol.RedeemCodeList{}, err
 	}
 	now := s.clock.Now()
-	items := make([]admincontrol.RedeemCode, 0, len(collection.Items))
-	for _, item := range collection.Items {
+	items := make([]admincontrol.RedeemCode, 0, len(stored))
+	for _, item := range stored {
 		item = redeemCodeWithDerivedStatus(item, now)
 		if opts.Status != "" && string(item.Status) != opts.Status {
 			continue
@@ -35,55 +33,43 @@ func (s *Service) ListRedeemCodes(ctx context.Context, opts admincontrol.ListOpt
 }
 
 func (s *Service) CreateRedeemCode(ctx context.Context, req admincontrol.CreateRedeemCodeRequest, actorUserID int) (admincontrol.RedeemCode, error) {
-	var collection redeemCodeCollection
-	if err := s.loadTyped(ctx, settingsKeyRedeemCodes, &collection); err != nil {
-		return admincontrol.RedeemCode{}, err
-	}
-	code, err := redeemCodeFromCreateRequest(req, nextID(collection.NextID, len(collection.Items)), s.clock.Now())
+	code, err := redeemCodeFromCreateRequest(req, s.clock.Now())
 	if err != nil {
 		return admincontrol.RedeemCode{}, err
 	}
-	if redeemCodeExists(collection.Items, code.Code) {
-		return admincontrol.RedeemCode{}, admincontrol.ErrConflict
-	}
-	collection.Items = append(collection.Items, code)
-	collection.NextID = code.ID + 1
-	if err := s.saveTyped(ctx, settingsKeyRedeemCodes, collection, actorUserID); err != nil {
-		return admincontrol.RedeemCode{}, err
-	}
-	return code, nil
+	return s.store.CreateRedeemCode(ctx, code)
 }
 
 func (s *Service) BatchGenerateRedeemCodes(ctx context.Context, req admincontrol.BatchGenerateRedeemCodesRequest, actorUserID int) ([]admincontrol.RedeemCode, error) {
 	if req.Count <= 0 || req.Count > 1000 {
 		return nil, admincontrol.ErrInvalidInput
 	}
-	var collection redeemCodeCollection
-	if err := s.loadTyped(ctx, settingsKeyRedeemCodes, &collection); err != nil {
-		return nil, err
-	}
 	now := s.clock.Now()
 	created := make([]admincontrol.RedeemCode, 0, req.Count)
-	next := nextID(collection.NextID, len(collection.Items))
+	generated := map[string]bool{}
 	for len(created) < req.Count {
 		generatedCode, err := randomCode(defaultString(req.Prefix, "SR"))
 		if err != nil {
 			return nil, err
 		}
-		if redeemCodeExists(collection.Items, generatedCode) || redeemCodeExists(created, generatedCode) {
+		if generated[normalizeCode(generatedCode)] {
 			continue
 		}
-		code, err := redeemCodeFromBatchRequest(req, next, generatedCode, now)
+		code, err := redeemCodeFromBatchRequest(req, generatedCode, now)
 		if err != nil {
 			return nil, err
 		}
-		created = append(created, code)
-		next++
-	}
-	collection.Items = append(collection.Items, created...)
-	collection.NextID = next
-	if err := s.saveTyped(ctx, settingsKeyRedeemCodes, collection, actorUserID); err != nil {
-		return nil, err
+		stored, err := s.store.CreateRedeemCode(ctx, code)
+		if err != nil {
+			// Collisions with already-persisted codes are skipped, matching the
+			// previous behavior of generating a unique batch.
+			if err == admincontrol.ErrConflict {
+				continue
+			}
+			return nil, err
+		}
+		generated[normalizeCode(stored.Code)] = true
+		created = append(created, stored)
 	}
 	return created, nil
 }
@@ -92,55 +78,49 @@ func (s *Service) BatchDisableRedeemCodes(ctx context.Context, ids []int, actorU
 	if len(ids) == 0 || len(ids) > 1000 {
 		return admincontrol.BatchOperationResult{}, admincontrol.ErrInvalidInput
 	}
-	var collection redeemCodeCollection
-	if err := s.loadTyped(ctx, settingsKeyRedeemCodes, &collection); err != nil {
-		return admincontrol.BatchOperationResult{}, err
-	}
-	idSet := map[int]bool{}
+	requested := make([]int, 0, len(ids))
+	seen := map[int]bool{}
 	for _, id := range ids {
 		if id <= 0 {
 			return admincontrol.BatchOperationResult{}, admincontrol.ErrInvalidInput
 		}
-		idSet[id] = true
-	}
-	now := s.clock.Now()
-	var succeeded int
-	for idx, item := range collection.Items {
-		if !idSet[item.ID] {
+		if seen[id] {
 			continue
 		}
-		item.Status = admincontrol.RedeemCodeStatusDisabled
-		item.UpdatedAt = now
-		collection.Items[idx] = item
-		succeeded++
-		delete(idSet, item.ID)
+		seen[id] = true
+		requested = append(requested, id)
 	}
-	if succeeded > 0 {
-		if err := s.saveTyped(ctx, settingsKeyRedeemCodes, collection, actorUserID); err != nil {
-			return admincontrol.BatchOperationResult{}, err
+	succeededIDs, err := s.store.DisableRedeemCodes(ctx, requested, s.clock.Now())
+	if err != nil {
+		return admincontrol.BatchOperationResult{}, err
+	}
+	succeededSet := map[int]bool{}
+	for _, id := range succeededIDs {
+		succeededSet[id] = true
+	}
+	failedIDs := make([]int, 0, len(requested))
+	for _, id := range requested {
+		if !succeededSet[id] {
+			failedIDs = append(failedIDs, id)
 		}
-	}
-	failedIDs := make([]int, 0, len(idSet))
-	for id := range idSet {
-		failedIDs = append(failedIDs, id)
 	}
 	sort.Ints(failedIDs)
 	return admincontrol.BatchOperationResult{
 		Requested: len(ids),
-		Succeeded: succeeded,
+		Succeeded: len(succeededIDs),
 		Failed:    len(failedIDs),
 		FailedIDs: failedIDs,
 	}, nil
 }
 
 func (s *Service) RedeemCodeStats(ctx context.Context) (admincontrol.RedeemCodeStats, error) {
-	var collection redeemCodeCollection
-	if err := s.loadTyped(ctx, settingsKeyRedeemCodes, &collection); err != nil {
+	stored, err := s.store.ListRedeemCodes(ctx)
+	if err != nil {
 		return admincontrol.RedeemCodeStats{}, err
 	}
 	now := s.clock.Now()
-	stats := admincontrol.RedeemCodeStats{Total: len(collection.Items)}
-	for _, item := range collection.Items {
+	stats := admincontrol.RedeemCodeStats{Total: len(stored)}
+	for _, item := range stored {
 		switch redeemCodeWithDerivedStatus(item, now).Status {
 		case admincontrol.RedeemCodeStatusActive:
 			stats.Active++
@@ -156,21 +136,10 @@ func (s *Service) RedeemCodeStats(ctx context.Context) (admincontrol.RedeemCodeS
 }
 
 func (s *Service) DeleteRedeemCode(ctx context.Context, id int, actorUserID int) (admincontrol.RedeemCode, error) {
-	var collection redeemCodeCollection
-	if err := s.loadTyped(ctx, settingsKeyRedeemCodes, &collection); err != nil {
-		return admincontrol.RedeemCode{}, err
+	if id <= 0 {
+		return admincontrol.RedeemCode{}, admincontrol.ErrNotFound
 	}
-	for idx, item := range collection.Items {
-		if item.ID != id {
-			continue
-		}
-		collection.Items = append(collection.Items[:idx], collection.Items[idx+1:]...)
-		if err := s.saveTyped(ctx, settingsKeyRedeemCodes, collection, actorUserID); err != nil {
-			return admincontrol.RedeemCode{}, err
-		}
-		return item, nil
-	}
-	return admincontrol.RedeemCode{}, admincontrol.ErrNotFound
+	return s.store.DeleteRedeemCode(ctx, id)
 }
 
 func (s *Service) RedeemCode(ctx context.Context, user userscontract.User, req admincontrol.RedeemCodeRedemptionRequest) (admincontrol.RedeemCodeRedemptionResult, error) {
@@ -188,12 +157,7 @@ func (s *Service) RedeemCode(ctx context.Context, user userscontract.User, req a
 	})
 }
 
-type redeemCodeCollection struct {
-	NextID int                       `json:"next_id"`
-	Items  []admincontrol.RedeemCode `json:"items"`
-}
-
-func redeemCodeFromCreateRequest(req admincontrol.CreateRedeemCodeRequest, id int, now time.Time) (admincontrol.RedeemCode, error) {
+func redeemCodeFromCreateRequest(req admincontrol.CreateRedeemCodeRequest, now time.Time) (admincontrol.RedeemCode, error) {
 	if !req.Type.Valid() || strings.TrimSpace(req.Code) == "" || !validRedeemCodeValue(req.Type, req.Value) {
 		return admincontrol.RedeemCode{}, admincontrol.ErrInvalidInput
 	}
@@ -205,7 +169,6 @@ func redeemCodeFromCreateRequest(req admincontrol.CreateRedeemCodeRequest, id in
 		return admincontrol.RedeemCode{}, admincontrol.ErrInvalidInput
 	}
 	return admincontrol.RedeemCode{
-		ID:             id,
 		Code:           normalizeCode(req.Code),
 		Type:           req.Type,
 		Status:         admincontrol.RedeemCodeStatusActive,
@@ -219,7 +182,7 @@ func redeemCodeFromCreateRequest(req admincontrol.CreateRedeemCodeRequest, id in
 	}, nil
 }
 
-func redeemCodeFromBatchRequest(req admincontrol.BatchGenerateRedeemCodesRequest, id int, code string, now time.Time) (admincontrol.RedeemCode, error) {
+func redeemCodeFromBatchRequest(req admincontrol.BatchGenerateRedeemCodesRequest, code string, now time.Time) (admincontrol.RedeemCode, error) {
 	if !req.Type.Valid() || !validRedeemCodeValue(req.Type, req.Value) {
 		return admincontrol.RedeemCode{}, admincontrol.ErrInvalidInput
 	}
@@ -231,7 +194,6 @@ func redeemCodeFromBatchRequest(req admincontrol.BatchGenerateRedeemCodesRequest
 		return admincontrol.RedeemCode{}, admincontrol.ErrInvalidInput
 	}
 	return admincontrol.RedeemCode{
-		ID:             id,
 		Code:           normalizeCode(code),
 		Type:           req.Type,
 		Status:         admincontrol.RedeemCodeStatusActive,
@@ -260,16 +222,6 @@ func validRedeemCodeValue(codeType admincontrol.RedeemCodeType, value string) bo
 	default:
 		return false
 	}
-}
-
-func redeemCodeExists(items []admincontrol.RedeemCode, code string) bool {
-	code = normalizeCode(code)
-	for _, item := range items {
-		if normalizeCode(item.Code) == code {
-			return true
-		}
-	}
-	return false
 }
 
 func redeemCodeWithDerivedStatus(item admincontrol.RedeemCode, now time.Time) admincontrol.RedeemCode {

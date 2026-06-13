@@ -55,11 +55,13 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/pendingoauthsession"
 	"github.com/srapi/srapi/apps/api/ent/pricinginterval"
 	"github.com/srapi/srapi/apps/api/ent/pricingrule"
+	"github.com/srapi/srapi/apps/api/ent/promocode"
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
 	"github.com/srapi/srapi/apps/api/ent/proxy"
 	"github.com/srapi/srapi/apps/api/ent/qualityevalsample"
 	"github.com/srapi/srapi/apps/api/ent/qualityevaluation"
+	"github.com/srapi/srapi/apps/api/ent/redeemcode"
 	"github.com/srapi/srapi/apps/api/ent/role"
 	"github.com/srapi/srapi/apps/api/ent/scheduledtestplan"
 	"github.com/srapi/srapi/apps/api/ent/scheduledtestplanrun"
@@ -186,11 +188,13 @@ func checkColumn(t, c string) error {
 			pendingoauthsession.Table:       pendingoauthsession.ValidColumn,
 			pricinginterval.Table:           pricinginterval.ValidColumn,
 			pricingrule.Table:               pricingrule.ValidColumn,
+			promocode.Table:                 promocode.ValidColumn,
 			provider.Table:                  provider.ValidColumn,
 			provideraccount.Table:           provideraccount.ValidColumn,
 			proxy.Table:                     proxy.ValidColumn,
 			qualityevalsample.Table:         qualityevalsample.ValidColumn,
 			qualityevaluation.Table:         qualityevaluation.ValidColumn,
+			redeemcode.Table:                redeemcode.ValidColumn,
 			role.Table:                      role.ValidColumn,
 			scheduledtestplan.Table:         scheduledtestplan.ValidColumn,
 			scheduledtestplanrun.Table:      scheduledtestplanrun.ValidColumn,

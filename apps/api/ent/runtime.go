@@ -48,11 +48,13 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/pendingoauthsession"
 	"github.com/srapi/srapi/apps/api/ent/pricinginterval"
 	"github.com/srapi/srapi/apps/api/ent/pricingrule"
+	"github.com/srapi/srapi/apps/api/ent/promocode"
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
 	"github.com/srapi/srapi/apps/api/ent/proxy"
 	"github.com/srapi/srapi/apps/api/ent/qualityevalsample"
 	"github.com/srapi/srapi/apps/api/ent/qualityevaluation"
+	"github.com/srapi/srapi/apps/api/ent/redeemcode"
 	"github.com/srapi/srapi/apps/api/ent/role"
 	"github.com/srapi/srapi/apps/api/ent/scheduledtestplan"
 	"github.com/srapi/srapi/apps/api/ent/scheduledtestplanrun"
@@ -1598,6 +1600,57 @@ func init() {
 	pricingruleDescCurrency := pricingruleFields[15].Descriptor()
 	// pricingrule.DefaultCurrency holds the default value on creation for the currency field.
 	pricingrule.DefaultCurrency = pricingruleDescCurrency.Default.(string)
+	promocodeMixin := schema.PromoCode{}.Mixin()
+	promocodeMixinFields0 := promocodeMixin[0].Fields()
+	_ = promocodeMixinFields0
+	promocodeFields := schema.PromoCode{}.Fields()
+	_ = promocodeFields
+	// promocodeDescCreatedAt is the schema descriptor for created_at field.
+	promocodeDescCreatedAt := promocodeMixinFields0[0].Descriptor()
+	// promocode.DefaultCreatedAt holds the default value on creation for the created_at field.
+	promocode.DefaultCreatedAt = promocodeDescCreatedAt.Default.(func() time.Time)
+	// promocodeDescUpdatedAt is the schema descriptor for updated_at field.
+	promocodeDescUpdatedAt := promocodeMixinFields0[1].Descriptor()
+	// promocode.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	promocode.DefaultUpdatedAt = promocodeDescUpdatedAt.Default.(func() time.Time)
+	// promocode.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	promocode.UpdateDefaultUpdatedAt = promocodeDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// promocodeDescCode is the schema descriptor for code field.
+	promocodeDescCode := promocodeFields[0].Descriptor()
+	// promocode.CodeValidator is a validator for the "code" field. It is called by the builders before save.
+	promocode.CodeValidator = promocodeDescCode.Validators[0].(func(string) error)
+	// promocodeDescStatus is the schema descriptor for status field.
+	promocodeDescStatus := promocodeFields[1].Descriptor()
+	// promocode.DefaultStatus holds the default value on creation for the status field.
+	promocode.DefaultStatus = promocodeDescStatus.Default.(string)
+	// promocodeDescDiscountType is the schema descriptor for discount_type field.
+	promocodeDescDiscountType := promocodeFields[2].Descriptor()
+	// promocode.DiscountTypeValidator is a validator for the "discount_type" field. It is called by the builders before save.
+	promocode.DiscountTypeValidator = promocodeDescDiscountType.Validators[0].(func(string) error)
+	// promocodeDescDiscountValue is the schema descriptor for discount_value field.
+	promocodeDescDiscountValue := promocodeFields[3].Descriptor()
+	// promocode.DefaultDiscountValue holds the default value on creation for the discount_value field.
+	promocode.DefaultDiscountValue = promocodeDescDiscountValue.Default.(string)
+	// promocodeDescCurrency is the schema descriptor for currency field.
+	promocodeDescCurrency := promocodeFields[4].Descriptor()
+	// promocode.DefaultCurrency holds the default value on creation for the currency field.
+	promocode.DefaultCurrency = promocodeDescCurrency.Default.(string)
+	// promocodeDescMaxUses is the schema descriptor for max_uses field.
+	promocodeDescMaxUses := promocodeFields[5].Descriptor()
+	// promocode.DefaultMaxUses holds the default value on creation for the max_uses field.
+	promocode.DefaultMaxUses = promocodeDescMaxUses.Default.(int)
+	// promocodeDescPerUserLimit is the schema descriptor for per_user_limit field.
+	promocodeDescPerUserLimit := promocodeFields[6].Descriptor()
+	// promocode.DefaultPerUserLimit holds the default value on creation for the per_user_limit field.
+	promocode.DefaultPerUserLimit = promocodeDescPerUserLimit.Default.(int)
+	// promocodeDescMinOrderAmount is the schema descriptor for min_order_amount field.
+	promocodeDescMinOrderAmount := promocodeFields[7].Descriptor()
+	// promocode.DefaultMinOrderAmount holds the default value on creation for the min_order_amount field.
+	promocode.DefaultMinOrderAmount = promocodeDescMinOrderAmount.Default.(string)
+	// promocodeDescUsedCount is the schema descriptor for used_count field.
+	promocodeDescUsedCount := promocodeFields[8].Descriptor()
+	// promocode.DefaultUsedCount holds the default value on creation for the used_count field.
+	promocode.DefaultUsedCount = promocodeDescUsedCount.Default.(int)
 	providerMixin := schema.Provider{}.Mixin()
 	providerMixinFields0 := providerMixin[0].Fields()
 	_ = providerMixinFields0
@@ -1793,6 +1846,49 @@ func init() {
 	qualityevaluationDescScore := qualityevaluationFields[10].Descriptor()
 	// qualityevaluation.DefaultScore holds the default value on creation for the score field.
 	qualityevaluation.DefaultScore = qualityevaluationDescScore.Default.(float64)
+	redeemcodeMixin := schema.RedeemCode{}.Mixin()
+	redeemcodeMixinFields0 := redeemcodeMixin[0].Fields()
+	_ = redeemcodeMixinFields0
+	redeemcodeFields := schema.RedeemCode{}.Fields()
+	_ = redeemcodeFields
+	// redeemcodeDescCreatedAt is the schema descriptor for created_at field.
+	redeemcodeDescCreatedAt := redeemcodeMixinFields0[0].Descriptor()
+	// redeemcode.DefaultCreatedAt holds the default value on creation for the created_at field.
+	redeemcode.DefaultCreatedAt = redeemcodeDescCreatedAt.Default.(func() time.Time)
+	// redeemcodeDescUpdatedAt is the schema descriptor for updated_at field.
+	redeemcodeDescUpdatedAt := redeemcodeMixinFields0[1].Descriptor()
+	// redeemcode.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	redeemcode.DefaultUpdatedAt = redeemcodeDescUpdatedAt.Default.(func() time.Time)
+	// redeemcode.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	redeemcode.UpdateDefaultUpdatedAt = redeemcodeDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// redeemcodeDescCode is the schema descriptor for code field.
+	redeemcodeDescCode := redeemcodeFields[0].Descriptor()
+	// redeemcode.CodeValidator is a validator for the "code" field. It is called by the builders before save.
+	redeemcode.CodeValidator = redeemcodeDescCode.Validators[0].(func(string) error)
+	// redeemcodeDescType is the schema descriptor for type field.
+	redeemcodeDescType := redeemcodeFields[1].Descriptor()
+	// redeemcode.TypeValidator is a validator for the "type" field. It is called by the builders before save.
+	redeemcode.TypeValidator = redeemcodeDescType.Validators[0].(func(string) error)
+	// redeemcodeDescStatus is the schema descriptor for status field.
+	redeemcodeDescStatus := redeemcodeFields[2].Descriptor()
+	// redeemcode.DefaultStatus holds the default value on creation for the status field.
+	redeemcode.DefaultStatus = redeemcodeDescStatus.Default.(string)
+	// redeemcodeDescValue is the schema descriptor for value field.
+	redeemcodeDescValue := redeemcodeFields[3].Descriptor()
+	// redeemcode.DefaultValue holds the default value on creation for the value field.
+	redeemcode.DefaultValue = redeemcodeDescValue.Default.(string)
+	// redeemcodeDescCurrency is the schema descriptor for currency field.
+	redeemcodeDescCurrency := redeemcodeFields[4].Descriptor()
+	// redeemcode.DefaultCurrency holds the default value on creation for the currency field.
+	redeemcode.DefaultCurrency = redeemcodeDescCurrency.Default.(string)
+	// redeemcodeDescMaxRedemptions is the schema descriptor for max_redemptions field.
+	redeemcodeDescMaxRedemptions := redeemcodeFields[5].Descriptor()
+	// redeemcode.DefaultMaxRedemptions holds the default value on creation for the max_redemptions field.
+	redeemcode.DefaultMaxRedemptions = redeemcodeDescMaxRedemptions.Default.(int)
+	// redeemcodeDescRedeemedCount is the schema descriptor for redeemed_count field.
+	redeemcodeDescRedeemedCount := redeemcodeFields[6].Descriptor()
+	// redeemcode.DefaultRedeemedCount holds the default value on creation for the redeemed_count field.
+	redeemcode.DefaultRedeemedCount = redeemcodeDescRedeemedCount.Default.(int)
 	roleMixin := schema.Role{}.Mixin()
 	roleMixinFields0 := roleMixin[0].Fields()
 	_ = roleMixinFields0

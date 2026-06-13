@@ -2,24 +2,16 @@ package admincontrol
 
 import (
 	"context"
-	"encoding/json"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/ent"
-	entsetting "github.com/srapi/srapi/apps/api/ent/setting"
+	entpromocode "github.com/srapi/srapi/apps/api/ent/promocode"
 	entuserpromocodeapplication "github.com/srapi/srapi/apps/api/ent/userpromocodeapplication"
 	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
-
-const settingsKeyPromoCodes = "admin_control.promo_codes"
-
-type promoCodeCollection struct {
-	NextID int                              `json:"next_id"`
-	Items  []admincontrolcontract.PromoCode `json:"items"`
-}
 
 // PreviewPromoCodeWithClient evaluates a promo code against an Ent client without mutating state.
 func PreviewPromoCodeWithClient(ctx context.Context, client *ent.Client, input admincontrolcontract.PromoCodePreviewInput) (admincontrolcontract.PromoCodeApplication, error) {
@@ -30,13 +22,9 @@ func PreviewPromoCodeWithClient(ctx context.Context, client *ent.Client, input a
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
-	collection, _, err := LoadPromoCodes(ctx, client)
+	item, _, err := findPromoCodeByCode(ctx, client, input.Code, now)
 	if err != nil {
 		return admincontrolcontract.PromoCodeApplication{}, err
-	}
-	item, _, ok := findPromoCode(collection.Items, input.Code, now)
-	if !ok {
-		return admincontrolcontract.PromoCodeApplication{}, admincontrolcontract.ErrNotFound
 	}
 	userUses, err := countActivePromoUses(ctx, client, item.ID, input.UserID)
 	if err != nil {
@@ -62,13 +50,9 @@ func FinalizePromoCodeWithClient(ctx context.Context, client *ent.Client, input 
 		return admincontrolcontract.PromoCodeApplication{}, err
 	}
 
-	collection, setting, err := LoadPromoCodes(ctx, client)
+	item, _, err := findPromoCodeByCode(ctx, client, input.Code, now)
 	if err != nil {
 		return admincontrolcontract.PromoCodeApplication{}, err
-	}
-	item, idx, ok := findPromoCode(collection.Items, input.Code, now)
-	if !ok {
-		return admincontrolcontract.PromoCodeApplication{}, admincontrolcontract.ErrNotFound
 	}
 	userUses, err := countActivePromoUses(ctx, client, item.ID, input.UserID)
 	if err != nil {
@@ -112,8 +96,11 @@ func FinalizePromoCodeWithClient(ctx context.Context, client *ent.Client, input 
 	if item.UsedCount >= item.MaxUses {
 		item.Status = admincontrolcontract.PromoCodeStatusExpired
 	}
-	collection.Items[idx] = item
-	if err := SavePromoCodeSetting(ctx, client, setting.ID, collection); err != nil {
+	if _, err := client.PromoCode.UpdateOneID(item.ID).
+		SetUsedCount(item.UsedCount).
+		SetStatus(string(item.Status)).
+		SetUpdatedAt(now).
+		Save(ctx); err != nil {
 		return admincontrolcontract.PromoCodeApplication{}, err
 	}
 	return ToPromoCodeApplication(row), nil
@@ -139,14 +126,14 @@ func ReleasePromoCodeWithClient(ctx context.Context, client *ent.Client, input a
 	if promoApplicationReleased(row.MetadataJSON) {
 		return ToPromoCodeApplication(row), false, nil
 	}
-	collection, setting, err := LoadPromoCodes(ctx, client)
+	codeRow, err := client.PromoCode.Query().Where(entpromocode.IDEQ(row.PromoCodeID)).Only(ctx)
 	if err != nil {
+		if ent.IsNotFound(err) {
+			return admincontrolcontract.PromoCodeApplication{}, false, admincontrolcontract.ErrNotFound
+		}
 		return admincontrolcontract.PromoCodeApplication{}, false, err
 	}
-	item, idx, ok := findPromoCodeByID(collection.Items, row.PromoCodeID)
-	if !ok {
-		return admincontrolcontract.PromoCodeApplication{}, false, admincontrolcontract.ErrNotFound
-	}
+	item := toPromoCode(codeRow)
 	if item.UsedCount > 0 {
 		item.UsedCount--
 	}
@@ -154,8 +141,11 @@ func ReleasePromoCodeWithClient(ctx context.Context, client *ent.Client, input a
 		item.Status = admincontrolcontract.PromoCodeStatusActive
 	}
 	item.UpdatedAt = releasedAt
-	collection.Items[idx] = item
-	if err := SavePromoCodeSetting(ctx, client, setting.ID, collection); err != nil {
+	if _, err := client.PromoCode.UpdateOneID(item.ID).
+		SetUsedCount(item.UsedCount).
+		SetStatus(string(item.Status)).
+		SetUpdatedAt(releasedAt).
+		Save(ctx); err != nil {
 		return admincontrolcontract.PromoCodeApplication{}, false, err
 	}
 	metadata := cloneMap(row.MetadataJSON)
@@ -199,74 +189,19 @@ func ListPromoCodeUsagesWithClient(ctx context.Context, client *ent.Client, prom
 	return usages, nil
 }
 
-func LoadPromoCodes(ctx context.Context, client *ent.Client) (promoCodeCollection, *ent.Setting, error) {
-	setting, err := client.Setting.Query().Where(entsetting.KeyEQ(settingsKeyPromoCodes)).Only(ctx)
+// findPromoCodeByCode loads a single promo code row by its normalized code and
+// applies derived (expiry/exhaustion) status. ErrNotFound is returned when no
+// row matches. Callers that mutate the row should run inside a serializable
+// transaction.
+func findPromoCodeByCode(ctx context.Context, client *ent.Client, code string, now time.Time) (admincontrolcontract.PromoCode, *ent.PromoCode, error) {
+	row, err := client.PromoCode.Query().Where(entpromocode.CodeEQ(normalizeCode(code))).Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return promoCodeCollection{}, nil, admincontrolcontract.ErrNotFound
+			return admincontrolcontract.PromoCode{}, nil, admincontrolcontract.ErrNotFound
 		}
-		return promoCodeCollection{}, nil, err
+		return admincontrolcontract.PromoCode{}, nil, err
 	}
-	collection, err := promoCodeCollectionFromMap(setting.ValueJSON)
-	if err != nil {
-		return promoCodeCollection{}, nil, err
-	}
-	return collection, setting, nil
-}
-
-func SavePromoCodeSetting(ctx context.Context, client *ent.Client, settingID int, collection promoCodeCollection) error {
-	value, err := promoCodeCollectionToMap(collection)
-	if err != nil {
-		return err
-	}
-	_, err = client.Setting.UpdateOneID(settingID).
-		SetValueJSON(value).
-		Save(ctx)
-	return err
-}
-
-func promoCodeCollectionFromMap(value map[string]any) (promoCodeCollection, error) {
-	var collection promoCodeCollection
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return promoCodeCollection{}, err
-	}
-	if err := json.Unmarshal(raw, &collection); err != nil {
-		return promoCodeCollection{}, err
-	}
-	return collection, nil
-}
-
-func promoCodeCollectionToMap(collection promoCodeCollection) (map[string]any, error) {
-	raw, err := json.Marshal(collection)
-	if err != nil {
-		return nil, err
-	}
-	var value map[string]any
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return nil, err
-	}
-	return value, nil
-}
-
-func findPromoCode(items []admincontrolcontract.PromoCode, code string, now time.Time) (admincontrolcontract.PromoCode, int, bool) {
-	code = normalizeCode(code)
-	for idx, item := range items {
-		item = promoCodeWithDerivedStatus(item, now)
-		if normalizeCode(item.Code) == code {
-			return item, idx, true
-		}
-	}
-	return admincontrolcontract.PromoCode{}, -1, false
-}
-
-func findPromoCodeByID(items []admincontrolcontract.PromoCode, id int) (admincontrolcontract.PromoCode, int, bool) {
-	for idx, item := range items {
-		if item.ID == id {
-			return item, idx, true
-		}
-	}
-	return admincontrolcontract.PromoCode{}, -1, false
+	return promoCodeWithDerivedStatus(toPromoCode(row), now), row, nil
 }
 
 func previewPromoCode(item admincontrolcontract.PromoCode, userID int, amount string, currency string, now time.Time, userUses int) (admincontrolcontract.PromoCodeApplication, error) {

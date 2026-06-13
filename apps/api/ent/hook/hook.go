@@ -525,6 +525,18 @@ func (f PricingRuleFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value,
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PricingRuleMutation", m)
 }
 
+// The PromoCodeFunc type is an adapter to allow the use of ordinary
+// function as PromoCode mutator.
+type PromoCodeFunc func(context.Context, *ent.PromoCodeMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PromoCodeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PromoCodeMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PromoCodeMutation", m)
+}
+
 // The ProviderFunc type is an adapter to allow the use of ordinary
 // function as Provider mutator.
 type ProviderFunc func(context.Context, *ent.ProviderMutation) (ent.Value, error)
@@ -583,6 +595,18 @@ func (f QualityEvaluationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.QualityEvaluationMutation", m)
+}
+
+// The RedeemCodeFunc type is an adapter to allow the use of ordinary
+// function as RedeemCode mutator.
+type RedeemCodeFunc func(context.Context, *ent.RedeemCodeMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f RedeemCodeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.RedeemCodeMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RedeemCodeMutation", m)
 }
 
 // The RoleFunc type is an adapter to allow the use of ordinary

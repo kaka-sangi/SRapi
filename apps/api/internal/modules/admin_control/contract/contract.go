@@ -18,7 +18,22 @@ type Store interface {
 	ListAnnouncementReads(ctx context.Context, userID int, announcementIDs []int) ([]AnnouncementRead, error)
 	ListAnnouncementReadsByAnnouncement(ctx context.Context, announcementID, limit int) ([]AnnouncementRead, error)
 	MarkAnnouncementRead(ctx context.Context, userID int, announcementID int, at time.Time) (AnnouncementRead, error)
+
+	// Redeem code records are first-class per-row tables (not a serialized
+	// settings blob). The service owns validation and status derivation; the
+	// store persists and returns the raw rows.
+	ListRedeemCodes(ctx context.Context) ([]RedeemCode, error)
+	CreateRedeemCode(ctx context.Context, code RedeemCode) (RedeemCode, error)
+	DeleteRedeemCode(ctx context.Context, id int) (RedeemCode, error)
+	DisableRedeemCodes(ctx context.Context, ids []int, at time.Time) ([]int, error)
 	RedeemCode(ctx context.Context, input RedeemCodeRedemptionInput) (RedeemCodeRedemptionResult, error)
+
+	// Promo code records are first-class per-row tables (not a serialized
+	// settings blob). The service owns validation and status derivation.
+	ListPromoCodes(ctx context.Context) ([]PromoCode, error)
+	CreatePromoCode(ctx context.Context, code PromoCode) (PromoCode, error)
+	UpdatePromoCode(ctx context.Context, code PromoCode) (PromoCode, error)
+	DeletePromoCode(ctx context.Context, id int) (PromoCode, error)
 	PreviewPromoCode(ctx context.Context, input PromoCodePreviewInput) (PromoCodeApplication, error)
 	FinalizePromoCode(ctx context.Context, input PromoCodeFinalizeInput) (PromoCodeApplication, error)
 	ReleasePromoCode(ctx context.Context, input PromoCodeReleaseInput) (PromoCodeApplication, bool, error)

@@ -57,11 +57,13 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/pendingoauthsession"
 	"github.com/srapi/srapi/apps/api/ent/pricinginterval"
 	"github.com/srapi/srapi/apps/api/ent/pricingrule"
+	"github.com/srapi/srapi/apps/api/ent/promocode"
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
 	"github.com/srapi/srapi/apps/api/ent/proxy"
 	"github.com/srapi/srapi/apps/api/ent/qualityevalsample"
 	"github.com/srapi/srapi/apps/api/ent/qualityevaluation"
+	"github.com/srapi/srapi/apps/api/ent/redeemcode"
 	"github.com/srapi/srapi/apps/api/ent/role"
 	"github.com/srapi/srapi/apps/api/ent/scheduledtestplan"
 	"github.com/srapi/srapi/apps/api/ent/scheduledtestplanrun"
@@ -178,6 +180,8 @@ type Client struct {
 	PricingInterval *PricingIntervalClient
 	// PricingRule is the client for interacting with the PricingRule builders.
 	PricingRule *PricingRuleClient
+	// PromoCode is the client for interacting with the PromoCode builders.
+	PromoCode *PromoCodeClient
 	// Provider is the client for interacting with the Provider builders.
 	Provider *ProviderClient
 	// ProviderAccount is the client for interacting with the ProviderAccount builders.
@@ -188,6 +192,8 @@ type Client struct {
 	QualityEvalSample *QualityEvalSampleClient
 	// QualityEvaluation is the client for interacting with the QualityEvaluation builders.
 	QualityEvaluation *QualityEvaluationClient
+	// RedeemCode is the client for interacting with the RedeemCode builders.
+	RedeemCode *RedeemCodeClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
 	// ScheduledTestPlan is the client for interacting with the ScheduledTestPlan builders.
@@ -288,11 +294,13 @@ func (c *Client) init() {
 	c.PendingOAuthSession = NewPendingOAuthSessionClient(c.config)
 	c.PricingInterval = NewPricingIntervalClient(c.config)
 	c.PricingRule = NewPricingRuleClient(c.config)
+	c.PromoCode = NewPromoCodeClient(c.config)
 	c.Provider = NewProviderClient(c.config)
 	c.ProviderAccount = NewProviderAccountClient(c.config)
 	c.Proxy = NewProxyClient(c.config)
 	c.QualityEvalSample = NewQualityEvalSampleClient(c.config)
 	c.QualityEvaluation = NewQualityEvaluationClient(c.config)
+	c.RedeemCode = NewRedeemCodeClient(c.config)
 	c.Role = NewRoleClient(c.config)
 	c.ScheduledTestPlan = NewScheduledTestPlanClient(c.config)
 	c.ScheduledTestPlanRun = NewScheduledTestPlanRunClient(c.config)
@@ -451,11 +459,13 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PendingOAuthSession:       NewPendingOAuthSessionClient(cfg),
 		PricingInterval:           NewPricingIntervalClient(cfg),
 		PricingRule:               NewPricingRuleClient(cfg),
+		PromoCode:                 NewPromoCodeClient(cfg),
 		Provider:                  NewProviderClient(cfg),
 		ProviderAccount:           NewProviderAccountClient(cfg),
 		Proxy:                     NewProxyClient(cfg),
 		QualityEvalSample:         NewQualityEvalSampleClient(cfg),
 		QualityEvaluation:         NewQualityEvaluationClient(cfg),
+		RedeemCode:                NewRedeemCodeClient(cfg),
 		Role:                      NewRoleClient(cfg),
 		ScheduledTestPlan:         NewScheduledTestPlanClient(cfg),
 		ScheduledTestPlanRun:      NewScheduledTestPlanRunClient(cfg),
@@ -541,11 +551,13 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PendingOAuthSession:       NewPendingOAuthSessionClient(cfg),
 		PricingInterval:           NewPricingIntervalClient(cfg),
 		PricingRule:               NewPricingRuleClient(cfg),
+		PromoCode:                 NewPromoCodeClient(cfg),
 		Provider:                  NewProviderClient(cfg),
 		ProviderAccount:           NewProviderAccountClient(cfg),
 		Proxy:                     NewProxyClient(cfg),
 		QualityEvalSample:         NewQualityEvalSampleClient(cfg),
 		QualityEvaluation:         NewQualityEvaluationClient(cfg),
+		RedeemCode:                NewRedeemCodeClient(cfg),
 		Role:                      NewRoleClient(cfg),
 		ScheduledTestPlan:         NewScheduledTestPlanClient(cfg),
 		ScheduledTestPlanRun:      NewScheduledTestPlanRunClient(cfg),
@@ -609,15 +621,15 @@ func (c *Client) Use(hooks ...Hook) {
 		c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule, c.ObsAlertSilence,
 		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PayloadRule,
 		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
-		c.PendingOAuthSession, c.PricingInterval, c.PricingRule, c.Provider,
-		c.ProviderAccount, c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role,
-		c.ScheduledTestPlan, c.ScheduledTestPlanRun, c.SchedulerDecision,
-		c.SchedulerFeedback, c.SchedulerRequestSnapshot, c.SchedulerStrategy,
-		c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageLog, c.User,
-		c.UserAnnouncementRead, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserAuthIdentity, c.UserPlatformQuota, c.UserPromoCodeApplication,
-		c.UserRedeemCodeRedemption, c.UserRole, c.UserSubscription, c.UserTOTPSecret,
-		c.Workspace,
+		c.PendingOAuthSession, c.PricingInterval, c.PricingRule, c.PromoCode,
+		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
+		c.QualityEvaluation, c.RedeemCode, c.Role, c.ScheduledTestPlan,
+		c.ScheduledTestPlanRun, c.SchedulerDecision, c.SchedulerFeedback,
+		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
+		c.UserPlatformQuota, c.UserPromoCodeApplication, c.UserRedeemCodeRedemption,
+		c.UserRole, c.UserSubscription, c.UserTOTPSecret, c.Workspace,
 	} {
 		n.Use(hooks...)
 	}
@@ -638,15 +650,15 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule, c.ObsAlertSilence,
 		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PayloadRule,
 		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
-		c.PendingOAuthSession, c.PricingInterval, c.PricingRule, c.Provider,
-		c.ProviderAccount, c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role,
-		c.ScheduledTestPlan, c.ScheduledTestPlanRun, c.SchedulerDecision,
-		c.SchedulerFeedback, c.SchedulerRequestSnapshot, c.SchedulerStrategy,
-		c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageLog, c.User,
-		c.UserAnnouncementRead, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserAuthIdentity, c.UserPlatformQuota, c.UserPromoCodeApplication,
-		c.UserRedeemCodeRedemption, c.UserRole, c.UserSubscription, c.UserTOTPSecret,
-		c.Workspace,
+		c.PendingOAuthSession, c.PricingInterval, c.PricingRule, c.PromoCode,
+		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
+		c.QualityEvaluation, c.RedeemCode, c.Role, c.ScheduledTestPlan,
+		c.ScheduledTestPlanRun, c.SchedulerDecision, c.SchedulerFeedback,
+		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
+		c.UserPlatformQuota, c.UserPromoCodeApplication, c.UserRedeemCodeRedemption,
+		c.UserRole, c.UserSubscription, c.UserTOTPSecret, c.Workspace,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -741,6 +753,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PricingInterval.mutate(ctx, m)
 	case *PricingRuleMutation:
 		return c.PricingRule.mutate(ctx, m)
+	case *PromoCodeMutation:
+		return c.PromoCode.mutate(ctx, m)
 	case *ProviderMutation:
 		return c.Provider.mutate(ctx, m)
 	case *ProviderAccountMutation:
@@ -751,6 +765,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.QualityEvalSample.mutate(ctx, m)
 	case *QualityEvaluationMutation:
 		return c.QualityEvaluation.mutate(ctx, m)
+	case *RedeemCodeMutation:
+		return c.RedeemCode.mutate(ctx, m)
 	case *RoleMutation:
 		return c.Role.mutate(ctx, m)
 	case *ScheduledTestPlanMutation:
@@ -6521,6 +6537,139 @@ func (c *PricingRuleClient) mutate(ctx context.Context, m *PricingRuleMutation) 
 	}
 }
 
+// PromoCodeClient is a client for the PromoCode schema.
+type PromoCodeClient struct {
+	config
+}
+
+// NewPromoCodeClient returns a client for the PromoCode from the given config.
+func NewPromoCodeClient(c config) *PromoCodeClient {
+	return &PromoCodeClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `promocode.Hooks(f(g(h())))`.
+func (c *PromoCodeClient) Use(hooks ...Hook) {
+	c.hooks.PromoCode = append(c.hooks.PromoCode, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `promocode.Intercept(f(g(h())))`.
+func (c *PromoCodeClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PromoCode = append(c.inters.PromoCode, interceptors...)
+}
+
+// Create returns a builder for creating a PromoCode entity.
+func (c *PromoCodeClient) Create() *PromoCodeCreate {
+	mutation := newPromoCodeMutation(c.config, OpCreate)
+	return &PromoCodeCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PromoCode entities.
+func (c *PromoCodeClient) CreateBulk(builders ...*PromoCodeCreate) *PromoCodeCreateBulk {
+	return &PromoCodeCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PromoCodeClient) MapCreateBulk(slice any, setFunc func(*PromoCodeCreate, int)) *PromoCodeCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PromoCodeCreateBulk{err: fmt.Errorf("calling to PromoCodeClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PromoCodeCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PromoCodeCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PromoCode.
+func (c *PromoCodeClient) Update() *PromoCodeUpdate {
+	mutation := newPromoCodeMutation(c.config, OpUpdate)
+	return &PromoCodeUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PromoCodeClient) UpdateOne(_m *PromoCode) *PromoCodeUpdateOne {
+	mutation := newPromoCodeMutation(c.config, OpUpdateOne, withPromoCode(_m))
+	return &PromoCodeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PromoCodeClient) UpdateOneID(id int) *PromoCodeUpdateOne {
+	mutation := newPromoCodeMutation(c.config, OpUpdateOne, withPromoCodeID(id))
+	return &PromoCodeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PromoCode.
+func (c *PromoCodeClient) Delete() *PromoCodeDelete {
+	mutation := newPromoCodeMutation(c.config, OpDelete)
+	return &PromoCodeDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PromoCodeClient) DeleteOne(_m *PromoCode) *PromoCodeDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PromoCodeClient) DeleteOneID(id int) *PromoCodeDeleteOne {
+	builder := c.Delete().Where(promocode.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PromoCodeDeleteOne{builder}
+}
+
+// Query returns a query builder for PromoCode.
+func (c *PromoCodeClient) Query() *PromoCodeQuery {
+	return &PromoCodeQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePromoCode},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PromoCode entity by its id.
+func (c *PromoCodeClient) Get(ctx context.Context, id int) (*PromoCode, error) {
+	return c.Query().Where(promocode.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PromoCodeClient) GetX(ctx context.Context, id int) *PromoCode {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PromoCodeClient) Hooks() []Hook {
+	return c.hooks.PromoCode
+}
+
+// Interceptors returns the client interceptors.
+func (c *PromoCodeClient) Interceptors() []Interceptor {
+	return c.inters.PromoCode
+}
+
+func (c *PromoCodeClient) mutate(ctx context.Context, m *PromoCodeMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PromoCodeCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PromoCodeUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PromoCodeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PromoCodeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PromoCode mutation op: %q", m.Op())
+	}
+}
+
 // ProviderClient is a client for the Provider schema.
 type ProviderClient struct {
 	config
@@ -7183,6 +7332,139 @@ func (c *QualityEvaluationClient) mutate(ctx context.Context, m *QualityEvaluati
 		return (&QualityEvaluationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown QualityEvaluation mutation op: %q", m.Op())
+	}
+}
+
+// RedeemCodeClient is a client for the RedeemCode schema.
+type RedeemCodeClient struct {
+	config
+}
+
+// NewRedeemCodeClient returns a client for the RedeemCode from the given config.
+func NewRedeemCodeClient(c config) *RedeemCodeClient {
+	return &RedeemCodeClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `redeemcode.Hooks(f(g(h())))`.
+func (c *RedeemCodeClient) Use(hooks ...Hook) {
+	c.hooks.RedeemCode = append(c.hooks.RedeemCode, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `redeemcode.Intercept(f(g(h())))`.
+func (c *RedeemCodeClient) Intercept(interceptors ...Interceptor) {
+	c.inters.RedeemCode = append(c.inters.RedeemCode, interceptors...)
+}
+
+// Create returns a builder for creating a RedeemCode entity.
+func (c *RedeemCodeClient) Create() *RedeemCodeCreate {
+	mutation := newRedeemCodeMutation(c.config, OpCreate)
+	return &RedeemCodeCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of RedeemCode entities.
+func (c *RedeemCodeClient) CreateBulk(builders ...*RedeemCodeCreate) *RedeemCodeCreateBulk {
+	return &RedeemCodeCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *RedeemCodeClient) MapCreateBulk(slice any, setFunc func(*RedeemCodeCreate, int)) *RedeemCodeCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &RedeemCodeCreateBulk{err: fmt.Errorf("calling to RedeemCodeClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*RedeemCodeCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &RedeemCodeCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for RedeemCode.
+func (c *RedeemCodeClient) Update() *RedeemCodeUpdate {
+	mutation := newRedeemCodeMutation(c.config, OpUpdate)
+	return &RedeemCodeUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *RedeemCodeClient) UpdateOne(_m *RedeemCode) *RedeemCodeUpdateOne {
+	mutation := newRedeemCodeMutation(c.config, OpUpdateOne, withRedeemCode(_m))
+	return &RedeemCodeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *RedeemCodeClient) UpdateOneID(id int) *RedeemCodeUpdateOne {
+	mutation := newRedeemCodeMutation(c.config, OpUpdateOne, withRedeemCodeID(id))
+	return &RedeemCodeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for RedeemCode.
+func (c *RedeemCodeClient) Delete() *RedeemCodeDelete {
+	mutation := newRedeemCodeMutation(c.config, OpDelete)
+	return &RedeemCodeDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *RedeemCodeClient) DeleteOne(_m *RedeemCode) *RedeemCodeDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *RedeemCodeClient) DeleteOneID(id int) *RedeemCodeDeleteOne {
+	builder := c.Delete().Where(redeemcode.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &RedeemCodeDeleteOne{builder}
+}
+
+// Query returns a query builder for RedeemCode.
+func (c *RedeemCodeClient) Query() *RedeemCodeQuery {
+	return &RedeemCodeQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeRedeemCode},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a RedeemCode entity by its id.
+func (c *RedeemCodeClient) Get(ctx context.Context, id int) (*RedeemCode, error) {
+	return c.Query().Where(redeemcode.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *RedeemCodeClient) GetX(ctx context.Context, id int) *RedeemCode {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *RedeemCodeClient) Hooks() []Hook {
+	return c.hooks.RedeemCode
+}
+
+// Interceptors returns the client interceptors.
+func (c *RedeemCodeClient) Interceptors() []Interceptor {
+	return c.inters.RedeemCode
+}
+
+func (c *RedeemCodeClient) mutate(ctx context.Context, m *RedeemCodeMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&RedeemCodeCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&RedeemCodeUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&RedeemCodeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&RedeemCodeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown RedeemCode mutation op: %q", m.Op())
 	}
 }
 
@@ -10258,9 +10540,9 @@ type (
 		MonitorRequestTemplate, MonitorRunResult, ObsAlertEvent, ObsAlertRule,
 		ObsAlertSilence, ObsSLODefinition, OpsSystemLog, PasswordResetToken,
 		PayloadRule, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
-		PendingOAuthSession, PricingInterval, PricingRule, Provider, ProviderAccount,
-		Proxy, QualityEvalSample, QualityEvaluation, Role, ScheduledTestPlan,
-		ScheduledTestPlanRun, SchedulerDecision, SchedulerFeedback,
+		PendingOAuthSession, PricingInterval, PricingRule, PromoCode, Provider,
+		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, RedeemCode, Role,
+		ScheduledTestPlan, ScheduledTestPlanRun, SchedulerDecision, SchedulerFeedback,
 		SchedulerRequestSnapshot, SchedulerStrategy, Setting, SubscriptionPlan,
 		TLSFingerprintProfile, UsageLog, User, UserAnnouncementRead,
 		UserAttributeDefinition, UserAttributeValue, UserAuthIdentity,
@@ -10278,9 +10560,9 @@ type (
 		MonitorRequestTemplate, MonitorRunResult, ObsAlertEvent, ObsAlertRule,
 		ObsAlertSilence, ObsSLODefinition, OpsSystemLog, PasswordResetToken,
 		PayloadRule, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
-		PendingOAuthSession, PricingInterval, PricingRule, Provider, ProviderAccount,
-		Proxy, QualityEvalSample, QualityEvaluation, Role, ScheduledTestPlan,
-		ScheduledTestPlanRun, SchedulerDecision, SchedulerFeedback,
+		PendingOAuthSession, PricingInterval, PricingRule, PromoCode, Provider,
+		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, RedeemCode, Role,
+		ScheduledTestPlan, ScheduledTestPlanRun, SchedulerDecision, SchedulerFeedback,
 		SchedulerRequestSnapshot, SchedulerStrategy, Setting, SubscriptionPlan,
 		TLSFingerprintProfile, UsageLog, User, UserAnnouncementRead,
 		UserAttributeDefinition, UserAttributeValue, UserAuthIdentity,

@@ -2,7 +2,6 @@ package memory
 
 import (
 	"context"
-	"encoding/json"
 	"math/big"
 	"sort"
 	"strconv"
@@ -27,6 +26,10 @@ type Store struct {
 	users                  userscontract.Store
 	billing                billingcontract.Store
 	subs                   subscriptioncontract.Store
+	redeemCodes            map[int]admincontrol.RedeemCode
+	nextRedeemCodeID       int
+	promoCodes             map[int]admincontrol.PromoCode
+	nextPromoCodeID        int
 	redemptions            map[int]map[int]admincontrol.RedeemCodeRedemption
 	nextRedemptionID       int
 	promoApplications      map[int]admincontrol.PromoCodeApplication
@@ -46,6 +49,10 @@ func NewWithFulfillment(users userscontract.Store, billing billingcontract.Store
 		users:                  users,
 		billing:                billing,
 		subs:                   subs,
+		redeemCodes:            map[int]admincontrol.RedeemCode{},
+		nextRedeemCodeID:       1,
+		promoCodes:             map[int]admincontrol.PromoCode{},
+		nextPromoCodeID:        1,
 		redemptions:            map[int]map[int]admincontrol.RedeemCodeRedemption{},
 		nextRedemptionID:       1,
 		promoApplications:      map[int]admincontrol.PromoCodeApplication{},
@@ -161,6 +168,69 @@ func (s *Store) MarkAnnouncementRead(_ context.Context, userID int, announcement
 	return item, nil
 }
 
+func (s *Store) ListRedeemCodes(_ context.Context) ([]admincontrol.RedeemCode, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items := make([]admincontrol.RedeemCode, 0, len(s.redeemCodes))
+	for _, item := range s.redeemCodes {
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (s *Store) CreateRedeemCode(_ context.Context, code admincontrol.RedeemCode) (admincontrol.RedeemCode, error) {
+	if strings.TrimSpace(code.Code) == "" {
+		return admincontrol.RedeemCode{}, admincontrol.ErrInvalidInput
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	normalized := normalizeCode(code.Code)
+	for _, existing := range s.redeemCodes {
+		if normalizeCode(existing.Code) == normalized {
+			return admincontrol.RedeemCode{}, admincontrol.ErrConflict
+		}
+	}
+	code.ID = s.nextRedeemCodeID
+	s.nextRedeemCodeID++
+	s.redeemCodes[code.ID] = code
+	return code, nil
+}
+
+func (s *Store) DeleteRedeemCode(_ context.Context, id int) (admincontrol.RedeemCode, error) {
+	if id <= 0 {
+		return admincontrol.RedeemCode{}, admincontrol.ErrNotFound
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item, ok := s.redeemCodes[id]
+	if !ok {
+		return admincontrol.RedeemCode{}, admincontrol.ErrNotFound
+	}
+	delete(s.redeemCodes, id)
+	return item, nil
+}
+
+func (s *Store) DisableRedeemCodes(_ context.Context, ids []int, at time.Time) ([]int, error) {
+	now := at.UTC()
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	succeeded := make([]int, 0, len(ids))
+	for _, id := range ids {
+		item, ok := s.redeemCodes[id]
+		if !ok {
+			continue
+		}
+		item.Status = admincontrol.RedeemCodeStatusDisabled
+		item.UpdatedAt = now
+		s.redeemCodes[id] = item
+		succeeded = append(succeeded, id)
+	}
+	return succeeded, nil
+}
+
 func (s *Store) RedeemCode(ctx context.Context, input admincontrol.RedeemCodeRedemptionInput) (admincontrol.RedeemCodeRedemptionResult, error) {
 	if input.UserID <= 0 || strings.TrimSpace(input.Code) == "" {
 		return admincontrol.RedeemCodeRedemptionResult{}, admincontrol.ErrInvalidInput
@@ -174,14 +244,9 @@ func (s *Store) RedeemCode(ctx context.Context, input admincontrol.RedeemCodeRed
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	collection, err := s.redeemCodeCollection()
-	if err != nil {
-		return admincontrol.RedeemCodeRedemptionResult{}, err
-	}
-	for idx, item := range collection.Items {
+	for id, item := range s.redeemCodes {
 		item = redeemCodeWithDerivedStatus(item, now)
-		if item.Code != codeValue {
-			collection.Items[idx] = item
+		if normalizeCode(item.Code) != codeValue {
 			continue
 		}
 		if existing, ok := s.redemption(input.UserID, item.ID); ok {
@@ -192,8 +257,7 @@ func (s *Store) RedeemCode(ctx context.Context, input admincontrol.RedeemCodeRed
 			}, nil
 		}
 		if item.Status != admincontrol.RedeemCodeStatusActive || item.RedeemedCount >= item.MaxRedemptions {
-			collection.Items[idx] = item
-			_ = s.saveRedeemCodeCollection(collection)
+			s.redeemCodes[id] = item
 			return admincontrol.RedeemCodeRedemptionResult{}, admincontrol.ErrConflict
 		}
 
@@ -206,10 +270,7 @@ func (s *Store) RedeemCode(ctx context.Context, input admincontrol.RedeemCodeRed
 		if item.RedeemedCount >= item.MaxRedemptions {
 			item.Status = admincontrol.RedeemCodeStatusRedeemed
 		}
-		collection.Items[idx] = item
-		if err := s.saveRedeemCodeCollection(collection); err != nil {
-			return admincontrol.RedeemCodeRedemptionResult{}, err
-		}
+		s.redeemCodes[id] = item
 		if _, ok := s.redemptions[input.UserID]; !ok {
 			s.redemptions[input.UserID] = map[int]admincontrol.RedeemCodeRedemption{}
 		}
@@ -219,8 +280,74 @@ func (s *Store) RedeemCode(ctx context.Context, input admincontrol.RedeemCodeRed
 			RedeemCode: item,
 		}, nil
 	}
-	_ = s.saveRedeemCodeCollection(collection)
 	return admincontrol.RedeemCodeRedemptionResult{}, admincontrol.ErrNotFound
+}
+
+func (s *Store) ListPromoCodes(_ context.Context) ([]admincontrol.PromoCode, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items := make([]admincontrol.PromoCode, 0, len(s.promoCodes))
+	for _, item := range s.promoCodes {
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (s *Store) CreatePromoCode(_ context.Context, code admincontrol.PromoCode) (admincontrol.PromoCode, error) {
+	if strings.TrimSpace(code.Code) == "" {
+		return admincontrol.PromoCode{}, admincontrol.ErrInvalidInput
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	normalized := normalizeCode(code.Code)
+	for _, existing := range s.promoCodes {
+		if normalizeCode(existing.Code) == normalized {
+			return admincontrol.PromoCode{}, admincontrol.ErrConflict
+		}
+	}
+	code.ID = s.nextPromoCodeID
+	s.nextPromoCodeID++
+	s.promoCodes[code.ID] = code
+	return code, nil
+}
+
+func (s *Store) UpdatePromoCode(_ context.Context, code admincontrol.PromoCode) (admincontrol.PromoCode, error) {
+	if code.ID <= 0 {
+		return admincontrol.PromoCode{}, admincontrol.ErrNotFound
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	existing, ok := s.promoCodes[code.ID]
+	if !ok {
+		return admincontrol.PromoCode{}, admincontrol.ErrNotFound
+	}
+	normalized := normalizeCode(code.Code)
+	if !strings.EqualFold(existing.Code, code.Code) {
+		for id, other := range s.promoCodes {
+			if id == code.ID {
+				continue
+			}
+			if normalizeCode(other.Code) == normalized {
+				return admincontrol.PromoCode{}, admincontrol.ErrConflict
+			}
+		}
+	}
+	s.promoCodes[code.ID] = code
+	return code, nil
+}
+
+func (s *Store) DeletePromoCode(_ context.Context, id int) (admincontrol.PromoCode, error) {
+	if id <= 0 {
+		return admincontrol.PromoCode{}, admincontrol.ErrNotFound
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item, ok := s.promoCodes[id]
+	if !ok {
+		return admincontrol.PromoCode{}, admincontrol.ErrNotFound
+	}
+	delete(s.promoCodes, id)
+	return item, nil
 }
 
 func (s *Store) PreviewPromoCode(_ context.Context, input admincontrol.PromoCodePreviewInput) (admincontrol.PromoCodeApplication, error) {
@@ -233,11 +360,7 @@ func (s *Store) PreviewPromoCode(_ context.Context, input admincontrol.PromoCode
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	collection, err := s.promoCodeCollection()
-	if err != nil {
-		return admincontrol.PromoCodeApplication{}, err
-	}
-	item, _, ok := findPromoCode(collection.Items, input.Code, now)
+	item, _, ok := s.findPromoCode(input.Code, now)
 	if !ok {
 		return admincontrol.PromoCodeApplication{}, admincontrol.ErrNotFound
 	}
@@ -258,11 +381,7 @@ func (s *Store) FinalizePromoCode(_ context.Context, input admincontrol.PromoCod
 	if existing, ok := s.promoApplications[input.PaymentOrderID]; ok {
 		return existing, nil
 	}
-	collection, err := s.promoCodeCollection()
-	if err != nil {
-		return admincontrol.PromoCodeApplication{}, err
-	}
-	item, idx, ok := findPromoCode(collection.Items, input.Code, now)
+	item, id, ok := s.findPromoCode(input.Code, now)
 	if !ok {
 		return admincontrol.PromoCodeApplication{}, admincontrol.ErrNotFound
 	}
@@ -285,10 +404,7 @@ func (s *Store) FinalizePromoCode(_ context.Context, input admincontrol.PromoCod
 	if item.UsedCount >= item.MaxUses {
 		item.Status = admincontrol.PromoCodeStatusExpired
 	}
-	collection.Items[idx] = item
-	if err := s.savePromoCodeCollection(collection); err != nil {
-		return admincontrol.PromoCodeApplication{}, err
-	}
+	s.promoCodes[id] = item
 	s.promoApplications[input.PaymentOrderID] = application
 	return application, nil
 }
@@ -310,11 +426,7 @@ func (s *Store) ReleasePromoCode(_ context.Context, input admincontrol.PromoCode
 	if promoApplicationReleased(application) {
 		return application, false, nil
 	}
-	collection, err := s.promoCodeCollection()
-	if err != nil {
-		return admincontrol.PromoCodeApplication{}, false, err
-	}
-	item, idx, ok := findPromoCodeByID(collection.Items, application.PromoCodeID)
+	item, ok := s.promoCodes[application.PromoCodeID]
 	if !ok {
 		return admincontrol.PromoCodeApplication{}, false, admincontrol.ErrNotFound
 	}
@@ -325,10 +437,7 @@ func (s *Store) ReleasePromoCode(_ context.Context, input admincontrol.PromoCode
 		item.Status = admincontrol.PromoCodeStatusActive
 	}
 	item.UpdatedAt = releasedAt
-	collection.Items[idx] = item
-	if err := s.savePromoCodeCollection(collection); err != nil {
-		return admincontrol.PromoCodeApplication{}, false, err
-	}
+	s.promoCodes[application.PromoCodeID] = item
 	metadata := cloneMap(application.Metadata)
 	metadata["released"] = true
 	metadata["released_at"] = releasedAt.Format(time.RFC3339Nano)
@@ -524,76 +633,17 @@ func pageSystemLogs(items []admincontrol.OpsSystemLog, page, pageSize int) []adm
 	return items[start:end]
 }
 
-const settingsKeyRedeemCodes = "admin_control.redeem_codes"
-
-type redeemCodeCollection struct {
-	NextID int                       `json:"next_id"`
-	Items  []admincontrol.RedeemCode `json:"items"`
-}
-
-const settingsKeyPromoCodes = "admin_control.promo_codes"
-
-type promoCodeCollection struct {
-	NextID int                      `json:"next_id"`
-	Items  []admincontrol.PromoCode `json:"items"`
-}
-
-func (s *Store) redeemCodeCollection() (redeemCodeCollection, error) {
-	raw, ok := s.values[settingsKeyRedeemCodes]
-	if !ok {
-		return redeemCodeCollection{}, nil
+// findPromoCode locates a promo code row by its normalized code, applying
+// derived (expiry/exhaustion) status. It must be called with s.mu held.
+func (s *Store) findPromoCode(code string, now time.Time) (admincontrol.PromoCode, int, bool) {
+	normalized := normalizeCode(code)
+	for id, item := range s.promoCodes {
+		item = promoCodeWithDerivedStatus(item, now)
+		if normalizeCode(item.Code) == normalized {
+			return item, id, true
+		}
 	}
-	var collection redeemCodeCollection
-	encoded, err := json.Marshal(raw)
-	if err != nil {
-		return redeemCodeCollection{}, err
-	}
-	if err := json.Unmarshal(encoded, &collection); err != nil {
-		return redeemCodeCollection{}, err
-	}
-	return collection, nil
-}
-
-func (s *Store) saveRedeemCodeCollection(collection redeemCodeCollection) error {
-	encoded, err := json.Marshal(collection)
-	if err != nil {
-		return err
-	}
-	var raw map[string]any
-	if err := json.Unmarshal(encoded, &raw); err != nil {
-		return err
-	}
-	s.values[settingsKeyRedeemCodes] = raw
-	return nil
-}
-
-func (s *Store) promoCodeCollection() (promoCodeCollection, error) {
-	raw, ok := s.values[settingsKeyPromoCodes]
-	if !ok {
-		return promoCodeCollection{}, nil
-	}
-	var collection promoCodeCollection
-	encoded, err := json.Marshal(raw)
-	if err != nil {
-		return promoCodeCollection{}, err
-	}
-	if err := json.Unmarshal(encoded, &collection); err != nil {
-		return promoCodeCollection{}, err
-	}
-	return collection, nil
-}
-
-func (s *Store) savePromoCodeCollection(collection promoCodeCollection) error {
-	encoded, err := json.Marshal(collection)
-	if err != nil {
-		return err
-	}
-	var raw map[string]any
-	if err := json.Unmarshal(encoded, &raw); err != nil {
-		return err
-	}
-	s.values[settingsKeyPromoCodes] = raw
-	return nil
+	return admincontrol.PromoCode{}, 0, false
 }
 
 func (s *Store) redemption(userID int, redeemCodeID int) (admincontrol.RedeemCodeRedemption, bool) {
@@ -737,26 +787,6 @@ func redeemCodeWithDerivedStatus(item admincontrol.RedeemCode, now time.Time) ad
 		item.Status = admincontrol.RedeemCodeStatusRedeemed
 	}
 	return item
-}
-
-func findPromoCode(items []admincontrol.PromoCode, code string, now time.Time) (admincontrol.PromoCode, int, bool) {
-	code = normalizeCode(code)
-	for idx, item := range items {
-		item = promoCodeWithDerivedStatus(item, now)
-		if normalizeCode(item.Code) == code {
-			return item, idx, true
-		}
-	}
-	return admincontrol.PromoCode{}, -1, false
-}
-
-func findPromoCodeByID(items []admincontrol.PromoCode, id int) (admincontrol.PromoCode, int, bool) {
-	for idx, item := range items {
-		if item.ID == id {
-			return item, idx, true
-		}
-	}
-	return admincontrol.PromoCode{}, -1, false
 }
 
 func promoCodeWithDerivedStatus(item admincontrol.PromoCode, now time.Time) admincontrol.PromoCode {

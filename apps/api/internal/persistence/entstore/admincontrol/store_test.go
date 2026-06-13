@@ -2,7 +2,6 @@ package admincontrol
 
 import (
 	"context"
-	"encoding/json"
 	"path/filepath"
 	"testing"
 	"time"
@@ -39,7 +38,6 @@ func TestRedeemCodeCreditsBalanceOncePersistently(t *testing.T) {
 	}
 	createdAt := time.Date(2026, 5, 29, 12, 0, 0, 0, time.UTC)
 	code := admincontrolcontract.RedeemCode{
-		ID:             7,
 		Code:           "WELCOME10",
 		Type:           admincontrolcontract.RedeemCodeTypeBalance,
 		Status:         admincontrolcontract.RedeemCodeStatusActive,
@@ -98,18 +96,12 @@ func TestRedeemCodeCreditsBalanceOncePersistently(t *testing.T) {
 }
 
 func seedRedeemCodes(ctx context.Context, store *Store, codes []admincontrolcontract.RedeemCode) error {
-	raw, err := json.Marshal(redeemCodeCollection{
-		NextID: 100,
-		Items:  codes,
-	})
-	if err != nil {
-		return err
+	for _, code := range codes {
+		if _, err := store.CreateRedeemCode(ctx, code); err != nil {
+			return err
+		}
 	}
-	var value map[string]any
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return err
-	}
-	return store.Set(ctx, settingsKeyRedeemCodes, value, nil)
+	return nil
 }
 
 func sqliteDSN(t *testing.T) string {

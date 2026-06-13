@@ -2,7 +2,6 @@ package payments
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"path/filepath"
 	"strconv"
@@ -13,7 +12,6 @@ import (
 	"github.com/srapi/srapi/apps/api/ent"
 	"github.com/srapi/srapi/apps/api/ent/enttest"
 	entpaymentorder "github.com/srapi/srapi/apps/api/ent/paymentorder"
-	entsetting "github.com/srapi/srapi/apps/api/ent/setting"
 	entuserpromocodeapplication "github.com/srapi/srapi/apps/api/ent/userpromocodeapplication"
 	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
@@ -201,21 +199,17 @@ func TestStoreCreatesDiscountedOrderAndPromoApplicationAtomically(t *testing.T) 
 	if err != nil {
 		t.Fatalf("create provider: %v", err)
 	}
-	seedPromoCodes(t, ctx, client, map[string]any{
-		"next_id": 2,
-		"items": []map[string]any{
-			{
-				"id":             1,
-				"code":           "SAVE5",
-				"status":         string(admincontrolcontract.PromoCodeStatusActive),
-				"discount_type":  string(admincontrolcontract.PromoDiscountTypeAmount),
-				"discount_value": "5.00",
-				"currency":       "USD",
-				"max_uses":       1,
-				"used_count":     0,
-				"created_at":     now.Format(time.RFC3339Nano),
-				"updated_at":     now.Format(time.RFC3339Nano),
-			},
+	seedPromoCodes(t, ctx, client, []admincontrolcontract.PromoCode{
+		{
+			Code:          "SAVE5",
+			Status:        admincontrolcontract.PromoCodeStatusActive,
+			DiscountType:  admincontrolcontract.PromoDiscountTypeAmount,
+			DiscountValue: "5.00",
+			Currency:      "USD",
+			MaxUses:       1,
+			UsedCount:     0,
+			CreatedAt:     now,
+			UpdatedAt:     now,
 		},
 	})
 	preview, err := store.PreviewPromoCode(ctx, contract.PromoCodePreviewInput{
@@ -260,13 +254,9 @@ func TestStoreCreatesDiscountedOrderAndPromoApplicationAtomically(t *testing.T) 
 	if app.OrderNo != order.OrderNo || app.DiscountAmount != "5.00000000" || app.FinalAmount != "15.00000000" {
 		t.Fatalf("unexpected promo application: %+v", app)
 	}
-	setting, err := client.Setting.Query().Where(entsetting.KeyEQ("admin_control.promo_codes")).Only(ctx)
-	if err != nil {
-		t.Fatalf("find promo setting: %v", err)
-	}
-	usedCount, status := promoUsageState(t, setting.ValueJSON)
+	usedCount, status := promoUsageState(t, ctx, client, 1)
 	if usedCount != 1 || status != string(admincontrolcontract.PromoCodeStatusExpired) {
-		t.Fatalf("expected promo usage to be exhausted, used=%d status=%s value=%+v", usedCount, status, setting.ValueJSON)
+		t.Fatalf("expected promo usage to be exhausted, used=%d status=%s", usedCount, status)
 	}
 	if _, err := store.CreateOrder(ctx, contract.CreateStoredOrder{
 		UserID:             7,
@@ -317,23 +307,19 @@ func TestStorePromoLimitsAndRelease(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create provider: %v", err)
 	}
-	seedPromoCodes(t, ctx, client, map[string]any{
-		"next_id": 2,
-		"items": []map[string]any{
-			{
-				"id":               1,
-				"code":             "SAVE10",
-				"status":           string(admincontrolcontract.PromoCodeStatusActive),
-				"discount_type":    string(admincontrolcontract.PromoDiscountTypeAmount),
-				"discount_value":   "10.00",
-				"currency":         "USD",
-				"max_uses":         3,
-				"per_user_limit":   1,
-				"min_order_amount": "50.00",
-				"used_count":       0,
-				"created_at":       now.Format(time.RFC3339Nano),
-				"updated_at":       now.Format(time.RFC3339Nano),
-			},
+	seedPromoCodes(t, ctx, client, []admincontrolcontract.PromoCode{
+		{
+			Code:           "SAVE10",
+			Status:         admincontrolcontract.PromoCodeStatusActive,
+			DiscountType:   admincontrolcontract.PromoDiscountTypeAmount,
+			DiscountValue:  "10.00",
+			Currency:       "USD",
+			MaxUses:        3,
+			PerUserLimit:   1,
+			MinOrderAmount: "50.00",
+			UsedCount:      0,
+			CreatedAt:      now,
+			UpdatedAt:      now,
 		},
 	})
 	if _, err := store.PreviewPromoCode(ctx, contract.PromoCodePreviewInput{
@@ -380,13 +366,9 @@ func TestStorePromoLimitsAndRelease(t *testing.T) {
 	if released.Metadata["released"] != true {
 		t.Fatalf("expected released metadata, got %+v", released.Metadata)
 	}
-	setting, err := client.Setting.Query().Where(entsetting.KeyEQ("admin_control.promo_codes")).Only(ctx)
-	if err != nil {
-		t.Fatalf("find promo setting: %v", err)
-	}
-	usedCount, status := promoUsageState(t, setting.ValueJSON)
+	usedCount, status := promoUsageState(t, ctx, client, 1)
 	if usedCount != 0 || status != string(admincontrolcontract.PromoCodeStatusActive) {
-		t.Fatalf("expected released promo usage, used=%d status=%s value=%+v", usedCount, status, setting.ValueJSON)
+		t.Fatalf("expected released promo usage, used=%d status=%s", usedCount, status)
 	}
 	if _, err := store.PreviewPromoCode(ctx, contract.PromoCodePreviewInput{
 		UserID:   7,
@@ -404,37 +386,40 @@ func sqliteDSN(t *testing.T) string {
 	return "file:" + filepath.Join(t.TempDir(), "payments.db") + "?_fk=1"
 }
 
-func seedPromoCodes(t *testing.T, ctx context.Context, client *ent.Client, value map[string]any) {
+func seedPromoCodes(t *testing.T, ctx context.Context, client *ent.Client, codes []admincontrolcontract.PromoCode) {
 	t.Helper()
-	_, err := client.Setting.Create().
-		SetKey("admin_control.promo_codes").
-		SetValueJSON(value).
-		SetDescription("promo test setting").
-		Save(ctx)
-	if err != nil {
-		t.Fatalf("seed promo setting: %v", err)
+	for _, code := range codes {
+		create := client.PromoCode.Create().
+			SetCode(code.Code).
+			SetStatus(string(code.Status)).
+			SetDiscountType(string(code.DiscountType)).
+			SetDiscountValue(code.DiscountValue).
+			SetCurrency(code.Currency).
+			SetMaxUses(code.MaxUses).
+			SetPerUserLimit(code.PerUserLimit).
+			SetMinOrderAmount(code.MinOrderAmount).
+			SetUsedCount(code.UsedCount).
+			SetNillableStartsAt(code.StartsAt).
+			SetNillableExpiresAt(code.ExpiresAt)
+		if !code.CreatedAt.IsZero() {
+			create.SetCreatedAt(code.CreatedAt)
+		}
+		if !code.UpdatedAt.IsZero() {
+			create.SetUpdatedAt(code.UpdatedAt)
+		}
+		if _, err := create.Save(ctx); err != nil {
+			t.Fatalf("seed promo code %q: %v", code.Code, err)
+		}
 	}
 }
 
-func promoUsageState(t *testing.T, value map[string]any) (int, string) {
+func promoUsageState(t *testing.T, ctx context.Context, client *ent.Client, id int) (int, string) {
 	t.Helper()
-	raw, err := json.Marshal(value)
+	row, err := client.PromoCode.Get(ctx, id)
 	if err != nil {
-		t.Fatalf("marshal promo setting: %v", err)
+		t.Fatalf("load promo code %d: %v", id, err)
 	}
-	var collection struct {
-		Items []struct {
-			UsedCount int    `json:"used_count"`
-			Status    string `json:"status"`
-		} `json:"items"`
-	}
-	if err := json.Unmarshal(raw, &collection); err != nil {
-		t.Fatalf("unmarshal promo setting: %v", err)
-	}
-	if len(collection.Items) != 1 {
-		t.Fatalf("expected one promo code, got %+v", collection.Items)
-	}
-	return collection.Items[0].UsedCount, collection.Items[0].Status
+	return row.UsedCount, row.Status
 }
 
 func intPtr(value int) *int {

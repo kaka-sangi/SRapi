@@ -135,6 +135,9 @@ type PricingInterval func(*sql.Selector)
 // PricingRule is the predicate function for pricingrule builders.
 type PricingRule func(*sql.Selector)
 
+// PromoCode is the predicate function for promocode builders.
+type PromoCode func(*sql.Selector)
+
 // Provider is the predicate function for provider builders.
 type Provider func(*sql.Selector)
 
@@ -149,6 +152,9 @@ type QualityEvalSample func(*sql.Selector)
 
 // QualityEvaluation is the predicate function for qualityevaluation builders.
 type QualityEvaluation func(*sql.Selector)
+
+// RedeemCode is the predicate function for redeemcode builders.
+type RedeemCode func(*sql.Selector)
 
 // Role is the predicate function for role builders.
 type Role func(*sql.Selector)

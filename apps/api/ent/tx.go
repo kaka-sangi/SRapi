@@ -98,6 +98,8 @@ type Tx struct {
 	PricingInterval *PricingIntervalClient
 	// PricingRule is the client for interacting with the PricingRule builders.
 	PricingRule *PricingRuleClient
+	// PromoCode is the client for interacting with the PromoCode builders.
+	PromoCode *PromoCodeClient
 	// Provider is the client for interacting with the Provider builders.
 	Provider *ProviderClient
 	// ProviderAccount is the client for interacting with the ProviderAccount builders.
@@ -108,6 +110,8 @@ type Tx struct {
 	QualityEvalSample *QualityEvalSampleClient
 	// QualityEvaluation is the client for interacting with the QualityEvaluation builders.
 	QualityEvaluation *QualityEvaluationClient
+	// RedeemCode is the client for interacting with the RedeemCode builders.
+	RedeemCode *RedeemCodeClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
 	// ScheduledTestPlan is the client for interacting with the ScheduledTestPlan builders.
@@ -328,11 +332,13 @@ func (tx *Tx) init() {
 	tx.PendingOAuthSession = NewPendingOAuthSessionClient(tx.config)
 	tx.PricingInterval = NewPricingIntervalClient(tx.config)
 	tx.PricingRule = NewPricingRuleClient(tx.config)
+	tx.PromoCode = NewPromoCodeClient(tx.config)
 	tx.Provider = NewProviderClient(tx.config)
 	tx.ProviderAccount = NewProviderAccountClient(tx.config)
 	tx.Proxy = NewProxyClient(tx.config)
 	tx.QualityEvalSample = NewQualityEvalSampleClient(tx.config)
 	tx.QualityEvaluation = NewQualityEvaluationClient(tx.config)
+	tx.RedeemCode = NewRedeemCodeClient(tx.config)
 	tx.Role = NewRoleClient(tx.config)
 	tx.ScheduledTestPlan = NewScheduledTestPlanClient(tx.config)
 	tx.ScheduledTestPlanRun = NewScheduledTestPlanRunClient(tx.config)
