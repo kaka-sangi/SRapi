@@ -160,19 +160,6 @@ export function useAvailableModels() {
   });
 }
 
-export function useProviderAccounts() {
-  return useQuery({
-    queryKey: queryKeys.providerAccounts(),
-    queryFn: () => apiService.listProviderAccounts(),
-  });
-}
-
-export function useTestProviderAccount() {
-  return useMutation({
-    mutationFn: (id: string) => apiService.testProviderAccount(id),
-  });
-}
-
 export function useSchedulerDecisions() {
   return useQuery({
     queryKey: queryKeys.schedulerDecisions(),

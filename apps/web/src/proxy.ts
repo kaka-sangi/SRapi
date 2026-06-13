@@ -18,11 +18,9 @@ const PROTECTED_PATHS = [
   "/admin",
   "/api-keys",
   "/usage",
-  "/provider-accounts",
-  "/scheduler-decisions",
 ];
 
-const ADMIN_ONLY_PATHS = ["/admin", "/provider-accounts", "/scheduler-decisions"];
+const ADMIN_ONLY_PATHS = ["/admin"];
 const USER_ONLY_PATHS = ["/dashboard"];
 
 // Human-verification widget CDNs (Cloudflare Turnstile / hCaptcha / reCAPTCHA).

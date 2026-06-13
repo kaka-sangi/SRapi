@@ -23,8 +23,6 @@ import {
   createApiKey as sdkCreateApiKey,
   updateApiKey as sdkUpdateApiKey,
   getApiKeyUsage as sdkGetApiKeyUsage,
-  listAdminAccounts as sdkListAdminAccounts,
-  testAdminAccount as sdkTestAdminAccount,
   listAdminUsageLogs as sdkListAdminUsageLogs,
   listAdminSchedulerDecisions as sdkListAdminSchedulerDecisions,
   listAdminOpsSlos as sdkListAdminOpsSlos
@@ -41,7 +39,7 @@ import {
   type UsageLogSummary,
   type AvailableModelSummary,
 } from './srapi-types';
-import type { AdminTestResult, EnabledOAuthProvider, OAuthPendingSession, GatewayUsageResponse } from '../../../../packages/sdk/typescript/src/types.gen';
+import type { EnabledOAuthProvider, OAuthPendingSession, GatewayUsageResponse } from '../../../../packages/sdk/typescript/src/types.gen';
 import { setSessionPresenceCookie, clearSessionPresenceCookie } from './session-cookie';
 
 export interface ApiRuntimeStatus {
@@ -906,36 +904,6 @@ export const apiService = {
       throw new Error('API key usage returned an empty response.');
     }
     return response.data;
-  },
-
-  async listProviderAccounts(): Promise<ProviderAccountSummary[]> {
-    const response = await sdkListAdminAccounts({ throwOnError: true });
-    if (response.data) {
-      return ((response.data.data || []) as LiveProviderAccount[]).map((account) => ({
-        id: account.id,
-        name: account.name,
-        provider_id: account.provider_id,
-        provider_name: account.provider?.display_name || account.provider_id,
-        runtime_class: account.runtime_class,
-        status: account.status as 'active' | 'limited' | 'disabled',
-        base_url: typeof account.metadata?.base_url === 'string' ? account.metadata.base_url : 'not configured',
-        supported_models: account.supported_models || [],
-        latency: account.health_snapshot?.latency_ms || 0,
-        quota_percentage: account.quota_snapshot?.remaining_percentage || 0
-      }));
-    }
-    return [];
-  },
-
-  async testProviderAccount(id: string): Promise<AdminTestResult> {
-    const response = await sdkTestAdminAccount({
-      path: { id },
-      throwOnError: true,
-    });
-    if (response.data?.data) {
-      return response.data.data;
-    }
-    throw new Error('Provider account test returned an empty response.');
   },
 
   async listUsageLogs(): Promise<UsageLogSummary[]> {

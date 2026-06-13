@@ -542,14 +542,6 @@ export function useDeleteUserPlatformQuota() {
 }
 
 // ---- Ops ----
-export function useOpsOverview(range?: P<typeof adminApi.getOpsOverview>) {
-  return useQuery({
-    queryKey: queryKeys.admin.opsOverview(range),
-    queryFn: () => adminApi.getOpsOverview(range),
-    refetchInterval: 30_000,
-  });
-}
-
 export function useOpsSlos() {
   return useQuery({
     queryKey: queryKeys.admin.opsSlos(),
@@ -805,12 +797,6 @@ export function useImportCodexSession() {
     ["admin", "accounts"],
   );
 }
-export function useBatchUpdateAccounts() {
-  return useAdminMutation(
-    (body: P<typeof adminApi.batchUpdateAccounts>) => adminApi.batchUpdateAccounts(body),
-    ["admin", "accounts"],
-  );
-}
 export function useBatchActionAccounts() {
   return useAdminMutation(
     (body: P<typeof adminApi.batchActionAccounts>) => adminApi.batchActionAccounts(body),
@@ -900,12 +886,6 @@ export function useUpdateModel() {
 }
 export function useDeleteModel() {
   return useAdminMutation((id: string) => adminApi.deleteModel(id), ["admin", "models"]);
-}
-export function useQuickMapModels() {
-  return useAdminMutation(
-    (body: P<typeof adminApi.quickMapModels>) => adminApi.quickMapModels(body),
-    ["admin", "models"],
-  );
 }
 export function useCreateModelAlias() {
   return useAdminMutation(
