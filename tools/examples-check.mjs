@@ -40,9 +40,9 @@ const migrationRequiredPhrases = [
   'OAuth/session/desktop/CLI/IDE credential',
   '不是把本地 Codex / Claude Code / Antigravity 客户端作为 SRapi 的下游入口',
   '不是在 Gateway service 为 Codex / Claude Code / Antigravity 增加本地 DTO',
-  '/home/senran/Desktop/sub2api',
-  '/home/senran/Desktop/CLIProxyAPI',
-  '/home/senran/Desktop/chatgpt2api',
+  'sub2api',
+  'CLIProxyAPI',
+  'chatgpt2api',
 ];
 
 const docs = read('examples/README.md')
