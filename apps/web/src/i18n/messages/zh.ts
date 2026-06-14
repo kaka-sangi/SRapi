@@ -1897,6 +1897,9 @@ export const zh: Messages = {
     maxTokens: "最大输出 token",
     paramDefault: "默认",
     resetParams: "恢复默认",
+    regenerate: "重新生成",
+    copy: "复制",
+    copied: "已复制",
   },
   copilot: {
     title: "AI 副驾驶",

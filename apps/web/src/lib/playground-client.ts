@@ -17,6 +17,18 @@ export interface PlaygroundMessage {
   images?: CopilotImagePart[];
 }
 
+/** Per-turn gateway telemetry: which model actually served the request, token
+ * accounting, and timing. Any field may be undefined on older gateways that
+ * don't emit a usage chunk. */
+export interface PlaygroundTurnMeta {
+  servedModel?: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  latencyMs?: number;
+  firstTokenMs?: number;
+}
+
 function apiBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_SRAPI_BASE_URL || "").replace(/\/+$/, "");
 }
@@ -38,12 +50,15 @@ export interface StreamPlaygroundOptions {
   maxTokens?: number;
   signal?: AbortSignal;
   onDelta: (kind: "content" | "reasoning", text: string) => void;
+  /** Called once when the stream closes, with whatever telemetry was observed. */
+  onMeta?: (meta: PlaygroundTurnMeta) => void;
   onError: (message: string) => void;
 }
 
 /** Streams one billed playground turn. Resolves when the stream closes. */
 export async function streamPlaygroundChat(options: StreamPlaygroundOptions): Promise<void> {
   const csrf = csrfToken();
+  const start = performance.now();
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl()}/api/v1/me/playground/chat`, {
@@ -60,6 +75,9 @@ export async function streamPlaygroundChat(options: StreamPlaygroundOptions): Pr
         system: options.system?.trim() || undefined,
         temperature: options.temperature,
         max_tokens: options.maxTokens,
+        // Ask the OpenAI-compatible gateway to emit a final usage chunk so we
+        // can surface token accounting. Older gateways ignore this harmlessly.
+        stream_options: { include_usage: true },
         messages: options.messages.map((m) => ({
           role: m.role,
           content: m.content ?? "",
@@ -79,6 +97,15 @@ export async function streamPlaygroundChat(options: StreamPlaygroundOptions): Pr
     return;
   }
 
+  // Telemetry accumulated across the stream. `start` was captured before the
+  // fetch; firstTokenMs is filled when the first delta lands; token fields stay
+  // undefined unless a usage chunk arrives.
+  const meta: PlaygroundTurnMeta = {};
+  const onDelta = (kind: "content" | "reasoning", text: string) => {
+    if (meta.firstTokenMs === undefined) meta.firstTokenMs = performance.now() - start;
+    options.onDelta(kind, text);
+  };
+
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -88,22 +115,40 @@ export async function streamPlaygroundChat(options: StreamPlaygroundOptions): Pr
     buffer += decoder.decode(value, { stream: true });
     let boundary = buffer.indexOf("\n\n");
     while (boundary >= 0) {
-      handleFrame(buffer.slice(0, boundary), options.onDelta);
+      handleFrame(buffer.slice(0, boundary), onDelta, meta);
       buffer = buffer.slice(boundary + 2);
       boundary = buffer.indexOf("\n\n");
     }
   }
+
+  meta.latencyMs = performance.now() - start;
+  options.onMeta?.(meta);
 }
 
-function handleFrame(frame: string, onDelta: (kind: "content" | "reasoning", text: string) => void) {
+function handleFrame(
+  frame: string,
+  onDelta: (kind: "content" | "reasoning", text: string) => void,
+  meta: PlaygroundTurnMeta,
+) {
   for (const line of frame.split("\n")) {
     if (!line.startsWith("data:")) continue;
     const payload = line.slice(5).trim();
     if (!payload || payload === "[DONE]") continue;
     try {
       const chunk = JSON.parse(payload) as {
+        model?: string;
         choices?: Array<{ delta?: { content?: string; reasoning_content?: string } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
       };
+      // The served model rides on every chunk's top-level `model`; keep the last
+      // seen value. Usage typically arrives in a final chunk whose `choices` is
+      // empty, so read both BEFORE bailing on a missing delta.
+      if (typeof chunk.model === "string" && chunk.model) meta.servedModel = chunk.model;
+      if (chunk.usage) {
+        if (typeof chunk.usage.prompt_tokens === "number") meta.promptTokens = chunk.usage.prompt_tokens;
+        if (typeof chunk.usage.completion_tokens === "number") meta.completionTokens = chunk.usage.completion_tokens;
+        if (typeof chunk.usage.total_tokens === "number") meta.totalTokens = chunk.usage.total_tokens;
+      }
       const delta = chunk.choices?.[0]?.delta;
       if (!delta) continue;
       if (delta.reasoning_content) onDelta("reasoning", delta.reasoning_content);

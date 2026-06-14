@@ -1899,6 +1899,9 @@ export const en = {
     maxTokens: "Max tokens",
     paramDefault: "default",
     resetParams: "Reset to defaults",
+    regenerate: "Regenerate",
+    copy: "Copy",
+    copied: "Copied",
   },
   copilot: {
     title: "AI Copilot",

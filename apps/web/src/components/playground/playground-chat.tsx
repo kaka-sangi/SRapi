@@ -1,14 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bot, User as UserIcon, Plus, AlertTriangle, Loader2 } from "lucide-react";
+import {
+  Bot,
+  User as UserIcon,
+  Plus,
+  AlertTriangle,
+  Loader2,
+  Zap,
+  Hash,
+  Cpu,
+  Copy,
+  Check,
+  RefreshCw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Markdown } from "@/components/ui/markdown";
 import { Composer } from "@/components/chat/composer";
 import { ReasoningBlock } from "@/components/chat/reasoning-block";
 import type { ReasoningEffort } from "@/components/chat/types";
 import { useLanguage } from "@/context/LanguageContext";
-import { streamPlaygroundChat, type PlaygroundMessage } from "@/lib/playground-client";
+import {
+  streamPlaygroundChat,
+  type PlaygroundMessage,
+  type PlaygroundTurnMeta,
+} from "@/lib/playground-client";
 import { fileToImagePart, imagePartToDataUrl, type CopilotImagePart } from "@/lib/image-utils";
 import {
   PlaygroundSettings,
@@ -21,8 +37,12 @@ const rise = (i: number) => ({ "--stagger-index": i }) as CSSProperties;
 
 const SESSION_STORAGE_KEY = "srapi_playground_session_v1";
 
+/** A playground message plus the per-turn gateway telemetry we attach to
+ * assistant replies. `meta` persists in localStorage alongside the text. */
+type ChatMessage = PlaygroundMessage & { meta?: PlaygroundTurnMeta };
+
 interface PersistedSession {
-  messages: PlaygroundMessage[];
+  messages: ChatMessage[];
   model?: string;
   effort?: ReasoningEffort;
   params?: PlaygroundParams;
@@ -70,7 +90,7 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
   // Lazy initializers restore the previous session (messages, model, params)
   // so a reload never loses the conversation. The component only mounts
   // client-side (behind AuthGate), so reading localStorage here is safe.
-  const [messages, setMessages] = useState<PlaygroundMessage[]>(
+  const [messages, setMessages] = useState<ChatMessage[]>(
     () => readPersistedSession()?.messages ?? [],
   );
   const [input, setInput] = useState("");
@@ -105,12 +125,12 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
   }, [messages, running, model, effort, params]);
 
   const runTurn = useCallback(
-    async (history: PlaygroundMessage[]) => {
+    async (history: ChatMessage[]) => {
       setRunning(true);
       setError(null);
       const controller = new AbortController();
       abortRef.current = controller;
-      const working: PlaygroundMessage[] = [...history];
+      const working: ChatMessage[] = [...history];
       let assistantIdx = -1;
       const ensureAssistant = () => {
         if (assistantIdx < 0) {
@@ -136,6 +156,13 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
               kind === "reasoning"
                 ? { ...working[assistantIdx], reasoning: (working[assistantIdx].reasoning ?? "") + text }
                 : { ...working[assistantIdx], content: (working[assistantIdx].content ?? "") + text };
+            setMessages([...working]);
+          },
+          onMeta: (meta) => {
+            // Telemetry lands once the stream closes. Only attach it if the turn
+            // actually produced an assistant message (it always should here).
+            ensureAssistant();
+            working[assistantIdx] = { ...working[assistantIdx], meta };
             setMessages([...working]);
           },
           onError: (msg) => setError(msg),
@@ -164,6 +191,19 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
 
   function stop() {
     abortRef.current?.abort();
+  }
+
+  function regenerate() {
+    if (running) return;
+    // Trim trailing assistant messages so the history ends at the last user
+    // turn, then re-run from there. (Normally there's exactly one assistant
+    // message to drop.)
+    let cut = messages.length;
+    while (cut > 0 && messages[cut - 1].role === "assistant") cut -= 1;
+    if (cut === 0) return;
+    const history = messages.slice(0, cut);
+    setMessages(history);
+    void runTurn(history);
   }
 
   function reset() {
@@ -199,7 +239,13 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
         ) : (
           <div className="mx-auto max-w-3xl space-y-5 py-4">
             {messages.map((message, i) => (
-              <MessageRow key={i} message={message} />
+              <MessageRow
+                key={i}
+                message={message}
+                isLastAssistant={message.role === "assistant" && i === messages.length - 1}
+                running={running}
+                onRegenerate={regenerate}
+              />
             ))}
             {running ? (
               <div className="flex items-center gap-2 pl-9 text-sm text-srapi-text-tertiary">
@@ -281,7 +327,17 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
   );
 }
 
-function MessageRow({ message }: { message: PlaygroundMessage }) {
+function MessageRow({
+  message,
+  isLastAssistant,
+  running,
+  onRegenerate,
+}: {
+  message: ChatMessage;
+  isLastAssistant: boolean;
+  running: boolean;
+  onRegenerate: () => void;
+}) {
   if (message.role === "user") {
     return (
       <div className="anim-rise-sm flex justify-end gap-2">
@@ -312,13 +368,115 @@ function MessageRow({ message }: { message: PlaygroundMessage }) {
     );
   }
   return (
-    <div className="anim-rise-sm flex gap-2">
+    <div className="anim-rise-sm group flex gap-2">
       <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-srapi-primary/10">
         <Bot className="size-4 text-srapi-primary" />
       </div>
       <div className="min-w-0 flex-1 space-y-2">
         {message.reasoning ? <ReasoningBlock text={message.reasoning} /> : null}
         {message.content ? <Markdown>{message.content}</Markdown> : null}
+        {message.content ? (
+          <AssistantFooter
+            meta={message.meta}
+            content={message.content}
+            isLastAssistant={isLastAssistant}
+            running={running}
+            onRegenerate={onRegenerate}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** Quiet gateway telemetry + copy/regenerate actions under an assistant reply.
+ * The telemetry reads as a single muted mono line; the actions appear on hover. */
+function AssistantFooter({
+  meta,
+  content,
+  isLastAssistant,
+  running,
+  onRegenerate,
+}: {
+  meta?: PlaygroundTurnMeta;
+  content: string;
+  isLastAssistant: boolean;
+  running: boolean;
+  onRegenerate: () => void;
+}) {
+  const { t } = useLanguage();
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard unavailable (insecure context / denied permission) — ignore.
+    }
+  };
+
+  const latencyLabel =
+    meta?.latencyMs === undefined
+      ? null
+      : meta.latencyMs < 1000
+        ? `${Math.round(meta.latencyMs)}ms`
+        : `${(meta.latencyMs / 1000).toFixed(1)}s`;
+
+  return (
+    <div className="flex min-h-5 items-center gap-2.5 pt-0.5">
+      {meta ? (
+        <div className="flex items-center gap-1.5 font-mono text-2xs text-srapi-text-tertiary">
+          {meta.servedModel ? (
+            <span className="flex items-center gap-1">
+              <Cpu className="size-3" />
+              <span className="truncate">{meta.servedModel}</span>
+            </span>
+          ) : null}
+          {meta.totalTokens !== undefined ? (
+            <>
+              {meta.servedModel ? <span aria-hidden>·</span> : null}
+              <span className="flex items-center gap-1">
+                <Hash className="size-3" />
+                {meta.totalTokens.toLocaleString()} tok
+              </span>
+            </>
+          ) : null}
+          {latencyLabel ? (
+            <>
+              {meta.servedModel || meta.totalTokens !== undefined ? <span aria-hidden>·</span> : null}
+              <span className="flex items-center gap-1">
+                <Zap className="size-3" />
+                {latencyLabel}
+              </span>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <button
+          type="button"
+          onClick={() => void copy()}
+          aria-label={copied ? t("playground.copied") : t("playground.copy")}
+          title={copied ? t("playground.copied") : t("playground.copy")}
+          className="rounded-md p-1 text-srapi-text-tertiary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary"
+        >
+          {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+        </button>
+        {isLastAssistant ? (
+          <button
+            type="button"
+            onClick={onRegenerate}
+            disabled={running}
+            aria-label={t("playground.regenerate")}
+            title={t("playground.regenerate")}
+            className="rounded-md p-1 text-srapi-text-tertiary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <RefreshCw className="size-3.5" />
+          </button>
+        ) : null}
       </div>
     </div>
   );
