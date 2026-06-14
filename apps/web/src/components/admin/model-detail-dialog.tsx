@@ -16,6 +16,7 @@ import {
   useModelMappings,
   useDeleteModelAlias,
   useDeleteModelMapping,
+  useAdminAccounts,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -51,6 +52,18 @@ export function ModelDetailDialog({
 
   const aliasRows = aliases.data?.data ?? [];
   const mappingRows = mappings.data?.data ?? [];
+
+  // Count active upstream accounts per provider so each mapping can show whether
+  // anything can actually serve it. A model can be enabled and mapped yet have
+  // zero accounts on its provider — in which case requests fail at the gateway
+  // with no obvious cause. Surfacing the count (and a warning at zero) closes
+  // that gap.
+  const accounts = useAdminAccounts({ page: 1, page_size: 200, status: "active" });
+  const activeAccountsByProvider = new Map<string, number>();
+  for (const account of accounts.data?.data ?? []) {
+    const providerKey = String(account.provider_id);
+    activeAccountsByProvider.set(providerKey, (activeAccountsByProvider.get(providerKey) ?? 0) + 1);
+  }
 
   async function removeAlias(aliasId: string) {
     try {
@@ -138,12 +151,26 @@ export function ModelDetailDialog({
                 {mappingRows.map((m) => {
                   const key = `mapping:${m.id}`;
                   const provider = providerLabels.get(String(m.provider_id)) ?? `#${m.provider_id}`;
+                  const serving = activeAccountsByProvider.get(String(m.provider_id)) ?? 0;
                   return (
                     <li key={m.id} className="flex items-center justify-between gap-3 py-2">
                       <span className="min-w-0 truncate text-2xs text-srapi-text-primary">
                         <span className="text-srapi-text-secondary">{provider}</span>
                         <span className="text-srapi-text-tertiary"> · </span>
                         <span className="font-mono">{m.upstream_model_name}</span>
+                        {!accounts.isLoading ? (
+                          serving > 0 ? (
+                            <span className="text-srapi-text-tertiary">
+                              {" · "}
+                              {t("adminModels.servingAccounts", { count: serving })}
+                            </span>
+                          ) : (
+                            <span className="text-srapi-error">
+                              {" · "}
+                              {t("adminModels.noServingAccount")}
+                            </span>
+                          )
+                        ) : null}
                       </span>
                       <div className="flex shrink-0 items-center gap-2">
                         <QuietBadge status={quietStatusFor(m.status)} label={statusLabel(t, m.status)} />

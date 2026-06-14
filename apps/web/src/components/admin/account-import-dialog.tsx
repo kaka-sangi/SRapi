@@ -47,15 +47,24 @@ export function AccountImportDialog({
   open,
   onOpenChange,
   providerOptions,
+  codexProviderOptions,
   defaultProviderId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   providerOptions: { value: string; label: string }[];
+  // Codex/ChatGPT sessions can only be imported into a codex-cli reverse-proxy
+  // provider. When provided, the "Import Codex session" tab is restricted to
+  // these (vs. listing every provider, which would let an operator pick an
+  // incompatible one and fail confusingly). Falls back to all providers.
+  codexProviderOptions?: { value: string; label: string }[];
   defaultProviderId: string;
 }) {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const codexOptions =
+    codexProviderOptions && codexProviderOptions.length > 0 ? codexProviderOptions : providerOptions;
+  const defaultCodexProviderId = codexOptions[0]?.value ?? defaultProviderId;
   const importMut = useImportAccounts();
   const codexImportMut = useImportCodexSession();
   const createAccountMut = useCreateAccount();
@@ -64,7 +73,7 @@ export function AccountImportDialog({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProviderAccountImportResult | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [codexProviderId, setCodexProviderId] = useState<string>(defaultProviderId);
+  const [codexProviderId, setCodexProviderId] = useState<string>(defaultCodexProviderId);
   const [codexContent, setCodexContent] = useState("");
   const [codexName, setCodexName] = useState("");
   const [codexUpdateExisting, setCodexUpdateExisting] = useState(true);
@@ -99,8 +108,11 @@ export function AccountImportDialog({
 
   const handleCodexFiles = useCallback(async (files: File[]) => {
     const texts = await Promise.all(files.map((f) => f.text()));
-    setCodexContent((prev) => (prev ? prev + "\n" : "") + texts.join("\n"));
-    setCodexFileNames((prev) => [...prev, ...files.map((f) => f.name)]);
+    // Replace on each drop (combining only the files in this drop) rather than
+    // appending across drops — dropping a corrected file should not silently
+    // concatenate it onto the previous (wrong) one.
+    setCodexContent(texts.join("\n"));
+    setCodexFileNames(files.map((f) => f.name));
   }, []);
 
   function reset() {
@@ -309,7 +321,9 @@ export function AccountImportDialog({
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>{t("adminAccounts.importTitle")}</DialogTitle>
-          <DialogDescription>{t("adminAccounts.importHint")}</DialogDescription>
+          <DialogDescription>
+            {tab === "codex" ? t("codexImport.dialogHint") : t("adminAccounts.importHint")}
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
@@ -532,7 +546,7 @@ export function AccountImportDialog({
                     <SelectValue placeholder={t("codexImport.providerPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {providerOptions.map((opt) => (
+                    {codexOptions.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}
                       </SelectItem>

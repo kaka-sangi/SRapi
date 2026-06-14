@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { apiService } from "@/lib/api";
+import { clearSession } from "@/lib/api/_shared";
 import type { CurrentUser } from "@/lib/srapi-types";
 import { SIGN_IN_ROUTE, USER_HOME_ROUTE } from "@/lib/routes";
 import { Spinner } from "@/components/ui/spinner";
@@ -54,6 +55,14 @@ function readStoredUser(): CurrentUser | null {
   }
 }
 
+/** True when a live-session error is the backend explicitly rejecting the
+ *  session (expired / insufficient role) rather than a transient network or 5xx
+ *  failure. Only the former should log the user out — an outage must not. */
+function isSessionRejection(err: unknown): boolean {
+  const code = (err as { error?: { code?: string } } | null)?.error?.code;
+  return code === "UNAUTHORIZED" || code === "FORBIDDEN";
+}
+
 const CurrentUserContext = createContext<CurrentUser | null>(null);
 
 export function useAuthUser(): CurrentUser {
@@ -91,6 +100,35 @@ export function AuthGate({
       router.replace(USER_HOME_ROUTE);
     }
   }, [user, allowedRole, router]);
+
+  useEffect(() => {
+    // Validate the session against the backend instead of trusting localStorage
+    // + the non-credential presence cookie alone. Those persist for 30 days and
+    // are only cleared on an explicit logout, so after the real (HttpOnly)
+    // session expires the shell would otherwise render fully "authenticated"
+    // (name/email/nav) while every API call 401/403s. On an explicit auth
+    // rejection, clear the stale shell and bounce to sign-in; ignore transient
+    // network / 5xx errors so an outage never logs everyone out.
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    async function validate() {
+      try {
+        await apiService.getLiveCurrentUser();
+        if (!cancelled) window.dispatchEvent(new Event(USER_EVENT));
+      } catch (err) {
+        if (cancelled || !isSessionRejection(err)) return;
+        clearSession();
+        window.dispatchEvent(new Event(USER_EVENT));
+        router.replace(SIGN_IN_ROUTE);
+      }
+    }
+    void validate();
+    window.addEventListener("focus", validate);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", validate);
+    };
+  }, [router]);
 
   if (!user || (allowedRole === "admin" && user.role !== "admin")) {
     return (

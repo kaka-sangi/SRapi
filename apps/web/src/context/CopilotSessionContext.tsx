@@ -38,8 +38,10 @@ interface CopilotSessionValue {
   activeId: number | null;
   model: string;
   effort: ReasoningEffort;
+  autoApprove: boolean;
   setModel: (m: string) => void;
   setEffort: (e: ReasoningEffort) => void;
+  setAutoApprove: (v: boolean) => void;
   send: (text: string, images: CopilotImage[], files: CopilotFilePart[]) => void;
   resolvePending: (approved: boolean) => void;
   stop: () => void;
@@ -56,6 +58,21 @@ const CopilotSessionContext = createContext<CopilotSessionValue | null>(null);
 // instantly (the live stream itself survives only client-side navigation, which
 // keeps this provider mounted). Stored per-tab, cleared on tab close.
 const STORAGE_KEY = "srapi.copilot.session";
+// These two are per-operator preferences (not per-tab), so they live in
+// localStorage and survive reloads / new tabs.
+const EFFORT_KEY = "srapi.copilot.effort";
+const YOLO_KEY = "srapi.copilot.yolo";
+
+function loadStoredEffort(): ReasoningEffort {
+  if (typeof window === "undefined") return "off";
+  const raw = window.localStorage.getItem(EFFORT_KEY);
+  return raw === "low" || raw === "medium" || raw === "high" || raw === "off" ? raw : "off";
+}
+
+function loadStoredYolo(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(YOLO_KEY) === "1";
+}
 
 function loadStored(): { messages: CopilotMessage[]; activeId: number | null } {
   if (typeof window === "undefined") return { messages: [], activeId: null };
@@ -81,7 +98,29 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
   const [usage, setUsage] = useState<TurnUsage | null>(null);
   const [activeId, setActiveId] = useState<number | null>(stored.activeId);
   const [model, setModel] = useState("");
-  const [effort, setEffort] = useState<ReasoningEffort>("off");
+  const [effort, setEffortState] = useState<ReasoningEffort>(loadStoredEffort);
+  const setEffort = (e: ReasoningEffort) => {
+    setEffortState(e);
+    try {
+      window.localStorage.setItem(EFFORT_KEY, e);
+    } catch {
+      // localStorage unavailable/over quota — the in-session value still works.
+    }
+  };
+  // Yolo / auto-approve: when on, tool calls that would normally pause for an
+  // approval prompt are continued automatically. Persisted, with a ref so the
+  // long-lived stream handler always reads the current value.
+  const [autoApprove, setAutoApproveState] = useState<boolean>(loadStoredYolo);
+  const autoApproveRef = useRef(autoApprove);
+  const setAutoApprove = (v: boolean) => {
+    autoApproveRef.current = v;
+    setAutoApproveState(v);
+    try {
+      window.localStorage.setItem(YOLO_KEY, v ? "1" : "0");
+    } catch {
+      // localStorage unavailable/over quota — the in-session value still works.
+    }
+  };
 
   const abortRef = useRef<AbortController | null>(null);
   const flushRef = useRef<number>(0);
@@ -207,7 +246,12 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
           receivedTerminal = true;
           cancelFlush();
           persistSession([...working], activeIdRef.current);
-          setPending(event.data);
+          if (autoApproveRef.current) {
+            // Yolo mode: skip the approval prompt and continue immediately.
+            void runTurn([...working], { tool_call_id: event.data.tool_call_id, approved: true });
+          } else {
+            setPending(event.data);
+          }
           break;
         case "done":
           receivedTerminal = true;
@@ -321,8 +365,10 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
     activeId,
     model,
     effort,
+    autoApprove,
     setModel,
     setEffort,
+    setAutoApprove,
     send,
     resolvePending,
     stop,

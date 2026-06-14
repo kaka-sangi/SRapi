@@ -53,6 +53,23 @@ export function ResultView({
         </div>
       </div>
 
+      {/* No models routed yet (e.g. a custom OpenAI-compatible provider): warn
+          so the operator does not create a key against a model that nothing
+          serves. */}
+      {result.models_created + result.mappings_created === 0 ? (
+        <div className="flex items-start gap-3 rounded-xl border border-srapi-warning/30 bg-srapi-warning/5 p-5">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-srapi-warning" />
+          <div>
+            <div className="text-sm font-medium text-srapi-text-primary">
+              {t("adminQuickSetup.noModelsTitle")}
+            </div>
+            <div className="mt-1 text-xs text-srapi-text-secondary">
+              {t("adminQuickSetup.noModelsBody")}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Details */}
         <div className="rounded-xl border border-srapi-border bg-srapi-card p-5">
@@ -129,6 +146,12 @@ export function ResultView({
           <a href={ADMIN_ROUTES.accounts}>
             {t("adminQuickSetup.goToAccounts")}
           </a>
+        </Button>
+        <Button variant="outline" size="md" asChild>
+          <a href={ADMIN_ROUTES.models}>{t("adminQuickSetup.goToModels")}</a>
+        </Button>
+        <Button variant="outline" size="md" asChild>
+          <a href="/api-keys">{t("adminQuickSetup.createKey")}</a>
         </Button>
         {accountId && (
           <>

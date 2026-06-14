@@ -1046,7 +1046,14 @@ func (rt *runtimeState) bootstrapAdmin(ctx context.Context) error {
 	if email == "" || password == "" {
 		return nil
 	}
-	if _, err := rt.userStore.FindByEmail(ctx, email); err == nil {
+	if existing, err := rt.userStore.FindByEmail(ctx, email); err == nil {
+		// The bootstrap admin is seeded only on first start. If the operator later
+		// edits BOOTSTRAP_ADMIN_PASSWORD it is silently ignored — warn loudly so a
+		// subsequent failed login is diagnosable instead of looking like a typo.
+		if usersservice.ComparePassword(existing.PasswordHash, password) != nil {
+			rt.logger.Warn("bootstrap admin already exists and BOOTSTRAP_ADMIN_PASSWORD no longer matches the stored password; it is only applied on first start and is ignored now — sign in with the original password or reset it via the password-reset flow",
+				"email", email)
+		}
 		return nil
 	}
 	_, err := rt.users.Create(ctx, usersservice.CreateRequest{

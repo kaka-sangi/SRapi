@@ -248,3 +248,91 @@ func TestAdminImportCodexSessionNoRefreshTokenRequiresValidExpiry(t *testing.T) 
 		t.Fatalf("expected auto_pause_on_expired metadata, got %+v", getResp.Data.Metadata)
 	}
 }
+
+// TestAdminImportCodexSessionEnvelopeSeedsBaseURL covers two regressions at once:
+//  1. An exported "snapshot" envelope {exported_at, proxies, accounts:[{name,
+//     credentials:{access_token,...}}]} must unwrap into one entry per account
+//     (reading tokens from the nested `credentials` object) instead of failing
+//     as a single "missing access_token".
+//  2. Each imported account must be seeded with the codex provider/preset
+//     default base_url when the session blob carries none, so it is not dead on
+//     arrival ("reverse proxy upstream base url missing").
+func TestAdminImportCodexSessionEnvelopeSeedsBaseURL(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	// Provider created WITHOUT a config_schema base_url (mirrors a manually
+	// created / legacy codex provider), so the seed must come from the preset.
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-envelope-provider","display_name":"Codex Envelope","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+
+	makeJWT := func(acct, user string) string {
+		return codexTestJWT(t, map[string]any{
+			"sub":   "auth0|" + user,
+			"email": user + "@example.com",
+			"exp":   time.Now().Add(time.Hour).Unix(),
+			"https://api.openai.com/auth": map[string]any{
+				"chatgpt_account_id": acct,
+				"chatgpt_user_id":    user,
+				"chatgpt_plan_type":  "free",
+			},
+		})
+	}
+	envelope := map[string]any{
+		"exported_at": "2026-06-14T03:45:52.435Z",
+		"proxies":     []any{},
+		"accounts": []any{
+			map[string]any{
+				"name":     "alice@example.com",
+				"platform": "openai",
+				"type":     "oauth",
+				"credentials": map[string]any{
+					"access_token":  makeJWT("acct-1", "user-1"),
+					"refresh_token": "refresh-1",
+					"email":         "alice@example.com",
+				},
+			},
+			map[string]any{
+				"name":     "bob@example.com",
+				"platform": "openai",
+				"type":     "oauth",
+				"credentials": map[string]any{
+					"access_token":  makeJWT("acct-2", "user-2"),
+					"refresh_token": "refresh-2",
+					"email":         "bob@example.com",
+				},
+			},
+		},
+	}
+	envBytes, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatalf("marshal envelope: %v", err)
+	}
+	contentEscaped, err := json.Marshal(string(envBytes))
+	if err != nil {
+		t.Fatalf("escape content: %v", err)
+	}
+	body := `{"provider_id":"` + string(providerResp.Data.Id) + `","content":` + string(contentEscaped) + `}`
+
+	resp, raw := mustImportCodexSession(t, handler, sessionCookie, loginResp.Data.CsrfToken, body)
+	if resp.Data.Total != 2 || resp.Data.Created != 2 || resp.Data.Failed != 0 {
+		t.Fatalf("expected envelope to import 2 accounts, got %+v (raw=%s)", resp.Data, raw)
+	}
+	for _, item := range resp.Data.Items {
+		if item.AccountId == nil {
+			t.Fatalf("missing account id: %+v", item)
+		}
+		getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(*item.AccountId), nil)
+		getReq.AddCookie(sessionCookie)
+		getRec := httptest.NewRecorder()
+		handler.ServeHTTP(getRec, getReq)
+		if getRec.Code != http.StatusOK {
+			t.Fatalf("expected account inspect 200, got %d body=%s", getRec.Code, getRec.Body.String())
+		}
+		var getResp apiopenapi.ProviderAccountResponse
+		if err := json.NewDecoder(getRec.Body).Decode(&getResp); err != nil {
+			t.Fatalf("decode account inspect: %v", err)
+		}
+		if getResp.Data.Metadata == nil || (*getResp.Data.Metadata)["base_url"] != "https://chatgpt.com/backend-api/codex" {
+			t.Fatalf("expected seeded base_url, got %+v", getResp.Data.Metadata)
+		}
+	}
+}

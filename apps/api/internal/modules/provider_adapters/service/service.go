@@ -12,6 +12,7 @@ import (
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
+	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 )
 
@@ -228,6 +229,29 @@ func egressAccountRuntime(account accountcontract.ProviderAccount, credential ma
 	}
 }
 
+// presetReverseProxyBaseURL is a last-resort fallback for reverse-proxy
+// providers whose canonical upstream is fixed by their preset but whose account
+// metadata / provider config_schema happen to carry no base_url (e.g. a
+// manually-created or legacy provider, or an account created by a path that
+// skipped the preset template defaults). It keeps such accounts from hard-
+// failing with "reverse proxy upstream base url missing".
+func presetReverseProxyBaseURL(adapterType string) string {
+	var presetKey string
+	switch strings.ToLower(strings.TrimSpace(adapterType)) {
+	case "reverse-proxy-codex-cli":
+		presetKey = "codex-cli"
+	case "reverse-proxy-chatgpt-web":
+		presetKey = "chatgpt-web"
+	default:
+		return ""
+	}
+	preset, ok := providerpreset.Default().Lookup(presetKey)
+	if !ok {
+		return ""
+	}
+	return strings.TrimRight(preset.DefaultBaseURL, "/")
+}
+
 func upstreamBaseURL(req contract.ConversationRequest) string {
 	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
 		for _, key := range []string{"base_url", "upstream_base_url", "openai_base_url", "anthropic_base_url", "gemini_base_url", "bedrock_base_url"} {
@@ -236,7 +260,7 @@ func upstreamBaseURL(req contract.ConversationRequest) string {
 			}
 		}
 	}
-	return ""
+	return presetReverseProxyBaseURL(req.Provider.AdapterType)
 }
 
 func upstreamBaseURLResponseInputItems(req contract.ResponseInputItemsRequest) string {
@@ -247,7 +271,7 @@ func upstreamBaseURLResponseInputItems(req contract.ResponseInputItemsRequest) s
 			}
 		}
 	}
-	return ""
+	return presetReverseProxyBaseURL(req.Provider.AdapterType)
 }
 
 func upstreamBaseURLRealtime(req contract.RealtimeRequest) string {
@@ -258,7 +282,7 @@ func upstreamBaseURLRealtime(req contract.RealtimeRequest) string {
 			}
 		}
 	}
-	return ""
+	return presetReverseProxyBaseURL(req.Provider.AdapterType)
 }
 
 func upstreamBaseURLEmbeddings(req contract.EmbeddingRequest) string {
@@ -269,7 +293,7 @@ func upstreamBaseURLEmbeddings(req contract.EmbeddingRequest) string {
 			}
 		}
 	}
-	return ""
+	return presetReverseProxyBaseURL(req.Provider.AdapterType)
 }
 
 func upstreamBaseURLImages(req contract.ImageGenerationRequest) string {
@@ -280,7 +304,7 @@ func upstreamBaseURLImages(req contract.ImageGenerationRequest) string {
 			}
 		}
 	}
-	return ""
+	return presetReverseProxyBaseURL(req.Provider.AdapterType)
 }
 
 func isGeminiCompatible(req contract.ConversationRequest) bool {

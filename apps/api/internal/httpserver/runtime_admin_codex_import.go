@@ -13,6 +13,8 @@ import (
 	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
+	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -91,7 +93,8 @@ func (s *Server) handleImportAdminCodexSession(w http.ResponseWriter, r *http.Re
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid provider_id", requestID)
 		return
 	}
-	if _, err := s.runtime.providers.FindByID(r.Context(), providerID); err != nil {
+	provider, err := s.runtime.providers.FindByID(r.Context(), providerID)
+	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "provider_id not found", requestID)
 		return
 	}
@@ -105,7 +108,7 @@ func (s *Server) handleImportAdminCodexSession(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	result := s.importCodexSessions(r.Context(), providerID, body, entries)
+	result := s.importCodexSessions(r.Context(), providerID, codexImportDefaultBaseURL(provider), body, entries)
 
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.import_codex_session", "provider_account", "bulk", nil, map[string]any{
 		"provider_id":   providerID,
@@ -122,7 +125,7 @@ func (s *Server) handleImportAdminCodexSession(w http.ResponseWriter, r *http.Re
 	})
 }
 
-func (s *Server) importCodexSessions(ctx context.Context, providerID int, body apiopenapi.CodexSessionImportRequest, entries []codexImportEntry) apiopenapi.CodexSessionImportResult {
+func (s *Server) importCodexSessions(ctx context.Context, providerID int, defaultBaseURL string, body apiopenapi.CodexSessionImportRequest, entries []codexImportEntry) apiopenapi.CodexSessionImportResult {
 	result := apiopenapi.CodexSessionImportResult{
 		Total:    len(entries),
 		Items:    make([]apiopenapi.CodexSessionImportItem, 0, len(entries)),
@@ -169,7 +172,7 @@ func (s *Server) importCodexSessions(ctx context.Context, providerID int, body a
 		}
 		markImportIdentitySeen(seen, item.identityKeys, entry.index)
 
-		credential, metadata, status, expiryErr := s.resolveCodexImportTarget(item, requestStatus)
+		credential, metadata, status, expiryErr := s.resolveCodexImportTarget(item, defaultBaseURL, requestStatus)
 		if expiryErr != nil {
 			recordCodexFailure(&result, entry.index, accountName, expiryErr.Error())
 			continue
@@ -258,7 +261,7 @@ func (s *Server) applyCodexUpdate(ctx context.Context, result *apiopenapi.CodexS
 // resolveCodexImportTarget builds the credential + metadata maps and resolves
 // the account status. Refresh-token-less sessions require a valid (non-expired)
 // access token and are marked for auto-pause-on-expiry.
-func (s *Server) resolveCodexImportTarget(item *codexImportAccount, requestStatus *accountcontract.Status) (map[string]any, map[string]any, *accountcontract.Status, error) {
+func (s *Server) resolveCodexImportTarget(item *codexImportAccount, defaultBaseURL string, requestStatus *accountcontract.Status) (map[string]any, map[string]any, *accountcontract.Status, error) {
 	// Keep the imported access token when present so the import never depends on a
 	// blocking/failing OAuth refresh at import time: an unreachable codex auth
 	// endpoint would otherwise make every account fail ("oauth refresh failed").
@@ -292,9 +295,16 @@ func (s *Server) resolveCodexImportTarget(item *codexImportAccount, requestStatu
 	setCodexMetadataIfNotEmpty(metadata, "codex_user_id", item.userID)
 	setCodexMetadataIfNotEmpty(metadata, "codex_plan_type", item.planType)
 	setCodexMetadataIfNotEmpty(metadata, "codex_organization_id", item.organizationID)
-	// Optional upstream-endpoint hints (e.g. a desktop session pointed at a
-	// proxy). When absent, the codex_cli runtime falls back to its defaults.
+	// Upstream-endpoint hints. Prefer a base_url carried by the session blob
+	// (e.g. a desktop session pointed at a proxy); otherwise seed the
+	// provider/preset default. The codex reverse-proxy adapter has NO implicit
+	// default and hard-fails every request with "reverse proxy upstream base url
+	// missing" when this key is absent, so an imported account without it is dead
+	// on arrival.
 	setCodexMetadataIfNotEmpty(metadata, "base_url", item.baseURL)
+	if mapString(metadata, "base_url") == "" {
+		setCodexMetadataIfNotEmpty(metadata, "base_url", defaultBaseURL)
+	}
 	setCodexMetadataIfNotEmpty(metadata, "oauth_token_url", item.tokenURL)
 
 	status := requestStatus
@@ -396,12 +406,39 @@ func flattenCodexImportValues(values []any) []any {
 			}
 			return
 		}
+		if obj, ok := value.(map[string]any); ok {
+			if inner, ok := codexImportEnvelopeArray(obj); ok {
+				for _, item := range inner {
+					appendValue(item)
+				}
+				return
+			}
+		}
 		out = append(out, value)
 	}
 	for _, value := range values {
 		appendValue(value)
 	}
 	return out
+}
+
+// codexImportEnvelopeArray detects an export wrapper such as
+// {exported_at, proxies, accounts:[...]} (or sessions/items) and returns the
+// inner array so each element becomes its own session entry. It only unwraps
+// when the object does NOT itself carry a token field, so a genuine single
+// session that merely happens to have an unrelated array key is never split.
+func codexImportEnvelopeArray(obj map[string]any) ([]any, bool) {
+	for _, key := range []string{"access_token", "accessToken", "token", "refresh_token", "id_token", "tokens", "credentials"} {
+		if _, ok := obj[key]; ok {
+			return nil, false
+		}
+	}
+	for _, key := range []string{"accounts", "sessions", "items"} {
+		if arr, ok := obj[key].([]any); ok && len(arr) > 0 {
+			return arr, true
+		}
+	}
+	return nil, false
 }
 
 func codexLooksLikeJSON(content string) bool {
@@ -428,20 +465,25 @@ func normalizeCodexImportEntry(entry codexImportEntry) (*codexImportAccount, err
 	case map[string]any:
 		item.accessToken = firstCodexString(raw,
 			[]string{"tokens", "access_token"}, []string{"tokens", "accessToken"},
+			[]string{"credentials", "access_token"}, []string{"credentials", "accessToken"},
 			[]string{"access_token"}, []string{"accessToken"}, []string{"token"})
 		item.refreshToken = firstCodexString(raw,
 			[]string{"tokens", "refresh_token"}, []string{"tokens", "refreshToken"},
+			[]string{"credentials", "refresh_token"}, []string{"credentials", "refreshToken"},
 			[]string{"refresh_token"}, []string{"refreshToken"})
 		item.idToken = firstCodexString(raw,
 			[]string{"tokens", "id_token"}, []string{"tokens", "idToken"},
+			[]string{"credentials", "id_token"}, []string{"credentials", "idToken"},
 			[]string{"id_token"}, []string{"idToken"})
-		item.email = firstCodexString(raw, []string{"email"}, []string{"user", "email"})
+		item.email = firstCodexString(raw, []string{"email"}, []string{"credentials", "email"}, []string{"user", "email"})
 		item.accountID = firstCodexString(raw,
 			[]string{"chatgpt_account_id"}, []string{"chatgptAccountId"},
+			[]string{"credentials", "chatgpt_account_id"}, []string{"credentials", "chatgptAccountId"},
 			[]string{"account_id"}, []string{"accountId"}, []string{"account", "id"},
 			[]string{"account", "account_id"}, []string{"account", "chatgpt_account_id"})
 		item.userID = firstCodexString(raw,
 			[]string{"chatgpt_user_id"}, []string{"chatgptUserId"},
+			[]string{"credentials", "chatgpt_user_id"}, []string{"credentials", "chatgptUserId"},
 			[]string{"user_id"}, []string{"userId"}, []string{"user", "id"})
 		item.planType = firstCodexString(raw,
 			[]string{"plan_type"}, []string{"planType"},
@@ -454,6 +496,7 @@ func normalizeCodexImportEntry(entry codexImportEntry) (*codexImportAccount, err
 		item.tokenURL = firstCodexString(raw, []string{"oauth_token_url"}, []string{"token_url"}, []string{"tokenUrl"})
 		if expiresAt, ok := firstCodexTime(raw,
 			[]string{"tokens", "expires_at"}, []string{"tokens", "expiresAt"},
+			[]string{"credentials", "expires_at"}, []string{"credentials", "expiresAt"},
 			[]string{"expires_at"}, []string{"expiresAt"}); ok {
 			expiresAt := expiresAt.UTC()
 			item.tokenExpiresAt = &expiresAt
@@ -634,6 +677,29 @@ func recordCodexFailure(result *apiopenapi.CodexSessionImportResult, index int, 
 	result.Errors = append(result.Errors, apiopenapi.CodexSessionImportMessage{
 		Index: index, Name: namePtr, Message: message,
 	})
+}
+
+// codexImportDefaultBaseURL resolves the upstream base URL to seed onto imported
+// Codex accounts when the session blob carries none. It prefers the provider's
+// own configured base_url (present when the provider was installed from a
+// preset), then falls back to the built-in codex-cli preset default. Without
+// this seed the codex reverse-proxy adapter rejects every request with "reverse
+// proxy upstream base url missing", so the import would silently create dead
+// accounts.
+func codexImportDefaultBaseURL(provider providercontract.Provider) string {
+	if bu := mapString(provider.ConfigSchema, "base_url"); bu != "" {
+		return bu
+	}
+	preset, ok := providerpreset.Default().Lookup("codex-cli")
+	if !ok {
+		return ""
+	}
+	if preset.AccountTemplate != nil {
+		if bu := mapString(preset.AccountTemplate.DefaultMetadata, "base_url"); bu != "" {
+			return bu
+		}
+	}
+	return preset.DefaultBaseURL
 }
 
 func setCodexCredentialIfNotEmpty(credential map[string]any, key, value string) {

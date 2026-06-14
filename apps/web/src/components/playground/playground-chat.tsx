@@ -236,7 +236,7 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
 
       <div className="flex-1 overflow-y-auto px-1 pb-4">
         {empty ? (
-          <EmptyState onPick={(s) => send(s)} />
+          <EmptyState />
         ) : (
           <div className="mx-auto max-w-3xl space-y-5 py-4">
             {messages.map((message, i) => (
@@ -302,9 +302,8 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
   );
 }
 
-function EmptyState({ onPick }: { onPick: (s: string) => void }) {
+function EmptyState() {
   const { t } = useLanguage();
-  const examples = [t("playground.example1"), t("playground.example2"), t("playground.example3")];
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 px-4 text-center">
       <div
@@ -313,22 +312,9 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
       >
         <Bot className="size-7 text-srapi-primary" />
       </div>
-      <div className="anim-rise space-y-1.5" style={rise(1)}>
-        <h2 className="font-serif text-2xl text-srapi-text-primary">{t("playground.greeting")}</h2>
-        <p className="mx-auto max-w-md text-sm text-srapi-text-secondary">{t("playground.emptyHint")}</p>
-      </div>
-      <div className="anim-rise flex flex-wrap justify-center gap-2" style={rise(2)}>
-        {examples.map((ex) => (
-          <button
-            key={ex}
-            type="button"
-            onClick={() => onPick(ex)}
-            className="rounded-full border border-srapi-border bg-srapi-card px-3.5 py-1.5 text-xs text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
-          >
-            {ex}
-          </button>
-        ))}
-      </div>
+      <h2 className="anim-rise font-serif text-2xl text-srapi-text-primary" style={rise(1)}>
+        {t("playground.greeting")}
+      </h2>
     </div>
   );
 }

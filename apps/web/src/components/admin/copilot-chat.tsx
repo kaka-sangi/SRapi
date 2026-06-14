@@ -17,6 +17,7 @@ import {
   MessageSquare,
   Pencil,
   Trash2,
+  Zap,
 } from "lucide-react";
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -54,8 +55,10 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
     usage,
     model,
     effort,
+    autoApprove,
     setModel,
     setEffort,
+    setAutoApprove,
     send,
     resolvePending,
     stop,
@@ -142,7 +145,7 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex-1 overflow-y-auto px-1 pb-4">
           {empty ? (
-            <EmptyState onPick={(s) => doSend(s)} />
+            <EmptyState />
           ) : (
             <div className="mx-auto max-w-3xl space-y-5 py-4">
               {messages.map((message, i) => (
@@ -205,6 +208,20 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
             removeFile={(idx) => setFiles((prev) => prev.filter((_, i) => i !== idx))}
             onAttach={() => fileRef.current?.click()}
             placeholder={t("copilot.placeholder")}
+            extraControls={
+              <Button
+                type="button"
+                variant={autoApprove ? "primary" : "ghost"}
+                size="sm"
+                className="h-8 shrink-0 gap-1 px-2"
+                onClick={() => setAutoApprove(!autoApprove)}
+                aria-pressed={autoApprove}
+                title={t("copilot.yoloHint")}
+              >
+                <Zap className="size-3.5" />
+                <span className="hidden text-2xs sm:inline">{t("copilot.yolo")}</span>
+              </Button>
+            }
           />
           <input
             ref={fileRef}
@@ -334,30 +351,14 @@ function ConversationSidebar() {
   );
 }
 
-function EmptyState({ onPick }: { onPick: (s: string) => void }) {
+function EmptyState() {
   const { t } = useLanguage();
-  const examples = [t("copilot.example1"), t("copilot.example2"), t("copilot.example3")];
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 px-4 text-center">
       <div className="flex size-14 items-center justify-center rounded-2xl bg-srapi-primary/10">
         <Bot className="size-7 text-srapi-primary" />
       </div>
-      <div className="space-y-1.5">
-        <h2 className="font-serif text-2xl text-srapi-text-primary">{t("copilot.greeting")}</h2>
-        <p className="mx-auto max-w-md text-sm text-srapi-text-secondary">{t("copilot.emptyHint")}</p>
-      </div>
-      <div className="flex flex-wrap justify-center gap-2">
-        {examples.map((ex) => (
-          <button
-            key={ex}
-            type="button"
-            onClick={() => onPick(ex)}
-            className="rounded-full border border-srapi-border bg-srapi-card px-3.5 py-1.5 text-xs text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:bg-srapi-card-muted hover:text-srapi-text-primary"
-          >
-            {ex}
-          </button>
-        ))}
-      </div>
+      <h2 className="font-serif text-2xl text-srapi-text-primary">{t("copilot.greeting")}</h2>
     </div>
   );
 }
@@ -652,9 +653,7 @@ function PendingActionBanner({
   disabled: boolean;
 }) {
   const { t } = useLanguage();
-  const [confirmText, setConfirmText] = useState("");
   const danger = !!action.danger;
-  const confirmed = !danger || confirmText.trim() === action.path;
   return (
     <div
       className={`ml-9 rounded-2xl border p-3 ${
@@ -678,16 +677,7 @@ function PendingActionBanner({
             </pre>
           ) : null}
           {danger ? (
-            <div className="mt-2">
-              <p className="mb-1 text-2xs text-srapi-error">{t("copilot.dangerConfirmHint")}</p>
-              <input
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                placeholder={action.path}
-                spellCheck={false}
-                className="w-full rounded-md border border-srapi-error/40 bg-srapi-bg px-2 py-1.5 font-mono text-xs text-srapi-text-primary outline-none focus:border-srapi-error"
-              />
-            </div>
+            <p className="mt-2 text-2xs text-srapi-error">{t("copilot.dangerConfirmHint")}</p>
           ) : null}
         </div>
       </div>
@@ -700,7 +690,7 @@ function PendingActionBanner({
           variant={danger ? "danger" : "primary"}
           size="sm"
           onClick={() => onResolve(true)}
-          disabled={disabled || !confirmed}
+          disabled={disabled}
         >
           <Check className="size-4" />
           {t("copilot.approve")}
