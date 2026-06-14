@@ -72,9 +72,14 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
   const endRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  // Seed the per-turn model from the configured default once.
+  // Seed the per-turn model from the configured default. Re-seed when the
+  // current model is empty OR no longer offered by the config (e.g. the admin
+  // changed the copilot's model) so the picker never sticks on a stale value
+  // that the dropdown doesn't even list. A still-valid manual pick is kept.
   useEffect(() => {
-    if (!model) setModel(defaultModel || models[0] || "");
+    if (!model || (models.length > 0 && !models.includes(model))) {
+      setModel(defaultModel || models[0] || "");
+    }
   }, [model, defaultModel, models, setModel]);
 
   const resultsById = useMemo(() => {
