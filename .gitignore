@@ -68,3 +68,4 @@ deploy/.env
 
 # AI agent scratch / session work logs (history lives in git, not a tracked file)
 progress.txt
+ROOTCAUSE-SWEEP.md

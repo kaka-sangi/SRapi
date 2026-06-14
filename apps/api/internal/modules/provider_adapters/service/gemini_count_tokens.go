@@ -348,7 +348,7 @@ func upstreamBaseURLTokenCount(req contract.TokenCountRequest) string {
 			}
 		}
 	}
-	return ""
+	return presetReverseProxyBaseURL(req.Provider.AdapterType)
 }
 
 func isGeminiTokenCountCompatible(req contract.TokenCountRequest) bool {

@@ -16,6 +16,7 @@ import (
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	modelservice "github.com/srapi/srapi/apps/api/internal/modules/models/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
+	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
@@ -841,6 +842,57 @@ func (s *Server) handleAdminAccountProxyQuality(w http.ResponseWriter, r *http.R
 	})
 }
 
+// applyProviderTemplateMetadata fills account metadata with the provider preset's
+// AccountTemplate.DefaultMetadata for any key the caller did not set, so accounts
+// created via the plain create / generic-import paths carry the same defaults
+// (e.g. base_url) that quick-setup already applies. Caller-provided values always
+// win. This keeps the account-creation paths from drifting apart.
+func applyProviderTemplateMetadata(provider providercontract.Provider, userMeta map[string]any) map[string]any {
+	defaults := providerTemplateDefaultMetadata(provider)
+	if len(defaults) == 0 {
+		return userMeta
+	}
+	merged := make(map[string]any, len(defaults)+len(userMeta))
+	for k, v := range defaults {
+		merged[k] = v
+	}
+	for k, v := range userMeta {
+		merged[k] = v
+	}
+	return merged
+}
+
+func providerTemplateDefaultMetadata(provider providercontract.Provider) map[string]any {
+	// Preset-installed providers carry the template under config_schema.
+	if at, ok := provider.ConfigSchema["account_template"].(map[string]any); ok {
+		if dm, ok := at["default_metadata"].(map[string]any); ok && len(dm) > 0 {
+			return dm
+		}
+	}
+	// Fall back to the registry preset matched by provider key or adapter type
+	// (covers manually-created / custom-named providers whose config_schema was
+	// not seeded from the preset).
+	if preset, ok := presetForProvider(provider); ok && preset.AccountTemplate != nil {
+		return preset.AccountTemplate.DefaultMetadata
+	}
+	return nil
+}
+
+func presetForProvider(provider providercontract.Provider) (providerpreset.Preset, bool) {
+	if p, ok := providerpreset.Default().Lookup(provider.Name); ok {
+		return p, true
+	}
+	switch strings.ToLower(strings.TrimSpace(provider.AdapterType)) {
+	case "reverse-proxy-codex-cli":
+		return providerpreset.Default().Lookup("codex-cli")
+	case "reverse-proxy-chatgpt-web":
+		return providerpreset.Default().Lookup("chatgpt-web")
+	case "reverse-proxy-antigravity":
+		return providerpreset.Default().Lookup("antigravity")
+	}
+	return providerpreset.Preset{}, false
+}
+
 func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)
@@ -872,7 +924,7 @@ func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request
 		return
 	}
 	credential := derefMap(body.Credential)
-	metadata := jsonObjectToMap(body.Metadata)
+	metadata := applyProviderTemplateMetadata(provider, jsonObjectToMap(body.Metadata))
 	credential, err = s.refreshImportCredential(r.Context(), accountcontract.RuntimeClass(body.RuntimeClass), body.UpstreamClient, metadata, body.ProxyId, credential)
 	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "oauth refresh failed", requestID)

@@ -200,7 +200,7 @@ func upstreamBaseURLSpeech(req contract.AudioSpeechRequest) string {
 			}
 		}
 	}
-	return ""
+	return presetReverseProxyBaseURL(req.Provider.AdapterType)
 }
 
 func isReverseProxyAudioSpeechRuntime(req contract.AudioSpeechRequest) bool {

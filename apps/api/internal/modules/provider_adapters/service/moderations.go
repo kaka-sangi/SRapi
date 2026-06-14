@@ -181,7 +181,7 @@ func upstreamBaseURLModerations(req contract.ModerationRequest) string {
 			}
 		}
 	}
-	return ""
+	return presetReverseProxyBaseURL(req.Provider.AdapterType)
 }
 
 func isReverseProxyModerationRuntime(req contract.ModerationRequest) bool {

@@ -46,7 +46,8 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 			items = append(items, importResultItem(index, item.Name, apiopenapi.CodexSessionImportItemActionFailed, nil, message))
 			continue
 		}
-		if _, err := s.runtime.providers.FindByID(r.Context(), providerID); err != nil {
+		provider, err := s.runtime.providers.FindByID(r.Context(), providerID)
+		if err != nil {
 			failed++
 			message := fmt.Sprintf("accounts[%d].provider_id not found", idx)
 			importErrors = append(importErrors, message)
@@ -108,7 +109,7 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 			Name:           item.Name,
 			RuntimeClass:   accountcontract.RuntimeClass(item.RuntimeClass),
 			Credential:     credential,
-			Metadata:       metadata,
+			Metadata:       applyProviderTemplateMetadata(provider, metadata),
 			ProxyID:        item.ProxyId,
 			Status:         toAccountStatusPtr(item.Status),
 			Priority:       item.Priority,

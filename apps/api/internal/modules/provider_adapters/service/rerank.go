@@ -221,7 +221,7 @@ func upstreamBaseURLRerank(req contract.RerankRequest) string {
 			}
 		}
 	}
-	return ""
+	return presetReverseProxyBaseURL(req.Provider.AdapterType)
 }
 
 func isReverseProxyRerankRuntime(req contract.RerankRequest) bool {

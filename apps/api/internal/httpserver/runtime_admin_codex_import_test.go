@@ -336,3 +336,17 @@ func TestAdminImportCodexSessionEnvelopeSeedsBaseURL(t *testing.T) {
 		}
 	}
 }
+
+// TestAdminCreateAccountSeedsProviderTemplateBaseURL covers Root-cause A: the
+// plain create path must apply the provider preset's AccountTemplate default
+// metadata (base_url) the same way quick-setup does, so a codex account created
+// via the form/API without a base_url is not dead on arrival.
+func TestAdminCreateAccountSeedsProviderTemplateBaseURL(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-template-create-provider","display_name":"Codex Template Create","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	acctResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"tmpl-seeded","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"tok"},"status":"active"}`)
+	if acctResp.Data.Metadata == nil || (*acctResp.Data.Metadata)["base_url"] != "https://chatgpt.com/backend-api/codex" {
+		t.Fatalf("expected create to seed codex base_url from preset template, got %+v", acctResp.Data.Metadata)
+	}
+}

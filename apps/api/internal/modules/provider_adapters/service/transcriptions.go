@@ -284,7 +284,7 @@ func upstreamBaseURLTranscriptions(req contract.AudioTranscriptionRequest) strin
 			}
 		}
 	}
-	return ""
+	return presetReverseProxyBaseURL(req.Provider.AdapterType)
 }
 
 func isReverseProxyAudioTranscriptionRuntime(req contract.AudioTranscriptionRequest) bool {
