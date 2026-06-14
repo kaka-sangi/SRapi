@@ -218,7 +218,12 @@ function UserAttributesContent() {
           submit={
             isNew
               ? (body) => createMut.mutateAsync(body)
-              : (body) => updateMut.mutateAsync({ id: String(formTarget.id), body })
+              : (body) => {
+                  // `key` is immutable and absent from the update DTO; the backend
+                  // strictly rejects unknown fields, so strip it on edit.
+                  const { key: _key, ...updateBody } = body;
+                  return updateMut.mutateAsync({ id: String(formTarget.id), body: updateBody });
+                }
           }
           successMessage={isNew ? t("feedback.created") : t("feedback.updated")}
           isPending={createMut.isPending || updateMut.isPending}

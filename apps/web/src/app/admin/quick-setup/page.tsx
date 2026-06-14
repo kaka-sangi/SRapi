@@ -118,9 +118,12 @@ function QuickSetupContent() {
 
     if (platform.custom) {
       const providerList = providers.data?.data ?? [];
+      // Must be an OpenAI-compatible provider — do NOT fall back to providerList[0]
+      // (e.g. Anthropic), which would silently send the key to the wrong upstream
+      // and fail with a cryptic credential error.
       const oaiProvider = providerList.find(
         (p) => p.platform_family === "openai_compatible",
-      ) ?? providerList[0];
+      );
       if (!oaiProvider) {
         toast({ title: t("adminQuickSetup.noProvider"), tone: "error" });
         return;

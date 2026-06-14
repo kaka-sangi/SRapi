@@ -186,7 +186,7 @@ function AffiliateContent() {
                 type="submit"
                 variant="primary"
                 loading={transferMut.isPending}
-                disabled={!amount.trim()}
+                disabled={!amount.trim() || !primary}
               >
                 {t("affiliate.transfer")}
               </Button>
@@ -275,7 +275,7 @@ function AffiliateContent() {
                 type="submit"
                 variant="outline"
                 loading={withdrawMut.isPending}
-                disabled={!withdrawAmount.trim()}
+                disabled={!withdrawAmount.trim() || !primary}
               >
                 <WalletCards className="size-4" aria-hidden />
                 {t("affiliate.withdraw")}
