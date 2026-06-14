@@ -1,0 +1,171 @@
+import type { AdminAccountFormState } from "@/lib/admin-account-form";
+import type { PlatformFamily } from "@/lib/sdk-types";
+
+/** A provider entry enriched with the per-provider auth-method scoping data. */
+export interface AccountProviderOption {
+  value: string;
+  label: string;
+  platformFamily?: PlatformFamily | null;
+  authMethods?: RuntimeClass[] | null;
+  adapterType?: string;
+  accountTemplate?: AccountTemplate | null;
+}
+
+export interface AccountTemplate {
+  upstream_client?: string;
+  default_metadata?: Record<string, unknown>;
+  model_catalog?: string[];
+  metadata_hints?: Record<string, string>;
+}
+
+/**
+ * Stable display order for the grouped provider dropdown — first-party families
+ * first, then reverse-proxy and rerank. Families not listed here (or providers
+ * carrying no platform_family) fall through to an unlabeled trailing group.
+ */
+export const PLATFORM_FAMILY_ORDER: PlatformFamily[] = [
+  "anthropic_compatible",
+  "gemini_compatible",
+  "openai_compatible",
+  "bedrock_anthropic",
+  "reverse_proxy_antigravity",
+  "rerank_compatible",
+];
+
+const CODEX_FALLBACK_TEMPLATE: AccountTemplate = {
+  upstream_client: "codex_cli",
+  default_metadata: { base_url: "https://chatgpt.com/backend-api/codex" },
+  model_catalog: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "codex-auto-review", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2", "codex-mini-latest"],
+  metadata_hints: { base_url: "Codex upstream (adapter appends /responses)", chatgpt_account_id: "From session JWT (optional)" },
+};
+
+export function getProviderTemplate(
+  providerOptions: AccountProviderOption[],
+  providerId: string,
+): AccountTemplate | null {
+  const p = providerOptions.find((o) => o.value === providerId);
+  if (p?.accountTemplate) return p.accountTemplate;
+  if (p?.adapterType === "reverse-proxy-codex-cli") return CODEX_FALLBACK_TEMPLATE;
+  return null;
+}
+
+export type RuntimeClass = AdminAccountFormState["runtimeClass"];
+
+/**
+ * Group providers by platform family for the dropdown (sub2api-style), in a
+ * stable family order. Providers without a family fall into a trailing group.
+ */
+export function groupProviders(
+  providerOptions: AccountProviderOption[],
+): { family: PlatformFamily | null; options: AccountProviderOption[] }[] {
+  const byFamily = new Map<PlatformFamily, AccountProviderOption[]>();
+  const ungrouped: AccountProviderOption[] = [];
+  for (const opt of providerOptions) {
+    if (opt.platformFamily) {
+      const list = byFamily.get(opt.platformFamily) ?? [];
+      list.push(opt);
+      byFamily.set(opt.platformFamily, list);
+    } else {
+      ungrouped.push(opt);
+    }
+  }
+  const groups: { family: PlatformFamily | null; options: AccountProviderOption[] }[] = [];
+  for (const family of PLATFORM_FAMILY_ORDER) {
+    const list = byFamily.get(family);
+    if (list && list.length > 0) groups.push({ family, options: list });
+  }
+  for (const [family, list] of byFamily) {
+    if (!PLATFORM_FAMILY_ORDER.includes(family) && list.length > 0) {
+      groups.push({ family, options: list });
+    }
+  }
+  if (ungrouped.length > 0) groups.push({ family: null, options: ungrouped });
+  return groups;
+}
+
+/**
+ * Per-runtime credential UX. The admin enters friendly values — an API key, a
+ * token, a cookie, or a couple of labeled token fields — never raw JSON, and we
+ * assemble the credential object with the exact keys the backend's `injectAuth`
+ * switch reads. OAuth runtimes get one labeled input per token; the
+ * service-account runtime keeps a JSON box but adds a file-upload button so the
+ * admin can drop in the downloaded `.json` rather than hand-type it.
+ */
+export type CredKind = "password" | "textarea" | "json" | "fields";
+export interface CredFieldSpec {
+  key: string; // credential object key the backend reads
+  cred: string; // i18n suffix under adminAccounts.cred.* (…Label / …Hint)
+  secret?: boolean; // render as a password input
+}
+export interface CredSpec {
+  kind: CredKind;
+  credKey?: string;
+  cred: string; // i18n suffix under adminAccounts.cred.*
+  template?: string;
+  /** kind "fields": one labeled input per credential key */
+  fields?: CredFieldSpec[];
+}
+const OAUTH_FIELDS: CredFieldSpec[] = [
+  { key: "access_token", cred: "accessToken", secret: true },
+  { key: "refresh_token", cred: "refreshToken", secret: true },
+];
+const CREDENTIAL_SPECS: Record<RuntimeClass, CredSpec> = {
+  api_key: { kind: "password", credKey: "api_key", cred: "apiKey" },
+  cli_client_token: { kind: "password", credKey: "access_token", cred: "accessToken" },
+  custom_reverse_proxy: { kind: "password", credKey: "access_token", cred: "accessToken" },
+  web_session_cookie: { kind: "textarea", credKey: "cookie", cred: "cookie" },
+  oauth_refresh: { kind: "fields", cred: "oauth", fields: OAUTH_FIELDS },
+  oauth_device_code: { kind: "fields", cred: "oauth", fields: OAUTH_FIELDS },
+};
+
+export function specFor(rc: RuntimeClass): CredSpec {
+  return CREDENTIAL_SPECS[rc] ?? CREDENTIAL_SPECS.api_key;
+}
+
+// metadataStringList reads a metadata field as a list of trimmed, non-empty
+// strings. Accepts an array (the canonical shape) or a comma-separated string
+// (a legacy/typo-friendly shape the gateway also tolerates).
+export function metadataStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+export function defaultCredInput(rc: RuntimeClass): string {
+  const spec = specFor(rc);
+  return spec.kind === "json" ? (spec.template ?? "{}") : "";
+}
+
+/** True when the admin has supplied a credential for the selected runtime. */
+export function hasCredential(rc: RuntimeClass, value: string, fields: Record<string, string>): boolean {
+  const spec = specFor(rc);
+  if (spec.kind === "fields") return (spec.fields ?? []).some((f) => fields[f.key]?.trim());
+  return value.trim() !== "";
+}
+
+/** Assemble the credential JSON string consumed by buildCreate/UpdateAccountBody. */
+export function buildCredentialJson(
+  rc: RuntimeClass,
+  value: string,
+  fields: Record<string, string>,
+): string {
+  const spec = specFor(rc);
+  if (spec.kind === "json") return value; // raw JSON, validated downstream
+  if (spec.kind === "fields") {
+    const object: Record<string, string> = {};
+    for (const f of spec.fields ?? []) {
+      const v = fields[f.key]?.trim();
+      if (v) object[f.key] = v;
+    }
+    return Object.keys(object).length ? JSON.stringify(object) : "";
+  }
+  const v = value.trim();
+  return v ? JSON.stringify({ [spec.credKey as string]: v }) : "";
+}
