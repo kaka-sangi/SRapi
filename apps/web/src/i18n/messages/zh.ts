@@ -501,6 +501,10 @@ export const zh: Messages = {
   usage: {
     title: "用量",
     subtitle: "请求日志。",
+    topModelsByCost: "按花费排名的模型",
+    topEndpointsByCost: "按花费排名的端点",
+    noModelUsage: "暂无模型用量",
+    noEndpointUsage: "暂无端点用量",
     requests: "请求总数",
     successRate: "成功率",
     totalTokens: "累计 Token",
@@ -1900,6 +1904,8 @@ export const zh: Messages = {
     regenerate: "重新生成",
     copy: "复制",
     copied: "已复制",
+    viewAsCode: "查看代码",
+    viewAsCodeHint: "这段对话对应的等价 API 请求。把网关密钥设为 SRAPI_API_KEY 后即可直接运行。",
   },
   copilot: {
     title: "AI 副驾驶",

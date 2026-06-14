@@ -504,6 +504,10 @@ export const en = {
   usage: {
     title: "Usage",
     subtitle: "Request logs.",
+    topModelsByCost: "Top models by cost",
+    topEndpointsByCost: "Top endpoints by cost",
+    noModelUsage: "No model usage",
+    noEndpointUsage: "No endpoint usage",
     requests: "Requests",
     successRate: "Success rate",
     totalTokens: "Total tokens",
@@ -1902,6 +1906,8 @@ export const en = {
     regenerate: "Regenerate",
     copy: "Copy",
     copied: "Copied",
+    viewAsCode: "View as code",
+    viewAsCodeHint: "The equivalent API request for this conversation. Set your gateway key as SRAPI_API_KEY, then run it as-is.",
   },
   copilot: {
     title: "AI Copilot",

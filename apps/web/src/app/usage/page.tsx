@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import type { UsageLogSummary } from "@/lib/srapi-types";
 import { formatMoney } from "@/lib/admin-format";
+import { UsageBreakdown } from "./usage-breakdown";
 
 export default function UsagePage() {
   return (
@@ -115,6 +116,8 @@ function UsageBody({
         <StatCard label={t("usage.totalTokens")} value={totals.totalTokens} format={(n) => Math.round(n).toLocaleString()} />
         <StatCard label={t("usage.cost")} value={formatMoney(totals.totalCost, totals.currency)} />
       </div>
+
+      <UsageBreakdown logs={logs} />
 
       <Card>
         <div className="flex flex-wrap items-center gap-3 border-b border-srapi-border p-4">

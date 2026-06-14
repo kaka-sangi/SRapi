@@ -31,6 +31,7 @@ import {
   DEFAULT_PLAYGROUND_PARAMS,
   type PlaygroundParams,
 } from "@/components/playground/playground-settings";
+import { ViewAsCodeDialog } from "@/components/playground/view-as-code-dialog";
 import type { CSSProperties } from "react";
 
 const rise = (i: number) => ({ "--stagger-index": i }) as CSSProperties;
@@ -280,7 +281,12 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
           removeImage={(idx) => setImages((prev) => prev.filter((_, i) => i !== idx))}
           onAttach={() => fileRef.current?.click()}
           placeholder={t("playground.placeholder")}
-          extraControls={<PlaygroundSettings params={params} onChange={setParams} />}
+          extraControls={
+            <>
+              <PlaygroundSettings params={params} onChange={setParams} />
+              <ViewAsCodeDialog model={model} params={params} messages={messages} />
+            </>
+          }
         />
         <input
           ref={fileRef}
