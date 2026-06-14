@@ -167,8 +167,6 @@ export const en = {
     adminSubscriptions: "Subscriptions",
     adminOrders: "Orders",
     adminOps: "Ops / SLO",
-    adminMonitor: "Monitoring",
-    adminScheduledTests: "Scheduled tests",
     adminOpsStrategy: "Strategy replay",
     adminRiskControl: "Risk control",
     adminAnnouncements: "Announcements",

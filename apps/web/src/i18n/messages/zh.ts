@@ -170,8 +170,6 @@ export const zh: Messages = {
     adminOrders: "订单",
     adminOps: "Ops / SLO",
     adminOpsStrategy: "策略回放",
-    adminMonitor: "监控",
-    adminScheduledTests: "定时探测",
     adminRiskControl: "风控",
     adminAnnouncements: "公告",
     adminUsage: "用量记录",
