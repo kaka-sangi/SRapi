@@ -150,6 +150,65 @@ func TestPaymentWebhookFulfillsSubscriptionOrderIdempotently(t *testing.T) {
 	assertCounts(t, h, 1, 1, 1, 1)
 }
 
+// Regression (Root-cause D, security): after a VALID first webhook, an
+// idempotent replay carrying a FORGED signature must be REJECTED, not returned
+// as a 200 no-op. The replay branch previously trusted only the stored
+// signature flag and never re-verified the current request.
+func TestPaymentWebhookReplayWithForgedSignatureRejected(t *testing.T) {
+	h := newHarness(t)
+	plan, err := h.subscriptions.CreatePlan(t.Context(), subscriptioncontract.CreatePlanRequest{
+		Name:         "replay-plan",
+		Price:        "19.99",
+		Currency:     "usd",
+		ValidityDays: 30,
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "primary",
+		Config:           easypayTestConfig("provider-signing-secret"),
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "USD", "min_amount": "1.00", "max_amount": "100.00"},
+	}); err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      1,
+		Method:      "alipay",
+		Amount:      "19.99",
+		Currency:    "usd",
+		ProductType: contract.ProductTypeSubscriptionPlan,
+		ProductID:   strconv.Itoa(plan.ID),
+	})
+	if err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	payload := map[string]any{
+		"order_no":        order.OrderNo,
+		"amount":          "19.99000000",
+		"currency":        "USD",
+		"status":          "paid",
+		"transaction_id":  "txn_replay",
+		"idempotency_key": "evt_replay_forge",
+	}
+	if _, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{
+		Provider: "easypay",
+		Headers:  map[string]string{"X-SRapi-Payment-Signature": signWebhookPayload("provider-signing-secret", payload)},
+		Payload:  payload,
+	}); err != nil {
+		t.Fatalf("first webhook should succeed: %v", err)
+	}
+	if _, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{
+		Provider: "easypay",
+		Headers:  map[string]string{"X-SRapi-Payment-Signature": "bad-signature"},
+		Payload:  payload,
+	}); !errors.Is(err, ErrSignatureInvalid) {
+		t.Fatalf("expected forged-signature replay to be rejected, got %v", err)
+	}
+}
+
 // Regression for B2: a paid balance_credit top-up must credit the user's
 // spendable balance, and refunding it must claw that balance back.
 func TestPaidBalanceCreditCreditsThenRefundDebits(t *testing.T) {

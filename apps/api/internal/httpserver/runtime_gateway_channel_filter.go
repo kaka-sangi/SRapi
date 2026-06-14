@@ -13,7 +13,14 @@ func (rt *runtimeState) filterCandidatesByEnabledChannels(ctx context.Context, c
 	}
 	settings, err := rt.adminControl.GetAdminSettings(ctx)
 	if err != nil {
-		return []schedulercontract.Candidate{}
+		// Fail OPEN, not closed: a transient settings-read failure must not drop
+		// every candidate and take the whole gateway down with "no available
+		// account". Skip channel filtering for this request (same effect as no
+		// channel restriction configured) and let it route normally.
+		if rt.logger != nil {
+			rt.logger.Warn("channel filter skipped: admin settings unavailable", "error", err)
+		}
+		return candidates
 	}
 	enabled := enabledChannelSet(settings.Features.EnabledChannels)
 	if len(enabled) == 0 {

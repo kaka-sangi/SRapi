@@ -1008,7 +1008,7 @@ func gatewayShouldFailover(errorClass string, upstreamStatus int, attemptNo int,
 		return true
 	}
 	switch errorClass {
-	case "rate_limit", "quota_exhausted", "timeout", "network_error", "provider_5xx", "model_unavailable", "configuration_error", "credential_error", "auth_failed", "auth_error", "permission_denied", "session_invalid", "account_locked", "account_banned", "abuse_detected", "device_unrecognized", "stream_interrupted", "empty_completion":
+	case "rate_limit", "quota_exhausted", "timeout", "network_error", "provider_5xx", "model_unavailable", "configuration_error", "credential_error", "auth_failed", "auth_error", "permission_denied", "session_invalid", "account_locked", "account_banned", "abuse_detected", "device_unrecognized", "stream_interrupted", "empty_completion", "invalid_response":
 		return true
 	default:
 		return false

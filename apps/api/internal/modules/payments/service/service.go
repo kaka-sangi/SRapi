@@ -672,7 +672,11 @@ func (s *Service) HandleWebhook(ctx context.Context, req contract.WebhookRequest
 		return contract.WebhookResult{}, err
 	}
 	if !created {
-		if !auditLog.SignatureValid {
+		// Idempotent replay: reject if the STORED log was unsigned OR the CURRENT
+		// request's signature does not verify. Trusting only the stored flag would
+		// let an attacker replay a known idempotency key with a forged/absent
+		// signature and get a 200 (no-op) back instead of a rejection.
+		if !auditLog.SignatureValid || !signatureValid {
 			return contract.WebhookResult{}, ErrSignatureInvalid
 		}
 		current, findErr := s.store.FindOrderByID(ctx, order.ID)
