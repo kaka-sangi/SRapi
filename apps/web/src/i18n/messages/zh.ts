@@ -234,6 +234,7 @@ export const zh: Messages = {
     verify: "验证",
     verifying: "验证中…",
     err2fa: "验证码无效或已过期，请重试。",
+    err2faExpired: "验证会话已过期，请重新登录。",
     back: "返回登录",
   },
   authReset: {

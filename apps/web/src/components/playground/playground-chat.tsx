@@ -266,7 +266,16 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
             {error ? (
               <div className="ml-9 flex items-start gap-2 rounded-xl border border-srapi-error/30 bg-srapi-error/5 px-3 py-2 text-sm text-srapi-error">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                <span>{error}</span>
+                <span className="flex-1">{error}</span>
+                <button
+                  type="button"
+                  onClick={regenerate}
+                  disabled={running}
+                  className="flex shrink-0 items-center gap-1 text-xs font-medium transition-colors hover:text-srapi-error/80 disabled:opacity-50"
+                >
+                  <RefreshCw className="size-3.5" />
+                  {t("common.retry")}
+                </button>
               </div>
             ) : null}
             <div ref={endRef} />

@@ -233,6 +233,7 @@ export const en = {
     verify: "Verify",
     verifying: "Verifying…",
     err2fa: "Invalid or expired code. Try again.",
+    err2faExpired: "Your verification challenge expired. Please sign in again.",
     back: "Back to sign in",
   },
   authReset: {

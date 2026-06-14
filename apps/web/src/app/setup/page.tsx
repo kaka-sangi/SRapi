@@ -39,9 +39,17 @@ export default function SetupPage() {
     setApiHealth("checking");
     setDbHealth("checking");
     try {
-      const connected = await apiService.isBackendConnected();
-      setApiHealth(connected ? "ok" : "error");
-      setDbHealth(connected ? "ok" : "error");
+      // Read the real per-dependency status so "Database" reflects the actual DB
+      // probe rather than mirroring the API check (which would mask a DB outage).
+      const res = await fetch("/api/v1/health", { headers: { accept: "application/json" } });
+      if (!res.ok) {
+        setApiHealth("error");
+        setDbHealth("error");
+        return;
+      }
+      const body = (await res.json()) as { data?: { dependencies?: { database?: string } } };
+      setApiHealth("ok");
+      setDbHealth(body.data?.dependencies?.database === "ok" ? "ok" : "error");
     } catch {
       setApiHealth("error");
       setDbHealth("error");

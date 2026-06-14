@@ -218,10 +218,9 @@ export function ScheduledTestsContent() {
         p.last_status ? (
           <QuietBadge status={STATUS_TONE[p.last_status] ?? "disabled"} label={statusLabel(p.last_status)} />
         ) : (
-          <QuietBadge
-            status={p.enabled ? "active" : "disabled"}
-            label={p.enabled ? t("common.active") : t("common.disabled")}
-          />
+          // No run yet — the "Last status" column must say "never ran", not the
+          // test's enabled/disabled config state.
+          <QuietBadge status="disabled" label={t("adminScheduledTests.never")} />
         ),
     },
   ];

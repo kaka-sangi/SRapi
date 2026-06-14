@@ -402,25 +402,30 @@ func parsedModelDiscoveryURL(rawURL string) (*url.URL, error) {
 }
 
 func parseDiscoveredModelIDs(source modelDiscoverySource, body []byte, limit int) ([]string, error) {
-	var ids []string
+	var (
+		ids []string
+		ok  bool
+	)
 	switch source {
 	case modelDiscoveryOpenAI, modelDiscoveryAnthropic:
-		ids = parseObjectModelIDs(body)
+		ids, ok = parseObjectModelIDs(body)
 	case modelDiscoveryGemini:
-		ids = parseGeminiModelIDs(body)
+		ids, ok = parseGeminiModelIDs(body)
 	case modelDiscoveryAntigravity:
-		ids = parseAntigravityModelIDs(body)
+		ids, ok = parseAntigravityModelIDs(body)
 	default:
 		return nil, errModelDiscoveryUnsupported
 	}
-	ids = normalizeModelIDs(ids, limit)
-	if len(ids) == 0 {
+	// Only an UNRECOGNIZED/malformed body (e.g. a 200 error payload) is an
+	// upstream failure. A recognized response that simply lists no models is a
+	// valid "no models available" result, not a 502.
+	if !ok {
 		return nil, errModelDiscoveryUpstream
 	}
-	return ids, nil
+	return normalizeModelIDs(ids, limit), nil
 }
 
-func parseObjectModelIDs(body []byte) []string {
+func parseObjectModelIDs(body []byte) ([]string, bool) {
 	var decoded struct {
 		Data []struct {
 			ID   string `json:"id"`
@@ -432,7 +437,11 @@ func parseObjectModelIDs(body []byte) []string {
 		} `json:"models"`
 	}
 	if err := json.Unmarshal(body, &decoded); err != nil {
-		return nil
+		return nil, false
+	}
+	// Neither key present -> not a recognized model-listing envelope.
+	if decoded.Data == nil && decoded.Models == nil {
+		return nil, false
 	}
 	ids := make([]string, 0, len(decoded.Data)+len(decoded.Models))
 	for _, model := range decoded.Data {
@@ -441,48 +450,52 @@ func parseObjectModelIDs(body []byte) []string {
 	for _, model := range decoded.Models {
 		ids = append(ids, firstNonEmpty(model.ID, model.Name))
 	}
-	return ids
+	return ids, true
 }
 
-func parseGeminiModelIDs(body []byte) []string {
+func parseGeminiModelIDs(body []byte) ([]string, bool) {
 	var decoded struct {
 		Models []struct {
 			Name string `json:"name"`
 		} `json:"models"`
 	}
 	if err := json.Unmarshal(body, &decoded); err != nil {
-		return nil
+		return nil, false
+	}
+	if decoded.Models == nil {
+		return nil, false
 	}
 	ids := make([]string, 0, len(decoded.Models))
 	for _, model := range decoded.Models {
 		ids = append(ids, strings.TrimPrefix(strings.TrimSpace(model.Name), "models/"))
 	}
-	return ids
+	return ids, true
 }
 
-func parseAntigravityModelIDs(body []byte) []string {
+func parseAntigravityModelIDs(body []byte) ([]string, bool) {
 	var decoded struct {
 		Models json.RawMessage `json:"models"`
 	}
 	if err := json.Unmarshal(body, &decoded); err != nil || len(decoded.Models) == 0 {
-		return nil
+		return nil, false
 	}
+	// `models` may be an object map {id: {...}} or an array [{id,...}].
 	var asObject map[string]json.RawMessage
-	if err := json.Unmarshal(decoded.Models, &asObject); err == nil && len(asObject) > 0 {
+	if err := json.Unmarshal(decoded.Models, &asObject); err == nil && asObject != nil {
 		ids := make([]string, 0, len(asObject))
 		for id := range asObject {
 			if !isInternalAntigravityModelID(id) {
 				ids = append(ids, id)
 			}
 		}
-		return ids
+		return ids, true
 	}
 	var asArray []struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 	}
 	if err := json.Unmarshal(decoded.Models, &asArray); err != nil {
-		return nil
+		return nil, false
 	}
 	ids := make([]string, 0, len(asArray))
 	for _, model := range asArray {
@@ -491,7 +504,7 @@ func parseAntigravityModelIDs(body []byte) []string {
 			ids = append(ids, id)
 		}
 	}
-	return ids
+	return ids, true
 }
 
 func isInternalAntigravityModelID(value string) bool {

@@ -36,6 +36,7 @@ export function LoginForm() {
   const [passwordlessSent, setPasswordlessSent] = useState(false);
   // When set, the password step succeeded but TOTP is required to finish.
   const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [challengeExpiresAt, setChallengeExpiresAt] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const captcha = useCaptcha();
@@ -73,6 +74,7 @@ export function LoginForm() {
       const result = await apiService.login(email, password, captcha.token);
       if (result.kind === "twoFactor") {
         setChallengeId(result.challengeId);
+        setChallengeExpiresAt(result.expiresAt);
         setCode("");
       } else {
         goHome(result.user.role);
@@ -104,6 +106,15 @@ export function LoginForm() {
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
     if (!challengeId) return;
+    if (challengeExpiresAt && Date.parse(challengeExpiresAt) <= Date.now()) {
+      // Challenge already expired — return to the password step with a clear
+      // reason instead of submitting an expired code for a generic "2fa failed".
+      setChallengeId(null);
+      setChallengeExpiresAt(null);
+      setCode("");
+      setError(t("login.err2faExpired"));
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -155,6 +166,7 @@ export function LoginForm() {
             type="button"
             onClick={() => {
               setChallengeId(null);
+              setChallengeExpiresAt(null);
               setError(null);
             }}
             className="w-full text-center font-mono text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"

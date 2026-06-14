@@ -64,7 +64,21 @@ export function CopilotTab({
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <Label>{t("copilot.fieldSource")}</Label>
-            <Select value={value.source} onValueChange={(v) => onField("source", v)}>
+            <Select
+              value={value.source}
+              onValueChange={(v) => {
+                onField("source", v);
+                // Clear the other mode's fields so switching source can't save
+                // stale/conflicting credentials from the mode you left.
+                if (v === "account") {
+                  onField("dedicated_api_key", "");
+                  onField("dedicated_base_url", "");
+                  onField("dedicated_protocol", "");
+                } else {
+                  onField("provider_account_id", 0);
+                }
+              }}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

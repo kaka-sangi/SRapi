@@ -123,6 +123,10 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
   };
 
   const abortRef = useRef<AbortController | null>(null);
+  // Model + effort captured at the START of the active turn, so changing the
+  // picker mid-turn (e.g. before approving a pending tool call) does not alter
+  // the in-flight turn — resolvePending continues with the same settings.
+  const activeTurnRef = useRef<{ model: string; effort: ReasoningEffort }>({ model: "", effort: "off" });
   const flushRef = useRef<number>(0);
   // Refs the streaming "done" handler reads (avoids stale closures).
   const activeIdRef = useRef<number | null>(stored.activeId);
@@ -272,8 +276,8 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
       await streamCopilotChat({
         messages: history,
         approval,
-        model: model || undefined,
-        reasoningEffort: effort,
+        model: activeTurnRef.current.model || undefined,
+        reasoningEffort: activeTurnRef.current.effort,
         signal: controller.signal,
         onEvent,
       });
@@ -298,6 +302,7 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
     if (files.length) userMsg.files = files;
     const next = [...messages, userMsg];
     persistSession(next, activeIdRef.current);
+    activeTurnRef.current = { model, effort };
     void runTurn(next);
   }
 
@@ -318,6 +323,7 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
     if (lastUser < 0) return;
     const history = messages.slice(0, lastUser + 1);
     persistSession(history, activeIdRef.current);
+    activeTurnRef.current = { model, effort };
     void runTurn(history);
   }
 
