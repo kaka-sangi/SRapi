@@ -226,9 +226,36 @@ type runtimeState struct {
 	accountBreakers   map[int]*circuitbreaker.Breaker
 	accountBreakersMu sync.RWMutex
 
+	// accountMetaLocks serializes read-modify-write updates to a provider
+	// account's metadata (cooldown escalation and runtime-quota snapshots) so
+	// concurrent gateway-side writes for the same account — now that the usage
+	// path is asynchronous — don't clobber each other's changes by each cloning a
+	// stale metadata map and writing back the full document. Keyed by account ID;
+	// values are *sync.Mutex. Cross-subsystem edits (admin) are out of scope and
+	// still rely on last-write-wins.
+	accountMetaLocks sync.Map
+
 	modelResolutionCache *localcache.Cache[modelcontract.ModelResolution]
 
 	eventHub *eventsub.Hub
+
+	// usageSem bounds the number of in-flight asynchronous gateway usage / billing
+	// writes. When nil (struct-literal test runtimes, or async disabled via
+	// GATEWAY_USAGE_MAX_CONCURRENCY=0) recordGatewayUsage runs inline. When the
+	// semaphore is saturated the caller falls back to inline processing
+	// (backpressure) rather than dropping billing data. usageWG tracks the
+	// outstanding async writes so graceful shutdown can drain them before the DB
+	// connection closes.
+	usageSem chan struct{}
+	usageWG  sync.WaitGroup
+	// usageMu guards usageDraining. Dispatch takes the read lock around its
+	// WaitGroup.Add (so the Add is ordered before drain's Wait), and drain takes
+	// the write lock to set usageDraining before waiting. Once draining is set,
+	// dispatch runs inline instead of spawning a tracked goroutine, so no new
+	// Add can race a Wait (which would panic) even if graceful shutdown timed
+	// out with a handler still in flight.
+	usageMu       sync.RWMutex
+	usageDraining bool
 }
 
 type dependencyHealth struct {
@@ -439,6 +466,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 	if err := rt.bootstrapGatewayCatalog(context.Background()); err != nil {
 		return nil, err
 	}
+	rt.startUsageWriters(cfg.Gateway.UsageMaxConcurrency)
 	return rt, nil
 }
 

@@ -129,6 +129,11 @@ type GatewayConfig struct {
 	// users (who never bill to balance). Default false preserves the historical
 	// fail-open behavior.
 	RequirePositiveBalance bool
+	// UsageMaxConcurrency bounds how many gateway usage/billing writes run
+	// asynchronously off the request critical path at once. Above this the
+	// caller processes inline (backpressure, never dropped). 0 disables async
+	// processing entirely, restoring fully-synchronous in-request billing.
+	UsageMaxConcurrency int
 }
 
 type SecurityConfig struct {
@@ -285,6 +290,7 @@ func Load() Config {
 			RealtimeMaxOpenSlots:         getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS", 0),
 			RealtimeMaxOpenSlotsPerKey:   getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS_PER_API_KEY", 0),
 			RequirePositiveBalance:       getBoolEnv("GATEWAY_REQUIRE_POSITIVE_BALANCE", false),
+			UsageMaxConcurrency:          getIntEnv("GATEWAY_USAGE_MAX_CONCURRENCY", 32),
 		},
 		Security: securityConfigFromEnv(),
 		Bootstrap: BootstrapConfig{

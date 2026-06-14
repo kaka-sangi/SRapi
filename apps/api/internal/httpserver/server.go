@@ -76,42 +76,43 @@ type dependencyPinger interface {
 type Option func(*runtimeOptions)
 
 type runtimeOptions struct {
-	adminControl       admincontrolcontract.Store
-	database           dependencyPinger
-	redis              dependencyPinger
-	users              userscontract.Store
-	apiKeys            apikeycontract.Store
-	providers          providercontract.Store
-	models             modelcontract.Store
-	accounts           accountcontract.Store
-	audit              auditcontract.Store
-	authSessions       authcontract.Store
-	billing            billingcontract.Store
-	events             eventscontract.Store
-	affiliate          affiliatecontract.Store
-	idempotency        idempotencycontract.Store
-	operations         operationscontract.Store
-	payments           paymentcontract.Store
-	qualityEval        qualitycontract.Store
-	realtime           realtimecontract.Store
-	rateLimiter        *ratelimit.Limiter
-	scheduler          schedulercontract.Store
-	sessionAffinity    sessionaffinitycontract.Store
-	subscriptions      subscriptioncontract.Store
-	totp               totpcontract.Store
-	usage              usagecontract.Store
-	userAttributes     userattributescontract.Store
-	errorPassthrough   errorpassthroughcontract.Store
-	tlsProfiles        tlsprofilescontract.Store
-	healthRollups      healthrollupscontract.Store
-	modelRateLimits    modelratelimitscontract.Store
-	groupRateLimits    groupratelimitscontract.Store
-	userPlatformQuotas userplatformquotascontract.Store
-	payloadRules       payloadrulescontract.Store
-	scheduledTests     scheduledtestscontract.Store
-	channelMonitors    channelmonitorscontract.Store
-	copilotConvs       copilotconvcontract.ConversationStore
-	metrics            *runtimeMetricsState
+	adminControl        admincontrolcontract.Store
+	database            dependencyPinger
+	redis               dependencyPinger
+	users               userscontract.Store
+	apiKeys             apikeycontract.Store
+	providers           providercontract.Store
+	models              modelcontract.Store
+	accounts            accountcontract.Store
+	audit               auditcontract.Store
+	authSessions        authcontract.Store
+	billing             billingcontract.Store
+	events              eventscontract.Store
+	affiliate           affiliatecontract.Store
+	idempotency         idempotencycontract.Store
+	operations          operationscontract.Store
+	payments            paymentcontract.Store
+	qualityEval         qualitycontract.Store
+	realtime            realtimecontract.Store
+	rateLimiter         *ratelimit.Limiter
+	scheduler           schedulercontract.Store
+	sessionAffinity     sessionaffinitycontract.Store
+	subscriptions       subscriptioncontract.Store
+	totp                totpcontract.Store
+	usage               usagecontract.Store
+	userAttributes      userattributescontract.Store
+	errorPassthrough    errorpassthroughcontract.Store
+	tlsProfiles         tlsprofilescontract.Store
+	healthRollups       healthrollupscontract.Store
+	modelRateLimits     modelratelimitscontract.Store
+	groupRateLimits     groupratelimitscontract.Store
+	userPlatformQuotas  userplatformquotascontract.Store
+	payloadRules        payloadrulescontract.Store
+	scheduledTests      scheduledtestscontract.Store
+	channelMonitors     channelmonitorscontract.Store
+	copilotConvs        copilotconvcontract.ConversationStore
+	metrics             *runtimeMetricsState
+	backgroundDrainSink *func(context.Context)
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -338,6 +339,16 @@ func withRuntimeMetricsState(metrics *runtimeMetricsState) Option {
 	}
 }
 
+// WithBackgroundDrainHook captures the runtime's background-writer drain into
+// sink. The application calls it during graceful shutdown — after the HTTP
+// server stops accepting connections and before the database closes — so
+// in-flight asynchronous usage/billing writes are flushed rather than lost.
+func WithBackgroundDrainHook(sink *func(context.Context)) Option {
+	return func(opts *runtimeOptions) {
+		opts.backgroundDrainSink = sink
+	}
+}
+
 type envelope struct {
 	Data      healthData `json:"data"`
 	RequestID string     `json:"request_id"`
@@ -363,6 +374,9 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	if err != nil {
 		logger.Error("failed to initialize runtime", "error", err)
 		panic(err)
+	}
+	if opts.backgroundDrainSink != nil {
+		*opts.backgroundDrainSink = runtime.drainUsageWriters
 	}
 	server := &Server{cfg: cfg, logger: logger, runtime: runtime}
 

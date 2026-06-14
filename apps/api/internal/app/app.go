@@ -68,6 +68,10 @@ type App struct {
 	health           *healthprobeworker.Worker
 	quality          *qualityevalworker.Worker
 	sloEval          *sloevaluatorworker.Worker
+	// usageDrain flushes in-flight asynchronous gateway usage/billing writes
+	// during graceful shutdown. Populated by newHandler; nil when async usage
+	// processing is disabled.
+	usageDrain func(context.Context)
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*App, error) {
@@ -92,7 +96,8 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 
-	handler, outbox, retention, availability, backup, authClean, expirer, reconcile, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, liteLLMPricing, connectivityTest, scheduledTest, channelMonitor, err := newHandler(cfg, logger, dbClient, redisClient)
+	var usageDrain func(context.Context)
+	handler, outbox, retention, availability, backup, authClean, expirer, reconcile, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, liteLLMPricing, connectivityTest, scheduledTest, channelMonitor, err := newHandler(cfg, logger, dbClient, redisClient, &usageDrain)
 	if err != nil {
 		_ = dbClient.Close()
 		_ = redisClient.Close()
@@ -131,6 +136,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		health:           health,
 		quality:          quality,
 		sloEval:          sloEval,
+		usageDrain:       usageDrain,
 	}, nil
 }
 
@@ -138,6 +144,18 @@ func (a *App) Serve() error {
 	a.startWorkers()
 	defer func() {
 		_ = a.stopWorkers(context.Background())
+		// Flush in-flight async usage/billing writes if ListenAndServe returned
+		// on its own (e.g. a serve error) without going through Shutdown, which
+		// already drains. Bounded so a stuck write cannot hang process exit.
+		if a.usageDrain != nil {
+			timeout := a.cfg.Server.ShutdownTimeout
+			if timeout <= 0 {
+				timeout = 30 * time.Second
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+			a.usageDrain(ctx)
+		}
 	}()
 	err := a.server.ListenAndServe()
 	if err == nil || errors.Is(err, http.ErrServerClosed) {
@@ -153,6 +171,21 @@ func (a *App) Shutdown(ctx context.Context) error {
 	}
 	if err := a.server.Shutdown(ctx); err != nil {
 		errs = append(errs, err)
+	}
+	// The HTTP server has now stopped accepting connections and all in-flight
+	// handlers have returned, so no new async usage writes will be dispatched.
+	// Flush the ones still running before closing the database connection. Use a
+	// fresh budget rather than the caller's ctx, which server.Shutdown may have
+	// already (nearly) exhausted — otherwise a slow connection drain could starve
+	// the usage drain and leave billing writes running against a closing DB.
+	if a.usageDrain != nil {
+		timeout := a.cfg.Server.ShutdownTimeout
+		if timeout <= 0 {
+			timeout = 30 * time.Second
+		}
+		drainCtx, cancel := context.WithTimeout(context.Background(), timeout)
+		a.usageDrain(drainCtx)
+		cancel()
 	}
 	if a.db != nil {
 		if err := a.db.Close(); err != nil {
@@ -180,13 +213,16 @@ func Healthcheck(ctx context.Context, cfg config.Config, path string) error {
 	return httpserver.Healthcheck(ctx, cfg.HealthcheckAddress(), path)
 }
 
-func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *availabilityrollupworker.Worker, *backupworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *paymentreconcileworker.Worker, *subscriptionexpirerworker.Worker, *accountquotaalertworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, *idempotencycleanupworker.Worker, *quotarefreshworker.Worker, *litellmpricingworker.Worker, *connectivitytestworker.Worker, *scheduledtestworker.Worker, *channelmonitorworker.Worker, error) {
+func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client, usageDrainSink *func(context.Context)) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *availabilityrollupworker.Worker, *backupworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *paymentreconcileworker.Worker, *subscriptionexpirerworker.Worker, *accountquotaalertworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, *idempotencycleanupworker.Worker, *quotarefreshworker.Worker, *litellmpricingworker.Worker, *connectivitytestworker.Worker, *scheduledtestworker.Worker, *channelmonitorworker.Worker, error) {
 	var (
 		handler http.Handler
 		err     error
 	)
 
 	options := []httpserver.Option{httpserver.WithRedisPinger(redisClient)}
+	if usageDrainSink != nil {
+		options = append(options, httpserver.WithBackgroundDrainHook(usageDrainSink))
+	}
 	if cfg.UsesMemoryStorage() {
 		options = append(options, httpserver.WithDatabasePinger(notRequiredPinger{}))
 	} else {

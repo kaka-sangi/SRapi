@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -21,11 +22,22 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
+// recordGatewayUsage records a completed gateway request. The durable
+// source-of-truth — the usage_log row and its derived completion event — is
+// written SYNCHRONOUSLY so it survives a crash and the billing/feedback state
+// derived from it stays reconstructable. usage_log is an append, not the
+// row-locked aggregation, so it adds negligible latency/contention to the hot
+// path. The contended follow-on writes (the two row-locked billing
+// aggregations, scheduler feedback, cooldown, snapshot refresh) are then
+// dispatched off the request critical path when async usage writing is armed
+// (see startUsageWriters), with a context detached via context.WithoutCancel so
+// a client disconnect can't cancel them. When async is disabled or saturated
+// they run inline — identical to the historical behavior.
 func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsageRecord) {
-	model := fallbackModelName(rec.Model)
 	if rec.AttemptNo == 0 {
 		rec.AttemptNo = 1
 	}
+	model := fallbackModelName(rec.Model)
 	pricing := rec.Pricing.withDefaults()
 	rt.warnDefaultZeroGatewayPricing(rec, model, pricing)
 	rateMultiplier := rt.gatewayAccountRateMultiplier(ctx, rec.AccountID)
@@ -72,6 +84,20 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		}
 		rt.enqueueGatewayUsageEvent(ctx, usageLog)
 	}
+
+	detached := context.WithoutCancel(ctx)
+	rt.dispatchUsageWrite(detached, func(c context.Context) {
+		rt.recordGatewayUsageEffects(c, rec, model, pricing)
+	})
+}
+
+// recordGatewayUsageEffects applies the follow-on writes that are not the
+// durable source of truth and are safe to run off the request critical path:
+// the row-locked billing aggregation, scheduler feedback, provider-account
+// cooldown, risk signals and the account snapshot refresh. On a hard crash an
+// in-flight invocation may be lost, but every value here is derivable from the
+// usage_log row recorded synchronously by recordGatewayUsage.
+func (rt *runtimeState) recordGatewayUsageEffects(ctx context.Context, rec gatewayUsageRecord, model string, pricing gatewayPricingEvidence) {
 	if rec.Success {
 		rt.recordGatewayMaterializedCosts(ctx, rec, pricing.BillableCost)
 	}
@@ -321,10 +347,24 @@ func escalateCooldownWindow(base time.Duration, strikes int, lastCooldownAt *tim
 	return window, strikes + 1
 }
 
+// accountMetaLock returns the per-account mutex that serializes read-modify-write
+// updates to a provider account's metadata document, so concurrent gateway-side
+// writers for the same account don't overwrite each other.
+func (rt *runtimeState) accountMetaLock(accountID int) *sync.Mutex {
+	actual, _ := rt.accountMetaLocks.LoadOrStore(accountID, &sync.Mutex{})
+	return actual.(*sync.Mutex)
+}
+
 func (rt *runtimeState) applyProviderAccountCooldown(ctx context.Context, rec gatewayUsageRecord) {
 	if rec.AccountID == nil || *rec.AccountID <= 0 || rec.ErrorClass == nil {
 		return
 	}
+	// Hold the per-account lock across the whole read-modify-write so a
+	// concurrent cooldown or quota-metadata update for the same account can't
+	// clobber the strike/cooldown fields we write back.
+	mu := rt.accountMetaLock(*rec.AccountID)
+	mu.Lock()
+	defer mu.Unlock()
 	account, err := rt.accounts.FindByID(ctx, *rec.AccountID)
 	if err != nil {
 		rt.logger.Warn("failed to load cooling provider account", "error", err, "account_id", *rec.AccountID)
@@ -794,6 +834,12 @@ func (rt *runtimeState) recordProviderQuotaSignals(ctx context.Context, account 
 }
 
 func (rt *runtimeState) updateAccountRuntimeQuotaMetadata(ctx context.Context, account accountcontract.ProviderAccount, logs []usagecontract.UsageLog, now time.Time) error {
+	// Serialize this read-modify-write against a concurrent cooldown / quota
+	// update for the same account, and rebase onto the freshest metadata below,
+	// so the two writers can't overwrite each other's fields.
+	mu := rt.accountMetaLock(account.ID)
+	mu.Lock()
+	defer mu.Unlock()
 	window := accountRuntimeQuotaWindow(account.Metadata)
 	windowStart := now.Add(-window)
 	rpmUsed := 0
@@ -824,7 +870,13 @@ func (rt *runtimeState) updateAccountRuntimeQuotaMetadata(ctx context.Context, a
 		}
 	}
 
-	metadata := cloneMetadata(account.Metadata)
+	// Rebase onto the freshest metadata inside the lock so concurrent cooldown
+	// fields written since `account` was loaded are preserved.
+	base := account
+	if fresh, err := rt.accounts.FindByID(ctx, account.ID); err == nil {
+		base = fresh
+	}
+	metadata := cloneMetadata(base.Metadata)
 	windowSeconds := int(window / time.Second)
 	resetAt := now.Add(window).Format(time.RFC3339)
 	metadata["rpm_used"] = rpmUsed

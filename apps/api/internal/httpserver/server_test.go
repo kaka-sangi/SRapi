@@ -61,8 +61,13 @@ import (
 func TestMain(m *testing.M) {
 	originalStorage, hadOriginalStorage := os.LookupEnv("STORAGE_BACKEND")
 	originalHashCost, hadOriginalHashCost := os.LookupEnv("PASSWORD_HASH_COST")
+	originalUsageConc, hadOriginalUsageConc := os.LookupEnv("GATEWAY_USAGE_MAX_CONCURRENCY")
 	_ = os.Setenv("STORAGE_BACKEND", config.StorageBackendMemory)
 	_ = os.Setenv("PASSWORD_HASH_COST", "4")
+	// Process gateway usage/billing writes inline so these tests can assert on
+	// the resulting usage logs immediately after a request. The async path is
+	// exercised separately in TestAsyncUsageWriterDrains.
+	_ = os.Setenv("GATEWAY_USAGE_MAX_CONCURRENCY", "0")
 	code := m.Run()
 	if hadOriginalStorage {
 		_ = os.Setenv("STORAGE_BACKEND", originalStorage)
@@ -73,6 +78,11 @@ func TestMain(m *testing.M) {
 		_ = os.Setenv("PASSWORD_HASH_COST", originalHashCost)
 	} else {
 		_ = os.Unsetenv("PASSWORD_HASH_COST")
+	}
+	if hadOriginalUsageConc {
+		_ = os.Setenv("GATEWAY_USAGE_MAX_CONCURRENCY", originalUsageConc)
+	} else {
+		_ = os.Unsetenv("GATEWAY_USAGE_MAX_CONCURRENCY")
 	}
 	os.Exit(code)
 }

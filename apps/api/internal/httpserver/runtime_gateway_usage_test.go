@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -321,6 +322,138 @@ func TestRecordGatewayUsagePersistsProviderQuotaSignals(t *testing.T) {
 	}
 	if !foundRefreshEvent {
 		t.Fatalf("expected deferred account snapshot refresh event, got %+v", outboxRows)
+	}
+}
+
+// asyncWriterFixture builds a runtime wired with the services the async usage
+// effects touch (usage_log is the synchronous source of truth; the scheduler
+// feedback and account-snapshot-refresh effects are dispatched asynchronously),
+// plus a provider account to attribute records to, with async writing armed at
+// the given concurrency.
+func asyncWriterFixture(t *testing.T, concurrency int) (*runtimeState, accountcontract.ProviderAccount, *eventsservice.Service) {
+	t.Helper()
+	accounts, err := accountservice.New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new account service: %v", err)
+	}
+	account, err := accounts.Create(context.Background(), accountcontract.CreateRequest{
+		ProviderID:   7,
+		Name:         "async-writer-account",
+		RuntimeClass: accountcontract.RuntimeClassCliClientToken,
+		Credential:   map[string]any{"cli_client_token": "secret"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	usage, err := usageservice.New(usagememory.New(), nil)
+	if err != nil {
+		t.Fatalf("new usage service: %v", err)
+	}
+	events, err := eventsservice.New(eventsmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	scheduler, err := schedulerservice.New(schedulermemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new scheduler service: %v", err)
+	}
+	rt := &runtimeState{
+		logger:    slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		accounts:  accounts,
+		usage:     usage,
+		events:    events,
+		scheduler: scheduler,
+	}
+	rt.startUsageWriters(concurrency)
+	return rt, account, events
+}
+
+func asyncWriterRecord(account accountcontract.ProviderAccount, requestID string) gatewayUsageRecord {
+	return gatewayUsageRecord{
+		RequestID:      requestID,
+		AttemptNo:      1,
+		DecisionID:     1,
+		Authed:         apikeycontract.AuthResult{UserID: 1, Key: apikeycontract.APIKey{ID: 2}},
+		ProviderID:     ptrInt(account.ProviderID),
+		AccountID:      ptrInt(account.ID),
+		SourceEndpoint: "/v1/chat/completions",
+		TargetProtocol: "openai-compatible",
+		Model:          "async-model",
+		Success:        true,
+	}
+}
+
+func countSnapshotRefreshEvents(t *testing.T, events *eventsservice.Service) int {
+	t.Helper()
+	rows, err := events.ListOutbox(context.Background())
+	if err != nil {
+		t.Fatalf("list outbox: %v", err)
+	}
+	n := 0
+	for _, row := range rows {
+		if row.EventType == "GatewayAccountSnapshotRefreshRequested" {
+			n++
+		}
+	}
+	return n
+}
+
+// TestAsyncUsageWriterDrains exercises the asynchronous usage-effects path
+// (startUsageWriters / dispatchUsageWrite / drainUsageWriters): with a small
+// concurrency bound, more records than slots are fired so some are dispatched
+// async and some fall back to inline under backpressure. After draining, the
+// account-snapshot-refresh effect (which runs on the async path) must have
+// landed for every record — proving the drain flushes in-flight writes and the
+// backpressure fallback never drops them.
+func TestAsyncUsageWriterDrains(t *testing.T) {
+	ctx := context.Background()
+	rt, account, events := asyncWriterFixture(t, 3)
+	if rt.usageSem == nil {
+		t.Fatal("expected async usage writers to be armed")
+	}
+
+	const total = 50
+	for i := 0; i < total; i++ {
+		rt.recordGatewayUsage(ctx, asyncWriterRecord(account, "req_async_"+strconv.Itoa(i)))
+	}
+
+	rt.drainUsageWriters(ctx)
+
+	if got := countSnapshotRefreshEvents(t, events); got != total {
+		t.Fatalf("after drain expected %d async snapshot-refresh events, got %d", total, got)
+	}
+}
+
+// TestUsageWriterDrainRaceSafe fires usage records from many goroutines while a
+// drain runs concurrently — the scenario where a slow graceful shutdown could
+// have a handler dispatch a write as the drain's WaitGroup.Wait begins. With the
+// draining gate this must neither panic (WaitGroup reuse) nor lose an effect:
+// writes dispatched before the drain are flushed, and writes after it run inline.
+// Run under -race to catch ordering violations.
+func TestUsageWriterDrainRaceSafe(t *testing.T) {
+	ctx := context.Background()
+	rt, account, events := asyncWriterFixture(t, 4)
+
+	const goroutines = 8
+	const perGoroutine = 25
+	var wg sync.WaitGroup
+	for g := 0; g < goroutines; g++ {
+		wg.Add(1)
+		go func(g int) {
+			defer wg.Done()
+			for k := 0; k < perGoroutine; k++ {
+				rt.recordGatewayUsage(ctx, asyncWriterRecord(account, "req_race_"+strconv.Itoa(g)+"_"+strconv.Itoa(k)))
+			}
+		}(g)
+	}
+	// Drain concurrently with the in-flight dispatchers, then once more after
+	// they all return to flush anything still async.
+	rt.drainUsageWriters(ctx)
+	wg.Wait()
+	rt.drainUsageWriters(ctx)
+
+	if want := goroutines * perGoroutine; countSnapshotRefreshEvents(t, events) != want {
+		t.Fatalf("expected %d snapshot-refresh events (no loss across concurrent drain), got %d", want, countSnapshotRefreshEvents(t, events))
 	}
 }
 
