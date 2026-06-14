@@ -32,7 +32,12 @@ type SystemClock struct{}
 
 func (SystemClock) Now() time.Time { return time.Now().UTC() }
 
-const feedbackSignalWindow = 30 * 24 * time.Hour
+// feedbackSignalWindow bounds how far back the scheduler scans recent feedback
+// signals when scoring candidates. This scan runs on every routing decision, so
+// the window is a direct hot-path cost. 14 days is ample for the EWMA-style
+// recency signals we derive (older data is already heavily discounted) while
+// halving the rows scanned per request versus the original 30-day window.
+const feedbackSignalWindow = 14 * 24 * time.Hour
 const strategyRefreshInterval = 30 * time.Second
 
 type Service struct {

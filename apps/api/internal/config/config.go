@@ -259,8 +259,8 @@ func Load() Config {
 			Password:               getEnv("DATABASE_PASSWORD", ""),
 			Database:               getEnv("DATABASE_DBNAME", "srapi"),
 			SSLMode:                getEnv("DATABASE_SSLMODE", "disable"),
-			MaxOpenConns:           getIntEnv("DATABASE_MAX_OPEN_CONNS", 25),
-			MaxIdleConns:           getIntEnv("DATABASE_MAX_IDLE_CONNS", 10),
+			MaxOpenConns:           getIntEnv("DATABASE_MAX_OPEN_CONNS", 50),
+			MaxIdleConns:           getIntEnv("DATABASE_MAX_IDLE_CONNS", 20),
 			ConnMaxLifetimeSeconds: getIntEnv("DATABASE_CONN_MAX_LIFETIME_SECONDS", 1800),
 		},
 		Redis: DependencyConfig{

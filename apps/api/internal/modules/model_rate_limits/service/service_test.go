@@ -105,3 +105,59 @@ func TestUpsertValidationAndDelete(t *testing.T) {
 		t.Fatalf("delete: %v", err)
 	}
 }
+
+// countingStore wraps the memory store and counts FindByModel calls so the test
+// can assert the service's short-TTL cache actually collapses the per-request
+// reads (RPM + TPM + concurrency all touch the same row).
+type countingStore struct {
+	*memory.Store
+	finds int
+}
+
+func (s *countingStore) FindByModel(ctx context.Context, modelID int) (contract.Limit, error) {
+	s.finds++
+	return s.Store.FindByModel(ctx, modelID)
+}
+
+func TestRuleLookupsCacheAndInvalidateOnWrite(t *testing.T) {
+	ctx := context.Background()
+	cs := &countingStore{Store: memory.New()}
+	svc, err := service.New(cs)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	if _, err := svc.UpsertLimit(ctx, contract.UpsertLimit{ModelID: 7, RPMLimit: 120, TPMLimit: 9000, MaxConcurrency: 4, Enabled: true}); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	// The upsert invalidated the entry, so the next lookup reads through once;
+	// the sibling reads for the same model are then served from cache.
+	cs.finds = 0
+	if got := svc.RPMForModel(ctx, 7); got != 120 {
+		t.Fatalf("RPMForModel = %d, want 120", got)
+	}
+	if got := svc.TPMForModel(ctx, 7); got != 9000 {
+		t.Fatalf("TPMForModel = %d, want 9000", got)
+	}
+	if got := svc.ConcurrencyForModel(ctx, 7); got != 4 {
+		t.Fatalf("ConcurrencyForModel = %d, want 4", got)
+	}
+	if got := svc.RPMForModel(ctx, 7); got != 120 {
+		t.Fatalf("RPMForModel (repeat) = %d, want 120", got)
+	}
+	if cs.finds != 1 {
+		t.Fatalf("expected 1 store read across 4 cached lookups, got %d", cs.finds)
+	}
+
+	// A write must invalidate the cached entry so the next read reflects it.
+	if _, err := svc.UpsertLimit(ctx, contract.UpsertLimit{ModelID: 7, RPMLimit: 60, Enabled: true}); err != nil {
+		t.Fatalf("upsert update: %v", err)
+	}
+	if got := svc.RPMForModel(ctx, 7); got != 60 {
+		t.Fatalf("RPMForModel after update = %d, want 60", got)
+	}
+	if cs.finds != 2 {
+		t.Fatalf("expected 1 more store read after invalidation, got %d total", cs.finds)
+	}
+}
