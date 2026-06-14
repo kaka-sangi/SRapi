@@ -97,6 +97,7 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
       toast({ title: t("feedback.saved"), tone: "success" });
     } catch (err) {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+      throw err;
     }
   }
 
@@ -104,7 +105,9 @@ function SettingsEditor({ initial }: { initial: Parameters<typeof createSettings
     if (settingsTabRequiresConfirmation(tab)) {
       setConfirmTab(tab);
     } else {
-      void save();
+      // save() now re-throws so the confirm dialog can detect failure; the error
+      // is already toasted, so swallow the rejection at this fire-and-forget site.
+      void save().catch(() => {});
     }
   }
 

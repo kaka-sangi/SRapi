@@ -78,7 +78,7 @@ function PayloadRulesContent() {
   const actionLabel = (action: PayloadRule["action"]) => t(`adminPayloadRules.action_${action}`);
 
   const fields: FieldConfig<PayloadRuleFormState>[] = [
-    { name: "name", label: t("adminPayloadRules.name") },
+    { name: "name", label: t("adminPayloadRules.name"), required: true },
     {
       name: "action",
       label: t("adminPayloadRules.action"),
@@ -105,6 +105,7 @@ function PayloadRulesContent() {
       label: t("adminPayloadRules.params"),
       type: "keyvalue",
       hint: t("adminPayloadRules.paramsHint"),
+      required: true,
     },
   ];
 

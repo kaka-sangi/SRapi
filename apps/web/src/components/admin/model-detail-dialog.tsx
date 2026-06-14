@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
@@ -18,6 +18,8 @@ import {
   useDeleteModelMapping,
   useAdminAccounts,
 } from "@/hooks/admin-queries";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
@@ -43,12 +45,20 @@ export function ModelDetailDialog({
 }) {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const aliases = useModelAliases(model.id);
   const mappings = useModelMappings(model.id);
   const deleteAlias = useDeleteModelAlias();
   const deleteMapping = useDeleteModelMapping();
   // The row pending inline-confirm, keyed as "alias:<id>" / "mapping:<id>".
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
+
+  // Refetch accounts on mount to ensure fresh data when dialog reopens
+  useEffect(() => {
+    void queryClient.refetchQueries({
+      queryKey: queryKeys.admin.accounts({ page: 1, page_size: 200, status: "active" }),
+    });
+  }, [queryClient]);
 
   const aliasRows = aliases.data?.data ?? [];
   const mappingRows = mappings.data?.data ?? [];

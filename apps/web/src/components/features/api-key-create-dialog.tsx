@@ -247,7 +247,7 @@ export function ApiKeyFormDialog({
             <div className="mt-4 space-y-4">
               <div>
                 <Label htmlFor="key-name">{t("apiKeys.name")}</Label>
-                <Input id="key-name" value={name} onChange={(e) => setName(e.target.value)} />
+                <Input id="key-name" value={name} onChange={(e) => setName(e.target.value)} disabled={pending} />
               </div>
               <div>
                 <Label htmlFor="key-models">{t("apiKeys.allowedModels")}</Label>

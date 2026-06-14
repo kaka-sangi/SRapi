@@ -27,6 +27,7 @@ type quickSetupRequest struct {
 	ProxyID        *string        `json:"proxy_id,omitempty"`
 	Priority       *int           `json:"priority,omitempty"`
 	Weight         *float32       `json:"weight,omitempty"`
+	RiskLevel      *string        `json:"risk_level,omitempty"`
 	Metadata       map[string]any `json:"metadata,omitempty"`
 }
 
@@ -142,6 +143,7 @@ func (s *Server) handleAdminQuickSetup(w http.ResponseWriter, r *http.Request) {
 		ProxyID:        body.ProxyID,
 		Priority:       body.Priority,
 		Weight:         body.Weight,
+		RiskLevel:      body.RiskLevel,
 	})
 	if err != nil {
 		switch {

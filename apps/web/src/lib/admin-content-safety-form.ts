@@ -23,7 +23,7 @@ export function createContentSafetyForm(config: ContentSafetyConfig): ContentSaf
     blockPromptInjection: config.block_prompt_injection,
     blockCustomKeywords: config.block_custom_keywords,
     customKeywords: cleanList(config.custom_keywords),
-    modelScopes: cleanList(config.model_scopes),
+    modelScopes: cleanList(config.model_scopes).map((scope) => scope.toLowerCase()),
   };
 }
 

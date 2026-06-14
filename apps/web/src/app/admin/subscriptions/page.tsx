@@ -65,12 +65,14 @@ function SubscriptionsContent() {
       name: "userId",
       label: t("adminSubscriptions.user"),
       type: "select",
+      required: true,
       options: (users.data?.data ?? []).map((u) => ({ value: u.id, label: u.email })),
     },
     {
       name: "planId",
       label: t("adminSubscriptions.plan"),
       type: "select",
+      required: true,
       options: (plans.data?.data ?? []).map((p) => ({ value: p.id, label: p.name })),
     },
     {

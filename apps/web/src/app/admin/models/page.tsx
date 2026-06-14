@@ -81,7 +81,7 @@ function ModelsContent() {
   const deleteMut = useDeleteModel();
   // Provider picker for the mapping dialog (the registry is small; 200 covers it).
   const providers = useAdminProviders({ page: 1, page_size: 200 });
-  const providerOptions = (providers.data?.data ?? []).map((p) => ({
+  const providerOptions = (providers.data?.data ?? []).filter((p) => p.status === "active").map((p) => ({
     value: p.id,
     label: p.display_name || p.name,
   }));

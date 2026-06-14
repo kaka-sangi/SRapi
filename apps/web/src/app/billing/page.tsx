@@ -97,8 +97,9 @@ function BalanceTab() {
   const [error, setError] = useState<string | null>(null);
 
   const methodList = methods.data?.data ?? [];
+  const effectiveInstanceId = instanceId || methodList[0]?.provider_instance_id || "";
   const selected =
-    methodList.find((m) => m.provider_instance_id === instanceId) ?? methodList[0] ?? null;
+    methodList.find((m) => m.provider_instance_id === effectiveInstanceId) ?? methodList[0] ?? null;
   const feePreview = selected ? paymentFeePreview(amount, selected) : null;
   const paymentCurrency = balance.data?.currency ?? "USD";
   const needsWeChatPayer = selected
@@ -164,7 +165,7 @@ function BalanceTab() {
                 <p className="text-2xs text-srapi-text-tertiary">{t("billing.noMethods")}</p>
               ) : (
                 <Select
-                  value={instanceId || methodList[0]?.provider_instance_id}
+                  value={effectiveInstanceId}
                   onValueChange={setInstanceId}
                 >
                   <SelectTrigger id="method">

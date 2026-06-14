@@ -203,10 +203,11 @@ function TemplateEditor({ target, onClose }: { target: EditTarget; onClose: () =
       setSubject(restored.subject);
       setHtml(restored.html);
       setPreview(null);
-      setConfirmRestore(false);
       toast({ title: t("feedback.updated"), tone: "success" });
     } catch (err) {
       setError(adminErrorMessage(err));
+    } finally {
+      setConfirmRestore(false);
     }
   }
 

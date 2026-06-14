@@ -180,6 +180,8 @@ function UserAttributesContent() {
         minWidth={680}
         isFiltered={isFiltered}
         onClearFilters={list.clearFilters}
+        sort={list.sort}
+        onSort={list.toggleSort}
         toolbar={
           <ListToolbar>
             <SearchInput

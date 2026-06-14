@@ -162,7 +162,7 @@ function RulesContent() {
         pagination={{
           page: list.page,
           pageSize: list.pageSize,
-          total: rules.data?.pagination?.total ?? rules.data?.data.length ?? 0,
+          total: rules.data?.pagination?.total ?? 0,
           onPageChange: list.setPage,
         }}
         rowActions={(rule) => (

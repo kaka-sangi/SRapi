@@ -34,7 +34,7 @@ export function emptyModelForm(): ModelFormState {
     maxOutputTokens: "",
     qualityTier: "",
     status: "active",
-    capabilities: ["chat_completions"],
+    capabilities: [],
   };
 }
 

@@ -234,7 +234,7 @@ function RolesContent() {
         }
       />
 
-      {creating ? (
+      {creating && permissionCatalog.data ? (
         <ResourceFormDialog
           open
           onOpenChange={(open) => {
@@ -251,7 +251,7 @@ function RolesContent() {
         />
       ) : null}
 
-      {editTarget ? (
+      {editTarget && permissionCatalog.data ? (
         <ResourceFormDialog
           open
           onOpenChange={(open) => {

@@ -108,7 +108,7 @@ export function CopilotTab({
             <Label>{t("copilot.fieldAccount")}</Label>
             <Select
               value={value.provider_account_id ? String(value.provider_account_id) : ""}
-              onValueChange={(v) => onField("provider_account_id", Number(v))}
+              onValueChange={(v) => v && onField("provider_account_id", Number(v))}
             >
               <SelectTrigger>
                 <SelectValue placeholder={t("copilot.selectAccount")} />

@@ -166,6 +166,9 @@ export function AccountImportDialog({
         }),
         tone: res.errors.length > 0 ? "default" : "success",
       });
+      if (res.errors.length === 0) {
+        onOpenChange(false);
+      }
     } catch (err) {
       setError(adminErrorMessage(err));
     }
@@ -199,6 +202,9 @@ export function AccountImportDialog({
         }),
         tone: data.failed > 0 ? "error" : "success",
       });
+      if (data.failed === 0) {
+        onOpenChange(false);
+      }
     } catch (err) {
       setError(adminErrorMessage(err));
     }
@@ -755,6 +761,9 @@ export function AccountImportDialog({
                       title: t("crsSync.done", { created: result.created, failed: result.failed }),
                       tone: result.failed > 0 ? "warning" : "success",
                     });
+                    if (result.failed === 0) {
+                      onOpenChange(false);
+                    }
                   } catch (err) {
                     setError(adminErrorMessage(err));
                   } finally {

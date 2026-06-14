@@ -123,7 +123,15 @@ function UsersContent() {
   ];
 
   const balanceFields: FieldConfig<UserBalanceFormState>[] = [
-    { name: "amount", label: t("adminUsers.amount") },
+    {
+      name: "amount",
+      label: t("adminUsers.amount"),
+      validate: (value) => {
+        const num = Number(value);
+        if (num === 0) return "Amount must be greater than zero.";
+        return undefined;
+      },
+    },
     { name: "operation", label: t("adminUsers.operation"), type: "select", options: enumOptions(BALANCE_OPERATIONS) },
     { name: "currency", label: t("adminCommon.currency") },
     { name: "note", label: t("adminUsers.note"), type: "textarea" },

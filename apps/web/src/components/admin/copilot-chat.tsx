@@ -295,7 +295,11 @@ function ConversationSidebar() {
         </Button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {items.length === 0 ? (
+        {list.isPending ? (
+          <div className="flex items-center justify-center px-2 py-6">
+            <Loader2 className="size-4 animate-spin text-srapi-text-tertiary" />
+          </div>
+        ) : items.length === 0 ? (
           <p className="px-2 py-6 text-center text-2xs text-srapi-text-tertiary">{t("copilot.noConversations")}</p>
         ) : (
           <ul className="space-y-0.5">

@@ -82,6 +82,7 @@ export default function SetupPage() {
       router.replace("/?setup=done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to complete setup.");
+    } finally {
       setSubmitting(false);
     }
   }

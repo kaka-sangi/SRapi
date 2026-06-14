@@ -63,7 +63,7 @@ function InvitesContent() {
         actions={
           <div className="flex items-center gap-3">
             {invites.data ? (
-              <ListCount total={invites.data.pagination?.total ?? invites.data.data.length} />
+              <ListCount total={invites.data.pagination?.total ?? 0} />
             ) : null}
             <ColumnToggle
               columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
