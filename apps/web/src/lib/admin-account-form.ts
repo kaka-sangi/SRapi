@@ -24,6 +24,16 @@ export const ACCOUNT_RUNTIME_CLASSES: RuntimeClass[] = [
   "custom_reverse_proxy",
 ];
 
+// Human label for a runtime class (auth method). Use everywhere instead of
+// showing the raw identifier (e.g. "oauth_refresh") to the operator. Falls back
+// to the raw value for any unknown class.
+export function runtimeClassLabel(t: (key: string) => string, runtimeClass: string): string {
+  if (!runtimeClass) return "";
+  const label = t(`adminAccounts.runtime.${runtimeClass}`);
+  // t() returns the key itself when missing — fall back to the raw value then.
+  return label === `adminAccounts.runtime.${runtimeClass}` ? runtimeClass : label;
+}
+
 export const ACCOUNT_STATUSES: ProviderAccountStatus[] = [
   "active",
   "disabled",

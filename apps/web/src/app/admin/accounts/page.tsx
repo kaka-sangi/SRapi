@@ -46,6 +46,7 @@ import { adminErrorMessage } from "@/lib/admin-api";
 import {
   ACCOUNT_STATUSES,
   buildBatchAccountActionBody,
+  runtimeClassLabel,
   type AccountBatchAction,
 } from "@/lib/admin-account-form";
 import { AccountImportDialog } from "@/components/admin/account-import-dialog";
@@ -281,7 +282,7 @@ function AccountsContent() {
       header: t("adminAccounts.type"),
       hideOnMobile: true,
       render: (a) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">{a.runtime_class}</span>
+        <span className="text-2xs text-srapi-text-tertiary">{runtimeClassLabel(t, a.runtime_class)}</span>
       ),
     },
     {

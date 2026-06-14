@@ -722,11 +722,11 @@ export const en = {
     importErrorsTitle: "Some accounts were not imported",
     runtime: {
       api_key: "API Key",
-      oauth_refresh: "OAuth · refresh token",
-      oauth_device_code: "OAuth · device code",
-      web_session_cookie: "Web cookie",
-      cli_client_token: "CLI client token",
-      custom_reverse_proxy: "Custom reverse proxy",
+      oauth_refresh: "OAuth",
+      oauth_device_code: "OAuth (device code)",
+      web_session_cookie: "Session cookie",
+      cli_client_token: "CLI token",
+      custom_reverse_proxy: "Reverse proxy",
     },
     risk: {
       normal: "Normal",

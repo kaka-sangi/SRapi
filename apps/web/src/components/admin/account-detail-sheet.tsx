@@ -15,6 +15,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { runtimeClassLabel } from "@/lib/admin-account-form";
 import { cn } from "@/lib/cn";
 import {
   latestQuotaWindows,
@@ -167,8 +168,8 @@ export function AccountDetailSheet({
 
         {account ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
-            <span className="rounded-md bg-srapi-bg-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-secondary">
-              {account.runtime_class}
+            <span className="rounded-md bg-srapi-bg-muted px-2 py-0.5 text-2xs text-srapi-text-secondary">
+              {runtimeClassLabel(t, account.runtime_class)}
             </span>
             {account.priority != null && account.priority !== 0 ? (
               <span className="rounded-md bg-srapi-bg-muted px-2 py-0.5 font-mono text-2xs text-srapi-text-tertiary">

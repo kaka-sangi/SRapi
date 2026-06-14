@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { SearchX, Server } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { runtimeClassLabel } from "@/lib/admin-account-form";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -223,7 +224,7 @@ function AccountCard({
           <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
             <span className="truncate text-xs text-srapi-text-secondary">{providerName}</span>
             <span className="shrink-0 text-srapi-border">·</span>
-            <span className="truncate font-mono text-2xs text-srapi-text-tertiary">{account.runtime_class}</span>
+            <span className="truncate text-2xs text-srapi-text-tertiary">{runtimeClassLabel(t, account.runtime_class)}</span>
           </div>
           {baseUrl ? (
             <p className="mt-1 truncate font-mono text-2xs text-srapi-text-tertiary" title={baseUrl}>

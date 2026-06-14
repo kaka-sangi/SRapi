@@ -718,11 +718,11 @@ export const zh: Messages = {
     importErrorsTitle: "部分账号未能导入",
     runtime: {
       api_key: "API Key",
-      oauth_refresh: "OAuth · 刷新令牌",
-      oauth_device_code: "OAuth · 设备码",
-      web_session_cookie: "网页 Cookie",
-      cli_client_token: "CLI 客户端令牌",
-      custom_reverse_proxy: "自定义反代",
+      oauth_refresh: "OAuth",
+      oauth_device_code: "OAuth（设备码）",
+      web_session_cookie: "会话 Cookie",
+      cli_client_token: "CLI 令牌",
+      custom_reverse_proxy: "反向代理",
     },
     risk: {
       normal: "普通",
