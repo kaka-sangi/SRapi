@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/admin-api";
 import { queryKeys } from "@/lib/query-keys";
 import { type B, type P, useAdminMutation } from "./_shared";
@@ -240,8 +240,17 @@ export function useConfigSnapshot() {
   });
 }
 export function useImportConfigSnapshot() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { body: P<typeof adminApi.importConfigSnapshot>; dryRun?: boolean }) =>
       adminApi.importConfigSnapshot(vars.body, vars.dryRun),
+    onSuccess: (_data, vars) => {
+      // A real (non-dry-run) restore can replace providers, models, accounts,
+      // settings, etc. Refresh the whole admin cache instead of leaving every
+      // admin view showing pre-restore data.
+      if (!vars.dryRun) {
+        qc.invalidateQueries({ queryKey: ["admin"] });
+      }
+    },
   });
 }

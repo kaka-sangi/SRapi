@@ -45,6 +45,14 @@ export default function KeyUsagePage() {
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<GatewayUsageResponse | null>(null);
 
+  // Changing the window drops the previous report/error so a different-period
+  // result isn't shown under the new filter until the user re-runs the lookup.
+  function changeDays(next: string) {
+    setDays(next);
+    setReport(null);
+    setError(null);
+  }
+
   async function lookup(event: React.FormEvent) {
     event.preventDefault();
     const trimmed = key.trim();
@@ -102,7 +110,7 @@ export default function KeyUsagePage() {
                 </div>
                 <div>
                   <Label htmlFor="lookup-days">{t("keyUsage.window")}</Label>
-                  <Select value={days} onValueChange={setDays}>
+                  <Select value={days} onValueChange={changeDays}>
                     <SelectTrigger id="lookup-days" className="w-28">
                       <SelectValue />
                     </SelectTrigger>

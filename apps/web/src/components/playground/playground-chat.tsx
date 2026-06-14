@@ -117,6 +117,15 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, running]);
 
+  // Re-validate the selected model against the available list (the React-blessed
+  // "adjust state during render" pattern): when the list finishes loading or a
+  // model is revoked, snap an out-of-list pick back to the default so the
+  // composer can't sit on a model the user can't actually use. The guard makes
+  // it converge in one extra render.
+  if (model && models.length > 0 && !models.includes(model)) {
+    setModel(defaultModel && models.includes(defaultModel) ? defaultModel : models[0]);
+  }
+
   // Persist after a turn settles (not on every streaming delta) and whenever
   // the picker/params change, so a reload restores the latest state. An empty
   // conversation still persists model/effort/params.

@@ -29,10 +29,18 @@ export type B<F extends (...a: never[]) => unknown> = Parameters<F>[1];
 export function useAdminMutation<TVars, TData>(
   mutationFn: (vars: TVars) => Promise<TData>,
   invalidate: readonly unknown[],
+  // Extra query keys to invalidate alongside the primary one — for mutations
+  // that affect more than one cache (e.g. a list AND its summary stats).
+  ...alsoInvalidate: (readonly unknown[])[]
 ) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn,
-    onSuccess: () => qc.invalidateQueries({ queryKey: invalidate }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: invalidate });
+      for (const key of alsoInvalidate) {
+        qc.invalidateQueries({ queryKey: key });
+      }
+    },
   });
 }

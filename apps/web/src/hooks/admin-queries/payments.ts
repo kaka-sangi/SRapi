@@ -75,22 +75,29 @@ export function useCreateRedeemCode() {
   return useAdminMutation(
     (body: P<typeof adminApi.createRedeemCode>) => adminApi.createRedeemCode(body),
     ["admin", "redeem-codes"],
+    queryKeys.admin.redeemStats(),
   );
 }
 export function useBatchGenerateRedeemCodes() {
   return useAdminMutation(
     (body: P<typeof adminApi.batchGenerateRedeemCodes>) => adminApi.batchGenerateRedeemCodes(body),
     ["admin", "redeem-codes"],
+    queryKeys.admin.redeemStats(),
   );
 }
 export function useBatchDisableRedeemCodes() {
   return useAdminMutation(
     (ids: string[]) => adminApi.batchDisableRedeemCodes(ids),
     ["admin", "redeem-codes"],
+    queryKeys.admin.redeemStats(),
   );
 }
 export function useDeleteRedeemCode() {
-  return useAdminMutation((id: string) => adminApi.deleteRedeemCode(id), ["admin", "redeem-codes"]);
+  return useAdminMutation(
+    (id: string) => adminApi.deleteRedeemCode(id),
+    ["admin", "redeem-codes"],
+    queryKeys.admin.redeemStats(),
+  );
 }
 export function useRedeemStats() {
   return useQuery({

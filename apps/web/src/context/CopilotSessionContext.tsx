@@ -344,6 +344,9 @@ export function CopilotSessionProvider({ children }: { children: ReactNode }) {
       titleRef.current = conv.title;
       persistSession(conv.messages ?? [], conv.id);
     } catch (err) {
+      // Clear the previously-loaded conversation so a failed switch doesn't leave
+      // the old messages on screen, misattributed under the new error.
+      persistSession([], null);
       setError((err as Error)?.message ?? "Failed to load conversation");
     }
   }

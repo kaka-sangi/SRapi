@@ -121,7 +121,7 @@ export function AccountImportDialog({
     setError(null);
     setResult(null);
     setFileName(null);
-    setCodexProviderId(defaultProviderId);
+    setCodexProviderId(defaultCodexProviderId);
     setCodexContent("");
     setCodexName("");
     setCodexUpdateExisting(true);
