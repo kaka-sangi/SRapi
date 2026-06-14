@@ -478,7 +478,9 @@ function OpsOverviewContent() {
         />
       ) : null}
 
-      <AlertSilenceFormDialog open={showSilenceForm} onOpenChange={setShowSilenceForm} />
+      {showSilenceForm ? (
+        <AlertSilenceFormDialog open onOpenChange={setShowSilenceForm} />
+      ) : null}
 
       {ruleToDelete ? (
         <ConfirmDialog
