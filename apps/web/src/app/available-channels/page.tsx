@@ -103,7 +103,7 @@ function AvailableModelsTable({
             />
           </div>
           <span className="ml-auto font-mono text-2xs text-srapi-text-tertiary tabular">
-            {filtered.length} / {models.length}
+            {rows.length} / {models.flatMap((m) => m.channels).length}
           </span>
         </div>
       </CardHeader>

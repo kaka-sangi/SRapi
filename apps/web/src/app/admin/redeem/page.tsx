@@ -70,16 +70,14 @@ export default function AdminRedeemPage() {
   );
 }
 
-const REDEEM_STATUS_OPTIONS: { value: RedeemCode["status"]; label: string }[] = [
-  { value: "active", label: "active" },
-  { value: "redeemed", label: "redeemed" },
-  { value: "disabled", label: "disabled" },
-  { value: "expired", label: "expired" },
-];
+const REDEEM_STATUS_VALUES: RedeemCode["status"][] = ["active", "redeemed", "disabled", "expired"];
 
 function RedeemContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
+  // Translate the status filter labels (the badge column already uses
+  // statusLabel) instead of showing hardcoded English.
+  const statusOptions = REDEEM_STATUS_VALUES.map((value) => ({ value, label: statusLabel(t, value) }));
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-redeem", []);
   const statusFilter = (list.filters.status as RedeemCode["status"]) || undefined;
@@ -224,7 +222,7 @@ function RedeemContent() {
             <FilterSelect
               value={statusFilter}
               onChange={(v) => list.setFilter("status", v)}
-              options={REDEEM_STATUS_OPTIONS}
+              options={statusOptions}
               allLabel={t("adminCommon.allStatuses")}
             />
           </ListToolbar>
