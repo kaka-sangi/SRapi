@@ -584,6 +584,26 @@ func (_u *UsageLogUpdate) ClearChargedAt() *UsageLogUpdate {
 	return _u
 }
 
+// SetAggregatedAt sets the "aggregated_at" field.
+func (_u *UsageLogUpdate) SetAggregatedAt(v time.Time) *UsageLogUpdate {
+	_u.mutation.SetAggregatedAt(v)
+	return _u
+}
+
+// SetNillableAggregatedAt sets the "aggregated_at" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableAggregatedAt(v *time.Time) *UsageLogUpdate {
+	if v != nil {
+		_u.SetAggregatedAt(*v)
+	}
+	return _u
+}
+
+// ClearAggregatedAt clears the value of the "aggregated_at" field.
+func (_u *UsageLogUpdate) ClearAggregatedAt() *UsageLogUpdate {
+	_u.mutation.ClearAggregatedAt()
+	return _u
+}
+
 // SetCompatibilityWarningsJSON sets the "compatibility_warnings_json" field.
 func (_u *UsageLogUpdate) SetCompatibilityWarningsJSON(v []string) *UsageLogUpdate {
 	_u.mutation.SetCompatibilityWarningsJSON(v)
@@ -808,6 +828,12 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ChargedAtCleared() {
 		_spec.ClearField(usagelog.FieldChargedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.AggregatedAt(); ok {
+		_spec.SetField(usagelog.FieldAggregatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.AggregatedAtCleared() {
+		_spec.ClearField(usagelog.FieldAggregatedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.CompatibilityWarningsJSON(); ok {
 		_spec.SetField(usagelog.FieldCompatibilityWarningsJSON, field.TypeJSON, value)
@@ -1395,6 +1421,26 @@ func (_u *UsageLogUpdateOne) ClearChargedAt() *UsageLogUpdateOne {
 	return _u
 }
 
+// SetAggregatedAt sets the "aggregated_at" field.
+func (_u *UsageLogUpdateOne) SetAggregatedAt(v time.Time) *UsageLogUpdateOne {
+	_u.mutation.SetAggregatedAt(v)
+	return _u
+}
+
+// SetNillableAggregatedAt sets the "aggregated_at" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableAggregatedAt(v *time.Time) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetAggregatedAt(*v)
+	}
+	return _u
+}
+
+// ClearAggregatedAt clears the value of the "aggregated_at" field.
+func (_u *UsageLogUpdateOne) ClearAggregatedAt() *UsageLogUpdateOne {
+	_u.mutation.ClearAggregatedAt()
+	return _u
+}
+
 // SetCompatibilityWarningsJSON sets the "compatibility_warnings_json" field.
 func (_u *UsageLogUpdateOne) SetCompatibilityWarningsJSON(v []string) *UsageLogUpdateOne {
 	_u.mutation.SetCompatibilityWarningsJSON(v)
@@ -1649,6 +1695,12 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if _u.mutation.ChargedAtCleared() {
 		_spec.ClearField(usagelog.FieldChargedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.AggregatedAt(); ok {
+		_spec.SetField(usagelog.FieldAggregatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.AggregatedAtCleared() {
+		_spec.ClearField(usagelog.FieldAggregatedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.CompatibilityWarningsJSON(); ok {
 		_spec.SetField(usagelog.FieldCompatibilityWarningsJSON, field.TypeJSON, value)

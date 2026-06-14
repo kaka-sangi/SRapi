@@ -472,6 +472,20 @@ func (_c *UsageLogCreate) SetNillableChargedAt(v *time.Time) *UsageLogCreate {
 	return _c
 }
 
+// SetAggregatedAt sets the "aggregated_at" field.
+func (_c *UsageLogCreate) SetAggregatedAt(v time.Time) *UsageLogCreate {
+	_c.mutation.SetAggregatedAt(v)
+	return _c
+}
+
+// SetNillableAggregatedAt sets the "aggregated_at" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableAggregatedAt(v *time.Time) *UsageLogCreate {
+	if v != nil {
+		_c.SetAggregatedAt(*v)
+	}
+	return _c
+}
+
 // SetCompatibilityWarningsJSON sets the "compatibility_warnings_json" field.
 func (_c *UsageLogCreate) SetCompatibilityWarningsJSON(v []string) *UsageLogCreate {
 	_c.mutation.SetCompatibilityWarningsJSON(v)
@@ -881,6 +895,10 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ChargedAt(); ok {
 		_spec.SetField(usagelog.FieldChargedAt, field.TypeTime, value)
 		_node.ChargedAt = &value
+	}
+	if value, ok := _c.mutation.AggregatedAt(); ok {
+		_spec.SetField(usagelog.FieldAggregatedAt, field.TypeTime, value)
+		_node.AggregatedAt = &value
 	}
 	if value, ok := _c.mutation.CompatibilityWarningsJSON(); ok {
 		_spec.SetField(usagelog.FieldCompatibilityWarningsJSON, field.TypeJSON, value)

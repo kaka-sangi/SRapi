@@ -86,6 +86,8 @@ type UsageLog struct {
 	Currency string `json:"currency,omitempty"`
 	// ChargedAt holds the value of the "charged_at" field.
 	ChargedAt *time.Time `json:"charged_at,omitempty"`
+	// AggregatedAt holds the value of the "aggregated_at" field.
+	AggregatedAt *time.Time `json:"aggregated_at,omitempty"`
 	// CompatibilityWarningsJSON holds the value of the "compatibility_warnings_json" field.
 	CompatibilityWarningsJSON []string `json:"compatibility_warnings_json,omitempty"`
 	selectValues              sql.SelectValues
@@ -104,7 +106,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case usagelog.FieldRequestID, usagelog.FieldSourceProtocol, usagelog.FieldSourceEndpoint, usagelog.FieldTargetProtocol, usagelog.FieldModel, usagelog.FieldErrorClass, usagelog.FieldCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier, usagelog.FieldBillableCost, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCacheReadCost, usagelog.FieldCacheWriteCost, usagelog.FieldRequestedModel, usagelog.FieldUpstreamModel, usagelog.FieldBillingMode, usagelog.FieldCurrency:
 			values[i] = new(sql.NullString)
-		case usagelog.FieldCreatedAt, usagelog.FieldUpdatedAt, usagelog.FieldChargedAt:
+		case usagelog.FieldCreatedAt, usagelog.FieldUpdatedAt, usagelog.FieldChargedAt, usagelog.FieldAggregatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -335,6 +337,13 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 				_m.ChargedAt = new(time.Time)
 				*_m.ChargedAt = value.Time
 			}
+		case usagelog.FieldAggregatedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field aggregated_at", values[i])
+			} else if value.Valid {
+				_m.AggregatedAt = new(time.Time)
+				*_m.AggregatedAt = value.Time
+			}
 		case usagelog.FieldCompatibilityWarningsJSON:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field compatibility_warnings_json", values[i])
@@ -486,6 +495,11 @@ func (_m *UsageLog) String() string {
 	builder.WriteString(", ")
 	if v := _m.ChargedAt; v != nil {
 		builder.WriteString("charged_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.AggregatedAt; v != nil {
+		builder.WriteString("aggregated_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")

@@ -272,6 +272,25 @@ func (s *Store) IncrementMaterializedUsage(ctx context.Context, delta contract.U
 	return materializedUsageFromSubscription(updated, at), nil
 }
 
+// ApplyUsageDeltaTx applies a materialized-usage delta within the caller's
+// transaction (the caller owns commit/rollback). It is a no-op when the user has
+// no active subscription. Used by the cross-table billing-aggregation coordinator
+// so the subscription increment, the API-key cost increment and the usage_log
+// marker all commit atomically. Reuses the same window-roll logic as
+// IncrementMaterializedUsage.
+func (s *Store) ApplyUsageDeltaTx(ctx context.Context, tx *ent.Tx, delta contract.UsageDelta) error {
+	row, err := activeSubscriptionForUser(ctx, tx, delta.UserID, delta.OccurredAt.UTC())
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	updated := applyUsageDelta(toSubscription(row), delta)
+	_, err = updateSubscriptionUsage(ctx, tx, updated)
+	return err
+}
+
 func (s *Store) ListActiveEntitlements(ctx context.Context, userID int, at time.Time) ([]contract.Entitlement, error) {
 	at = at.UTC()
 	rows, err := s.client.Entitlement.Query().
@@ -351,15 +370,15 @@ func resetExpiredUsage(subscription contract.UserSubscription, at time.Time) con
 	dayStart := startOfDayUTC(at)
 	weekStart := startOfWeekUTC(at)
 	monthStart := startOfMonthUTC(at)
-	if subscription.DailyWindowStart == nil || isExpiredWindow(*subscription.DailyWindowStart, dayStart) {
+	if subscription.DailyWindowStart == nil || windowRolledForward(*subscription.DailyWindowStart, dayStart) {
 		subscription.DailyUsageUSD = money.ZeroAmount
 		subscription.DailyWindowStart = &dayStart
 	}
-	if subscription.WeeklyWindowStart == nil || isExpiredWindow(*subscription.WeeklyWindowStart, weekStart) {
+	if subscription.WeeklyWindowStart == nil || windowRolledForward(*subscription.WeeklyWindowStart, weekStart) {
 		subscription.WeeklyUsageUSD = money.ZeroAmount
 		subscription.WeeklyWindowStart = &weekStart
 	}
-	if subscription.MonthlyWindowStart == nil || isExpiredWindow(*subscription.MonthlyWindowStart, monthStart) {
+	if subscription.MonthlyWindowStart == nil || windowRolledForward(*subscription.MonthlyWindowStart, monthStart) {
 		subscription.MonthlyUsageUSD = money.ZeroAmount
 		subscription.MonthlyWindowStart = &monthStart
 	}
@@ -385,8 +404,14 @@ func startOfMonthUTC(value time.Time) time.Time {
 	return time.Date(value.Year(), value.Month(), 1, 0, 0, 0, 0, time.UTC)
 }
 
-func isExpiredWindow(storedStart, expectedStart time.Time) bool {
-	return !storedStart.UTC().Equal(expectedStart.UTC())
+// windowRolledForward reports whether expectedStart (the period containing the
+// event time) is a strictly newer period than the stored window start. It is
+// deliberately forward-only: the live path always advances time, so this matches
+// the previous "different period" behavior there, but a reconciler replaying an
+// older usage_log row (OccurredAt in a past period) must NOT roll a current
+// window backward — that would zero out the current period's accumulated usage.
+func windowRolledForward(storedStart, expectedStart time.Time) bool {
+	return expectedStart.UTC().After(storedStart.UTC())
 }
 
 func (s *Store) activeSubscriptionIDs(ctx context.Context, rows []*ent.Entitlement, at time.Time) (map[int]bool, error) {

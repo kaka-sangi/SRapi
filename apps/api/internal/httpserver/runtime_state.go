@@ -256,6 +256,12 @@ type runtimeState struct {
 	// out with a handler still in flight.
 	usageMu       sync.RWMutex
 	usageDraining bool
+
+	// usageAggregator, when set, applies a completed request's billing
+	// aggregation (subscription materialized usage + api-key cost usage) under the
+	// usage_log.aggregated_at idempotency marker. When nil the gateway uses the
+	// direct (unmarked) increment path.
+	usageAggregator usageAggregator
 }
 
 type dependencyHealth struct {
@@ -960,7 +966,8 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 			MaxEntries: 512,
 			DefaultTTL: 30 * time.Second,
 		}),
-		eventHub: eventsub.NewHub(),
+		eventHub:        eventsub.NewHub(),
+		usageAggregator: opts.usageAggregator,
 	}
 }
 

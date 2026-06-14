@@ -73,6 +73,14 @@ type dependencyPinger interface {
 	Ping(context.Context) error
 }
 
+// usageAggregator applies the cross-table billing aggregation (subscription
+// materialized usage + API-key cost usage) for a usage_log row exactly once,
+// gated by usage_log.aggregated_at. The gateway applies it eagerly off the hot
+// path; a reconciler sweeps any dropped rows.
+type usageAggregator interface {
+	ApplyAggregation(ctx context.Context, usageLogID int) (bool, error)
+}
+
 type Option func(*runtimeOptions)
 
 type runtimeOptions struct {
@@ -113,6 +121,7 @@ type runtimeOptions struct {
 	copilotConvs        copilotconvcontract.ConversationStore
 	metrics             *runtimeMetricsState
 	backgroundDrainSink *func(context.Context)
+	usageAggregator     usageAggregator
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -346,6 +355,16 @@ func withRuntimeMetricsState(metrics *runtimeMetricsState) Option {
 func WithBackgroundDrainHook(sink *func(context.Context)) Option {
 	return func(opts *runtimeOptions) {
 		opts.backgroundDrainSink = sink
+	}
+}
+
+// WithUsageAggregator wires the cross-table billing-aggregation coordinator so
+// the gateway applies a usage_log row's subscription/api-key increments eagerly
+// (off the hot path) under the aggregated_at idempotency marker. When unset, the
+// gateway falls back to the direct (unmarked) increment path.
+func WithUsageAggregator(agg usageAggregator) Option {
+	return func(opts *runtimeOptions) {
+		opts.usageAggregator = agg
 	}
 }
 

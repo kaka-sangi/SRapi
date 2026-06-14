@@ -224,6 +224,11 @@ func ChargedAt(v time.Time) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldChargedAt, v))
 }
 
+// AggregatedAt applies equality check predicate on the "aggregated_at" field. It's identical to AggregatedAtEQ.
+func AggregatedAt(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldAggregatedAt, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCreatedAt, v))
@@ -2012,6 +2017,56 @@ func ChargedAtIsNil() predicate.UsageLog {
 // ChargedAtNotNil applies the NotNil predicate on the "charged_at" field.
 func ChargedAtNotNil() predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldNotNull(FieldChargedAt))
+}
+
+// AggregatedAtEQ applies the EQ predicate on the "aggregated_at" field.
+func AggregatedAtEQ(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldAggregatedAt, v))
+}
+
+// AggregatedAtNEQ applies the NEQ predicate on the "aggregated_at" field.
+func AggregatedAtNEQ(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldAggregatedAt, v))
+}
+
+// AggregatedAtIn applies the In predicate on the "aggregated_at" field.
+func AggregatedAtIn(vs ...time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldAggregatedAt, vs...))
+}
+
+// AggregatedAtNotIn applies the NotIn predicate on the "aggregated_at" field.
+func AggregatedAtNotIn(vs ...time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldAggregatedAt, vs...))
+}
+
+// AggregatedAtGT applies the GT predicate on the "aggregated_at" field.
+func AggregatedAtGT(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldAggregatedAt, v))
+}
+
+// AggregatedAtGTE applies the GTE predicate on the "aggregated_at" field.
+func AggregatedAtGTE(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldAggregatedAt, v))
+}
+
+// AggregatedAtLT applies the LT predicate on the "aggregated_at" field.
+func AggregatedAtLT(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldAggregatedAt, v))
+}
+
+// AggregatedAtLTE applies the LTE predicate on the "aggregated_at" field.
+func AggregatedAtLTE(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldAggregatedAt, v))
+}
+
+// AggregatedAtIsNil applies the IsNil predicate on the "aggregated_at" field.
+func AggregatedAtIsNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIsNull(FieldAggregatedAt))
+}
+
+// AggregatedAtNotNil applies the NotNil predicate on the "aggregated_at" field.
+func AggregatedAtNotNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotNull(FieldAggregatedAt))
 }
 
 // CompatibilityWarningsJSONIsNil applies the IsNil predicate on the "compatibility_warnings_json" field.

@@ -51,6 +51,11 @@ func (UsageLog) Fields() []ent.Field {
 		field.String("billing_mode").Default("token"),
 		field.String("currency").Default("USD"),
 		field.Time("charged_at").Optional().Nillable(),
+		// aggregated_at marks that this row's billing aggregation (subscription
+		// materialized usage + api-key cost usage) has been applied exactly once.
+		// NULL = not yet applied; the reconciler sweeps NULL rows. Mirrors the
+		// charged_at balance-settlement marker.
+		field.Time("aggregated_at").Optional().Nillable(),
 		field.JSON("compatibility_warnings_json", []string{}).Optional(),
 	}
 }
@@ -60,6 +65,7 @@ func (UsageLog) Indexes() []ent.Index {
 		index.Fields("request_id", "attempt_no").Unique(),
 		index.Fields("user_id", "created_at"),
 		index.Fields("charged_at", "success", "created_at"),
+		index.Fields("aggregated_at", "success", "created_at"),
 		index.Fields("api_key_id", "created_at"),
 		index.Fields("provider_id", "created_at"),
 		index.Fields("account_id", "created_at"),

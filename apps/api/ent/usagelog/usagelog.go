@@ -81,6 +81,8 @@ const (
 	FieldCurrency = "currency"
 	// FieldChargedAt holds the string denoting the charged_at field in the database.
 	FieldChargedAt = "charged_at"
+	// FieldAggregatedAt holds the string denoting the aggregated_at field in the database.
+	FieldAggregatedAt = "aggregated_at"
 	// FieldCompatibilityWarningsJSON holds the string denoting the compatibility_warnings_json field in the database.
 	FieldCompatibilityWarningsJSON = "compatibility_warnings_json"
 	// Table holds the table name of the usagelog in the database.
@@ -124,6 +126,7 @@ var Columns = []string{
 	FieldBillingMode,
 	FieldCurrency,
 	FieldChargedAt,
+	FieldAggregatedAt,
 	FieldCompatibilityWarningsJSON,
 }
 
@@ -374,4 +377,9 @@ func ByCurrency(opts ...sql.OrderTermOption) OrderOption {
 // ByChargedAt orders the results by the charged_at field.
 func ByChargedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldChargedAt, opts...).ToFunc()
+}
+
+// ByAggregatedAt orders the results by the aggregated_at field.
+func ByAggregatedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAggregatedAt, opts...).ToFunc()
 }

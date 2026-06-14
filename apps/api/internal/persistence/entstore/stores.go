@@ -61,6 +61,7 @@ import (
 	tlsprofilesstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/tlsprofiles"
 	totpstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/totp"
 	usagestore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/usage"
+	usagebillingstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/usagebilling"
 	userattributesstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/userattributes"
 	userplatformquotasstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/userplatformquotas"
 	userstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/users"
@@ -101,6 +102,9 @@ type Stores struct {
 	ScheduledTests     scheduledtestscontract.Store
 	ChannelMonitors    channelmonitorscontract.Store
 	CopilotConvs       copilotconvcontract.ConversationStore
+	// UsageBilling coordinates the cross-table billing aggregation (subscription
+	// materialized usage + API-key cost usage) gated by usage_log.aggregated_at.
+	UsageBilling *usagebillingstore.Store
 }
 
 func New(client *ent.Client) (Stores, error) {
@@ -224,6 +228,10 @@ func New(client *ent.Client) (Stores, error) {
 	if err != nil {
 		return Stores{}, err
 	}
+	usageBilling, err := usagebillingstore.New(client, subscriptions, apiKeys)
+	if err != nil {
+		return Stores{}, err
+	}
 	return Stores{
 		AdminControl:       adminControl,
 		Users:              users,
@@ -257,5 +265,6 @@ func New(client *ent.Client) (Stores, error) {
 		ScheduledTests:     scheduledTests,
 		ChannelMonitors:    channelMonitors,
 		CopilotConvs:       copilotConvs,
+		UsageBilling:       usageBilling,
 	}, nil
 }

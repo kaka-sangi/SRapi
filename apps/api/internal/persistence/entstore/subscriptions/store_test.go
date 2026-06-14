@@ -197,3 +197,35 @@ func sqliteDSN(t *testing.T) string {
 	t.Helper()
 	return "file:" + filepath.Join(t.TempDir(), "subscriptions.db") + "?_fk=1"
 }
+
+// TestResetExpiredUsageIsForwardOnly locks in the reconciler-safety guard: an
+// event replayed with a PAST timestamp (a late/dropped usage_log row) must never
+// roll a current window backward and zero out the period's accumulated usage,
+// while a genuinely newer period still resets forward as before.
+func TestResetExpiredUsageIsForwardOnly(t *testing.T) {
+	today := time.Date(2026, 6, 14, 0, 0, 0, 0, time.UTC)
+	weekStart := startOfWeekUTC(today)
+	monthStart := startOfMonthUTC(today)
+	base := contract.UserSubscription{
+		DailyUsageUSD: "5.00000000", DailyWindowStart: &today,
+		WeeklyUsageUSD: "5.00000000", WeeklyWindowStart: &weekStart,
+		MonthlyUsageUSD: "5.00000000", MonthlyWindowStart: &monthStart,
+	}
+
+	// Replay from the previous day: windows must stay put (no backward reset).
+	past := today.AddDate(0, 0, -1).Add(12 * time.Hour)
+	got := resetExpiredUsage(base, past)
+	if got.DailyUsageUSD != "5.00000000" || !got.DailyWindowStart.Equal(today) {
+		t.Fatalf("daily window rolled backward: usage=%s start=%s", got.DailyUsageUSD, got.DailyWindowStart)
+	}
+	if got.MonthlyUsageUSD != "5.00000000" {
+		t.Fatalf("monthly usage wiped by backward replay: %s", got.MonthlyUsageUSD)
+	}
+
+	// A genuinely newer day still resets forward.
+	next := today.AddDate(0, 0, 1).Add(time.Hour)
+	fwd := resetExpiredUsage(base, next)
+	if fwd.DailyUsageUSD != "0.00000000" || !fwd.DailyWindowStart.Equal(today.AddDate(0, 0, 1)) {
+		t.Fatalf("daily window did not roll forward: usage=%s start=%s", fwd.DailyUsageUSD, fwd.DailyWindowStart)
+	}
+}

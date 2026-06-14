@@ -37,6 +37,7 @@ import (
 	scheduledtestworker "github.com/srapi/srapi/apps/api/internal/workers/scheduled_test"
 	sloevaluatorworker "github.com/srapi/srapi/apps/api/internal/workers/slo_evaluator"
 	subscriptionexpirerworker "github.com/srapi/srapi/apps/api/internal/workers/subscription_expirer"
+	usageaggregationreconcilerworker "github.com/srapi/srapi/apps/api/internal/workers/usage_aggregation_reconciler"
 	"github.com/srapi/srapi/apps/api/migrations"
 )
 
@@ -72,6 +73,9 @@ type App struct {
 	// during graceful shutdown. Populated by newHandler; nil when async usage
 	// processing is disabled.
 	usageDrain func(context.Context)
+	// usageReconciler re-applies billing aggregation for usage_log rows whose
+	// eager apply was dropped (e.g. on a crash). Nil under memory storage.
+	usageReconciler *usageaggregationreconcilerworker.Worker
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*App, error) {
@@ -97,7 +101,8 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	}
 
 	var usageDrain func(context.Context)
-	handler, outbox, retention, availability, backup, authClean, expirer, reconcile, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, liteLLMPricing, connectivityTest, scheduledTest, channelMonitor, err := newHandler(cfg, logger, dbClient, redisClient, &usageDrain)
+	var usageReconciler *usageaggregationreconcilerworker.Worker
+	handler, outbox, retention, availability, backup, authClean, expirer, reconcile, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, liteLLMPricing, connectivityTest, scheduledTest, channelMonitor, err := newHandler(cfg, logger, dbClient, redisClient, &usageDrain, &usageReconciler)
 	if err != nil {
 		_ = dbClient.Close()
 		_ = redisClient.Close()
@@ -137,6 +142,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		quality:          quality,
 		sloEval:          sloEval,
 		usageDrain:       usageDrain,
+		usageReconciler:  usageReconciler,
 	}, nil
 }
 
@@ -213,7 +219,7 @@ func Healthcheck(ctx context.Context, cfg config.Config, path string) error {
 	return httpserver.Healthcheck(ctx, cfg.HealthcheckAddress(), path)
 }
 
-func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client, usageDrainSink *func(context.Context)) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *availabilityrollupworker.Worker, *backupworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *paymentreconcileworker.Worker, *subscriptionexpirerworker.Worker, *accountquotaalertworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, *idempotencycleanupworker.Worker, *quotarefreshworker.Worker, *litellmpricingworker.Worker, *connectivitytestworker.Worker, *scheduledtestworker.Worker, *channelmonitorworker.Worker, error) {
+func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client, usageDrainSink *func(context.Context), reconcilerSink **usageaggregationreconcilerworker.Worker) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *availabilityrollupworker.Worker, *backupworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *paymentreconcileworker.Worker, *subscriptionexpirerworker.Worker, *accountquotaalertworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, *idempotencycleanupworker.Worker, *quotarefreshworker.Worker, *litellmpricingworker.Worker, *connectivitytestworker.Worker, *scheduledtestworker.Worker, *channelmonitorworker.Worker, error) {
 	var (
 		handler http.Handler
 		err     error
@@ -369,6 +375,18 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithChannelMonitorsStore(stores.ChannelMonitors),
 			httpserver.WithCopilotConversationStore(stores.CopilotConvs),
 		)
+		if stores.UsageBilling != nil {
+			options = append(options, httpserver.WithUsageAggregator(stores.UsageBilling))
+		}
+		// The reconciler is non-critical background cleanup; if it can't be built,
+		// log and continue rather than failing the whole server.
+		if reconcilerSink != nil {
+			if w, werr := usageAggregationReconcilerWorker(stores, logger, workerGuard); werr != nil {
+				logger.Error("failed to construct usage aggregation reconciler", "error", werr)
+			} else {
+				*reconcilerSink = w
+			}
+		}
 	}
 
 	func() {
@@ -690,6 +708,15 @@ func balanceChargerWorker(cfg config.Config, stores *entstore.Stores, logger *sl
 	})
 }
 
+func usageAggregationReconcilerWorker(stores *entstore.Stores, logger *slog.Logger, guards ...*workerLeaderGuard) (*usageaggregationreconcilerworker.Worker, error) {
+	if stores == nil || stores.UsageBilling == nil {
+		return nil, nil
+	}
+	return usageaggregationreconcilerworker.New(stores.UsageBilling, logger, usageaggregationreconcilerworker.Config{
+		RunGuard: optionalWorkerGuard(guards...),
+	})
+}
+
 func accountHealthProbeWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger, guards ...*workerLeaderGuard) (*healthprobeworker.Worker, error) {
 	if stores == nil || stores.Accounts == nil || stores.Providers == nil {
 		return nil, nil
@@ -835,6 +862,9 @@ func (a *App) startWorkers() {
 	if a.balance != nil {
 		a.balance.Start(context.Background())
 	}
+	if a.usageReconciler != nil {
+		a.usageReconciler.Start(context.Background())
+	}
 	if a.health != nil {
 		a.health.Start(context.Background())
 	}
@@ -898,6 +928,9 @@ func (a *App) stopWorkers(ctx context.Context) error {
 	}
 	if a.balance != nil {
 		errs = append(errs, a.balance.Shutdown(ctx))
+	}
+	if a.usageReconciler != nil {
+		errs = append(errs, a.usageReconciler.Shutdown(ctx))
 	}
 	if a.health != nil {
 		errs = append(errs, a.health.Shutdown(ctx))

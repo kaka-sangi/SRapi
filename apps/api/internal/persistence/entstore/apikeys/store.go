@@ -240,20 +240,34 @@ func (s *Store) ApplyCostUsage(ctx context.Context, input contract.CostUsageUpda
 	if err != nil {
 		return contract.APIKey{}, err
 	}
+	if err := s.ApplyCostUsageTx(ctx, tx, input); err != nil {
+		_ = tx.Rollback()
+		return contract.APIKey{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return contract.APIKey{}, err
+	}
+	return s.FindByID(ctx, input.KeyID)
+}
+
+// ApplyCostUsageTx applies a cost-usage delta to an API key within the caller's
+// transaction (the caller owns commit/rollback). Returns contract.ErrKeyNotFound
+// when the key is absent. Used by the cross-table billing-aggregation
+// coordinator so the cost increment commits atomically with the subscription
+// increment and the usage_log marker.
+func (s *Store) ApplyCostUsageTx(ctx context.Context, tx *ent.Tx, input contract.CostUsageUpdate) error {
 	stored, err := tx.APIKey.Query().
 		Where(entapikey.IDEQ(input.KeyID), entapikey.DeletedAtIsNil()).
 		Only(ctx)
 	if err != nil {
-		_ = tx.Rollback()
 		if ent.IsNotFound(err) {
-			return contract.APIKey{}, contract.ErrKeyNotFound
+			return contract.ErrKeyNotFound
 		}
-		return contract.APIKey{}, err
+		return err
 	}
 	key, err := s.toAPIKeyWithTx(ctx, tx, stored)
 	if err != nil {
-		_ = tx.Rollback()
-		return contract.APIKey{}, err
+		return err
 	}
 	key = applyAPIKeyCostUsage(key, input)
 	_, err = tx.APIKey.UpdateOneID(stored.ID).
@@ -267,16 +281,12 @@ func (s *Store) ApplyCostUsage(ctx context.Context, input contract.CostUsageUpda
 		SetNillableCostWindowStart7d(key.CostWindowStart7d).
 		Save(ctx)
 	if err != nil {
-		_ = tx.Rollback()
 		if ent.IsNotFound(err) {
-			return contract.APIKey{}, contract.ErrKeyNotFound
+			return contract.ErrKeyNotFound
 		}
-		return contract.APIKey{}, err
+		return err
 	}
-	if err := tx.Commit(); err != nil {
-		return contract.APIKey{}, err
-	}
-	return s.FindByID(ctx, stored.ID)
+	return nil
 }
 
 func applyAPIKeyCostUsage(key contract.APIKey, input contract.CostUsageUpdate) contract.APIKey {

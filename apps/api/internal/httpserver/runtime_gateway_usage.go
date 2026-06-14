@@ -85,9 +85,13 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		rt.enqueueGatewayUsageEvent(ctx, usageLog)
 	}
 
+	usageLogID := 0
+	if usageErr == nil {
+		usageLogID = usageLog.ID
+	}
 	detached := context.WithoutCancel(ctx)
 	rt.dispatchUsageWrite(detached, func(c context.Context) {
-		rt.recordGatewayUsageEffects(c, rec, model, pricing)
+		rt.recordGatewayUsageEffects(c, rec, model, pricing, usageLogID)
 	})
 }
 
@@ -97,9 +101,20 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 // cooldown, risk signals and the account snapshot refresh. On a hard crash an
 // in-flight invocation may be lost, but every value here is derivable from the
 // usage_log row recorded synchronously by recordGatewayUsage.
-func (rt *runtimeState) recordGatewayUsageEffects(ctx context.Context, rec gatewayUsageRecord, model string, pricing gatewayPricingEvidence) {
+func (rt *runtimeState) recordGatewayUsageEffects(ctx context.Context, rec gatewayUsageRecord, model string, pricing gatewayPricingEvidence, usageLogID int) {
 	if rec.Success {
-		rt.recordGatewayMaterializedCosts(ctx, rec, pricing.BillableCost)
+		// Prefer the marked, idempotent cross-table aggregation when wired; it
+		// applies the same subscription + api-key increments atomically and lets
+		// the reconciler recover any dropped applies. Fall back to the direct
+		// increments when no aggregator is configured (tests, memory storage) or
+		// the usage_log row wasn't persisted.
+		if rt.usageAggregator != nil && usageLogID > 0 {
+			if _, err := rt.usageAggregator.ApplyAggregation(ctx, usageLogID); err != nil {
+				rt.logger.Warn("failed to aggregate gateway usage billing", "error", err, "request_id", rec.RequestID, "usage_log_id", usageLogID)
+			}
+		} else {
+			rt.recordGatewayMaterializedCosts(ctx, rec, pricing.BillableCost)
+		}
 	}
 	if rec.DecisionID <= 0 || rec.AccountID == nil || rec.ProviderID == nil {
 		return

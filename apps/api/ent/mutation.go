@@ -61870,6 +61870,7 @@ type UsageLogMutation struct {
 	billing_mode                      *string
 	currency                          *string
 	charged_at                        *time.Time
+	aggregated_at                     *time.Time
 	compatibility_warnings_json       *[]string
 	appendcompatibility_warnings_json []string
 	clearedFields                     map[string]struct{}
@@ -63474,6 +63475,55 @@ func (m *UsageLogMutation) ResetChargedAt() {
 	delete(m.clearedFields, usagelog.FieldChargedAt)
 }
 
+// SetAggregatedAt sets the "aggregated_at" field.
+func (m *UsageLogMutation) SetAggregatedAt(t time.Time) {
+	m.aggregated_at = &t
+}
+
+// AggregatedAt returns the value of the "aggregated_at" field in the mutation.
+func (m *UsageLogMutation) AggregatedAt() (r time.Time, exists bool) {
+	v := m.aggregated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAggregatedAt returns the old "aggregated_at" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldAggregatedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAggregatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAggregatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAggregatedAt: %w", err)
+	}
+	return oldValue.AggregatedAt, nil
+}
+
+// ClearAggregatedAt clears the value of the "aggregated_at" field.
+func (m *UsageLogMutation) ClearAggregatedAt() {
+	m.aggregated_at = nil
+	m.clearedFields[usagelog.FieldAggregatedAt] = struct{}{}
+}
+
+// AggregatedAtCleared returns if the "aggregated_at" field was cleared in this mutation.
+func (m *UsageLogMutation) AggregatedAtCleared() bool {
+	_, ok := m.clearedFields[usagelog.FieldAggregatedAt]
+	return ok
+}
+
+// ResetAggregatedAt resets all changes to the "aggregated_at" field.
+func (m *UsageLogMutation) ResetAggregatedAt() {
+	m.aggregated_at = nil
+	delete(m.clearedFields, usagelog.FieldAggregatedAt)
+}
+
 // SetCompatibilityWarningsJSON sets the "compatibility_warnings_json" field.
 func (m *UsageLogMutation) SetCompatibilityWarningsJSON(s []string) {
 	m.compatibility_warnings_json = &s
@@ -63573,7 +63623,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 35)
+	fields := make([]string, 0, 36)
 	if m.created_at != nil {
 		fields = append(fields, usagelog.FieldCreatedAt)
 	}
@@ -63676,6 +63726,9 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.charged_at != nil {
 		fields = append(fields, usagelog.FieldChargedAt)
 	}
+	if m.aggregated_at != nil {
+		fields = append(fields, usagelog.FieldAggregatedAt)
+	}
 	if m.compatibility_warnings_json != nil {
 		fields = append(fields, usagelog.FieldCompatibilityWarningsJSON)
 	}
@@ -63755,6 +63808,8 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.Currency()
 	case usagelog.FieldChargedAt:
 		return m.ChargedAt()
+	case usagelog.FieldAggregatedAt:
+		return m.AggregatedAt()
 	case usagelog.FieldCompatibilityWarningsJSON:
 		return m.CompatibilityWarningsJSON()
 	}
@@ -63834,6 +63889,8 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCurrency(ctx)
 	case usagelog.FieldChargedAt:
 		return m.OldChargedAt(ctx)
+	case usagelog.FieldAggregatedAt:
+		return m.OldAggregatedAt(ctx)
 	case usagelog.FieldCompatibilityWarningsJSON:
 		return m.OldCompatibilityWarningsJSON(ctx)
 	}
@@ -64083,6 +64140,13 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetChargedAt(v)
 		return nil
+	case usagelog.FieldAggregatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAggregatedAt(v)
+		return nil
 	case usagelog.FieldCompatibilityWarningsJSON:
 		v, ok := value.([]string)
 		if !ok {
@@ -64267,6 +64331,9 @@ func (m *UsageLogMutation) ClearedFields() []string {
 	if m.FieldCleared(usagelog.FieldChargedAt) {
 		fields = append(fields, usagelog.FieldChargedAt)
 	}
+	if m.FieldCleared(usagelog.FieldAggregatedAt) {
+		fields = append(fields, usagelog.FieldAggregatedAt)
+	}
 	if m.FieldCleared(usagelog.FieldCompatibilityWarningsJSON) {
 		fields = append(fields, usagelog.FieldCompatibilityWarningsJSON)
 	}
@@ -64295,6 +64362,9 @@ func (m *UsageLogMutation) ClearField(name string) error {
 		return nil
 	case usagelog.FieldChargedAt:
 		m.ClearChargedAt()
+		return nil
+	case usagelog.FieldAggregatedAt:
+		m.ClearAggregatedAt()
 		return nil
 	case usagelog.FieldCompatibilityWarningsJSON:
 		m.ClearCompatibilityWarningsJSON()
@@ -64408,6 +64478,9 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldChargedAt:
 		m.ResetChargedAt()
+		return nil
+	case usagelog.FieldAggregatedAt:
+		m.ResetAggregatedAt()
 		return nil
 	case usagelog.FieldCompatibilityWarningsJSON:
 		m.ResetCompatibilityWarningsJSON()

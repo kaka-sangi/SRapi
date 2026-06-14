@@ -2307,6 +2307,7 @@ var (
 		{Name: "billing_mode", Type: field.TypeString, Default: "token"},
 		{Name: "currency", Type: field.TypeString, Default: "USD"},
 		{Name: "charged_at", Type: field.TypeTime, Nullable: true},
+		{Name: "aggregated_at", Type: field.TypeTime, Nullable: true},
 		{Name: "compatibility_warnings_json", Type: field.TypeJSON, Nullable: true},
 	}
 	// UsageLogsTable holds the schema information for the "usage_logs" table.
@@ -2329,6 +2330,11 @@ var (
 				Name:    "usagelog_charged_at_success_created_at",
 				Unique:  false,
 				Columns: []*schema.Column{UsageLogsColumns[34], UsageLogsColumns[20], UsageLogsColumns[1]},
+			},
+			{
+				Name:    "usagelog_aggregated_at_success_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[35], UsageLogsColumns[20], UsageLogsColumns[1]},
 			},
 			{
 				Name:    "usagelog_api_key_id_created_at",
