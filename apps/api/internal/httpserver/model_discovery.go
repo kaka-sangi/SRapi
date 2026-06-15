@@ -178,6 +178,14 @@ func (rt *runtimeState) executeModelDiscoveryRequest(ctx context.Context, accoun
 		if err := rt.materializeProviderProxy(ctx, &account); err != nil {
 			return nil, errModelDiscoveryUpstream
 		}
+		// Refresh an expired OAuth/reverse-proxy token before dispatch, mirroring
+		// the gateway/quota-fetch/websocket paths — otherwise discovery fails on
+		// accounts whose access token has expired.
+		if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, account, credential); err != nil {
+			return nil, errModelDiscoveryUpstream
+		} else if ok {
+			credential = refreshed
+		}
 		resp, err := rt.reverseProxy.Do(ctx, reverseproxycontract.Request{
 			Account: antigravityModelDiscoveryRuntime(account, credential),
 			Method:  req.Method,

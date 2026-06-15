@@ -106,6 +106,13 @@ func (rt *runtimeState) executeAntigravityBootstrapRequest(ctx context.Context, 
 	if err := rt.materializeProviderProxy(ctx, &account); err != nil {
 		return nil, errModelDiscoveryUpstream
 	}
+	// Refresh an expired OAuth/reverse-proxy token before dispatch, mirroring the
+	// gateway path — otherwise antigravity bootstrap fails on an expired token.
+	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, account, credential); err != nil {
+		return nil, errModelDiscoveryUpstream
+	} else if ok {
+		credential = refreshed
+	}
 	headers := http.Header{
 		"Accept":       {"*/*"},
 		"Content-Type": {"application/json"},
