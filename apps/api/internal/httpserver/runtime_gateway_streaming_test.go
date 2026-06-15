@@ -605,3 +605,90 @@ func TestGatewayChatCompletionStreamIdleTimeoutCutsHungUpstream(t *testing.T) {
 		t.Fatalf("idle timeout did not cut the hung stream promptly; elapsed=%s", elapsed)
 	}
 }
+
+// TestAnthropicStreamUsageAccumulatorRecoversUsage feeds synthetic Anthropic SSE
+// chunks into the fallback accumulator and asserts the token tally matches the
+// message_start (prompt-side / cache) and message_delta (output) usage events.
+// This is the path that recovers usage when the terminal usage event falls
+// beyond the bounded meter cap. The chunk boundaries deliberately split SSE
+// lines mid-line to prove the accumulator reassembles across reads.
+func TestAnthropicStreamUsageAccumulatorRecoversUsage(t *testing.T) {
+	full := "event: message_start\n" +
+		"data: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"usage\":{\"input_tokens\":120,\"cache_read_input_tokens\":40,\"cache_creation_input_tokens\":7,\"output_tokens\":1}}}\n\n" +
+		"event: content_block_delta\n" +
+		"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"hi\"}}\n\n" +
+		"event: message_delta\n" +
+		"data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":256}}\n\n" +
+		"event: message_stop\n" +
+		"data: {\"type\":\"message_stop\"}\n\n"
+
+	// Split into byte-sized chunks of varying length, including boundaries that
+	// land in the middle of SSE lines, so the cross-chunk reassembly is exercised.
+	var acc anthropicStreamUsageAccumulator
+	for i := 0; i < len(full); i += 7 {
+		end := i + 7
+		if end > len(full) {
+			end = len(full)
+		}
+		// Copy into a fresh, reusable-style buffer to mimic the streaming read
+		// loop reusing its byte slice; the accumulator must not alias it.
+		buf := make([]byte, end-i)
+		copy(buf, full[i:end])
+		acc.write(buf)
+	}
+
+	if !acc.seen {
+		t.Fatalf("expected accumulator to observe usage events, seen=false")
+	}
+	if acc.usage.InputTokens != 120 {
+		t.Fatalf("input_tokens = %d, want 120", acc.usage.InputTokens)
+	}
+	if acc.usage.OutputTokens != 256 {
+		t.Fatalf("output_tokens = %d, want 256 (message_delta should supersede message_start)", acc.usage.OutputTokens)
+	}
+	if acc.usage.CacheReadInputTokens != 40 {
+		t.Fatalf("cache_read_input_tokens = %d, want 40", acc.usage.CacheReadInputTokens)
+	}
+	if acc.usage.CacheCreationInputTokens != 7 {
+		t.Fatalf("cache_creation_input_tokens = %d, want 7", acc.usage.CacheCreationInputTokens)
+	}
+}
+
+// TestAnthropicStreamUsageAccumulatorNonZeroWins proves the non-zero-wins merge
+// semantics ported from sub2api's mergeAnthropicUsage: a later zero-valued field
+// must not clobber an earlier non-zero value, while a later non-zero value does.
+func TestAnthropicStreamUsageAccumulatorNonZeroWins(t *testing.T) {
+	var acc anthropicStreamUsageAccumulator
+	// message_start establishes input + cache counts and a provisional output of 1.
+	acc.write([]byte("data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":50,\"cache_read_input_tokens\":10,\"output_tokens\":1}}}\n\n"))
+	// message_delta reports output but omits input/cache (zeroes) — they must persist.
+	acc.write([]byte("data: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":99}}\n\n"))
+
+	if acc.usage.InputTokens != 50 {
+		t.Fatalf("input_tokens = %d, want 50 (zero message_delta input must not clobber)", acc.usage.InputTokens)
+	}
+	if acc.usage.CacheReadInputTokens != 10 {
+		t.Fatalf("cache_read_input_tokens = %d, want 10 (must persist across message_delta)", acc.usage.CacheReadInputTokens)
+	}
+	if acc.usage.OutputTokens != 99 {
+		t.Fatalf("output_tokens = %d, want 99 (non-zero message_delta must win)", acc.usage.OutputTokens)
+	}
+}
+
+// TestAnthropicStreamUsageAccumulatorIgnoresNonUsageStream proves the
+// accumulator stays inert on a stream with no Anthropic usage events (e.g. a
+// non-Anthropic SSE protocol or a [DONE]-only tail), leaving seen=false so the
+// caller keeps the primary meter parse / admission estimate.
+func TestAnthropicStreamUsageAccumulatorIgnoresNonUsageStream(t *testing.T) {
+	var acc anthropicStreamUsageAccumulator
+	acc.write([]byte("event: ping\ndata: {\"type\":\"ping\"}\n\n"))
+	acc.write([]byte("data: {\"id\":\"chunk_1\",\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\n"))
+	acc.write([]byte("data: [DONE]\n\n"))
+
+	if acc.seen {
+		t.Fatalf("expected accumulator to remain inert on a non-Anthropic stream, seen=true usage=%+v", acc.usage)
+	}
+	if acc.usage.InputTokens != 0 || acc.usage.OutputTokens != 0 {
+		t.Fatalf("expected zero usage, got %+v", acc.usage)
+	}
+}

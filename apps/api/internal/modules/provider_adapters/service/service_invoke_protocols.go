@@ -6,13 +6,89 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 )
+
+// transportErrorPersistentMetadataKey marks a ProviderError whose transport-level
+// failure is durable (proxy/DNS/routing/credential fault) rather than a transient
+// blip. The class stays "network_error" (which the gateway's cooldown path already
+// treats as cooldown-eligible), so a persistent marker tells that path to park the
+// account instead of repeatedly scheduling it into the same hard failure. Transient
+// transport errors carry no marker and remain freely reschedulable.
+//
+// Ported from sub2api's classifyOpenAITransportError
+// (internal/service/openai_upstream_transport_error.go): the typed-error checks
+// (syscall ECONNREFUSED/EHOSTUNREACH/ENETUNREACH and *net.DNSError.IsNotFound) are
+// preferred and portable; the string-marker list is a cross-platform safety net for
+// errors with no typed form (e.g. SOCKS5 RFC1929 credential rejection).
+const transportErrorPersistentMetadataKey = "transport_error_persistent"
+
+// persistentTransportErrorMarkers are substrings (matched case-insensitively
+// against the raw transport error) that indicate a durable proxy/network fault.
+// Matched signals are intentionally specific failure *reasons*, not the operation,
+// so that a transient failure of the same operation (e.g. a proxy timeout) is NOT
+// misclassified as durable. Mirrors sub2api openAIPersistentTransportErrorMarkers.
+var persistentTransportErrorMarkers = []string{
+	"authentication failed",         // SOCKS5 RFC1929 / proxy credentials rejected (expired account)
+	"proxy authentication required", // HTTP proxy 407
+	"connection refused",            // proxy/upstream endpoint down
+	"no route to host",
+	"network is unreachable",
+	"no such host", // DNS resolution failure (bad/expired proxy hostname)
+}
+
+// transportErrorIsPersistent decides whether a transport-level upstream error is
+// durable (retrying the same proxy/account is pointless) or a transient blip.
+// Typed checks are tried first (portable, unambiguous), then a string-marker
+// fallback. Mirrors sub2api classifyOpenAITransportError.
+func transportErrorIsPersistent(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Typed checks (preferred).
+	if errors.Is(err, syscall.ECONNREFUSED) ||
+		errors.Is(err, syscall.EHOSTUNREACH) ||
+		errors.Is(err, syscall.ENETUNREACH) {
+		return true
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+		return true
+	}
+	// String-marker fallback for errors with no typed form.
+	msg := strings.ToLower(err.Error())
+	for _, marker := range persistentTransportErrorMarkers {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// classifyTransportError converts a transport-level upstream failure (the HTTP
+// round-trip never completed: proxy/DNS/TCP/TLS error, no status code received)
+// into a ProviderError. The class is always "network_error" so the gateway's
+// existing cooldown path applies; persistent faults additionally carry a distinct
+// metadata marker so that path parks the account rather than rescheduling it into
+// the same hard failure. Mirrors sub2api's transport-error classification.
+func classifyTransportError(err error) contract.ProviderError {
+	provErr := contract.ProviderError{
+		Class:      "network_error",
+		StatusCode: http.StatusBadGateway,
+		Message:    "provider request failed",
+	}
+	if transportErrorIsPersistent(err) {
+		provErr.Metadata = map[string]any{transportErrorPersistentMetadataKey: true}
+	}
+	return provErr
+}
 
 func (s *Service) invokeOpenAICompatibleEmbeddings(ctx context.Context, req contract.EmbeddingRequest, baseURL string) (contract.EmbeddingResponse, error) {
 	apiKey := credentialString(req.Credential, "api_key")
@@ -35,7 +111,7 @@ func (s *Service) invokeOpenAICompatibleEmbeddings(ctx context.Context, req cont
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return contract.EmbeddingResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
 		}
-		return contract.EmbeddingResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider request failed"}
+		return contract.EmbeddingResponse{}, classifyTransportError(err)
 	}
 	defer resp.Body.Close()
 
@@ -116,7 +192,7 @@ func (s *Service) invokeOpenAICompatibleImages(ctx context.Context, req contract
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
 		}
-		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider request failed"}
+		return contract.ImageGenerationResponse{}, classifyTransportError(err)
 	}
 	defer resp.Body.Close()
 

@@ -211,6 +211,10 @@ func QuotaMetadataFromReport(current map[string]any, report QuotaCreditReport) m
 	metadata := cloneMetadata(current)
 	if strings.TrimSpace(report.Plan) != "" {
 		metadata["last_quota_plan"] = strings.TrimSpace(report.Plan)
+		// Mirror sub2api's creds["plan_type"]: the report's plan should be
+		// stored on the account credential. This function only reaches account
+		// metadata, so surface plan_type here under the established convention.
+		metadata["plan_type"] = strings.TrimSpace(report.Plan)
 	}
 	if strings.TrimSpace(report.CreditsRemaining) != "" {
 		metadata["last_quota_credits_remaining"] = strings.TrimSpace(report.CreditsRemaining)

@@ -59,9 +59,14 @@ type gatewayUsageRecord struct {
 	ProviderQuotaSignals  []provideradaptercontract.QuotaSignal
 	ProviderRetryAfter    *time.Time
 	ProviderErrorMessage  string
-	QualityPrompt         string
-	QualityOutput         string
-	FeedbackID            int
+	// Headers carries the upstream provider response headers from a failed
+	// attempt (e.g. the x-codex-* rate-limit telemetry). It is populated only on
+	// failure paths so the cooldown stage can fold provider quota telemetry into
+	// account metadata without re-reading the upstream response.
+	Headers       http.Header
+	QualityPrompt string
+	QualityOutput string
+	FeedbackID    int
 }
 
 type gatewayAdmission struct {

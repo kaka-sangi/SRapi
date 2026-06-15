@@ -593,6 +593,157 @@ func TestRecordGatewayProviderAttemptFailureIncludesProviderQuotaSignals(t *test
 	}
 }
 
+// TestCodexQuotaUsageMetadataUpdates ports sub2api's buildCodexUsageExtraUpdates
+// field-copy semantics: the raw Codex primary/secondary used-percent +
+// reset-after-seconds and the usage-updated-at marker are pulled out of the
+// per-signal Metadata so the quota windows can be persisted (and survive
+// offline). Only the named keys are mirrored, present fields keep their type
+// (float for percents, int for seconds, string for the timestamp), absent
+// fields are skipped, and an empty result is nil.
+func TestCodexQuotaUsageMetadataUpdates(t *testing.T) {
+	t.Run("copies named codex fields with their types", func(t *testing.T) {
+		signals := []provideradaptercontract.QuotaSignal{{
+			QuotaType: "codex_5h_percent",
+			Metadata: map[string]any{
+				"codex_primary_used_percent":           88.5,
+				"codex_primary_reset_after_seconds":    86400,
+				"codex_secondary_used_percent":         12.0,
+				"codex_secondary_reset_after_seconds":  3600,
+				"codex_usage_updated_at":               "2026-05-28T10:00:00Z",
+				"codex_primary_window_minutes":         10080, // not mirrored
+				"codex_primary_over_secondary_percent": 117.5, // not mirrored
+			},
+		}}
+
+		updates := codexQuotaUsageMetadataUpdates(signals)
+		if updates == nil {
+			t.Fatal("expected non-nil updates")
+		}
+		if got := updates["codex_primary_used_percent"]; got != 88.5 {
+			t.Fatalf("codex_primary_used_percent = %v (%T), want 88.5 float64", got, got)
+		}
+		if got := updates["codex_primary_reset_after_seconds"]; got != 86400 {
+			t.Fatalf("codex_primary_reset_after_seconds = %v (%T), want 86400 int", got, got)
+		}
+		if got := updates["codex_secondary_used_percent"]; got != 12.0 {
+			t.Fatalf("codex_secondary_used_percent = %v (%T), want 12 float64", got, got)
+		}
+		if got := updates["codex_secondary_reset_after_seconds"]; got != 3600 {
+			t.Fatalf("codex_secondary_reset_after_seconds = %v (%T), want 3600 int", got, got)
+		}
+		if got := updates["codex_usage_updated_at"]; got != "2026-05-28T10:00:00Z" {
+			t.Fatalf("codex_usage_updated_at = %v, want %s", got, "2026-05-28T10:00:00Z")
+		}
+		if _, ok := updates["codex_primary_window_minutes"]; ok {
+			t.Fatalf("did not expect non-mirrored key codex_primary_window_minutes: %v", updates)
+		}
+		if _, ok := updates["codex_primary_over_secondary_percent"]; ok {
+			t.Fatalf("did not expect non-mirrored key codex_primary_over_secondary_percent: %v", updates)
+		}
+	})
+
+	t.Run("skips absent fields and signals without metadata", func(t *testing.T) {
+		signals := []provideradaptercontract.QuotaSignal{
+			{QuotaType: "codex_7d_percent"}, // no metadata
+			{
+				QuotaType: "codex_5h_percent",
+				Metadata: map[string]any{
+					"codex_primary_used_percent": 5.0,
+					"codex_usage_updated_at":     "2026-05-28T11:00:00Z",
+				},
+			},
+		}
+
+		updates := codexQuotaUsageMetadataUpdates(signals)
+		if len(updates) != 2 {
+			t.Fatalf("expected exactly the two present fields, got %+v", updates)
+		}
+		if updates["codex_primary_used_percent"] != 5.0 || updates["codex_usage_updated_at"] != "2026-05-28T11:00:00Z" {
+			t.Fatalf("unexpected updates: %+v", updates)
+		}
+		if _, ok := updates["codex_primary_reset_after_seconds"]; ok {
+			t.Fatalf("did not expect absent reset-after seconds: %+v", updates)
+		}
+	})
+
+	t.Run("no codex metadata yields nil", func(t *testing.T) {
+		if got := codexQuotaUsageMetadataUpdates(nil); got != nil {
+			t.Fatalf("expected nil for no signals, got %+v", got)
+		}
+		signals := []provideradaptercontract.QuotaSignal{{
+			QuotaType: "codex_5h_percent",
+			Metadata:  map[string]any{"unrelated": "x"},
+		}}
+		if got := codexQuotaUsageMetadataUpdates(signals); got != nil {
+			t.Fatalf("expected nil when no mirrored fields present, got %+v", got)
+		}
+	})
+}
+
+// TestRecordProviderQuotaSignalsPersistsCodexUsageMetadata proves the quota
+// signals' Codex usage fields are merged onto account.Metadata (so they survive
+// offline) without clobbering unrelated metadata such as a live cooldown field.
+func TestRecordProviderQuotaSignalsPersistsCodexUsageMetadata(t *testing.T) {
+	ctx := context.Background()
+	accounts, err := accountservice.New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new account service: %v", err)
+	}
+	account, err := accounts.Create(ctx, accountcontract.CreateRequest{
+		ProviderID:   12,
+		Name:         "codex-usage-meta-account",
+		RuntimeClass: accountcontract.RuntimeClassCliClientToken,
+		Credential:   map[string]any{"cli_client_token": "secret"},
+		Metadata: map[string]any{
+			"cooldown_active": true,
+			"cooldown_reason": "rate_limit",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	rt := &runtimeState{
+		logger:   slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		accounts: accounts,
+	}
+	now := time.Date(2026, 5, 28, 10, 0, 0, 0, time.UTC)
+	resetAt := now.Add(time.Hour)
+	signals := []provideradaptercontract.QuotaSignal{{
+		QuotaType:      "codex_5h_percent",
+		Remaining:      "66",
+		Used:           "34",
+		QuotaLimit:     "100",
+		RemainingRatio: 0.66,
+		ResetAt:        &resetAt,
+		SnapshotAt:     now,
+		Metadata: map[string]any{
+			"codex_primary_used_percent":          88.0,
+			"codex_primary_reset_after_seconds":   86400,
+			"codex_secondary_used_percent":        34.0,
+			"codex_secondary_reset_after_seconds": 3600,
+			"codex_usage_updated_at":              now.Format(time.RFC3339),
+		},
+	}}
+
+	rt.recordProviderQuotaSignals(ctx, account, signals, now)
+
+	updated, err := accounts.FindByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("find account: %v", err)
+	}
+	if metadataFloatValue(updated.Metadata, "codex_primary_used_percent") != 88.0 ||
+		metadataInt(updated.Metadata, "codex_primary_reset_after_seconds") != 86400 ||
+		metadataFloatValue(updated.Metadata, "codex_secondary_used_percent") != 34.0 ||
+		metadataInt(updated.Metadata, "codex_secondary_reset_after_seconds") != 3600 ||
+		metadataString(updated.Metadata, "codex_usage_updated_at") != now.Format(time.RFC3339) {
+		t.Fatalf("expected codex usage metadata persisted, got %+v", updated.Metadata)
+	}
+	// The merge must not clobber unrelated metadata.
+	if !metadataBool(updated.Metadata, "cooldown_active") || metadataString(updated.Metadata, "cooldown_reason") != "rate_limit" {
+		t.Fatalf("expected pre-existing cooldown metadata preserved, got %+v", updated.Metadata)
+	}
+}
+
 func quotaSignalPayloadsForTest(value any) []map[string]any {
 	switch typed := value.(type) {
 	case []map[string]any:

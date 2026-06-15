@@ -11,6 +11,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/httputil"
 )
 
 func classifyProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
@@ -27,6 +28,21 @@ func classifyProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, b
 	metadata := map[string]any(nil)
 	if statusCode == http.StatusForbidden {
 		class, metadata = classifyForbiddenProviderError(body, message)
+	}
+	// A Cloudflare JS interstitial ("just a moment", cf-mitigated: challenge,
+	// etc.) on a 403/429 is a transient anti-bot challenge, not a genuine auth
+	// failure or rate limit. Classify it distinctly so failure handling does not
+	// park the account on a cooldown: "cloudflare_challenge" is intentionally
+	// absent from gatewayErrorClassUsesCooldown, which defaults to NO cooldown.
+	if (statusCode == http.StatusForbidden || statusCode == http.StatusTooManyRequests) &&
+		httputil.IsCloudflareChallengeResponse(statusCode, headers, body) {
+		class = "cloudflare_challenge"
+		if metadata == nil {
+			metadata = map[string]any{}
+		}
+		if rayID := httputil.ExtractCloudflareRayID(headers, body); rayID != "" {
+			metadata["cf_ray"] = rayID
+		}
 	}
 	if statusCode == http.StatusUnauthorized && providerErrorBodyIndicatesSessionInvalid(body, message) {
 		class = "session_invalid"

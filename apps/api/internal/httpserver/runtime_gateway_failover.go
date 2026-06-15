@@ -593,6 +593,7 @@ func (s *Server) recordGatewayProviderAttemptFailure(r *http.Request, authed api
 		ProviderQuotaSignals:  providerQuotaSignalsFromError(providerErr),
 		ProviderRetryAfter:    providerRetryAfterFromError(providerErr),
 		ProviderErrorMessage:  providerErrorMessage(providerErr),
+		Headers:               providerHeadersFromError(providerErr),
 	})
 }
 
@@ -645,6 +646,198 @@ func providerHeadersFromError(err error) http.Header {
 		return nil
 	}
 	return cloneHTTPHeader(providerErr.Headers)
+}
+
+// codexUsageHeaderWindow is one Codex rate-limit window (primary or secondary)
+// parsed from the x-codex-* response headers. valid is false when the upstream
+// did not emit a used-percent value for that window.
+type codexUsageHeaderWindow struct {
+	usedPercent  float64
+	resetSeconds *int
+	windowMin    int
+	valid        bool
+}
+
+type codexUsageWindowKind int
+
+const (
+	codexUsageWindow5h codexUsageWindowKind = iota
+	codexUsageWindow7d
+)
+
+type codexUsageHeaderMapping struct {
+	kind   codexUsageWindowKind
+	window codexUsageHeaderWindow
+}
+
+// codexCooldownMetadataUpdates parses the x-codex-* rate-limit telemetry headers
+// into the account-metadata fields used by the cooldown stage. It is a faithful
+// port of sub2api's ParseCodexRateLimitHeaders + (*OpenAICodexUsageSnapshot).
+// Normalize + buildCodexUsageExtraUpdates: it preserves the raw primary/secondary
+// values for troubleshooting and normalizes them to the canonical 5h/7d fields by
+// comparing window-minutes (smaller window = 5h, larger = 7d; classified by a
+// <=360 minute threshold when only one window is known; legacy responses without
+// window-minutes treat primary as 7d and secondary as 5h). It returns nil when no
+// recognized header is present so the caller can skip the metadata write entirely.
+func codexCooldownMetadataUpdates(headers http.Header, now time.Time) map[string]any {
+	if headers == nil {
+		return nil
+	}
+	primary := codexUsageHeaderWindowFromHeaders(headers, "x-codex-primary")
+	secondary := codexUsageHeaderWindowFromHeaders(headers, "x-codex-secondary")
+	overflow, hasOverflow := parseCodexHeaderFloat(headers, "x-codex-primary-over-secondary-limit-percent")
+
+	if !primary.valid && !secondary.valid && !primaryWindowHasData(primary) && !primaryWindowHasData(secondary) && !hasOverflow {
+		return nil
+	}
+
+	baseTime := now.UTC()
+	updates := make(map[string]any)
+
+	// Preserve the raw primary/secondary fields for troubleshooting.
+	if primary.valid {
+		updates["codex_primary_used_percent"] = primary.usedPercent
+	}
+	if primary.resetSeconds != nil {
+		updates["codex_primary_reset_after_seconds"] = *primary.resetSeconds
+	}
+	if primary.windowMin > 0 {
+		updates["codex_primary_window_minutes"] = primary.windowMin
+	}
+	if secondary.valid {
+		updates["codex_secondary_used_percent"] = secondary.usedPercent
+	}
+	if secondary.resetSeconds != nil {
+		updates["codex_secondary_reset_after_seconds"] = *secondary.resetSeconds
+	}
+	if secondary.windowMin > 0 {
+		updates["codex_secondary_window_minutes"] = secondary.windowMin
+	}
+	if hasOverflow {
+		updates["codex_primary_over_secondary_percent"] = overflow
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	updates["codex_usage_updated_at"] = baseTime.Format(time.RFC3339)
+
+	// Normalize to the canonical 5h/7d fields.
+	for _, mapping := range codexUsageHeaderMappings(primary, secondary) {
+		prefix := codexUsageWindowFieldPrefix(mapping.kind)
+		if prefix == "" {
+			continue
+		}
+		if mapping.window.valid {
+			updates[prefix+"_used_percent"] = mapping.window.usedPercent
+		}
+		if mapping.window.resetSeconds != nil {
+			updates[prefix+"_reset_after_seconds"] = *mapping.window.resetSeconds
+			if resetAt := codexResetAtRFC3339(baseTime, mapping.window.resetSeconds); resetAt != "" {
+				updates[prefix+"_reset_at"] = resetAt
+			}
+		}
+		if mapping.window.windowMin > 0 {
+			updates[prefix+"_window_minutes"] = mapping.window.windowMin
+		}
+	}
+
+	return updates
+}
+
+func primaryWindowHasData(window codexUsageHeaderWindow) bool {
+	return window.resetSeconds != nil || window.windowMin > 0
+}
+
+func codexUsageHeaderWindowFromHeaders(headers http.Header, prefix string) codexUsageHeaderWindow {
+	window := codexUsageHeaderWindow{}
+	if value, ok := parseCodexHeaderFloat(headers, prefix+"-used-percent"); ok {
+		window.usedPercent = value
+		window.valid = true
+	}
+	if value, ok := parseCodexHeaderInt(headers, prefix+"-reset-after-seconds"); ok {
+		window.resetSeconds = &value
+	}
+	if value, ok := parseCodexHeaderInt(headers, prefix+"-window-minutes"); ok {
+		window.windowMin = value
+	}
+	return window
+}
+
+// codexUsageHeaderMappings classifies the primary/secondary windows into the
+// canonical 5h/7d slots, mirroring sub2api's Normalize() strategy.
+func codexUsageHeaderMappings(primary codexUsageHeaderWindow, secondary codexUsageHeaderWindow) []codexUsageHeaderMapping {
+	hasPrimaryWindow := primary.windowMin > 0
+	hasSecondaryWindow := secondary.windowMin > 0
+
+	switch {
+	case hasPrimaryWindow && hasSecondaryWindow:
+		// Both known: smaller window is 5h, larger is 7d.
+		if primary.windowMin < secondary.windowMin {
+			return []codexUsageHeaderMapping{{kind: codexUsageWindow5h, window: primary}, {kind: codexUsageWindow7d, window: secondary}}
+		}
+		return []codexUsageHeaderMapping{{kind: codexUsageWindow7d, window: primary}, {kind: codexUsageWindow5h, window: secondary}}
+	case hasPrimaryWindow:
+		// Only primary known: classify by the <=360 minute threshold.
+		if primary.windowMin <= 360 {
+			return []codexUsageHeaderMapping{{kind: codexUsageWindow5h, window: primary}, {kind: codexUsageWindow7d, window: secondary}}
+		}
+		return []codexUsageHeaderMapping{{kind: codexUsageWindow7d, window: primary}, {kind: codexUsageWindow5h, window: secondary}}
+	case hasSecondaryWindow:
+		// Only secondary known: classify by threshold; primary takes the opposite.
+		if secondary.windowMin <= 360 {
+			return []codexUsageHeaderMapping{{kind: codexUsageWindow7d, window: primary}, {kind: codexUsageWindow5h, window: secondary}}
+		}
+		return []codexUsageHeaderMapping{{kind: codexUsageWindow5h, window: primary}, {kind: codexUsageWindow7d, window: secondary}}
+	default:
+		// No window-minutes: legacy assumption (primary=7d, secondary=5h).
+		return []codexUsageHeaderMapping{{kind: codexUsageWindow7d, window: primary}, {kind: codexUsageWindow5h, window: secondary}}
+	}
+}
+
+func codexUsageWindowFieldPrefix(kind codexUsageWindowKind) string {
+	switch kind {
+	case codexUsageWindow5h:
+		return "codex_5h"
+	case codexUsageWindow7d:
+		return "codex_7d"
+	default:
+		return ""
+	}
+}
+
+func codexResetAtRFC3339(base time.Time, resetAfterSeconds *int) string {
+	if resetAfterSeconds == nil {
+		return ""
+	}
+	seconds := *resetAfterSeconds
+	if seconds < 0 {
+		seconds = 0
+	}
+	return base.Add(time.Duration(seconds) * time.Second).Format(time.RFC3339)
+}
+
+func parseCodexHeaderFloat(headers http.Header, key string) (float64, bool) {
+	raw := strings.TrimSpace(headers.Get(key))
+	if raw == "" {
+		return 0, false
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, false
+	}
+	return value, true
+}
+
+func parseCodexHeaderInt(headers http.Header, key string) (int, bool) {
+	raw := strings.TrimSpace(headers.Get(key))
+	if raw == "" {
+		return 0, false
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, false
+	}
+	return value, true
 }
 
 func setRetryAfterFromProviderError(w http.ResponseWriter, err error) {

@@ -420,6 +420,11 @@ func (rt *runtimeState) applyProviderAccountCooldown(ctx context.Context, rec ga
 	metadata["cooldown_strikes"] = nextStrikes
 	metadata["cooldown_last_at"] = now.Format(time.RFC3339)
 	metadata["last_error_class"] = decision.LastErrorClass
+	// Fold any Codex 429 rate-limit headers from the failing response into the
+	// persisted metadata so quota windows survive across cooldown (sub2api parity).
+	for key, value := range codexCooldownMetadataUpdates(rec.Headers, now) {
+		metadata[key] = value
+	}
 	before := accountAuditSnapshot(account)
 	updated, err := rt.accounts.Update(ctx, *rec.AccountID, accountcontract.UpdateRequest{Metadata: &metadata})
 	if err != nil {
@@ -860,6 +865,85 @@ func (rt *runtimeState) recordProviderQuotaSignals(ctx context.Context, account 
 		if err != nil {
 			rt.logger.Warn("failed to record provider quota signal", "error", err, "account_id", account.ID, "quota_type", signal.QuotaType)
 		}
+	}
+	rt.persistCodexQuotaUsageMetadata(ctx, account, signals)
+}
+
+// persistCodexQuotaUsageMetadata mirrors sub2api's buildCodexUsageExtraUpdates:
+// it copies the raw Codex primary/secondary used-percent + reset-after-seconds
+// and the snapshot's usage-updated-at marker out of the quota signals and onto
+// account.Metadata, so the quota windows survive an offline period (a restart or
+// a stretch with no traffic) instead of living only in the per-signal snapshot
+// table. The signal Metadata is the same document codexQuotaMetadataFromHeaders
+// builds from the upstream x-codex-* headers, so the values are carried through
+// verbatim. The write is merged onto the freshest metadata under the per-account
+// lock — like updateAccountRuntimeQuotaMetadata / applyProviderAccountCooldown —
+// so it does not clobber concurrently-written cooldown / runtime-quota fields.
+func (rt *runtimeState) persistCodexQuotaUsageMetadata(ctx context.Context, account accountcontract.ProviderAccount, signals []provideradaptercontract.QuotaSignal) {
+	if rt == nil || rt.accounts == nil {
+		return
+	}
+	updates := codexQuotaUsageMetadataUpdates(signals)
+	if len(updates) == 0 {
+		return
+	}
+	mu := rt.accountMetaLock(account.ID)
+	mu.Lock()
+	defer mu.Unlock()
+	// Rebase onto the freshest metadata inside the lock so concurrent cooldown /
+	// runtime-quota fields written since `account` was loaded are preserved.
+	base := account
+	if fresh, err := rt.accounts.FindByID(ctx, account.ID); err == nil {
+		base = fresh
+	}
+	metadata := cloneMetadata(base.Metadata)
+	for key, value := range updates {
+		metadata[key] = value
+	}
+	if _, err := rt.accounts.Update(ctx, account.ID, accountcontract.UpdateRequest{Metadata: &metadata}); err != nil {
+		rt.logger.Warn("failed to persist codex quota usage metadata", "error", err, "account_id", account.ID)
+	}
+}
+
+// codexQuotaUsageMetadataUpdates extracts the Codex usage fields the durable
+// account metadata mirrors from the per-signal Metadata documents. It ports the
+// "copy each field when present" shape of sub2api's buildCodexUsageExtraUpdates,
+// limited to the keys whose persistence keeps the quota windows alive offline.
+// All signals from a single header parse carry the same Metadata, so a later
+// signal's value simply reaffirms an earlier one.
+func codexQuotaUsageMetadataUpdates(signals []provideradaptercontract.QuotaSignal) map[string]any {
+	updates := make(map[string]any)
+	for _, signal := range signals {
+		if len(signal.Metadata) == 0 {
+			continue
+		}
+		copyMetadataFloat(updates, signal.Metadata, "codex_primary_used_percent")
+		copyMetadataInt(updates, signal.Metadata, "codex_primary_reset_after_seconds")
+		copyMetadataFloat(updates, signal.Metadata, "codex_secondary_used_percent")
+		copyMetadataInt(updates, signal.Metadata, "codex_secondary_reset_after_seconds")
+		copyMetadataString(updates, signal.Metadata, "codex_usage_updated_at")
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	return updates
+}
+
+func copyMetadataFloat(dst, src map[string]any, key string) {
+	if value, ok := metacoerce.Float(src[key]); ok {
+		dst[key] = value
+	}
+}
+
+func copyMetadataInt(dst, src map[string]any, key string) {
+	if value, ok := metacoerce.Int(src[key]); ok {
+		dst[key] = value
+	}
+}
+
+func copyMetadataString(dst, src map[string]any, key string) {
+	if value := metadataString(src, key); value != "" {
+		dst[key] = value
 	}
 }
 

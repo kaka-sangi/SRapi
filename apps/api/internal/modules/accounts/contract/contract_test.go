@@ -62,6 +62,39 @@ func TestShouldRefreshOAuthCredential(t *testing.T) {
 	}
 }
 
+func TestQuotaMetadataFromReportSurfacesPlanType(t *testing.T) {
+	fetchedAt := time.Date(2026, 6, 11, 1, 2, 3, 0, time.UTC)
+
+	t.Run("plan surfaced as plan_type and last_quota_plan", func(t *testing.T) {
+		metadata := QuotaMetadataFromReport(map[string]any{"existing": "kept"}, QuotaCreditReport{
+			Plan:      "  pro  ",
+			FetchedAt: fetchedAt,
+		})
+		if metadata["plan_type"] != "pro" {
+			t.Fatalf("plan_type = %v, want pro", metadata["plan_type"])
+		}
+		if metadata["last_quota_plan"] != "pro" {
+			t.Fatalf("last_quota_plan = %v, want pro", metadata["last_quota_plan"])
+		}
+		if metadata["existing"] != "kept" {
+			t.Fatalf("existing metadata not preserved: %v", metadata["existing"])
+		}
+	})
+
+	t.Run("empty plan does not set plan_type", func(t *testing.T) {
+		metadata := QuotaMetadataFromReport(nil, QuotaCreditReport{
+			Plan:      "   ",
+			FetchedAt: fetchedAt,
+		})
+		if _, ok := metadata["plan_type"]; ok {
+			t.Fatalf("plan_type should be absent for empty plan, got %v", metadata["plan_type"])
+		}
+		if _, ok := metadata["last_quota_plan"]; ok {
+			t.Fatalf("last_quota_plan should be absent for empty plan, got %v", metadata["last_quota_plan"])
+		}
+	})
+}
+
 func TestQuotaCreditSnapshotFromReport(t *testing.T) {
 	account := ProviderAccount{ID: 10, ProviderID: 20}
 	fetchedAt := time.Date(2026, 6, 11, 1, 2, 3, 0, time.UTC)

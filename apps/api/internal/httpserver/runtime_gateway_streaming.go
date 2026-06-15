@@ -20,6 +20,120 @@ import (
 // pathological upstream cannot exhaust memory.
 const maxStreamMeterBytes = 16 << 20
 
+// anthropicStreamUsageAccumulator incrementally recovers token usage from an
+// Anthropic SSE stream as bytes flow past, independent of the bounded meter.
+// The terminal usage figures live on the message_delta event, which can fall
+// beyond the 16MB meter cap on a pathologically large response; this fallback
+// keeps a running tally so usage is still recovered in that case. It mirrors
+// sub2api's processEvent usage handling (gateway_forward_as_responses.go):
+// message_start carries the prompt-side counts (input/cache tokens) and
+// message_delta carries the cumulative output count, merged with non-zero-wins
+// semantics so a later non-zero value supersedes an earlier one.
+type anthropicStreamUsageAccumulator struct {
+	pending []byte // bytes of a partial trailing SSE line carried across chunks
+	usage   anthropicAccumulatedUsage
+	seen    bool // whether any usage field was ever observed
+}
+
+// anthropicAccumulatedUsage holds the running Anthropic token tally. Fields use
+// Anthropic's wire names; cache_read_input_tokens maps to gateway CachedTokens
+// and cache_creation_input_tokens to gateway CacheCreationTokens.
+type anthropicAccumulatedUsage struct {
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+}
+
+// anthropicStreamUsageEvent is the minimal shape needed to read usage off an
+// Anthropic SSE event payload. message_start nests usage under message.usage;
+// message_delta carries usage at the top level.
+type anthropicStreamUsageEvent struct {
+	Type    string `json:"type"`
+	Message *struct {
+		Usage anthropicAccumulatedUsage `json:"usage"`
+	} `json:"message,omitempty"`
+	Usage *anthropicAccumulatedUsage `json:"usage,omitempty"`
+}
+
+// mergeAnthropicAccumulatedUsage applies non-zero-wins semantics: a non-zero
+// source field overwrites the destination, while a zero source field leaves the
+// destination untouched. This is a faithful port of sub2api's
+// mergeAnthropicUsage (gateway_forward_as_responses.go).
+func mergeAnthropicAccumulatedUsage(dst *anthropicAccumulatedUsage, src anthropicAccumulatedUsage) {
+	if dst == nil {
+		return
+	}
+	if src.InputTokens > 0 {
+		dst.InputTokens = src.InputTokens
+	}
+	if src.OutputTokens > 0 {
+		dst.OutputTokens = src.OutputTokens
+	}
+	if src.CacheReadInputTokens > 0 {
+		dst.CacheReadInputTokens = src.CacheReadInputTokens
+	}
+	if src.CacheCreationInputTokens > 0 {
+		dst.CacheCreationInputTokens = src.CacheCreationInputTokens
+	}
+}
+
+// write feeds a streamed chunk into the accumulator. Chunks may split SSE lines
+// at arbitrary byte boundaries, so a partial trailing line is buffered until the
+// next chunk completes it.
+func (a *anthropicStreamUsageAccumulator) write(chunk []byte) {
+	if len(chunk) == 0 {
+		return
+	}
+	data := chunk
+	if len(a.pending) > 0 {
+		data = append(a.pending, chunk...)
+		a.pending = nil
+	}
+	for {
+		nl := bytes.IndexByte(data, '\n')
+		if nl < 0 {
+			// No newline yet: retain the remainder for the next chunk. Copy so we
+			// do not alias the caller's reusable read buffer.
+			if len(data) > 0 {
+				a.pending = append(a.pending[:0:0], data...)
+			}
+			return
+		}
+		a.processLine(data[:nl])
+		data = data[nl+1:]
+	}
+}
+
+// processLine inspects a single SSE line for an Anthropic usage-bearing event.
+// Only "data: " lines are parsed; the event-type line is not required because
+// the payload itself carries the discriminating "type" field.
+func (a *anthropicStreamUsageAccumulator) processLine(line []byte) {
+	line = bytes.TrimRight(line, "\r")
+	const prefix = "data: "
+	if !bytes.HasPrefix(line, []byte(prefix)) {
+		return
+	}
+	payload := line[len(prefix):]
+	if len(payload) == 0 || bytes.Equal(bytes.TrimSpace(payload), []byte("[DONE]")) {
+		return
+	}
+	var event anthropicStreamUsageEvent
+	if err := json.Unmarshal(payload, &event); err != nil {
+		return
+	}
+	// message_delta carries the cumulative output usage.
+	if event.Type == "message_delta" && event.Usage != nil {
+		mergeAnthropicAccumulatedUsage(&a.usage, *event.Usage)
+		a.seen = true
+	}
+	// message_start carries the prompt-side (input/cache) usage.
+	if event.Type == "message_start" && event.Message != nil {
+		mergeAnthropicAccumulatedUsage(&a.usage, event.Message.Usage)
+		a.seen = true
+	}
+}
+
 // streamLeaseCloser wraps a streamed upstream body so that closing it also
 // releases the request's concurrency lease, exactly once, after the caller has
 // finished streaming to the client.
@@ -158,6 +272,10 @@ func (s *Server) writeConversationStreamPassthrough(
 	}()
 
 	var meter bytes.Buffer
+	// usageAcc is a fallback Anthropic-SSE usage accumulator that runs over the
+	// full stream (not just the bounded meter), so usage is still recovered when
+	// the terminal message_delta usage event falls beyond the 16MB meter cap.
+	var usageAcc anthropicStreamUsageAccumulator
 	interrupted := false
 readLoop:
 	for {
@@ -172,6 +290,7 @@ readLoop:
 						meter.Write(sc.data[:remaining])
 					}
 				}
+				usageAcc.write(sc.data)
 				if _, writeErr := w.Write(sc.data); writeErr != nil {
 					interrupted = true
 					break readLoop
@@ -217,6 +336,22 @@ readLoop:
 				s.runtime.bindGatewayPreviousResponseAffinity(r.Context(), authed.Key.ID, parsed.ID, result.Candidate.Account.ID)
 			}
 		}
+	}
+
+	// Fallback: if the primary meter parse produced no concrete usage (e.g. the
+	// terminal usage event fell beyond the 16MB meter cap, leaving only the
+	// admission estimate), but the incremental Anthropic accumulator captured
+	// real token counts, adopt them. The primary StreamParse-on-meter path stays
+	// authoritative whenever it yielded usage.
+	if usageEstimated && usageAcc.seen && (usageAcc.usage.InputTokens > 0 || usageAcc.usage.OutputTokens > 0) {
+		usage = gatewaycontract.Usage{
+			InputTokens:         usageAcc.usage.InputTokens,
+			OutputTokens:        usageAcc.usage.OutputTokens,
+			CachedTokens:        usageAcc.usage.CacheReadInputTokens,
+			CacheCreationTokens: usageAcc.usage.CacheCreationInputTokens,
+			Estimated:           false,
+		}
+		usageEstimated = false
 	}
 
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(modelID, result.Candidate, canonical, usage), usage.Estimated)

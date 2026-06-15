@@ -66,3 +66,37 @@ func TestClassifyProviderHTTPError401SessionInvalid(t *testing.T) {
 		})
 	}
 }
+
+// TestClassifyProviderHTTPErrorCloudflareChallenge verifies that a 403/429 whose
+// response is a Cloudflare JS challenge is classified as "cloudflare_challenge"
+// (a transient class deliberately excluded from cooldown) and records the cf-ray
+// in the error metadata, while a normal 403 retains its forbidden classification.
+func TestClassifyProviderHTTPErrorCloudflareChallenge(t *testing.T) {
+	challengeBody := []byte(`<!DOCTYPE html><html><head><title>Just a moment...</title></head>` +
+		`<body><script>window._cf_chl_opt={cvId:'3'};</script>` +
+		`Enable JavaScript and cookies to continue</body></html>`)
+	challengeHeaders := http.Header{}
+	challengeHeaders.Set("cf-ray", "8d2f1a9b0c4e1234-IAD")
+	challengeHeaders.Set("content-type", "text/html; charset=UTF-8")
+
+	got := classifyProviderHTTPErrorWithHeaders(http.StatusForbidden, challengeHeaders, challengeBody)
+	if got.Class != "cloudflare_challenge" {
+		t.Fatalf("cloudflare 403 class = %q, want cloudflare_challenge", got.Class)
+	}
+	if got.Metadata["cf_ray"] != "8d2f1a9b0c4e1234-IAD" {
+		t.Fatalf("cloudflare 403 cf_ray metadata = %v, want cf-ray header value", got.Metadata["cf_ray"])
+	}
+
+	got429 := classifyProviderHTTPErrorWithHeaders(http.StatusTooManyRequests, challengeHeaders, challengeBody)
+	if got429.Class != "cloudflare_challenge" {
+		t.Fatalf("cloudflare 429 class = %q, want cloudflare_challenge", got429.Class)
+	}
+
+	normal := classifyProviderHTTPErrorWithHeaders(http.StatusForbidden, nil, []byte(`{"error":{"message":"forbidden"}}`))
+	if normal.Class == "cloudflare_challenge" {
+		t.Fatalf("normal 403 class = %q, want non cloudflare_challenge", normal.Class)
+	}
+	if _, ok := normal.Metadata["cf_ray"]; ok {
+		t.Fatalf("normal 403 should not carry cf_ray metadata, got %v", normal.Metadata["cf_ray"])
+	}
+}
