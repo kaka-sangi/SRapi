@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
@@ -17,19 +18,15 @@ import (
 // requests that actually draw down balance: pure pay-go users and allowance-mode
 // subscription overage. hard_cap subscription users never bill to balance and so
 // are never blocked here (they may legitimately carry a zero balance).
-func (rt *runtimeState) gatewayBalanceGate(ctx context.Context, userID int, entitlement subscriptioncontract.EntitlementDecision, pricing gatewayPricingEvidence) (bool, error) {
+func (rt *runtimeState) gatewayBalanceGate(ctx context.Context, user userscontract.StoredUser, entitlement subscriptioncontract.EntitlementDecision, pricing gatewayPricingEvidence) (bool, error) {
 	if !rt.cfg.Gateway.RequirePositiveBalance {
 		return false, nil
 	}
 	if !gatewayEntitlementBalanceBilled(entitlement) {
 		return false, nil
 	}
-	if userID <= 0 {
+	if user.ID <= 0 {
 		return false, nil
-	}
-	user, err := rt.users.FindByID(ctx, userID)
-	if err != nil {
-		return false, err
 	}
 	return !gatewayBalanceCoversRequest(user.Balance, pricing.Amount), nil
 }

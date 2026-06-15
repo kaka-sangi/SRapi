@@ -876,8 +876,11 @@ func applyRateMultiplier(cost string, rateMultiplier string) string {
 // pure and clamps the result to [0, cost].
 func BillableOverage(cost, usedBefore, allowance string) string {
 	costRat, ok := money.DecimalRat(cost)
-	if !ok || costRat.Sign() <= 0 {
+	if !ok {
 		return cost
+	}
+	if costRat.Sign() < 0 {
+		return money.ZeroAmount
 	}
 	allowRat, ok := money.DecimalRat(allowance)
 	if !ok {

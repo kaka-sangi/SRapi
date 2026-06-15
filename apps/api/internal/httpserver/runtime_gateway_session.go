@@ -352,7 +352,11 @@ func (rt *runtimeState) bindGatewaySessionAffinity(ctx context.Context, apiKeyID
 	// count limits (max_sessions). Re-binding the same conversation refreshes the
 	// same id, so one conversation never counts twice.
 	if sessionID := gatewayAccountSessionID(sessionKey); sessionID != "" {
-		_ = rt.sessionAffinity.AddAccountSession(ctx, accountID, sessionID, gatewaySessionAffinityTTL)
+		if err := rt.sessionAffinity.AddAccountSession(ctx, accountID, sessionID, gatewaySessionAffinityTTL); err != nil {
+			if rt.logger != nil {
+				rt.logger.Warn("session affinity add account session failed", "error", err, "account_id", accountID)
+			}
+		}
 	}
 }
 

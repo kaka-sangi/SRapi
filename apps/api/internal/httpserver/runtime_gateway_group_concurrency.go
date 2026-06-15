@@ -21,7 +21,12 @@ func (rt *runtimeState) acquireAccountGroupConcurrency(ctx context.Context, acco
 	}
 	groupIDs, err := rt.accounts.ListGroupIDsByAccount(ctx, account.ID)
 	if err != nil {
-		return nil, nil // fail-open: a group lookup error must not block traffic
+		// fail-open: a group lookup error must not block traffic, but surface it
+		// so silently bypassed group concurrency limits stay observable.
+		if rt.logger != nil {
+			rt.logger.Warn("group concurrency lookup failed; bypassing group limits", "account_id", account.ID, "error", err)
+		}
+		return nil, nil
 	}
 	var leases []ratelimit.ConcurrencyLease
 	for _, groupID := range groupIDs {

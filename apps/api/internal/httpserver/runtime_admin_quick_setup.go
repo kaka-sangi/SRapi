@@ -84,7 +84,11 @@ func (s *Server) handleAdminQuickSetup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, providerservice.ErrProviderExists) {
-			provider, _ = s.runtime.providers.FindByName(r.Context(), preset.ProviderKey)
+			provider, err = s.runtime.providers.FindByName(r.Context(), preset.ProviderKey)
+			if err != nil {
+				writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to find existing provider", requestID)
+				return
+			}
 		}
 	}
 

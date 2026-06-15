@@ -156,6 +156,30 @@ func (l *Limiter) ReleaseConcurrency(ctx context.Context, lease ConcurrencyLease
 	return releaseConcurrencyScript.Run(ctx, l.client, []string{l.prefix + lease.Key}, lease.Token).Err()
 }
 
+// Release refunds windowed-counter reservations previously made by Allow for the
+// given checks (used to undo a reservation when a gateway failover attempt fails).
+// Best-effort: only decrements counters that still exist (same window) and never
+// drives a counter below zero.
+func (l *Limiter) Release(ctx context.Context, checks []Check) error {
+	if l == nil || l.client == nil {
+		return nil
+	}
+	normalized, err := normalizeChecks(checks)
+	if err != nil {
+		return err
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(normalized))
+	args := make([]any, 0, len(normalized))
+	for _, check := range normalized {
+		keys = append(keys, l.prefix+check.Key)
+		args = append(args, check.Cost)
+	}
+	return releaseLimitScript.Run(ctx, l.client, keys, args...).Err()
+}
+
 func normalizeChecks(checks []Check) ([]Check, error) {
 	out := make([]Check, 0, len(checks))
 	for _, check := range checks {

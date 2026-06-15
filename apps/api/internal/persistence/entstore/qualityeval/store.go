@@ -164,6 +164,58 @@ func (s *Store) AggregateScore(ctx context.Context, accountID int, model string,
 	}, nil
 }
 
+func (s *Store) AggregateScoreBatch(ctx context.Context, accountIDs []int, model string, since time.Time) (map[int]qualitycontract.AggregateScore, error) {
+	model = strings.TrimSpace(model)
+	out := make(map[int]qualitycontract.AggregateScore, len(accountIDs))
+	if len(accountIDs) == 0 {
+		return out, nil
+	}
+	ids := make([]int, 0, len(accountIDs))
+	seen := make(map[int]struct{}, len(accountIDs))
+	for _, id := range accountIDs {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+		out[id] = qualitycontract.AggregateScore{AccountID: id, Model: model}
+	}
+	rows, err := s.client.QualityEvaluation.Query().
+		Where(
+			entqualityevaluation.AccountIDIn(ids...),
+			entqualityevaluation.ModelEQ(model),
+			entqualityevaluation.JudgedAtGTE(since),
+		).
+		Order(entqualityevaluation.ByJudgedAt()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	totals := make(map[int]float64, len(ids))
+	counts := make(map[int]int, len(ids))
+	updated := make(map[int]time.Time, len(ids))
+	for _, row := range rows {
+		totals[row.AccountID] += row.Score
+		counts[row.AccountID]++
+		if row.JudgedAt.After(updated[row.AccountID]) {
+			updated[row.AccountID] = row.JudgedAt
+		}
+	}
+	for id, count := range counts {
+		if count == 0 {
+			continue
+		}
+		out[id] = qualitycontract.AggregateScore{
+			AccountID:   id,
+			Model:       model,
+			Score:       totals[id] / float64(count),
+			SampleCount: count,
+			UpdatedAt:   updated[id],
+		}
+	}
+	return out, nil
+}
+
 func (s *Store) ListEvaluations(ctx context.Context) ([]qualitycontract.Evaluation, error) {
 	rows, err := s.client.QualityEvaluation.Query().
 		Order(entqualityevaluation.ByID()).

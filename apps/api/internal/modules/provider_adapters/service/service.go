@@ -12,7 +12,7 @@ import (
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
-	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 )
 
@@ -245,11 +245,7 @@ func presetReverseProxyBaseURL(adapterType string) string {
 	default:
 		return ""
 	}
-	preset, ok := providerpreset.Default().Lookup(presetKey)
-	if !ok {
-		return ""
-	}
-	return strings.TrimRight(preset.DefaultBaseURL, "/")
+	return providercontract.PresetBaseURL(presetKey)
 }
 
 func upstreamBaseURL(req contract.ConversationRequest) string {

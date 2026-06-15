@@ -90,6 +90,75 @@ func TestLimiterRejectsInvalidChecks(t *testing.T) {
 	}
 }
 
+func TestLimiterReleaseRefundsReservation(t *testing.T) {
+	limiter, redisServer, closeRedis := newLimiter(t)
+	defer closeRedis()
+
+	ctx := context.Background()
+	now := time.Date(2026, 5, 24, 10, 0, 0, 0, time.UTC)
+	check := Check{Name: "t", Key: "k", Limit: 10, Cost: 3, Window: time.Minute}
+
+	first, err := limiter.Allow(ctx, []Check{check}, now)
+	if err != nil {
+		t.Fatalf("first allow: %v", err)
+	}
+	if !first.Allowed {
+		t.Fatalf("expected first allow within limit, got %+v", first)
+	}
+	if got := redisValue(t, redisServer, "srapi:rl:k"); got != "3" {
+		t.Fatalf("expected counter at 3 after reservation, got %q", got)
+	}
+
+	if err := limiter.Release(ctx, []Check{check}); err != nil {
+		t.Fatalf("release: %v", err)
+	}
+	if got := redisValue(t, redisServer, "srapi:rl:k"); got != "0" {
+		t.Fatalf("expected counter refunded to 0, got %q", got)
+	}
+
+	// With the 3 refunded (used == 0), a fresh Cost 8 reservation (0+8 <= 10) must
+	// be allowed. Without the refund (3+8 > 10) this would be limited.
+	second, err := limiter.Allow(ctx, []Check{{Name: "t", Key: "k", Limit: 10, Cost: 8, Window: time.Minute}}, now.Add(time.Second))
+	if err != nil {
+		t.Fatalf("second allow: %v", err)
+	}
+	if !second.Allowed {
+		t.Fatalf("expected second allow after refund, got %+v", second)
+	}
+}
+
+func TestLimiterReleaseClampsAtZero(t *testing.T) {
+	limiter, redisServer, closeRedis := newLimiter(t)
+	defer closeRedis()
+
+	ctx := context.Background()
+	now := time.Date(2026, 5, 24, 10, 0, 0, 0, time.UTC)
+
+	if _, err := limiter.Allow(ctx, []Check{{Name: "t", Key: "clamp", Limit: 10, Cost: 1, Window: time.Minute}}, now); err != nil {
+		t.Fatalf("reserve: %v", err)
+	}
+	// Refund more than was reserved; the counter must clamp at 0, never go negative.
+	if err := limiter.Release(ctx, []Check{{Name: "t", Key: "clamp", Limit: 10, Cost: 5, Window: time.Minute}}); err != nil {
+		t.Fatalf("over-release: %v", err)
+	}
+	if got := redisValue(t, redisServer, "srapi:rl:clamp"); got != "0" {
+		t.Fatalf("expected counter clamped to 0, got %q", got)
+	}
+}
+
+func TestLimiterReleaseNoopForUnreservedKey(t *testing.T) {
+	limiter, redisServer, closeRedis := newLimiter(t)
+	defer closeRedis()
+
+	ctx := context.Background()
+	if err := limiter.Release(ctx, []Check{{Name: "t", Key: "missing", Limit: 10, Cost: 5, Window: time.Minute}}); err != nil {
+		t.Fatalf("release of unreserved key: %v", err)
+	}
+	if redisServer.Exists("srapi:rl:missing") {
+		t.Fatal("expected release of unreserved key to not create a counter")
+	}
+}
+
 func TestLimiterConcurrencyLeaseRejectsReleasesAndExpires(t *testing.T) {
 	limiter, redisServer, closeRedis := newLimiter(t)
 	defer closeRedis()

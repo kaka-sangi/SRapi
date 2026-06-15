@@ -498,7 +498,7 @@ func (s *Service) ResetPassword(ctx context.Context, id int, newPassword string)
 
 // ChangePassword verifies the current password before replacing the stored password hash.
 func (s *Service) ChangePassword(ctx context.Context, id int, req ChangePasswordRequest) (contract.StoredUser, error) {
-	if id <= 0 || strings.TrimSpace(req.CurrentPassword) == "" || strings.TrimSpace(req.NewPassword) == "" {
+	if id <= 0 || strings.TrimSpace(req.CurrentPassword) == "" || strings.TrimSpace(req.NewPassword) == "" || len(req.NewPassword) < 8 {
 		return contract.StoredUser{}, ErrInvalidInput
 	}
 	user, err := s.store.FindByID(ctx, id)

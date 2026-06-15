@@ -77,3 +77,17 @@ if redis.call("ZCARD", KEYS[1]) == 0 then
 end
 return {"ok"}
 `)
+
+var releaseLimitScript = redis.NewScript(`
+local count = #KEYS
+for i = 1, count do
+	local cost = tonumber(ARGV[i])
+	if redis.call("EXISTS", KEYS[i]) == 1 then
+		local newval = redis.call("DECRBY", KEYS[i], cost)
+		if newval < 0 then
+			redis.call("INCRBY", KEYS[i], -newval)
+		end
+	end
+end
+return {"ok"}
+`)

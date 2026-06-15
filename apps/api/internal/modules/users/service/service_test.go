@@ -621,6 +621,40 @@ func TestChangePasswordRequiresCurrentPasswordAndUpdatesHash(t *testing.T) {
 	}
 }
 
+func TestChangePasswordRejectsShortNewPassword(t *testing.T) {
+	store := newMemoryStore()
+	svc := newTestService(t, store)
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "short-password@srapi.local",
+		Name:     "Short Password",
+		Password: "oldpassword123",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	// A new password shorter than the minimum length is rejected on change.
+	if _, err := svc.ChangePassword(context.Background(), created.ID, ChangePasswordRequest{
+		CurrentPassword: "oldpassword123",
+		NewPassword:     "short7!",
+	}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput for short new password, got %v", err)
+	}
+
+	// The original password remains usable after a rejected change.
+	if _, err := svc.AuthenticatePassword(context.Background(), created.Email, "oldpassword123"); err != nil {
+		t.Fatalf("expected original password to still authenticate: %v", err)
+	}
+
+	// A new password at the minimum length passes the length gate.
+	if _, err := svc.ChangePassword(context.Background(), created.ID, ChangePasswordRequest{
+		CurrentPassword: "oldpassword123",
+		NewPassword:     "password8",
+	}); err != nil {
+		t.Fatalf("expected eight-character new password to be accepted: %v", err)
+	}
+}
+
 func TestUpdateProfileOnlyChangesDisplayName(t *testing.T) {
 	store := newMemoryStore()
 	svc := newTestService(t, store)

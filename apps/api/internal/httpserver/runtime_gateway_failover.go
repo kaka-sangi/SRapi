@@ -532,6 +532,7 @@ NextCandidate:
 				s.runtime.logger.Info("retrying gateway provider candidate", "request_id", canonical.RequestID, "attempt_no", result.Decision.AttemptNo, "retry_no", sameCandidateRetries, "account_id", result.Candidate.Account.ID, "provider_id", result.Candidate.Provider.ID, "error_class", errorClass, "status_code", upstreamStatus, "delay_ms", int(delay/time.Millisecond))
 				if err := sleepGatewayRetryDelay(ctx, delay); err != nil {
 					breakerDone(false)
+					s.runtime.releaseGatewayAccountQuota(ctx, admission.EstimatedUsage, result.Candidate)
 					s.recordGatewayProviderAttemptFailure(r, authed, canonical, result, err, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
 					return gatewayFailoverResult[T]{
 						ScheduleResult:  result,
@@ -543,6 +544,7 @@ NextCandidate:
 			}
 
 			breakerDone(false)
+			s.runtime.releaseGatewayAccountQuota(ctx, admission.EstimatedUsage, result.Candidate)
 			s.recordGatewayProviderAttemptFailure(r, authed, canonical, result, err, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
 			lastFailure = gatewayFailoverResult[T]{
 				ScheduleResult:  result,

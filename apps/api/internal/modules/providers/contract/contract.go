@@ -2,7 +2,10 @@ package contract
 
 import (
 	"context"
+	"strings"
 	"time"
+
+	"github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
 )
 
 type Status string
@@ -64,4 +67,18 @@ type Store interface {
 	FindByName(ctx context.Context, name string) (Provider, error)
 	List(ctx context.Context) ([]Provider, error)
 	SoftDelete(ctx context.Context, id int) error
+}
+
+// PresetBaseURL resolves the canonical upstream base URL declared by the
+// built-in provider preset identified by presetKey, with any trailing slash
+// trimmed. It returns "" when no preset matches the key (the same fallback
+// callers get when a preset carries no default base URL). This is the stable
+// boundary other modules use to consult preset defaults without depending on
+// the providers/preset package directly.
+func PresetBaseURL(presetKey string) string {
+	matched, ok := preset.Default().Lookup(presetKey)
+	if !ok {
+		return ""
+	}
+	return strings.TrimRight(matched.DefaultBaseURL, "/")
 }

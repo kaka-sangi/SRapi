@@ -272,6 +272,9 @@ func sumUsageCosts(rows []*ent.UsageLog) (string, error) {
 		if !ok {
 			return "", ErrInvalidStore
 		}
+		if amount.Sign() < 0 {
+			return "", ErrInvalidStore
+		}
 		total.Add(total, amount)
 	}
 	return money.FormatRatFixed(total, 8), nil

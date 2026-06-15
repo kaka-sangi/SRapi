@@ -20,6 +20,7 @@ import (
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
+	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 	"github.com/srapi/srapi/apps/api/internal/pkg/usagewindow"
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
@@ -87,7 +88,21 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 	if !entitlement.Allowed {
 		return admission, nil
 	}
-	denied, err := rt.gatewayBalanceGate(ctx, canonical.UserID, entitlement, pricing)
+	// Fetch the user record once and reuse it for both the balance gate and the
+	// per-user rate-limit check, which previously each performed an identical
+	// users.FindByID on every gateway request. Only load it when one of those
+	// consumers would actually read it, mirroring their existing preconditions so
+	// no request path gains an extra store lookup.
+	var user userscontract.StoredUser
+	balanceNeedsUser := rt.cfg.Gateway.RequirePositiveBalance && gatewayEntitlementBalanceBilled(entitlement)
+	rateLimitNeedsUser := rt.rateLimiter != nil && canonical.APIKeyID > 0
+	if canonical.UserID > 0 && (balanceNeedsUser || rateLimitNeedsUser) {
+		user, err = rt.users.FindByID(ctx, canonical.UserID)
+		if err != nil {
+			return gatewayAdmission{}, err
+		}
+	}
+	denied, err := rt.gatewayBalanceGate(ctx, user, entitlement, pricing)
 	if err != nil {
 		return gatewayAdmission{}, err
 	}
@@ -105,7 +120,7 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 		admission.Entitlement.Reason = reason
 		return admission, nil
 	}
-	rateLimit, err := rt.checkGatewayRateLimit(ctx, *canonical, estimatedUsage, modelID)
+	rateLimit, err := rt.checkGatewayRateLimit(ctx, *canonical, user, estimatedUsage, modelID)
 	if err != nil {
 		return gatewayAdmission{}, err
 	}
@@ -157,15 +172,11 @@ func (rt *runtimeState) applyGatewayContentSafety(ctx context.Context, canonical
 	return updated, result, nil
 }
 
-func (rt *runtimeState) checkGatewayRateLimit(ctx context.Context, canonical gatewaycontract.CanonicalRequest, usage gatewaycontract.Usage, modelID int) (ratelimit.Decision, error) {
+func (rt *runtimeState) checkGatewayRateLimit(ctx context.Context, canonical gatewaycontract.CanonicalRequest, user userscontract.StoredUser, usage gatewaycontract.Usage, modelID int) (ratelimit.Decision, error) {
 	if rt.rateLimiter == nil || canonical.UserID <= 0 || canonical.APIKeyID <= 0 {
 		return ratelimit.Decision{Allowed: true}, nil
 	}
 	apiKey, err := rt.apiKeyByID(ctx, canonical.UserID, canonical.APIKeyID)
-	if err != nil {
-		return ratelimit.Decision{}, err
-	}
-	user, err := rt.users.FindByID(ctx, canonical.UserID)
 	if err != nil {
 		return ratelimit.Decision{}, err
 	}
@@ -225,10 +236,12 @@ func (rt *runtimeState) checkGatewayRateLimit(ctx context.Context, canonical gat
 	return rt.rateLimiter.Allow(ctx, checks, time.Now().UTC())
 }
 
-func (rt *runtimeState) reserveGatewayAccountQuota(ctx context.Context, usage gatewaycontract.Usage, candidate schedulercontract.Candidate) error {
-	if rt.rateLimiter == nil || candidate.Account.ID <= 0 {
-		return nil
-	}
+// buildGatewayAccountQuotaChecks assembles the per-account rpm/tpm and
+// per-account-group rpm/tpm windowed limit checks for a scheduled candidate. It is
+// shared by reserveGatewayAccountQuota (which Allow-increments these counters) and
+// releaseGatewayAccountQuota (which refunds them on failover) so the reserved and
+// refunded checks match exactly.
+func (rt *runtimeState) buildGatewayAccountQuotaChecks(ctx context.Context, usage gatewaycontract.Usage, candidate schedulercontract.Candidate) []ratelimit.Check {
 	checks := make([]ratelimit.Check, 0, 2)
 	if limit := positiveLimit(candidate.Limits.RPMLimit); limit > 0 {
 		checks = append(checks, ratelimit.Check{
@@ -275,6 +288,14 @@ func (rt *runtimeState) reserveGatewayAccountQuota(ctx context.Context, usage ga
 			}
 		}
 	}
+	return checks
+}
+
+func (rt *runtimeState) reserveGatewayAccountQuota(ctx context.Context, usage gatewaycontract.Usage, candidate schedulercontract.Candidate) error {
+	if rt.rateLimiter == nil || candidate.Account.ID <= 0 {
+		return nil
+	}
+	checks := rt.buildGatewayAccountQuotaChecks(ctx, usage, candidate)
 	if len(checks) == 0 {
 		return nil
 	}
@@ -289,6 +310,22 @@ func (rt *runtimeState) reserveGatewayAccountQuota(ctx context.Context, usage ga
 		Class:      gatewayAccountQuotaErrorClass(decision.Name),
 		StatusCode: http.StatusTooManyRequests,
 		Message:    "provider account rate limit exceeded",
+	}
+}
+
+// releaseGatewayAccountQuota refunds a reservation made by reserveGatewayAccountQuota
+// when a failover attempt for that candidate fails, so the failed attempt does not
+// permanently consume the account's rpm/tpm/group window. Best-effort.
+func (rt *runtimeState) releaseGatewayAccountQuota(ctx context.Context, usage gatewaycontract.Usage, candidate schedulercontract.Candidate) {
+	if rt.rateLimiter == nil || candidate.Account.ID <= 0 {
+		return
+	}
+	checks := rt.buildGatewayAccountQuotaChecks(ctx, usage, candidate)
+	if len(checks) == 0 {
+		return
+	}
+	if err := rt.rateLimiter.Release(ctx, checks); err != nil && rt.logger != nil {
+		rt.logger.Warn("failed to refund account quota reservation after failover", "account_id", candidate.Account.ID, "error", err)
 	}
 }
 

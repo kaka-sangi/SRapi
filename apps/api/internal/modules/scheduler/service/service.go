@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"log/slog"
 	"math"
 	"sort"
 	"strconv"
@@ -113,7 +114,13 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (r
 	}
 	decision, _, err := s.createDecisionWithSnapshot(ctx, req, strategy, evaluation.decision, evaluation.candidatesByRank)
 	if err != nil {
-		_, _ = s.store.UpdateLeaseStatus(ctx, strings.TrimSpace(req.RequestID), attemptNo, contract.LeaseStatusReleased)
+		if _, releaseErr := s.store.UpdateLeaseStatus(ctx, strings.TrimSpace(req.RequestID), attemptNo, contract.LeaseStatusReleased); releaseErr != nil {
+			slog.Warn("scheduler: failed to release lease after decision creation error",
+				"request_id", strings.TrimSpace(req.RequestID),
+				"attempt_no", attemptNo,
+				"account_id", evaluation.selected.Account.ID,
+				"error", releaseErr)
+		}
 		return contract.ScheduleResult{}, err
 	}
 	return contract.ScheduleResult{Decision: decision, Candidate: evaluation.selected, Candidates: evaluation.candidatesByRank, Lease: lease}, nil
@@ -348,6 +355,12 @@ func (s *Service) RecordFeedback(ctx context.Context, req contract.RecordFeedbac
 		status = contract.LeaseStatusFailed
 	}
 	if _, err := s.store.UpdateLeaseStatus(ctx, strings.TrimSpace(req.RequestID), req.AttemptNo, status); err != nil {
+		slog.Warn("scheduler: failed to update lease status on feedback",
+			"request_id", strings.TrimSpace(req.RequestID),
+			"attempt_no", req.AttemptNo,
+			"account_id", req.AccountID,
+			"lease_status", string(status),
+			"error", err)
 		return feedback, nil
 	}
 	return feedback, nil
@@ -1628,9 +1641,10 @@ func cloneCapabilityDescriptors(values []capabilitiescontract.Descriptor) []capa
 
 func cloneRuntimeLimits(value contract.RuntimeLimits) contract.RuntimeLimits {
 	return contract.RuntimeLimits{
-		MaxConcurrency: cloneIntPtr(value.MaxConcurrency),
-		RPMLimit:       cloneIntPtr(value.RPMLimit),
-		TPMLimit:       cloneIntPtr(value.TPMLimit),
+		MaxConcurrency:  cloneIntPtr(value.MaxConcurrency),
+		RPMLimit:        cloneIntPtr(value.RPMLimit),
+		TPMLimit:        cloneIntPtr(value.TPMLimit),
+		CostWindowLimit: cloneFloatPtr(value.CostWindowLimit),
 	}
 }
 
@@ -1720,6 +1734,14 @@ func boolPtr(value bool) *bool {
 }
 
 func cloneIntPtr(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func cloneFloatPtr(value *float64) *float64 {
 	if value == nil {
 		return nil
 	}
