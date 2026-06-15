@@ -3161,6 +3161,45 @@ func (e GetAdminOpsThroughputTrendParamsBucket) Valid() bool {
 	}
 }
 
+// Defines values for GetAdminUsageTrendsParamsBucket.
+const (
+	GetAdminUsageTrendsParamsBucketDay  GetAdminUsageTrendsParamsBucket = "day"
+	GetAdminUsageTrendsParamsBucketHour GetAdminUsageTrendsParamsBucket = "hour"
+)
+
+// Valid indicates whether the value is a known member of the GetAdminUsageTrendsParamsBucket enum.
+func (e GetAdminUsageTrendsParamsBucket) Valid() bool {
+	switch e {
+	case GetAdminUsageTrendsParamsBucketDay:
+		return true
+	case GetAdminUsageTrendsParamsBucketHour:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetAdminUsageTrendsParamsDimension.
+const (
+	GetAdminUsageTrendsParamsDimensionAccount        GetAdminUsageTrendsParamsDimension = "account"
+	GetAdminUsageTrendsParamsDimensionModel          GetAdminUsageTrendsParamsDimension = "model"
+	GetAdminUsageTrendsParamsDimensionSourceEndpoint GetAdminUsageTrendsParamsDimension = "source_endpoint"
+)
+
+// Valid indicates whether the value is a known member of the GetAdminUsageTrendsParamsDimension enum.
+func (e GetAdminUsageTrendsParamsDimension) Valid() bool {
+	switch e {
+	case GetAdminUsageTrendsParamsDimensionAccount:
+		return true
+	case GetAdminUsageTrendsParamsDimensionModel:
+		return true
+	case GetAdminUsageTrendsParamsDimensionSourceEndpoint:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StartOAuthAuthorizationParamsIntent.
 const (
 	StartOAuthAuthorizationParamsIntentBindCurrentUser StartOAuthAuthorizationParamsIntent = "bind_current_user"
@@ -3181,16 +3220,16 @@ func (e StartOAuthAuthorizationParamsIntent) Valid() bool {
 
 // Defines values for GetCurrentUserUsageTrendParamsBucket.
 const (
-	GetCurrentUserUsageTrendParamsBucketDay  GetCurrentUserUsageTrendParamsBucket = "day"
-	GetCurrentUserUsageTrendParamsBucketHour GetCurrentUserUsageTrendParamsBucket = "hour"
+	Day  GetCurrentUserUsageTrendParamsBucket = "day"
+	Hour GetCurrentUserUsageTrendParamsBucket = "hour"
 )
 
 // Valid indicates whether the value is a known member of the GetCurrentUserUsageTrendParamsBucket enum.
 func (e GetCurrentUserUsageTrendParamsBucket) Valid() bool {
 	switch e {
-	case GetCurrentUserUsageTrendParamsBucketDay:
+	case Day:
 		return true
-	case GetCurrentUserUsageTrendParamsBucketHour:
+	case Hour:
 		return true
 	default:
 		return false
@@ -9512,6 +9551,13 @@ type UsageCleanupResult struct {
 	MaxDelete int  `json:"max_delete"`
 }
 
+// UsageErrorBucket defines model for UsageErrorBucket.
+type UsageErrorBucket struct {
+	Count      int     `json:"count"`
+	ErrorClass string  `json:"error_class"`
+	Percentage float32 `json:"percentage"`
+}
+
 // UsageExport defines model for UsageExport.
 type UsageExport struct {
 	ByAccount   []UsageAggregate `json:"by_account"`
@@ -9623,6 +9669,29 @@ type UsageTrendPoint struct {
 type UsageTrendPointListResponse struct {
 	Data      []UsageTrendPoint `json:"data"`
 	RequestId RequestId         `json:"request_id"`
+}
+
+// UsageTrendSeries defines model for UsageTrendSeries.
+type UsageTrendSeries struct {
+	Label  string                  `json:"label"`
+	Points []UsageTrendSeriesPoint `json:"points"`
+}
+
+// UsageTrendSeriesPoint defines model for UsageTrendSeriesPoint.
+type UsageTrendSeriesPoint struct {
+	Bucket       string `json:"bucket"`
+	Cost         string `json:"cost"`
+	Currency     string `json:"currency"`
+	InputTokens  int    `json:"input_tokens"`
+	OutputTokens int    `json:"output_tokens"`
+	Requests     int    `json:"requests"`
+}
+
+// UsageTrendSeriesResult defines model for UsageTrendSeriesResult.
+type UsageTrendSeriesResult struct {
+	Bucket    string             `json:"bucket"`
+	Dimension string             `json:"dimension"`
+	Series    []UsageTrendSeries `json:"series"`
 }
 
 // User defines model for User.
@@ -10370,11 +10439,32 @@ type GetAdminUsageDailyParams struct {
 	End   *openapi_types.Date `form:"end,omitempty" json:"end,omitempty"`
 }
 
+// GetAdminUsageErrorDistributionParams defines parameters for GetAdminUsageErrorDistribution.
+type GetAdminUsageErrorDistributionParams struct {
+	Start *time.Time `form:"start,omitempty" json:"start,omitempty"`
+	End   *time.Time `form:"end,omitempty" json:"end,omitempty"`
+}
+
 // ExportAdminUsageParams defines parameters for ExportAdminUsage.
 type ExportAdminUsageParams struct {
 	Start *openapi_types.Date `form:"start,omitempty" json:"start,omitempty"`
 	End   *openapi_types.Date `form:"end,omitempty" json:"end,omitempty"`
 }
+
+// GetAdminUsageTrendsParams defines parameters for GetAdminUsageTrends.
+type GetAdminUsageTrendsParams struct {
+	Start     *time.Time                          `form:"start,omitempty" json:"start,omitempty"`
+	End       *time.Time                          `form:"end,omitempty" json:"end,omitempty"`
+	Bucket    *GetAdminUsageTrendsParamsBucket    `form:"bucket,omitempty" json:"bucket,omitempty"`
+	Dimension *GetAdminUsageTrendsParamsDimension `form:"dimension,omitempty" json:"dimension,omitempty"`
+	Limit     *int                                `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetAdminUsageTrendsParamsBucket defines parameters for GetAdminUsageTrends.
+type GetAdminUsageTrendsParamsBucket string
+
+// GetAdminUsageTrendsParamsDimension defines parameters for GetAdminUsageTrends.
+type GetAdminUsageTrendsParamsDimension string
 
 // ListAdminUserSubscriptionsParams defines parameters for ListAdminUserSubscriptions.
 type ListAdminUserSubscriptionsParams struct {
@@ -18065,9 +18155,15 @@ type ServerInterface interface {
 	// Get daily usage aggregates.
 	// (GET /api/v1/admin/usage/daily)
 	GetAdminUsageDaily(w http.ResponseWriter, r *http.Request, params GetAdminUsageDailyParams)
+	// Get usage error-class distribution for charts.
+	// (GET /api/v1/admin/usage/error-distribution)
+	GetAdminUsageErrorDistribution(w http.ResponseWriter, r *http.Request, params GetAdminUsageErrorDistributionParams)
 	// Export usage logs and aggregates.
 	// (GET /api/v1/admin/usage/export)
 	ExportAdminUsage(w http.ResponseWriter, r *http.Request, params ExportAdminUsageParams)
+	// Get usage trend series for charts.
+	// (GET /api/v1/admin/usage/trends)
+	GetAdminUsageTrends(w http.ResponseWriter, r *http.Request, params GetAdminUsageTrendsParams)
 	// List user attribute definitions.
 	// (GET /api/v1/admin/user-attributes)
 	ListAdminUserAttributeDefinitions(w http.ResponseWriter, r *http.Request)
@@ -27321,6 +27417,58 @@ func (siw *ServerInterfaceWrapper) GetAdminUsageDaily(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminUsageErrorDistribution operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminUsageErrorDistribution(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminUsageErrorDistributionParams
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminUsageErrorDistribution(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ExportAdminUsage operation middleware
 func (siw *ServerInterfaceWrapper) ExportAdminUsage(w http.ResponseWriter, r *http.Request) {
 
@@ -27364,6 +27512,97 @@ func (siw *ServerInterfaceWrapper) ExportAdminUsage(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ExportAdminUsage(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminUsageTrends operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminUsageTrends(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminUsageTrendsParams
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "bucket" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "bucket", r.URL.Query(), &params.Bucket, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "bucket"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bucket", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "dimension" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "dimension", r.URL.Query(), &params.Dimension, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "dimension"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dimension", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminUsageTrends(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -31588,7 +31827,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/aggregates", wrapper.GetAdminUsageAggregates)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/usage/cleanup", wrapper.CleanupAdminUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/daily", wrapper.GetAdminUsageDaily)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/error-distribution", wrapper.GetAdminUsageErrorDistribution)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/export", wrapper.ExportAdminUsage)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/trends", wrapper.GetAdminUsageTrends)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/user-attributes", wrapper.ListAdminUserAttributeDefinitions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/user-attributes", wrapper.CreateAdminUserAttributeDefinition)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/user-attributes/{id}", wrapper.DeleteAdminUserAttributeDefinition)

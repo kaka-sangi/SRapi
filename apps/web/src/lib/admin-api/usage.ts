@@ -4,6 +4,8 @@ import {
   cleanupAdminUsage,
   getAdminUsageAggregates,
   getAdminUsageDaily,
+  getAdminUsageErrorDistribution,
+  getAdminUsageTrends,
   listAdminAuditLogs,
   listAdminBillingLedger,
   listAdminOutboxEvents,
@@ -13,6 +15,7 @@ import type {
   AuditLog,
   BillingLedgerEntry,
   DomainEventOutbox,
+  GetAdminUsageTrendsData,
   ListAdminAuditLogsData,
   ListAdminBillingLedgerData,
   ListAdminOutboxEventsData,
@@ -21,7 +24,9 @@ import type {
   UsageCleanupResult,
   UsageAggregate,
   UsageAggregateDimension,
+  UsageErrorBucket,
   UsageLog,
+  UsageTrendSeriesResult,
 } from "../../../../../packages/sdk/typescript/src/types.gen";
 import { unwrapList, unwrapData } from "./_shared";
 import type { AdminListResult, AdminTimeRange } from "./types";
@@ -45,6 +50,19 @@ export const usageApi = {
         throwOnError: true,
       }),
     );
+  },
+
+  // Multi-series usage trend (tokens / cost / requests over time), bucketed by
+  // day|hour and grouped by a dimension (model|account|source_endpoint). The
+  // backend returns the top-N series; `limit` caps how many series come back.
+  getUsageTrends(query?: GetAdminUsageTrendsData["query"]): Promise<UsageTrendSeriesResult> {
+    return unwrapData(() => getAdminUsageTrends({ query, throwOnError: true }));
+  },
+
+  // Error distribution over the usage window, grouped by error_class. The
+  // payload `data` is the bucket array directly (no pagination envelope).
+  getUsageErrorDistribution(query?: AdminTimeRange): Promise<UsageErrorBucket[]> {
+    return unwrapData(() => getAdminUsageErrorDistribution({ query, throwOnError: true }));
   },
 
   // Operator on-demand deletion of usage records (the counterpart to the

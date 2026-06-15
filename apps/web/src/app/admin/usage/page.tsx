@@ -16,6 +16,12 @@ import {
   useAdminModels,
   useAdminUsers,
 } from "@/hooks/admin-queries";
+import {
+  useAdminUsageTrends,
+  useAdminUsageErrorDistribution,
+} from "@/hooks/admin-queries/usage-charts";
+import { UsageTrendChart, type UsageTrendMetric } from "@/components/admin/usage-trend-chart";
+import { UsageErrorDistributionChart } from "@/components/admin/usage-error-distribution-chart";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -45,6 +51,24 @@ const DIMENSION_LABEL_KEY: Record<AggregateDimension, string> = {
 };
 
 const TOP_N = 12;
+
+// Trend-chart toggles. Dimensions match `GetAdminUsageTrendsData["query"].dimension`
+// ('model' | 'account' | 'source_endpoint'); buckets match `.bucket`
+// ('day' | 'hour'). The order here drives the segmented-control order.
+const TREND_DIMENSIONS = ["model", "account", "source_endpoint"] as const;
+type TrendDimension = (typeof TREND_DIMENSIONS)[number];
+
+const TREND_DIMENSION_LABEL_KEY: Record<TrendDimension, string> = {
+  model: "adminUsage.byModel",
+  account: "adminUsage.byAccount",
+  source_endpoint: "usage.endpoint",
+};
+
+const TREND_BUCKETS = ["day", "hour"] as const;
+type TrendBucket = (typeof TREND_BUCKETS)[number];
+
+// One line per series — keep the chart readable; the backend caps to this top-N.
+const TREND_SERIES_LIMIT = 6;
 
 // Verbose / low-frequency UsageLog fields start hidden; the always-useful
 // columns (time, user, model, output, cost, status) stay visible by default.
@@ -414,6 +438,7 @@ function UsageContent() {
           </CardContent>
         </Card>
       ) : null}
+      <UsageCharts />
       <UsageBreakdown />
       <AdminListView
         query={usage}
@@ -450,6 +475,68 @@ function UsageContent() {
         }}
       />
     </>
+  );
+}
+
+function UsageCharts() {
+  const { t } = useLanguage();
+  // The shared message catalog has no keys for the new usage charts yet; fall
+  // back to a readable English string so they never render as a raw dotted key.
+  const tWithFallback = (key: string, fallback: string) => {
+    const value = t(key);
+    return value === key ? fallback : value;
+  };
+
+  const [dimension, setDimension] = useState<TrendDimension>("model");
+  const [bucket, setBucket] = useState<TrendBucket>("day");
+  const [metric, setMetric] = useState<UsageTrendMetric>("tokens");
+
+  const trends = useAdminUsageTrends({ dimension, bucket, limit: TREND_SERIES_LIMIT });
+  const errorDistribution = useAdminUsageErrorDistribution();
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <UsageTrendChart
+        series={trends.data?.series ?? []}
+        loading={trends.isLoading}
+        metric={metric}
+        onMetricChange={setMetric}
+        title={tWithFallback("adminUsage.trendTitle", "Usage trend")}
+        metricTokensLabel={t("usage.tokens")}
+        metricCostLabel={t("adminUsage.cost")}
+        emptyLabel={tWithFallback("adminUsage.trendEmpty", "No usage in window")}
+        controls={
+          <>
+            <Tabs value={dimension} onValueChange={(v) => setDimension(v as TrendDimension)}>
+              <TabsList>
+                {TREND_DIMENSIONS.map((dim) => (
+                  <TabsTrigger key={dim} value={dim} className="text-xs">
+                    {t(TREND_DIMENSION_LABEL_KEY[dim])}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+            <Tabs value={bucket} onValueChange={(v) => setBucket(v as TrendBucket)}>
+              <TabsList>
+                {TREND_BUCKETS.map((b) => (
+                  <TabsTrigger key={b} value={b} className="text-xs">
+                    {tWithFallback(`adminUsage.bucket.${b}`, b === "day" ? "Day" : "Hour")}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </>
+        }
+      />
+      <UsageErrorDistributionChart
+        items={errorDistribution.data ?? []}
+        loading={errorDistribution.isLoading}
+        title={tWithFallback("adminUsage.errorDistributionTitle", "Error distribution")}
+        emptyLabel={tWithFallback("adminUsage.errorDistributionEmpty", "No errors in window")}
+        totalLabel={tWithFallback("adminUsage.errorsTotal", "errors")}
+        otherLabel={tWithFallback("adminUsage.errorsOther", "Other")}
+      />
+    </div>
   );
 }
 
