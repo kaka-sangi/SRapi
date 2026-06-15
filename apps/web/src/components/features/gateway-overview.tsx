@@ -2,9 +2,15 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { KeyRound, Activity, ArrowUpRight, Gauge, Wallet } from "lucide-react";
+import { KeyRound, Activity, ArrowUpRight, Gauge, Wallet, LineChart, BarChart3 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useBalance, usePlatformQuotas, useUsageLogs } from "@/hooks/queries";
+import {
+  useUserUsageThroughput,
+  useUserUsageTrend,
+  useUserUsageModels,
+  useUserUsageCacheMetrics,
+} from "@/hooks/use-user-dashboard";
 import { useUsageTotals } from "@/hooks/use-usage-totals";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
@@ -13,10 +19,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
+import { TrendChart } from "@/components/charts/trend-chart";
+import { ChartEmpty } from "@/components/charts/chart-empty";
+import { DialogListSkeleton, TrendChartSkeleton, BarChartSkeleton } from "@/components/charts/chart-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatMoney } from "@/lib/admin-format";
-import type { UserPlatformQuota } from "@/lib/sdk-types";
+import { formatMoney, formatCompactNumber } from "@/lib/admin-format";
+import type { UserPlatformQuota, UsageModelShare, UsageTrendPoint } from "@/lib/sdk-types";
 import type { UsageLogSummary } from "@/lib/srapi-types";
 
 const rise = (i: number) => ({ "--stagger-index": i }) as CSSProperties;
@@ -64,18 +72,29 @@ function bucketRequests(logs: UsageLogSummary[], buckets = 14): number[] {
   return out;
 }
 
+/** Window (days) for the trend chart and model-distribution rollups. */
+const TREND_DAYS = 7;
+
 /**
- * User workspace dashboard. Shows ONLY the signed-in user's own data, derived
- * entirely from `/me/usage`. Gateway internals — upstream account health,
- * scheduler decisions, fleet-wide overview — are admin-only capabilities (no
- * `/me` endpoint exists for them) and live on the admin dashboard, so they are
- * deliberately absent here rather than 403-ing against admin endpoints.
+ * User workspace dashboard. Shows ONLY the signed-in user's own data: the live
+ * usage-dashboard aggregates (`/user/usage/dashboard/*` — throughput, trend,
+ * model share, cache metrics) plus the user's own `/me/usage` request log.
+ * Gateway internals — upstream account health, scheduler decisions, fleet-wide
+ * overview — are admin-only capabilities (no `/me` endpoint exists for them) and
+ * live on the admin dashboard, so they are deliberately absent here rather than
+ * 403-ing against admin endpoints.
  */
 export function GatewayOverview() {
   const { t } = useLanguage();
   const balance = useBalance();
   const platformQuotas = usePlatformQuotas();
   const usage = useUsageLogs();
+
+  // Live usage-dashboard aggregates (server-side rollups, not derived client-side).
+  const throughput = useUserUsageThroughput();
+  const cacheMetrics = useUserUsageCacheMetrics();
+  const trend = useUserUsageTrend(TREND_DAYS, "day");
+  const models = useUserUsageModels(TREND_DAYS);
 
   // Derived, honest metrics from the user's own usage logs.
   const logs = usage.data ?? [];
@@ -170,6 +189,19 @@ export function GatewayOverview() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Header KPIs — live throughput (RPM/TPM) + prompt-cache hit rate. */}
+      <ThroughputKpis throughput={throughput} cacheMetrics={cacheMetrics} />
+
+      {/* Usage trend over the last window + model distribution by tokens. */}
+      <div className="grid gap-4 lg:grid-cols-5">
+        <div className="anim-rise-sm lg:col-span-3" style={rise(1)}>
+          <UsageTrendCard query={trend} />
+        </div>
+        <div className="anim-rise-sm lg:col-span-2" style={rise(2)}>
+          <ModelDistributionCard query={models} />
+        </div>
       </div>
 
       {/* KPI row — the user's own request/token/cost footprint. */}
@@ -287,5 +319,210 @@ export function GatewayOverview() {
       </div>
 
     </>
+  );
+}
+
+/**
+ * Header KPI strip backed by the live usage-dashboard aggregates: requests- and
+ * tokens-per-minute (with their window peaks as the card hint) and the
+ * prompt-cache hit rate (with cost saved). Each card loads independently so a
+ * slow rollup never blocks the others.
+ */
+function ThroughputKpis({
+  throughput,
+  cacheMetrics,
+}: {
+  throughput: ReturnType<typeof useUserUsageThroughput>;
+  cacheMetrics: ReturnType<typeof useUserUsageCacheMetrics>;
+}) {
+  const { t } = useLanguage();
+  const tp = throughput.data;
+  const cache = cacheMetrics.data;
+  const tpLoading = throughput.isLoading;
+  const cacheLoading = cacheMetrics.isLoading;
+
+  return (
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      <div className="anim-rise-sm" style={rise(1)}>
+        {tpLoading ? (
+          <StatCardSkeleton className="h-full" />
+        ) : (
+          <StatCard
+            className="h-full"
+            label={t("dashboard.rpm")}
+            value={tp ? tp.rpm : "—"}
+            format={formatCompactNumber}
+            hint={
+              tp
+                ? t("dashboard.peakRpm", { value: formatCompactNumber(tp.peak_rpm) })
+                : undefined
+            }
+          />
+        )}
+      </div>
+      <div className="anim-rise-sm" style={rise(2)}>
+        {tpLoading ? (
+          <StatCardSkeleton className="h-full" />
+        ) : (
+          <StatCard
+            className="h-full"
+            label={t("dashboard.tpm")}
+            value={tp ? tp.tpm : "—"}
+            format={formatCompactNumber}
+            hint={
+              tp
+                ? t("dashboard.peakTpm", { value: formatCompactNumber(tp.peak_tpm) })
+                : undefined
+            }
+          />
+        )}
+      </div>
+      <div className="anim-rise-sm col-span-2 lg:col-span-1" style={rise(3)}>
+        {cacheLoading ? (
+          <StatCardSkeleton className="h-full" />
+        ) : (
+          <StatCard
+            className="h-full"
+            label={t("dashboard.cacheHitRate")}
+            value={cache ? cache.cache_hit_rate * 100 : "—"}
+            format={(n) => `${n.toFixed(1)}%`}
+            hint={
+              cache && Number(cache.cache_cost_saved) > 0
+                ? t("dashboard.cacheSaved", {
+                    value: formatMoney(cache.cache_cost_saved, cache.currency),
+                  })
+                : cache
+                  ? t("dashboard.cachedInput", {
+                      cached: formatCompactNumber(cache.cache_read_tokens),
+                      total: formatCompactNumber(cache.total_input_tokens),
+                    })
+                  : undefined
+            }
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Usage trend over the window as a two-series pure-SVG line chart (requests +
+ * tokens, each min-max normalised by the shared TrendChart so both shapes read
+ * even at different magnitudes). Buckets arrive pre-aggregated from the server.
+ */
+function UsageTrendCard({ query }: { query: ReturnType<typeof useUserUsageTrend> }) {
+  const { t } = useLanguage();
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle>{t("dashboard.usageTrend")}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <PageQueryState query={query} skeleton={<TrendChartSkeleton height={160} />}>
+          {(points) =>
+            points.length === 0 ? (
+              <ChartEmpty icon={LineChart} label={t("dashboard.noData")} />
+            ) : (
+              <TrendChart
+                ariaLabel={t("dashboard.usageTrend")}
+                height={160}
+                series={[
+                  {
+                    key: "requests",
+                    label: t("dashboard.trendRequests"),
+                    values: points.map((p: UsageTrendPoint) => p.requests),
+                    tone: "primary",
+                  },
+                  {
+                    key: "tokens",
+                    label: t("dashboard.trendTokens"),
+                    values: points.map(
+                      (p: UsageTrendPoint) => p.input_tokens + p.output_tokens,
+                    ),
+                    tone: "success",
+                  },
+                ]}
+              />
+            )
+          }
+        </PageQueryState>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Top models by token volume as a proportional list/donut hybrid: each row is a
+ * model with a share bar scaled to the leader, mirroring the usage-breakdown
+ * primitive but ranked by tokens (not cost) to match the sub2api distribution
+ * view. The server returns these already aggregated per model.
+ */
+function ModelDistributionCard({ query }: { query: ReturnType<typeof useUserUsageModels> }) {
+  const { t } = useLanguage();
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle>{t("dashboard.topModels")}</CardTitle>
+        <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          {t("dashboard.byTokens")}
+        </span>
+      </CardHeader>
+      <CardContent>
+        <PageQueryState query={query} skeleton={<BarChartSkeleton rows={5} />}>
+          {(rows) =>
+            rows.length === 0 ? (
+              <ChartEmpty icon={BarChart3} label={t("dashboard.noModelUsage")} />
+            ) : (
+              <ModelDistributionList rows={rows} />
+            )
+          }
+        </PageQueryState>
+      </CardContent>
+    </Card>
+  );
+}
+
+const MODEL_ROWS = 6;
+
+function ModelDistributionList({ rows }: { rows: UsageModelShare[] }) {
+  const { t } = useLanguage();
+  const ranked = [...rows].sort((a, b) => b.total_tokens - a.total_tokens).slice(0, MODEL_ROWS);
+  const totalTokens = rows.reduce((sum, r) => sum + r.total_tokens, 0);
+  const maxTokens = ranked.reduce((max, r) => Math.max(max, r.total_tokens), 0);
+
+  return (
+    <div className="space-y-3">
+      {ranked.map((row) => {
+        const width = maxTokens > 0 ? Math.min(100, (row.total_tokens / maxTokens) * 100) : 0;
+        const share = totalTokens > 0 ? Math.round((row.total_tokens / totalTokens) * 100) : 0;
+        return (
+          <div key={row.model}>
+            <div className="flex items-baseline justify-between gap-3">
+              <span
+                className="min-w-0 truncate font-mono text-2xs text-srapi-text-primary"
+                title={row.model}
+              >
+                {row.model}
+              </span>
+              <span className="shrink-0 font-mono text-2xs text-srapi-text-secondary tabular">
+                {compact(row.total_tokens)}
+              </span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-srapi-card-muted">
+              <div
+                className="h-full rounded-full bg-srapi-primary"
+                style={{ width: `${width}%` }}
+              />
+            </div>
+            <div className="mt-1 flex items-center justify-between font-mono text-2xs text-srapi-text-tertiary tabular">
+              <span>
+                {compact(row.requests)} req · {fmtCost(Number(row.cost), row.currency)}
+              </span>
+              <span>{t("dashboard.modelShare", { percent: share })}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }

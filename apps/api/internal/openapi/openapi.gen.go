@@ -3145,16 +3145,16 @@ func (e GetAdminOpsErrorTrendParamsBucket) Valid() bool {
 
 // Defines values for GetAdminOpsThroughputTrendParamsBucket.
 const (
-	Day  GetAdminOpsThroughputTrendParamsBucket = "day"
-	Hour GetAdminOpsThroughputTrendParamsBucket = "hour"
+	GetAdminOpsThroughputTrendParamsBucketDay  GetAdminOpsThroughputTrendParamsBucket = "day"
+	GetAdminOpsThroughputTrendParamsBucketHour GetAdminOpsThroughputTrendParamsBucket = "hour"
 )
 
 // Valid indicates whether the value is a known member of the GetAdminOpsThroughputTrendParamsBucket enum.
 func (e GetAdminOpsThroughputTrendParamsBucket) Valid() bool {
 	switch e {
-	case Day:
+	case GetAdminOpsThroughputTrendParamsBucketDay:
 		return true
-	case Hour:
+	case GetAdminOpsThroughputTrendParamsBucketHour:
 		return true
 	default:
 		return false
@@ -3173,6 +3173,24 @@ func (e StartOAuthAuthorizationParamsIntent) Valid() bool {
 	case StartOAuthAuthorizationParamsIntentBindCurrentUser:
 		return true
 	case StartOAuthAuthorizationParamsIntentLogin:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetCurrentUserUsageTrendParamsBucket.
+const (
+	GetCurrentUserUsageTrendParamsBucketDay  GetCurrentUserUsageTrendParamsBucket = "day"
+	GetCurrentUserUsageTrendParamsBucketHour GetCurrentUserUsageTrendParamsBucket = "hour"
+)
+
+// Valid indicates whether the value is a known member of the GetCurrentUserUsageTrendParamsBucket enum.
+func (e GetCurrentUserUsageTrendParamsBucket) Valid() bool {
+	switch e {
+	case GetCurrentUserUsageTrendParamsBucketDay:
+		return true
+	case GetCurrentUserUsageTrendParamsBucketHour:
 		return true
 	default:
 		return false
@@ -9452,6 +9470,22 @@ type UsageAggregateListResponse struct {
 	RequestId  RequestId        `json:"request_id"`
 }
 
+// UsageCacheMetrics defines model for UsageCacheMetrics.
+type UsageCacheMetrics struct {
+	CacheCostSaved      string  `json:"cache_cost_saved"`
+	CacheCreationTokens int     `json:"cache_creation_tokens"`
+	CacheHitRate        float32 `json:"cache_hit_rate"`
+	CacheReadTokens     int     `json:"cache_read_tokens"`
+	Currency            string  `json:"currency"`
+	TotalInputTokens    int     `json:"total_input_tokens"`
+}
+
+// UsageCacheMetricsResponse defines model for UsageCacheMetricsResponse.
+type UsageCacheMetricsResponse struct {
+	Data      UsageCacheMetrics `json:"data"`
+	RequestId RequestId         `json:"request_id"`
+}
+
 // UsageCleanupRequest Bounded filter for operator on-demand usage-record cleanup. At least one of model, start or end must be supplied so a cleanup can never match the entire table by accident.
 type UsageCleanupRequest struct {
 	DryRun    *bool      `json:"dry_run,omitempty"`
@@ -9539,6 +9573,56 @@ type UsageLogListResponse struct {
 	Data       []UsageLog `json:"data"`
 	Pagination Pagination `json:"pagination"`
 	RequestId  RequestId  `json:"request_id"`
+}
+
+// UsageModelShare defines model for UsageModelShare.
+type UsageModelShare struct {
+	Cost         string `json:"cost"`
+	Currency     string `json:"currency"`
+	InputTokens  int    `json:"input_tokens"`
+	Model        string `json:"model"`
+	OutputTokens int    `json:"output_tokens"`
+	Requests     int    `json:"requests"`
+	TotalTokens  int    `json:"total_tokens"`
+}
+
+// UsageModelShareListResponse defines model for UsageModelShareListResponse.
+type UsageModelShareListResponse struct {
+	Data      []UsageModelShare `json:"data"`
+	RequestId RequestId         `json:"request_id"`
+}
+
+// UsageThroughput defines model for UsageThroughput.
+type UsageThroughput struct {
+	PeakRpm       float32 `json:"peak_rpm"`
+	PeakTpm       float32 `json:"peak_tpm"`
+	Rpm           float32 `json:"rpm"`
+	TotalRequests int     `json:"total_requests"`
+	TotalTokens   int     `json:"total_tokens"`
+	Tpm           float32 `json:"tpm"`
+	WindowMinutes int     `json:"window_minutes"`
+}
+
+// UsageThroughputResponse defines model for UsageThroughputResponse.
+type UsageThroughputResponse struct {
+	Data      UsageThroughput `json:"data"`
+	RequestId RequestId       `json:"request_id"`
+}
+
+// UsageTrendPoint defines model for UsageTrendPoint.
+type UsageTrendPoint struct {
+	Bucket       string `json:"bucket"`
+	Cost         string `json:"cost"`
+	Currency     string `json:"currency"`
+	InputTokens  int    `json:"input_tokens"`
+	OutputTokens int    `json:"output_tokens"`
+	Requests     int    `json:"requests"`
+}
+
+// UsageTrendPointListResponse defines model for UsageTrendPointListResponse.
+type UsageTrendPointListResponse struct {
+	Data      []UsageTrendPoint `json:"data"`
+	RequestId RequestId         `json:"request_id"`
 }
 
 // User defines model for User.
@@ -10413,6 +10497,20 @@ type ListPaymentOrdersParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
+
+// GetCurrentUserUsageModelsParams defines parameters for GetCurrentUserUsageModels.
+type GetCurrentUserUsageModelsParams struct {
+	Days *int `form:"days,omitempty" json:"days,omitempty"`
+}
+
+// GetCurrentUserUsageTrendParams defines parameters for GetCurrentUserUsageTrend.
+type GetCurrentUserUsageTrendParams struct {
+	Days   *int                                  `form:"days,omitempty" json:"days,omitempty"`
+	Bucket *GetCurrentUserUsageTrendParamsBucket `form:"bucket,omitempty" json:"bucket,omitempty"`
+}
+
+// GetCurrentUserUsageTrendParamsBucket defines parameters for GetCurrentUserUsageTrend.
+type GetCurrentUserUsageTrendParamsBucket string
 
 // CreateChatCompletionParams defines parameters for CreateChatCompletion.
 type CreateChatCompletionParams struct {
@@ -18264,6 +18362,18 @@ type ServerInterface interface {
 	// Public site branding and agreement configuration.
 	// (GET /api/v1/site-config)
 	GetSiteConfig(w http.ResponseWriter, r *http.Request)
+	// Current-user prompt-cache usage metrics.
+	// (GET /api/v1/user/usage/dashboard/cache-metrics)
+	GetCurrentUserUsageCacheMetrics(w http.ResponseWriter, r *http.Request)
+	// Current-user usage breakdown by model.
+	// (GET /api/v1/user/usage/dashboard/models)
+	GetCurrentUserUsageModels(w http.ResponseWriter, r *http.Request, params GetCurrentUserUsageModelsParams)
+	// Current-user usage throughput (RPM/TPM) dashboard metric.
+	// (GET /api/v1/user/usage/dashboard/throughput)
+	GetCurrentUserUsageThroughput(w http.ResponseWriter, r *http.Request)
+	// Current-user usage trend over time.
+	// (GET /api/v1/user/usage/dashboard/trend)
+	GetCurrentUserUsageTrend(w http.ResponseWriter, r *http.Request, params GetCurrentUserUsageTrendParams)
 	// Get a console user avatar image.
 	// (GET /api/v1/users/{id}/avatar)
 	GetUserAvatar(w http.ResponseWriter, r *http.Request, id Id)
@@ -30035,6 +30145,137 @@ func (siw *ServerInterfaceWrapper) GetSiteConfig(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// GetCurrentUserUsageCacheMetrics operation middleware
+func (siw *ServerInterfaceWrapper) GetCurrentUserUsageCacheMetrics(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCurrentUserUsageCacheMetrics(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCurrentUserUsageModels operation middleware
+func (siw *ServerInterfaceWrapper) GetCurrentUserUsageModels(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCurrentUserUsageModelsParams
+
+	// ------------- Optional query parameter "days" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "days", r.URL.Query(), &params.Days, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "days"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "days", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCurrentUserUsageModels(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCurrentUserUsageThroughput operation middleware
+func (siw *ServerInterfaceWrapper) GetCurrentUserUsageThroughput(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCurrentUserUsageThroughput(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCurrentUserUsageTrend operation middleware
+func (siw *ServerInterfaceWrapper) GetCurrentUserUsageTrend(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCurrentUserUsageTrendParams
+
+	// ------------- Optional query parameter "days" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "days", r.URL.Query(), &params.Days, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "days"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "days", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "bucket" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "bucket", r.URL.Query(), &params.Bucket, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "bucket"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bucket", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCurrentUserUsageTrend(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetUserAvatar operation middleware
 func (siw *ServerInterfaceWrapper) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
 
@@ -31446,6 +31687,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/setup", wrapper.CompleteSetup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/setup/status", wrapper.GetSetupStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/site-config", wrapper.GetSiteConfig)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/user/usage/dashboard/cache-metrics", wrapper.GetCurrentUserUsageCacheMetrics)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/user/usage/dashboard/models", wrapper.GetCurrentUserUsageModels)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/user/usage/dashboard/throughput", wrapper.GetCurrentUserUsageThroughput)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/user/usage/dashboard/trend", wrapper.GetCurrentUserUsageTrend)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/users/{id}/avatar", wrapper.GetUserAvatar)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/webhooks/payments/{provider}", wrapper.HandlePaymentWebhook)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/audio/speech", wrapper.CreateAudioSpeech)

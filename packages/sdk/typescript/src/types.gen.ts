@@ -3492,6 +3492,64 @@ export type UsageLogListResponse = {
     request_id: RequestId;
 };
 
+export type UsageThroughput = {
+    rpm: number;
+    tpm: number;
+    peak_rpm: number;
+    peak_tpm: number;
+    total_requests: number;
+    total_tokens: number;
+    window_minutes: number;
+};
+
+export type UsageThroughputResponse = {
+    data: UsageThroughput;
+    request_id: RequestId;
+};
+
+export type UsageModelShare = {
+    model: string;
+    requests: number;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    cost: string;
+    currency: string;
+};
+
+export type UsageModelShareListResponse = {
+    data: Array<UsageModelShare>;
+    request_id: RequestId;
+};
+
+export type UsageTrendPoint = {
+    bucket: string;
+    requests: number;
+    input_tokens: number;
+    output_tokens: number;
+    cost: string;
+    currency: string;
+};
+
+export type UsageTrendPointListResponse = {
+    data: Array<UsageTrendPoint>;
+    request_id: RequestId;
+};
+
+export type UsageCacheMetrics = {
+    cache_read_tokens: number;
+    cache_creation_tokens: number;
+    total_input_tokens: number;
+    cache_hit_rate: number;
+    cache_cost_saved: string;
+    currency: string;
+};
+
+export type UsageCacheMetricsResponse = {
+    data: UsageCacheMetrics;
+    request_id: RequestId;
+};
+
 export type AccountUsageWindow = {
     window: string;
     requests: number;
@@ -8419,6 +8477,127 @@ export type GetCurrentUserUsageResponses = {
 };
 
 export type GetCurrentUserUsageResponse = GetCurrentUserUsageResponses[keyof GetCurrentUserUsageResponses];
+
+export type GetCurrentUserUsageThroughputData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/user/usage/dashboard/throughput';
+};
+
+export type GetCurrentUserUsageThroughputErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetCurrentUserUsageThroughputError = GetCurrentUserUsageThroughputErrors[keyof GetCurrentUserUsageThroughputErrors];
+
+export type GetCurrentUserUsageThroughputResponses = {
+    /**
+     * Current user usage throughput.
+     */
+    200: UsageThroughputResponse;
+};
+
+export type GetCurrentUserUsageThroughputResponse = GetCurrentUserUsageThroughputResponses[keyof GetCurrentUserUsageThroughputResponses];
+
+export type GetCurrentUserUsageModelsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        days?: number;
+    };
+    url: '/api/v1/user/usage/dashboard/models';
+};
+
+export type GetCurrentUserUsageModelsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetCurrentUserUsageModelsError = GetCurrentUserUsageModelsErrors[keyof GetCurrentUserUsageModelsErrors];
+
+export type GetCurrentUserUsageModelsResponses = {
+    /**
+     * Current user usage by model.
+     */
+    200: UsageModelShareListResponse;
+};
+
+export type GetCurrentUserUsageModelsResponse = GetCurrentUserUsageModelsResponses[keyof GetCurrentUserUsageModelsResponses];
+
+export type GetCurrentUserUsageTrendData = {
+    body?: never;
+    path?: never;
+    query?: {
+        days?: number;
+        bucket?: 'day' | 'hour';
+    };
+    url: '/api/v1/user/usage/dashboard/trend';
+};
+
+export type GetCurrentUserUsageTrendErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetCurrentUserUsageTrendError = GetCurrentUserUsageTrendErrors[keyof GetCurrentUserUsageTrendErrors];
+
+export type GetCurrentUserUsageTrendResponses = {
+    /**
+     * Current user usage trend points.
+     */
+    200: UsageTrendPointListResponse;
+};
+
+export type GetCurrentUserUsageTrendResponse = GetCurrentUserUsageTrendResponses[keyof GetCurrentUserUsageTrendResponses];
+
+export type GetCurrentUserUsageCacheMetricsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/user/usage/dashboard/cache-metrics';
+};
+
+export type GetCurrentUserUsageCacheMetricsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetCurrentUserUsageCacheMetricsError = GetCurrentUserUsageCacheMetricsErrors[keyof GetCurrentUserUsageCacheMetricsErrors];
+
+export type GetCurrentUserUsageCacheMetricsResponses = {
+    /**
+     * Current user cache metrics.
+     */
+    200: UsageCacheMetricsResponse;
+};
+
+export type GetCurrentUserUsageCacheMetricsResponse = GetCurrentUserUsageCacheMetricsResponses[keyof GetCurrentUserUsageCacheMetricsResponses];
 
 export type GetCurrentUserSubscriptionsData = {
     body?: never;
