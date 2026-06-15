@@ -352,21 +352,21 @@ func selectCodexAccountsCheckAccount(accounts map[string]any, req contract.Probe
 		return nil
 	}
 	candidateIDs := codexAccountsCheckCandidateIDs(req)
+	// Primary org match: direct accounts-map key lookup, mirroring sub2api's
+	// openai_privacy_service.go `accounts[orgID]` lookup.
 	for _, candidateID := range candidateIDs {
 		if account, ok := mapStringAccount(accounts[candidateID]); ok && codexAccountsCheckPlan(account) != "" {
 			return account
 		}
 	}
-	keys := sortedMapKeys(accounts)
-	for _, candidateID := range candidateIDs {
-		for _, key := range keys {
-			account, ok := mapStringAccount(accounts[key])
-			if ok && codexAccountsCheckPlan(account) != "" && codexAccountsCheckAccountMatches(account, candidateID) {
-				return account
-			}
-		}
-	}
 
+	// Accumulate is_default / paid / any candidates over all accounts. This
+	// mirrors sub2api's fallback loop, which checks is_default at the same
+	// priority as the org-ID match (default > paid > any). is_default is
+	// resolved here, before the stored-org-ID field match below, so an
+	// is_default account wins over a non-default account whose nested id field
+	// merely matches the stored organization_id.
+	keys := sortedMapKeys(accounts)
 	var defaultAccount map[string]any
 	var paidAccount map[string]any
 	var anyAccount map[string]any
@@ -385,13 +385,26 @@ func selectCodexAccountsCheckAccount(accounts map[string]any, req contract.Probe
 		if paidAccount == nil && !strings.EqualFold(plan, "free") {
 			paidAccount = account
 		}
-		if nestedBoolField(account, "account", "is_default") {
+		if defaultAccount == nil && nestedBoolField(account, "account", "is_default") {
 			defaultAccount = account
 		}
 	}
-	switch {
-	case defaultAccount != nil:
+	if defaultAccount != nil {
 		return defaultAccount
+	}
+
+	// Fallback stored-org-ID match: only used when no is_default account exists.
+	// Matches the stored organization_id against nested account id fields.
+	for _, candidateID := range candidateIDs {
+		for _, key := range keys {
+			account, ok := mapStringAccount(accounts[key])
+			if ok && codexAccountsCheckPlan(account) != "" && codexAccountsCheckAccountMatches(account, candidateID) {
+				return account
+			}
+		}
+	}
+
+	switch {
 	case paidAccount != nil:
 		return paidAccount
 	default:

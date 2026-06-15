@@ -1069,3 +1069,48 @@ func addUsageCostBreakdown(input, output, cacheRead, cacheWrite string) string {
 	sum = money.AddMoney(sum, cacheWrite)
 	return sum
 }
+
+// TestGatewayErrorClassUsesCooldownNetworkError pins the sub2api transport-error
+// parity: a transport/network failure (dead proxy / DNS-failed account) must take
+// a SHORT account cooldown instead of being immediately reschedulable and hammered
+// in a tight loop, while unrelated classes (e.g. a client-side invalid request)
+// stay uncooled.
+func TestGatewayErrorClassUsesCooldownNetworkError(t *testing.T) {
+	if !gatewayErrorClassUsesCooldown("network_error") {
+		t.Fatalf("expected gatewayErrorClassUsesCooldown(\"network_error\") == true")
+	}
+	if gatewayErrorClassUsesCooldown("invalid_request") {
+		t.Fatalf("expected gatewayErrorClassUsesCooldown(\"invalid_request\") == false")
+	}
+
+	// network_error must derive the SHORT transport cooldown, not the long
+	// auth/overload window.
+	if got := gatewayCooldownWindow("network_error"); got != networkErrorCooldownWindow {
+		t.Fatalf("expected network_error cooldown window %s, got %s", networkErrorCooldownWindow, got)
+	}
+	if networkErrorCooldownWindow >= authFailureCooldownWindow || networkErrorCooldownWindow >= overloadCooldownWindow {
+		t.Fatalf("expected network_error cooldown (%s) to be shorter than auth (%s) and overload (%s) windows",
+			networkErrorCooldownWindow, authFailureCooldownWindow, overloadCooldownWindow)
+	}
+	if networkErrorCooldownWindow <= 0 || networkErrorCooldownWindow > 15*time.Minute {
+		t.Fatalf("expected network_error cooldown to be a few minutes, got %s", networkErrorCooldownWindow)
+	}
+
+	// End-to-end: a network_error failure with no configured rule yields a
+	// cooldown decision carrying the short window.
+	decision, ok := gatewayCooldownDecisionForFailure(nil, "network_error", nil, "dial tcp: lookup proxy.example: no such host", nil)
+	if !ok {
+		t.Fatalf("expected network_error to produce a cooldown decision")
+	}
+	if decision.Reason != "network_error" || decision.LastErrorClass != "network_error" {
+		t.Fatalf("unexpected network_error cooldown decision: %+v", decision)
+	}
+	if decision.Window != networkErrorCooldownWindow {
+		t.Fatalf("expected network_error decision window %s, got %s", networkErrorCooldownWindow, decision.Window)
+	}
+
+	// An unrelated class still yields no cooldown decision.
+	if _, ok := gatewayCooldownDecisionForFailure(nil, "invalid_request", nil, "", nil); ok {
+		t.Fatalf("expected invalid_request to produce no cooldown decision")
+	}
+}

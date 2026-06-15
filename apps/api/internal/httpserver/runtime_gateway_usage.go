@@ -302,9 +302,20 @@ func (rt *runtimeState) warnDefaultZeroGatewayPricing(rec gatewayUsageRecord, mo
 	rt.logger.Warn("gateway usage recorded with default zero pricing", "request_id", rec.RequestID, "model", model, "source_endpoint", rec.SourceEndpoint)
 }
 
+// networkErrorCooldownWindow is the SHORT account cooldown applied after a
+// transport-level failure (proxy / DNS / TCP / TLS — no HTTP status received).
+// It mirrors sub2api's transport-error handling, which temporarily unschedules
+// an account on a persistent transport fault (openAITransportErrorTempUnschedDuration,
+// 10m) so a dead-proxy / DNS-failed account is not immediately reschedulable and
+// hammered in a tight loop. We deliberately keep this a few minutes — long enough
+// to break the hot loop, short enough that a transient blip recovers quickly —
+// not the long auth/overload window. The geometric strike backoff in
+// escalateCooldownWindow still escalates a persistently-failing account.
+const networkErrorCooldownWindow = 5 * time.Minute
+
 func gatewayErrorClassUsesCooldown(errorClass string) bool {
 	switch errorClass {
-	case "rate_limit", "overloaded", "auth_failed", "forbidden", "validation_required", "policy_violation":
+	case "rate_limit", "overloaded", "auth_failed", "forbidden", "validation_required", "policy_violation", "network_error":
 		return true
 	default:
 		return false
@@ -543,6 +554,10 @@ func gatewayCooldownWindow(errorClass string) time.Duration {
 		return overloadCooldownWindow
 	case "auth_failed", "forbidden", "validation_required", "policy_violation":
 		return authFailureCooldownWindow
+	case "network_error":
+		// SHORT, transport-fault cooldown (sub2api transport-error parity) — not
+		// the long auth/overload window.
+		return networkErrorCooldownWindow
 	default:
 		return rateLimitCooldownWindow
 	}

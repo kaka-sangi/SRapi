@@ -28,6 +28,9 @@ func classifyProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, b
 	if statusCode == http.StatusForbidden {
 		class, metadata = classifyForbiddenProviderError(body, message)
 	}
+	if statusCode == http.StatusUnauthorized && providerErrorBodyIndicatesSessionInvalid(body, message) {
+		class = "session_invalid"
+	}
 	if providerErrorBodyIndicatesQuotaExhausted(body, message) {
 		class = "quota_exhausted"
 	}
@@ -153,6 +156,29 @@ func providerErrorBodyIndicatesQuotaExhausted(body []byte, message string) bool 
 		"minimum credit",
 	} {
 		if strings.Contains(text, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+// providerErrorBodyIndicatesSessionInvalid reports whether a 401 response body
+// carries an OAuth revocation marker (a permanently rejected refresh token),
+// rather than a transient access-token failure. It mirrors the marker detection
+// in reverse_proxy classifyOAuthRefreshError so the resulting "session_invalid"
+// class maps (via reverseProxyAccountFailureStatus) to NeedsReauth, stopping the
+// scheduler from re-selecting accounts whose refresh token was revoked.
+func providerErrorBodyIndicatesSessionInvalid(body []byte, message string) bool {
+	text := strings.ToLower(strings.TrimSpace(message + " " + string(body)))
+	if text == "" {
+		return false
+	}
+	for _, marker := range []string{
+		"invalid_grant",
+		"refresh_token_reused",
+		"invalid refresh",
+	} {
+		if strings.Contains(text, marker) {
 			return true
 		}
 	}
