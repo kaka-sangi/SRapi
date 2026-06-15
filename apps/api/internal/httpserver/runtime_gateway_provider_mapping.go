@@ -105,6 +105,7 @@ func codexRequestSettings(headers http.Header, rawBody []byte) map[string]any {
 		{"session_id", "codex_session_id"},
 		{"Session-Id", "codex_session_id"},
 		{"Originator", "codex_originator"},
+		{"Accept-Language", "accept-language"},
 	} {
 		setSetting(candidate.key, gatewayHeaderValue(headers, candidate.header))
 	}

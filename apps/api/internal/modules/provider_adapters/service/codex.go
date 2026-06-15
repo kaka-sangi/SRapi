@@ -286,6 +286,9 @@ func codexResponsesHeaders(req contract.ConversationRequest, stream bool, payloa
 		headers.Set("Session_id", codexDefaultAccountSessionID(req.Account.ID))
 	}
 	codexApplySessionIdentityHeaders(headers, promptCacheKey, requestSetting(req, "codex_window_id", "x_codex_window_id", "X-Codex-Window-Id"))
+	if al := requestSetting(req, "accept-language"); al != "" {
+		headers.Set("Accept-Language", al)
+	}
 	return headers
 }
 
@@ -316,6 +319,9 @@ func codexResponseInputItemsHeaders(req contract.ResponseInputItemsRequest) http
 		headers.Set("Session_id", sessionID)
 	} else if req.Account.ID > 0 {
 		headers.Set("Session_id", codexDefaultAccountSessionID(req.Account.ID))
+	}
+	if al := responseInputItemsSetting(req, "accept-language"); al != "" {
+		headers.Set("Accept-Language", al)
 	}
 	return headers
 }
@@ -429,6 +435,9 @@ func codexRealtimeHeaders(req contract.RealtimeRequest, initialFrame []byte) htt
 		headers.Set("session_id", codexDefaultAccountSessionID(req.Account.ID))
 	}
 	codexApplySessionIdentityHeaders(headers, promptCacheKey, realtimeSetting(req, "codex_window_id", "x_codex_window_id", "X-Codex-Window-Id"))
+	if al := realtimeSetting(req, "accept-language"); al != "" {
+		headers.Set("Accept-Language", al)
+	}
 	return headers
 }
 
