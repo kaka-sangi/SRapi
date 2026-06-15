@@ -191,6 +191,83 @@ func TestGatewayChatCompletionsToCodexStreamsTransformedChunksIncrementally(t *t
 	}
 }
 
+// TestGatewayResponsesToCodexStreamsVerbatimIncrementally proves the same-shape
+// path: a /v1/responses client backed by a Codex CLI account receives the
+// upstream Codex /responses SSE piped through verbatim (Responses-API events,
+// NOT rewritten into chat.completion.chunk) and incrementally (first event
+// flushed before the upstream produced the rest).
+func TestGatewayResponsesToCodexStreamsVerbatimIncrementally(t *testing.T) {
+	frame1 := "event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"Hello\"}\n\n"
+	rest := "event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\" world\"}\n\n" +
+		"event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_y\",\"status\":\"completed\",\"usage\":{\"input_tokens\":2,\"output_tokens\":2,\"total_tokens\":4}}}\n\n" +
+		"data: [DONE]\n\n"
+
+	release := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/responses") {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		_, _ = io.WriteString(w, frame1)
+		if flusher != nil {
+			flusher.Flush()
+		}
+		select {
+		case <-release:
+		case <-time.After(2 * time.Second):
+		}
+		_, _ = io.WriteString(w, rest)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-resp-stream-provider","display_name":"Codex Resp Stream","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-resp-stream-model","display_name":"Codex Resp Stream Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"codex-resp-stream-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"codex-resp-stream-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"codex-resp-stream-model","stream":true,"input":"hi"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	rec := &flushCapturingWriter{header: http.Header{}, release: release}
+	handler.ServeHTTP(rec, req)
+
+	if rec.code != 0 && rec.code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.code, rec.body.String())
+	}
+	body := rec.body.String()
+	// Verbatim Responses events, NOT rewritten to chat.completion.chunk.
+	if !strings.Contains(body, "response.output_text.delta") {
+		t.Fatalf("expected verbatim Responses SSE passthrough, got:\n%s", body)
+	}
+	if strings.Contains(body, "chat.completion.chunk") {
+		t.Fatalf("/responses stream was wrongly transformed into chat chunks:\n%s", body)
+	}
+	for _, want := range []string{"Hello", " world", "data: [DONE]"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("verbatim stream missing %q, got:\n%s", want, body)
+		}
+	}
+	// Incremental: the first event was flushed before the upstream sent the rest.
+	if !rec.flushed {
+		t.Fatal("expected an early flush (incremental streaming), got none")
+	}
+	if !strings.Contains(rec.firstFlushBody, "Hello") {
+		t.Fatalf("first flush should contain the first event, got: %q", rec.firstFlushBody)
+	}
+	if strings.Contains(rec.firstFlushBody, " world") {
+		t.Fatalf("response was buffered: first flush already contained the later event: %q", rec.firstFlushBody)
+	}
+}
+
 func TestGatewayChatCompletionsStreamEmitsKeepaliveDuringUpstreamGap(t *testing.T) {
 	chunk1 := "data: {\"id\":\"chunk_1\",\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n"
 	chunk2 := "data: {\"id\":\"chunk_2\",\"choices\":[{\"delta\":{\"content\":\" world\"},\"finish_reason\":\"stop\"}]}\n\n"
