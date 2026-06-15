@@ -10169,10 +10169,19 @@ type ListAdminSubscriptionPlansParams struct {
 
 // ListAdminUsageLogsParams defines parameters for ListAdminUsageLogs.
 type ListAdminUsageLogsParams struct {
-	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
-	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
-	UserId   *Id       `form:"user_id,omitempty" json:"user_id,omitempty"`
-	Model    *string   `form:"model,omitempty" json:"model,omitempty"`
+	Page           *Page      `form:"page,omitempty" json:"page,omitempty"`
+	PageSize       *PageSize  `form:"page_size,omitempty" json:"page_size,omitempty"`
+	UserId         *Id        `form:"user_id,omitempty" json:"user_id,omitempty"`
+	Model          *string    `form:"model,omitempty" json:"model,omitempty"`
+	ApiKeyId       *Id        `form:"api_key_id,omitempty" json:"api_key_id,omitempty"`
+	AccountId      *Id        `form:"account_id,omitempty" json:"account_id,omitempty"`
+	ProviderId     *Id        `form:"provider_id,omitempty" json:"provider_id,omitempty"`
+	SourceEndpoint *string    `form:"source_endpoint,omitempty" json:"source_endpoint,omitempty"`
+	BillingMode    *string    `form:"billing_mode,omitempty" json:"billing_mode,omitempty"`
+	ErrorClass     *string    `form:"error_class,omitempty" json:"error_class,omitempty"`
+	Success        *bool      `form:"success,omitempty" json:"success,omitempty"`
+	Start          *time.Time `form:"start,omitempty" json:"start,omitempty"`
+	End            *time.Time `form:"end,omitempty" json:"end,omitempty"`
 }
 
 // GetAdminUsageAggregatesParams defines parameters for GetAdminUsageAggregates.
@@ -26527,6 +26536,123 @@ func (siw *ServerInterfaceWrapper) ListAdminUsageLogs(w http.ResponseWriter, r *
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "model"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "api_key_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "api_key_id", r.URL.Query(), &params.ApiKeyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "api_key_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "api_key_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "account_id", r.URL.Query(), &params.AccountId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "provider_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "provider_id", r.URL.Query(), &params.ProviderId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "provider_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "source_endpoint" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "source_endpoint", r.URL.Query(), &params.SourceEndpoint, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "source_endpoint"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source_endpoint", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "billing_mode" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "billing_mode", r.URL.Query(), &params.BillingMode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "billing_mode"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "billing_mode", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error_class" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_class", r.URL.Query(), &params.ErrorClass, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_class"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_class", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "success" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "success", r.URL.Query(), &params.Success, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "success"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "success", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
 		}
 		return
 	}

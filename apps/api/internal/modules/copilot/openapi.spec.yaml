@@ -5619,6 +5619,44 @@ paths:
           in: query
           schema:
             type: string
+        - name: api_key_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: account_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: provider_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: source_endpoint
+          in: query
+          schema:
+            type: string
+        - name: billing_mode
+          in: query
+          schema:
+            type: string
+        - name: error_class
+          in: query
+          schema:
+            type: string
+        - name: success
+          in: query
+          schema:
+            type: boolean
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date-time
       responses:
         "200":
           description: Usage log list.

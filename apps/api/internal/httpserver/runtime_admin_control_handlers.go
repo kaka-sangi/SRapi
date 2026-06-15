@@ -35,7 +35,7 @@ func (s *Server) handleListAdminUsageLogs(w http.ResponseWriter, r *http.Request
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list usage logs", requestID)
 		return
 	}
-	items = filterUsageLogs(items, r.URL.Query().Get("user_id"), r.URL.Query().Get("model"))
+	items = filterUsageLogs(items, r)
 	total := len(items)
 	opts := listOptionsFromRequest(r)
 	start := (opts.Page - 1) * opts.PageSize

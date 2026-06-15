@@ -77,9 +77,24 @@ func filterAccounts(accounts []accountcontract.ProviderAccount, status, provider
 	return out
 }
 
-func filterUsageLogs(items []usagecontract.UsageLog, userID, model string) []usagecontract.UsageLog {
-	userID = strings.TrimSpace(userID)
-	model = strings.ToLower(strings.TrimSpace(model))
+// filterUsageLogs applies the admin usage-log query filters in memory over the
+// already-loaded slice. It supports user/model plus account, api-key, provider,
+// source-endpoint, billing-mode, error-class, success and a created-at date
+// range (start/end as RFC3339 or YYYY-MM-DD), matching sub2api's usage filters.
+func filterUsageLogs(items []usagecontract.UsageLog, r *http.Request) []usagecontract.UsageLog {
+	q := r.URL.Query()
+	userID := strings.TrimSpace(q.Get("user_id"))
+	model := strings.ToLower(strings.TrimSpace(q.Get("model")))
+	apiKeyID := strings.TrimSpace(q.Get("api_key_id"))
+	accountID := strings.TrimSpace(q.Get("account_id"))
+	providerID := strings.TrimSpace(q.Get("provider_id"))
+	sourceEndpoint := strings.ToLower(strings.TrimSpace(q.Get("source_endpoint")))
+	billingMode := strings.TrimSpace(q.Get("billing_mode"))
+	errorClass := strings.TrimSpace(q.Get("error_class"))
+	success := strings.TrimSpace(q.Get("success"))
+	start := parseUsageFilterTime(q.Get("start"))
+	end := parseUsageFilterTime(q.Get("end"))
+
 	out := make([]usagecontract.UsageLog, 0, len(items))
 	for _, item := range items {
 		if userID != "" && strconv.Itoa(item.UserID) != userID {
@@ -88,9 +103,54 @@ func filterUsageLogs(items []usagecontract.UsageLog, userID, model string) []usa
 		if model != "" && !strings.Contains(strings.ToLower(item.Model), model) {
 			continue
 		}
+		if apiKeyID != "" && strconv.Itoa(item.APIKeyID) != apiKeyID {
+			continue
+		}
+		if accountID != "" && (item.AccountID == nil || strconv.Itoa(*item.AccountID) != accountID) {
+			continue
+		}
+		if providerID != "" && (item.ProviderID == nil || strconv.Itoa(*item.ProviderID) != providerID) {
+			continue
+		}
+		if sourceEndpoint != "" && !strings.Contains(strings.ToLower(item.SourceEndpoint), sourceEndpoint) {
+			continue
+		}
+		if billingMode != "" && !strings.EqualFold(item.BillingMode, billingMode) {
+			continue
+		}
+		if errorClass != "" && (item.ErrorClass == nil || !strings.EqualFold(*item.ErrorClass, errorClass)) {
+			continue
+		}
+		if success == "true" && !item.Success {
+			continue
+		}
+		if success == "false" && item.Success {
+			continue
+		}
+		if !start.IsZero() && item.CreatedAt.Before(start) {
+			continue
+		}
+		if !end.IsZero() && item.CreatedAt.After(end) {
+			continue
+		}
 		out = append(out, item)
 	}
 	return out
+}
+
+// parseUsageFilterTime accepts RFC3339 or a bare YYYY-MM-DD date; returns the
+// zero time when empty/unparseable (treated as no bound).
+func parseUsageFilterTime(value string) time.Time {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}
+	}
+	for _, layout := range []string{time.RFC3339, "2006-01-02"} {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed
+		}
+	}
+	return time.Time{}
 }
 
 func filterAuditLogs(items []auditcontract.Log, action, resourceType string) []auditcontract.Log {

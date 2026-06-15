@@ -11990,6 +11990,15 @@ export type ListAdminUsageLogsData = {
         page_size?: number;
         user_id?: Id;
         model?: string;
+        api_key_id?: Id;
+        account_id?: Id;
+        provider_id?: Id;
+        source_endpoint?: string;
+        billing_mode?: string;
+        error_class?: string;
+        success?: boolean;
+        start?: string;
+        end?: string;
     };
     url: '/api/v1/admin/usage-logs';
 };
