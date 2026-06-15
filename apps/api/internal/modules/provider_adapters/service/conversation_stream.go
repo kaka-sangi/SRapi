@@ -331,5 +331,21 @@ func (s *Service) streamReverseProxyCodexResponses(ctx context.Context, streamer
 	if err != nil {
 		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
+	// A client speaking the Responses API gets the upstream Codex /responses SSE
+	// piped through verbatim (same wire shape). A chat/completions client cannot
+	// parse those events, so transform them into chat.completion.chunk SSE on the
+	// fly — preserving true incremental streaming. Usage is still recovered from
+	// the retained raw bytes via the existing parseCodexResponsesBody.
+	if !openAIResponsesEndpoint(req) {
+		reader := newCodexChatStreamReader(resp.Body, req)
+		return contract.ConversationResponse{
+			StatusCode: resp.StatusCode,
+			Headers:    resp.Headers,
+			StreamBody: reader,
+			StreamParse: func(_ []byte, statusCode int) (contract.ConversationResponse, error) {
+				return parseCodexResponsesBody(reader.rawBytes(), statusCode)
+			},
+		}, nil
+	}
 	return streamConversationResponse(resp, parseCodexResponsesBody), nil
 }
