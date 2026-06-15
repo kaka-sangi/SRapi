@@ -242,3 +242,22 @@ func TestStatusUnknownSession(t *testing.T) {
 		t.Fatalf("expected ErrSessionNotFound, got %v", err)
 	}
 }
+
+func TestProvisioningUserAgent(t *testing.T) {
+	cases := []struct {
+		endpoint string
+		want     string
+	}{
+		{"https://auth.openai.com/oauth/token", "codex_cli_rs/0.125.0 (Ubuntu 22.4.0; x86_64) xterm-256color"},
+		{"https://chatgpt.com/backend-api/oauth/token", "codex_cli_rs/0.125.0 (Ubuntu 22.4.0; x86_64) xterm-256color"},
+		{"https://console.anthropic.com/v1/oauth/token", "axios/1.13.6"},
+		{"https://claude.ai/oauth/token", "axios/1.13.6"},
+		{"https://example.com/token", "axios/1.13.6"},
+		{"not a url", "axios/1.13.6"},
+	}
+	for _, tc := range cases {
+		if got := provisioningUserAgent(tc.endpoint); got != tc.want {
+			t.Fatalf("provisioningUserAgent(%q) = %q, want %q", tc.endpoint, got, tc.want)
+		}
+	}
+}

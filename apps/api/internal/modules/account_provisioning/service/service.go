@@ -432,6 +432,26 @@ func (s *Service) postTokenRequest(ctx context.Context, session contract.Pending
 
 // postForm performs a form-encoded POST applying client authentication, returns
 // the decoded JSON body and maps transport/status errors to sentinel errors.
+// provisioningUserAgent returns a realistic client User-Agent for an OAuth token
+// endpoint so the request is not flagged for presenting Go's default
+// "Go-http-client/2.0" (which Cloudflare-fronted token endpoints can reject).
+// Mirrors the official clients the provider expects, matching the sub2api
+// reference: the Codex CLI for OpenAI, axios for Anthropic and as the default.
+func provisioningUserAgent(endpoint string) string {
+	host := ""
+	if parsed, err := url.Parse(strings.TrimSpace(endpoint)); err == nil {
+		host = strings.ToLower(parsed.Hostname())
+	}
+	switch {
+	case strings.Contains(host, "openai.com") || strings.Contains(host, "chatgpt.com"):
+		return "codex_cli_rs/0.125.0 (Ubuntu 22.4.0; x86_64) xterm-256color"
+	case strings.Contains(host, "anthropic.com") || strings.Contains(host, "claude.ai"):
+		return "axios/1.13.6"
+	default:
+		return "axios/1.13.6"
+	}
+}
+
 func (s *Service) postForm(ctx context.Context, endpoint string, cfg contract.ProviderOAuthConfig, form url.Values) (map[string]any, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -457,6 +477,7 @@ func (s *Service) postForm(ctx context.Context, endpoint string, cfg contract.Pr
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", provisioningUserAgent(endpoint))
 	if authMethod == tokenAuthMethodBasic && cfg.ClientSecret != "" {
 		req.SetBasicAuth(cfg.ClientID, cfg.ClientSecret)
 	}
