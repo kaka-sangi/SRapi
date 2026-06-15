@@ -11,12 +11,27 @@ import {
   useFetchAccountQuota,
   useAccountRpmStatus,
   useAccountProxyQuality,
+  useAccountUsageWindows,
+  useAccountUsageToday,
+  useAccountUsageDaily,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { formatCompactNumber, formatDate, formatMoney, formatPercent } from "@/lib/admin-format";
 import { runtimeClassLabel } from "@/lib/admin-account-form";
 import { cn } from "@/lib/cn";
+import { StatCard } from "@/components/ui/stat-card";
+import { Sparkline } from "@/components/charts/sparkline";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableScroll,
+} from "@/components/ui/table";
 import {
   latestQuotaWindows,
   quotaWindowDisplayLabel,
@@ -24,7 +39,13 @@ import {
   quotaWindowValue,
   type QuotaDisplayWindow,
 } from "@/lib/quota-display";
-import type { ProviderAccount } from "@/lib/sdk-types";
+import type {
+  ProviderAccount,
+  AccountUsageDailyPoint,
+  AccountUsageToday,
+  AccountUsageWindow,
+  AccountUsageWindowsResult,
+} from "@/lib/sdk-types";
 
 function pct(ratio: number): string {
   return `${Math.round(ratio * 100)}%`;
@@ -83,6 +104,152 @@ function QuotaWindowRow({ window }: { window: QuotaDisplayWindow }) {
   );
 }
 
+/** Map a usage-window key ("5h"/"7d") to a localized label, falling back to the
+ * raw key for any window the SDK adds later. */
+function usageWindowLabel(window: string, t: (k: string) => string): string {
+  if (window === "5h") return t("adminAccounts.usageWindow5h");
+  if (window === "7d") return t("adminAccounts.usageWindow7d");
+  return window;
+}
+
+/** One 5h/7d window: a requests bar (scaled to the busiest window in the set)
+ * plus tokens / cost / error-count stats. Reuses the QuotaWindowRow bar style. */
+function UsageWindowCard({
+  window,
+  maxRequests,
+}: {
+  window: AccountUsageWindow;
+  maxRequests: number;
+}) {
+  const { t } = useLanguage();
+  const ratio = maxRequests > 0 ? window.requests / maxRequests : 0;
+  const hasErrors = window.error_count > 0;
+  return (
+    <div className="space-y-1.5 py-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="font-mono text-2xs uppercase tracking-wide text-srapi-text-secondary">
+          {usageWindowLabel(window.window, t)}
+        </span>
+        <span className="font-mono text-xs text-srapi-text-primary tabular">
+          {formatCompactNumber(window.requests)} {t("adminAccounts.usageRequests").toLowerCase()}
+        </span>
+      </div>
+      <div className="relative h-1.5 overflow-hidden rounded-full bg-srapi-border">
+        <div
+          className="h-full rounded-full bg-srapi-success transition-all"
+          style={{ width: `${Math.max(ratio * 100, window.requests > 0 ? 2 : 0)}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-3 font-mono text-2xs text-srapi-text-tertiary">
+        <span>
+          {t("adminAccounts.usageTokens")} {formatCompactNumber(window.total_tokens)}
+        </span>
+        <span>{formatMoney(window.cost, window.currency)}</span>
+        <span className={cn(hasErrors && "text-srapi-error")}>
+          {t("adminAccounts.usageErrors")} {window.error_count}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function UsageWindowsBody({ result }: { result: AccountUsageWindowsResult }) {
+  const { t } = useLanguage();
+  if (result.windows.length === 0) {
+    return <p className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>;
+  }
+  const maxRequests = Math.max(...result.windows.map((w) => w.requests), 0);
+  return (
+    <div className="space-y-2">
+      {result.windows.map((window) => (
+        <UsageWindowCard key={window.window} window={window} maxRequests={maxRequests} />
+      ))}
+    </div>
+  );
+}
+
+/** Compact 2x2 stat grid for the "since midnight" roll-up. */
+function UsageTodayBody({ today }: { today: AccountUsageToday }) {
+  const { t } = useLanguage();
+  const tokens = today.total_tokens || today.input_tokens + today.output_tokens;
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <StatCard
+        className="p-3"
+        label={t("adminAccounts.usageRequests")}
+        value={today.requests}
+        format={(n) => formatCompactNumber(n)}
+      />
+      <StatCard
+        className="p-3"
+        label={t("adminAccounts.usageTokens")}
+        value={tokens}
+        format={(n) => formatCompactNumber(n)}
+      />
+      <StatCard
+        className="p-3"
+        label={t("adminAccounts.usageCost")}
+        value={formatMoney(today.cost, today.currency)}
+      />
+      <StatCard
+        className="p-3"
+        label={t("adminAccounts.usageSuccessRate")}
+        value={formatPercent(today.success_rate)}
+        hint={`${today.success_count}/${today.requests}`}
+      />
+    </div>
+  );
+}
+
+/** 30-day series as a requests sparkline above a dense mini-table. */
+function UsageDailyBody({ points }: { points: AccountUsageDailyPoint[] }) {
+  const { t } = useLanguage();
+  if (points.length === 0) {
+    return <p className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>;
+  }
+  // The series arrives oldest→newest from the read model; render most-recent
+  // first in the table but keep chronological order for the sparkline.
+  const spark = points.map((p) => p.requests);
+  const rows = [...points].reverse();
+  return (
+    <div className="space-y-3">
+      {spark.length >= 2 ? (
+        <Sparkline values={spark} ariaLabel={t("adminAccounts.usageDailyTitle")} className="h-10" />
+      ) : null}
+      <TableScroll minWidth={320}>
+        <Table className="text-2xs">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="h-7">{t("adminAccounts.usageDailyDate")}</TableHead>
+              <TableHead className="h-7 text-right">{t("adminAccounts.usageRequests")}</TableHead>
+              <TableHead className="h-7 text-right">{t("adminAccounts.usageTokens")}</TableHead>
+              <TableHead className="h-7 text-right">{t("adminAccounts.usageCost")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((p) => (
+              <TableRow key={p.date}>
+                <TableCell className="py-1.5 font-mono text-srapi-text-secondary">
+                  {formatDate(p.date)}
+                </TableCell>
+                <TableCell className="py-1.5 text-right font-mono tabular text-srapi-text-primary">
+                  {formatCompactNumber(p.requests)}
+                </TableCell>
+                <TableCell className="py-1.5 text-right font-mono tabular text-srapi-text-secondary">
+                  {formatCompactNumber(p.input_tokens + p.output_tokens)}
+                </TableCell>
+                <TableCell className="py-1.5 text-right font-mono tabular text-srapi-text-secondary">
+                  {formatMoney(p.cost, p.currency)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableScroll>
+    </div>
+  );
+}
+
 /** Wrap one detail query: skeleton while loading, children when data, a quiet
  * "no data" line otherwise (the read endpoints 404 for accounts that never ran). */
 function Section<T>({
@@ -134,6 +301,9 @@ export function AccountDetailSheet({
   const quota = useAccountQuota(id);
   const rpm = useAccountRpmStatus(id);
   const proxy = useAccountProxyQuality(id);
+  const usageWindows = useAccountUsageWindows(id);
+  const usageToday = useAccountUsageToday(id);
+  const usageDaily = useAccountUsageDaily(id);
   const fetchQuota = useFetchAccountQuota();
 
   async function refreshQuota() {
@@ -196,6 +366,18 @@ export function AccountDetailSheet({
                 {h.cooldown_until ? <Row label={t("adminAccounts.cooldown")} value={h.cooldown_reason ?? h.cooldown_until} /> : null}
               </div>
             )}
+          </Section>
+
+          <Section title={t("adminAccounts.usageTodayTitle")} query={usageToday}>
+            {(today) => <UsageTodayBody today={today} />}
+          </Section>
+
+          <Section title={t("adminAccounts.usageWindowsTitle")} query={usageWindows}>
+            {(result) => <UsageWindowsBody result={result} />}
+          </Section>
+
+          <Section title={t("adminAccounts.usageDailyTitle")} query={usageDaily}>
+            {(points) => <UsageDailyBody points={points} />}
           </Section>
 
           <Section title={t("adminAccounts.rpmTitle")} query={rpm}>

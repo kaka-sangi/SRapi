@@ -3584,6 +3584,48 @@ type AccountRpmStatusResponse struct {
 	RequestId RequestId        `json:"request_id"`
 }
 
+// AccountUsageDailyPoint defines model for AccountUsageDailyPoint.
+type AccountUsageDailyPoint struct {
+	Cost         string `json:"cost"`
+	Currency     string `json:"currency"`
+	Date         string `json:"date"`
+	InputTokens  int    `json:"input_tokens"`
+	OutputTokens int    `json:"output_tokens"`
+	Requests     int    `json:"requests"`
+}
+
+// AccountUsageToday defines model for AccountUsageToday.
+type AccountUsageToday struct {
+	Cost         string  `json:"cost"`
+	Currency     string  `json:"currency"`
+	ErrorCount   int     `json:"error_count"`
+	InputTokens  int     `json:"input_tokens"`
+	OutputTokens int     `json:"output_tokens"`
+	Requests     int     `json:"requests"`
+	SuccessCount int     `json:"success_count"`
+	SuccessRate  float32 `json:"success_rate"`
+	TotalTokens  int     `json:"total_tokens"`
+}
+
+// AccountUsageWindow defines model for AccountUsageWindow.
+type AccountUsageWindow struct {
+	Cost         string `json:"cost"`
+	Currency     string `json:"currency"`
+	ErrorCount   int    `json:"error_count"`
+	InputTokens  int    `json:"input_tokens"`
+	OutputTokens int    `json:"output_tokens"`
+	Requests     int    `json:"requests"`
+	SuccessCount int    `json:"success_count"`
+	TotalTokens  int    `json:"total_tokens"`
+	Window       string `json:"window"`
+}
+
+// AccountUsageWindowsResult defines model for AccountUsageWindowsResult.
+type AccountUsageWindowsResult struct {
+	AccountId Id                   `json:"account_id"`
+	Windows   []AccountUsageWindow `json:"windows"`
+}
+
 // AccountsAvailabilitySummaryResponse defines model for AccountsAvailabilitySummaryResponse.
 type AccountsAvailabilitySummaryResponse struct {
 	Data       []AccountAvailabilitySummary `json:"data"`
@@ -9884,6 +9926,11 @@ type PreviewAdminCRSSyncJSONBody struct {
 
 // GetAdminAccountAvailabilityParams defines parameters for GetAdminAccountAvailability.
 type GetAdminAccountAvailabilityParams struct {
+	Days *int `form:"days,omitempty" json:"days,omitempty"`
+}
+
+// GetAdminAccountUsageDailyParams defines parameters for GetAdminAccountUsageDaily.
+type GetAdminAccountUsageDailyParams struct {
 	Days *int `form:"days,omitempty" json:"days,omitempty"`
 }
 
@@ -17356,6 +17403,15 @@ type ServerInterface interface {
 	// Test provider account configuration.
 	// (POST /api/v1/admin/accounts/{id}/test)
 	TestAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
+	// Get daily usage points for an account.
+	// (GET /api/v1/admin/accounts/{id}/usage-daily)
+	GetAdminAccountUsageDaily(w http.ResponseWriter, r *http.Request, id Id, params GetAdminAccountUsageDailyParams)
+	// Get today's usage stats for an account.
+	// (GET /api/v1/admin/accounts/{id}/usage-today)
+	GetAdminAccountUsageToday(w http.ResponseWriter, r *http.Request, id Id)
+	// Get rolling-window usage stats for an account.
+	// (GET /api/v1/admin/accounts/{id}/usage-windows)
+	GetAdminAccountUsageWindows(w http.ResponseWriter, r *http.Request, id Id)
 	// List affiliate rebate rules.
 	// (GET /api/v1/admin/affiliate-rules)
 	ListAdminAffiliateRules(w http.ResponseWriter, r *http.Request, params ListAdminAffiliateRulesParams)
@@ -20126,6 +20182,118 @@ func (siw *ServerInterfaceWrapper) TestAdminAccount(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.TestAdminAccount(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminAccountUsageDaily operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminAccountUsageDaily(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminAccountUsageDailyParams
+
+	// ------------- Optional query parameter "days" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "days", r.URL.Query(), &params.Days, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "days"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "days", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminAccountUsageDaily(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminAccountUsageToday operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminAccountUsageToday(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminAccountUsageToday(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminAccountUsageWindows operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminAccountUsageWindows(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminAccountUsageWindows(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -30991,6 +31159,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/reset-quota", wrapper.ResetAdminAccountQuota)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/rpm-status", wrapper.GetAdminAccountRpmStatus)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/test", wrapper.TestAdminAccount)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/usage-daily", wrapper.GetAdminAccountUsageDaily)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/usage-today", wrapper.GetAdminAccountUsageToday)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/usage-windows", wrapper.GetAdminAccountUsageWindows)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliate-rules", wrapper.ListAdminAffiliateRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/affiliate-rules", wrapper.CreateAdminAffiliateRule)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/affiliate-rules/{id}", wrapper.UpdateAdminAffiliateRule)

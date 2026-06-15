@@ -22,6 +22,9 @@ import {
   getAdminAccountHealth,
   getAdminAccountProxyQuality,
   getAdminAccountsHealthSummary,
+  getAdminAccountUsageWindows,
+  getAdminAccountUsageToday,
+  getAdminAccountUsageDaily,
   fetchAdminAccountQuota,
   getAdminAccountQuota,
   getAdminAccountRpmStatus,
@@ -46,6 +49,10 @@ import type {
   AccountQuotaReport,
   AccountQuotaSnapshot,
   AccountRpmStatus,
+  AccountUsageWindowsResult,
+  AccountUsageToday,
+  AccountUsageDailyPoint,
+  GetAdminAccountUsageDailyData,
   AdminAccountTestRequest,
   AdminTestResult,
   AccountAvailabilitySummary,
@@ -226,6 +233,23 @@ export const accountsApi = {
 
   getAccountRpmStatus(id: Id): Promise<AccountRpmStatus> {
     return unwrapData(() => getAdminAccountRpmStatus({ path: { id }, throwOnError: true }));
+  },
+
+  // Per-account usage roll-ups (read models). Windows = 5h/7d aggregate cards;
+  // today = the live "since midnight" stat row; daily = a 30-day point series.
+  getAccountUsageWindows(id: Id): Promise<AccountUsageWindowsResult> {
+    return unwrapData(() => getAdminAccountUsageWindows({ path: { id }, throwOnError: true }));
+  },
+
+  getAccountUsageToday(id: Id): Promise<AccountUsageToday> {
+    return unwrapData(() => getAdminAccountUsageToday({ path: { id }, throwOnError: true }));
+  },
+
+  getAccountUsageDaily(
+    id: Id,
+    query?: GetAdminAccountUsageDailyData["query"],
+  ): Promise<AccountUsageDailyPoint[]> {
+    return unwrapData(() => getAdminAccountUsageDaily({ path: { id }, query, throwOnError: true }));
   },
 
   listAccountGroups(): Promise<AdminListResult<AccountGroup>> {

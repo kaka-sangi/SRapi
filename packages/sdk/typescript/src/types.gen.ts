@@ -3492,6 +3492,44 @@ export type UsageLogListResponse = {
     request_id: RequestId;
 };
 
+export type AccountUsageWindow = {
+    window: string;
+    requests: number;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    cost: string;
+    currency: string;
+    success_count: number;
+    error_count: number;
+};
+
+export type AccountUsageWindowsResult = {
+    account_id: Id;
+    windows: Array<AccountUsageWindow>;
+};
+
+export type AccountUsageDailyPoint = {
+    date: string;
+    requests: number;
+    input_tokens: number;
+    output_tokens: number;
+    cost: string;
+    currency: string;
+};
+
+export type AccountUsageToday = {
+    requests: number;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    cost: string;
+    currency: string;
+    success_count: number;
+    error_count: number;
+    success_rate: number;
+};
+
 export type ErrorLog = {
     id: Id;
     request_id: RequestId;
@@ -12054,6 +12092,134 @@ export type ListAdminUsageLogsResponses = {
 };
 
 export type ListAdminUsageLogsResponse = ListAdminUsageLogsResponses[keyof ListAdminUsageLogsResponses];
+
+export type GetAdminAccountUsageWindowsData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}/usage-windows';
+};
+
+export type GetAdminAccountUsageWindowsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminAccountUsageWindowsError = GetAdminAccountUsageWindowsErrors[keyof GetAdminAccountUsageWindowsErrors];
+
+export type GetAdminAccountUsageWindowsResponses = {
+    /**
+     * Account usage windows.
+     */
+    200: {
+        data: AccountUsageWindowsResult;
+        request_id: RequestId;
+    };
+};
+
+export type GetAdminAccountUsageWindowsResponse = GetAdminAccountUsageWindowsResponses[keyof GetAdminAccountUsageWindowsResponses];
+
+export type GetAdminAccountUsageDailyData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: {
+        days?: number;
+    };
+    url: '/api/v1/admin/accounts/{id}/usage-daily';
+};
+
+export type GetAdminAccountUsageDailyErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminAccountUsageDailyError = GetAdminAccountUsageDailyErrors[keyof GetAdminAccountUsageDailyErrors];
+
+export type GetAdminAccountUsageDailyResponses = {
+    /**
+     * Account daily usage points.
+     */
+    200: {
+        data: Array<AccountUsageDailyPoint>;
+        request_id: RequestId;
+    };
+};
+
+export type GetAdminAccountUsageDailyResponse = GetAdminAccountUsageDailyResponses[keyof GetAdminAccountUsageDailyResponses];
+
+export type GetAdminAccountUsageTodayData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}/usage-today';
+};
+
+export type GetAdminAccountUsageTodayErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminAccountUsageTodayError = GetAdminAccountUsageTodayErrors[keyof GetAdminAccountUsageTodayErrors];
+
+export type GetAdminAccountUsageTodayResponses = {
+    /**
+     * Account usage today.
+     */
+    200: {
+        data: AccountUsageToday;
+        request_id: RequestId;
+    };
+};
+
+export type GetAdminAccountUsageTodayResponse = GetAdminAccountUsageTodayResponses[keyof GetAdminAccountUsageTodayResponses];
 
 export type ListAdminErrorLogsData = {
     body?: never;

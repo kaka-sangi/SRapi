@@ -61,6 +61,10 @@ export const queryKeys = {
     accountQuota: (id: string) => ["admin", "accounts", id, "quota"] as const,
     accountRpm: (id: string) => ["admin", "accounts", id, "rpm"] as const,
     accountProxyQuality: (id: string) => ["admin", "accounts", id, "proxy-quality"] as const,
+    accountUsageWindows: (id: string) => ["admin", "accounts", id, "usage-windows"] as const,
+    accountUsageToday: (id: string) => ["admin", "accounts", id, "usage-today"] as const,
+    accountUsageDaily: (id: string, days: number) =>
+      ["admin", "accounts", id, "usage-daily", days] as const,
     proxies: (params?: unknown) => ["admin", "proxies", params ?? {}] as const,
     accountGroups: () => ["admin", "account-groups"] as const,
     accountGroupMembers: (groupId: string) =>
