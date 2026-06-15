@@ -113,7 +113,7 @@ func (s *Service) doQuotaFetch(ctx context.Context, account accountcontract.Prov
 	if len(requestBody) > 0 && httpReq.Header.Get("Content-Type") == "" {
 		httpReq.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := s.egressHTTPClient(account, nil).Do(httpReq)
+	resp, err := s.egressHTTPClient(quotaAccountWithCloudflareTLSDefault(account, endpoint), nil).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return 0, nil, nil, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "quota fetch timed out"}
@@ -126,6 +126,42 @@ func (s *Service) doQuotaFetch(ctx context.Context, account accountcontract.Prov
 		return 0, nil, nil, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "quota fetch response read failed"}
 	}
 	return resp.StatusCode, body, resp.Header, nil
+}
+
+// quotaAccountWithCloudflareTLSDefault defaults the account's egress TLS template
+// to Chrome (uTLS HelloChrome_Auto) when the quota endpoint is a Cloudflare-fronted
+// host (chatgpt.com) and the operator has not already configured a TLS profile.
+//
+// The ChatGPT accounts/check endpoint sits behind Cloudflare's JS challenge,
+// which fingerprints the TLS handshake; Go's default client is challenged and the
+// quota fetch fails. The sub2api reference impersonates Chrome by default for all
+// chatgpt.com/backend-api calls — this gives the same out-of-the-box behavior
+// without requiring a per-account TLS profile. Non-Cloudflare quota endpoints and
+// accounts with an explicit TLS profile are returned unchanged.
+func quotaAccountWithCloudflareTLSDefault(account accountcontract.ProviderAccount, endpoint string) accountcontract.ProviderAccount {
+	parsed, err := url.Parse(strings.TrimSpace(endpoint))
+	if err != nil {
+		return account
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host != "chatgpt.com" && !strings.HasSuffix(host, ".chatgpt.com") {
+		return account
+	}
+	if _, ok := account.Metadata["egress_profile"]; ok {
+		return account
+	}
+	if mapString(account.Metadata, "tls_template") != "" ||
+		mapString(account.Metadata, "egress_tls_template") != "" ||
+		mapString(account.Metadata, "tls_profile") != "" {
+		return account
+	}
+	cloned := make(map[string]any, len(account.Metadata)+1)
+	for key, value := range account.Metadata {
+		cloned[key] = value
+	}
+	cloned["tls_template"] = "chrome"
+	account.Metadata = cloned
+	return account
 }
 
 // QuotaConfigured reports whether a quota endpoint is configured for the account
