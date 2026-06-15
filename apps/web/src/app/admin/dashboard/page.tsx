@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { CSSProperties } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { LineChart, Server } from "lucide-react";
+import { LineChart, Server, Radio } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
@@ -17,6 +17,10 @@ import { ChartEmpty } from "@/components/charts/chart-empty";
 import { TrendChartSkeleton, BarChartSkeleton } from "@/components/charts/chart-skeleton";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { useAdminDashboard, useAccountsHealthSummary } from "@/hooks/admin-queries";
+import {
+  useListOpsRealtimeSlots,
+  type RealtimeActiveSlotCounters,
+} from "@/hooks/admin-queries/realtime-slots";
 import { useLanguage } from "@/context/LanguageContext";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { AdminTourTrigger } from "@/components/onboarding/admin-tour";
@@ -244,13 +248,14 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
             )} ${formatInteger(users.total_users)}`}
           />
         </div>
+        <RealtimeSlotsCard staggerIndex={6} />
       </div>
 
       {/* Account health overview */}
-      <AccountHealthOverview staggerIndex={6} />
+      <AccountHealthOverview staggerIndex={7} />
 
       {/* Token composition */}
-      <Card className="anim-rise-sm" style={rise(7)}>
+      <Card className="anim-rise-sm" style={rise(8)}>
         <CardHeader>
           <CardTitle>
             {t("dashboard.tokenBreakdown")}
@@ -271,7 +276,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
       </Card>
 
       {/* Token trend over the window */}
-      <Card className="anim-rise-sm" style={rise(8)}>
+      <Card className="anim-rise-sm" style={rise(9)}>
         <CardContent>
           <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
             {t("dashboard.tokenTrend")}
@@ -294,7 +299,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
       </Card>
 
       {/* Distributions: by model + by user */}
-      <div className="anim-rise-sm grid gap-4 md:grid-cols-2" style={rise(9)}>
+      <div className="anim-rise-sm grid gap-4 md:grid-cols-2" style={rise(10)}>
         <Card>
           <CardHeader>
             <CardTitle>
@@ -380,6 +385,78 @@ function AccountHealthOverview({ staggerIndex }: { staggerIndex: number }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// Human-readable short labels for the realtime slot breakdown. Endpoints and
+// kinds arrive as raw routing identifiers; map the known ones to compact names
+// and fall back to a tidied raw key so new variants still render.
+const REALTIME_ENDPOINT_LABELS: Record<string, string> = {
+  "/v1/realtime": "Realtime",
+  "/v1/responses/ws": "Responses WS",
+};
+const REALTIME_KIND_LABELS: Record<string, string> = {
+  realtime_websocket: "Realtime",
+  responses_websocket: "Responses",
+};
+
+function prettyRealtimeKey(key: string, labels: Record<string, string>): string {
+  return labels[key] ?? key.replace(/^\/v1\//, "").replace(/[_/]/g, " ").trim();
+}
+
+// breakdownHint renders a compact "Label N · Label N" string from the first
+// non-empty of the per-endpoint / per-kind counter maps (endpoint preferred,
+// since its labels read better). Returns null when nothing is broken out.
+function breakdownHint(counters: RealtimeActiveSlotCounters): string | null {
+  const byEndpoint = Object.entries(counters.active_by_endpoint ?? {});
+  const byKind = Object.entries(counters.active_by_kind ?? {});
+  const source = byEndpoint.length > 0 ? byEndpoint : byKind;
+  const labels = byEndpoint.length > 0 ? REALTIME_ENDPOINT_LABELS : REALTIME_KIND_LABELS;
+  const parts = source
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, count]) => `${prettyRealtimeKey(key, labels)} ${formatInteger(count)}`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+// RealtimeSlotsCard surfaces the live count of active realtime/websocket slots
+// (RealtimeActiveSlotCounters.active_slots) as a dashboard KPI, with an optional
+// per-endpoint / per-kind breakdown in the hint. Polls every ~30s via its hook.
+function RealtimeSlotsCard({ staggerIndex }: { staggerIndex: number }) {
+  const { t } = useLanguage();
+  const query = useListOpsRealtimeSlots();
+  const counters = query.data?.counters;
+
+  if (query.isLoading && !counters) {
+    return (
+      <div className="anim-rise-sm" style={rise(staggerIndex)}>
+        <StatCardSkeleton className="h-full" />
+      </div>
+    );
+  }
+  if (query.isError || !counters) return null;
+
+  const breakdown = breakdownHint(counters);
+  const hint =
+    breakdown ??
+    `${t("dashboard.today")} ${formatInteger(counters.acquired_total)} ${t("dashboard.requests")}`;
+
+  return (
+    <div className="anim-rise-sm" style={rise(staggerIndex)}>
+      <StatCard
+        className="card-interactive h-full"
+        label="Realtime slots"
+        value={counters.active_slots}
+        format={formatInteger}
+        unit="active"
+        hint={
+          <span className="flex items-center gap-1.5">
+            <Radio className="size-3 text-srapi-text-tertiary" />
+            {hint}
+          </span>
+        }
+      />
+    </div>
   );
 }
 

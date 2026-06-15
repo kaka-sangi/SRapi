@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { Gauge, Radar, FileText } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
@@ -24,11 +25,17 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useClientPagedList } from "@/hooks/use-client-list";
+import {
+  useAccountsAvailabilityWindows,
+  AVAILABILITY_WINDOWS,
+  type AccountAvailabilityWindows,
+} from "@/hooks/use-accounts-availability-windows";
 import {
   useAccountsAvailability,
   useChannelMonitors,
@@ -45,7 +52,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { formatPercent, formatDateTime } from "@/lib/admin-format";
-import { adminErrorMessage } from "@/lib/admin-api";
+import { adminErrorMessage, type AdminListResult } from "@/lib/admin-api";
 import { cn } from "@/lib/cn";
 import {
   CHANNEL_MONITOR_SCOPES,
@@ -618,7 +625,251 @@ function ApplyTemplateDialog({
   );
 }
 
-// ---- Availability tab (the existing rollup, preserved) ----
+// ---- Availability tab ----
+//
+// Two views share this tab. The multi-window view (default) fans out parallel
+// availability queries across every window in WINDOW_OPTIONS and renders one
+// uptime column per window, so an operator compares 7/14/30/90d side by side
+// without re-querying. The single-window view is the original rollup, kept as a
+// simpler fallback behind a small mode toggle.
+
+const UPTIME_WARN_THRESHOLD = 0.95;
+
+function uptimeTone(uptime: number | undefined): string {
+  if (uptime == null) return "text-srapi-text-tertiary";
+  return uptime < UPTIME_WARN_THRESHOLD ? "text-srapi-error" : "text-srapi-text-secondary";
+}
+
+type AvailabilityMode = "windows" | "single";
+
+function AvailabilityTab() {
+  const { t } = useLanguage();
+  // The toggle lives at the tab level so both views unmount cleanly when the
+  // operator switches; each view owns its own list/search/pagination state.
+  const [mode, setMode] = useState<AvailabilityMode>("windows");
+
+  // Labels compose from existing translation keys so we don't introduce new
+  // i18n entries here: "All · Window" vs "Window".
+  const toggle = (
+    <div className="flex items-center gap-1 rounded-lg border border-srapi-border p-0.5">
+      <Button
+        variant={mode === "windows" ? "outline" : "ghost"}
+        size="sm"
+        onClick={() => setMode("windows")}
+      >
+        {t("common.all")} · {t("adminMonitor.window")}
+      </Button>
+      <Button
+        variant={mode === "single" ? "outline" : "ghost"}
+        size="sm"
+        onClick={() => setMode("single")}
+      >
+        {t("adminMonitor.window")}
+      </Button>
+    </div>
+  );
+
+  return mode === "windows" ? (
+    <MultiWindowAvailabilityTab modeToggle={toggle} />
+  ) : (
+    <SingleWindowAvailabilityTab modeToggle={toggle} />
+  );
+}
+
+// ---- Multi-window view (parallel windows, simultaneous uptime columns) ----
+
+function windowsMatch(row: AccountAvailabilityWindows, term: string): boolean {
+  if (!term) return true;
+  return [row.account_name, row.status].filter(Boolean).join(" ").toLowerCase().includes(term);
+}
+
+/** Worst-first by the widest resolved window (falling back to any window). */
+function worstUptime(row: AccountAvailabilityWindows): number {
+  for (let i = AVAILABILITY_WINDOWS.length - 1; i >= 0; i--) {
+    const u = row.uptime[AVAILABILITY_WINDOWS[i]];
+    if (u != null) return u;
+  }
+  return 1;
+}
+
+function windowsCompare(a: AccountAvailabilityWindows, b: AccountAvailabilityWindows): number {
+  return worstUptime(a) - worstUptime(b) || a.account_name.localeCompare(b.account_name);
+}
+
+function MultiWindowAvailabilityTab({ modeToggle }: { modeToggle: React.ReactNode }) {
+  const { t } = useLanguage();
+  const list = useAdminList();
+  const colVis = useColumnVisibility("admin-channel-availability-windows", []);
+  const [detail, setDetail] = useState<AccountAvailabilityWindows | null>(null);
+
+  const availability = useAccountsAvailabilityWindows();
+
+  // Adapt the merged multi-query result into the UseQueryResult shape AdminListView
+  // expects, so loading/error/empty/skeleton + the table chrome stay identical to
+  // every other admin list — only the data source differs.
+  const query = useMemo(
+    () =>
+      ({
+        data: { data: availability.rows } as AdminListResult<AccountAvailabilityWindows>,
+        isLoading: availability.isPending,
+        isError: availability.error != null,
+        isPending: availability.isPending,
+        isFetching: availability.isFetching,
+        error: availability.error,
+        refetch: availability.refetch,
+      }) as unknown as UseQueryResult<AdminListResult<AccountAvailabilityWindows>>,
+    [availability],
+  );
+
+  const { query: pagedQuery, total } = useClientPagedList(query, list, {
+    match: windowsMatch,
+    compare: windowsCompare,
+  });
+
+  const columns: Column<AccountAvailabilityWindows>[] = [
+    {
+      key: "account",
+      header: t("adminMonitor.account"),
+      pinned: true,
+      render: (r) => (
+        <button
+          type="button"
+          onClick={() => setDetail(r)}
+          className="text-left text-srapi-text-primary underline-offset-4 hover:underline"
+        >
+          {r.account_name}
+        </button>
+      ),
+    },
+    {
+      key: "status",
+      header: t("adminMonitor.status"),
+      render: (r) => (
+        <QuietBadge status={quietStatusFor(r.status)} label={statusLabel(t, r.status)} />
+      ),
+    },
+    // One uptime column per window, rendered simultaneously.
+    ...AVAILABILITY_WINDOWS.map(
+      (d): Column<AccountAvailabilityWindows> => ({
+        key: `uptime-${d}`,
+        header: t("adminMonitor.windowDays", { days: d }),
+        align: "right",
+        render: (r) => (
+          <span className={cn("font-mono tabular", uptimeTone(r.uptime[d]))}>
+            {r.uptime[d] == null ? "—" : formatPercent(r.uptime[d])}
+          </span>
+        ),
+      }),
+    ),
+    {
+      key: "checked",
+      header: t("adminMonitor.lastChecked"),
+      align: "right",
+      hideOnMobile: true,
+      render: (r) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {formatDateTime(r.last_checked_at)}
+        </span>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      <AdminListView
+        query={pagedQuery}
+        columns={columns}
+        getRowId={(r) => String(r.account_id)}
+        emptyIcon={Gauge}
+        emptyTitle={t("adminMonitor.emptyTitle")}
+        emptyBody={t("adminMonitor.emptyBody")}
+        minWidth={720}
+        columnVisibility={colVis}
+        isFiltered={Boolean(list.search)}
+        onClearFilters={list.clearFilters}
+        toolbar={
+          <ListToolbar>
+            <SearchInput
+              value={list.searchInput}
+              onChange={list.setSearchInput}
+              placeholder={t("adminMonitor.searchPlaceholder")}
+            />
+            <div className="ml-auto flex items-center gap-3">
+              {availability.isPending ? null : <ListCount total={total} />}
+              <ColumnToggle columns={columns} visibility={colVis} />
+              {modeToggle}
+            </div>
+          </ListToolbar>
+        }
+        pagination={{
+          page: list.page,
+          pageSize: list.pageSize,
+          total,
+          onPageChange: list.setPage,
+        }}
+        rowActions={(r) => (
+          <RowActionsMenu
+            actions={[
+              { label: `${t("common.show")} · ${t("adminMonitor.uptime")}`, onSelect: () => setDetail(r) },
+            ]}
+          />
+        )}
+      />
+
+      {detail ? (
+        <AvailabilityDetailDialog account={detail} onClose={() => setDetail(null)} />
+      ) : null}
+    </>
+  );
+}
+
+function AvailabilityDetailDialog({
+  account,
+  onClose,
+}: {
+  account: AccountAvailabilityWindows;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{account.account_name}</DialogTitle>
+          <DialogDescription className="flex items-center gap-2">
+            <QuietBadge
+              status={quietStatusFor(account.status)}
+              label={statusLabel(t, account.status)}
+            />
+            <span className="font-mono text-2xs text-srapi-text-tertiary">
+              {formatDateTime(account.last_checked_at)}
+            </span>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {AVAILABILITY_WINDOWS.map((d) => {
+            const uptime = account.uptime[d];
+            return (
+              <StatCard
+                key={d}
+                label={t("adminMonitor.windowDays", { days: d })}
+                value={uptime == null ? "—" : formatPercent(uptime)}
+                className={uptime != null && uptime < UPTIME_WARN_THRESHOLD ? "ring-1 ring-srapi-error/40" : undefined}
+              />
+            );
+          })}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---- Single-window view (the original rollup, preserved as a fallback) ----
 
 function availabilityMatch(row: AccountAvailabilitySummary, term: string): boolean {
   if (!term) return true;
@@ -628,7 +879,7 @@ function availabilityMatch(row: AccountAvailabilitySummary, term: string): boole
 const availabilityCompare = (a: AccountAvailabilitySummary, b: AccountAvailabilitySummary) =>
   a.overall_uptime - b.overall_uptime || a.account_name.localeCompare(b.account_name);
 
-function AvailabilityTab() {
+function SingleWindowAvailabilityTab({ modeToggle }: { modeToggle: React.ReactNode }) {
   const { t } = useLanguage();
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-channel-availability", []);
@@ -719,6 +970,7 @@ function AvailabilityTab() {
                 ))}
               </SelectContent>
             </Select>
+            {modeToggle}
           </div>
         </ListToolbar>
       }

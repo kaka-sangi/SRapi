@@ -170,6 +170,40 @@ function UsageReport({ report }: { report: GatewayUsageResponse }) {
         <StatCard label={t("keyUsage.balance")} value={formatMoney(report.balance, report.unit)} />
       </div>
 
+      {report.daily_usage.length > 0 ? (
+        <Card>
+          <CardContent>
+            <h2 className="font-serif text-lg text-srapi-text-primary">{t("adminUsage.byDay")}</h2>
+            <TableScroll minWidth={480}>
+              <Table className="mt-3">
+                <TableHeader>
+                  <tr>
+                    <TableHead>{t("adminAffiliates.date")}</TableHead>
+                    <TableHead className="text-right">{t("keyUsage.requests")}</TableHead>
+                    <TableHead className="text-right">{t("dashboard.inputTokens")}</TableHead>
+                    <TableHead className="text-right">{t("dashboard.outputTokens")}</TableHead>
+                    <TableHead className="text-right">{t("keyUsage.cost")}</TableHead>
+                  </tr>
+                </TableHeader>
+                <TableBody>
+                  {report.daily_usage.map((d) => (
+                    <TableRow key={d.date}>
+                      <TableCell className="font-mono text-2xs text-srapi-text-secondary">{d.date}</TableCell>
+                      <TableCell className="text-right font-mono tabular">{d.requests}</TableCell>
+                      <TableCell className="text-right font-mono tabular">{d.input_tokens}</TableCell>
+                      <TableCell className="text-right font-mono tabular">{d.output_tokens}</TableCell>
+                      <TableCell className="text-right font-mono tabular">
+                        {formatMoney(d.cost, currency)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableScroll>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {report.model_stats.length > 0 ? (
         <Card>
           <CardContent>

@@ -8,6 +8,7 @@ import { AdminListView, ListCount, type Column } from "@/components/admin/admin-
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { UserPlatformQuotasDialog } from "@/components/admin/user-platform-quotas-dialog";
+import { UserBalanceHistoryDialog } from "@/components/admin/user-balance-history-dialog";
 import { ListToolbar, SearchInput, FilterSelect } from "@/components/admin/list-toolbar";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useAdminList } from "@/hooks/use-admin-list";
@@ -77,6 +78,7 @@ function UsersContent() {
   const [creating, setCreating] = useState(false);
   const [editTarget, setEditTarget] = useState<User | null>(null);
   const [balanceTarget, setBalanceTarget] = useState<User | null>(null);
+  const [historyTarget, setHistoryTarget] = useState<User | null>(null);
   const [quotaTarget, setQuotaTarget] = useState<User | null>(null);
   const [disableTarget, setDisableTarget] = useState<User | null>(null);
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
@@ -266,6 +268,7 @@ function UsersContent() {
             actions={[
               { label: t("adminUsers.edit"), onSelect: () => setEditTarget(u) },
               { label: t("adminUsers.adjustBalance"), onSelect: () => setBalanceTarget(u) },
+              { label: t("adminUsers.balanceHistory"), onSelect: () => setHistoryTarget(u) },
               { label: t("adminUsers.platformQuotas"), onSelect: () => setQuotaTarget(u) },
               {
                 label: u.status === "disabled" ? t("adminUsers.enable") : t("adminUsers.disable"),
@@ -323,6 +326,17 @@ function UsersContent() {
           submit={(body) => balanceMut.mutateAsync({ id: balanceTarget.id, body })}
           successMessage={t("feedback.updated")}
           isPending={balanceMut.isPending}
+        />
+      ) : null}
+
+      {historyTarget ? (
+        <UserBalanceHistoryDialog
+          userId={historyTarget.id}
+          email={historyTarget.email}
+          open
+          onOpenChange={(open) => {
+            if (!open) setHistoryTarget(null);
+          }}
         />
       ) : null}
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Inbox, SearchX } from "lucide-react";
+import { Download, Inbox, SearchX } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import type { UsageLogSummary } from "@/lib/srapi-types";
 import { formatMoney } from "@/lib/admin-format";
+import { UsageExportDialog } from "@/components/usage-export-dialog";
 import { UsageBreakdown } from "./usage-breakdown";
 
 export default function UsagePage() {
@@ -48,6 +49,7 @@ function UsageContent() {
   const usage = useUsageLogs();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const [exportOpen, setExportOpen] = useState(false);
   const model = searchParams.get("model") ?? "all";
   const status = searchParams.get("status") ?? "all";
   function setFilter(key: string, value: string) {
@@ -60,17 +62,32 @@ function UsageContent() {
   const setModel = (v: string) => setFilter("model", v);
   const setStatus = (v: string) => setFilter("status", v);
 
+  const hasLogs = (usage.data?.length ?? 0) > 0;
+
   return (
     <>
       <PageHeader
         eyebrow={t("nav.sectionWorkspace")}
         title={t("usage.title")}
         description={t("usage.subtitle")}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!hasLogs}
+            onClick={() => setExportOpen(true)}
+          >
+            <Download className="size-4" aria-hidden />
+            {t("usage.export")}
+          </Button>
+        }
       />
 
       <PageQueryState query={usage} skeleton={<UsageSkeleton />}>
         {(logs) => <UsageBody logs={logs} model={model} status={status} setModel={setModel} setStatus={setStatus} />}
       </PageQueryState>
+
+      <UsageExportDialog open={exportOpen} onOpenChange={setExportOpen} />
     </>
   );
 }

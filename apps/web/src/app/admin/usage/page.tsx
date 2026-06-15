@@ -29,6 +29,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChartSkeleton } from "@/components/charts/chart-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatMoney, formatDateTime, formatInteger } from "@/lib/admin-format";
+import { UserBalanceHistoryDialog } from "@/components/admin/user-balance-history-dialog";
 import type { UsageLog } from "@/lib/sdk-types";
 
 // Structurally matches `UsageAggregateDimension` ('day' | 'model' | 'user' |
@@ -44,6 +45,27 @@ const DIMENSION_LABEL_KEY: Record<AggregateDimension, string> = {
 };
 
 const TOP_N = 12;
+
+// Verbose / low-frequency UsageLog fields start hidden; the always-useful
+// columns (time, user, model, output, cost, status) stay visible by default.
+const DEFAULT_HIDDEN_COLUMNS = [
+  "input",
+  "latency",
+  "api_key_id",
+  "account_id",
+  "provider_id",
+  "error_class",
+  "cached_tokens",
+  "cache_creation_tokens",
+  "input_cost",
+  "output_cost",
+  "cache_read_cost",
+  "cache_write_cost",
+  "rate_multiplier",
+  "protocol",
+  "attempt_no",
+  "usage_estimated",
+];
 
 export default function AdminUsagePage() {
   return (
@@ -61,8 +83,10 @@ function formatLatency(ms: number): string {
 function UsageContent() {
   const { t } = useLanguage();
   const list = useAdminList();
-  const colVis = useColumnVisibility("admin-usage", ["latency"]);
+  const colVis = useColumnVisibility("admin-usage", DEFAULT_HIDDEN_COLUMNS);
   const [cleanupOpen, setCleanupOpen] = useState(false);
+  // Clicking a usage row's user opens the shared balance-history dialog.
+  const [balanceUser, setBalanceUser] = useState<{ id: string; email: string } | null>(null);
   const modelFilter = list.filters.model || undefined;
   const userFilter = list.filters.user || undefined;
   // Server-side: page/filters drive the query (the log can grow unbounded).
@@ -89,6 +113,10 @@ function UsageContent() {
   const userEmailById = new Map(
     (usersList.data?.data ?? []).map((u) => [String(u.id), u.email] as const),
   );
+  const userById = new Map(
+    (usersList.data?.data ?? []).map((u) => [String(u.id), u] as const),
+  );
+  const balanceUserRecord = balanceUser ? userById.get(balanceUser.id) : undefined;
   const isFiltered = Boolean(modelFilter || userFilter);
   const total = usage.data?.pagination?.total ?? usage.data?.data.length ?? 0;
 
@@ -107,11 +135,19 @@ function UsageContent() {
       key: "user",
       header: t("adminUsage.user"),
       hideOnMobile: true,
-      render: (u) => (
-        <span className="text-srapi-text-secondary">
-          {userEmailById.get(String(u.user_id)) || u.user_id}
-        </span>
-      ),
+      render: (u) => {
+        const email = userEmailById.get(String(u.user_id)) || String(u.user_id);
+        return (
+          <button
+            type="button"
+            onClick={() => setBalanceUser({ id: String(u.user_id), email })}
+            className="truncate text-left text-srapi-text-secondary underline-offset-2 transition-colors hover:text-srapi-text-primary hover:underline"
+            title={t("adminUsers.balanceHistory")}
+          >
+            {email}
+          </button>
+        );
+      },
     },
     {
       key: "model",
@@ -143,6 +179,83 @@ function UsageContent() {
       ),
     },
     {
+      key: "input_cost",
+      header: `${t("adminUsage.cost")} · ${t("usage.costIn")}`,
+      align: "right",
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {formatMoney(u.input_cost ?? "0", u.currency)}
+        </span>
+      ),
+    },
+    {
+      key: "output_cost",
+      header: `${t("adminUsage.cost")} · ${t("usage.costOut")}`,
+      align: "right",
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {formatMoney(u.output_cost ?? "0", u.currency)}
+        </span>
+      ),
+    },
+    {
+      key: "cache_read_cost",
+      header: `${t("adminUsage.cost")} · ${t("usage.costCacheRead")}`,
+      align: "right",
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {formatMoney(u.cache_read_cost ?? "0", u.currency)}
+        </span>
+      ),
+    },
+    {
+      key: "cache_write_cost",
+      header: `${t("adminUsage.cost")} · ${t("usage.costCacheWrite")}`,
+      align: "right",
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {formatMoney(u.cache_write_cost ?? "0", u.currency)}
+        </span>
+      ),
+    },
+    {
+      key: "cached_tokens",
+      header: `${t("dashboard.inputTokens")} · ${t("usage.costCacheRead")}`,
+      align: "right",
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {formatInteger(u.cached_tokens)}
+        </span>
+      ),
+    },
+    {
+      key: "cache_creation_tokens",
+      header: `${t("dashboard.inputTokens")} · ${t("usage.costCacheWrite")}`,
+      align: "right",
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {formatInteger(u.cache_creation_tokens ?? 0)}
+        </span>
+      ),
+    },
+    {
+      key: "rate_multiplier",
+      header: t("adminUsage.cost"),
+      align: "right",
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {u.rate_multiplier ? `×${u.rate_multiplier}` : "—"}
+        </span>
+      ),
+    },
+    {
       key: "latency",
       header: t("adminUsage.latency"),
       align: "right",
@@ -161,6 +274,71 @@ function UsageContent() {
         <span className="font-mono text-srapi-text-secondary tabular">
           {formatMoney(u.cost, u.currency)}
         </span>
+      ),
+    },
+    {
+      key: "api_key_id",
+      header: t("adminApiKeys.title"),
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary">{u.api_key_id || "—"}</span>
+      ),
+    },
+    {
+      key: "account_id",
+      header: t("adminUsage.byAccount"),
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary">{u.account_id || "—"}</span>
+      ),
+    },
+    {
+      key: "provider_id",
+      header: t("adminAccounts.title"),
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary">{u.provider_id || "—"}</span>
+      ),
+    },
+    {
+      key: "protocol",
+      header: t("usage.endpoint"),
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary">
+          {u.source_protocol}
+          {u.target_protocol ? ` → ${u.target_protocol}` : ""}
+        </span>
+      ),
+    },
+    {
+      key: "attempt_no",
+      header: t("adminUsage.requests"),
+      align: "right",
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {formatInteger(u.attempt_no)}
+        </span>
+      ),
+    },
+    {
+      key: "error_class",
+      header: t("usage.status"),
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="text-2xs text-srapi-text-tertiary">{u.error_class || "—"}</span>
+      ),
+    },
+    {
+      key: "usage_estimated",
+      header: t("usage.tokens"),
+      hideOnMobile: true,
+      render: (u) => (
+        <QuietBadge
+          status={u.usage_estimated ? "limited" : "active"}
+          label={u.usage_estimated ? "Estimated" : "Exact"}
+        />
       ),
     },
     {
@@ -205,6 +383,18 @@ function UsageContent() {
         onOpenChange={setCleanupOpen}
         modelOptions={modelOptions}
       />
+      {balanceUser ? (
+        <UserBalanceHistoryDialog
+          userId={balanceUser.id}
+          email={balanceUser.email}
+          open={balanceUser !== null}
+          onOpenChange={(v) => {
+            if (!v) setBalanceUser(null);
+          }}
+          balance={balanceUserRecord?.balance}
+          currency={balanceUserRecord?.currency}
+        />
+      ) : null}
       {dailyData.length > 0 ? (
         <Card>
           <CardContent>
