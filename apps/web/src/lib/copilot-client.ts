@@ -172,6 +172,23 @@ export async function streamCopilotChat(options: StreamCopilotChatOptions): Prom
       boundary = buffer.indexOf("\n\n");
     }
   }
+  // Final flush: a multibyte UTF-8 char split across the last chunk boundary is
+  // still pending in the decoder, so drain it before processing the tail. Then
+  // handle any complete frame(s) left in the buffer (a stream may close without
+  // a trailing blank line), and the final partial frame if it carries data.
+  buffer += decoder.decode();
+  let boundary = buffer.indexOf("\n\n");
+  while (boundary >= 0) {
+    const frame = buffer.slice(0, boundary);
+    buffer = buffer.slice(boundary + 2);
+    const event = parseFrame(frame);
+    if (event) options.onEvent(event);
+    boundary = buffer.indexOf("\n\n");
+  }
+  if (buffer) {
+    const event = parseFrame(buffer);
+    if (event) options.onEvent(event);
+  }
 }
 
 function parseFrame(frame: string): CopilotEvent | null {

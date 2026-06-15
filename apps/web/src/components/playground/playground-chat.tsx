@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   User as UserIcon,
@@ -376,17 +376,22 @@ function MessageRow({
   running: boolean;
   onRegenerate: () => void;
 }) {
+  // Rebuilding the (potentially large) base64 data URLs on every render — and
+  // MessageRow re-renders on each streaming delta — is wasted work; memoize on
+  // the stable images array.
+  const imageUrls = useMemo(() => (message.images ?? []).map(imagePartToDataUrl), [message.images]);
+
   if (message.role === "user") {
     return (
       <div className="anim-rise-sm flex justify-end gap-2">
         <div className="max-w-[80%] space-y-2">
           {message.images?.length ? (
             <div className="flex flex-wrap justify-end gap-1.5">
-              {message.images.map((img, i) => (
+              {imageUrls.map((src, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={i}
-                  src={imagePartToDataUrl(img)}
+                  src={src}
                   alt=""
                   className="size-20 rounded-lg border border-srapi-border object-cover"
                 />

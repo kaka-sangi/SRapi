@@ -120,6 +120,18 @@ export async function streamPlaygroundChat(options: StreamPlaygroundOptions): Pr
       boundary = buffer.indexOf("\n\n");
     }
   }
+  // Final flush: a multibyte UTF-8 char split across the last chunk boundary is
+  // still pending in the decoder, so drain it before processing the tail. Then
+  // handle any complete frame(s) left in the buffer (a stream may close without
+  // a trailing blank line), and the final partial frame if it carries data.
+  buffer += decoder.decode();
+  let boundary = buffer.indexOf("\n\n");
+  while (boundary >= 0) {
+    handleFrame(buffer.slice(0, boundary), onDelta, meta);
+    buffer = buffer.slice(boundary + 2);
+    boundary = buffer.indexOf("\n\n");
+  }
+  if (buffer) handleFrame(buffer, onDelta, meta);
 
   meta.latencyMs = performance.now() - start;
   options.onMeta?.(meta);
