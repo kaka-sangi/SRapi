@@ -5674,6 +5674,117 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/error-logs:
+    get:
+      tags:
+        - AdminUsage
+      operationId: listAdminErrorLogs
+      summary: List error logs.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: user_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: api_key_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: account_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: model
+          in: query
+          schema:
+            type: string
+        - name: error_class
+          in: query
+          schema:
+            type: string
+        - name: source_endpoint
+          in: query
+          schema:
+            type: string
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Error log list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorLogListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/error-logs/{id}:
+    get:
+      tags:
+        - AdminUsage
+      operationId: getAdminErrorLog
+      summary: Get an error log.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Error log.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - request_id
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ErrorLog"
+                  request_id:
+                    $ref: "#/components/schemas/RequestId"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/usage/daily:
     get:
       tags:
@@ -22388,6 +22499,82 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UsageLog"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ErrorLog:
+      type: object
+      required:
+        - id
+        - request_id
+        - created_at
+        - user_id
+        - api_key_id
+        - model
+        - source_endpoint
+        - source_protocol
+        - target_protocol
+        - latency_ms
+        - input_tokens
+        - output_tokens
+        - attempt_no
+        - usage_estimated
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        user_id:
+          $ref: "#/components/schemas/Id"
+        api_key_id:
+          $ref: "#/components/schemas/Id"
+        account_id:
+          type: string
+          nullable: true
+        provider_id:
+          type: string
+          nullable: true
+        model:
+          type: string
+        source_endpoint:
+          type: string
+        source_protocol:
+          type: string
+        target_protocol:
+          type: string
+        error_class:
+          type: string
+          nullable: true
+        latency_ms:
+          type: integer
+          minimum: 0
+        input_tokens:
+          type: integer
+          minimum: 0
+        output_tokens:
+          type: integer
+          minimum: 0
+        attempt_no:
+          type: integer
+          minimum: 1
+        usage_estimated:
+          type: boolean
+
+    ErrorLogListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorLog"
         pagination:
           $ref: "#/components/schemas/Pagination"
         request_id:

@@ -39,6 +39,7 @@ export type {
   AuditLog,
   BillingLedgerEntry,
   DomainEventOutbox,
+  ErrorLog,
   ErrorPassthroughRule,
   PayloadRule,
   ScheduledTestPlan,

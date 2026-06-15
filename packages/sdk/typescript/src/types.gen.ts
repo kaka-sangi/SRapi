@@ -3492,6 +3492,32 @@ export type UsageLogListResponse = {
     request_id: RequestId;
 };
 
+export type ErrorLog = {
+    id: Id;
+    request_id: RequestId;
+    created_at: Timestamp;
+    user_id: Id;
+    api_key_id: Id;
+    account_id?: string | null;
+    provider_id?: string | null;
+    model: string;
+    source_endpoint: string;
+    source_protocol: string;
+    target_protocol: string;
+    error_class?: string | null;
+    latency_ms: number;
+    input_tokens: number;
+    output_tokens: number;
+    attempt_no: number;
+    usage_estimated: boolean;
+};
+
+export type ErrorLogListResponse = {
+    data: Array<ErrorLog>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
 export type AuditLog = {
     id: Id;
     actor_user_id?: string | null;
@@ -12028,6 +12054,92 @@ export type ListAdminUsageLogsResponses = {
 };
 
 export type ListAdminUsageLogsResponse = ListAdminUsageLogsResponses[keyof ListAdminUsageLogsResponses];
+
+export type ListAdminErrorLogsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        user_id?: Id;
+        api_key_id?: Id;
+        account_id?: Id;
+        model?: string;
+        error_class?: string;
+        source_endpoint?: string;
+        start?: string;
+        end?: string;
+    };
+    url: '/api/v1/admin/error-logs';
+};
+
+export type ListAdminErrorLogsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminErrorLogsError = ListAdminErrorLogsErrors[keyof ListAdminErrorLogsErrors];
+
+export type ListAdminErrorLogsResponses = {
+    /**
+     * Error log list.
+     */
+    200: ErrorLogListResponse;
+};
+
+export type ListAdminErrorLogsResponse = ListAdminErrorLogsResponses[keyof ListAdminErrorLogsResponses];
+
+export type GetAdminErrorLogData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/error-logs/{id}';
+};
+
+export type GetAdminErrorLogErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminErrorLogError = GetAdminErrorLogErrors[keyof GetAdminErrorLogErrors];
+
+export type GetAdminErrorLogResponses = {
+    /**
+     * Error log.
+     */
+    200: {
+        data: ErrorLog;
+        request_id: RequestId;
+    };
+};
+
+export type GetAdminErrorLogResponse = GetAdminErrorLogResponses[keyof GetAdminErrorLogResponses];
 
 export type GetAdminUsageDailyData = {
     body?: never;

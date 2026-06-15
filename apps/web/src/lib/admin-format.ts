@@ -9,6 +9,12 @@ export function formatInteger(value: number | null | undefined): string {
   return new Intl.NumberFormat().format(value);
 }
 
+/** Latency in ms → "1.2s" / "340ms"; em-dash for missing/zero. */
+export function formatLatency(ms: number | null | undefined): string {
+  if (!ms || !Number.isFinite(ms)) return "—";
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
+}
+
 export function formatCompactNumber(value: number | null | undefined): string {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return "-";

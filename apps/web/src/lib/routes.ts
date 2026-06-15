@@ -40,6 +40,7 @@ export const ADMIN_ROUTES = {
   diagnostics: "/admin/ops/diagnostics",
   riskControl: "/admin/risk-control",
   auditLogs: "/admin/audit-logs",
+  errorLogs: "/admin/error-logs",
   billingLedger: "/admin/billing-ledger",
   errorPassthrough: "/admin/error-passthrough",
   tlsProfiles: "/admin/tls-profiles",

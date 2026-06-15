@@ -70,6 +70,8 @@ export const queryKeys = {
     usageAggregates: (dimension: string, params?: unknown) =>
       ["admin", "usage-aggregates", dimension, params ?? {}] as const,
     auditLogs: (params?: unknown) => ["admin", "audit-logs", params ?? {}] as const,
+    errorLogs: (params?: unknown) => ["admin", "error-logs", params ?? {}] as const,
+    errorLog: (id: string) => ["admin", "error-logs", id] as const,
     outboxEvents: (params?: unknown) => ["admin", "outbox-events", params ?? {}] as const,
     apiKeys: (params?: unknown) => ["admin", "api-keys", params ?? {}] as const,
     apiKeyUsage: (id: string, days: number) => ["admin", "api-key-usage", id, days] as const,

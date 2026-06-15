@@ -39,6 +39,7 @@ import {
   Stethoscope,
   Replace,
   OctagonAlert,
+  Bug,
   Fingerprint,
   type LucideIcon,
 } from "lucide-react";
@@ -136,6 +137,7 @@ const ADMIN_OPS_SECTION: NavSection = {
     { href: ADMIN_ROUTES.ops, labelKey: "nav.adminOps", icon: HeartPulse },
     { href: ADMIN_ROUTES.opsStrategy, labelKey: "nav.adminOpsStrategy", icon: Route },
     { href: ADMIN_ROUTES.errorPassthrough, labelKey: "nav.adminErrorPassthrough", icon: OctagonAlert },
+    { href: ADMIN_ROUTES.errorLogs, labelKey: "nav.adminErrorLogs", icon: Bug },
     { href: ADMIN_ROUTES.riskControl, labelKey: "nav.adminRiskControl", icon: ShieldAlert },
     { href: ADMIN_ROUTES.announcements, labelKey: "nav.adminAnnouncements", icon: Megaphone },
     { href: ADMIN_ROUTES.eventsOutbox, labelKey: "nav.adminOutbox", icon: Send },

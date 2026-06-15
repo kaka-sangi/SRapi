@@ -494,6 +494,8 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/account-groups/{id}/accounts/{account_id}", server.handleAddAdminAccountGroupMember)
 	mux.HandleFunc("DELETE /api/v1/admin/account-groups/{id}/accounts/{account_id}", server.handleRemoveAdminAccountGroupMember)
 	mux.HandleFunc("GET /api/v1/admin/usage-logs", server.handleListAdminUsageLogs)
+	mux.HandleFunc("GET /api/v1/admin/error-logs", server.handleListAdminErrorLogs)
+	mux.HandleFunc("GET /api/v1/admin/error-logs/{id}", server.handleGetAdminErrorLog)
 	mux.HandleFunc("GET /api/v1/admin/usage/daily", server.handleAdminUsageDaily)
 	mux.HandleFunc("GET /api/v1/admin/usage/aggregates", server.handleAdminUsageAggregates)
 	mux.HandleFunc("GET /api/v1/admin/usage/export", server.handleAdminUsageExport)

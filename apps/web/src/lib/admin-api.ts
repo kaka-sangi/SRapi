@@ -7,6 +7,7 @@ import type {
 import { accountsApi } from "./admin-api/accounts";
 import { affiliateApi } from "./admin-api/affiliate";
 import { diagnosticsApi } from "./admin-api/diagnostics";
+import { errorLogsApi } from "./admin-api/error-logs";
 import { modelsApi } from "./admin-api/models";
 import { monitoringApi } from "./admin-api/monitoring";
 import { notificationsApi } from "./admin-api/notifications";
@@ -79,6 +80,7 @@ export const adminApi = {
   ...riskApi,
   ...settingsApi,
   ...diagnosticsApi,
+  ...errorLogsApi,
 };
 
 export function statusQuery(status: string): { status?: UserStatus | AnnouncementStatus | string } {

@@ -5961,6 +5961,34 @@ type EnabledOAuthProviderListResponse struct {
 // ErrorCode defines model for ErrorCode.
 type ErrorCode string
 
+// ErrorLog defines model for ErrorLog.
+type ErrorLog struct {
+	AccountId      *string   `json:"account_id,omitempty"`
+	ApiKeyId       Id        `json:"api_key_id"`
+	AttemptNo      int       `json:"attempt_no"`
+	CreatedAt      Timestamp `json:"created_at"`
+	ErrorClass     *string   `json:"error_class,omitempty"`
+	Id             Id        `json:"id"`
+	InputTokens    int       `json:"input_tokens"`
+	LatencyMs      int       `json:"latency_ms"`
+	Model          string    `json:"model"`
+	OutputTokens   int       `json:"output_tokens"`
+	ProviderId     *string   `json:"provider_id,omitempty"`
+	RequestId      RequestId `json:"request_id"`
+	SourceEndpoint string    `json:"source_endpoint"`
+	SourceProtocol string    `json:"source_protocol"`
+	TargetProtocol string    `json:"target_protocol"`
+	UsageEstimated bool      `json:"usage_estimated"`
+	UserId         Id        `json:"user_id"`
+}
+
+// ErrorLogListResponse defines model for ErrorLogListResponse.
+type ErrorLogListResponse struct {
+	Data       []ErrorLog `json:"data"`
+	Pagination Pagination `json:"pagination"`
+	RequestId  RequestId  `json:"request_id"`
+}
+
 // ErrorObject defines model for ErrorObject.
 type ErrorObject struct {
 	Code    ErrorCode   `json:"code"`
@@ -9944,6 +9972,20 @@ type ImportAdminConfigSnapshotParams struct {
 type GetAdminDashboardSnapshotParams struct {
 	Start *time.Time `form:"start,omitempty" json:"start,omitempty"`
 	End   *time.Time `form:"end,omitempty" json:"end,omitempty"`
+}
+
+// ListAdminErrorLogsParams defines parameters for ListAdminErrorLogs.
+type ListAdminErrorLogsParams struct {
+	Page           *Page      `form:"page,omitempty" json:"page,omitempty"`
+	PageSize       *PageSize  `form:"page_size,omitempty" json:"page_size,omitempty"`
+	UserId         *Id        `form:"user_id,omitempty" json:"user_id,omitempty"`
+	ApiKeyId       *Id        `form:"api_key_id,omitempty" json:"api_key_id,omitempty"`
+	AccountId      *Id        `form:"account_id,omitempty" json:"account_id,omitempty"`
+	Model          *string    `form:"model,omitempty" json:"model,omitempty"`
+	ErrorClass     *string    `form:"error_class,omitempty" json:"error_class,omitempty"`
+	SourceEndpoint *string    `form:"source_endpoint,omitempty" json:"source_endpoint,omitempty"`
+	Start          *time.Time `form:"start,omitempty" json:"start,omitempty"`
+	End            *time.Time `form:"end,omitempty" json:"end,omitempty"`
 }
 
 // ListAdminModelsParams defines parameters for ListAdminModels.
@@ -17461,6 +17503,12 @@ type ServerInterface interface {
 	// Reset a tripped circuit breaker to closed state.
 	// (POST /api/v1/admin/diagnostics/circuit-breakers/{accountId}/reset)
 	ResetAdminCircuitBreaker(w http.ResponseWriter, r *http.Request, accountId string)
+	// List error logs.
+	// (GET /api/v1/admin/error-logs)
+	ListAdminErrorLogs(w http.ResponseWriter, r *http.Request, params ListAdminErrorLogsParams)
+	// Get an error log.
+	// (GET /api/v1/admin/error-logs/{id})
+	GetAdminErrorLog(w http.ResponseWriter, r *http.Request, id Id)
 	// List error-passthrough rules.
 	// (GET /api/v1/admin/error-passthrough-rules)
 	ListAdminErrorPassthroughRules(w http.ResponseWriter, r *http.Request)
@@ -21864,6 +21912,194 @@ func (siw *ServerInterfaceWrapper) ResetAdminCircuitBreaker(w http.ResponseWrite
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ResetAdminCircuitBreaker(w, r, accountId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminErrorLogs operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminErrorLogs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminErrorLogsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "api_key_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "api_key_id", r.URL.Query(), &params.ApiKeyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "api_key_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "api_key_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "account_id", r.URL.Query(), &params.AccountId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "model" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "model", r.URL.Query(), &params.Model, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "model"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error_class" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_class", r.URL.Query(), &params.ErrorClass, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_class"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_class", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "source_endpoint" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "source_endpoint", r.URL.Query(), &params.SourceEndpoint, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "source_endpoint"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source_endpoint", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminErrorLogs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminErrorLog operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminErrorLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminErrorLog(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -30804,6 +31040,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/diagnostics/cache/clear", wrapper.ClearAdminCache)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/diagnostics/circuit-breakers", wrapper.GetAdminCircuitBreakers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/diagnostics/circuit-breakers/{accountId}/reset", wrapper.ResetAdminCircuitBreaker)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/error-logs", wrapper.ListAdminErrorLogs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/error-logs/{id}", wrapper.GetAdminErrorLog)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules", wrapper.ListAdminErrorPassthroughRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules", wrapper.CreateAdminErrorPassthroughRule)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules/{id}", wrapper.DeleteAdminErrorPassthroughRule)

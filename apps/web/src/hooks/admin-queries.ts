@@ -20,5 +20,6 @@ export * from "./admin-queries/subscriptions";
 export * from "./admin-queries/payments";
 export * from "./admin-queries/affiliate";
 export * from "./admin-queries/ops";
+export * from "./admin-queries/error-logs";
 export * from "./admin-queries/system";
 export * from "./admin-queries/settings";
