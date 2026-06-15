@@ -144,12 +144,11 @@ func TestAdminUsageChartsEndpoints(t *testing.T) {
 	if errRec.Code != http.StatusOK {
 		t.Fatalf("error-distribution: expected 200, got %d body=%s", errRec.Code, errRec.Body.String())
 	}
+	// data is a bare UsageErrorBucket array per the OpenAPI contract (this array
+	// assertion is the guard against the handler drifting back to an object).
 	var errDist struct {
-		Data struct {
-			TotalErrors int                           `json:"total_errors"`
-			Buckets     []apiopenapi.UsageErrorBucket `json:"buckets"`
-		} `json:"data"`
-		RequestID string `json:"request_id"`
+		Data      []apiopenapi.UsageErrorBucket `json:"data"`
+		RequestID string                        `json:"request_id"`
 	}
 	if err := json.NewDecoder(errRec.Body).Decode(&errDist); err != nil {
 		t.Fatalf("decode error-distribution: %v", err)
@@ -157,13 +156,10 @@ func TestAdminUsageChartsEndpoints(t *testing.T) {
 	if errDist.RequestID == "" {
 		t.Fatalf("error-distribution: expected a request_id")
 	}
-	if errDist.Data.TotalErrors != 1 {
-		t.Fatalf("error-distribution: expected 1 total error, got %d", errDist.Data.TotalErrors)
+	if len(errDist.Data) != 1 {
+		t.Fatalf("error-distribution: expected 1 bucket, got %d (%+v)", len(errDist.Data), errDist.Data)
 	}
-	if len(errDist.Data.Buckets) != 1 {
-		t.Fatalf("error-distribution: expected 1 bucket, got %d (%+v)", len(errDist.Data.Buckets), errDist.Data.Buckets)
-	}
-	bucket := errDist.Data.Buckets[0]
+	bucket := errDist.Data[0]
 	if bucket.Count != 1 {
 		t.Fatalf("error-distribution: expected bucket count 1, got %d", bucket.Count)
 	}

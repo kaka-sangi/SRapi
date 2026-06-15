@@ -245,12 +245,9 @@ func (s *Server) handleGetAdminAccountUsageDaily(w http.ResponseWriter, r *http.
 		points = append(points, point)
 	}
 
+	// data is a bare AccountUsageDailyPoint array per the OpenAPI contract.
 	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"account_id": apiopenapi.Id(strconv.Itoa(accountID)),
-			"days":       days,
-			"points":     points,
-		},
+		"data":       points,
 		"request_id": requestID,
 	})
 }

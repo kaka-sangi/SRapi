@@ -274,11 +274,10 @@ func (s *Server) handleGetAdminUsageErrorDistribution(w http.ResponseWriter, r *
 		return buckets[i].ErrorClass < buckets[j].ErrorClass
 	})
 
+	// data is a bare UsageErrorBucket array per the OpenAPI contract (each bucket
+	// already carries its percentage; total is derivable by summing counts).
 	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"total_errors": totalErrors,
-			"buckets":      buckets,
-		},
+		"data":       buckets,
 		"request_id": requestID,
 	})
 }

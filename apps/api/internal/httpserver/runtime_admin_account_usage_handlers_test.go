@@ -101,25 +101,21 @@ func TestAdminAccountUsageStatsEndpoints(t *testing.T) {
 	if dailyRec.Code != http.StatusOK {
 		t.Fatalf("usage-daily: expected 200, got %d body=%s", dailyRec.Code, dailyRec.Body.String())
 	}
+	// data is a bare AccountUsageDailyPoint array per the OpenAPI contract
+	// (asserting the array shape here is the guard that the handler can't drift
+	// back to an object wrapper, which the frontend cannot iterate).
 	var daily struct {
-		Data struct {
-			AccountID string                              `json:"account_id"`
-			Days      int                                 `json:"days"`
-			Points    []apiopenapi.AccountUsageDailyPoint `json:"points"`
-		} `json:"data"`
-		RequestID string `json:"request_id"`
+		Data      []apiopenapi.AccountUsageDailyPoint `json:"data"`
+		RequestID string                              `json:"request_id"`
 	}
 	if err := json.NewDecoder(dailyRec.Body).Decode(&daily); err != nil {
 		t.Fatalf("decode usage-daily: %v", err)
 	}
-	if daily.Data.Days != 30 {
-		t.Fatalf("usage-daily: expected default 30 days, got %d", daily.Data.Days)
-	}
-	if len(daily.Data.Points) != 30 {
-		t.Fatalf("usage-daily: expected 30 dense points, got %d", len(daily.Data.Points))
+	if len(daily.Data) != 30 {
+		t.Fatalf("usage-daily: expected 30 dense points (default window), got %d", len(daily.Data))
 	}
 	totalRequests := 0
-	for _, point := range daily.Data.Points {
+	for _, point := range daily.Data {
 		totalRequests += point.Requests
 		if point.Cost == "" {
 			t.Fatalf("usage-daily: point %q missing cost", point.Date)
@@ -128,7 +124,7 @@ func TestAdminAccountUsageStatsEndpoints(t *testing.T) {
 	if totalRequests != 1 {
 		t.Fatalf("usage-daily: expected exactly 1 request across the series, got %d", totalRequests)
 	}
-	last := daily.Data.Points[len(daily.Data.Points)-1]
+	last := daily.Data[len(daily.Data)-1]
 	if last.Requests != 1 {
 		t.Fatalf("usage-daily: expected today's (last) bucket to hold the 1 request, got %d", last.Requests)
 	}
