@@ -2,6 +2,8 @@ package service
 
 import (
 	"bytes"
+	"compress/flate"
+	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -16,6 +18,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/andybalholm/brotli"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	"nhooyr.io/websocket"
@@ -1198,6 +1202,154 @@ func TestRuntimeRefreshClassifiesInvalidGrantWithoutOverwritingCredential(t *tes
 	if metrics.OAuthRefreshTotal["session_invalid"] != 1 {
 		t.Fatalf("unexpected refresh metrics: %+v", metrics)
 	}
+}
+
+func TestDecompressResponseBody(t *testing.T) {
+	const plaintext = "hello, decompressed world"
+
+	gzipEncode := func(t *testing.T, data string) []byte {
+		t.Helper()
+		var buf bytes.Buffer
+		w := gzip.NewWriter(&buf)
+		if _, err := w.Write([]byte(data)); err != nil {
+			t.Fatalf("gzip write: %v", err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("gzip close: %v", err)
+		}
+		return buf.Bytes()
+	}
+	brotliEncode := func(t *testing.T, data string) []byte {
+		t.Helper()
+		var buf bytes.Buffer
+		w := brotli.NewWriter(&buf)
+		if _, err := w.Write([]byte(data)); err != nil {
+			t.Fatalf("brotli write: %v", err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("brotli close: %v", err)
+		}
+		return buf.Bytes()
+	}
+	deflateEncode := func(t *testing.T, data string) []byte {
+		t.Helper()
+		var buf bytes.Buffer
+		w, err := flate.NewWriter(&buf, flate.DefaultCompression)
+		if err != nil {
+			t.Fatalf("flate writer: %v", err)
+		}
+		if _, err := w.Write([]byte(data)); err != nil {
+			t.Fatalf("flate write: %v", err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("flate close: %v", err)
+		}
+		return buf.Bytes()
+	}
+
+	newResp := func(encoding string, raw []byte) *http.Response {
+		header := http.Header{}
+		if encoding != "" {
+			header.Set("Content-Encoding", encoding)
+		}
+		header.Set("Content-Length", strconv.Itoa(len(raw)))
+		return &http.Response{
+			StatusCode:    http.StatusOK,
+			Header:        header,
+			Body:          io.NopCloser(bytes.NewReader(raw)),
+			ContentLength: int64(len(raw)),
+		}
+	}
+
+	t.Run("decodes gzip and strips headers", func(t *testing.T) {
+		resp := newResp("gzip", gzipEncode(t, plaintext))
+		decompressResponseBody(resp)
+
+		got, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := resp.Body.Close(); err != nil {
+			t.Fatalf("close body: %v", err)
+		}
+		if string(got) != plaintext {
+			t.Fatalf("gzip body = %q, want %q", got, plaintext)
+		}
+		if resp.Header.Get("Content-Encoding") != "" {
+			t.Fatalf("Content-Encoding not stripped: %q", resp.Header.Get("Content-Encoding"))
+		}
+		if resp.Header.Get("Content-Length") != "" {
+			t.Fatalf("Content-Length not stripped: %q", resp.Header.Get("Content-Length"))
+		}
+		if resp.ContentLength != -1 {
+			t.Fatalf("ContentLength = %d, want -1", resp.ContentLength)
+		}
+	})
+
+	t.Run("decodes brotli", func(t *testing.T) {
+		resp := newResp("br", brotliEncode(t, plaintext))
+		decompressResponseBody(resp)
+		got, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if string(got) != plaintext {
+			t.Fatalf("brotli body = %q, want %q", got, plaintext)
+		}
+	})
+
+	t.Run("decodes deflate case-insensitively", func(t *testing.T) {
+		resp := newResp("Deflate", deflateEncode(t, plaintext))
+		decompressResponseBody(resp)
+		got, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if string(got) != plaintext {
+			t.Fatalf("deflate body = %q, want %q", got, plaintext)
+		}
+	})
+
+	t.Run("passes through when no Content-Encoding", func(t *testing.T) {
+		resp := newResp("", []byte(plaintext))
+		decompressResponseBody(resp)
+		got, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if string(got) != plaintext {
+			t.Fatalf("identity body = %q, want %q", got, plaintext)
+		}
+		if resp.ContentLength != int64(len(plaintext)) {
+			t.Fatalf("ContentLength mutated: got %d", resp.ContentLength)
+		}
+	})
+
+	t.Run("leaves unknown encoding untouched", func(t *testing.T) {
+		raw := []byte("opaque-bytes")
+		resp := newResp("zstd", raw)
+		decompressResponseBody(resp)
+		got, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if !bytes.Equal(got, raw) {
+			t.Fatalf("unknown-encoding body = %q, want %q", got, raw)
+		}
+		if resp.Header.Get("Content-Encoding") != "zstd" {
+			t.Fatalf("Content-Encoding mutated for unknown encoding: %q", resp.Header.Get("Content-Encoding"))
+		}
+	})
+
+	t.Run("nil and empty body are safe", func(t *testing.T) {
+		decompressResponseBody(nil)
+		resp := &http.Response{Header: http.Header{}}
+		resp.Header.Set("Content-Encoding", "gzip")
+		decompressResponseBody(resp) // resp.Body is nil
+		if resp.Body != nil {
+			t.Fatalf("nil body should stay nil")
+		}
+	})
 }
 
 func ptrString(value string) *string {

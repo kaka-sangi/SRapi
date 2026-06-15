@@ -2,6 +2,8 @@ package service
 
 import (
 	"bytes"
+	"compress/flate"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/andybalholm/brotli"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	"nhooyr.io/websocket"
@@ -145,6 +149,9 @@ func (s *Service) Do(ctx context.Context, req contract.Request) (contract.Respon
 		s.recordError(runtimeErr.Class)
 		return contract.Response{}, runtimeErr
 	}
+	// The transport sets DisableCompression=true, so the upstream returns
+	// compressed bodies raw; decode them here before buffering for callers.
+	decompressResponseBody(resp)
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxReverseProxyResponseBytes))
@@ -221,6 +228,10 @@ func (s *Service) DoStream(ctx context.Context, req contract.Request) (contract.
 		s.recordError(runtimeErr.Class)
 		return contract.StreamResponse{}, runtimeErr
 	}
+	// The transport sets DisableCompression=true, so the upstream returns
+	// compressed bodies raw; wrap resp.Body in a decoder before it is streamed
+	// to the caller (or consumed for a non-2xx error classification).
+	decompressResponseBody(resp)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxReverseProxyResponseBytes))
 		_ = resp.Body.Close()
@@ -1154,6 +1165,61 @@ func cloneHeaders(headers http.Header) http.Header {
 		}
 	}
 	return out
+}
+
+// decompressResponseBody decodes the response body according to its
+// Content-Encoding. The egress transport sets DisableCompression=true, so Go's
+// http.Transport does not transparently decode gzip/br/deflate; this restores
+// plaintext for the caller. On success it strips Content-Encoding and the now
+// inaccurate Content-Length header. Ported from sub2api http_upstream.go.
+func decompressResponseBody(resp *http.Response) {
+	if resp == nil || resp.Body == nil {
+		return
+	}
+	ce := strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Encoding")))
+	if ce == "" {
+		return
+	}
+
+	var reader io.Reader
+	switch ce {
+	case "gzip":
+		gr, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return // decompression failed; leave the body untouched
+		}
+		reader = gr
+	case "br":
+		reader = brotli.NewReader(resp.Body)
+	case "deflate":
+		reader = flate.NewReader(resp.Body)
+	default:
+		return
+	}
+
+	originalBody := resp.Body
+	resp.Body = &decompressedBody{reader: reader, closer: originalBody}
+	resp.Header.Del("Content-Encoding")
+	resp.Header.Del("Content-Length") // length is no longer accurate after decode
+	resp.ContentLength = -1
+}
+
+// decompressedBody pairs a decompression reader with the original body's Close.
+type decompressedBody struct {
+	reader io.Reader
+	closer io.Closer
+}
+
+func (d *decompressedBody) Read(p []byte) (int, error) {
+	return d.reader.Read(p)
+}
+
+func (d *decompressedBody) Close() error {
+	// If the reader is itself a Closer (e.g. gzip.Reader), close it first.
+	if rc, ok := d.reader.(io.Closer); ok {
+		_ = rc.Close()
+	}
+	return d.closer.Close()
 }
 
 func cloneCredential(values map[string]any) map[string]any {

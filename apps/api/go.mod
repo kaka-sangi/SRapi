@@ -5,6 +5,7 @@ go 1.26.3
 require (
 	entgo.io/ent v0.14.6
 	github.com/alicebob/miniredis/v2 v2.38.0
+	github.com/andybalholm/brotli v1.1.0
 	github.com/aws/aws-sdk-go-v2 v1.41.3
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.10
 	github.com/coreos/go-oidc/v3 v3.18.0
@@ -34,7 +35,6 @@ require (
 require (
 	ariga.io/atlas v1.2.0 // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
-	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/aws/smithy-go v1.25.1 // indirect

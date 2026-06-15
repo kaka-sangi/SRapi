@@ -28,6 +28,11 @@ type egressProfile struct {
 	UserAgent         string
 	ExtraHeaders      http.Header
 	ForbiddenHeaders  map[string]struct{}
+	// ALPNProtocols is the ordered ALPN list advertised in the uTLS ClientHello and
+	// the transport's NextProtos. Empty falls back to ["http/1.1"]. Mirrors
+	// sub2api Profile.ALPNProtocols. Defaulted from HTTPVersionPolicy in
+	// resolveEgressProfile.
+	ALPNProtocols []string
 }
 
 // namedProfileExpander, when installed, expands a named TLS fingerprint profile
@@ -69,6 +74,7 @@ func resolveEgressProfile(account contract.AccountRuntime) (egressProfile, error
 	if err := validateHTTPVersionPolicy(profile); err != nil {
 		return egressProfile{}, err
 	}
+	profile.ALPNProtocols = defaultALPNForPolicy(profile.HTTPVersionPolicy)
 	headers, err := resolveEgressStaticHeaders(nested, metadata)
 	if err != nil {
 		return egressProfile{}, err
@@ -113,7 +119,10 @@ func validateEgressTargetURL(rawURL string, profile egressProfile) error {
 }
 
 func configureTransportForEgress(transport *http.Transport, account contract.AccountRuntime, profile egressProfile, blockPrivateEgress bool) error {
-	if profile.requiresHTTP1() {
+	// Only forbid HTTP/2 at the standard transport level when the policy bans it
+	// outright (require_h1). prefer_* policies leave HTTP/2 available and express
+	// their preference through the advertised ALPN ordering instead.
+	if profile.forbidsHTTP2() {
 		disableHTTP2(transport)
 	}
 	if profile.TLSTemplate == "" {
@@ -130,19 +139,22 @@ func configureTransportForEgress(transport *http.Transport, account contract.Acc
 	if proxyURL != nil && !supportedUTLSProxyScheme(proxyURL.Scheme) {
 		return unsupportedEgressProfile("TLS egress profile supports direct, HTTP CONNECT, or SOCKS5 proxy egress")
 	}
+	// The uTLS dial path returns an HTTP/1.1 connection, so HTTP/2 must always be
+	// disabled on the wrapping transport regardless of the advertised ALPN.
 	disableHTTP2(transport)
 	transport.Proxy = nil
+	alpnProtocols := profile.alpnProtocols()
 	tlsConfig := transport.TLSClientConfig
 	transport.DialTLSContext = func(ctx context.Context, network string, addr string) (net.Conn, error) {
 		if proxyURL != nil {
 			switch strings.ToLower(proxyURL.Scheme) {
 			case "http":
-				return dialUTLSHTTP1ViaHTTPProxy(ctx, network, addr, proxyURL, clientHelloID, tlsConfig)
+				return dialUTLSHTTP1ViaHTTPProxy(ctx, network, addr, proxyURL, clientHelloID, alpnProtocols, tlsConfig)
 			case "socks5", "socks5h":
-				return dialUTLSHTTP1ViaSOCKS5(ctx, network, addr, proxyURL, clientHelloID, tlsConfig)
+				return dialUTLSHTTP1ViaSOCKS5(ctx, network, addr, proxyURL, clientHelloID, alpnProtocols, tlsConfig)
 			}
 		}
-		return dialUTLSHTTP1(ctx, network, addr, clientHelloID, tlsConfig, blockPrivateEgress)
+		return dialUTLSHTTP1(ctx, network, addr, clientHelloID, alpnProtocols, tlsConfig, blockPrivateEgress)
 	}
 	return nil
 }
@@ -161,16 +173,16 @@ func disableHTTP2(transport *http.Transport) {
 	transport.TLSNextProto = map[string]func(string, *stdtls.Conn) http.RoundTripper{}
 }
 
-func dialUTLSHTTP1(ctx context.Context, network string, addr string, clientHelloID utls.ClientHelloID, tlsConfig *stdtls.Config, blockPrivateEgress bool) (net.Conn, error) {
+func dialUTLSHTTP1(ctx context.Context, network string, addr string, clientHelloID utls.ClientHelloID, alpnProtocols []string, tlsConfig *stdtls.Config, blockPrivateEgress bool) (net.Conn, error) {
 	dialer := egressDialer(blockPrivateEgress)
 	rawConn, err := dialer.DialContext(ctx, network, addr)
 	if err != nil {
 		return nil, err
 	}
-	return performUTLSHTTP1Handshake(ctx, rawConn, addr, clientHelloID, tlsConfig)
+	return performUTLSHTTP1Handshake(ctx, rawConn, addr, clientHelloID, alpnProtocols, tlsConfig)
 }
 
-func dialUTLSHTTP1ViaHTTPProxy(ctx context.Context, network string, addr string, proxyURL *url.URL, clientHelloID utls.ClientHelloID, tlsConfig *stdtls.Config) (net.Conn, error) {
+func dialUTLSHTTP1ViaHTTPProxy(ctx context.Context, network string, addr string, proxyURL *url.URL, clientHelloID utls.ClientHelloID, alpnProtocols []string, tlsConfig *stdtls.Config) (net.Conn, error) {
 	proxyAddr := proxyAddress(proxyURL)
 	dialer := &net.Dialer{Timeout: 30 * time.Second}
 	rawConn, err := dialer.DialContext(ctx, network, proxyAddr)
@@ -181,10 +193,10 @@ func dialUTLSHTTP1ViaHTTPProxy(ctx context.Context, network string, addr string,
 		_ = rawConn.Close()
 		return nil, err
 	}
-	return performUTLSHTTP1Handshake(ctx, rawConn, addr, clientHelloID, tlsConfig)
+	return performUTLSHTTP1Handshake(ctx, rawConn, addr, clientHelloID, alpnProtocols, tlsConfig)
 }
 
-func dialUTLSHTTP1ViaSOCKS5(ctx context.Context, network string, addr string, proxyURL *url.URL, clientHelloID utls.ClientHelloID, tlsConfig *stdtls.Config) (net.Conn, error) {
+func dialUTLSHTTP1ViaSOCKS5(ctx context.Context, network string, addr string, proxyURL *url.URL, clientHelloID utls.ClientHelloID, alpnProtocols []string, tlsConfig *stdtls.Config) (net.Conn, error) {
 	proxyAddr := proxyAddress(proxyURL)
 	auth := socks5Auth(proxyURL)
 	dialer, err := xproxy.SOCKS5(network, proxyAddr, auth, xproxy.Direct)
@@ -195,7 +207,7 @@ func dialUTLSHTTP1ViaSOCKS5(ctx context.Context, network string, addr string, pr
 	if err != nil {
 		return nil, err
 	}
-	return performUTLSHTTP1Handshake(ctx, rawConn, addr, clientHelloID, tlsConfig)
+	return performUTLSHTTP1Handshake(ctx, rawConn, addr, clientHelloID, alpnProtocols, tlsConfig)
 }
 
 func socks5Auth(proxyURL *url.URL) *xproxy.Auth {
@@ -227,17 +239,17 @@ func dialWithContext(ctx context.Context, dialer xproxy.Dialer, network string, 
 	}
 }
 
-func performUTLSHTTP1Handshake(ctx context.Context, rawConn net.Conn, addr string, clientHelloID utls.ClientHelloID, tlsConfig *stdtls.Config) (net.Conn, error) {
+func performUTLSHTTP1Handshake(ctx context.Context, rawConn net.Conn, addr string, clientHelloID utls.ClientHelloID, alpnProtocols []string, tlsConfig *stdtls.Config) (net.Conn, error) {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		host = addr
 	}
-	spec, err := clientHelloSpecForHTTP1(clientHelloID)
+	spec, err := clientHelloSpecForHTTP1(clientHelloID, alpnProtocols)
 	if err != nil {
 		_ = rawConn.Close()
 		return nil, err
 	}
-	config := utlsConfigForHTTP1(host, tlsConfig)
+	config := utlsConfigForHTTP1(host, alpnProtocols, tlsConfig)
 	tlsConn := utls.UClient(rawConn, config, utls.HelloCustom)
 	if err := tlsConn.ApplyPreset(spec); err != nil {
 		_ = rawConn.Close()
@@ -250,8 +262,11 @@ func performUTLSHTTP1Handshake(ctx context.Context, rawConn net.Conn, addr strin
 	return tlsConn, nil
 }
 
-func utlsConfigForHTTP1(serverName string, tlsConfig *stdtls.Config) *utls.Config {
-	config := &utls.Config{ServerName: serverName, NextProtos: []string{"http/1.1"}}
+func utlsConfigForHTTP1(serverName string, alpnProtocols []string, tlsConfig *stdtls.Config) *utls.Config {
+	if len(alpnProtocols) == 0 {
+		alpnProtocols = []string{"http/1.1"}
+	}
+	config := &utls.Config{ServerName: serverName, NextProtos: append([]string(nil), alpnProtocols...)}
 	if tlsConfig == nil {
 		return config
 	}
@@ -335,14 +350,17 @@ func writeHTTPProxyConnect(conn net.Conn, proxyURL *url.URL, targetAddr string) 
 	return nil
 }
 
-func clientHelloSpecForHTTP1(clientHelloID utls.ClientHelloID) (*utls.ClientHelloSpec, error) {
+func clientHelloSpecForHTTP1(clientHelloID utls.ClientHelloID, alpnProtocols []string) (*utls.ClientHelloSpec, error) {
 	spec, err := utls.UTLSIdToSpec(clientHelloID)
 	if err != nil {
 		return nil, err
 	}
+	if len(alpnProtocols) == 0 {
+		alpnProtocols = []string{"http/1.1"}
+	}
 	for _, extension := range spec.Extensions {
 		if alpn, ok := extension.(*utls.ALPNExtension); ok {
-			alpn.AlpnProtocols = []string{"http/1.1"}
+			alpn.AlpnProtocols = append([]string(nil), alpnProtocols...)
 			break
 		}
 	}
@@ -599,6 +617,41 @@ func (profile egressProfile) requiresHTTP1() bool {
 		return true
 	default:
 		return profile.TLSTemplate != ""
+	}
+}
+
+// forbidsHTTP2 reports whether the HTTP version policy disallows advertising or
+// negotiating HTTP/2 at all. Only require_h1 forbids it outright; prefer_* still
+// allow HTTP/2 to be offered (prefer_h2) or simply ordered after HTTP/1.1.
+func (profile egressProfile) forbidsHTTP2() bool {
+	switch profile.HTTPVersionPolicy {
+	case "require_h1", "require_http1":
+		return true
+	default:
+		return false
+	}
+}
+
+// alpnProtocols returns the effective ALPN list, falling back to ["http/1.1"]
+// when unset. Mirrors sub2api's empty-means-default behavior.
+func (profile egressProfile) alpnProtocols() []string {
+	if len(profile.ALPNProtocols) > 0 {
+		return profile.ALPNProtocols
+	}
+	return []string{"http/1.1"}
+}
+
+// defaultALPNForPolicy derives the ALPN list advertised for a given HTTP version
+// policy. prefer_h2/auto offer HTTP/2 ahead of HTTP/1.1; h1 policies offer only
+// HTTP/1.1. Ports sub2api's "prefer_h2 -> [h2, http/1.1]" default. require_h2 is
+// rejected earlier by validateHTTPVersionPolicy, so it never reaches here.
+func defaultALPNForPolicy(policy string) []string {
+	switch policy {
+	case "prefer_h1", "prefer_http1", "require_h1", "require_http1":
+		return []string{"http/1.1"}
+	default:
+		// "", auto, prefer_h2, prefer_http2
+		return []string{"h2", "http/1.1"}
 	}
 }
 
