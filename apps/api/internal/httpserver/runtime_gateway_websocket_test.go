@@ -628,12 +628,14 @@ func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 	if err := json.Unmarshal(obs.InitialFrame, &initialFrame); err != nil {
 		t.Fatalf("decode codex initial frame: %v", err)
 	}
+	if instr, _ := initialFrame["instructions"].(string); !strings.HasPrefix(instr, "You are Codex, based on GPT-5") {
+		t.Fatalf("expected the real Codex base instructions in initial frame, got %+v", initialFrame)
+	}
 	if initialFrame["type"] != "response.create" ||
 		initialFrame["model"] != "codex-upstream" ||
 		initialFrame["stream"] != true ||
 		initialFrame["store"] != false ||
-		initialFrame["service_tier"] != "priority" ||
-		initialFrame["instructions"] != "You are a concise assistant." {
+		initialFrame["service_tier"] != "priority" {
 		t.Fatalf("unexpected codex initial frame: %+v", initialFrame)
 	}
 	if _, ok := initialFrame["background"]; ok {
