@@ -7962,7 +7962,7 @@ func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
 	if runtime.request.Headers.Get("Accept") != "text/event-stream" ||
 		runtime.request.Headers.Get("OpenAI-Beta") != "responses=experimental" ||
 		runtime.request.Headers.Get("Originator") != "codex_cli_rs" ||
-		runtime.request.Headers.Get("User-Agent") != "codex_cli_rs/0.125.0" ||
+		runtime.request.Headers.Get("User-Agent") != "codex_cli_rs/0.125.0 (Ubuntu 22.4.0; x86_64) xterm-256color" ||
 		runtime.request.Headers.Get("Version") != "0.125.0" ||
 		runtime.request.Headers.Get("Session_id") != "srapi-codex-account-9" ||
 		runtime.request.Headers.Get("Authorization") != "" {
@@ -8046,7 +8046,7 @@ func TestReverseProxyCodexCLIAdapterBridgesImageGenerationToResponses(t *testing
 	if runtime.request.Headers.Get("Accept") != "text/event-stream" ||
 		runtime.request.Headers.Get("OpenAI-Beta") != "responses=experimental" ||
 		runtime.request.Headers.Get("Originator") != "codex_cli_rs" ||
-		runtime.request.Headers.Get("User-Agent") != "codex_cli_rs/0.125.0" ||
+		runtime.request.Headers.Get("User-Agent") != "codex_cli_rs/0.125.0 (Ubuntu 22.4.0; x86_64) xterm-256color" ||
 		runtime.request.Headers.Get("Version") != "0.125.0" ||
 		runtime.request.Headers.Get("Session_id") != "srapi-codex-account-9" ||
 		runtime.request.Headers.Get("Authorization") != "" {
@@ -8694,7 +8694,7 @@ func TestReverseProxyCodexCLIAdapterPreservesRawResponsesPayload(t *testing.T) {
 		t.Fatalf("unexpected raw codex response: %+v", resp)
 	}
 	if runtime.request.Headers.Get("OpenAI-Beta") != "responses=experimental" ||
-		runtime.request.Headers.Get("User-Agent") != "codex_cli_rs/0.125.0" ||
+		runtime.request.Headers.Get("User-Agent") != "codex_cli_rs/0.125.0 (Ubuntu 22.4.0; x86_64) xterm-256color" ||
 		runtime.request.Headers.Get("Session_id") != "cache-123" ||
 		runtime.request.Headers.Get("Conversation_id") != "cache-123" ||
 		runtime.request.Headers.Get("Thread-Id") != "cache-123" ||

@@ -16,9 +16,14 @@ import (
 )
 
 const (
-	codexOriginator                         = "codex_cli_rs"
-	codexDefaultVersion                     = "0.125.0"
-	codexDefaultUserAgent                   = codexOriginator + "/" + codexDefaultVersion
+	codexOriginator     = "codex_cli_rs"
+	codexDefaultVersion = "0.125.0"
+	// Match the real Codex CLI User-Agent structure: {originator}/{version}
+	// ({OS} {OS_version}; {arch}) {terminal}. The bare "codex_cli_rs/0.125.0"
+	// (no OS/arch/terminal suffix) is fingerprinted upstream as a non-official
+	// client, which gets newer models (e.g. gpt-5.5) rejected as
+	// model_unavailable. Value mirrors the sub2api reference verbatim.
+	codexDefaultUserAgent                   = codexOriginator + "/" + codexDefaultVersion + " (Ubuntu 22.4.0; x86_64) xterm-256color"
 	codexImageGenerationBridgeMarker        = "<srapi-codex-image-generation>"
 	codexImageGenerationBridgeText          = codexImageGenerationBridgeMarker + "\nWhen the user asks for raster image generation or editing, use the OpenAI Responses native `image_generation` tool attached to this request. The local Codex client may not expose an `image_gen` namespace, but image generation is still available through this tool.\n</srapi-codex-image-generation>"
 	codexSparkImageUnsupportedMarker        = "<srapi-codex-spark-image-unsupported>"

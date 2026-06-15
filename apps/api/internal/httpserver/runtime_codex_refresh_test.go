@@ -237,7 +237,7 @@ func TestGatewayCodexConvertsTextEndpointsToResponsesUpstream(t *testing.T) {
 			call.Authorization != "Bearer codex-convert-token" ||
 			call.Originator != "codex_cli_rs" ||
 			call.Beta != "responses=experimental" ||
-			call.UserAgent != "codex_cli_rs/0.125.0" ||
+			call.UserAgent != "codex_cli_rs/0.125.0 (Ubuntu 22.4.0; x86_64) xterm-256color" ||
 			call.Version != "0.125.0" ||
 			!strings.HasPrefix(call.SessionID, "srapi-codex-account-") ||
 			strings.TrimSpace(call.RequestID) == "" {
