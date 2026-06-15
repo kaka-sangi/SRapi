@@ -353,7 +353,7 @@ func activeProviderMappingForModel(ctx context.Context, models interface {
 		if accountExcludesModel(account.Metadata, canonicalName, effectiveMapping.UpstreamModelName) {
 			continue
 		}
-		if !accountSupportsUpstreamModel(account.Metadata, effectiveMapping.UpstreamModelName) {
+		if !accountRoutableForModel(provider, account.Metadata, effectiveMapping.UpstreamModelName) {
 			continue
 		}
 		return effectiveMapping, nil

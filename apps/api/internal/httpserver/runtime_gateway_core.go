@@ -668,6 +668,30 @@ func accountSupportsUpstreamModel(metadata map[string]any, upstreamModelName str
 	return false
 }
 
+// isCodexCLIReverseProxyProvider reports whether the provider proxies to the
+// ChatGPT/Codex backend through the Codex CLI reverse-proxy adapter.
+func isCodexCLIReverseProxyProvider(provider providercontract.Provider) bool {
+	return strings.EqualFold(strings.TrimSpace(provider.AdapterType), "reverse-proxy-codex-cli")
+}
+
+// accountRoutableForModel reports whether the account may be selected to serve
+// the given upstream model.
+//
+// For most providers this enforces the discovery-derived supported_models
+// allowlist. Codex CLI accounts deliberately skip it: the ChatGPT/Codex
+// model-discovery list under-reports what the /responses endpoint actually
+// serves — a free account can call gpt-5.5 even though discovery never
+// advertises it — so enforcing the allowlist here pre-emptively rejects
+// requests the upstream would accept. Mirror the sub2api reference: forward and
+// let the upstream decide. Explicit admin exclusions (accountExcludesModel) are
+// applied separately and still hold.
+func accountRoutableForModel(provider providercontract.Provider, metadata map[string]any, upstreamModelName string) bool {
+	if isCodexCLIReverseProxyProvider(provider) {
+		return true
+	}
+	return accountSupportsUpstreamModel(metadata, upstreamModelName)
+}
+
 func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forcedProviderKey string, apiKey apikeycontract.APIKey, sourceEndpoint string) ([]schedulercontract.Candidate, error) {
 	model, err := rt.models.FindByID(ctx, modelID)
 	if err != nil {
@@ -721,7 +745,7 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 			if accountExcludesModel(account.Metadata, model.CanonicalName, effectiveMapping.UpstreamModelName) {
 				continue
 			}
-			if !accountSupportsUpstreamModel(account.Metadata, effectiveMapping.UpstreamModelName) {
+			if !accountRoutableForModel(provider, account.Metadata, effectiveMapping.UpstreamModelName) {
 				continue
 			}
 			if len(apiKey.GroupIDs) > 0 && !intersectsInt(apiKey.GroupIDs, groupIDsByAccount[account.ID]) {
@@ -743,7 +767,7 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 }
 
 func providerEffectiveModelMapping(provider providercontract.Provider, mapping modelcontract.ModelProviderMapping) modelcontract.ModelProviderMapping {
-	if strings.EqualFold(strings.TrimSpace(provider.AdapterType), "reverse-proxy-codex-cli") {
+	if isCodexCLIReverseProxyProvider(provider) {
 		mapping.UpstreamModelName = provideradaptercontract.NormalizeCodexUpstreamModelName(mapping.UpstreamModelName)
 	}
 	return mapping

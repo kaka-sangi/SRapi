@@ -9,6 +9,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/config"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 )
 
 // TestAccountModelOverride covers the per-account model_mapping resolver guards:
@@ -103,6 +104,45 @@ func TestAccountSupportsUpstreamModelWildcard(t *testing.T) {
 			got := accountSupportsUpstreamModel(tc.metadata, tc.model)
 			if got != tc.want {
 				t.Fatalf("accountSupportsUpstreamModel = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestAccountRoutableForModelCodexBypassesAllowlist proves the fix for free
+// Codex accounts: a Codex CLI provider forwards regardless of the discovery
+// derived supported_models allowlist (mirroring sub2api — the upstream decides),
+// while every other adapter type keeps enforcing the allowlist.
+func TestAccountRoutableForModelCodexBypassesAllowlist(t *testing.T) {
+	codex := providercontract.Provider{AdapterType: "reverse-proxy-codex-cli"}
+	codexCased := providercontract.Provider{AdapterType: "  Reverse-Proxy-Codex-CLI "}
+	antigravity := providercontract.Provider{AdapterType: "reverse-proxy-antigravity"}
+	plain := providercontract.Provider{AdapterType: "openai-compatible"}
+
+	// supported_models discovered for a free account: gpt-5.5 is NOT advertised.
+	freeAllowlist := map[string]any{"supported_models": []any{"gpt-5.4", "gpt-5.4-mini"}}
+	emptyAllowlist := map[string]any{"supported_models": []any{}}
+
+	cases := []struct {
+		name     string
+		provider providercontract.Provider
+		metadata map[string]any
+		model    string
+		want     bool
+	}{
+		{name: "codex bypasses discovery allowlist for gpt-5.5", provider: codex, metadata: freeAllowlist, model: "gpt-5.5", want: true},
+		{name: "codex bypass is case/space insensitive", provider: codexCased, metadata: freeAllowlist, model: "gpt-5.5", want: true},
+		{name: "codex bypasses even an empty allowlist", provider: codex, metadata: emptyAllowlist, model: "gpt-5.5", want: true},
+		{name: "antigravity still enforces allowlist (miss)", provider: antigravity, metadata: freeAllowlist, model: "gpt-5.5", want: false},
+		{name: "antigravity still enforces allowlist (hit)", provider: antigravity, metadata: freeAllowlist, model: "gpt-5.4", want: true},
+		{name: "plain adapter still enforces allowlist", provider: plain, metadata: freeAllowlist, model: "gpt-5.5", want: false},
+		{name: "non-codex with no allowlist allows all", provider: plain, metadata: nil, model: "gpt-5.5", want: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := accountRoutableForModel(tc.provider, tc.metadata, tc.model)
+			if got != tc.want {
+				t.Fatalf("accountRoutableForModel = %v, want %v", got, tc.want)
 			}
 		})
 	}
