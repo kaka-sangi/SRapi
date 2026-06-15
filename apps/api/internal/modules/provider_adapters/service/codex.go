@@ -19,7 +19,6 @@ const (
 	codexOriginator                         = "codex_cli_rs"
 	codexDefaultVersion                     = "0.125.0"
 	codexDefaultUserAgent                   = codexOriginator + "/" + codexDefaultVersion
-	codexDefaultInstructions                = "You are a concise assistant."
 	codexImageGenerationBridgeMarker        = "<srapi-codex-image-generation>"
 	codexImageGenerationBridgeText          = codexImageGenerationBridgeMarker + "\nWhen the user asks for raster image generation or editing, use the OpenAI Responses native `image_generation` tool attached to this request. The local Codex client may not expose an `image_gen` namespace, but image generation is still available through this tool.\n</srapi-codex-image-generation>"
 	codexSparkImageUnsupportedMarker        = "<srapi-codex-spark-image-unsupported>"

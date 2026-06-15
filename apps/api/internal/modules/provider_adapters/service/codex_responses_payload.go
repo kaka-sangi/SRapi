@@ -300,7 +300,10 @@ func codexEnsureResponsesInstructions(req contract.ConversationRequest, payload 
 		payload["instructions"] = instructions
 		return
 	}
-	payload["instructions"] = codexDefaultInstructions
+	// No caller-supplied prompt: fall back to the real Codex CLI base prompt for
+	// this model. The upstream backend validates `instructions`, so a placeholder
+	// gets rejected — this is what blocked gpt-5.5 and the other gpt-5.x models.
+	payload["instructions"] = codexBaseInstructionsForModel(codexStringValue(payload["model"]))
 }
 
 func codexApplyImageGenerationInstructions(payload map[string]any) {

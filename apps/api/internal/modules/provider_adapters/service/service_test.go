@@ -8581,8 +8581,8 @@ func TestReverseProxyCodexCLIAdapterAddsDefaultInstructionsWhenMissing(t *testin
 	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
 		t.Fatalf("decode codex payload: %v", err)
 	}
-	if payload["instructions"] != "You are a concise assistant." {
-		t.Fatalf("expected default instructions, got %+v", payload)
+	if instr, _ := payload["instructions"].(string); !strings.HasPrefix(instr, "You are Codex, based on GPT-5") {
+		t.Fatalf("expected the real Codex base instructions, got %+v", payload)
 	}
 }
 
@@ -9870,11 +9870,13 @@ func TestReverseProxyCodexCLIPrepareRealtimeBuildsResponsesWebSocketSession(t *t
 	if err := json.Unmarshal(session.InitialFrame, &frame); err != nil {
 		t.Fatalf("decode initial frame: %v", err)
 	}
+	if instr, _ := frame["instructions"].(string); !strings.HasPrefix(instr, "You are Codex, based on GPT-5") {
+		t.Fatalf("expected the real Codex base instructions in initial frame, got %+v", frame)
+	}
 	if frame["type"] != "response.create" ||
 		frame["model"] != "codex-upstream" ||
 		frame["stream"] != true ||
 		frame["store"] != false ||
-		frame["instructions"] != "You are a concise assistant." ||
 		frame["service_tier"] != "priority" {
 		t.Fatalf("unexpected codex websocket initial frame: %+v", frame)
 	}

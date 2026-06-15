@@ -277,3 +277,32 @@ func containsStringAny(values []any, want string) bool {
 	}
 	return false
 }
+
+func TestCodexBaseInstructionsForModel(t *testing.T) {
+	// The embedded Codex CLI base prompts must load — an empty `instructions`
+	// field is rejected by the upstream Codex backend.
+	if codexBaseInstructions == "" || codexInstructionsGPT51 == "" || codexInstructionsGPT52 == "" {
+		t.Fatal("embedded codex base instructions must not be empty")
+	}
+
+	cases := []struct {
+		model string
+		want  string
+	}{
+		{"gpt-5.3-codex", codexBaseInstructions},
+		{"codex-upstream", codexBaseInstructions},
+		{"gpt-5-codex", codexBaseInstructions},
+		{"gpt-5.2-codex", codexBaseInstructions}, // codex match takes precedence
+		{"gpt-5.5", codexInstructionsGPT51},      // the model that was being rejected
+		{"GPT-5.5", codexInstructionsGPT51},      // case-insensitive
+		{"gpt-5", codexInstructionsGPT51},
+		{"gpt-5.1", codexInstructionsGPT51},
+		{"gpt-5.2", codexInstructionsGPT52},
+		{"", codexBaseInstructions},
+	}
+	for _, tc := range cases {
+		if got := codexBaseInstructionsForModel(tc.model); got != tc.want {
+			t.Errorf("codexBaseInstructionsForModel(%q) returned the wrong base prompt", tc.model)
+		}
+	}
+}
