@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -85,6 +86,11 @@ func (w *Worker) Start(parent context.Context) {
 
 	go func() {
 		defer close(done)
+		defer func() {
+			if r := recover(); r != nil {
+				w.logger.Error("worker panicked; goroutine stopped", "worker", "retention", "panic", r, "stack", string(debug.Stack()))
+			}
+		}()
 		w.run(ctx)
 	}()
 }

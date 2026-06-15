@@ -3,8 +3,10 @@ package quotarefresh
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -135,6 +137,11 @@ func (w *Worker) Start(parent context.Context) {
 
 	go func() {
 		defer close(done)
+		defer func() {
+			if r := recover(); r != nil {
+				w.logger.Error("worker panicked; goroutine stopped", "worker", "quota_refresh", "panic", r, "stack", string(debug.Stack()))
+			}
+		}()
 		w.run(ctx)
 	}()
 }
@@ -247,6 +254,15 @@ func (w *Worker) refreshPass(ctx context.Context) (Result, error) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					mu.Lock()
+					result.Failed++
+					firstErr = errors.Join(firstErr, fmt.Errorf("account quota refresh panicked: %v", r))
+					mu.Unlock()
+					w.logger.Error("worker panicked; goroutine stopped", "worker", "quota_refresh", "account_id", account.ID, "panic", r, "stack", string(debug.Stack()))
+				}
+			}()
 			select {
 			case <-ctx.Done():
 				mu.Lock()

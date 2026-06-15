@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -108,6 +109,11 @@ func (w *Worker) Start(parent context.Context) {
 	w.mu.Unlock()
 	go func() {
 		defer close(done)
+		defer func() {
+			if r := recover(); r != nil {
+				w.logger.Error("worker panicked; goroutine stopped", "worker", "backup", "panic", r, "stack", string(debug.Stack()))
+			}
+		}()
 		w.run(ctx)
 	}()
 }

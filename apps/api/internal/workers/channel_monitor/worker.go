@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -146,6 +147,11 @@ func (w *Worker) Start(parent context.Context) {
 	w.mu.Unlock()
 	go func() {
 		defer close(done)
+		defer func() {
+			if r := recover(); r != nil {
+				w.logger.Error("worker panicked; goroutine stopped", "worker", "channel_monitor", "panic", r, "stack", string(debug.Stack()))
+			}
+		}()
 		w.run(ctx)
 	}()
 }

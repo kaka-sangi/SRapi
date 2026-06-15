@@ -3,9 +3,11 @@ package healthprobe
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -143,6 +145,11 @@ func (w *Worker) Start(parent context.Context) {
 
 	go func() {
 		defer close(done)
+		defer func() {
+			if r := recover(); r != nil {
+				w.logger.Error("worker panicked; goroutine stopped", "worker", "health_probe", "panic", r, "stack", string(debug.Stack()))
+			}
+		}()
 		w.run(ctx)
 	}()
 }
@@ -228,6 +235,15 @@ func (w *Worker) probePass(ctx context.Context, applyJitter bool) (Result, error
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					mu.Lock()
+					result.Failed++
+					firstErr = errors.Join(firstErr, fmt.Errorf("account health probe panicked: %v", r))
+					mu.Unlock()
+					w.logger.Error("worker panicked; goroutine stopped", "worker", "health_probe", "account_id", account.ID, "panic", r, "stack", string(debug.Stack()))
+				}
+			}()
 			// Desynchronize probes: each eligible account waits a bounded random
 			// delay so many accounts never hit their upstreams as one synchronized
 			// burst (which, on a shared egress, is itself a correlation signal).

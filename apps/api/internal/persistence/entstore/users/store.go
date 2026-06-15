@@ -168,25 +168,35 @@ func (s *Store) List(ctx context.Context, filter contract.ListUsersFilter) ([]co
 	if err != nil {
 		return nil, err
 	}
-	out := make([]contract.StoredUser, 0, len(rows))
-	for _, row := range rows {
-		user, err := s.toStoredUser(ctx, row)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, user)
-	}
-	return out, nil
+	return s.toStoredUsers(ctx, rows)
 }
 
 func (s *Store) ListByIDs(ctx context.Context, ids []int) ([]contract.StoredUser, error) {
+	if len(ids) == 0 {
+		return make([]contract.StoredUser, 0), nil
+	}
+	rows, err := s.client.User.Query().
+		Where(entuser.IDIn(ids...), entuser.DeletedAtIsNil()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rowByID := make(map[int]*ent.User, len(rows))
+	for _, row := range rows {
+		rowByID[row.ID] = row
+	}
+	rolesByUser, permissionsByUser, err := s.rolesForUsers(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]contract.StoredUser, 0, len(ids))
 	for _, id := range ids {
-		user, err := s.FindByID(ctx, id)
-		if err != nil {
-			return nil, err
+		row, ok := rowByID[id]
+		if !ok {
+			// Match FindByID semantics: a missing ID fails the whole call.
+			return nil, contract.ErrNotFound
 		}
-		out = append(out, user)
+		out = append(out, assembleStoredUser(row, rolesByUser[id], permissionsByUser[id]))
 	}
 	return out, nil
 }
@@ -509,6 +519,10 @@ func (s *Store) toStoredUser(ctx context.Context, user *ent.User) (contract.Stor
 	if err != nil {
 		return contract.StoredUser{}, err
 	}
+	return assembleStoredUser(user, roles, permissions), nil
+}
+
+func assembleStoredUser(user *ent.User, roles []contract.Role, permissions []string) contract.StoredUser {
 	return contract.StoredUser{
 		User: contract.User{
 			ID:              user.ID,
@@ -527,7 +541,7 @@ func (s *Store) toStoredUser(ctx context.Context, user *ent.User) (contract.Stor
 		},
 		PasswordHash:    user.PasswordHash,
 		EmailVerifiedAt: user.EmailVerifiedAt,
-	}, nil
+	}
 }
 
 func (s *Store) rolesForUser(ctx context.Context, userID int) ([]contract.Role, []string, error) {
@@ -569,6 +583,89 @@ func (s *Store) rolesForUser(ctx context.Context, userID int) ([]contract.Role, 
 		}
 	}
 	return out, permissions, nil
+}
+
+// rolesForUsers batches the per-user role/permission lookup performed by
+// rolesForUser across many users in a fixed number of queries. The result maps
+// each requested user ID to the same (roles, permissions) pair that
+// rolesForUser would have produced individually, preserving join-ID ordering
+// and the nil-vs-empty distinction (no roles -> nil slices).
+func (s *Store) rolesForUsers(ctx context.Context, userIDs []int) (map[int][]contract.Role, map[int][]string, error) {
+	rolesByUser := make(map[int][]contract.Role, len(userIDs))
+	permissionsByUser := make(map[int][]string, len(userIDs))
+	if len(userIDs) == 0 {
+		return rolesByUser, permissionsByUser, nil
+	}
+	joins, err := s.client.UserRole.Query().
+		Where(entuserrole.UserIDIn(userIDs...)).
+		Order(entuserrole.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	// Collect role IDs per user in join-ID order, mirroring rolesForUser.
+	roleIDsByUser := make(map[int][]int, len(userIDs))
+	roleIDSet := make(map[int]struct{})
+	for _, join := range joins {
+		roleIDsByUser[join.UserID] = append(roleIDsByUser[join.UserID], join.RoleID)
+		roleIDSet[join.RoleID] = struct{}{}
+	}
+	if len(roleIDSet) == 0 {
+		return rolesByUser, permissionsByUser, nil
+	}
+	allRoleIDs := make([]int, 0, len(roleIDSet))
+	for id := range roleIDSet {
+		allRoleIDs = append(allRoleIDs, id)
+	}
+	roles, err := s.client.Role.Query().Where(entrole.IDIn(allRoleIDs...)).All(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	roleByID := make(map[int]*ent.Role, len(roles))
+	for _, role := range roles {
+		roleByID[role.ID] = role
+	}
+	for userID, roleIDs := range roleIDsByUser {
+		if len(roleIDs) == 0 {
+			continue
+		}
+		out := make([]contract.Role, 0, len(roleIDs))
+		permissions := make([]string, 0)
+		seenPermission := map[string]bool{}
+		for _, id := range roleIDs {
+			if role, ok := roleByID[id]; ok {
+				out = append(out, contract.Role(role.Name))
+				for _, permission := range role.PermissionsJSON {
+					if seenPermission[permission] {
+						continue
+					}
+					seenPermission[permission] = true
+					permissions = append(permissions, permission)
+				}
+			}
+		}
+		rolesByUser[userID] = out
+		permissionsByUser[userID] = permissions
+	}
+	return rolesByUser, permissionsByUser, nil
+}
+
+// toStoredUsers assembles StoredUser values for the given rows using a single
+// batched role/permission fetch instead of one lookup per row.
+func (s *Store) toStoredUsers(ctx context.Context, rows []*ent.User) ([]contract.StoredUser, error) {
+	userIDs := make([]int, 0, len(rows))
+	for _, row := range rows {
+		userIDs = append(userIDs, row.ID)
+	}
+	rolesByUser, permissionsByUser, err := s.rolesForUsers(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.StoredUser, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, assembleStoredUser(row, rolesByUser[row.ID], permissionsByUser[row.ID]))
+	}
+	return out, nil
 }
 
 func ensureRole(ctx context.Context, tx *ent.Tx, roleName contract.Role) (*ent.Role, error) {

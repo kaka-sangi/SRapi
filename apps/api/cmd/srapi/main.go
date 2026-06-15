@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -42,6 +43,12 @@ func main() {
 	}
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("server panicked", "panic", r, "stack", string(debug.Stack()))
+				os.Exit(1)
+			}
+		}()
 		logger.Info("starting API", "address", cfg.Address(), "mode", cfg.Server.Mode, "version", cfg.Server.Version)
 		if err := application.Serve(); err != nil {
 			logger.Error("server failed", "error", err)
