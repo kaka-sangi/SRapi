@@ -1,12 +1,13 @@
 "use client";
 
-import { Activity, RefreshCw, RotateCcw, Database, Wifi, WifiOff } from "lucide-react";
+import { Activity, AlertTriangle, RefreshCw, RotateCcw, Database, Wifi, WifiOff } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAdminCircuitBreakers,
@@ -124,6 +125,17 @@ function DiagnosticsContent() {
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}
               </div>
+            ) : breakers.isError ? (
+              <EmptyState
+                icon={AlertTriangle}
+                title={t("common.error")}
+                description={t("common.errorBody")}
+                action={
+                  <Button variant="outline" size="sm" onClick={() => void breakers.refetch()}>
+                    {t("common.retry")}
+                  </Button>
+                }
+              />
             ) : !breakers.data?.length ? (
               <p className="py-6 text-center text-sm text-srapi-text-tertiary">
                 {t("diagnostics.noBreakers")}
@@ -147,8 +159,8 @@ function DiagnosticsContent() {
                           {Math.round(entry.success_rate * 100)}%
                         </span>
                         <span>req: {entry.requests}</span>
-                        <span className="text-emerald-500">ok: {entry.total_successes}</span>
-                        <span className="text-red-400">fail: {entry.total_failures}</span>
+                        <span className="text-srapi-success">ok: {entry.total_successes}</span>
+                        <span className="text-srapi-error">fail: {entry.total_failures}</span>
                         <span>streak: +{entry.consecutive_successes} / -{entry.consecutive_failures}</span>
                       </div>
                       {entry.state !== "closed" && (
@@ -198,6 +210,17 @@ function DiagnosticsContent() {
               <div className="space-y-2">
                 <Skeleton className="h-12 w-full" />
               </div>
+            ) : cacheStats.isError ? (
+              <EmptyState
+                icon={AlertTriangle}
+                title={t("common.error")}
+                description={t("common.errorBody")}
+                action={
+                  <Button variant="outline" size="sm" onClick={() => void cacheStats.refetch()}>
+                    {t("common.retry")}
+                  </Button>
+                }
+              />
             ) : !cacheStats.data?.length ? (
               <p className="py-6 text-center text-sm text-srapi-text-tertiary">
                 {t("diagnostics.noCaches")}
@@ -212,8 +235,8 @@ function DiagnosticsContent() {
                         <span className="font-mono text-sm text-srapi-text-primary">{cache.name}</span>
                         <div className="flex gap-4 font-mono text-2xs text-srapi-text-tertiary">
                           <span>size: {cache.size}</span>
-                          <span className="text-emerald-500">hits: {cache.hits}</span>
-                          <span className="text-red-400">misses: {cache.misses}</span>
+                          <span className="text-srapi-success">hits: {cache.hits}</span>
+                          <span className="text-srapi-error">misses: {cache.misses}</span>
                           <span>evictions: {cache.evictions}</span>
                         </div>
                       </div>

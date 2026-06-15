@@ -294,6 +294,7 @@ export default function OAuthCallbackPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
+                <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("authRegister.passwordHint")}</p>
               </div>
               {error && (
                 <p role="alert" className="text-sm text-srapi-error">

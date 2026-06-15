@@ -111,7 +111,13 @@ export function ApiKeyOnboarding({
       });
       const ms = Math.round(performance.now() - started);
       if (!res.ok) {
-        setTest({ phase: "fail", message: `HTTP ${res.status}` });
+        // A 401/403 here means the gateway rejected this key (not an upstream
+        // issue) — give an actionable message instead of a bare HTTP code.
+        const message =
+          res.status === 401 || res.status === 403
+            ? t("apiKeys.onboardingTestRejected")
+            : `HTTP ${res.status}`;
+        setTest({ phase: "fail", message });
         return;
       }
       const body = (await res.json()) as { data?: unknown[] };

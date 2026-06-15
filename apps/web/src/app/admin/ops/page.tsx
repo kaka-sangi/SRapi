@@ -438,7 +438,7 @@ function OpsOverviewContent() {
                       {silence.comment || matcherText}
                     </div>
                     <div className="font-mono text-2xs text-srapi-text-tertiary tabular">
-                      {matcherText} · {formatDateTime(silence.starts_at)} → {formatDateTime(silence.ends_at)}
+                      {silence.comment ? `${matcherText} · ` : ""}{formatDateTime(silence.starts_at)} → {formatDateTime(silence.ends_at)}
                     </div>
                   </div>
                   <button

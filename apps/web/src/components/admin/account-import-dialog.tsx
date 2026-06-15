@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { KeyRound } from "lucide-react";
+import { KeyRound, Eye, EyeOff } from "lucide-react";
 import {
   AccountOAuthAuthorizeDialog,
   type AccountOAuthFlowMode,
@@ -91,6 +91,7 @@ export function AccountImportDialog({
   const [crsUrl, setCrsUrl] = useState("");
   const [crsUser, setCrsUser] = useState("");
   const [crsPass, setCrsPass] = useState("");
+  const [crsPassVisible, setCrsPassVisible] = useState(false);
   const [crsStep, setCrsStep] = useState<"input" | "preview" | "result">("input");
   const [crsPreview, setCrsPreview] = useState<CRSPreviewResult | null>(null);
   const [crsSelected, setCrsSelected] = useState<Set<string>>(new Set());
@@ -456,7 +457,25 @@ export function AccountImportDialog({
                   </div>
                   <div>
                     <Label htmlFor="crs-pass">{t("crsSync.password")}</Label>
-                    <Input id="crs-pass" type="password" value={crsPass} onChange={(e) => setCrsPass(e.target.value)} disabled={busy} />
+                    <div className="relative">
+                      <Input
+                        id="crs-pass"
+                        type={crsPassVisible ? "text" : "password"}
+                        className="pr-9"
+                        value={crsPass}
+                        onChange={(e) => setCrsPass(e.target.value)}
+                        disabled={busy}
+                      />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        aria-label={crsPassVisible ? t("common.hide") : t("common.show")}
+                        onClick={() => setCrsPassVisible((v) => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+                      >
+                        {crsPassVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
                   </div>
                 </>
               )}

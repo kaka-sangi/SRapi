@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, XCircle, Loader2, Play, ShieldCheck } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Play, ShieldCheck, Lightbulb } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/admin-format";
+import { gatewayErrorHintKey } from "@/lib/gateway-error-hint";
 import type { AdminAccountTestRequest, AdminTestResult, Model } from "@/lib/sdk-types";
 
 const MODEL_AUTO = "__auto__";
@@ -102,6 +103,10 @@ export function AccountTestDialog({
   const loading = isPending;
   const ok = !loading && !error && result?.ok === true;
   const failed = !loading && (error != null || result?.ok === false);
+  // Translate the terse gateway/scheduler reject codes in the failure message
+  // into a plain-language "what to do" hint, so a failed test is actionable
+  // rather than cryptic.
+  const hintKey = failed ? gatewayErrorHintKey(error || result?.message) : null;
   const checks = (result?.checks as Record<string, unknown> | undefined) ?? undefined;
   const promptDisabled = mode === "default";
 
@@ -203,6 +208,13 @@ export function AccountTestDialog({
 
           {!loading && (error || result?.message) ? (
             <p className="mt-2 text-srapi-text-secondary [overflow-wrap:anywhere]">{error || result?.message}</p>
+          ) : null}
+
+          {hintKey ? (
+            <div className="mt-2 flex items-start gap-1.5 rounded-md border border-srapi-border bg-srapi-card px-2.5 py-2 text-2xs text-srapi-text-secondary">
+              <Lightbulb className="mt-0.5 size-3 shrink-0 text-srapi-text-tertiary" />
+              <span className="[overflow-wrap:anywhere]">{t(`gatewayHints.${hintKey}`)}</span>
+            </div>
           ) : null}
 
           {!loading && checks && Object.keys(checks).length > 0 ? (

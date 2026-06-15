@@ -1,9 +1,13 @@
 "use client";
 
-import { CheckCircle2, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, AlertTriangle, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useDiscoverAccountModels, useTestAccount } from "@/hooks/admin-queries";
+import { useCreateApiKey } from "@/hooks/queries";
+import { ApiKeyOnboarding } from "@/components/features/api-key-onboarding";
+import { gatewayErrorHintKey } from "@/lib/gateway-error-hint";
 import { useToast } from "@/context/ToastContext";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import type { AdminQuickSetupResult } from "@/lib/sdk-types";
@@ -24,9 +28,39 @@ export function ResultView({
   const { toast } = useToast();
   const discoverMut = useDiscoverAccountModels();
   const testMut = useTestAccount();
+  const createKey = useCreateApiKey();
+  const [keyPlaintext, setKeyPlaintext] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const accountId = String(
     (result.account as { id?: string | number })?.id ?? "",
   );
+  const modelNames = result.model_names ?? [];
+  // Only offer the one-click key when models actually route here — the key
+  // create contract requires at least one allowed model.
+  const canGenerateKey = modelNames.length > 0;
+
+  // Finish the journey the wizard otherwise leaves half-done: mint a key bound
+  // to NO group (group_ids empty) so the account just created is immediately
+  // usable, with the models it just registered allow-listed.
+  async function generateKey() {
+    try {
+      const created = await createKey.mutateAsync({
+        name: t("adminQuickSetup.defaultKeyName"),
+        allowedModels: modelNames.slice(0, 16),
+        groupIds: [],
+      });
+      setKeyPlaintext(created.plaintextKey ?? null);
+    } catch {
+      toast({ title: t("adminQuickSetup.keyFailed"), tone: "error" });
+    }
+  }
+
+  async function copyKey() {
+    if (!keyPlaintext) return;
+    await navigator.clipboard.writeText(keyPlaintext);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
 
   const providerName =
     (result.provider as { display_name?: string; name?: string })
@@ -137,9 +171,51 @@ export function ResultView({
         </div>
       )}
 
+      {/* One-click key: the wizard otherwise stops at provider+account+models.
+          Mint a ready-to-use key bound to NO group so the account just created
+          can be called immediately, with no further wiring. */}
+      {keyPlaintext ? (
+        <div className="space-y-3 rounded-xl border border-srapi-success/20 bg-srapi-success/5 p-5">
+          <div>
+            <div className="text-sm font-medium text-srapi-text-primary">
+              {t("adminQuickSetup.keyReady")}
+            </div>
+            <div className="mt-1 text-xs text-srapi-text-secondary">
+              {t("adminQuickSetup.keyUnbound")} {t("adminQuickSetup.keyRevealOnce")}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 rounded-xl border border-srapi-border bg-srapi-card px-3 py-2.5">
+            <code className="flex-1 truncate font-mono text-sm">{keyPlaintext}</code>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => void copyKey()}
+              aria-label={t("apiKeys.copyKey")}
+            >
+              {copied ? (
+                <Check className="size-4 text-srapi-success" />
+              ) : (
+                <Copy className="size-4" />
+              )}
+            </Button>
+          </div>
+          <ApiKeyOnboarding apiKey={keyPlaintext} defaultModel={modelNames[0]} />
+        </div>
+      ) : null}
+
       {/* Actions */}
       <div className="flex flex-wrap gap-3">
-        <Button variant="primary" size="md" onClick={onReset}>
+        {canGenerateKey && !keyPlaintext ? (
+          <Button
+            variant="primary"
+            size="md"
+            loading={createKey.isPending}
+            onClick={() => void generateKey()}
+          >
+            {t("adminQuickSetup.generateKey")}
+          </Button>
+        ) : null}
+        <Button variant="outline" size="md" onClick={onReset}>
           {t("adminQuickSetup.backToSetup")}
         </Button>
         <Button variant="outline" size="md" asChild>
@@ -163,12 +239,17 @@ export function ResultView({
                 testMut.mutate(
                   { id: accountId, body: { mode: "live" } },
                   {
-                    onSuccess: (res) =>
+                    onSuccess: (res) => {
+                      const hint = res?.ok ? null : gatewayErrorHintKey(res?.message);
                       toast({
                         title: res?.ok ? t("adminAccounts.testOk") : t("adminAccounts.testFailed"),
-                        description: res?.message || undefined,
+                        description:
+                          [res?.message, hint ? t(`gatewayHints.${hint}`) : null]
+                            .filter(Boolean)
+                            .join(" — ") || undefined,
                         tone: res?.ok ? "success" : "error",
-                      }),
+                      });
+                    },
                     onError: () =>
                       toast({ title: t("adminAccounts.testFailed"), tone: "error" }),
                   },
@@ -193,6 +274,7 @@ export function ResultView({
                     onError: () =>
                       toast({
                         title: t("adminQuickSetup.discoverFailed"),
+                        description: t("adminQuickSetup.discoverFailedHint"),
                         tone: "error",
                       }),
                   },

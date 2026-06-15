@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShieldAlert } from "lucide-react";
+import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
@@ -20,6 +20,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
@@ -230,6 +231,19 @@ function RiskContent() {
             </div>
           </CardContent>
         </Card>
+      ) : status.isError ? (
+        <Card>
+          <EmptyState
+            icon={AlertTriangle}
+            title={t("common.error")}
+            description={t("common.errorBody")}
+            action={
+              <Button variant="outline" size="sm" onClick={() => void status.refetch()}>
+                {t("common.retry")}
+              </Button>
+            }
+          />
+        </Card>
       ) : null}
 
       {contentSafety.isLoading ? (
@@ -290,6 +304,19 @@ function RiskContent() {
               {t("adminRisk.editContentSafety")}
             </Button>
           </CardContent>
+        </Card>
+      ) : contentSafety.isError ? (
+        <Card>
+          <EmptyState
+            icon={AlertTriangle}
+            title={t("common.error")}
+            description={t("common.errorBody")}
+            action={
+              <Button variant="outline" size="sm" onClick={() => void contentSafety.refetch()}>
+                {t("common.retry")}
+              </Button>
+            }
+          />
         </Card>
       ) : null}
 

@@ -151,8 +151,8 @@ export default function RegisterPage() {
                       onChange={(event) => setAttributeValues((prev) => ({ ...prev, [item.definition_id]: event.target.value }))}
                     >
                       <option value="">{t("account.attrUnset")}</option>
-                      <option value="true">True</option>
-                      <option value="false">False</option>
+                      <option value="true">{t("account.attrTrue")}</option>
+                      <option value="false">{t("account.attrFalse")}</option>
                     </select>
                   ) : item.data_type === "select" ? (
                     <select

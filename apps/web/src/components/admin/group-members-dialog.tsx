@@ -11,13 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -50,7 +44,8 @@ export function GroupMembersDialog({
   const accounts = useAdminAccounts();
   const addMut = useAddGroupMember();
   const removeMut = useRemoveGroupMember();
-  const [toAdd, setToAdd] = useState("");
+  const [toAdd, setToAdd] = useState<string[]>([]);
+  const [adding, setAdding] = useState(false);
 
   const accountList = accounts.data?.data ?? [];
   const memberRows = members.data?.data ?? [];
@@ -58,14 +53,38 @@ export function GroupMembersDialog({
   const memberIds = new Set(memberRows.map((m) => m.account_id));
   const addable = accountList.filter((a) => !memberIds.has(a.id));
 
+  // Batch add: the API only takes one account at a time, so fan the selected
+  // ids out over the single-member mutation and report an aggregate result —
+  // the operator picks many accounts once instead of select-then-click N times.
   async function add() {
-    if (!toAdd) return;
+    if (toAdd.length === 0) return;
+    setAdding(true);
     try {
-      await addMut.mutateAsync({ accountId: toAdd, groupId: group.id });
-      toast({ title: t("adminGroups.memberAdded"), tone: "success" });
-      setToAdd("");
-    } catch (err) {
-      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+      const results = await Promise.allSettled(
+        toAdd.map((accountId) => addMut.mutateAsync({ accountId, groupId: group.id })),
+      );
+      const ok = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - ok;
+      if (ok > 0) {
+        toast({
+          title: t("adminGroups.membersAdded", { count: ok }),
+          description:
+            failed > 0 ? t("adminGroups.membersAddFailed", { count: failed }) : undefined,
+          tone: failed > 0 ? "warning" : "success",
+        });
+      } else {
+        const firstErr = results.find((r) => r.status === "rejected") as
+          | PromiseRejectedResult
+          | undefined;
+        toast({
+          title: t("feedback.failed"),
+          description: firstErr ? adminErrorMessage(firstErr.reason) : undefined,
+          tone: "error",
+        });
+      }
+      setToAdd([]);
+    } finally {
+      setAdding(false);
     }
   }
 
@@ -89,31 +108,24 @@ export function GroupMembersDialog({
         <div className="mt-4 space-y-4">
           <div className="flex items-end gap-2">
             <div className="flex-1">
-              <Select
+              <MultiSelect
                 value={toAdd}
-                onValueChange={setToAdd}
-                disabled={addMut.isPending || addable.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("adminGroups.selectAccount")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {addable.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={setToAdd}
+                options={addable.map((a) => ({ value: a.id, label: a.name }))}
+                placeholder={t("adminGroups.selectAccounts")}
+                searchPlaceholder={t("adminGroups.searchAccounts")}
+                emptyText={t("adminGroups.allAccountsInGroup")}
+                disabled={adding || addable.length === 0}
+              />
             </div>
             <Button
               type="button"
               variant="primary"
-              loading={addMut.isPending}
-              disabled={!toAdd}
+              loading={adding}
+              disabled={toAdd.length === 0}
               onClick={() => void add()}
             >
-              {t("adminGroups.addMember")}
+              {t("adminGroups.addSelected", { count: toAdd.length })}
             </Button>
           </div>
 

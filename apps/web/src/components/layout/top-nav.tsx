@@ -46,7 +46,7 @@ export function TopNav({
         size="icon"
         className="lg:hidden"
         onClick={onOpenNav}
-        aria-label="Open navigation"
+        aria-label={t("common.openNav")}
       >
         <Menu className="size-4" />
       </Button>

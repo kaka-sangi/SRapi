@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronLeft, ChevronDown, Settings2 } from "lucide-react";
+import { useState } from "react";
+import { ChevronLeft, ChevronDown, Settings2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAdminProxies } from "@/hooks/admin-queries";
+import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/cn";
 import {
   PLATFORM_ICON_COLORS,
@@ -23,6 +25,49 @@ import {
 // ---------------------------------------------------------------------------
 // Step 2: Credential form + Advanced settings
 // ---------------------------------------------------------------------------
+
+/**
+ * Masked credential input with a reveal toggle, so the operator can verify a
+ * pasted key/token instead of staring at dots. Mirrors the reveal pattern used
+ * in the account form dialog.
+ */
+function SecretInput({
+  id,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const { t } = useLanguage();
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative">
+      <Input
+        id={id}
+        type={visible ? "text" : "password"}
+        autoComplete="off"
+        spellCheck={false}
+        className="pr-9 font-mono"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label={visible ? t("common.hide") : t("common.show")}
+        onClick={() => setVisible((v) => !v)}
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+      >
+        {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+      </button>
+    </div>
+  );
+}
 
 export function CredentialsForm({
   platform,
@@ -97,6 +142,18 @@ export function CredentialsForm({
     ? accessToken.trim().length > 0 && refreshToken.trim().length > 0
     : apiKey.trim().length > 0 && (!platform.custom || baseUrl.trim().length > 0);
 
+  // Tell the operator *why* the submit button is disabled instead of leaving a
+  // dead grey button — the most common "I'm stuck" moment in the wizard.
+  const submitHint = isOAuth
+    ? !accessToken.trim() || !refreshToken.trim()
+      ? t("adminQuickSetup.needTokens")
+      : ""
+    : !apiKey.trim()
+      ? t("adminQuickSetup.needApiKey")
+      : platform.custom && !baseUrl.trim()
+        ? t("adminQuickSetup.needBaseUrl")
+        : "";
+
   return (
     <div className="space-y-6">
       {/* Back link */}
@@ -154,23 +211,19 @@ export function CredentialsForm({
             <div className="space-y-4">
               <div>
                 <Label htmlFor="qs-access">access_token</Label>
-                <Input
+                <SecretInput
                   id="qs-access"
-                  type="password"
-                  autoComplete="off"
                   value={accessToken}
-                  onChange={(e) => onAccessTokenChange(e.target.value)}
+                  onChange={onAccessTokenChange}
                   placeholder="eyJ..."
                 />
               </div>
               <div>
                 <Label htmlFor="qs-refresh">refresh_token</Label>
-                <Input
+                <SecretInput
                   id="qs-refresh"
-                  type="password"
-                  autoComplete="off"
                   value={refreshToken}
-                  onChange={(e) => onRefreshTokenChange(e.target.value)}
+                  onChange={onRefreshTokenChange}
                   placeholder="eyJ..."
                 />
               </div>
@@ -178,12 +231,10 @@ export function CredentialsForm({
           ) : (
             <div>
               <Label htmlFor="qs-apikey">{t("adminQuickSetup.apiKeyLabel")}</Label>
-              <Input
+              <SecretInput
                 id="qs-apikey"
-                type="password"
-                autoComplete="off"
                 value={apiKey}
-                onChange={(e) => onApiKeyChange(e.target.value)}
+                onChange={onApiKeyChange}
                 placeholder="sk-..."
               />
             </div>
@@ -382,6 +433,9 @@ export function CredentialsForm({
             ? t("adminQuickSetup.submitting")
             : t("adminQuickSetup.submit")}
         </Button>
+        {submitHint && !isPending ? (
+          <p className="mt-1.5 text-2xs text-srapi-text-tertiary">{submitHint}</p>
+        ) : null}
       </div>
     </div>
   );

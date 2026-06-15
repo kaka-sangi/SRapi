@@ -134,6 +134,16 @@ export const PLATFORMS: PlatformPreset[] = [
   },
 ];
 
+/**
+ * Flattened, de-duplicated list of well-known model names across all platform
+ * presets — surfaced as autocomplete suggestions when an operator creates a
+ * model by hand, so canonical names match what clients actually call (fewer
+ * typos, fewer model_not_found 404s).
+ */
+export const PRESET_MODEL_NAMES: string[] = [
+  ...new Set(PLATFORMS.flatMap((p) => p.defaultModels)),
+].sort();
+
 // ---------------------------------------------------------------------------
 // Platform icon abbreviations
 // ---------------------------------------------------------------------------

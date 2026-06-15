@@ -39,9 +39,12 @@ export const createApiKeySchema = z.object({
     .regex(NAME_PATTERN, {
       message: "Use letters, digits, spaces, dots, dashes, slashes or underscores.",
     }),
+  // Empty = all models. This matches the OpenAPI contract (allowed_models has
+  // `default: []`, not required) and the backend, which treats an empty
+  // allow-list as "every model". Forcing at least one here only blocked the
+  // common "one key that works for everything" case.
   allowedModels: z
     .array(z.string().min(1))
-    .min(1, { message: "Select at least one model." })
     .max(ALLOWED_MODELS_MAX, { message: "Select at most 16 models." }),
   groupIds: z
     .array(z.string().min(1))
@@ -71,8 +74,9 @@ export const createApiKeySchema = z.object({
 export type CreateApiKeyValues = z.infer<typeof createApiKeySchema>;
 
 /**
- * Edit schema. Identical to create except `allowedModels` may be empty — an
- * existing key with no model restriction (= all models) must stay editable.
+ * Edit schema. Same shape as create — both allow an empty `allowedModels`
+ * (= all models). Kept as a distinct export so the two can diverge later
+ * without touching call sites.
  */
 export const updateApiKeySchema = createApiKeySchema.extend({
   allowedModels: z

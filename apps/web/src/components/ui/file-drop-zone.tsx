@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Upload, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface FileDropZoneProps {
   accept?: string;
@@ -25,6 +26,7 @@ export function FileDropZone({
   onClearFiles,
   className,
 }: FileDropZoneProps) {
+  const { t } = useLanguage();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -64,6 +66,7 @@ export function FileDropZone({
     <div className={className}>
       <div
         role="button"
+        aria-label={hint ?? t("common.uploadFiles")}
         tabIndex={disabled ? -1 : 0}
         onClick={() => !disabled && inputRef.current?.click()}
         onKeyDown={(e) => {
@@ -115,6 +118,7 @@ export function FileDropZone({
             <button
               type="button"
               onClick={onClearFiles}
+              aria-label={t("common.removeFile")}
               className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
             >
               <X className="size-3" />

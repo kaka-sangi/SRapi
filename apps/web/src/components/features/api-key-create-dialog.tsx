@@ -8,6 +8,7 @@ import {
   type CreateApiKeyValues,
 } from "@/lib/schemas/api-key";
 import { useAvailableModels, useCreateApiKey, useUpdateApiKey } from "@/hooks/queries";
+import { useAdminGroups } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import {
@@ -23,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TagInput } from "@/components/ui/tag-input";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { formatMoney } from "@/lib/admin-format";
 import { ApiKeyOnboarding } from "@/components/features/api-key-onboarding";
 import type { ApiKeySummary } from "@/lib/srapi-types";
@@ -98,6 +100,14 @@ export function ApiKeyFormDialog({
   const createKey = useCreateApiKey();
   const updateKey = useUpdateApiKey();
   const availableModels = useAvailableModels();
+  // Existing account groups, so the operator picks names instead of hand-typing
+  // group IDs. On a self-service (non-admin) account this query may not resolve;
+  // MultiSelect's allowCustom keeps manual entry working, so nothing breaks.
+  const adminGroups = useAdminGroups();
+  const groupOptions = (adminGroups.data?.data ?? []).map((g) => ({
+    value: g.id,
+    label: g.name,
+  }));
   const pending = isEdit ? updateKey.isPending : createKey.isPending;
 
   function parseLimit(value: string): number | undefined {
@@ -284,12 +294,17 @@ export function ApiKeyFormDialog({
               </div>
               <div>
                 <Label htmlFor="key-groups">{t("apiKeys.groups")}</Label>
-                <TagInput
+                <MultiSelect
                   id="key-groups"
                   value={groupIds}
                   onChange={setGroupIds}
+                  options={groupOptions}
+                  placeholder={t("apiKeys.groupsPlaceholder")}
+                  searchPlaceholder={t("apiKeys.groupsSearch")}
+                  emptyText={t("apiKeys.groupsEmpty")}
+                  addCustomLabel={(q) => t("apiKeys.groupsUseId", { id: q })}
+                  allowCustom
                   disabled={pending}
-                  placeholder="default"
                 />
                 <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.groupsHint")}</p>
               </div>

@@ -5,6 +5,7 @@ import { Plug } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
+import { ADMIN_ROUTES } from "@/lib/routes";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
@@ -255,9 +256,14 @@ function ProvidersContent() {
         emptyTitle={t("adminProviders.emptyTitle")}
         emptyBody={t("adminProviders.emptyBody")}
         emptyAction={
-          <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
-            ＋ {t("adminProviders.create")}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
+              ＋ {t("adminProviders.create")}
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <a href={ADMIN_ROUTES.quickSetup}>{t("adminProviders.emptyQuickSetup")}</a>
+            </Button>
+          </div>
         }
         minWidth={560}
         isFiltered={Boolean(statusFilter)}

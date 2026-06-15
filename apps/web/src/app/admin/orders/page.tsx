@@ -349,7 +349,7 @@ function RefundDialog({ order, onClose }: { order: PaymentOrder; onClose: () => 
                 placeholder={t("adminOrders.refundFull")}
                 value={form.amount}
                 disabled={refundMut.isPending}
-                aria-invalid={exceeds || !enteredValid || undefined}
+                aria-invalid={exceeds || !enteredValid}
                 onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
               />
               {exceeds ? (

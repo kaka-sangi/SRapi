@@ -149,9 +149,9 @@ export function CopilotTab({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="openai-compatible">OpenAI-compatible</SelectItem>
-                  <SelectItem value="anthropic-compatible">Anthropic-compatible</SelectItem>
-                  <SelectItem value="gemini-compatible">Gemini-compatible</SelectItem>
+                  <SelectItem value="openai-compatible">{t("copilot.protocolOpenAI")}</SelectItem>
+                  <SelectItem value="anthropic-compatible">{t("copilot.protocolAnthropic")}</SelectItem>
+                  <SelectItem value="gemini-compatible">{t("copilot.protocolGemini")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

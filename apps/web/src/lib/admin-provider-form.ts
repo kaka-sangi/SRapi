@@ -56,7 +56,10 @@ export function emptyProviderForm(): ProviderFormState {
     displayName: "",
     adapterType: "openai-compatible",
     protocol: "openai-compatible",
-    status: "disabled",
+    // Default active, consistent with every other resource form and with the
+    // Quick Setup wizard (which creates providers active). A disabled default
+    // silently breaks every account created under the new provider.
+    status: "active",
     capabilities: {},
     configSchema: {},
   };

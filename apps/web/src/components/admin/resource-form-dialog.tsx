@@ -68,6 +68,8 @@ export interface FieldConfig<TDraft> {
   emptyText?: string;
   /** combobox: label for the "add typed value" row */
   addCustomLabel?: (query: string) => string;
+  /** text inputs: native datalist autocomplete suggestions (opt-in, no effect on other field types) */
+  suggestions?: string[];
   /** tuck this field under a collapsed "Advanced" section to keep the common path short */
   advanced?: boolean;
   /** render the stored draft value as an input string (default: String(value)) */
@@ -152,7 +154,11 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
         const empty =
           value == null ||
           (typeof value === "string" && value.trim() === "") ||
-          (Array.isArray(value) && value.length === 0);
+          (Array.isArray(value) && value.length === 0) ||
+          (typeof value === "object" &&
+            value !== null &&
+            !Array.isArray(value) &&
+            Object.keys(value).length === 0);
         if (empty) {
           errs[field.name] = t("adminCommon.required");
           continue;
@@ -532,12 +538,15 @@ function FieldRow<TDraft extends object>({
           ? "datetime-local"
           : "text";
 
+  const listId =
+    field.suggestions && field.suggestions.length > 0 ? `${id}-suggest` : undefined;
   return (
     <div>
       {renderFieldLabel(field.label, id)}
       <Input
         id={id}
         type={inputType}
+        list={listId}
         placeholder={field.placeholder}
         value={asString}
         disabled={disabled}
@@ -545,6 +554,13 @@ function FieldRow<TDraft extends object>({
         aria-describedby={describedBy}
         onChange={(event) => onChange(parse(event.target.value))}
       />
+      {listId ? (
+        <datalist id={listId}>
+          {field.suggestions!.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+      ) : null}
       <FieldMessage id={msgId} error={error} hint={field.hint} />
     </div>
   );

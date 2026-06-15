@@ -64,7 +64,7 @@ function ProxiesContent() {
   const isNew = formTarget === "new";
 
   const fields: FieldConfig<ProxyFormState>[] = [
-    { name: "name", label: t("adminProxies.name") },
+    { name: "name", label: t("adminProxies.name"), required: true },
     {
       name: "type",
       label: t("adminProxies.protocol"),

@@ -9,6 +9,8 @@ export function Pagination({
   total,
   onPageChange,
   labelFor,
+  labelPrev = "Previous page",
+  labelNext = "Next page",
 }: {
   page: number;
   pageSize: number;
@@ -16,6 +18,9 @@ export function Pagination({
   onPageChange: (page: number) => void;
   /** localized "{from}–{to} of {total}" label builder */
   labelFor?: (from: number, to: number, total: number) => string;
+  /** localized accessible labels for the prev/next buttons */
+  labelPrev?: string;
+  labelNext?: string;
 }) {
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
@@ -32,7 +37,7 @@ export function Pagination({
           size="icon"
           disabled={!hasPrev}
           onClick={() => onPageChange(page - 1)}
-          aria-label="Previous page"
+          aria-label={labelPrev}
         >
           <ChevronLeft className="size-4" />
         </Button>
@@ -41,7 +46,7 @@ export function Pagination({
           size="icon"
           disabled={!hasNext}
           onClick={() => onPageChange(page + 1)}
-          aria-label="Next page"
+          aria-label={labelNext}
         >
           <ChevronRight className="size-4" />
         </Button>

@@ -206,7 +206,7 @@ function BalanceTab() {
             {needsWeChatPayer ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="payer-openid">WeChat OpenID</Label>
+                  <Label htmlFor="payer-openid">{t("billing.payerOpenID")}</Label>
                   <Input
                     id="payer-openid"
                     value={payerOpenID}
@@ -215,7 +215,7 @@ function BalanceTab() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="payer-client-ip">Client IP</Label>
+                  <Label htmlFor="payer-client-ip">{t("billing.payerClientIP")}</Label>
                   <Input
                     id="payer-client-ip"
                     value={payerClientIP}

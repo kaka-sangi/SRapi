@@ -323,10 +323,10 @@ function UsageBreakdown() {
                         <span className="font-mono text-srapi-text-secondary">{formatMoney(row.total_cost, row.currency)}</span>
                       </div>
                       <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-srapi-text-tertiary">
-                        <span>in {formatMoney(row.input_cost ?? "0", row.currency)}</span>
-                        <span>out {formatMoney(row.output_cost ?? "0", row.currency)}</span>
-                        <span>cache r {formatMoney(row.cache_read_cost ?? "0", row.currency)}</span>
-                        <span>cache w {formatMoney(row.cache_write_cost ?? "0", row.currency)}</span>
+                        <span>{t("usage.costIn")} {formatMoney(row.input_cost ?? "0", row.currency)}</span>
+                        <span>{t("usage.costOut")} {formatMoney(row.output_cost ?? "0", row.currency)}</span>
+                        <span>{t("usage.costCacheRead")} {formatMoney(row.cache_read_cost ?? "0", row.currency)}</span>
+                        <span>{t("usage.costCacheWrite")} {formatMoney(row.cache_write_cost ?? "0", row.currency)}</span>
                       </div>
                     </div>
                   ))}

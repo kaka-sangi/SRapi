@@ -177,6 +177,8 @@ export function AdminListView<T>({
             total={pagination.total}
             onPageChange={pagination.onPageChange}
             labelFor={(from, to, total) => t("adminCommon.pageLabel", { from, to, total })}
+            labelPrev={t("adminCommon.previousPage")}
+            labelNext={t("adminCommon.nextPage")}
           />
         </div>
       ) : null}

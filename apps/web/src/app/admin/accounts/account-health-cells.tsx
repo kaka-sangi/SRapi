@@ -27,15 +27,24 @@ export function HealthSummaryStrip({
 }
 
 export function AccountHealthCell({ health }: { health?: AccountHealthSnapshot }) {
+  const { t } = useLanguage();
   if (!health) return <span className="text-2xs text-srapi-text-tertiary">—</span>;
   const rate = health.success_rate;
   const circuit = health.circuit_state;
   const isOpen = circuit === "open";
   const isHalfOpen = circuit === "half-open";
   const p50 = Math.round(health.latency_p50_ms);
+  // Explain the routing state in plain language: an "open" circuit means the
+  // account is benched — a common reason requests get 'no available account'.
+  const circuitTitle = isOpen
+    ? t("adminAccounts.circuitOpen")
+    : isHalfOpen
+      ? t("adminAccounts.circuitHalfOpen")
+      : t("adminAccounts.circuitClosed");
   return (
     <div className="flex min-w-0 items-center gap-1.5 font-mono text-2xs tabular">
       <span
+        title={circuitTitle}
         className={cn(
           "inline-block size-1.5 shrink-0 rounded-full",
           isOpen ? "bg-srapi-error" : isHalfOpen ? "bg-srapi-warning" : rate >= 0.95 ? "bg-srapi-success" : rate >= 0.8 ? "bg-srapi-warning" : "bg-srapi-error",

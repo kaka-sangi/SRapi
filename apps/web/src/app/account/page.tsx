@@ -355,6 +355,7 @@ function ChangePasswordCard() {
           <div>
             <Label htmlFor="new">{t("account.newPassword")}</Label>
             <Input id="new" type="password" value={next} onChange={(e) => setNext(e.target.value)} />
+            <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("account.passwordHint")}</p>
           </div>
           <div>
             <Label htmlFor="cfm">{t("account.confirmPassword")}</Label>
@@ -370,7 +371,7 @@ function ChangePasswordCard() {
               type="submit"
               variant="primary"
               loading={changeMut.isPending}
-              disabled={!current || !next}
+              disabled={!current || next.length < 8}
             >
               {t("account.changePassword")}
             </Button>

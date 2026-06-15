@@ -45,6 +45,20 @@ import {
   type CopilotFilePart,
 } from "@/lib/image-utils";
 
+/** Derives a stable React list key for a copilot message. The store (and the
+ * `CopilotMessage` type) lives outside this component, so we can't stamp an id
+ * at construction — instead we key off server-assigned ids that already exist
+ * on the messages that actually move under regenerate/slice: tool calls and
+ * tool results carry a unique `tool_call_id`. Plain user/assistant-text turns
+ * have no inherent id; they form the retained prefix on regenerate, so a
+ * role+position key is stable for them. Strictly better than a bare array
+ * index, which remaps tool messages onto unrelated content. */
+function messageKey(message: CopilotMessage, index: number): string {
+  if (message.tool_calls?.length) return `call:${message.tool_calls[0].id}`;
+  if (message.tool_results?.length) return `result:${message.tool_results[0].tool_call_id}`;
+  return `${message.role}:${index}`;
+}
+
 export function CopilotChat({ models, defaultModel }: { models: string[]; defaultModel: string }) {
   const session = useCopilotSession();
   const {
@@ -155,7 +169,7 @@ export function CopilotChat({ models, defaultModel }: { models: string[]; defaul
             <div className="mx-auto max-w-3xl space-y-5 py-4">
               {messages.map((message, i) => (
                 <MessageRow
-                  key={i}
+                  key={messageKey(message, i)}
                   message={message}
                   resultsById={resultsById}
                   isLast={i === lastAssistantIdx}

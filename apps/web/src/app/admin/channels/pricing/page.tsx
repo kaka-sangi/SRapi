@@ -135,8 +135,8 @@ function PricingContent() {
   ];
 
   const fields: FieldConfig<PricingRuleFormState>[] = [
-    { name: "modelId", label: t("adminPricing.model"), type: "select", options: modelOptions },
-    { name: "providerId", label: t("adminPricing.provider"), type: "select", options: providerOptions },
+    { name: "modelId", label: t("adminPricing.model"), type: "select", options: modelOptions, required: true },
+    { name: "providerId", label: t("adminPricing.provider"), type: "select", options: providerOptions, required: true },
     ...priceFields,
   ];
 

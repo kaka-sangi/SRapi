@@ -5,6 +5,7 @@ import { Boxes } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
+import { ADMIN_ROUTES } from "@/lib/routes";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useAdminList } from "@/hooks/use-admin-list";
@@ -165,9 +166,14 @@ function GroupsContent() {
         emptyTitle={t("adminGroups.emptyTitle")}
         emptyBody={t("adminGroups.emptyBody")}
         emptyAction={
-          <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
-            ＋ {t("adminGroups.create")}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
+              ＋ {t("adminGroups.create")}
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <a href={ADMIN_ROUTES.quickSetup}>{t("adminGroups.emptyQuickSetup")}</a>
+            </Button>
+          </div>
         }
         minWidth={480}
         sort={list.sort}
@@ -301,6 +307,7 @@ function GroupFormDialog({
             </div>
             <div>
               <Label htmlFor="g-provider">{t("adminGroups.providerScope")}</Label>
+              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">{t("adminGroups.providerScopeHint")}</p>
               <Select
                 value={form.selectedProviderId || ALL}
                 onValueChange={(v) =>
@@ -322,6 +329,7 @@ function GroupFormDialog({
             </div>
             <div>
               <Label htmlFor="g-model">{t("adminGroups.modelScope")}</Label>
+              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">{t("adminGroups.modelScopeHint")}</p>
               <Select
                 value={form.selectedModelName || ALL}
                 onValueChange={(v) =>
@@ -343,6 +351,7 @@ function GroupFormDialog({
             </div>
             <div>
               <Label htmlFor="g-strategy">{t("adminGroups.strategy")}</Label>
+              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">{t("adminGroups.strategyHint")}</p>
               <Select value={form.strategyHint} onValueChange={(v) => set("strategyHint", v)}>
                 <SelectTrigger id="g-strategy">
                   <SelectValue />

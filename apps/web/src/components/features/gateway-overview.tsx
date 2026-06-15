@@ -106,15 +106,16 @@ export function GatewayOverview() {
                 <Wallet className="size-3.5" />
                 {t("dashboard.balance")}
               </div>
-              {balance.isLoading ? (
-                <Skeleton className="mt-3 h-9 w-36" />
-              ) : (
-                <div className="mt-2 truncate font-serif text-3xl text-srapi-text-primary tabular">
-                  {balance.data
-                    ? formatMoney(balance.data.balance, balance.data.currency)
-                    : "—"}
-                </div>
-              )}
+              <PageQueryState
+                query={balance}
+                skeleton={<Skeleton className="mt-3 h-9 w-36" />}
+              >
+                {(data) => (
+                  <div className="mt-2 truncate font-serif text-3xl text-srapi-text-primary tabular">
+                    {formatMoney(data.balance, data.currency)}
+                  </div>
+                )}
+              </PageQueryState>
             </div>
             <Button asChild variant="outline" size="sm" className="shrink-0">
               <Link href="/billing">
@@ -132,86 +133,94 @@ export function GatewayOverview() {
                 <Gauge className="size-3.5" />
                 {t("dashboard.platformQuotas")}
               </div>
-              {platformQuotas.isLoading ? (
-                <Skeleton className="mt-3 h-9 w-40" />
-              ) : (
-                <>
-                  <div className="mt-2 font-serif text-3xl text-srapi-text-primary tabular">
-                    {enabledQuotas.length}
-                    <span className="ml-1.5 text-sm font-sans text-srapi-text-tertiary">
-                      {t("dashboard.quotaPlatforms")}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
-                    {enabledQuotas.slice(0, 3).map((quota) => {
-                      const limit = quotaLimit(quota);
-                      return (
-                        <span
-                          key={quota.platform}
-                          className="max-w-full truncate rounded-md border border-srapi-border bg-srapi-card-muted px-2 py-1 font-mono text-2xs text-srapi-text-secondary"
-                        >
-                          {quota.platform}
-                          {limit ? ` · ${formatMoney(limit, quota.currency)}` : ""}
-                        </span>
-                      );
-                    })}
-                    {enabledQuotas.length === 0 ? (
-                      <span className="text-sm text-srapi-text-tertiary">
-                        {t("dashboard.noPlatformQuotas")}
+              <PageQueryState
+                query={platformQuotas}
+                skeleton={<Skeleton className="mt-3 h-9 w-40" />}
+              >
+                {() => (
+                  <>
+                    <div className="mt-2 font-serif text-3xl text-srapi-text-primary tabular">
+                      {enabledQuotas.length}
+                      <span className="ml-1.5 text-sm font-sans text-srapi-text-tertiary">
+                        {t("dashboard.quotaPlatforms")}
                       </span>
-                    ) : null}
-                  </div>
-                </>
-              )}
+                    </div>
+                    <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
+                      {enabledQuotas.slice(0, 3).map((quota) => {
+                        const limit = quotaLimit(quota);
+                        return (
+                          <span
+                            key={quota.platform}
+                            className="max-w-full truncate rounded-md border border-srapi-border bg-srapi-card-muted px-2 py-1 font-mono text-2xs text-srapi-text-secondary"
+                          >
+                            {quota.platform}
+                            {limit ? ` · ${formatMoney(limit, quota.currency)}` : ""}
+                          </span>
+                        );
+                      })}
+                      {enabledQuotas.length === 0 ? (
+                        <span className="text-sm text-srapi-text-tertiary">
+                          {t("dashboard.noPlatformQuotas")}
+                        </span>
+                      ) : null}
+                    </div>
+                  </>
+                )}
+              </PageQueryState>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* KPI row — the user's own request/token/cost footprint. */}
-      {usage.isLoading ? (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <StatCardSkeleton key={i} />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <div className="anim-rise-sm" style={rise(1)}>
-            <StatCard
-              className="h-full"
-              label={t("dashboard.requests")}
-              value={totals.requests}
-              format={compact}
-              spark={reqSpark}
-            />
+      <PageQueryState
+        query={usage}
+        skeleton={
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <StatCardSkeleton key={i} />
+            ))}
           </div>
-          <div className="anim-rise-sm" style={rise(2)}>
-            <StatCard
-              className="h-full"
-              label={t("dashboard.successRate")}
-              value={totals.requests > 0 ? totals.successRate : "—"}
-              format={(n) => `${Math.round(n)}%`}
-            />
+        }
+      >
+        {() => (
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="anim-rise-sm" style={rise(1)}>
+              <StatCard
+                className="h-full"
+                label={t("dashboard.requests")}
+                value={totals.requests}
+                format={compact}
+                spark={reqSpark}
+              />
+            </div>
+            <div className="anim-rise-sm" style={rise(2)}>
+              <StatCard
+                className="h-full"
+                label={t("dashboard.successRate")}
+                value={totals.requests > 0 ? totals.successRate : "—"}
+                format={(n) => `${Math.round(n)}%`}
+              />
+            </div>
+            <div className="anim-rise-sm" style={rise(3)}>
+              <StatCard
+                className="h-full"
+                label={t("dashboard.totalTokens")}
+                value={totals.totalTokens}
+                format={compact}
+              />
+            </div>
+            <div className="anim-rise-sm" style={rise(4)}>
+              <StatCard
+                className="h-full"
+                label={t("dashboard.cost")}
+                value={totals.totalCost}
+                format={(n) => fmtCost(n, totals.currency)}
+              />
+            </div>
           </div>
-          <div className="anim-rise-sm" style={rise(3)}>
-            <StatCard
-              className="h-full"
-              label={t("dashboard.totalTokens")}
-              value={totals.totalTokens}
-              format={compact}
-            />
-          </div>
-          <div className="anim-rise-sm" style={rise(4)}>
-            <StatCard
-              className="h-full"
-              label={t("dashboard.cost")}
-              value={totals.totalCost}
-              format={(n) => fmtCost(n, totals.currency)}
-            />
-          </div>
-        </div>
-      )}
+        )}
+      </PageQueryState>
 
       {/* Recent request activity — full width; onboarding CTA when empty */}
       <div className="anim-rise-sm" style={rise(5)}>

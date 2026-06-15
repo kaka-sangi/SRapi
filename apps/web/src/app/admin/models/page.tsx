@@ -5,6 +5,8 @@ import { Cpu } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
+import { ADMIN_ROUTES } from "@/lib/routes";
+import { PRESET_MODEL_NAMES } from "@/app/admin/quick-setup/presets";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
@@ -99,7 +101,7 @@ function ModelsContent() {
   );
 
   const sharedFields: FieldConfig<ModelFormState>[] = [
-    { name: "displayName", label: t("adminModels.displayName") },
+    { name: "displayName", label: t("adminModels.displayName"), required: true },
     { name: "family", label: t("adminModels.family"), help: t("adminModels.familyHelp"), placeholder: "gpt, claude, gemini" },
     { name: "contextWindow", label: t("adminModels.contextWindow"), help: t("adminModels.contextWindowHelp"), type: "number", placeholder: "128000" },
     { name: "maxOutputTokens", label: t("adminModels.maxOutput"), help: t("adminModels.maxOutputHelp"), type: "number", placeholder: "16384" },
@@ -120,6 +122,8 @@ function ModelsContent() {
       label: t("adminModels.canonicalName"),
       placeholder: "gpt-4o-mini",
       hint: t("adminModels.canonicalHint"),
+      required: true,
+      suggestions: PRESET_MODEL_NAMES,
     },
     ...sharedFields,
   ];
@@ -131,6 +135,7 @@ function ModelsContent() {
       hint: t("adminModels.aliasHint"),
       required: true,
       placeholder: "gpt-4o",
+      suggestions: PRESET_MODEL_NAMES,
     },
     { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(MODEL_STATUSES) },
     {
@@ -162,6 +167,7 @@ function ModelsContent() {
       hint: t("adminModels.upstreamModelNameHint"),
       required: true,
       placeholder: "gpt-4o-2024-08-06",
+      suggestions: PRESET_MODEL_NAMES,
     },
     { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(MODEL_STATUSES) },
     {
@@ -267,9 +273,14 @@ function ModelsContent() {
         emptyTitle={t("adminModels.emptyTitle")}
         emptyBody={t("adminModels.emptyBody")}
         emptyAction={
-          <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
-            ＋ {t("adminModels.create")}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
+              ＋ {t("adminModels.create")}
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <a href={ADMIN_ROUTES.quickSetup}>{t("adminModels.emptyQuickSetup")}</a>
+            </Button>
+          </div>
         }
         minWidth={560}
         sort={list.sort}

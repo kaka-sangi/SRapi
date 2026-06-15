@@ -13,6 +13,7 @@ import {
   Copy,
   Check,
   RefreshCw,
+  Lightbulb,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Markdown } from "@/components/ui/markdown";
@@ -26,6 +27,7 @@ import {
   type PlaygroundTurnMeta,
 } from "@/lib/playground-client";
 import { fileToImagePart, imagePartToDataUrl, type CopilotImagePart } from "@/lib/image-utils";
+import { gatewayErrorHintKey } from "@/lib/gateway-error-hint";
 import {
   PlaygroundSettings,
   DEFAULT_PLAYGROUND_PARAMS,
@@ -39,8 +41,19 @@ const rise = (i: number) => ({ "--stagger-index": i }) as CSSProperties;
 const SESSION_STORAGE_KEY = "srapi_playground_session_v1";
 
 /** A playground message plus the per-turn gateway telemetry we attach to
- * assistant replies. `meta` persists in localStorage alongside the text. */
-type ChatMessage = PlaygroundMessage & { meta?: PlaygroundTurnMeta };
+ * assistant replies. `meta` persists in localStorage alongside the text. `id`
+ * is a stable, per-message key assigned at creation so React list keys survive
+ * the regenerate/slice paths (which remap array indices). */
+type ChatMessage = PlaygroundMessage & { meta?: PlaygroundTurnMeta; id: string };
+
+let messageIdCounter = 0;
+/** Collision-free id for a freshly created message. Monotonic per page load;
+ * the counter is module-scoped so restored-from-storage messages (which are
+ * backfilled below) can't clash with newly created ones. */
+function nextMessageId(): string {
+  messageIdCounter += 1;
+  return `m${messageIdCounter}`;
+}
 
 interface PersistedSession {
   messages: ChatMessage[];
@@ -56,6 +69,9 @@ function readPersistedSession(): PersistedSession | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PersistedSession;
     if (!Array.isArray(parsed.messages)) return null;
+    // Backfill stable ids for messages persisted before ids existed (or any that
+    // somehow lack one), so React keys stay unique after a reload.
+    parsed.messages = parsed.messages.map((m) => (m.id ? m : { ...m, id: nextMessageId() }));
     return parsed;
   } catch {
     return null;
@@ -144,7 +160,7 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
       let assistantIdx = -1;
       const ensureAssistant = () => {
         if (assistantIdx < 0) {
-          working.push({ role: "assistant", content: "", reasoning: "" });
+          working.push({ role: "assistant", content: "", reasoning: "", id: nextMessageId() });
           assistantIdx = working.length - 1;
         }
       };
@@ -190,7 +206,7 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
   function send(text?: string) {
     const content = (text ?? input).trim();
     if ((!content && images.length === 0) || running) return;
-    const userMsg: PlaygroundMessage = { role: "user", content };
+    const userMsg: ChatMessage = { role: "user", content, id: nextMessageId() };
     if (images.length) userMsg.images = images;
     const next = [...messages, userMsg];
     setMessages(next);
@@ -231,6 +247,10 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
   }
 
   const empty = messages.length === 0 && !running;
+  // Same plain-language diagnosis used in the account test dialog: turn a terse
+  // gateway reject message into an actionable hint right where the operator
+  // tests the full key → model → account → upstream chain.
+  const errorHint = error ? gatewayErrorHintKey(error) : null;
 
   return (
     <div className="relative flex h-[calc(100vh-9rem)] min-h-[30rem] flex-col">
@@ -250,7 +270,7 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
           <div className="mx-auto max-w-3xl space-y-5 py-4">
             {messages.map((message, i) => (
               <MessageRow
-                key={i}
+                key={message.id}
                 message={message}
                 isLastAssistant={message.role === "assistant" && i === messages.length - 1}
                 running={running}
@@ -264,18 +284,26 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
               </div>
             ) : null}
             {error ? (
-              <div className="ml-9 flex items-start gap-2 rounded-xl border border-srapi-error/30 bg-srapi-error/5 px-3 py-2 text-sm text-srapi-error">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                <span className="flex-1">{error}</span>
-                <button
-                  type="button"
-                  onClick={regenerate}
-                  disabled={running}
-                  className="flex shrink-0 items-center gap-1 text-xs font-medium transition-colors hover:text-srapi-error/80 disabled:opacity-50"
-                >
-                  <RefreshCw className="size-3.5" />
-                  {t("common.retry")}
-                </button>
+              <div className="ml-9 rounded-xl border border-srapi-error/30 bg-srapi-error/5 px-3 py-2 text-sm text-srapi-error">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <span className="flex-1">{error}</span>
+                  <button
+                    type="button"
+                    onClick={regenerate}
+                    disabled={running}
+                    className="flex shrink-0 items-center gap-1 text-xs font-medium transition-colors hover:text-srapi-error/80 disabled:opacity-50"
+                  >
+                    <RefreshCw className="size-3.5" />
+                    {t("common.retry")}
+                  </button>
+                </div>
+                {errorHint ? (
+                  <div className="mt-2 flex items-start gap-1.5 border-t border-srapi-error/20 pt-2 text-2xs text-srapi-text-secondary">
+                    <Lightbulb className="mt-0.5 size-3 shrink-0 text-srapi-text-tertiary" />
+                    <span className="[overflow-wrap:anywhere]">{t(`gatewayHints.${errorHint}`)}</span>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             <div ref={endRef} />

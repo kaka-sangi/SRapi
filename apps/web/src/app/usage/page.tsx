@@ -106,7 +106,7 @@ function UsageBody({
     [logs, model, status],
   );
 
-  const totals = useUsageTotals(logs);
+  const totals = useUsageTotals(filtered);
 
   return (
     <>
@@ -117,7 +117,7 @@ function UsageBody({
         <StatCard label={t("usage.cost")} value={formatMoney(totals.totalCost, totals.currency)} />
       </div>
 
-      <UsageBreakdown logs={logs} />
+      <UsageBreakdown logs={filtered} />
 
       <Card>
         <div className="flex flex-wrap items-center gap-3 border-b border-srapi-border p-4">
@@ -205,8 +205,8 @@ function UsageBody({
                     </TableCell>
                     <TableCell className="text-right font-mono text-srapi-text-secondary tabular">
                       <div>{formatMoney(log.cost, log.currency)}</div>
-                      <div className="mt-1 max-w-[200px] truncate text-2xs text-srapi-text-tertiary" title={usageCostBreakdown(log)}>
-                        {usageCostBreakdown(log)}
+                      <div className="mt-1 max-w-[200px] truncate text-2xs text-srapi-text-tertiary" title={usageCostBreakdown(log, t)}>
+                        {usageCostBreakdown(log, t)}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -220,12 +220,15 @@ function UsageBody({
   );
 }
 
-function usageCostBreakdown(log: UsageLogSummary): string {
+function usageCostBreakdown(
+  log: UsageLogSummary,
+  t: ReturnType<typeof useLanguage>["t"],
+): string {
   return [
-    `in ${formatMoney(log.input_cost, log.currency)}`,
-    `out ${formatMoney(log.output_cost, log.currency)}`,
-    `cache r ${formatMoney(log.cache_read_cost, log.currency)}`,
-    `cache w ${formatMoney(log.cache_write_cost, log.currency)}`,
+    `${t("usage.costIn")} ${formatMoney(log.input_cost, log.currency)}`,
+    `${t("usage.costOut")} ${formatMoney(log.output_cost, log.currency)}`,
+    `${t("usage.costCacheRead")} ${formatMoney(log.cache_read_cost, log.currency)}`,
+    `${t("usage.costCacheWrite")} ${formatMoney(log.cache_write_cost, log.currency)}`,
   ].join(" / ");
 }
 

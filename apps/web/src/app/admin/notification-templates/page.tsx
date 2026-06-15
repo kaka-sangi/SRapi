@@ -183,6 +183,10 @@ function TemplateEditor({ target, onClose }: { target: EditTarget; onClose: () =
 
   async function handleSave() {
     setError(null);
+    if (!subject.trim() || !html.trim()) {
+      setError(t("adminCommon.required"));
+      return;
+    }
     try {
       await updateMut.mutateAsync({ event: event.event, body: { subject: subject.trim(), html } });
       toast({ title: t("feedback.updated"), tone: "success" });
