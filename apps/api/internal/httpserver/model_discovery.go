@@ -104,7 +104,11 @@ func (rt *runtimeState) discoverAccountModels(ctx context.Context, provider prov
 	persisted := req.Persist != nil && *req.Persist
 	if persisted {
 		metadata := cloneMetadata(account.Metadata)
-		metadata["supported_models"] = append([]string(nil), modelIDs...)
+		if len(modelIDs) > 0 {
+			metadata["supported_models"] = append([]string(nil), modelIDs...)
+		} else {
+			delete(metadata, "supported_models")
+		}
 		metadata["model_discovery_source"] = string(source)
 		metadata["model_discovery_endpoint"] = discoveryReq.Endpoint
 		metadata["model_discovery_last_seen_at"] = checkedAt.Format(time.RFC3339)

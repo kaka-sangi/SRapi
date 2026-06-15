@@ -272,6 +272,18 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 	codexNormalizeResponsesInput(payload)
 	codexLiftInstructionInputItems(payload)
 	codexNormalizeResponsesText(payload)
+	// Mirror sub2api, which always sets text={verbosity:"medium"} and
+	// reasoning.summary="auto". These are additive defaults: they never override
+	// an existing text payload (e.g. text.format from response_format handling
+	// above) or an existing reasoning.summary.
+	if _, hasText := payload["text"]; !hasText {
+		payload["text"] = map[string]any{"verbosity": "medium"}
+	}
+	if reasoning, ok := payload["reasoning"].(map[string]any); ok {
+		if _, hasSummary := reasoning["summary"]; !hasSummary {
+			reasoning["summary"] = "auto"
+		}
+	}
 	codexNormalizeServiceTier(req, payload)
 	if !codexResponsesCompactRequest(req) {
 		codexApplyImageGenerationBridgeTool(req, payload)

@@ -784,13 +784,13 @@ func firstCredentialString(values map[string]any, keys ...string) string {
 func defaultUserAgentForUpstreamClient(upstreamClient string) string {
 	switch strings.ToLower(strings.TrimSpace(upstreamClient)) {
 	case "codex_cli":
-		return "Codex/1.0"
+		return "codex_cli_rs/0.125.0 (Ubuntu 22.4.0; x86_64) xterm-256color"
 	case "claude_code_cli":
-		return "Claude-Code/1.0"
+		return "claude-cli/2.1.161 (external, cli)"
 	case "gemini_cli":
-		return "Gemini-CLI/1.0"
+		return "GeminiCLI/0.1.5 (Windows; AMD64)"
 	case "antigravity_desktop", "antigravity":
-		return "Antigravity/1.0"
+		return "antigravity/1.23.2 windows/amd64"
 	default:
 		return ""
 	}

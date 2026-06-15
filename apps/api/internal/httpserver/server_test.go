@@ -2669,7 +2669,7 @@ func TestAdminAccountModelDiscoveryPreviewAntigravityReverseProxy(t *testing.T) 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected discovery 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	if call.Method != http.MethodPost || call.Authorization != "Bearer antigravity-discovery-token" || call.Cookie != "" || call.RequestID != "" || call.UserAgent != "Antigravity/1.0" || call.Project != "project-1" {
+	if call.Method != http.MethodPost || call.Authorization != "Bearer antigravity-discovery-token" || call.Cookie != "" || call.RequestID != "" || call.UserAgent != "antigravity/1.23.2 windows/amd64" || call.Project != "project-1" {
 		t.Fatalf("unexpected antigravity discovery upstream call: %+v", call)
 	}
 	if strings.Contains(rec.Body.String(), "antigravity-discovery-token") || strings.Contains(rec.Body.String(), "caller-token") {
@@ -9809,7 +9809,7 @@ func TestGatewayAntigravityReverseProxyUsesOAuthRuntimeIdentity(t *testing.T) {
 	if chatRec.Code != http.StatusOK {
 		t.Fatalf("expected antigravity gateway success 200, got %d body=%s", chatRec.Code, chatRec.Body.String())
 	}
-	if upstreamPath != "/v1internal:generateContent" || upstreamAuthorization != "Bearer oauth-token" || upstreamUserAgent != "Antigravity/1.0" {
+	if upstreamPath != "/v1internal:generateContent" || upstreamAuthorization != "Bearer oauth-token" || upstreamUserAgent != "antigravity/1.23.2 windows/amd64" {
 		t.Fatalf("unexpected antigravity upstream request path=%q auth=%q ua=%q", upstreamPath, upstreamAuthorization, upstreamUserAgent)
 	}
 	if upstreamProject != "project-1" || !strings.HasPrefix(upstreamRequestID, "agent-") || upstreamModel != "antigravity-upstream" || upstreamPrompt != "call antigravity" {

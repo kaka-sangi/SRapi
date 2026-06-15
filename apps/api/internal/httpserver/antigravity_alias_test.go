@@ -94,7 +94,7 @@ func TestGatewayAntigravityProviderAliasTargetsOpenAIReverseProxy(t *testing.T) 
 	call := gotCalls[0]
 	if call.Path != "/v1internal:generateContent" ||
 		call.Authorization != "Bearer desktop-token" ||
-		call.UserAgent != "Antigravity/1.0" ||
+		call.UserAgent != "antigravity/1.23.2 windows/amd64" ||
 		call.Project != "project-1" ||
 		!strings.HasPrefix(call.RequestID, "agent-") ||
 		call.Model != "antigravity-upstream" ||
@@ -192,7 +192,7 @@ func TestGatewayAntigravityProviderAliasTargetsAnthropicReverseProxy(t *testing.
 	call := gotCalls[0]
 	if call.Path != "/v1internal:generateContent" ||
 		call.Authorization != "Bearer desktop-token" ||
-		call.UserAgent != "Antigravity/1.0" ||
+		call.UserAgent != "antigravity/1.23.2 windows/amd64" ||
 		call.Project != "project-1" ||
 		call.Model != "antigravity-claude" ||
 		call.System != "be direct" ||
@@ -492,7 +492,7 @@ func TestGatewayAntigravityGeminiCountTokensAliasTargetsReverseProxy(t *testing.
 	call := gotCalls[0]
 	if call.Path != "/v1internal:countTokens" ||
 		call.Authorization != "Bearer desktop-token" ||
-		call.UserAgent != "Antigravity/1.0" ||
+		call.UserAgent != "antigravity/1.23.2 windows/amd64" ||
 		call.Project != "project-1" ||
 		!strings.HasPrefix(call.RequestID, "agent-") ||
 		call.Model != "antigravity-count-upstream" ||
@@ -634,7 +634,7 @@ func TestGatewayAntigravityImageGenerationTargetsNativeReverseProxy(t *testing.T
 	call := gotCalls[0]
 	if call.Path != "/v1internal:generateContent" ||
 		call.Authorization != "Bearer desktop-token" ||
-		call.UserAgent != "Antigravity/1.0" ||
+		call.UserAgent != "antigravity/1.23.2 windows/amd64" ||
 		call.Project != "project-1" ||
 		!strings.HasPrefix(call.RequestID, "image_gen/") ||
 		call.RequestType != "image_gen" ||

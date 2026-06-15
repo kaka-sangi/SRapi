@@ -152,7 +152,7 @@ func TestRuntimeInjectsCliClientTokenAndDefaultClientUserAgent(t *testing.T) {
 	if gotHeader.Get("Authorization") != "Bearer cli-token" {
 		t.Fatalf("expected cli client token auth, got %q", gotHeader.Get("Authorization"))
 	}
-	if gotHeader.Get("User-Agent") != "Claude-Code/1.0" {
+	if gotHeader.Get("User-Agent") != "claude-cli/2.1.161 (external, cli)" {
 		t.Fatalf("expected claude code user agent, got %q", gotHeader.Get("User-Agent"))
 	}
 	if gotHeader.Get("X-Stainless-Runtime") != "node" ||
@@ -197,7 +197,7 @@ func TestRuntimeDoesNotInjectAPIKeyRuntimeCredentials(t *testing.T) {
 	if gotHeader.Get("Authorization") != "" {
 		t.Fatalf("expected no api key auth injection, got %q", gotHeader.Get("Authorization"))
 	}
-	if gotHeader.Get("User-Agent") != "Codex/1.0" {
+	if gotHeader.Get("User-Agent") != "codex_cli_rs/0.125.0 (Ubuntu 22.4.0; x86_64) xterm-256color" {
 		t.Fatalf("expected codex user agent, got %q", gotHeader.Get("User-Agent"))
 	}
 }
@@ -233,7 +233,7 @@ func TestRuntimeInjectsAntigravityOAuthTokenAndDefaultUserAgent(t *testing.T) {
 	if gotHeader.Get("Authorization") != "Bearer antigravity-token" {
 		t.Fatalf("expected OAuth bearer token auth, got %q", gotHeader.Get("Authorization"))
 	}
-	if gotHeader.Get("User-Agent") != "Antigravity/1.0" {
+	if gotHeader.Get("User-Agent") != "antigravity/1.23.2 windows/amd64" {
 		t.Fatalf("expected antigravity user agent, got %q", gotHeader.Get("User-Agent"))
 	}
 }
@@ -794,7 +794,7 @@ func TestRuntimeRelaysWebSocketWithAccountContextAndHeaderHygiene(t *testing.T) 
 	if string(payload) != "hello websocket" {
 		t.Fatalf("expected upstream websocket payload, got %q", payload)
 	}
-	if headers.Get("Authorization") != "Bearer cli-token" || headers.Get("Cookie") != "" || headers.Get("User-Agent") != "Codex/1.0" {
+	if headers.Get("Authorization") != "Bearer cli-token" || headers.Get("Cookie") != "" || headers.Get("User-Agent") != "codex_cli_rs/0.125.0 (Ubuntu 22.4.0; x86_64) xterm-256color" {
 		t.Fatalf("unexpected websocket account headers: %+v", headers)
 	}
 	if headers.Get("X-Forwarded-For") != "" || headers.Get("X-SRapi-Test") != "" || strings.Contains(headers.Get("Sec-Websocket-Protocol"), "leaked-protocol") {

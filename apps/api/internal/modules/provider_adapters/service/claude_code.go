@@ -18,6 +18,11 @@ const (
 	claudeCodeDefaultStainlessPackageVersion = "0.74.0"
 	claudeCodeDefaultStainlessRuntimeVersion = "v24.3.0"
 	claudeCodeAgentText                      = "You are Claude Code, Anthropic's official CLI for Claude."
+	// CLICurrentVersion is the Claude Code CLI version impersonated in the
+	// User-Agent header. It must stay in sync with sub2api's value
+	// (internal/pkg/claude/constants.go) or Anthropic may flag the traffic as
+	// non-CLI usage.
+	CLICurrentVersion = "2.1.161"
 )
 
 func isClaudeCodeReverseProxy(req contract.ConversationRequest) bool {
@@ -97,6 +102,8 @@ func claudeCodeMessagesHeaders(req contract.ConversationRequest) http.Header {
 	}
 	headers.Set("Anthropic-Beta", beta)
 	headers.Set("Anthropic-Version", defaultRequestSetting(req, "2023-06-01", "anthropic_version", "anthropic-version"))
+	headers.Set("User-Agent", defaultRequestSetting(req, "claude-cli/"+CLICurrentVersion+" (external, cli)", "user_agent", "user-agent", "User-Agent"))
+	headers.Set("Anthropic-Dangerous-Direct-Browser-Access", "true")
 	headers.Set("X-App", defaultRequestSetting(req, "cli", "x_app", "x-app"))
 	headers.Set("X-Stainless-Retry-Count", defaultRequestSetting(req, "0", "x_stainless_retry_count", "x-stainless-retry-count"))
 	headers.Set("X-Stainless-Runtime", defaultRequestSetting(req, "node", "x_stainless_runtime", "x-stainless-runtime"))
