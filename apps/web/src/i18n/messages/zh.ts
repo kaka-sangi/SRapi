@@ -1401,6 +1401,11 @@ export const zh: Messages = {
     deletedResult: "已删除 {deleted} / 匹配 {matched} 条。",
     limited: "受上限 {max} 限制",
   },
+  adminUsageExport: {
+    action: "导出 CSV",
+    doneTitle: "已导出 {count} 条",
+    emptyTitle: "暂无数据可导出。",
+  },
   adminUsageCleanup: {
     action: "清理记录",
     title: "清理用量记录",

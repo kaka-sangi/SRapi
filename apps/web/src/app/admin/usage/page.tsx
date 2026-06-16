@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BarChart3, Trash2 } from "lucide-react";
+import { BarChart3, Download, Trash2 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Button } from "@/components/ui/button";
 import { UsageCleanupDialog } from "@/components/admin/usage-cleanup-dialog";
@@ -39,6 +39,8 @@ import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { useAdminUsageExport } from "@/hooks/use-admin-usage-export";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { TrendChart } from "@/components/charts/trend-chart";
@@ -154,6 +156,21 @@ function UsageContent() {
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-usage", DEFAULT_HIDDEN_COLUMNS);
   const [cleanupOpen, setCleanupOpen] = useState(false);
+  const { toast } = useToast();
+  const usageExport = useAdminUsageExport();
+
+  async function runExport() {
+    const rows = await usageExport.start();
+    if (usageExport.state.phase === "error") {
+      toast({ title: t("feedback.failed"), description: usageExport.state.error, tone: "error" });
+      return;
+    }
+    if (rows > 0) {
+      toast({ title: t("adminUsageExport.doneTitle", { count: rows }), tone: "success" });
+    } else {
+      toast({ title: t("adminUsageExport.emptyTitle"), tone: "default" });
+    }
+  }
   // Clicking a usage row's user opens the shared balance-history dialog.
   const [balanceUser, setBalanceUser] = useState<{ id: string; email: string } | null>(null);
   const modelFilter = list.filters.model || undefined;
@@ -435,6 +452,15 @@ function UsageContent() {
               columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
               visibility={colVis}
             />
+            <Button
+              variant="outline"
+              size="sm"
+              loading={usageExport.isExporting}
+              onClick={() => void runExport()}
+            >
+              <Download />
+              {t("adminUsageExport.action")}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setCleanupOpen(true)}>
               <Trash2 />
               {t("adminUsageCleanup.action")}

@@ -1423,6 +1423,11 @@ export const en = {
     deletedResult: "Deleted {deleted} of {matched} matched.",
     limited: "capped at {max}",
   },
+  adminUsageExport: {
+    action: "Export CSV",
+    doneTitle: "Exported {count} rows",
+    emptyTitle: "Nothing to export.",
+  },
   adminUsageCleanup: {
     action: "Clean up records",
     title: "Clean up usage records",
