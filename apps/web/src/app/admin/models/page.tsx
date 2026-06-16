@@ -35,6 +35,8 @@ import {
 import { RateLimitDialog } from "@/components/admin/rate-limit-dialog";
 import { ModelDetailDialog } from "@/components/admin/model-detail-dialog";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { adminErrorMessage } from "@/lib/admin-api";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { rateLimitSummary } from "@/lib/rate-limit-format";
@@ -70,6 +72,7 @@ export default function AdminModelsPage() {
 
 function ModelsContent() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-models", []);
   const statusFilter = (list.filters.status as Model["status"]) || undefined;
@@ -99,6 +102,21 @@ function ModelsContent() {
   const isFiltered = Boolean(statusFilter || list.search);
 
   const [formTarget, setFormTarget] = useState<Model | "new" | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  async function toggleStatus(m: Model) {
+    if (togglingId === m.id) return;
+    const next: Model["status"] = m.status === "active" ? "disabled" : "active";
+    setTogglingId(m.id);
+    try {
+      await updateMut.mutateAsync({ id: m.id, body: { status: next } });
+      toast({ title: t("feedback.saved"), tone: "success" });
+    } catch (err) {
+      toast({ title: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setTogglingId(null);
+    }
+  }
   const [rateLimitTarget, setRateLimitTarget] = useState<Model | null>(null);
   const [aliasTarget, setAliasTarget] = useState<Model | null>(null);
   const [mappingTarget, setMappingTarget] = useState<Model | null>(null);
@@ -252,7 +270,27 @@ function ModelsContent() {
       key: "status",
       header: t("common.active"),
       sortValue: (m) => m.status,
-      render: (m) => <QuietBadge status={quietStatusFor(m.status)} label={statusLabel(t, m.status)} />,
+      render: (m) => {
+        // Inline toggle only between active <-> disabled. pending/archived
+        // stay read-only — letting a click silently move an archived model
+        // back to disabled would surprise operators.
+        const canToggle = m.status === "active" || m.status === "disabled";
+        const badge = (
+          <QuietBadge status={quietStatusFor(m.status)} label={statusLabel(t, m.status)} />
+        );
+        if (!canToggle) return badge;
+        return (
+          <button
+            type="button"
+            onClick={() => void toggleStatus(m)}
+            disabled={togglingId === m.id}
+            className="cursor-pointer disabled:cursor-wait disabled:opacity-60"
+            title={m.status === "active" ? t("common.disable") : t("common.enable")}
+          >
+            {badge}
+          </button>
+        );
+      },
     },
   ];
 
