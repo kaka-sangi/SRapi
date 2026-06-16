@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { CreditCard } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
-import { AdminListView, type Column } from "@/components/admin/admin-list-view";
-import { ListToolbar } from "@/components/admin/list-toolbar";
+import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
+import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
+import { useAdminList } from "@/hooks/use-admin-list";
+import { useClientPagedList } from "@/hooks/use-client-list";
 import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
@@ -40,9 +42,19 @@ import type { UserSubscription } from "@/lib/sdk-types";
 
 export function SubscriptionsPanel() {
   const { t } = useLanguage();
+  const list = useAdminList();
   const colVis = useColumnVisibility("admin-subscriptions", []);
   const plans = useAdminSubscriptionPlans();
-  const subs = useAdminSubscriptions();
+  const allSubs = useAdminSubscriptions();
+  // Server endpoint accepts page/page_size/user_id only — no status filter —
+  // so the operator-side filtering happens client-side via the shared list
+  // helper. The full list ships in one shot today, so the lift is small.
+  const { query: subs, total } = useClientPagedList(allSubs, list, {
+    match: (row, _term, filters) =>
+      !filters.status || row.status === filters.status,
+    compare: (a, b) => (b.starts_at ?? "").localeCompare(a.starts_at ?? ""),
+  });
+  const statusFilter = list.filters.status as UserSubscription["status"] | undefined;
   const users = useAdminUsers();
   const createSub = useCreateUserSubscription();
   const deleteSub = useDeleteUserSubscription();
@@ -117,9 +129,12 @@ export function SubscriptionsPanel() {
         title={t("adminSubscriptions.title")}
         description={t("adminSubscriptions.subtitle")}
         actions={
-          <Button variant="primary" size="sm" onClick={() => setCreatingSub(true)}>
-            ＋ {t("adminSubscriptions.createSubscription")}
-          </Button>
+          <div className="flex items-center gap-3">
+            {allSubs.data ? <ListCount total={total} /> : null}
+            <Button variant="primary" size="sm" onClick={() => setCreatingSub(true)}>
+              ＋ {t("adminSubscriptions.createSubscription")}
+            </Button>
+          </div>
         }
       />
       <AdminListView
@@ -131,14 +146,31 @@ export function SubscriptionsPanel() {
         emptyTitle={t("adminSubscriptions.emptySubs")}
         emptyBody={t("adminSubscriptions.emptySubsBody")}
         minWidth={560}
+        isFiltered={Boolean(statusFilter)}
+        onClearFilters={list.clearFilters}
         toolbar={
           <ListToolbar>
+            <FilterSelect
+              value={list.filters.status}
+              onChange={(v) => list.setFilter("status", v)}
+              options={USER_SUBSCRIPTION_STATUSES.map((s) => ({
+                value: s,
+                label: statusLabel(t, s),
+              }))}
+              allLabel={t("adminCommon.allStatuses")}
+            />
             <ColumnToggle
               columns={subColumns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
               visibility={colVis}
             />
           </ListToolbar>
         }
+        pagination={{
+          page: list.page,
+          pageSize: list.pageSize,
+          total,
+          onPageChange: list.setPage,
+        }}
         rowActions={(s) => {
           const actions: RowAction[] = [
             { label: t("common.delete"), destructive: true, onSelect: () => setSubToDelete(s) },
