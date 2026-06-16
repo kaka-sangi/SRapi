@@ -15,6 +15,11 @@ import { useAdminErrorLogs, useAdminModels, useAdminUsers } from "@/hooks/admin-
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatLatency } from "@/lib/admin-format";
 import type { ErrorLog } from "@/lib/sdk-types";
+import {
+  LOG_WINDOW_PRESETS,
+  LOG_WINDOW_ALL_LABEL_KEY,
+  logWindowSince,
+} from "@/lib/log-window-filter";
 
 const DEFAULT_HIDDEN_COLUMNS = ["api_key_id", "provider_id", "protocol", "attempt_no"];
 
@@ -27,6 +32,10 @@ export function ErrorLogsPanel() {
   const modelFilter = list.filters.model || undefined;
   const userFilter = list.filters.user || undefined;
   const errorClassFilter = list.search || undefined;
+  const windowFilter = list.filters.window;
+  // Resolve the preset to an ISO timestamp the backend's start/end filter
+  // honours. logWindowSince returns null when the preset is unset.
+  const sinceFilter = logWindowSince(windowFilter)?.toISOString();
 
   const errorLogs = useAdminErrorLogs({
     page: list.page,
@@ -34,6 +43,7 @@ export function ErrorLogsPanel() {
     model: modelFilter,
     user_id: userFilter,
     error_class: errorClassFilter,
+    start: sinceFilter,
   });
 
   const models = useAdminModels({ page: 1, page_size: 100 });
@@ -50,7 +60,7 @@ export function ErrorLogsPanel() {
     (usersList.data?.data ?? []).map((u) => [String(u.id), u.email] as const),
   );
 
-  const isFiltered = Boolean(modelFilter || userFilter || errorClassFilter);
+  const isFiltered = Boolean(modelFilter || userFilter || errorClassFilter || windowFilter);
   const total = errorLogs.data?.pagination?.total ?? errorLogs.data?.data.length ?? 0;
 
   const emailFor = (e: ErrorLog) => userEmailById.get(String(e.user_id)) || String(e.user_id);
@@ -212,6 +222,12 @@ export function ErrorLogsPanel() {
               onChange={(v) => list.setFilter("user", v)}
               options={userOptions}
               allLabel={t("adminErrorLogs.allUsers")}
+            />
+            <FilterSelect
+              value={list.filters.window}
+              onChange={(v) => list.setFilter("window", v)}
+              options={LOG_WINDOW_PRESETS.map((p) => ({ value: p.value, label: t(p.labelKey) }))}
+              allLabel={t(LOG_WINDOW_ALL_LABEL_KEY)}
             />
           </ListToolbar>
         }
