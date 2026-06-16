@@ -15,6 +15,8 @@ import {
 } from "@/components/admin/resource-form-dialog";
 import { useAffiliateRules, useCreateAffiliateRule, useUpdateAffiliateRule } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { adminErrorMessage } from "@/lib/admin-api";
 import { Button } from "@/components/ui/button";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
@@ -31,13 +33,29 @@ import type { AffiliateRule } from "@/lib/sdk-types";
 
 export function RulesPanel() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-affiliate-rules", []);
   const rules = useAffiliateRules({ page: list.page, page_size: list.pageSize });
   const createMut = useCreateAffiliateRule();
   const updateMut = useUpdateAffiliateRule();
   const [formTarget, setFormTarget] = useState<AffiliateRule | "new" | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const isNew = formTarget === "new";
+
+  async function toggleStatus(rule: AffiliateRule) {
+    if (togglingId === rule.id) return;
+    const next: AffiliateRule["status"] = rule.status === "active" ? "disabled" : "active";
+    setTogglingId(rule.id);
+    try {
+      await updateMut.mutateAsync({ id: rule.id, body: { status: next } });
+      toast({ title: t("feedback.saved"), tone: "success" });
+    } catch (err) {
+      toast({ title: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setTogglingId(null);
+    }
+  }
 
   const fields: FieldConfig<AffiliateRuleFormState>[] = [
     { name: "name", label: t("adminAffiliates.ruleName"), required: true },
@@ -107,9 +125,24 @@ export function RulesPanel() {
     {
       key: "status",
       header: t("adminCommon.status"),
-      render: (rule) => (
-        <QuietBadge status={quietStatusFor(rule.status)} label={statusLabel(t, rule.status)} />
-      ),
+      render: (rule) => {
+        const canToggle = rule.status === "active" || rule.status === "disabled";
+        const badge = (
+          <QuietBadge status={quietStatusFor(rule.status)} label={statusLabel(t, rule.status)} />
+        );
+        if (!canToggle) return badge;
+        return (
+          <button
+            type="button"
+            onClick={() => void toggleStatus(rule)}
+            disabled={togglingId === rule.id}
+            className="cursor-pointer disabled:cursor-wait disabled:opacity-60"
+            title={rule.status === "active" ? t("common.disable") : t("common.enable")}
+          >
+            {badge}
+          </button>
+        );
+      },
     },
   ];
 
