@@ -6,6 +6,7 @@ import { AdminListView, ListCount, type Column } from "@/components/admin/admin-
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { PageHeader } from "@/components/layout/page-header";
+import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { useAffiliateWithdrawals, useApproveWithdrawal, useCancelWithdrawal } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatMoney, formatDateTime } from "@/lib/admin-format";
@@ -87,13 +88,20 @@ export function WithdrawalsPanel() {
         title={t("adminAffiliates.withdrawalsTitle")}
         description={t("adminAffiliates.withdrawalsSubtitle")}
         actions={
-          withdrawalsQuery.data ? (
-            <ListCount
-              total={
-                withdrawalsQuery.data.pagination?.total ?? withdrawalsQuery.data.data.length
-              }
+          <div className="flex items-center gap-3">
+            {withdrawalsQuery.data ? (
+              <ListCount
+                total={
+                  withdrawalsQuery.data.pagination?.total ?? withdrawalsQuery.data.data.length
+                }
+              />
+            ) : null}
+            <AutoRefreshControl
+              onRefresh={() => void query.refetch()}
+              isRefreshing={query.isFetching}
+              storageKey="srapi.autorefresh.admin-affiliate-withdrawals"
             />
-          ) : undefined
+          </div>
         }
       />
       <AdminListView
