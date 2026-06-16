@@ -22,11 +22,16 @@ export const ADMIN_ROUTES = {
   accounts: "/admin/accounts",
   groups: "/admin/groups",
   proxies: "/admin/proxies",
-  subscriptions: "/admin/subscriptions",
+  // Billing-admin (catalog + sales config) is one tabbed page since the
+  // aggregation pass — plans/subscriptions/payment-providers all live under
+  // /admin/billing-admin. The transactional order log /admin/orders stays
+  // standalone. Legacy routes still 308-redirect to the tab params.
+  billingAdmin: "/admin/billing-admin",
+  subscriptions: "/admin/billing-admin?tab=subscriptions",
   orders: "/admin/orders",
-  ordersPlans: "/admin/orders/plans",
+  ordersPlans: "/admin/billing-admin?tab=plans",
   channelsPricing: "/admin/channels/pricing",
-  paymentProviders: "/admin/payment-providers",
+  paymentProviders: "/admin/billing-admin?tab=payment-providers",
   promoCodes: "/admin/promo-codes",
   redeem: "/admin/redeem",
   // Affiliate admin is one tabbed page (/admin/affiliates) since the
