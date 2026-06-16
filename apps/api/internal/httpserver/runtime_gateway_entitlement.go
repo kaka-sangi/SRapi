@@ -50,10 +50,10 @@ func gatewayEntitlementBalanceBilled(decision subscriptioncontract.EntitlementDe
 func gatewayBalanceCoversRequest(balance string, estimatedCost string) bool {
 	balanceRat, ok := money.DecimalRat(money.NormalizeAmount(balance))
 	if !ok {
-		// Unparseable balance is treated as covering the request so a data
-		// anomaly never hard-blocks traffic; the deferred charger remains the
-		// backstop.
-		return true
+		// Fail CLOSED: if we cannot determine the balance we must not draw down a
+		// real upstream on credit. (Previously this failed open, which let a user
+		// with a corrupted/unparseable balance run unbounded paid requests.)
+		return false
 	}
 	if balanceRat.Sign() <= 0 {
 		return false

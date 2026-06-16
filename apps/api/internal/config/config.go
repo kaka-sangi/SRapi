@@ -126,8 +126,10 @@ type GatewayConfig struct {
 	// gateway requests (pay-go users, or allowance-mode subscription overage)
 	// from users whose balance no longer covers the request, closing the
 	// deferred-charging overspend window. It never blocks hard_cap subscription
-	// users (who never bill to balance). Default false preserves the historical
-	// fail-open behavior.
+	// users (who never bill to balance). The code default is false, but the
+	// production deploy (deploy/docker-compose.yml) sets
+	// GATEWAY_REQUIRE_POSITIVE_BALANCE=true — a paid gateway must not let a
+	// zero-balance user draw down real upstreams.
 	RequirePositiveBalance bool
 	// UsageMaxConcurrency bounds how many gateway usage/billing writes run
 	// asynchronously off the request critical path at once. Above this the

@@ -61,7 +61,7 @@ func TestGatewayBalanceCoversRequest(t *testing.T) {
 		{name: "zero balance never covers", balance: "0.00000000", estCost: "0.00000000", wantCover: false},
 		{name: "negative balance never covers", balance: "-0.00000001", estCost: "0.00000000", wantCover: false},
 		{name: "empty balance treated as zero, does not cover", balance: "", estCost: "0.00000000", wantCover: false},
-		{name: "unparseable balance fails open (covers)", balance: "not-a-number", estCost: "1.00000000", wantCover: true},
+		{name: "unparseable balance fails closed (does not cover)", balance: "not-a-number", estCost: "1.00000000", wantCover: false},
 		{name: "positive balance with unknown estimate covers", balance: "0.00000001", estCost: "", wantCover: true},
 	}
 	for _, tc := range cases {
