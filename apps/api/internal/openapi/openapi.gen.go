@@ -5127,6 +5127,12 @@ type BatchUpdateUsersResult struct {
 	UpdatedIds   []Id     `json:"updated_ids"`
 }
 
+// BatchUserAttributeValuesResponse defines model for BatchUserAttributeValuesResponse.
+type BatchUserAttributeValuesResponse struct {
+	Data      []UserAttributeValueWithUserID `json:"data"`
+	RequestId RequestId                      `json:"request_id"`
+}
+
 // BillingLedgerEntry defines model for BillingLedgerEntry.
 type BillingLedgerEntry struct {
 	Amount        string                 `json:"amount"`
@@ -10080,6 +10086,19 @@ type UserAttributeValueListResponse struct {
 	RequestId  RequestId            `json:"request_id"`
 }
 
+// UserAttributeValueWithUserID defines model for UserAttributeValueWithUserID.
+type UserAttributeValueWithUserID struct {
+	DataType     string     `json:"data_type"`
+	DefinitionId int64      `json:"definition_id"`
+	Key          string     `json:"key"`
+	Name         string     `json:"name"`
+	Options      []string   `json:"options"`
+	Required     bool       `json:"required"`
+	UpdatedAt    *time.Time `json:"updated_at,omitempty"`
+	UserId       Id         `json:"user_id"`
+	Value        string     `json:"value"`
+}
+
 // UserAvatar defines model for UserAvatar.
 type UserAvatar struct {
 	ByteSize    int                   `json:"byte_size"`
@@ -10803,6 +10822,12 @@ type ListAdminUsersParams struct {
 	PageSize *PageSize    `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Q        *SearchQuery `form:"q,omitempty" json:"q,omitempty"`
 	Status   *UserStatus  `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// BatchListAdminUserAttributeValuesParams defines parameters for BatchListAdminUserAttributeValues.
+type BatchListAdminUserAttributeValuesParams struct {
+	// UserIds Comma-separated user ids. Empty / missing returns an empty data array.
+	UserIds string `form:"user_ids" json:"user_ids"`
 }
 
 // GetAdminUserBalanceHistoryParams defines parameters for GetAdminUserBalanceHistory.
@@ -18578,6 +18603,9 @@ type ServerInterface interface {
 	// Create a user.
 	// (POST /api/v1/admin/users)
 	CreateAdminUser(w http.ResponseWriter, r *http.Request)
+	// Batch list user attribute values across multiple users.
+	// (GET /api/v1/admin/users/attributes/batch)
+	BatchListAdminUserAttributeValues(w http.ResponseWriter, r *http.Request, params BatchListAdminUserAttributeValuesParams)
 	// Batch update user attributes.
 	// (PATCH /api/v1/admin/users/batch)
 	BatchUpdateAdminUsers(w http.ResponseWriter, r *http.Request)
@@ -28842,6 +28870,45 @@ func (siw *ServerInterfaceWrapper) CreateAdminUser(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// BatchListAdminUserAttributeValues operation middleware
+func (siw *ServerInterfaceWrapper) BatchListAdminUserAttributeValues(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params BatchListAdminUserAttributeValuesParams
+
+	// ------------- Required query parameter "user_ids" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "user_ids", r.URL.Query(), &params.UserIds, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_ids"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_ids", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchListAdminUserAttributeValues(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // BatchUpdateAdminUsers operation middleware
 func (siw *ServerInterfaceWrapper) BatchUpdateAdminUsers(w http.ResponseWriter, r *http.Request) {
 
@@ -32850,6 +32917,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/user-subscriptions/{id}", wrapper.DeleteAdminUserSubscription)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users", wrapper.ListAdminUsers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/users", wrapper.CreateAdminUser)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users/attributes/batch", wrapper.BatchListAdminUserAttributeValues)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/users/batch", wrapper.BatchUpdateAdminUsers)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/users/{id}", wrapper.DeleteAdminUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users/{id}", wrapper.GetAdminUser)

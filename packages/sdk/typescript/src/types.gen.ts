@@ -5926,6 +5926,15 @@ export type UserAttributeValue = {
     updated_at?: string;
 };
 
+export type UserAttributeValueWithUserId = UserAttributeValue & {
+    user_id: Id;
+};
+
+export type BatchUserAttributeValuesResponse = {
+    data: Array<UserAttributeValueWithUserId>;
+    request_id: RequestId;
+};
+
 export type SetUserAttributeValueRequest = {
     value?: string;
 };
@@ -21444,6 +21453,48 @@ export type UpdateAdminUserAttributeDefinitionResponses = {
 };
 
 export type UpdateAdminUserAttributeDefinitionResponse = UpdateAdminUserAttributeDefinitionResponses[keyof UpdateAdminUserAttributeDefinitionResponses];
+
+export type BatchListAdminUserAttributeValuesData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Comma-separated user ids. Empty / missing returns an empty data array.
+         */
+        user_ids: string;
+    };
+    url: '/api/v1/admin/users/attributes/batch';
+};
+
+export type BatchListAdminUserAttributeValuesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchListAdminUserAttributeValuesError = BatchListAdminUserAttributeValuesErrors[keyof BatchListAdminUserAttributeValuesErrors];
+
+export type BatchListAdminUserAttributeValuesResponses = {
+    /**
+     * Per-user attribute values flattened.
+     */
+    200: BatchUserAttributeValuesResponse;
+};
+
+export type BatchListAdminUserAttributeValuesResponse = BatchListAdminUserAttributeValuesResponses[keyof BatchListAdminUserAttributeValuesResponses];
 
 export type ListAdminUserAttributeValuesData = {
     body?: never;

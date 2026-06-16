@@ -14453,6 +14453,50 @@ paths:
           $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
+  /api/v1/admin/users/attributes/batch:
+    get:
+      tags:
+        - AdminUserAttributes
+      operationId: batchListAdminUserAttributeValues
+      summary: Batch list user attribute values across multiple users.
+      description: |
+        Returns one flat list of {user_id, definition fields, value} rows for
+        every (user × enabled definition) pair, computed from a single pass.
+        Used by the users-list "Attributes" column so showing N users costs
+        one round-trip instead of N. Unknown user_ids are silently omitted
+        (the list view shouldn't blow up on a stale id).
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: user_ids
+          in: query
+          description: Comma-separated user ids. Empty / missing returns an empty data array.
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Per-user attribute values flattened.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchUserAttributeValuesResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/users/{id}/attributes:
     get:
       tags:
@@ -29669,6 +29713,30 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    UserAttributeValueWithUserID:
+      allOf:
+        - $ref: "#/components/schemas/UserAttributeValue"
+        - type: object
+          required:
+            - user_id
+          properties:
+            user_id:
+              $ref: "#/components/schemas/Id"
+
+    BatchUserAttributeValuesResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserAttributeValueWithUserID"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     SetUserAttributeValueRequest:
       type: object
       properties:

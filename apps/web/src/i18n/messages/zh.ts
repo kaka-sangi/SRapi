@@ -643,6 +643,7 @@ export const zh: Messages = {
     balanceHistory: "余额记录",
     platformQuotas: "平台配额",
     attributes: "自定义属性",
+    attributesColumn: "属性",
     amount: "金额",
     operation: "操作",
     note: "备注",

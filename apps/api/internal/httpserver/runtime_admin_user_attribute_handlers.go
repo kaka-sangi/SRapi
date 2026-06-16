@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	userattributescontract "github.com/srapi/srapi/apps/api/internal/modules/userattributes/contract"
@@ -341,4 +342,99 @@ func (s *Server) writeUserAttributeError(w http.ResponseWriter, err error, reque
 	default:
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to process user attribute request", requestID)
 	}
+}
+
+// handleBatchListAdminUserAttributeValues serves
+// GET /api/v1/admin/users/attributes/batch?user_ids=1,2,3
+//
+// Flattens the per-user-values data so the users list page can render an
+// "Attributes" column in one round-trip rather than firing N. Definitions
+// load once; ListUserValues fires once per requested user. The flat shape
+// (one row per user × definition) is easier for the frontend to group than
+// a nested list.
+func (s *Server) handleBatchListAdminUserAttributeValues(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	raw := strings.TrimSpace(r.URL.Query().Get("user_ids"))
+	if raw == "" {
+		writeJSONAny(w, http.StatusOK, apiopenapi.BatchUserAttributeValuesResponse{
+			Data:      []apiopenapi.UserAttributeValueWithUserID{},
+			RequestId: requestID,
+		})
+		return
+	}
+	wanted := make([]int, 0)
+	seen := make(map[int]bool)
+	for _, piece := range strings.Split(raw, ",") {
+		piece = strings.TrimSpace(piece)
+		if piece == "" {
+			continue
+		}
+		id, err := strconv.Atoi(piece)
+		if err != nil || id <= 0 {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid user id in batch", requestID)
+			return
+		}
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		wanted = append(wanted, id)
+	}
+	if len(wanted) == 0 {
+		writeJSONAny(w, http.StatusOK, apiopenapi.BatchUserAttributeValuesResponse{
+			Data:      []apiopenapi.UserAttributeValueWithUserID{},
+			RequestId: requestID,
+		})
+		return
+	}
+	defs, err := s.runtime.userAttributes.ListDefinitions(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list user attributes", requestID)
+		return
+	}
+	// Skip disabled definitions up front — the per-user endpoint does the same.
+	enabled := make([]userattributescontract.Definition, 0, len(defs))
+	for _, def := range defs {
+		if def.Enabled {
+			enabled = append(enabled, def)
+		}
+	}
+	out := make([]apiopenapi.UserAttributeValueWithUserID, 0, len(wanted)*len(enabled))
+	for _, userID := range wanted {
+		values, err := s.runtime.userAttributes.ListUserValues(r.Context(), userID)
+		if err != nil {
+			// A single bad user shouldn't sink the whole batch — log nothing
+			// (silent), just skip it so the frontend gets a stable shape.
+			continue
+		}
+		valueByDefinition := make(map[int]userattributescontract.Value, len(values))
+		for _, v := range values {
+			valueByDefinition[v.DefinitionID] = v
+		}
+		for _, def := range enabled {
+			row := apiopenapi.UserAttributeValueWithUserID{
+				UserId:       apiopenapi.Id(strconv.Itoa(userID)),
+				DefinitionId: int64(def.ID),
+				Key:          def.Key,
+				Name:         def.Name,
+				DataType:     string(def.DataType),
+				Options:      attributeOptions(def.Options),
+				Required:     def.Required,
+			}
+			if v, ok := valueByDefinition[def.ID]; ok {
+				row.Value = v.Value
+				updatedAt := v.UpdatedAt.UTC()
+				row.UpdatedAt = &updatedAt
+			}
+			out = append(out, row)
+		}
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.BatchUserAttributeValuesResponse{
+		Data:      out,
+		RequestId: requestID,
+	})
 }

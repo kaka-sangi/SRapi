@@ -720,6 +720,7 @@ func (s *Server) registerGatewayEndpointRoutes(mux *http.ServeMux) {
 // fingerprint profiles).
 func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/admin/users/{id}/attributes", s.handleListAdminUserAttributeValues)
+	mux.HandleFunc("GET /api/v1/admin/users/attributes/batch", s.handleBatchListAdminUserAttributeValues)
 	mux.HandleFunc("PUT /api/v1/admin/users/{id}/attributes/{definitionId}", s.handleSetAdminUserAttributeValue)
 	mux.HandleFunc("GET /api/v1/admin/user-attributes", s.handleListAdminUserAttributeDefinitions)
 	mux.HandleFunc("POST /api/v1/admin/user-attributes", s.handleCreateAdminUserAttributeDefinition)

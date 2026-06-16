@@ -646,6 +646,7 @@ export const en = {
     balanceHistory: "Balance history",
     platformQuotas: "Platform quotas",
     attributes: "Custom attributes",
+    attributesColumn: "Attributes",
     amount: "Amount",
     operation: "Operation",
     note: "Note",

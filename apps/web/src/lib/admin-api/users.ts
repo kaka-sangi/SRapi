@@ -7,6 +7,7 @@ import {
   deleteAdminUserAttributeDefinition,
   listAdminUserAttributeDefinitions,
   listAdminUserAttributeValues,
+  batchListAdminUserAttributeValues,
   setAdminUserAttributeValue,
   updateAdminUserAttributeDefinition,
   listAdminUserPlatformQuotas,
@@ -22,6 +23,7 @@ import type {
   CreateUserAttributeDefinitionRequest,
   UserAttributeDefinition,
   UserAttributeValue,
+  UserAttributeValueWithUserId,
   UpdateUserAttributeDefinitionRequest,
   UserPlatformQuota,
   UpsertUserPlatformQuotaRequest,
@@ -98,6 +100,16 @@ export const usersApi = {
   listUserAttributeValues(userId: Id): Promise<AdminListResult<UserAttributeValue>> {
     return unwrapList(() =>
       listAdminUserAttributeValues({ path: { id: userId }, throwOnError: true }),
+    );
+  },
+
+  batchListUserAttributeValues(userIds: Id[]): Promise<UserAttributeValueWithUserId[]> {
+    if (userIds.length === 0) return Promise.resolve([]);
+    return unwrapData(() =>
+      batchListAdminUserAttributeValues({
+        query: { user_ids: userIds.join(",") },
+        throwOnError: true,
+      }),
     );
   },
 

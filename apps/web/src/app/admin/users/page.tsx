@@ -28,6 +28,7 @@ import {
   useUpdateAdminUser,
   useDeleteAdminUser,
   useUpdateUserBalance,
+  useUserAttributeValuesBatch,
 } from "@/hooks/admin-queries";
 import type { UserStatus } from "@/lib/sdk-types";
 import { useLanguage } from "@/context/LanguageContext";
@@ -74,6 +75,16 @@ function UsersContent() {
   });
   const setEnabled = useSetUserEnabled();
   const bulkEnabled = useBulkSetUsersEnabled();
+  // Attribute values for the current page in one round-trip. Group by user_id
+  // so the column can pick up to N chips per row without re-scanning the list.
+  const visibleUserIds = (users.data?.data ?? []).map((u) => u.id);
+  const attributeBatch = useUserAttributeValuesBatch(visibleUserIds);
+  const attributesByUserId = new Map<string, typeof attributeBatch.data>();
+  for (const row of attributeBatch.data ?? []) {
+    const existing = attributesByUserId.get(row.user_id) ?? [];
+    existing.push(row);
+    attributesByUserId.set(row.user_id, existing);
+  }
   const createMut = useCreateAdminUser();
   const updateMut = useUpdateAdminUser();
   const deleteMut = useDeleteAdminUser();
@@ -178,6 +189,39 @@ function UsersContent() {
           {formatMoney(u.balance, u.currency)}
         </span>
       ),
+    },
+    {
+      key: "attributes",
+      header: t("adminUsers.attributesColumn"),
+      hideOnMobile: true,
+      render: (u) => {
+        const rows = attributesByUserId.get(u.id) ?? [];
+        // Only show definitions the operator has actually set — empty values
+        // are noise. Cap at 3 chips so the column stays compact; the full
+        // editor lives behind the row-actions "Custom attributes" entry.
+        const set = rows.filter((r) => r.value !== "");
+        if (set.length === 0) {
+          return <span className="text-2xs text-srapi-text-tertiary">—</span>;
+        }
+        const chips = set.slice(0, 3);
+        const extra = set.length - chips.length;
+        return (
+          <div className="flex flex-wrap gap-1">
+            {chips.map((row) => (
+              <span
+                key={row.definition_id}
+                className="inline-flex items-center rounded-md border border-srapi-border bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
+                title={`${row.name} (${row.key})`}
+              >
+                {row.key}: {row.value}
+              </span>
+            ))}
+            {extra > 0 ? (
+              <span className="font-mono text-2xs text-srapi-text-tertiary">+{extra}</span>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       key: "status",

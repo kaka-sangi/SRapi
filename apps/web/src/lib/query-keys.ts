@@ -130,6 +130,8 @@ export const queryKeys = {
     accountsAvailability: (days?: number) => ["admin", "accounts-availability", days ?? 7] as const,
     userPlatformQuotas: (userId: string) => ["admin", "user-platform-quotas", userId] as const,
     userAttributeValues: (userId: string) => ["admin", "user-attribute-values", userId] as const,
+    userAttributeValuesBatch: (userIds: string[]) =>
+      ["admin", "user-attribute-values", "batch", userIds] as const,
     riskConfig: () => ["admin", "risk-config"] as const,
     riskStatus: () => ["admin", "risk-status"] as const,
     riskLogs: (params?: unknown) => ["admin", "risk-logs", params ?? {}] as const,

@@ -160,6 +160,19 @@ export function useUserAttributeValues(userId: string | null) {
   });
 }
 
+// Batched read for the users list "Attributes" column. Sorts the ids so the
+// cache key is stable across renders that ask for the same set in a
+// different order.
+export function useUserAttributeValuesBatch(userIds: string[]) {
+  const sorted = [...userIds].sort();
+  return useQuery({
+    queryKey: queryKeys.admin.userAttributeValuesBatch(sorted),
+    queryFn: () => adminApi.batchListUserAttributeValues(sorted),
+    enabled: sorted.length > 0,
+    staleTime: 30_000,
+  });
+}
+
 export function useSetUserAttributeValue(userId: string) {
   return useAdminMutation(
     (vars: { definitionId: string; body: Parameters<typeof adminApi.setUserAttributeValue>[2] }) =>
