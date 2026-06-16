@@ -4450,6 +4450,11 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/Id"
+        - name: group_id
+          in: query
+          description: Restrict to accounts that are members of the given account group.
+          schema:
+            $ref: "#/components/schemas/Id"
       responses:
         "200":
           description: Provider account list.

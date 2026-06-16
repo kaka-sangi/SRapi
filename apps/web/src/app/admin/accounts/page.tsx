@@ -105,11 +105,13 @@ function AccountsContent() {
   const statusFilter =
     (list.filters.status as ProviderAccount["status"]) || (readOnlyHealthView ? "active" : undefined);
   const providerFilter = list.filters.providerId || undefined;
+  const groupFilter = list.filters.groupId || undefined;
   const accounts = useAdminAccounts({
     page: list.page,
     page_size: list.pageSize,
     status: statusFilter,
     provider_id: providerFilter,
+    group_id: groupFilter,
   });
   const models = useAdminModels({ page: 1, page_size: 200, status: "active" });
   const providers = useAdminProviders();
@@ -165,6 +167,10 @@ function AccountsContent() {
     authMethods: p.auth_methods ?? null,
     adapterType: p.adapter_type,
     accountTemplate: extractAccountTemplate(p),
+  }));
+  const groupFilterOptions = (groups.data?.data ?? []).map((g) => ({
+    value: String(g.id),
+    label: g.name,
   }));
   const providerNameById = new Map(
     (providers.data?.data ?? []).map((p) => [String(p.id), p.display_name || p.name] as const),
@@ -424,6 +430,14 @@ function AccountsContent() {
           onChange={(v) => list.setFilter("providerId", v)}
           options={providerOptions}
           allLabel={t("adminAccounts.allProviders")}
+        />
+      ) : null}
+      {groupFilterOptions.length > 0 ? (
+        <FilterSelect
+          value={groupFilter}
+          onChange={(v) => list.setFilter("groupId", v)}
+          options={groupFilterOptions}
+          allLabel={t("adminAccounts.allGroups")}
         />
       ) : null}
       <div className="flex items-center gap-2 sm:ml-auto">

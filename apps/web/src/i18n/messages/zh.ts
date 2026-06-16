@@ -664,6 +664,7 @@ export const zh: Messages = {
     type: "类型",
     groups: "分组",
     ungrouped: "未分组",
+    allGroups: "全部分组",
     models: "模型",
     test: "测试",
     viewCards: "卡片",

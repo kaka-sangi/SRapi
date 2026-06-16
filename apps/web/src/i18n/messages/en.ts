@@ -667,6 +667,7 @@ export const en = {
     type: "Type",
     groups: "Groups",
     ungrouped: "Ungrouped",
+    allGroups: "All groups",
     models: "Models",
     test: "Test",
     viewCards: "Cards",

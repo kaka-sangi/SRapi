@@ -884,6 +884,31 @@ func (s *Server) handleListAdminAccounts(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	accounts = filterAccounts(accounts, r.URL.Query().Get("status"), r.URL.Query().Get("provider_id"))
+	if groupIDRaw := strings.TrimSpace(r.URL.Query().Get("group_id")); groupIDRaw != "" {
+		groupID, parseErr := strconv.Atoi(groupIDRaw)
+		if parseErr != nil || groupID <= 0 {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid group id", requestID)
+			return
+		}
+		members, memberErr := s.runtime.accounts.ListGroupMembers(r.Context(), groupID)
+		if memberErr != nil {
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list group members", requestID)
+			return
+		}
+		// Fetching members is one round-trip; membership is then an O(1) set lookup
+		// per account row. Keeps the list-by-group hot path fast even at moderate fleet sizes.
+		inGroup := make(map[int]struct{}, len(members))
+		for _, m := range members {
+			inGroup[m.AccountID] = struct{}{}
+		}
+		filtered := make([]accountcontract.ProviderAccount, 0, len(accounts))
+		for _, a := range accounts {
+			if _, ok := inGroup[a.ID]; ok {
+				filtered = append(filtered, a)
+			}
+		}
+		accounts = filtered
+	}
 	data := make([]apiopenapi.ProviderAccount, 0, len(accounts))
 	for _, account := range accounts {
 		data = append(data, s.apiAccount(r.Context(), account))

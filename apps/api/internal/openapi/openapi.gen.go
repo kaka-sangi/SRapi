@@ -10300,6 +10300,9 @@ type ListAdminAccountsParams struct {
 	PageSize   *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Status     *Status   `form:"status,omitempty" json:"status,omitempty"`
 	ProviderId *Id       `form:"provider_id,omitempty" json:"provider_id,omitempty"`
+
+	// GroupId Restrict to accounts that are members of the given account group.
+	GroupId *Id `form:"group_id,omitempty" json:"group_id,omitempty"`
 }
 
 // ListAdminAccountsAvailabilityParams defines parameters for ListAdminAccountsAvailability.
@@ -19778,6 +19781,19 @@ func (siw *ServerInterfaceWrapper) ListAdminAccounts(w http.ResponseWriter, r *h
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "provider_id"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "group_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "group_id", r.URL.Query(), &params.GroupId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "group_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group_id", Err: err})
 		}
 		return
 	}

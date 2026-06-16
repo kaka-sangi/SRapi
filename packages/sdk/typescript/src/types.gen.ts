@@ -11127,6 +11127,10 @@ export type ListAdminAccountsData = {
         page_size?: number;
         status?: string;
         provider_id?: Id;
+        /**
+         * Restrict to accounts that are members of the given account group.
+         */
+        group_id?: Id;
     };
     url: '/api/v1/admin/accounts';
 };
