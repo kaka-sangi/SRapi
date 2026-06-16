@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CreditCard } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
-import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
+import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
@@ -51,8 +51,18 @@ export function SubscriptionsPanel() {
   // so the operator-side filtering happens client-side via the shared list
   // helper. The full list ships in one shot today, so the lift is small.
   const { query: subs, total } = useClientPagedList(allSubs, list, {
-    match: (row, _term, filters) =>
-      !filters.status || row.status === filters.status,
+    match: (row, term, filters) => {
+      if (filters.status && row.status !== filters.status) return false;
+      if (!term) return true;
+      // user_id alone is opaque (numeric); search hits both the raw id and
+      // the looked-up email so an operator can paste either.
+      const email = userLookup.map.get(String(row.user_id)) ?? "";
+      return [String(row.user_id), email, String(row.plan_id), row.status]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(term);
+    },
     compare: (a, b) => (b.starts_at ?? "").localeCompare(a.starts_at ?? ""),
   });
   const statusFilter = list.filters.status as UserSubscription["status"] | undefined;
@@ -148,10 +158,15 @@ export function SubscriptionsPanel() {
         emptyTitle={t("adminSubscriptions.emptySubs")}
         emptyBody={t("adminSubscriptions.emptySubsBody")}
         minWidth={560}
-        isFiltered={Boolean(statusFilter)}
+        isFiltered={Boolean(statusFilter || list.search)}
         onClearFilters={list.clearFilters}
         toolbar={
           <ListToolbar>
+            <SearchInput
+              value={list.searchInput}
+              onChange={list.setSearchInput}
+              placeholder={t("adminSubscriptions.searchPlaceholder")}
+            />
             <FilterSelect
               value={list.filters.status}
               onChange={(v) => list.setFilter("status", v)}

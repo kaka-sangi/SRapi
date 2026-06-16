@@ -1159,6 +1159,7 @@ export const en = {
   adminSubscriptions: {
     title: "Subscriptions",
     subtitle: "Active user subscriptions. Manage the plan catalog under Plans.",
+    searchPlaceholder: "Search by email, user id, plan…",
     tabPlans: "Plans",
     tabSubscriptions: "User subscriptions",
     managePlans: "Manage plans",
