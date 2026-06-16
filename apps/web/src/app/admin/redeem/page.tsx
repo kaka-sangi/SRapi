@@ -39,6 +39,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { CopyButton } from "@/components/ui/copy-button";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -178,7 +179,12 @@ function RedeemContent() {
       header: t("adminPromos.code"),
       pinned: true,
       sortValue: (c) => c.code,
-      render: (c) => <span className="font-mono text-srapi-text-primary">{c.code}</span>,
+      render: (c) => (
+        <span className="flex items-center gap-1.5">
+          <span className="font-mono text-srapi-text-primary">{c.code}</span>
+          <CopyButton value={c.code} size="inline" />
+        </span>
+      ),
     },
     {
       key: "value",
