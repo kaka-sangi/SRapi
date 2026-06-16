@@ -61,6 +61,22 @@ type Definition struct {
 	UpdatedAt time.Time
 }
 
+// DefinitionWithSummary pairs a definition with a thin summary of its most recent
+// run, so the admin list view can show last_run_at + ok/latency at a glance
+// without an extra request per row. LastRun is nil when no runs exist yet.
+type DefinitionWithSummary struct {
+	Definition
+	LastRun *RunSummary
+}
+
+// RunSummary is a row-level snapshot of the most recent run, deliberately
+// smaller than RunResult (no per-check results).
+type RunSummary struct {
+	At        time.Time
+	OK        bool
+	LatencyMS int
+}
+
 type CreateDefinition struct {
 	Name     string
 	Enabled  bool

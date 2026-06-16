@@ -29090,6 +29090,17 @@ components:
         updated_at:
           type: string
           format: date-time
+        last_run_at:
+          type: string
+          format: date-time
+          description: Timestamp of the most recent recorded run for this monitor (absent when no runs exist yet).
+        last_run_ok:
+          type: boolean
+          description: Whether the most recent run was a fully-OK result. Absent when no runs exist.
+        last_run_latency_ms:
+          type: integer
+          minimum: 0
+          description: Latency in ms of the most recent run. Absent when no runs exist.
     CreateChannelMonitorRequest:
       type: object
       required:

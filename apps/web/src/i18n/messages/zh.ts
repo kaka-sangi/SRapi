@@ -1678,6 +1678,8 @@ export const zh: Messages = {
     enabled: "启用",
     interval: "间隔",
     intervalHint: "两次定时探测之间的秒数（最少 30）。",
+    lastRun: "上次运行",
+    neverRun: "未运行",
     model: "探测模型",
     modelHint: "可选，用于上报的规范模型名。",
     method: "方法",

@@ -5251,8 +5251,17 @@ type ChannelMonitor struct {
 	Enabled         bool      `json:"enabled"`
 	Id              int64     `json:"id"`
 	IntervalSeconds int64     `json:"interval_seconds"`
-	Model           string    `json:"model"`
-	Name            string    `json:"name"`
+
+	// LastRunAt Timestamp of the most recent recorded run for this monitor (absent when no runs exist yet).
+	LastRunAt *time.Time `json:"last_run_at,omitempty"`
+
+	// LastRunLatencyMs Latency in ms of the most recent run. Absent when no runs exist.
+	LastRunLatencyMs *int `json:"last_run_latency_ms,omitempty"`
+
+	// LastRunOk Whether the most recent run was a fully-OK result. Absent when no runs exist.
+	LastRunOk *bool  `json:"last_run_ok,omitempty"`
+	Model     string `json:"model"`
+	Name      string `json:"name"`
 
 	// Request Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
 	Request ChannelMonitorRequest `json:"request"`

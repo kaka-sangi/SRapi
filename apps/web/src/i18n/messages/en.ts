@@ -1701,6 +1701,8 @@ export const en = {
     enabled: "Enabled",
     interval: "Interval",
     intervalHint: "Seconds between scheduled probes (min 30).",
+    lastRun: "Last run",
+    neverRun: "Never run",
     model: "Probe model",
     modelHint: "Optional canonical model to report against.",
     method: "Method",

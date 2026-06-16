@@ -22,16 +22,19 @@ type channelMonitorRequestPayload struct {
 }
 
 type channelMonitorPayload struct {
-	ID              int                          `json:"id"`
-	Name            string                       `json:"name"`
-	Enabled         bool                         `json:"enabled"`
-	Scope           string                       `json:"scope"`
-	ScopeRef        string                       `json:"scope_ref"`
-	IntervalSeconds int                          `json:"interval_seconds"`
-	Model           string                       `json:"model"`
-	Request         channelMonitorRequestPayload `json:"request"`
-	CreatedAt       time.Time                    `json:"created_at"`
-	UpdatedAt       time.Time                    `json:"updated_at"`
+	ID               int                          `json:"id"`
+	Name             string                       `json:"name"`
+	Enabled          bool                         `json:"enabled"`
+	Scope            string                       `json:"scope"`
+	ScopeRef         string                       `json:"scope_ref"`
+	IntervalSeconds  int                          `json:"interval_seconds"`
+	Model            string                       `json:"model"`
+	Request          channelMonitorRequestPayload `json:"request"`
+	CreatedAt        time.Time                    `json:"created_at"`
+	UpdatedAt        time.Time                    `json:"updated_at"`
+	LastRunAt        *time.Time                   `json:"last_run_at,omitempty"`
+	LastRunOK        *bool                        `json:"last_run_ok,omitempty"`
+	LastRunLatencyMS *int                         `json:"last_run_latency_ms,omitempty"`
 }
 
 type createChannelMonitorRequest struct {
@@ -110,14 +113,23 @@ func (s *Server) handleListAdminChannelMonitors(w http.ResponseWriter, r *http.R
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	defs, err := s.runtime.channelMonitors.ListDefinitions(r.Context())
+	entries, err := s.runtime.channelMonitors.ListDefinitionsWithSummary(r.Context())
 	if err != nil {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list channel monitors", requestID)
 		return
 	}
-	data := make([]channelMonitorPayload, 0, len(defs))
-	for _, def := range defs {
-		data = append(data, toChannelMonitorPayload(def))
+	data := make([]channelMonitorPayload, 0, len(entries))
+	for _, entry := range entries {
+		payload := toChannelMonitorPayload(entry.Definition)
+		if entry.LastRun != nil {
+			at := entry.LastRun.At.UTC()
+			ok := entry.LastRun.OK
+			latency := entry.LastRun.LatencyMS
+			payload.LastRunAt = &at
+			payload.LastRunOK = &ok
+			payload.LastRunLatencyMS = &latency
+		}
+		data = append(data, payload)
 	}
 	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, map[string]any{

@@ -5740,6 +5740,18 @@ export type ChannelMonitor = {
     request: ChannelMonitorRequest;
     created_at: string;
     updated_at: string;
+    /**
+     * Timestamp of the most recent recorded run for this monitor (absent when no runs exist yet).
+     */
+    last_run_at?: string;
+    /**
+     * Whether the most recent run was a fully-OK result. Absent when no runs exist.
+     */
+    last_run_ok?: boolean;
+    /**
+     * Latency in ms of the most recent run. Absent when no runs exist.
+     */
+    last_run_latency_ms?: number;
 };
 
 export type CreateChannelMonitorRequest = {

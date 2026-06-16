@@ -38,6 +38,38 @@ func (s *Service) ListDefinitions(ctx context.Context) ([]contract.Definition, e
 	return s.store.ListDefinitions(ctx)
 }
 
+// ListDefinitionsWithSummary returns every monitor definition paired with a
+// thin summary of its most recent run (or nil when no runs exist).
+//
+// The implementation is N+1 — one ListRuns call per monitor — which is fine for
+// the admin list page (monitor counts are typically small) and keeps the store
+// interface unchanged. A batched store query is the right swap if monitor counts
+// grow problematic.
+func (s *Service) ListDefinitionsWithSummary(ctx context.Context) ([]contract.DefinitionWithSummary, error) {
+	defs, err := s.store.ListDefinitions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.DefinitionWithSummary, 0, len(defs))
+	for _, def := range defs {
+		entry := contract.DefinitionWithSummary{Definition: def}
+		runs, err := s.store.ListRuns(ctx, def.ID, 1)
+		if err != nil {
+			return nil, err
+		}
+		if len(runs) > 0 {
+			r := runs[0]
+			entry.LastRun = &contract.RunSummary{
+				At:        r.CreatedAt,
+				OK:        r.OK,
+				LatencyMS: r.LatencyMS,
+			}
+		}
+		out = append(out, entry)
+	}
+	return out, nil
+}
+
 func (s *Service) GetDefinition(ctx context.Context, id int) (contract.Definition, error) {
 	if id <= 0 {
 		return contract.Definition{}, ErrInvalidInput

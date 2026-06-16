@@ -123,6 +123,72 @@ func TestRunHistoryRecordedAndOrdered(t *testing.T) {
 	}
 }
 
+func TestListDefinitionsWithSummaryAttachesLastRun(t *testing.T) {
+	svc := newService(t)
+	ctx := context.Background()
+
+	// Monitor with no runs — summary entry must exist but LastRun should be nil.
+	noRuns, err := svc.CreateDefinition(ctx, contract.CreateDefinition{Name: "no-runs", Scope: contract.ScopeAccount, ScopeRef: "1"})
+	if err != nil {
+		t.Fatalf("create no-runs: %v", err)
+	}
+	// Monitor with two runs — only the newest run should populate the summary.
+	withRuns, err := svc.CreateDefinition(ctx, contract.CreateDefinition{Name: "with-runs", Scope: contract.ScopeAccount, ScopeRef: "2"})
+	if err != nil {
+		t.Fatalf("create with-runs: %v", err)
+	}
+	if _, err := svc.RecordRun(ctx, contract.RecordRun{
+		MonitorID:    withRuns.ID,
+		RunID:        "older",
+		OK:           false,
+		CheckedCount: 1,
+		OKCount:      0,
+		LatencyMS:    900,
+	}); err != nil {
+		t.Fatalf("record older: %v", err)
+	}
+	if _, err := svc.RecordRun(ctx, contract.RecordRun{
+		MonitorID:    withRuns.ID,
+		RunID:        "newer",
+		OK:           true,
+		CheckedCount: 1,
+		OKCount:      1,
+		LatencyMS:    120,
+	}); err != nil {
+		t.Fatalf("record newer: %v", err)
+	}
+
+	entries, err := svc.ListDefinitionsWithSummary(ctx)
+	if err != nil {
+		t.Fatalf("list with summary: %v", err)
+	}
+	byID := map[int]contract.DefinitionWithSummary{}
+	for _, e := range entries {
+		byID[e.ID] = e
+	}
+	if entry, ok := byID[noRuns.ID]; !ok {
+		t.Fatalf("no-runs monitor missing from result")
+	} else if entry.LastRun != nil {
+		t.Fatalf("no-runs monitor should have nil LastRun, got %+v", entry.LastRun)
+	}
+	entry, ok := byID[withRuns.ID]
+	if !ok {
+		t.Fatalf("with-runs monitor missing from result")
+	}
+	if entry.LastRun == nil {
+		t.Fatalf("with-runs monitor should have a LastRun summary")
+	}
+	if !entry.LastRun.OK {
+		t.Fatalf("LastRun.OK: want true (newest run), got false")
+	}
+	if entry.LastRun.LatencyMS != 120 {
+		t.Fatalf("LastRun.LatencyMS: want 120 (newest run), got %d", entry.LastRun.LatencyMS)
+	}
+	if entry.LastRun.At.IsZero() {
+		t.Fatalf("LastRun.At must be set")
+	}
+}
+
 func TestDeleteDefinitionRemovesRuns(t *testing.T) {
 	svc := newService(t)
 	ctx := context.Background()

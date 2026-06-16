@@ -51,7 +51,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
-import { formatPercent, formatDateTime } from "@/lib/admin-format";
+import { formatPercent, formatDateTime, formatLatency } from "@/lib/admin-format";
 import { adminErrorMessage, type AdminListResult } from "@/lib/admin-api";
 import { cn } from "@/lib/cn";
 import {
@@ -241,6 +241,38 @@ function MonitorsTab() {
           {r.interval_seconds}s
         </span>
       ),
+    },
+    {
+      key: "last_run",
+      header: t("adminMonitor.lastRun"),
+      hideOnMobile: true,
+      render: (r) => {
+        if (!r.last_run_at) {
+          return <span className="text-2xs text-srapi-text-tertiary">{t("adminMonitor.neverRun")}</span>;
+        }
+        const isOK = r.last_run_ok ?? false;
+        return (
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-1.5">
+              <span
+                className={
+                  "inline-block h-1.5 w-1.5 rounded-full " +
+                  (isOK ? "bg-srapi-success" : "bg-srapi-error")
+                }
+                aria-hidden
+              />
+              <span className="font-mono text-2xs text-srapi-text-tertiary">
+                {formatDateTime(r.last_run_at)}
+              </span>
+            </div>
+            {typeof r.last_run_latency_ms === "number" ? (
+              <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+                {formatLatency(r.last_run_latency_ms)}
+              </span>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       key: "enabled",
