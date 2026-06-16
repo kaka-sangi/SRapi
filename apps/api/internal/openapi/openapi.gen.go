@@ -9302,6 +9302,22 @@ type UpdateErrorPassthroughRuleRequest struct {
 // UpdateErrorPassthroughRuleRequestAction defines model for UpdateErrorPassthroughRuleRequest.Action.
 type UpdateErrorPassthroughRuleRequestAction string
 
+// UpdateModelAliasRequest defines model for UpdateModelAliasRequest.
+type UpdateModelAliasRequest struct {
+	Alias          *string         `json:"alias,omitempty"`
+	FallbackModels *[]string       `json:"fallback_models,omitempty"`
+	Status         *ResourceStatus `json:"status,omitempty"`
+	StrategyHint   *string         `json:"strategy_hint,omitempty"`
+}
+
+// UpdateModelProviderMappingRequest defines model for UpdateModelProviderMappingRequest.
+type UpdateModelProviderMappingRequest struct {
+	CapabilityOverride *[]CapabilityDescriptor `json:"capability_override,omitempty"`
+	PricingOverride    *JsonObject             `json:"pricing_override,omitempty"`
+	Status             *ResourceStatus         `json:"status,omitempty"`
+	UpstreamModelName  *string                 `json:"upstream_model_name,omitempty"`
+}
+
 // UpdateModelRequest defines model for UpdateModelRequest.
 type UpdateModelRequest struct {
 	Capabilities    *[]CapabilityDescriptor `json:"capabilities,omitempty"`
@@ -11003,8 +11019,14 @@ type UpdateAdminModelJSONRequestBody = UpdateModelRequest
 // CreateAdminModelAliasJSONRequestBody defines body for CreateAdminModelAlias for application/json ContentType.
 type CreateAdminModelAliasJSONRequestBody = CreateModelAliasRequest
 
+// UpdateAdminModelAliasJSONRequestBody defines body for UpdateAdminModelAlias for application/json ContentType.
+type UpdateAdminModelAliasJSONRequestBody = UpdateModelAliasRequest
+
 // CreateAdminModelMappingJSONRequestBody defines body for CreateAdminModelMapping for application/json ContentType.
 type CreateAdminModelMappingJSONRequestBody = CreateModelProviderMappingRequest
+
+// UpdateAdminModelMappingJSONRequestBody defines body for UpdateAdminModelMapping for application/json ContentType.
+type UpdateAdminModelMappingJSONRequestBody = UpdateModelProviderMappingRequest
 
 // PreviewAdminNotificationEmailTemplateJSONRequestBody defines body for PreviewAdminNotificationEmailTemplate for application/json ContentType.
 type PreviewAdminNotificationEmailTemplateJSONRequestBody = PreviewNotificationEmailTemplateRequest
@@ -17934,6 +17956,9 @@ type ServerInterface interface {
 	// Delete a model alias.
 	// (DELETE /api/v1/admin/models/{id}/aliases/{aliasId})
 	DeleteAdminModelAlias(w http.ResponseWriter, r *http.Request, id Id, aliasId Id)
+	// Update a model alias.
+	// (PATCH /api/v1/admin/models/{id}/aliases/{aliasId})
+	UpdateAdminModelAlias(w http.ResponseWriter, r *http.Request, id Id, aliasId Id)
 	// List a model's provider mappings.
 	// (GET /api/v1/admin/models/{id}/mappings)
 	ListAdminModelMappings(w http.ResponseWriter, r *http.Request, id Id)
@@ -17943,6 +17968,9 @@ type ServerInterface interface {
 	// Delete a model provider mapping.
 	// (DELETE /api/v1/admin/models/{id}/mappings/{mappingId})
 	DeleteAdminModelMapping(w http.ResponseWriter, r *http.Request, id Id, mappingId Id)
+	// Update a model provider mapping.
+	// (PATCH /api/v1/admin/models/{id}/mappings/{mappingId})
+	UpdateAdminModelMapping(w http.ResponseWriter, r *http.Request, id Id, mappingId Id)
 	// Preview a notification email template without saving it.
 	// (POST /api/v1/admin/notifications/email-template-preview)
 	PreviewAdminNotificationEmailTemplate(w http.ResponseWriter, r *http.Request)
@@ -23299,6 +23327,49 @@ func (siw *ServerInterfaceWrapper) DeleteAdminModelAlias(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// UpdateAdminModelAlias operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminModelAlias(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "aliasId" -------------
+	var aliasId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "aliasId", r.PathValue("aliasId"), &aliasId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "aliasId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminModelAlias(w, r, id, aliasId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminModelMappings operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminModelMappings(w http.ResponseWriter, r *http.Request) {
 
@@ -23399,6 +23470,49 @@ func (siw *ServerInterfaceWrapper) DeleteAdminModelMapping(w http.ResponseWriter
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteAdminModelMapping(w, r, id, mappingId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminModelMapping operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminModelMapping(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "mappingId" -------------
+	var mappingId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "mappingId", r.PathValue("mappingId"), &mappingId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "mappingId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminModelMapping(w, r, id, mappingId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -32140,9 +32254,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/models/{id}/aliases", wrapper.ListAdminModelAliases)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models/{id}/aliases", wrapper.CreateAdminModelAlias)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/models/{id}/aliases/{aliasId}", wrapper.DeleteAdminModelAlias)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/models/{id}/aliases/{aliasId}", wrapper.UpdateAdminModelAlias)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/models/{id}/mappings", wrapper.ListAdminModelMappings)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models/{id}/mappings", wrapper.CreateAdminModelMapping)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/models/{id}/mappings/{mappingId}", wrapper.DeleteAdminModelMapping)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/models/{id}/mappings/{mappingId}", wrapper.UpdateAdminModelMapping)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/notifications/email-template-preview", wrapper.PreviewAdminNotificationEmailTemplate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/notifications/email-templates", wrapper.ListAdminNotificationEmailTemplates)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/notifications/email-templates/{event}", wrapper.GetAdminNotificationEmailTemplate)

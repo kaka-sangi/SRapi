@@ -1047,6 +1047,8 @@ export const zh: Messages = {
     edit: "编辑模型",
     addAlias: "添加别名",
     aliasTitle: "新建别名",
+    editAliasTitle: "编辑别名",
+    editMappingTitle: "编辑跨厂商映射",
     manageRouting: "别名与映射",
     manageTitle: "别名与跨厂商映射",
     aliasesSection: "别名",

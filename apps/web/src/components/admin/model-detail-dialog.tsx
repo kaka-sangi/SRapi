@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
-import type { Model } from "@/lib/sdk-types";
+import type { Model, ModelAlias, ModelProviderMapping } from "@/lib/sdk-types";
 
 // ModelDetailDialog lists a model's aliases and provider mappings — the only place
 // they are visible — and lets an admin remove individual ones (delete with an
@@ -36,12 +36,19 @@ export function ModelDetailDialog({
   onClose,
   onAddAlias,
   onAddMapping,
+  onEditAlias,
+  onEditMapping,
 }: {
   model: Model;
   providerLabels: Map<string, string>;
   onClose: () => void;
   onAddAlias: () => void;
   onAddMapping: () => void;
+  // Optional — when present, each alias/mapping row gets an Edit pencil that
+  // pops the row's edit dialog in the parent. Kept optional so existing
+  // callers (and tests) don't have to wire it.
+  onEditAlias?: (alias: ModelAlias) => void;
+  onEditMapping?: (mapping: ModelProviderMapping) => void;
 }) {
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -128,6 +135,17 @@ export function ModelDetailDialog({
                       <span className="truncate font-mono text-2xs text-srapi-text-primary">{a.alias}</span>
                       <div className="flex shrink-0 items-center gap-2">
                         <QuietBadge status={quietStatusFor(a.status)} label={statusLabel(t, a.status)} />
+                        {onEditAlias && confirmKey !== key ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={t("common.edit")}
+                            onClick={() => onEditAlias(a)}
+                            className="text-srapi-text-tertiary hover:text-srapi-text-primary"
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                        ) : null}
                         <RowRemove
                           confirming={confirmKey === key}
                           pending={deleteAlias.isPending}
@@ -184,6 +202,17 @@ export function ModelDetailDialog({
                       </span>
                       <div className="flex shrink-0 items-center gap-2">
                         <QuietBadge status={quietStatusFor(m.status)} label={statusLabel(t, m.status)} />
+                        {onEditMapping && confirmKey !== key ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={t("common.edit")}
+                            onClick={() => onEditMapping(m)}
+                            className="text-srapi-text-tertiary hover:text-srapi-text-primary"
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                        ) : null}
                         <RowRemove
                           confirming={confirmKey === key}
                           pending={deleteMapping.isPending}

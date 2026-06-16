@@ -1546,6 +1546,13 @@ export type CreateModelAliasRequest = {
     status?: ResourceStatus;
 };
 
+export type UpdateModelAliasRequest = {
+    alias?: string;
+    strategy_hint?: string | null;
+    fallback_models?: Array<string>;
+    status?: ResourceStatus;
+};
+
 export type ModelAliasResponse = {
     data: ModelAlias;
     request_id: RequestId;
@@ -1570,6 +1577,13 @@ export type ModelProviderMapping = {
 export type CreateModelProviderMappingRequest = {
     provider_id: Id;
     upstream_model_name: string;
+    status?: ResourceStatus;
+    capability_override?: Array<CapabilityDescriptor>;
+    pricing_override?: JsonObject;
+};
+
+export type UpdateModelProviderMappingRequest = {
+    upstream_model_name?: string;
     status?: ResourceStatus;
     capability_override?: Array<CapabilityDescriptor>;
     pricing_override?: JsonObject;
@@ -10728,6 +10742,54 @@ export type DeleteAdminModelAliasResponses = {
 
 export type DeleteAdminModelAliasResponse = DeleteAdminModelAliasResponses[keyof DeleteAdminModelAliasResponses];
 
+export type UpdateAdminModelAliasData = {
+    body: UpdateModelAliasRequest;
+    path: {
+        id: Id;
+        aliasId: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/models/{id}/aliases/{aliasId}';
+};
+
+export type UpdateAdminModelAliasErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminModelAliasError = UpdateAdminModelAliasErrors[keyof UpdateAdminModelAliasErrors];
+
+export type UpdateAdminModelAliasResponses = {
+    /**
+     * Model alias updated.
+     */
+    200: ModelAliasResponse;
+};
+
+export type UpdateAdminModelAliasResponse = UpdateAdminModelAliasResponses[keyof UpdateAdminModelAliasResponses];
+
 export type ListAdminModelMappingsData = {
     body?: never;
     path: {
@@ -10853,6 +10915,54 @@ export type DeleteAdminModelMappingResponses = {
 };
 
 export type DeleteAdminModelMappingResponse = DeleteAdminModelMappingResponses[keyof DeleteAdminModelMappingResponses];
+
+export type UpdateAdminModelMappingData = {
+    body: UpdateModelProviderMappingRequest;
+    path: {
+        id: Id;
+        mappingId: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/models/{id}/mappings/{mappingId}';
+};
+
+export type UpdateAdminModelMappingErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminModelMappingError = UpdateAdminModelMappingErrors[keyof UpdateAdminModelMappingErrors];
+
+export type UpdateAdminModelMappingResponses = {
+    /**
+     * Model provider mapping updated.
+     */
+    200: ModelProviderMappingResponse;
+};
+
+export type UpdateAdminModelMappingResponse = UpdateAdminModelMappingResponses[keyof UpdateAdminModelMappingResponses];
 
 export type ListAdminAccountsData = {
     body?: never;

@@ -670,6 +670,73 @@ func (s *Server) handleDeleteAdminModelAlias(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+func (s *Server) handleUpdateAdminModelAlias(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	modelID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || modelID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
+		return
+	}
+	aliasID, err := strconv.Atoi(r.PathValue("aliasId"))
+	if err != nil || aliasID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model alias id", requestID)
+		return
+	}
+	var body apiopenapi.UpdateModelAliasRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid model alias update request", requestID)
+		return
+	}
+	before, err := s.runtime.models.FindAliasByID(r.Context(), aliasID)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "model alias not found", requestID)
+		return
+	}
+	alias, err := s.runtime.models.UpdateAlias(r.Context(), modelID, aliasID, modelcontract.UpdateAliasRequest{
+		Alias:          body.Alias,
+		StrategyHint:   optionalNullableString(body.StrategyHint),
+		FallbackModels: body.FallbackModels,
+		Status:         toModelStatusPtr(body.Status),
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, modelservice.ErrAliasNotFound):
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "model alias not found", requestID)
+		case errors.Is(err, modelservice.ErrAliasExists):
+			writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "model alias already exists", requestID)
+		case errors.Is(err, modelservice.ErrInvalidInput):
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model alias update request", requestID)
+		default:
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to update model alias", requestID)
+		}
+		return
+	}
+	// Invalidate both the old alias string (if it changed) and the new one.
+	s.runtime.invalidateModelCache(before.Alias, alias.Alias)
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model_alias.update", "model_alias", strconv.Itoa(alias.ID), map[string]any{
+		"alias":           before.Alias,
+		"fallback_models": before.FallbackModels,
+		"status":          before.Status,
+	}, map[string]any{
+		"alias":           alias.Alias,
+		"fallback_models": alias.FallbackModels,
+		"status":          alias.Status,
+	}))
+	writeJSONAny(w, http.StatusOK, apiopenapi.ModelAliasResponse{
+		Data:      toAPIModelAlias(alias),
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleListAdminModelMappings(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {
@@ -739,6 +806,69 @@ func (s *Server) handleDeleteAdminModelMapping(w http.ResponseWriter, r *http.Re
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       map[string]any{"id": mappingID, "deleted": true},
 		"request_id": requestID,
+	})
+}
+
+func (s *Server) handleUpdateAdminModelMapping(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	modelID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || modelID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
+		return
+	}
+	mappingID, err := strconv.Atoi(r.PathValue("mappingId"))
+	if err != nil || mappingID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model mapping id", requestID)
+		return
+	}
+	var body apiopenapi.UpdateModelProviderMappingRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid model mapping update request", requestID)
+		return
+	}
+	before, err := s.runtime.models.FindMappingByID(r.Context(), mappingID)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "model provider mapping not found", requestID)
+		return
+	}
+	mapping, err := s.runtime.models.UpdateMapping(r.Context(), modelID, mappingID, modelcontract.UpdateMappingRequest{
+		UpstreamModelName:  body.UpstreamModelName,
+		Status:             toModelStatusPtr(body.Status),
+		CapabilityOverride: toCapabilityDescriptorsPtrContract(body.CapabilityOverride),
+		PricingOverride:    jsonObjectToMapPtr(body.PricingOverride),
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, modelservice.ErrMappingNotFound):
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "model provider mapping not found", requestID)
+		case errors.Is(err, modelservice.ErrMappingExists):
+			writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "model provider mapping already exists", requestID)
+		case errors.Is(err, modelservice.ErrInvalidInput):
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model mapping update request", requestID)
+		default:
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to update model mapping", requestID)
+		}
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model_provider_mapping.update", "model_provider_mapping", strconv.Itoa(mapping.ID), map[string]any{
+		"upstream_model_name": before.UpstreamModelName,
+		"status":              before.Status,
+	}, map[string]any{
+		"upstream_model_name": mapping.UpstreamModelName,
+		"status":              mapping.Status,
+	}))
+	writeJSONAny(w, http.StatusOK, apiopenapi.ModelProviderMappingResponse{
+		Data:      toAPIModelProviderMapping(mapping),
+		RequestId: requestID,
 	})
 }
 

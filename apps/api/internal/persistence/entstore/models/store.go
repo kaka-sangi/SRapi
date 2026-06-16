@@ -193,6 +193,19 @@ func (s *Store) DeleteAlias(ctx context.Context, id int) error {
 	return s.client.ModelAlias.DeleteOneID(id).Exec(ctx)
 }
 
+func (s *Store) UpdateAlias(ctx context.Context, id int, input contract.UpdateStoredAlias) (contract.ModelAlias, error) {
+	updated, err := s.client.ModelAlias.UpdateOneID(id).
+		SetAlias(input.Alias).
+		SetNillableStrategyHint(input.StrategyHint).
+		SetFallbackModelsJSON(cloneStrings(input.FallbackModels)).
+		SetStatus(string(input.Status)).
+		Save(ctx)
+	if err != nil {
+		return contract.ModelAlias{}, err
+	}
+	return toAlias(updated), nil
+}
+
 func (s *Store) FindMapping(ctx context.Context, modelID int, providerID int, upstreamModelName string) (contract.ModelProviderMapping, error) {
 	found, err := s.client.ModelProviderMapping.Query().
 		Where(
@@ -247,6 +260,19 @@ func (s *Store) FindMappingByID(ctx context.Context, id int) (contract.ModelProv
 
 func (s *Store) DeleteMapping(ctx context.Context, id int) error {
 	return s.client.ModelProviderMapping.DeleteOneID(id).Exec(ctx)
+}
+
+func (s *Store) UpdateMapping(ctx context.Context, id int, input contract.UpdateStoredMapping) (contract.ModelProviderMapping, error) {
+	updated, err := s.client.ModelProviderMapping.UpdateOneID(id).
+		SetUpstreamModelName(input.UpstreamModelName).
+		SetStatus(string(input.Status)).
+		SetCapabilityOverrideJSON(descriptorsToMaps(input.CapabilityOverride)).
+		SetPricingOverrideJSON(cloneMap(input.PricingOverride)).
+		Save(ctx)
+	if err != nil {
+		return contract.ModelProviderMapping{}, err
+	}
+	return toMapping(updated), nil
 }
 
 func (s *Store) List(ctx context.Context) ([]contract.Model, error) {

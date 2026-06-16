@@ -26,6 +26,8 @@ import {
   useDeleteModel,
   useCreateModelAlias,
   useCreateModelMapping,
+  useUpdateModelAlias,
+  useUpdateModelMapping,
   useModelRateLimits,
   useUpsertModelRateLimit,
   useDeleteModelRateLimit,
@@ -47,12 +49,16 @@ import {
   buildCreateModelAliasBody,
   emptyModelMappingForm,
   buildCreateModelMappingBody,
+  modelAliasFormFromRow,
+  modelMappingFormFromRow,
+  buildUpdateModelAliasBody,
+  buildUpdateModelMappingBody,
   type ModelFormState,
   type ModelAliasFormState,
   type ModelMappingFormState,
 } from "@/lib/admin-model-form";
 import { MODEL_CAPABILITY_OPTIONS } from "@/lib/capabilities";
-import type { Model, ModelRateLimit } from "@/lib/sdk-types";
+import type { Model, ModelAlias, ModelProviderMapping, ModelRateLimit } from "@/lib/sdk-types";
 
 export default function AdminModelsPage() {
   return (
@@ -80,6 +86,8 @@ function ModelsContent() {
   const deleteRl = useDeleteModelRateLimit();
   const aliasMut = useCreateModelAlias();
   const mappingMut = useCreateModelMapping();
+  const aliasUpdateMut = useUpdateModelAlias();
+  const mappingUpdateMut = useUpdateModelMapping();
   const deleteMut = useDeleteModel();
   // Provider picker for the mapping dialog (the registry is small; 200 covers it).
   const providers = useAdminProviders({ page: 1, page_size: 200 });
@@ -95,6 +103,11 @@ function ModelsContent() {
   const [aliasTarget, setAliasTarget] = useState<Model | null>(null);
   const [mappingTarget, setMappingTarget] = useState<Model | null>(null);
   const [detailTarget, setDetailTarget] = useState<Model | null>(null);
+  // Inline edit targets — when set the per-row Edit dialog opens with the row
+  // pre-populated. Kept separate from the create targets above so an open
+  // edit doesn't accidentally fall into a "create" code path.
+  const [aliasEditTarget, setAliasEditTarget] = useState<{ model: Model; alias: ModelAlias } | null>(null);
+  const [mappingEditTarget, setMappingEditTarget] = useState<{ model: Model; mapping: ModelProviderMapping } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Model | null>(null);
   const rateLimitByModel = new Map<number, ModelRateLimit>(
     (rateLimits.data?.data ?? []).map((rl) => [rl.model_id, rl]),
@@ -439,6 +452,65 @@ function ModelsContent() {
             setDetailTarget(null);
             setMappingTarget(m);
           }}
+          onEditAlias={(alias) => {
+            const m = detailTarget;
+            setDetailTarget(null);
+            setAliasEditTarget({ model: m, alias });
+          }}
+          onEditMapping={(mapping) => {
+            const m = detailTarget;
+            setDetailTarget(null);
+            setMappingEditTarget({ model: m, mapping });
+          }}
+        />
+      ) : null}
+
+      {aliasEditTarget ? (
+        <ResourceFormDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setAliasEditTarget(null);
+          }}
+          title={t("adminModels.editAliasTitle")}
+          description={aliasEditTarget.alias.alias}
+          fields={aliasFields}
+          initial={modelAliasFormFromRow(aliasEditTarget.alias)}
+          buildBody={buildUpdateModelAliasBody}
+          submit={(body) =>
+            aliasUpdateMut.mutateAsync({
+              id: aliasEditTarget.model.id,
+              aliasId: aliasEditTarget.alias.id,
+              body,
+            })
+          }
+          successMessage={t("feedback.updated")}
+          isPending={aliasUpdateMut.isPending}
+        />
+      ) : null}
+
+      {mappingEditTarget ? (
+        <ResourceFormDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setMappingEditTarget(null);
+          }}
+          title={t("adminModels.editMappingTitle")}
+          description={`${providerLabels.get(mappingEditTarget.mapping.provider_id) ?? mappingEditTarget.mapping.provider_id} · ${mappingEditTarget.mapping.upstream_model_name}`}
+          // Provider cannot change on a PATCH (the backend rejects provider
+          // reassignment to preserve audit history) — hide it on edit by
+          // dropping the providerId field from the schema.
+          fields={mappingFields.filter((f) => f.name !== "providerId")}
+          initial={modelMappingFormFromRow(mappingEditTarget.mapping)}
+          buildBody={buildUpdateModelMappingBody}
+          submit={(body) =>
+            mappingUpdateMut.mutateAsync({
+              id: mappingEditTarget.model.id,
+              mappingId: mappingEditTarget.mapping.id,
+              body,
+            })
+          }
+          successMessage={t("feedback.updated")}
+          isPending={mappingUpdateMut.isPending}
         />
       ) : null}
     </>

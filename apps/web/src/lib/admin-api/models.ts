@@ -4,10 +4,12 @@ import {
   listAdminModels,
   createAdminModel,
   createAdminModelAlias,
+  updateAdminModelAlias,
   quickMapAdminModels,
   listAdminModelAliases,
   deleteAdminModelAlias,
   createAdminModelMapping,
+  updateAdminModelMapping,
   listAdminModelMappings,
   deleteAdminModelMapping,
   updateAdminModel,
@@ -60,11 +62,25 @@ export const modelsApi = {
   listModelAliases(id: Id): Promise<AdminListResult<ModelAlias>> {
     return unwrapList(() => listAdminModelAliases({ path: { id }, throwOnError: true }));
   },
+  updateModelAlias(
+    id: Id,
+    aliasId: Id,
+    body: Parameters<typeof updateAdminModelAlias>[0]["body"],
+  ): Promise<ModelAlias> {
+    return unwrapData(() => updateAdminModelAlias({ path: { id, aliasId }, body, throwOnError: true }));
+  },
   deleteModelAlias(id: Id, aliasId: Id): Promise<{ deleted: boolean }> {
     return unwrapData(() => deleteAdminModelAlias({ path: { id, aliasId }, throwOnError: true }));
   },
   listModelMappings(id: Id): Promise<AdminListResult<ModelProviderMapping>> {
     return unwrapList(() => listAdminModelMappings({ path: { id }, throwOnError: true }));
+  },
+  updateModelMapping(
+    id: Id,
+    mappingId: Id,
+    body: Parameters<typeof updateAdminModelMapping>[0]["body"],
+  ): Promise<ModelProviderMapping> {
+    return unwrapData(() => updateAdminModelMapping({ path: { id, mappingId }, body, throwOnError: true }));
   },
   deleteModelMapping(id: Id, mappingId: Id): Promise<{ deleted: boolean }> {
     return unwrapData(() => deleteAdminModelMapping({ path: { id, mappingId }, throwOnError: true }));

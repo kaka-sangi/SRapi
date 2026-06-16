@@ -112,6 +112,41 @@ type CreateStoredMapping struct {
 	PricingOverride    map[string]any
 }
 
+// UpdateAliasRequest is the PATCH body accepted by the HTTP handler.
+// All fields are optional; omitting a field leaves it unchanged.
+type UpdateAliasRequest struct {
+	Alias          *string
+	StrategyHint   **string
+	FallbackModels *[]string
+	Status         *Status
+}
+
+// UpdateStoredAlias is the fully-resolved struct passed down to the store.
+// Every field is present (patched from the current stored value).
+type UpdateStoredAlias struct {
+	Alias          string
+	StrategyHint   *string
+	FallbackModels []string
+	Status         Status
+}
+
+// UpdateMappingRequest is the PATCH body accepted by the HTTP handler.
+// All fields are optional; omitting a field leaves it unchanged.
+type UpdateMappingRequest struct {
+	UpstreamModelName  *string
+	Status             *Status
+	CapabilityOverride *[]capabilitiescontract.Descriptor
+	PricingOverride    *map[string]any
+}
+
+// UpdateStoredMapping is the fully-resolved struct passed down to the store.
+type UpdateStoredMapping struct {
+	UpstreamModelName  string
+	Status             Status
+	CapabilityOverride []capabilitiescontract.Descriptor
+	PricingOverride    map[string]any
+}
+
 type CreateStoredModel struct {
 	CanonicalName   string
 	DisplayName     string
@@ -133,11 +168,13 @@ type Store interface {
 	ListAliasesByModel(ctx context.Context, modelID int) ([]ModelAlias, error)
 	FindAliasByID(ctx context.Context, id int) (ModelAlias, error)
 	DeleteAlias(ctx context.Context, id int) error
+	UpdateAlias(ctx context.Context, id int, input UpdateStoredAlias) (ModelAlias, error)
 	FindMapping(ctx context.Context, modelID int, providerID int, upstreamModelName string) (ModelProviderMapping, error)
 	CreateMapping(ctx context.Context, input CreateStoredMapping) (ModelProviderMapping, error)
 	ListMappingsByModel(ctx context.Context, modelID int) ([]ModelProviderMapping, error)
 	FindMappingByID(ctx context.Context, id int) (ModelProviderMapping, error)
 	DeleteMapping(ctx context.Context, id int) error
+	UpdateMapping(ctx context.Context, id int, input UpdateStoredMapping) (ModelProviderMapping, error)
 	List(ctx context.Context) ([]Model, error)
 	// Delete removes a model and cascades its aliases and provider mappings so a
 	// removed model can't still be resolved via a lingering alias/mapping.

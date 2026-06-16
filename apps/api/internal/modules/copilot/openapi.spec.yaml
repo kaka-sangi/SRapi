@@ -4165,6 +4165,56 @@ paths:
           $ref: "#/components/responses/StandardError"
 
   /api/v1/admin/models/{id}/aliases/{aliasId}:
+    patch:
+      tags:
+        - AdminModels
+      operationId: updateAdminModelAlias
+      summary: Update a model alias.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: aliasId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateModelAliasRequest"
+      responses:
+        "200":
+          description: Model alias updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelAliasResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
     delete:
       tags:
         - AdminModels
@@ -4289,6 +4339,56 @@ paths:
           $ref: "#/components/responses/StandardError"
 
   /api/v1/admin/models/{id}/mappings/{mappingId}:
+    patch:
+      tags:
+        - AdminModels
+      operationId: updateAdminModelMapping
+      summary: Update a model provider mapping.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: mappingId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateModelProviderMappingRequest"
+      responses:
+        "200":
+          description: Model provider mapping updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelProviderMappingResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
     delete:
       tags:
         - AdminModels
@@ -18418,6 +18518,26 @@ components:
         status:
           $ref: "#/components/schemas/ResourceStatus"
 
+    UpdateModelAliasRequest:
+      type: object
+      minProperties: 1
+      properties:
+        alias:
+          type: string
+          minLength: 1
+          example: claude-sonnet
+        strategy_hint:
+          type: string
+          nullable: true
+          example: balanced
+        fallback_models:
+          type: array
+          items:
+            type: string
+          default: []
+        status:
+          $ref: "#/components/schemas/ResourceStatus"
+
     ModelAliasResponse:
       type: object
       required:
@@ -18482,6 +18602,23 @@ components:
       properties:
         provider_id:
           $ref: "#/components/schemas/Id"
+        upstream_model_name:
+          type: string
+          minLength: 1
+        status:
+          $ref: "#/components/schemas/ResourceStatus"
+        capability_override:
+          type: array
+          items:
+            $ref: "#/components/schemas/CapabilityDescriptor"
+          default: []
+        pricing_override:
+          $ref: "#/components/schemas/JsonObject"
+
+    UpdateModelProviderMappingRequest:
+      type: object
+      minProperties: 1
+      properties:
         upstream_model_name:
           type: string
           minLength: 1

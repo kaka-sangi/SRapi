@@ -3,7 +3,11 @@ import type {
   CreateModelProviderMappingRequest,
   CreateModelRequest,
   Model,
+  ModelAlias,
+  ModelProviderMapping,
   ResourceStatus,
+  UpdateModelAliasRequest,
+  UpdateModelProviderMappingRequest,
   UpdateModelRequest,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 import {
@@ -99,6 +103,31 @@ export function buildCreateModelAliasBody(form: ModelAliasFormState): CreateMode
   };
 }
 
+// Pre-populates the alias-edit form from a row so the dialog opens with the
+// current values rather than blanks. The form shape is identical to create,
+// so the same FieldConfig + dialog can drive both flows.
+export function modelAliasFormFromRow(alias: ModelAlias): ModelAliasFormState {
+  return {
+    alias: alias.alias,
+    strategyHint: alias.strategy_hint ?? "",
+    fallbackModelsText: (alias.fallback_models ?? []).join("\n"),
+    status: alias.status,
+  };
+}
+
+// The update body sends ALL fields the form knows about, not a diff. The
+// backend service treats nil-pointer fields as "no change", so we always
+// pass the current form state — letting the user-visible form be the source
+// of truth (a half-cleared field clears it). For fallback_models we pass [].
+export function buildUpdateModelAliasBody(form: ModelAliasFormState): UpdateModelAliasRequest {
+  return {
+    alias: requiredText(form.alias, "Alias"),
+    strategy_hint: optionalText(form.strategyHint),
+    fallback_models: splitLines(form.fallbackModelsText),
+    status: form.status,
+  };
+}
+
 // --- Model → provider mapping (this model served by a provider's upstream name) ---
 
 export interface ModelMappingFormState {
@@ -131,6 +160,31 @@ export function buildCreateModelMappingBody(
       ? capabilityKeysToDescriptors(form.capabilities)
       : undefined,
     pricing_override: Object.keys(form.pricingOverride).length ? form.pricingOverride : undefined,
+  };
+}
+
+export function modelMappingFormFromRow(mapping: ModelProviderMapping): ModelMappingFormState {
+  return {
+    providerId: mapping.provider_id,
+    upstreamModelName: mapping.upstream_model_name,
+    status: mapping.status,
+    capabilities: descriptorsToCapabilityKeys(mapping.capability_override ?? []),
+    pricingOverride: (mapping.pricing_override ?? {}) as Record<string, unknown>,
+  };
+}
+
+// The update body omits provider_id — the backend explicitly does NOT support
+// reassigning a mapping to a different provider via PATCH (that'd require a
+// new mapping row to preserve audit history). The dialog disables the
+// provider field in edit mode to match.
+export function buildUpdateModelMappingBody(
+  form: ModelMappingFormState,
+): UpdateModelProviderMappingRequest {
+  return {
+    upstream_model_name: requiredText(form.upstreamModelName, "Upstream model name"),
+    status: form.status,
+    capability_override: capabilityKeysToDescriptors(form.capabilities),
+    pricing_override: form.pricingOverride,
   };
 }
 

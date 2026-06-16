@@ -203,6 +203,33 @@ func (s *Store) DeleteAlias(_ context.Context, id int) error {
 	return nil
 }
 
+func (s *Store) UpdateAlias(_ context.Context, id int, input contract.UpdateStoredAlias) (contract.ModelAlias, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	existing, ok := s.aliasesByID[id]
+	if !ok {
+		return contract.ModelAlias{}, errors.New("model alias not found")
+	}
+	newKey := aliasKey(input.Alias)
+	oldKey := aliasKey(existing.Alias)
+	// If the alias string is changing, check uniqueness and update index.
+	if newKey != oldKey {
+		if _, taken := s.aliasByName[newKey]; taken {
+			return contract.ModelAlias{}, errors.New("model alias already exists")
+		}
+		delete(s.aliasByName, oldKey)
+		s.aliasByName[newKey] = id
+	}
+	updated := existing
+	updated.Alias = strings.TrimSpace(input.Alias)
+	updated.StrategyHint = input.StrategyHint
+	updated.FallbackModels = cloneStrings(input.FallbackModels)
+	updated.Status = input.Status
+	updated.UpdatedAt = time.Now().UTC()
+	s.aliasesByID[id] = updated
+	return cloneAlias(updated), nil
+}
+
 func (s *Store) FindMapping(_ context.Context, modelID int, providerID int, upstreamModelName string) (contract.ModelProviderMapping, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -279,6 +306,34 @@ func (s *Store) DeleteMapping(_ context.Context, id int) error {
 		s.mappingIDsByModel[mapping.ModelID] = remaining
 	}
 	return nil
+}
+
+func (s *Store) UpdateMapping(_ context.Context, id int, input contract.UpdateStoredMapping) (contract.ModelProviderMapping, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	existing, ok := s.mappingsByID[id]
+	if !ok {
+		return contract.ModelProviderMapping{}, errors.New("model provider mapping not found")
+	}
+	newUpstream := strings.TrimSpace(input.UpstreamModelName)
+	newKey := mappingKey(existing.ModelID, existing.ProviderID, newUpstream)
+	oldKey := mappingKey(existing.ModelID, existing.ProviderID, existing.UpstreamModelName)
+	// If the upstream model name is changing, check uniqueness and update index.
+	if newKey != oldKey {
+		if _, taken := s.mappingByKey[newKey]; taken {
+			return contract.ModelProviderMapping{}, errors.New("model provider mapping already exists")
+		}
+		delete(s.mappingByKey, oldKey)
+		s.mappingByKey[newKey] = id
+	}
+	updated := existing
+	updated.UpstreamModelName = newUpstream
+	updated.Status = input.Status
+	updated.CapabilityOverride = cloneDescriptors(input.CapabilityOverride)
+	updated.PricingOverride = cloneMap(input.PricingOverride)
+	updated.UpdatedAt = time.Now().UTC()
+	s.mappingsByID[id] = updated
+	return cloneMapping(updated), nil
 }
 
 func removeID(ids []int, id int) []int {

@@ -99,9 +99,23 @@ export function useModelMappings(modelId: string | null) {
     enabled: Boolean(modelId),
   });
 }
+export function useUpdateModelAlias() {
+  return useAdminMutation(
+    (vars: { id: string; aliasId: string; body: Parameters<typeof adminApi.updateModelAlias>[2] }) =>
+      adminApi.updateModelAlias(vars.id, vars.aliasId, vars.body),
+    ["admin", "models"],
+  );
+}
 export function useDeleteModelAlias() {
   return useAdminMutation(
     (vars: { id: string; aliasId: string }) => adminApi.deleteModelAlias(vars.id, vars.aliasId),
+    ["admin", "models"],
+  );
+}
+export function useUpdateModelMapping() {
+  return useAdminMutation(
+    (vars: { id: string; mappingId: string; body: Parameters<typeof adminApi.updateModelMapping>[2] }) =>
+      adminApi.updateModelMapping(vars.id, vars.mappingId, vars.body),
     ["admin", "models"],
   );
 }

@@ -1065,6 +1065,8 @@ export const en = {
     edit: "Edit model",
     addAlias: "Add alias",
     aliasTitle: "New alias",
+    editAliasTitle: "Edit alias",
+    editMappingTitle: "Edit provider mapping",
     manageRouting: "Aliases & mappings",
     manageTitle: "Aliases & provider mappings",
     aliasesSection: "Aliases",

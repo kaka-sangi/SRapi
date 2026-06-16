@@ -208,6 +208,17 @@ func (s *Service) CreateAlias(ctx context.Context, modelID int, req contract.Cre
 	return stored, nil
 }
 
+func (s *Service) FindAliasByID(ctx context.Context, aliasID int) (contract.ModelAlias, error) {
+	if aliasID <= 0 {
+		return contract.ModelAlias{}, ErrInvalidInput
+	}
+	alias, err := s.store.FindAliasByID(ctx, aliasID)
+	if err != nil {
+		return contract.ModelAlias{}, ErrAliasNotFound
+	}
+	return alias, nil
+}
+
 func (s *Service) ListAliasesByModel(ctx context.Context, modelID int) ([]contract.ModelAlias, error) {
 	if modelID <= 0 {
 		return nil, ErrInvalidInput
@@ -227,6 +238,48 @@ func (s *Service) DeleteAlias(ctx context.Context, modelID int, aliasID int) err
 		return ErrAliasNotFound
 	}
 	return s.store.DeleteAlias(ctx, aliasID)
+}
+
+func (s *Service) UpdateAlias(ctx context.Context, modelID int, aliasID int, req contract.UpdateAliasRequest) (contract.ModelAlias, error) {
+	if modelID <= 0 || aliasID <= 0 {
+		return contract.ModelAlias{}, ErrInvalidInput
+	}
+	existing, err := s.store.FindAliasByID(ctx, aliasID)
+	if err != nil || existing.ModelID != modelID {
+		return contract.ModelAlias{}, ErrAliasNotFound
+	}
+	// Start from current values, apply only the fields provided.
+	aliasStr := existing.Alias
+	if req.Alias != nil {
+		aliasStr = strings.TrimSpace(*req.Alias)
+		if aliasStr == "" {
+			return contract.ModelAlias{}, ErrInvalidInput
+		}
+		// Uniqueness check: only needed when the alias string actually changes.
+		if !strings.EqualFold(aliasStr, existing.Alias) {
+			if _, err := s.store.FindByAlias(ctx, aliasStr); err == nil {
+				return contract.ModelAlias{}, ErrAliasExists
+			}
+		}
+	}
+	strategyHint := existing.StrategyHint
+	if req.StrategyHint != nil {
+		strategyHint = cloneString(*req.StrategyHint)
+	}
+	fallbackModels := existing.FallbackModels
+	if req.FallbackModels != nil {
+		fallbackModels = cloneStrings(*req.FallbackModels)
+	}
+	status := existing.Status
+	if req.Status != nil {
+		status = *req.Status
+	}
+	return s.store.UpdateAlias(ctx, aliasID, contract.UpdateStoredAlias{
+		Alias:          aliasStr,
+		StrategyHint:   strategyHint,
+		FallbackModels: fallbackModels,
+		Status:         status,
+	})
 }
 
 func (s *Service) CreateMapping(ctx context.Context, modelID int, req contract.CreateMappingRequest) (contract.ModelProviderMapping, error) {
@@ -262,6 +315,17 @@ func (s *Service) CreateMapping(ctx context.Context, modelID int, req contract.C
 	return stored, nil
 }
 
+func (s *Service) FindMappingByID(ctx context.Context, mappingID int) (contract.ModelProviderMapping, error) {
+	if mappingID <= 0 {
+		return contract.ModelProviderMapping{}, ErrInvalidInput
+	}
+	mapping, err := s.store.FindMappingByID(ctx, mappingID)
+	if err != nil {
+		return contract.ModelProviderMapping{}, ErrMappingNotFound
+	}
+	return mapping, nil
+}
+
 func (s *Service) ListMappingsByModel(ctx context.Context, modelID int) ([]contract.ModelProviderMapping, error) {
 	if modelID <= 0 {
 		return nil, ErrInvalidInput
@@ -281,6 +345,52 @@ func (s *Service) DeleteMapping(ctx context.Context, modelID int, mappingID int)
 		return ErrMappingNotFound
 	}
 	return s.store.DeleteMapping(ctx, mappingID)
+}
+
+func (s *Service) UpdateMapping(ctx context.Context, modelID int, mappingID int, req contract.UpdateMappingRequest) (contract.ModelProviderMapping, error) {
+	if modelID <= 0 || mappingID <= 0 {
+		return contract.ModelProviderMapping{}, ErrInvalidInput
+	}
+	existing, err := s.store.FindMappingByID(ctx, mappingID)
+	if err != nil || existing.ModelID != modelID {
+		return contract.ModelProviderMapping{}, ErrMappingNotFound
+	}
+	// Start from current values, apply only the fields provided.
+	upstreamModelName := existing.UpstreamModelName
+	if req.UpstreamModelName != nil {
+		upstreamModelName = strings.TrimSpace(*req.UpstreamModelName)
+		if upstreamModelName == "" {
+			return contract.ModelProviderMapping{}, ErrInvalidInput
+		}
+		// Uniqueness check: only needed when upstream_model_name actually changes.
+		if upstreamModelName != existing.UpstreamModelName {
+			if _, err := s.store.FindMapping(ctx, modelID, existing.ProviderID, upstreamModelName); err == nil {
+				return contract.ModelProviderMapping{}, ErrMappingExists
+			}
+		}
+	}
+	status := existing.Status
+	if req.Status != nil {
+		status = *req.Status
+	}
+	capabilityOverride := existing.CapabilityOverride
+	if req.CapabilityOverride != nil {
+		normalized, err := normalizeDescriptors(*req.CapabilityOverride)
+		if err != nil {
+			return contract.ModelProviderMapping{}, ErrInvalidInput
+		}
+		capabilityOverride = normalized
+	}
+	pricingOverride := existing.PricingOverride
+	if req.PricingOverride != nil {
+		pricingOverride = cloneMap(*req.PricingOverride)
+	}
+	return s.store.UpdateMapping(ctx, mappingID, contract.UpdateStoredMapping{
+		UpstreamModelName:  upstreamModelName,
+		Status:             status,
+		CapabilityOverride: capabilityOverride,
+		PricingOverride:    pricingOverride,
+	})
 }
 
 func cloneString(value *string) *string {
