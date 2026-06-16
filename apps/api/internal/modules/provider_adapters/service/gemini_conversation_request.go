@@ -80,13 +80,18 @@ func geminiCompatibleRequestBodyRaw(req contract.ConversationRequest) ([]byte, e
 
 func geminiCompatibleContents(req contract.ConversationRequest) []geminiContent {
 	out := make([]geminiContent, 0, len(req.Messages)+1)
+	// Gemini's functionResponse must carry the function name that matches the
+	// earlier functionCall, but an inbound tool_result references the call by id,
+	// not name. Build a callID->name map across the whole history so a tool_result
+	// with no name can recover it.
+	toolNames := geminiToolNameByCallID(req)
 	hasConversationMessage := false
 	for _, message := range req.Messages {
 		role := geminiRole(message.Role)
 		if role == "system" {
 			continue
 		}
-		parts := geminiPartsFromContentParts(message.Parts)
+		parts := geminiPartsFromContentParts(message.Parts, toolNames)
 		if len(parts) == 0 {
 			continue
 		}
@@ -94,7 +99,7 @@ func geminiCompatibleContents(req contract.ConversationRequest) []geminiContent 
 		hasConversationMessage = true
 	}
 	if !hasConversationMessage {
-		parts := geminiPartsFromContentParts(req.InputParts)
+		parts := geminiPartsFromContentParts(req.InputParts, toolNames)
 		if len(parts) == 0 {
 			prompt := conversationPrompt(req)
 			if prompt == "" {
@@ -118,7 +123,31 @@ func geminiRole(role string) string {
 	}
 }
 
-func geminiPartsFromContentParts(parts []contract.ContentPart) []geminiPart {
+// geminiToolNameByCallID maps each tool_use call id to its function name across
+// the whole request so a later tool_result (which references the call by id, not
+// name) can recover the name Gemini's functionResponse requires.
+func geminiToolNameByCallID(req contract.ConversationRequest) map[string]string {
+	names := map[string]string{}
+	collect := func(parts []contract.ContentPart) {
+		for _, part := range parts {
+			if part.Kind != contract.ContentPartToolUse {
+				continue
+			}
+			id := strings.TrimSpace(part.ToolCallID)
+			name := strings.TrimSpace(part.ToolName)
+			if id != "" && name != "" {
+				names[id] = name
+			}
+		}
+	}
+	for _, message := range req.Messages {
+		collect(message.Parts)
+	}
+	collect(req.InputParts)
+	return names
+}
+
+func geminiPartsFromContentParts(parts []contract.ContentPart, toolNames map[string]string) []geminiPart {
 	out := make([]geminiPart, 0, len(parts))
 	for _, part := range parts {
 		switch part.Kind {
@@ -145,7 +174,11 @@ func geminiPartsFromContentParts(parts []contract.ContentPart) []geminiPart {
 			}
 		case contract.ContentPartToolResult:
 			response := map[string]any{}
-			if name := strings.TrimSpace(part.ToolName); name != "" {
+			name := strings.TrimSpace(part.ToolName)
+			if name == "" {
+				name = toolNames[firstNonEmpty(part.ToolResultForID, part.ToolCallID)]
+			}
+			if name != "" {
 				response["name"] = name
 			}
 			if payload := jsonObjectValue(part.Text); payload != nil {

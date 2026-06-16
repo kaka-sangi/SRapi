@@ -35,3 +35,31 @@ func TestGeminiThoughtPartBecomesThinking(t *testing.T) {
 		t.Fatalf("plain text part must stay text, got kind=%q ok=%v", plain.Kind, ok)
 	}
 }
+
+// TestGeminiToolResultRecoversFunctionName guards that a tool_result with no
+// explicit name recovers the function name from the matching tool_use call id,
+// since Gemini's functionResponse must carry the name to correlate the call.
+func TestGeminiToolResultRecoversFunctionName(t *testing.T) {
+	req := contract.ConversationRequest{
+		Messages: []contract.ConversationMessage{
+			{Role: "assistant", Parts: []contract.ContentPart{
+				{Kind: contract.ContentPartToolUse, ToolCallID: "call_x", ToolName: "get_weather", ToolArgumentsJSON: `{"city":"SF"}`},
+			}},
+			{Role: "tool", Parts: []contract.ContentPart{
+				{Kind: contract.ContentPartToolResult, ToolResultForID: "call_x", Text: `{"temp":20}`},
+			}},
+		},
+	}
+	contents := geminiCompatibleContents(req)
+	var gotName string
+	for _, c := range contents {
+		for _, p := range c.Parts {
+			if len(p.FunctionResponse) > 0 {
+				gotName, _ = p.FunctionResponse["name"].(string)
+			}
+		}
+	}
+	if gotName != "get_weather" {
+		t.Fatalf("tool_result functionResponse must recover the function name from the call id, got %q", gotName)
+	}
+}

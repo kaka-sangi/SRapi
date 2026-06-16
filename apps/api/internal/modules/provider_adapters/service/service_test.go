@@ -3498,7 +3498,10 @@ func TestGeminiCompatibleAdapterPreservesFunctionCallResponse(t *testing.T) {
 	if len(resp.Parts) != 1 || resp.StopReason != contract.StopReasonToolUse || resp.Usage.OutputTokens != 1 {
 		t.Fatalf("unexpected gemini tool call response: %+v", resp)
 	}
-	assertToolUsePart(t, resp.Parts[0], "", "lookup", `{"query":"weather"}`)
+	// Gemini functionCall has no id; the adapter synthesizes a deterministic one
+	// ("call_" + sha256 prefix of name:arguments) so OpenAI/Anthropic clients can
+	// correlate the tool result.
+	assertToolUsePart(t, resp.Parts[0], "call_c0240d67", "lookup", `{"query":"weather"}`)
 	if resp.Parts[0].Metadata["signature"] != "sig_gemini_1" ||
 		resp.Parts[0].Metadata["thoughtSignature"] != "sig_gemini_1" {
 		t.Fatalf("expected Gemini thoughtSignature metadata, got %+v", resp.Parts[0])
@@ -3695,7 +3698,10 @@ func TestGeminiCompatibleAdapterStreamsFunctionCall(t *testing.T) {
 	if len(resp.Parts) != 1 || resp.StopReason != contract.StopReasonToolUse {
 		t.Fatalf("unexpected gemini stream tool response: %+v", resp)
 	}
-	assertToolUsePart(t, resp.Parts[0], "", "lookup", `{"query":"weather"}`)
+	// Gemini functionCall has no id; the adapter synthesizes a deterministic one
+	// ("call_" + sha256 prefix of name:arguments) so OpenAI/Anthropic clients can
+	// correlate the tool result.
+	assertToolUsePart(t, resp.Parts[0], "call_c0240d67", "lookup", `{"query":"weather"}`)
 }
 
 func TestGeminiCompatibleAdapterAcceptsModelsBaseURL(t *testing.T) {

@@ -592,8 +592,12 @@ func geminiContentPart(part geminiPart) (contract.ContentPart, bool) {
 		if name == "" && arguments == "{}" {
 			return contract.ContentPart{}, false
 		}
+		// Gemini functionCall carries no id, but OpenAI/Anthropic clients require a
+		// tool-call id to correlate the result. Synthesize a deterministic one from
+		// the call so the client echoes it back on the tool_result.
 		return contract.ContentPart{
 			Kind:              contract.ContentPartToolUse,
+			ToolCallID:        "call_" + sha256HexPrefix([]byte(name+":"+arguments), 8),
 			ToolName:          name,
 			ToolArgumentsJSON: arguments,
 			Metadata:          geminiPartMetadata(part, map[string]any{"type": "function"}),
