@@ -25,6 +25,8 @@ func NewUpstreamStreamParser(protocol string) (contract.UpstreamStreamParser, bo
 		return &anthropicUpstreamStreamParser{state: newAnthropicStreamParseState()}, true
 	case "openai-compatible", "openai":
 		return &openAIUpstreamStreamParser{state: newOpenAIStreamParseState()}, true
+	case "gemini-compatible", "gemini":
+		return &geminiUpstreamStreamParser{state: newGeminiStreamParseState()}, true
 	default:
 		return nil, false
 	}
@@ -37,6 +39,16 @@ func (p *anthropicUpstreamStreamParser) FeedFrame(eventType, data string) ([]con
 }
 
 func (p *anthropicUpstreamStreamParser) Finalize() []contract.ConversationStreamEvent {
+	return p.state.Finalize()
+}
+
+type geminiUpstreamStreamParser struct{ state *geminiStreamParseState }
+
+func (p *geminiUpstreamStreamParser) FeedFrame(eventType, data string) ([]contract.ConversationStreamEvent, bool, error) {
+	return p.state.FeedFrame(sseFrame{Event: eventType, Data: data})
+}
+
+func (p *geminiUpstreamStreamParser) Finalize() []contract.ConversationStreamEvent {
 	return p.state.Finalize()
 }
 

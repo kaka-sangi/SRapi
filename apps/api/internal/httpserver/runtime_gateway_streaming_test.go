@@ -263,6 +263,72 @@ func TestGatewayAnthropicMessagesToOpenAIStreamsTransformedIncrementally(t *test
 	}
 }
 
+// TestGatewayChatCompletionsToGeminiStreamsTransformedIncrementally proves pair 11
+// (the gemini-upstream direction): a /v1/chat/completions client backed by a
+// Gemini-compatible upstream receives transcoded chat.completion.chunk SSE built
+// on the fly from the upstream Gemini streamGenerateContent SSE, incrementally,
+// with no raw Gemini candidates leaking.
+func TestGatewayChatCompletionsToGeminiStreamsTransformedIncrementally(t *testing.T) {
+	first := "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Hello\"}]},\"index\":0}]}\n\n"
+	rest := "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\" world\"}]},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":3,\"candidatesTokenCount\":2,\"totalTokenCount\":5}}\n\n"
+
+	release := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		_, _ = io.WriteString(w, first)
+		if flusher != nil {
+			flusher.Flush()
+		}
+		select {
+		case <-release:
+		case <-time.After(2 * time.Second):
+		}
+		_, _ = io.WriteString(w, rest)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"x-gemini-up","display_name":"Gemini Up","adapter_type":"gemini-compatible","protocol":"gemini-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"pair11-model","display_name":"Pair11","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gemini-up","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"pair11-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1beta"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"pair11-model","stream":true,"messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	rec := &flushCapturingWriter{header: http.Header{}, release: release}
+	handler.ServeHTTP(rec, req)
+
+	if rec.code != 0 && rec.code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.code, rec.body.String())
+	}
+	body := rec.body.String()
+	if !strings.Contains(body, "chat.completion.chunk") {
+		t.Fatalf("expected transcoded chat.completion.chunk SSE, got:\n%s", body)
+	}
+	if strings.Contains(body, `"candidates"`) {
+		t.Fatalf("raw Gemini SSE leaked to the chat client:\n%s", body)
+	}
+	for _, want := range []string{`"content":"Hello"`, `"content":" world"`, "data: [DONE]"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("transcoded stream missing %q, got:\n%s", want, body)
+		}
+	}
+	if !rec.flushed {
+		t.Fatal("expected an early flush (incremental streaming), got none")
+	}
+	if strings.Contains(rec.firstFlushBody, `"content":" world"`) {
+		t.Fatalf("response was buffered: first flush already contained the later chunk: %q", rec.firstFlushBody)
+	}
+}
+
 // TestGatewayChatCompletionsToCodexStreamsTransformedChunksIncrementally proves
 // the cross-shape streaming fix: a chat/completions client backed by a Codex CLI
 // account receives correctly-shaped chat.completion.chunk SSE — transformed on

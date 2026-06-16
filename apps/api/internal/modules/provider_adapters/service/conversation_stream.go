@@ -105,7 +105,7 @@ func (s *Service) crossProtocolUpstreamProtocol(req contract.ConversationRequest
 	case isAnthropicCompatible(req):
 		return "anthropic-compatible", true
 	case isGeminiCompatible(req):
-		return "", false // gemini incremental parser lands with C6
+		return "gemini-compatible", true
 	default:
 		return "openai-compatible", true
 	}

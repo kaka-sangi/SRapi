@@ -725,97 +725,126 @@ func (u geminiUsageMetadata) HasTokenUsage() bool {
 		u.CachedContentTokenCount != nil
 }
 
+// geminiStreamParseState drives a Gemini streamGenerateContent SSE stream,
+// accumulating content parts and emitting canonical stream events per frame.
+// The batch parser and the per-frame cross-protocol driver share this one state
+// machine so they cannot drift.
+type geminiStreamParseState struct {
+	usage        geminiUsageMetadata
+	parts        []contract.ContentPart
+	streamEvents []contract.ConversationStreamEvent
+	eventIndex   int
+	stopReason   contract.StopReason
+	seenChunk    bool
+}
+
+func newGeminiStreamParseState() *geminiStreamParseState {
+	return &geminiStreamParseState{streamEvents: make([]contract.ConversationStreamEvent, 0), stopReason: contract.StopReasonEndTurn}
+}
+
+// FeedFrame processes one Gemini SSE frame and returns the canonical stream
+// events it produced. Gemini carries its stop inline (the chunk's finishReason),
+// so done is signalled only by a [DONE] sentinel.
+func (s *geminiStreamParseState) FeedFrame(frame sseFrame) ([]contract.ConversationStreamEvent, bool, error) {
+	data := strings.TrimSpace(frame.Data)
+	if data == "" {
+		return nil, false, nil
+	}
+	if data == "[DONE]" {
+		return nil, true, nil
+	}
+	if providerErr, ok := providerErrorFromStreamFrame(frame, data, "gemini-compatible"); ok {
+		return nil, false, providerErr
+	}
+	var chunk geminiGenerateContentResponse
+	if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+		return nil, false, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
+	}
+	before := len(s.streamEvents)
+	s.seenChunk = true
+	chunkParts := chunk.ContentParts()
+	s.parts = appendStreamContentParts(s.parts, chunkParts)
+	for contentIndex, part := range chunkParts {
+		eventType := contract.ConversationStreamEventContentDelta
+		switch part.Kind {
+		case contract.ContentPartToolUse:
+			eventType = contract.ConversationStreamEventToolCallDelta
+		case contract.ContentPartToolResult:
+			eventType = contract.ConversationStreamEventToolResult
+		case contract.ContentPartThinking:
+			eventType = contract.ConversationStreamEventReasoning
+		}
+		part.OriginProtocol = firstNonEmpty(part.OriginProtocol, "gemini-compatible")
+		s.streamEvents = append(s.streamEvents, contract.ConversationStreamEvent{
+			Index:          s.eventIndex,
+			Type:           eventType,
+			ContentIndex:   contentIndex,
+			Delta:          part,
+			RawEventType:   "generateContentResponse",
+			Raw:            append(json.RawMessage(nil), data...),
+			OriginProtocol: "gemini-compatible",
+		})
+		s.eventIndex++
+	}
+	if reason := chunk.StopReason(); reason != contract.StopReasonEndTurn {
+		s.stopReason = reason
+		s.streamEvents = append(s.streamEvents, contract.ConversationStreamEvent{
+			Index:          s.eventIndex,
+			Type:           contract.ConversationStreamEventStop,
+			StopReason:     s.stopReason,
+			RawEventType:   "generateContentResponse",
+			Raw:            append(json.RawMessage(nil), data...),
+			OriginProtocol: "gemini-compatible",
+		})
+		s.eventIndex++
+	}
+	chunkUsage := chunk.Usage()
+	s.usage.Merge(chunkUsage)
+	if chunkUsage.HasTokenUsage() {
+		s.streamEvents = append(s.streamEvents, contract.ConversationStreamEvent{
+			Index:          s.eventIndex,
+			Type:           contract.ConversationStreamEventUsage,
+			Usage:          s.usage.ToUsage(contentPartsText(s.parts)),
+			RawEventType:   "generateContentResponse",
+			Raw:            append(json.RawMessage(nil), data...),
+			OriginProtocol: "gemini-compatible",
+		})
+		s.eventIndex++
+	}
+	return cloneConversationStreamEventsTail(s.streamEvents, before), false, nil
+}
+
+// Finalize returns no trailing events — Gemini's stop is carried inline by the
+// chunk that sets finishReason.
+func (s *geminiStreamParseState) Finalize() []contract.ConversationStreamEvent { return nil }
+
 func parseGeminiCompatibleStream(body []byte, statusCode int) (contract.ConversationResponse, error) {
 	frames, err := parseSSEFrames(body)
 	if err != nil {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
 	}
-	var usage geminiUsageMetadata
-	var parts []contract.ContentPart
-	streamEvents := make([]contract.ConversationStreamEvent, 0)
-	eventIndex := 0
-	stopReason := contract.StopReasonEndTurn
-	seenChunk := false
+	state := newGeminiStreamParseState()
 	for _, frame := range frames {
-		data := strings.TrimSpace(frame.Data)
-		if data == "" {
-			continue
-		}
-		if data == "[DONE]" {
+		if _, done, feedErr := state.FeedFrame(frame); feedErr != nil {
+			return contract.ConversationResponse{}, feedErr
+		} else if done {
 			break
 		}
-		if providerErr, ok := providerErrorFromStreamFrame(frame, data, "gemini-compatible"); ok {
-			return contract.ConversationResponse{}, providerErr
-		}
-		var chunk geminiGenerateContentResponse
-		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-			return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
-		}
-		seenChunk = true
-		chunkParts := chunk.ContentParts()
-		parts = appendStreamContentParts(parts, chunkParts)
-		for contentIndex, part := range chunkParts {
-			eventType := contract.ConversationStreamEventContentDelta
-			switch part.Kind {
-			case contract.ContentPartToolUse:
-				eventType = contract.ConversationStreamEventToolCallDelta
-			case contract.ContentPartToolResult:
-				eventType = contract.ConversationStreamEventToolResult
-			case contract.ContentPartThinking:
-				eventType = contract.ConversationStreamEventReasoning
-			}
-			part.OriginProtocol = firstNonEmpty(part.OriginProtocol, "gemini-compatible")
-			streamEvents = append(streamEvents, contract.ConversationStreamEvent{
-				Index:          eventIndex,
-				Type:           eventType,
-				ContentIndex:   contentIndex,
-				Delta:          part,
-				RawEventType:   "generateContentResponse",
-				Raw:            append(json.RawMessage(nil), data...),
-				OriginProtocol: "gemini-compatible",
-			})
-			eventIndex++
-		}
-		if reason := chunk.StopReason(); reason != contract.StopReasonEndTurn {
-			stopReason = reason
-			streamEvents = append(streamEvents, contract.ConversationStreamEvent{
-				Index:          eventIndex,
-				Type:           contract.ConversationStreamEventStop,
-				StopReason:     stopReason,
-				RawEventType:   "generateContentResponse",
-				Raw:            append(json.RawMessage(nil), data...),
-				OriginProtocol: "gemini-compatible",
-			})
-			eventIndex++
-		}
-		chunkUsage := chunk.Usage()
-		usage.Merge(chunkUsage)
-		if chunkUsage.HasTokenUsage() {
-			streamEvents = append(streamEvents, contract.ConversationStreamEvent{
-				Index:          eventIndex,
-				Type:           contract.ConversationStreamEventUsage,
-				Usage:          usage.ToUsage(contentPartsText(parts)),
-				RawEventType:   "generateContentResponse",
-				Raw:            append(json.RawMessage(nil), data...),
-				OriginProtocol: "gemini-compatible",
-			})
-			eventIndex++
-		}
 	}
-	if !seenChunk {
+	if !state.seenChunk {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before chunk"}
 	}
-	if len(parts) == 0 {
+	if len(state.parts) == 0 {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no content"}
 	}
-	text := contentPartsText(parts)
+	text := contentPartsText(state.parts)
 	return contract.ConversationResponse{
-		Parts:        parts,
-		StopReason:   stopReason,
+		Parts:        state.parts,
+		StopReason:   state.stopReason,
 		StatusCode:   statusCode,
-		Usage:        usage.ToUsage(text),
+		Usage:        state.usage.ToUsage(text),
 		Raw:          append(json.RawMessage(nil), body...),
-		StreamEvents: streamEvents,
+		StreamEvents: state.streamEvents,
 	}, nil
 }
 
