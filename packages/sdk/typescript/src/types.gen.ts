@@ -5757,6 +5757,18 @@ export type ChannelMonitor = {
      * Latency in ms of the most recent run. Absent when no runs exist.
      */
     last_run_latency_ms?: number;
+    /**
+     * Window in days over which recent_uptime_success_rate is computed (absent when no recent runs).
+     */
+    recent_uptime_window_days?: number;
+    /**
+     * How many runs in the window contributed to recent_uptime_success_rate (capped per server policy).
+     */
+    recent_uptime_sample_count?: number;
+    /**
+     * Ratio of OK runs over recent_uptime_sample_count (absent when no recent runs).
+     */
+    recent_uptime_success_rate?: number;
 };
 
 export type CreateChannelMonitorRequest = {

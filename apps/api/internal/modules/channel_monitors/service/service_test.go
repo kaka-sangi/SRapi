@@ -189,6 +189,50 @@ func TestListDefinitionsWithSummaryAttachesLastRun(t *testing.T) {
 	}
 }
 
+func TestListDefinitionsWithSummaryComputesRollingUptime(t *testing.T) {
+	svc := newService(t)
+	ctx := context.Background()
+
+	def, err := svc.CreateDefinition(ctx, contract.CreateDefinition{Name: "m", Scope: contract.ScopeAccount, ScopeRef: "1"})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	// Record 5 runs: 3 OK + 2 failures. Expected SampleCount=5, Successes=3.
+	for i, ok := range []bool{true, false, true, false, true} {
+		if _, err := svc.RecordRun(ctx, contract.RecordRun{
+			MonitorID: def.ID,
+			RunID:     "r",
+			OK:        ok,
+		}); err != nil {
+			t.Fatalf("record %d: %v", i, err)
+		}
+	}
+
+	entries, err := svc.ListDefinitionsWithSummary(ctx)
+	if err != nil {
+		t.Fatalf("list with summary: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("entries len: want 1, got %d", len(entries))
+	}
+	entry := entries[0]
+	if entry.Recent == nil {
+		t.Fatalf("Recent should be populated for a monitor with runs")
+	}
+	if entry.Recent.SampleCount != 5 {
+		t.Fatalf("SampleCount: want 5, got %d", entry.Recent.SampleCount)
+	}
+	if entry.Recent.Successes != 3 {
+		t.Fatalf("Successes: want 3, got %d", entry.Recent.Successes)
+	}
+	if entry.Recent.WindowDays != 7 {
+		t.Fatalf("WindowDays: want 7, got %d", entry.Recent.WindowDays)
+	}
+	if got := entry.Recent.SuccessRate(); got != 0.6 {
+		t.Fatalf("SuccessRate: want 0.6, got %v", got)
+	}
+}
+
 func TestDeleteDefinitionRemovesRuns(t *testing.T) {
 	svc := newService(t)
 	ctx := context.Background()

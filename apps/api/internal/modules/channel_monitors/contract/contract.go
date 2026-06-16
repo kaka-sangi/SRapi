@@ -64,9 +64,11 @@ type Definition struct {
 // DefinitionWithSummary pairs a definition with a thin summary of its most recent
 // run, so the admin list view can show last_run_at + ok/latency at a glance
 // without an extra request per row. LastRun is nil when no runs exist yet.
+// Recent is nil when no runs exist in the rolling window.
 type DefinitionWithSummary struct {
 	Definition
 	LastRun *RunSummary
+	Recent  *RecentUptime
 }
 
 // RunSummary is a row-level snapshot of the most recent run, deliberately
@@ -75,6 +77,24 @@ type RunSummary struct {
 	At        time.Time
 	OK        bool
 	LatencyMS int
+}
+
+// RecentUptime is a rolling availability snapshot computed over the last
+// RecentUptimeWindow worth of runs. Successes covers runs whose OK was true.
+type RecentUptime struct {
+	SampleCount int
+	Successes   int
+	WindowDays  int
+}
+
+// SuccessRate returns Successes / SampleCount; 0 when there are no samples
+// (callers should check SampleCount == 0 to decide between "no data" and
+// "actively failing").
+func (r RecentUptime) SuccessRate() float64 {
+	if r.SampleCount == 0 {
+		return 0
+	}
+	return float64(r.Successes) / float64(r.SampleCount)
 }
 
 type CreateDefinition struct {

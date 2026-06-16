@@ -51,7 +51,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
-import { formatPercent, formatDateTime, formatLatency } from "@/lib/admin-format";
+import { formatPercent, formatDateTime, formatLatency, formatInteger } from "@/lib/admin-format";
 import { adminErrorMessage, type AdminListResult } from "@/lib/admin-api";
 import { cn } from "@/lib/cn";
 import {
@@ -251,6 +251,10 @@ function MonitorsTab() {
           return <span className="text-2xs text-srapi-text-tertiary">{t("adminMonitor.neverRun")}</span>;
         }
         const isOK = r.last_run_ok ?? false;
+        const hasUptime =
+          typeof r.recent_uptime_success_rate === "number" &&
+          typeof r.recent_uptime_sample_count === "number" &&
+          r.recent_uptime_sample_count > 0;
         return (
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-1.5">
@@ -268,6 +272,18 @@ function MonitorsTab() {
             {typeof r.last_run_latency_ms === "number" ? (
               <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
                 {formatLatency(r.last_run_latency_ms)}
+              </span>
+            ) : null}
+            {hasUptime ? (
+              <span
+                className="font-mono text-2xs text-srapi-text-tertiary tabular"
+                title={t("adminMonitor.uptimeHint", {
+                  count: formatInteger(r.recent_uptime_sample_count ?? 0),
+                  days: r.recent_uptime_window_days ?? 7,
+                })}
+              >
+                {formatPercent(r.recent_uptime_success_rate ?? 0)} ·{" "}
+                {formatInteger(r.recent_uptime_sample_count ?? 0)}
               </span>
             ) : null}
           </div>

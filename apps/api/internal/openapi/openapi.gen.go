@@ -5269,6 +5269,15 @@ type ChannelMonitor struct {
 	Model     string `json:"model"`
 	Name      string `json:"name"`
 
+	// RecentUptimeSampleCount How many runs in the window contributed to recent_uptime_success_rate (capped per server policy).
+	RecentUptimeSampleCount *int `json:"recent_uptime_sample_count,omitempty"`
+
+	// RecentUptimeSuccessRate Ratio of OK runs over recent_uptime_sample_count (absent when no recent runs).
+	RecentUptimeSuccessRate *float32 `json:"recent_uptime_success_rate,omitempty"`
+
+	// RecentUptimeWindowDays Window in days over which recent_uptime_success_rate is computed (absent when no recent runs).
+	RecentUptimeWindowDays *int `json:"recent_uptime_window_days,omitempty"`
+
 	// Request Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
 	Request ChannelMonitorRequest `json:"request"`
 

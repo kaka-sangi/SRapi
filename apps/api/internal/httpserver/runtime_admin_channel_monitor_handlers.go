@@ -22,19 +22,22 @@ type channelMonitorRequestPayload struct {
 }
 
 type channelMonitorPayload struct {
-	ID               int                          `json:"id"`
-	Name             string                       `json:"name"`
-	Enabled          bool                         `json:"enabled"`
-	Scope            string                       `json:"scope"`
-	ScopeRef         string                       `json:"scope_ref"`
-	IntervalSeconds  int                          `json:"interval_seconds"`
-	Model            string                       `json:"model"`
-	Request          channelMonitorRequestPayload `json:"request"`
-	CreatedAt        time.Time                    `json:"created_at"`
-	UpdatedAt        time.Time                    `json:"updated_at"`
-	LastRunAt        *time.Time                   `json:"last_run_at,omitempty"`
-	LastRunOK        *bool                        `json:"last_run_ok,omitempty"`
-	LastRunLatencyMS *int                         `json:"last_run_latency_ms,omitempty"`
+	ID                      int                          `json:"id"`
+	Name                    string                       `json:"name"`
+	Enabled                 bool                         `json:"enabled"`
+	Scope                   string                       `json:"scope"`
+	ScopeRef                string                       `json:"scope_ref"`
+	IntervalSeconds         int                          `json:"interval_seconds"`
+	Model                   string                       `json:"model"`
+	Request                 channelMonitorRequestPayload `json:"request"`
+	CreatedAt               time.Time                    `json:"created_at"`
+	UpdatedAt               time.Time                    `json:"updated_at"`
+	LastRunAt               *time.Time                   `json:"last_run_at,omitempty"`
+	LastRunOK               *bool                        `json:"last_run_ok,omitempty"`
+	LastRunLatencyMS        *int                         `json:"last_run_latency_ms,omitempty"`
+	RecentUptimeWindowDays  *int                         `json:"recent_uptime_window_days,omitempty"`
+	RecentUptimeSampleCount *int                         `json:"recent_uptime_sample_count,omitempty"`
+	RecentUptimeSuccessRate *float64                     `json:"recent_uptime_success_rate,omitempty"`
 }
 
 type createChannelMonitorRequest struct {
@@ -128,6 +131,14 @@ func (s *Server) handleListAdminChannelMonitors(w http.ResponseWriter, r *http.R
 			payload.LastRunAt = &at
 			payload.LastRunOK = &ok
 			payload.LastRunLatencyMS = &latency
+		}
+		if entry.Recent != nil {
+			windowDays := entry.Recent.WindowDays
+			sampleCount := entry.Recent.SampleCount
+			rate := entry.Recent.SuccessRate()
+			payload.RecentUptimeWindowDays = &windowDays
+			payload.RecentUptimeSampleCount = &sampleCount
+			payload.RecentUptimeSuccessRate = &rate
 		}
 		data = append(data, payload)
 	}

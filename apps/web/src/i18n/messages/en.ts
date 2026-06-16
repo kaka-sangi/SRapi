@@ -1727,6 +1727,7 @@ export const en = {
     intervalHint: "Seconds between scheduled probes (min 30).",
     lastRun: "Last run",
     neverRun: "Never run",
+    uptimeHint: "{count} runs over the last {days}d",
     model: "Probe model",
     modelHint: "Optional canonical model to report against.",
     method: "Method",

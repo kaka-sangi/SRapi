@@ -38,8 +38,21 @@ func (s *Service) ListDefinitions(ctx context.Context) ([]contract.Definition, e
 	return s.store.ListDefinitions(ctx)
 }
 
+// uptimeWindowDays bounds the rolling-uptime window. Seven days matches the
+// horizon admins typically reason about ("did this channel work over the last
+// week?"). uptimeWindowRunCap caps how many recent runs we look at per monitor
+// so a chatty monitor (interval=30s -> ~20k runs/week) doesn't drag the list
+// page. The cap reflects "enough samples to make the percentage meaningful"
+// rather than "every run in the window".
+const (
+	uptimeWindowDays   = 7
+	uptimeWindowRunCap = 200
+)
+
 // ListDefinitionsWithSummary returns every monitor definition paired with a
-// thin summary of its most recent run (or nil when no runs exist).
+// thin summary of its most recent run (or nil when no runs exist), plus a
+// rolling uptime aggregate computed from the last uptimeWindowRunCap runs that
+// fell inside the rolling window.
 //
 // The implementation is N+1 — one ListRuns call per monitor — which is fine for
 // the admin list page (monitor counts are typically small) and keeps the store
@@ -50,10 +63,14 @@ func (s *Service) ListDefinitionsWithSummary(ctx context.Context) ([]contract.De
 	if err != nil {
 		return nil, err
 	}
+	since := time.Now().UTC().Add(-uptimeWindowDays * 24 * time.Hour)
 	out := make([]contract.DefinitionWithSummary, 0, len(defs))
 	for _, def := range defs {
 		entry := contract.DefinitionWithSummary{Definition: def}
-		runs, err := s.store.ListRuns(ctx, def.ID, 1)
+		// One query pulls both the freshest run (for LastRun) and the recent
+		// window for the uptime aggregate — runs are returned newest-first by
+		// the store contract.
+		runs, err := s.store.ListRuns(ctx, def.ID, uptimeWindowRunCap)
 		if err != nil {
 			return nil, err
 		}
@@ -63,6 +80,23 @@ func (s *Service) ListDefinitionsWithSummary(ctx context.Context) ([]contract.De
 				At:        r.CreatedAt,
 				OK:        r.OK,
 				LatencyMS: r.LatencyMS,
+			}
+		}
+		var sampleCount, successes int
+		for _, r := range runs {
+			if r.CreatedAt.Before(since) {
+				break
+			}
+			sampleCount++
+			if r.OK {
+				successes++
+			}
+		}
+		if sampleCount > 0 {
+			entry.Recent = &contract.RecentUptime{
+				SampleCount: sampleCount,
+				Successes:   successes,
+				WindowDays:  uptimeWindowDays,
 			}
 		}
 		out = append(out, entry)
