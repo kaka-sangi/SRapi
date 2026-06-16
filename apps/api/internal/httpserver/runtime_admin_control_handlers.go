@@ -88,20 +88,32 @@ func (s *Server) handleListAdminBillingLedger(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	items, err := s.runtime.billing.List(r.Context())
+	filter := billingcontract.LedgerListFilter{
+		ReferenceType: strings.TrimSpace(r.URL.Query().Get("reference_type")),
+	}
+	if raw := strings.TrimSpace(r.URL.Query().Get("user_id")); raw != "" {
+		uid, err := strconv.Atoi(raw)
+		if err != nil || uid <= 0 {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid user id", requestID)
+			return
+		}
+		filter.UserID = &uid
+	}
+	limit, offset, page, pageSize := paginationParams(r)
+	filter.Limit = limit
+	filter.Offset = offset
+	result, err := s.runtime.billing.ListPage(r.Context(), filter)
 	if err != nil {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list billing ledger", requestID)
 		return
 	}
-	items = filterBillingLedger(items, r.URL.Query().Get("user_id"), r.URL.Query().Get("reference_type"))
-	data := make([]apiopenapi.BillingLedgerEntry, 0, len(items))
-	for _, item := range items {
+	data := make([]apiopenapi.BillingLedgerEntry, 0, len(result.Items))
+	for _, item := range result.Items {
 		data = append(data, toAPIBillingLedgerEntry(item))
 	}
-	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.BillingLedgerListResponse{
 		Data:       data,
-		Pagination: pg,
+		Pagination: paginationFromTotal(result.Total, page, pageSize),
 		RequestId:  requestID,
 	})
 }

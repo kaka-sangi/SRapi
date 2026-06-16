@@ -52,6 +52,45 @@ func (s *Store) List(_ context.Context) ([]contract.LedgerEntry, error) {
 	return out, nil
 }
 
+// ListPage mirrors the ent store's WHERE + ORDER BY created_at DESC, id DESC +
+// LIMIT/OFFSET path, but in memory. Used by unit tests and dev runs that don't
+// stand up Postgres.
+func (s *Store) ListPage(_ context.Context, filter contract.LedgerListFilter) (contract.LedgerListResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	matched := make([]contract.LedgerEntry, 0, len(s.byID))
+	refType := strings.TrimSpace(filter.ReferenceType)
+	for _, entry := range s.byID {
+		if filter.UserID != nil && entry.UserID != *filter.UserID {
+			continue
+		}
+		if refType != "" && entry.ReferenceType != refType {
+			continue
+		}
+		matched = append(matched, cloneEntry(entry))
+	}
+	// Newest first; tie-break by id desc to match the ent ordering.
+	sort.Slice(matched, func(i, j int) bool {
+		if matched[i].CreatedAt.Equal(matched[j].CreatedAt) {
+			return matched[i].ID > matched[j].ID
+		}
+		return matched[i].CreatedAt.After(matched[j].CreatedAt)
+	})
+	total := len(matched)
+	if filter.Offset >= total {
+		return contract.LedgerListResult{Items: []contract.LedgerEntry{}, Total: total}, nil
+	}
+	end := total
+	if filter.Limit > 0 {
+		end = filter.Offset + filter.Limit
+		if end > total {
+			end = total
+		}
+	}
+	page := append([]contract.LedgerEntry(nil), matched[filter.Offset:end]...)
+	return contract.LedgerListResult{Items: page, Total: total}, nil
+}
+
 func (s *Store) CreatePricingRule(_ context.Context, input contract.PricingRule) (contract.PricingRule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

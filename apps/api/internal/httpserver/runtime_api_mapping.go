@@ -1756,6 +1756,41 @@ func paginate[T any](r *http.Request, items []T) ([]T, apiopenapi.Pagination) {
 	return items[start:end], apiopenapi.Pagination{Page: page, PageSize: pageSize, Total: total, HasNext: end < total}
 }
 
+// paginationParams parses ?page and ?page_size into (limit, offset, page,
+// pageSize) for store-side pagination. When page_size is missing the limit is
+// zero, signalling "no LIMIT, return everything" — matches the legacy paginate
+// behaviour above. Used by handlers that want the DB to slice (e.g. billing
+// ledger) instead of loading the full table and paginate-in-memory.
+func paginationParams(r *http.Request) (limit, offset, page, pageSize int) {
+	rawSize := strings.TrimSpace(r.URL.Query().Get("page_size"))
+	if rawSize == "" {
+		return 0, 0, 1, 0
+	}
+	pageSize, err := strconv.Atoi(rawSize)
+	if err != nil || pageSize <= 0 {
+		return 0, 0, 1, 0
+	}
+	page = 1
+	if v, convErr := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("page"))); convErr == nil && v > 0 {
+		page = v
+	}
+	return pageSize, (page - 1) * pageSize, page, pageSize
+}
+
+// paginationFromTotal builds the response Pagination from a store-side total
+// and the same page/page_size the request used. Mirrors the shape paginate()
+// returns so the wire format stays identical.
+func paginationFromTotal(total, page, pageSize int) apiopenapi.Pagination {
+	if pageSize <= 0 {
+		return apiopenapi.Pagination{Page: 1, PageSize: total, Total: total, HasNext: false}
+	}
+	end := page * pageSize
+	if end > total {
+		end = total
+	}
+	return apiopenapi.Pagination{Page: page, PageSize: pageSize, Total: total, HasNext: end < total}
+}
+
 func copyStringCounts(values map[string]int) map[string]int {
 	if values == nil {
 		return map[string]int{}

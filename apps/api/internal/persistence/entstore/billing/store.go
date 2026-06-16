@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/srapi/srapi/apps/api/ent"
 	entbillingledger "github.com/srapi/srapi/apps/api/ent/billingledger"
 	entmodelregistry "github.com/srapi/srapi/apps/api/ent/modelregistry"
@@ -69,6 +70,45 @@ func (s *Store) List(ctx context.Context) ([]contract.LedgerEntry, error) {
 		out = append(out, toLedgerEntry(row))
 	}
 	return out, nil
+}
+
+// ListPage runs the ledger query at the DB layer using the
+// (user_id, created_at) index (see migrations/postgres/up/000001_initial_schema.sql:237),
+// then issues a parallel COUNT(*) so the API layer can fill Pagination.Total
+// without scanning the full table. Replaces the older List+filter-in-memory
+// path used by /admin/billing-ledger and /admin/users/{id}/balance-history.
+func (s *Store) ListPage(ctx context.Context, filter contract.LedgerListFilter) (contract.LedgerListResult, error) {
+	predicates := make([]predicate.BillingLedger, 0, 2)
+	if filter.UserID != nil {
+		predicates = append(predicates, entbillingledger.UserIDEQ(*filter.UserID))
+	}
+	if ref := strings.TrimSpace(filter.ReferenceType); ref != "" {
+		predicates = append(predicates, entbillingledger.ReferenceTypeEQ(ref))
+	}
+	base := s.client.BillingLedger.Query()
+	if len(predicates) > 0 {
+		base = base.Where(predicates...)
+	}
+	total, err := base.Clone().Count(ctx)
+	if err != nil {
+		return contract.LedgerListResult{}, err
+	}
+	q := base.Order(entbillingledger.ByCreatedAt(entsql.OrderDesc()), entbillingledger.ByID(entsql.OrderDesc()))
+	if filter.Limit > 0 {
+		q = q.Limit(filter.Limit)
+	}
+	if filter.Offset > 0 {
+		q = q.Offset(filter.Offset)
+	}
+	rows, err := q.All(ctx)
+	if err != nil {
+		return contract.LedgerListResult{}, err
+	}
+	out := make([]contract.LedgerEntry, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toLedgerEntry(row))
+	}
+	return contract.LedgerListResult{Items: out, Total: total}, nil
 }
 
 func (s *Store) ListPendingUsageCharges(ctx context.Context, limit int) ([]contract.PendingUsageCharge, error) {

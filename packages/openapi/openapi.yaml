@@ -1807,6 +1807,46 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/me/billing-history:
+    get:
+      tags:
+        - CurrentUser
+      operationId: getCurrentUserBillingHistory
+      summary: List the current user's billing-ledger entries.
+      description: |
+        Paginated view of the authenticated user's own billing ledger —
+        credits, debits, refunds and usage charges. Scoped at the DB layer by
+        user_id so the user only ever sees their own rows.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Current user billing history.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingLedgerListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/me/platform-quotas:
     get:
       tags:

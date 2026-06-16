@@ -341,6 +341,14 @@ export function usePaymentMethods() {
 export function useMyOrders() {
   return useQuery({ queryKey: queryKeys.me.orders(), queryFn: () => meApi.listOrders() });
 }
+// Authenticated billing ledger for the session user, paginated server-side.
+// Pass page/page_size like every other admin list hook.
+export function useMyBillingHistory(query?: MeP<typeof meApi.listBillingHistory>) {
+  return useQuery({
+    queryKey: queryKeys.me.billingHistory(query),
+    queryFn: () => meApi.listBillingHistory(query),
+  });
+}
 /** Polls one payment order while it is pending so the UI can confirm the
  * moment the webhook lands. Stops polling on any terminal status. */
 export function usePaymentOrderStatus(id: string | null) {

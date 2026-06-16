@@ -8142,6 +8142,38 @@ export type GetCurrentUserBalanceResponses = {
 
 export type GetCurrentUserBalanceResponse = GetCurrentUserBalanceResponses[keyof GetCurrentUserBalanceResponses];
 
+export type GetCurrentUserBillingHistoryData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/me/billing-history';
+};
+
+export type GetCurrentUserBillingHistoryErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetCurrentUserBillingHistoryError = GetCurrentUserBillingHistoryErrors[keyof GetCurrentUserBillingHistoryErrors];
+
+export type GetCurrentUserBillingHistoryResponses = {
+    /**
+     * Current user billing history.
+     */
+    200: BillingLedgerListResponse;
+};
+
+export type GetCurrentUserBillingHistoryResponse = GetCurrentUserBillingHistoryResponses[keyof GetCurrentUserBillingHistoryResponses];
+
 export type ListCurrentUserPlatformQuotasData = {
     body?: never;
     path?: never;

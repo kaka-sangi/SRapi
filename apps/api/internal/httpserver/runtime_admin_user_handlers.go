@@ -257,21 +257,23 @@ func (s *Server) handleAdminUserBalanceHistory(w http.ResponseWriter, r *http.Re
 	if !ok {
 		return
 	}
-	items, err := s.runtime.billing.List(r.Context())
+	limit, offset, page, pageSize := paginationParams(r)
+	result, err := s.runtime.billing.ListPage(r.Context(), billingcontract.LedgerListFilter{
+		UserID: &userID,
+		Limit:  limit,
+		Offset: offset,
+	})
 	if err != nil {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list balance history", requestID)
 		return
 	}
-	filtered := make([]apiopenapi.BillingLedgerEntry, 0)
-	for _, item := range items {
-		if item.UserID == userID {
-			filtered = append(filtered, toAPIBillingLedgerEntry(item))
-		}
+	data := make([]apiopenapi.BillingLedgerEntry, 0, len(result.Items))
+	for _, item := range result.Items {
+		data = append(data, toAPIBillingLedgerEntry(item))
 	}
-	filtered, pg := paginate(r, filtered)
 	writeJSONAny(w, http.StatusOK, apiopenapi.BillingLedgerListResponse{
-		Data:       filtered,
-		Pagination: pg,
+		Data:       data,
+		Pagination: paginationFromTotal(result.Total, page, pageSize),
 		RequestId:  requestID,
 	})
 }

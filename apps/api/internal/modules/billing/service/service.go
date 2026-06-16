@@ -98,6 +98,15 @@ func (s *Service) List(ctx context.Context) ([]contract.LedgerEntry, error) {
 	return s.store.List(ctx)
 }
 
+// ListPage delegates to the store's paginated query. Replaces the older List +
+// in-memory filter pattern; admin and user handlers should prefer this.
+func (s *Service) ListPage(ctx context.Context, filter contract.LedgerListFilter) (contract.LedgerListResult, error) {
+	if s == nil || s.store == nil {
+		return contract.LedgerListResult{}, ErrInvalidInput
+	}
+	return s.store.ListPage(ctx, filter)
+}
+
 func (s *Service) ChargePendingUsage(ctx context.Context, req contract.ChargePendingUsageRequest) (contract.ChargePendingUsageResult, error) {
 	if s == nil || s.usageCharges == nil {
 		return contract.ChargePendingUsageResult{}, ErrInvalidInput

@@ -1,17 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingCart, CreditCard } from "lucide-react";
+import { ShoppingCart, CreditCard, Receipt } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { CheckoutRedirect } from "@/components/features/checkout-redirect";
+import { useAdminList } from "@/hooks/use-admin-list";
 import {
   useBalance,
   usePaymentMethods,
   useMyOrders,
+  useMyBillingHistory,
   useCreateOrder,
   useCancelOrder,
   useMySubscriptions,
@@ -39,7 +41,12 @@ import {
   type SubscriptionUsageLabels,
 } from "@/components/features/subscription-usage-bars";
 import { meErrorMessage } from "@/lib/me-api";
-import type { PaymentMethod, PaymentOrder, UserSubscription } from "@/lib/sdk-types";
+import type {
+  BillingLedgerEntry,
+  PaymentMethod,
+  PaymentOrder,
+  UserSubscription,
+} from "@/lib/sdk-types";
 
 export default function BillingPage() {
   return (
@@ -64,6 +71,7 @@ function BillingContent() {
           <TabsTrigger value="balance">{t("billing.tabBalance")}</TabsTrigger>
           <TabsTrigger value="orders">{t("billing.tabOrders")}</TabsTrigger>
           <TabsTrigger value="subs">{t("billing.tabSubscriptions")}</TabsTrigger>
+          <TabsTrigger value="ledger">{t("billing.tabLedger")}</TabsTrigger>
         </TabsList>
         <TabsContent value="balance">
           <BalanceTab />
@@ -73,6 +81,9 @@ function BillingContent() {
         </TabsContent>
         <TabsContent value="subs">
           <SubscriptionsTab />
+        </TabsContent>
+        <TabsContent value="ledger">
+          <LedgerTab />
         </TabsContent>
       </Tabs>
     </>
@@ -409,4 +420,84 @@ function subscriptionUsageLabels(t: ReturnType<typeof useLanguage>["t"]): Subscr
     monthly: t("billing.monthlyUsage"),
     noQuota: t("billing.noCostQuota"),
   };
+}
+
+// Authenticated billing ledger for the session user. The server scopes by
+// user_id so the user only ever sees their own rows; it does NOT depend on
+// any client-side filter. Pagination is real (LIMIT/OFFSET at the DB layer
+// via billing.Store.ListPage).
+function LedgerTab() {
+  const { t } = useLanguage();
+  const list = useAdminList();
+  const ledger = useMyBillingHistory({ page: list.page, page_size: list.pageSize });
+
+  const columns: Column<BillingLedgerEntry>[] = [
+    {
+      key: "date",
+      header: t("billing.date"),
+      render: (row) => (
+        <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+          {formatDate(row.created_at)}
+        </span>
+      ),
+    },
+    {
+      key: "type",
+      header: t("billing.entryType"),
+      render: (row) => <span className="text-srapi-text-secondary">{row.type}</span>,
+    },
+    {
+      key: "amount",
+      header: t("billing.amount"),
+      align: "right",
+      render: (row) => (
+        <span className="font-mono text-srapi-text-secondary tabular">
+          {formatMoney(row.amount, row.currency)}
+        </span>
+      ),
+    },
+    {
+      key: "balance",
+      header: t("billing.runningBalance"),
+      align: "right",
+      hideOnMobile: true,
+      render: (row) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {formatMoney(row.balance_after, row.currency)}
+        </span>
+      ),
+    },
+    {
+      key: "reference",
+      header: t("billing.reference"),
+      hideOnMobile: true,
+      render: (row) =>
+        row.reference_type ? (
+          <span className="font-mono text-2xs text-srapi-text-tertiary">
+            {row.reference_type}
+            {row.reference_id ? ` · ${row.reference_id}` : ""}
+          </span>
+        ) : (
+          <span className="text-2xs text-srapi-text-tertiary">—</span>
+        ),
+    },
+  ];
+
+  return (
+    <AdminListView
+      query={ledger}
+      columns={columns}
+      getRowId={(r) => r.id}
+      emptyIcon={Receipt}
+      emptyTitle={t("billing.emptyLedger")}
+      emptyBody={t("billing.emptyLedgerBody")}
+      minWidth={560}
+      pagination={{
+        page: list.page,
+        pageSize: list.pageSize,
+        total: ledger.data?.pagination?.total ?? ledger.data?.data.length ?? 0,
+        onPageChange: list.setPage,
+      }}
+    />
+  );
 }

@@ -10,6 +10,7 @@ import {
   enableCurrentUserTotp,
   disableCurrentUserTotp,
   getCurrentUserBalance,
+  getCurrentUserBillingHistory,
   listCurrentUserPlatformQuotas,
   getCurrentUserSubscriptions,
   redeemCurrentUserRedeemCode,
@@ -49,6 +50,7 @@ import type {
   ChangeCurrentUserPasswordRequest,
   CreatePaymentOrderRequest,
   ListCurrentUserAffiliateLedgerData,
+  GetCurrentUserBillingHistoryData,
   ListPaymentOrdersData,
   Pagination,
   RedeemCodeRedemptionRequest,
@@ -167,6 +169,11 @@ export const meApi = {
   },
   listOrders(query?: ListPaymentOrdersData["query"]) {
     return unwrapList(() => listPaymentOrders({ query, throwOnError: true }));
+  },
+  // Authenticated billing ledger for the session user. Scoped at the DB layer
+  // by user_id so we never leak other users' rows.
+  listBillingHistory(query?: GetCurrentUserBillingHistoryData["query"]) {
+    return unwrapList(() => getCurrentUserBillingHistory({ query, throwOnError: true }));
   },
   getOrder(id: string) {
     return unwrapData(() => getPaymentOrder({ path: { id }, throwOnError: true }));

@@ -20,6 +20,7 @@ import (
 	apikeyservice "github.com/srapi/srapi/apps/api/internal/modules/api_keys/service"
 	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
 	authservice "github.com/srapi/srapi/apps/api/internal/modules/auth/service"
+	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	captchacontract "github.com/srapi/srapi/apps/api/internal/modules/captcha/contract"
 	captchaservice "github.com/srapi/srapi/apps/api/internal/modules/captcha/service"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
@@ -869,6 +870,39 @@ func (s *Server) handleCurrentUserBalance(w http.ResponseWriter, r *http.Request
 			Currency: user.Currency,
 		},
 		RequestId: requestID,
+	})
+}
+
+// handleCurrentUserBillingHistory exposes the authenticated user's own ledger
+// entries (credits, debits, refunds, usage charges). Scoped at the DB layer to
+// session.User.ID — see billing.Store.ListPage — so a user only ever sees
+// their own rows.
+func (s *Server) handleCurrentUserBillingHistory(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	userID := session.User.ID
+	limit, offset, page, pageSize := paginationParams(r)
+	result, err := s.runtime.billing.ListPage(r.Context(), billingcontract.LedgerListFilter{
+		UserID: &userID,
+		Limit:  limit,
+		Offset: offset,
+	})
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list billing history", requestID)
+		return
+	}
+	data := make([]apiopenapi.BillingLedgerEntry, 0, len(result.Items))
+	for _, item := range result.Items {
+		data = append(data, toAPIBillingLedgerEntry(item))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.BillingLedgerListResponse{
+		Data:       data,
+		Pagination: paginationFromTotal(result.Total, page, pageSize),
+		RequestId:  requestID,
 	})
 }
 

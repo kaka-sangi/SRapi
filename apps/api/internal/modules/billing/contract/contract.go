@@ -272,9 +272,32 @@ type ChargePendingUsageResult struct {
 	Batches  []ChargeUsageResult
 }
 
+// LedgerListFilter scopes a ledger query at the DB layer. Set UserID to
+// restrict to a single user (uses the existing (user_id, created_at) index);
+// leave nil for an admin-wide scan. ReferenceType is an optional substring
+// match. Limit > 0 turns on pagination; Limit == 0 returns everything (legacy
+// behaviour used only by tests).
+type LedgerListFilter struct {
+	UserID        *int
+	ReferenceType string
+	Limit         int
+	Offset        int
+}
+
+// LedgerListResult carries the page rows alongside the total row count so the
+// API layer can populate Pagination without a second round trip.
+type LedgerListResult struct {
+	Items []LedgerEntry
+	Total int
+}
+
 type Store interface {
 	Create(ctx context.Context, input LedgerEntry) (LedgerEntry, error)
 	List(ctx context.Context) ([]LedgerEntry, error)
+	// ListPage runs at the DB layer with WHERE + ORDER BY + LIMIT + OFFSET,
+	// returning the matching window plus the total matching row count.
+	// Replaces the old List+filter-in-memory pattern for paginated views.
+	ListPage(ctx context.Context, filter LedgerListFilter) (LedgerListResult, error)
 }
 
 type UsageChargeStore interface {

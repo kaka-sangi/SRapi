@@ -10654,6 +10654,12 @@ type UploadCurrentUserAvatarMultipartBody struct {
 	Avatar openapi_types.File `json:"avatar"`
 }
 
+// GetCurrentUserBillingHistoryParams defines parameters for GetCurrentUserBillingHistory.
+type GetCurrentUserBillingHistoryParams struct {
+	Page     *int `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
 // GetCurrentUserSubscriptionsParams defines parameters for GetCurrentUserSubscriptions.
 type GetCurrentUserSubscriptionsParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
@@ -18471,6 +18477,9 @@ type ServerInterface interface {
 	// Get current user balance.
 	// (GET /api/v1/me/balance)
 	GetCurrentUserBalance(w http.ResponseWriter, r *http.Request)
+	// List the current user's billing-ledger entries.
+	// (GET /api/v1/me/billing-history)
+	GetCurrentUserBillingHistory(w http.ResponseWriter, r *http.Request, params GetCurrentUserBillingHistoryParams)
 	// List current user notification contacts.
 	// (GET /api/v1/me/notification-contacts)
 	ListCurrentUserNotificationContacts(w http.ResponseWriter, r *http.Request)
@@ -29852,6 +29861,58 @@ func (siw *ServerInterfaceWrapper) GetCurrentUserBalance(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// GetCurrentUserBillingHistory operation middleware
+func (siw *ServerInterfaceWrapper) GetCurrentUserBillingHistory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCurrentUserBillingHistoryParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCurrentUserBillingHistory(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListCurrentUserNotificationContacts operation middleware
 func (siw *ServerInterfaceWrapper) ListCurrentUserNotificationContacts(w http.ResponseWriter, r *http.Request) {
 
@@ -32143,6 +32204,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/me/avatar", wrapper.DeleteCurrentUserAvatar)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/me/avatar", wrapper.UploadCurrentUserAvatar)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/balance", wrapper.GetCurrentUserBalance)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/billing-history", wrapper.GetCurrentUserBillingHistory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/notification-contacts", wrapper.ListCurrentUserNotificationContacts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/notification-contacts", wrapper.RequestCurrentUserNotificationContactVerification)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/notification-contacts/verify", wrapper.ConfirmCurrentUserNotificationContactVerification)

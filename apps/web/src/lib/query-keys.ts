@@ -21,6 +21,7 @@ export const queryKeys = {
     platformQuotas: () => ["me", "platform-quotas"] as const,
     orders: (params?: unknown) => ["me", "orders", params ?? {}] as const,
     order: (id: string) => ["me", "order", id] as const,
+    billingHistory: (params?: unknown) => ["me", "billing-history", params ?? {}] as const,
     paymentMethods: () => ["me", "payment-methods"] as const,
     subscriptionPlans: () => ["public", "subscription-plans"] as const,
     subscriptions: () => ["me", "subscriptions"] as const,

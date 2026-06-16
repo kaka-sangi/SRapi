@@ -11,7 +11,6 @@ import (
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
-	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
@@ -162,22 +161,6 @@ func filterAuditLogs(items []auditcontract.Log, action, resourceType string) []a
 			continue
 		}
 		if resourceType != "" && item.ResourceType != resourceType {
-			continue
-		}
-		out = append(out, item)
-	}
-	return out
-}
-
-func filterBillingLedger(items []billingcontract.LedgerEntry, userID, referenceType string) []billingcontract.LedgerEntry {
-	userID = strings.TrimSpace(userID)
-	referenceType = strings.TrimSpace(referenceType)
-	out := make([]billingcontract.LedgerEntry, 0, len(items))
-	for _, item := range items {
-		if userID != "" && strconv.Itoa(item.UserID) != userID {
-			continue
-		}
-		if referenceType != "" && item.ReferenceType != referenceType {
 			continue
 		}
 		out = append(out, item)
