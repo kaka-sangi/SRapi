@@ -22,6 +22,8 @@ import {
   useAdminGroups,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { adminErrorMessage } from "@/lib/admin-api";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
@@ -38,8 +40,24 @@ import type { SubscriptionPlan } from "@/lib/sdk-types";
 
 export function PlansPanel() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const colVis = useColumnVisibility("admin-orders-plans", []);
   const plans = useAdminSubscriptionPlans();
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  async function toggleStatus(p: SubscriptionPlan) {
+    if (togglingId === p.id) return;
+    const next: SubscriptionPlan["status"] = p.status === "active" ? "disabled" : "active";
+    setTogglingId(p.id);
+    try {
+      await updateMut.mutateAsync({ id: p.id, body: { status: next } });
+      toast({ title: t("feedback.saved"), tone: "success" });
+    } catch (err) {
+      toast({ title: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setTogglingId(null);
+    }
+  }
   const models = useAdminModels();
   const groups = useAdminGroups();
   const createMut = useCreateSubscriptionPlan();
@@ -165,7 +183,24 @@ export function PlansPanel() {
     {
       key: "status",
       header: t("common.active"),
-      render: (p) => <QuietBadge status={quietStatusFor(p.status)} label={statusLabel(t, p.status)} />,
+      render: (p) => {
+        const canToggle = p.status === "active" || p.status === "disabled";
+        const badge = (
+          <QuietBadge status={quietStatusFor(p.status)} label={statusLabel(t, p.status)} />
+        );
+        if (!canToggle) return badge;
+        return (
+          <button
+            type="button"
+            onClick={() => void toggleStatus(p)}
+            disabled={togglingId === p.id}
+            className="cursor-pointer disabled:cursor-wait disabled:opacity-60"
+            title={p.status === "active" ? t("common.disable") : t("common.enable")}
+          >
+            {badge}
+          </button>
+        );
+      },
     },
   ];
 
