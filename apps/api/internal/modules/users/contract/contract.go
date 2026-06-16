@@ -251,6 +251,10 @@ type UpdateStoredUser struct {
 type ListUsersFilter struct {
 	Status *Status
 	Query  string
+	// Role narrows the result to users who hold this role. Matched
+	// inclusively — a user with [admin, user] satisfies Role=user just as
+	// well as Role=admin.
+	Role *Role
 }
 
 type Store interface {

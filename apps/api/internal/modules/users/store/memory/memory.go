@@ -105,6 +105,18 @@ func (s *Store) List(_ context.Context, filter contract.ListUsersFilter) ([]cont
 			!strings.Contains(strconv.Itoa(user.ID), query) {
 			continue
 		}
+		if filter.Role != nil {
+			hasRole := false
+			for _, role := range user.Roles {
+				if role == *filter.Role {
+					hasRole = true
+					break
+				}
+			}
+			if !hasRole {
+				continue
+			}
+		}
 		out = append(out, cloneUser(s.withRolePermissions(user)))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })

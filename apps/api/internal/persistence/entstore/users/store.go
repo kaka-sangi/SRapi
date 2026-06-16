@@ -168,7 +168,28 @@ func (s *Store) List(ctx context.Context, filter contract.ListUsersFilter) ([]co
 	if err != nil {
 		return nil, err
 	}
-	return s.toStoredUsers(ctx, rows)
+	users, err := s.toStoredUsers(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	// Role membership lives in a separate table; rather than join on it in
+	// SQL we filter in Go after roles have been loaded for every row. This
+	// stays correct without adding ent-level predicates and is cheap for
+	// typical admin page sizes (the SQL where-clause already narrowed by
+	// status/query).
+	if filter.Role != nil {
+		filtered := make([]contract.StoredUser, 0, len(users))
+		for _, user := range users {
+			for _, role := range user.Roles {
+				if role == *filter.Role {
+					filtered = append(filtered, user)
+					break
+				}
+			}
+		}
+		users = filtered
+	}
+	return users, nil
 }
 
 func (s *Store) ListByIDs(ctx context.Context, ids []int) ([]contract.StoredUser, error) {

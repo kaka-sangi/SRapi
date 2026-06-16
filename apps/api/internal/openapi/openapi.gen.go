@@ -10890,6 +10890,9 @@ type ListAdminUsersParams struct {
 	PageSize *PageSize    `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Q        *SearchQuery `form:"q,omitempty" json:"q,omitempty"`
 	Status   *UserStatus  `form:"status,omitempty" json:"status,omitempty"`
+
+	// Role Restrict to users who hold this role (include-any across the user's role set).
+	Role *UserRole `form:"role,omitempty" json:"role,omitempty"`
 }
 
 // BatchListAdminUserAttributeValuesParams defines parameters for BatchListAdminUserAttributeValues.
@@ -28978,6 +28981,19 @@ func (siw *ServerInterfaceWrapper) ListAdminUsers(w http.ResponseWriter, r *http
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "role" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "role", r.URL.Query(), &params.Role, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "role"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "role", Err: err})
 		}
 		return
 	}

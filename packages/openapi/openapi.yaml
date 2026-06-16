@@ -3468,6 +3468,11 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/UserStatus"
+        - name: role
+          in: query
+          description: Restrict to users who hold this role (include-any across the user's role set).
+          schema:
+            $ref: "#/components/schemas/UserRole"
       responses:
         "200":
           description: User list.

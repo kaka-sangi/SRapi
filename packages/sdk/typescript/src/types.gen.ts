@@ -10222,6 +10222,10 @@ export type ListAdminUsersData = {
         page_size?: number;
         q?: string;
         status?: UserStatus;
+        /**
+         * Restrict to users who hold this role (include-any across the user's role set).
+         */
+        role?: UserRole;
     };
     url: '/api/v1/admin/users';
 };

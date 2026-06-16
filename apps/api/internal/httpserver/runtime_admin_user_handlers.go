@@ -27,9 +27,15 @@ func (s *Server) handleListAdminUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status := optionalUserStatusFromQuery(r)
+	var rolePtr *userscontract.Role
+	if raw := strings.TrimSpace(r.URL.Query().Get("role")); raw != "" {
+		role := userscontract.Role(raw)
+		rolePtr = &role
+	}
 	users, err := s.runtime.users.List(r.Context(), usersservice.ListRequest{
 		Status: status,
 		Query:  r.URL.Query().Get("q"),
+		Role:   rolePtr,
 	})
 	if err != nil {
 		writeUserServiceError(w, err, requestID)

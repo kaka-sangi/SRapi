@@ -41,6 +41,7 @@ import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { formatMoney, formatInteger, formatPercent } from "@/lib/admin-format";
 import {
   USER_STATUSES,
+  USER_FILTER_ROLES,
   BALANCE_OPERATIONS,
   emptyUserCreateForm,
   userEditFormFromUser,
@@ -68,11 +69,13 @@ function UsersContent() {
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-users", ["created_at", "updated_at"]);
   const statusFilter = list.filters.status as UserStatus | undefined;
+  const roleFilter = list.filters.role || undefined;
   const users = useAdminUsers({
     page: list.page,
     page_size: list.pageSize,
     q: list.search || undefined,
     status: statusFilter,
+    role: roleFilter,
   });
   const setEnabled = useSetUserEnabled();
   const bulkEnabled = useBulkSetUsersEnabled();
@@ -109,7 +112,7 @@ function UsersContent() {
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
 
-  const isFiltered = Boolean(list.search || statusFilter);
+  const isFiltered = Boolean(list.search || statusFilter || roleFilter);
 
   async function toggleEnabled(u: User) {
     try {
@@ -313,6 +316,12 @@ function UsersContent() {
               onChange={(v) => list.setFilter("status", v)}
               options={enumOptions(USER_STATUSES)}
               allLabel={t("adminCommon.allStatuses")}
+            />
+            <FilterSelect
+              value={roleFilter}
+              onChange={(v) => list.setFilter("role", v)}
+              options={USER_FILTER_ROLES.map((r) => ({ value: r, label: r }))}
+              allLabel={t("adminUsers.allRoles")}
             />
             <ColumnToggle
               columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}

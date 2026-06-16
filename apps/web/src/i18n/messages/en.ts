@@ -649,6 +649,7 @@ export const en = {
     attributesColumn: "Attributes",
     today: "Today",
     todayIdle: "Idle",
+    allRoles: "All roles",
     amount: "Amount",
     operation: "Operation",
     note: "Note",

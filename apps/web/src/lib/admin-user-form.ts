@@ -7,6 +7,10 @@ import type {
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
 export const USER_STATUSES: UserStatus[] = ["active", "disabled", "pending"];
+// Built-in role names that the /admin/users role filter exposes. Custom roles
+// defined via the admin-roles surface aren't listed here — they'd need a
+// dynamic options fetch, which is more than the filter dropdown shape allows.
+export const USER_FILTER_ROLES = ["owner", "admin", "operator", "user"] as const;
 export const BALANCE_OPERATIONS: UpdateUserBalanceRequest["operation"][] = [
   "set",
   "increment",

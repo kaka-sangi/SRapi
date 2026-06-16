@@ -101,6 +101,18 @@ func (s *memoryStore) List(_ context.Context, filter contract.ListUsersFilter) (
 		if query != "" && !strings.Contains(strings.ToLower(user.Email), query) && !strings.Contains(strings.ToLower(user.Name), query) {
 			continue
 		}
+		if filter.Role != nil {
+			hasRole := false
+			for _, role := range user.Roles {
+				if role == *filter.Role {
+					hasRole = true
+					break
+				}
+			}
+			if !hasRole {
+				continue
+			}
+		}
 		users = append(users, cloneUser(s.withRolePermissions(user)))
 	}
 	sort.Slice(users, func(i, j int) bool { return users[i].ID < users[j].ID })

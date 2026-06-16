@@ -867,3 +867,65 @@ func TestListUpdateAndBatchUsers(t *testing.T) {
 		t.Fatalf("unexpected listed users: %+v", listed)
 	}
 }
+
+// TestListByRoleNarrowsToUsersHoldingRole verifies the new role filter on
+// ListRequest: a user with [admin, user] matches BOTH role=admin and
+// role=user (include-any across the role set). Unknown role values reject
+// as ErrInvalidInput.
+func TestListByRoleNarrowsToUsersHoldingRole(t *testing.T) {
+	store := newMemoryStore()
+	svc := newTestService(t, store)
+	ctx := context.Background()
+
+	regular, err := svc.Create(ctx, CreateRequest{Email: "regular@srapi.local", Name: "Regular", Password: "password123"})
+	if err != nil {
+		t.Fatalf("create regular: %v", err)
+	}
+	admin, err := svc.Create(ctx, CreateRequest{
+		Email: "admin@srapi.local", Name: "Admin", Password: "password123",
+		Roles: []contract.Role{contract.RoleAdmin, contract.RoleUser},
+	})
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+
+	roleAdmin := contract.RoleAdmin
+	adminListed, err := svc.List(ctx, ListRequest{Role: &roleAdmin})
+	if err != nil {
+		t.Fatalf("list admins: %v", err)
+	}
+	if len(adminListed) != 1 || adminListed[0].ID != admin.ID {
+		t.Fatalf("admin role list: want only %d, got %+v", admin.ID, adminListed)
+	}
+
+	roleUser := contract.RoleUser
+	userListed, err := svc.List(ctx, ListRequest{Role: &roleUser})
+	if err != nil {
+		t.Fatalf("list users: %v", err)
+	}
+	// Both should match — regular has [user]; admin has [admin, user].
+	if len(userListed) != 2 {
+		t.Fatalf("user role list: want 2 (regular + admin), got %d", len(userListed))
+	}
+	gotIDs := map[int]bool{}
+	for _, u := range userListed {
+		gotIDs[u.ID] = true
+	}
+	if !gotIDs[regular.ID] || !gotIDs[admin.ID] {
+		t.Fatalf("user role list missing expected ids: %+v", userListed)
+	}
+
+	roleOwner := contract.RoleOwner
+	ownerListed, err := svc.List(ctx, ListRequest{Role: &roleOwner})
+	if err != nil {
+		t.Fatalf("list owners: %v", err)
+	}
+	if len(ownerListed) != 0 {
+		t.Fatalf("owner role list should be empty: %+v", ownerListed)
+	}
+
+	bogus := contract.Role("not-a-role")
+	if _, err := svc.List(ctx, ListRequest{Role: &bogus}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("bogus role: want ErrInvalidInput, got %v", err)
+	}
+}

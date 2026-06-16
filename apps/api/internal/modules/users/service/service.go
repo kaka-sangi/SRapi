@@ -61,6 +61,7 @@ type UpdateRequest struct {
 type ListRequest struct {
 	Status *contract.Status
 	Query  string
+	Role   *contract.Role
 }
 
 // CreateRoleRequest creates a role catalog entry with resource:action permissions.
@@ -264,9 +265,18 @@ func (s *Service) List(ctx context.Context, req ListRequest) ([]contract.StoredU
 	if req.Status != nil && !validStatus(*req.Status) {
 		return nil, ErrInvalidInput
 	}
+	if req.Role != nil {
+		switch *req.Role {
+		case contract.RoleOwner, contract.RoleAdmin, contract.RoleOperator, contract.RoleUser:
+			// known role; accept
+		default:
+			return nil, ErrInvalidInput
+		}
+	}
 	return s.store.List(ctx, contract.ListUsersFilter{
 		Status: req.Status,
 		Query:  strings.TrimSpace(req.Query),
+		Role:   req.Role,
 	})
 }
 
