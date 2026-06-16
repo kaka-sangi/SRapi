@@ -119,6 +119,7 @@ const monitorCompare = (a: ChannelMonitor, b: ChannelMonitor) => a.name.localeCo
 
 function MonitorsTab() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const list = useAdminList();
   const all = useChannelMonitors();
   const { query, total } = useClientPagedList(all, list, {
@@ -128,6 +129,30 @@ function MonitorsTab() {
   const createMut = useCreateChannelMonitor();
   const updateMut = useUpdateChannelMonitor();
   const deleteMut = useDeleteChannelMonitor();
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+
+  // Inline enabled toggle — the sub2api workflow lets an operator silence a
+  // flapping monitor without opening the edit dialog.
+  async function toggleEnabled(row: ChannelMonitor) {
+    if (togglingId === row.id) return;
+    setTogglingId(row.id);
+    try {
+      await updateMut.mutateAsync({
+        id: String(row.id),
+        body: { enabled: !row.enabled },
+      });
+      toast({
+        title: row.enabled
+          ? t("adminMonitor.toggleDisabled")
+          : t("adminMonitor.toggleEnabled"),
+        tone: "success",
+      });
+    } catch (err) {
+      toast({ title: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setTogglingId(null);
+    }
+  }
 
   const colVis = useColumnVisibility("admin-channel-monitors", []);
   const [formTarget, setFormTarget] = useState<ChannelMonitor | "new" | null>(null);
@@ -294,10 +319,22 @@ function MonitorsTab() {
       key: "enabled",
       header: t("adminMonitor.enabled"),
       render: (r) => (
-        <QuietBadge
-          status={r.enabled ? "active" : "disabled"}
-          label={r.enabled ? t("common.active") : t("common.disabled")}
-        />
+        <button
+          type="button"
+          onClick={() => void toggleEnabled(r)}
+          disabled={togglingId === r.id}
+          className="cursor-pointer disabled:cursor-wait disabled:opacity-60"
+          title={
+            r.enabled
+              ? t("adminMonitor.clickToDisable")
+              : t("adminMonitor.clickToEnable")
+          }
+        >
+          <QuietBadge
+            status={r.enabled ? "active" : "disabled"}
+            label={r.enabled ? t("common.active") : t("common.disabled")}
+          />
+        </button>
       ),
     },
   ];
