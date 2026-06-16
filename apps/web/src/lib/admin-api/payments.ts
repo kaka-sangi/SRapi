@@ -17,6 +17,7 @@ import {
   deleteAdminUserSubscription,
   deleteAdminPromoCode,
   getAdminRedeemCodeStats,
+  batchDeleteAdminRedeemCodes,
   batchDisableAdminRedeemCodes,
   batchGenerateAdminRedeemCodes,
   listAdminPaymentOrders,
@@ -189,6 +190,12 @@ export const paymentsApi = {
 
   batchDisableRedeemCodes(ids: Id[]): Promise<unknown> {
     return unwrapData(() => batchDisableAdminRedeemCodes({ body: { ids }, throwOnError: true }));
+  },
+
+  // Hard delete (vs the soft batch-disable above which keeps the audit row).
+  // Reuses the BatchDisableRedeemCodesRequest body shape so the type is shared.
+  batchDeleteRedeemCodes(ids: Id[]): Promise<unknown> {
+    return unwrapData(() => batchDeleteAdminRedeemCodes({ body: { ids }, throwOnError: true }));
   },
 
   deleteRedeemCode(id: Id): Promise<{ deleted: boolean }> {

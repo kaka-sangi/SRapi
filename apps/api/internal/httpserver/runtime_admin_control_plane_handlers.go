@@ -297,6 +297,39 @@ func (s *Server) handleBatchDisableAdminRedeemCodes(w http.ResponseWriter, r *ht
 	writeJSONAny(w, http.StatusOK, apiopenapi.BatchOperationResponse{Data: toAPIBatchOperationResult(result), RequestId: requestID})
 }
 
+// handleBatchDeleteAdminRedeemCodes hard-deletes the named codes (vs the
+// soft batch-disable that preserves the row). Shares the BatchOperationResponse
+// shape so the admin UI can swap mutations without re-wiring its callback.
+func (s *Server) handleBatchDeleteAdminRedeemCodes(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.BatchDisableRedeemCodesRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid redeem code batch request", requestID)
+		return
+	}
+	ids, err := idsFromAPI(body.Ids)
+	if err != nil {
+		writeAdminControlError(w, err, requestID)
+		return
+	}
+	result, err := s.runtime.adminControl.BatchDeleteRedeemCodes(r.Context(), ids, session.User.ID)
+	if err != nil {
+		writeAdminControlError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "redeem_code.batch_delete", "redeem_code", "bulk", nil, adminControlAuditSnapshot(result)))
+	writeJSONAny(w, http.StatusOK, apiopenapi.BatchOperationResponse{Data: toAPIBatchOperationResult(result), RequestId: requestID})
+}
+
 func (s *Server) handleAdminRedeemCodeStats(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {

@@ -9873,6 +9873,49 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/redeem-codes/batch-delete:
+    post:
+      tags:
+        - AdminPromotions
+      operationId: batchDeleteAdminRedeemCodes
+      summary: Batch hard-delete redeem codes.
+      description: |
+        Deletes the named codes outright (vs batch-disable, which preserves
+        the row with status=disabled for audit). Use when a generation went
+        wrong (wrong currency, wrong campaign). Already-deleted or unknown
+        ids surface in failed_ids without failing the call. Use the smaller
+        batch-disable when you want to keep history.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchDisableRedeemCodesRequest"
+      responses:
+        "200":
+          description: Redeem codes deleted — per-id outcome in the result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchOperationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/redeem-codes/stats:
     get:
       tags:

@@ -142,6 +142,45 @@ func (s *Service) DeleteRedeemCode(ctx context.Context, id int, actorUserID int)
 	return s.store.DeleteRedeemCode(ctx, id)
 }
 
+// BatchDeleteRedeemCodes hard-deletes the named codes. Loops over the
+// per-id DeleteRedeemCode so a missing/already-deleted id surfaces in
+// FailedIDs without failing the whole call. Same {ids,bulk}-shape as
+// BatchDisableRedeemCodes so the admin UI can swap mutations without
+// reshaping the result.
+func (s *Service) BatchDeleteRedeemCodes(ctx context.Context, ids []int, actorUserID int) (admincontrol.BatchOperationResult, error) {
+	if len(ids) == 0 || len(ids) > 1000 {
+		return admincontrol.BatchOperationResult{}, admincontrol.ErrInvalidInput
+	}
+	requested := make([]int, 0, len(ids))
+	seen := map[int]bool{}
+	for _, id := range ids {
+		if id <= 0 {
+			return admincontrol.BatchOperationResult{}, admincontrol.ErrInvalidInput
+		}
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		requested = append(requested, id)
+	}
+	succeeded := 0
+	failedIDs := make([]int, 0)
+	for _, id := range requested {
+		if _, err := s.store.DeleteRedeemCode(ctx, id); err != nil {
+			failedIDs = append(failedIDs, id)
+			continue
+		}
+		succeeded++
+	}
+	sort.Ints(failedIDs)
+	return admincontrol.BatchOperationResult{
+		Requested: len(ids),
+		Succeeded: succeeded,
+		Failed:    len(failedIDs),
+		FailedIDs: failedIDs,
+	}, nil
+}
+
 func (s *Service) RedeemCode(ctx context.Context, user userscontract.User, req admincontrol.RedeemCodeRedemptionRequest) (admincontrol.RedeemCodeRedemptionResult, error) {
 	if user.ID <= 0 {
 		return admincontrol.RedeemCodeRedemptionResult{}, admincontrol.ErrInvalidInput

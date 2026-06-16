@@ -1264,6 +1264,10 @@ export const en = {
     disable: "Disable",
     disableSelected: "Disable selected",
     disableSelectedTitle: "Disable {count} redeem codes?",
+    deleteSelected: "Delete selected",
+    deleteSelectedTitle: "Delete {count} redeem codes?",
+    deleteSelectedBody:
+      "Selected codes are permanently removed — no row remains to show they ever existed. Use 'Disable' instead if you want to keep the audit trail.",
     statsTotal: "Total",
     statsActive: "Active",
     statsRedeemed: "Redeemed",

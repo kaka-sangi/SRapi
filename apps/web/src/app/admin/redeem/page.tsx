@@ -29,6 +29,7 @@ import {
   useRedeemStats,
   useCreateRedeemCode,
   useBatchGenerateRedeemCodes,
+  useBatchDeleteRedeemCodes,
   useBatchDisableRedeemCodes,
   useDeleteRedeemCode,
 } from "@/hooks/admin-queries";
@@ -89,6 +90,7 @@ function RedeemContent() {
   const stats = useRedeemStats();
   const createMut = useCreateRedeemCode();
   const disableMut = useBatchDisableRedeemCodes();
+  const batchDeleteMut = useBatchDeleteRedeemCodes();
   const deleteMut = useDeleteRedeemCode();
 
   const [creating, setCreating] = useState(false);
@@ -96,6 +98,23 @@ function RedeemContent() {
   const [disableTarget, setDisableTarget] = useState<RedeemCode | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RedeemCode | null>(null);
   const [bulkDisabling, setBulkDisabling] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  /** Bulk hard-delete the selection. Unlike disable, this is irreversible —
+   * the rows are gone — so it gets a destructive confirm. Failed ids
+   * (missing/already-deleted) surface in the toast count. */
+  async function confirmBulkDelete() {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    try {
+      await batchDeleteMut.mutateAsync(ids);
+      toast({ title: t("feedback.batchAllSucceeded", { count: ids.length }), tone: "success" });
+      list.clearSelection();
+    } catch (err) {
+      toast({ title: t("feedback.failed"), tone: "error" });
+      throw err;
+    }
+  }
 
   // Disable only ACTIVE selected codes — never re-disable redeemed/expired ones.
   const selectedActive = redeemDisableStateFromSelection(
@@ -238,15 +257,25 @@ function RedeemContent() {
           onToggle: list.toggle,
           onTogglePage: list.togglePage,
           bulkActions: (
-            <Button
-              variant="outline"
-              size="sm"
-              loading={disableMut.isPending}
-              disabled={selectedActive.ids.length === 0}
-              onClick={() => setBulkDisabling(true)}
-            >
-              {t("adminPromos.disableSelected")}
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={disableMut.isPending}
+                disabled={selectedActive.ids.length === 0}
+                onClick={() => setBulkDisabling(true)}
+              >
+                {t("adminPromos.disableSelected")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={batchDeleteMut.isPending}
+                onClick={() => setBulkDeleting(true)}
+              >
+                {t("adminPromos.deleteSelected")}
+              </Button>
+            </>
           ),
         }}
         rowActions={(c) => (
@@ -309,6 +338,21 @@ function RedeemContent() {
           confirmLabel={t("adminPromos.disableSelected")}
           onConfirm={confirmBulkDisable}
           isPending={disableMut.isPending}
+        />
+      ) : null}
+
+      {bulkDeleting ? (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setBulkDeleting(false);
+          }}
+          tone="danger"
+          title={t("adminPromos.deleteSelectedTitle", { count: list.selected.size })}
+          body={t("adminPromos.deleteSelectedBody")}
+          confirmLabel={t("adminPromos.deleteSelected")}
+          onConfirm={confirmBulkDelete}
+          isPending={batchDeleteMut.isPending}
         />
       ) : null}
 

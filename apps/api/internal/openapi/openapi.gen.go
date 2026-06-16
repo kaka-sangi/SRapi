@@ -11174,6 +11174,9 @@ type RunAdminQuickSetupJSONRequestBody = AdminQuickSetupRequest
 // CreateAdminRedeemCodeJSONRequestBody defines body for CreateAdminRedeemCode for application/json ContentType.
 type CreateAdminRedeemCodeJSONRequestBody = CreateRedeemCodeRequest
 
+// BatchDeleteAdminRedeemCodesJSONRequestBody defines body for BatchDeleteAdminRedeemCodes for application/json ContentType.
+type BatchDeleteAdminRedeemCodesJSONRequestBody = BatchDisableRedeemCodesRequest
+
 // BatchDisableAdminRedeemCodesJSONRequestBody defines body for BatchDisableAdminRedeemCodes for application/json ContentType.
 type BatchDisableAdminRedeemCodesJSONRequestBody = BatchDisableRedeemCodesRequest
 
@@ -18252,6 +18255,9 @@ type ServerInterface interface {
 	// Create a redeem code.
 	// (POST /api/v1/admin/redeem-codes)
 	CreateAdminRedeemCode(w http.ResponseWriter, r *http.Request)
+	// Batch hard-delete redeem codes.
+	// (POST /api/v1/admin/redeem-codes/batch-delete)
+	BatchDeleteAdminRedeemCodes(w http.ResponseWriter, r *http.Request)
 	// Batch disable redeem codes.
 	// (POST /api/v1/admin/redeem-codes/batch-disable)
 	BatchDisableAdminRedeemCodes(w http.ResponseWriter, r *http.Request)
@@ -26324,6 +26330,28 @@ func (siw *ServerInterfaceWrapper) CreateAdminRedeemCode(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// BatchDeleteAdminRedeemCodes operation middleware
+func (siw *ServerInterfaceWrapper) BatchDeleteAdminRedeemCodes(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchDeleteAdminRedeemCodes(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // BatchDisableAdminRedeemCodes operation middleware
 func (siw *ServerInterfaceWrapper) BatchDisableAdminRedeemCodes(w http.ResponseWriter, r *http.Request) {
 
@@ -32450,6 +32478,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/quick-setup", wrapper.RunAdminQuickSetup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/redeem-codes", wrapper.ListAdminRedeemCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes", wrapper.CreateAdminRedeemCode)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-delete", wrapper.BatchDeleteAdminRedeemCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-disable", wrapper.BatchDisableAdminRedeemCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-generate", wrapper.BatchGenerateAdminRedeemCodes)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/redeem-codes/stats", wrapper.GetAdminRedeemCodeStats)

@@ -1242,6 +1242,10 @@ export const zh: Messages = {
     disable: "停用",
     disableSelected: "停用所选",
     disableSelectedTitle: "停用 {count} 个兑换码？",
+    deleteSelected: "删除所选",
+    deleteSelectedTitle: "删除 {count} 个兑换码？",
+    deleteSelectedBody:
+      "所选兑换码将被彻底删除，无记录保留。若要保留审计轨迹，请改用「停用」。",
     statsTotal: "总数",
     statsActive: "可用",
     statsRedeemed: "已兑换",

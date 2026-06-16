@@ -16545,6 +16545,43 @@ export type BatchDisableAdminRedeemCodesResponses = {
 
 export type BatchDisableAdminRedeemCodesResponse = BatchDisableAdminRedeemCodesResponses[keyof BatchDisableAdminRedeemCodesResponses];
 
+export type BatchDeleteAdminRedeemCodesData = {
+    body: BatchDisableRedeemCodesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/redeem-codes/batch-delete';
+};
+
+export type BatchDeleteAdminRedeemCodesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchDeleteAdminRedeemCodesError = BatchDeleteAdminRedeemCodesErrors[keyof BatchDeleteAdminRedeemCodesErrors];
+
+export type BatchDeleteAdminRedeemCodesResponses = {
+    /**
+     * Redeem codes deleted — per-id outcome in the result.
+     */
+    200: BatchOperationResponse;
+};
+
+export type BatchDeleteAdminRedeemCodesResponse = BatchDeleteAdminRedeemCodesResponses[keyof BatchDeleteAdminRedeemCodesResponses];
+
 export type GetAdminRedeemCodeStatsData = {
     body?: never;
     path?: never;
