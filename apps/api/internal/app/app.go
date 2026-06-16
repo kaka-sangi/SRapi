@@ -12,6 +12,7 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/httpserver"
 	"github.com/srapi/srapi/apps/api/internal/persistence/entstore"
 	entschedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/scheduler"
+	redisbalancereservation "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/balancereservation"
 	redisrealtimestore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/realtime"
 	redisschedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/scheduler"
 	redissessionaffinitystore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/sessionaffinity"
@@ -240,6 +241,13 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	}
 	if realtimeStore != nil {
 		options = append(options, httpserver.WithRealtimeStore(realtimeStore))
+	}
+	balanceReservationStore, err := balanceReservationGateStore(context.Background(), cfg, logger, redisClient)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+	}
+	if balanceReservationStore != nil {
+		options = append(options, httpserver.WithBalanceReservationStore(balanceReservationStore))
 	}
 	sessionAffinity, err := sessionAffinityStore(context.Background(), cfg, logger, redisClient)
 	if err != nil {
@@ -506,6 +514,34 @@ func realtimeSlotStore(ctx context.Context, cfg config.Config, logger *slog.Logg
 		return nil, nil
 	}
 	return redisrealtimestore.New(redisClient.Raw())
+}
+
+// balanceReservationGateStore wires the atomic-reservation gate when Redis
+// is available. Without Redis the gateway falls back to the read-only
+// single-instance balance check; that's enough to keep $0-balance users from
+// running unbounded paid traffic but cannot prevent the concurrent-overspend
+// race that ate $1 balances. In release mode, missing Redis is loud (we'd
+// rather an operator configure REDIS_URL than discover the race under abuse).
+func balanceReservationGateStore(ctx context.Context, cfg config.Config, logger *slog.Logger, redisClient *platformredis.Client) (*redisbalancereservation.Store, error) {
+	if redisClient == nil || redisClient.Raw() == nil {
+		if cfg.Server.Mode == "release" {
+			logger.Warn("redis not configured; gateway balance reservation is DISABLED in release mode — set REDIS_URL to close the concurrent-overspend race")
+		}
+		return nil, nil
+	}
+	err := pingRedisForDependency(ctx, cfg, logger, redisClient, "balance reservation")
+	if err != nil {
+		if cfg.Server.Mode == "release" {
+			return nil, fmt.Errorf("redis unavailable for balance reservation: %w", err)
+		}
+		logger.Warn("redis unavailable; balance reservation disabled", "error", err)
+		return nil, nil
+	}
+	// 10-minute default TTL bounds leaked reservations if a release call is
+	// somehow missed. Long enough for any reasonable upstream timeout; short
+	// enough that a permanently lost reservation doesn't poison a user's
+	// available balance for hours.
+	return redisbalancereservation.New(redisClient.Raw(), "srapi:balance_reservation", 10*time.Minute), nil
 }
 
 func gatewayRateLimiterOption(ctx context.Context, cfg config.Config, logger *slog.Logger, redisClient *platformredis.Client) (httpserver.Option, error) {

@@ -89,6 +89,13 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	if usageErr == nil {
 		usageLogID = usageLog.ID
 	}
+	// Release the atomic balance reservation taken at admission. Idempotent
+	// on the store, so repeated recordGatewayUsage calls from a failover loop
+	// just succeed-on-the-first and no-op on subsequent calls. Skipped when
+	// the reservation gate isn't wired (Redis not configured) or there's no
+	// user (anonymous / api-key auth without a backing user).
+	rt.releaseGatewayReservation(ctx, rec.Authed.UserID, rec.RequestID)
+
 	detached := context.WithoutCancel(ctx)
 	rt.dispatchUsageWrite(detached, func(c context.Context) {
 		rt.recordGatewayUsageEffects(c, rec, model, pricing, usageLogID)

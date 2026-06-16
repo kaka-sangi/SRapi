@@ -197,6 +197,12 @@ type runtimeState struct {
 	paymentStore            paymentcontract.Store
 	qualityEvalStore        qualitycontract.Store
 	realtimeStore           realtimecontract.Store
+	// balanceReservation is the optional atomic-reservation gate that prevents
+	// concurrent gateway requests from collectively over-spending a user's
+	// balance before the asynchronous balance_charger has a chance to debit.
+	// Nil when Redis isn't configured — the balance gate then falls back to
+	// the single-instance read-only check.
+	balanceReservation balanceReservationStore
 	rateLimiter             *ratelimit.Limiter
 	schedulerStore          schedulercontract.Store
 	sessionAffinity         sessionaffinitycontract.Store
@@ -951,6 +957,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		paymentStore:         assembly.paymentStore,
 		qualityEvalStore:     assembly.qualityEvalStore,
 		realtimeStore:        opts.realtime,
+		balanceReservation:   opts.balanceReservation,
 		rateLimiter:          opts.rateLimiter,
 		schedulerStore:       assembly.schedulerStore,
 		sessionAffinity:      opts.sessionAffinity,

@@ -102,6 +102,7 @@ type runtimeOptions struct {
 	payments            paymentcontract.Store
 	qualityEval         qualitycontract.Store
 	realtime            realtimecontract.Store
+	balanceReservation  balanceReservationStore
 	rateLimiter         *ratelimit.Limiter
 	scheduler           schedulercontract.Store
 	sessionAffinity     sessionaffinitycontract.Store
@@ -295,6 +296,16 @@ func WithQualityEvalStore(store qualitycontract.Store) Option {
 func WithRealtimeStore(store realtimecontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.realtime = store
+	}
+}
+
+// WithBalanceReservationStore wires the atomic-reservation gate. When unset
+// the gateway falls back to the read-only balance check (single-instance
+// gate), which still rejects requests from zero-balance users but cannot
+// prevent the concurrent-overspend race.
+func WithBalanceReservationStore(store balanceReservationStore) Option {
+	return func(opts *runtimeOptions) {
+		opts.balanceReservation = store
 	}
 }
 

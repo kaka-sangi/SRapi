@@ -106,7 +106,11 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 			return gatewayAdmission{}, err
 		}
 	}
-	denied, err := rt.gatewayBalanceGate(ctx, user, entitlement, pricing)
+	// Use the request ID (not per-attempt) as the reservation key — admission
+	// runs once per request, while the failover loop inside the dispatcher may
+	// record multiple usage rows. The reservation needs to span the whole
+	// request and be released exactly once at usage record (idempotently).
+	denied, err := rt.gatewayBalanceGate(ctx, user, entitlement, pricing, canonical.RequestID)
 	if err != nil {
 		return gatewayAdmission{}, err
 	}
