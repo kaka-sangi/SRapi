@@ -1620,6 +1620,13 @@ export type AccountGroup = {
     model_scope: JsonObject;
     strategy_hint: string;
     status: AccountGroupStatus;
+    /**
+     * Decimal multiplier applied to per-request usage charges for
+     * accounts in this group (discount: < 1.0; markup: > 1.0). Default
+     * "1.00000000". See modules/accounts/service.go for normalisation.
+     *
+     */
+    rate_multiplier: string;
     created_at: Timestamp;
 };
 
@@ -1630,6 +1637,10 @@ export type CreateAccountGroupRequest = {
     model_scope?: JsonObject;
     strategy_hint?: string;
     status?: AccountGroupStatus;
+    /**
+     * Optional rate multiplier. Defaults to "1.00000000" when omitted.
+     */
+    rate_multiplier?: string;
 };
 
 export type UpdateAccountGroupRequest = {
@@ -1639,6 +1650,10 @@ export type UpdateAccountGroupRequest = {
     model_scope?: JsonObject;
     strategy_hint?: string;
     status?: AccountGroupStatus;
+    /**
+     * Optional decimal multiplier; pass to update the per-group rate.
+     */
+    rate_multiplier?: string;
 };
 
 export type AccountGroupResponse = {

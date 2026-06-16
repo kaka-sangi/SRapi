@@ -113,6 +113,17 @@ function GroupsContent() {
       ),
     },
     {
+      key: "rate-multiplier",
+      header: t("adminGroups.rateMultiplier"),
+      hideOnMobile: true,
+      align: "right",
+      render: (g) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {g.rate_multiplier || "1.00000000"}×
+        </span>
+      ),
+    },
+    {
       key: "ratelimit",
       header: t("adminRateLimit.column"),
       hideOnMobile: true,
@@ -382,6 +393,19 @@ function GroupFormDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label htmlFor="g-rate-multiplier">{t("adminGroups.rateMultiplier")}</Label>
+              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
+                {t("adminGroups.rateMultiplierHint")}
+              </p>
+              <Input
+                id="g-rate-multiplier"
+                inputMode="decimal"
+                placeholder="1.00000000"
+                value={form.rateMultiplier}
+                onChange={(e) => set("rateMultiplier", e.target.value)}
+              />
             </div>
             {error ? (
               <p role="alert" className="text-sm text-srapi-error">

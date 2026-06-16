@@ -289,14 +289,15 @@ func (s *Server) apiAccount(ctx context.Context, account accountcontract.Provide
 
 func toAPIAccountGroup(group accountcontract.AccountGroup) apiopenapi.AccountGroup {
 	return apiopenapi.AccountGroup{
-		CreatedAt:     group.CreatedAt,
-		Description:   group.Description,
-		Id:            apiopenapi.Id(strconv.Itoa(group.ID)),
-		ModelScope:    jsonObject(group.ModelScope),
-		Name:          group.Name,
-		ProviderScope: jsonObject(group.ProviderScope),
-		Status:        apiopenapi.AccountGroupStatus(group.Status),
-		StrategyHint:  group.StrategyHint,
+		CreatedAt:      group.CreatedAt,
+		Description:    group.Description,
+		Id:             apiopenapi.Id(strconv.Itoa(group.ID)),
+		ModelScope:     jsonObject(group.ModelScope),
+		Name:           group.Name,
+		ProviderScope:  jsonObject(group.ProviderScope),
+		Status:         apiopenapi.AccountGroupStatus(group.Status),
+		StrategyHint:   group.StrategyHint,
+		RateMultiplier: group.RateMultiplier,
 	}
 }
 

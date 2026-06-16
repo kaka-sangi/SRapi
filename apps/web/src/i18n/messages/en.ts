@@ -910,6 +910,8 @@ export const en = {
       "Delete account group “{name}”? Its memberships and rate-limit policy are removed too; the provider accounts inside it are not affected. This cannot be undone.",
     strategy: "Strategy",
     strategyHint: "How accounts in this group are ranked when routing.",
+    rateMultiplier: "Rate multiplier",
+    rateMultiplierHint: "Decimal multiplier applied to per-request usage charges for accounts in this group (e.g. 0.8 = 20% discount, 1.5 = 50% markup). Leave empty to keep the existing value.",
     providerScope: "Provider scope",
     providerScopeHint: "Optional — limit this group to one provider.",
     modelScope: "Model scope",

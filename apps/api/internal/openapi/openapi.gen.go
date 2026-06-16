@@ -3385,14 +3385,19 @@ type AccountAvailabilitySummary struct {
 
 // AccountGroup defines model for AccountGroup.
 type AccountGroup struct {
-	CreatedAt     Timestamp          `json:"created_at"`
-	Description   string             `json:"description"`
-	Id            Id                 `json:"id"`
-	ModelScope    JsonObject         `json:"model_scope"`
-	Name          string             `json:"name"`
-	ProviderScope JsonObject         `json:"provider_scope"`
-	Status        AccountGroupStatus `json:"status"`
-	StrategyHint  string             `json:"strategy_hint"`
+	CreatedAt     Timestamp  `json:"created_at"`
+	Description   string     `json:"description"`
+	Id            Id         `json:"id"`
+	ModelScope    JsonObject `json:"model_scope"`
+	Name          string     `json:"name"`
+	ProviderScope JsonObject `json:"provider_scope"`
+
+	// RateMultiplier Decimal multiplier applied to per-request usage charges for
+	// accounts in this group (discount: < 1.0; markup: > 1.0). Default
+	// "1.00000000". See modules/accounts/service.go for normalisation.
+	RateMultiplier string             `json:"rate_multiplier"`
+	Status         AccountGroupStatus `json:"status"`
+	StrategyHint   string             `json:"strategy_hint"`
 }
 
 // AccountGroupListResponse defines model for AccountGroupListResponse.
@@ -5507,12 +5512,15 @@ type CopilotConversationSummary struct {
 
 // CreateAccountGroupRequest defines model for CreateAccountGroupRequest.
 type CreateAccountGroupRequest struct {
-	Description   *string             `json:"description,omitempty"`
-	ModelScope    *JsonObject         `json:"model_scope,omitempty"`
-	Name          string              `json:"name"`
-	ProviderScope *JsonObject         `json:"provider_scope,omitempty"`
-	Status        *AccountGroupStatus `json:"status,omitempty"`
-	StrategyHint  *string             `json:"strategy_hint,omitempty"`
+	Description   *string     `json:"description,omitempty"`
+	ModelScope    *JsonObject `json:"model_scope,omitempty"`
+	Name          string      `json:"name"`
+	ProviderScope *JsonObject `json:"provider_scope,omitempty"`
+
+	// RateMultiplier Optional rate multiplier. Defaults to "1.00000000" when omitted.
+	RateMultiplier *string             `json:"rate_multiplier,omitempty"`
+	Status         *AccountGroupStatus `json:"status,omitempty"`
+	StrategyHint   *string             `json:"strategy_hint,omitempty"`
 }
 
 // CreateAdminUserRequest defines model for CreateAdminUserRequest.
@@ -9174,12 +9182,15 @@ type TraceId = string
 
 // UpdateAccountGroupRequest defines model for UpdateAccountGroupRequest.
 type UpdateAccountGroupRequest struct {
-	Description   *string             `json:"description,omitempty"`
-	ModelScope    *JsonObject         `json:"model_scope,omitempty"`
-	Name          *string             `json:"name,omitempty"`
-	ProviderScope *JsonObject         `json:"provider_scope,omitempty"`
-	Status        *AccountGroupStatus `json:"status,omitempty"`
-	StrategyHint  *string             `json:"strategy_hint,omitempty"`
+	Description   *string     `json:"description,omitempty"`
+	ModelScope    *JsonObject `json:"model_scope,omitempty"`
+	Name          *string     `json:"name,omitempty"`
+	ProviderScope *JsonObject `json:"provider_scope,omitempty"`
+
+	// RateMultiplier Optional decimal multiplier; pass to update the per-group rate.
+	RateMultiplier *string             `json:"rate_multiplier,omitempty"`
+	Status         *AccountGroupStatus `json:"status,omitempty"`
+	StrategyHint   *string             `json:"strategy_hint,omitempty"`
 }
 
 // UpdateAdminUserRequest defines model for UpdateAdminUserRequest.

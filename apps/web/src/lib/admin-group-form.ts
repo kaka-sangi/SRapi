@@ -28,6 +28,9 @@ export interface AccountGroupFormState {
   selectedModelName: string;
   strategyHint: string;
   status: AccountGroupStatus;
+  // Decimal string. "" means "send no override" — the backend keeps the
+  // existing value on update, or defaults to "1.00000000" on create.
+  rateMultiplier: string;
 }
 
 export function emptyAccountGroupForm(): AccountGroupFormState {
@@ -40,6 +43,7 @@ export function emptyAccountGroupForm(): AccountGroupFormState {
     selectedModelName: "",
     strategyHint: "balanced",
     status: "active",
+    rateMultiplier: "",
   };
 }
 
@@ -53,10 +57,12 @@ export function accountGroupFormFromGroup(group: AccountGroup): AccountGroupForm
     selectedModelName: typeof group.model_scope?.canonical_name === "string" ? group.model_scope.canonical_name : "",
     strategyHint: group.strategy_hint || "balanced",
     status: group.status,
+    rateMultiplier: group.rate_multiplier || "",
   };
 }
 
 export function buildCreateAccountGroupBody(form: AccountGroupFormState): CreateAccountGroupRequest {
+  const trimmedMultiplier = form.rateMultiplier.trim();
   return {
     name: requiredText(form.name, "Name"),
     description: form.description.trim(),
@@ -64,6 +70,9 @@ export function buildCreateAccountGroupBody(form: AccountGroupFormState): Create
     model_scope: parseJsonObject(form.modelScopeJson, "Model scope"),
     strategy_hint: form.strategyHint.trim(),
     status: form.status,
+    // Omit when blank so create defaults to "1.00000000" and update leaves
+    // the existing value untouched (the service treats nil as "no change").
+    ...(trimmedMultiplier ? { rate_multiplier: trimmedMultiplier } : {}),
   };
 }
 

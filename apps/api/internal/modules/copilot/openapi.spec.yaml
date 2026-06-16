@@ -18612,6 +18612,7 @@ components:
         - model_scope
         - strategy_hint
         - status
+        - rate_multiplier
         - created_at
       properties:
         id:
@@ -18630,6 +18631,13 @@ components:
           example: balanced
         status:
           $ref: "#/components/schemas/AccountGroupStatus"
+        rate_multiplier:
+          type: string
+          description: |
+            Decimal multiplier applied to per-request usage charges for
+            accounts in this group (discount: < 1.0; markup: > 1.0). Default
+            "1.00000000". See modules/accounts/service.go for normalisation.
+          example: "1.00000000"
         created_at:
           $ref: "#/components/schemas/Timestamp"
 
@@ -18653,6 +18661,10 @@ components:
           example: balanced
         status:
           $ref: "#/components/schemas/AccountGroupStatus"
+        rate_multiplier:
+          type: string
+          description: Optional rate multiplier. Defaults to "1.00000000" when omitted.
+          example: "1.00000000"
 
     UpdateAccountGroupRequest:
       type: object
@@ -18671,6 +18683,10 @@ components:
           type: string
         status:
           $ref: "#/components/schemas/AccountGroupStatus"
+        rate_multiplier:
+          type: string
+          description: Optional decimal multiplier; pass to update the per-group rate.
+          example: "0.80000000"
 
     AccountGroupResponse:
       type: object

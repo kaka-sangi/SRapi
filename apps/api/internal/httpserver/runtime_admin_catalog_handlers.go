@@ -1739,12 +1739,13 @@ func (s *Server) handleCreateAdminAccountGroup(w http.ResponseWriter, r *http.Re
 		description = *body.Description
 	}
 	group, err := s.runtime.accounts.CreateGroup(r.Context(), accountcontract.CreateGroupRequest{
-		Name:          body.Name,
-		Description:   description,
-		ProviderScope: jsonObjectToMap(body.ProviderScope),
-		ModelScope:    jsonObjectToMap(body.ModelScope),
-		StrategyHint:  body.StrategyHint,
-		Status:        toAccountGroupStatusPtr(body.Status),
+		Name:           body.Name,
+		Description:    description,
+		ProviderScope:  jsonObjectToMap(body.ProviderScope),
+		ModelScope:     jsonObjectToMap(body.ModelScope),
+		StrategyHint:   body.StrategyHint,
+		Status:         toAccountGroupStatusPtr(body.Status),
+		RateMultiplier: body.RateMultiplier,
 	})
 	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account group request", requestID)
@@ -1784,12 +1785,13 @@ func (s *Server) handleUpdateAdminAccountGroup(w http.ResponseWriter, r *http.Re
 		return
 	}
 	group, err := s.runtime.accounts.UpdateGroup(r.Context(), groupID, accountcontract.UpdateGroupRequest{
-		Name:          body.Name,
-		Description:   body.Description,
-		ProviderScope: jsonObjectToMapPtr(body.ProviderScope),
-		ModelScope:    jsonObjectToMapPtr(body.ModelScope),
-		StrategyHint:  body.StrategyHint,
-		Status:        toAccountGroupStatusPtr(body.Status),
+		Name:           body.Name,
+		Description:    body.Description,
+		ProviderScope:  jsonObjectToMapPtr(body.ProviderScope),
+		ModelScope:     jsonObjectToMapPtr(body.ModelScope),
+		StrategyHint:   body.StrategyHint,
+		Status:         toAccountGroupStatusPtr(body.Status),
+		RateMultiplier: body.RateMultiplier,
 	})
 	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account group update request", requestID)

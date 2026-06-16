@@ -903,6 +903,8 @@ export const zh: Messages = {
     deleteBody: "确定要删除账号组「{name}」吗？组内成员关系和限速策略会一并清除，组内的上游账号本身不受影响。此操作不可撤销。",
     strategy: "调度策略",
     strategyHint: "组内账号在路由时的排序策略。",
+    rateMultiplier: "计费倍率",
+    rateMultiplierHint: "应用于组内账号每次请求扣费的小数倍率（如 0.8 表示 8 折，1.5 表示加价 50%）。留空则保留现有值。",
     providerScope: "服务商范围",
     providerScopeHint: "可选——将本组限定到某个供应商。",
     modelScope: "模型范围",
