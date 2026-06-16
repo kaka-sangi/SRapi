@@ -40,6 +40,11 @@ import {
   type RefundOrderFormState,
 } from "@/lib/admin-orders-form";
 import type { PaymentAuditLog, PaymentOrder } from "@/lib/sdk-types";
+import {
+  LOG_WINDOW_PRESETS,
+  LOG_WINDOW_ALL_LABEL_KEY,
+  logWindowSince,
+} from "@/lib/log-window-filter";
 import { PaymentDashboardPanel } from "./_panels/payment-dashboard-panel";
 
 export default function AdminOrdersPage() {
@@ -69,6 +74,10 @@ function orderMatch(
   filters: Record<string, string>,
 ): boolean {
   if (filters.status && order.status !== filters.status) return false;
+  if (filters.window) {
+    const since = logWindowSince(filters.window);
+    if (since && order.created_at && new Date(order.created_at) < since) return false;
+  }
   if (!term) return true;
   return [order.order_no, String(order.user_id), order.product_type, order.status]
     .filter(Boolean)
@@ -163,7 +172,7 @@ function OrdersContent() {
         emptyTitle={t("adminOrders.emptyTitle")}
         emptyBody={t("adminOrders.emptyBody")}
         minWidth={640}
-        isFiltered={Boolean(statusFilter)}
+        isFiltered={Boolean(statusFilter || list.filters.window)}
         onClearFilters={list.clearFilters}
         sort={list.sort}
         onSort={list.toggleSort}
@@ -174,6 +183,12 @@ function OrdersContent() {
               onChange={(v) => list.setFilter("status", v)}
               options={statusOptions}
               allLabel={t("adminCommon.allStatuses")}
+            />
+            <FilterSelect
+              value={list.filters.window}
+              onChange={(v) => list.setFilter("window", v)}
+              options={LOG_WINDOW_PRESETS.map((p) => ({ value: p.value, label: t(p.labelKey) }))}
+              allLabel={t(LOG_WINDOW_ALL_LABEL_KEY)}
             />
             <ColumnToggle
               columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
