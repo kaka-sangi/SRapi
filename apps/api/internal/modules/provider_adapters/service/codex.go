@@ -118,7 +118,17 @@ type codexResponsesOutputItem struct {
 	RevisedPrompt string                        `json:"revised_prompt"`
 	OutputFormat  string                        `json:"output_format"`
 	Content       []codexResponsesOutputContent `json:"content"`
+	Summary       []codexResponsesOutputSummary `json:"summary"`
 	Annotations   []map[string]any              `json:"-"`
+}
+
+// codexResponsesOutputSummary is one entry of a reasoning item's summary array.
+// In the non-streaming Responses JSON the model's human-readable chain-of-thought
+// lives here as {"type":"summary_text","text":"..."} (the streaming path instead
+// accumulates reasoning_summary_text deltas).
+type codexResponsesOutputSummary struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
 }
 
 type codexResponsesOutputContent struct {
@@ -1478,15 +1488,33 @@ func codexResponsesOutputItemParts(item codexResponsesOutputItem) []contract.Con
 		}
 		return parts
 	}
+	if itemType == "reasoning" {
+		// A non-streaming reasoning item carries its chain-of-thought in
+		// summary:[{type:"summary_text",text:...}] (item.Text is empty for the
+		// standard shape). Assemble the summary parts so reasoning is preserved as
+		// thinking; without this the model's reasoning is silently dropped on
+		// non-stream responses, unlike the streaming path which accumulates the
+		// reasoning_summary_text deltas. Mirrors sub2api responses_to_chatcompletions.
+		reasoning := strings.TrimSpace(item.Text)
+		if reasoning == "" {
+			pieces := make([]string, 0, len(item.Summary))
+			for _, s := range item.Summary {
+				if strings.EqualFold(strings.TrimSpace(s.Type), "summary_text") {
+					if t := strings.TrimSpace(s.Text); t != "" {
+						pieces = append(pieces, t)
+					}
+				}
+			}
+			reasoning = strings.Join(pieces, "\n")
+		}
+		if reasoning != "" {
+			parts = append(parts, contract.ContentPart{Kind: contract.ContentPartThinking, Text: reasoning, OriginProtocol: "openai"})
+		}
+		return parts
+	}
 	if text := strings.TrimSpace(item.Text); text != "" {
-		kind := contract.ContentPartText
-		if itemType == "reasoning" {
-			kind = contract.ContentPartThinking
-		}
-		part := contract.ContentPart{Kind: kind, Text: text, OriginProtocol: "openai"}
-		if kind == contract.ContentPartText {
-			part.Metadata = codexOutputItemTextMetadata(item)
-		}
+		part := contract.ContentPart{Kind: contract.ContentPartText, Text: text, OriginProtocol: "openai"}
+		part.Metadata = codexOutputItemTextMetadata(item)
 		parts = append(parts, part)
 	}
 	for _, content := range item.Content {
