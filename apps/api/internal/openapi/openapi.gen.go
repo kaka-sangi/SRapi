@@ -8369,6 +8369,31 @@ type ProxyDefinitionStatus string
 // ProxyDefinitionType defines model for ProxyDefinitionType.
 type ProxyDefinitionType string
 
+// ProxyTestResult defines model for ProxyTestResult.
+type ProxyTestResult struct {
+	// ErrorClass Empty when ok=true. Otherwise one of: bad_proxy_url, bad_target_url,
+	// timeout, transport_error, bad_status.
+	ErrorClass string `json:"error_class"`
+
+	// LatencyMs Wall-clock latency of the probe in ms (0 when the request didn't get far enough to time).
+	LatencyMs int `json:"latency_ms"`
+
+	// Ok True when the upstream returned a 2xx within the timeout.
+	Ok bool `json:"ok"`
+
+	// StatusCode HTTP status of the upstream, when one was received. 0 when the transport failed before headers.
+	StatusCode int `json:"status_code"`
+
+	// TargetUrl URL that was actually probed (echoed back so the UI can show the resolved default).
+	TargetUrl string `json:"target_url"`
+}
+
+// ProxyTestResultResponse defines model for ProxyTestResultResponse.
+type ProxyTestResultResponse struct {
+	Data      ProxyTestResult `json:"data"`
+	RequestId RequestId       `json:"request_id"`
+}
+
 // RealtimeActiveSlot defines model for RealtimeActiveSlot.
 type RealtimeActiveSlot struct {
 	AcquiredAt Timestamp `json:"acquired_at"`
@@ -9330,6 +9355,12 @@ type TOTPStatusResponse struct {
 type TOTPVerifyRequest struct {
 	// Code Six-digit TOTP code or one recovery code.
 	Code string `json:"code"`
+}
+
+// TestProxyRequest defines model for TestProxyRequest.
+type TestProxyRequest struct {
+	// TargetUrl Optional URL to probe. Defaults to a small, dependable HTTPS endpoint when omitted.
+	TargetUrl *string `json:"target_url,omitempty"`
 }
 
 // TimeWindow defines model for TimeWindow.
@@ -11323,6 +11354,9 @@ type BatchDeleteAdminProxiesJSONRequestBody = BatchDeleteProxiesRequest
 
 // UpdateAdminProxyJSONRequestBody defines body for UpdateAdminProxy for application/json ContentType.
 type UpdateAdminProxyJSONRequestBody = UpdateProxyDefinitionRequest
+
+// TestAdminProxyJSONRequestBody defines body for TestAdminProxy for application/json ContentType.
+type TestAdminProxyJSONRequestBody = TestProxyRequest
 
 // RunAdminQuickSetupJSONRequestBody defines body for RunAdminQuickSetup for application/json ContentType.
 type RunAdminQuickSetupJSONRequestBody = AdminQuickSetupRequest
@@ -18414,6 +18448,9 @@ type ServerInterface interface {
 	// Update an encrypted egress proxy definition.
 	// (PATCH /api/v1/admin/proxies/{id})
 	UpdateAdminProxy(w http.ResponseWriter, r *http.Request, id Id)
+	// One-shot probe through a proxy.
+	// (POST /api/v1/admin/proxies/{id}/test)
+	TestAdminProxy(w http.ResponseWriter, r *http.Request, id Id)
 	// Create a provider account from a built-in platform preset.
 	// (POST /api/v1/admin/quick-setup)
 	RunAdminQuickSetup(w http.ResponseWriter, r *http.Request)
@@ -26502,6 +26539,40 @@ func (siw *ServerInterfaceWrapper) UpdateAdminProxy(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// TestAdminProxy operation middleware
+func (siw *ServerInterfaceWrapper) TestAdminProxy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TestAdminProxy(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RunAdminQuickSetup operation middleware
 func (siw *ServerInterfaceWrapper) RunAdminQuickSetup(w http.ResponseWriter, r *http.Request) {
 
@@ -32854,6 +32925,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/proxies/batch-delete", wrapper.BatchDeleteAdminProxies)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/proxies/{id}", wrapper.DeleteAdminProxy)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/proxies/{id}", wrapper.UpdateAdminProxy)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/proxies/{id}/test", wrapper.TestAdminProxy)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/quick-setup", wrapper.RunAdminQuickSetup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/redeem-codes", wrapper.ListAdminRedeemCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes", wrapper.CreateAdminRedeemCode)

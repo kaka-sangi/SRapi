@@ -274,3 +274,60 @@ func (s *Server) handleDeleteAdminProxy(w http.ResponseWriter, r *http.Request) 
 		"request_id": requestID,
 	})
 }
+
+// handleTestAdminProxy issues a probe through the proxy and returns the
+// outcome. Always 200 — categorized failures live in the body (ok=false,
+// error_class set). Wraps the audit log so an operator-initiated probe
+// shows up in the trail.
+func (s *Server) handleTestAdminProxy(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid proxy id", requestID)
+		return
+	}
+	// Body is optional — only target_url is read, and an absent body is fine.
+	var body apiopenapi.TestProxyRequest
+	if r.ContentLength > 0 {
+		if err := s.decodeJSONBody(w, r, &body); err != nil {
+			writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid proxy test request", requestID)
+			return
+		}
+	}
+	target := ""
+	if body.TargetUrl != nil {
+		target = *body.TargetUrl
+	}
+	result, err := s.runtime.accounts.TestProxy(r.Context(), id, target)
+	if err != nil {
+		// Service returns ErrNotFound when the proxy was deleted between the
+		// list and the click — surface that explicitly so the UI can refresh.
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "proxy not found", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "proxy.test", "proxy", strconv.Itoa(id), nil, map[string]any{
+		"ok":          result.OK,
+		"latency_ms":  result.LatencyMS,
+		"status_code": result.StatusCode,
+		"error_class": result.ErrorClass,
+	}))
+	writeJSONAny(w, http.StatusOK, apiopenapi.ProxyTestResultResponse{
+		Data: apiopenapi.ProxyTestResult{
+			Ok:         result.OK,
+			LatencyMs:  result.LatencyMS,
+			StatusCode: result.StatusCode,
+			ErrorClass: result.ErrorClass,
+			TargetUrl:  result.TargetURL,
+		},
+		RequestId: requestID,
+	})
+}

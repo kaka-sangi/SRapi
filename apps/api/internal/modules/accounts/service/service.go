@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
@@ -260,6 +261,113 @@ func (s *Service) DeleteProxy(ctx context.Context, id int) error {
 		return err
 	}
 	return s.store.SoftDeleteProxy(ctx, id)
+}
+
+// defaultProxyTestTarget is a small, plain-text, dependable response over
+// HTTPS used by TestProxy when the caller doesn't pass a custom target.
+// Cloudflare's /cdn-cgi/trace returns a few hundred bytes of key=value text
+// and is widely used for exactly this kind of probe.
+const defaultProxyTestTarget = "https://www.cloudflare.com/cdn-cgi/trace"
+
+// proxyTestTimeout caps how long a single TestProxy call can wait — a wedged
+// proxy or unresponsive target shouldn't tie up an admin browser tab.
+const proxyTestTimeout = 8 * time.Second
+
+// TestProxy issues a one-shot HTTPS GET to targetURL routed through the
+// proxy. The result categorizes the failure mode for the UI: bad_proxy_url
+// when the stored ciphertext won't decrypt, bad_target_url when targetURL
+// isn't a usable URL, timeout when the wall-clock cap expires before any
+// response, transport_error when the dial / TLS / proxy CONNECT step fails,
+// and bad_status when the upstream returns non-2xx. OK is true only on a
+// 2xx response.
+//
+// targetURL may be empty — defaultProxyTestTarget is used in that case.
+func (s *Service) TestProxy(ctx context.Context, id int, targetURL string) (contract.ProxyTestResult, error) {
+	if id <= 0 {
+		return contract.ProxyTestResult{}, ErrInvalidInput
+	}
+	proxy, err := s.store.FindProxyByID(ctx, id)
+	if err != nil {
+		return contract.ProxyTestResult{}, err
+	}
+	target := strings.TrimSpace(targetURL)
+	if target == "" {
+		target = defaultProxyTestTarget
+	}
+	parsedTarget, err := url.Parse(target)
+	if err != nil || parsedTarget.Scheme == "" || parsedTarget.Host == "" {
+		return contract.ProxyTestResult{
+			OK:         false,
+			ErrorClass: "bad_target_url",
+			TargetURL:  target,
+		}, nil
+	}
+
+	proxyRawURL, err := s.decryptProxyURL(proxy)
+	if err != nil {
+		return contract.ProxyTestResult{
+			OK:         false,
+			ErrorClass: "bad_proxy_url",
+			TargetURL:  target,
+		}, nil
+	}
+	parsedProxyURL, err := url.Parse(proxyRawURL)
+	if err != nil || parsedProxyURL.Scheme == "" || parsedProxyURL.Host == "" {
+		return contract.ProxyTestResult{
+			OK:         false,
+			ErrorClass: "bad_proxy_url",
+			TargetURL:  target,
+		}, nil
+	}
+
+	transport := &http.Transport{Proxy: http.ProxyURL(parsedProxyURL)}
+	client := &http.Client{Transport: transport, Timeout: proxyTestTimeout}
+	defer transport.CloseIdleConnections()
+
+	probeCtx, cancel := context.WithTimeout(ctx, proxyTestTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(probeCtx, http.MethodGet, target, nil)
+	if err != nil {
+		return contract.ProxyTestResult{
+			OK:         false,
+			ErrorClass: "bad_target_url",
+			TargetURL:  target,
+		}, nil
+	}
+	start := time.Now()
+	resp, err := client.Do(req)
+	latencyMS := int(time.Since(start) / time.Millisecond)
+	if err != nil {
+		// Categorize the error: context-deadline + URL deadline errors map to
+		// timeout; anything else is a transport-level failure (dial / TLS /
+		// CONNECT refused). The frontend gets a stable, narrow set of classes.
+		errClass := "transport_error"
+		if errors.Is(err, context.DeadlineExceeded) {
+			errClass = "timeout"
+		}
+		return contract.ProxyTestResult{
+			OK:         false,
+			LatencyMS:  latencyMS,
+			ErrorClass: errClass,
+			TargetURL:  target,
+		}, nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return contract.ProxyTestResult{
+			OK:         true,
+			LatencyMS:  latencyMS,
+			StatusCode: resp.StatusCode,
+			TargetURL:  target,
+		}, nil
+	}
+	return contract.ProxyTestResult{
+		OK:         false,
+		LatencyMS:  latencyMS,
+		StatusCode: resp.StatusCode,
+		ErrorClass: "bad_status",
+		TargetURL:  target,
+	}, nil
 }
 
 // BatchCreateProxyResult is per-row outcome from BatchCreateProxies.

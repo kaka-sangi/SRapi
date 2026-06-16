@@ -1095,6 +1095,10 @@ export const zh: Messages = {
   adminProxies: {
     title: "代理",
     subtitle: "绑定到上游账号的出口代理。",
+    test: "测试",
+    testOk: "代理可用 · {latency}ms",
+    testFailed: "代理测试失败：{reason}",
+    testTarget: "通过 {target}",
     name: "名称",
     url: "URL",
     protocol: "协议",

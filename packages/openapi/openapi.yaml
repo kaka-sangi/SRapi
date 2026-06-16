@@ -5304,6 +5304,57 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/proxies/{id}/test:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: testAdminProxy
+      summary: One-shot probe through a proxy.
+      description: |
+        Issues an HTTPS GET routed through the named proxy at target_url
+        (or a sensible default) and reports the outcome — used by the
+        per-row "Test" action so an operator can verify connectivity
+        without bouncing real traffic through the proxy. Always returns
+        200 — the success/error fields live in the body.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestProxyRequest"
+      responses:
+        "200":
+          description: Probe outcome.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyTestResultResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/proxies/batch-delete:
     post:
       tags:
@@ -19644,6 +19695,53 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/BatchCreateProxiesResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    TestProxyRequest:
+      type: object
+      properties:
+        target_url:
+          type: string
+          description: Optional URL to probe. Defaults to a small, dependable HTTPS endpoint when omitted.
+
+    ProxyTestResult:
+      type: object
+      required:
+        - ok
+        - latency_ms
+        - status_code
+        - error_class
+        - target_url
+      properties:
+        ok:
+          type: boolean
+          description: True when the upstream returned a 2xx within the timeout.
+        latency_ms:
+          type: integer
+          minimum: 0
+          description: Wall-clock latency of the probe in ms (0 when the request didn't get far enough to time).
+        status_code:
+          type: integer
+          minimum: 0
+          description: HTTP status of the upstream, when one was received. 0 when the transport failed before headers.
+        error_class:
+          type: string
+          description: |
+            Empty when ok=true. Otherwise one of: bad_proxy_url, bad_target_url,
+            timeout, transport_error, bad_status.
+        target_url:
+          type: string
+          description: URL that was actually probed (echoed back so the UI can show the resolved default).
+
+    ProxyTestResultResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/ProxyTestResult"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

@@ -1113,6 +1113,10 @@ export const en = {
   adminProxies: {
     title: "Proxies",
     subtitle: "Egress proxies bound to provider accounts.",
+    test: "Test",
+    testOk: "Proxy OK · {latency}ms",
+    testFailed: "Proxy test failed: {reason}",
+    testTarget: "via {target}",
     name: "Name",
     url: "URL",
     protocol: "Protocol",

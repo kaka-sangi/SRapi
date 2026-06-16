@@ -251,6 +251,15 @@ export function useUpdateProxy() {
 export function useDeleteProxy() {
   return useAdminMutation((id: string) => adminApi.deleteProxy(id), ["admin", "proxies"]);
 }
+// One-shot probe through the proxy. No cache invalidation — the test doesn't
+// mutate proxy state, just returns the probe outcome the page surfaces in a
+// toast.
+export function useTestProxy() {
+  return useMutation({
+    mutationFn: (vars: { id: string; targetUrl?: string }) =>
+      adminApi.testProxy(vars.id, vars.targetUrl),
+  });
+}
 // Bulk-import — dedupes by name + returns per-row outcome. Cache invalidation
 // is identical to single-row create, so existing list views refresh.
 export function useBatchCreateProxies() {

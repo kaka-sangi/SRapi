@@ -6,6 +6,7 @@ import {
   createAdminProxy,
   deleteAdminProxy,
   listAdminProxies,
+  testAdminProxy,
   updateAdminProxy,
 } from "../../../../../packages/sdk/typescript/src/index";
 import type {
@@ -16,6 +17,7 @@ import type {
   Id,
   ListAdminProxiesData,
   ProxyDefinition,
+  ProxyTestResult,
   UpdateAdminProxyData,
 } from "../../../../../packages/sdk/typescript/src/types.gen";
 import { unwrapData, unwrapList } from "./_shared";
@@ -55,5 +57,13 @@ export const proxiesApi = {
     return unwrapData(() =>
       batchDeleteAdminProxies({ body: { proxy_ids: proxyIds }, throwOnError: true }),
     );
+  },
+
+  // One-shot probe through the proxy. Always resolves to a ProxyTestResult
+  // (ok=false categorizes the failure mode in `error_class`) unless the proxy
+  // itself was deleted, in which case the SDK throws on the 404.
+  testProxy(id: Id, targetUrl?: string): Promise<ProxyTestResult> {
+    const body = targetUrl ? { target_url: targetUrl } : undefined;
+    return unwrapData(() => testAdminProxy({ path: { id }, body, throwOnError: true }));
   },
 };

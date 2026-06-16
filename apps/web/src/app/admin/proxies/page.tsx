@@ -21,6 +21,7 @@ import {
   useCreateProxy,
   useUpdateProxy,
   useDeleteProxy,
+  useTestProxy,
   useBatchDeleteProxies,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -60,6 +61,35 @@ function ProxiesContent() {
   const createMut = useCreateProxy();
   const updateMut = useUpdateProxy();
   const deleteMut = useDeleteProxy();
+  const testMut = useTestProxy();
+
+  async function runTest(id: string) {
+    try {
+      const result = await testMut.mutateAsync({ id });
+      if (result.ok) {
+        toast({
+          title: t("adminProxies.testOk", { latency: result.latency_ms }),
+          description: t("adminProxies.testTarget", { target: result.target_url }),
+          tone: "success",
+        });
+      } else {
+        toast({
+          title: t("adminProxies.testFailed", {
+            // Show the categorised error class verbatim — useful for triage.
+            reason: result.error_class,
+          }),
+          description: t("adminProxies.testTarget", { target: result.target_url }),
+          tone: "error",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: t("feedback.failed"),
+        description: err instanceof Error ? err.message : String(err),
+        tone: "error",
+      });
+    }
+  }
   const batchDeleteMut = useBatchDeleteProxies();
   const { toast } = useToast();
 
@@ -222,6 +252,7 @@ function ProxiesContent() {
           <RowActionsMenu
             actions={[
               { label: t("common.edit"), onSelect: () => setFormTarget(p) },
+              { label: t("adminProxies.test"), onSelect: () => void runTest(p.id) },
               { label: t("common.delete"), destructive: true, onSelect: () => setToDelete(p) },
             ]}
           />

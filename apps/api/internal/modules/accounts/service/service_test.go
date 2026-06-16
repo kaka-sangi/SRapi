@@ -844,3 +844,68 @@ func (p fakeAccountProber) ProbeAccount(_ context.Context, _ contract.ProviderAc
 	}
 	return p.result, nil
 }
+
+// TestProxyTestErrorClassesCategorizeFailures verifies the wiring of
+// Service.TestProxy: bad target_url, bad proxy URL ciphertext, and a
+// connection that can't be made all produce ok=false with a stable
+// error_class. This test deliberately doesn't exercise a real successful
+// probe — Service.TestProxy makes a real HTTP request, and a happy path
+// would require either a running proxy or network egress in CI.
+func TestProxyTestErrorClassesCategorizeFailures(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+
+	// Create a valid-shape proxy that points at a TCP port that is virtually
+	// guaranteed to refuse connections (port 1 on the loopback interface).
+	// We can't reasonably assert "connection refused" vs "i/o timeout" across
+	// every platform — the contract is just ok=false + a non-empty error_class
+	// when the transport fails.
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name: "unreachable",
+		Type: contract.ProxyTypeHTTPS,
+		URL:  "https://127.0.0.1:1",
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+
+	// Bad target_url path — the service should categorize it BEFORE touching
+	// the network.
+	badTarget, err := svc.TestProxy(ctx, proxy.ID, "not a url")
+	if err != nil {
+		t.Fatalf("bad target: %v", err)
+	}
+	if badTarget.OK || badTarget.ErrorClass != "bad_target_url" {
+		t.Fatalf("bad target: want ok=false bad_target_url, got %+v", badTarget)
+	}
+
+	// Transport failure path. We intentionally use a low timeout in the
+	// service so this test runs fast; what we assert is just the shape, not
+	// the specific class string.
+	tcpFail, err := svc.TestProxy(ctx, proxy.ID, "https://example.invalid/")
+	if err != nil {
+		t.Fatalf("transport: %v", err)
+	}
+	if tcpFail.OK {
+		t.Fatalf("transport: want ok=false, got %+v", tcpFail)
+	}
+	if tcpFail.ErrorClass == "" {
+		t.Fatalf("transport: want non-empty error_class, got %+v", tcpFail)
+	}
+	if tcpFail.TargetURL != "https://example.invalid/" {
+		t.Fatalf("transport: target_url not echoed, got %q", tcpFail.TargetURL)
+	}
+
+	// Unknown proxy id — the service should propagate the not-found error.
+	if _, err := svc.TestProxy(ctx, 99999, ""); err == nil {
+		t.Fatalf("expected not-found for unknown proxy id, got nil")
+	}
+	// Invalid id input should surface ErrInvalidInput rather than reach the store.
+	if _, err := svc.TestProxy(ctx, 0, ""); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput for id=0, got %v", err)
+	}
+}

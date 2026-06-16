@@ -369,6 +369,19 @@ type ProxyQuality struct {
 	Metadata      map[string]any
 }
 
+// ProxyTestResult is the outcome of a one-shot HTTP probe sent through the
+// proxy at a known-good target URL. Used by the per-row "Test" action so an
+// operator can verify a proxy works without bouncing real traffic through it.
+// OK is true only when the upstream returns 2xx within the probe timeout;
+// ErrorClass categorizes the failure mode so the UI can render a useful hint.
+type ProxyTestResult struct {
+	OK         bool
+	LatencyMS  int
+	StatusCode int
+	ErrorClass string
+	TargetURL  string
+}
+
 type CreateRequest struct {
 	ProviderID     int
 	Name           string

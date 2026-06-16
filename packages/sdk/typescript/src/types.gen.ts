@@ -1878,6 +1878,43 @@ export type BatchCreateProxiesResponse = {
     request_id: RequestId;
 };
 
+export type TestProxyRequest = {
+    /**
+     * Optional URL to probe. Defaults to a small, dependable HTTPS endpoint when omitted.
+     */
+    target_url?: string;
+};
+
+export type ProxyTestResult = {
+    /**
+     * True when the upstream returned a 2xx within the timeout.
+     */
+    ok: boolean;
+    /**
+     * Wall-clock latency of the probe in ms (0 when the request didn't get far enough to time).
+     */
+    latency_ms: number;
+    /**
+     * HTTP status of the upstream, when one was received. 0 when the transport failed before headers.
+     */
+    status_code: number;
+    /**
+     * Empty when ok=true. Otherwise one of: bad_proxy_url, bad_target_url,
+     * timeout, transport_error, bad_status.
+     *
+     */
+    error_class: string;
+    /**
+     * URL that was actually probed (echoed back so the UI can show the resolved default).
+     */
+    target_url: string;
+};
+
+export type ProxyTestResultResponse = {
+    data: ProxyTestResult;
+    request_id: RequestId;
+};
+
 export type BatchDeleteProxiesRequest = {
     proxy_ids: Array<Id>;
 };
@@ -12014,6 +12051,49 @@ export type BatchCreateAdminProxiesResponses = {
 };
 
 export type BatchCreateAdminProxiesResponse = BatchCreateAdminProxiesResponses[keyof BatchCreateAdminProxiesResponses];
+
+export type TestAdminProxyData = {
+    body?: TestProxyRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/proxies/{id}/test';
+};
+
+export type TestAdminProxyErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type TestAdminProxyError = TestAdminProxyErrors[keyof TestAdminProxyErrors];
+
+export type TestAdminProxyResponses = {
+    /**
+     * Probe outcome.
+     */
+    200: ProxyTestResultResponse;
+};
+
+export type TestAdminProxyResponse = TestAdminProxyResponses[keyof TestAdminProxyResponses];
 
 export type BatchDeleteAdminProxiesData = {
     body: BatchDeleteProxiesRequest;
