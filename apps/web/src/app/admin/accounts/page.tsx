@@ -21,6 +21,7 @@ import { AccountDetailSheet } from "@/components/admin/account-detail-sheet";
 import { AccountTestDialog } from "@/components/features/account-test-dialog";
 import {
   useAdminAccounts,
+  useAdminGroups,
   useAdminModels,
   useAdminProviders,
   useAdminProxies,
@@ -128,6 +129,13 @@ function AccountsContent() {
   const healthSummary = useAccountsHealthSummary();
   const healthById = new Map(
     (healthSummary.data ?? []).map((h) => [h.account_id, h] as const),
+  );
+  // Group membership lookup: ProviderAccount carries group_ids only — resolve to
+  // names for the table cell. Cheap to keep around as a Map; useAdminGroups is
+  // already cached across the admin shell.
+  const groups = useAdminGroups();
+  const groupNameById = new Map(
+    (groups.data?.data ?? []).map((g) => [String(g.id), g.name] as const),
   );
 
   const [formTarget, setFormTarget] = useState<ProviderAccount | "new" | null>(null);
@@ -295,6 +303,32 @@ function AccountsContent() {
       render: (a) => (
         <span className="text-2xs text-srapi-text-tertiary">{runtimeClassLabel(t, a.runtime_class)}</span>
       ),
+    },
+    {
+      key: "groups",
+      header: t("adminAccounts.groups"),
+      hideOnMobile: true,
+      render: (a) => {
+        const ids = a.group_ids ?? [];
+        if (ids.length === 0) {
+          return <span className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.ungrouped")}</span>;
+        }
+        return (
+          <div className="flex flex-wrap gap-1">
+            {ids.map((id) => {
+              const name = groupNameById.get(String(id)) ?? `#${id}`;
+              return (
+                <span
+                  key={String(id)}
+                  className="inline-flex items-center rounded-md border border-srapi-border bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
+                >
+                  {name}
+                </span>
+              );
+            })}
+          </div>
+        );
+      },
     },
     {
       key: "status",

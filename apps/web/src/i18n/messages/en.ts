@@ -658,6 +658,8 @@ export const en = {
     provider: "Provider",
     allProviders: "All providers",
     type: "Type",
+    groups: "Groups",
+    ungrouped: "Ungrouped",
     models: "Models",
     test: "Test",
     viewCards: "Cards",

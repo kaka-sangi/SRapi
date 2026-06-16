@@ -655,6 +655,8 @@ export const zh: Messages = {
     provider: "服务商",
     allProviders: "全部服务商",
     type: "类型",
+    groups: "分组",
+    ungrouped: "未分组",
     models: "模型",
     test: "测试",
     viewCards: "卡片",
