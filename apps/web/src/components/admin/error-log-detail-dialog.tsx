@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { CopyButton } from "@/components/ui/copy-button";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { useAdminErrorLog } from "@/hooks/admin-queries";
@@ -93,9 +94,9 @@ function ErrorLogDetailBody({ detail }: { detail: ErrorLog }) {
 
       {/* Metadata grid */}
       <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-        <Field label={t("adminErrorLogs.requestId")} value={detail.request_id} mono />
+        <Field label={t("adminErrorLogs.requestId")} value={detail.request_id} mono copyable />
         <Field label={t("adminErrorLogs.model")} value={detail.model || "—"} />
-        <Field label={t("adminErrorLogs.sourceEndpoint")} value={detail.source_endpoint || "—"} mono />
+        <Field label={t("adminErrorLogs.sourceEndpoint")} value={detail.source_endpoint || "—"} mono copyable />
         <Field label={t("adminErrorLogs.protocol")} value={protocol} mono />
         <Field label={t("adminErrorLogs.latency")} value={formatLatency(detail.latency_ms)} mono />
         <Field label={t("adminErrorLogs.attempt")} value={formatInteger(detail.attempt_no)} mono />
@@ -111,18 +112,31 @@ function ErrorLogDetailBody({ detail }: { detail: ErrorLog }) {
 }
 
 /** Labelled metadata cell: caption above value, optional mono for ids/codes. */
-function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function Field({
+  label,
+  value,
+  mono,
+  copyable,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  copyable?: boolean;
+}) {
   return (
     <div className="min-w-0">
       <span className="font-medium text-srapi-text-tertiary">{label}</span>
-      <p
-        className={
-          "mt-0.5 break-all text-srapi-text-primary" +
-          (mono ? " font-mono text-2xs tabular" : " text-sm")
-        }
-      >
-        {value}
-      </p>
+      <div className="mt-0.5 flex items-start gap-1.5">
+        <p
+          className={
+            "min-w-0 break-all text-srapi-text-primary" +
+            (mono ? " font-mono text-2xs tabular" : " text-sm")
+          }
+        >
+          {value}
+        </p>
+        {copyable && value && value !== "—" ? <CopyButton value={value} size="inline" /> : null}
+      </div>
     </div>
   );
 }
