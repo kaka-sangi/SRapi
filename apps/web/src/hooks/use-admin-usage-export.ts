@@ -83,10 +83,17 @@ function triggerDownload(csv: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+export interface AdminUsageExportRange {
+  // Optional ISO timestamps forwarded as ?start=&end= so the CSV honours the
+  // window preset / explicit range the operator has applied to the table.
+  start?: string;
+  end?: string;
+}
+
 export interface UseAdminUsageExportResult {
   state: AdminUsageExportState;
   isExporting: boolean;
-  start: (filenameStamp?: string) => Promise<number>;
+  start: (filenameStamp?: string, range?: AdminUsageExportRange) => Promise<number>;
   reset: () => void;
 }
 
@@ -96,13 +103,19 @@ export function useAdminUsageExport(): UseAdminUsageExportResult {
 
   const reset = useCallback(() => setState(INITIAL), []);
 
-  const start = useCallback(async (filenameStamp?: string): Promise<number> => {
+  const start = useCallback(async (filenameStamp?: string, range?: AdminUsageExportRange): Promise<number> => {
     if (runningRef.current) return 0;
     runningRef.current = true;
     configureSDKClient();
     setState({ phase: "running", rows: 0 });
     try {
-      const response = await exportAdminUsage({ throwOnError: true });
+      const query: AdminUsageExportRange = {};
+      if (range?.start) query.start = range.start;
+      if (range?.end) query.end = range.end;
+      const response = await exportAdminUsage({
+        throwOnError: true,
+        query: Object.keys(query).length > 0 ? query : undefined,
+      });
       const logs = (response.data?.data?.logs ?? []) as UsageLog[];
       if (logs.length > 0) {
         const stamp = filenameStamp ?? new Date().toISOString().slice(0, 10);

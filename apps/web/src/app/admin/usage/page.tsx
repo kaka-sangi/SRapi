@@ -165,7 +165,12 @@ function UsageContent() {
   const usageExport = useAdminUsageExport();
 
   async function runExport() {
-    const rows = await usageExport.start();
+    // Honour the window preset the operator currently has on the table —
+    // exporting a 7-day filtered view and getting an all-time CSV would be
+    // a silent surprise.
+    const rows = await usageExport.start(undefined, {
+      start: sinceFilter,
+    });
     if (usageExport.state.phase === "error") {
       toast({ title: t("feedback.failed"), description: usageExport.state.error, tone: "error" });
       return;
