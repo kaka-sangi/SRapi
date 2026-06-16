@@ -37,6 +37,7 @@ export function ErrorLogsPanel() {
 
   const modelFilter = list.filters.model || undefined;
   const userFilter = list.filters.user || undefined;
+  const accountFilter = list.filters.account || undefined;
   const errorClassFilter = list.search || undefined;
   const windowFilter = list.filters.window;
   // Resolve the preset to an ISO timestamp the backend's start/end filter
@@ -48,6 +49,7 @@ export function ErrorLogsPanel() {
     page_size: list.pageSize,
     model: modelFilter,
     user_id: userFilter,
+    account_id: accountFilter,
     error_class: errorClassFilter,
     start: sinceFilter,
   });
@@ -66,7 +68,13 @@ export function ErrorLogsPanel() {
     (usersList.data?.data ?? []).map((u) => [String(u.id), u.email] as const),
   );
 
-  const isFiltered = Boolean(modelFilter || userFilter || errorClassFilter || windowFilter);
+  const isFiltered = Boolean(modelFilter || userFilter || accountFilter || errorClassFilter || windowFilter);
+  // Reuse the iter-56 accountLookup's underlying query.data for the dropdown
+  // (the panel already fetches it for the column render).
+  const accountOptions = (accountLookup.query.data?.data ?? []).map((a) => ({
+    value: String(a.id),
+    label: a.name,
+  }));
   const total = errorLogs.data?.pagination?.total ?? errorLogs.data?.data.length ?? 0;
 
   const emailFor = (e: ErrorLog) => userEmailById.get(String(e.user_id)) || String(e.user_id);
@@ -228,6 +236,12 @@ export function ErrorLogsPanel() {
               onChange={(v) => list.setFilter("user", v)}
               options={userOptions}
               allLabel={t("adminErrorLogs.allUsers")}
+            />
+            <FilterSelect
+              value={list.filters.account}
+              onChange={(v) => list.setFilter("account", v)}
+              options={accountOptions}
+              allLabel={t("adminAccounts.allAccounts")}
             />
             <FilterSelect
               value={list.filters.window}
