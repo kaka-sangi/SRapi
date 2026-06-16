@@ -6,6 +6,8 @@ import {
   deleteAdminUser,
   deleteAdminUserAttributeDefinition,
   listAdminUserAttributeDefinitions,
+  listAdminUserAttributeValues,
+  setAdminUserAttributeValue,
   updateAdminUserAttributeDefinition,
   listAdminUserPlatformQuotas,
   upsertAdminUserPlatformQuota,
@@ -19,12 +21,14 @@ import {
 import type {
   CreateUserAttributeDefinitionRequest,
   UserAttributeDefinition,
+  UserAttributeValue,
   UpdateUserAttributeDefinitionRequest,
   UserPlatformQuota,
   UpsertUserPlatformQuotaRequest,
   CreateAdminUserData,
   Id,
   ListAdminUsersData,
+  SetUserAttributeValueRequest,
   UpdateAdminUserData,
   UpdateUserBalanceRequest,
   User,
@@ -88,6 +92,26 @@ export const usersApi = {
   deleteUserAttributeDefinition(id: Id): Promise<{ deleted: boolean }> {
     return unwrapData(() =>
       deleteAdminUserAttributeDefinition({ path: { id }, throwOnError: true }),
+    );
+  },
+
+  listUserAttributeValues(userId: Id): Promise<AdminListResult<UserAttributeValue>> {
+    return unwrapList(() =>
+      listAdminUserAttributeValues({ path: { id: userId }, throwOnError: true }),
+    );
+  },
+
+  setUserAttributeValue(
+    userId: Id,
+    definitionId: Id,
+    body: SetUserAttributeValueRequest,
+  ): Promise<{ definition_id: number; value: string; updated_at?: string }> {
+    return unwrapData(() =>
+      setAdminUserAttributeValue({
+        path: { id: userId, definitionId },
+        body,
+        throwOnError: true,
+      }),
     );
   },
 

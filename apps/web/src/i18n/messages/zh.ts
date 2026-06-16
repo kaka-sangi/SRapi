@@ -642,9 +642,16 @@ export const zh: Messages = {
     adjustBalance: "调整余额",
     balanceHistory: "余额记录",
     platformQuotas: "平台配额",
+    attributes: "自定义属性",
     amount: "金额",
     operation: "操作",
     note: "备注",
+  },
+  adminUserAttributeValues: {
+    title: "自定义属性",
+    subtitle: "为 {user} 设置自定义属性值。",
+    empty: "尚未定义自定义属性,请先到 /admin/identity 定义。",
+    required: "{name} 是必填项。",
   },
   adminAccounts: {
     title: "上游账号",

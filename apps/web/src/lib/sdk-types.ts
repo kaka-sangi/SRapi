@@ -33,6 +33,7 @@ export type {
   AdminPaymentDashboardTotals,
   AdminPaymentMethodBreakdown,
   AdminPaymentTopUser,
+  UserAttributeValue,
   UsageLog,
   UsageCleanupRequest,
   UsageCleanupResult,

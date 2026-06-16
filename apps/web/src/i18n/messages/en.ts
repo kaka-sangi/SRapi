@@ -645,9 +645,16 @@ export const en = {
     adjustBalance: "Adjust balance",
     balanceHistory: "Balance history",
     platformQuotas: "Platform quotas",
+    attributes: "Custom attributes",
     amount: "Amount",
     operation: "Operation",
     note: "Note",
+  },
+  adminUserAttributeValues: {
+    title: "Custom attributes",
+    subtitle: "Set custom attribute values for {user}.",
+    empty: "No custom attribute definitions exist yet. Define them at /admin/identity first.",
+    required: "{name} is required.",
   },
   adminAccounts: {
     title: "Provider accounts",

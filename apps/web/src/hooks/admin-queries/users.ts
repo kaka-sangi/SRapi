@@ -150,3 +150,20 @@ export function useDeleteUserAttributeDefinition() {
     ["admin", "user-attributes"],
   );
 }
+
+// ---- Per-user attribute values ----
+export function useUserAttributeValues(userId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.admin.userAttributeValues(userId ?? ""),
+    queryFn: () => adminApi.listUserAttributeValues(userId as string),
+    enabled: Boolean(userId),
+  });
+}
+
+export function useSetUserAttributeValue(userId: string) {
+  return useAdminMutation(
+    (vars: { definitionId: string; body: Parameters<typeof adminApi.setUserAttributeValue>[2] }) =>
+      adminApi.setUserAttributeValue(userId, vars.definitionId, vars.body),
+    ["admin", "user-attribute-values", userId],
+  );
+}

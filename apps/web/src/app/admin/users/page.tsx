@@ -9,6 +9,7 @@ import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { UserPlatformQuotasDialog } from "@/components/admin/user-platform-quotas-dialog";
 import { UserBalanceHistoryDialog } from "@/components/admin/user-balance-history-dialog";
+import { UserAttributeValuesDialog } from "@/components/admin/user-attribute-values-dialog";
 import { ListToolbar, SearchInput, FilterSelect } from "@/components/admin/list-toolbar";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useAdminList } from "@/hooks/use-admin-list";
@@ -85,6 +86,7 @@ function UsersContent() {
   const [balanceTarget, setBalanceTarget] = useState<User | null>(null);
   const [historyTarget, setHistoryTarget] = useState<User | null>(null);
   const [quotaTarget, setQuotaTarget] = useState<User | null>(null);
+  const [attributesTarget, setAttributesTarget] = useState<User | null>(null);
   const [disableTarget, setDisableTarget] = useState<User | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
@@ -276,6 +278,7 @@ function UsersContent() {
               { label: t("adminUsers.adjustBalance"), onSelect: () => setBalanceTarget(u) },
               { label: t("adminUsers.balanceHistory"), onSelect: () => setHistoryTarget(u) },
               { label: t("adminUsers.platformQuotas"), onSelect: () => setQuotaTarget(u) },
+              { label: t("adminUsers.attributes"), onSelect: () => setAttributesTarget(u) },
               {
                 label: u.status === "disabled" ? t("adminUsers.enable") : t("adminUsers.disable"),
                 destructive: u.status !== "disabled",
@@ -362,6 +365,14 @@ function UsersContent() {
           userId={quotaTarget.id}
           userLabel={quotaTarget.email}
           onClose={() => setQuotaTarget(null)}
+        />
+      ) : null}
+
+      {attributesTarget ? (
+        <UserAttributeValuesDialog
+          userId={attributesTarget.id}
+          userLabel={attributesTarget.email}
+          onClose={() => setAttributesTarget(null)}
         />
       ) : null}
 
