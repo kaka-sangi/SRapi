@@ -78,6 +78,12 @@ export function useUpdateAdminApiKey() {
     ["admin", "api-keys"],
   );
 }
+export function useResetAdminApiKeyUsage() {
+  return useAdminMutation(
+    (id: string) => adminApi.resetAdminApiKeyUsage(id),
+    ["admin", "api-keys"],
+  );
+}
 export function useAdminApiKeyUsage(id: string | null, days: number, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.admin.apiKeyUsage(id ?? "", days),

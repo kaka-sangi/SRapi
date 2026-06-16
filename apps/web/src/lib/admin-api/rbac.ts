@@ -9,6 +9,7 @@ import {
   updateAdminRole,
   listAdminApiKeys as listAdminApiKeysFn,
   getAdminApiKeyUsage as getAdminApiKeyUsageFn,
+  resetAdminApiKeyUsage,
 } from "../../../../../packages/sdk/typescript/src/index";
 import type {
   AdminUpdateApiKeyRequest,
@@ -51,6 +52,13 @@ export const rbacApi = {
 
   updateAdminApiKey(id: Id, body: AdminUpdateApiKeyRequest): Promise<ApiKey> {
     return unwrapData(() => updateAdminApiKey({ path: { id }, body, throwOnError: true }));
+  },
+
+  // Admin recovery: zero the key's rolling cost-used counters so it can serve
+  // again after tripping its quota. Single-UPDATE on the backend so it can't
+  // race with concurrent ApplyCostUsage.
+  resetAdminApiKeyUsage(id: Id): Promise<ApiKey> {
+    return unwrapData(() => resetAdminApiKeyUsage({ path: { id }, throwOnError: true }));
   },
 
   // The usage envelope is returned bare (no { data } wrapper), so call directly.

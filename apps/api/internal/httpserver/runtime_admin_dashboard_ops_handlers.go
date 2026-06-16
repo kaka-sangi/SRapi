@@ -154,7 +154,11 @@ func (s *Server) handleAdminOpsConcurrency(w http.ResponseWriter, r *http.Reques
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpsConcurrencyResponse{
 		Data: apiopenapi.OpsConcurrency{
-			ActiveGatewayRequests: 0,
+			// Live count of pending scheduler leases — the same gauge the
+			// Prometheus exporter publishes as srapi_gateway_inflight_requests
+			// (runtime_metrics.go:354). Previously hardcoded to 0, which made
+			// the ops dashboard's "in-flight" tile permanently say zero.
+			ActiveGatewayRequests: s.runtime.scheduler.ActiveLeaseCount(r.Context()),
 			ActiveRealtimeSlots:   active.Snapshot.ActiveSlots,
 			ActiveByApiKey:        byKey,
 		},

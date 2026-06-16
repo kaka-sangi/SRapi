@@ -106,6 +106,24 @@ func (s *Store) Update(_ context.Context, key contract.APIKey) (contract.APIKey,
 	return key, nil
 }
 
+func (s *Store) ResetUsage(_ context.Context, id int) (contract.APIKey, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, ok := s.byID[id]
+	if !ok {
+		return contract.APIKey{}, contract.ErrKeyNotFound
+	}
+	key.CostUsed = "0"
+	key.CostUsed5h = "0"
+	key.CostWindowStart5h = nil
+	key.CostUsed1d = "0"
+	key.CostWindowStart1d = nil
+	key.CostUsed7d = "0"
+	key.CostWindowStart7d = nil
+	s.byID[id] = key
+	return key, nil
+}
+
 func (s *Store) Delete(_ context.Context, id int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

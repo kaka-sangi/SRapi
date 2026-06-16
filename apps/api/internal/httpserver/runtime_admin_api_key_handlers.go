@@ -123,6 +123,43 @@ func (s *Server) handleUpdateAdminApiKey(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// handleResetAdminApiKeyUsage zeros the rolling cost-used counters
+// (cost_used, cost_used_5h, cost_used_1d, cost_used_7d) and clears their
+// window-start timestamps so the key resumes from a clean slate. Admin
+// recovery action — e.g. after a runaway client tripped the quota.
+func (s *Server) handleResetAdminApiKeyUsage(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	keyID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || keyID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid api key id", requestID)
+		return
+	}
+	existing, err := s.runtime.apiKeys.GetByID(r.Context(), keyID)
+	if err != nil {
+		s.writeAdminApiKeyError(w, err, requestID)
+		return
+	}
+	updated, err := s.runtime.apiKeys.ResetUsage(r.Context(), keyID)
+	if err != nil {
+		s.writeAdminApiKeyError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "admin_api_key.reset_usage", "api_key", strconv.Itoa(keyID), apiKeyAuditSnapshot(existing), apiKeyAuditSnapshot(updated)))
+	writeJSONAny(w, http.StatusOK, apiopenapi.ApiKeyResponse{
+		Data:      s.toAdminAPIKey(r, updated),
+		RequestId: requestID,
+	})
+}
+
 // toAdminAPIKey maps a key to the API shape and attaches owner attribution
 // (user_id always, email when the owner is resolvable).
 func (s *Server) toAdminAPIKey(r *http.Request, key apikeycontract.APIKey) apiopenapi.ApiKey {

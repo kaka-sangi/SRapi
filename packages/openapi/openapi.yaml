@@ -3360,6 +3360,48 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/api-keys/{id}/reset-usage:
+    post:
+      tags:
+        - AdminUsers
+      operationId: resetAdminApiKeyUsage
+      summary: Reset an API key's rolling usage counters.
+      description: |
+        Zeros cost_used, cost_used_5h, cost_used_1d and cost_used_7d and
+        clears their window-start timestamps. Admin recovery action — e.g.
+        after a runaway client tripped the quota. Done in a single UPDATE so
+        it cannot lose a race against an in-flight ApplyCostUsage.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: API key usage reset.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/api-keys/{id}/usage:
     get:
       tags:

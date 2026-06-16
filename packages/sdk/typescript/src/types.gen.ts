@@ -9839,6 +9839,45 @@ export type UpdateAdminApiKeyResponses = {
 
 export type UpdateAdminApiKeyResponse = UpdateAdminApiKeyResponses[keyof UpdateAdminApiKeyResponses];
 
+export type ResetAdminApiKeyUsageData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/api-keys/{id}/reset-usage';
+};
+
+export type ResetAdminApiKeyUsageErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ResetAdminApiKeyUsageError = ResetAdminApiKeyUsageErrors[keyof ResetAdminApiKeyUsageErrors];
+
+export type ResetAdminApiKeyUsageResponses = {
+    /**
+     * API key usage reset.
+     */
+    200: ApiKeyResponse;
+};
+
+export type ResetAdminApiKeyUsageResponse = ResetAdminApiKeyUsageResponses[keyof ResetAdminApiKeyUsageResponses];
+
 export type GetAdminApiKeyUsageData = {
     body?: never;
     path: {

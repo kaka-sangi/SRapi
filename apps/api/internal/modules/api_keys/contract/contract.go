@@ -116,6 +116,11 @@ type Store interface {
 	ListByUser(ctx context.Context, userID int) ([]APIKey, error)
 	TouchLastUsed(ctx context.Context, id int, usedAt time.Time) error
 	ApplyCostUsage(ctx context.Context, input CostUsageUpdate) (APIKey, error)
+	// ResetUsage zeros the rolling cost-used counters and clears their window
+	// starts so the next charge opens a fresh window. Used by admins to
+	// recover a key that has bumped against its quota due to a runaway client
+	// or after debugging. A single UPDATE so it can't race with ApplyCostUsage.
+	ResetUsage(ctx context.Context, id int) (APIKey, error)
 }
 
 type CreateStoredKey struct {

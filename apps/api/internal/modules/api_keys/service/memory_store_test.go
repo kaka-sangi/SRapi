@@ -166,6 +166,24 @@ func (s *memoryStore) ApplyCostUsage(_ context.Context, input contract.CostUsage
 	return key, nil
 }
 
+func (s *memoryStore) ResetUsage(_ context.Context, id int) (contract.APIKey, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, ok := s.byID[id]
+	if !ok {
+		return contract.APIKey{}, ErrKeyNotFound
+	}
+	key.CostUsed = "0"
+	key.CostUsed5h = "0"
+	key.CostWindowStart5h = nil
+	key.CostUsed1d = "0"
+	key.CostWindowStart1d = nil
+	key.CostUsed7d = "0"
+	key.CostWindowStart7d = nil
+	s.byID[key.ID] = key
+	return key, nil
+}
+
 func (s *memoryStore) setStatus(prefix string, status contract.Status) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -134,6 +134,20 @@ func (s *Service) Delete(ctx context.Context, userID, keyID int) error {
 	return s.store.Delete(ctx, keyID)
 }
 
+// ResetUsage zeros the rolling cost-used counters on an API key (admin-only
+// recovery action). Delegates to the store, which does it in a single UPDATE
+// so the reset can't lose a race against an in-flight ApplyCostUsage.
+func (s *Service) ResetUsage(ctx context.Context, keyID int) (contract.APIKey, error) {
+	if keyID <= 0 {
+		return contract.APIKey{}, ErrInvalidInput
+	}
+	key, err := s.store.ResetUsage(ctx, keyID)
+	if err != nil {
+		return contract.APIKey{}, err
+	}
+	return withoutHash(key), nil
+}
+
 func (s *Service) ListByUser(ctx context.Context, userID int) ([]contract.APIKey, error) {
 	if userID <= 0 {
 		return nil, ErrInvalidInput

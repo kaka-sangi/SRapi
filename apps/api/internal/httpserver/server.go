@@ -428,6 +428,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("DELETE /api/v1/admin/roles/{id}", server.handleDeleteAdminRole)
 	mux.HandleFunc("GET /api/v1/admin/api-keys", server.handleListAdminApiKeys)
 	mux.HandleFunc("PATCH /api/v1/admin/api-keys/{id}", server.handleUpdateAdminApiKey)
+	mux.HandleFunc("POST /api/v1/admin/api-keys/{id}/reset-usage", server.handleResetAdminApiKeyUsage)
 	mux.HandleFunc("GET /api/v1/admin/api-keys/{id}/usage", server.handleAdminApiKeyUsage)
 	mux.HandleFunc("GET /api/v1/admin/users", server.handleListAdminUsers)
 	mux.HandleFunc("POST /api/v1/admin/users", server.handleCreateAdminUser)

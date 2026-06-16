@@ -17748,6 +17748,9 @@ type ServerInterface interface {
 	// Update an API key as an admin (e.g. revoke by disabling).
 	// (PATCH /api/v1/admin/api-keys/{id})
 	UpdateAdminApiKey(w http.ResponseWriter, r *http.Request, id Id)
+	// Reset an API key's rolling usage counters.
+	// (POST /api/v1/admin/api-keys/{id}/reset-usage)
+	ResetAdminApiKeyUsage(w http.ResponseWriter, r *http.Request, id Id)
 	// Get the usage drilldown for any API key as an admin.
 	// (GET /api/v1/admin/api-keys/{id}/usage)
 	GetAdminApiKeyUsage(w http.ResponseWriter, r *http.Request, id Id, params GetAdminApiKeyUsageParams)
@@ -21291,6 +21294,40 @@ func (siw *ServerInterfaceWrapper) UpdateAdminApiKey(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAdminApiKey(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResetAdminApiKeyUsage operation middleware
+func (siw *ServerInterfaceWrapper) ResetAdminApiKeyUsage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResetAdminApiKeyUsage(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -31961,6 +31998,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/announcements/{id}/reads", wrapper.GetAdminAnnouncementReadStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/api-keys", wrapper.ListAdminApiKeys)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/api-keys/{id}", wrapper.UpdateAdminApiKey)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/api-keys/{id}/reset-usage", wrapper.ResetAdminApiKeyUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/api-keys/{id}/usage", wrapper.GetAdminApiKeyUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/audit-logs", wrapper.ListAdminAuditLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/billing-ledger", wrapper.ListAdminBillingLedger)

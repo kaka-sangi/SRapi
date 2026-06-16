@@ -148,6 +148,30 @@ func (s *Store) Update(ctx context.Context, key contract.APIKey) (contract.APIKe
 	return s.FindByPrefix(ctx, stored.Prefix)
 }
 
+// ResetUsage zeros the rolling cost-used counters in a single UPDATE so it
+// can't lose a race against ApplyCostUsage (which would otherwise increment
+// between a FindByID + Update pair). Clears the window-start timestamps too —
+// the next charge opens a fresh rolling window.
+func (s *Store) ResetUsage(ctx context.Context, id int) (contract.APIKey, error) {
+	n, err := s.client.APIKey.Update().
+		Where(entapikey.IDEQ(id), entapikey.DeletedAtIsNil()).
+		SetCostUsed("0").
+		SetCostUsed5h("0").
+		ClearCostWindowStart5h().
+		SetCostUsed1d("0").
+		ClearCostWindowStart1d().
+		SetCostUsed7d("0").
+		ClearCostWindowStart7d().
+		Save(ctx)
+	if err != nil {
+		return contract.APIKey{}, err
+	}
+	if n == 0 {
+		return contract.APIKey{}, contract.ErrKeyNotFound
+	}
+	return s.FindByID(ctx, id)
+}
+
 func (s *Store) Delete(ctx context.Context, id int) error {
 	now := time.Now().UTC()
 	n, err := s.client.APIKey.Update().

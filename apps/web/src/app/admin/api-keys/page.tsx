@@ -15,7 +15,7 @@ import { ColumnToggle } from "@/components/ui/column-toggle";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
-import { useAdminApiKeys, useUpdateAdminApiKey } from "@/hooks/admin-queries";
+import { useAdminApiKeys, useResetAdminApiKeyUsage, useUpdateAdminApiKey } from "@/hooks/admin-queries";
 import { ApiKeyUsageDialog } from "@/components/features/api-key-usage-dialog";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -52,7 +52,9 @@ function ApiKeysContent() {
     status: statusFilter,
   });
   const updateMut = useUpdateAdminApiKey();
+  const resetUsageMut = useResetAdminApiKeyUsage();
   const [revokeTarget, setRevokeTarget] = useState<ApiKey | null>(null);
+  const [resetUsageTarget, setResetUsageTarget] = useState<ApiKey | null>(null);
   const [usageTarget, setUsageTarget] = useState<ApiKey | null>(null);
 
   async function enableKey(key: ApiKey) {
@@ -170,6 +172,7 @@ function ApiKeysContent() {
           <RowActionsMenu
             actions={[
               { label: t("apiKeys.usageAction"), onSelect: () => setUsageTarget(k) },
+              { label: t("adminApiKeys.resetUsage"), onSelect: () => setResetUsageTarget(k) },
               ...(k.status === "expired"
                 ? []
                 : k.status === "disabled"
@@ -213,6 +216,25 @@ function ApiKeysContent() {
           }
           successMessage={t("feedback.saved")}
           isPending={updateMut.isPending}
+        />
+      ) : null}
+
+      {resetUsageTarget ? (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setResetUsageTarget(null);
+          }}
+          tone="default"
+          title={t("adminApiKeys.resetUsageTitle")}
+          body={t("adminApiKeys.resetUsageBody", {
+            name: resetUsageTarget.name,
+            prefix: resetUsageTarget.prefix,
+          })}
+          confirmLabel={t("adminApiKeys.resetUsage")}
+          onConfirm={() => resetUsageMut.mutateAsync(String(resetUsageTarget.id))}
+          successMessage={t("feedback.saved")}
+          isPending={resetUsageMut.isPending}
         />
       ) : null}
     </>
