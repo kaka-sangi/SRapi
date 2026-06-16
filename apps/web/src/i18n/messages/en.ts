@@ -2298,6 +2298,7 @@ export const en = {
   adminPayments: {
     title: "Payment providers",
     subtitle: "Payment channels that orders are charged through.",
+    searchPlaceholder: "Search name, slug, method…",
     create: "New payment provider",
     edit: "Edit payment provider",
     test: "Test configuration",

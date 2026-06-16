@@ -8,6 +8,7 @@ import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import { ColumnToggle } from "@/components/ui/column-toggle";
+import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -341,6 +342,27 @@ export function PaymentProvidersPanel() {
         minWidth={520}
         sort={list.sort}
         onSort={list.toggleSort}
+        isFiltered={Boolean(list.search || list.filters.status)}
+        onClearFilters={list.clearFilters}
+        toolbar={
+          <ListToolbar>
+            <SearchInput
+              value={list.searchInput}
+              onChange={list.setSearchInput}
+              placeholder={t("adminPayments.searchPlaceholder")}
+            />
+            <FilterSelect
+              value={list.filters.status}
+              onChange={(v) => list.setFilter("status", v)}
+              options={[
+                { value: "active", label: t("common.active") },
+                { value: "disabled", label: t("common.disabled") },
+                { value: "archived", label: t("common.archived") },
+              ]}
+              allLabel={t("adminCommon.allStatuses")}
+            />
+          </ListToolbar>
+        }
         pagination={{
           page: list.page,
           pageSize: list.pageSize,

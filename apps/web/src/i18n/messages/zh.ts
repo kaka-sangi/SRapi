@@ -2284,6 +2284,7 @@ export const zh: Messages = {
   adminPayments: {
     title: "支付渠道",
     subtitle: "订单计费所经过的支付渠道。",
+    searchPlaceholder: "搜索名称、标识、方式…",
     create: "新建支付渠道",
     edit: "编辑支付渠道",
     test: "测试配置",
