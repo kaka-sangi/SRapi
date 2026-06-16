@@ -11,10 +11,11 @@ import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
-import { useAdminErrorLogs, useAdminModels, useAdminUsers } from "@/hooks/admin-queries";
+import { useAdminErrorLogs, useAdminModels } from "@/hooks/admin-queries";
 import { useAccountNameLookup } from "@/hooks/use-account-name-lookup";
 import { useApiKeyNameLookup } from "@/hooks/use-api-key-name-lookup";
 import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
+import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatLatency } from "@/lib/admin-format";
 import type { ErrorLog } from "@/lib/sdk-types";
@@ -55,18 +56,18 @@ export function ErrorLogsPanel() {
   });
 
   const models = useAdminModels({ page: 1, page_size: 100 });
-  const usersList = useAdminUsers({ page: 1, page_size: 100 });
+  const userLookup = useUserEmailLookup();
   const modelOptions = (models.data?.data ?? []).map((m) => ({
     value: m.canonical_name,
     label: m.canonical_name,
   }));
-  const userOptions = (usersList.data?.data ?? []).map((u) => ({
+  // Both userOptions and the row email rendering come from the same shared
+  // lookup. Bumps the dropdown from 100 to the hook's 200-row window for
+  // free (more emails visible without changing the rendering contract).
+  const userOptions = (userLookup.query.data?.data ?? []).map((u) => ({
     value: String(u.id),
     label: u.email,
   }));
-  const userEmailById = new Map(
-    (usersList.data?.data ?? []).map((u) => [String(u.id), u.email] as const),
-  );
 
   const isFiltered = Boolean(modelFilter || userFilter || accountFilter || errorClassFilter || windowFilter);
   // Reuse the iter-56 accountLookup's underlying query.data for the dropdown
@@ -77,7 +78,7 @@ export function ErrorLogsPanel() {
   }));
   const total = errorLogs.data?.pagination?.total ?? errorLogs.data?.data.length ?? 0;
 
-  const emailFor = (e: ErrorLog) => userEmailById.get(String(e.user_id)) || String(e.user_id);
+  const emailFor = (e: ErrorLog) => userLookup.get(e.user_id);
   const openDetail = (e: ErrorLog) => setDetail({ id: e.id, email: emailFor(e) });
 
   const columns: Column<ErrorLog>[] = [
