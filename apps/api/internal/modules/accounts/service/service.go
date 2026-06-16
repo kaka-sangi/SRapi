@@ -580,16 +580,31 @@ func (s *Service) Update(ctx context.Context, id int, req contract.UpdateRequest
 }
 
 func (s *Service) BatchUpdateStatus(ctx context.Context, ids []int, status contract.Status) contract.BatchUpdateResult {
+	return s.BatchUpdateFields(ctx, ids, contract.UpdateRequest{Status: &status})
+}
+
+// BatchUpdateFields applies a partial UpdateRequest across many provider
+// accounts. Each non-nil field is passed through to Service.Update per id;
+// per-account failures collect in Errors without aborting the batch. Callers
+// requiring strict atomic semantics (all-or-nothing) must validate inputs
+// up-front since this is a best-effort multi-call wrapper. Used by the
+// admin /accounts/batch endpoint, which carries status + optional
+// scheduler-tier fields (priority/weight/risk_level) in one request.
+func (s *Service) BatchUpdateFields(ctx context.Context, ids []int, req contract.UpdateRequest) contract.BatchUpdateResult {
 	result := contract.BatchUpdateResult{
 		Updated: make([]contract.ProviderAccount, 0, len(ids)),
 		Errors:  make([]string, 0),
 	}
-	if len(ids) == 0 || !validAccountStatus(status) {
+	if len(ids) == 0 {
+		result.Errors = append(result.Errors, ErrInvalidInput.Error())
+		return result
+	}
+	if req.Status != nil && !validAccountStatus(*req.Status) {
 		result.Errors = append(result.Errors, ErrInvalidInput.Error())
 		return result
 	}
 	for _, id := range ids {
-		updated, err := s.Update(ctx, id, contract.UpdateRequest{Status: &status})
+		updated, err := s.Update(ctx, id, req)
 		if err != nil {
 			result.Errors = append(result.Errors, strings.TrimSpace(err.Error()))
 			continue

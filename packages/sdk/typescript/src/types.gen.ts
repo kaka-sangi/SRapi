@@ -1980,6 +1980,31 @@ export type CodexSessionImportResponse = {
 export type BatchUpdateAccountsRequest = {
     account_ids: Array<Id>;
     status: ProviderAccountStatus;
+    /**
+     * Optional — when present, the scheduler-tier priority is set across
+     * every selected account. Higher = preferred. Omit to leave priority
+     * unchanged. Useful for re-tiering an entire group of accounts at
+     * once after a quality re-evaluation.
+     *
+     */
+    priority?: number;
+    /**
+     * Optional — when present, the load-balancer weight is set across
+     * every selected account. Omit to leave weight unchanged. Useful
+     * for re-balancing traffic across a tenant's accounts in one
+     * operation.
+     *
+     */
+    weight?: number;
+    /**
+     * Optional — when present, the risk-level label is set across every
+     * selected account. Omit to leave risk_level unchanged. The label
+     * feeds the content-safety gate; bulk-setting is dangerous on a
+     * heterogeneous selection (e.g. mixing personal + pooled accounts)
+     * — pair with an admin confirm step in the UI.
+     *
+     */
+    risk_level?: string;
 };
 
 export type BatchAccountActionRequest = {

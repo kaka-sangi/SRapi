@@ -1155,18 +1155,46 @@ func (s *Server) handleBatchUpdateAdminAccounts(w http.ResponseWriter, r *http.R
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account ids", requestID)
 		return
 	}
-	result := s.runtime.accounts.BatchUpdateStatus(r.Context(), accountIDs, accountcontract.Status(body.Status))
+	// Build the partial UpdateRequest from the body. Status is required by
+	// the spec (kept for back-compat with the original status-only callers);
+	// priority/weight/risk_level were added in the widening pass and are
+	// applied only when present.
+	status := accountcontract.Status(body.Status)
+	updateReq := accountcontract.UpdateRequest{Status: &status}
+	if body.Priority != nil {
+		p := *body.Priority
+		updateReq.Priority = &p
+	}
+	if body.Weight != nil {
+		w := *body.Weight
+		updateReq.Weight = &w
+	}
+	if body.RiskLevel != nil {
+		rl := *body.RiskLevel
+		updateReq.RiskLevel = &rl
+	}
+	result := s.runtime.accounts.BatchUpdateFields(r.Context(), accountIDs, updateReq)
 	updatedIDs := make([]apiopenapi.Id, 0, len(result.Updated))
 	for _, updated := range result.Updated {
 		updatedIDs = append(updatedIDs, apiopenapi.Id(strconv.Itoa(updated.ID)))
 	}
-	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.batch_update", "provider_account", "bulk", nil, map[string]any{
+	auditDelta := map[string]any{
 		"account_ids":   accountIDs,
 		"status":        body.Status,
 		"updated_ids":   updatedIDs,
 		"updated_count": len(updatedIDs),
 		"errors":        result.Errors,
-	}))
+	}
+	if body.Priority != nil {
+		auditDelta["priority"] = *body.Priority
+	}
+	if body.Weight != nil {
+		auditDelta["weight"] = *body.Weight
+	}
+	if body.RiskLevel != nil {
+		auditDelta["risk_level"] = *body.RiskLevel
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.batch_update", "provider_account", "bulk", nil, auditDelta))
 	writeJSONAny(w, http.StatusOK, apiopenapi.BatchUpdateAccountsResponse{
 		Data: apiopenapi.BatchUpdateAccountsResult{
 			Errors:       result.Errors,
