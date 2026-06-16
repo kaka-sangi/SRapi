@@ -100,6 +100,7 @@ export const queryKeys = {
     paymentProviders: (params?: unknown) => ["admin", "payment-providers", params ?? {}] as const,
     paymentOrders: (params?: unknown) => ["admin", "payment-orders", params ?? {}] as const,
     paymentOrderAuditLogs: (id: string) => ["admin", "payment-orders", id, "audit-logs"] as const,
+    paymentDashboard: (days?: number) => ["admin", "payment-dashboard", days ?? 30] as const,
     subscriptionPlans: (params?: unknown) =>
       ["admin", "subscription-plans", params ?? {}] as const,
     userSubscriptions: (params?: unknown) =>

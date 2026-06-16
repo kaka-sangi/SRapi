@@ -12,6 +12,13 @@ export function useAdminPaymentOrders(params?: P<typeof adminApi.listPaymentOrde
   });
 }
 
+export function useAdminPaymentDashboard(days?: number) {
+  return useQuery({
+    queryKey: queryKeys.admin.paymentDashboard(days),
+    queryFn: () => adminApi.getPaymentDashboard(days),
+  });
+}
+
 export function useAdminPaymentOrderAuditLogs(id: string | null) {
   return useQuery({
     queryKey: queryKeys.admin.paymentOrderAuditLogs(id ?? ""),

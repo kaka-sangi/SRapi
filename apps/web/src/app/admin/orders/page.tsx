@@ -40,6 +40,7 @@ import {
   type RefundOrderFormState,
 } from "@/lib/admin-orders-form";
 import type { PaymentAuditLog, PaymentOrder } from "@/lib/sdk-types";
+import { PaymentDashboardPanel } from "./_panels/payment-dashboard-panel";
 
 export default function AdminOrdersPage() {
   return (
@@ -152,6 +153,7 @@ function OrdersContent() {
         description={t("adminOrders.subtitle")}
         actions={all.data ? <ListCount total={total} /> : undefined}
       />
+      <PaymentDashboardPanel />
       <AdminListView
         query={orders}
         columns={columns}

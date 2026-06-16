@@ -4,6 +4,7 @@ import {
   bulkImportAdminPricingRules,
   createAdminPaymentProvider,
   deleteAdminPaymentProvider,
+  getAdminPaymentDashboard,
   createAdminPricingRule,
   updateAdminPricingRule,
   deleteAdminPricingRule,
@@ -35,6 +36,7 @@ import {
   updateAdminPromoCode,
 } from "../../../../../packages/sdk/typescript/src/index";
 import type {
+  AdminPaymentDashboard,
   AdminTestResult,
   PromoCodeUsage,
   BulkImportAdminPricingRulesData,
@@ -110,6 +112,15 @@ export const paymentsApi = {
   refundPaymentOrder(id: Id, body: Parameters<typeof refundAdminPaymentOrder>[0]["body"]): Promise<PaymentOrder> {
     return unwrapData(() =>
       refundAdminPaymentOrder({ path: { id }, body, throwOnError: true }),
+    );
+  },
+
+  getPaymentDashboard(days?: number): Promise<AdminPaymentDashboard> {
+    return unwrapData(() =>
+      getAdminPaymentDashboard({
+        query: typeof days === "number" ? { days } : undefined,
+        throwOnError: true,
+      }),
     );
   },
 
