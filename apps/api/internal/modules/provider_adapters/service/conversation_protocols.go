@@ -565,6 +565,18 @@ func (r geminiGenerateContentResponse) StopReason() contract.StopReason {
 }
 
 func geminiContentPart(part geminiPart) (contract.ContentPart, bool) {
+	if part.Thought {
+		// Gemini marks reasoning parts with thought:true. Surface them as a
+		// thinking block (carrying any thoughtSignature) instead of leaking the
+		// chain-of-thought to the client as visible assistant text. An empty-text
+		// part that only carries a signature still emits a thinking block so the
+		// orphan signature can be passed back upstream on the next turn.
+		metadata := geminiPartMetadata(part)
+		if strings.TrimSpace(part.Text) == "" && len(metadata) == 0 {
+			return contract.ContentPart{}, false
+		}
+		return contract.ContentPart{Kind: contract.ContentPartThinking, Text: part.Text, Metadata: metadata, OriginProtocol: "gemini"}, true
+	}
 	if text := strings.TrimSpace(part.Text); text != "" {
 		metadata := geminiPartMetadata(part)
 		return contract.ContentPart{Kind: contract.ContentPartText, Text: part.Text, Metadata: metadata, OriginProtocol: "gemini"}, true
