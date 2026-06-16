@@ -115,6 +115,85 @@ func TestGatewayChatCompletionsStreamsSameProtocolSSEIncrementally(t *testing.T)
 	}
 }
 
+// TestGatewayChatCompletionsToAnthropicStreamsTransformedIncrementally proves the
+// universal cross-protocol streaming pipeline (pair 9): a /v1/chat/completions
+// client backed by an Anthropic-compatible upstream receives correctly-shaped
+// chat.completion.chunk SSE — transcoded on the fly from the upstream Anthropic
+// Messages SSE via the canonical pipeline — and incrementally (the first chunk
+// is flushed before the upstream produced the rest), NOT the raw Anthropic
+// events (which a chat client cannot parse) and NOT a buffered single response.
+func TestGatewayChatCompletionsToAnthropicStreamsTransformedIncrementally(t *testing.T) {
+	am := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"model\":\"claude\",\"usage\":{\"input_tokens\":5,\"output_tokens\":0}}}\n\n" +
+		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n" +
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}\n\n"
+	rest := "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" world\"}}\n\n" +
+		"event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n" +
+		"event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":2}}\n\n" +
+		"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+
+	release := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		_, _ = io.WriteString(w, am)
+		if flusher != nil {
+			flusher.Flush()
+		}
+		select {
+		case <-release:
+		case <-time.After(2 * time.Second):
+		}
+		_, _ = io.WriteString(w, rest)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"x-anthropic-up","display_name":"Anthropic Up","adapter_type":"anthropic-compatible","protocol":"anthropic-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"pair9-model","display_name":"Pair9","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"claude-up","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"pair9-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"pair9-model","stream":true,"messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	rec := &flushCapturingWriter{header: http.Header{}, release: release}
+	handler.ServeHTTP(rec, req)
+
+	if rec.code != 0 && rec.code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.code, rec.body.String())
+	}
+	body := rec.body.String()
+	if !strings.Contains(body, "chat.completion.chunk") {
+		t.Fatalf("expected transcoded chat.completion.chunk SSE, got:\n%s", body)
+	}
+	// Raw Anthropic events must NOT leak to the chat client.
+	if strings.Contains(body, "message_start") || strings.Contains(body, "content_block_delta") {
+		t.Fatalf("raw Anthropic SSE leaked to the chat client instead of being transcoded:\n%s", body)
+	}
+	for _, want := range []string{`"content":"Hello"`, `"content":" world"`, `"finish_reason":"stop"`, "data: [DONE]"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("transcoded stream missing %q, got:\n%s", want, body)
+		}
+	}
+	if !rec.flushed {
+		t.Fatal("expected an early flush (incremental streaming), got none")
+	}
+	// Incremental proof: a chat chunk was flushed before the upstream produced
+	// the gated-later " world" delta (a buffering gateway would not have).
+	if !strings.Contains(rec.firstFlushBody, "chat.completion.chunk") {
+		t.Fatalf("first flush should be a transcoded chat chunk, got: %q", rec.firstFlushBody)
+	}
+	if strings.Contains(rec.firstFlushBody, `"content":" world"`) {
+		t.Fatalf("response was buffered: first flush already contained the later chunk: %q", rec.firstFlushBody)
+	}
+}
+
 // TestGatewayChatCompletionsToCodexStreamsTransformedChunksIncrementally proves
 // the cross-shape streaming fix: a chat/completions client backed by a Codex CLI
 // account receives correctly-shaped chat.completion.chunk SSE — transformed on

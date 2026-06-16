@@ -32,6 +32,19 @@ func (s *Service) newChatStreamRenderer(resp gatewaycontract.CanonicalResponse) 
 	return &ChatStreamRenderer{svc: s, resp: resp, tools: newChatStreamToolCallIndexes()}
 }
 
+// NewChatStreamRenderer exposes the incremental chat renderer to the HTTP layer
+// for cross-protocol transcoding. resp seeds the chunk id/model; per-event state
+// is the renderer's own.
+func (s *Service) NewChatStreamRenderer(resp gatewaycontract.CanonicalResponse) *ChatStreamRenderer {
+	return s.newChatStreamRenderer(resp)
+}
+
+// NewAnthropicStreamRenderer exposes the incremental Anthropic renderer to the
+// HTTP layer for cross-protocol transcoding.
+func (s *Service) NewAnthropicStreamRenderer(resp gatewaycontract.CanonicalResponse) *AnthropicStreamRenderer {
+	return s.newAnthropicStreamRenderer(resp)
+}
+
 // FeedEvent renders the chat chunks produced by a single canonical event (zero
 // or one chunk). It mirrors the switch body of the original loop exactly.
 func (r *ChatStreamRenderer) FeedEvent(event gatewaycontract.StreamEvent) []map[string]any {

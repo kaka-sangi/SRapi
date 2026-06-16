@@ -35,12 +35,6 @@ func (s *Service) StreamConversation(ctx context.Context, req contract.Conversat
 	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" {
 		return contract.ConversationResponse{}, ErrInvalidInput
 	}
-	// Passthrough streaming only preserves bytes when the inbound and upstream
-	// protocols match; cross-protocol requests must use the buffered transform
-	// path so the response is re-rendered into the client's protocol.
-	if !sameConversationProtocol(req) {
-		return contract.ConversationResponse{}, contract.ErrStreamingUnsupported
-	}
 	streamer, ok := s.reverseProxy.(reverseproxycontract.StreamRuntime)
 	if !ok {
 		return contract.ConversationResponse{}, contract.ErrStreamingUnsupported
@@ -49,10 +43,33 @@ func (s *Service) StreamConversation(ctx context.Context, req contract.Conversat
 	if baseURL == "" {
 		return contract.ConversationResponse{}, contract.ErrStreamingUnsupported
 	}
-	// Mirror InvokeConversation's dispatch so streamed traffic routes exactly as
-	// the buffered path would: reverse-proxy runtimes (OAuth / session / cookie
-	// subscription resale) go through DoStream; plain api_key runtimes stream via
-	// the account's egress client directly.
+	// Same-protocol streaming is byte passthrough (or the codex responses->chat
+	// transform). Cross-protocol streaming gets the live upstream body and signals
+	// the HTTP layer to transcode it into the client's protocol on the fly, when
+	// an incremental parser (for the upstream) and renderer (for the client) both
+	// exist for the pair — otherwise it falls back to the buffered path.
+	if sameConversationProtocol(req) {
+		return s.streamByTarget(ctx, streamer, req, baseURL)
+	}
+	upstreamProto, ok := s.crossProtocolUpstreamProtocol(req)
+	if !ok || !clientHasIncrementalRenderer(req) {
+		return contract.ConversationResponse{}, contract.ErrStreamingUnsupported
+	}
+	resp, err := s.streamByTarget(ctx, streamer, req, baseURL)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	if resp.StreamBody != nil {
+		resp.TranscodeUpstreamProtocol = upstreamProto
+	}
+	return resp, nil
+}
+
+// streamByTarget routes a streamable request to the live upstream body exactly
+// as InvokeConversation's dispatch would: reverse-proxy runtimes (OAuth /
+// session / cookie subscription resale) go through DoStream; plain api_key
+// runtimes stream via the account's egress client directly.
+func (s *Service) streamByTarget(ctx context.Context, streamer reverseproxycontract.StreamRuntime, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
 	switch {
 	case isBedrockCompatible(req), isGenericReverseProxy(req), isAntigravityReverseProxy(req):
 		return contract.ConversationResponse{}, contract.ErrStreamingUnsupported
@@ -72,6 +89,39 @@ func (s *Service) StreamConversation(ctx context.Context, req contract.Conversat
 		return s.streamReverseProxyOpenAICompatible(ctx, streamer, req, baseURL)
 	default:
 		return s.streamDirectOpenAICompatible(ctx, req, baseURL)
+	}
+}
+
+// crossProtocolUpstreamProtocol returns the canonical upstream protocol string
+// for a cross-protocol streamable request (used as the transcode signal), or
+// (_, false) when the upstream has no incremental per-frame parser yet (codex's
+// bespoke responses wire, gemini, bedrock/generic/antigravity/chatgpt-web) — in
+// which case the request falls back to the buffered path.
+func (s *Service) crossProtocolUpstreamProtocol(req contract.ConversationRequest) (string, bool) {
+	if isCodexReverseProxy(req) || isBedrockCompatible(req) || isGenericReverseProxy(req) || isAntigravityReverseProxy(req) || isChatGPTWebReverseProxy(req) {
+		return "", false
+	}
+	switch {
+	case isAnthropicCompatible(req):
+		return "anthropic-compatible", true
+	case isGeminiCompatible(req):
+		return "", false // gemini incremental parser lands with C6
+	default:
+		return "openai-compatible", true
+	}
+}
+
+// clientHasIncrementalRenderer reports whether the inbound (client) protocol has
+// an incremental stream renderer. Chat Completions and Anthropic Messages do;
+// the /responses and Gemini client renderers are added with later components.
+func clientHasIncrementalRenderer(req contract.ConversationRequest) bool {
+	switch strings.ToLower(strings.TrimSpace(req.SourceProtocol)) {
+	case "anthropic-compatible", "anthropic":
+		return true
+	case "openai-compatible", "openai":
+		return !openAIResponsesEndpoint(req)
+	default:
+		return false
 	}
 }
 

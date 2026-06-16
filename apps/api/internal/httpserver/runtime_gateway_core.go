@@ -21,6 +21,7 @@ import (
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
+	provideradapterservice "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
@@ -1103,6 +1104,23 @@ func (rt *runtimeState) invokeProviderConversation(ctx context.Context, req prov
 	if req.Stream {
 		streamed, streamErr := rt.adapters.StreamConversation(ctx, req)
 		if streamErr == nil {
+			// Cross-protocol streaming: wrap the live upstream body in a reader that
+			// transcodes it into the client's protocol on the fly, and route the
+			// usage/billing parse through the upstream parser on the retained raw
+			// bytes (the client-facing bytes are no longer the upstream format).
+			if proto := strings.TrimSpace(streamed.TranscodeUpstreamProtocol); proto != "" && streamed.StreamBody != nil {
+				if parser, ok := provideradapterservice.NewUpstreamStreamParser(proto); ok {
+					if transcoder, ok := newClientStreamTranscoder(rt.gateway, req); ok {
+						reader := newCrossProtocolStreamReader(streamed.StreamBody, parser, transcoder)
+						if origParse := streamed.StreamParse; origParse != nil {
+							streamed.StreamParse = func(_ []byte, statusCode int) (provideradaptercontract.ConversationResponse, error) {
+								return origParse(reader.rawBytes(), statusCode)
+							}
+						}
+						streamed.StreamBody = reader
+					}
+				}
+			}
 			leases := dispatch.concurrencyLeases
 			streamed.StreamBody = newStreamLeaseCloser(streamed.StreamBody, func() {
 				rt.releaseGatewayConcurrency(leases)
