@@ -3271,12 +3271,13 @@ func TestGeminiCompatibleAdapterPreservesTextThoughtSignature(t *testing.T) {
 	}
 }
 
-func TestGeminiCompatibleAdapterDoesNotReuseAnthropicSignatureAsThoughtSignature(t *testing.T) {
+func TestGeminiCompatibleAdapterForwardsAnthropicSignatureAsThoughtSignature(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
 			Contents []struct {
 				Parts []struct {
 					Text             string `json:"text"`
+					Thought          bool   `json:"thought"`
 					ThoughtSignature string `json:"thoughtSignature"`
 				} `json:"parts"`
 			} `json:"contents"`
@@ -3284,11 +3285,14 @@ func TestGeminiCompatibleAdapterDoesNotReuseAnthropicSignatureAsThoughtSignature
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode upstream request: %v", err)
 		}
+		// sub2api forwards an Anthropic thinking block to Gemini as a thought:true
+		// part carrying its signature as the thoughtSignature (no origin gating).
 		if len(payload.Contents) != 1 ||
 			len(payload.Contents[0].Parts) != 1 ||
 			payload.Contents[0].Parts[0].Text != "anthropic thought" ||
-			payload.Contents[0].Parts[0].ThoughtSignature != "" {
-			t.Fatalf("expected Anthropic signature to stay out of Gemini thoughtSignature, got %+v", payload.Contents)
+			!payload.Contents[0].Parts[0].Thought ||
+			payload.Contents[0].Parts[0].ThoughtSignature != "sig_anthropic_1" {
+			t.Fatalf("expected Anthropic thinking forwarded as thought:true with its signature, got %+v", payload.Contents)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"done"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":1}}`))

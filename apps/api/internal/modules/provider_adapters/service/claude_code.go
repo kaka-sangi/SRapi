@@ -14,7 +14,11 @@ import (
 )
 
 const (
-	claudeCodeDefaultBeta                    = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,structured-outputs-2025-12-15,fast-mode-2026-02-01,redact-thinking-2026-02-12,token-efficient-tools-2026-03-28"
+	// redact-thinking-2026-02-12 is deliberately omitted: including it by default
+	// makes the Anthropic upstream erase thinking content from responses. sub2api
+	// omits it for the same reason; a client that explicitly sends it is still
+	// honored by the beta-merge logic.
+	claudeCodeDefaultBeta                    = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,structured-outputs-2025-12-15,fast-mode-2026-02-01,token-efficient-tools-2026-03-28"
 	claudeCodeDefaultStainlessPackageVersion = "0.74.0"
 	claudeCodeDefaultStainlessRuntimeVersion = "v24.3.0"
 	claudeCodeAgentText                      = "You are Claude Code, Anthropic's official CLI for Claude."

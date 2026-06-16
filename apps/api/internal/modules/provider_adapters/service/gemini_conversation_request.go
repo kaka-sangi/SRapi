@@ -191,6 +191,18 @@ func geminiPartsFromContentParts(parts []contract.ContentPart, toolNames map[str
 			if len(response) > 0 {
 				out = append(out, geminiPart{FunctionResponse: response})
 			}
+		case contract.ContentPartThinking:
+			// Claude/Anthropic thinking forwarded to a Gemini upstream must be a
+			// reasoning part (thought:true) carrying the thoughtSignature (a dummy
+			// placeholder when none is available), not visible text — matching
+			// sub2api's antigravity request_transformer "thinking" case.
+			if text := strings.TrimSpace(part.Text); text != "" {
+				out = append(out, geminiPart{
+					Text:             part.Text,
+					Thought:          true,
+					ThoughtSignature: geminiThoughtSignature(part, true),
+				})
+			}
 		default:
 			if text := strings.TrimSpace(part.Text); text != "" {
 				out = append(out, geminiPart{Text: text, ThoughtSignature: geminiThoughtSignature(part, false)})
@@ -201,11 +213,14 @@ func geminiPartsFromContentParts(parts []contract.ContentPart, toolNames map[str
 }
 
 func geminiThoughtSignature(part contract.ContentPart, useDummyForFunctionCall bool) string {
-	signature := firstNonEmpty(
-		metadataString(part.Metadata, "thoughtSignature"),
-		metadataString(part.Metadata, "thought_signature"),
-	)
-	if signature == "" && !contentPartOriginIs(part, "anthropic") {
+	// Pass the upstream-origin signature through as the Gemini thoughtSignature,
+	// including an Anthropic thinking block's "signature" (sub2api forwards it
+	// directly rather than gating it out by origin).
+	signature := metadataString(part.Metadata, "thoughtSignature")
+	if signature == "" {
+		signature = metadataString(part.Metadata, "thought_signature")
+	}
+	if signature == "" {
 		signature = metadataString(part.Metadata, "signature")
 	}
 	if signature == "" && useDummyForFunctionCall {
