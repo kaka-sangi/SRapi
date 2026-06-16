@@ -216,7 +216,27 @@ function ProvidersContent() {
       key: "status",
       header: t("common.active"),
       sortValue: (p) => p.status,
-      render: (p) => <QuietBadge status={quietStatusFor(p.status)} label={statusLabel(t, p.status)} />,
+      render: (p) => {
+        // Inline toggle only flips between the two operator-meaningful
+        // states — pending/archived are kept as a read-only badge so a
+        // misclick can't silently regress them.
+        const canToggle = p.status === "active" || p.status === "disabled";
+        const badge = (
+          <QuietBadge status={quietStatusFor(p.status)} label={statusLabel(t, p.status)} />
+        );
+        if (!canToggle) return badge;
+        return (
+          <button
+            type="button"
+            onClick={() => void toggleStatus(p)}
+            disabled={updateMut.isPending}
+            className="cursor-pointer disabled:cursor-wait disabled:opacity-60"
+            title={p.status === "active" ? t("common.disable") : t("common.enable")}
+          >
+            {badge}
+          </button>
+        );
+      },
     },
   ];
 
