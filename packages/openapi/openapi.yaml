@@ -10005,6 +10005,12 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/PromoCodeStatus"
+        - name: code
+          in: query
+          description: Case-insensitive substring filter on the promo code value.
+          schema:
+            type: string
+            maxLength: 80
       responses:
         "200":
           description: Promo code list.

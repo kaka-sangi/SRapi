@@ -813,6 +813,7 @@ func listOptionsFromRequest(r *http.Request) admincontrol.ListOptions {
 		PageSize: pageSize,
 		Status:   strings.TrimSpace(r.URL.Query().Get("status")),
 		Level:    strings.TrimSpace(r.URL.Query().Get("level")),
+		Code:     strings.TrimSpace(r.URL.Query().Get("code")),
 	}
 }
 

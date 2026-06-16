@@ -1254,6 +1254,7 @@ export const en = {
   adminPromos: {
     promoTitle: "Promo codes",
     promoSubtitle: "Discount codes for checkout.",
+    searchPlaceholder: "Search by code…",
     redeemTitle: "Redeem codes",
     redeemSubtitle: "One-time codes that credit a balance.",
     code: "Code",

@@ -1233,6 +1233,7 @@ export const zh: Messages = {
   adminPromos: {
     promoTitle: "促销码",
     promoSubtitle: "结算时使用的折扣码。",
+    searchPlaceholder: "按码搜索…",
     redeemTitle: "兑换码",
     redeemSubtitle: "一次性充值余额的兑换码。",
     code: "码",

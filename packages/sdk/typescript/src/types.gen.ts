@@ -16753,6 +16753,10 @@ export type ListAdminPromoCodesData = {
         page?: number;
         page_size?: number;
         status?: PromoCodeStatus;
+        /**
+         * Case-insensitive substring filter on the promo code value.
+         */
+        code?: string;
     };
     url: '/api/v1/admin/promo-codes';
 };

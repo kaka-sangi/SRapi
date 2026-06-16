@@ -45,6 +45,10 @@ type ListOptions struct {
 	PageSize int
 	Status   string
 	Level    string
+	// Code is an optional case-insensitive substring filter applied by list
+	// endpoints that operate on coded resources (promo codes, redeem codes).
+	// Other list endpoints simply ignore it.
+	Code string
 }
 
 type SecretConfigured struct {

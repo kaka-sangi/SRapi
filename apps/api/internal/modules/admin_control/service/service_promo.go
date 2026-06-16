@@ -15,10 +15,14 @@ func (s *Service) ListPromoCodes(ctx context.Context, opts admincontrol.ListOpti
 		return admincontrol.PromoCodeList{}, err
 	}
 	now := s.clock.Now()
+	codeNeedle := strings.ToLower(strings.TrimSpace(opts.Code))
 	items := make([]admincontrol.PromoCode, 0, len(stored))
 	for _, item := range stored {
 		item = promoCodeWithDerivedStatus(item, now)
 		if opts.Status != "" && string(item.Status) != opts.Status {
+			continue
+		}
+		if codeNeedle != "" && !strings.Contains(strings.ToLower(item.Code), codeNeedle) {
 			continue
 		}
 		items = append(items, item)

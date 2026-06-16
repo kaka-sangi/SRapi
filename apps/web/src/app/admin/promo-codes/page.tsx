@@ -6,7 +6,7 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
-import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
+import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -50,10 +50,12 @@ function PromoContent() {
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-promo-codes", []);
   const statusFilter = (list.filters.status as PromoCode["status"]) || undefined;
+  const codeSearch = list.search || undefined;
   const promos = useAdminPromoCodes({
     page: list.page,
     page_size: list.pageSize,
     status: statusFilter,
+    code: codeSearch,
   });
   const createMut = useCreatePromoCode();
   const updateMut = useUpdatePromoCode();
@@ -169,12 +171,17 @@ function PromoContent() {
           </Button>
         }
         minWidth={520}
-        isFiltered={Boolean(statusFilter)}
+        isFiltered={Boolean(statusFilter || codeSearch)}
         onClearFilters={list.clearFilters}
         sort={list.sort}
         onSort={list.toggleSort}
         toolbar={
           <ListToolbar>
+            <SearchInput
+              value={list.searchInput}
+              onChange={list.setSearchInput}
+              placeholder={t("adminPromos.searchPlaceholder")}
+            />
             <FilterSelect
               value={statusFilter}
               onChange={(v) => list.setFilter("status", v)}
