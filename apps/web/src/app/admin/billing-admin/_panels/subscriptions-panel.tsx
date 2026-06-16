@@ -7,6 +7,7 @@ import { AdminListView, ListCount, type Column } from "@/components/admin/admin-
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useClientPagedList } from "@/hooks/use-client-list";
+import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
@@ -56,6 +57,7 @@ export function SubscriptionsPanel() {
   });
   const statusFilter = list.filters.status as UserSubscription["status"] | undefined;
   const users = useAdminUsers();
+  const userLookup = useUserEmailLookup();
   const createSub = useCreateUserSubscription();
   const deleteSub = useDeleteUserSubscription();
   const [creatingSub, setCreatingSub] = useState(false);
@@ -91,7 +93,7 @@ export function SubscriptionsPanel() {
       key: "user",
       header: t("adminSubscriptions.user"),
       pinned: true,
-      render: (s) => <span className="font-mono text-2xs text-srapi-text-secondary">{s.user_id}</span>,
+      render: (s) => <span className="text-srapi-text-secondary">{userLookup.get(s.user_id)}</span>,
     },
     {
       key: "plan",

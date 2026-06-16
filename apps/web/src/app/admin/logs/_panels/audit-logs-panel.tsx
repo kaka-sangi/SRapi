@@ -212,7 +212,7 @@ export function AuditLogsPanel() {
               </DialogDescription>
             </DialogHeader>
             <div className="mt-4 max-h-[60vh] space-y-4 overflow-y-auto pr-1">
-              <AuditMeta label={t("adminAudit.actor")} value={detail.actor_user_id || "—"} />
+              <AuditMeta label={t("adminAudit.actor")} value={userLookup.get(detail.actor_user_id)} />
               <AuditMeta label={t("adminAudit.ip")} value={detail.ip || "—"} />
               <AuditMeta label={t("adminAudit.trace")} value={detail.trace_id || "—"} />
               <AuditMeta label={t("adminAudit.userAgent")} value={detail.user_agent || "—"} />

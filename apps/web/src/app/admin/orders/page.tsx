@@ -5,6 +5,7 @@ import { ShoppingCart } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
+import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
@@ -94,6 +95,7 @@ function OrdersContent() {
   const { t } = useLanguage();
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-orders", ["created_at"]);
+  const userLookup = useUserEmailLookup();
   // translate() returns the key path on a miss, so fall back to a humanized
   // token rather than leaking the dotted key into the UI.
   const labelOr = (key: string, fallback: string) => {
@@ -127,7 +129,7 @@ function OrdersContent() {
       key: "user",
       header: t("adminOrders.user"),
       hideOnMobile: true,
-      render: (o) => <span className="font-mono text-2xs text-srapi-text-tertiary">{o.user_id}</span>,
+      render: (o) => <span className="text-srapi-text-secondary">{userLookup.get(o.user_id)}</span>,
     },
     {
       key: "product",

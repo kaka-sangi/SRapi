@@ -8,6 +8,7 @@ import { RowActionsMenu } from "@/components/admin/row-actions";
 import { PageHeader } from "@/components/layout/page-header";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { useAffiliateWithdrawals, useApproveWithdrawal, useCancelWithdrawal } from "@/hooks/admin-queries";
+import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatMoney, formatDateTime } from "@/lib/admin-format";
 import type { AffiliateLedgerEntry } from "@/lib/sdk-types";
@@ -17,6 +18,7 @@ export function WithdrawalsPanel() {
   const query = useAffiliateWithdrawals();
   const approveMut = useApproveWithdrawal();
   const cancelMut = useCancelWithdrawal();
+  const userLookup = useUserEmailLookup();
 
   const [approveTarget, setApproveTarget] = useState<AffiliateLedgerEntry | null>(null);
   const [cancelTarget, setCancelTarget] = useState<AffiliateLedgerEntry | null>(null);
@@ -38,7 +40,7 @@ export function WithdrawalsPanel() {
       key: "user",
       header: t("adminAffiliates.inviter"),
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-secondary">{r.user_id}</span>
+        <span className="text-srapi-text-secondary">{userLookup.get(r.user_id)}</span>
       ),
     },
     {
@@ -140,7 +142,7 @@ export function WithdrawalsPanel() {
         title={t("adminAffiliates.approveWithdrawal")}
         body={
           approveTarget
-            ? `${approveTarget.user_id} · ${formatMoney(approveTarget.amount, approveTarget.currency)}`
+            ? `${userLookup.get(approveTarget.user_id)} · ${formatMoney(approveTarget.amount, approveTarget.currency)}`
             : undefined
         }
         confirmLabel={t("adminAffiliates.approveWithdrawal")}
@@ -162,7 +164,7 @@ export function WithdrawalsPanel() {
         title={t("adminAffiliates.cancelWithdrawal")}
         body={
           cancelTarget
-            ? `${cancelTarget.user_id} · ${formatMoney(cancelTarget.amount, cancelTarget.currency)}`
+            ? `${userLookup.get(cancelTarget.user_id)} · ${formatMoney(cancelTarget.amount, cancelTarget.currency)}`
             : undefined
         }
         confirmLabel={t("adminAffiliates.cancelWithdrawal")}
