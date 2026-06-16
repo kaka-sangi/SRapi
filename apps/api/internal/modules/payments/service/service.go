@@ -506,6 +506,192 @@ func (s *Service) ListOrders(ctx context.Context) ([]contract.PaymentOrder, erro
 	return s.store.ListOrders(ctx)
 }
 
+// AggregatePaymentDashboard computes the totals + payment-method breakdown + top
+// spenders for paid orders inside the last `days` days. days <= 0 falls back to 30,
+// values > 365 clamp to 365.
+//
+// The aggregation is done in Go after a full ListOrders fetch — payment volumes are
+// usually tractable, and skipping a dedicated time-windowed store query keeps this
+// adoption surface small. If volumes grow problematic, a windowed store method is
+// the obvious next step.
+func (s *Service) AggregatePaymentDashboard(ctx context.Context, days int) (contract.PaymentDashboardSnapshot, error) {
+	if days <= 0 {
+		days = 30
+	}
+	if days > 365 {
+		days = 365
+	}
+	now := time.Now().UTC()
+	since := now.AddDate(0, 0, -days)
+
+	orders, err := s.store.ListOrders(ctx)
+	if err != nil {
+		return contract.PaymentDashboardSnapshot{}, err
+	}
+	instances, err := s.store.ListProviderInstances(ctx)
+	if err != nil {
+		return contract.PaymentDashboardSnapshot{}, err
+	}
+	providerByInstance := make(map[int]string, len(instances))
+	for _, inst := range instances {
+		providerByInstance[inst.ID] = inst.Provider
+	}
+
+	paidStatuses := map[contract.OrderStatus]struct{}{
+		contract.OrderStatusPaid:              {},
+		contract.OrderStatusFulfilled:         {},
+		contract.OrderStatusPartiallyRefunded: {},
+		contract.OrderStatusRefunding:         {},
+		contract.OrderStatusRefunded:          {},
+	}
+
+	currencyCounts := make(map[string]int)
+	for _, o := range orders {
+		if o.PaidAt != nil && !o.PaidAt.Before(since) {
+			if _, ok := paidStatuses[o.Status]; ok && o.Currency != "" {
+				currencyCounts[o.Currency]++
+			}
+		}
+	}
+	reportCurrency := pickReportCurrency(currencyCounts)
+
+	totalsAmount := new(big.Rat)
+	providerAmounts := make(map[string]*big.Rat)
+	providerCounts := make(map[string]int)
+	userAmounts := make(map[int]*big.Rat)
+	userCounts := make(map[int]int)
+	var orderCount, paidCount int
+
+	for _, o := range orders {
+		// Window check is on CreatedAt for the "all orders in window" count, and
+		// on PaidAt for paid revenue — sub2api uses paid_at for everything, but
+		// counting unpaid pendings as "orders in window" gives a useful denominator.
+		if !o.CreatedAt.Before(since) {
+			orderCount++
+		}
+		if o.PaidAt == nil || o.PaidAt.Before(since) {
+			continue
+		}
+		if _, ok := paidStatuses[o.Status]; !ok {
+			continue
+		}
+		if o.Currency != reportCurrency {
+			continue
+		}
+
+		amount, ok := parseMoneyRat(o.PayableAmount)
+		if !ok {
+			continue
+		}
+		paidCount++
+		totalsAmount.Add(totalsAmount, amount)
+
+		provider := providerByInstance[o.ProviderInstanceID]
+		if provider == "" {
+			provider = "unknown"
+		}
+		if _, present := providerAmounts[provider]; !present {
+			providerAmounts[provider] = new(big.Rat)
+		}
+		providerAmounts[provider].Add(providerAmounts[provider], amount)
+		providerCounts[provider]++
+
+		if _, present := userAmounts[o.UserID]; !present {
+			userAmounts[o.UserID] = new(big.Rat)
+		}
+		userAmounts[o.UserID].Add(userAmounts[o.UserID], amount)
+		userCounts[o.UserID]++
+	}
+
+	methods := make([]contract.PaymentMethodBreakdown, 0, len(providerAmounts))
+	for provider, amount := range providerAmounts {
+		methods = append(methods, contract.PaymentMethodBreakdown{
+			Provider: provider,
+			Count:    providerCounts[provider],
+			Amount:   money.FormatRatFixed(amount, 8),
+		})
+	}
+	sort.Slice(methods, func(i, j int) bool {
+		// Largest amount first; tie-break by provider name for stability.
+		cmp := compareRats(providerAmounts[methods[i].Provider], providerAmounts[methods[j].Provider])
+		if cmp != 0 {
+			return cmp > 0
+		}
+		return methods[i].Provider < methods[j].Provider
+	})
+
+	type userRow struct {
+		userID int
+		amount *big.Rat
+	}
+	userRows := make([]userRow, 0, len(userAmounts))
+	for userID, amount := range userAmounts {
+		userRows = append(userRows, userRow{userID: userID, amount: amount})
+	}
+	sort.Slice(userRows, func(i, j int) bool {
+		cmp := compareRats(userRows[i].amount, userRows[j].amount)
+		if cmp != 0 {
+			return cmp > 0
+		}
+		return userRows[i].userID < userRows[j].userID
+	})
+	const topUsersLimit = 10
+	if len(userRows) > topUsersLimit {
+		userRows = userRows[:topUsersLimit]
+	}
+	topUsers := make([]contract.PaymentTopUser, 0, len(userRows))
+	for _, row := range userRows {
+		topUsers = append(topUsers, contract.PaymentTopUser{
+			UserID:     row.userID,
+			Amount:     money.FormatRatFixed(row.amount, 8),
+			OrderCount: userCounts[row.userID],
+		})
+	}
+
+	return contract.PaymentDashboardSnapshot{
+		DayRange: days,
+		Currency: reportCurrency,
+		Totals: contract.PaymentDashboardTotals{
+			OrderCount: orderCount,
+			PaidCount:  paidCount,
+			PaidAmount: money.FormatRatFixed(totalsAmount, 8),
+		},
+		PaymentMethods: methods,
+		TopUsers:       topUsers,
+	}, nil
+}
+
+func pickReportCurrency(counts map[string]int) string {
+	if len(counts) == 0 {
+		return "USD"
+	}
+	bestCount := -1
+	best := ""
+	for cur, n := range counts {
+		if n > bestCount || (n == bestCount && cur < best) {
+			bestCount = n
+			best = cur
+		}
+	}
+	return best
+}
+
+func parseMoneyRat(value string) (*big.Rat, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return new(big.Rat), true
+	}
+	r := new(big.Rat)
+	if _, ok := r.SetString(value); !ok {
+		return nil, false
+	}
+	return r, true
+}
+
+func compareRats(a, b *big.Rat) int {
+	return a.Cmp(b)
+}
+
 func (s *Service) ListOrdersByUser(ctx context.Context, userID int) ([]contract.PaymentOrder, error) {
 	if userID <= 0 {
 		return nil, ErrInvalidInput

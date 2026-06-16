@@ -249,6 +249,36 @@ type ReconcileOrdersResult struct {
 	Failed   int
 }
 
+// PaymentDashboardSnapshot is the aggregated view powering /admin/payments/dashboard.
+// The currency field reports the most-common currency observed across paid orders in
+// the window; mixed-currency aggregation is deliberately out of scope — operators with
+// multi-currency catalogs should slice elsewhere.
+type PaymentDashboardSnapshot struct {
+	DayRange       int
+	Currency       string
+	Totals         PaymentDashboardTotals
+	PaymentMethods []PaymentMethodBreakdown
+	TopUsers       []PaymentTopUser
+}
+
+type PaymentDashboardTotals struct {
+	OrderCount int
+	PaidCount  int
+	PaidAmount string
+}
+
+type PaymentMethodBreakdown struct {
+	Provider string
+	Count    int
+	Amount   string
+}
+
+type PaymentTopUser struct {
+	UserID     int
+	Amount     string
+	OrderCount int
+}
+
 type Store interface {
 	CreateProviderInstance(ctx context.Context, input CreateStoredProviderInstance) (PaymentProviderInstance, error)
 	ListProviderInstances(ctx context.Context) ([]PaymentProviderInstance, error)

@@ -301,6 +301,62 @@ func (s *Server) handleTestAdminPaymentProvider(w http.ResponseWriter, r *http.R
 	})
 }
 
+func (s *Server) handleGetAdminPaymentDashboard(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminPermission(r, userscontract.PermissionPaymentRead); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "permission required", requestID)
+		return
+	}
+	days := 30
+	if raw := strings.TrimSpace(r.URL.Query().Get("days")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed <= 0 {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid days", requestID)
+			return
+		}
+		days = parsed
+	}
+	snapshot, err := s.runtime.payments.AggregatePaymentDashboard(r.Context(), days)
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.AdminPaymentDashboardResponse{
+		Data:      toAPIPaymentDashboard(snapshot),
+		RequestId: requestID,
+	})
+}
+
+func toAPIPaymentDashboard(snap paymentcontract.PaymentDashboardSnapshot) apiopenapi.AdminPaymentDashboard {
+	methods := make([]apiopenapi.AdminPaymentMethodBreakdown, 0, len(snap.PaymentMethods))
+	for _, m := range snap.PaymentMethods {
+		methods = append(methods, apiopenapi.AdminPaymentMethodBreakdown{
+			Provider: m.Provider,
+			Count:    m.Count,
+			Amount:   m.Amount,
+		})
+	}
+	topUsers := make([]apiopenapi.AdminPaymentTopUser, 0, len(snap.TopUsers))
+	for _, u := range snap.TopUsers {
+		topUsers = append(topUsers, apiopenapi.AdminPaymentTopUser{
+			UserId:     apiopenapi.Id(strconv.Itoa(u.UserID)),
+			Amount:     u.Amount,
+			OrderCount: u.OrderCount,
+		})
+	}
+	return apiopenapi.AdminPaymentDashboard{
+		DayRange: snap.DayRange,
+		Currency: snap.Currency,
+		Totals: apiopenapi.AdminPaymentDashboardTotals{
+			OrderCount: snap.Totals.OrderCount,
+			PaidCount:  snap.Totals.PaidCount,
+			PaidAmount: snap.Totals.PaidAmount,
+		},
+		PaymentMethods: methods,
+		TopUsers:       topUsers,
+	}
+}
+
 func (s *Server) handleListAdminPaymentOrders(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminPermission(r, userscontract.PermissionPaymentRead); err != nil {

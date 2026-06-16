@@ -7466,6 +7466,44 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/payments/dashboard:
+    get:
+      tags:
+        - AdminPayments
+      operationId: getAdminPaymentDashboard
+      summary: Aggregate paid-order stats for the admin dashboard.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        permission: payment:read
+      parameters:
+        - name: days
+          in: query
+          description: Day window for the aggregation (defaults to 30; clamped 1..365).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 30
+      responses:
+        "200":
+          description: Admin payment dashboard snapshot.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPaymentDashboardResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/payments/orders/{id}/refund:
     post:
       tags:
@@ -17451,6 +17489,95 @@ components:
         reason:
           type: string
           maxLength: 500
+
+    AdminPaymentDashboardResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminPaymentDashboard"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AdminPaymentDashboard:
+      type: object
+      required:
+        - day_range
+        - currency
+        - totals
+        - payment_methods
+        - top_users
+      properties:
+        day_range:
+          type: integer
+          minimum: 1
+          description: Day window the snapshot covers, echoed from the request.
+        currency:
+          type: string
+          description: Currency code most represented in the result set (or "USD" when no paid orders exist).
+        totals:
+          $ref: "#/components/schemas/AdminPaymentDashboardTotals"
+        payment_methods:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminPaymentMethodBreakdown"
+        top_users:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminPaymentTopUser"
+
+    AdminPaymentDashboardTotals:
+      type: object
+      required:
+        - order_count
+        - paid_count
+        - paid_amount
+      properties:
+        order_count:
+          type: integer
+          minimum: 0
+          description: All orders created in the window, any status.
+        paid_count:
+          type: integer
+          minimum: 0
+          description: Orders with paid_at inside the window and a paid-ish status.
+        paid_amount:
+          type: string
+          description: Sum of payable_amount across paid orders, in the report currency.
+
+    AdminPaymentMethodBreakdown:
+      type: object
+      required:
+        - provider
+        - count
+        - amount
+      properties:
+        provider:
+          type: string
+          description: Payment provider type (e.g. alipay, wxpay, stripe).
+        count:
+          type: integer
+          minimum: 0
+        amount:
+          type: string
+          description: Sum of payable_amount for orders settled via this provider.
+
+    AdminPaymentTopUser:
+      type: object
+      required:
+        - user_id
+        - amount
+        - order_count
+      properties:
+        user_id:
+          $ref: "#/components/schemas/Id"
+        amount:
+          type: string
+        order_count:
+          type: integer
+          minimum: 0
 
     SubscriptionPlanStatus:
       type: string

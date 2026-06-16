@@ -1650,6 +1650,149 @@ func newHarness(t *testing.T) harness {
 	return newHarnessWithDeps(t, Dependencies{})
 }
 
+func TestAggregatePaymentDashboardGroupsPaidOrdersByProviderAndUser(t *testing.T) {
+	h := newHarness(t)
+	now := time.Now().UTC()
+
+	// Direct store inserts keep the test focused on aggregation: the service-level
+	// CreateProviderInstance for alipay needs RSA keys, which is irrelevant here.
+	alipay, err := h.store.CreateProviderInstance(t.Context(), contract.CreateStoredProviderInstance{
+		Provider:         "alipay",
+		Name:             "alipay-primary",
+		Status:           contract.ProviderStatusActive,
+		ConfigCiphertext: "ciphertext-noop",
+		ConfigVersion:    1,
+		SupportedMethods: []string{"alipay"},
+	})
+	if err != nil {
+		t.Fatalf("create alipay provider: %v", err)
+	}
+	easypay, err := h.store.CreateProviderInstance(t.Context(), contract.CreateStoredProviderInstance{
+		Provider:         "easypay",
+		Name:             "easypay-primary",
+		Status:           contract.ProviderStatusActive,
+		ConfigCiphertext: "ciphertext-noop",
+		ConfigVersion:    1,
+		SupportedMethods: []string{"alipay"},
+	})
+	if err != nil {
+		t.Fatalf("create easypay provider: %v", err)
+	}
+
+	// Seed five orders:
+	//   - 2 paid via alipay (user 1: $30, user 2: $20)
+	//   - 1 paid via easypay (user 1: $10)
+	//   - 1 outside the day window (must be excluded from paid totals)
+	//   - 1 pending (must count toward order_count but not paid_count)
+	type seed struct {
+		orderNo  string
+		userID   int
+		provider int
+		amount   string
+		status   contract.OrderStatus
+		paidAt   *time.Time
+		created  time.Time
+	}
+	t1 := now.Add(-2 * 24 * time.Hour)
+	t2 := now.Add(-3 * 24 * time.Hour)
+	t3 := now.Add(-1 * 24 * time.Hour)
+	stale := now.Add(-90 * 24 * time.Hour)
+
+	seeds := []seed{
+		{"o1", 1, alipay.ID, "30.00000000", contract.OrderStatusFulfilled, &t1, t1},
+		{"o2", 2, alipay.ID, "20.00000000", contract.OrderStatusPaid, &t2, t2},
+		{"o3", 1, easypay.ID, "10.00000000", contract.OrderStatusFulfilled, &t3, t3},
+		{"o4", 1, alipay.ID, "99.00000000", contract.OrderStatusFulfilled, &stale, stale},
+		{"o5", 3, alipay.ID, "5.00000000", contract.OrderStatusPending, nil, now.Add(-1 * time.Hour)},
+	}
+	for _, s := range seeds {
+		stored, err := h.store.CreateOrder(t.Context(), contract.CreateStoredOrder{
+			UserID:             s.userID,
+			OrderNo:            s.orderNo,
+			ProviderInstanceID: s.provider,
+			Amount:             s.amount,
+			PayableAmount:      s.amount,
+			Currency:           "USD",
+			Status:             s.status,
+			ProductType:        contract.ProductTypeBalanceCredit,
+		})
+		if err != nil {
+			t.Fatalf("create order %s: %v", s.orderNo, err)
+		}
+		if s.paidAt != nil || s.created != (time.Time{}) {
+			stored.PaidAt = s.paidAt
+			stored.CreatedAt = s.created
+			if _, err := h.store.UpdateOrder(t.Context(), stored); err != nil {
+				t.Fatalf("update order %s: %v", s.orderNo, err)
+			}
+		}
+	}
+
+	snap, err := h.payments.AggregatePaymentDashboard(t.Context(), 30)
+	if err != nil {
+		t.Fatalf("aggregate dashboard: %v", err)
+	}
+
+	if snap.DayRange != 30 {
+		t.Fatalf("day_range: want 30, got %d", snap.DayRange)
+	}
+	if snap.Currency != "USD" {
+		t.Fatalf("currency: want USD, got %q", snap.Currency)
+	}
+	if got := snap.Totals.PaidCount; got != 3 {
+		t.Fatalf("paid_count: want 3 (the 30-day stale + the pending excluded), got %d", got)
+	}
+	if got := snap.Totals.PaidAmount; got != "60.00000000" {
+		t.Fatalf("paid_amount: want 60.00000000, got %q", got)
+	}
+	// order_count counts orders CREATED in the window — that's o1, o2, o3, o5 = 4.
+	if got := snap.Totals.OrderCount; got != 4 {
+		t.Fatalf("order_count: want 4, got %d", got)
+	}
+
+	// Payment-method breakdown: alipay leads with $50 / 2 orders, easypay $10 / 1.
+	if len(snap.PaymentMethods) != 2 {
+		t.Fatalf("payment_methods len: want 2, got %d", len(snap.PaymentMethods))
+	}
+	if snap.PaymentMethods[0].Provider != "alipay" || snap.PaymentMethods[0].Amount != "50.00000000" || snap.PaymentMethods[0].Count != 2 {
+		t.Fatalf("payment_methods[0]: %+v", snap.PaymentMethods[0])
+	}
+	if snap.PaymentMethods[1].Provider != "easypay" || snap.PaymentMethods[1].Amount != "10.00000000" || snap.PaymentMethods[1].Count != 1 {
+		t.Fatalf("payment_methods[1]: %+v", snap.PaymentMethods[1])
+	}
+
+	// Top users: user 1 ($30+$10 = $40) > user 2 ($20).
+	if len(snap.TopUsers) != 2 {
+		t.Fatalf("top_users len: want 2, got %d", len(snap.TopUsers))
+	}
+	if snap.TopUsers[0].UserID != 1 || snap.TopUsers[0].Amount != "40.00000000" || snap.TopUsers[0].OrderCount != 2 {
+		t.Fatalf("top_users[0]: %+v", snap.TopUsers[0])
+	}
+	if snap.TopUsers[1].UserID != 2 || snap.TopUsers[1].Amount != "20.00000000" || snap.TopUsers[1].OrderCount != 1 {
+		t.Fatalf("top_users[1]: %+v", snap.TopUsers[1])
+	}
+}
+
+func TestAggregatePaymentDashboardEmptyReturnsUSDDefault(t *testing.T) {
+	h := newHarness(t)
+	snap, err := h.payments.AggregatePaymentDashboard(t.Context(), 7)
+	if err != nil {
+		t.Fatalf("aggregate empty: %v", err)
+	}
+	if snap.DayRange != 7 {
+		t.Fatalf("day_range: want 7, got %d", snap.DayRange)
+	}
+	if snap.Currency != "USD" {
+		t.Fatalf("currency: want USD default, got %q", snap.Currency)
+	}
+	if snap.Totals.PaidCount != 0 || snap.Totals.PaidAmount != "0.00000000" {
+		t.Fatalf("empty totals: %+v", snap.Totals)
+	}
+	if len(snap.PaymentMethods) != 0 || len(snap.TopUsers) != 0 {
+		t.Fatalf("empty arrays: methods=%d users=%d", len(snap.PaymentMethods), len(snap.TopUsers))
+	}
+}
+
 // stubBalance is an in-memory BalanceAdjuster that tracks each user's net
 // spendable balance so tests can assert top-up credits and refund debits.
 type stubBalance struct {

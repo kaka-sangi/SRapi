@@ -547,6 +547,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("DELETE /api/v1/admin/payments/providers/{id}", server.handleDeleteAdminPaymentProvider)
 	mux.HandleFunc("POST /api/v1/admin/payments/providers/{id}/test", server.handleTestAdminPaymentProvider)
 	mux.HandleFunc("GET /api/v1/admin/payments/orders", server.handleListAdminPaymentOrders)
+	mux.HandleFunc("GET /api/v1/admin/payments/dashboard", server.handleGetAdminPaymentDashboard)
 	mux.HandleFunc("POST /api/v1/admin/payments/orders/{id}/refund", server.handleRefundAdminPaymentOrder)
 	mux.HandleFunc("GET /api/v1/admin/payment-orders/{id}/audit-logs", server.handleListAdminPaymentOrderAuditLogs)
 	mux.HandleFunc("GET /api/v1/admin/subscription-plans", server.handleListAdminSubscriptionPlans)

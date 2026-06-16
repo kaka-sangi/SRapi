@@ -1078,6 +1078,58 @@ export type RefundPaymentOrderRequest = {
     reason?: string;
 };
 
+export type AdminPaymentDashboardResponse = {
+    data: AdminPaymentDashboard;
+    request_id: RequestId;
+};
+
+export type AdminPaymentDashboard = {
+    /**
+     * Day window the snapshot covers, echoed from the request.
+     */
+    day_range: number;
+    /**
+     * Currency code most represented in the result set (or "USD" when no paid orders exist).
+     */
+    currency: string;
+    totals: AdminPaymentDashboardTotals;
+    payment_methods: Array<AdminPaymentMethodBreakdown>;
+    top_users: Array<AdminPaymentTopUser>;
+};
+
+export type AdminPaymentDashboardTotals = {
+    /**
+     * All orders created in the window, any status.
+     */
+    order_count: number;
+    /**
+     * Orders with paid_at inside the window and a paid-ish status.
+     */
+    paid_count: number;
+    /**
+     * Sum of payable_amount across paid orders, in the report currency.
+     */
+    paid_amount: string;
+};
+
+export type AdminPaymentMethodBreakdown = {
+    /**
+     * Payment provider type (e.g. alipay, wxpay, stripe).
+     */
+    provider: string;
+    count: number;
+    /**
+     * Sum of payable_amount for orders settled via this provider.
+     */
+    amount: string;
+};
+
+export type AdminPaymentTopUser = {
+    user_id: Id;
+    amount: string;
+    order_count: number;
+};
+
 export type SubscriptionPlanStatus = 'active' | 'disabled' | 'archived';
 
 export type UserSubscriptionStatus = 'active' | 'expired' | 'cancelled' | 'suspended';
@@ -13991,6 +14043,44 @@ export type ListAdminPaymentOrdersResponses = {
 };
 
 export type ListAdminPaymentOrdersResponse = ListAdminPaymentOrdersResponses[keyof ListAdminPaymentOrdersResponses];
+
+export type GetAdminPaymentDashboardData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Day window for the aggregation (defaults to 30; clamped 1..365).
+         */
+        days?: number;
+    };
+    url: '/api/v1/admin/payments/dashboard';
+};
+
+export type GetAdminPaymentDashboardErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminPaymentDashboardError = GetAdminPaymentDashboardErrors[keyof GetAdminPaymentDashboardErrors];
+
+export type GetAdminPaymentDashboardResponses = {
+    /**
+     * Admin payment dashboard snapshot.
+     */
+    200: AdminPaymentDashboardResponse;
+};
+
+export type GetAdminPaymentDashboardResponse = GetAdminPaymentDashboardResponses[keyof GetAdminPaymentDashboardResponses];
 
 export type RefundAdminPaymentOrderData = {
     body: RefundPaymentOrderRequest;

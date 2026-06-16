@@ -3994,6 +3994,53 @@ type AdminOverviewResponse struct {
 	RequestId RequestId     `json:"request_id"`
 }
 
+// AdminPaymentDashboard defines model for AdminPaymentDashboard.
+type AdminPaymentDashboard struct {
+	// Currency Currency code most represented in the result set (or "USD" when no paid orders exist).
+	Currency string `json:"currency"`
+
+	// DayRange Day window the snapshot covers, echoed from the request.
+	DayRange       int                           `json:"day_range"`
+	PaymentMethods []AdminPaymentMethodBreakdown `json:"payment_methods"`
+	TopUsers       []AdminPaymentTopUser         `json:"top_users"`
+	Totals         AdminPaymentDashboardTotals   `json:"totals"`
+}
+
+// AdminPaymentDashboardResponse defines model for AdminPaymentDashboardResponse.
+type AdminPaymentDashboardResponse struct {
+	Data      AdminPaymentDashboard `json:"data"`
+	RequestId RequestId             `json:"request_id"`
+}
+
+// AdminPaymentDashboardTotals defines model for AdminPaymentDashboardTotals.
+type AdminPaymentDashboardTotals struct {
+	// OrderCount All orders created in the window, any status.
+	OrderCount int `json:"order_count"`
+
+	// PaidAmount Sum of payable_amount across paid orders, in the report currency.
+	PaidAmount string `json:"paid_amount"`
+
+	// PaidCount Orders with paid_at inside the window and a paid-ish status.
+	PaidCount int `json:"paid_count"`
+}
+
+// AdminPaymentMethodBreakdown defines model for AdminPaymentMethodBreakdown.
+type AdminPaymentMethodBreakdown struct {
+	// Amount Sum of payable_amount for orders settled via this provider.
+	Amount string `json:"amount"`
+	Count  int    `json:"count"`
+
+	// Provider Payment provider type (e.g. alipay, wxpay, stripe).
+	Provider string `json:"provider"`
+}
+
+// AdminPaymentTopUser defines model for AdminPaymentTopUser.
+type AdminPaymentTopUser struct {
+	Amount     string `json:"amount"`
+	OrderCount int    `json:"order_count"`
+	UserId     Id     `json:"user_id"`
+}
+
 // AdminQuickMapModelsRequest defines model for AdminQuickMapModelsRequest.
 type AdminQuickMapModelsRequest struct {
 	Models     []string `json:"models"`
@@ -10508,6 +10555,12 @@ type GetAdminOpsThroughputTrendParams struct {
 
 // GetAdminOpsThroughputTrendParamsBucket defines parameters for GetAdminOpsThroughputTrend.
 type GetAdminOpsThroughputTrendParamsBucket string
+
+// GetAdminPaymentDashboardParams defines parameters for GetAdminPaymentDashboard.
+type GetAdminPaymentDashboardParams struct {
+	// Days Day window for the aggregation (defaults to 30; clamped 1..365).
+	Days *int `form:"days,omitempty" json:"days,omitempty"`
+}
 
 // ListAdminPaymentOrdersParams defines parameters for ListAdminPaymentOrders.
 type ListAdminPaymentOrdersParams struct {
@@ -18172,6 +18225,9 @@ type ServerInterface interface {
 	// List payment order audit timeline.
 	// (GET /api/v1/admin/payment-orders/{id}/audit-logs)
 	ListAdminPaymentOrderAuditLogs(w http.ResponseWriter, r *http.Request, id Id)
+	// Aggregate paid-order stats for the admin dashboard.
+	// (GET /api/v1/admin/payments/dashboard)
+	GetAdminPaymentDashboard(w http.ResponseWriter, r *http.Request, params GetAdminPaymentDashboardParams)
 	// List payment orders.
 	// (GET /api/v1/admin/payments/orders)
 	ListAdminPaymentOrders(w http.ResponseWriter, r *http.Request, params ListAdminPaymentOrdersParams)
@@ -25098,6 +25154,45 @@ func (siw *ServerInterfaceWrapper) ListAdminPaymentOrderAuditLogs(w http.Respons
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminPaymentOrderAuditLogs(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminPaymentDashboard operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminPaymentDashboard(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminPaymentDashboardParams
+
+	// ------------- Optional query parameter "days" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "days", r.URL.Query(), &params.Days, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "days"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "days", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminPaymentDashboard(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -32463,6 +32558,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/payload-rules/{id}", wrapper.DeleteAdminPayloadRule)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/payload-rules/{id}", wrapper.UpdateAdminPayloadRule)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payment-orders/{id}/audit-logs", wrapper.ListAdminPaymentOrderAuditLogs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/dashboard", wrapper.GetAdminPaymentDashboard)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/orders", wrapper.ListAdminPaymentOrders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/orders/{id}/refund", wrapper.RefundAdminPaymentOrder)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/providers", wrapper.ListAdminPaymentProviders)
