@@ -13,6 +13,7 @@ import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import { enumOptions } from "@/components/admin/resource-form-dialog";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { CopyButton } from "@/components/ui/copy-button";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useAdminApiKeys, useAdminUsers, useResetAdminApiKeyUsage, useUpdateAdminApiKey } from "@/hooks/admin-queries";
@@ -83,7 +84,10 @@ function ApiKeysContent() {
       render: (k) => (
         <div className="min-w-0">
           <div className="truncate text-srapi-text-primary">{k.name}</div>
-          <div className="truncate font-mono text-2xs text-srapi-text-tertiary">{k.prefix}</div>
+          <div className="flex min-w-0 items-center gap-1">
+            <span className="truncate font-mono text-2xs text-srapi-text-tertiary">{k.prefix}</span>
+            {k.prefix ? <CopyButton value={k.prefix} size="inline" /> : null}
+          </div>
         </div>
       ),
       sortValue: (k) => k.name,
