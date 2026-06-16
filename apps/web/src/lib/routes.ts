@@ -62,9 +62,13 @@ export const ADMIN_ROUTES = {
   errorPassthrough: "/admin/gateway-policies?tab=error-passthrough",
   tlsProfiles: "/admin/gateway-policies?tab=tls-profiles",
   payloadRules: "/admin/gateway-policies?tab=payload-rules",
-  roles: "/admin/roles",
+  // Identity config (roles + user-attribute schemas) is one tabbed page
+  // /admin/identity since the aggregation pass — the user DATA CRUD remains
+  // standalone at /admin/users. Legacy routes still 308-redirect.
+  identity: "/admin/identity",
+  roles: "/admin/identity?tab=roles",
   apiKeys: "/admin/api-keys",
-  userAttributes: "/admin/user-attributes",
+  userAttributes: "/admin/identity?tab=user-attributes",
   notificationTemplates: "/admin/notification-templates",
   usage: "/admin/usage",
   copilot: "/admin/copilot",
