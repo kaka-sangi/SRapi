@@ -3729,6 +3729,20 @@ type AccountUsageToday struct {
 	TotalTokens  int     `json:"total_tokens"`
 }
 
+// AccountUsageTodayWithID defines model for AccountUsageTodayWithID.
+type AccountUsageTodayWithID struct {
+	AccountId    Id      `json:"account_id"`
+	Cost         string  `json:"cost"`
+	Currency     string  `json:"currency"`
+	ErrorCount   int     `json:"error_count"`
+	InputTokens  int     `json:"input_tokens"`
+	OutputTokens int     `json:"output_tokens"`
+	Requests     int     `json:"requests"`
+	SuccessCount int     `json:"success_count"`
+	SuccessRate  float32 `json:"success_rate"`
+	TotalTokens  int     `json:"total_tokens"`
+}
+
 // AccountUsageWindow defines model for AccountUsageWindow.
 type AccountUsageWindow struct {
 	Cost         string `json:"cost"`
@@ -4944,6 +4958,12 @@ type BatchAccountActionRequest struct {
 
 // BatchAccountActionRequestAction Maintenance action to apply per account. `clear_error` clears transient error/cooldown metadata and reactivates non-healthy accounts; `recover` resets the account back to active.
 type BatchAccountActionRequestAction string
+
+// BatchAccountUsageTodayResponse defines model for BatchAccountUsageTodayResponse.
+type BatchAccountUsageTodayResponse struct {
+	Data      []AccountUsageTodayWithID `json:"data"`
+	RequestId RequestId                 `json:"request_id"`
+}
 
 // BatchCreateProxiesErrorRow defines model for BatchCreateProxiesErrorRow.
 type BatchCreateProxiesErrorRow struct {
@@ -10339,6 +10359,12 @@ type PreviewAdminCRSSyncJSONBody struct {
 	BaseUrl  string `json:"base_url"`
 	Password string `json:"password"`
 	Username string `json:"username"`
+}
+
+// BatchGetAdminAccountsUsageTodayParams defines parameters for BatchGetAdminAccountsUsageToday.
+type BatchGetAdminAccountsUsageTodayParams struct {
+	// AccountIds Comma-separated account ids. Empty / missing returns an empty data array.
+	AccountIds string `form:"account_ids" json:"account_ids"`
 }
 
 // GetAdminAccountAvailabilityParams defines parameters for GetAdminAccountAvailability.
@@ -17865,6 +17891,9 @@ type ServerInterface interface {
 	// Preview accounts from an external CRS before syncing.
 	// (POST /api/v1/admin/accounts/sync/crs/preview)
 	PreviewAdminCRSSync(w http.ResponseWriter, r *http.Request)
+	// Batch today's usage stats across multiple accounts.
+	// (GET /api/v1/admin/accounts/usage-today/batch)
+	BatchGetAdminAccountsUsageToday(w http.ResponseWriter, r *http.Request, params BatchGetAdminAccountsUsageTodayParams)
 	// Delete a provider account.
 	// (DELETE /api/v1/admin/accounts/{id})
 	DeleteAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
@@ -20186,6 +20215,45 @@ func (siw *ServerInterfaceWrapper) PreviewAdminCRSSync(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PreviewAdminCRSSync(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchGetAdminAccountsUsageToday operation middleware
+func (siw *ServerInterfaceWrapper) BatchGetAdminAccountsUsageToday(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params BatchGetAdminAccountsUsageTodayParams
+
+	// ------------- Required query parameter "account_ids" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "account_ids", r.URL.Query(), &params.AccountIds, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "account_ids"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_ids", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchGetAdminAccountsUsageToday(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -32553,6 +32621,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/pending/{id}", wrapper.GetAdminAccountOAuthPending)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/sync/crs", wrapper.SyncAdminCRS)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/sync/crs/preview", wrapper.PreviewAdminCRSSync)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/usage-today/batch", wrapper.BatchGetAdminAccountsUsageToday)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.DeleteAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.GetAdminAccount)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.UpdateAdminAccount)

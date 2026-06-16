@@ -38,6 +38,7 @@ import {
   useDiscoverAccountModels,
   useExportAccounts,
   useAccountsHealthSummary,
+  useAccountsUsageTodayBatch,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -45,6 +46,7 @@ import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { formatInteger, formatMoney, formatPercent } from "@/lib/admin-format";
 import {
   ACCOUNT_STATUSES,
   buildBatchAccountActionBody,
@@ -138,6 +140,13 @@ function AccountsContent() {
   const groups = useAdminGroups();
   const groupNameById = new Map(
     (groups.data?.data ?? []).map((g) => [String(g.id), g.name] as const),
+  );
+  // Today usage per row — batched into one call so the column is cheap even
+  // when the page shows many accounts. Joined back by account_id below.
+  const visibleAccountIds = (accounts.data?.data ?? []).map((a) => a.id);
+  const usageToday = useAccountsUsageTodayBatch(visibleAccountIds);
+  const todayByAccountId = new Map(
+    (usageToday.data ?? []).map((t) => [t.account_id, t] as const),
   );
 
   const [formTarget, setFormTarget] = useState<ProviderAccount | "new" | null>(null);
@@ -360,6 +369,37 @@ function AccountsContent() {
       hideOnMobile: true,
       sortValue: (a) => healthById.get(a.id)?.quota_remaining_ratio ?? -1,
       render: (a) => <AccountQuotaCell health={healthById.get(a.id)} />,
+    },
+    {
+      key: "today",
+      header: t("adminAccounts.today"),
+      hideOnMobile: true,
+      sortValue: (a) => todayByAccountId.get(a.id)?.requests ?? -1,
+      render: (a) => {
+        const today = todayByAccountId.get(a.id);
+        if (!today) {
+          return (
+            <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>
+          );
+        }
+        if (today.requests === 0) {
+          return (
+            <span className="font-mono text-2xs text-srapi-text-tertiary">
+              {t("adminAccounts.todayIdle")}
+            </span>
+          );
+        }
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="font-mono text-2xs text-srapi-text-secondary tabular">
+              {formatInteger(today.requests)} · {formatMoney(today.cost, today.currency)}
+            </span>
+            <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+              {formatPercent(today.success_rate)}
+            </span>
+          </div>
+        );
+      },
     },
   ];
 

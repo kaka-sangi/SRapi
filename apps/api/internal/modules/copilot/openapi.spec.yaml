@@ -6225,6 +6225,49 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/accounts/usage-today/batch:
+    get:
+      tags:
+        - AdminAccounts
+      operationId: batchGetAdminAccountsUsageToday
+      summary: Batch today's usage stats across multiple accounts.
+      description: |
+        Returns one AccountUsageToday entry per requested account_id, all
+        computed from a single scan over the usage log. Useful for showing
+        per-row "today" metrics on the accounts list without an N+1 fetch.
+        Unknown account_ids are silently omitted from the response.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: account_ids
+          in: query
+          description: Comma-separated account ids. Empty / missing returns an empty data array.
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Per-account usage today.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchAccountUsageTodayResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/accounts/{id}/usage-today:
     get:
       tags:
@@ -24095,6 +24138,29 @@ components:
           minimum: 0
         success_rate:
           type: number
+
+    AccountUsageTodayWithID:
+      allOf:
+        - $ref: "#/components/schemas/AccountUsageToday"
+        - type: object
+          required:
+            - account_id
+          properties:
+            account_id:
+              $ref: "#/components/schemas/Id"
+
+    BatchAccountUsageTodayResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountUsageTodayWithID"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
 
     UsageTrendSeriesPoint:
       type: object

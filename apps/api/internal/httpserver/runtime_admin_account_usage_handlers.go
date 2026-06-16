@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
@@ -249,6 +250,109 @@ func (s *Server) handleGetAdminAccountUsageDaily(w http.ResponseWriter, r *http.
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       points,
 		"request_id": requestID,
+	})
+}
+
+// handleBatchGetAdminAccountsUsageToday serves
+// GET /api/v1/admin/accounts/usage-today/batch?account_ids=1,2,3
+//
+// Sums today's usage per requested account in a single scan over the usage
+// log so the accounts list page can render per-row "today" metrics without
+// firing N requests. Unknown account_ids silently drop out of the response —
+// pagination-driven callers shouldn't fail on stale ids.
+func (s *Server) handleBatchGetAdminAccountsUsageToday(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	raw := strings.TrimSpace(r.URL.Query().Get("account_ids"))
+	if raw == "" {
+		writeJSONAny(w, http.StatusOK, apiopenapi.BatchAccountUsageTodayResponse{
+			Data:      []apiopenapi.AccountUsageTodayWithID{},
+			RequestId: requestID,
+		})
+		return
+	}
+	wanted := make(map[int]struct{})
+	order := make([]int, 0)
+	for _, piece := range strings.Split(raw, ",") {
+		piece = strings.TrimSpace(piece)
+		if piece == "" {
+			continue
+		}
+		id, err := strconv.Atoi(piece)
+		if err != nil || id <= 0 {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account id in batch", requestID)
+			return
+		}
+		if _, dup := wanted[id]; dup {
+			continue
+		}
+		wanted[id] = struct{}{}
+		order = append(order, id)
+	}
+	if len(wanted) == 0 {
+		writeJSONAny(w, http.StatusOK, apiopenapi.BatchAccountUsageTodayResponse{
+			Data:      []apiopenapi.AccountUsageTodayWithID{},
+			RequestId: requestID,
+		})
+		return
+	}
+	items, err := s.runtime.usage.List(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to load usage", requestID)
+		return
+	}
+	now := time.Now().UTC()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	accumulators := make(map[int]*usageWindowAccumulator, len(wanted))
+	for _, log := range items {
+		if log.AccountID == nil {
+			continue
+		}
+		if _, ok := wanted[*log.AccountID]; !ok {
+			continue
+		}
+		created := log.CreatedAt.UTC()
+		if created.Before(todayStart) || created.After(now) {
+			continue
+		}
+		acc, ok := accumulators[*log.AccountID]
+		if !ok {
+			acc = newUsageWindowAccumulator()
+			accumulators[*log.AccountID] = acc
+		}
+		acc.add(log)
+	}
+	out := make([]apiopenapi.AccountUsageTodayWithID, 0, len(order))
+	for _, id := range order {
+		acc, ok := accumulators[id]
+		if !ok {
+			// No traffic today for this account — keep the row but zero it out
+			// so the frontend can render "—" without a missing-key check.
+			acc = newUsageWindowAccumulator()
+		}
+		var successRate float32
+		if acc.requests > 0 {
+			successRate = float32(acc.successCount) / float32(acc.requests)
+		}
+		out = append(out, apiopenapi.AccountUsageTodayWithID{
+			AccountId:    apiopenapi.Id(strconv.Itoa(id)),
+			Requests:     acc.requests,
+			SuccessCount: acc.successCount,
+			ErrorCount:   acc.errorCount,
+			SuccessRate:  successRate,
+			InputTokens:  acc.inputTokens,
+			OutputTokens: acc.outputTokens,
+			TotalTokens:  acc.totalTokens,
+			Cost:         money.FormatRatFixed(acc.cost, 2),
+			Currency:     acc.currencyOrDefault(),
+		})
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.BatchAccountUsageTodayResponse{
+		Data:      out,
+		RequestId: requestID,
 	})
 }
 

@@ -3761,6 +3761,15 @@ export type AccountUsageToday = {
     success_rate: number;
 };
 
+export type AccountUsageTodayWithId = AccountUsageToday & {
+    account_id: Id;
+};
+
+export type BatchAccountUsageTodayResponse = {
+    data: Array<AccountUsageTodayWithId>;
+    request_id: RequestId;
+};
+
 export type UsageTrendSeriesPoint = {
     bucket: string;
     requests: number;
@@ -12918,6 +12927,48 @@ export type GetAdminAccountUsageDailyResponses = {
 };
 
 export type GetAdminAccountUsageDailyResponse = GetAdminAccountUsageDailyResponses[keyof GetAdminAccountUsageDailyResponses];
+
+export type BatchGetAdminAccountsUsageTodayData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Comma-separated account ids. Empty / missing returns an empty data array.
+         */
+        account_ids: string;
+    };
+    url: '/api/v1/admin/accounts/usage-today/batch';
+};
+
+export type BatchGetAdminAccountsUsageTodayErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchGetAdminAccountsUsageTodayError = BatchGetAdminAccountsUsageTodayErrors[keyof BatchGetAdminAccountsUsageTodayErrors];
+
+export type BatchGetAdminAccountsUsageTodayResponses = {
+    /**
+     * Per-account usage today.
+     */
+    200: BatchAccountUsageTodayResponse;
+};
+
+export type BatchGetAdminAccountsUsageTodayResponse = BatchGetAdminAccountsUsageTodayResponses[keyof BatchGetAdminAccountsUsageTodayResponses];
 
 export type GetAdminAccountUsageTodayData = {
     body?: never;

@@ -668,6 +668,8 @@ export const en = {
     groups: "Groups",
     ungrouped: "Ungrouped",
     allGroups: "All groups",
+    today: "Today",
+    todayIdle: "Idle",
     models: "Models",
     test: "Test",
     viewCards: "Cards",

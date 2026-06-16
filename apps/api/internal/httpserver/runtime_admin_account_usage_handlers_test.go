@@ -142,6 +142,47 @@ func TestAdminAccountUsageStatsEndpoints(t *testing.T) {
 	if anonRec.Code != http.StatusForbidden {
 		t.Fatalf("usage-today without admin session: expected 403, got %d", anonRec.Code)
 	}
+
+	// usage-today/batch must match the single-account number for the same id,
+	// echo unknown ids as zeroed rows (not omit them — the list view wants a
+	// consistent column for every selected row), and surface the requested
+	// account_id back on each row so the frontend can join by id.
+	batchRec := doAdminGet(t, handler, sessionCookie,
+		"/api/v1/admin/accounts/usage-today/batch?account_ids="+accountID+",99999")
+	if batchRec.Code != http.StatusOK {
+		t.Fatalf("batch usage-today: expected 200, got %d body=%s", batchRec.Code, batchRec.Body.String())
+	}
+	var batch apiopenapi.BatchAccountUsageTodayResponse
+	if err := json.NewDecoder(batchRec.Body).Decode(&batch); err != nil {
+		t.Fatalf("decode batch usage-today: %v", err)
+	}
+	if len(batch.Data) != 2 {
+		t.Fatalf("batch usage-today: expected 2 rows (real + unknown zero-row), got %d", len(batch.Data))
+	}
+	var matched *apiopenapi.AccountUsageTodayWithID
+	for i := range batch.Data {
+		if string(batch.Data[i].AccountId) == accountID {
+			matched = &batch.Data[i]
+		}
+	}
+	if matched == nil {
+		t.Fatalf("batch usage-today: expected a row for account %q", accountID)
+	}
+	if matched.Requests != 1 || matched.SuccessCount != 1 || matched.SuccessRate != 1 {
+		t.Fatalf("batch usage-today: row for account %q mismatch: %+v", accountID, matched)
+	}
+	if matched.TotalTokens != 8 {
+		t.Fatalf("batch usage-today: expected 8 total tokens, got %d", matched.TotalTokens)
+	}
+
+	emptyRec := doAdminGet(t, handler, sessionCookie, "/api/v1/admin/accounts/usage-today/batch?account_ids=")
+	if emptyRec.Code != http.StatusOK {
+		t.Fatalf("batch usage-today empty: expected 200, got %d", emptyRec.Code)
+	}
+	badRec := doAdminGet(t, handler, sessionCookie, "/api/v1/admin/accounts/usage-today/batch?account_ids=foo")
+	if badRec.Code != http.StatusBadRequest {
+		t.Fatalf("batch usage-today bad: expected 400, got %d", badRec.Code)
+	}
 }
 
 // doAdminGet issues an admin-authenticated GET and returns the recorder.

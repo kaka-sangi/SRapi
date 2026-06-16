@@ -34,6 +34,20 @@ export function useAccountUsageToday(id: string | null) {
   });
 }
 
+// useAccountsUsageTodayBatch fetches today's usage for the currently visible
+// account ids in a single round-trip — used by the accounts list "Today" column
+// so a list of N rows costs one HTTP call instead of N. The id list is sorted
+// for cache-key stability so consecutive renders share the same query.
+export function useAccountsUsageTodayBatch(ids: string[]) {
+  const sortedIds = [...ids].sort();
+  return useQuery({
+    queryKey: queryKeys.admin.accountsUsageTodayBatch(sortedIds),
+    queryFn: () => adminApi.batchGetAccountsUsageToday(sortedIds),
+    enabled: sortedIds.length > 0,
+    staleTime: 30_000,
+  });
+}
+
 export function useAccountUsageDaily(id: string | null, days = ACCOUNT_USAGE_DAILY_DAYS) {
   return useQuery({
     queryKey: queryKeys.admin.accountUsageDaily(id ?? "", days),

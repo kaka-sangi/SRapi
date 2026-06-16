@@ -24,6 +24,7 @@ import {
   getAdminAccountsHealthSummary,
   getAdminAccountUsageWindows,
   getAdminAccountUsageToday,
+  batchGetAdminAccountsUsageToday,
   getAdminAccountUsageDaily,
   fetchAdminAccountQuota,
   getAdminAccountQuota,
@@ -51,6 +52,7 @@ import type {
   AccountRpmStatus,
   AccountUsageWindowsResult,
   AccountUsageToday,
+  AccountUsageTodayWithId,
   AccountUsageDailyPoint,
   GetAdminAccountUsageDailyData,
   AdminAccountTestRequest,
@@ -243,6 +245,16 @@ export const accountsApi = {
 
   getAccountUsageToday(id: Id): Promise<AccountUsageToday> {
     return unwrapData(() => getAdminAccountUsageToday({ path: { id }, throwOnError: true }));
+  },
+
+  batchGetAccountsUsageToday(accountIds: Id[]): Promise<AccountUsageTodayWithId[]> {
+    if (accountIds.length === 0) return Promise.resolve([]);
+    return unwrapData(() =>
+      batchGetAdminAccountsUsageToday({
+        query: { account_ids: accountIds.join(",") },
+        throwOnError: true,
+      }),
+    );
   },
 
   getAccountUsageDaily(
