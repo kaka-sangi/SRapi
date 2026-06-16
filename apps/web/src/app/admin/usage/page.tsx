@@ -51,6 +51,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { formatMoney, formatDateTime, formatInteger } from "@/lib/admin-format";
 import { UserBalanceHistoryDialog } from "@/components/admin/user-balance-history-dialog";
 import type { UsageLog } from "@/lib/sdk-types";
+import {
+  LOG_WINDOW_PRESETS,
+  LOG_WINDOW_ALL_LABEL_KEY,
+  logWindowSince,
+} from "@/lib/log-window-filter";
 
 // Structurally matches `UsageAggregateDimension` ('day' | 'model' | 'user' |
 // 'account'). The order here drives the segmented-control order.
@@ -175,12 +180,18 @@ function UsageContent() {
   const [balanceUser, setBalanceUser] = useState<{ id: string; email: string } | null>(null);
   const modelFilter = list.filters.model || undefined;
   const userFilter = list.filters.user || undefined;
+  const windowFilter = list.filters.window;
+  // Resolve the preset to an ISO timestamp the backend's start filter
+  // honours via the shared filterUsageLogs helper. Null when the preset is
+  // unset (default "All time").
+  const sinceFilter = logWindowSince(windowFilter)?.toISOString();
   // Server-side: page/filters drive the query (the log can grow unbounded).
   const usage = useAdminUsageLogs({
     page: list.page,
     page_size: list.pageSize,
     model: modelFilter,
     user_id: userFilter,
+    start: sinceFilter,
   });
   const daily = useAdminUsageDaily();
   const dailyData = daily.data?.data ?? [];
@@ -203,7 +214,7 @@ function UsageContent() {
     (usersList.data?.data ?? []).map((u) => [String(u.id), u] as const),
   );
   const balanceUserRecord = balanceUser ? userById.get(balanceUser.id) : undefined;
-  const isFiltered = Boolean(modelFilter || userFilter);
+  const isFiltered = Boolean(modelFilter || userFilter || windowFilter);
   const total = usage.data?.pagination?.total ?? usage.data?.data.length ?? 0;
 
   const columns: Column<UsageLog>[] = [
@@ -535,6 +546,12 @@ function UsageContent() {
               onChange={(v) => list.setFilter("user", v)}
               options={userOptions}
               allLabel={t("adminUsage.allUsers")}
+            />
+            <FilterSelect
+              value={list.filters.window}
+              onChange={(v) => list.setFilter("window", v)}
+              options={LOG_WINDOW_PRESETS.map((p) => ({ value: p.value, label: t(p.labelKey) }))}
+              allLabel={t(LOG_WINDOW_ALL_LABEL_KEY)}
             />
           </ListToolbar>
         }
