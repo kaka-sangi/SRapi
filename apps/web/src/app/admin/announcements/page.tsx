@@ -89,6 +89,18 @@ function AnnouncementsContent() {
       options: enumOptions(ANNOUNCEMENT_AUDIENCES),
     },
     {
+      name: "startsAt",
+      label: t("adminAnnouncements.startsAt"),
+      type: "datetime",
+      hint: t("adminAnnouncements.startsAtHint"),
+    },
+    {
+      name: "endsAt",
+      label: t("adminAnnouncements.endsAt"),
+      type: "datetime",
+      hint: t("adminAnnouncements.endsAtHint"),
+    },
+    {
       name: "segmentRoles",
       label: t("adminAnnouncements.segmentRoles"),
       type: "multiselect",

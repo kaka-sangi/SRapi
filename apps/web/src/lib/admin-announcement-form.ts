@@ -25,6 +25,11 @@ export interface AnnouncementFormState {
   segmentRoles: string[];
   segmentUserIds: string[];
   segmentEmailDomains: string[];
+  // Scheduling window. Both are optional — leave blank for "active now" /
+  // "no end". Stored as the local-form `yyyy-MM-ddTHH:mm` shape used by the
+  // datetime-local input; converted to ISO on save.
+  startsAt: string;
+  endsAt: string;
 }
 
 export interface AnnouncementDeleteState {
@@ -43,6 +48,8 @@ export function emptyAnnouncementForm(): AnnouncementFormState {
     segmentRoles: [],
     segmentUserIds: [],
     segmentEmailDomains: [],
+    startsAt: "",
+    endsAt: "",
   };
 }
 
@@ -57,6 +64,8 @@ export function announcementFormFromAnnouncement(announcement: Announcement): An
     segmentRoles: segment?.roles ?? [],
     segmentUserIds: (segment?.user_ids ?? []).map((id) => String(id)),
     segmentEmailDomains: segment?.email_domains ?? [],
+    startsAt: isoToLocalInput(announcement.starts_at),
+    endsAt: isoToLocalInput(announcement.ends_at),
   };
 }
 
@@ -73,7 +82,28 @@ export function buildAnnouncementBody(form: AnnouncementFormState): CreateAnnoun
     severity: form.severity,
     audience: form.audience,
     segments: hasSegment ? [segment] : undefined,
+    starts_at: localInputToIso(form.startsAt) ?? undefined,
+    ends_at: localInputToIso(form.endsAt) ?? undefined,
   };
+}
+
+// datetime-local <input> values are `yyyy-MM-ddTHH:mm` in the user's local
+// time. Convert each direction via the JS Date so the backend sees a real
+// ISO timestamp and the form sees a value the input control will accept.
+function isoToLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function localInputToIso(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const d = new Date(trimmed);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
 }
 
 export function deleteStateFromAnnouncement(announcement: Announcement): AnnouncementDeleteState {
