@@ -55,6 +55,23 @@ export function useCancelWithdrawal() {
   );
 }
 
+export function useAffiliateManualAdjustments(
+  params?: P<typeof adminApi.listAffiliateManualAdjustments>,
+) {
+  return useQuery({
+    queryKey: queryKeys.admin.affiliateManualAdjustments(params),
+    queryFn: () => adminApi.listAffiliateManualAdjustments(params),
+  });
+}
+
+export function useCreateAffiliateManualAdjustment() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createAffiliateManualAdjustment>) =>
+      adminApi.createAffiliateManualAdjustment(body),
+    ["admin", "affiliates", "manual-adjustments"],
+  );
+}
+
 export function useAffiliateRules(params?: P<typeof adminApi.listAffiliateRules>) {
   return useQuery({
     queryKey: queryKeys.admin.affiliateRules(params),

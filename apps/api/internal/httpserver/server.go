@@ -519,6 +519,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/affiliates/invites", server.handleListAdminAffiliateInvites)
 	mux.HandleFunc("GET /api/v1/admin/affiliates/rebates", server.handleListAdminAffiliateRebates)
 	mux.HandleFunc("GET /api/v1/admin/affiliates/transfers", server.handleListAdminAffiliateTransfers)
+	mux.HandleFunc("GET /api/v1/admin/affiliates/manual-adjustments", server.handleListAdminAffiliateManualAdjustments)
 	mux.HandleFunc("POST /api/v1/admin/affiliates/manual-adjustments", server.handleCreateAdminAffiliateManualAdjustment)
 	mux.HandleFunc("POST /api/v1/admin/affiliates/withdrawals/{id}/approve", server.handleApproveAdminAffiliateWithdrawal)
 	mux.HandleFunc("POST /api/v1/admin/affiliates/withdrawals/{id}/cancel", server.handleCancelAdminAffiliateWithdrawal)

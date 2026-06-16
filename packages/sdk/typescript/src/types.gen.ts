@@ -13178,6 +13178,43 @@ export type ListAdminAffiliateTransfersResponses = {
 
 export type ListAdminAffiliateTransfersResponse = ListAdminAffiliateTransfersResponses[keyof ListAdminAffiliateTransfersResponses];
 
+export type ListAdminAffiliateManualAdjustmentsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        user_id?: Id;
+    };
+    url: '/api/v1/admin/affiliates/manual-adjustments';
+};
+
+export type ListAdminAffiliateManualAdjustmentsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminAffiliateManualAdjustmentsError = ListAdminAffiliateManualAdjustmentsErrors[keyof ListAdminAffiliateManualAdjustmentsErrors];
+
+export type ListAdminAffiliateManualAdjustmentsResponses = {
+    /**
+     * Affiliate manual adjustment ledger list.
+     */
+    200: AffiliateLedgerEntryListResponse;
+};
+
+export type ListAdminAffiliateManualAdjustmentsResponse = ListAdminAffiliateManualAdjustmentsResponses[keyof ListAdminAffiliateManualAdjustmentsResponses];
+
 export type CreateAdminAffiliateManualAdjustmentData = {
     body: AdminAffiliateManualAdjustmentRequest;
     path?: never;

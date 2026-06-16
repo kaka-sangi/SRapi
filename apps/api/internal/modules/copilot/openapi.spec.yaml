@@ -6775,6 +6775,42 @@ paths:
           $ref: "#/components/responses/StandardError"
 
   /api/v1/admin/affiliates/manual-adjustments:
+    get:
+      tags:
+        - AdminAffiliates
+      operationId: listAdminAffiliateManualAdjustments
+      summary: List affiliate manual adjustments.
+      description: |
+        Admin recovery / corrections — credits and debits to a user's
+        affiliate balance recorded outside the normal accrual/payout flow.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: user_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Affiliate manual adjustment ledger list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateLedgerEntryListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
     post:
       tags:
         - AdminAffiliates

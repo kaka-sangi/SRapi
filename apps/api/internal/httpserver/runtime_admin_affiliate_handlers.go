@@ -39,6 +39,10 @@ func (s *Server) handleListAdminAffiliateTransfers(w http.ResponseWriter, r *htt
 	s.handleListAdminAffiliateLedgers(w, r, "transfer")
 }
 
+func (s *Server) handleListAdminAffiliateManualAdjustments(w http.ResponseWriter, r *http.Request) {
+	s.handleListAdminAffiliateLedgers(w, r, "manual_adjustment")
+}
+
 func (s *Server) handleListAdminAffiliateRules(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {

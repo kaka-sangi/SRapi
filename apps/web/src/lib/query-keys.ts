@@ -93,6 +93,8 @@ export const queryKeys = {
       ["admin", "affiliates", "transfers", params ?? {}] as const,
     affiliateWithdrawals: (params?: unknown) =>
       ["admin", "affiliates", "withdrawals", params ?? {}] as const,
+    affiliateManualAdjustments: (params?: unknown) =>
+      ["admin", "affiliates", "manual-adjustments", params ?? {}] as const,
     affiliateRules: (params?: unknown) => ["admin", "affiliates", "rules", params ?? {}] as const,
     paymentProviders: (params?: unknown) => ["admin", "payment-providers", params ?? {}] as const,
     paymentOrders: (params?: unknown) => ["admin", "payment-orders", params ?? {}] as const,

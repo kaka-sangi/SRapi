@@ -10178,6 +10178,13 @@ type ListAdminAffiliateInvitesParams struct {
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
+// ListAdminAffiliateManualAdjustmentsParams defines parameters for ListAdminAffiliateManualAdjustments.
+type ListAdminAffiliateManualAdjustmentsParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+	UserId   *Id       `form:"user_id,omitempty" json:"user_id,omitempty"`
+}
+
 // ListAdminAffiliateRebatesParams defines parameters for ListAdminAffiliateRebates.
 type ListAdminAffiliateRebatesParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
@@ -17712,6 +17719,9 @@ type ServerInterface interface {
 	// List affiliate invite relationships.
 	// (GET /api/v1/admin/affiliates/invites)
 	ListAdminAffiliateInvites(w http.ResponseWriter, r *http.Request, params ListAdminAffiliateInvitesParams)
+	// List affiliate manual adjustments.
+	// (GET /api/v1/admin/affiliates/manual-adjustments)
+	ListAdminAffiliateManualAdjustments(w http.ResponseWriter, r *http.Request, params ListAdminAffiliateManualAdjustmentsParams)
 	// Create an affiliate ledger manual adjustment.
 	// (POST /api/v1/admin/affiliates/manual-adjustments)
 	CreateAdminAffiliateManualAdjustment(w http.ResponseWriter, r *http.Request)
@@ -20775,6 +20785,71 @@ func (siw *ServerInterfaceWrapper) ListAdminAffiliateInvites(w http.ResponseWrit
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminAffiliateInvites(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminAffiliateManualAdjustments operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminAffiliateManualAdjustments(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminAffiliateManualAdjustmentsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminAffiliateManualAdjustments(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -31986,6 +32061,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/affiliate-rules", wrapper.CreateAdminAffiliateRule)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/affiliate-rules/{id}", wrapper.UpdateAdminAffiliateRule)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliates/invites", wrapper.ListAdminAffiliateInvites)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliates/manual-adjustments", wrapper.ListAdminAffiliateManualAdjustments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/affiliates/manual-adjustments", wrapper.CreateAdminAffiliateManualAdjustment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliates/rebates", wrapper.ListAdminAffiliateRebates)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliates/transfers", wrapper.ListAdminAffiliateTransfers)

@@ -3,14 +3,17 @@
 import {
   approveAdminAffiliateWithdrawal,
   cancelAdminAffiliateWithdrawal,
+  createAdminAffiliateManualAdjustment,
   createAdminAffiliateRule,
   listAdminAffiliateInvites,
+  listAdminAffiliateManualAdjustments,
   listAdminAffiliateRebates,
   listAdminAffiliateRules,
   listAdminAffiliateTransfers,
   updateAdminAffiliateRule,
 } from "../../../../../packages/sdk/typescript/src/index";
 import type {
+  AdminAffiliateManualAdjustmentRequest,
   AdminAffiliateWithdrawalDecisionRequest,
   AffiliateInviteRecord,
   AffiliateLedgerEntry,
@@ -18,6 +21,7 @@ import type {
   CreateAffiliateRuleRequest,
   Id,
   ListAdminAffiliateInvitesData,
+  ListAdminAffiliateManualAdjustmentsData,
   ListAdminAffiliateRebatesData,
   ListAdminAffiliateRulesData,
   ListAdminAffiliateTransfersData,
@@ -64,6 +68,18 @@ export const affiliateApi = {
     return unwrapData(() =>
       cancelAdminAffiliateWithdrawal({ path: { id }, body, throwOnError: true }),
     );
+  },
+
+  listAffiliateManualAdjustments(
+    query?: ListAdminAffiliateManualAdjustmentsData["query"],
+  ): Promise<AdminListResult<AffiliateLedgerEntry>> {
+    return unwrapList(() => listAdminAffiliateManualAdjustments({ query, throwOnError: true }));
+  },
+
+  createAffiliateManualAdjustment(
+    body: AdminAffiliateManualAdjustmentRequest,
+  ): Promise<AffiliateLedgerEntry> {
+    return unwrapData(() => createAdminAffiliateManualAdjustment({ body, throwOnError: true }));
   },
 
   listAffiliateRules(
