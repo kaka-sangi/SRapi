@@ -315,6 +315,52 @@ func TestGatewayChatCompletionsStreamEmitsKeepaliveDuringUpstreamGap(t *testing.
 	}
 }
 
+// TestGatewayChatCompletionsStreamEmitsErrorOnIdleTimeout proves a stalled
+// upstream surfaces an in-band error frame to the client rather than silently
+// truncating the stream (which would leave the client hanging on a connection
+// that simply stops producing data).
+func TestGatewayChatCompletionsStreamEmitsErrorOnIdleTimeout(t *testing.T) {
+	chunk1 := "data: {\"id\":\"chunk_1\",\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n"
+	release := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		_, _ = io.WriteString(w, chunk1)
+		if flusher != nil {
+			flusher.Flush()
+		}
+		<-release // stall past the idle timeout so the gateway must give up
+	}))
+	defer upstream.Close()
+	defer close(release)
+
+	cfg := config.Load()
+	cfg.Gateway.StreamIdleTimeout = 80 * time.Millisecond
+	cfg.Gateway.StreamKeepaliveInterval = 10 * time.Second // keep keepalives out of the body
+	handler := New(cfg, nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"stream-idle-provider","display_name":"Stream Idle Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"stream-idle-model","display_name":"Stream Idle Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"stream-idle-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"stream-idle-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"stream-idle-model","stream":true,"messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "chunk_1") {
+		t.Fatalf("expected the first chunk before the stall, got: %q", body)
+	}
+	if !strings.Contains(body, "event: error") || !strings.Contains(body, "stream_idle_timeout") {
+		t.Fatalf("expected an idle-timeout error frame, got: %q", body)
+	}
+}
+
 func TestGatewayCodexImageGenerationStreamsTransformedEventsIncrementally(t *testing.T) {
 	partial := "data: {\"type\":\"response.image_generation_call.partial_image\",\"partial_image_b64\":\"cGFydGlhbA==\",\"partial_image_index\":0,\"output_format\":\"png\",\"background\":\"auto\"}\n\n"
 	completed := "data: {\"type\":\"response.completed\",\"response\":{\"created_at\":1710000001,\"usage\":{\"input_tokens\":5,\"output_tokens\":9,\"total_tokens\":14},\"tools\":[{\"type\":\"image_generation\",\"model\":\"gpt-image-2\",\"background\":\"auto\",\"output_format\":\"png\",\"quality\":\"high\",\"size\":\"1024x1024\"}],\"output\":[{\"type\":\"image_generation_call\",\"result\":\"ZmluYWw=\",\"output_format\":\"png\"}]}}\n\n"

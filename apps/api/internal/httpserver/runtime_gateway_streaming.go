@@ -303,6 +303,10 @@ readLoop:
 			if sc.err != nil {
 				if sc.err != io.EOF {
 					interrupted = true
+					// A non-EOF mid-stream read error must surface to the client as
+					// an error frame, not a silent truncation that looks like a clean
+					// but incomplete response.
+					_ = writeSSEStreamError(w, flusher, "upstream stream error", "upstream_stream_error", http.StatusBadGateway)
 				}
 				break readLoop
 			}
@@ -310,6 +314,9 @@ readLoop:
 			idleTimedOut = true
 			interrupted = true
 			_ = providerResp.StreamBody.Close()
+			// Tell the client the stream stalled instead of leaving it to hang on a
+			// connection that simply stops producing data.
+			_ = writeSSEStreamError(w, flusher, "upstream stream idle timeout", "stream_idle_timeout", http.StatusGatewayTimeout)
 			break readLoop
 		case <-keepaliveCh:
 			if err := writeSSEKeepalive(w, flusher); err != nil {
@@ -478,7 +485,7 @@ readLoop:
 			idleTimedOut = true
 			interrupted = true
 			_ = providerResp.StreamBody.Close()
-			_ = writeImageGenerationStreamError(w, flusher, "upstream image stream idle timeout", "stream_idle_timeout", http.StatusGatewayTimeout)
+			_ = writeSSEStreamError(w, flusher, "upstream image stream idle timeout", "stream_idle_timeout", http.StatusGatewayTimeout)
 			break readLoop
 		case <-keepaliveCh:
 			if err := writeSSEKeepalive(w, flusher); err != nil {
@@ -536,7 +543,11 @@ readLoop:
 	s.runtime.recordGatewayUsage(r.Context(), record)
 }
 
-func writeImageGenerationStreamError(w http.ResponseWriter, flusher http.Flusher, message string, code string, statusCode int) error {
+// writeSSEStreamError emits an in-band `event: error` SSE frame so a client sees
+// a real error instead of a silently truncated stream. The frame shape (type:
+// error + nested error object) is Anthropic-compatible and tolerated by chat /
+// responses clients, which read the data payload regardless of the event name.
+func writeSSEStreamError(w http.ResponseWriter, flusher http.Flusher, message string, code string, statusCode int) error {
 	payload := map[string]any{
 		"type":        "error",
 		"status_code": statusCode,
