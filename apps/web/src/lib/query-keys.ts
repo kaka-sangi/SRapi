@@ -76,6 +76,8 @@ export const queryKeys = {
     usageTrends: (params?: unknown) => ["admin", "usage-trends", params ?? {}] as const,
     usageErrorDistribution: (params?: unknown) =>
       ["admin", "usage-error-distribution", params ?? {}] as const,
+    usageDistribution: (params?: unknown) =>
+      ["admin", "usage-distribution", params ?? {}] as const,
     auditLogs: (params?: unknown) => ["admin", "audit-logs", params ?? {}] as const,
     errorLogs: (params?: unknown) => ["admin", "error-logs", params ?? {}] as const,
     errorLog: (id: string) => ["admin", "error-logs", id] as const,

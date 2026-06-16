@@ -4,6 +4,7 @@ import {
   cleanupAdminUsage,
   getAdminUsageAggregates,
   getAdminUsageDaily,
+  getAdminUsageDistribution,
   getAdminUsageErrorDistribution,
   getAdminUsageTrends,
   listAdminAuditLogs,
@@ -15,6 +16,7 @@ import type {
   AuditLog,
   BillingLedgerEntry,
   DomainEventOutbox,
+  GetAdminUsageDistributionData,
   GetAdminUsageTrendsData,
   ListAdminAuditLogsData,
   ListAdminBillingLedgerData,
@@ -24,6 +26,7 @@ import type {
   UsageCleanupResult,
   UsageAggregate,
   UsageAggregateDimension,
+  UsageDistributionResult,
   UsageErrorBucket,
   UsageLog,
   UsageTrendSeriesResult,
@@ -63,6 +66,16 @@ export const usageApi = {
   // payload `data` is the bucket array directly (no pagination envelope).
   getUsageErrorDistribution(query?: AdminTimeRange): Promise<UsageErrorBucket[]> {
     return unwrapData(() => getAdminUsageErrorDistribution({ query, throwOnError: true }));
+  },
+
+  // Share-by-dimension distribution (the complement to getUsageTrends): groups
+  // usage by a dimension (model|requested_model|upstream_model|account|provider|
+  // api_key|source_endpoint|billing_mode|user) and returns the top-N buckets,
+  // each carrying its percentage share of the chosen metric (requests|tokens|cost).
+  getUsageDistribution(
+    query?: GetAdminUsageDistributionData["query"],
+  ): Promise<UsageDistributionResult> {
+    return unwrapData(() => getAdminUsageDistribution({ query, throwOnError: true }));
   },
 
   // Operator on-demand deletion of usage records (the counterpart to the

@@ -34,6 +34,11 @@ export type UsageErrorDistributionData = Awaited<
 >;
 export type UsageErrorBucketItem = UsageErrorDistributionData[number];
 
+export type UsageDistributionData = Awaited<
+  ReturnType<typeof adminApi.getUsageDistribution>
+>;
+export type UsageDistributionBucketItem = UsageDistributionData["buckets"][number];
+
 export function useAdminUsageTrends(params?: P<typeof adminApi.getUsageTrends>) {
   return useQuery({
     queryKey: queryKeys.admin.usageTrends(params),
@@ -48,6 +53,16 @@ export function useAdminUsageErrorDistribution(
   return useQuery({
     queryKey: queryKeys.admin.usageErrorDistribution(params),
     queryFn: () => adminApi.getUsageErrorDistribution(params),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useAdminUsageDistribution(
+  params?: P<typeof adminApi.getUsageDistribution>,
+) {
+  return useQuery({
+    queryKey: queryKeys.admin.usageDistribution(params),
+    queryFn: () => adminApi.getUsageDistribution(params),
     refetchInterval: 30_000,
   });
 }

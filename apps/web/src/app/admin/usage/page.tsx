@@ -19,9 +19,21 @@ import {
 import {
   useAdminUsageTrends,
   useAdminUsageErrorDistribution,
+  useAdminUsageDistribution,
 } from "@/hooks/admin-queries/usage-charts";
 import { UsageTrendChart, type UsageTrendMetric } from "@/components/admin/usage-trend-chart";
 import { UsageErrorDistributionChart } from "@/components/admin/usage-error-distribution-chart";
+import {
+  UsageDistributionChart,
+  type UsageDistributionMetric,
+} from "@/components/admin/usage-distribution-chart";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -69,6 +81,39 @@ type TrendBucket = (typeof TREND_BUCKETS)[number];
 
 // One line per series — keep the chart readable; the backend caps to this top-N.
 const TREND_SERIES_LIMIT = 6;
+
+// Share-by-dimension distribution. Dimensions match
+// `GetAdminUsageDistributionData["query"].dimension`; the order drives the
+// dropdown order. Each has an i18n key with a readable English fallback.
+const DISTRIBUTION_DIMENSIONS = [
+  "model",
+  "requested_model",
+  "upstream_model",
+  "account",
+  "provider",
+  "api_key",
+  "source_endpoint",
+  "billing_mode",
+  "user",
+] as const;
+type DistributionDimension = (typeof DISTRIBUTION_DIMENSIONS)[number];
+
+const DISTRIBUTION_DIMENSION_FALLBACK: Record<DistributionDimension, string> = {
+  model: "Model",
+  requested_model: "Requested model",
+  upstream_model: "Upstream model",
+  account: "Account",
+  provider: "Provider",
+  api_key: "API key",
+  source_endpoint: "Endpoint",
+  billing_mode: "Billing mode",
+  user: "User",
+};
+
+const DISTRIBUTION_METRICS = ["requests", "tokens", "cost"] as const;
+
+// Top-N buckets to request/render for the distribution chart.
+const DISTRIBUTION_LIMIT = 8;
 
 // Verbose / low-frequency UsageLog fields start hidden; the always-useful
 // columns (time, user, model, output, cost, status) stay visible by default.
@@ -491,8 +536,16 @@ function UsageCharts() {
   const [bucket, setBucket] = useState<TrendBucket>("day");
   const [metric, setMetric] = useState<UsageTrendMetric>("tokens");
 
+  const [distDimension, setDistDimension] = useState<DistributionDimension>("model");
+  const [distMetric, setDistMetric] = useState<UsageDistributionMetric>("requests");
+
   const trends = useAdminUsageTrends({ dimension, bucket, limit: TREND_SERIES_LIMIT });
   const errorDistribution = useAdminUsageErrorDistribution();
+  const distribution = useAdminUsageDistribution({
+    dimension: distDimension,
+    metric: distMetric,
+    limit: DISTRIBUTION_LIMIT,
+  });
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -535,6 +588,45 @@ function UsageCharts() {
         emptyLabel={tWithFallback("adminUsage.errorDistributionEmpty", "No errors in window")}
         totalLabel={tWithFallback("adminUsage.errorsTotal", "errors")}
         otherLabel={tWithFallback("adminUsage.errorsOther", "Other")}
+      />
+      <UsageDistributionChart
+        buckets={distribution.data?.buckets ?? []}
+        metric={distMetric}
+        loading={distribution.isLoading}
+        title={tWithFallback("adminUsage.distributionTitle", "Usage distribution")}
+        emptyLabel={tWithFallback("adminUsage.distributionEmpty", "No usage in window")}
+        controls={
+          <>
+            <Select
+              value={distDimension}
+              onValueChange={(v) => setDistDimension(v as DistributionDimension)}
+            >
+              <SelectTrigger className="h-8 w-auto min-w-[8.5rem] gap-2 rounded-lg text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DISTRIBUTION_DIMENSIONS.map((dim) => (
+                  <SelectItem key={dim} value={dim} className="text-xs">
+                    {tWithFallback(`adminUsage.dimension.${dim}`, DISTRIBUTION_DIMENSION_FALLBACK[dim])}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Tabs value={distMetric} onValueChange={(v) => setDistMetric(v as UsageDistributionMetric)}>
+              <TabsList>
+                {DISTRIBUTION_METRICS.map((m) => (
+                  <TabsTrigger key={m} value={m} className="text-xs">
+                    {m === "requests"
+                      ? tWithFallback("adminUsage.metric.requests", "Requests")
+                      : m === "tokens"
+                        ? t("usage.tokens")
+                        : t("adminUsage.cost")}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </>
+        }
       />
     </div>
   );
