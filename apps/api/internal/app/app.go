@@ -425,7 +425,14 @@ func persistentStores(ctx context.Context, cfg config.Config, logger *slog.Logge
 			return nil, fmt.Errorf("apply versioned database migrations: %w", err)
 		}
 	} else {
-		schemaCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		// 5-minute timeout matches the release-mode migration window. ent's
+		// CreateSchema is idempotent (CREATE INDEX IF NOT EXISTS, etc.), so
+		// re-running on an existing dev DB is a no-op once everything is in
+		// place — but adding a fresh index on a usage_logs table that has
+		// accumulated several days of gateway data can take longer than the
+		// previous 10-second budget. Bumping the timeout closes a footgun
+		// without changing semantics.
+		schemaCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 		err = dbClient.CreateSchema(schemaCtx)
 		cancel()
 		if err != nil {
