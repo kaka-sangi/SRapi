@@ -20,6 +20,7 @@ import {
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
+import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import {
   useScheduledTestPlans,
@@ -237,6 +238,11 @@ export function ScheduledTestsContent() {
             <ColumnToggle
               columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
               visibility={colVis}
+            />
+            <AutoRefreshControl
+              onRefresh={() => void all.refetch()}
+              isRefreshing={all.isFetching}
+              storageKey="srapi.autorefresh.admin-scheduled-tests"
             />
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminScheduledTests.create")}
