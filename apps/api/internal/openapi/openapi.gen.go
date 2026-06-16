@@ -3161,6 +3161,66 @@ func (e GetAdminOpsThroughputTrendParamsBucket) Valid() bool {
 	}
 }
 
+// Defines values for GetAdminUsageDistributionParamsDimension.
+const (
+	GetAdminUsageDistributionParamsDimensionAccount        GetAdminUsageDistributionParamsDimension = "account"
+	GetAdminUsageDistributionParamsDimensionApiKey         GetAdminUsageDistributionParamsDimension = "api_key"
+	GetAdminUsageDistributionParamsDimensionBillingMode    GetAdminUsageDistributionParamsDimension = "billing_mode"
+	GetAdminUsageDistributionParamsDimensionModel          GetAdminUsageDistributionParamsDimension = "model"
+	GetAdminUsageDistributionParamsDimensionProvider       GetAdminUsageDistributionParamsDimension = "provider"
+	GetAdminUsageDistributionParamsDimensionRequestedModel GetAdminUsageDistributionParamsDimension = "requested_model"
+	GetAdminUsageDistributionParamsDimensionSourceEndpoint GetAdminUsageDistributionParamsDimension = "source_endpoint"
+	GetAdminUsageDistributionParamsDimensionUpstreamModel  GetAdminUsageDistributionParamsDimension = "upstream_model"
+	GetAdminUsageDistributionParamsDimensionUser           GetAdminUsageDistributionParamsDimension = "user"
+)
+
+// Valid indicates whether the value is a known member of the GetAdminUsageDistributionParamsDimension enum.
+func (e GetAdminUsageDistributionParamsDimension) Valid() bool {
+	switch e {
+	case GetAdminUsageDistributionParamsDimensionAccount:
+		return true
+	case GetAdminUsageDistributionParamsDimensionApiKey:
+		return true
+	case GetAdminUsageDistributionParamsDimensionBillingMode:
+		return true
+	case GetAdminUsageDistributionParamsDimensionModel:
+		return true
+	case GetAdminUsageDistributionParamsDimensionProvider:
+		return true
+	case GetAdminUsageDistributionParamsDimensionRequestedModel:
+		return true
+	case GetAdminUsageDistributionParamsDimensionSourceEndpoint:
+		return true
+	case GetAdminUsageDistributionParamsDimensionUpstreamModel:
+		return true
+	case GetAdminUsageDistributionParamsDimensionUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetAdminUsageDistributionParamsMetric.
+const (
+	Cost     GetAdminUsageDistributionParamsMetric = "cost"
+	Requests GetAdminUsageDistributionParamsMetric = "requests"
+	Tokens   GetAdminUsageDistributionParamsMetric = "tokens"
+)
+
+// Valid indicates whether the value is a known member of the GetAdminUsageDistributionParamsMetric enum.
+func (e GetAdminUsageDistributionParamsMetric) Valid() bool {
+	switch e {
+	case Cost:
+		return true
+	case Requests:
+		return true
+	case Tokens:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetAdminUsageTrendsParamsBucket.
 const (
 	GetAdminUsageTrendsParamsBucketDay  GetAdminUsageTrendsParamsBucket = "day"
@@ -9551,6 +9611,25 @@ type UsageCleanupResult struct {
 	MaxDelete int  `json:"max_delete"`
 }
 
+// UsageDistributionBucket defines model for UsageDistributionBucket.
+type UsageDistributionBucket struct {
+	Cost         string  `json:"cost"`
+	Currency     string  `json:"currency"`
+	InputTokens  int     `json:"input_tokens"`
+	Label        string  `json:"label"`
+	OutputTokens int     `json:"output_tokens"`
+	Percentage   float32 `json:"percentage"`
+	Requests     int     `json:"requests"`
+	TotalTokens  int     `json:"total_tokens"`
+}
+
+// UsageDistributionResult defines model for UsageDistributionResult.
+type UsageDistributionResult struct {
+	Buckets   []UsageDistributionBucket `json:"buckets"`
+	Dimension string                    `json:"dimension"`
+	Metric    string                    `json:"metric"`
+}
+
 // UsageErrorBucket defines model for UsageErrorBucket.
 type UsageErrorBucket struct {
 	Count      int     `json:"count"`
@@ -10438,6 +10517,21 @@ type GetAdminUsageDailyParams struct {
 	Start *openapi_types.Date `form:"start,omitempty" json:"start,omitempty"`
 	End   *openapi_types.Date `form:"end,omitempty" json:"end,omitempty"`
 }
+
+// GetAdminUsageDistributionParams defines parameters for GetAdminUsageDistribution.
+type GetAdminUsageDistributionParams struct {
+	Start     *time.Time                                `form:"start,omitempty" json:"start,omitempty"`
+	End       *time.Time                                `form:"end,omitempty" json:"end,omitempty"`
+	Dimension *GetAdminUsageDistributionParamsDimension `form:"dimension,omitempty" json:"dimension,omitempty"`
+	Metric    *GetAdminUsageDistributionParamsMetric    `form:"metric,omitempty" json:"metric,omitempty"`
+	Limit     *int                                      `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetAdminUsageDistributionParamsDimension defines parameters for GetAdminUsageDistribution.
+type GetAdminUsageDistributionParamsDimension string
+
+// GetAdminUsageDistributionParamsMetric defines parameters for GetAdminUsageDistribution.
+type GetAdminUsageDistributionParamsMetric string
 
 // GetAdminUsageErrorDistributionParams defines parameters for GetAdminUsageErrorDistribution.
 type GetAdminUsageErrorDistributionParams struct {
@@ -18155,6 +18249,9 @@ type ServerInterface interface {
 	// Get daily usage aggregates.
 	// (GET /api/v1/admin/usage/daily)
 	GetAdminUsageDaily(w http.ResponseWriter, r *http.Request, params GetAdminUsageDailyParams)
+	// Get usage share distribution grouped by a dimension.
+	// (GET /api/v1/admin/usage/distribution)
+	GetAdminUsageDistribution(w http.ResponseWriter, r *http.Request, params GetAdminUsageDistributionParams)
 	// Get usage error-class distribution for charts.
 	// (GET /api/v1/admin/usage/error-distribution)
 	GetAdminUsageErrorDistribution(w http.ResponseWriter, r *http.Request, params GetAdminUsageErrorDistributionParams)
@@ -27417,6 +27514,97 @@ func (siw *ServerInterfaceWrapper) GetAdminUsageDaily(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminUsageDistribution operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminUsageDistribution(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminUsageDistributionParams
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "dimension" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "dimension", r.URL.Query(), &params.Dimension, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "dimension"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dimension", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "metric" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "metric", r.URL.Query(), &params.Metric, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "metric"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "metric", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminUsageDistribution(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAdminUsageErrorDistribution operation middleware
 func (siw *ServerInterfaceWrapper) GetAdminUsageErrorDistribution(w http.ResponseWriter, r *http.Request) {
 
@@ -31827,6 +32015,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/aggregates", wrapper.GetAdminUsageAggregates)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/usage/cleanup", wrapper.CleanupAdminUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/daily", wrapper.GetAdminUsageDaily)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/distribution", wrapper.GetAdminUsageDistribution)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/error-distribution", wrapper.GetAdminUsageErrorDistribution)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/export", wrapper.ExportAdminUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/trends", wrapper.GetAdminUsageTrends)

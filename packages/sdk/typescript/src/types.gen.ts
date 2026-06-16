@@ -3614,6 +3614,23 @@ export type UsageErrorBucket = {
     percentage: number;
 };
 
+export type UsageDistributionResult = {
+    dimension: string;
+    metric: string;
+    buckets: Array<UsageDistributionBucket>;
+};
+
+export type UsageDistributionBucket = {
+    label: string;
+    requests: number;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    cost: string;
+    currency: string;
+    percentage: number;
+};
+
 export type ErrorLog = {
     id: Id;
     request_id: RequestId;
@@ -12742,6 +12759,48 @@ export type GetAdminUsageErrorDistributionResponses = {
 };
 
 export type GetAdminUsageErrorDistributionResponse = GetAdminUsageErrorDistributionResponses[keyof GetAdminUsageErrorDistributionResponses];
+
+export type GetAdminUsageDistributionData = {
+    body?: never;
+    path?: never;
+    query?: {
+        start?: string;
+        end?: string;
+        dimension?: 'model' | 'requested_model' | 'upstream_model' | 'account' | 'provider' | 'api_key' | 'source_endpoint' | 'billing_mode' | 'user';
+        metric?: 'requests' | 'tokens' | 'cost';
+        limit?: number;
+    };
+    url: '/api/v1/admin/usage/distribution';
+};
+
+export type GetAdminUsageDistributionErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminUsageDistributionError = GetAdminUsageDistributionErrors[keyof GetAdminUsageDistributionErrors];
+
+export type GetAdminUsageDistributionResponses = {
+    /**
+     * Usage distribution buckets.
+     */
+    200: {
+        data: UsageDistributionResult;
+        request_id: RequestId;
+    };
+};
+
+export type GetAdminUsageDistributionResponse = GetAdminUsageDistributionResponses[keyof GetAdminUsageDistributionResponses];
 
 export type ListAdminAuditLogsData = {
     body?: never;

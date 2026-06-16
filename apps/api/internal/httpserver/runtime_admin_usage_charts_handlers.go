@@ -282,6 +282,210 @@ func (s *Server) handleGetAdminUsageErrorDistribution(w http.ResponseWriter, r *
 	})
 }
 
+// usageDistributionAcc accumulates one dimension value's totals while scanning
+// the usage logs once. Cost is summed as an exact rational and formatted at the
+// end; the share percentage is computed against the chosen metric total.
+type usageDistributionAcc struct {
+	label        string
+	requests     int
+	inputTokens  int
+	outputTokens int
+	totalTokens  int
+	cost         *big.Rat
+	currency     string
+}
+
+// metricValue returns this bucket's contribution under the chosen share metric
+// (request count, total tokens, or summed cost as a float for ranking/share).
+func (a *usageDistributionAcc) metricValue(metric apiopenapi.GetAdminUsageDistributionParamsMetric) float64 {
+	switch metric {
+	case apiopenapi.Tokens:
+		return float64(a.totalTokens)
+	case apiopenapi.Cost:
+		v, _ := a.cost.Float64()
+		return v
+	default: // requests
+		return float64(a.requests)
+	}
+}
+
+// handleGetAdminUsageDistribution serves GET /api/v1/admin/usage/distribution.
+//
+// It groups every usage log by the chosen dimension (model, requested/upstream
+// model, account, provider, api_key, source_endpoint, billing_mode or user) and
+// reports each group's requests, input/output/total tokens and summed cost. Each
+// bucket's percentage is its share of the chosen metric (requests, tokens or
+// cost) across all groups. Buckets are sorted by that metric descending and
+// capped at the top-N (default 8). start/end bound CreatedAt inclusively.
+//
+// This is the share-by-dimension complement to the time-series trends endpoint:
+// a single call powers the model / endpoint / provider / billing-mode / api-key
+// / per-user distribution charts. The 200 body is the inline {data, request_id}
+// object built with writeJSONAny.
+func (s *Server) handleGetAdminUsageDistribution(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+
+	query := r.URL.Query()
+
+	dimensionParam := apiopenapi.GetAdminUsageDistributionParamsDimensionModel
+	if raw := strings.TrimSpace(query.Get("dimension")); raw != "" {
+		candidate := apiopenapi.GetAdminUsageDistributionParamsDimension(raw)
+		if !candidate.Valid() {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid dimension parameter", requestID)
+			return
+		}
+		dimensionParam = candidate
+	}
+
+	metricParam := apiopenapi.Requests
+	if raw := strings.TrimSpace(query.Get("metric")); raw != "" {
+		candidate := apiopenapi.GetAdminUsageDistributionParamsMetric(raw)
+		if !candidate.Valid() {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid metric parameter", requestID)
+			return
+		}
+		metricParam = candidate
+	}
+
+	limit := usageTrendDefaultLimit
+	if raw := strings.TrimSpace(query.Get("limit")); raw != "" {
+		parsed, parseErr := strconv.Atoi(raw)
+		if parseErr != nil || parsed <= 0 || parsed > usageTrendMaxLimit {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid limit parameter", requestID)
+			return
+		}
+		limit = parsed
+	}
+
+	start, end, ok := parseUsageTrendRange(query.Get("start"), query.Get("end"))
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "start must be before end", requestID)
+		return
+	}
+
+	logs, err := s.runtime.usage.List(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to load usage", requestID)
+		return
+	}
+
+	groups := map[string]*usageDistributionAcc{}
+	var total float64
+	for _, log := range logs {
+		created := log.CreatedAt.UTC()
+		if !start.IsZero() && created.Before(start) {
+			continue
+		}
+		if !end.IsZero() && created.After(end) {
+			continue
+		}
+		label := usageDistributionDimensionLabel(log, dimensionParam)
+		acc := groups[label]
+		if acc == nil {
+			acc = &usageDistributionAcc{label: label, cost: new(big.Rat)}
+			groups[label] = acc
+		}
+		acc.requests++
+		acc.inputTokens += log.InputTokens
+		acc.outputTokens += log.OutputTokens
+		acc.totalTokens += log.TotalTokens
+		if rat, costOK := money.DecimalRat(log.Cost); costOK && rat != nil {
+			acc.cost.Add(acc.cost, rat)
+		}
+		if acc.currency == "" && log.Currency != "" {
+			acc.currency = log.Currency
+		}
+	}
+
+	ordered := make([]*usageDistributionAcc, 0, len(groups))
+	for _, acc := range groups {
+		ordered = append(ordered, acc)
+		total += acc.metricValue(metricParam)
+	}
+	sort.Slice(ordered, func(i, j int) bool {
+		vi, vj := ordered[i].metricValue(metricParam), ordered[j].metricValue(metricParam)
+		if vi != vj {
+			return vi > vj
+		}
+		return ordered[i].label < ordered[j].label
+	})
+	if limit > 0 && len(ordered) > limit {
+		ordered = ordered[:limit]
+	}
+
+	buckets := make([]apiopenapi.UsageDistributionBucket, 0, len(ordered))
+	for _, acc := range ordered {
+		var percentage float32
+		if total > 0 {
+			percentage = float32(acc.metricValue(metricParam) / total * 100)
+		}
+		buckets = append(buckets, apiopenapi.UsageDistributionBucket{
+			Label:        acc.label,
+			Requests:     acc.requests,
+			InputTokens:  acc.inputTokens,
+			OutputTokens: acc.outputTokens,
+			TotalTokens:  acc.totalTokens,
+			Cost:         money.FormatRatFixed(acc.cost, 2),
+			Currency:     money.NormalizeCurrency(acc.currency),
+			Percentage:   percentage,
+		})
+	}
+
+	result := apiopenapi.UsageDistributionResult{
+		Dimension: string(dimensionParam),
+		Metric:    string(metricParam),
+		Buckets:   buckets,
+	}
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       result,
+		"request_id": requestID,
+	})
+}
+
+// usageDistributionDimensionLabel resolves the bucket label for one log under
+// the chosen distribution dimension. Numeric foreign keys (account, provider,
+// api_key, user) are stringified; a missing value falls back to "unknown" so
+// every log lands in some bucket.
+func usageDistributionDimensionLabel(log usagecontract.UsageLog, dimension apiopenapi.GetAdminUsageDistributionParamsDimension) string {
+	var value string
+	switch dimension {
+	case apiopenapi.GetAdminUsageDistributionParamsDimensionRequestedModel:
+		value = log.RequestedModel
+	case apiopenapi.GetAdminUsageDistributionParamsDimensionUpstreamModel:
+		value = log.UpstreamModel
+	case apiopenapi.GetAdminUsageDistributionParamsDimensionAccount:
+		if log.AccountID != nil {
+			value = strconv.Itoa(*log.AccountID)
+		}
+	case apiopenapi.GetAdminUsageDistributionParamsDimensionProvider:
+		if log.ProviderID != nil {
+			value = strconv.Itoa(*log.ProviderID)
+		}
+	case apiopenapi.GetAdminUsageDistributionParamsDimensionApiKey:
+		if log.APIKeyID > 0 {
+			value = strconv.Itoa(log.APIKeyID)
+		}
+	case apiopenapi.GetAdminUsageDistributionParamsDimensionSourceEndpoint:
+		value = log.SourceEndpoint
+	case apiopenapi.GetAdminUsageDistributionParamsDimensionBillingMode:
+		value = log.BillingMode
+	case apiopenapi.GetAdminUsageDistributionParamsDimensionUser:
+		if log.UserID > 0 {
+			value = strconv.Itoa(log.UserID)
+		}
+	default: // model
+		value = log.Model
+	}
+	if trimmed := strings.TrimSpace(value); trimmed != "" {
+		return trimmed
+	}
+	return usageTrendUnknownLabel
+}
+
 // usageTrendDimensionLabel resolves the series label for one log under the
 // chosen dimension. account uses the numeric account id as a string; model and
 // source_endpoint use the corresponding UsageLog field. A missing value falls

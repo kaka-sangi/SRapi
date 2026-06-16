@@ -503,6 +503,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/usage/aggregates", server.handleAdminUsageAggregates)
 	mux.HandleFunc("GET /api/v1/admin/usage/trends", server.handleGetAdminUsageTrends)
 	mux.HandleFunc("GET /api/v1/admin/usage/error-distribution", server.handleGetAdminUsageErrorDistribution)
+	mux.HandleFunc("GET /api/v1/admin/usage/distribution", server.handleGetAdminUsageDistribution)
 	mux.HandleFunc("GET /api/v1/admin/usage/export", server.handleAdminUsageExport)
 	mux.HandleFunc("GET /api/v1/admin/diagnostics/circuit-breakers", server.handleAdminCircuitBreakers)
 	mux.HandleFunc("POST /api/v1/admin/diagnostics/circuit-breakers/{accountId}/reset", server.handleAdminResetCircuitBreaker)
