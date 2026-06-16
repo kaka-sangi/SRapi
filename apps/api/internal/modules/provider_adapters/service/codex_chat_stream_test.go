@@ -170,6 +170,59 @@ func TestCodexChatStreamReaderStreamsToolCalls(t *testing.T) {
 	}
 }
 
+// TestCodexChatStreamReaderStreamsCustomToolArgs guards that a custom/freeform
+// tool call streams its arguments: the input fragments arrive under
+// response.custom_tool_call_input.delta (not function_call_arguments.delta), and
+// must still surface as tool_calls[].function.arguments so the client sees a
+// complete tool call.
+func TestCodexChatStreamReaderStreamsCustomToolArgs(t *testing.T) {
+	body := strings.Join([]string{
+		"event: response.output_item.added",
+		`data: {"type":"response.output_item.added","output_index":0,"item":{"type":"custom_tool_call","call_id":"call_shell","name":"shell"}}`,
+		"",
+		"event: response.custom_tool_call_input.delta",
+		`data: {"type":"response.custom_tool_call_input.delta","output_index":0,"delta":"ls -"}`,
+		"",
+		"event: response.custom_tool_call_input.delta",
+		`data: {"type":"response.custom_tool_call_input.delta","output_index":0,"delta":"la"}`,
+		"",
+		"event: response.completed",
+		`data: {"type":"response.completed","response":{"id":"resp_c","status":"completed"}}`,
+		"",
+	}, "\n")
+
+	chunks, sawDone, _ := readCodexChatChunks(t, body)
+	if !sawDone {
+		t.Fatal("expected a terminating data: [DONE]")
+	}
+
+	header, _ := chunkDelta(t, chunks[1])
+	toolCalls, ok := header["tool_calls"].([]any)
+	if !ok || len(toolCalls) != 1 {
+		t.Fatalf("tool header delta = %v, want one tool_call", header)
+	}
+	call, _ := toolCalls[0].(map[string]any)
+	if fn, _ := call["function"].(map[string]any); fn["name"] != "shell" {
+		t.Fatalf("custom tool header function = %v, want name shell", call["function"])
+	}
+
+	var args strings.Builder
+	for _, idx := range []int{2, 3} {
+		delta, _ := chunkDelta(t, chunks[idx])
+		tc, _ := delta["tool_calls"].([]any)
+		one, _ := tc[0].(map[string]any)
+		fn, _ := one["function"].(map[string]any)
+		args.WriteString(fn["arguments"].(string))
+	}
+	if args.String() != "ls -la" {
+		t.Fatalf("streamed custom tool args = %q, want %q", args.String(), "ls -la")
+	}
+
+	if _, finish := chunkDelta(t, chunks[len(chunks)-1]); finish != "tool_calls" {
+		t.Fatalf("final finish_reason = %v, want tool_calls", finish)
+	}
+}
+
 func TestCodexChatStreamReaderEmptyResponseStillTerminates(t *testing.T) {
 	body := strings.Join([]string{
 		"event: response.completed",

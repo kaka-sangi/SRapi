@@ -162,7 +162,10 @@ func (r *codexChatStreamReader) handleEvent(eventField, data string) {
 				},
 			}}})
 		}
-	case "response.function_call_arguments.delta":
+	case "response.function_call_arguments.delta", "response.custom_tool_call_input.delta":
+		// custom/freeform tool calls stream their arguments under
+		// custom_tool_call_input.delta; without this alias the args were silently
+		// dropped and the client saw a tool call with empty arguments.
 		if ev.Delta != "" {
 			r.sawTool = true
 			r.emitDelta(map[string]any{"tool_calls": []map[string]any{{
