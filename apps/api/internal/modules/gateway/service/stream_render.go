@@ -1233,158 +1233,20 @@ func (s *Service) RenderAnthropicMessagesStreamEvents(resp gatewaycontract.Canon
 	return events
 }
 
+// renderAnthropicCanonicalStreamEvents renders the buffered canonical response
+// as Anthropic SSE. It is a thin wrapper over the incremental
+// AnthropicStreamRenderer, so the buffered and streaming paths are identical.
 func (s *Service) renderAnthropicCanonicalStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
 	events := normalizeStreamEvents(resp.StreamEvents)
 	if !streamEventsHaveRenderableOutput(events) {
 		return nil
 	}
-	out := []StreamEvent{{
-		Event: "message_start",
-		Data: map[string]any{
-			"type": "message_start",
-			"message": map[string]any{
-				"id":            "msg_" + responseID(resp),
-				"type":          "message",
-				"role":          "assistant",
-				"model":         resp.Model,
-				"content":       []any{},
-				"stop_reason":   nil,
-				"stop_sequence": nil,
-				"usage":         anthropicStreamUsage(ptrInt(resp.Usage.InputTokens), ptrInt(0), resp.Usage.CachedTokens),
-			},
-		},
-	}}
-	// Anthropic block indices must be distinct per logical block. The provider's
-	// ContentIndex can repeat across different kinds (e.g. reasoning and text both
-	// at index 0), so key blocks by (ContentIndex, kind) and assign a monotonic
-	// Anthropic index the first time each pair is seen — otherwise text/thinking/
-	// tool_use deltas collide into one block.
-	type anthropicBlockKey struct {
-		contentIndex int
-		kind         gatewaycontract.ContentBlockType
-	}
-	blockIndexByKey := map[anthropicBlockKey]int{}
-	openBlockOrder := make([]int, 0)
-	nextBlockIndex := 0
-	blockIndexFor := func(contentIndex int, kind gatewaycontract.ContentBlockType) (int, bool) {
-		key := anthropicBlockKey{contentIndex: contentIndex, kind: kind}
-		if idx, ok := blockIndexByKey[key]; ok {
-			return idx, false
-		}
-		idx := nextBlockIndex
-		nextBlockIndex++
-		blockIndexByKey[key] = idx
-		return idx, true
-	}
-	toolStates := newStreamToolCallStates(resp.OutputItems)
-	textStates := newResponseStreamTextStates(resp.OutputItems)
-	var pendingUsage *gatewaycontract.Usage
-	pendingStopReason := ""
+	renderer := s.newAnthropicStreamRenderer(resp)
+	out := make([]StreamEvent, 0, len(events)+4)
 	for _, event := range events {
-		switch event.Type {
-		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolCallDelta, gatewaycontract.StreamEventToolResult:
-			if event.Type == gatewaycontract.StreamEventReasoning && mapStringAny(event.Delta.Metadata, "signature_delta") != "" {
-				signature := textStates.appendSignature(event)
-				// The signature belongs to the thinking block at this content index;
-				// reuse its remapped index, opening the block if the signature
-				// somehow arrives before any thinking delta.
-				blockIdx, isNew := blockIndexFor(event.ContentIndex, gatewaycontract.ContentBlockReasoning)
-				if isNew {
-					openBlockOrder = append(openBlockOrder, blockIdx)
-					out = append(out, StreamEvent{
-						Event: "content_block_start",
-						Data: map[string]any{
-							"type":          "content_block_start",
-							"index":         blockIdx,
-							"content_block": anthropicStreamContentBlock(anthropicStreamEventStartBlock(event)),
-						},
-					})
-				}
-				out = append(out, StreamEvent{
-					Event: "content_block_delta",
-					Data: map[string]any{
-						"type":  "content_block_delta",
-						"index": blockIdx,
-						"delta": map[string]any{
-							"type":      "signature_delta",
-							"signature": signature,
-						},
-					},
-				})
-				continue
-			}
-			if event.Type == gatewaycontract.StreamEventReasoning {
-				_ = textStates.stateFor(event, gatewaycontract.ContentBlockReasoning)
-			}
-			startBlock := anthropicStreamEventStartBlock(event)
-			if event.Type == gatewaycontract.StreamEventToolCallDelta {
-				state := toolStates.stateFor(event)
-				startBlock = state.startBlock()
-			}
-			blockIdx, isNew := blockIndexFor(event.ContentIndex, startBlock.Type)
-			if isNew {
-				openBlockOrder = append(openBlockOrder, blockIdx)
-				out = append(out, StreamEvent{
-					Event: "content_block_start",
-					Data: map[string]any{
-						"type":          "content_block_start",
-						"index":         blockIdx,
-						"content_block": anthropicStreamContentBlock(startBlock),
-					},
-				})
-			}
-			if delta := anthropicStreamEventDelta(event); len(delta) > 0 {
-				out = append(out, StreamEvent{
-					Event: "content_block_delta",
-					Data: map[string]any{
-						"type":  "content_block_delta",
-						"index": blockIdx,
-						"delta": delta,
-					},
-				})
-			}
-		case gatewaycontract.StreamEventUsage:
-			copied := event.Usage
-			pendingUsage = &copied
-		case gatewaycontract.StreamEventStop:
-			pendingStopReason = firstNonEmpty(event.StopReason, pendingStopReason)
-		}
+		out = append(out, renderer.FeedEvent(event)...)
 	}
-	for _, index := range openBlockOrder {
-		out = append(out, StreamEvent{
-			Event: "content_block_stop",
-			Data: map[string]any{
-				"type":  "content_block_stop",
-				"index": index,
-			},
-		})
-	}
-	if pendingUsage != nil || pendingStopReason != "" {
-		outputTokens := resp.Usage.OutputTokens
-		if pendingUsage != nil {
-			outputTokens = pendingUsage.OutputTokens
-		}
-		delta := map[string]any{}
-		if pendingStopReason != "" {
-			delta["stop_reason"] = anthropicStopReason(firstNonEmpty(pendingStopReason, resp.StopReason))
-			delta["stop_sequence"] = nil
-		}
-		out = append(out, StreamEvent{
-			Event: "message_delta",
-			Data: map[string]any{
-				"type":  "message_delta",
-				"delta": delta,
-				"usage": anthropicStreamUsage(nil, ptrInt(outputTokens), 0),
-			},
-		})
-	}
-	out = append(out, StreamEvent{
-		Event: "message_stop",
-		Data: map[string]any{
-			"type": "message_stop",
-		},
-	})
-	return out
+	return append(out, renderer.Finalize()...)
 }
 
 func anthropicStreamUsage(inputTokens *int, outputTokens *int, cachedTokens int) map[string]any {
