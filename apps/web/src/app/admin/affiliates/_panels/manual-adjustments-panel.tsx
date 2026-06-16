@@ -17,6 +17,7 @@ import {
   useCreateAffiliateManualAdjustment,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { Button } from "@/components/ui/button";
 import { formatMoney, formatDateTime } from "@/lib/admin-format";
 import type { AffiliateLedgerEntry } from "@/lib/sdk-types";
@@ -42,6 +43,7 @@ export function ManualAdjustmentsPanel() {
   const { t } = useLanguage();
   const query = useAffiliateManualAdjustments();
   const createMut = useCreateAffiliateManualAdjustment();
+  const userLookup = useUserEmailLookup();
   const [creating, setCreating] = useState(false);
 
   const fields: FieldConfig<FormState>[] = [
@@ -94,7 +96,7 @@ export function ManualAdjustmentsPanel() {
       key: "user",
       header: t("adminAffiliates.inviter"),
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-secondary">{r.user_id}</span>
+        <span className="text-srapi-text-secondary">{userLookup.get(r.user_id)}</span>
       ),
     },
     {

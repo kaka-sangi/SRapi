@@ -11,6 +11,7 @@ import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import { useBillingLedger } from "@/hooks/admin-queries";
+import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatMoney } from "@/lib/admin-format";
 import type { BillingLedgerEntry } from "@/lib/sdk-types";
@@ -80,6 +81,7 @@ export function BillingLedgerPanel() {
     match: ledgerMatch,
     compare: ledgerCompare,
   });
+  const userLookup = useUserEmailLookup();
 
   const rows = useMemo(() => all.data?.data ?? [], [all.data]);
   const referenceOptions = useMemo(() => distinct(rows.map((r) => r.reference_type)), [rows]);
@@ -103,7 +105,7 @@ export function BillingLedgerPanel() {
       header: t("adminBillingLedger.user"),
       hideOnMobile: true,
       render: (r) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">{r.user_id}</span>
+        <span className="text-srapi-text-secondary">{userLookup.get(r.user_id)}</span>
       ),
     },
     {
