@@ -152,7 +152,7 @@ func parseUsageFilterTime(value string) time.Time {
 	return time.Time{}
 }
 
-func filterAuditLogs(items []auditcontract.Log, action, resourceType string) []auditcontract.Log {
+func filterAuditLogs(items []auditcontract.Log, action, resourceType string, actorUserID *int) []auditcontract.Log {
 	action = strings.TrimSpace(action)
 	resourceType = strings.TrimSpace(resourceType)
 	out := make([]auditcontract.Log, 0, len(items))
@@ -162,6 +162,14 @@ func filterAuditLogs(items []auditcontract.Log, action, resourceType string) []a
 		}
 		if resourceType != "" && item.ResourceType != resourceType {
 			continue
+		}
+		if actorUserID != nil {
+			// A nil ActorUserID is "system action" — only match when the caller
+			// explicitly asks for the same id, which they can't (the filter is
+			// scoped to real users). So skip the row if the actor is unset.
+			if item.ActorUserID == nil || *item.ActorUserID != *actorUserID {
+				continue
+			}
 		}
 		out = append(out, item)
 	}

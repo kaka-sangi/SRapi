@@ -1365,6 +1365,7 @@ export const zh: Messages = {
     searchPlaceholder: "搜索操作者、资源、IP…",
     allActions: "全部动作",
     allResources: "全部资源",
+    allActors: "全部操作者",
     emptyTitle: "暂无审计记录",
     emptyBody: "管理操作会记录在这里。",
   },

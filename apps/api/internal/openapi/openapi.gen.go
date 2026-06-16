@@ -10524,6 +10524,9 @@ type ListAdminAuditLogsParams struct {
 	PageSize     *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Action       *string   `form:"action,omitempty" json:"action,omitempty"`
 	ResourceType *string   `form:"resource_type,omitempty" json:"resource_type,omitempty"`
+
+	// ActorUserId Narrow the list to actions taken by this admin user.
+	ActorUserId *Id `form:"actor_user_id,omitempty" json:"actor_user_id,omitempty"`
 }
 
 // ListAdminBillingLedgerParams defines parameters for ListAdminBillingLedger.
@@ -21966,6 +21969,19 @@ func (siw *ServerInterfaceWrapper) ListAdminAuditLogs(w http.ResponseWriter, r *
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resource_type"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resource_type", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "actor_user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "actor_user_id", r.URL.Query(), &params.ActorUserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actor_user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actor_user_id", Err: err})
 		}
 		return
 	}

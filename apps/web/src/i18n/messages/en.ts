@@ -1387,6 +1387,7 @@ export const en = {
     searchPlaceholder: "Search actor, resource, IP…",
     allActions: "All actions",
     allResources: "All resources",
+    allActors: "All actors",
     emptyTitle: "No audit entries",
     emptyBody: "Administrative changes will be recorded here.",
   },

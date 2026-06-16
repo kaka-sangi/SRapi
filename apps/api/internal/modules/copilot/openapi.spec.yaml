@@ -6955,6 +6955,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: actor_user_id
+          in: query
+          description: Narrow the list to actions taken by this admin user.
+          schema:
+            $ref: "#/components/schemas/Id"
       responses:
         "200":
           description: Audit log list.

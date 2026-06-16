@@ -17,7 +17,7 @@ import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useClientPagedList } from "@/hooks/use-client-list";
-import { useAuditLogs } from "@/hooks/admin-queries";
+import { useAuditLogs, useAdminUsers } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, safeJson } from "@/lib/admin-format";
 import type { AuditLog } from "@/lib/sdk-types";
@@ -25,6 +25,7 @@ import type { AuditLog } from "@/lib/sdk-types";
 function auditMatch(row: AuditLog, term: string, filters: Record<string, string>): boolean {
   if (filters.action && row.action !== filters.action) return false;
   if (filters.resource_type && row.resource_type !== filters.resource_type) return false;
+  if (filters.actor_user_id && String(row.actor_user_id ?? "") !== filters.actor_user_id) return false;
   if (!term) return true;
   return [row.actor_user_id, row.resource_id, row.resource_type, row.action, row.ip, row.trace_id]
     .filter(Boolean)
@@ -53,7 +54,21 @@ export function AuditLogsPanel() {
   const rows = useMemo(() => all.data?.data ?? [], [all.data]);
   const actionOptions = useMemo(() => distinct(rows.map((r) => r.action)), [rows]);
   const resourceOptions = useMemo(() => distinct(rows.map((r) => r.resource_type)), [rows]);
-  const isFiltered = Boolean(list.search || list.filters.action || list.filters.resource_type);
+  // Reuse the iter-15/error-logs pattern: 200-user lookup for actor labels
+  // gives us readable {email} options in the dropdown. Larger installs whose
+  // actors are past row 200 still see the actor_user_id in the table.
+  const users = useAdminUsers({ page: 1, page_size: 200 });
+  const actorOptions = useMemo(
+    () =>
+      (users.data?.data ?? []).map((u) => ({
+        value: String(u.id),
+        label: u.email,
+      })),
+    [users.data],
+  );
+  const isFiltered = Boolean(
+    list.search || list.filters.action || list.filters.resource_type || list.filters.actor_user_id,
+  );
 
   const columns: Column<AuditLog>[] = [
     {
@@ -144,6 +159,12 @@ export function AuditLogsPanel() {
               onChange={(v) => list.setFilter("resource_type", v)}
               options={resourceOptions.map((v) => ({ value: v, label: v }))}
               allLabel={t("adminAudit.allResources")}
+            />
+            <FilterSelect
+              value={list.filters.actor_user_id}
+              onChange={(v) => list.setFilter("actor_user_id", v)}
+              options={actorOptions}
+              allLabel={t("adminAudit.allActors")}
             />
           </ListToolbar>
         }

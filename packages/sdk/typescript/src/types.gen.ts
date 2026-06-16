@@ -13583,6 +13583,10 @@ export type ListAdminAuditLogsData = {
         page_size?: number;
         action?: string;
         resource_type?: string;
+        /**
+         * Narrow the list to actions taken by this admin user.
+         */
+        actor_user_id?: Id;
     };
     url: '/api/v1/admin/audit-logs';
 };

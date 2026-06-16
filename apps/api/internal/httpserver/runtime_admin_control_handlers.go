@@ -69,7 +69,16 @@ func (s *Server) handleListAdminAuditLogs(w http.ResponseWriter, r *http.Request
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list audit logs", requestID)
 		return
 	}
-	items = filterAuditLogs(items, r.URL.Query().Get("action"), r.URL.Query().Get("resource_type"))
+	var actorUserIDPtr *int
+	if raw := strings.TrimSpace(r.URL.Query().Get("actor_user_id")); raw != "" {
+		uid, err := strconv.Atoi(raw)
+		if err != nil || uid <= 0 {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid actor user id", requestID)
+			return
+		}
+		actorUserIDPtr = &uid
+	}
+	items = filterAuditLogs(items, r.URL.Query().Get("action"), r.URL.Query().Get("resource_type"), actorUserIDPtr)
 	data := make([]apiopenapi.AuditLog, 0, len(items))
 	for _, item := range items {
 		data = append(data, toAPIAuditLog(item))
