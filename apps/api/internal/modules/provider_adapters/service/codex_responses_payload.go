@@ -777,10 +777,17 @@ func codexResponsesInputItemsFromMessage(role string, parts []contract.ContentPa
 			}
 			itemType := codexResponsesToolResultType(part)
 			flushMessage()
+			// Codex requires function_call_output.output to be present; an empty
+			// tool result would be dropped by omitempty and the upstream rejects
+			// the turn. Default to "(empty)" like sub2api.
+			output := part.Text
+			if output == "" {
+				output = "(empty)"
+			}
 			out = append(out, codexResponsesInputItem{
 				Type:   itemType,
 				CallID: callID,
-				Output: part.Text,
+				Output: output,
 			})
 		case contract.ContentPartMetadata:
 			item, ok := codexResponsesRawInputItem(part)
@@ -814,6 +821,12 @@ func codexResponsesFunctionCallItem(part contract.ContentPart) (codexResponsesIn
 	if codexResponsesToolCallArgumentsField(part) == "input" {
 		item.Input = arguments
 	} else {
+		// Codex requires function_call.arguments to be present and valid JSON;
+		// an empty string would be dropped by omitempty and the upstream rejects
+		// the tool call. Default to "{}" like sub2api.
+		if strings.TrimSpace(arguments) == "" {
+			arguments = "{}"
+		}
 		item.Args = arguments
 	}
 	return item, true
