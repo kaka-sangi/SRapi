@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
+import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
 import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
@@ -160,7 +161,16 @@ function OrdersContent() {
         eyebrow={t("nav.sectionAdmin")}
         title={t("adminOrders.title")}
         description={t("adminOrders.subtitle")}
-        actions={all.data ? <ListCount total={total} /> : undefined}
+        actions={
+          <div className="flex items-center gap-3">
+            {all.data ? <ListCount total={total} /> : null}
+            <AutoRefreshControl
+              onRefresh={() => void all.refetch()}
+              isRefreshing={all.isFetching}
+              storageKey="srapi.autorefresh.admin-orders"
+            />
+          </div>
+        }
       />
       <PaymentDashboardPanel />
       <AdminListView
