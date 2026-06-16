@@ -10,6 +10,9 @@ import { QuietBadge } from "@/components/ui/quiet-badge";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { useAdminErrorLog } from "@/hooks/admin-queries";
+import { useAccountNameLookup } from "@/hooks/use-account-name-lookup";
+import { useApiKeyNameLookup } from "@/hooks/use-api-key-name-lookup";
+import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatInteger, formatLatency } from "@/lib/admin-format";
 import type { ErrorLog } from "@/lib/sdk-types";
@@ -63,6 +66,9 @@ export function ErrorLogDetailDialog({
 
 function ErrorLogDetailBody({ detail }: { detail: ErrorLog }) {
   const { t } = useLanguage();
+  const accountLookup = useAccountNameLookup();
+  const apiKeyLookup = useApiKeyNameLookup();
+  const providerLookup = useProviderNameLookup();
   const protocol = detail.target_protocol
     ? `${detail.source_protocol} → ${detail.target_protocol}`
     : detail.source_protocol;
@@ -95,9 +101,9 @@ function ErrorLogDetailBody({ detail }: { detail: ErrorLog }) {
         <Field label={t("adminErrorLogs.attempt")} value={formatInteger(detail.attempt_no)} mono />
         <Field label={t("adminErrorLogs.inputTokens")} value={formatInteger(detail.input_tokens)} mono />
         <Field label={t("adminErrorLogs.outputTokens")} value={formatInteger(detail.output_tokens)} mono />
-        <Field label={t("adminErrorLogs.apiKey")} value={detail.api_key_id || "—"} mono />
-        <Field label={t("adminErrorLogs.account")} value={detail.account_id || "—"} mono />
-        <Field label={t("adminErrorLogs.provider")} value={detail.provider_id || "—"} mono />
+        <Field label={t("adminErrorLogs.apiKey")} value={apiKeyLookup.get(detail.api_key_id)} />
+        <Field label={t("adminErrorLogs.account")} value={accountLookup.get(detail.account_id)} />
+        <Field label={t("adminErrorLogs.provider")} value={providerLookup.get(detail.provider_id)} />
         <Field label={t("adminErrorLogs.time")} value={formatDateTime(detail.created_at)} mono />
       </div>
     </div>
