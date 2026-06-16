@@ -1218,6 +1218,7 @@ export const en = {
   adminOrders: {
     title: "Orders",
     subtitle: "Payment orders and their status.",
+    searchPlaceholder: "Search order no, user, product…",
     order: "Order",
     amount: "Amount",
     user: "User",

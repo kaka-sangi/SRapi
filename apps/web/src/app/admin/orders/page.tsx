@@ -9,7 +9,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
-import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
+import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { useClientPagedList } from "@/hooks/use-client-list";
@@ -185,12 +185,17 @@ function OrdersContent() {
         emptyTitle={t("adminOrders.emptyTitle")}
         emptyBody={t("adminOrders.emptyBody")}
         minWidth={640}
-        isFiltered={Boolean(statusFilter || list.filters.window)}
+        isFiltered={Boolean(statusFilter || list.filters.window || list.search)}
         onClearFilters={list.clearFilters}
         sort={list.sort}
         onSort={list.toggleSort}
         toolbar={
           <ListToolbar>
+            <SearchInput
+              value={list.searchInput}
+              onChange={list.setSearchInput}
+              placeholder={t("adminOrders.searchPlaceholder")}
+            />
             <FilterSelect
               value={statusFilter}
               onChange={(v) => list.setFilter("status", v)}

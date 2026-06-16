@@ -1197,6 +1197,7 @@ export const zh: Messages = {
   adminOrders: {
     title: "订单",
     subtitle: "支付订单及其状态。",
+    searchPlaceholder: "搜索订单号、用户、商品…",
     order: "订单",
     amount: "金额",
     user: "用户",
