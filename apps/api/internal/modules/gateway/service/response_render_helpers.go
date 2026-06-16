@@ -885,8 +885,8 @@ func anthropicStreamContentDelta(block gatewaycontract.ContentBlock) map[string]
 		}
 		if text := strings.TrimSpace(block.Text); text != "" {
 			return map[string]any{
-				"type": "thinking_delta",
-				"text": text,
+				"type":     "thinking_delta",
+				"thinking": text,
 			}
 		}
 	default:

@@ -2501,7 +2501,7 @@ func TestRenderAnthropicStreamEventsPreservesThinkingSignatureDeltas(t *testing.
 	firstDelta, _ := deltas[0].Data["delta"].(map[string]any)
 	thirdDelta, _ := deltas[2].Data["delta"].(map[string]any)
 	fourthDelta, _ := deltas[3].Data["delta"].(map[string]any)
-	if firstDelta["type"] != "thinking_delta" || firstDelta["text"] != "private " {
+	if firstDelta["type"] != "thinking_delta" || firstDelta["thinking"] != "private " {
 		t.Fatalf("expected thinking text delta, got %+v", firstDelta)
 	}
 	if thirdDelta["type"] != "signature_delta" || thirdDelta["signature"] != "sig_" {

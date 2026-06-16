@@ -1417,8 +1417,8 @@ func anthropicStreamEventDelta(event gatewaycontract.StreamEvent) map[string]any
 	case gatewaycontract.StreamEventReasoning:
 		if text := event.Delta.Text; text != "" {
 			return map[string]any{
-				"type": "thinking_delta",
-				"text": text,
+				"type":     "thinking_delta",
+				"thinking": text,
 			}
 		}
 	default:
