@@ -62,6 +62,7 @@ function ProxiesContent() {
   const updateMut = useUpdateProxy();
   const deleteMut = useDeleteProxy();
   const testMut = useTestProxy();
+  const [bulkTesting, setBulkTesting] = useState(false);
 
   async function runTest(id: string) {
     try {
@@ -97,6 +98,50 @@ function ProxiesContent() {
   const [toDelete, setToDelete] = useState<ProxyDefinition | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const isNew = formTarget === "new";
+
+  // Bulk-test the selection. Each proxy.test call hits the network, so we cap
+  // the concurrency at PROXY_TEST_CONCURRENCY to avoid lighting up the box
+  // with N parallel TLS handshakes on big selections. allSettled keeps the
+  // loop alive even if one mutation throws — we summarise everything at the
+  // end rather than aborting on the first failure.
+  async function bulkTest() {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    setBulkTesting(true);
+    let okCount = 0;
+    let failCount = 0;
+    const PROXY_TEST_CONCURRENCY = 4;
+    try {
+      for (let i = 0; i < ids.length; i += PROXY_TEST_CONCURRENCY) {
+        const slice = ids.slice(i, i + PROXY_TEST_CONCURRENCY);
+        const results = await Promise.allSettled(
+          slice.map((id) => testMut.mutateAsync({ id })),
+        );
+        for (const r of results) {
+          if (r.status === "fulfilled" && r.value.ok) okCount += 1;
+          else failCount += 1;
+        }
+      }
+      if (failCount === 0) {
+        toast({
+          title: t("adminProxies.bulkTestOk", { count: okCount }),
+          tone: "success",
+        });
+      } else if (okCount === 0) {
+        toast({
+          title: t("adminProxies.bulkTestAllFailed", { count: failCount }),
+          tone: "error",
+        });
+      } else {
+        toast({
+          title: t("adminProxies.bulkTestPartial", { ok: okCount, fail: failCount }),
+          tone: "warning",
+        });
+      }
+    } finally {
+      setBulkTesting(false);
+    }
+  }
 
   /** Atomic bulk-soft-delete via /admin/proxies/batch-delete. Per-id outcome
    * means partial failures show in the toast rather than silently rolling
@@ -232,14 +277,24 @@ function ProxiesContent() {
           onToggle: list.toggle,
           onTogglePage: list.togglePage,
           bulkActions: (
-            <Button
-              variant="outline"
-              size="sm"
-              loading={batchDeleteMut.isPending}
-              onClick={() => setBulkDeleteOpen(true)}
-            >
-              {t("common.delete")}
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={bulkTesting}
+                onClick={() => void bulkTest()}
+              >
+                {t("adminProxies.bulkTest")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={batchDeleteMut.isPending}
+                onClick={() => setBulkDeleteOpen(true)}
+              >
+                {t("common.delete")}
+              </Button>
+            </>
           ),
         }}
         pagination={{
