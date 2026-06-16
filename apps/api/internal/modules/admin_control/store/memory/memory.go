@@ -231,6 +231,35 @@ func (s *Store) DisableRedeemCodes(_ context.Context, ids []int, at time.Time) (
 	return succeeded, nil
 }
 
+func (s *Store) EnableRedeemCodes(_ context.Context, ids []int, at time.Time) ([]int, error) {
+	now := at.UTC()
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	succeeded := make([]int, 0, len(ids))
+	for _, id := range ids {
+		item, ok := s.redeemCodes[id]
+		if !ok {
+			continue
+		}
+		// Only flip rows that were explicitly disabled — never reanimate codes
+		// whose lifecycle is over (redeemed, expired, fully consumed). Status
+		// is derived from raw fields by the service, but the stored Status is
+		// the operator-set value; treat anything other than disabled as
+		// not-eligible-for-enable.
+		if item.Status != admincontrol.RedeemCodeStatusDisabled {
+			continue
+		}
+		item.Status = admincontrol.RedeemCodeStatusActive
+		item.UpdatedAt = now
+		s.redeemCodes[id] = item
+		succeeded = append(succeeded, id)
+	}
+	return succeeded, nil
+}
+
 func (s *Store) ExtendRedeemCodes(_ context.Context, ids []int, expiresAt time.Time, now time.Time) ([]int, error) {
 	stamp := now.UTC()
 	if stamp.IsZero() {

@@ -110,6 +110,43 @@ func (s *Store) DisableRedeemCodes(ctx context.Context, ids []int, at time.Time)
 	return existingIDs, nil
 }
 
+// EnableRedeemCodes is the inverse of DisableRedeemCodes — flips DISABLED rows
+// back to ACTIVE. Rows in any other status are skipped (we don't reanimate
+// redeemed/expired codes via the bulk action).
+func (s *Store) EnableRedeemCodes(ctx context.Context, ids []int, at time.Time) ([]int, error) {
+	if s == nil || s.client == nil {
+		return nil, admincontrolcontract.ErrInvalidInput
+	}
+	now := at.UTC()
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	requested := uniquePositiveInts(ids)
+	if len(requested) == 0 {
+		return []int{}, nil
+	}
+	eligibleIDs, err := s.client.RedeemCode.Query().
+		Where(
+			entredeemcode.IDIn(requested...),
+			entredeemcode.StatusEQ(string(admincontrolcontract.RedeemCodeStatusDisabled)),
+		).
+		IDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(eligibleIDs) == 0 {
+		return []int{}, nil
+	}
+	if _, err := s.client.RedeemCode.Update().
+		Where(entredeemcode.IDIn(eligibleIDs...)).
+		SetStatus(string(admincontrolcontract.RedeemCodeStatusActive)).
+		SetUpdatedAt(now).
+		Save(ctx); err != nil {
+		return nil, err
+	}
+	return eligibleIDs, nil
+}
+
 // ExtendRedeemCodes sets a new ExpiresAt on the named codes. Mirrors the
 // memory store: fully-consumed codes (redeemed_count >= max_redemptions) are
 // skipped so the result accurately reports rows that were actually touched.

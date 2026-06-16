@@ -26,6 +26,11 @@ type Store interface {
 	CreateRedeemCode(ctx context.Context, code RedeemCode) (RedeemCode, error)
 	DeleteRedeemCode(ctx context.Context, id int) (RedeemCode, error)
 	DisableRedeemCodes(ctx context.Context, ids []int, at time.Time) ([]int, error)
+	// EnableRedeemCodes flips DISABLED rows back to ACTIVE — the inverse of
+	// DisableRedeemCodes. Codes whose lifecycle is over (redeemed, expired,
+	// fully consumed) are skipped; the service treats their omission from the
+	// returned IDs as a per-row failure for the BatchOperation result.
+	EnableRedeemCodes(ctx context.Context, ids []int, at time.Time) ([]int, error)
 	// ExtendRedeemCodes sets ExpiresAt on each listed code, skipping codes that
 	// are already redeemed or fully consumed (their lifecycle is over). Returns
 	// the IDs that were successfully touched.

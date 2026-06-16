@@ -1290,6 +1290,7 @@ export const en = {
     disable: "Disable",
     disableSelected: "Disable selected",
     disableSelectedTitle: "Disable {count} redeem codes?",
+    enableSelected: "Enable selected",
     extendSelected: "Extend expiry",
     extendSelectedTitle: "Extend expiry on {count} redeem codes",
     extendSelectedBody:

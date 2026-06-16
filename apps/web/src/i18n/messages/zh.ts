@@ -1268,6 +1268,7 @@ export const zh: Messages = {
     disable: "停用",
     disableSelected: "停用所选",
     disableSelectedTitle: "停用 {count} 个兑换码？",
+    enableSelected: "启用所选",
     extendSelected: "延长有效期",
     extendSelectedTitle: "为 {count} 个兑换码延长有效期",
     extendSelectedBody:

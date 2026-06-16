@@ -9922,6 +9922,48 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/redeem-codes/batch-enable:
+    post:
+      tags:
+        - AdminPromotions
+      operationId: batchEnableAdminRedeemCodes
+      summary: Batch re-enable disabled redeem codes.
+      description: |
+        Inverse of batch-disable — flips DISABLED rows back to ACTIVE. Codes
+        in any other status (active, redeemed, expired) are reported in
+        failed_ids and not touched, so the bulk action never reanimates a
+        code whose lifecycle is over.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchDisableRedeemCodesRequest"
+      responses:
+        "200":
+          description: Redeem codes re-enabled — per-id outcome in the result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchOperationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/redeem-codes/batch-extend:
     post:
       tags:

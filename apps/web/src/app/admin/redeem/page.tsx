@@ -31,6 +31,7 @@ import {
   useBatchGenerateRedeemCodes,
   useBatchDeleteRedeemCodes,
   useBatchDisableRedeemCodes,
+  useBatchEnableRedeemCodes,
   useBatchExtendRedeemCodes,
   useDeleteRedeemCode,
 } from "@/hooks/admin-queries";
@@ -93,6 +94,7 @@ function RedeemContent() {
   const stats = useRedeemStats();
   const createMut = useCreateRedeemCode();
   const disableMut = useBatchDisableRedeemCodes();
+  const enableMut = useBatchEnableRedeemCodes();
   const extendMut = useBatchExtendRedeemCodes();
   const batchDeleteMut = useBatchDeleteRedeemCodes();
   const deleteMut = useDeleteRedeemCode();
@@ -125,6 +127,11 @@ function RedeemContent() {
   const selectedActive = redeemDisableStateFromSelection(
     (codes.data?.data ?? []).filter((c) => list.selected.has(c.id)),
   );
+  // Enable only DISABLED selected codes — the inverse filter from above. Lets
+  // the toolbar disable the Enable button when nothing eligible is selected.
+  const selectedDisabledIds = (codes.data?.data ?? [])
+    .filter((c) => list.selected.has(c.id) && c.status === "disabled")
+    .map((c) => c.id);
 
   async function confirmBulkDisable() {
     try {
@@ -134,6 +141,20 @@ function RedeemContent() {
     } catch (err) {
       toast({ title: t("feedback.failed"), tone: "error" });
       throw err;
+    }
+  }
+
+  async function bulkEnable() {
+    if (selectedDisabledIds.length === 0) return;
+    try {
+      await enableMut.mutateAsync(selectedDisabledIds);
+      toast({
+        title: t("feedback.batchAllSucceeded", { count: selectedDisabledIds.length }),
+        tone: "success",
+      });
+      list.clearSelection();
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
     }
   }
 
@@ -276,6 +297,15 @@ function RedeemContent() {
                 onClick={() => setBulkDisabling(true)}
               >
                 {t("adminPromos.disableSelected")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={enableMut.isPending}
+                disabled={selectedDisabledIds.length === 0}
+                onClick={() => void bulkEnable()}
+              >
+                {t("adminPromos.enableSelected")}
               </Button>
               <Button
                 variant="outline"

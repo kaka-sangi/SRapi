@@ -99,6 +99,13 @@ export function useBatchDisableRedeemCodes() {
     queryKeys.admin.redeemStats(),
   );
 }
+export function useBatchEnableRedeemCodes() {
+  return useAdminMutation(
+    (ids: string[]) => adminApi.batchEnableRedeemCodes(ids),
+    ["admin", "redeem-codes"],
+    queryKeys.admin.redeemStats(),
+  );
+}
 export function useBatchExtendRedeemCodes() {
   return useAdminMutation(
     (vars: { ids: string[]; expiresAt: string }) =>

@@ -675,6 +675,7 @@ func (s *Server) registerAdminPromotionRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/admin/redeem-codes", s.handleCreateAdminRedeemCode)
 	mux.HandleFunc("POST /api/v1/admin/redeem-codes/batch-generate", s.handleBatchGenerateAdminRedeemCodes)
 	mux.HandleFunc("POST /api/v1/admin/redeem-codes/batch-disable", s.handleBatchDisableAdminRedeemCodes)
+	mux.HandleFunc("POST /api/v1/admin/redeem-codes/batch-enable", s.handleBatchEnableAdminRedeemCodes)
 	mux.HandleFunc("POST /api/v1/admin/redeem-codes/batch-extend", s.handleBatchExtendAdminRedeemCodes)
 	mux.HandleFunc("POST /api/v1/admin/redeem-codes/batch-delete", s.handleBatchDeleteAdminRedeemCodes)
 	mux.HandleFunc("DELETE /api/v1/admin/redeem-codes/{id}", s.handleDeleteAdminRedeemCode)

@@ -568,6 +568,61 @@ func TestUpdateAdminSettingsNormalizesGatewayRetryKnobs(t *testing.T) {
 	}
 }
 
+func TestBatchEnableRedeemCodesFlipsDisabledBackToActive(t *testing.T) {
+	now := time.Date(2026, time.June, 9, 9, 0, 0, 0, time.UTC)
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	// Three codes, all created as active.
+	a, _ := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code: "ENABLE1", Type: admincontrol.RedeemCodeTypeBalance, Value: "5", Currency: "USD", MaxRedemptions: 1,
+	}, 1)
+	b, _ := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code: "ENABLE2", Type: admincontrol.RedeemCodeTypeBalance, Value: "5", Currency: "USD", MaxRedemptions: 1,
+	}, 1)
+	stillActive, _ := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code: "ENABLE3", Type: admincontrol.RedeemCodeTypeBalance, Value: "5", Currency: "USD", MaxRedemptions: 1,
+	}, 1)
+
+	// Disable A and B; leave the third active. Verifies the enable path only
+	// touches rows whose stored status is DISABLED.
+	if _, err := svc.BatchDisableRedeemCodes(context.Background(), []int{a.ID, b.ID}, 1); err != nil {
+		t.Fatalf("disable seed: %v", err)
+	}
+
+	result, err := svc.BatchEnableRedeemCodes(context.Background(), []int{a.ID, b.ID, stillActive.ID, 99999}, 1)
+	if err != nil {
+		t.Fatalf("batch enable: %v", err)
+	}
+	if result.Requested != 4 {
+		t.Fatalf("requested: want 4, got %d", result.Requested)
+	}
+	if result.Succeeded != 2 {
+		t.Fatalf("succeeded: want 2 (A, B), got %d", result.Succeeded)
+	}
+	if result.Failed != 2 {
+		t.Fatalf("failed: want 2 (the active one + unknown), got %d (ids=%v)", result.Failed, result.FailedIDs)
+	}
+
+	list, _ := svc.ListRedeemCodes(context.Background(), admincontrol.ListOptions{})
+	byID := map[int]admincontrol.RedeemCode{}
+	for _, c := range list.Items {
+		byID[c.ID] = c
+	}
+	for _, id := range []int{a.ID, b.ID, stillActive.ID} {
+		if got := byID[id]; got.Status != admincontrol.RedeemCodeStatusActive {
+			t.Fatalf("code %d should be active after enable, got %s", id, got.Status)
+		}
+	}
+
+	if _, err := svc.BatchEnableRedeemCodes(context.Background(), nil, 1); !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("empty ids should be invalid, got %v", err)
+	}
+}
+
 func TestBatchExtendRedeemCodesSetsExpiryAndSkipsFullyConsumed(t *testing.T) {
 	now := time.Date(2026, time.June, 9, 9, 0, 0, 0, time.UTC)
 	store := admincontrolmemory.New()

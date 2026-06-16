@@ -20,6 +20,7 @@ import {
   getAdminRedeemCodeStats,
   batchDeleteAdminRedeemCodes,
   batchDisableAdminRedeemCodes,
+  batchEnableAdminRedeemCodes,
   batchExtendAdminRedeemCodes,
   batchGenerateAdminRedeemCodes,
   listAdminPaymentOrders,
@@ -202,6 +203,10 @@ export const paymentsApi = {
 
   batchDisableRedeemCodes(ids: Id[]): Promise<unknown> {
     return unwrapData(() => batchDisableAdminRedeemCodes({ body: { ids }, throwOnError: true }));
+  },
+
+  batchEnableRedeemCodes(ids: Id[]): Promise<unknown> {
+    return unwrapData(() => batchEnableAdminRedeemCodes({ body: { ids }, throwOnError: true }));
   },
 
   batchExtendRedeemCodes(ids: Id[], expiresAt: string): Promise<unknown> {
