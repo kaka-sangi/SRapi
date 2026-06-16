@@ -49,6 +49,10 @@ type codexChatStreamReader struct {
 
 	toolIndex map[string]int
 	nextTool  int
+
+	// usage holds the token usage captured from the terminal event so a trailing
+	// usage chunk can be emitted before [DONE], matching OpenAI streaming.
+	usage *contract.Usage
 }
 
 func newCodexChatStreamReader(upstream io.ReadCloser, req contract.ConversationRequest) *codexChatStreamReader {
@@ -174,6 +178,9 @@ func (r *codexChatStreamReader) handleEvent(eventField, data string) {
 			}}})
 		}
 	case "response.completed", "response.done", "response.incomplete", "response.cancelled", "response.canceled", "response.failed":
+		if u := codexEventUsage(ev, ""); u.InputTokens > 0 || u.OutputTokens > 0 {
+			r.usage = &u
+		}
 		r.finish(r.terminalFinishReason(ev))
 	}
 }
@@ -206,16 +213,48 @@ func (r *codexChatStreamReader) finish(reason string) {
 		}
 	}
 	r.writeChunk(map[string]any{}, reason)
+	// Emit a trailing usage chunk (choices:[] + usage) before [DONE] so streaming
+	// clients can read token usage, matching OpenAI and the buffered codex path.
+	if r.usage != nil {
+		r.writeUsageChunk(*r.usage)
+	}
 	r.out.WriteString("data: [DONE]\n\n")
 	r.done = true
 }
 
-func (r *codexChatStreamReader) terminalFinishReason(ev codexResponsesEvent) string {
-	if r.sawTool {
-		return "tool_calls"
+// writeUsageChunk emits a terminal chat.completion.chunk that carries only the
+// token usage (empty choices), as OpenAI does when stream usage is requested.
+func (r *codexChatStreamReader) writeUsageChunk(usage contract.Usage) {
+	chunk := map[string]any{
+		"id":      r.id,
+		"object":  "chat.completion.chunk",
+		"created": r.created,
+		"model":   r.model,
+		"choices": []map[string]any{},
+		"usage": map[string]any{
+			"prompt_tokens":     usage.InputTokens,
+			"completion_tokens": usage.OutputTokens,
+			"total_tokens":      usage.InputTokens + usage.OutputTokens,
+		},
 	}
+	encoded, err := json.Marshal(chunk)
+	if err != nil {
+		return
+	}
+	r.out.WriteString("data: ")
+	r.out.Write(encoded)
+	r.out.WriteString("\n\n")
+}
+
+func (r *codexChatStreamReader) terminalFinishReason(ev codexResponsesEvent) string {
+	// A token-limit truncation is the terminal cause even if the model had begun
+	// tool calls: OpenAI reports finish_reason "length" for a truncated turn, so
+	// check IncompleteDetails before falling back to tool_calls.
 	if ev.Response != nil && ev.Response.IncompleteDetails != nil && strings.TrimSpace(ev.Response.IncompleteDetails.Reason) != "" {
 		return "length"
+	}
+	if r.sawTool {
+		return "tool_calls"
 	}
 	return "stop"
 }

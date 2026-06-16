@@ -170,6 +170,72 @@ func TestCodexChatStreamReaderStreamsToolCalls(t *testing.T) {
 	}
 }
 
+// TestCodexChatStreamReaderEmitsTrailingUsageChunk guards that the streamed chat
+// output carries a trailing usage chunk (empty choices + usage) recovered from
+// the terminal response.completed event, so streaming clients can read token
+// usage instead of getting nothing.
+func TestCodexChatStreamReaderEmitsTrailingUsageChunk(t *testing.T) {
+	body := strings.Join([]string{
+		"event: response.output_text.delta",
+		`data: {"type":"response.output_text.delta","delta":"hi"}`,
+		"",
+		"event: response.completed",
+		`data: {"type":"response.completed","response":{"id":"resp_u","status":"completed","usage":{"input_tokens":7,"output_tokens":5}}}`,
+		"",
+		"",
+	}, "\n")
+
+	chunks, sawDone, _ := readCodexChatChunks(t, body)
+	if !sawDone {
+		t.Fatal("expected a terminating data: [DONE]")
+	}
+	var usage map[string]any
+	for _, c := range chunks {
+		if u, ok := c["usage"].(map[string]any); ok {
+			usage = u
+		}
+	}
+	if usage == nil {
+		t.Fatalf("expected a trailing usage chunk, got chunks=%+v", chunks)
+	}
+	if usage["prompt_tokens"] != float64(7) || usage["completion_tokens"] != float64(5) || usage["total_tokens"] != float64(12) {
+		t.Fatalf("usage chunk = %+v, want prompt 7 / completion 5 / total 12", usage)
+	}
+}
+
+// TestCodexChatStreamReaderTruncatedToolTurnFinishesLength guards finish_reason
+// precedence: a turn truncated by max_output_tokens reports "length" even if the
+// model had begun a tool call (truncation is the terminal cause).
+func TestCodexChatStreamReaderTruncatedToolTurnFinishesLength(t *testing.T) {
+	body := strings.Join([]string{
+		"event: response.output_item.added",
+		`data: {"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","call_id":"c1","name":"f"}}`,
+		"",
+		"event: response.completed",
+		`data: {"type":"response.completed","response":{"id":"r","status":"incomplete","incomplete_details":{"reason":"max_output_tokens"}}}`,
+		"",
+		"",
+	}, "\n")
+
+	chunks, sawDone, _ := readCodexChatChunks(t, body)
+	if !sawDone {
+		t.Fatal("expected a terminating data: [DONE]")
+	}
+	var finish any
+	for _, c := range chunks {
+		choices, ok := c["choices"].([]any)
+		if !ok || len(choices) == 0 {
+			continue
+		}
+		if ch, _ := choices[0].(map[string]any); ch["finish_reason"] != nil {
+			finish = ch["finish_reason"]
+		}
+	}
+	if finish != "length" {
+		t.Fatalf("truncated tool turn finish_reason = %v, want length", finish)
+	}
+}
+
 // TestCodexChatStreamReaderStreamsCustomToolArgs guards that a custom/freeform
 // tool call streams its arguments: the input fragments arrive under
 // response.custom_tool_call_input.delta (not function_call_arguments.delta), and
