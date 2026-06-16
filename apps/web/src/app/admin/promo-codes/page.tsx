@@ -27,6 +27,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
+import { formatDateTime } from "@/lib/admin-format";
 import {
   PROMO_DISCOUNT_TYPES,
   PROMO_CODE_STATUSES,
@@ -126,6 +127,19 @@ function PromoContent() {
         <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
           {p.per_user_limit ? `${p.per_user_limit}/user` : "—"}
           {p.min_order_amount ? ` · ≥ ${p.min_order_amount}` : ""}
+        </span>
+      ),
+    },
+    {
+      key: "expires",
+      header: t("adminCommon.expiresAt"),
+      hideOnMobile: true,
+      // Empty string sortValue keeps unset expiries at the bottom on
+      // ascending sort, matching the "when does this expire?" mental model.
+      sortValue: (p) => p.expires_at ?? "",
+      render: (p) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {p.expires_at ? formatDateTime(p.expires_at) : "—"}
         </span>
       ),
     },

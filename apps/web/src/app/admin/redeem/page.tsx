@@ -51,7 +51,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
-import { formatMoney } from "@/lib/admin-format";
+import { formatMoney, formatDateTime } from "@/lib/admin-format";
 import { adminErrorMessage } from "@/lib/admin-api";
 import {
   REDEEM_CODE_TYPES,
@@ -198,6 +198,20 @@ function RedeemContent() {
         <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
           {c.redeemed_count ?? 0}
           {c.max_redemptions ? ` / ${c.max_redemptions}` : ""}
+        </span>
+      ),
+    },
+    {
+      key: "expires",
+      header: t("adminCommon.expiresAt"),
+      hideOnMobile: true,
+      // sortValue keeps unset expiries at the bottom on ascending sort (empty
+      // string sorts before all timestamps), which matches the typical "when
+      // does this expire?" mental model.
+      sortValue: (c) => c.expires_at ?? "",
+      render: (c) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {c.expires_at ? formatDateTime(c.expires_at) : "—"}
         </span>
       ),
     },
