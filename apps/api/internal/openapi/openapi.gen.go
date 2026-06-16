@@ -4898,6 +4898,71 @@ type BatchAccountActionRequest struct {
 // BatchAccountActionRequestAction Maintenance action to apply per account. `clear_error` clears transient error/cooldown metadata and reactivates non-healthy accounts; `recover` resets the account back to active.
 type BatchAccountActionRequestAction string
 
+// BatchCreateProxiesErrorRow defines model for BatchCreateProxiesErrorRow.
+type BatchCreateProxiesErrorRow struct {
+	Index   int    `json:"index"`
+	Message string `json:"message"`
+}
+
+// BatchCreateProxiesRequest defines model for BatchCreateProxiesRequest.
+type BatchCreateProxiesRequest struct {
+	Proxies []CreateProxyDefinitionRequest `json:"proxies"`
+}
+
+// BatchCreateProxiesResponse defines model for BatchCreateProxiesResponse.
+type BatchCreateProxiesResponse struct {
+	Data      BatchCreateProxiesResult `json:"data"`
+	RequestId RequestId                `json:"request_id"`
+}
+
+// BatchCreateProxiesResult defines model for BatchCreateProxiesResult.
+type BatchCreateProxiesResult struct {
+	Created []ProxyDefinition `json:"created"`
+
+	// CreatedCount Number of new proxies actually inserted.
+	CreatedCount int `json:"created_count"`
+
+	// Errors Rows that hard-failed validation. The other rows still apply.
+	Errors []BatchCreateProxiesErrorRow `json:"errors"`
+
+	// Skipped Rows that hit a soft-skip rule (e.g. duplicate name) — not errors.
+	Skipped []BatchCreateProxiesSkippedRow `json:"skipped"`
+}
+
+// BatchCreateProxiesSkippedRow defines model for BatchCreateProxiesSkippedRow.
+type BatchCreateProxiesSkippedRow struct {
+	// Index Zero-based index in the request `proxies` array.
+	Index  int    `json:"index"`
+	Name   string `json:"name"`
+	Reason string `json:"reason"`
+}
+
+// BatchDeleteProxiesErrorRow defines model for BatchDeleteProxiesErrorRow.
+type BatchDeleteProxiesErrorRow struct {
+	Id      Id     `json:"id"`
+	Message string `json:"message"`
+}
+
+// BatchDeleteProxiesRequest defines model for BatchDeleteProxiesRequest.
+type BatchDeleteProxiesRequest struct {
+	ProxyIds []Id `json:"proxy_ids"`
+}
+
+// BatchDeleteProxiesResponse defines model for BatchDeleteProxiesResponse.
+type BatchDeleteProxiesResponse struct {
+	Data      BatchDeleteProxiesResult `json:"data"`
+	RequestId RequestId                `json:"request_id"`
+}
+
+// BatchDeleteProxiesResult defines model for BatchDeleteProxiesResult.
+type BatchDeleteProxiesResult struct {
+	DeletedCount int  `json:"deleted_count"`
+	DeletedIds   []Id `json:"deleted_ids"`
+
+	// Errors Per-id failures (e.g. proxy not found). Other ids still succeeded.
+	Errors []BatchDeleteProxiesErrorRow `json:"errors"`
+}
+
 // BatchDisableRedeemCodesRequest defines model for BatchDisableRedeemCodesRequest.
 type BatchDisableRedeemCodesRequest struct {
 	Ids []Id `json:"ids"`
@@ -11093,6 +11158,12 @@ type UpdateAdminProviderJSONRequestBody = UpdateProviderRequest
 
 // CreateAdminProxyJSONRequestBody defines body for CreateAdminProxy for application/json ContentType.
 type CreateAdminProxyJSONRequestBody = CreateProxyDefinitionRequest
+
+// BatchCreateAdminProxiesJSONRequestBody defines body for BatchCreateAdminProxies for application/json ContentType.
+type BatchCreateAdminProxiesJSONRequestBody = BatchCreateProxiesRequest
+
+// BatchDeleteAdminProxiesJSONRequestBody defines body for BatchDeleteAdminProxies for application/json ContentType.
+type BatchDeleteAdminProxiesJSONRequestBody = BatchDeleteProxiesRequest
 
 // UpdateAdminProxyJSONRequestBody defines body for UpdateAdminProxy for application/json ContentType.
 type UpdateAdminProxyJSONRequestBody = UpdateProxyDefinitionRequest
@@ -18160,6 +18231,12 @@ type ServerInterface interface {
 	// Create an encrypted egress proxy definition.
 	// (POST /api/v1/admin/proxies)
 	CreateAdminProxy(w http.ResponseWriter, r *http.Request)
+	// Bulk-create egress proxy definitions.
+	// (POST /api/v1/admin/proxies/batch)
+	BatchCreateAdminProxies(w http.ResponseWriter, r *http.Request)
+	// Bulk soft-delete proxy definitions.
+	// (POST /api/v1/admin/proxies/batch-delete)
+	BatchDeleteAdminProxies(w http.ResponseWriter, r *http.Request)
 	// Delete an egress proxy definition.
 	// (DELETE /api/v1/admin/proxies/{id})
 	DeleteAdminProxy(w http.ResponseWriter, r *http.Request, id Id)
@@ -26026,6 +26103,50 @@ func (siw *ServerInterfaceWrapper) CreateAdminProxy(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// BatchCreateAdminProxies operation middleware
+func (siw *ServerInterfaceWrapper) BatchCreateAdminProxies(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchCreateAdminProxies(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchDeleteAdminProxies operation middleware
+func (siw *ServerInterfaceWrapper) BatchDeleteAdminProxies(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchDeleteAdminProxies(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteAdminProxy operation middleware
 func (siw *ServerInterfaceWrapper) DeleteAdminProxy(w http.ResponseWriter, r *http.Request) {
 
@@ -32322,6 +32443,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/providers/{id}/test", wrapper.TestAdminProvider)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/proxies", wrapper.ListAdminProxies)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/proxies", wrapper.CreateAdminProxy)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/proxies/batch", wrapper.BatchCreateAdminProxies)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/proxies/batch-delete", wrapper.BatchDeleteAdminProxies)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/proxies/{id}", wrapper.DeleteAdminProxy)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/proxies/{id}", wrapper.UpdateAdminProxy)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/quick-setup", wrapper.RunAdminQuickSetup)

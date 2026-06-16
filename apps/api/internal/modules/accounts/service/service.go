@@ -262,6 +262,88 @@ func (s *Service) DeleteProxy(ctx context.Context, id int) error {
 	return s.store.SoftDeleteProxy(ctx, id)
 }
 
+// BatchCreateProxyResult is per-row outcome from BatchCreateProxies.
+// Created is the inserted row, SkippedReason is set when the row was a
+// soft-skip (duplicate name), Err is set on a hard validation failure.
+type BatchCreateProxyResult struct {
+	Index         int
+	Name          string
+	Created       *contract.ProxyDefinition
+	SkippedReason string
+	Err           error
+}
+
+// BatchCreateProxies inserts many proxies in one call. Dedupes by name
+// against existing proxies AND within the request itself — a duplicate name
+// surfaces as SkippedReason="duplicate_name" rather than failing the whole
+// call. Hard validation errors (bad URL, bad type) surface in Err on that
+// row; other rows still succeed. Order matches the input.
+func (s *Service) BatchCreateProxies(ctx context.Context, reqs []contract.CreateProxyRequest) ([]BatchCreateProxyResult, error) {
+	if len(reqs) == 0 {
+		return nil, ErrInvalidInput
+	}
+	existing, err := s.store.ListProxies(ctx)
+	if err != nil {
+		return nil, err
+	}
+	taken := make(map[string]struct{}, len(existing))
+	for _, p := range existing {
+		taken[strings.ToLower(strings.TrimSpace(p.Name))] = struct{}{}
+	}
+	out := make([]BatchCreateProxyResult, len(reqs))
+	for i, req := range reqs {
+		name := strings.TrimSpace(req.Name)
+		row := BatchCreateProxyResult{Index: i, Name: name}
+		if name == "" {
+			row.Err = ErrInvalidInput
+			out[i] = row
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, dup := taken[key]; dup {
+			row.SkippedReason = "duplicate_name"
+			out[i] = row
+			continue
+		}
+		created, createErr := s.CreateProxy(ctx, req)
+		if createErr != nil {
+			row.Err = createErr
+		} else {
+			taken[key] = struct{}{}
+			row.Created = &created
+		}
+		out[i] = row
+	}
+	return out, nil
+}
+
+// BatchDeleteProxyResult is per-id outcome from BatchDeleteProxies. Err is
+// set when the id couldn't be deleted (e.g. not found); successful rows have
+// Err == nil. Maintains input order.
+type BatchDeleteProxyResult struct {
+	ID  int
+	Err error
+}
+
+// BatchDeleteProxies soft-deletes the named ids. Same semantics as the
+// per-id DeleteProxy — accounts routed through a deleted proxy fall back to
+// a direct connection. Missing ids surface in Err on that row without
+// failing the call.
+func (s *Service) BatchDeleteProxies(ctx context.Context, ids []int) ([]BatchDeleteProxyResult, error) {
+	if len(ids) == 0 {
+		return nil, ErrInvalidInput
+	}
+	out := make([]BatchDeleteProxyResult, len(ids))
+	for i, id := range ids {
+		row := BatchDeleteProxyResult{ID: id}
+		if err := s.DeleteProxy(ctx, id); err != nil {
+			row.Err = err
+		}
+		out[i] = row
+	}
+	return out, nil
+}
+
 func (s *Service) Delete(ctx context.Context, id int) error {
 	if id <= 0 {
 		return ErrInvalidInput

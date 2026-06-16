@@ -1091,6 +1091,8 @@ export const zh: Messages = {
     urlEditHint: "留空则保持现有 URL 不变。",
     deleteTitle: "删除代理",
     deleteBody: "确定要删除代理「{name}」吗？通过 ID 绑定该代理的上游账号会自动解绑、改为直连。此操作不可撤销。",
+    bulkDeleteTitle: "批量删除代理",
+    bulkDeleteBody: "确定删除已选 {count} 个代理？绑定到这些代理的上游账号会自动解绑、改为直连。此操作不可撤销。",
   },
   adminRateLimit: {
     title: "{name} · 限流",

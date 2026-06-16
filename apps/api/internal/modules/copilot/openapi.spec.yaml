@@ -5257,6 +5257,90 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/proxies/batch:
+    post:
+      tags:
+        - AdminProxies
+      operationId: batchCreateAdminProxies
+      summary: Bulk-create egress proxy definitions.
+      description: |
+        Operator onboarding shortcut for importing a provider's proxy list.
+        Dedupes by name against existing proxies — a duplicate name surfaces
+        in `skipped` rather than failing the whole call. Per-row failures are
+        returned in `errors` and the call still succeeds for the others.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchCreateProxiesRequest"
+      responses:
+        "200":
+          description: Proxies created — see counts + per-row outcome.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchCreateProxiesResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/proxies/batch-delete:
+    post:
+      tags:
+        - AdminProxies
+      operationId: batchDeleteAdminProxies
+      summary: Bulk soft-delete proxy definitions.
+      description: |
+        Soft-deletes the named proxies and unbinds any accounts routed through
+        them (those accounts fall back to a direct connection) — same as the
+        per-id DELETE handler, just in one call. Per-id outcome is returned;
+        missing ids surface in `errors` without failing the call.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchDeleteProxiesRequest"
+      responses:
+        "200":
+          description: Proxies deleted — see counts + per-id outcome.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchDeleteProxiesResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/accounts/{id}/test:
     post:
       tags:
@@ -19128,6 +19212,135 @@ components:
           $ref: "#/components/schemas/ProxyDefinitionStatus"
         metadata:
           $ref: "#/components/schemas/JsonObject"
+
+    BatchCreateProxiesRequest:
+      type: object
+      required:
+        - proxies
+      properties:
+        proxies:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/CreateProxyDefinitionRequest"
+
+    BatchCreateProxiesSkippedRow:
+      type: object
+      required:
+        - index
+        - name
+        - reason
+      properties:
+        index:
+          type: integer
+          description: Zero-based index in the request `proxies` array.
+        name:
+          type: string
+        reason:
+          type: string
+          example: duplicate_name
+
+    BatchCreateProxiesErrorRow:
+      type: object
+      required:
+        - index
+        - message
+      properties:
+        index:
+          type: integer
+        message:
+          type: string
+
+    BatchCreateProxiesResult:
+      type: object
+      required:
+        - created_count
+        - created
+        - skipped
+        - errors
+      properties:
+        created_count:
+          type: integer
+          description: Number of new proxies actually inserted.
+        created:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProxyDefinition"
+        skipped:
+          type: array
+          description: Rows that hit a soft-skip rule (e.g. duplicate name) — not errors.
+          items:
+            $ref: "#/components/schemas/BatchCreateProxiesSkippedRow"
+        errors:
+          type: array
+          description: Rows that hard-failed validation. The other rows still apply.
+          items:
+            $ref: "#/components/schemas/BatchCreateProxiesErrorRow"
+
+    BatchCreateProxiesResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchCreateProxiesResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BatchDeleteProxiesRequest:
+      type: object
+      required:
+        - proxy_ids
+      properties:
+        proxy_ids:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/Id"
+
+    BatchDeleteProxiesErrorRow:
+      type: object
+      required:
+        - id
+        - message
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        message:
+          type: string
+
+    BatchDeleteProxiesResult:
+      type: object
+      required:
+        - deleted_count
+        - deleted_ids
+        - errors
+      properties:
+        deleted_count:
+          type: integer
+        deleted_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+        errors:
+          type: array
+          description: Per-id failures (e.g. proxy not found). Other ids still succeeded.
+          items:
+            $ref: "#/components/schemas/BatchDeleteProxiesErrorRow"
+
+    BatchDeleteProxiesResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchDeleteProxiesResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
 
     ProxyDefinitionResponse:
       type: object

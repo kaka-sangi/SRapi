@@ -112,6 +112,137 @@ func (s *Server) handleUpdateAdminProxy(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+// handleBatchCreateAdminProxies bulk-creates proxy definitions. Dedupes by
+// name against existing proxies (and within the request itself) so importing
+// a CSV that overlaps a previous batch is idempotent — duplicates surface in
+// `skipped`, hard validation failures in `errors`, the rest still apply.
+func (s *Server) handleBatchCreateAdminProxies(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.BatchCreateProxiesRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid batch proxy create request", requestID)
+		return
+	}
+	if len(body.Proxies) == 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "proxies must be non-empty", requestID)
+		return
+	}
+	reqs := make([]accountcontract.CreateProxyRequest, 0, len(body.Proxies))
+	for _, p := range body.Proxies {
+		reqs = append(reqs, accountcontract.CreateProxyRequest{
+			Name:     p.Name,
+			Type:     accountcontract.ProxyType(p.Type),
+			URL:      optionalStringValue(p.Url),
+			Status:   toProxyStatusPtr(p.Status),
+			Metadata: jsonObjectToMap(p.Metadata),
+		})
+	}
+	results, err := s.runtime.accounts.BatchCreateProxies(r.Context(), reqs)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid batch proxy create request", requestID)
+		return
+	}
+	created := make([]apiopenapi.ProxyDefinition, 0, len(results))
+	skipped := make([]apiopenapi.BatchCreateProxiesSkippedRow, 0)
+	errs := make([]apiopenapi.BatchCreateProxiesErrorRow, 0)
+	for _, row := range results {
+		switch {
+		case row.Created != nil:
+			created = append(created, toAPIProxyDefinition(*row.Created))
+		case row.SkippedReason != "":
+			skipped = append(skipped, apiopenapi.BatchCreateProxiesSkippedRow{
+				Index:  row.Index,
+				Name:   row.Name,
+				Reason: row.SkippedReason,
+			})
+		case row.Err != nil:
+			errs = append(errs, apiopenapi.BatchCreateProxiesErrorRow{
+				Index:   row.Index,
+				Message: row.Err.Error(),
+			})
+		}
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "proxy.batch_create", "proxy", "bulk", nil, map[string]any{
+		"requested":     len(body.Proxies),
+		"created_count": len(created),
+		"skipped_count": len(skipped),
+		"error_count":   len(errs),
+	}))
+	writeJSONAny(w, http.StatusOK, apiopenapi.BatchCreateProxiesResponse{
+		Data: apiopenapi.BatchCreateProxiesResult{
+			CreatedCount: len(created),
+			Created:      created,
+			Skipped:      skipped,
+			Errors:       errs,
+		},
+		RequestId: requestID,
+	})
+}
+
+// handleBatchDeleteAdminProxies bulk soft-deletes proxies. Missing ids
+// surface in `errors` without failing the call.
+func (s *Server) handleBatchDeleteAdminProxies(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.BatchDeleteProxiesRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid batch proxy delete request", requestID)
+		return
+	}
+	ids, err := apiIDsValueToInts(body.ProxyIds)
+	if err != nil || len(ids) == 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid proxy ids", requestID)
+		return
+	}
+	results, err := s.runtime.accounts.BatchDeleteProxies(r.Context(), ids)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid batch proxy delete request", requestID)
+		return
+	}
+	deletedIDs := make([]apiopenapi.Id, 0, len(results))
+	errs := make([]apiopenapi.BatchDeleteProxiesErrorRow, 0)
+	for _, row := range results {
+		if row.Err == nil {
+			deletedIDs = append(deletedIDs, apiopenapi.Id(strconv.Itoa(row.ID)))
+		} else {
+			errs = append(errs, apiopenapi.BatchDeleteProxiesErrorRow{
+				Id:      apiopenapi.Id(strconv.Itoa(row.ID)),
+				Message: row.Err.Error(),
+			})
+		}
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "proxy.batch_delete", "proxy", "bulk", nil, map[string]any{
+		"requested":     len(ids),
+		"deleted_count": len(deletedIDs),
+		"error_count":   len(errs),
+	}))
+	writeJSONAny(w, http.StatusOK, apiopenapi.BatchDeleteProxiesResponse{
+		Data: apiopenapi.BatchDeleteProxiesResult{
+			DeletedCount: len(deletedIDs),
+			DeletedIds:   deletedIDs,
+			Errors:       errs,
+		},
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleDeleteAdminProxy(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)

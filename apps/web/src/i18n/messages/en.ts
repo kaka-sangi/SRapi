@@ -1110,6 +1110,9 @@ export const en = {
     deleteTitle: "Delete proxy",
     deleteBody:
       "Delete proxy “{name}”? Provider accounts bound to it by id are unbound and fall back to a direct connection. This cannot be undone.",
+    bulkDeleteTitle: "Delete proxies",
+    bulkDeleteBody:
+      "Delete {count} selected proxies? Provider accounts bound to them are unbound and fall back to direct connections. This cannot be undone.",
   },
   adminRateLimit: {
     title: "{name} · Rate limit",

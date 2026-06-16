@@ -32,6 +32,7 @@ import {
   useRecoverAccount,
   useResetAccountQuota,
   useBatchActionAccounts,
+  useBatchUpdateAccounts,
   useDeleteAccount,
   useDiscoverAccountModels,
   useExportAccounts,
@@ -120,6 +121,7 @@ function AccountsContent() {
   const recover = useRecoverAccount();
   const resetQuota = useResetAccountQuota();
   const batchAction = useBatchActionAccounts();
+  const batchUpdate = useBatchUpdateAccounts();
   const deleteMut = useDeleteAccount();
   const discover = useDiscoverAccountModels();
   const exportMut = useExportAccounts();
@@ -162,22 +164,31 @@ function AccountsContent() {
   const proxyOptions = (proxies.data?.data ?? []).map((p) => ({ value: p.id, label: p.name }));
   const isFiltered = Boolean(statusFilter || providerFilter);
 
-  /** Apply a status to every selected account, reporting partial failures. */
+  /** Apply a status to every selected account via the atomic PATCH
+   * /admin/accounts/batch endpoint. Previously this fired N concurrent
+   * single-item enable/disable calls (Promise.allSettled), which made the
+   * audit log noisy + the result non-atomic on partial failure. The backend
+   * already returns per-id errors so partial-failure feedback is preserved. */
   async function applyBulkStatus(status: "active" | "disabled") {
     const ids = [...list.selected];
     if (ids.length === 0) return;
-    const results = await Promise.allSettled(
-      ids.map((id) => setStatus.mutateAsync({ id, status })),
-    );
-    const failed = results.filter((r) => r.status === "rejected").length;
-    const succeeded = ids.length - failed;
-    list.clearSelection();
-    if (failed > 0 && succeeded > 0) {
-      toast({ title: t("feedback.batchPartial", { succeeded, failed }), tone: "warning" });
-    } else if (failed > 0) {
-      toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
-    } else {
-      toast({ title: t("feedback.batchAllSucceeded", { count: ids.length }), tone: "success" });
+    try {
+      const result = await batchUpdate.mutateAsync({ account_ids: ids, status });
+      list.clearSelection();
+      const failedCount = result.errors.length;
+      const succeededCount = result.updated_count;
+      if (failedCount > 0 && succeededCount > 0) {
+        toast({
+          title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
+          tone: "warning",
+        });
+      } else if (failedCount > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
     }
   }
 

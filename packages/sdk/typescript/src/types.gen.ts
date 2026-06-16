@@ -1787,6 +1787,68 @@ export type UpdateProxyDefinitionRequest = {
     metadata?: JsonObject;
 };
 
+export type BatchCreateProxiesRequest = {
+    proxies: Array<CreateProxyDefinitionRequest>;
+};
+
+export type BatchCreateProxiesSkippedRow = {
+    /**
+     * Zero-based index in the request `proxies` array.
+     */
+    index: number;
+    name: string;
+    reason: string;
+};
+
+export type BatchCreateProxiesErrorRow = {
+    index: number;
+    message: string;
+};
+
+export type BatchCreateProxiesResult = {
+    /**
+     * Number of new proxies actually inserted.
+     */
+    created_count: number;
+    created: Array<ProxyDefinition>;
+    /**
+     * Rows that hit a soft-skip rule (e.g. duplicate name) — not errors.
+     */
+    skipped: Array<BatchCreateProxiesSkippedRow>;
+    /**
+     * Rows that hard-failed validation. The other rows still apply.
+     */
+    errors: Array<BatchCreateProxiesErrorRow>;
+};
+
+export type BatchCreateProxiesResponse = {
+    data: BatchCreateProxiesResult;
+    request_id: RequestId;
+};
+
+export type BatchDeleteProxiesRequest = {
+    proxy_ids: Array<Id>;
+};
+
+export type BatchDeleteProxiesErrorRow = {
+    id: Id;
+    message: string;
+};
+
+export type BatchDeleteProxiesResult = {
+    deleted_count: number;
+    deleted_ids: Array<Id>;
+    /**
+     * Per-id failures (e.g. proxy not found). Other ids still succeeded.
+     */
+    errors: Array<BatchDeleteProxiesErrorRow>;
+};
+
+export type BatchDeleteProxiesResponse = {
+    data: BatchDeleteProxiesResult;
+    request_id: RequestId;
+};
+
 export type ProxyDefinitionResponse = {
     data: ProxyDefinition;
     request_id: RequestId;
@@ -6031,6 +6093,10 @@ export type UpdateProxyDefinitionRequestWritable = {
     url?: string;
     status?: ProxyDefinitionStatus;
     metadata?: JsonObject;
+};
+
+export type BatchCreateProxiesRequestWritable = {
+    proxies: Array<CreateProxyDefinitionRequestWritable>;
 };
 
 export type ProviderAccountImportItemWritable = {
@@ -11783,6 +11849,80 @@ export type UpdateAdminProxyResponses = {
 };
 
 export type UpdateAdminProxyResponse = UpdateAdminProxyResponses[keyof UpdateAdminProxyResponses];
+
+export type BatchCreateAdminProxiesData = {
+    body: BatchCreateProxiesRequestWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/proxies/batch';
+};
+
+export type BatchCreateAdminProxiesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchCreateAdminProxiesError = BatchCreateAdminProxiesErrors[keyof BatchCreateAdminProxiesErrors];
+
+export type BatchCreateAdminProxiesResponses = {
+    /**
+     * Proxies created — see counts + per-row outcome.
+     */
+    200: BatchCreateProxiesResponse;
+};
+
+export type BatchCreateAdminProxiesResponse = BatchCreateAdminProxiesResponses[keyof BatchCreateAdminProxiesResponses];
+
+export type BatchDeleteAdminProxiesData = {
+    body: BatchDeleteProxiesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/proxies/batch-delete';
+};
+
+export type BatchDeleteAdminProxiesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchDeleteAdminProxiesError = BatchDeleteAdminProxiesErrors[keyof BatchDeleteAdminProxiesErrors];
+
+export type BatchDeleteAdminProxiesResponses = {
+    /**
+     * Proxies deleted — see counts + per-id outcome.
+     */
+    200: BatchDeleteProxiesResponse;
+};
+
+export type BatchDeleteAdminProxiesResponse = BatchDeleteAdminProxiesResponses[keyof BatchDeleteAdminProxiesResponses];
 
 export type TestAdminAccountData = {
     body?: AdminAccountTestRequest;

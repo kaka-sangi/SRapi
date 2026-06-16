@@ -21,8 +21,10 @@ import {
   useCreateProxy,
   useUpdateProxy,
   useDeleteProxy,
+  useBatchDeleteProxies,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
@@ -58,10 +60,37 @@ function ProxiesContent() {
   const createMut = useCreateProxy();
   const updateMut = useUpdateProxy();
   const deleteMut = useDeleteProxy();
+  const batchDeleteMut = useBatchDeleteProxies();
+  const { toast } = useToast();
 
   const [formTarget, setFormTarget] = useState<ProxyDefinition | "new" | null>(null);
   const [toDelete, setToDelete] = useState<ProxyDefinition | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const isNew = formTarget === "new";
+
+  /** Atomic bulk-soft-delete via /admin/proxies/batch-delete. Per-id outcome
+   * means partial failures show in the toast rather than silently rolling
+   * back the whole call — same UX pattern as the accounts bulk-status flow. */
+  async function applyBulkDelete() {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    try {
+      const result = await batchDeleteMut.mutateAsync(ids);
+      list.clearSelection();
+      setBulkDeleteOpen(false);
+      const failed = result.errors.length;
+      const succeeded = result.deleted_count;
+      if (failed > 0 && succeeded > 0) {
+        toast({ title: t("feedback.batchPartial", { succeeded, failed }), tone: "warning" });
+      } else if (failed > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeeded }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: String(err), tone: "error" });
+    }
+  }
 
   const fields: FieldConfig<ProxyFormState>[] = [
     { name: "name", label: t("adminProxies.name"), required: true },
@@ -168,6 +197,21 @@ function ProxiesContent() {
             />
           </ListToolbar>
         }
+        selection={{
+          selected: list.selected,
+          onToggle: list.toggle,
+          onTogglePage: list.togglePage,
+          bulkActions: (
+            <Button
+              variant="outline"
+              size="sm"
+              loading={batchDeleteMut.isPending}
+              onClick={() => setBulkDeleteOpen(true)}
+            >
+              {t("common.delete")}
+            </Button>
+          ),
+        }}
         pagination={{
           page: list.page,
           pageSize: list.pageSize,
@@ -197,6 +241,16 @@ function ProxiesContent() {
         onConfirm={async () => {
           if (toDelete) await deleteMut.mutateAsync(toDelete.id);
         }}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={t("adminProxies.bulkDeleteTitle")}
+        body={t("adminProxies.bulkDeleteBody", { count: list.selected.size })}
+        confirmLabel={t("common.delete")}
+        isPending={batchDeleteMut.isPending}
+        onConfirm={applyBulkDelete}
       />
 
       {formTarget === "new" ? (

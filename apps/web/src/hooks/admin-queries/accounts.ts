@@ -220,6 +220,15 @@ export function useBatchActionAccounts() {
     ["admin", "accounts"],
   );
 }
+// PATCH /admin/accounts/batch — atomic multi-id status change.
+// Replaces the old Promise.allSettled-over-single-item-endpoint pattern that
+// fired N requests per bulk action (and couldn't roll back on partial fail).
+export function useBatchUpdateAccounts() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.batchUpdateAccounts>) => adminApi.batchUpdateAccounts(body),
+    ["admin", "accounts"],
+  );
+}
 /** Export is read-only; expose as a mutation so pages can trigger it on click. */
 export function useExportAccounts() {
   return useMutation({ mutationFn: () => adminApi.exportAccounts() });
@@ -241,6 +250,22 @@ export function useUpdateProxy() {
 }
 export function useDeleteProxy() {
   return useAdminMutation((id: string) => adminApi.deleteProxy(id), ["admin", "proxies"]);
+}
+// Bulk-import — dedupes by name + returns per-row outcome. Cache invalidation
+// is identical to single-row create, so existing list views refresh.
+export function useBatchCreateProxies() {
+  return useAdminMutation(
+    (proxies: P<typeof adminApi.batchCreateProxies>) => adminApi.batchCreateProxies(proxies),
+    ["admin", "proxies"],
+  );
+}
+// Bulk soft-delete with per-id outcome. Same semantics as single-id delete:
+// accounts routed through the deleted proxy fall back to direct connection.
+export function useBatchDeleteProxies() {
+  return useAdminMutation(
+    (proxyIds: P<typeof adminApi.batchDeleteProxies>) => adminApi.batchDeleteProxies(proxyIds),
+    ["admin", "proxies"],
+  );
 }
 
 // Account groups

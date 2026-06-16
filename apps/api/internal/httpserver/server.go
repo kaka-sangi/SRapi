@@ -487,6 +487,8 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("PATCH /api/v1/admin/accounts/{id}/proxy", server.handleBindAdminAccountProxy)
 	mux.HandleFunc("GET /api/v1/admin/proxies", server.handleListAdminProxies)
 	mux.HandleFunc("POST /api/v1/admin/proxies", server.handleCreateAdminProxy)
+	mux.HandleFunc("POST /api/v1/admin/proxies/batch", server.handleBatchCreateAdminProxies)
+	mux.HandleFunc("POST /api/v1/admin/proxies/batch-delete", server.handleBatchDeleteAdminProxies)
 	mux.HandleFunc("PATCH /api/v1/admin/proxies/{id}", server.handleUpdateAdminProxy)
 	mux.HandleFunc("DELETE /api/v1/admin/proxies/{id}", server.handleDeleteAdminProxy)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/test", server.handleTestAdminAccount)
