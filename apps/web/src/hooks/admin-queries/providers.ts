@@ -57,6 +57,19 @@ export function useRunQuickSetup() {
   });
 }
 
+// Bulk-create canonical models + provider mappings for a provider. Used by the
+// quick-setup custom-platform path to actually map the operator's models
+// (instead of silently creating none).
+export function useQuickMapModels() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: P<typeof adminApi.quickMapModels>) => adminApi.quickMapModels(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "models"] });
+    },
+  });
+}
+
 // ---- TLS fingerprint profiles ----
 export function useTlsProfiles() {
   return useQuery({

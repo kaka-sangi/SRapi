@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import {
   useAdminProviders,
   useCreateAccount,
+  useQuickMapModels,
   useRunQuickSetup,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -50,6 +51,10 @@ function QuickSetupContent() {
   const [accountName, setAccountName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
+  // Custom-platform model names (one per line or comma-separated) — the custom
+  // path has no preset catalog, so the operator types the models their endpoint
+  // serves and we map them for real.
+  const [customModels, setCustomModels] = useState("");
 
   // Advanced fields
   const [proxyId, setProxyId] = useState("");
@@ -59,6 +64,7 @@ function QuickSetupContent() {
 
   const mutation = useRunQuickSetup();
   const createMut = useCreateAccount();
+  const quickMapMut = useQuickMapModels();
   const providers = useAdminProviders();
 
   function handleSuccess(data: AdminQuickSetupResult) {
@@ -86,7 +92,7 @@ function QuickSetupContent() {
     mutation.reset();
   }
 
-  const isSubmitting = mutation.isPending || createMut.isPending;
+  const isSubmitting = mutation.isPending || createMut.isPending || quickMapMut.isPending;
 
   function selectPlatform(p: PlatformPreset) {
     setPlatform(p);
@@ -142,15 +148,29 @@ function QuickSetupContent() {
           weight: weight ? parseFloat(weight) : undefined,
           proxy_id: proxyId && proxyId !== "__none__" ? proxyId : undefined,
         });
-        const fakeResult: AdminQuickSetupResult = {
+        // Actually create the operator's models + provider mappings. Without this
+        // a custom platform has an account but no usable models.
+        const models = customModels
+          .split(/[\n,]/)
+          .map((m) => m.trim())
+          .filter(Boolean);
+        let mapped = { models_created: 0, mappings_created: 0, warnings: [] as string[] };
+        if (models.length > 0) {
+          const r = await quickMapMut.mutateAsync({ provider_id: oaiProvider.id, models });
+          mapped = {
+            models_created: r.models_created,
+            mappings_created: r.mappings_created,
+            warnings: r.warnings ?? [],
+          };
+        }
+        handleSuccess({
           provider: oaiProvider,
           account,
-          models_created: 0,
-          mappings_created: 0,
-          model_names: [],
-          warnings: [],
-        };
-        handleSuccess(fakeResult);
+          models_created: mapped.models_created,
+          mappings_created: mapped.mappings_created,
+          model_names: models,
+          warnings: mapped.warnings,
+        });
       } catch (err) {
         handleError(err instanceof Error ? err : new Error(String(err)));
       }
@@ -233,6 +253,8 @@ function QuickSetupContent() {
           onAccountNameChange={setAccountName}
           baseUrl={baseUrl}
           onBaseUrlChange={setBaseUrl}
+          customModels={customModels}
+          onCustomModelsChange={setCustomModels}
           selectedModels={selectedModels}
           onToggleModel={toggleModel}
           onSelectAll={() =>

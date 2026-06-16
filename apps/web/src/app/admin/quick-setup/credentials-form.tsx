@@ -83,6 +83,8 @@ export function CredentialsForm({
   onAccountNameChange,
   baseUrl,
   onBaseUrlChange,
+  customModels,
+  onCustomModelsChange,
   selectedModels,
   onToggleModel,
   onSelectAll,
@@ -113,6 +115,8 @@ export function CredentialsForm({
   onAccountNameChange: (v: string) => void;
   baseUrl: string;
   onBaseUrlChange: (v: string) => void;
+  customModels: string;
+  onCustomModelsChange: (v: string) => void;
   selectedModels: Set<string>;
   onToggleModel: (m: string) => void;
   onSelectAll: () => void;
@@ -414,6 +418,21 @@ export function CredentialsForm({
                   {selectedModels.size} / {platform.defaultModels.length}
                 </p>
               )}
+            </div>
+          )}
+          {platform.custom && (
+            <div className="rounded-xl border border-srapi-border bg-srapi-card p-5">
+              <Label className="mb-2 block">{t("adminQuickSetup.modelCatalog")}</Label>
+              <p className="mb-3 text-2xs text-srapi-text-tertiary">
+                {t("adminQuickSetup.modelCatalogHint")}
+              </p>
+              <textarea
+                value={customModels}
+                onChange={(e) => onCustomModelsChange(e.target.value)}
+                rows={6}
+                placeholder={"gpt-4o\ndeepseek-chat\nllama-3.3-70b"}
+                className="w-full rounded-lg border border-srapi-border bg-srapi-card px-3 py-2 font-mono text-xs text-srapi-text-primary placeholder:text-srapi-text-tertiary focus:border-srapi-text-secondary focus:outline-none"
+              />
             </div>
           )}
         </div>
