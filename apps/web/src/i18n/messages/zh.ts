@@ -1099,6 +1099,8 @@ export const zh: Messages = {
     testOk: "代理可用 · {latency}ms",
     testFailed: "代理测试失败：{reason}",
     testTarget: "通过 {target}",
+    lastTest: "上次测试",
+    neverTested: "未测试",
     bulkTest: "测试所选",
     bulkTestOk: "{count} 个代理可用",
     bulkTestAllFailed: "{count} 个代理失败",

@@ -40,6 +40,7 @@ import {
   type ProxyFormState,
 } from "@/lib/admin-proxy-form";
 import type { ProxyDefinition } from "@/lib/sdk-types";
+import { formatDateTime, formatLatency } from "@/lib/admin-format";
 
 export default function AdminProxiesPage() {
   return (
@@ -210,6 +211,39 @@ function ProxiesContent() {
       ),
     },
     {
+      key: "last_test",
+      header: t("adminProxies.lastTest"),
+      hideOnMobile: true,
+      sortValue: (p) => readLastTest(p)?.at ?? "",
+      render: (p) => {
+        const snap = readLastTest(p);
+        if (!snap) {
+          return <span className="text-2xs text-srapi-text-tertiary">{t("adminProxies.neverTested")}</span>;
+        }
+        return (
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-1.5">
+              <span
+                className={
+                  "inline-block h-1.5 w-1.5 rounded-full " +
+                  (snap.ok ? "bg-srapi-success" : "bg-srapi-error")
+                }
+                aria-hidden
+              />
+              <span className="font-mono text-2xs text-srapi-text-tertiary">
+                {formatDateTime(snap.at)}
+              </span>
+            </div>
+            <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+              {snap.ok
+                ? formatLatency(snap.latency_ms)
+                : snap.error_class || t("adminProxies.testFailed", { reason: "" })}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
       key: "status",
       header: t("common.active"),
       render: (p) => <QuietBadge status={quietStatusFor(p.status)} label={statusLabel(t, p.status)} />,
@@ -363,4 +397,30 @@ function ProxiesContent() {
       ) : null}
     </>
   );
+}
+
+interface LastProxyTest {
+  at: string;
+  ok: boolean;
+  latency_ms: number;
+  error_class: string;
+}
+
+// readLastTest extracts the persisted `_last_test` snapshot the backend writes
+// into proxy.metadata after each Test action. The metadata field is
+// loosely-typed `JsonObject` so we narrow defensively — older rows that have
+// never been tested return null and the column renders "Never tested".
+function readLastTest(p: ProxyDefinition): LastProxyTest | null {
+  const metadata = (p as { metadata?: Record<string, unknown> }).metadata;
+  if (!metadata || typeof metadata !== "object") return null;
+  const raw = (metadata as Record<string, unknown>)["_last_test"];
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.at !== "string") return null;
+  return {
+    at: obj.at,
+    ok: obj.ok === true,
+    latency_ms: typeof obj.latency_ms === "number" ? obj.latency_ms : 0,
+    error_class: typeof obj.error_class === "string" ? obj.error_class : "",
+  };
 }

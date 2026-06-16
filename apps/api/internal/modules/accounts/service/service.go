@@ -270,6 +270,14 @@ func (s *Service) DeleteProxy(ctx context.Context, id int) error {
 // and is widely used for exactly this kind of probe.
 const defaultProxyTestTarget = "https://www.cloudflare.com/cdn-cgi/trace"
 
+// proxyLastTestMetadataKey is the reserved metadata key that TestProxy and
+// BatchTestProxies use to persist the most recent probe outcome on the proxy
+// row. The leading underscore signals "internal — don't touch from the form
+// editor"; the value is an object with {at, ok, latency_ms, error_class,
+// status_code, target_url}. Stored on metadata to avoid an ent schema change
+// for what is essentially a per-row diagnostic cache.
+const proxyLastTestMetadataKey = "_last_test"
+
 // batchTestProxyConcurrency caps how many in-flight probes BatchTestProxies
 // runs at once. Each one is a real HTTPS handshake — too many simultaneous
 // dials would hammer the box, too few would make a moderate selection feel
@@ -350,6 +358,7 @@ func (s *Service) TestProxy(ctx context.Context, id int, targetURL string) (cont
 	start := time.Now()
 	resp, err := client.Do(req)
 	latencyMS := int(time.Since(start) / time.Millisecond)
+	var result contract.ProxyTestResult
 	if err != nil {
 		// Categorize the error: context-deadline + URL deadline errors map to
 		// timeout; anything else is a transport-level failure (dial / TLS /
@@ -358,29 +367,66 @@ func (s *Service) TestProxy(ctx context.Context, id int, targetURL string) (cont
 		if errors.Is(err, context.DeadlineExceeded) {
 			errClass = "timeout"
 		}
-		return contract.ProxyTestResult{
+		result = contract.ProxyTestResult{
 			OK:         false,
 			LatencyMS:  latencyMS,
 			ErrorClass: errClass,
 			TargetURL:  target,
-		}, nil
+		}
+	} else {
+		defer resp.Body.Close()
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			result = contract.ProxyTestResult{
+				OK:         true,
+				LatencyMS:  latencyMS,
+				StatusCode: resp.StatusCode,
+				TargetURL:  target,
+			}
+		} else {
+			result = contract.ProxyTestResult{
+				OK:         false,
+				LatencyMS:  latencyMS,
+				StatusCode: resp.StatusCode,
+				ErrorClass: "bad_status",
+				TargetURL:  target,
+			}
+		}
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return contract.ProxyTestResult{
-			OK:         true,
-			LatencyMS:  latencyMS,
-			StatusCode: resp.StatusCode,
-			TargetURL:  target,
-		}, nil
+	// Persist the outcome onto the proxy's metadata so the list view can show
+	// a "last test" badge across page loads. A persist failure is silently
+	// dropped — the probe result the caller is about to see is what matters;
+	// the cache is best-effort.
+	_ = s.persistProxyTestResult(ctx, proxy, result)
+	return result, nil
+}
+
+// persistProxyTestResult merges a result snapshot into proxy.Metadata under
+// proxyLastTestMetadataKey and writes the proxy back via the store.
+//
+// Loads a fresh copy from the store before mutating so we don't race with
+// concurrent edits to other metadata fields — the cost is one extra round-trip
+// per Test, which is negligible compared to the probe itself.
+func (s *Service) persistProxyTestResult(ctx context.Context, original contract.ProxyDefinition, result contract.ProxyTestResult) error {
+	fresh, err := s.store.FindProxyByID(ctx, original.ID)
+	if err != nil {
+		return err
 	}
-	return contract.ProxyTestResult{
-		OK:         false,
-		LatencyMS:  latencyMS,
-		StatusCode: resp.StatusCode,
-		ErrorClass: "bad_status",
-		TargetURL:  target,
-	}, nil
+	if fresh.Metadata == nil {
+		fresh.Metadata = map[string]any{}
+	}
+	snapshot := map[string]any{
+		"at":          time.Now().UTC().Format(time.RFC3339),
+		"ok":          result.OK,
+		"latency_ms":  result.LatencyMS,
+		"status_code": result.StatusCode,
+		"error_class": result.ErrorClass,
+		"target_url":  result.TargetURL,
+	}
+	fresh.Metadata[proxyLastTestMetadataKey] = snapshot
+	if _, err := s.store.UpdateProxy(ctx, fresh); err != nil {
+		return err
+	}
+	return nil
 }
 
 // BatchTestProxies runs TestProxy for each id in parallel (capped at

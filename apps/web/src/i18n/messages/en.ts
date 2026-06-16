@@ -1117,6 +1117,8 @@ export const en = {
     testOk: "Proxy OK · {latency}ms",
     testFailed: "Proxy test failed: {reason}",
     testTarget: "via {target}",
+    lastTest: "Last test",
+    neverTested: "Never tested",
     bulkTest: "Test selected",
     bulkTestOk: "{count} proxies OK",
     bulkTestAllFailed: "{count} proxies failed",

@@ -845,6 +845,59 @@ func (p fakeAccountProber) ProbeAccount(_ context.Context, _ contract.ProviderAc
 	return p.result, nil
 }
 
+// TestProxyTestPersistsResultInMetadata verifies that TestProxy writes the
+// most recent probe outcome onto the proxy's metadata under the reserved
+// `_last_test` key, so the list view can render a "last test" badge without
+// re-probing on every page load. Uses the same loopback:1 unreachable proxy
+// so the outcome is deterministic without a network dependency.
+func TestProxyTestPersistsResultInMetadata(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name:     "unreachable",
+		Type:     contract.ProxyTypeHTTPS,
+		URL:      "https://127.0.0.1:1",
+		Metadata: map[string]any{"region": "us-east"},
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+
+	result, err := svc.TestProxy(ctx, proxy.ID, "")
+	if err != nil {
+		t.Fatalf("test proxy: %v", err)
+	}
+	if result.OK {
+		t.Fatalf("expected ok=false for loopback:1, got %+v", result)
+	}
+
+	fresh, err := svc.FindProxyByID(ctx, proxy.ID)
+	if err != nil {
+		t.Fatalf("find proxy: %v", err)
+	}
+	// Untouched user metadata survives the persist write.
+	if fresh.Metadata["region"] != "us-east" {
+		t.Fatalf("user metadata clobbered: %+v", fresh.Metadata)
+	}
+	snapshot, ok := fresh.Metadata["_last_test"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected _last_test metadata to be a map, got %T: %+v", fresh.Metadata["_last_test"], fresh.Metadata["_last_test"])
+	}
+	if snapshot["ok"] != false {
+		t.Fatalf("_last_test.ok: want false, got %v", snapshot["ok"])
+	}
+	if snapshot["error_class"] == nil || snapshot["error_class"] == "" {
+		t.Fatalf("_last_test.error_class should be set: %+v", snapshot)
+	}
+	if snapshot["at"] == nil {
+		t.Fatalf("_last_test.at should be set: %+v", snapshot)
+	}
+}
+
 // TestBatchTestProxiesReturnsOneRowPerIdAndCategorisesMissing checks that
 // BatchTestProxies returns rows in input order, that a missing id is
 // reported as a row with error_class="not_found" (not a hard error), and
