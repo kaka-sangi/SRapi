@@ -2,6 +2,7 @@ package service
 
 import (
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
+	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
 // Incremental client-side stream renderers.
@@ -87,6 +88,62 @@ func (r *ChatStreamRenderer) Finalize() []map[string]any {
 	}
 	return nil
 }
+
+// GeminiStreamRenderer is the incremental form of renderGeminiCanonicalStreamEvents.
+// It is stateless per-event: each canonical event maps to zero or one Gemini
+// streamGenerateContent chunk.
+type GeminiStreamRenderer struct {
+	resp gatewaycontract.CanonicalResponse
+}
+
+func (s *Service) newGeminiStreamRenderer(resp gatewaycontract.CanonicalResponse) *GeminiStreamRenderer {
+	return &GeminiStreamRenderer{resp: resp}
+}
+
+// NewGeminiStreamRenderer exposes the incremental Gemini renderer to the HTTP
+// layer for cross-protocol transcoding.
+func (s *Service) NewGeminiStreamRenderer(resp gatewaycontract.CanonicalResponse) *GeminiStreamRenderer {
+	return s.newGeminiStreamRenderer(resp)
+}
+
+// FeedEvent renders the Gemini chunk(s) produced by one canonical event.
+func (r *GeminiStreamRenderer) FeedEvent(event gatewaycontract.StreamEvent) []StreamEvent {
+	switch event.Type {
+	case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolCallDelta, gatewaycontract.StreamEventToolResult:
+		part, ok := outputGeminiStreamPart(event.Delta)
+		if !ok {
+			return nil
+		}
+		return []StreamEvent{{Data: map[string]any{
+			"candidates": []apiopenapi.GeminiCandidate{{
+				Index: event.ContentIndex,
+				Content: apiopenapi.GeminiContent{
+					Parts: []apiopenapi.GeminiPart{part},
+				},
+			}},
+		}}}
+	case gatewaycontract.StreamEventUsage:
+		return []StreamEvent{{Data: map[string]any{
+			"candidates":    []apiopenapi.GeminiCandidate{},
+			"usageMetadata": geminiUsage(event.Usage),
+		}}}
+	case gatewaycontract.StreamEventStop:
+		return []StreamEvent{{Data: map[string]any{
+			"candidates": []apiopenapi.GeminiCandidate{{
+				Index:        event.ContentIndex,
+				FinishReason: geminiFinishReason(firstNonEmpty(event.StopReason, r.resp.StopReason)),
+				Content: apiopenapi.GeminiContent{
+					Parts: []apiopenapi.GeminiPart{},
+				},
+			}},
+		}}}
+	}
+	return nil
+}
+
+// Finalize emits no trailing chunk — Gemini's terminal is the finish_reason
+// candidate carried by the stop event.
+func (r *GeminiStreamRenderer) Finalize() []StreamEvent { return nil }
 
 // anthropicBlockKey identifies one logical Anthropic content block by the
 // provider's content index AND the block kind, so distinct kinds at the same

@@ -1322,44 +1322,21 @@ func (s *Service) RenderGeminiGenerateContentStreamEvents(resp gatewaycontract.C
 	}}
 }
 
+// renderGeminiCanonicalStreamEvents renders the buffered canonical response as
+// Gemini streamGenerateContent chunks. It is a thin wrapper over the incremental
+// GeminiStreamRenderer (guarded by streamEventsCanRenderGemini), so the buffered
+// and streaming paths are identical.
 func (s *Service) renderGeminiCanonicalStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
 	events := normalizeStreamEvents(resp.StreamEvents)
 	if !streamEventsCanRenderGemini(events) {
 		return nil
 	}
+	renderer := s.newGeminiStreamRenderer(resp)
 	out := make([]StreamEvent, 0, len(events))
 	for _, event := range events {
-		switch event.Type {
-		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolCallDelta, gatewaycontract.StreamEventToolResult:
-			part, ok := outputGeminiStreamPart(event.Delta)
-			if !ok {
-				continue
-			}
-			out = append(out, StreamEvent{Data: map[string]any{
-				"candidates": []apiopenapi.GeminiCandidate{{
-					Index: event.ContentIndex,
-					Content: apiopenapi.GeminiContent{
-						Parts: []apiopenapi.GeminiPart{part},
-					},
-				}},
-			}})
-		case gatewaycontract.StreamEventUsage:
-			out = append(out, StreamEvent{Data: map[string]any{
-				"candidates":    []apiopenapi.GeminiCandidate{},
-				"usageMetadata": geminiUsage(event.Usage),
-			}})
-		case gatewaycontract.StreamEventStop:
-			out = append(out, StreamEvent{Data: map[string]any{
-				"candidates": []apiopenapi.GeminiCandidate{{
-					Index:        event.ContentIndex,
-					FinishReason: geminiFinishReason(firstNonEmpty(event.StopReason, resp.StopReason)),
-					Content: apiopenapi.GeminiContent{
-						Parts: []apiopenapi.GeminiPart{},
-					},
-				}},
-			}})
-		}
+		out = append(out, renderer.FeedEvent(event)...)
 	}
+	out = append(out, renderer.Finalize()...)
 	if len(out) == 0 {
 		return nil
 	}

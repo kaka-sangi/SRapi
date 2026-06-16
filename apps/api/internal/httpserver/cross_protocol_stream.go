@@ -214,6 +214,41 @@ func writeAnthropicEventSSE(b *bytes.Buffer, event gatewayservice.StreamEvent) {
 	b.WriteString("\n\n")
 }
 
+// geminiTranscoder serializes Gemini streamGenerateContent chunks
+// ("data: {json}\n\n"); there is no event name or [DONE] sentinel.
+type geminiTranscoder struct{ renderer *gatewayservice.GeminiStreamRenderer }
+
+func (t *geminiTranscoder) feed(events []gatewaycontract.StreamEvent) []byte {
+	var b bytes.Buffer
+	for _, event := range events {
+		for _, out := range t.renderer.FeedEvent(event) {
+			writeGeminiChunkSSE(&b, out)
+		}
+	}
+	return b.Bytes()
+}
+
+func (t *geminiTranscoder) finalize() []byte {
+	var b bytes.Buffer
+	for _, out := range t.renderer.Finalize() {
+		writeGeminiChunkSSE(&b, out)
+	}
+	// Match SRapi's existing gemini stream path, which terminates with the
+	// [DONE] sentinel (the buffered writeSSEEvents path appends it).
+	b.WriteString("data: [DONE]\n\n")
+	return b.Bytes()
+}
+
+func writeGeminiChunkSSE(b *bytes.Buffer, event gatewayservice.StreamEvent) {
+	raw, err := json.Marshal(event.Data)
+	if err != nil {
+		return
+	}
+	b.WriteString("data: ")
+	b.Write(raw)
+	b.WriteString("\n\n")
+}
+
 // newClientStreamTranscoder selects the client-protocol transcoder for a
 // cross-protocol stream. seed carries the chunk id/model.
 func newClientStreamTranscoder(gateway *gatewayservice.Service, req provideradaptercontract.ConversationRequest) (clientStreamTranscoder, bool) {
@@ -221,6 +256,8 @@ func newClientStreamTranscoder(gateway *gatewayservice.Service, req provideradap
 	switch strings.ToLower(strings.TrimSpace(req.SourceProtocol)) {
 	case "anthropic-compatible", "anthropic":
 		return &anthropicTranscoder{renderer: gateway.NewAnthropicStreamRenderer(seed)}, true
+	case "gemini-compatible", "gemini":
+		return &geminiTranscoder{renderer: gateway.NewGeminiStreamRenderer(seed)}, true
 	case "openai-compatible", "openai":
 		return &chatTranscoder{renderer: gateway.NewChatStreamRenderer(seed)}, true
 	default:

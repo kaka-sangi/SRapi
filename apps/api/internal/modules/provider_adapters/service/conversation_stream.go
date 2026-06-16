@@ -118,6 +118,8 @@ func clientHasIncrementalRenderer(req contract.ConversationRequest) bool {
 	switch strings.ToLower(strings.TrimSpace(req.SourceProtocol)) {
 	case "anthropic-compatible", "anthropic":
 		return true
+	case "gemini-compatible", "gemini":
+		return true
 	case "openai-compatible", "openai":
 		return !openAIResponsesEndpoint(req)
 	default:
