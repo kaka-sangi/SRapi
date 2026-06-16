@@ -16,6 +16,7 @@ import {
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
+import { CopyButton } from "@/components/ui/copy-button";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import { useAuditLogs } from "@/hooks/admin-queries";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
@@ -213,8 +214,8 @@ export function AuditLogsPanel() {
             </DialogHeader>
             <div className="mt-4 max-h-[60vh] space-y-4 overflow-y-auto pr-1">
               <AuditMeta label={t("adminAudit.actor")} value={userLookup.get(detail.actor_user_id)} />
-              <AuditMeta label={t("adminAudit.ip")} value={detail.ip || "—"} />
-              <AuditMeta label={t("adminAudit.trace")} value={detail.trace_id || "—"} />
+              <AuditMeta label={t("adminAudit.ip")} value={detail.ip || "—"} copyable />
+              <AuditMeta label={t("adminAudit.trace")} value={detail.trace_id || "—"} copyable />
               <AuditMeta label={t("adminAudit.userAgent")} value={detail.user_agent || "—"} />
               <JsonBlock label={t("adminAudit.before")} value={detail.before} />
               <JsonBlock label={t("adminAudit.after")} value={detail.after} />
@@ -226,13 +227,24 @@ export function AuditLogsPanel() {
   );
 }
 
-function AuditMeta({ label, value }: { label: string; value: string }) {
+function AuditMeta({
+  label,
+  value,
+  copyable,
+}: {
+  label: string;
+  value: string;
+  copyable?: boolean;
+}) {
   return (
     <div className="flex items-baseline gap-3">
       <span className="w-24 shrink-0 font-mono text-2xs uppercase text-srapi-text-tertiary">
         {label}
       </span>
-      <span className="break-all font-mono text-xs text-srapi-text-secondary">{value}</span>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="break-all font-mono text-xs text-srapi-text-secondary">{value}</span>
+        {copyable && value && value !== "—" ? <CopyButton value={value} size="inline" /> : null}
+      </span>
     </div>
   );
 }
