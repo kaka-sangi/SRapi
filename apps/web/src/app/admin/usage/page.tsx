@@ -14,8 +14,8 @@ import {
   useAdminUsageDaily,
   useAdminUsageAggregates,
   useAdminModels,
-  useAdminUsers,
 } from "@/hooks/admin-queries";
+import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import {
   useAdminUsageTrends,
   useAdminUsageErrorDistribution,
@@ -215,20 +215,20 @@ function UsageContent() {
 
   // Filter option sources: catalog models + users (by email).
   const models = useAdminModels({ page: 1, page_size: 100 });
-  const usersList = useAdminUsers({ page: 1, page_size: 100 });
+  const userLookup = useUserEmailLookup();
   const modelOptions = (models.data?.data ?? []).map((m) => ({
     value: m.canonical_name,
     label: m.canonical_name,
   }));
-  const userOptions = (usersList.data?.data ?? []).map((u) => ({
+  const userOptions = (userLookup.query.data?.data ?? []).map((u) => ({
     value: String(u.id),
     label: u.email,
   }));
-  const userEmailById = new Map(
-    (usersList.data?.data ?? []).map((u) => [String(u.id), u.email] as const),
-  );
+  // userById carries the full User object (for the balance-history dialog's
+  // initial data); the shared hook only exposes the email map, so we still
+  // build this from the underlying query.data.
   const userById = new Map(
-    (usersList.data?.data ?? []).map((u) => [String(u.id), u] as const),
+    (userLookup.query.data?.data ?? []).map((u) => [String(u.id), u] as const),
   );
   const balanceUserRecord = balanceUser ? userById.get(balanceUser.id) : undefined;
   const isFiltered = Boolean(modelFilter || userFilter || accountFilter || statusFilter || windowFilter);
@@ -257,7 +257,7 @@ function UsageContent() {
       header: t("adminUsage.user"),
       hideOnMobile: true,
       render: (u) => {
-        const email = userEmailById.get(String(u.user_id)) || String(u.user_id);
+        const email = userLookup.get(u.user_id);
         return (
           <button
             type="button"
