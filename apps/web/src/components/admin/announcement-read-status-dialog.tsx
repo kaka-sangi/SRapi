@@ -18,6 +18,7 @@ import {
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { useAnnouncementReadStatus } from "@/hooks/admin-queries";
+import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime } from "@/lib/admin-format";
 
@@ -33,6 +34,7 @@ export function AnnouncementReadStatusDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useLanguage();
+  const userLookup = useUserEmailLookup();
   const query = useAnnouncementReadStatus(announcementId, open);
 
   return (
@@ -67,8 +69,8 @@ export function AnnouncementReadStatusDialog({
                     <TableBody>
                       {status.readers.map((reader) => (
                         <TableRow key={reader.user_id}>
-                          <TableCell className="font-mono text-2xs text-srapi-text-secondary">
-                            #{reader.user_id}
+                          <TableCell className="text-srapi-text-secondary">
+                            {userLookup.get(reader.user_id)}
                           </TableCell>
                           <TableCell className="font-mono text-2xs text-srapi-text-tertiary tabular">
                             {formatDateTime(reader.read_at)}
