@@ -69,7 +69,11 @@ export default function RegisterPage() {
     }
     setSubmitting(true);
     try {
-      await apiService.register(email, name.trim(), password, captcha.token, values);
+      // Affiliate referral: pass ?invite_code= from the share link so the
+      // referral/rebate is recorded on sign-up (read at submit time — runs on
+      // the client). The backend RegisterRequest applies it.
+      const inviteCode = new URLSearchParams(window.location.search).get("invite_code") || "";
+      await apiService.register(email, name.trim(), password, captcha.token, values, inviteCode || undefined);
       router.replace(USER_HOME_ROUTE);
     } catch (err) {
       setError(meErrorMessage(err));

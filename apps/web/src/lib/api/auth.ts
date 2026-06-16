@@ -8,6 +8,7 @@ import {
   createPendingOAuthAccount as sdkCreateOAuthAccount,
   sendPendingOAuthEmailCompletion as sdkSendOAuthEmailCode,
   confirmPendingOAuthEmailCompletion as sdkConfirmOAuthEmail,
+  confirmEmailVerification as sdkConfirmEmailVerification,
   logout as sdkLogout,
   getSetupStatus as sdkGetSetupStatus,
   completeSetup as sdkCompleteSetup,
@@ -74,13 +75,22 @@ export const authApi = {
     password: string,
     captchaToken?: string,
     attributes?: Array<{ definition_id: number; value: string }>,
+    inviteCode?: string,
   ) {
     const response = await fetchApiJSON<{
       data?: { user?: LiveUser; csrf_token?: string; expires_at?: string };
     }>('/api/v1/auth/register', {
       method: 'POST',
       headers: captchaToken ? { 'X-Captcha-Token': captchaToken } : undefined,
-      body: JSON.stringify({ email, name, password, attributes: attributes || [] }),
+      body: JSON.stringify({
+        email,
+        name,
+        password,
+        attributes: attributes || [],
+        // Carry the affiliate invite code so the referral/rebate is recorded
+        // (the backend RegisterRequest accepts invite_code).
+        ...(inviteCode ? { invite_code: inviteCode } : {}),
+      }),
     });
     const session = response.data;
     if (!session?.user) {
@@ -252,6 +262,12 @@ export const authApi = {
     const data = response.data?.data;
     if (!data) throw new Error('Email verification failed.');
     return data;
+  },
+
+  // Confirms a regular email-verification token from the /verify-email link.
+  async confirmEmailVerification(token: string): Promise<void> {
+    configureSDKClient();
+    await sdkConfirmEmailVerification({ body: { token }, throwOnError: true });
   },
 
   async logout(): Promise<void> {

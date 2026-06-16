@@ -320,5 +320,8 @@ function InviteCodeRow({ code }: { code: AffiliateInviteCode }) {
 }
 
 function invitePathForCode(code: string): string {
-  return `/register?invite_code=${encodeURIComponent(code)}`;
+  // Full shareable URL pointing at the real register route (/auth/register, not
+  // /register), with the invite code the register page reads on submit.
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return `${origin}/auth/register?invite_code=${encodeURIComponent(code)}`;
 }
