@@ -533,6 +533,23 @@ type ConversationStreamEvent struct {
 	Metadata       map[string]any
 }
 
+// UpstreamStreamParser drives an upstream SSE stream one frame at a time,
+// emitting the canonical ConversationStreamEvents each frame produces. It lets
+// an HTTP-layer reader transcode a cross-protocol stream into the client's
+// protocol incrementally (real time-to-first-byte) instead of buffering the
+// whole upstream response. Construct via the adapter service's
+// NewUpstreamStreamParser; FeedFrame takes the SSE event-line type and the data
+// payload so the caller need not depend on the adapter's internal frame type.
+type UpstreamStreamParser interface {
+	// FeedFrame processes one SSE frame and returns the canonical events it
+	// produced (the delta since the last call), whether the stream is done, and
+	// any provider error.
+	FeedFrame(eventType, data string) ([]ConversationStreamEvent, bool, error)
+	// Finalize returns any trailing events (e.g. a synthesized terminal stop)
+	// after the upstream stream ends.
+	Finalize() []ConversationStreamEvent
+}
+
 // ConversationStreamEventType identifies the canonical meaning of a provider stream event.
 type ConversationStreamEventType string
 
@@ -572,6 +589,13 @@ type ConversationResponse struct {
 	// fully-streamed body using the same parser as the buffered path. Only set
 	// when StreamBody is non-nil.
 	StreamParse func(body []byte, statusCode int) (ConversationResponse, error)
+
+	// TranscodeUpstreamProtocol, when non-empty alongside StreamBody, signals
+	// that the live body is in this upstream protocol and must be transcoded into
+	// the client's protocol on the fly (cross-protocol streaming). The HTTP layer
+	// drives a NewUpstreamStreamParser for this protocol and renders into the
+	// client's SSE. Empty means same-protocol byte passthrough (the default).
+	TranscodeUpstreamProtocol string
 }
 
 // ProbeRequest contains the provider, account, and credential used for a health probe.

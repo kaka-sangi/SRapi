@@ -15,6 +15,41 @@ import (
 // transcode an upstream stream into the client's protocol incrementally. The
 // batch parsers remain the authoritative StreamParse billing hooks.
 
+// NewUpstreamStreamParser returns a per-frame parser for the given upstream
+// protocol, or (nil, false) if that protocol has no incremental parser yet (the
+// caller then falls back to buffered streaming). The returned parser drives the
+// same state machine as the buffered batch parser, one frame at a time.
+func NewUpstreamStreamParser(protocol string) (contract.UpstreamStreamParser, bool) {
+	switch strings.ToLower(strings.TrimSpace(protocol)) {
+	case "anthropic-compatible", "anthropic":
+		return &anthropicUpstreamStreamParser{state: newAnthropicStreamParseState()}, true
+	case "openai-compatible", "openai":
+		return &openAIUpstreamStreamParser{state: newOpenAIStreamParseState()}, true
+	default:
+		return nil, false
+	}
+}
+
+type anthropicUpstreamStreamParser struct{ state *anthropicStreamParseState }
+
+func (p *anthropicUpstreamStreamParser) FeedFrame(eventType, data string) ([]contract.ConversationStreamEvent, bool, error) {
+	return p.state.FeedFrame(sseFrame{Event: eventType, Data: data})
+}
+
+func (p *anthropicUpstreamStreamParser) Finalize() []contract.ConversationStreamEvent {
+	return p.state.Finalize()
+}
+
+type openAIUpstreamStreamParser struct{ state *openAIStreamParseState }
+
+func (p *openAIUpstreamStreamParser) FeedFrame(eventType, data string) ([]contract.ConversationStreamEvent, bool, error) {
+	return p.state.FeedFrame(sseFrame{Event: eventType, Data: data})
+}
+
+func (p *openAIUpstreamStreamParser) Finalize() []contract.ConversationStreamEvent {
+	return p.state.Finalize()
+}
+
 // cloneConversationStreamEventsTail returns a copy of events[from:] (the events
 // appended since a parser's pre-call length snapshot).
 func cloneConversationStreamEventsTail(events []contract.ConversationStreamEvent, from int) []contract.ConversationStreamEvent {
