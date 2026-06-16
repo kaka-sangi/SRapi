@@ -24,6 +24,7 @@ import {
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
+import { adminErrorMessage } from "@/lib/admin-api";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
@@ -157,6 +158,22 @@ export function PaymentProvidersPanel() {
   const [selectedPreset, setSelectedPreset] = useState<PaymentPreset | null>(null);
   const [showPresetPicker, setShowPresetPicker] = useState(false);
   const [toDelete, setToDelete] = useState<PaymentProviderInstance | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  async function toggleStatus(p: PaymentProviderInstance) {
+    if (togglingId === p.id) return;
+    const next: PaymentProviderInstance["status"] =
+      p.status === "active" ? "disabled" : "active";
+    setTogglingId(p.id);
+    try {
+      await updateMut.mutateAsync({ id: p.id, body: { status: next } });
+      toast({ title: t("feedback.saved"), tone: "success" });
+    } catch (err) {
+      toast({ title: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setTogglingId(null);
+    }
+  }
 
   async function runTest(id: string) {
     try {
@@ -236,7 +253,24 @@ export function PaymentProvidersPanel() {
     {
       key: "status",
       header: t("adminCommon.status"),
-      render: (p) => <QuietBadge status={quietStatusFor(p.status)} label={statusLabel(t, p.status)} />,
+      render: (p) => {
+        const canToggle = p.status === "active" || p.status === "disabled";
+        const badge = (
+          <QuietBadge status={quietStatusFor(p.status)} label={statusLabel(t, p.status)} />
+        );
+        if (!canToggle) return badge;
+        return (
+          <button
+            type="button"
+            onClick={() => void toggleStatus(p)}
+            disabled={togglingId === p.id}
+            className="cursor-pointer disabled:cursor-wait disabled:opacity-60"
+            title={p.status === "active" ? t("common.disable") : t("common.enable")}
+          >
+            {badge}
+          </button>
+        );
+      },
     },
     {
       key: "methods",
