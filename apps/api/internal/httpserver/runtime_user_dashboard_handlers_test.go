@@ -122,7 +122,12 @@ func TestCurrentUserUsageDashboardAggregates(t *testing.T) {
 		t.Fatalf("unexpected trailing model row: %+v", models.Data[1])
 	}
 
-	// Trend: dense day series, today's bucket holds all three current-user logs.
+	// Trend: dense day series, oldest-first, last bucket is today. The two recent
+	// logs are always in today's UTC bucket; the 3-hours-older one lands in
+	// today's bucket too, except when the test runs within the first 3 hours of a
+	// UTC day, where it falls into the previous day's bucket. Both buckets are
+	// inside the 7-day window, so the midnight-robust assertion is the per-series
+	// total (all three logs) plus today holding at least the two recent ones.
 	var trend apiopenapi.UsageTrendPointListResponse
 	doDashboardGet(t, handler, sessionCookie, "/api/v1/user/usage/dashboard/trend?days=7&bucket=day", &trend)
 	if len(trend.Data) != 7 {
@@ -133,8 +138,17 @@ func TestCurrentUserUsageDashboardAggregates(t *testing.T) {
 	if todayPoint.Bucket != todayKey {
 		t.Fatalf("expected last bucket %q, got %q", todayKey, todayPoint.Bucket)
 	}
-	if todayPoint.Requests != 3 || todayPoint.InputTokens != 31 || todayPoint.OutputTokens != 16 || todayPoint.Cost != "0.35" {
-		t.Fatalf("unexpected today trend point: %+v", todayPoint)
+	if todayPoint.Requests < 2 || todayPoint.InputTokens < 30 || todayPoint.OutputTokens < 15 {
+		t.Fatalf("expected today bucket to hold at least the two recent logs, got %+v", todayPoint)
+	}
+	var seriesRequests, seriesInput, seriesOutput int
+	for _, point := range trend.Data {
+		seriesRequests += point.Requests
+		seriesInput += point.InputTokens
+		seriesOutput += point.OutputTokens
+	}
+	if seriesRequests != 3 || seriesInput != 31 || seriesOutput != 16 {
+		t.Fatalf("expected the dense series to total all three logs (3 req / 31 in / 16 out), got %d req / %d in / %d out", seriesRequests, seriesInput, seriesOutput)
 	}
 
 	// Cache metrics: cache-read/creation/input rollups across all current-user logs.
