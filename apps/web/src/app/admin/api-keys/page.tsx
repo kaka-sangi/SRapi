@@ -122,7 +122,30 @@ function ApiKeysContent() {
       key: "status",
       header: t("adminCommon.status"),
       sortValue: (k) => k.status,
-      render: (k) => <QuietBadge status={quietStatusFor(k.status)} label={statusLabel(t, k.status)} />,
+      render: (k) => {
+        const badge = (
+          <QuietBadge status={quietStatusFor(k.status)} label={statusLabel(t, k.status)} />
+        );
+        // Expired is terminal — show the badge only. Active routes through the
+        // existing revoke ConfirmDialog (clicking should not silently kill a
+        // live key). Disabled is restorative and safe to flip in one click.
+        if (k.status === "expired") return badge;
+        const onClick =
+          k.status === "disabled" ? () => void enableKey(k) : () => setRevokeTarget(k);
+        const title =
+          k.status === "disabled" ? t("adminApiKeys.enable") : t("adminApiKeys.revoke");
+        return (
+          <button
+            type="button"
+            onClick={onClick}
+            disabled={updateMut.isPending}
+            className="cursor-pointer disabled:cursor-wait disabled:opacity-60"
+            title={title}
+          >
+            {badge}
+          </button>
+        );
+      },
     },
   ];
 
