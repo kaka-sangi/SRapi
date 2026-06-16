@@ -1348,6 +1348,12 @@ export const zh: Messages = {
     emptyTitle: "暂无记录",
     emptyBody: "联盟相关活动会显示在这里。",
   },
+  adminLogs: {
+    allTime: "全部时间",
+    window24h: "最近 24 小时",
+    window7d: "最近 7 天",
+    window30d: "最近 30 天",
+  },
   adminAudit: {
     title: "审计日志",
     subtitle: "每一次管理操作：谁做的、改了什么（前后对比）。",
@@ -1366,10 +1372,6 @@ export const zh: Messages = {
     allActions: "全部动作",
     allResources: "全部资源",
     allActors: "全部操作者",
-    allTime: "全部时间",
-    window24h: "最近 24 小时",
-    window7d: "最近 7 天",
-    window30d: "最近 30 天",
     emptyTitle: "暂无审计记录",
     emptyBody: "管理操作会记录在这里。",
   },

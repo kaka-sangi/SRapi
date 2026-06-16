@@ -14,6 +14,11 @@ import { useBillingLedger } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatMoney } from "@/lib/admin-format";
 import type { BillingLedgerEntry } from "@/lib/sdk-types";
+import {
+  LOG_WINDOW_PRESETS,
+  LOG_WINDOW_ALL_LABEL_KEY,
+  logWindowSince,
+} from "@/lib/log-window-filter";
 
 type LedgerType = BillingLedgerEntry["type"];
 
@@ -47,6 +52,10 @@ function ledgerMatch(
 ): boolean {
   if (filters.type && row.type !== filters.type) return false;
   if (filters.reference_type && row.reference_type !== filters.reference_type) return false;
+  if (filters.window) {
+    const since = logWindowSince(filters.window);
+    if (since && row.created_at && new Date(row.created_at) < since) return false;
+  }
   if (!term) return true;
   return [String(row.user_id), row.reference_id, row.reference_type, row.type]
     .filter(Boolean)
@@ -74,7 +83,9 @@ export function BillingLedgerPanel() {
 
   const rows = useMemo(() => all.data?.data ?? [], [all.data]);
   const referenceOptions = useMemo(() => distinct(rows.map((r) => r.reference_type)), [rows]);
-  const isFiltered = Boolean(list.search || list.filters.type || list.filters.reference_type);
+  const isFiltered = Boolean(
+    list.search || list.filters.type || list.filters.reference_type || list.filters.window,
+  );
 
   const columns: Column<BillingLedgerEntry>[] = [
     {
@@ -186,6 +197,12 @@ export function BillingLedgerPanel() {
               onChange={(v) => list.setFilter("reference_type", v)}
               options={referenceOptions.map((v) => ({ value: v, label: v }))}
               allLabel={t("adminBillingLedger.allReferences")}
+            />
+            <FilterSelect
+              value={list.filters.window}
+              onChange={(v) => list.setFilter("window", v)}
+              options={LOG_WINDOW_PRESETS.map((p) => ({ value: p.value, label: t(p.labelKey) }))}
+              allLabel={t(LOG_WINDOW_ALL_LABEL_KEY)}
             />
           </ListToolbar>
         }

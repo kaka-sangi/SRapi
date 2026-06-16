@@ -1370,6 +1370,12 @@ export const en = {
     emptyTitle: "Nothing here yet",
     emptyBody: "Affiliate activity will appear here.",
   },
+  adminLogs: {
+    allTime: "All time",
+    window24h: "Last 24 hours",
+    window7d: "Last 7 days",
+    window30d: "Last 30 days",
+  },
   adminAudit: {
     title: "Audit logs",
     subtitle: "Every administrative change — who made it, and the before / after.",
@@ -1388,10 +1394,6 @@ export const en = {
     allActions: "All actions",
     allResources: "All resources",
     allActors: "All actors",
-    allTime: "All time",
-    window24h: "Last 24 hours",
-    window7d: "Last 7 days",
-    window30d: "Last 30 days",
     emptyTitle: "No audit entries",
     emptyBody: "Administrative changes will be recorded here.",
   },

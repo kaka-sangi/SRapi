@@ -21,28 +21,18 @@ import { useAuditLogs, useAdminUsers } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, safeJson } from "@/lib/admin-format";
 import type { AuditLog } from "@/lib/sdk-types";
-
-// Preset values are minutes-back-from-now. "all" (or empty) means no bound;
-// the auditMatch check below skips the comparison when the preset isn't set.
-const WINDOW_PRESETS: { value: string; labelKey: string; minutes: number }[] = [
-  { value: "24h", labelKey: "adminAudit.window24h", minutes: 24 * 60 },
-  { value: "7d", labelKey: "adminAudit.window7d", minutes: 7 * 24 * 60 },
-  { value: "30d", labelKey: "adminAudit.window30d", minutes: 30 * 24 * 60 },
-];
-
-function windowSinceFromFilter(value: string | undefined): Date | null {
-  if (!value) return null;
-  const preset = WINDOW_PRESETS.find((p) => p.value === value);
-  if (!preset) return null;
-  return new Date(Date.now() - preset.minutes * 60 * 1000);
-}
+import {
+  LOG_WINDOW_PRESETS,
+  LOG_WINDOW_ALL_LABEL_KEY,
+  logWindowSince,
+} from "@/lib/log-window-filter";
 
 function auditMatch(row: AuditLog, term: string, filters: Record<string, string>): boolean {
   if (filters.action && row.action !== filters.action) return false;
   if (filters.resource_type && row.resource_type !== filters.resource_type) return false;
   if (filters.actor_user_id && String(row.actor_user_id ?? "") !== filters.actor_user_id) return false;
   if (filters.window) {
-    const since = windowSinceFromFilter(filters.window);
+    const since = logWindowSince(filters.window);
     if (since && row.created_at && new Date(row.created_at) < since) return false;
   }
   if (!term) return true;
@@ -192,8 +182,8 @@ export function AuditLogsPanel() {
             <FilterSelect
               value={list.filters.window}
               onChange={(v) => list.setFilter("window", v)}
-              options={WINDOW_PRESETS.map((p) => ({ value: p.value, label: t(p.labelKey) }))}
-              allLabel={t("adminAudit.allTime")}
+              options={LOG_WINDOW_PRESETS.map((p) => ({ value: p.value, label: t(p.labelKey) }))}
+              allLabel={t(LOG_WINDOW_ALL_LABEL_KEY)}
             />
           </ListToolbar>
         }
