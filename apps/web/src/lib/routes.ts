@@ -29,12 +29,17 @@ export const ADMIN_ROUTES = {
   paymentProviders: "/admin/payment-providers",
   promoCodes: "/admin/promo-codes",
   redeem: "/admin/redeem",
-  affiliatesInvites: "/admin/affiliates/invites",
-  affiliatesRebates: "/admin/affiliates/rebates",
-  affiliatesTransfers: "/admin/affiliates/transfers",
-  affiliatesWithdrawals: "/admin/affiliates/withdrawals",
-  affiliatesManualAdjustments: "/admin/affiliates/manual-adjustments",
-  affiliatesRules: "/admin/affiliates/rules",
+  // Affiliate admin is one tabbed page (/admin/affiliates) since the
+  // aggregation pass — these entries now point at the tab params. The
+  // old `/admin/affiliates/<name>` routes still 308-redirect for any
+  // external bookmarks.
+  affiliates: "/admin/affiliates",
+  affiliatesInvites: "/admin/affiliates?tab=invites",
+  affiliatesRebates: "/admin/affiliates?tab=rebates",
+  affiliatesTransfers: "/admin/affiliates?tab=transfers",
+  affiliatesWithdrawals: "/admin/affiliates?tab=withdrawals",
+  affiliatesManualAdjustments: "/admin/affiliates?tab=manual-adjustments",
+  affiliatesRules: "/admin/affiliates?tab=rules",
   announcements: "/admin/announcements",
   ops: "/admin/ops",
   opsStrategy: "/admin/ops?tab=strategy",
