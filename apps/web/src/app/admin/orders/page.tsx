@@ -5,6 +5,7 @@ import { ShoppingCart } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
+import { CopyButton } from "@/components/ui/copy-button";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
@@ -275,6 +276,8 @@ function AuditDialog({ order, onClose }: { order: PaymentOrder; onClose: () => v
 
 function AuditLogItem({ log }: { log: PaymentAuditLog }) {
   const { t } = useLanguage();
+  const payloadJson = safeJson(log.payload);
+  const hasPayload = payloadJson && payloadJson !== "null" && payloadJson !== "{}" && payloadJson !== "[]";
   return (
     <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -287,15 +290,21 @@ function AuditLogItem({ log }: { log: PaymentAuditLog }) {
       <dl className="mt-2 grid gap-1 text-2xs text-srapi-text-tertiary sm:grid-cols-2">
         <div>
           <dt>{t("adminOutbox.idempotency")}</dt>
-          <dd className="break-all font-mono text-srapi-text-secondary">{log.idempotency_key}</dd>
+          <dd className="flex items-center gap-1.5 break-all font-mono text-srapi-text-secondary">
+            <span className="break-all">{log.idempotency_key}</span>
+            {log.idempotency_key ? <CopyButton value={log.idempotency_key} size="inline" /> : null}
+          </dd>
         </div>
         <div>
           <dt>{t("adminCommon.created")}</dt>
           <dd className="font-mono text-srapi-text-secondary">{formatDateTime(log.created_at)}</dd>
         </div>
       </dl>
-      <pre className="mt-2 max-h-48 overflow-auto rounded-md border border-srapi-border bg-srapi-card px-3 py-2 text-2xs text-srapi-text-secondary">
-        {safeJson(log.payload)}
+      <div className="mt-2 flex items-center justify-end">
+        {hasPayload ? <CopyButton value={payloadJson} size="inline" /> : null}
+      </div>
+      <pre className="overflow-auto rounded-md border border-srapi-border bg-srapi-card px-3 py-2 text-2xs text-srapi-text-secondary max-h-48">
+        {payloadJson}
       </pre>
     </div>
   );
