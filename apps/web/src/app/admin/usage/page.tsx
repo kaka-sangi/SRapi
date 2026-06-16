@@ -41,6 +41,7 @@ import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { useAdminUsageExport } from "@/hooks/use-admin-usage-export";
+import { useAccountNameLookup } from "@/hooks/use-account-name-lookup";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { TrendChart } from "@/components/charts/trend-chart";
@@ -163,6 +164,7 @@ function UsageContent() {
   const [cleanupOpen, setCleanupOpen] = useState(false);
   const { toast } = useToast();
   const usageExport = useAdminUsageExport();
+  const accountLookup = useAccountNameLookup();
 
   async function runExport() {
     // Honour the window preset the operator currently has on the table —
@@ -391,7 +393,7 @@ function UsageContent() {
       header: t("adminUsage.byAccount"),
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">{u.account_id || "—"}</span>
+        <span className="text-srapi-text-secondary">{accountLookup.get(u.account_id)}</span>
       ),
     },
     {
