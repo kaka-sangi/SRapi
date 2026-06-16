@@ -906,6 +906,7 @@ export const en = {
   adminGroups: {
     title: "Account groups",
     subtitle: "Group provider accounts for load distribution.",
+    searchPlaceholder: "Search groups…",
     name: "Name",
     description: "Description",
     accounts: "Accounts",

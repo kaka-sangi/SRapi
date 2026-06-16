@@ -10,7 +10,9 @@ import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useClientPagedList } from "@/hooks/use-client-list";
 import { ColumnToggle } from "@/components/ui/column-toggle";
+import { ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import {
   Dialog,
   DialogContent,
@@ -71,11 +73,27 @@ export default function AdminGroupsPage() {
   );
 }
 
+function groupMatch(group: AccountGroup, term: string): boolean {
+  if (!term) return true;
+  return [group.name, group.description, group.strategy_hint]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(term);
+}
+
+const groupCompare = (a: AccountGroup, b: AccountGroup) => a.name.localeCompare(b.name);
+
 function GroupsContent() {
   const { t } = useLanguage();
-  const groups = useAdminGroups();
+  const all = useAdminGroups();
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-groups", []);
+  const { query: groups, total } = useClientPagedList(all, list, {
+    match: groupMatch,
+    compare: groupCompare,
+  });
+  const isFiltered = Boolean(list.search);
   const [formTarget, setFormTarget] = useState<AccountGroup | "new" | null>(null);
   const [membersTarget, setMembersTarget] = useState<AccountGroup | null>(null);
   const [rateLimitTarget, setRateLimitTarget] = useState<AccountGroup | null>(null);
@@ -155,9 +173,7 @@ function GroupsContent() {
         description={t("adminGroups.subtitle")}
         actions={
           <div className="flex items-center gap-3">
-            {groups.data ? (
-              <ListCount total={groups.data.pagination?.total ?? groups.data.data.length} />
-            ) : null}
+            {all.data ? <ListCount total={total} /> : null}
             <ColumnToggle
               columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}
               visibility={colVis}
@@ -189,6 +205,17 @@ function GroupsContent() {
         minWidth={480}
         sort={list.sort}
         onSort={list.toggleSort}
+        isFiltered={isFiltered}
+        onClearFilters={list.clearFilters}
+        toolbar={
+          <ListToolbar>
+            <SearchInput
+              value={list.searchInput}
+              onChange={list.setSearchInput}
+              placeholder={t("adminGroups.searchPlaceholder")}
+            />
+          </ListToolbar>
+        }
         rowActions={(g) => (
           <RowActionsMenu
             actions={[

@@ -900,6 +900,7 @@ export const zh: Messages = {
   adminGroups: {
     title: "账号组",
     subtitle: "把上游账号分组以分摊负载。",
+    searchPlaceholder: "搜索分组…",
     name: "名称",
     description: "描述",
     accounts: "账号数",
