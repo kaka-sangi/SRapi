@@ -21,6 +21,8 @@ import {
   useDeleteErrorPassthroughRule,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { adminErrorMessage } from "@/lib/admin-api";
 import {
   ERROR_PASSTHROUGH_ACTIONS,
   emptyErrorPassthroughForm,
@@ -55,6 +57,7 @@ const ruleCompare = (a: ErrorPassthroughRule, b: ErrorPassthroughRule) =>
 
 export function ErrorPassthroughPanel() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-error-passthrough", []);
   const all = useErrorPassthroughRules();
@@ -63,6 +66,28 @@ export function ErrorPassthroughPanel() {
   const createMut = useCreateErrorPassthroughRule();
   const updateMut = useUpdateErrorPassthroughRule();
   const deleteMut = useDeleteErrorPassthroughRule();
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+
+  async function toggleEnabled(rule: ErrorPassthroughRule) {
+    if (togglingId === rule.id) return;
+    setTogglingId(rule.id);
+    try {
+      await updateMut.mutateAsync({
+        id: String(rule.id),
+        body: { enabled: !rule.enabled },
+      });
+      toast({
+        title: rule.enabled
+          ? t("adminErrorPassthrough.toggleDisabled")
+          : t("adminErrorPassthrough.toggleEnabled"),
+        tone: "success",
+      });
+    } catch (err) {
+      toast({ title: adminErrorMessage(err), tone: "error" });
+    } finally {
+      setTogglingId(null);
+    }
+  }
 
   const [formTarget, setFormTarget] = useState<ErrorPassthroughRule | "new" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ErrorPassthroughRule | null>(null);
@@ -128,10 +153,22 @@ export function ErrorPassthroughPanel() {
       key: "enabled",
       header: t("adminErrorPassthrough.enabled"),
       render: (r) => (
-        <QuietBadge
-          status={r.enabled ? "active" : "disabled"}
-          label={r.enabled ? t("common.active") : t("common.disabled")}
-        />
+        <button
+          type="button"
+          onClick={() => void toggleEnabled(r)}
+          disabled={togglingId === r.id}
+          className="cursor-pointer disabled:cursor-wait disabled:opacity-60"
+          title={
+            r.enabled
+              ? t("adminErrorPassthrough.clickToDisable")
+              : t("adminErrorPassthrough.clickToEnable")
+          }
+        >
+          <QuietBadge
+            status={r.enabled ? "active" : "disabled"}
+            label={r.enabled ? t("common.active") : t("common.disabled")}
+          />
+        </button>
       ),
     },
   ];
