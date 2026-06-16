@@ -1993,6 +1993,8 @@ export const zh: Messages = {
     tokens: "Token",
     cost: "花费",
     time: "时间",
+    statusOk: "仅成功",
+    statusError: "仅失败",
     emptyTitle: "暂无用量",
     emptyBody: "产生请求后用量会显示在这里。",
     aggregatesTitle: "维度拆解",

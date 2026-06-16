@@ -2016,6 +2016,8 @@ export const en = {
     tokens: "Tokens",
     cost: "Cost",
     time: "Time",
+    statusOk: "Success only",
+    statusError: "Errors only",
     emptyTitle: "No usage yet",
     emptyBody: "Usage will appear here once requests are made.",
     aggregatesTitle: "Breakdown",

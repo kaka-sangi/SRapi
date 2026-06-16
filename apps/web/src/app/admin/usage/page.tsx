@@ -192,6 +192,9 @@ function UsageContent() {
   const modelFilter = list.filters.model || undefined;
   const userFilter = list.filters.user || undefined;
   const accountFilter = list.filters.account || undefined;
+  // "ok" → success=true, "error" → success=false, "" (All) → undefined.
+  const statusFilter = list.filters.status || undefined;
+  const successFilter = statusFilter === "ok" ? true : statusFilter === "error" ? false : undefined;
   const windowFilter = list.filters.window;
   // Resolve the preset to an ISO timestamp the backend's start filter
   // honours via the shared filterUsageLogs helper. Null when the preset is
@@ -204,6 +207,7 @@ function UsageContent() {
     model: modelFilter,
     user_id: userFilter,
     account_id: accountFilter,
+    success: successFilter,
     start: sinceFilter,
   });
   const daily = useAdminUsageDaily();
@@ -227,7 +231,7 @@ function UsageContent() {
     (usersList.data?.data ?? []).map((u) => [String(u.id), u] as const),
   );
   const balanceUserRecord = balanceUser ? userById.get(balanceUser.id) : undefined;
-  const isFiltered = Boolean(modelFilter || userFilter || accountFilter || windowFilter);
+  const isFiltered = Boolean(modelFilter || userFilter || accountFilter || statusFilter || windowFilter);
   // The shared lookup hook already fetches /admin/accounts page 1 of 200,
   // so we get the dropdown options "for free" from its query.data without an
   // extra fetch.
@@ -572,6 +576,15 @@ function UsageContent() {
               onChange={(v) => list.setFilter("account", v)}
               options={accountOptions}
               allLabel={t("adminAccounts.allAccounts")}
+            />
+            <FilterSelect
+              value={list.filters.status}
+              onChange={(v) => list.setFilter("status", v)}
+              options={[
+                { value: "ok", label: t("adminUsage.statusOk") },
+                { value: "error", label: t("adminUsage.statusError") },
+              ]}
+              allLabel={t("adminCommon.allStatuses")}
             />
             <FilterSelect
               value={list.filters.window}
