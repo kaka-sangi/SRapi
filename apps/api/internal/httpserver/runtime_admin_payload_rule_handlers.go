@@ -78,9 +78,10 @@ func (s *Server) handleListAdminPayloadRules(w http.ResponseWriter, r *http.Requ
 	for _, rule := range rules {
 		data = append(data, toPayloadRulePayload(rule))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       data,
-		"pagination": pagination(len(data)),
+		"pagination": pg,
 		"request_id": requestID,
 	})
 }

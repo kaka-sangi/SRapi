@@ -56,9 +56,10 @@ func (s *Server) handleListAdminGroupRateLimits(w http.ResponseWriter, r *http.R
 	for _, limit := range limits {
 		data = append(data, toGroupRateLimitPayload(limit))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       data,
-		"pagination": pagination(len(data)),
+		"pagination": pg,
 		"request_id": requestID,
 	})
 }

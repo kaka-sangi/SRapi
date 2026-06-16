@@ -76,9 +76,10 @@ func (s *Server) handleListAdminTLSProfiles(w http.ResponseWriter, r *http.Reque
 	for _, profile := range profiles {
 		data = append(data, toTLSProfilePayload(profile))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       data,
-		"pagination": pagination(len(data)),
+		"pagination": pg,
 		"request_id": requestID,
 	})
 }

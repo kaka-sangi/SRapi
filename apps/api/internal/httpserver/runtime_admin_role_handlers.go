@@ -24,9 +24,10 @@ func (s *Server) handleListAdminRoles(w http.ResponseWriter, r *http.Request) {
 	for _, role := range roles {
 		data = append(data, toAPIRole(role))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.RoleListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }

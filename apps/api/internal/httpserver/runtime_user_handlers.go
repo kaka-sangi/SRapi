@@ -931,9 +931,10 @@ func (s *Server) handleListCurrentUserAffiliateInviteCodes(w http.ResponseWriter
 		writeAffiliateServiceError(w, err, requestID)
 		return
 	}
+	items, pg := paginate(r, items)
 	writeJSONAny(w, http.StatusOK, apiopenapi.AffiliateInviteCodeListResponse{
 		Data:       toAPIAffiliateInviteCodes(items),
-		Pagination: pagination(len(items)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -995,9 +996,10 @@ func (s *Server) handleCurrentUserAffiliateLedger(w http.ResponseWriter, r *http
 	for _, item := range items {
 		data = append(data, toAPIAffiliateLedgerEntry(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.AffiliateLedgerEntryListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -1108,9 +1110,10 @@ func (s *Server) handleCurrentUserUsage(w http.ResponseWriter, r *http.Request) 
 	for _, item := range items {
 		data = append(data, toAPIUsageLog(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.UsageLogListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -1134,9 +1137,10 @@ func (s *Server) handleCurrentUserSubscriptions(w http.ResponseWriter, r *http.R
 	for _, item := range items {
 		data = append(data, toAPIUserSubscription(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.UserSubscriptionListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -1159,9 +1163,10 @@ func (s *Server) handleListPaymentMethods(w http.ResponseWriter, r *http.Request
 	for _, item := range items {
 		data = append(data, toAPIPaymentMethod(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentMethodListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -1224,9 +1229,10 @@ func (s *Server) handleListPaymentOrders(w http.ResponseWriter, r *http.Request)
 	for _, item := range items {
 		data = append(data, toAPIPaymentOrder(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentOrderListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }

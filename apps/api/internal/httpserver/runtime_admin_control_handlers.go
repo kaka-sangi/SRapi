@@ -74,9 +74,10 @@ func (s *Server) handleListAdminAuditLogs(w http.ResponseWriter, r *http.Request
 	for _, item := range items {
 		data = append(data, toAPIAuditLog(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.AuditLogListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -97,9 +98,10 @@ func (s *Server) handleListAdminBillingLedger(w http.ResponseWriter, r *http.Req
 	for _, item := range items {
 		data = append(data, toAPIBillingLedgerEntry(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.BillingLedgerListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -119,9 +121,10 @@ func (s *Server) handleListAdminPaymentProviders(w http.ResponseWriter, r *http.
 	for _, item := range items {
 		data = append(data, toAPIPaymentProviderInstance(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentProviderInstanceListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -315,9 +318,10 @@ func (s *Server) handleListAdminPaymentOrders(w http.ResponseWriter, r *http.Req
 	for _, item := range items {
 		data = append(data, toAPIPaymentOrder(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentOrderListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -379,9 +383,10 @@ func (s *Server) handleListAdminPaymentOrderAuditLogs(w http.ResponseWriter, r *
 	for _, item := range items {
 		data = append(data, toAPIPaymentAuditLog(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentAuditLogListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -401,9 +406,10 @@ func (s *Server) handleListAdminSubscriptionPlans(w http.ResponseWriter, r *http
 	for _, item := range items {
 		data = append(data, toAPISubscriptionPlan(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.SubscriptionPlanListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -573,9 +579,10 @@ func (s *Server) handleListAdminUserSubscriptions(w http.ResponseWriter, r *http
 	for _, item := range items {
 		data = append(data, toAPIUserSubscription(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.UserSubscriptionListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -690,9 +697,10 @@ func (s *Server) handleListAdminPricingRules(w http.ResponseWriter, r *http.Requ
 	for _, item := range items {
 		data = append(data, toAPIPricingRule(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.PricingRuleListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -1128,9 +1136,10 @@ func (s *Server) handleListAdminOutboxEvents(w http.ResponseWriter, r *http.Requ
 	for _, item := range items {
 		data = append(data, toAPIDomainEventOutbox(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.DomainEventOutboxListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -1150,10 +1159,11 @@ func (s *Server) handleListAdminOpsRealtimeSlots(w http.ResponseWriter, r *http.
 	for _, slot := range list.Slots {
 		data = append(data, toAPIRealtimeActiveSlot(slot))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.RealtimeActiveSlotListResponse{
 		Counters:   toAPIRealtimeActiveSlotCounters(list),
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -1173,9 +1183,10 @@ func (s *Server) handleListAdminOpsSLOs(w http.ResponseWriter, r *http.Request) 
 	for _, item := range items {
 		data = append(data, toAPIOpsSLO(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpsSLOListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -1304,9 +1315,10 @@ func (s *Server) handleListAdminOpsAlerts(w http.ResponseWriter, r *http.Request
 	for _, item := range items {
 		data = append(data, toAPIOpsAlert(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpsAlertListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -1352,9 +1364,10 @@ func (s *Server) handleListAdminCapabilities(w http.ResponseWriter, r *http.Requ
 	for _, item := range items {
 		data = append(data, toAPICapabilityDefinition(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.CapabilityListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -1397,9 +1410,10 @@ func (s *Server) handleListAdminSchedulerDecisions(w http.ResponseWriter, r *htt
 	for _, item := range items {
 		data = append(data, toAPISchedulerDecision(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.SchedulerDecisionListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -1419,9 +1433,10 @@ func (s *Server) handleListSchedulerStrategies(w http.ResponseWriter, r *http.Re
 	for _, strategy := range strategies {
 		data = append(data, toAPISchedulerStrategy(strategy))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.SchedulerStrategyListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }

@@ -146,9 +146,10 @@ func (s *Server) handleListAdminAccountsAvailability(w http.ResponseWriter, r *h
 		data = append(data, summary)
 	}
 
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.AccountsAvailabilitySummaryResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }

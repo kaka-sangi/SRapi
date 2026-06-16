@@ -95,9 +95,10 @@ func (s *Server) handleListAdminUserAttributeDefinitions(w http.ResponseWriter, 
 	for _, def := range defs {
 		data = append(data, toUserAttributeDefinitionPayload(def))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       data,
-		"pagination": pagination(len(data)),
+		"pagination": pg,
 		"request_id": requestID,
 	})
 }
@@ -268,9 +269,10 @@ func (s *Server) handleListAdminUserAttributeValues(w http.ResponseWriter, r *ht
 		}
 		data = append(data, payload)
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       data,
-		"pagination": pagination(len(data)),
+		"pagination": pg,
 		"request_id": requestID,
 	})
 }

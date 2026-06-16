@@ -23,9 +23,10 @@ func (s *Server) handleListAdminAffiliateInvites(w http.ResponseWriter, r *http.
 	for _, item := range items {
 		data = append(data, toAPIAffiliateInviteRecord(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.AffiliateInviteRecordListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -259,9 +260,10 @@ func (s *Server) handleListAdminAffiliateLedgers(w http.ResponseWriter, r *http.
 		}
 		data = append(data, toAPIAffiliateLedgerEntry(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.AffiliateLedgerEntryListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }

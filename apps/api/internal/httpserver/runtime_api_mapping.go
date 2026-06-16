@@ -1725,6 +1725,37 @@ func pagination(total int) apiopenapi.Pagination {
 	return apiopenapi.Pagination{Page: 1, PageSize: total, Total: total, HasNext: false}
 }
 
+// paginate applies real pagination to a fully-built list. The admin list pages
+// send page + page_size and render page controls off the returned total/pageSize,
+// so honoring those here is what makes paging actually work (and CSV export walk
+// past page 1). When no explicit page_size is sent — callers that genuinely want
+// the whole list, e.g. dropdowns — it returns every item as page 1, preserving
+// existing behavior. Returns the sliced window plus honest pagination metadata.
+func paginate[T any](r *http.Request, items []T) ([]T, apiopenapi.Pagination) {
+	total := len(items)
+	rawSize := strings.TrimSpace(r.URL.Query().Get("page_size"))
+	if rawSize == "" {
+		return items, apiopenapi.Pagination{Page: 1, PageSize: total, Total: total, HasNext: false}
+	}
+	pageSize, err := strconv.Atoi(rawSize)
+	if err != nil || pageSize <= 0 {
+		return items, apiopenapi.Pagination{Page: 1, PageSize: total, Total: total, HasNext: false}
+	}
+	page := 1
+	if v, convErr := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("page"))); convErr == nil && v > 0 {
+		page = v
+	}
+	start := (page - 1) * pageSize
+	if start >= total {
+		return []T{}, apiopenapi.Pagination{Page: page, PageSize: pageSize, Total: total, HasNext: false}
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+	return items[start:end], apiopenapi.Pagination{Page: page, PageSize: pageSize, Total: total, HasNext: end < total}
+}
+
 func copyStringCounts(values map[string]int) map[string]int {
 	if values == nil {
 		return map[string]int{}

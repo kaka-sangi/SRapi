@@ -39,9 +39,10 @@ func (s *Server) handleListAdminUsers(w http.ResponseWriter, r *http.Request) {
 	for _, user := range users {
 		data = append(data, toAPIUser(user.User))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.UserListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -230,9 +231,10 @@ func (s *Server) handleAdminUserBalanceHistory(w http.ResponseWriter, r *http.Re
 			filtered = append(filtered, toAPIBillingLedgerEntry(item))
 		}
 	}
+	filtered, pg := paginate(r, filtered)
 	writeJSONAny(w, http.StatusOK, apiopenapi.BillingLedgerListResponse{
 		Data:       filtered,
-		Pagination: pagination(len(filtered)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -387,9 +389,10 @@ func (s *Server) handleAdminUsageAggregatesWithDimension(w http.ResponseWriter, 
 		return
 	}
 	data := toAPIUsageAggregates(aggregates)
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.UsageAggregateListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }

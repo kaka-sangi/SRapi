@@ -263,7 +263,8 @@ func (s *Server) handleBatchGenerateAdminRedeemCodes(w http.ResponseWriter, r *h
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "redeem_code.batch_generate", "redeem_code", "bulk", nil, map[string]any{"count": len(items)}))
-	writeJSONAny(w, http.StatusCreated, apiopenapi.RedeemCodeListResponse{Data: toAPIRedeemCodes(items), Pagination: pagination(len(items)), RequestId: requestID})
+	items, pg := paginate(r, items)
+	writeJSONAny(w, http.StatusCreated, apiopenapi.RedeemCodeListResponse{Data: toAPIRedeemCodes(items), Pagination: pg, RequestId: requestID})
 }
 
 func (s *Server) handleBatchDisableAdminRedeemCodes(w http.ResponseWriter, r *http.Request) {

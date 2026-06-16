@@ -38,9 +38,10 @@ func (s *Server) handleRegistrationAttributes(w http.ResponseWriter, r *http.Req
 			Required:     def.Required,
 		})
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       data,
-		"pagination": pagination(len(data)),
+		"pagination": pg,
 		"request_id": requestID,
 	})
 }
@@ -57,9 +58,10 @@ func (s *Server) handleCurrentUserAttributes(w http.ResponseWriter, r *http.Requ
 		s.writeUserAttributeError(w, err, requestID, "invalid user attribute request")
 		return
 	}
+	items, pg := paginate(r, items)
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       toCurrentUserAttributePayloads(items),
-		"pagination": pagination(len(items)),
+		"pagination": pg,
 		"request_id": requestID,
 	})
 }
@@ -96,9 +98,10 @@ func (s *Server) handleUpdateCurrentUserAttributes(w http.ResponseWriter, r *htt
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "user_attribute_value.self_update", "user", strconv.Itoa(session.User.ID), nil, map[string]any{
 		"count": len(values),
 	}))
+	items, pg := paginate(r, items)
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       toCurrentUserAttributePayloads(items),
-		"pagination": pagination(len(items)),
+		"pagination": pg,
 		"request_id": requestID,
 	})
 }

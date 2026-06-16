@@ -36,9 +36,10 @@ func (s *Server) handleListAdminOpsAlertRules(w http.ResponseWriter, r *http.Req
 	for _, item := range items {
 		data = append(data, toAPIOpsAlertRule(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpsAlertRuleListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -162,9 +163,10 @@ func (s *Server) handleListAdminOpsAlertSilences(w http.ResponseWriter, r *http.
 	for _, item := range items {
 		data = append(data, toAPIOpsAlertSilence(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpsAlertSilenceListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }

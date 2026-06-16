@@ -119,9 +119,10 @@ func (s *Server) handleListAdminChannelMonitors(w http.ResponseWriter, r *http.R
 	for _, def := range defs {
 		data = append(data, toChannelMonitorPayload(def))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       data,
-		"pagination": pagination(len(data)),
+		"pagination": pg,
 		"request_id": requestID,
 	})
 }
@@ -273,9 +274,10 @@ func (s *Server) handleListAdminChannelMonitorRuns(w http.ResponseWriter, r *htt
 	for _, run := range runs {
 		data = append(data, toChannelMonitorRunPayload(run))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       data,
-		"pagination": pagination(len(data)),
+		"pagination": pg,
 		"request_id": requestID,
 	})
 }

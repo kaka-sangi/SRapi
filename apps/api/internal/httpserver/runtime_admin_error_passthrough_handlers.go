@@ -98,9 +98,10 @@ func (s *Server) handleListAdminErrorPassthroughRules(w http.ResponseWriter, r *
 	for _, rule := range rules {
 		data = append(data, toErrorPassthroughRulePayload(rule))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       data,
-		"pagination": pagination(len(data)),
+		"pagination": pg,
 		"request_id": requestID,
 	})
 }

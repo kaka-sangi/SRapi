@@ -120,9 +120,10 @@ func (s *Server) handleListAdminProviders(w http.ResponseWriter, r *http.Request
 	for _, provider := range providers {
 		data = append(data, toAPIProvider(provider))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -331,9 +332,10 @@ func (s *Server) handleListAdminModels(w http.ResponseWriter, r *http.Request) {
 	for _, model := range models {
 		data = append(data, toAPIModel(model))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.ModelListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -756,9 +758,10 @@ func (s *Server) handleListAdminAccounts(w http.ResponseWriter, r *http.Request)
 	for _, account := range accounts {
 		data = append(data, s.apiAccount(r.Context(), account))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -1684,9 +1687,10 @@ func (s *Server) handleAdminAccountQuota(w http.ResponseWriter, r *http.Request)
 	if len(data) == 0 {
 		data = append(data, buildAccountQuotaSnapshot(account, usageLogsForAccount(usageLogs, account.ID), time.Now().UTC()))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.AccountQuotaListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -1706,9 +1710,10 @@ func (s *Server) handleListAdminAccountGroups(w http.ResponseWriter, r *http.Req
 	for _, group := range groups {
 		data = append(data, toAPIAccountGroup(group))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.AccountGroupListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
