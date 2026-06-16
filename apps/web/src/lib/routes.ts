@@ -52,9 +52,14 @@ export const ADMIN_ROUTES = {
   eventsOutbox: "/admin/ops/events",
   diagnostics: "/admin/ops/diagnostics",
   riskControl: "/admin/risk-control",
-  auditLogs: "/admin/audit-logs",
-  errorLogs: "/admin/error-logs",
-  billingLedger: "/admin/billing-ledger",
+  // Logs admin (audit + billing-ledger + error) is one tabbed page
+  // /admin/logs since the aggregation pass — these entries point at the
+  // tab params. Legacy standalone routes still 308-redirect for external
+  // bookmarks.
+  logs: "/admin/logs",
+  auditLogs: "/admin/logs",
+  errorLogs: "/admin/logs?tab=error",
+  billingLedger: "/admin/logs?tab=billing-ledger",
   // Gateway-edge policies admin is one tabbed page (/admin/gateway-policies)
   // since the aggregation pass — these entries point at the tab params. The
   // old standalone routes still 308-redirect for external bookmarks.
