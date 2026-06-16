@@ -50,9 +50,13 @@ export const ADMIN_ROUTES = {
   auditLogs: "/admin/audit-logs",
   errorLogs: "/admin/error-logs",
   billingLedger: "/admin/billing-ledger",
-  errorPassthrough: "/admin/error-passthrough",
-  tlsProfiles: "/admin/tls-profiles",
-  payloadRules: "/admin/payload-rules",
+  // Gateway-edge policies admin is one tabbed page (/admin/gateway-policies)
+  // since the aggregation pass — these entries point at the tab params. The
+  // old standalone routes still 308-redirect for external bookmarks.
+  gatewayPolicies: "/admin/gateway-policies",
+  errorPassthrough: "/admin/gateway-policies?tab=error-passthrough",
+  tlsProfiles: "/admin/gateway-policies?tab=tls-profiles",
+  payloadRules: "/admin/gateway-policies?tab=payload-rules",
   roles: "/admin/roles",
   apiKeys: "/admin/api-keys",
   userAttributes: "/admin/user-attributes",
