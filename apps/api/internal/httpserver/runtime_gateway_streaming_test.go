@@ -332,6 +332,75 @@ func TestGatewayResponsesToAnthropicStreamsTransformedIncrementally(t *testing.T
 	}
 }
 
+// TestGatewayAnthropicMessagesToCodexStreamsTransformedIncrementally proves the
+// last cross-protocol pair: a /v1/messages (Anthropic) client backed by a Codex
+// (Responses-API) upstream receives transcoded Anthropic Messages SSE built on
+// the fly from the upstream Codex /responses stream, incrementally, with no raw
+// Responses events leaking.
+func TestGatewayAnthropicMessagesToCodexStreamsTransformedIncrementally(t *testing.T) {
+	frame1 := "event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"Hello\"}\n\n"
+	rest := "event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\" world\"}\n\n" +
+		"event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"r\",\"status\":\"completed\",\"usage\":{\"input_tokens\":2,\"output_tokens\":2,\"total_tokens\":4}}}\n\n" +
+		"data: [DONE]\n\n"
+
+	release := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/responses") {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		_, _ = io.WriteString(w, frame1)
+		if flusher != nil {
+			flusher.Flush()
+		}
+		select {
+		case <-release:
+		case <-time.After(2 * time.Second):
+		}
+		_, _ = io.WriteString(w, rest)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"x-codex-up","display_name":"Codex Up","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codexpair-model","display_name":"CodexPair","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"codex-up","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"codexpair-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"codexpair-model","stream":true,"max_tokens":16,"messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	rec := &flushCapturingWriter{header: http.Header{}, release: release}
+	handler.ServeHTTP(rec, req)
+
+	if rec.code != 0 && rec.code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.code, rec.body.String())
+	}
+	body := rec.body.String()
+	for _, want := range []string{"event: message_start", "event: content_block_delta", `"type":"text_delta"`, "Hello", " world", "event: message_stop"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("transcoded Anthropic stream missing %q, got:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "response.output_text.delta") || strings.Contains(body, "chat.completion.chunk") {
+		t.Fatalf("raw Codex Responses SSE leaked to the Anthropic client:\n%s", body)
+	}
+	if !rec.flushed {
+		t.Fatal("expected an early flush (incremental streaming), got none")
+	}
+	if strings.Contains(rec.firstFlushBody, " world") {
+		t.Fatalf("response was buffered: first flush already contained the later delta: %q", rec.firstFlushBody)
+	}
+}
+
 // TestGatewayChatCompletionsToGeminiStreamsTransformedIncrementally proves pair 11
 // (the gemini-upstream direction): a /v1/chat/completions client backed by a
 // Gemini-compatible upstream receives transcoded chat.completion.chunk SSE built

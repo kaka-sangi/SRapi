@@ -98,10 +98,13 @@ func (s *Service) streamByTarget(ctx context.Context, streamer reverseproxycontr
 // bespoke responses wire, gemini, bedrock/generic/antigravity/chatgpt-web) — in
 // which case the request falls back to the buffered path.
 func (s *Service) crossProtocolUpstreamProtocol(req contract.ConversationRequest) (string, bool) {
-	if isCodexReverseProxy(req) || isBedrockCompatible(req) || isGenericReverseProxy(req) || isAntigravityReverseProxy(req) || isChatGPTWebReverseProxy(req) {
+	if isBedrockCompatible(req) || isGenericReverseProxy(req) || isAntigravityReverseProxy(req) || isChatGPTWebReverseProxy(req) {
 		return "", false
 	}
 	switch {
+	case isCodexReverseProxy(req):
+		// Codex's protocol is openai-compatible but its wire is the Responses API.
+		return "responses", true
 	case isAnthropicCompatible(req):
 		return "anthropic-compatible", true
 	case isGeminiCompatible(req):
@@ -385,12 +388,13 @@ func (s *Service) streamReverseProxyCodexResponses(ctx context.Context, streamer
 	if err != nil {
 		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
-	// A client speaking the Responses API gets the upstream Codex /responses SSE
-	// piped through verbatim (same wire shape). A chat/completions client cannot
-	// parse those events, so transform them into chat.completion.chunk SSE on the
-	// fly — preserving true incremental streaming. Usage is still recovered from
-	// the retained raw bytes via the existing parseCodexResponsesBody.
-	if !openAIResponsesEndpoint(req) {
+	// A chat/completions client cannot parse Codex /responses SSE, so transform it
+	// into chat.completion.chunk SSE on the fly (true incremental streaming). A
+	// Responses-API client gets the same-shape stream piped verbatim. Any OTHER
+	// client (anthropic/gemini) gets the raw Responses stream + a transcode signal
+	// so the cross-protocol reader re-renders it into that client's protocol. Usage
+	// is always recovered from the retained raw bytes via parseCodexResponsesBody.
+	if isChatCompletionsClient(req) {
 		reader := newCodexChatStreamReader(resp.Body, req)
 		return contract.ConversationResponse{
 			StatusCode: resp.StatusCode,
@@ -402,4 +406,11 @@ func (s *Service) streamReverseProxyCodexResponses(ctx context.Context, streamer
 		}, nil
 	}
 	return streamConversationResponse(resp, parseCodexResponsesBody), nil
+}
+
+// isChatCompletionsClient reports whether the inbound request is an OpenAI
+// Chat Completions client (openai-compatible source on a non-/responses
+// endpoint) — the only client the codex reader transforms directly to chat.
+func isChatCompletionsClient(req contract.ConversationRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(req.SourceProtocol), "openai-compatible") && !openAIResponsesEndpoint(req)
 }

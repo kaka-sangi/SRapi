@@ -27,6 +27,8 @@ func NewUpstreamStreamParser(protocol string) (contract.UpstreamStreamParser, bo
 		return &openAIUpstreamStreamParser{state: newOpenAIStreamParseState()}, true
 	case "gemini-compatible", "gemini":
 		return &geminiUpstreamStreamParser{state: newGeminiStreamParseState()}, true
+	case "responses", "codex-responses":
+		return &codexResponsesUpstreamStreamParser{state: newCodexResponsesStreamFrameParser()}, true
 	default:
 		return nil, false
 	}
