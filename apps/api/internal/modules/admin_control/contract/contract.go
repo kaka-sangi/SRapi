@@ -26,6 +26,10 @@ type Store interface {
 	CreateRedeemCode(ctx context.Context, code RedeemCode) (RedeemCode, error)
 	DeleteRedeemCode(ctx context.Context, id int) (RedeemCode, error)
 	DisableRedeemCodes(ctx context.Context, ids []int, at time.Time) ([]int, error)
+	// ExtendRedeemCodes sets ExpiresAt on each listed code, skipping codes that
+	// are already redeemed or fully consumed (their lifecycle is over). Returns
+	// the IDs that were successfully touched.
+	ExtendRedeemCodes(ctx context.Context, ids []int, expiresAt time.Time, now time.Time) ([]int, error)
 	RedeemCode(ctx context.Context, input RedeemCodeRedemptionInput) (RedeemCodeRedemptionResult, error)
 
 	// Promo code records are first-class per-row tables (not a serialized

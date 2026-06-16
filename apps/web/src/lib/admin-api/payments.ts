@@ -20,6 +20,7 @@ import {
   getAdminRedeemCodeStats,
   batchDeleteAdminRedeemCodes,
   batchDisableAdminRedeemCodes,
+  batchExtendAdminRedeemCodes,
   batchGenerateAdminRedeemCodes,
   listAdminPaymentOrders,
   listAdminPaymentOrderAuditLogs,
@@ -201,6 +202,12 @@ export const paymentsApi = {
 
   batchDisableRedeemCodes(ids: Id[]): Promise<unknown> {
     return unwrapData(() => batchDisableAdminRedeemCodes({ body: { ids }, throwOnError: true }));
+  },
+
+  batchExtendRedeemCodes(ids: Id[], expiresAt: string): Promise<unknown> {
+    return unwrapData(() =>
+      batchExtendAdminRedeemCodes({ body: { ids, expires_at: expiresAt }, throwOnError: true }),
+    );
   },
 
   // Hard delete (vs the soft batch-disable above which keeps the audit row).

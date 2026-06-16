@@ -1290,6 +1290,11 @@ export const en = {
     disable: "Disable",
     disableSelected: "Disable selected",
     disableSelectedTitle: "Disable {count} redeem codes?",
+    extendSelected: "Extend expiry",
+    extendSelectedTitle: "Extend expiry on {count} redeem codes",
+    extendSelectedBody:
+      "Set a new expiration for every selected code. Codes that have already been fully redeemed are reported as failures and not touched.",
+    extendRequired: "Pick an expiration date.",
     deleteSelected: "Delete selected",
     deleteSelectedTitle: "Delete {count} redeem codes?",
     deleteSelectedBody:

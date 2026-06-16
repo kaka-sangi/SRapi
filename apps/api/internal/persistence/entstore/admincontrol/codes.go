@@ -110,6 +110,52 @@ func (s *Store) DisableRedeemCodes(ctx context.Context, ids []int, at time.Time)
 	return existingIDs, nil
 }
 
+// ExtendRedeemCodes sets a new ExpiresAt on the named codes. Mirrors the
+// memory store: fully-consumed codes (redeemed_count >= max_redemptions) are
+// skipped so the result accurately reports rows that were actually touched.
+func (s *Store) ExtendRedeemCodes(ctx context.Context, ids []int, expiresAt time.Time, now time.Time) ([]int, error) {
+	if s == nil || s.client == nil {
+		return nil, admincontrolcontract.ErrInvalidInput
+	}
+	stamp := now.UTC()
+	if stamp.IsZero() {
+		stamp = time.Now().UTC()
+	}
+	requested := uniquePositiveInts(ids)
+	if len(requested) == 0 {
+		return []int{}, nil
+	}
+	rows, err := s.client.RedeemCode.Query().
+		Where(entredeemcode.IDIn(requested...)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	eligible := make([]int, 0, len(rows))
+	for _, row := range rows {
+		// Skip codes that have already hit their redemption cap — extending
+		// their expiry would have no effect. Codes whose status is "redeemed"
+		// or "disabled" are still touched (operators may legitimately want
+		// to push back the expiry on a disabled code before re-enabling it).
+		if row.MaxRedemptions > 0 && row.RedeemedCount >= row.MaxRedemptions {
+			continue
+		}
+		eligible = append(eligible, row.ID)
+	}
+	if len(eligible) == 0 {
+		return []int{}, nil
+	}
+	want := expiresAt.UTC()
+	if _, err := s.client.RedeemCode.Update().
+		Where(entredeemcode.IDIn(eligible...)).
+		SetExpiresAt(want).
+		SetUpdatedAt(stamp).
+		Save(ctx); err != nil {
+		return nil, err
+	}
+	return eligible, nil
+}
+
 // ListPromoCodes returns every promo code row. The admin_control service owns
 // status derivation, filtering, sorting, and paging.
 func (s *Store) ListPromoCodes(ctx context.Context) ([]admincontrolcontract.PromoCode, error) {

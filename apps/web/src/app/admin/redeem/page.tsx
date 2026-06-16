@@ -31,6 +31,7 @@ import {
   useBatchGenerateRedeemCodes,
   useBatchDeleteRedeemCodes,
   useBatchDisableRedeemCodes,
+  useBatchExtendRedeemCodes,
   useDeleteRedeemCode,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -92,6 +93,7 @@ function RedeemContent() {
   const stats = useRedeemStats();
   const createMut = useCreateRedeemCode();
   const disableMut = useBatchDisableRedeemCodes();
+  const extendMut = useBatchExtendRedeemCodes();
   const batchDeleteMut = useBatchDeleteRedeemCodes();
   const deleteMut = useDeleteRedeemCode();
 
@@ -101,6 +103,7 @@ function RedeemContent() {
   const [deleteTarget, setDeleteTarget] = useState<RedeemCode | null>(null);
   const [bulkDisabling, setBulkDisabling] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkExtending, setBulkExtending] = useState(false);
 
   /** Bulk hard-delete the selection. Unlike disable, this is irreversible —
    * the rows are gone — so it gets a destructive confirm. Failed ids
@@ -277,6 +280,15 @@ function RedeemContent() {
               <Button
                 variant="outline"
                 size="sm"
+                loading={extendMut.isPending}
+                disabled={list.selected.size === 0}
+                onClick={() => setBulkExtending(true)}
+              >
+                {t("adminPromos.extendSelected")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 loading={batchDeleteMut.isPending}
                 onClick={() => setBulkDeleting(true)}
               >
@@ -360,6 +372,30 @@ function RedeemContent() {
           confirmLabel={t("adminPromos.deleteSelected")}
           onConfirm={confirmBulkDelete}
           isPending={batchDeleteMut.isPending}
+        />
+      ) : null}
+
+      {bulkExtending ? (
+        <RedeemExtendDialog
+          count={list.selected.size}
+          isPending={extendMut.isPending}
+          onSubmit={async (isoExpiresAt) => {
+            try {
+              await extendMut.mutateAsync({
+                ids: [...list.selected],
+                expiresAt: isoExpiresAt,
+              });
+              toast({
+                title: t("feedback.batchAllSucceeded", { count: list.selected.size }),
+                tone: "success",
+              });
+              list.clearSelection();
+              setBulkExtending(false);
+            } catch (err) {
+              toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+            }
+          }}
+          onClose={() => setBulkExtending(false)}
         />
       ) : null}
 
@@ -541,6 +577,81 @@ function RedeemBatchDialog({ onClose }: { onClose: () => void }) {
             </DialogFooter>
           </form>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Small focused dialog: one datetime-local input + selected-count blurb.
+// Submits the ISO timestamp to the parent; the parent owns the mutation.
+function RedeemExtendDialog({
+  count,
+  isPending,
+  onSubmit,
+  onClose,
+}: {
+  count: number;
+  isPending: boolean;
+  onSubmit: (isoExpiresAt: string) => void | Promise<void>;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setError(t("adminPromos.extendRequired"));
+      return;
+    }
+    // datetime-local is `yyyy-MM-ddTHH:mm` in the user's local zone — round-trip
+    // through Date so the backend receives a real ISO timestamp.
+    const d = new Date(trimmed);
+    if (Number.isNaN(d.getTime())) {
+      setError(t("adminPromos.extendRequired"));
+      return;
+    }
+    void onSubmit(d.toISOString());
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent>
+        <form onSubmit={submit}>
+          <DialogHeader>
+            <DialogTitle>{t("adminPromos.extendSelectedTitle", { count })}</DialogTitle>
+            <DialogDescription>{t("adminPromos.extendSelectedBody")}</DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 space-y-3">
+            <div>
+              <Label htmlFor="extend-expires">{t("adminCommon.expiresAt")}</Label>
+              <Input
+                id="extend-expires"
+                type="datetime-local"
+                value={value}
+                disabled={isPending}
+                aria-invalid={Boolean(error)}
+                onChange={(e) => setValue(e.target.value)}
+              />
+            </div>
+            {error ? (
+              <p role="alert" className="text-2xs text-srapi-error">
+                {error}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter className="mt-5">
+            <Button type="button" variant="ghost" disabled={isPending} onClick={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" variant="primary" loading={isPending}>
+              {t("adminPromos.extendSelected")}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

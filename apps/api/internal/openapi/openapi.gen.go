@@ -5015,6 +5015,12 @@ type BatchDisableRedeemCodesRequest struct {
 	Ids []Id `json:"ids"`
 }
 
+// BatchExtendRedeemCodesRequest defines model for BatchExtendRedeemCodesRequest.
+type BatchExtendRedeemCodesRequest struct {
+	ExpiresAt Timestamp `json:"expires_at"`
+	Ids       []Id      `json:"ids"`
+}
+
 // BatchGenerateRedeemCodesRequest defines model for BatchGenerateRedeemCodesRequest.
 type BatchGenerateRedeemCodesRequest struct {
 	Count          int            `json:"count"`
@@ -11269,6 +11275,9 @@ type BatchDeleteAdminRedeemCodesJSONRequestBody = BatchDisableRedeemCodesRequest
 
 // BatchDisableAdminRedeemCodesJSONRequestBody defines body for BatchDisableAdminRedeemCodes for application/json ContentType.
 type BatchDisableAdminRedeemCodesJSONRequestBody = BatchDisableRedeemCodesRequest
+
+// BatchExtendAdminRedeemCodesJSONRequestBody defines body for BatchExtendAdminRedeemCodes for application/json ContentType.
+type BatchExtendAdminRedeemCodesJSONRequestBody = BatchExtendRedeemCodesRequest
 
 // BatchGenerateAdminRedeemCodesJSONRequestBody defines body for BatchGenerateAdminRedeemCodes for application/json ContentType.
 type BatchGenerateAdminRedeemCodesJSONRequestBody = BatchGenerateRedeemCodesRequest
@@ -18354,6 +18363,9 @@ type ServerInterface interface {
 	// Batch disable redeem codes.
 	// (POST /api/v1/admin/redeem-codes/batch-disable)
 	BatchDisableAdminRedeemCodes(w http.ResponseWriter, r *http.Request)
+	// Batch set a new expiration on redeem codes.
+	// (POST /api/v1/admin/redeem-codes/batch-extend)
+	BatchExtendAdminRedeemCodes(w http.ResponseWriter, r *http.Request)
 	// Batch generate redeem codes.
 	// (POST /api/v1/admin/redeem-codes/batch-generate)
 	BatchGenerateAdminRedeemCodes(w http.ResponseWriter, r *http.Request)
@@ -26545,6 +26557,28 @@ func (siw *ServerInterfaceWrapper) BatchDisableAdminRedeemCodes(w http.ResponseW
 	handler.ServeHTTP(w, r)
 }
 
+// BatchExtendAdminRedeemCodes operation middleware
+func (siw *ServerInterfaceWrapper) BatchExtendAdminRedeemCodes(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchExtendAdminRedeemCodes(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // BatchGenerateAdminRedeemCodes operation middleware
 func (siw *ServerInterfaceWrapper) BatchGenerateAdminRedeemCodes(w http.ResponseWriter, r *http.Request) {
 
@@ -32652,6 +32686,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes", wrapper.CreateAdminRedeemCode)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-delete", wrapper.BatchDeleteAdminRedeemCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-disable", wrapper.BatchDisableAdminRedeemCodes)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-extend", wrapper.BatchExtendAdminRedeemCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-generate", wrapper.BatchGenerateAdminRedeemCodes)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/redeem-codes/stats", wrapper.GetAdminRedeemCodeStats)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/redeem-codes/{id}", wrapper.DeleteAdminRedeemCode)

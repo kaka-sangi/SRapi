@@ -568,6 +568,86 @@ func TestUpdateAdminSettingsNormalizesGatewayRetryKnobs(t *testing.T) {
 	}
 }
 
+func TestBatchExtendRedeemCodesSetsExpiryAndSkipsFullyConsumed(t *testing.T) {
+	now := time.Date(2026, time.June, 9, 9, 0, 0, 0, time.UTC)
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	// Create two unredeemed codes plus one that we'll mark fully consumed.
+	codeA, err := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code: "EXTEND1", Type: admincontrol.RedeemCodeTypeBalance, Value: "5", Currency: "USD", MaxRedemptions: 1,
+	}, 1)
+	if err != nil {
+		t.Fatalf("create A: %v", err)
+	}
+	codeB, err := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code: "EXTEND2", Type: admincontrol.RedeemCodeTypeBalance, Value: "5", Currency: "USD", MaxRedemptions: 1,
+	}, 1)
+	if err != nil {
+		t.Fatalf("create B: %v", err)
+	}
+	consumed, err := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code: "EXTEND3", Type: admincontrol.RedeemCodeTypeBalance, Value: "5", Currency: "USD", MaxRedemptions: 1,
+	}, 1)
+	if err != nil {
+		t.Fatalf("create C: %v", err)
+	}
+	// Mark the third one fully consumed via the store (no public service hook
+	// to do this since redemption is a user-facing flow).
+	all, _ := store.ListRedeemCodes(context.Background())
+	for i := range all {
+		if all[i].ID == consumed.ID {
+			all[i].RedeemedCount = all[i].MaxRedemptions
+			if _, err := store.DeleteRedeemCode(context.Background(), all[i].ID); err != nil {
+				t.Fatalf("temp delete to re-create consumed: %v", err)
+			}
+			if _, err := store.CreateRedeemCode(context.Background(), all[i]); err != nil {
+				t.Fatalf("recreate consumed: %v", err)
+			}
+		}
+	}
+
+	newExpiry := now.AddDate(0, 0, 30)
+	result, err := svc.BatchExtendRedeemCodes(context.Background(), []int{codeA.ID, codeB.ID, consumed.ID, 99999}, newExpiry, 1)
+	if err != nil {
+		t.Fatalf("batch extend: %v", err)
+	}
+	if result.Requested != 4 {
+		t.Fatalf("requested: want 4, got %d", result.Requested)
+	}
+	if result.Succeeded != 2 {
+		t.Fatalf("succeeded: want 2 (A and B), got %d", result.Succeeded)
+	}
+	if result.Failed != 2 {
+		t.Fatalf("failed: want 2 (consumed + unknown), got %d (ids=%v)", result.Failed, result.FailedIDs)
+	}
+
+	// Verify A and B actually got the new expiry; consumed unchanged.
+	list, _ := svc.ListRedeemCodes(context.Background(), admincontrol.ListOptions{})
+	byID := map[int]admincontrol.RedeemCode{}
+	for _, c := range list.Items {
+		byID[c.ID] = c
+	}
+	for _, id := range []int{codeA.ID, codeB.ID} {
+		got := byID[id]
+		if got.ExpiresAt == nil || !got.ExpiresAt.Equal(newExpiry) {
+			t.Fatalf("code %d expiry: want %v, got %v", id, newExpiry, got.ExpiresAt)
+		}
+	}
+
+	// Zero expiresAt must be rejected as invalid input.
+	if _, err := svc.BatchExtendRedeemCodes(context.Background(), []int{codeA.ID}, time.Time{}, 1); !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("zero expiry should be invalid, got %v", err)
+	}
+	// Empty ids must be rejected.
+	if _, err := svc.BatchExtendRedeemCodes(context.Background(), nil, newExpiry, 1); !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("empty ids should be invalid, got %v", err)
+	}
+}
+
 func TestDeleteRedeemCode(t *testing.T) {
 	now := time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)
 	store := admincontrolmemory.New()

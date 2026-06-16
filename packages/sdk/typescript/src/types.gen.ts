@@ -3353,6 +3353,11 @@ export type BatchDisableRedeemCodesRequest = {
     ids: Array<Id>;
 };
 
+export type BatchExtendRedeemCodesRequest = {
+    ids: Array<Id>;
+    expires_at: Timestamp;
+};
+
 export type RedeemCodeResponse = {
     data: RedeemCode;
     request_id: RequestId;
@@ -16679,6 +16684,43 @@ export type BatchDisableAdminRedeemCodesResponses = {
 };
 
 export type BatchDisableAdminRedeemCodesResponse = BatchDisableAdminRedeemCodesResponses[keyof BatchDisableAdminRedeemCodesResponses];
+
+export type BatchExtendAdminRedeemCodesData = {
+    body: BatchExtendRedeemCodesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/redeem-codes/batch-extend';
+};
+
+export type BatchExtendAdminRedeemCodesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchExtendAdminRedeemCodesError = BatchExtendAdminRedeemCodesErrors[keyof BatchExtendAdminRedeemCodesErrors];
+
+export type BatchExtendAdminRedeemCodesResponses = {
+    /**
+     * Redeem codes extended — per-id outcome in the result.
+     */
+    200: BatchOperationResponse;
+};
+
+export type BatchExtendAdminRedeemCodesResponse = BatchExtendAdminRedeemCodesResponses[keyof BatchExtendAdminRedeemCodesResponses];
 
 export type BatchDeleteAdminRedeemCodesData = {
     body: BatchDisableRedeemCodesRequest;

@@ -99,6 +99,14 @@ export function useBatchDisableRedeemCodes() {
     queryKeys.admin.redeemStats(),
   );
 }
+export function useBatchExtendRedeemCodes() {
+  return useAdminMutation(
+    (vars: { ids: string[]; expiresAt: string }) =>
+      adminApi.batchExtendRedeemCodes(vars.ids, vars.expiresAt),
+    ["admin", "redeem-codes"],
+    queryKeys.admin.redeemStats(),
+  );
+}
 // Hard-delete a selection — the row is gone (vs disable which keeps history).
 // Same invalidation set as batch-disable so both refresh the same list views.
 export function useBatchDeleteRedeemCodes() {

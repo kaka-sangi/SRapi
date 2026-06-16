@@ -231,6 +231,34 @@ func (s *Store) DisableRedeemCodes(_ context.Context, ids []int, at time.Time) (
 	return succeeded, nil
 }
 
+func (s *Store) ExtendRedeemCodes(_ context.Context, ids []int, expiresAt time.Time, now time.Time) ([]int, error) {
+	stamp := now.UTC()
+	if stamp.IsZero() {
+		stamp = time.Now().UTC()
+	}
+	want := expiresAt.UTC()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	succeeded := make([]int, 0, len(ids))
+	for _, id := range ids {
+		item, ok := s.redeemCodes[id]
+		if !ok {
+			continue
+		}
+		// A fully-consumed code has redeemed_count >= max_redemptions; extending
+		// its expiry is a no-op since it can no longer be redeemed. Skip it so
+		// the result accurately reports rows that were actually touched.
+		if item.MaxRedemptions > 0 && item.RedeemedCount >= item.MaxRedemptions {
+			continue
+		}
+		item.ExpiresAt = &want
+		item.UpdatedAt = stamp
+		s.redeemCodes[id] = item
+		succeeded = append(succeeded, id)
+	}
+	return succeeded, nil
+}
+
 func (s *Store) RedeemCode(ctx context.Context, input admincontrol.RedeemCodeRedemptionInput) (admincontrol.RedeemCodeRedemptionResult, error) {
 	if input.UserID <= 0 || strings.TrimSpace(input.Code) == "" {
 		return admincontrol.RedeemCodeRedemptionResult{}, admincontrol.ErrInvalidInput

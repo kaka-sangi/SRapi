@@ -1268,6 +1268,11 @@ export const zh: Messages = {
     disable: "停用",
     disableSelected: "停用所选",
     disableSelectedTitle: "停用 {count} 个兑换码？",
+    extendSelected: "延长有效期",
+    extendSelectedTitle: "为 {count} 个兑换码延长有效期",
+    extendSelectedBody:
+      "为每个所选兑换码设置新的到期时间。已被完全兑换的码会在失败列表中给出，不会被修改。",
+    extendRequired: "请选择新的到期时间。",
     deleteSelected: "删除所选",
     deleteSelectedTitle: "删除 {count} 个兑换码？",
     deleteSelectedBody:

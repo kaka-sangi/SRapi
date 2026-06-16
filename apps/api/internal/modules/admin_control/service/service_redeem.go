@@ -117,6 +117,52 @@ func (s *Service) BatchDisableRedeemCodes(ctx context.Context, ids []int, actorU
 	}, nil
 }
 
+// BatchExtendRedeemCodes sets a new ExpiresAt on each listed code. Codes whose
+// lifecycle is over (fully consumed) are reported as failures in the result so
+// the admin sees exactly which rows weren't touched. Mirrors the BatchDisable
+// shape — same input dedup + same result accounting.
+func (s *Service) BatchExtendRedeemCodes(ctx context.Context, ids []int, expiresAt time.Time, actorUserID int) (admincontrol.BatchOperationResult, error) {
+	if len(ids) == 0 || len(ids) > 1000 {
+		return admincontrol.BatchOperationResult{}, admincontrol.ErrInvalidInput
+	}
+	if expiresAt.IsZero() {
+		return admincontrol.BatchOperationResult{}, admincontrol.ErrInvalidInput
+	}
+	requested := make([]int, 0, len(ids))
+	seen := map[int]bool{}
+	for _, id := range ids {
+		if id <= 0 {
+			return admincontrol.BatchOperationResult{}, admincontrol.ErrInvalidInput
+		}
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		requested = append(requested, id)
+	}
+	succeededIDs, err := s.store.ExtendRedeemCodes(ctx, requested, expiresAt, s.clock.Now())
+	if err != nil {
+		return admincontrol.BatchOperationResult{}, err
+	}
+	succeededSet := map[int]bool{}
+	for _, id := range succeededIDs {
+		succeededSet[id] = true
+	}
+	failedIDs := make([]int, 0, len(requested))
+	for _, id := range requested {
+		if !succeededSet[id] {
+			failedIDs = append(failedIDs, id)
+		}
+	}
+	sort.Ints(failedIDs)
+	return admincontrol.BatchOperationResult{
+		Requested: len(ids),
+		Succeeded: len(succeededIDs),
+		Failed:    len(failedIDs),
+		FailedIDs: failedIDs,
+	}, nil
+}
+
 func (s *Service) RedeemCodeStats(ctx context.Context) (admincontrol.RedeemCodeStats, error) {
 	stored, err := s.store.ListRedeemCodes(ctx)
 	if err != nil {
