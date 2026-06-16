@@ -1277,8 +1277,28 @@ func (s *Service) renderAnthropicCanonicalStreamEvents(resp gatewaycontract.Cano
 			},
 		},
 	}}
-	openBlocks := map[int]bool{}
+	// Anthropic block indices must be distinct per logical block. The provider's
+	// ContentIndex can repeat across different kinds (e.g. reasoning and text both
+	// at index 0), so key blocks by (ContentIndex, kind) and assign a monotonic
+	// Anthropic index the first time each pair is seen — otherwise text/thinking/
+	// tool_use deltas collide into one block.
+	type anthropicBlockKey struct {
+		contentIndex int
+		kind         gatewaycontract.ContentBlockType
+	}
+	blockIndexByKey := map[anthropicBlockKey]int{}
 	openBlockOrder := make([]int, 0)
+	nextBlockIndex := 0
+	blockIndexFor := func(contentIndex int, kind gatewaycontract.ContentBlockType) (int, bool) {
+		key := anthropicBlockKey{contentIndex: contentIndex, kind: kind}
+		if idx, ok := blockIndexByKey[key]; ok {
+			return idx, false
+		}
+		idx := nextBlockIndex
+		nextBlockIndex++
+		blockIndexByKey[key] = idx
+		return idx, true
+	}
 	toolStates := newStreamToolCallStates(resp.OutputItems)
 	textStates := newResponseStreamTextStates(resp.OutputItems)
 	var pendingUsage *gatewaycontract.Usage
@@ -1288,11 +1308,26 @@ func (s *Service) renderAnthropicCanonicalStreamEvents(resp gatewaycontract.Cano
 		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolCallDelta, gatewaycontract.StreamEventToolResult:
 			if event.Type == gatewaycontract.StreamEventReasoning && mapStringAny(event.Delta.Metadata, "signature_delta") != "" {
 				signature := textStates.appendSignature(event)
+				// The signature belongs to the thinking block at this content index;
+				// reuse its remapped index, opening the block if the signature
+				// somehow arrives before any thinking delta.
+				blockIdx, isNew := blockIndexFor(event.ContentIndex, gatewaycontract.ContentBlockReasoning)
+				if isNew {
+					openBlockOrder = append(openBlockOrder, blockIdx)
+					out = append(out, StreamEvent{
+						Event: "content_block_start",
+						Data: map[string]any{
+							"type":          "content_block_start",
+							"index":         blockIdx,
+							"content_block": anthropicStreamContentBlock(anthropicStreamEventStartBlock(event)),
+						},
+					})
+				}
 				out = append(out, StreamEvent{
 					Event: "content_block_delta",
 					Data: map[string]any{
 						"type":  "content_block_delta",
-						"index": event.ContentIndex,
+						"index": blockIdx,
 						"delta": map[string]any{
 							"type":      "signature_delta",
 							"signature": signature,
@@ -1309,14 +1344,14 @@ func (s *Service) renderAnthropicCanonicalStreamEvents(resp gatewaycontract.Cano
 				state := toolStates.stateFor(event)
 				startBlock = state.startBlock()
 			}
-			if !openBlocks[event.ContentIndex] {
-				openBlocks[event.ContentIndex] = true
-				openBlockOrder = append(openBlockOrder, event.ContentIndex)
+			blockIdx, isNew := blockIndexFor(event.ContentIndex, startBlock.Type)
+			if isNew {
+				openBlockOrder = append(openBlockOrder, blockIdx)
 				out = append(out, StreamEvent{
 					Event: "content_block_start",
 					Data: map[string]any{
 						"type":          "content_block_start",
-						"index":         event.ContentIndex,
+						"index":         blockIdx,
 						"content_block": anthropicStreamContentBlock(startBlock),
 					},
 				})
@@ -1326,7 +1361,7 @@ func (s *Service) renderAnthropicCanonicalStreamEvents(resp gatewaycontract.Cano
 					Event: "content_block_delta",
 					Data: map[string]any{
 						"type":  "content_block_delta",
-						"index": event.ContentIndex,
+						"index": blockIdx,
 						"delta": delta,
 					},
 				})

@@ -1334,6 +1334,51 @@ func TestRenderAnthropicMessagesPreservesCachedUsage(t *testing.T) {
 	}
 }
 
+// TestRenderAnthropicStreamSeparatesReasoningAndTextBlocks guards that reasoning
+// and text deltas sharing the same provider ContentIndex are emitted as two
+// distinct Anthropic blocks (thinking at index 0, text at index 1) rather than
+// colliding into one block — otherwise a text_delta would be appended to a
+// thinking block and the client's reasoning/answer would be corrupted.
+func TestRenderAnthropicStreamSeparatesReasoningAndTextBlocks(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		Model:      "claude-local",
+		StopReason: "end_turn",
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{Index: 0, Type: gatewaycontract.StreamEventReasoning, ContentIndex: 0, Delta: gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockReasoning, Text: "thinking"}},
+			{Index: 1, Type: gatewaycontract.StreamEventContentDelta, ContentIndex: 0, Delta: gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Text: "answer"}},
+			{Index: 2, Type: gatewaycontract.StreamEventStop, StopReason: "end_turn"},
+		},
+	}
+
+	events := svc.RenderAnthropicMessagesStreamEvents(resp)
+	starts := streamEventsByName(events, "content_block_start")
+	if len(starts) != 2 {
+		t.Fatalf("expected two distinct blocks (thinking + text), got %d: %+v", len(starts), starts)
+	}
+	b0, _ := starts[0].Data["content_block"].(map[string]any)
+	b1, _ := starts[1].Data["content_block"].(map[string]any)
+	if starts[0].Data["index"] != 0 || b0["type"] != "thinking" {
+		t.Fatalf("first block must be thinking at index 0, got idx=%v block=%v", starts[0].Data["index"], b0)
+	}
+	if starts[1].Data["index"] != 1 || b1["type"] != "text" {
+		t.Fatalf("text must be a separate block at index 1 (not colliding with thinking), got idx=%v block=%v", starts[1].Data["index"], b1)
+	}
+
+	var textDeltaIndex any = "none"
+	for _, d := range streamEventsByName(events, "content_block_delta") {
+		if delta, _ := d.Data["delta"].(map[string]any); delta["type"] == "text_delta" {
+			textDeltaIndex = d.Data["index"]
+		}
+	}
+	if textDeltaIndex != 1 {
+		t.Fatalf("text_delta must target the text block (index 1), got %v", textDeltaIndex)
+	}
+}
+
 func TestRenderProtocolResponsesPreservesToolCallOutput(t *testing.T) {
 	svc, err := New()
 	if err != nil {
