@@ -617,6 +617,7 @@ func (s *Server) registerPublicRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/logout", s.handleLogout)
 	mux.HandleFunc("GET /api/v1/notifications/unsubscribe", s.handlePreviewNotificationUnsubscribe)
 	mux.HandleFunc("POST /api/v1/notifications/unsubscribe", s.handleNotificationUnsubscribe)
+	mux.HandleFunc("GET /api/v1/subscription-plans", s.handleListPublicSubscriptionPlans)
 }
 
 // registerAdminOpsRoutes registers the operational monitoring + maintenance

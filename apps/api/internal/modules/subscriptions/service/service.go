@@ -155,6 +155,23 @@ func (s *Service) ListPlans(ctx context.Context) ([]contract.SubscriptionPlan, e
 	return s.store.ListPlans(ctx)
 }
 
+// ListForSalePlans returns only the plans the storefront should expose: active
+// status and explicitly flagged for_sale. Filtered in service rather than via a
+// new store predicate because the catalog is small.
+func (s *Service) ListForSalePlans(ctx context.Context) ([]contract.SubscriptionPlan, error) {
+	all, err := s.store.ListPlans(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.SubscriptionPlan, 0, len(all))
+	for _, p := range all {
+		if p.ForSale && p.Status == contract.PlanStatusActive {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
 // FindPlanByID returns a single plan, used by the update handler to capture the
 // pre-change audit snapshot.
 func (s *Service) FindPlanByID(ctx context.Context, id int) (contract.SubscriptionPlan, error) {

@@ -371,6 +371,14 @@ export function useMySubscriptions() {
     queryFn: () => meApi.getSubscriptions(),
   });
 }
+// Public storefront catalog. No auth required; the marketing /pricing page
+// uses this to render plan cards for unauthenticated visitors.
+export function usePublicSubscriptionPlans() {
+  return useQuery({
+    queryKey: queryKeys.me.subscriptionPlans(),
+    queryFn: () => meApi.listSubscriptionPlans(),
+  });
+}
 
 // ---- Redeem ----
 export function useRedeemCode() {

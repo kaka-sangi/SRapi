@@ -15,6 +15,7 @@ import {
   redeemCurrentUserRedeemCode,
   listPaymentMethods,
   listPaymentOrders,
+  listSubscriptionPlans,
   getPaymentOrder,
   createPaymentOrder,
   cancelPaymentOrder,
@@ -158,6 +159,11 @@ export const meApi = {
   },
   listPaymentMethods() {
     return unwrapList(() => listPaymentMethods({ throwOnError: true }));
+  },
+  // Public storefront catalog: only for_sale + active plans. No auth required —
+  // safe to call from the marketing /pricing page before sign-in.
+  listSubscriptionPlans() {
+    return unwrapList(() => listSubscriptionPlans({ throwOnError: true }));
   },
   listOrders(query?: ListPaymentOrdersData["query"]) {
     return unwrapList(() => listPaymentOrders({ query, throwOnError: true }));

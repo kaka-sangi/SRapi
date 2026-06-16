@@ -8674,6 +8674,35 @@ export type GetCurrentUserSubscriptionsResponses = {
 
 export type GetCurrentUserSubscriptionsResponse = GetCurrentUserSubscriptionsResponses[keyof GetCurrentUserSubscriptionsResponses];
 
+export type ListSubscriptionPlansData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/subscription-plans';
+};
+
+export type ListSubscriptionPlansErrors = {
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListSubscriptionPlansError = ListSubscriptionPlansErrors[keyof ListSubscriptionPlansErrors];
+
+export type ListSubscriptionPlansResponses = {
+    /**
+     * Subscription plans available for purchase.
+     */
+    200: SubscriptionPlanListResponse;
+};
+
+export type ListSubscriptionPlansResponse = ListSubscriptionPlansResponses[keyof ListSubscriptionPlansResponses];
+
 export type ListPaymentMethodsData = {
     body?: never;
     path?: never;

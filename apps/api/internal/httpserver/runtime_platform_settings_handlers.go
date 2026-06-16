@@ -62,6 +62,32 @@ func (s *Server) handleSiteConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleListPublicSubscriptionPlans returns the storefront catalog — only
+// for_sale active plans, no auth required so the pricing page can be browsed
+// before sign-in. The admin variant (/admin/subscription-plans) returns
+// everything including draft/archived/internal plans.
+func (s *Server) handleListPublicSubscriptionPlans(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if !s.requireSubscriptionPlansEnabled(w, r, requestID) {
+		return
+	}
+	items, err := s.runtime.subscriptions.ListForSalePlans(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list subscription plans", requestID)
+		return
+	}
+	data := make([]apiopenapi.SubscriptionPlan, 0, len(items))
+	for _, item := range items {
+		data = append(data, toAPISubscriptionPlan(item))
+	}
+	data, pg := paginate(r, data)
+	writeJSONAny(w, http.StatusOK, apiopenapi.SubscriptionPlanListResponse{
+		Data:       data,
+		Pagination: pg,
+		RequestId:  requestID,
+	})
+}
+
 func (s *Server) handleDeleteCurrentUser(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireConsoleSession(r)

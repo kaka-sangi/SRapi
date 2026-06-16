@@ -18558,6 +18558,9 @@ type ServerInterface interface {
 	// Public site branding and agreement configuration.
 	// (GET /api/v1/site-config)
 	GetSiteConfig(w http.ResponseWriter, r *http.Request)
+	// List subscription plans available for purchase.
+	// (GET /api/v1/subscription-plans)
+	ListSubscriptionPlans(w http.ResponseWriter, r *http.Request)
 	// Current-user prompt-cache usage metrics.
 	// (GET /api/v1/user/usage/dashboard/cache-metrics)
 	GetCurrentUserUsageCacheMetrics(w http.ResponseWriter, r *http.Request)
@@ -30609,6 +30612,20 @@ func (siw *ServerInterfaceWrapper) GetSiteConfig(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// ListSubscriptionPlans operation middleware
+func (siw *ServerInterfaceWrapper) ListSubscriptionPlans(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSubscriptionPlans(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetCurrentUserUsageCacheMetrics operation middleware
 func (siw *ServerInterfaceWrapper) GetCurrentUserUsageCacheMetrics(w http.ResponseWriter, r *http.Request) {
 
@@ -32155,6 +32172,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/setup", wrapper.CompleteSetup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/setup/status", wrapper.GetSetupStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/site-config", wrapper.GetSiteConfig)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/subscription-plans", wrapper.ListSubscriptionPlans)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/user/usage/dashboard/cache-metrics", wrapper.GetCurrentUserUsageCacheMetrics)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/user/usage/dashboard/models", wrapper.GetCurrentUserUsageModels)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/user/usage/dashboard/throughput", wrapper.GetCurrentUserUsageThroughput)

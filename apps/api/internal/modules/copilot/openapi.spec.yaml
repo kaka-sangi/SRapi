@@ -2269,6 +2269,32 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/subscription-plans:
+    get:
+      tags:
+        - Subscriptions
+      operationId: listSubscriptionPlans
+      summary: List subscription plans available for purchase.
+      description: |
+        Public storefront endpoint — returns only plans flagged for sale and
+        in active status. No authentication required so the pricing page can
+        be browsed by visitors before sign-in.
+      security: []
+      responses:
+        "200":
+          description: Subscription plans available for purchase.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionPlanListResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/payment/methods:
     get:
       tags:

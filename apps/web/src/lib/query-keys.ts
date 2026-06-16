@@ -22,6 +22,7 @@ export const queryKeys = {
     orders: (params?: unknown) => ["me", "orders", params ?? {}] as const,
     order: (id: string) => ["me", "order", id] as const,
     paymentMethods: () => ["me", "payment-methods"] as const,
+    subscriptionPlans: () => ["public", "subscription-plans"] as const,
     subscriptions: () => ["me", "subscriptions"] as const,
     affiliate: () => ["me", "affiliate"] as const,
     affiliateInviteCodes: () => ["me", "affiliate-invite-codes"] as const,
