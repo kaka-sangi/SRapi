@@ -10527,6 +10527,11 @@ type ListAdminAuditLogsParams struct {
 
 	// ActorUserId Narrow the list to actions taken by this admin user.
 	ActorUserId *Id `form:"actor_user_id,omitempty" json:"actor_user_id,omitempty"`
+
+	// Since Lower bound on created_at. Rows whose created_at is BEFORE this
+	// timestamp are excluded. Accepts RFC3339 or YYYY-MM-DD; missing /
+	// empty means no bound.
+	Since *time.Time `form:"since,omitempty" json:"since,omitempty"`
 }
 
 // ListAdminBillingLedgerParams defines parameters for ListAdminBillingLedger.
@@ -21982,6 +21987,19 @@ func (siw *ServerInterfaceWrapper) ListAdminAuditLogs(w http.ResponseWriter, r *
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actor_user_id"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actor_user_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "since" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "since", r.URL.Query(), &params.Since, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "since"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "since", Err: err})
 		}
 		return
 	}

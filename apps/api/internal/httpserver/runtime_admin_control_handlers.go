@@ -78,7 +78,8 @@ func (s *Server) handleListAdminAuditLogs(w http.ResponseWriter, r *http.Request
 		}
 		actorUserIDPtr = &uid
 	}
-	items = filterAuditLogs(items, r.URL.Query().Get("action"), r.URL.Query().Get("resource_type"), actorUserIDPtr)
+	since := parseUsageFilterTime(r.URL.Query().Get("since"))
+	items = filterAuditLogs(items, r.URL.Query().Get("action"), r.URL.Query().Get("resource_type"), actorUserIDPtr, since)
 	data := make([]apiopenapi.AuditLog, 0, len(items))
 	for _, item := range items {
 		data = append(data, toAPIAuditLog(item))

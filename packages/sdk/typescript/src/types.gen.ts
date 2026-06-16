@@ -13587,6 +13587,13 @@ export type ListAdminAuditLogsData = {
          * Narrow the list to actions taken by this admin user.
          */
         actor_user_id?: Id;
+        /**
+         * Lower bound on created_at. Rows whose created_at is BEFORE this
+         * timestamp are excluded. Accepts RFC3339 or YYYY-MM-DD; missing /
+         * empty means no bound.
+         *
+         */
+        since?: string;
     };
     url: '/api/v1/admin/audit-logs';
 };

@@ -6960,6 +6960,15 @@ paths:
           description: Narrow the list to actions taken by this admin user.
           schema:
             $ref: "#/components/schemas/Id"
+        - name: since
+          in: query
+          description: |
+            Lower bound on created_at. Rows whose created_at is BEFORE this
+            timestamp are excluded. Accepts RFC3339 or YYYY-MM-DD; missing /
+            empty means no bound.
+          schema:
+            type: string
+            format: date-time
       responses:
         "200":
           description: Audit log list.

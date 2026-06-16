@@ -152,7 +152,7 @@ func parseUsageFilterTime(value string) time.Time {
 	return time.Time{}
 }
 
-func filterAuditLogs(items []auditcontract.Log, action, resourceType string, actorUserID *int) []auditcontract.Log {
+func filterAuditLogs(items []auditcontract.Log, action, resourceType string, actorUserID *int, since time.Time) []auditcontract.Log {
 	action = strings.TrimSpace(action)
 	resourceType = strings.TrimSpace(resourceType)
 	out := make([]auditcontract.Log, 0, len(items))
@@ -170,6 +170,9 @@ func filterAuditLogs(items []auditcontract.Log, action, resourceType string, act
 			if item.ActorUserID == nil || *item.ActorUserID != *actorUserID {
 				continue
 			}
+		}
+		if !since.IsZero() && item.CreatedAt.Before(since) {
+			continue
 		}
 		out = append(out, item)
 	}
