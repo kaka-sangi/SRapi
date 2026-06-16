@@ -121,7 +121,9 @@ func clientHasIncrementalRenderer(req contract.ConversationRequest) bool {
 	case "gemini-compatible", "gemini":
 		return true
 	case "openai-compatible", "openai":
-		return !openAIResponsesEndpoint(req)
+		// chat (ChatStreamRenderer) and /responses (ResponsesStreamRenderer) both
+		// have incremental renderers now.
+		return true
 	default:
 		return false
 	}

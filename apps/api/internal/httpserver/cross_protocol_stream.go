@@ -249,6 +249,30 @@ func writeGeminiChunkSSE(b *bytes.Buffer, event gatewayservice.StreamEvent) {
 	b.WriteString("\n\n")
 }
 
+// responsesTranscoder serializes OpenAI Responses named events
+// ("event: X\ndata: {json}\n\n"), terminated by [DONE] to match SRapi's existing
+// /v1/responses stream path.
+type responsesTranscoder struct{ renderer *gatewayservice.ResponsesStreamRenderer }
+
+func (t *responsesTranscoder) feed(events []gatewaycontract.StreamEvent) []byte {
+	var b bytes.Buffer
+	for _, event := range events {
+		for _, out := range t.renderer.FeedEvent(event) {
+			writeAnthropicEventSSE(&b, out)
+		}
+	}
+	return b.Bytes()
+}
+
+func (t *responsesTranscoder) finalize() []byte {
+	var b bytes.Buffer
+	for _, out := range t.renderer.Finalize() {
+		writeAnthropicEventSSE(&b, out)
+	}
+	b.WriteString("data: [DONE]\n\n")
+	return b.Bytes()
+}
+
 // newClientStreamTranscoder selects the client-protocol transcoder for a
 // cross-protocol stream. seed carries the chunk id/model.
 func newClientStreamTranscoder(gateway *gatewayservice.Service, req provideradaptercontract.ConversationRequest) (clientStreamTranscoder, bool) {
@@ -259,6 +283,9 @@ func newClientStreamTranscoder(gateway *gatewayservice.Service, req provideradap
 	case "gemini-compatible", "gemini":
 		return &geminiTranscoder{renderer: gateway.NewGeminiStreamRenderer(seed)}, true
 	case "openai-compatible", "openai":
+		if strings.Contains(strings.ToLower(req.SourceEndpoint), "/responses") {
+			return &responsesTranscoder{renderer: gateway.NewResponsesStreamRenderer(seed)}, true
+		}
 		return &chatTranscoder{renderer: gateway.NewChatStreamRenderer(seed)}, true
 	default:
 		return nil, false
