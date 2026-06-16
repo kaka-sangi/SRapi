@@ -42,6 +42,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { useAdminUsageExport } from "@/hooks/use-admin-usage-export";
 import { useAccountNameLookup } from "@/hooks/use-account-name-lookup";
+import { useApiKeyNameLookup } from "@/hooks/use-api-key-name-lookup";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { TrendChart } from "@/components/charts/trend-chart";
@@ -165,6 +166,7 @@ function UsageContent() {
   const { toast } = useToast();
   const usageExport = useAdminUsageExport();
   const accountLookup = useAccountNameLookup();
+  const apiKeyLookup = useApiKeyNameLookup();
 
   async function runExport() {
     // Honour the window preset the operator currently has on the table —
@@ -385,7 +387,7 @@ function UsageContent() {
       header: t("adminApiKeys.title"),
       hideOnMobile: true,
       render: (u) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">{u.api_key_id || "—"}</span>
+        <span className="text-srapi-text-secondary">{apiKeyLookup.get(u.api_key_id)}</span>
       ),
     },
     {

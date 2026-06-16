@@ -13,6 +13,7 @@ import { ColumnToggle } from "@/components/ui/column-toggle";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { useAdminErrorLogs, useAdminModels, useAdminUsers } from "@/hooks/admin-queries";
 import { useAccountNameLookup } from "@/hooks/use-account-name-lookup";
+import { useApiKeyNameLookup } from "@/hooks/use-api-key-name-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatLatency } from "@/lib/admin-format";
 import type { ErrorLog } from "@/lib/sdk-types";
@@ -29,6 +30,7 @@ export function ErrorLogsPanel() {
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-error-logs", DEFAULT_HIDDEN_COLUMNS);
   const accountLookup = useAccountNameLookup();
+  const apiKeyLookup = useApiKeyNameLookup();
   const [detail, setDetail] = useState<{ id: string; email?: string } | null>(null);
 
   const modelFilter = list.filters.model || undefined;
@@ -147,7 +149,7 @@ export function ErrorLogsPanel() {
       header: t("adminErrorLogs.apiKey"),
       hideOnMobile: true,
       render: (e) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">{e.api_key_id || "—"}</span>
+        <span className="text-srapi-text-secondary">{apiKeyLookup.get(e.api_key_id)}</span>
       ),
     },
     {
