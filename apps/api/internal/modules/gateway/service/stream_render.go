@@ -268,41 +268,18 @@ func (s *Service) RenderChatStreamChunk(resp gatewaycontract.CanonicalResponse) 
 	return chunk
 }
 
+// RenderChatStreamChunks renders the full buffered canonical response as chat
+// chunks. It is a thin wrapper over the incremental ChatStreamRenderer (feed
+// every event, then Finalize), so the buffered and streaming paths are
+// byte-identical by construction.
 func (s *Service) RenderChatStreamChunks(resp gatewaycontract.CanonicalResponse) []map[string]any {
 	events := normalizeStreamEvents(resp.StreamEvents)
-	if len(events) == 0 {
-		return []map[string]any{s.RenderChatStreamChunk(resp)}
-	}
-	chunks := make([]map[string]any, 0, len(events))
-	toolIndexes := newChatStreamToolCallIndexes()
+	renderer := s.newChatStreamRenderer(resp)
+	chunks := make([]map[string]any, 0, len(events)+1)
 	for _, event := range events {
-		switch event.Type {
-		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventToolResult:
-			if text := event.Delta.Text; text != "" {
-				chunks = append(chunks, chatStreamChunkWithIndex(resp, streamEventChoiceIndex(event), map[string]any{"content": text}, nil, nil))
-			}
-		case gatewaycontract.StreamEventReasoning:
-			if text := event.Delta.Text; text != "" {
-				chunks = append(chunks, chatStreamChunkWithIndex(resp, streamEventChoiceIndex(event), map[string]any{"reasoning_content": text}, nil, nil))
-			}
-		case gatewaycontract.StreamEventToolCallDelta:
-			toolCall := chatStreamToolCallDelta(event, toolIndexes.indexFor(event))
-			if toolCall != nil {
-				chunks = append(chunks, chatStreamChunkWithIndex(resp, streamEventChoiceIndex(event), map[string]any{"tool_calls": []map[string]any{toolCall}}, nil, nil))
-			}
-		case gatewaycontract.StreamEventUsage:
-			chunk := chatStreamChunk(resp, nil, nil, tokenUsage(event.Usage))
-			chunk["choices"] = []map[string]any{}
-			chunks = append(chunks, chunk)
-		case gatewaycontract.StreamEventStop:
-			reason := firstNonEmpty(event.StopReason, resp.StopReason)
-			chunks = append(chunks, chatStreamChunkWithIndex(resp, streamEventChoiceIndex(event), map[string]any{}, openAIChatFinishReason(reason), nil))
-		}
+		chunks = append(chunks, renderer.FeedEvent(event)...)
 	}
-	if len(chunks) == 0 {
-		return []map[string]any{s.RenderChatStreamChunk(resp)}
-	}
-	return chunks
+	return append(chunks, renderer.Finalize()...)
 }
 
 func chatStreamChunk(resp gatewaycontract.CanonicalResponse, delta map[string]any, finishReason any, usage *apiopenapi.TokenUsage) map[string]any {
