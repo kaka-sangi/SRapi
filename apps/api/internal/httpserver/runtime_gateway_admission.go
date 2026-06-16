@@ -58,6 +58,10 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 			},
 		}, nil
 	}
+	// Admission runs before scheduling picks an account, so accountID is nil
+	// here — multiplier falls back to 1.0x. This is intentionally conservative
+	// for the balance gate; the real multiplier is applied when the per-call
+	// pricing handler runs after the upstream response (post-dispatch).
 	pricing := rt.gatewayPricing(ctx, billingcontract.PricingRequest{
 		ModelID:      modelID,
 		ModelFamily:  optionalStringValue(resolution.Model.Family),
@@ -65,7 +69,7 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 		InputTokens:  estimatedUsage.InputTokens,
 		OutputTokens: estimatedUsage.OutputTokens,
 		At:           time.Now().UTC(),
-	}, true)
+	}, nil, true)
 	now := time.Now().UTC()
 	periodUsage, err := rt.gatewayUserPeriodUsage(ctx, canonical.UserID, now)
 	if err != nil {
@@ -479,8 +483,15 @@ func (rt *runtimeState) filterCandidatesByAccountGroupScope(ctx context.Context,
 	return out, nil
 }
 
-func (rt *runtimeState) gatewayPricing(ctx context.Context, req billingcontract.PricingRequest, estimated bool) gatewayPricingEvidence {
-	gatewayReq := contractGatewayPricingRequest(req, estimated)
+// gatewayPricing computes the priced cost of a usage record. accountID may
+// be nil at admission time (no account selected yet) — the multiplier then
+// defaults to 1.0x. Post-dispatch callers pass the scheduled account so the
+// estimated price returned to the caller matches the eventual debit by the
+// balance_charger worker (which reads the multiplier from the persisted usage
+// log, see runtime_gateway_usage.go:66).
+func (rt *runtimeState) gatewayPricing(ctx context.Context, req billingcontract.PricingRequest, accountID *int, estimated bool) gatewayPricingEvidence {
+	rateMultiplier := rt.gatewayAccountRateMultiplier(ctx, accountID)
+	gatewayReq := contractGatewayPricingRequest(req, rateMultiplier, estimated)
 	result, err := rt.billing.PriceGatewayUsage(ctx, gatewayReq)
 	if err != nil {
 		rt.logger.Warn("failed to estimate gateway price", "error", err, "model_id", req.ModelID, "provider_id", req.ProviderID)

@@ -197,7 +197,7 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 	}
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw, gatewayStreamEventsFromProvider(providerResp.StreamEvents))
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), ptrInt(result.Candidate.Account.ID), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -382,7 +382,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw, gatewayStreamEventsFromProvider(providerResp.StreamEvents))
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), ptrInt(result.Candidate.Account.ID), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -691,7 +691,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw, gatewayStreamEventsFromProvider(providerResp.StreamEvents))
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), ptrInt(result.Candidate.Account.ID), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -871,7 +871,7 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 	providerResp := failover.Response
 	usage := gatewayUsageFromEmbeddingProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalEmbeddingResponse(canonical, gatewayEmbeddingsFromProvider(providerResp), usage)
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), ptrInt(result.Candidate.Account.ID), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -1033,7 +1033,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 	}
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw, gatewayStreamEventsFromProvider(providerResp.StreamEvents))
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(model.ID, result.Candidate, canonical, canonicalResp.Usage), ptrInt(result.Candidate.Account.ID), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,

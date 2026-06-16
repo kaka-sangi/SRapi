@@ -361,7 +361,7 @@ readLoop:
 		usageEstimated = false
 	}
 
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(modelID, result.Candidate, canonical, usage), usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(modelID, result.Candidate, canonical, usage), ptrInt(result.Candidate.Account.ID), usage.Estimated)
 
 	record := gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
@@ -508,7 +508,7 @@ readLoop:
 		}
 	}
 
-	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(modelID, result.Candidate, canonical, usage), usage.Estimated)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequestForCanonical(modelID, result.Candidate, canonical, usage), ptrInt(result.Candidate.Account.ID), usage.Estimated)
 	record := gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,

@@ -834,7 +834,7 @@ func responsesWebSocketUsageRecord(authed apikeycontract.AuthResult, canonical g
 func (s *Server) recordResponsesWebSocketUsage(ctx context.Context, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, modelID int, result schedulercontract.ScheduleResult, success bool, errorClass string, statusCode int, latencyMS int, admission gatewayAdmission, usage *gatewaycontract.Usage, providerMessage string) {
 	rec := responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, success, errorClass, statusCode, latencyMS, admission, usage, providerMessage)
 	if usage != nil {
-		rec.Pricing = s.runtime.gatewayPricing(ctx, gatewayPricingRequestForCanonical(modelID, result.Candidate, canonical, *usage), usage.Estimated)
+		rec.Pricing = s.runtime.gatewayPricing(ctx, gatewayPricingRequestForCanonical(modelID, result.Candidate, canonical, *usage), ptrInt(result.Candidate.Account.ID), usage.Estimated)
 	}
 	s.runtime.recordGatewayUsage(ctx, rec)
 }

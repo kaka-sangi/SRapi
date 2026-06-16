@@ -10,10 +10,20 @@ import (
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 )
 
-func contractGatewayPricingRequest(req billingcontract.PricingRequest, estimated bool) billingcontract.GatewayPricingRequest {
+// contractGatewayPricingRequest builds the priceable request. rateMultiplier
+// is the per-account group rate (gatewayAccountRateMultiplier), or the
+// canonical "1.00000000" when the caller doesn't yet know which account will
+// serve the request (e.g. admission, before scheduling). Passing the real
+// multiplier here matches what recordGatewayUsage later persists, so the
+// estimated price the gateway returns matches what the balance_charger
+// ultimately debits.
+func contractGatewayPricingRequest(req billingcontract.PricingRequest, rateMultiplier string, estimated bool) billingcontract.GatewayPricingRequest {
+	if strings.TrimSpace(rateMultiplier) == "" {
+		rateMultiplier = "1.00000000"
+	}
 	return billingcontract.GatewayPricingRequest{
 		PricingRequest: req,
-		RateMultiplier: "1.00000000",
+		RateMultiplier: rateMultiplier,
 		Success:        true,
 		Estimated:      estimated,
 	}
