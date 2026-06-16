@@ -15,7 +15,7 @@ import { ColumnToggle } from "@/components/ui/column-toggle";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
-import { useAdminApiKeys, useResetAdminApiKeyUsage, useUpdateAdminApiKey } from "@/hooks/admin-queries";
+import { useAdminApiKeys, useAdminUsers, useResetAdminApiKeyUsage, useUpdateAdminApiKey } from "@/hooks/admin-queries";
 import { ApiKeyUsageDialog } from "@/components/features/api-key-usage-dialog";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -46,11 +46,20 @@ function ApiKeysContent() {
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-api-keys", ["created_at"]);
   const statusFilter = (list.filters.status as ApiKey["status"]) || undefined;
+  const userFilter = list.filters.userId || undefined;
   const keys = useAdminApiKeys({
     page: list.page,
     page_size: list.pageSize,
     status: statusFilter,
+    user_id: userFilter,
   });
+  // Audit one user's keys at a time — page-1/200 covers typical installs and
+  // matches the lookup pattern used by error-logs / payment-dashboard panels.
+  const users = useAdminUsers({ page: 1, page_size: 200 });
+  const userOptions = (users.data?.data ?? []).map((u) => ({
+    value: String(u.id),
+    label: u.email,
+  }));
   const updateMut = useUpdateAdminApiKey();
   const resetUsageMut = useResetAdminApiKeyUsage();
   const [revokeTarget, setRevokeTarget] = useState<ApiKey | null>(null);
@@ -143,7 +152,7 @@ function ApiKeysContent() {
         emptyTitle={t("adminApiKeys.emptyTitle")}
         emptyBody={t("adminApiKeys.emptyBody")}
         minWidth={680}
-        isFiltered={Boolean(statusFilter)}
+        isFiltered={Boolean(statusFilter || userFilter)}
         onClearFilters={list.clearFilters}
         sort={list.sort}
         onSort={list.toggleSort}
@@ -155,6 +164,12 @@ function ApiKeysContent() {
               onChange={(v) => list.setFilter("status", v)}
               options={enumOptions(API_KEY_STATUSES)}
               allLabel={t("adminCommon.allStatuses")}
+            />
+            <FilterSelect
+              value={userFilter}
+              onChange={(v) => list.setFilter("userId", v)}
+              options={userOptions}
+              allLabel={t("adminApiKeys.allUsers")}
             />
             <ColumnToggle
               columns={columns.filter((c) => !c.pinned).map((c) => ({ key: c.key, label: c.header }))}

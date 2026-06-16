@@ -1614,6 +1614,7 @@ export const en = {
   adminApiKeys: {
     title: "API keys",
     subtitle: "Every user's API keys — audit usage and revoke compromised keys.",
+    allUsers: "All users",
     createCta: "Create a key",
     key: "Key",
     owner: "Owner",

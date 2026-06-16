@@ -1591,6 +1591,7 @@ export const zh: Messages = {
   adminApiKeys: {
     title: "API 密钥",
     subtitle: "所有用户的 API 密钥——审计使用情况、吊销已泄露的密钥。",
+    allUsers: "全部用户",
     createCta: "新建密钥",
     key: "密钥",
     owner: "归属用户",
