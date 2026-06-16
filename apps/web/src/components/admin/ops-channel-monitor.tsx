@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
+import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { useClientPagedList } from "@/hooks/use-client-list";
 import {
   useAccountsAvailabilityWindows,
@@ -366,6 +367,11 @@ function MonitorsTab() {
             <div className="ml-auto flex items-center gap-3">
               {all.data ? <ListCount total={total} /> : null}
               <ColumnToggle columns={columns} visibility={colVis} />
+              <AutoRefreshControl
+                onRefresh={() => void all.refetch()}
+                isRefreshing={all.isFetching}
+                storageKey="srapi.autorefresh.admin-channel-monitors"
+              />
               <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
                 ＋ {t("adminMonitor.create")}
               </Button>
