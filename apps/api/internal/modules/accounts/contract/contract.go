@@ -382,6 +382,15 @@ type ProxyTestResult struct {
 	TargetURL  string
 }
 
+// ProxyBatchTestRow is one row of a BatchTestProxies result. ProxyID identifies
+// which input row the result applies to; Result is identical in shape to the
+// single-row TestProxy result. A missing or invalid id surfaces as a row whose
+// ErrorClass is "not_found" rather than as a hard error on the call.
+type ProxyBatchTestRow struct {
+	ProxyID int
+	Result  ProxyTestResult
+}
+
 type CreateRequest struct {
 	ProviderID     int
 	Name           string

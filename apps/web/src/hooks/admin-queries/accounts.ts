@@ -260,6 +260,14 @@ export function useTestProxy() {
       adminApi.testProxy(vars.id, vars.targetUrl),
   });
 }
+
+// Bulk probe — same single-HTTP-call simplicity for any selection size. Server
+// runs the actual probes in parallel; the frontend just renders the summary.
+export function useBatchTestProxies() {
+  return useMutation({
+    mutationFn: (proxyIds: string[]) => adminApi.batchTestProxies(proxyIds),
+  });
+}
 // Bulk-import — dedupes by name + returns per-row outcome. Cache invalidation
 // is identical to single-row create, so existing list views refresh.
 export function useBatchCreateProxies() {

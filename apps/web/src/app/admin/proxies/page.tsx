@@ -22,6 +22,7 @@ import {
   useUpdateProxy,
   useDeleteProxy,
   useTestProxy,
+  useBatchTestProxies,
   useBatchDeleteProxies,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -62,7 +63,7 @@ function ProxiesContent() {
   const updateMut = useUpdateProxy();
   const deleteMut = useDeleteProxy();
   const testMut = useTestProxy();
-  const [bulkTesting, setBulkTesting] = useState(false);
+  const batchTestMut = useBatchTestProxies();
 
   async function runTest(id: string) {
     try {
@@ -99,29 +100,17 @@ function ProxiesContent() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const isNew = formTarget === "new";
 
-  // Bulk-test the selection. Each proxy.test call hits the network, so we cap
-  // the concurrency at PROXY_TEST_CONCURRENCY to avoid lighting up the box
-  // with N parallel TLS handshakes on big selections. allSettled keeps the
-  // loop alive even if one mutation throws — we summarise everything at the
-  // end rather than aborting on the first failure.
+  // Bulk-test the selection. The server runs the probes in parallel with its
+  // own concurrency cap (see Service.BatchTestProxies) so the frontend gets
+  // one HTTP call and one result list — simpler than the iter-26 client-side
+  // Promise.allSettled loop and faster on big selections.
   async function bulkTest() {
     const ids = [...list.selected];
     if (ids.length === 0) return;
-    setBulkTesting(true);
-    let okCount = 0;
-    let failCount = 0;
-    const PROXY_TEST_CONCURRENCY = 4;
     try {
-      for (let i = 0; i < ids.length; i += PROXY_TEST_CONCURRENCY) {
-        const slice = ids.slice(i, i + PROXY_TEST_CONCURRENCY);
-        const results = await Promise.allSettled(
-          slice.map((id) => testMut.mutateAsync({ id })),
-        );
-        for (const r of results) {
-          if (r.status === "fulfilled" && r.value.ok) okCount += 1;
-          else failCount += 1;
-        }
-      }
+      const rows = await batchTestMut.mutateAsync(ids);
+      const okCount = rows.filter((r) => r.result.ok).length;
+      const failCount = rows.length - okCount;
       if (failCount === 0) {
         toast({
           title: t("adminProxies.bulkTestOk", { count: okCount }),
@@ -138,8 +127,12 @@ function ProxiesContent() {
           tone: "warning",
         });
       }
-    } finally {
-      setBulkTesting(false);
+    } catch (err) {
+      toast({
+        title: t("feedback.failed"),
+        description: err instanceof Error ? err.message : String(err),
+        tone: "error",
+      });
     }
   }
 
@@ -281,7 +274,7 @@ function ProxiesContent() {
               <Button
                 variant="outline"
                 size="sm"
-                loading={bulkTesting}
+                loading={batchTestMut.isPending}
                 onClick={() => void bulkTest()}
               >
                 {t("adminProxies.bulkTest")}

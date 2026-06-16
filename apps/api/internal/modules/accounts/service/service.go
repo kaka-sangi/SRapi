@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -269,6 +270,18 @@ func (s *Service) DeleteProxy(ctx context.Context, id int) error {
 // and is widely used for exactly this kind of probe.
 const defaultProxyTestTarget = "https://www.cloudflare.com/cdn-cgi/trace"
 
+// batchTestProxyConcurrency caps how many in-flight probes BatchTestProxies
+// runs at once. Each one is a real HTTPS handshake — too many simultaneous
+// dials would hammer the box, too few would make a moderate selection feel
+// slow. 8 lets a 50-row selection finish in well under a minute with the
+// 8s per-probe cap.
+const batchTestProxyConcurrency = 8
+
+// batchTestProxyMaxRows caps how many proxies a single batch can probe. A
+// runaway-loop guard, not a feature limit — typical operator selections are
+// well under this.
+const batchTestProxyMaxRows = 200
+
 // proxyTestTimeout caps how long a single TestProxy call can wait — a wedged
 // proxy or unresponsive target shouldn't tie up an admin browser tab.
 const proxyTestTimeout = 8 * time.Second
@@ -368,6 +381,51 @@ func (s *Service) TestProxy(ctx context.Context, id int, targetURL string) (cont
 		ErrorClass: "bad_status",
 		TargetURL:  target,
 	}, nil
+}
+
+// BatchTestProxies runs TestProxy for each id in parallel (capped at
+// batchTestProxyConcurrency), in input order, with the default target URL
+// for every row. Returns one row per requested id — a row whose proxy was
+// missing surfaces with ErrorClass="not_found" rather than failing the
+// whole call. Caller-visible duplicates in ids are returned verbatim in
+// the result (same id appears twice → two rows) so the frontend can
+// align by index without re-grouping.
+func (s *Service) BatchTestProxies(ctx context.Context, ids []int) ([]contract.ProxyBatchTestRow, error) {
+	if len(ids) == 0 || len(ids) > batchTestProxyMaxRows {
+		return nil, ErrInvalidInput
+	}
+	for _, id := range ids {
+		if id <= 0 {
+			return nil, ErrInvalidInput
+		}
+	}
+	rows := make([]contract.ProxyBatchTestRow, len(ids))
+	sem := make(chan struct{}, batchTestProxyConcurrency)
+	var wg sync.WaitGroup
+	for i, id := range ids {
+		i, id := i, id
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
+			result, err := s.TestProxy(ctx, id, "")
+			if err != nil {
+				rows[i] = contract.ProxyBatchTestRow{
+					ProxyID: id,
+					Result: contract.ProxyTestResult{
+						OK:         false,
+						ErrorClass: "not_found",
+						TargetURL:  defaultProxyTestTarget,
+					},
+				}
+				return
+			}
+			rows[i] = contract.ProxyBatchTestRow{ProxyID: id, Result: result}
+		}()
+	}
+	wg.Wait()
+	return rows, nil
 }
 
 // BatchCreateProxyResult is per-row outcome from BatchCreateProxies.

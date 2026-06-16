@@ -3,6 +3,7 @@
 import {
   batchCreateAdminProxies,
   batchDeleteAdminProxies,
+  batchTestAdminProxies,
   createAdminProxy,
   deleteAdminProxy,
   listAdminProxies,
@@ -17,6 +18,7 @@ import type {
   Id,
   ListAdminProxiesData,
   ProxyDefinition,
+  ProxyBatchTestRow,
   ProxyTestResult,
   UpdateAdminProxyData,
 } from "../../../../../packages/sdk/typescript/src/types.gen";
@@ -65,5 +67,15 @@ export const proxiesApi = {
   testProxy(id: Id, targetUrl?: string): Promise<ProxyTestResult> {
     const body = targetUrl ? { target_url: targetUrl } : undefined;
     return unwrapData(() => testAdminProxy({ path: { id }, body, throwOnError: true }));
+  },
+
+  // Bulk probe — server runs the probes in parallel with its own concurrency
+  // cap so the client doesn't have to (and one HTTP round-trip beats N).
+  // Each input id gets one row in the result; missing ids surface as
+  // error_class="not_found" rather than failing the whole call.
+  batchTestProxies(proxyIds: Id[]): Promise<ProxyBatchTestRow[]> {
+    return unwrapData(() =>
+      batchTestAdminProxies({ body: { proxy_ids: proxyIds }, throwOnError: true }),
+    );
   },
 };

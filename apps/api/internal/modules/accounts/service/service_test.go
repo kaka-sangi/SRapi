@@ -845,6 +845,62 @@ func (p fakeAccountProber) ProbeAccount(_ context.Context, _ contract.ProviderAc
 	return p.result, nil
 }
 
+// TestBatchTestProxiesReturnsOneRowPerIdAndCategorisesMissing checks that
+// BatchTestProxies returns rows in input order, that a missing id is
+// reported as a row with error_class="not_found" (not a hard error), and
+// that input validation rejects empty / negative ids. Like the single-id
+// test, this doesn't assert a successful probe — the loopback:1 proxy
+// surfaces a transport_error which is the deterministic outcome.
+func TestBatchTestProxiesReturnsOneRowPerIdAndCategorisesMissing(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name: "unreachable",
+		Type: contract.ProxyTypeHTTPS,
+		URL:  "https://127.0.0.1:1",
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+
+	rows, err := svc.BatchTestProxies(ctx, []int{proxy.ID, 99999, proxy.ID})
+	if err != nil {
+		t.Fatalf("batch test: %v", err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("rows: want 3 (matching input length), got %d", len(rows))
+	}
+	if rows[0].ProxyID != proxy.ID || rows[2].ProxyID != proxy.ID {
+		t.Fatalf("rows out of input order: %+v", rows)
+	}
+	if rows[1].ProxyID != 99999 {
+		t.Fatalf("rows[1] id mismatch: got %d", rows[1].ProxyID)
+	}
+	if rows[1].Result.OK || rows[1].Result.ErrorClass != "not_found" {
+		t.Fatalf("rows[1]: want ok=false not_found, got %+v", rows[1].Result)
+	}
+	for i := 0; i < 3; i += 2 {
+		if rows[i].Result.OK {
+			t.Fatalf("rows[%d]: want ok=false (unreachable proxy), got %+v", i, rows[i].Result)
+		}
+		if rows[i].Result.ErrorClass == "" {
+			t.Fatalf("rows[%d]: want non-empty error_class, got %+v", i, rows[i].Result)
+		}
+	}
+
+	if _, err := svc.BatchTestProxies(ctx, nil); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("empty ids: want ErrInvalidInput, got %v", err)
+	}
+	if _, err := svc.BatchTestProxies(ctx, []int{0}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("zero id: want ErrInvalidInput, got %v", err)
+	}
+}
+
 // TestProxyTestErrorClassesCategorizeFailures verifies the wiring of
 // Service.TestProxy: bad target_url, bad proxy URL ciphertext, and a
 // connection that can't be made all produce ok=false with a stable

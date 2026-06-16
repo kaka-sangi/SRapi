@@ -5355,6 +5355,50 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/proxies/batch-test:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: batchTestAdminProxies
+      summary: Probe many proxies in one call.
+      description: |
+        Runs one HTTPS probe per listed proxy id in parallel (server-controlled
+        concurrency cap) and returns one outcome row per input id, in input
+        order. Same shape as the per-id Test action — failures categorise into
+        error_class. Missing ids surface as rows with error_class="not_found"
+        rather than failing the whole call, matching the per-row Test
+        behaviour. Used by the /admin/proxies "Test selected" bulk action.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchTestProxiesRequest"
+      responses:
+        "200":
+          description: One outcome per proxy id.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchTestProxiesResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/proxies/batch-delete:
     post:
       tags:
@@ -19742,6 +19786,42 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/ProxyTestResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BatchTestProxiesRequest:
+      type: object
+      required:
+        - proxy_ids
+      properties:
+        proxy_ids:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/Id"
+
+    ProxyBatchTestRow:
+      type: object
+      required:
+        - proxy_id
+        - result
+      properties:
+        proxy_id:
+          $ref: "#/components/schemas/Id"
+        result:
+          $ref: "#/components/schemas/ProxyTestResult"
+
+    BatchTestProxiesResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProxyBatchTestRow"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

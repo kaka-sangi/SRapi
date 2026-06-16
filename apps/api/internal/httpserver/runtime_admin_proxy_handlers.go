@@ -275,6 +275,70 @@ func (s *Server) handleDeleteAdminProxy(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+// handleBatchTestAdminProxies probes many proxies in one call. The body is
+// {proxy_ids: Id[]}; the response is one ProxyBatchTestRow per input id in
+// the same order. Server-side concurrency keeps the call fast even on
+// 50-row selections — see Service.BatchTestProxies for the cap.
+func (s *Server) handleBatchTestAdminProxies(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.BatchTestProxiesRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid batch test request", requestID)
+		return
+	}
+	ids := make([]int, 0, len(body.ProxyIds))
+	for _, raw := range body.ProxyIds {
+		id, err := strconv.Atoi(string(raw))
+		if err != nil || id <= 0 {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid proxy id in batch", requestID)
+			return
+		}
+		ids = append(ids, id)
+	}
+	rows, err := s.runtime.accounts.BatchTestProxies(r.Context(), ids)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid batch test request", requestID)
+		return
+	}
+	out := make([]apiopenapi.ProxyBatchTestRow, 0, len(rows))
+	var okCount, failCount int
+	for _, row := range rows {
+		out = append(out, apiopenapi.ProxyBatchTestRow{
+			ProxyId: apiopenapi.Id(strconv.Itoa(row.ProxyID)),
+			Result: apiopenapi.ProxyTestResult{
+				Ok:         row.Result.OK,
+				LatencyMs:  row.Result.LatencyMS,
+				StatusCode: row.Result.StatusCode,
+				ErrorClass: row.Result.ErrorClass,
+				TargetUrl:  row.Result.TargetURL,
+			},
+		})
+		if row.Result.OK {
+			okCount++
+		} else {
+			failCount++
+		}
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "proxy.batch_test", "proxy", "bulk", nil, map[string]any{
+		"requested": len(ids),
+		"ok":        okCount,
+		"failed":    failCount,
+	}))
+	writeJSONAny(w, http.StatusOK, apiopenapi.BatchTestProxiesResponse{
+		Data:      out,
+		RequestId: requestID,
+	})
+}
+
 // handleTestAdminProxy issues a probe through the proxy and returns the
 // outcome. Always 200 — categorized failures live in the body (ok=false,
 // error_class set). Wraps the audit log so an operator-initiated probe

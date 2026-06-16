@@ -1915,6 +1915,20 @@ export type ProxyTestResultResponse = {
     request_id: RequestId;
 };
 
+export type BatchTestProxiesRequest = {
+    proxy_ids: Array<Id>;
+};
+
+export type ProxyBatchTestRow = {
+    proxy_id: Id;
+    result: ProxyTestResult;
+};
+
+export type BatchTestProxiesResponse = {
+    data: Array<ProxyBatchTestRow>;
+    request_id: RequestId;
+};
+
 export type BatchDeleteProxiesRequest = {
     proxy_ids: Array<Id>;
 };
@@ -12094,6 +12108,43 @@ export type TestAdminProxyResponses = {
 };
 
 export type TestAdminProxyResponse = TestAdminProxyResponses[keyof TestAdminProxyResponses];
+
+export type BatchTestAdminProxiesData = {
+    body: BatchTestProxiesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/proxies/batch-test';
+};
+
+export type BatchTestAdminProxiesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchTestAdminProxiesError = BatchTestAdminProxiesErrors[keyof BatchTestAdminProxiesErrors];
+
+export type BatchTestAdminProxiesResponses = {
+    /**
+     * One outcome per proxy id.
+     */
+    200: BatchTestProxiesResponse;
+};
+
+export type BatchTestAdminProxiesResponse = BatchTestAdminProxiesResponses[keyof BatchTestAdminProxiesResponses];
 
 export type BatchDeleteAdminProxiesData = {
     body: BatchDeleteProxiesRequest;
