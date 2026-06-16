@@ -95,6 +95,7 @@ export type {
   OpsAlertOperator,
   OpsAlertSeverity,
   OpsSettings,
+  OpsSystemLog,
   OpsSystemLogLevel,
   OpsSystemLogCleanupResult,
   ModelRateLimit,

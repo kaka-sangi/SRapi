@@ -31,6 +31,7 @@ import {
   Megaphone,
   FileSearch,
   Receipt,
+  FileText,
   UserCog,
   MailCheck,
   Compass,
@@ -152,6 +153,7 @@ const ADMIN_OPS_SECTION: NavSection = {
     { href: ADMIN_ROUTES.riskControl, labelKey: "nav.adminRiskControl", icon: ShieldAlert },
     { href: ADMIN_ROUTES.announcements, labelKey: "nav.adminAnnouncements", icon: Megaphone },
     { href: ADMIN_ROUTES.eventsOutbox, labelKey: "nav.adminOutbox", icon: Send },
+    { href: ADMIN_ROUTES.opsSystemLogs, labelKey: "nav.adminOpsSystemLogs", icon: FileText },
     { href: ADMIN_ROUTES.diagnostics, labelKey: "nav.adminDiagnostics", icon: Stethoscope },
   ],
 };

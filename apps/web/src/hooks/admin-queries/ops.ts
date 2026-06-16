@@ -34,6 +34,13 @@ export function useUpdateOpsSettings() {
   );
 }
 
+export function useOpsSystemLogs(params?: P<typeof adminApi.listOpsSystemLogs>) {
+  return useQuery({
+    queryKey: queryKeys.admin.opsSystemLogs(params),
+    queryFn: () => adminApi.listOpsSystemLogs(params),
+  });
+}
+
 export function useOpsAlerts(params?: P<typeof adminApi.listOpsAlerts>) {
   return useQuery({
     queryKey: queryKeys.admin.opsAlerts(params),
