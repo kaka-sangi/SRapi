@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  batchGetAdminUsersSpendingToday,
   createAdminUser,
   createAdminUserAttributeDefinition,
   deleteAdminUser,
@@ -24,6 +25,7 @@ import type {
   UserAttributeDefinition,
   UserAttributeValue,
   UserAttributeValueWithUserId,
+  UserSpendingToday,
   UpdateUserAttributeDefinitionRequest,
   UserPlatformQuota,
   UpsertUserPlatformQuotaRequest,
@@ -107,6 +109,16 @@ export const usersApi = {
     if (userIds.length === 0) return Promise.resolve([]);
     return unwrapData(() =>
       batchListAdminUserAttributeValues({
+        query: { user_ids: userIds.join(",") },
+        throwOnError: true,
+      }),
+    );
+  },
+
+  batchGetUsersSpendingToday(userIds: Id[]): Promise<UserSpendingToday[]> {
+    if (userIds.length === 0) return Promise.resolve([]);
+    return unwrapData(() =>
+      batchGetAdminUsersSpendingToday({
         query: { user_ids: userIds.join(",") },
         throwOnError: true,
       }),

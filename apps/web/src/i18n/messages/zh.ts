@@ -644,6 +644,8 @@ export const zh: Messages = {
     platformQuotas: "平台配额",
     attributes: "自定义属性",
     attributesColumn: "属性",
+    today: "今日",
+    todayIdle: "空闲",
     amount: "金额",
     operation: "操作",
     note: "备注",

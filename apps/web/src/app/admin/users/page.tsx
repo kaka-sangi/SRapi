@@ -29,6 +29,7 @@ import {
   useDeleteAdminUser,
   useUpdateUserBalance,
   useUserAttributeValuesBatch,
+  useUsersSpendingTodayBatch,
 } from "@/hooks/admin-queries";
 import type { UserStatus } from "@/lib/sdk-types";
 import { useLanguage } from "@/context/LanguageContext";
@@ -37,7 +38,7 @@ import { adminErrorMessage } from "@/lib/admin-api";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
-import { formatMoney } from "@/lib/admin-format";
+import { formatMoney, formatInteger, formatPercent } from "@/lib/admin-format";
 import {
   USER_STATUSES,
   BALANCE_OPERATIONS,
@@ -85,6 +86,12 @@ function UsersContent() {
     existing.push(row);
     attributesByUserId.set(row.user_id, existing);
   }
+  // Same shape as the iter-23 accounts today-stats column, just grouped by
+  // user_id. Joined back by id when the column renders below.
+  const spendingBatch = useUsersSpendingTodayBatch(visibleUserIds);
+  const spendingByUserId = new Map(
+    (spendingBatch.data ?? []).map((r) => [r.user_id, r] as const),
+  );
   const createMut = useCreateAdminUser();
   const updateMut = useUpdateAdminUser();
   const deleteMut = useDeleteAdminUser();
@@ -189,6 +196,35 @@ function UsersContent() {
           {formatMoney(u.balance, u.currency)}
         </span>
       ),
+    },
+    {
+      key: "today",
+      header: t("adminUsers.today"),
+      hideOnMobile: true,
+      sortValue: (u) => spendingByUserId.get(u.id)?.requests ?? -1,
+      render: (u) => {
+        const today = spendingByUserId.get(u.id);
+        if (!today) {
+          return <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>;
+        }
+        if (today.requests === 0) {
+          return (
+            <span className="font-mono text-2xs text-srapi-text-tertiary">
+              {t("adminUsers.todayIdle")}
+            </span>
+          );
+        }
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="font-mono text-2xs text-srapi-text-secondary tabular">
+              {formatInteger(today.requests)} · {formatMoney(today.cost, today.currency)}
+            </span>
+            <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+              {formatPercent(today.success_rate)}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: "attributes",

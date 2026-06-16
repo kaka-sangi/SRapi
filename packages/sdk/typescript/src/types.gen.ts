@@ -3821,6 +3821,24 @@ export type BatchAccountUsageTodayResponse = {
     request_id: RequestId;
 };
 
+export type UserSpendingToday = {
+    user_id: Id;
+    requests: number;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    cost: string;
+    currency: string;
+    success_count: number;
+    error_count: number;
+    success_rate: number;
+};
+
+export type BatchUserSpendingTodayResponse = {
+    data: Array<UserSpendingToday>;
+    request_id: RequestId;
+};
+
 export type UsageTrendSeriesPoint = {
     bucket: string;
     requests: number;
@@ -13237,6 +13255,48 @@ export type GetAdminErrorLogResponses = {
 };
 
 export type GetAdminErrorLogResponse = GetAdminErrorLogResponses[keyof GetAdminErrorLogResponses];
+
+export type BatchGetAdminUsersSpendingTodayData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Comma-separated user ids. Empty / missing returns an empty data array.
+         */
+        user_ids: string;
+    };
+    url: '/api/v1/admin/users/spending-today/batch';
+};
+
+export type BatchGetAdminUsersSpendingTodayErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchGetAdminUsersSpendingTodayError = BatchGetAdminUsersSpendingTodayErrors[keyof BatchGetAdminUsersSpendingTodayErrors];
+
+export type BatchGetAdminUsersSpendingTodayResponses = {
+    /**
+     * Per-user spending today.
+     */
+    200: BatchUserSpendingTodayResponse;
+};
+
+export type BatchGetAdminUsersSpendingTodayResponse = BatchGetAdminUsersSpendingTodayResponses[keyof BatchGetAdminUsersSpendingTodayResponses];
 
 export type GetAdminUsageDailyData = {
     body?: never;

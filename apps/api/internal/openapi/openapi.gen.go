@@ -5144,6 +5144,12 @@ type BatchUserAttributeValuesResponse struct {
 	RequestId RequestId                      `json:"request_id"`
 }
 
+// BatchUserSpendingTodayResponse defines model for BatchUserSpendingTodayResponse.
+type BatchUserSpendingTodayResponse struct {
+	Data      []UserSpendingToday `json:"data"`
+	RequestId RequestId           `json:"request_id"`
+}
+
 // BillingLedgerEntry defines model for BillingLedgerEntry.
 type BillingLedgerEntry struct {
 	Amount        string                 `json:"amount"`
@@ -10226,6 +10232,20 @@ type UserResponse struct {
 // UserRole Role name. Built-in roles are owner, admin, operator, and user; custom roles are managed through the admin roles API.
 type UserRole = string
 
+// UserSpendingToday defines model for UserSpendingToday.
+type UserSpendingToday struct {
+	Cost         string  `json:"cost"`
+	Currency     string  `json:"currency"`
+	ErrorCount   int     `json:"error_count"`
+	InputTokens  int     `json:"input_tokens"`
+	OutputTokens int     `json:"output_tokens"`
+	Requests     int     `json:"requests"`
+	SuccessCount int     `json:"success_count"`
+	SuccessRate  float32 `json:"success_rate"`
+	TotalTokens  int     `json:"total_tokens"`
+	UserId       Id      `json:"user_id"`
+}
+
 // UserStatus defines model for UserStatus.
 type UserStatus string
 
@@ -10874,6 +10894,12 @@ type ListAdminUsersParams struct {
 
 // BatchListAdminUserAttributeValuesParams defines parameters for BatchListAdminUserAttributeValues.
 type BatchListAdminUserAttributeValuesParams struct {
+	// UserIds Comma-separated user ids. Empty / missing returns an empty data array.
+	UserIds string `form:"user_ids" json:"user_ids"`
+}
+
+// BatchGetAdminUsersSpendingTodayParams defines parameters for BatchGetAdminUsersSpendingToday.
+type BatchGetAdminUsersSpendingTodayParams struct {
 	// UserIds Comma-separated user ids. Empty / missing returns an empty data array.
 	UserIds string `form:"user_ids" json:"user_ids"`
 }
@@ -18669,6 +18695,9 @@ type ServerInterface interface {
 	// Batch update user attributes.
 	// (PATCH /api/v1/admin/users/batch)
 	BatchUpdateAdminUsers(w http.ResponseWriter, r *http.Request)
+	// Batch today's spending stats across multiple users.
+	// (GET /api/v1/admin/users/spending-today/batch)
+	BatchGetAdminUsersSpendingToday(w http.ResponseWriter, r *http.Request, params BatchGetAdminUsersSpendingTodayParams)
 	// Delete a user.
 	// (DELETE /api/v1/admin/users/{id})
 	DeleteAdminUser(w http.ResponseWriter, r *http.Request, id Id)
@@ -29047,6 +29076,45 @@ func (siw *ServerInterfaceWrapper) BatchUpdateAdminUsers(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// BatchGetAdminUsersSpendingToday operation middleware
+func (siw *ServerInterfaceWrapper) BatchGetAdminUsersSpendingToday(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params BatchGetAdminUsersSpendingTodayParams
+
+	// ------------- Required query parameter "user_ids" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "user_ids", r.URL.Query(), &params.UserIds, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_ids"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_ids", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchGetAdminUsersSpendingToday(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteAdminUser operation middleware
 func (siw *ServerInterfaceWrapper) DeleteAdminUser(w http.ResponseWriter, r *http.Request) {
 
@@ -33037,6 +33105,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/users", wrapper.CreateAdminUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users/attributes/batch", wrapper.BatchListAdminUserAttributeValues)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/users/batch", wrapper.BatchUpdateAdminUsers)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users/spending-today/batch", wrapper.BatchGetAdminUsersSpendingToday)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/users/{id}", wrapper.DeleteAdminUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users/{id}", wrapper.GetAdminUser)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/users/{id}", wrapper.UpdateAdminUser)

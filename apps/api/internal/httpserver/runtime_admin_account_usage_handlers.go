@@ -253,6 +253,108 @@ func (s *Server) handleGetAdminAccountUsageDaily(w http.ResponseWriter, r *http.
 	})
 }
 
+// handleBatchGetAdminUsersSpendingToday serves
+// GET /api/v1/admin/users/spending-today/batch?user_ids=1,2,3
+//
+// Mirrors handleBatchGetAdminAccountsUsageToday but groups the single usage-log
+// scan by user_id instead of account_id. Used by the /admin/users list "Today"
+// column. Unknown ids surface as zero-traffic rows so the column has a stable
+// shape for every row.
+func (s *Server) handleBatchGetAdminUsersSpendingToday(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	raw := strings.TrimSpace(r.URL.Query().Get("user_ids"))
+	if raw == "" {
+		writeJSONAny(w, http.StatusOK, apiopenapi.BatchUserSpendingTodayResponse{
+			Data:      []apiopenapi.UserSpendingToday{},
+			RequestId: requestID,
+		})
+		return
+	}
+	wanted := make(map[int]struct{})
+	order := make([]int, 0)
+	for _, piece := range strings.Split(raw, ",") {
+		piece = strings.TrimSpace(piece)
+		if piece == "" {
+			continue
+		}
+		id, err := strconv.Atoi(piece)
+		if err != nil || id <= 0 {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid user id in batch", requestID)
+			return
+		}
+		if _, dup := wanted[id]; dup {
+			continue
+		}
+		wanted[id] = struct{}{}
+		order = append(order, id)
+	}
+	if len(wanted) == 0 {
+		writeJSONAny(w, http.StatusOK, apiopenapi.BatchUserSpendingTodayResponse{
+			Data:      []apiopenapi.UserSpendingToday{},
+			RequestId: requestID,
+		})
+		return
+	}
+	items, err := s.runtime.usage.List(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to load usage", requestID)
+		return
+	}
+	now := time.Now().UTC()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	accumulators := make(map[int]*usageWindowAccumulator, len(wanted))
+	for _, log := range items {
+		userID := log.UserID
+		if userID == 0 {
+			continue
+		}
+		if _, ok := wanted[userID]; !ok {
+			continue
+		}
+		created := log.CreatedAt.UTC()
+		if created.Before(todayStart) || created.After(now) {
+			continue
+		}
+		acc, ok := accumulators[userID]
+		if !ok {
+			acc = newUsageWindowAccumulator()
+			accumulators[userID] = acc
+		}
+		acc.add(log)
+	}
+	out := make([]apiopenapi.UserSpendingToday, 0, len(order))
+	for _, id := range order {
+		acc, ok := accumulators[id]
+		if !ok {
+			acc = newUsageWindowAccumulator()
+		}
+		var successRate float32
+		if acc.requests > 0 {
+			successRate = float32(acc.successCount) / float32(acc.requests)
+		}
+		out = append(out, apiopenapi.UserSpendingToday{
+			UserId:       apiopenapi.Id(strconv.Itoa(id)),
+			Requests:     acc.requests,
+			SuccessCount: acc.successCount,
+			ErrorCount:   acc.errorCount,
+			SuccessRate:  successRate,
+			InputTokens:  acc.inputTokens,
+			OutputTokens: acc.outputTokens,
+			TotalTokens:  acc.totalTokens,
+			Cost:         money.FormatRatFixed(acc.cost, 2),
+			Currency:     acc.currencyOrDefault(),
+		})
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.BatchUserSpendingTodayResponse{
+		Data:      out,
+		RequestId: requestID,
+	})
+}
+
 // handleBatchGetAdminAccountsUsageToday serves
 // GET /api/v1/admin/accounts/usage-today/batch?account_ids=1,2,3
 //

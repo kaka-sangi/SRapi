@@ -647,6 +647,8 @@ export const en = {
     platformQuotas: "Platform quotas",
     attributes: "Custom attributes",
     attributesColumn: "Attributes",
+    today: "Today",
+    todayIdle: "Idle",
     amount: "Amount",
     operation: "Operation",
     note: "Note",

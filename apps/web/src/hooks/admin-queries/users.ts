@@ -173,6 +173,18 @@ export function useUserAttributeValuesBatch(userIds: string[]) {
   });
 }
 
+// Batched read for the users list "Today" column — same sorted-ids cache-key
+// pattern as the attribute-values batch above.
+export function useUsersSpendingTodayBatch(userIds: string[]) {
+  const sorted = [...userIds].sort();
+  return useQuery({
+    queryKey: queryKeys.admin.usersSpendingTodayBatch(sorted),
+    queryFn: () => adminApi.batchGetUsersSpendingToday(sorted),
+    enabled: sorted.length > 0,
+    staleTime: 30_000,
+  });
+}
+
 export function useSetUserAttributeValue(userId: string) {
   return useAdminMutation(
     (vars: { definitionId: string; body: Parameters<typeof adminApi.setUserAttributeValue>[2] }) =>

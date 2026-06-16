@@ -509,6 +509,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/usage-daily", server.handleGetAdminAccountUsageDaily)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/usage-today", server.handleGetAdminAccountUsageToday)
 	mux.HandleFunc("GET /api/v1/admin/accounts/usage-today/batch", server.handleBatchGetAdminAccountsUsageToday)
+	mux.HandleFunc("GET /api/v1/admin/users/spending-today/batch", server.handleBatchGetAdminUsersSpendingToday)
 	mux.HandleFunc("GET /api/v1/admin/account-groups", server.handleListAdminAccountGroups)
 	mux.HandleFunc("POST /api/v1/admin/account-groups", server.handleCreateAdminAccountGroup)
 	mux.HandleFunc("PATCH /api/v1/admin/account-groups/{id}", server.handleUpdateAdminAccountGroup)

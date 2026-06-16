@@ -132,6 +132,8 @@ export const queryKeys = {
     userAttributeValues: (userId: string) => ["admin", "user-attribute-values", userId] as const,
     userAttributeValuesBatch: (userIds: string[]) =>
       ["admin", "user-attribute-values", "batch", userIds] as const,
+    usersSpendingTodayBatch: (userIds: string[]) =>
+      ["admin", "users", "spending-today", "batch", userIds] as const,
     riskConfig: () => ["admin", "risk-config"] as const,
     riskStatus: () => ["admin", "risk-status"] as const,
     riskLogs: (params?: unknown) => ["admin", "risk-logs", params ?? {}] as const,
