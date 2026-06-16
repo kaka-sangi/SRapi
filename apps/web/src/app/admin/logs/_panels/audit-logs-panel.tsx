@@ -250,11 +250,18 @@ function AuditMeta({
 }
 
 function JsonBlock({ label, value }: { label: string; value: unknown }) {
+  const json = safeJson(value);
+  // A bare {} or empty payload would put a useless copy button on every audit
+  // entry — suppress it for those cases.
+  const hasContent = json && json !== "null" && json !== "{}" && json !== "[]";
   return (
     <div>
-      <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</span>
+        {hasContent ? <CopyButton value={json} size="inline" /> : null}
+      </div>
       <pre className="mt-1.5 max-h-48 overflow-auto rounded-lg bg-srapi-card-muted p-3 font-mono text-2xs text-srapi-text-secondary">
-        {safeJson(value)}
+        {json}
       </pre>
     </div>
   );
