@@ -668,6 +668,7 @@ export const en = {
     name: "Name",
     provider: "Provider",
     allProviders: "All providers",
+    allAccounts: "All accounts",
     type: "Type",
     groups: "Groups",
     ungrouped: "Ungrouped",

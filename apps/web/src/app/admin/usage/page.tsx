@@ -191,6 +191,7 @@ function UsageContent() {
   const [balanceUser, setBalanceUser] = useState<{ id: string; email: string } | null>(null);
   const modelFilter = list.filters.model || undefined;
   const userFilter = list.filters.user || undefined;
+  const accountFilter = list.filters.account || undefined;
   const windowFilter = list.filters.window;
   // Resolve the preset to an ISO timestamp the backend's start filter
   // honours via the shared filterUsageLogs helper. Null when the preset is
@@ -202,6 +203,7 @@ function UsageContent() {
     page_size: list.pageSize,
     model: modelFilter,
     user_id: userFilter,
+    account_id: accountFilter,
     start: sinceFilter,
   });
   const daily = useAdminUsageDaily();
@@ -225,7 +227,14 @@ function UsageContent() {
     (usersList.data?.data ?? []).map((u) => [String(u.id), u] as const),
   );
   const balanceUserRecord = balanceUser ? userById.get(balanceUser.id) : undefined;
-  const isFiltered = Boolean(modelFilter || userFilter || windowFilter);
+  const isFiltered = Boolean(modelFilter || userFilter || accountFilter || windowFilter);
+  // The shared lookup hook already fetches /admin/accounts page 1 of 200,
+  // so we get the dropdown options "for free" from its query.data without an
+  // extra fetch.
+  const accountOptions = (accountLookup.query.data?.data ?? []).map((a) => ({
+    value: String(a.id),
+    label: a.name,
+  }));
   const total = usage.data?.pagination?.total ?? usage.data?.data.length ?? 0;
 
   const columns: Column<UsageLog>[] = [
@@ -557,6 +566,12 @@ function UsageContent() {
               onChange={(v) => list.setFilter("user", v)}
               options={userOptions}
               allLabel={t("adminUsage.allUsers")}
+            />
+            <FilterSelect
+              value={list.filters.account}
+              onChange={(v) => list.setFilter("account", v)}
+              options={accountOptions}
+              allLabel={t("adminAccounts.allAccounts")}
             />
             <FilterSelect
               value={list.filters.window}

@@ -665,6 +665,7 @@ export const zh: Messages = {
     name: "名称",
     provider: "服务商",
     allProviders: "全部服务商",
+    allAccounts: "全部账号",
     type: "类型",
     groups: "分组",
     ungrouped: "未分组",
