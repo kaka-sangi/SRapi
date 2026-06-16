@@ -107,6 +107,12 @@ export function useUpdateAdminUser() {
     ["admin", "users"],
   );
 }
+export function useDeleteAdminUser() {
+  return useAdminMutation(
+    (id: string) => adminApi.deleteUser(id),
+    ["admin", "users"],
+  );
+}
 export function useUpdateUserBalance() {
   return useAdminMutation(
     (vars: { id: string; body: B<typeof adminApi.updateUserBalance> }) =>

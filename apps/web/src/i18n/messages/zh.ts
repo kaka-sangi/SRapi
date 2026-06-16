@@ -630,6 +630,8 @@ export const zh: Messages = {
     lastLogin: "上次登录",
     enable: "启用",
     disable: "停用",
+    delete: "删除用户",
+    deleteWarning: "软删除该用户：邮箱将被匿名化、登录身份被解绑，账户无法再登录。",
     emptyTitle: "暂无用户",
     emptyBody: "还没有创建任何用户账户。",
     create: "新建用户",

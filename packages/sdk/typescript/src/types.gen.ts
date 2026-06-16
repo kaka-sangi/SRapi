@@ -9942,6 +9942,49 @@ export type BatchUpdateAdminUsersResponses = {
 
 export type BatchUpdateAdminUsersResponse = BatchUpdateAdminUsersResponses[keyof BatchUpdateAdminUsersResponses];
 
+export type DeleteAdminUserData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{id}';
+};
+
+export type DeleteAdminUserErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminUserError = DeleteAdminUserErrors[keyof DeleteAdminUserErrors];
+
+export type DeleteAdminUserResponses = {
+    /**
+     * User deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminUserResponse = DeleteAdminUserResponses[keyof DeleteAdminUserResponses];
+
 export type GetAdminUserData = {
     body?: never;
     path: {

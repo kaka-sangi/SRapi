@@ -13,6 +13,7 @@ import { ListToolbar, SearchInput, FilterSelect } from "@/components/admin/list-
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useCurrentUserShell } from "@/components/layout/auth-gate";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -24,6 +25,7 @@ import {
   useBulkSetUsersEnabled,
   useCreateAdminUser,
   useUpdateAdminUser,
+  useDeleteAdminUser,
   useUpdateUserBalance,
 } from "@/hooks/admin-queries";
 import type { UserStatus } from "@/lib/sdk-types";
@@ -73,7 +75,10 @@ function UsersContent() {
   const bulkEnabled = useBulkSetUsersEnabled();
   const createMut = useCreateAdminUser();
   const updateMut = useUpdateAdminUser();
+  const deleteMut = useDeleteAdminUser();
   const balanceMut = useUpdateUserBalance();
+  const currentUser = useCurrentUserShell();
+  const selfId = currentUser?.id;
 
   const [creating, setCreating] = useState(false);
   const [editTarget, setEditTarget] = useState<User | null>(null);
@@ -81,6 +86,7 @@ function UsersContent() {
   const [historyTarget, setHistoryTarget] = useState<User | null>(null);
   const [quotaTarget, setQuotaTarget] = useState<User | null>(null);
   const [disableTarget, setDisableTarget] = useState<User | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
 
   const isFiltered = Boolean(list.search || statusFilter);
@@ -276,6 +282,17 @@ function UsersContent() {
                 onSelect: () =>
                   u.status === "disabled" ? void toggleEnabled(u) : setDisableTarget(u),
               },
+              // Self-delete is also rejected server-side, but hiding it removes
+              // a footgun and a confusing dialog.
+              ...(selfId && u.id === selfId
+                ? []
+                : [
+                    {
+                      label: t("adminUsers.delete"),
+                      destructive: true,
+                      onSelect: () => setDeleteTarget(u),
+                    },
+                  ]),
             ]}
           />
         )}
@@ -370,6 +387,26 @@ function UsersContent() {
         confirmLabel={t("adminUsers.disable")}
         isPending={bulkEnabled.isPending}
         onConfirm={() => runBulk(false)}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        tone="danger"
+        title={t("adminUsers.delete")}
+        body={
+          deleteTarget
+            ? `${deleteTarget.name} · ${deleteTarget.email}\n${t("adminUsers.deleteWarning")}`
+            : undefined
+        }
+        confirmLabel={t("adminUsers.delete")}
+        successMessage={t("feedback.deleted")}
+        isPending={deleteMut.isPending}
+        onConfirm={async () => {
+          if (deleteTarget) await deleteMut.mutateAsync(deleteTarget.id);
+        }}
       />
     </>
   );

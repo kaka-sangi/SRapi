@@ -3,6 +3,7 @@
 import {
   createAdminUser,
   createAdminUserAttributeDefinition,
+  deleteAdminUser,
   deleteAdminUserAttributeDefinition,
   listAdminUserAttributeDefinitions,
   updateAdminUserAttributeDefinition,
@@ -42,6 +43,10 @@ export const usersApi = {
 
   updateUser(id: Id, body: UpdateAdminUserData["body"]): Promise<User> {
     return unwrapData(() => updateAdminUser({ path: { id }, body, throwOnError: true }));
+  },
+
+  deleteUser(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminUser({ path: { id }, throwOnError: true }));
   },
 
   updateUserBalance(id: Id, body: UpdateUserBalanceRequest): Promise<User> {

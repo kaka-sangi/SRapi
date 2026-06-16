@@ -434,6 +434,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("PATCH /api/v1/admin/users/batch", server.handleBatchUpdateAdminUsers)
 	mux.HandleFunc("GET /api/v1/admin/users/{id}", server.handleGetAdminUser)
 	mux.HandleFunc("PATCH /api/v1/admin/users/{id}", server.handleUpdateAdminUser)
+	mux.HandleFunc("DELETE /api/v1/admin/users/{id}", server.handleDeleteAdminUser)
 	mux.HandleFunc("PATCH /api/v1/admin/users/{id}/balance", server.handleUpdateAdminUserBalance)
 	mux.HandleFunc("GET /api/v1/admin/users/{id}/balance-history", server.handleAdminUserBalanceHistory)
 	mux.HandleFunc("PATCH /api/v1/admin/users/{id}/rpm-limit", server.handleUpdateAdminUserRpmLimit)

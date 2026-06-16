@@ -149,6 +149,43 @@ func (s *Server) handleUpdateAdminUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleDeleteAdminUser(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	userID, ok := adminPathID(w, r, requestID, "user")
+	if !ok {
+		return
+	}
+	// Self-delete would log the acting admin out and could lock the panel
+	// (e.g. if they are the only owner) — refuse it.
+	if userID == session.User.ID {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "cannot delete your own account", requestID)
+		return
+	}
+	before, err := s.runtime.users.FindByID(r.Context(), userID)
+	if err != nil {
+		writeUserServiceError(w, err, requestID)
+		return
+	}
+	if err := s.runtime.users.Delete(r.Context(), userID); err != nil {
+		writeUserServiceError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "user.delete", "user", strconv.Itoa(userID), userAuditSnapshot(before), nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       map[string]any{"id": userID, "deleted": true},
+		"request_id": requestID,
+	})
+}
+
 func (s *Server) handleUpdateAdminUserBalance(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)

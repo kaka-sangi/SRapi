@@ -18291,6 +18291,9 @@ type ServerInterface interface {
 	// Batch update user attributes.
 	// (PATCH /api/v1/admin/users/batch)
 	BatchUpdateAdminUsers(w http.ResponseWriter, r *http.Request)
+	// Delete a user.
+	// (DELETE /api/v1/admin/users/{id})
+	DeleteAdminUser(w http.ResponseWriter, r *http.Request, id Id)
 	// Get a user.
 	// (GET /api/v1/admin/users/{id})
 	GetAdminUser(w http.ResponseWriter, r *http.Request, id Id)
@@ -28153,6 +28156,40 @@ func (siw *ServerInterfaceWrapper) BatchUpdateAdminUsers(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAdminUser operation middleware
 func (siw *ServerInterfaceWrapper) GetAdminUser(w http.ResponseWriter, r *http.Request) {
 
@@ -32029,6 +32066,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users", wrapper.ListAdminUsers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/users", wrapper.CreateAdminUser)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/users/batch", wrapper.BatchUpdateAdminUsers)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/users/{id}", wrapper.DeleteAdminUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users/{id}", wrapper.GetAdminUser)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/users/{id}", wrapper.UpdateAdminUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users/{id}/attributes", wrapper.ListAdminUserAttributeValues)
