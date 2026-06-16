@@ -14,8 +14,8 @@ import {
   useResetCircuitBreaker,
   useAdminCacheStats,
   useClearCache,
-  useAdminAccounts,
 } from "@/hooks/admin-queries";
+import { useAccountNameLookup } from "@/hooks/use-account-name-lookup";
 import { useAdminEventStream } from "@/hooks/use-admin-events";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -50,7 +50,7 @@ function DiagnosticsContent() {
   const cacheStats = useAdminCacheStats();
   const resetMut = useResetCircuitBreaker();
   const clearCacheMut = useClearCache();
-  const accounts = useAdminAccounts({ page: 1, page_size: 200 });
+  const accountLookup = useAccountNameLookup();
 
   const { connected: streamConnected } = useAdminEventStream(
     (event) => {
@@ -58,9 +58,6 @@ function DiagnosticsContent() {
         void breakers.refetch();
       }
     },
-  );
-  const accountNameById = new Map(
-    (accounts.data?.data ?? []).map((a) => [a.id, a.name] as const),
   );
 
   async function handleReset(accountId: number) {
@@ -149,7 +146,7 @@ function DiagnosticsContent() {
                   >
                     <div className="flex items-center gap-3">
                       <span className="font-mono text-sm text-srapi-text-primary">
-                        {accountNameById.get(String(entry.account_id)) ?? `#${entry.account_id}`}
+                        {accountLookup.get(entry.account_id)}
                       </span>
                       <QuietBadge status={breakerBadgeVariant(entry.state)} label={entry.state} />
                     </div>
