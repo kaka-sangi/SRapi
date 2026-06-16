@@ -542,6 +542,18 @@ func writeSSEJSONChunks(w http.ResponseWriter, payloads []map[string]any) {
 }
 
 func writeSSEEvents(w http.ResponseWriter, events []gatewayservice.StreamEvent) {
+	writeSSEEventStream(w, events, true)
+}
+
+// writeSSEEventsNoDone writes named SSE events without the OpenAI-only
+// `data: [DONE]` sentinel. The Anthropic Messages stream terminates with its
+// own `message_stop` event; appending [DONE] is a foreign Chat-Completions
+// artifact that strict Anthropic clients should not see.
+func writeSSEEventsNoDone(w http.ResponseWriter, events []gatewayservice.StreamEvent) {
+	writeSSEEventStream(w, events, false)
+}
+
+func writeSSEEventStream(w http.ResponseWriter, events []gatewayservice.StreamEvent, done bool) {
 	setSSEResponseHeaders(w)
 	for _, event := range events {
 		if name := strings.TrimSpace(event.Event); name != "" {
@@ -549,7 +561,9 @@ func writeSSEEvents(w http.ResponseWriter, events []gatewayservice.StreamEvent) 
 		}
 		writeSSEJSONAny(w, event.Data)
 	}
-	writeSSEDone(w)
+	if done {
+		writeSSEDone(w)
+	}
 }
 
 func writeRawSSEResponse(w http.ResponseWriter, raw []byte) {

@@ -727,7 +727,9 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
-		writeSSEEvents(w, s.runtime.gateway.RenderAnthropicMessagesStreamEvents(canonicalResp))
+		// Anthropic streams terminate with message_stop; do not append the
+		// OpenAI-only [DONE] sentinel.
+		writeSSEEventsNoDone(w, s.runtime.gateway.RenderAnthropicMessagesStreamEvents(canonicalResp))
 		return
 	}
 	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {

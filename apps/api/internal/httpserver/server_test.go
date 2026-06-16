@@ -3297,8 +3297,13 @@ func TestAdminCatalogFlow(t *testing.T) {
 	messageStreamReq.Header.Set("Authorization", "Bearer "+apiKey)
 	messageStreamRec := httptest.NewRecorder()
 	handler.ServeHTTP(messageStreamRec, messageStreamReq)
-	if body := messageStreamRec.Body.String(); !strings.Contains(body, "event: message_start") || !strings.Contains(body, "event: content_block_delta") || !strings.Contains(body, "event: message_stop") || !strings.Contains(body, "data: [DONE]") {
+	if body := messageStreamRec.Body.String(); !strings.Contains(body, "event: message_start") || !strings.Contains(body, "event: content_block_delta") || !strings.Contains(body, "event: message_stop") {
 		t.Fatalf("expected messages stream SSE payload, got %q", body)
+	}
+	// Anthropic streams terminate with message_stop and must NOT carry the
+	// OpenAI-only [DONE] sentinel.
+	if body := messageStreamRec.Body.String(); strings.Contains(body, "[DONE]") {
+		t.Fatalf("anthropic messages stream must not contain a [DONE] sentinel, got %q", body)
 	}
 
 	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions", nil)
