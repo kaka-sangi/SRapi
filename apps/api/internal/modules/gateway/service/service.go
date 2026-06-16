@@ -36,6 +36,19 @@ func (s *Service) NormalizeChatCompletions(req apiopenapi.ChatCompletionRequest,
 		if msg.ToolCalls != nil {
 			blocks = append(blocks, chatToolCallBlocks(*msg.ToolCalls)...)
 		}
+		// Preserve the assistant's prior reasoning across turns: an inbound
+		// reasoning_content is wrapped as <thinking>...</thinking> text prepended
+		// to the assistant message so the upstream (e.g. Codex/gpt-5.x) keeps the
+		// chain-of-thought continuity, matching sub2api chatcompletions_to_responses.
+		// Without this the prior reasoning is silently dropped on multi-turn.
+		if role == "assistant" && msg.ReasoningContent != nil {
+			if reasoning := strings.TrimSpace(*msg.ReasoningContent); reasoning != "" {
+				blocks = append([]gatewaycontract.ContentBlock{{
+					Type: gatewaycontract.ContentBlockText,
+					Text: "<thinking>" + reasoning + "</thinking>",
+				}}, blocks...)
+			}
+		}
 		if len(blocks) > 0 {
 			messages = append(messages, gatewaycontract.Message{Role: role, Content: blocks})
 		}
