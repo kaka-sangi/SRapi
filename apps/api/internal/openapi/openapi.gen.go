@@ -10638,6 +10638,9 @@ type ListAdminRedeemCodesParams struct {
 	Page     *Page             `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *PageSize         `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Status   *RedeemCodeStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Code Case-insensitive substring filter on the redeem code value.
+	Code *string `form:"code,omitempty" json:"code,omitempty"`
 }
 
 // ListAdminRiskControlLogsParams defines parameters for ListAdminRiskControlLogs.
@@ -26448,6 +26451,19 @@ func (siw *ServerInterfaceWrapper) ListAdminRedeemCodes(w http.ResponseWriter, r
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "code" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "code", r.URL.Query(), &params.Code, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
 		}
 		return
 	}

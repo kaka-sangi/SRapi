@@ -16496,6 +16496,10 @@ export type ListAdminRedeemCodesData = {
         page?: number;
         page_size?: number;
         status?: RedeemCodeStatus;
+        /**
+         * Case-insensitive substring filter on the redeem code value.
+         */
+        code?: string;
     };
     url: '/api/v1/admin/redeem-codes';
 };

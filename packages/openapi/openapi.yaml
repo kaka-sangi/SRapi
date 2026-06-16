@@ -9753,6 +9753,12 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/RedeemCodeStatus"
+        - name: code
+          in: query
+          description: Case-insensitive substring filter on the redeem code value.
+          schema:
+            type: string
+            maxLength: 80
       responses:
         "200":
           description: Redeem code list.

@@ -20,10 +20,14 @@ func (s *Service) ListRedeemCodes(ctx context.Context, opts admincontrol.ListOpt
 		return admincontrol.RedeemCodeList{}, err
 	}
 	now := s.clock.Now()
+	codeNeedle := strings.ToLower(strings.TrimSpace(opts.Code))
 	items := make([]admincontrol.RedeemCode, 0, len(stored))
 	for _, item := range stored {
 		item = redeemCodeWithDerivedStatus(item, now)
 		if opts.Status != "" && string(item.Status) != opts.Status {
+			continue
+		}
+		if codeNeedle != "" && !strings.Contains(strings.ToLower(item.Code), codeNeedle) {
 			continue
 		}
 		items = append(items, item)

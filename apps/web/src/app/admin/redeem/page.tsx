@@ -6,7 +6,7 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
-import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
+import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -82,10 +82,12 @@ function RedeemContent() {
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-redeem", []);
   const statusFilter = (list.filters.status as RedeemCode["status"]) || undefined;
+  const codeSearch = list.search || undefined;
   const codes = useAdminRedeemCodes({
     page: list.page,
     page_size: list.pageSize,
     status: statusFilter,
+    code: codeSearch,
   });
   const stats = useRedeemStats();
   const createMut = useCreateRedeemCode();
@@ -232,12 +234,17 @@ function RedeemContent() {
         }
         minWidth={560}
         dimRow={(c) => c.status !== "active"}
-        isFiltered={Boolean(statusFilter)}
+        isFiltered={Boolean(statusFilter || codeSearch)}
         onClearFilters={list.clearFilters}
         sort={list.sort}
         onSort={list.toggleSort}
         toolbar={
           <ListToolbar>
+            <SearchInput
+              value={list.searchInput}
+              onChange={list.setSearchInput}
+              placeholder={t("adminPromos.searchPlaceholder")}
+            />
             <FilterSelect
               value={statusFilter}
               onChange={(v) => list.setFilter("status", v)}
