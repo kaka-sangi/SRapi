@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { StatCard, StatCardSkeleton } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
-import { useAdminPaymentDashboard, useAdminUsers } from "@/hooks/admin-queries";
+import { useAdminPaymentDashboard } from "@/hooks/admin-queries";
+import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatMoney } from "@/lib/admin-format";
 import { cn } from "@/lib/cn";
@@ -12,25 +13,14 @@ import { cn } from "@/lib/cn";
 const DAY_OPTIONS = [7, 30, 90] as const;
 type DayRange = (typeof DAY_OPTIONS)[number];
 
-// Best-effort email lookup. The dashboard endpoint returns user_id only; we
-// resolve to email via the existing /admin/users list (capped at the first 200
-// users) and fall back to "User #<id>" when the user is past that window.
-// Server-side join is a future improvement — noted in iter 7's progress.md.
-const USER_LOOKUP_PAGE_SIZE = 200;
-
 export function PaymentDashboardPanel() {
   const { t } = useLanguage();
   const [days, setDays] = useState<DayRange>(30);
   const dashboard = useAdminPaymentDashboard(days);
-  const users = useAdminUsers({ page: 1, page_size: USER_LOOKUP_PAGE_SIZE });
-
-  const emailByUserId = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const u of users.data?.data ?? []) {
-      map.set(String(u.id), u.email);
-    }
-    return map;
-  }, [users.data]);
+  // Top-users list resolves id → email via the shared 200-row lookup; falls
+  // back to "User #<id>" for ids past the window (more readable than the
+  // raw id in a "top spender" context where a name is expected).
+  const userLookup = useUserEmailLookup();
 
   const snapshot = dashboard.data;
   const currency = snapshot?.currency || "USD";
@@ -162,7 +152,7 @@ export function PaymentDashboardPanel() {
             ) : (
               <ol className="space-y-1.5">
                 {snapshot.top_users.map((u, idx) => {
-                  const email = emailByUserId.get(String(u.user_id));
+                  const email = userLookup.map.get(String(u.user_id));
                   return (
                     <li
                       key={u.user_id}

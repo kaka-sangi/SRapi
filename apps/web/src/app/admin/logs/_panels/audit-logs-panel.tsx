@@ -17,7 +17,8 @@ import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useClientPagedList } from "@/hooks/use-client-list";
-import { useAuditLogs, useAdminUsers } from "@/hooks/admin-queries";
+import { useAuditLogs } from "@/hooks/admin-queries";
+import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, safeJson } from "@/lib/admin-format";
 import type { AuditLog } from "@/lib/sdk-types";
@@ -66,14 +67,14 @@ export function AuditLogsPanel() {
   // Reuse the iter-15/error-logs pattern: 200-user lookup for actor labels
   // gives us readable {email} options in the dropdown. Larger installs whose
   // actors are past row 200 still see the actor_user_id in the table.
-  const users = useAdminUsers({ page: 1, page_size: 200 });
+  const userLookup = useUserEmailLookup();
   const actorOptions = useMemo(
     () =>
-      (users.data?.data ?? []).map((u) => ({
+      (userLookup.query.data?.data ?? []).map((u) => ({
         value: String(u.id),
         label: u.email,
       })),
-    [users.data],
+    [userLookup.query.data],
   );
   const isFiltered = Boolean(
     list.search ||
@@ -99,7 +100,7 @@ export function AuditLogsPanel() {
       header: t("adminAudit.actor"),
       hideOnMobile: true,
       render: (a) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary">{a.actor_user_id || "—"}</span>
+        <span className="text-srapi-text-secondary">{userLookup.get(a.actor_user_id)}</span>
       ),
     },
     {
