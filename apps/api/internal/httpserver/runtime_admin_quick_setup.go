@@ -222,6 +222,11 @@ func (s *Server) handleAdminQuickMapModels(w http.ResponseWriter, r *http.Reques
 	}
 
 	created, mapped, warnings := s.quickMapModels(r.Context(), provider, body.Models, nil)
+	// warnings must serialize as a JSON array, never null: the SDK declares it
+	// Array<string> and a consumer doing .map/.length on null would crash.
+	if warnings == nil {
+		warnings = []string{}
+	}
 
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model.quick_map", "model", "bulk", nil, map[string]any{
 		"provider_id":      providerID,
