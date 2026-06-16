@@ -32,6 +32,7 @@ export const ADMIN_ROUTES = {
   affiliatesInvites: "/admin/affiliates/invites",
   affiliatesRebates: "/admin/affiliates/rebates",
   affiliatesTransfers: "/admin/affiliates/transfers",
+  affiliatesWithdrawals: "/admin/affiliates/withdrawals",
   affiliatesRules: "/admin/affiliates/rules",
   announcements: "/admin/announcements",
   ops: "/admin/ops",

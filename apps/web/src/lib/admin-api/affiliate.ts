@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  approveAdminAffiliateWithdrawal,
+  cancelAdminAffiliateWithdrawal,
   createAdminAffiliateRule,
   listAdminAffiliateInvites,
   listAdminAffiliateRebates,
@@ -9,6 +11,7 @@ import {
   updateAdminAffiliateRule,
 } from "../../../../../packages/sdk/typescript/src/index";
 import type {
+  AdminAffiliateWithdrawalDecisionRequest,
   AffiliateInviteRecord,
   AffiliateLedgerEntry,
   AffiliateRule,
@@ -40,6 +43,27 @@ export const affiliateApi = {
     query?: ListAdminAffiliateTransfersData["query"],
   ): Promise<AdminListResult<AffiliateLedgerEntry>> {
     return unwrapList(() => listAdminAffiliateTransfers({ query, throwOnError: true }));
+  },
+
+  // Withdrawals are a subset of the transfers ledger (type === "withdraw").
+  // The backend has no dedicated list-withdrawals endpoint; we reuse the
+  // transfers endpoint and let the UI filter by type client-side.
+  listAffiliateWithdrawals(
+    query?: ListAdminAffiliateTransfersData["query"],
+  ): Promise<AdminListResult<AffiliateLedgerEntry>> {
+    return unwrapList(() => listAdminAffiliateTransfers({ query, throwOnError: true }));
+  },
+
+  approveWithdrawal(id: Id, body: AdminAffiliateWithdrawalDecisionRequest): Promise<AffiliateLedgerEntry> {
+    return unwrapData(() =>
+      approveAdminAffiliateWithdrawal({ path: { id }, body, throwOnError: true }),
+    );
+  },
+
+  cancelWithdrawal(id: Id, body: AdminAffiliateWithdrawalDecisionRequest): Promise<AffiliateLedgerEntry> {
+    return unwrapData(() =>
+      cancelAdminAffiliateWithdrawal({ path: { id }, body, throwOnError: true }),
+    );
   },
 
   listAffiliateRules(

@@ -127,6 +127,11 @@ const ADMIN_AFFILIATE_SECTION: NavSection = {
       labelKey: "nav.adminAffiliatesTransfers",
       icon: ArrowLeftRight,
     },
+    {
+      href: ADMIN_ROUTES.affiliatesWithdrawals,
+      labelKey: "nav.adminAffiliatesWithdrawals",
+      icon: Wallet,
+    },
     { href: ADMIN_ROUTES.affiliatesRules, labelKey: "nav.adminAffiliatesRules", icon: Percent },
   ],
 };

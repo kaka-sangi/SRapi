@@ -27,6 +27,34 @@ export function useAffiliateTransfers(params?: P<typeof adminApi.listAffiliateTr
   });
 }
 
+// Withdrawals are fetched via the transfers endpoint (same shape) and filtered
+// client-side to type === "withdraw". Approve/cancel mutations invalidate this
+// cache as well as the broader transfers cache.
+export function useAffiliateWithdrawals(params?: P<typeof adminApi.listAffiliateWithdrawals>) {
+  return useQuery({
+    queryKey: queryKeys.admin.affiliateWithdrawals(params),
+    queryFn: () => adminApi.listAffiliateWithdrawals(params),
+  });
+}
+
+export function useApproveWithdrawal() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.approveWithdrawal> }) =>
+      adminApi.approveWithdrawal(vars.id, vars.body),
+    ["admin", "affiliates", "withdrawals"],
+    ["admin", "affiliates", "transfers"],
+  );
+}
+
+export function useCancelWithdrawal() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.cancelWithdrawal> }) =>
+      adminApi.cancelWithdrawal(vars.id, vars.body),
+    ["admin", "affiliates", "withdrawals"],
+    ["admin", "affiliates", "transfers"],
+  );
+}
+
 export function useAffiliateRules(params?: P<typeof adminApi.listAffiliateRules>) {
   return useQuery({
     queryKey: queryKeys.admin.affiliateRules(params),
