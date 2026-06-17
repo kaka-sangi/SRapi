@@ -485,6 +485,11 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 		*opts.backgroundDrainSink = runtime.drainUsageWriters
 	}
 	server := &Server{cfg: cfg, logger: logger, runtime: runtime}
+	// Wire the gateway-wide WS idle-timeout janitor logger so it emits
+	// structured "ws_idle_timeout" events through the same sink as the rest
+	// of the http server. The janitor itself is started lazily by the first
+	// session registration.
+	globalWSIdleSessionStore.SetLogger(logger)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /livez", server.handleLive)

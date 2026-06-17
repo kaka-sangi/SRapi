@@ -99,9 +99,18 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 		conn.SetReadLimit(s.cfg.Gateway.MaxBodySize)
 	}
 
+	// Register this connection with the WS idle-timeout janitor (5min,
+	// ported from CLIProxyAPI codex_websockets_executor.go). The janitor
+	// will close the client connection if no frame is read or written
+	// within the idle window.
+	idleCtx, cancelIdle := context.WithCancel(r.Context())
+	defer cancelIdle()
+	idleSession := globalWSIdleSessionStore.Register(slot.ID, conn, nil, cancelIdle)
+	defer globalWSIdleSessionStore.Unregister(slot.ID)
+
 	var lastTurn responsesWebSocketTurnState
 	for {
-		messageType, payload, err := conn.Read(r.Context())
+		messageType, payload, err := conn.Read(idleCtx)
 		if err != nil {
 			if status := websocket.CloseStatus(err); status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
 				return
@@ -111,10 +120,12 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 			}
 			return
 		}
+		idleSession.SetActive()
 		if messageType != websocket.MessageText {
 			if err := writeResponsesWebSocketError(r.Context(), conn, http.StatusBadRequest, "invalid_request", "responses websocket only accepts JSON text frames", nil); err != nil {
 				return
 			}
+			idleSession.SetActive()
 			continue
 		}
 		if handled, err := handleResponsesWebSocketControl(r.Context(), conn, payload); handled || err != nil {
@@ -145,7 +156,7 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 			continue
 		}
 		if s.shouldUseCodexWebSocketRelay(r, requestPayload) {
-			relayed, turnState, err := s.relayCodexResponsesWebSocket(r, conn, requestPayload, authed)
+			relayed, turnState, err := s.relayCodexResponsesWebSocket(r, conn, requestPayload, authed, idleSession)
 			if err != nil {
 				status, code, message := responsesWebSocketRelayError(err)
 				if err := writeResponsesWebSocketError(r.Context(), conn, status, code, message, nil); err != nil {
@@ -168,7 +179,7 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 			}
 			continue
 		}
-		turnState, err := writeCapturedResponsesWebSocket(r.Context(), conn, captured)
+		turnState, err := writeCapturedResponsesWebSocket(r.Context(), conn, captured, idleSession)
 		if err != nil {
 			return
 		}
@@ -288,7 +299,13 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 	if s.cfg.Gateway.MaxBodySize > 0 {
 		conn.SetReadLimit(s.cfg.Gateway.MaxBodySize)
 	}
-	success, errorClass, statusCode := s.relayRealtimeWebSocket(r.Context(), conn, session)
+	// Register the realtime WS with the idle-timeout janitor (5min, ported
+	// from CLIProxyAPI codex_websockets_executor.go).
+	idleCtx, cancelIdle := context.WithCancel(r.Context())
+	defer cancelIdle()
+	idleSession := globalWSIdleSessionStore.Register(slot.ID, conn, nil, cancelIdle)
+	defer globalWSIdleSessionStore.Unregister(slot.ID)
+	success, errorClass, statusCode := s.relayRealtimeWebSocket(idleCtx, conn, session, idleSession)
 	s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, success, errorClass, statusCode, elapsedMillis(startedAt), admission, nil, ""))
 }
 
@@ -315,9 +332,9 @@ func realtimeWebSocketHeaders(r *http.Request) http.Header {
 	return headers
 }
 
-func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Conn, session providerRealtimeSession) (bool, string, int) {
+func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Conn, session providerRealtimeSession, idleSession *wsIdleSession) (bool, string, int) {
 	if strings.EqualFold(strings.TrimSpace(session.Account.RuntimeClass), string(accountcontract.RuntimeClassAPIKey)) {
-		return s.relayOfficialAPIKeyRealtimeWebSocket(ctx, conn, session)
+		return s.relayOfficialAPIKeyRealtimeWebSocket(ctx, conn, session, idleSession)
 	}
 	clientToUpstream := make(chan reverseproxycontract.WebSocketMessage, 32)
 	upstreamToClient := make(chan reverseproxycontract.WebSocketMessage, 32)
@@ -335,7 +352,7 @@ func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Con
 		relayDone <- responsesWebSocketRelayResult{result: result, err: err}
 	}()
 	clientDone := make(chan error, 1)
-	go readRealtimeWebSocketClient(ctx, conn, clientToUpstream, clientDone)
+	go readRealtimeWebSocketClient(ctx, conn, clientToUpstream, clientDone, idleSession)
 
 	var relayResult *responsesWebSocketRelayResult
 	relayDoneCh := relayDone
@@ -374,6 +391,7 @@ func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Con
 				}
 				return false, "client_closed", statusClientClosedRequest
 			}
+			idleSession.SetActive()
 			forwardedUpstreamMessage = true
 		case err := <-clientDone:
 			cancelRelay()
@@ -418,7 +436,7 @@ func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Con
 	}
 }
 
-func (s *Server) relayOfficialAPIKeyRealtimeWebSocket(ctx context.Context, conn *websocket.Conn, session providerRealtimeSession) (bool, string, int) {
+func (s *Server) relayOfficialAPIKeyRealtimeWebSocket(ctx context.Context, conn *websocket.Conn, session providerRealtimeSession, idleSession *wsIdleSession) (bool, string, int) {
 	apiKey := firstNonEmpty(
 		mapString(session.Account.Credential, "api_key"),
 		mapString(session.Account.Credential, "openai_api_key"),
@@ -456,8 +474,8 @@ func (s *Server) relayOfficialAPIKeyRealtimeWebSocket(ctx context.Context, conn 
 	upstreamDone := make(chan realtimeDirectRelayResult, 1)
 	upstreamForwarded := make(chan struct{}, 1)
 	forwardedUpstreamMessage := false
-	go relayWebSocketClientToUpstream(ctx, conn, upstream, clientDone)
-	go relayWebSocketUpstreamToClient(ctx, upstream, conn, upstreamDone, upstreamForwarded)
+	go relayWebSocketClientToUpstream(ctx, conn, upstream, clientDone, idleSession)
+	go relayWebSocketUpstreamToClient(ctx, upstream, conn, upstreamDone, upstreamForwarded, idleSession)
 	for {
 		select {
 		case <-upstreamForwarded:
@@ -497,7 +515,7 @@ type realtimeDirectRelayResult struct {
 	forwarded bool
 }
 
-func relayWebSocketClientToUpstream(ctx context.Context, client *websocket.Conn, upstream *websocket.Conn, done chan<- error) {
+func relayWebSocketClientToUpstream(ctx context.Context, client *websocket.Conn, upstream *websocket.Conn, done chan<- error, idleSession *wsIdleSession) {
 	for {
 		messageType, payload, err := client.Read(ctx)
 		if err != nil {
@@ -512,6 +530,7 @@ func relayWebSocketClientToUpstream(ctx context.Context, client *websocket.Conn,
 			done <- err
 			return
 		}
+		idleSession.SetActive()
 		if err := upstream.Write(ctx, messageType, payload); err != nil {
 			done <- err
 			return
@@ -519,7 +538,7 @@ func relayWebSocketClientToUpstream(ctx context.Context, client *websocket.Conn,
 	}
 }
 
-func relayWebSocketUpstreamToClient(ctx context.Context, upstream *websocket.Conn, client *websocket.Conn, done chan<- realtimeDirectRelayResult, forwardedOnce chan<- struct{}) {
+func relayWebSocketUpstreamToClient(ctx context.Context, upstream *websocket.Conn, client *websocket.Conn, done chan<- realtimeDirectRelayResult, forwardedOnce chan<- struct{}, idleSession *wsIdleSession) {
 	forwarded := false
 	for {
 		messageType, payload, err := upstream.Read(ctx)
@@ -535,6 +554,7 @@ func relayWebSocketUpstreamToClient(ctx context.Context, upstream *websocket.Con
 			done <- realtimeDirectRelayResult{err: err, forwarded: forwarded}
 			return
 		}
+		idleSession.SetActive()
 		if err := client.Write(ctx, messageType, payload); err != nil {
 			done <- realtimeDirectRelayResult{err: err, forwarded: forwarded}
 			return
@@ -599,7 +619,7 @@ func realtimeWebSocketRelayStatus(ctx context.Context, err error) int {
 	return http.StatusBadGateway
 }
 
-func readRealtimeWebSocketClient(ctx context.Context, conn *websocket.Conn, clientToUpstream chan<- reverseproxycontract.WebSocketMessage, done chan<- error) {
+func readRealtimeWebSocketClient(ctx context.Context, conn *websocket.Conn, clientToUpstream chan<- reverseproxycontract.WebSocketMessage, done chan<- error, idleSession *wsIdleSession) {
 	defer close(clientToUpstream)
 	defer close(done)
 	for {
@@ -616,6 +636,7 @@ func readRealtimeWebSocketClient(ctx context.Context, conn *websocket.Conn, clie
 			done <- err
 			return
 		}
+		idleSession.SetActive()
 		msgType := reverseproxycontract.WebSocketMessageText
 		if messageType == websocket.MessageBinary {
 			msgType = reverseproxycontract.WebSocketMessageBinary
@@ -645,7 +666,7 @@ func responsesWebSocketRelayRequested(r *http.Request) bool {
 	))
 }
 
-func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.Conn, payload []byte, authed apikeycontract.AuthResult) (bool, responsesWebSocketTurnState, error) {
+func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.Conn, payload []byte, authed apikeycontract.AuthResult, idleSession *wsIdleSession) (bool, responsesWebSocketTurnState, error) {
 	startedAt := time.Now()
 	requestID := requestIDFromContext(r.Context())
 	sourceEndpoint := responsesWebSocketSourceEndpoint
@@ -718,7 +739,7 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 	}()
 	clientToUpstream <- reverseproxycontract.WebSocketMessage{Type: reverseproxycontract.WebSocketMessageText, Data: session.InitialFrame}
 	close(clientToUpstream)
-	success, errorClass, statusCode, usage, terminalForwarded, turnState := s.bridgeResponsesWebSocketRelay(r.Context(), conn, upstreamToClient, relayDone)
+	success, errorClass, statusCode, usage, terminalForwarded, turnState := s.bridgeResponsesWebSocketRelay(r.Context(), conn, upstreamToClient, relayDone, idleSession)
 	s.recordResponsesWebSocketUsage(r.Context(), authed, canonical, model.ID, result, success, errorClass, statusCode, elapsedMillis(startedAt), admission, usage, "")
 	if !success && errorClass != "client_closed" && !terminalForwarded {
 		return true, turnState, provideradaptercontract.ProviderError{Class: errorClass, StatusCode: statusCode, Message: providerGatewayMessage(errorClass)}
@@ -747,7 +768,7 @@ type providerRealtimeSession struct {
 	Account      reverseproxycontract.AccountRuntime
 }
 
-func (s *Server) bridgeResponsesWebSocketRelay(ctx context.Context, conn *websocket.Conn, upstreamToClient <-chan reverseproxycontract.WebSocketMessage, relayDone <-chan responsesWebSocketRelayResult) (bool, string, int, *gatewaycontract.Usage, bool, responsesWebSocketTurnState) {
+func (s *Server) bridgeResponsesWebSocketRelay(ctx context.Context, conn *websocket.Conn, upstreamToClient <-chan reverseproxycontract.WebSocketMessage, relayDone <-chan responsesWebSocketRelayResult, idleSession *wsIdleSession) (bool, string, int, *gatewaycontract.Usage, bool, responsesWebSocketTurnState) {
 	var usage *gatewaycontract.Usage
 	var turnState responsesWebSocketTurnState
 	relayDoneCh := relayDone
@@ -779,6 +800,7 @@ func (s *Server) bridgeResponsesWebSocketRelay(ctx context.Context, conn *websoc
 			if err := conn.Write(ctx, websocket.MessageText, msg.Data); err != nil {
 				return false, "client_closed", statusClientClosedRequest, usage, false, turnState
 			}
+			idleSession.SetActive()
 			if terminal, success, errorClass, statusCode := responsesWebSocketTerminal(msg.Data); terminal {
 				return success, errorClass, statusCode, usage, true, turnState
 			}
@@ -1335,7 +1357,7 @@ func anyString(value any) string {
 	}
 }
 
-func writeCapturedResponsesWebSocket(ctx context.Context, conn *websocket.Conn, captured *gatewayCaptureResponse) (responsesWebSocketTurnState, error) {
+func writeCapturedResponsesWebSocket(ctx context.Context, conn *websocket.Conn, captured *gatewayCaptureResponse, idleSession *wsIdleSession) (responsesWebSocketTurnState, error) {
 	body := bytes.TrimSpace(captured.body.Bytes())
 	if captured.Status() >= http.StatusBadRequest {
 		return responsesWebSocketTurnState{}, writeResponsesWebSocketError(ctx, conn, captured.Status(), "", "", body)
@@ -1353,6 +1375,7 @@ func writeCapturedResponsesWebSocket(ctx context.Context, conn *websocket.Conn, 
 				if err := conn.Write(ctx, websocket.MessageText, data); err != nil {
 					return turnState, err
 				}
+				idleSession.SetActive()
 				continue
 			}
 			wrapped := map[string]any{
@@ -1365,6 +1388,7 @@ func writeCapturedResponsesWebSocket(ctx context.Context, conn *websocket.Conn, 
 			if err := writeResponsesWebSocketJSON(ctx, conn, wrapped); err != nil {
 				return turnState, err
 			}
+			idleSession.SetActive()
 		}
 		return turnState, nil
 	}
@@ -1372,10 +1396,14 @@ func writeCapturedResponsesWebSocket(ctx context.Context, conn *websocket.Conn, 
 		return responsesWebSocketTurnState{}, writeResponsesWebSocketError(ctx, conn, http.StatusInternalServerError, "internal_error", "empty responses gateway result", nil)
 	}
 	turnState = responsesWebSocketTurnStateFromEvent(body)
-	return turnState, writeResponsesWebSocketJSON(ctx, conn, map[string]any{
+	err := writeResponsesWebSocketJSON(ctx, conn, map[string]any{
 		"type":     "response.completed",
 		"response": json.RawMessage(body),
 	})
+	if err == nil {
+		idleSession.SetActive()
+	}
+	return turnState, err
 }
 
 type responsesServerSentEvent struct {
