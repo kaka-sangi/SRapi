@@ -206,6 +206,11 @@ export const zh: Messages = {
     adminUserAttributes: "用户属性",
     adminNotificationTemplates: "邮件模板",
     adminSettings: "设置",
+    adminBillingAdmin: "计费管理",
+    adminAffiliates: "推广管理",
+    adminLogs: "日志",
+    adminGatewayPolicies: "网关策略",
+    adminIdentity: "身份与权限",
     signOut: "退出登录",
   },
   announcements: {

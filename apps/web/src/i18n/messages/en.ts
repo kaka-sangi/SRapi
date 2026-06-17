@@ -204,6 +204,11 @@ export const en = {
     adminUserAttributes: "User attributes",
     adminNotificationTemplates: "Email templates",
     adminSettings: "Settings",
+    adminBillingAdmin: "Billing admin",
+    adminAffiliates: "Affiliates",
+    adminLogs: "Logs",
+    adminGatewayPolicies: "Gateway policies",
+    adminIdentity: "Identity",
     signOut: "Sign out",
   },
   announcements: {
