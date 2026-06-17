@@ -324,6 +324,18 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 	if codexResponsesCompactRequest(req) {
 		// Compact is non-streaming by contract.
 		delete(payload, "stream")
+		// Codex /v1/responses/compact rejects `client_metadata` with
+		// {"error":{"code":"unknown_parameter","param":"client_metadata",
+		// "message":"Unknown parameter: 'client_metadata'."}}. The field is
+		// srapi-specific — it carries x-codex-installation-id /
+		// x-codex-turn-metadata / x-codex-window-id from per-account
+		// request settings via codexApplyClientMetadataSettings — and is
+		// accepted on /responses but not on /compact. CLIProxyAPI never
+		// sends this field at all (it puts the values on HTTP headers
+		// instead), so dropping it for compact matches the reference
+		// behaviour. Diagnosed against live srapi.senran.net traffic: the
+		// system-log body_excerpt showed the upstream rejection verbatim.
+		delete(payload, "client_metadata")
 		// CLIProxyAPI's normalizeCodexInstructions (codex_executor.go:1732)
 		// forces `instructions` to "" when missing/null rather than
 		// injecting the model base prompt — compact carries the user's

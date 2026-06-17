@@ -286,6 +286,38 @@ func TestCodexResponsesCompactPayloadMatchesCLIProxyAPITranslator(t *testing.T) 
 	if value, exists := payload["instructions"]; !exists || value != "" {
 		t.Fatalf("compact must set instructions=\"\" (CLIProxyAPI normalizeCodexInstructions), got exists=%v value=%v", exists, value)
 	}
+	if _, ok := payload["client_metadata"]; ok {
+		// Diagnosed against live srapi.senran.net traffic: Codex /compact returns
+		// {"error":{"code":"unknown_parameter","param":"client_metadata", ...}}
+		// when this srapi-specific field is present. CLIProxyAPI never sends it.
+		t.Fatalf("compact must NOT carry client_metadata (Codex /compact rejects it), got %+v", payload)
+	}
+}
+
+func TestCodexResponsesCompactPayloadStripsClientMetadataEvenWhenRequestSettingsSetIt(t *testing.T) {
+	// Regression: codexApplyClientMetadataSettings populates client_metadata
+	// from request settings (x-codex-installation-id, x-codex-turn-metadata,
+	// x-codex-window-id, beta-features). For /compact the upstream rejects
+	// the field outright (live srapi.senran.net diagnosis returned
+	// {"code":"unknown_parameter","param":"client_metadata"}), so the
+	// final payload normalizer must drop it after settings populated it.
+	payload, _, err := codexResponsesPayload(contract.ConversationRequest{
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses/compact",
+		RawBody:        []byte(`{"model":"codex-local","input":"hello"}`),
+		RequestSettings: map[string]any{
+			"codex_installation_id": "install-xyz",
+			"codex_window_id":       "window-xyz",
+			"codex_turn_metadata":   `{"prompt_cache_key":"pck-xyz"}`,
+		},
+		Mapping: modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+	})
+	if err != nil {
+		t.Fatalf("build codex compact payload with client_metadata settings: %v", err)
+	}
+	if _, ok := payload["client_metadata"]; ok {
+		t.Fatalf("client_metadata must be stripped for compact even when settings populated it, got %+v", payload)
+	}
 }
 
 func TestCodexResponsesPayloadStrandedSystemRoleBecomesDeveloper(t *testing.T) {
