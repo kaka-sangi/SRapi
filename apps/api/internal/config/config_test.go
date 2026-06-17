@@ -664,6 +664,55 @@ func TestObservabilityDefaultsOverridesAndValidation(t *testing.T) {
 	}
 }
 
+func TestCodexConfigModeDefaultsAndOverrides(t *testing.T) {
+	t.Setenv("CODEX_DISABLE_IMAGE_GENERATION", "")
+	t.Setenv("CODEX_MODEL_ALIAS_JSON", "")
+	cfg := Load()
+	if cfg.Codex.DisableImageGeneration != "never" {
+		t.Fatalf("default DisableImageGeneration = %q, want never", cfg.Codex.DisableImageGeneration)
+	}
+	if len(cfg.Codex.ModelAlias) != 0 {
+		t.Fatalf("default ModelAlias should be empty, got %v", cfg.Codex.ModelAlias)
+	}
+
+	for _, value := range []string{"never", "always", "auto", "ALWAYS", "Auto"} {
+		t.Setenv("CODEX_DISABLE_IMAGE_GENERATION", value)
+		cfg = Load()
+		want := strings.ToLower(strings.TrimSpace(value))
+		if cfg.Codex.DisableImageGeneration != want {
+			t.Fatalf("value %q parsed as %q, want %q", value, cfg.Codex.DisableImageGeneration, want)
+		}
+	}
+
+	// Unknown values fall back to "never" (fail-safe allow).
+	t.Setenv("CODEX_DISABLE_IMAGE_GENERATION", "panic")
+	cfg = Load()
+	if cfg.Codex.DisableImageGeneration != "never" {
+		t.Fatalf("unknown value should fall back to never, got %q", cfg.Codex.DisableImageGeneration)
+	}
+
+	// Nested JSON map parses, lower-cases the channel, trims whitespace.
+	t.Setenv("CODEX_MODEL_ALIAS_JSON", `{" OpenAI ":{" gpt-5-codex ":" gpt-5.1-codex-internal "}, "claude":{"":""}}`)
+	cfg = Load()
+	openai, ok := cfg.Codex.ModelAlias["openai"]
+	if !ok {
+		t.Fatalf("expected lower-cased openai key, got %v", cfg.Codex.ModelAlias)
+	}
+	if openai["gpt-5-codex"] != "gpt-5.1-codex-internal" {
+		t.Fatalf("expected trimmed gpt-5-codex->gpt-5.1-codex-internal, got %v", openai)
+	}
+	if _, present := cfg.Codex.ModelAlias["claude"]; present {
+		t.Fatalf("blank-only channel must be dropped, got %v", cfg.Codex.ModelAlias)
+	}
+
+	// Malformed JSON falls back to empty map (never nil/panic).
+	t.Setenv("CODEX_MODEL_ALIAS_JSON", "not json")
+	cfg = Load()
+	if cfg.Codex.ModelAlias == nil || len(cfg.Codex.ModelAlias) != 0 {
+		t.Fatalf("malformed JSON should yield empty map, got %v", cfg.Codex.ModelAlias)
+	}
+}
+
 func validReleaseConfig() Config {
 	cfg := Load()
 	cfg.Server.Mode = "release"

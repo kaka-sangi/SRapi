@@ -11,6 +11,7 @@ import (
 	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	"github.com/srapi/srapi/apps/api/internal/config"
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
@@ -24,6 +25,10 @@ type Service struct {
 	// has no upstream base_url. It MUST stay false outside local/dev mode so a
 	// misconfigured account can never bill a customer for counterfeit output.
 	allowLocalStub bool
+	// cfg carries the global Codex modes (OAuth model alias map +
+	// disable-image-generation enum) ported from CLIProxyAPI. nil is treated
+	// as a no-op by the helpers in codex_config_modes.go.
+	cfg *config.Config
 }
 
 // Option configures the provider-adapter Service.
@@ -33,6 +38,13 @@ type Option func(*Service)
 // account has no upstream base_url, instead of returning a configuration error.
 func WithLocalStub(enabled bool) Option {
 	return func(s *Service) { s.allowLocalStub = enabled }
+}
+
+// WithConfig injects the deployment config so the Codex request-build path
+// can consult the global OAuthModelAlias map and the DisableImageGeneration
+// enum. Passing nil (the default) leaves both modes as no-ops.
+func WithConfig(cfg *config.Config) Option {
+	return func(s *Service) { s.cfg = cfg }
 }
 
 func New(client *http.Client, opts ...Option) (*Service, error) {

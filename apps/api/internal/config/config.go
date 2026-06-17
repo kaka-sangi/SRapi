@@ -43,6 +43,35 @@ type Config struct {
 	ScheduledTest    ScheduledTestConfig
 	ProxyProbe       ProxyProbeConfig
 	OAuth            OAuthConfig
+	// Codex carries the global Codex provider modes ported from CLIProxyAPI:
+	// the per-channel OAuth model-name alias map and the global
+	// disable-image-generation enum. Both are no-ops when unset, which is the
+	// default behaviour.
+	Codex CodexConfig
+}
+
+// CodexConfig holds global Codex provider modes ported verbatim from
+// CLIProxyAPI's config.OAuthModelAlias and config.DisableImageGenerationMode.
+//
+// ModelAlias is a nested map keyed by upstream OAuth channel (e.g. "openai"),
+// then by the canonical client-visible model name. The value is the upstream
+// alias the request should be rewritten to before being sent to the provider.
+// Exact-match only — no glob/wildcard support, mirroring the CLIProxyAPI
+// behaviour. Channel keys are lower-cased; canonical names are matched
+// case-sensitively (the upstream model registry is case-sensitive).
+//
+// DisableImageGeneration is a three-state enum that controls whether the
+// hosted `image_generation` tool is allowed on Codex non-images endpoints:
+//   - "never"  (default): pass through; the gateway makes no decision.
+//   - "always": always reject any request that ships an `image_generation`
+//     tool in its tools array — the gateway short-circuits with a
+//     ProviderError class="image_generation_disabled".
+//   - "auto":  reject only when the inbound User-Agent looks like a Codex
+//     CLI version known to mis-route the tool. The matcher is the same
+//     case-insensitive regex CLIProxyAPI uses (see CodexDisableImageGenAutoUARegex).
+type CodexConfig struct {
+	ModelAlias             map[string]map[string]string
+	DisableImageGeneration string
 }
 
 // ProxyProbeConfig controls the proxy availability probe worker, which dials
@@ -438,6 +467,61 @@ func Load() Config {
 			ClientSecrets: parseStringMapEnv("OAUTH_CLIENT_SECRETS_JSON"),
 			Issuers:       parseStringMapEnv("OAUTH_ISSUERS_JSON"),
 		},
+		Codex: CodexConfig{
+			ModelAlias:             parseNestedStringMapEnv("CODEX_MODEL_ALIAS_JSON"),
+			DisableImageGeneration: normalizeCodexDisableImageGenMode(getEnv("CODEX_DISABLE_IMAGE_GENERATION", "never")),
+		},
+	}
+}
+
+// parseNestedStringMapEnv parses a JSON object of objects env var
+// ({"channel":{"canonical":"alias"}}) into a nested string map. The outer
+// channel keys are lower-cased and trimmed; inner keys are trimmed but kept
+// case-sensitive (upstream model IDs are case-sensitive). Returns an empty
+// map for any unset / malformed input so callers never see nil.
+func parseNestedStringMapEnv(key string) map[string]map[string]string {
+	out := map[string]map[string]string{}
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return out
+	}
+	parsed := map[string]map[string]string{}
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		return out
+	}
+	for channel, aliases := range parsed {
+		channel = strings.ToLower(strings.TrimSpace(channel))
+		if channel == "" || len(aliases) == 0 {
+			continue
+		}
+		clean := map[string]string{}
+		for canonical, alias := range aliases {
+			canonical = strings.TrimSpace(canonical)
+			alias = strings.TrimSpace(alias)
+			if canonical == "" || alias == "" {
+				continue
+			}
+			clean[canonical] = alias
+		}
+		if len(clean) > 0 {
+			out[channel] = clean
+		}
+	}
+	return out
+}
+
+// normalizeCodexDisableImageGenMode coerces an env-supplied value into the
+// canonical three-state enum {"never","always","auto"}. Unknown values fall
+// back to "never" — the gateway must fail safe (allow), never block on
+// misconfiguration.
+func normalizeCodexDisableImageGenMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "always":
+		return "always"
+	case "auto":
+		return "auto"
+	default:
+		return "never"
 	}
 }
 

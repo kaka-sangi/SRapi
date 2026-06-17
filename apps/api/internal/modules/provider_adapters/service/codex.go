@@ -184,6 +184,27 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 			codexApplyImageGenerationInstructions(payload)
 		}
 	}
+	// Global config modes ported verbatim from CLIProxyAPI: the
+	// OAuthModelAlias map and the DisableImageGeneration enum. Both
+	// consult s.cfg via nil-safe helpers in codex_config_modes.go — when
+	// the deployment hasn't opted in this is a no-op.
+	//
+	// The alias swap rewrites the upstream `model` field AFTER the auto-
+	// inject block above (so spark/free-plan gating sees the canonical
+	// model) but BEFORE the request marshal, so the upstream sees the
+	// rewritten name. The disable-image-gen gate runs after the
+	// auto-inject so it can short-circuit even on requests that did not
+	// arrive with a tool but had one synthesized into them.
+	if aliased := ResolveCodexModelAlias(s.cfg, "openai", codexStringValue(payload["model"])); aliased != "" {
+		payload["model"] = aliased
+	}
+	if ShouldDisableCodexImageGeneration(s.cfg, codexUserAgent(req)) && codexPayloadHasImageGenerationTool(payload) {
+		return contract.ConversationResponse{}, contract.ProviderError{
+			Class:      "image_generation_disabled",
+			StatusCode: http.StatusBadRequest,
+			Message:    "image_generation tool is disabled for this gateway deployment",
+		}
+	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return contract.ConversationResponse{}, err
