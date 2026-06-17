@@ -6198,7 +6198,7 @@ func TestReverseProxyCodexCLIAdapterPreservesResponsesToolResultImageInputs(t *t
 			t.Fatalf("expected nested tool result image to become input_image, got %+v", payload.Input[1])
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: [DONE]\n\n"))
+		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n"))
 	}))
 	defer upstream.Close()
 
@@ -6288,7 +6288,7 @@ func TestReverseProxyCodexCLIAdapterPreservesResponsesFunctionCallInputs(t *test
 			t.Fatalf("expected function_call_output item, got %+v", payload.Input[2])
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: [DONE]\n\n"))
+		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n"))
 	}))
 	defer upstream.Close()
 
@@ -6370,7 +6370,7 @@ func TestReverseProxyCodexCLIAdapterPreservesResponsesCustomToolInputField(t *te
 			t.Fatalf("expected custom_tool_call_output item, got %+v", payload.Input[1])
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: [DONE]\n\n"))
+		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n"))
 	}))
 	defer upstream.Close()
 
@@ -6465,7 +6465,7 @@ func TestReverseProxyCodexCLIAdapterPreservesHostedToolInputItems(t *testing.T) 
 			t.Fatalf("expected tool_search_output item, got %+v", payload.Input[2])
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: [DONE]\n\n"))
+		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n"))
 	}))
 	defer upstream.Close()
 
@@ -6561,7 +6561,7 @@ func TestReverseProxyCodexCLIAdapterPreservesResponsesContextInputItems(t *testi
 			t.Fatalf("expected user message item, got %+v", payload.Input[2])
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: [DONE]\n\n"))
+		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n"))
 	}))
 	defer upstream.Close()
 
@@ -7774,7 +7774,7 @@ func TestReverseProxyCodexCLIAdapterPreservesReasoningTextDeltas(t *testing.T) {
 					"data: {\"type\":\"response.reasoning_text.done\",\"item_id\":\"rs_1\",\"output_index\":0,\"content_index\":0,\"text\":\"think first\"}\n\n" +
 					"data: {\"type\":\"response.output_text.delta\",\"item_id\":\"msg_1\",\"output_index\":1,\"content_index\":0,\"delta\":\"answer\"}\n\n" +
 					"data: {\"type\":\"response.output_text.done\",\"item_id\":\"msg_1\",\"output_index\":1,\"content_index\":0,\"text\":\"answer\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -7828,7 +7828,7 @@ func TestReverseProxyCodexCLIAdapterPreservesReasoningSummaryTextDeltas(t *testi
 					"data: {\"type\":\"response.reasoning_summary_text.delta\",\"item_id\":\"rs_1\",\"output_index\":0,\"content_index\":0,\"delta\":\"only\"}\n\n" +
 					"data: {\"type\":\"response.reasoning_summary_text.done\",\"item_id\":\"rs_1\",\"output_index\":0,\"content_index\":0,\"text\":\"summary only\"}\n\n" +
 					"data: {\"type\":\"response.output_text.delta\",\"item_id\":\"msg_1\",\"output_index\":1,\"content_index\":0,\"delta\":\"answer\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -7879,9 +7879,14 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesCompactEndpoint(t *testing.T) {
 			t.Fatalf("decode codex compact payload: %v", err)
 		}
 		if payload["model"] != "codex-upstream" ||
-			payload["previous_response_id"] != "resp_previous" ||
-			payload["stream"] != false {
+			payload["previous_response_id"] != "resp_previous" {
 			t.Fatalf("expected compact raw responses payload with mapped model, got %+v", payload)
+		}
+		// Codex /responses/compact is non-streaming by contract; the adapter
+		// strips `stream` (and `store`) before forwarding — mirrors sub2api
+		// normalizeOpenAIPassthroughOAuthBody.
+		if _, hasStream := payload["stream"]; hasStream {
+			t.Fatalf("expected stream field stripped on compact path, got %+v", payload)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":"cmp_1","object":"response.compaction","input_tokens":12,"output_tokens":3}`))
@@ -7935,7 +7940,7 @@ func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"cli \"}\n\n" +
 					"data: {\"type\":\"response.output_text.delta\",\"delta\":\"response\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -8148,7 +8153,7 @@ func TestReverseProxyCodexCLIAdapterAllowsImagesEndpointWhenImageGenerationDisab
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"ig_1\",\"type\":\"image_generation_call\",\"status\":\"completed\",\"result\":\"aW1hZ2U=\",\"output_format\":\"png\"}}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -8194,7 +8199,7 @@ func TestReverseProxyCodexCLIAdapterAccountCanOverrideProviderImageGenerationDis
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"ig_1\",\"type\":\"image_generation_call\",\"status\":\"completed\",\"result\":\"aW1hZ2U=\",\"output_format\":\"png\"}}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -8517,7 +8522,7 @@ func TestReverseProxyCodexCLIAdapterUsesConfiguredOriginator(t *testing.T) {
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"originator\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -8559,7 +8564,7 @@ func TestReverseProxyCodexCLIAdapterAddsDefaultInstructionsWhenMissing(t *testin
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"default instructions\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -8602,7 +8607,7 @@ func TestReverseProxyCodexCLIAdapterUsesConfiguredDefaultInstructions(t *testing
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"custom instructions\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -8650,7 +8655,7 @@ func TestReverseProxyCodexCLIAdapterPreservesRawResponsesPayload(t *testing.T) {
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"raw response\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -8836,7 +8841,7 @@ func TestReverseProxyCodexCLIAdapterRetriesPreviousResponseNotFoundWithReplayabl
 				StatusCode: http.StatusOK,
 				Body: []byte(
 					"data: {\"type\":\"response.output_text.delta\",\"delta\":\"recovered\"}\n\n" +
-						"data: [DONE]\n\n",
+						"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 				),
 			},
 		},
@@ -9058,7 +9063,7 @@ func TestReverseProxyCodexCLIAdapterPinsSessionHeadersToPromptCacheKey(t *testin
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -9105,7 +9110,7 @@ func TestReverseProxyCodexCLIAdapterNormalizesRawToolRoleInput(t *testing.T) {
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"tool output\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -9173,7 +9178,7 @@ func TestReverseProxyCodexCLIAdapterStringifiesRawInputTextValues(t *testing.T) 
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"stringified\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -9233,7 +9238,7 @@ func TestReverseProxyCodexCLIAdapterNormalizesLegacyFunctionFields(t *testing.T)
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"legacy tools\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -9303,7 +9308,7 @@ func TestReverseProxyCodexCLIAdapterNormalizesToolSchemasAndInvalidChoice(t *tes
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"schema tools\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -9372,7 +9377,7 @@ func TestReverseProxyCodexCLIAdapterNormalizesRawImageGenerationToolAliases(t *t
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"image tool\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -9441,7 +9446,7 @@ func TestReverseProxyCodexCLIAdapterNormalizesCanonicalImageGenerationToolAliase
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"canonical image tool\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -9500,7 +9505,7 @@ func TestReverseProxyCodexCLIAdapterInjectsImageGenerationToolWhenBridgeEnabled(
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"bridge\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -9553,7 +9558,7 @@ func TestReverseProxyCodexCLIAdapterAccountCanDisableProviderImageGenerationBrid
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"no bridge\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -9605,7 +9610,7 @@ func TestReverseProxyCodexCLIAdapterDisableImageGenerationRemovesClientTool(t *t
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"no image tool\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -9670,7 +9675,7 @@ func TestReverseProxyCodexCLIAdapterAddsSparkImageUnsupportedInstructions(t *tes
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"spark\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -9726,7 +9731,7 @@ func TestReverseProxyCodexCLIAdapterBridgeEnabledDoesNotInjectImageToolForSpark(
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"spark bridge\"}\n\n" +
-					"data: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}

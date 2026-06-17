@@ -171,9 +171,12 @@ func TestGatewayCodexResponsesCompactReplaysRawJSON(t *testing.T) {
 		t.Fatalf("expected compact upstream path, got %q", upstreamPath)
 	}
 	if upstreamPayload["model"] != "codex-compact-upstream" ||
-		upstreamPayload["previous_response_id"] != "resp_prev" ||
-		upstreamPayload["stream"] != false {
+		upstreamPayload["previous_response_id"] != "resp_prev" {
 		t.Fatalf("expected mapped compact payload, got %+v", upstreamPayload)
+	}
+	// /responses/compact is non-streaming — adapter must strip `stream`.
+	if _, hasStream := upstreamPayload["stream"]; hasStream {
+		t.Fatalf("expected stream field stripped on compact path, got %+v", upstreamPayload)
 	}
 	var response map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {

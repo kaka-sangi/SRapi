@@ -306,6 +306,14 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 		payload["stream"] = true
 		payload["store"] = codexResponsesDefaultInternalStoreValue
 		payload["parallel_tool_calls"] = true
+	} else {
+		// Compact endpoint is non-streaming by contract — sub2api
+		// normalizeOpenAIPassthroughOAuthBody (openai_gateway_service.go:6516)
+		// strips both `stream` and `store` when forwarding to
+		// /responses/compact. The upstream rejects requests that still carry
+		// stream:true with "provider rejected request".
+		delete(payload, "stream")
+		delete(payload, "store")
 	}
 	for _, field := range codexUnsupportedResponsesFields() {
 		delete(payload, field)

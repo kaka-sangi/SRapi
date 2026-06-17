@@ -38,24 +38,73 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 			providerScoped[normalized.Key] = normalized
 		}
 	}
-	providerCaps := provider.Capabilities
-	if len(providerCaps) == 0 {
-		providerCaps = presetCapabilitiesForAdapter(provider.AdapterType)
-	}
-	for key, value := range providerCaps {
-		capabilityKey, ok := capabilitiescontract.CanonicalKeyFromConvenience(key)
-		if ok && boolValue(value) {
-			merged[capabilityKey] = capabilityRequirement(capabilityKey)
-			providerScoped[capabilityKey] = capabilityRequirement(capabilityKey)
-		}
-	}
-	for key, value := range account.Metadata {
-		if strings.HasPrefix(key, "capability_") && boolValue(value) {
-			capabilityKey := strings.TrimPrefix(key, "capability_")
-			if canonicalKey, ok := capabilitiescontract.CanonicalKeyFromConvenience(capabilityKey); ok {
+	// Preset baseline always merges in first: provider.Capabilities and account
+	// metadata then act as overrides (true to enable, false to disable) rather
+	// than full replacements. This mirrors sub2api's account-extra capability
+	// shape and matches the ported behavior tested by
+	// TestEffectiveCapabilitiesUsesPresetBaselineWithProviderOverrides.
+	explicitlyDisabled := map[string]bool{}
+	if presetCaps := presetCapabilitiesForAdapter(provider.AdapterType); len(presetCaps) > 0 {
+		for key, value := range presetCaps {
+			canonicalKey, ok := capabilitiescontract.CanonicalKeyFromConvenience(key)
+			if !ok {
+				continue
+			}
+			if boolValue(value) {
 				merged[canonicalKey] = capabilityRequirement(canonicalKey)
 				providerScoped[canonicalKey] = capabilityRequirement(canonicalKey)
 			}
+		}
+	}
+	for key, value := range provider.Capabilities {
+		capabilityKey, ok := capabilitiescontract.CanonicalKeyFromConvenience(key)
+		if !ok {
+			continue
+		}
+		if boolValue(value) {
+			merged[capabilityKey] = capabilityRequirement(capabilityKey)
+			providerScoped[capabilityKey] = capabilityRequirement(capabilityKey)
+		} else {
+			explicitlyDisabled[capabilityKey] = true
+			delete(merged, capabilityKey)
+			delete(providerScoped, capabilityKey)
+		}
+	}
+	for key, value := range account.Metadata {
+		if !strings.HasPrefix(key, "capability_") {
+			continue
+		}
+		capabilityKey := strings.TrimPrefix(key, "capability_")
+		canonicalKey, ok := capabilitiescontract.CanonicalKeyFromConvenience(capabilityKey)
+		if !ok {
+			continue
+		}
+		if boolValue(value) {
+			merged[canonicalKey] = capabilityRequirement(canonicalKey)
+			providerScoped[canonicalKey] = capabilityRequirement(canonicalKey)
+			delete(explicitlyDisabled, canonicalKey)
+		} else {
+			explicitlyDisabled[canonicalKey] = true
+			delete(merged, canonicalKey)
+			delete(providerScoped, canonicalKey)
+		}
+	}
+	// Auto-include responses_compact whenever the merged set already declares
+	// responses: compact is a strict non-streaming subset of /v1/responses, so
+	// any account that can serve full responses can also serve compact. The
+	// override is suppressed when the operator explicitly disabled compact via
+	// provider.Capabilities[responses_compact]=false, account metadata
+	// capability_responses_compact=false, or the
+	// metadata.disable_responses_compact opt-out flag. Mirrors sub2api's
+	// openai_gateway_service.openAICompactSupportTier which treats compact
+	// support as a tier on top of /responses rather than an parallel
+	// capability requirement.
+	if _, hasResponses := merged[capabilitiescontract.KeyResponses]; hasResponses &&
+		!explicitlyDisabled[capabilitiescontract.KeyResponsesCompact] &&
+		!disableResponsesCompactOptedOut(provider, account) {
+		if _, ok := merged[capabilitiescontract.KeyResponsesCompact]; !ok {
+			merged[capabilitiescontract.KeyResponsesCompact] = capabilityRequirement(capabilitiescontract.KeyResponsesCompact)
+			providerScoped[capabilitiescontract.KeyResponsesCompact] = capabilityRequirement(capabilitiescontract.KeyResponsesCompact)
 		}
 	}
 	for _, key := range providerScopedCapabilityKeys() {
@@ -69,6 +118,22 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
 	return out
+}
+
+// disableResponsesCompactOptedOut reports whether the operator explicitly
+// suppressed the responses_compact auto-include via metadata. Provider or
+// account metadata may set disable_responses_compact=true to force compact
+// requests to fall back to cross-protocol synthesis on this account.
+func disableResponsesCompactOptedOut(provider providercontract.Provider, account accountcontract.ProviderAccount) bool {
+	if metadataBool(account.Metadata, "disable_responses_compact") {
+		return true
+	}
+	for _, source := range []map[string]any{provider.Capabilities, provider.ConfigSchema} {
+		if metadataBool(source, "disable_responses_compact") {
+			return true
+		}
+	}
+	return false
 }
 
 func capabilityRequirement(key string) capabilitiescontract.Descriptor {

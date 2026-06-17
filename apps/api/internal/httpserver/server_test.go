@@ -4631,7 +4631,7 @@ func TestGatewayAnthropicCountTokensSchedulesAnthropicCompatibleUpstream(t *test
 func TestGatewayAnthropicCountTokensRequiresProviderScopedCapability(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"anthropic-count-missing-cap-provider","display_name":"Anthropic Missing Count Capability","adapter_type":"anthropic-compatible","protocol":"anthropic-compatible","status":"active","capabilities":{"messages":true}}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"anthropic-count-missing-cap-provider","display_name":"Anthropic Missing Count Capability","adapter_type":"anthropic-compatible","protocol":"anthropic-compatible","status":"active","capabilities":{"messages":true,"token_counting":false}}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"anthropic-count-missing-cap-model","display_name":"Anthropic Missing Count Capability Model","status":"active","capabilities":[{"key":"token_counting","level":"required","status":"stable","version":"v1"}]}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"claude-count-upstream","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"anthropic-count-missing-cap-account","runtime_class":"api_key","credential":{"api_key":"anthropic-count-secret"},"metadata":{"base_url":"https://api.anthropic.com/v1"},"status":"active"}`)
@@ -4665,10 +4665,13 @@ func TestGatewayAnthropicCountTokensRequiresProviderScopedCapability(t *testing.
 func TestGatewayResponsesCompactRequiresProviderScopedCapability(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"compact-missing-cap-provider","display_name":"Compact Missing Capability","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"responses":true}}`)
+	// Provider declares only /responses; operator explicitly opts the account
+	// out of the responses_compact auto-include (compact is normally a strict
+	// non-streaming subset of responses — see effectiveCapabilities).
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"compact-missing-cap-provider","display_name":"Compact Missing Capability","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"responses":true,"responses_compact":false}}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"compact-missing-cap-model","display_name":"Compact Missing Capability Model","status":"active","capabilities":[{"key":"responses_compact","level":"required","status":"stable","version":"v1"}]}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"compact-upstream","status":"active"}`)
-	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"compact-missing-cap-account","runtime_class":"api_key","credential":{"api_key":"compact-secret"},"metadata":{"base_url":"https://api.openai.com/v1"},"status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"compact-missing-cap-account","runtime_class":"api_key","credential":{"api_key":"compact-secret"},"metadata":{"base_url":"https://api.openai.com/v1","disable_responses_compact":true},"status":"active"}`)
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses/compact", strings.NewReader(`{"model":"compact-missing-cap-model","input":"compact"}`))

@@ -656,7 +656,15 @@ func realtimeSetting(req contract.RealtimeRequest, keys ...string) string {
 }
 
 func parseCodexResponsesBody(body []byte, statusCode int) (contract.ConversationResponse, error) {
-	return parseCodexResponsesBodyWithOptions(body, statusCode, codexResponsesParseOptions{})
+	// Mirror CLIProxyAPI codex_executor.go and sub2api openai_backend_api.py:
+	// the upstream Codex SSE stream MUST end with response.completed /
+	// response.done / response.failed, otherwise the connection was cut
+	// mid-flight (TCP reset, reverse-proxy buffer overflow, ctx cancel) and
+	// we must surface that as a typed stream_interrupted error so the
+	// scheduler's failover classifier can retry on the next candidate
+	// account instead of returning a silently truncated success to the
+	// client.
+	return parseCodexResponsesBodyWithOptions(body, statusCode, codexResponsesParseOptions{RequireTerminalEvent: true})
 }
 
 type codexResponsesParseOptions struct {
