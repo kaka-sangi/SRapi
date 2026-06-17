@@ -69,7 +69,7 @@ func TestGatewayCodexRefreshTokenOnlyCreateCanRequestResponses(t *testing.T) {
 				t.Fatalf("unexpected codex responses payload: %+v", payload)
 			}
 			w.Header().Set("Content-Type", "text/event-stream")
-			_, _ = io.WriteString(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"codex create ok\"}\n\ndata: [DONE]\n\n")
+			_, _ = io.WriteString(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"codex create ok\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":0,\"output_tokens\":0}}}\n\ndata: [DONE]\n\n")
 		default:
 			t.Fatalf("unexpected upstream path %s", r.URL.Path)
 		}
@@ -209,7 +209,7 @@ func TestGatewayCodexConvertsTextEndpointsToResponsesUpstream(t *testing.T) {
 			Payload:       payload,
 		})
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = io.WriteString(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"codex converted ok\"}\n\ndata: [DONE]\n\n")
+		_, _ = io.WriteString(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"codex converted ok\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":0,\"output_tokens\":0}}}\n\ndata: [DONE]\n\n")
 	}))
 	defer upstream.Close()
 
@@ -290,7 +290,7 @@ func TestGatewayCodexResponsesRawBodyClearedAfterContentSafetyRedaction(t *testi
 			t.Fatalf("decode codex payload: %v", err)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = io.WriteString(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"codex redacted ok\"}\n\ndata: [DONE]\n\n")
+		_, _ = io.WriteString(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"codex redacted ok\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":0,\"output_tokens\":0}}}\n\ndata: [DONE]\n\n")
 	}))
 	defer upstream.Close()
 
@@ -393,7 +393,7 @@ func TestGatewayCodexRefreshTokenOnlyUpdateCanRequestResponses(t *testing.T) {
 		case "/backend-api/codex/responses":
 			responseAuthorization = r.Header.Get("Authorization")
 			w.Header().Set("Content-Type", "text/event-stream")
-			_, _ = io.WriteString(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"codex update ok\"}\n\ndata: [DONE]\n\n")
+			_, _ = io.WriteString(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"codex update ok\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":0,\"output_tokens\":0}}}\n\ndata: [DONE]\n\n")
 		default:
 			t.Fatalf("unexpected upstream path %s", r.URL.Path)
 		}
