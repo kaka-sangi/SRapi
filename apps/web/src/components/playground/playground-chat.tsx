@@ -16,6 +16,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { writeClipboard } from "@/components/ui/copy-button";
 import { Markdown } from "@/components/ui/markdown";
 import { Composer } from "@/components/chat/composer";
 import { ReasoningBlock } from "@/components/chat/reasoning-block";
@@ -451,13 +452,12 @@ function AssistantFooter({
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard unavailable (insecure context / denied permission) — ignore.
-    }
+    // writeClipboard tries the async API then falls back to execCommand for
+    // insecure contexts; flash "Copied" only when something actually landed.
+    const ok = await writeClipboard(content);
+    if (!ok) return;
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   };
 
   const latencyLabel =

@@ -4,6 +4,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import { Copy, Check, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { writeClipboard } from "@/components/ui/copy-button";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import {
   useAccountHealth,
@@ -444,7 +445,8 @@ function CopyableUrl({ url }: { url: string }) {
     <button
       type="button"
       onClick={() => {
-        void navigator.clipboard?.writeText(url).then(() => {
+        void writeClipboard(url).then((ok) => {
+          if (!ok) return;
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         });

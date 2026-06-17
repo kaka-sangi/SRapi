@@ -10,6 +10,7 @@ import type { ApiKeySummary } from "@/lib/srapi-types";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { Card } from "@/components/ui/card";
+import { writeClipboard } from "@/components/ui/copy-button";
 import {
   Table,
   TableScroll,
@@ -232,7 +233,8 @@ function KeyPrefixCopy({ prefix }: { prefix: string }) {
     <button
       type="button"
       onClick={() => {
-        void navigator.clipboard?.writeText(prefix).then(() => {
+        void writeClipboard(prefix).then((ok) => {
+          if (!ok) return;
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         });

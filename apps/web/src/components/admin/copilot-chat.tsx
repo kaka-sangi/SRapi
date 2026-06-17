@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { writeClipboard } from "@/components/ui/copy-button";
 import { Badge } from "@/components/ui/badge";
 import { Markdown } from "@/components/ui/markdown";
 import { useLanguage } from "@/context/LanguageContext";
@@ -487,7 +488,8 @@ function MessageActions({
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const copy = () => {
-    void navigator.clipboard?.writeText(text).then(() => {
+    void writeClipboard(text).then((ok) => {
+      if (!ok) return;
       setCopied(true);
       toast({ title: t("copilot.copied") });
       setTimeout(() => setCopied(false), 1500);
