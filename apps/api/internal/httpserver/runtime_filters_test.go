@@ -64,3 +64,48 @@ func idsOf(items []usagecontract.UsageLog) []string {
 	}
 	return out
 }
+
+// TestFilterUsageLogsStartEndWindow covers the time-range filter the iter-33
+// shared window-preset module ultimately drives ("start" param resolved from
+// the chosen preset's minutes-back-from-now). Catches: bare YYYY-MM-DD
+// accepted as start, RFC3339 accepted, and the bound is inclusive on the
+// boundary timestamp (Before semantics).
+func TestFilterUsageLogsStartEndWindow(t *testing.T) {
+	base := time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC)
+	items := []usagecontract.UsageLog{
+		{ID: 1, CreatedAt: base.Add(-48 * time.Hour)}, // 2 days ago
+		{ID: 2, CreatedAt: base.Add(-2 * time.Hour)},  // 2h ago
+		{ID: 3, CreatedAt: base},                      // exactly now
+		{ID: 4, CreatedAt: base.Add(time.Hour)},       // in the future
+	}
+
+	// start = base - 4h (RFC3339) keeps rows 2, 3, 4.
+	since := base.Add(-4 * time.Hour).Format(time.RFC3339)
+	r := httptest.NewRequest("GET", "/?start="+since, nil)
+	got := filterUsageLogs(items, r)
+	if len(got) != 3 || got[0].ID != 2 || got[2].ID != 4 {
+		t.Fatalf("start=%s: want [2 3 4], got %v", since, idsOf(got))
+	}
+
+	// end = base (RFC3339) drops the future row (4) and keeps the boundary.
+	until := base.Format(time.RFC3339)
+	r = httptest.NewRequest("GET", "/?end="+until, nil)
+	got = filterUsageLogs(items, r)
+	if len(got) != 3 || got[2].ID != 3 {
+		t.Fatalf("end=%s: want rows ending at id 3, got %v", until, idsOf(got))
+	}
+
+	// Bare YYYY-MM-DD start is accepted (iter-33 sometimes sends dates).
+	r = httptest.NewRequest("GET", "/?start=2026-06-16", nil)
+	got = filterUsageLogs(items, r)
+	if len(got) != 3 {
+		t.Fatalf("bare-date start: want 3 rows, got %d (%v)", len(got), idsOf(got))
+	}
+
+	// Unparseable start is treated as no bound — should not 500 or drop rows.
+	r = httptest.NewRequest("GET", "/?start=garbage", nil)
+	got = filterUsageLogs(items, r)
+	if len(got) != 4 {
+		t.Fatalf("unparseable start: want all 4 rows, got %d (%v)", len(got), idsOf(got))
+	}
+}
