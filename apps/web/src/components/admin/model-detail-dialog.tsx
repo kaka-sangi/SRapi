@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { CopyButton } from "@/components/ui/copy-button";
 import {
   useModelAliases,
   useModelMappings,
@@ -110,7 +111,10 @@ export function ModelDetailDialog({
         <DialogHeader>
           <DialogTitle>{t("adminModels.manageTitle")}</DialogTitle>
         </DialogHeader>
-        <p className="-mt-1 font-mono text-2xs text-srapi-text-tertiary">{model.canonical_name}</p>
+        <p className="-mt-1 flex items-center gap-1.5 font-mono text-2xs text-srapi-text-tertiary">
+          <span>{model.canonical_name}</span>
+          <CopyButton value={model.canonical_name} size="inline" />
+        </p>
 
         <div className="mt-4 max-h-[60vh] space-y-6 overflow-y-auto pr-1">
           <section>
