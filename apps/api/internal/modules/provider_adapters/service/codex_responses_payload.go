@@ -269,6 +269,14 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 	if model := contract.NormalizeCodexUpstreamModelName(req.Mapping.UpstreamModelName); model != "" {
 		payload["model"] = model
 	}
+	// Component #5 (instructions normalization), ported from CLIProxyAPI
+	// internal/runtime/executor/codex_executor_instructions_test.go: when the
+	// caller supplies instructions: null (or an empty/whitespace string), the
+	// upstream rejects the request unless we forward an explicit empty string.
+	// codexEnsureResponsesInstructions below will substitute the model default
+	// when the field is missing, so we only need to coerce typed-null and
+	// whitespace into "" here.
+	codexNormalizeInstructionsField(payload)
 	codexNormalizeResponsesInput(payload)
 	codexLiftInstructionInputItems(payload)
 	codexNormalizeResponsesText(payload)
@@ -304,7 +312,57 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 	}
 }
 
+// codexInstructionsNormalizedSentinel marks an explicit caller-supplied
+// null/empty instructions string so codexEnsureResponsesInstructions will
+// preserve it instead of substituting a default. Mirrors CLIProxyAPI's
+// behaviour (see codex_executor_instructions_test.go).
+type codexInstructionsNormalizedSentinel struct{}
+
+// codexNormalizeInstructionsField rewrites a caller-supplied typed-null or
+// whitespace-only instructions field to a normalized empty-string marker.
+// codexEnsureResponsesInstructions inspects the marker and forwards "" to
+// the upstream instead of substituting the model default.
+func codexNormalizeInstructionsField(payload map[string]any) {
+	if payload == nil {
+		return
+	}
+	value, exists := payload["instructions"]
+	if !exists {
+		return
+	}
+	switch value.(type) {
+	case nil:
+		// Caller-supplied JSON null. CLIProxyAPI's
+		// TestCodexExecutorExecuteNormalizesNullInstructions asserts that
+		// the upstream receives "" — we mark this so
+		// codexEnsureResponsesInstructions does not replace it with the
+		// configured/model default. Whitespace-only strings are left to the
+		// existing default-substitution path (srapi has historically used
+		// the configured per-account default for whitespace, see
+		// TestReverseProxyCodexCLIAdapterUsesConfiguredDefaultInstructions).
+		payload["instructions"] = codexInstructionsNormalizedSentinel{}
+	}
+}
+
+// codexInstructionsWasNormalizedEmpty reports whether the caller explicitly
+// supplied null/empty/whitespace instructions, which must be forwarded as
+// "" instead of replaced with the model default.
+func codexInstructionsWasNormalizedEmpty(payload map[string]any) bool {
+	if payload == nil {
+		return false
+	}
+	_, ok := payload["instructions"].(codexInstructionsNormalizedSentinel)
+	return ok
+}
+
 func codexEnsureResponsesInstructions(req contract.ConversationRequest, payload map[string]any) {
+	// Caller explicitly sent null/empty/whitespace instructions: forward an
+	// empty string. Mirrors CLIProxyAPI's
+	// TestCodexExecutorExecuteNormalizesNullInstructions assertion.
+	if codexInstructionsWasNormalizedEmpty(payload) {
+		payload["instructions"] = ""
+		return
+	}
 	if strings.TrimSpace(codexStringValue(payload["instructions"])) != "" {
 		return
 	}
