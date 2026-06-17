@@ -16,7 +16,8 @@ import { QuietBadge } from "@/components/ui/quiet-badge";
 import { CopyButton } from "@/components/ui/copy-button";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
-import { useAdminApiKeys, useAdminUsers, useResetAdminApiKeyUsage, useUpdateAdminApiKey } from "@/hooks/admin-queries";
+import { useAdminApiKeys, useResetAdminApiKeyUsage, useUpdateAdminApiKey } from "@/hooks/admin-queries";
+import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { ApiKeyUsageDialog } from "@/components/features/api-key-usage-dialog";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -54,10 +55,10 @@ function ApiKeysContent() {
     status: statusFilter,
     user_id: userFilter,
   });
-  // Audit one user's keys at a time — page-1/200 covers typical installs and
-  // matches the lookup pattern used by error-logs / payment-dashboard panels.
-  const users = useAdminUsers({ page: 1, page_size: 200 });
-  const userOptions = (users.data?.data ?? []).map((u) => ({
+  // Audit one user's keys at a time — the shared lookup hook covers the same
+  // page-1/200 window the inline fetch used to.
+  const userLookup = useUserEmailLookup();
+  const userOptions = (userLookup.query.data?.data ?? []).map((u) => ({
     value: String(u.id),
     label: u.email,
   }));
