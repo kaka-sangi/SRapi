@@ -28,7 +28,7 @@ import {
   type PlaygroundTurnMeta,
 } from "@/lib/playground-client";
 import { fileToImagePart, imagePartToDataUrl, type CopilotImagePart } from "@/lib/image-utils";
-import { gatewayErrorHintKey } from "@/lib/gateway-error-hint";
+import { formatGatewayHintLine } from "@/lib/gateway-error-hint";
 import {
   PlaygroundSettings,
   DEFAULT_PLAYGROUND_PARAMS,
@@ -251,7 +251,7 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
   // Same plain-language diagnosis used in the account test dialog: turn a terse
   // gateway reject message into an actionable hint right where the operator
   // tests the full key → model → account → upstream chain.
-  const errorHint = error ? gatewayErrorHintKey(error) : null;
+  const errorHint = error ? formatGatewayHintLine(error, t) : null;
 
   return (
     <div className="relative flex h-[calc(100vh-9rem)] min-h-[30rem] flex-col">
@@ -302,7 +302,7 @@ export function PlaygroundChat({ models, defaultModel }: { models: string[]; def
                 {errorHint ? (
                   <div className="mt-2 flex items-start gap-1.5 border-t border-srapi-error/20 pt-2 text-2xs text-srapi-text-secondary">
                     <Lightbulb className="mt-0.5 size-3 shrink-0 text-srapi-text-tertiary" />
-                    <span className="[overflow-wrap:anywhere]">{t(`gatewayHints.${errorHint}`)}</span>
+                    <span className="[overflow-wrap:anywhere]">{errorHint}</span>
                   </div>
                 ) : null}
               </div>

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { gatewayErrorHintKey, extractMissingCapabilityKeys } from "@/lib/gateway-error-hint";
+import {
+  gatewayErrorHintKey,
+  extractMissingCapabilityKeys,
+  formatGatewayHintLine,
+} from "@/lib/gateway-error-hint";
 
 describe("gatewayErrorHintKey", () => {
   it("returns null for empty/blank/unknown input", () => {
@@ -114,5 +118,56 @@ describe("extractMissingCapabilityKeys", () => {
     expect(
       extractMissingCapabilityKeys("[capability_mismatch:_secret(1)]"),
     ).toEqual([]);
+  });
+});
+
+// formatGatewayHintLine: the operator-facing one-shot helper that combines
+// the hint-key translation + the specific missing capability key(s) into a
+// single string. All three call sites (admin quick-setup result, account
+// test dialog, playground chat error) use this so the rendering stays
+// consistent: "{hintCopy} (missing: responses)" or just "{hintCopy}" when
+// no key is tagged.
+describe("formatGatewayHintLine", () => {
+  // Translator stub that echoes the key back so the test can assert on the
+  // shape without coupling to actual en/zh copy.
+  const tEcho = (key: string) => `<<${key}>>`;
+
+  it("returns null when no hint pattern matches", () => {
+    expect(formatGatewayHintLine(null, tEcho)).toBeNull();
+    expect(formatGatewayHintLine(undefined, tEcho)).toBeNull();
+    expect(formatGatewayHintLine("", tEcho)).toBeNull();
+    expect(formatGatewayHintLine("totally unrelated text", tEcho)).toBeNull();
+  });
+
+  it("returns just the translated hint copy when no capability key is tagged", () => {
+    expect(formatGatewayHintLine("no available account", tEcho)).toBe(
+      "<<gatewayHints.noAvailableAccount>>",
+    );
+    expect(
+      formatGatewayHintLine(
+        "[capability_mismatch(20)]",
+        tEcho,
+      ),
+    ).toBe("<<gatewayHints.capabilityMismatch>>");
+  });
+
+  it("appends '(missing: <key>)' when one capability key is tagged", () => {
+    expect(
+      formatGatewayHintLine(
+        "no available account: 20 candidate(s) rejected [capability_mismatch:responses(20)]",
+        tEcho,
+      ),
+    ).toBe("<<gatewayHints.capabilityMismatch>> (missing: responses)");
+  });
+
+  it("joins multiple missing keys with comma", () => {
+    expect(
+      formatGatewayHintLine(
+        "[capability_mismatch:responses(5), capability_mismatch:embeddings(3)]",
+        tEcho,
+      ),
+    ).toBe(
+      "<<gatewayHints.capabilityMismatch>> (missing: responses, embeddings)",
+    );
   });
 });

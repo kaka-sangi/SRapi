@@ -36,7 +36,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { cn } from "@/lib/cn";
 import { adminErrorMessage } from "@/lib/admin-api";
-import { gatewayErrorHintKey } from "@/lib/gateway-error-hint";
+import { formatGatewayHintLine } from "@/lib/gateway-error-hint";
 import {
   ACCOUNT_RUNTIME_CLASSES,
   ACCOUNT_RISK_LEVELS,
@@ -293,11 +293,11 @@ export function AccountFormDialog({
       { id: target.id, body: { mode: "live" } },
       {
         onSuccess: (result) => {
-          const hint = result?.ok ? null : gatewayErrorHintKey(result?.message);
+          const hint = result?.ok ? null : formatGatewayHintLine(result?.message, t);
           toast({
             title: result?.ok ? t("adminAccounts.testOk") : t("adminAccounts.testFailed"),
             description:
-              [result?.message, hint ? t(`gatewayHints.${hint}`) : null]
+              [result?.message, hint]
                 .filter(Boolean)
                 .join(" — ") || undefined,
             tone: result?.ok ? "success" : "error",

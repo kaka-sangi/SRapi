@@ -56,6 +56,28 @@ export function gatewayErrorHintKey(message: string | null | undefined): string 
 }
 
 /**
+ * Renders the full operator-facing hint line for a gateway/scheduler failure
+ * message: hint copy + any specific missing capabilities the backend tagged.
+ *
+ * Returns null when nothing recognizable matches (so callers can omit the
+ * line entirely). When capability_mismatch surfaces a colon-suffix key, the
+ * line is augmented with "(missing: responses)" or "(missing: responses,
+ * embeddings)" — without translation since capability keys are canonical
+ * identifiers shared across the codebase.
+ */
+export function formatGatewayHintLine(
+  message: string | null | undefined,
+  t: (key: string) => string,
+): string | null {
+  const hintKey = gatewayErrorHintKey(message);
+  if (!hintKey) return null;
+  const hintCopy = t(`gatewayHints.${hintKey}`);
+  const missing = extractMissingCapabilityKeys(message);
+  if (missing.length === 0) return hintCopy;
+  return `${hintCopy} (missing: ${missing.join(", ")})`;
+}
+
+/**
  * Pulls the specific missing capability key out of a `capability_mismatch:<key>`
  * reject reason (the format the backend started emitting at commit e7345d0b so
  * operators can tell whether it was "responses", "embeddings", "vision_input"

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useDiscoverAccountModels, useTestAccount } from "@/hooks/admin-queries";
 import { useCreateApiKey } from "@/hooks/queries";
 import { ApiKeyOnboarding } from "@/components/features/api-key-onboarding";
-import { gatewayErrorHintKey } from "@/lib/gateway-error-hint";
+import { formatGatewayHintLine } from "@/lib/gateway-error-hint";
 import { useToast } from "@/context/ToastContext";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import type { AdminQuickSetupResult } from "@/lib/sdk-types";
@@ -243,11 +243,11 @@ export function ResultView({
                   { id: accountId, body: { mode: "live" } },
                   {
                     onSuccess: (res) => {
-                      const hint = res?.ok ? null : gatewayErrorHintKey(res?.message);
+                      const hint = res?.ok ? null : formatGatewayHintLine(res?.message, t);
                       toast({
                         title: res?.ok ? t("adminAccounts.testOk") : t("adminAccounts.testFailed"),
                         description:
-                          [res?.message, hint ? t(`gatewayHints.${hint}`) : null]
+                          [res?.message, hint]
                             .filter(Boolean)
                             .join(" — ") || undefined,
                         tone: res?.ok ? "success" : "error",
