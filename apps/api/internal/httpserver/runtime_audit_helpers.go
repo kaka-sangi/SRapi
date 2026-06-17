@@ -152,7 +152,11 @@ func accountAuditSnapshot(account accountcontract.ProviderAccount) map[string]an
 		"priority":           account.Priority,
 		"weight":             account.Weight,
 		"risk_level":         account.RiskLevel,
-		"metadata":           account.Metadata,
+		// Audit log persists indefinitely, so strip any token-ish keys from
+		// the metadata snapshot via the same allowlist the admin GET
+		// responses use (sensitiveMetadataKey: authorization, bearer, cookie,
+		// credential, password, private_key, secret, token, *_key, etc.).
+		"metadata":           sanitizedExportMetadata(account.Metadata),
 		"credential_version": account.CredentialVersion,
 	}
 }
@@ -164,7 +168,9 @@ func proxyAuditSnapshot(proxy accountcontract.ProxyDefinition) map[string]any {
 		"status":         proxy.Status,
 		"url_configured": proxy.URLCiphertext != "",
 		"url_version":    proxy.URLVersion,
-		"metadata":       cloneAnyMap(proxy.Metadata),
+		// Same redaction policy as account metadata — proxies seldom carry
+		// secrets but the audit log is forever, so don't gamble.
+		"metadata":       sanitizedExportMetadata(cloneAnyMap(proxy.Metadata)),
 	}
 }
 

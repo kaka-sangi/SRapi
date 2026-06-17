@@ -237,7 +237,7 @@ func toAPIAccount(account accountcontract.ProviderAccount) apiopenapi.ProviderAc
 		CreatedAt:        account.CreatedAt,
 		GroupIds:         []apiopenapi.Id{},
 		Id:               apiopenapi.Id(strconv.Itoa(account.ID)),
-		Metadata:         mapToJsonObjectPtr(account.Metadata),
+		Metadata:         mapToJsonObjectPtr(sanitizedExportMetadata(account.Metadata)),
 		Name:             account.Name,
 		Priority:         account.Priority,
 		ProviderId:       apiopenapi.Id(strconv.Itoa(account.ProviderID)),
