@@ -58,7 +58,16 @@ func codexResponsesCompactRequest(req contract.ConversationRequest) bool {
 }
 
 func codexResponsesPreviousResponseRecoveryPayload(req contract.ConversationRequest, payload map[string]any, responseBody []byte) (map[string]any, bool) {
-	if codexResponsesCompactRequest(req) || payload == nil {
+	// sub2api's recoverPrevResponseNotFound (openai_gateway_service.go:2775)
+	// gates only on "already tried once", "previous_response_id present",
+	// and "no function_call_output". It does NOT skip /compact — and
+	// skipping compact here was the exact reason Hermes' "remote compact
+	// task" never self-healed when the prior turn's anchor outlived the
+	// account it was bound to. Removing the carve-out so /compact gets
+	// the same Layer-2 recovery path as /responses; the downstream
+	// stateful/replayable input guards below still protect us against
+	// dropping the anchor when the request can't be safely replayed.
+	if payload == nil {
 		return nil, false
 	}
 	if strings.TrimSpace(codexStringValue(payload["previous_response_id"])) == "" {

@@ -8945,22 +8945,35 @@ func TestReverseProxyCodexCLIAdapterDoesNotRetryPreviousResponseNotFoundForToolC
 	}
 }
 
-func TestReverseProxyCodexCLIAdapterDoesNotRetryPreviousResponseNotFoundForCompact(t *testing.T) {
+func TestReverseProxyCodexCLIAdapterRetriesPreviousResponseNotFoundForCompact(t *testing.T) {
+	// Mirrors sub2api's recoverPrevResponseNotFound (openai_gateway_service.go:2775):
+	// upstream returns previous_response_not_found → drop previous_response_id
+	// from the body and replay once on the same endpoint. The earlier carve-out
+	// for /compact was the reason Hermes' "remote compact task" couldn't
+	// self-heal — every compact turn whose anchor outlived the account it was
+	// bound to terminated with "provider rejected request".
 	runtime := sequenceRuntime{
-		responses: []reverseproxycontract.Response{{
-			StatusCode: http.StatusNotFound,
-			Body:       []byte(`{"error":{"code":"previous_response_not_found","message":"previous response not found"}}`),
-		}},
+		responses: []reverseproxycontract.Response{
+			{
+				StatusCode: http.StatusNotFound,
+				Body:       []byte(`{"error":{"code":"previous_response_not_found","message":"previous response not found"}}`),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       []byte(`{"id":"cmp_recovered","object":"response.compaction","input_tokens":4,"output_tokens":2}`),
+			},
+		},
 	}
 	svc, err := service.NewWithReverseProxy(nil, &runtime)
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
-		RequestID:      "req_codex_compact_previous_response_no_retry",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_compact_previous_response_recovery",
 		SourceProtocol: "openai-compatible",
 		SourceEndpoint: "/v1/responses/compact",
 		Model:          "codex-local",
+		InputParts:     textParts("compact me"),
 		RawBody:        []byte(`{"model":"codex-local","input":"compact me","previous_response_id":"resp_missing"}`),
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-codex-cli",
@@ -8975,11 +8988,21 @@ func TestReverseProxyCodexCLIAdapterDoesNotRetryPreviousResponseNotFoundForCompa
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
 		Credential: map[string]any{"access_token": "oauth-token"},
 	})
-	if err == nil {
-		t.Fatal("expected compact previous_response_id upstream error")
+	if err != nil {
+		t.Fatalf("expected compact recovery to succeed on retry, got err=%v", err)
 	}
-	if len(runtime.requests) != 1 {
-		t.Fatalf("expected no recovery retry for compact, got %d requests", len(runtime.requests))
+	if len(runtime.requests) != 2 {
+		t.Fatalf("expected compact recovery retry (2 upstream requests), got %d", len(runtime.requests))
+	}
+	var retryPayload map[string]any
+	if e := json.Unmarshal(runtime.requests[1].Body, &retryPayload); e != nil {
+		t.Fatalf("decode retry payload: %v", e)
+	}
+	if _, present := retryPayload["previous_response_id"]; present {
+		t.Fatalf("recovery retry must drop previous_response_id, got %+v", retryPayload)
+	}
+	if !strings.Contains(string(resp.Raw), "cmp_recovered") {
+		t.Fatalf("expected recovered compaction body, got %q", string(resp.Raw))
 	}
 }
 
