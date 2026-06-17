@@ -607,6 +607,8 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/usage-logs", server.handleListAdminUsageLogs)
 	mux.HandleFunc("GET /api/v1/admin/error-logs", server.handleListAdminErrorLogs)
 	mux.HandleFunc("GET /api/v1/admin/error-logs/{id}", server.handleGetAdminErrorLog)
+	mux.HandleFunc("GET /api/v1/admin/ops/error-logs", server.handleListAdminOpsErrorLogs)
+	mux.HandleFunc("PATCH /api/v1/admin/ops/error-logs/{id}", server.handleUpdateAdminOpsErrorLogResolution)
 	mux.HandleFunc("GET /api/v1/admin/usage/daily", server.handleAdminUsageDaily)
 	mux.HandleFunc("GET /api/v1/admin/usage/aggregates", server.handleAdminUsageAggregates)
 	mux.HandleFunc("GET /api/v1/admin/usage/trends", server.handleGetAdminUsageTrends)

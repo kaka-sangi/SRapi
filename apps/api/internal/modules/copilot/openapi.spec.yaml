@@ -8906,6 +8906,109 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/ops/error-logs:
+    get:
+      tags:
+        - AdminOps
+      operationId: listAdminOpsErrorLogs
+      summary: List operator-facing upstream error logs.
+      description: |
+        Returns a paginated feed of upstream failures captured by the gateway
+        hot path (server-side errors and 5xx transient failures). Includes
+        operator-supplied resolution status and notes.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: user_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: account_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: error_class
+          in: query
+          schema:
+            type: string
+        - name: platform
+          in: query
+          schema:
+            type: string
+        - name: resolution
+          in: query
+          description: Filter by operator-supplied resolution status.
+          schema:
+            type: string
+            enum: [open, investigating, resolved, muted]
+      responses:
+        "200":
+          description: Operator-facing error log feed.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsErrorLogListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/error-logs/{id}:
+    patch:
+      tags:
+        - AdminOps
+      operationId: updateAdminOpsErrorLogResolution
+      summary: Update operator-supplied resolution for an upstream error.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+        operator: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpsErrorLogResolutionUpdate"
+      responses:
+        "200":
+          description: Updated error log entry.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsErrorLogResponse"
+        "400":
+          $ref: "#/components/responses/StandardError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/ops/latency-histogram:
     get:
       tags:
@@ -22595,6 +22698,89 @@ components:
           $ref: "#/components/schemas/OpsLatencyHistogram"
         request_id:
           $ref: "#/components/schemas/RequestId"
+
+    OpsErrorLog:
+      type: object
+      description: |
+        Operator-facing record of a single upstream failure observed by the
+        gateway hot path. Body excerpts are sanitised and credential-like
+        keys are redacted to "[REDACTED]" before persistence.
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+        trace_id:
+          type: string
+        platform:
+          type: string
+        source_endpoint:
+          type: string
+        model:
+          type: string
+        error_class:
+          type: string
+        error_phase:
+          type: string
+        error_message:
+          type: string
+        error_body_excerpt:
+          type: string
+        resolution:
+          type: string
+          enum: [open, investigating, resolved, muted]
+        resolution_note:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    OpsErrorLogListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsErrorLog"
+        pagination:
+          type: object
+          additionalProperties: true
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsErrorLogResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsErrorLog"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsErrorLogResolutionUpdate:
+      type: object
+      required:
+        - resolution
+      properties:
+        resolution:
+          type: string
+          enum: [open, investigating, resolved, muted]
+        note:
+          type: string
+          maxLength: 2048
 
     OpsConcurrency:
       type: object

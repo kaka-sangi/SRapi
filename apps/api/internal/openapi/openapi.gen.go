@@ -1834,22 +1834,70 @@ func (e OpsAlertSeverity) Valid() bool {
 
 // Defines values for OpsAlertStatus.
 const (
-	Acknowledged OpsAlertStatus = "acknowledged"
-	Firing       OpsAlertStatus = "firing"
-	Resolved     OpsAlertStatus = "resolved"
-	Suppressed   OpsAlertStatus = "suppressed"
+	OpsAlertStatusAcknowledged OpsAlertStatus = "acknowledged"
+	OpsAlertStatusFiring       OpsAlertStatus = "firing"
+	OpsAlertStatusResolved     OpsAlertStatus = "resolved"
+	OpsAlertStatusSuppressed   OpsAlertStatus = "suppressed"
 )
 
 // Valid indicates whether the value is a known member of the OpsAlertStatus enum.
 func (e OpsAlertStatus) Valid() bool {
 	switch e {
-	case Acknowledged:
+	case OpsAlertStatusAcknowledged:
 		return true
-	case Firing:
+	case OpsAlertStatusFiring:
 		return true
-	case Resolved:
+	case OpsAlertStatusResolved:
 		return true
-	case Suppressed:
+	case OpsAlertStatusSuppressed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsErrorLogResolution.
+const (
+	OpsErrorLogResolutionInvestigating OpsErrorLogResolution = "investigating"
+	OpsErrorLogResolutionMuted         OpsErrorLogResolution = "muted"
+	OpsErrorLogResolutionOpen          OpsErrorLogResolution = "open"
+	OpsErrorLogResolutionResolved      OpsErrorLogResolution = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the OpsErrorLogResolution enum.
+func (e OpsErrorLogResolution) Valid() bool {
+	switch e {
+	case OpsErrorLogResolutionInvestigating:
+		return true
+	case OpsErrorLogResolutionMuted:
+		return true
+	case OpsErrorLogResolutionOpen:
+		return true
+	case OpsErrorLogResolutionResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsErrorLogResolutionUpdateResolution.
+const (
+	OpsErrorLogResolutionUpdateResolutionInvestigating OpsErrorLogResolutionUpdateResolution = "investigating"
+	OpsErrorLogResolutionUpdateResolutionMuted         OpsErrorLogResolutionUpdateResolution = "muted"
+	OpsErrorLogResolutionUpdateResolutionOpen          OpsErrorLogResolutionUpdateResolution = "open"
+	OpsErrorLogResolutionUpdateResolutionResolved      OpsErrorLogResolutionUpdateResolution = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the OpsErrorLogResolutionUpdateResolution enum.
+func (e OpsErrorLogResolutionUpdateResolution) Valid() bool {
+	switch e {
+	case OpsErrorLogResolutionUpdateResolutionInvestigating:
+		return true
+	case OpsErrorLogResolutionUpdateResolutionMuted:
+		return true
+	case OpsErrorLogResolutionUpdateResolutionOpen:
+		return true
+	case OpsErrorLogResolutionUpdateResolutionResolved:
 		return true
 	default:
 		return false
@@ -3182,6 +3230,30 @@ func (e ListOpenAICompatibleResponseInputItemsAliasParamsOrder) Valid() bool {
 	case ListOpenAICompatibleResponseInputItemsAliasParamsOrderAsc:
 		return true
 	case ListOpenAICompatibleResponseInputItemsAliasParamsOrderDesc:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListAdminOpsErrorLogsParamsResolution.
+const (
+	ListAdminOpsErrorLogsParamsResolutionInvestigating ListAdminOpsErrorLogsParamsResolution = "investigating"
+	ListAdminOpsErrorLogsParamsResolutionMuted         ListAdminOpsErrorLogsParamsResolution = "muted"
+	ListAdminOpsErrorLogsParamsResolutionOpen          ListAdminOpsErrorLogsParamsResolution = "open"
+	ListAdminOpsErrorLogsParamsResolutionResolved      ListAdminOpsErrorLogsParamsResolution = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the ListAdminOpsErrorLogsParamsResolution enum.
+func (e ListAdminOpsErrorLogsParamsResolution) Valid() bool {
+	switch e {
+	case ListAdminOpsErrorLogsParamsResolutionInvestigating:
+		return true
+	case ListAdminOpsErrorLogsParamsResolutionMuted:
+		return true
+	case ListAdminOpsErrorLogsParamsResolutionOpen:
+		return true
+	case ListAdminOpsErrorLogsParamsResolutionResolved:
 		return true
 	default:
 		return false
@@ -7875,6 +7947,56 @@ type OpsErrorDistributionResponse struct {
 	RequestId RequestId            `json:"request_id"`
 }
 
+// OpsErrorLog Operator-facing record of a single upstream failure observed by the
+// gateway hot path. Body excerpts are sanitised and credential-like
+// keys are redacted to "[REDACTED]" before persistence.
+type OpsErrorLog struct {
+	CreatedAt            *time.Time             `json:"created_at,omitempty"`
+	ErrorBodyExcerpt     *string                `json:"error_body_excerpt,omitempty"`
+	ErrorClass           *string                `json:"error_class,omitempty"`
+	ErrorMessage         *string                `json:"error_message,omitempty"`
+	ErrorPhase           *string                `json:"error_phase,omitempty"`
+	Id                   *string                `json:"id,omitempty"`
+	Model                *string                `json:"model,omitempty"`
+	OccurredAt           *time.Time             `json:"occurred_at,omitempty"`
+	Platform             *string                `json:"platform,omitempty"`
+	RequestId            *string                `json:"request_id,omitempty"`
+	Resolution           *OpsErrorLogResolution `json:"resolution,omitempty"`
+	ResolutionNote       *string                `json:"resolution_note,omitempty"`
+	SourceEndpoint       *string                `json:"source_endpoint,omitempty"`
+	TraceId              *string                `json:"trace_id,omitempty"`
+	UpdatedAt            *time.Time             `json:"updated_at,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// OpsErrorLogResolution defines model for OpsErrorLog.Resolution.
+type OpsErrorLogResolution string
+
+// OpsErrorLogListResponse defines model for OpsErrorLogListResponse.
+type OpsErrorLogListResponse struct {
+	Data       []OpsErrorLog          `json:"data"`
+	Pagination map[string]interface{} `json:"pagination"`
+	RequestId  RequestId              `json:"request_id"`
+}
+
+// OpsErrorLogResolutionUpdate defines model for OpsErrorLogResolutionUpdate.
+type OpsErrorLogResolutionUpdate struct {
+	Note       *string                               `json:"note,omitempty"`
+	Resolution OpsErrorLogResolutionUpdateResolution `json:"resolution"`
+}
+
+// OpsErrorLogResolutionUpdateResolution defines model for OpsErrorLogResolutionUpdate.Resolution.
+type OpsErrorLogResolutionUpdateResolution string
+
+// OpsErrorLogResponse defines model for OpsErrorLogResponse.
+type OpsErrorLogResponse struct {
+	// Data Operator-facing record of a single upstream failure observed by the
+	// gateway hot path. Body excerpts are sanitised and credential-like
+	// keys are redacted to "[REDACTED]" before persistence.
+	Data      OpsErrorLog `json:"data"`
+	RequestId RequestId   `json:"request_id"`
+}
+
 // OpsErrorTrend defines model for OpsErrorTrend.
 type OpsErrorTrend struct {
 	Bucket OpsErrorTrendBucket  `json:"bucket"`
@@ -11044,6 +11166,22 @@ type GetAdminOpsErrorDistributionParams struct {
 	End *EndTime `form:"end,omitempty" json:"end,omitempty"`
 }
 
+// ListAdminOpsErrorLogsParams defines parameters for ListAdminOpsErrorLogs.
+type ListAdminOpsErrorLogsParams struct {
+	Page       *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize   *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+	UserId     *Id       `form:"user_id,omitempty" json:"user_id,omitempty"`
+	AccountId  *Id       `form:"account_id,omitempty" json:"account_id,omitempty"`
+	ErrorClass *string   `form:"error_class,omitempty" json:"error_class,omitempty"`
+	Platform   *string   `form:"platform,omitempty" json:"platform,omitempty"`
+
+	// Resolution Filter by operator-supplied resolution status.
+	Resolution *ListAdminOpsErrorLogsParamsResolution `form:"resolution,omitempty" json:"resolution,omitempty"`
+}
+
+// ListAdminOpsErrorLogsParamsResolution defines parameters for ListAdminOpsErrorLogs.
+type ListAdminOpsErrorLogsParamsResolution string
+
 // GetAdminOpsErrorTrendParams defines parameters for GetAdminOpsErrorTrend.
 type GetAdminOpsErrorTrendParams struct {
 	// Start Inclusive start time for read-model queries.
@@ -11782,6 +11920,9 @@ type UpdateAdminOpsAlertRuleJSONRequestBody = UpdateOpsAlertRuleRequest
 
 // CreateAdminOpsAlertSilenceJSONRequestBody defines body for CreateAdminOpsAlertSilence for application/json ContentType.
 type CreateAdminOpsAlertSilenceJSONRequestBody = CreateOpsAlertSilenceRequest
+
+// UpdateAdminOpsErrorLogResolutionJSONRequestBody defines body for UpdateAdminOpsErrorLogResolution for application/json ContentType.
+type UpdateAdminOpsErrorLogResolutionJSONRequestBody = OpsErrorLogResolutionUpdate
 
 // UpdateAdminOpsSettingsJSONRequestBody defines body for UpdateAdminOpsSettings for application/json ContentType.
 type UpdateAdminOpsSettingsJSONRequestBody = OpsSettings
@@ -16471,6 +16612,284 @@ func (a ModerationResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// Getter for additional properties for OpsErrorLog. Returns the specified
+// element and whether it was found
+func (a OpsErrorLog) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for OpsErrorLog
+func (a *OpsErrorLog) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for OpsErrorLog to handle AdditionalProperties
+func (a *OpsErrorLog) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["created_at"]; found {
+		err = json.Unmarshal(raw, &a.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'created_at': %w", err)
+		}
+		delete(object, "created_at")
+	}
+
+	if raw, found := object["error_body_excerpt"]; found {
+		err = json.Unmarshal(raw, &a.ErrorBodyExcerpt)
+		if err != nil {
+			return fmt.Errorf("error reading 'error_body_excerpt': %w", err)
+		}
+		delete(object, "error_body_excerpt")
+	}
+
+	if raw, found := object["error_class"]; found {
+		err = json.Unmarshal(raw, &a.ErrorClass)
+		if err != nil {
+			return fmt.Errorf("error reading 'error_class': %w", err)
+		}
+		delete(object, "error_class")
+	}
+
+	if raw, found := object["error_message"]; found {
+		err = json.Unmarshal(raw, &a.ErrorMessage)
+		if err != nil {
+			return fmt.Errorf("error reading 'error_message': %w", err)
+		}
+		delete(object, "error_message")
+	}
+
+	if raw, found := object["error_phase"]; found {
+		err = json.Unmarshal(raw, &a.ErrorPhase)
+		if err != nil {
+			return fmt.Errorf("error reading 'error_phase': %w", err)
+		}
+		delete(object, "error_phase")
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &a.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+		delete(object, "id")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["occurred_at"]; found {
+		err = json.Unmarshal(raw, &a.OccurredAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'occurred_at': %w", err)
+		}
+		delete(object, "occurred_at")
+	}
+
+	if raw, found := object["platform"]; found {
+		err = json.Unmarshal(raw, &a.Platform)
+		if err != nil {
+			return fmt.Errorf("error reading 'platform': %w", err)
+		}
+		delete(object, "platform")
+	}
+
+	if raw, found := object["request_id"]; found {
+		err = json.Unmarshal(raw, &a.RequestId)
+		if err != nil {
+			return fmt.Errorf("error reading 'request_id': %w", err)
+		}
+		delete(object, "request_id")
+	}
+
+	if raw, found := object["resolution"]; found {
+		err = json.Unmarshal(raw, &a.Resolution)
+		if err != nil {
+			return fmt.Errorf("error reading 'resolution': %w", err)
+		}
+		delete(object, "resolution")
+	}
+
+	if raw, found := object["resolution_note"]; found {
+		err = json.Unmarshal(raw, &a.ResolutionNote)
+		if err != nil {
+			return fmt.Errorf("error reading 'resolution_note': %w", err)
+		}
+		delete(object, "resolution_note")
+	}
+
+	if raw, found := object["source_endpoint"]; found {
+		err = json.Unmarshal(raw, &a.SourceEndpoint)
+		if err != nil {
+			return fmt.Errorf("error reading 'source_endpoint': %w", err)
+		}
+		delete(object, "source_endpoint")
+	}
+
+	if raw, found := object["trace_id"]; found {
+		err = json.Unmarshal(raw, &a.TraceId)
+		if err != nil {
+			return fmt.Errorf("error reading 'trace_id': %w", err)
+		}
+		delete(object, "trace_id")
+	}
+
+	if raw, found := object["updated_at"]; found {
+		err = json.Unmarshal(raw, &a.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'updated_at': %w", err)
+		}
+		delete(object, "updated_at")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for OpsErrorLog to handle AdditionalProperties
+func (a OpsErrorLog) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.CreatedAt != nil {
+		object["created_at"], err = json.Marshal(a.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'created_at': %w", err)
+		}
+	}
+
+	if a.ErrorBodyExcerpt != nil {
+		object["error_body_excerpt"], err = json.Marshal(a.ErrorBodyExcerpt)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'error_body_excerpt': %w", err)
+		}
+	}
+
+	if a.ErrorClass != nil {
+		object["error_class"], err = json.Marshal(a.ErrorClass)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'error_class': %w", err)
+		}
+	}
+
+	if a.ErrorMessage != nil {
+		object["error_message"], err = json.Marshal(a.ErrorMessage)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'error_message': %w", err)
+		}
+	}
+
+	if a.ErrorPhase != nil {
+		object["error_phase"], err = json.Marshal(a.ErrorPhase)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'error_phase': %w", err)
+		}
+	}
+
+	if a.Id != nil {
+		object["id"], err = json.Marshal(a.Id)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'id': %w", err)
+		}
+	}
+
+	if a.Model != nil {
+		object["model"], err = json.Marshal(a.Model)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'model': %w", err)
+		}
+	}
+
+	if a.OccurredAt != nil {
+		object["occurred_at"], err = json.Marshal(a.OccurredAt)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'occurred_at': %w", err)
+		}
+	}
+
+	if a.Platform != nil {
+		object["platform"], err = json.Marshal(a.Platform)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'platform': %w", err)
+		}
+	}
+
+	if a.RequestId != nil {
+		object["request_id"], err = json.Marshal(a.RequestId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'request_id': %w", err)
+		}
+	}
+
+	if a.Resolution != nil {
+		object["resolution"], err = json.Marshal(a.Resolution)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'resolution': %w", err)
+		}
+	}
+
+	if a.ResolutionNote != nil {
+		object["resolution_note"], err = json.Marshal(a.ResolutionNote)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'resolution_note': %w", err)
+		}
+	}
+
+	if a.SourceEndpoint != nil {
+		object["source_endpoint"], err = json.Marshal(a.SourceEndpoint)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'source_endpoint': %w", err)
+		}
+	}
+
+	if a.TraceId != nil {
+		object["trace_id"], err = json.Marshal(a.TraceId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'trace_id': %w", err)
+		}
+	}
+
+	if a.UpdatedAt != nil {
+		object["updated_at"], err = json.Marshal(a.UpdatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'updated_at': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
 // Getter for additional properties for RerankRequest. Returns the specified
 // element and whether it was found
 func (a RerankRequest) Get(fieldName string) (value interface{}, found bool) {
@@ -18822,6 +19241,12 @@ type ServerInterface interface {
 	// Get error distribution by class and owner.
 	// (GET /api/v1/admin/ops/error-distribution)
 	GetAdminOpsErrorDistribution(w http.ResponseWriter, r *http.Request, params GetAdminOpsErrorDistributionParams)
+	// List operator-facing upstream error logs.
+	// (GET /api/v1/admin/ops/error-logs)
+	ListAdminOpsErrorLogs(w http.ResponseWriter, r *http.Request, params ListAdminOpsErrorLogsParams)
+	// Update operator-supplied resolution for an upstream error.
+	// (PATCH /api/v1/admin/ops/error-logs/{id})
+	UpdateAdminOpsErrorLogResolution(w http.ResponseWriter, r *http.Request, id Id)
 	// Get error trend by time bucket.
 	// (GET /api/v1/admin/ops/error-trend)
 	GetAdminOpsErrorTrend(w http.ResponseWriter, r *http.Request, params GetAdminOpsErrorTrendParams)
@@ -25407,6 +25832,155 @@ func (siw *ServerInterfaceWrapper) GetAdminOpsErrorDistribution(w http.ResponseW
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAdminOpsErrorDistribution(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminOpsErrorLogs operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminOpsErrorLogs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminOpsErrorLogsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "account_id", r.URL.Query(), &params.AccountId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error_class" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_class", r.URL.Query(), &params.ErrorClass, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_class"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_class", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "platform" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "platform", r.URL.Query(), &params.Platform, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "platform"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "platform", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resolution" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resolution", r.URL.Query(), &params.Resolution, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resolution"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resolution", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminOpsErrorLogs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminOpsErrorLogResolution operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminOpsErrorLogResolution(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminOpsErrorLogResolution(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -33872,6 +34446,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/alerts/{id}/ack", wrapper.AcknowledgeAdminOpsAlert)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/concurrency", wrapper.GetAdminOpsConcurrency)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-distribution", wrapper.GetAdminOpsErrorDistribution)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-logs", wrapper.ListAdminOpsErrorLogs)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/ops/error-logs/{id}", wrapper.UpdateAdminOpsErrorLogResolution)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-trend", wrapper.GetAdminOpsErrorTrend)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/events/outbox", wrapper.ListAdminOutboxEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/latency-histogram", wrapper.GetAdminOpsLatencyHistogram)

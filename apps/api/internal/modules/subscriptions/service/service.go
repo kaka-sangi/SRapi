@@ -340,6 +340,46 @@ func (s *Service) EnqueueSubscriptionExpiryReminders(ctx context.Context, now ti
 	return result, nil
 }
 
+// EnsureUserSubscriptionsCurrent lazily flips any user-owned subscription whose
+// ExpiresAt has elapsed but whose status is still "active". This is a
+// per-request hot-path admission gate so a request from a user whose
+// subscription expired between worker passes is rejected as
+// "subscription_expired" instead of silently consuming a now-expired
+// entitlement. The check is bounded — a user typically has 0-1 active
+// subscriptions — and store calls reuse the same connection as the entitlement
+// lookup that already runs in CheckEntitlement.
+func (s *Service) EnsureUserSubscriptionsCurrent(ctx context.Context, userID int, now time.Time) (bool, error) {
+	if userID <= 0 {
+		return false, ErrInvalidInput
+	}
+	if now.IsZero() {
+		now = s.clock.Now()
+	}
+	now = now.UTC()
+	subs, err := s.store.ListUserSubscriptionsByUser(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	anyActive := false
+	for _, sub := range subs {
+		if sub.Status != contract.SubscriptionStatusActive {
+			continue
+		}
+		if !sub.ExpiresAt.IsZero() && !sub.ExpiresAt.After(now) {
+			updated, expired, err := s.store.ExpireUserSubscription(ctx, sub.ID, now)
+			if err != nil {
+				return anyActive, err
+			}
+			if expired {
+				s.enqueueSubscriptionExpired(ctx, updated, now)
+			}
+			continue
+		}
+		anyActive = true
+	}
+	return anyActive, nil
+}
+
 func (s *Service) CheckEntitlement(ctx context.Context, req contract.EntitlementCheckRequest) (contract.EntitlementDecision, error) {
 	if req.UserID <= 0 {
 		return contract.EntitlementDecision{}, ErrInvalidInput
@@ -347,6 +387,13 @@ func (s *Service) CheckEntitlement(ctx context.Context, req contract.Entitlement
 	now := req.RequestTime
 	if now.IsZero() {
 		now = s.clock.Now()
+	}
+	// Hot-path lazy expiry: flip any user subscription whose ExpiresAt has
+	// elapsed but whose status row is still "active" before reading
+	// entitlements. This prevents a between-worker-pass window where an
+	// expired subscription continues to grant gateway access.
+	if _, err := s.EnsureUserSubscriptionsCurrent(ctx, req.UserID, now); err != nil {
+		return contract.EntitlementDecision{}, err
 	}
 	active, err := s.store.ListActiveEntitlements(ctx, req.UserID, now)
 	if err != nil {
