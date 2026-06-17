@@ -1889,6 +1889,29 @@ export type BatchDeleteProviderAccountsResponse = {
     request_id: RequestId;
 };
 
+export type BatchAccountGroupMembersRequest = {
+    account_ids: Array<Id>;
+};
+
+export type BatchAccountGroupMembersErrorRow = {
+    id: Id;
+    message: string;
+};
+
+export type BatchAccountGroupMembersResult = {
+    applied_count: number;
+    applied_ids: Array<Id>;
+    /**
+     * Per-id failures (account not found, duplicate within batch, store conflict). Idempotent successes (already-member on add, not-member on remove) appear in applied_ids, NOT errors.
+     */
+    errors: Array<BatchAccountGroupMembersErrorRow>;
+};
+
+export type BatchAccountGroupMembersResponse = {
+    data: BatchAccountGroupMembersResult;
+    request_id: RequestId;
+};
+
 export type BatchUpdateAccountConcurrencyItem = {
     account_id: Id;
     /**
@@ -1916,6 +1939,163 @@ export type BatchUpdateAccountConcurrencyResult = {
 
 export type BatchUpdateAccountConcurrencyResponse = {
     data: BatchUpdateAccountConcurrencyResult;
+    request_id: RequestId;
+};
+
+export type BatchRefreshAdminAccountsRequest = {
+    account_ids: Array<Id>;
+};
+
+export type BatchRefreshAdminAccountsErrorRow = {
+    id: Id;
+    message: string;
+};
+
+export type BatchRefreshAdminAccountsRow = {
+    account_id: Id;
+    /**
+     * Categorical refresh outcome (success / permanent_error / transient_error / threshold_exceeded). Empty string when NotFound was idempotently skipped.
+     */
+    outcome_class: string;
+    /**
+     * Post-call refresh_attempts (the cumulative consecutive-failure count; 0 on success).
+     */
+    attempts?: number;
+    /**
+     * True when this call moved needs_reauth_at from nil to non-nil.
+     */
+    needs_reauth_flipped?: boolean;
+};
+
+export type BatchRefreshAdminAccountsResult = {
+    /**
+     * Number of rows that completed successfully (outcome_class=success or NotFound idempotent skip).
+     */
+    refreshed_count: number;
+    /**
+     * Per-id refresh outcome — preserves request order; carries the structured class + attempts even for failure rows.
+     */
+    rows: Array<BatchRefreshAdminAccountsRow>;
+    /**
+     * Per-id failures (invalid id, duplicate in batch, non-OAuth runtime class, refresher error). NotFound is NOT a failure — idempotent semantics.
+     */
+    errors: Array<BatchRefreshAdminAccountsErrorRow>;
+};
+
+export type BatchRefreshAdminAccountsResponse = {
+    data: BatchRefreshAdminAccountsResult;
+    request_id: RequestId;
+};
+
+export type BatchUpdateAdminAccountCredentialItem = {
+    account_id: Id;
+    /**
+     * Partial credential patch. Only fields present here overwrite the stored credential; absent fields are preserved. An empty object is rejected per-row to keep operator typos visible.
+     */
+    credential: JsonObject;
+};
+
+export type BatchUpdateAdminAccountCredentialsRequest = {
+    items: Array<BatchUpdateAdminAccountCredentialItem>;
+};
+
+export type BatchUpdateAdminAccountCredentialErrorRow = {
+    id: Id;
+    message: string;
+};
+
+export type BatchUpdateAdminAccountCredentialsResult = {
+    updated_count: number;
+    /**
+     * Per-id failures (invalid id, empty patch, store/encryption error, duplicate in batch). NotFound is NOT a failure — idempotent semantics.
+     */
+    errors: Array<BatchUpdateAdminAccountCredentialErrorRow>;
+};
+
+export type BatchUpdateAdminAccountCredentialsResponse = {
+    data: BatchUpdateAdminAccountCredentialsResult;
+    request_id: RequestId;
+};
+
+export type BatchSetAdminAffiliateRebateRateItem = {
+    user_id: Id;
+    /**
+     * Override rate as a 0..1 fraction (e.g. 0.15 = 15%). Required unless clear=true.
+     */
+    rate_percent?: number | null;
+    /**
+     * When true, removes the override and falls back to the rule-derived rate. rate_percent is ignored when clear=true.
+     */
+    clear?: boolean;
+};
+
+export type BatchSetAdminAffiliateRebateRateRequest = {
+    items: Array<BatchSetAdminAffiliateRebateRateItem>;
+};
+
+export type BatchSetAdminAffiliateRebateRateErrorRow = {
+    id: Id;
+    message: string;
+};
+
+export type BatchSetAdminAffiliateRebateRateResult = {
+    updated_count: number;
+    /**
+     * Per-id failures (invalid id, rate out of range, duplicate in batch).
+     */
+    errors: Array<BatchSetAdminAffiliateRebateRateErrorRow>;
+};
+
+export type BatchSetAdminAffiliateRebateRateResponse = {
+    data: BatchSetAdminAffiliateRebateRateResult;
+    request_id: RequestId;
+};
+
+export type BatchAssignAdminUserSubscriptionItem = {
+    user_id: Id;
+    plan_id: Id;
+    /**
+     * Optional explicit expiry override. When absent the subscription expires at start + plan.validity_days.
+     */
+    expires_at?: string | null;
+    /**
+     * Optional idempotency source tag — when both source_type and source_id are set, a matching existing subscription is returned idempotently (mirrors sub2api reused).
+     */
+    source_type?: string;
+    source_id?: string;
+};
+
+export type BatchAssignAdminUserSubscriptionsRequest = {
+    items: Array<BatchAssignAdminUserSubscriptionItem>;
+};
+
+export type BatchAssignAdminUserSubscriptionsErrorRow = {
+    id: Id;
+    message: string;
+};
+
+export type BatchAssignAdminUserSubscriptionsRow = {
+    user_id: Id;
+    plan_id: Id;
+    outcome: 'created' | 'reused' | 'failed' | 'skipped';
+    subscription_id?: Id;
+};
+
+export type BatchAssignAdminUserSubscriptionsResult = {
+    created_count: number;
+    reused_count: number;
+    /**
+     * Per-row outcome in request order — carries created/reused/failed plus the subscription id on success.
+     */
+    rows: Array<BatchAssignAdminUserSubscriptionsRow>;
+    /**
+     * Per-id failures (invalid id, missing plan, store error, duplicate (user_id, plan_id) in batch).
+     */
+    errors: Array<BatchAssignAdminUserSubscriptionsErrorRow>;
+};
+
+export type BatchAssignAdminUserSubscriptionsResponse = {
+    data: BatchAssignAdminUserSubscriptionsResult;
     request_id: RequestId;
 };
 
@@ -2882,6 +3062,49 @@ export type OpsLatencyHistogram = {
 export type OpsLatencyHistogramResponse = {
     data: OpsLatencyHistogram;
     request_id: RequestId;
+};
+
+/**
+ * Operator-facing record of a single upstream failure observed by the
+ * gateway hot path. Body excerpts are sanitised and credential-like
+ * keys are redacted to "[REDACTED]" before persistence.
+ *
+ */
+export type OpsErrorLog = {
+    id?: string;
+    occurred_at?: string;
+    request_id?: string;
+    trace_id?: string;
+    platform?: string;
+    source_endpoint?: string;
+    model?: string;
+    error_class?: string;
+    error_phase?: string;
+    error_message?: string;
+    error_body_excerpt?: string;
+    resolution?: 'open' | 'investigating' | 'resolved' | 'muted';
+    resolution_note?: string;
+    created_at?: string;
+    updated_at?: string;
+    [key: string]: unknown;
+};
+
+export type OpsErrorLogListResponse = {
+    data: Array<OpsErrorLog>;
+    pagination: {
+        [key: string]: unknown;
+    };
+    request_id: RequestId;
+};
+
+export type OpsErrorLogResponse = {
+    data: OpsErrorLog;
+    request_id: RequestId;
+};
+
+export type OpsErrorLogResolutionUpdate = {
+    resolution: 'open' | 'investigating' | 'resolved' | 'muted';
+    note?: string;
 };
 
 export type OpsConcurrency = {
@@ -12236,6 +12459,80 @@ export type BatchUpdateAdminAccountConcurrencyResponses = {
 
 export type BatchUpdateAdminAccountConcurrencyResponse = BatchUpdateAdminAccountConcurrencyResponses[keyof BatchUpdateAdminAccountConcurrencyResponses];
 
+export type BatchRefreshAdminAccountsData = {
+    body: BatchRefreshAdminAccountsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/batch-refresh';
+};
+
+export type BatchRefreshAdminAccountsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchRefreshAdminAccountsError = BatchRefreshAdminAccountsErrors[keyof BatchRefreshAdminAccountsErrors];
+
+export type BatchRefreshAdminAccountsResponses = {
+    /**
+     * Batch refresh result.
+     */
+    200: BatchRefreshAdminAccountsResponse;
+};
+
+export type BatchRefreshAdminAccountsResponse2 = BatchRefreshAdminAccountsResponses[keyof BatchRefreshAdminAccountsResponses];
+
+export type BatchUpdateAdminAccountCredentialsData = {
+    body: BatchUpdateAdminAccountCredentialsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/batch-update-credentials';
+};
+
+export type BatchUpdateAdminAccountCredentialsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchUpdateAdminAccountCredentialsError = BatchUpdateAdminAccountCredentialsErrors[keyof BatchUpdateAdminAccountCredentialsErrors];
+
+export type BatchUpdateAdminAccountCredentialsResponses = {
+    /**
+     * Batch credential rotation result.
+     */
+    200: BatchUpdateAdminAccountCredentialsResponse;
+};
+
+export type BatchUpdateAdminAccountCredentialsResponse2 = BatchUpdateAdminAccountCredentialsResponses[keyof BatchUpdateAdminAccountCredentialsResponses];
+
 export type GetAdminAccountsHealthSummaryData = {
     body?: never;
     path?: never;
@@ -13727,6 +14024,92 @@ export type ListAdminAccountGroupMembersResponses = {
 
 export type ListAdminAccountGroupMembersResponse = ListAdminAccountGroupMembersResponses[keyof ListAdminAccountGroupMembersResponses];
 
+export type BatchAddAdminAccountGroupMembersData = {
+    body: BatchAccountGroupMembersRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/account-groups/{id}/members/batch-add';
+};
+
+export type BatchAddAdminAccountGroupMembersErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchAddAdminAccountGroupMembersError = BatchAddAdminAccountGroupMembersErrors[keyof BatchAddAdminAccountGroupMembersErrors];
+
+export type BatchAddAdminAccountGroupMembersResponses = {
+    /**
+     * Members added — see per-row outcome.
+     */
+    200: BatchAccountGroupMembersResponse;
+};
+
+export type BatchAddAdminAccountGroupMembersResponse = BatchAddAdminAccountGroupMembersResponses[keyof BatchAddAdminAccountGroupMembersResponses];
+
+export type BatchRemoveAdminAccountGroupMembersData = {
+    body: BatchAccountGroupMembersRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/account-groups/{id}/members/batch-remove';
+};
+
+export type BatchRemoveAdminAccountGroupMembersErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchRemoveAdminAccountGroupMembersError = BatchRemoveAdminAccountGroupMembersErrors[keyof BatchRemoveAdminAccountGroupMembersErrors];
+
+export type BatchRemoveAdminAccountGroupMembersResponses = {
+    /**
+     * Members removed — see per-row outcome.
+     */
+    200: BatchAccountGroupMembersResponse;
+};
+
+export type BatchRemoveAdminAccountGroupMembersResponse = BatchRemoveAdminAccountGroupMembersResponses[keyof BatchRemoveAdminAccountGroupMembersResponses];
+
 export type RemoveAdminAccountGroupMemberData = {
     body?: never;
     path: {
@@ -14849,6 +15232,43 @@ export type CancelAdminAffiliateWithdrawalResponses = {
 
 export type CancelAdminAffiliateWithdrawalResponse = CancelAdminAffiliateWithdrawalResponses[keyof CancelAdminAffiliateWithdrawalResponses];
 
+export type BatchSetAdminAffiliateRebateRateData = {
+    body: BatchSetAdminAffiliateRebateRateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/affiliates/batch-rebate-rate';
+};
+
+export type BatchSetAdminAffiliateRebateRateErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchSetAdminAffiliateRebateRateError = BatchSetAdminAffiliateRebateRateErrors[keyof BatchSetAdminAffiliateRebateRateErrors];
+
+export type BatchSetAdminAffiliateRebateRateResponses = {
+    /**
+     * Batch rebate-rate result.
+     */
+    200: BatchSetAdminAffiliateRebateRateResponse;
+};
+
+export type BatchSetAdminAffiliateRebateRateResponse2 = BatchSetAdminAffiliateRebateRateResponses[keyof BatchSetAdminAffiliateRebateRateResponses];
+
 export type ListAdminAffiliateRulesData = {
     body?: never;
     path?: never;
@@ -15550,6 +15970,43 @@ export type CreateAdminUserSubscriptionResponses = {
 
 export type CreateAdminUserSubscriptionResponse = CreateAdminUserSubscriptionResponses[keyof CreateAdminUserSubscriptionResponses];
 
+export type BatchAssignAdminUserSubscriptionsData = {
+    body: BatchAssignAdminUserSubscriptionsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/user-subscriptions/batch-assign';
+};
+
+export type BatchAssignAdminUserSubscriptionsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchAssignAdminUserSubscriptionsError = BatchAssignAdminUserSubscriptionsErrors[keyof BatchAssignAdminUserSubscriptionsErrors];
+
+export type BatchAssignAdminUserSubscriptionsResponses = {
+    /**
+     * Batch assign result.
+     */
+    200: BatchAssignAdminUserSubscriptionsResponse;
+};
+
+export type BatchAssignAdminUserSubscriptionsResponse2 = BatchAssignAdminUserSubscriptionsResponses[keyof BatchAssignAdminUserSubscriptionsResponses];
+
 export type DeleteAdminUserSubscriptionData = {
     body?: never;
     path: {
@@ -15999,6 +16456,93 @@ export type GetAdminOpsErrorDistributionResponses = {
 };
 
 export type GetAdminOpsErrorDistributionResponse = GetAdminOpsErrorDistributionResponses[keyof GetAdminOpsErrorDistributionResponses];
+
+export type ListAdminOpsErrorLogsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        user_id?: Id;
+        account_id?: Id;
+        error_class?: string;
+        platform?: string;
+        /**
+         * Filter by operator-supplied resolution status.
+         */
+        resolution?: 'open' | 'investigating' | 'resolved' | 'muted';
+    };
+    url: '/api/v1/admin/ops/error-logs';
+};
+
+export type ListAdminOpsErrorLogsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminOpsErrorLogsError = ListAdminOpsErrorLogsErrors[keyof ListAdminOpsErrorLogsErrors];
+
+export type ListAdminOpsErrorLogsResponses = {
+    /**
+     * Operator-facing error log feed.
+     */
+    200: OpsErrorLogListResponse;
+};
+
+export type ListAdminOpsErrorLogsResponse = ListAdminOpsErrorLogsResponses[keyof ListAdminOpsErrorLogsResponses];
+
+export type UpdateAdminOpsErrorLogResolutionData = {
+    body: OpsErrorLogResolutionUpdate;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/ops/error-logs/{id}';
+};
+
+export type UpdateAdminOpsErrorLogResolutionErrors = {
+    /**
+     * Standard SRapi error.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminOpsErrorLogResolutionError = UpdateAdminOpsErrorLogResolutionErrors[keyof UpdateAdminOpsErrorLogResolutionErrors];
+
+export type UpdateAdminOpsErrorLogResolutionResponses = {
+    /**
+     * Updated error log entry.
+     */
+    200: OpsErrorLogResponse;
+};
+
+export type UpdateAdminOpsErrorLogResolutionResponse = UpdateAdminOpsErrorLogResolutionResponses[keyof UpdateAdminOpsErrorLogResolutionResponses];
 
 export type GetAdminOpsLatencyHistogramData = {
     body?: never;

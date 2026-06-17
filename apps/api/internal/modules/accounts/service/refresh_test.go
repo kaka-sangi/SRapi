@@ -460,3 +460,75 @@ func TestRefreshAccessTokenSuccessAfterFailuresClearsState(t *testing.T) {
 		t.Fatalf("expected token_expires_at=%v, got %v", newExpiry, updated.TokenExpiresAt)
 	}
 }
+
+// TestBatchRefreshAccountsHappyPath confirms the batched path uses the same
+// RefreshAccessTokenWithOutcome plumbing and surfaces per-row outcomes.
+func TestBatchRefreshAccountsHappyPath(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	svc, _ := newRefreshTestService(t, now)
+	a1 := newOAuthAccount(t, ctx, svc, now.Add(2*time.Minute))
+	a2 := newOAuthAccount(t, ctx, svc, now.Add(2*time.Minute))
+	refresher := &stubRefresher{credential: map[string]any{
+		"access_token":  "ok",
+		"refresh_token": "ok",
+		"expires_at":    now.Add(30 * time.Minute).Format(time.RFC3339),
+	}}
+	results, err := svc.BatchRefreshAccounts(ctx, []int{a1.ID, a2.ID}, refresher)
+	if err != nil {
+		t.Fatalf("BatchRefreshAccounts: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	for i, row := range results {
+		if row.Error != "" {
+			t.Fatalf("row %d unexpectedly failed: %+v", i, row)
+		}
+		if row.OutcomeClass != string(RefreshOutcomeSuccess) {
+			t.Fatalf("row %d expected outcome success, got %s", i, row.OutcomeClass)
+		}
+	}
+}
+
+// TestBatchRefreshAccountsRejectsNonOAuthRow confirms api_key accounts surface
+// a per-row error without aborting the batch.
+func TestBatchRefreshAccountsRejectsNonOAuthRow(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	svc, store := newRefreshTestService(t, now)
+	a1 := newOAuthAccount(t, ctx, svc, now.Add(2*time.Minute))
+	// Insert a raw api_key account directly via the store so we don't depend
+	// on the full Create plumbing.
+	apiKeyAccount, err := store.Create(ctx, contract.CreateStoredAccount{
+		ProviderID:           1,
+		Name:                 "apikey",
+		RuntimeClass:         contract.RuntimeClassAPIKey,
+		CredentialCiphertext: "doesnt-matter",
+		CredentialVersion:    credentialVersionV1,
+		Metadata:             map[string]any{},
+		Status:               contract.StatusActive,
+	})
+	if err != nil {
+		t.Fatalf("seed api key account: %v", err)
+	}
+	refresher := &stubRefresher{credential: map[string]any{
+		"access_token":  "ok",
+		"refresh_token": "ok",
+		"expires_at":    now.Add(30 * time.Minute).Format(time.RFC3339),
+	}}
+	results, err := svc.BatchRefreshAccounts(ctx, []int{a1.ID, apiKeyAccount.ID, 99999}, refresher)
+	if err != nil {
+		t.Fatalf("BatchRefreshAccounts: %v", err)
+	}
+	if results[0].Error != "" {
+		t.Fatalf("row 0 should succeed: %+v", results[0])
+	}
+	if results[1].Error == "" {
+		t.Fatalf("row 1 (api_key) should report not-oauth, got %+v", results[1])
+	}
+	// NotFound is idempotent (no error).
+	if results[2].Error != "" {
+		t.Fatalf("row 2 (NotFound) should be idempotent success, got %+v", results[2])
+	}
+}

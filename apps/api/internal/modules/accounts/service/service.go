@@ -387,6 +387,166 @@ func (s *Service) BatchUpdateConcurrency(ctx context.Context, items []contract.B
 	return results, nil
 }
 
+// BatchRefreshAccountsMaxItems caps the number of accounts per BatchRefreshAccounts
+// call. Mirrors the other batch-account caps so the operator-facing surface stays
+// consistent (1000 rows / call).
+const BatchRefreshAccountsMaxItems = 1000
+
+// BatchRefreshAccounts triggers an OAuth refresh against N accounts in one
+// call. Verbatim port of sub2api's AccountHandler.BatchRefresh
+// (account_handler.go): sub2api fans out via errgroup with maxConcurrency=10
+// and collects per-row outcomes. srapi reuses RefreshAccessTokenWithOutcome
+// (the same path the single-account /admin/accounts/{id}/refresh endpoint
+// uses) so the bookkeeping rules (refresh_attempts / needs_reauth_at /
+// token_expires_at) stay in one place. Per-row failures surface in
+// results[i].Error without aborting the batch. NotFound is idempotent
+// (matching BatchDeleteAccountResult), and non-OAuth runtime classes are
+// rejected per-row (the upstream handler-level gate is duplicated here so the
+// caller does not pre-filter).
+//
+// Outer error is reserved for precondition failures (empty input, > max
+// items, nil refresher).
+func (s *Service) BatchRefreshAccounts(ctx context.Context, ids []int, refresher AccountRefresher) ([]contract.BatchRefreshAccountResult, error) {
+	if len(ids) == 0 {
+		return nil, ErrInvalidInput
+	}
+	if len(ids) > BatchRefreshAccountsMaxItems {
+		return nil, ErrInvalidInput
+	}
+	if refresher == nil {
+		return nil, ErrInvalidInput
+	}
+	results := make([]contract.BatchRefreshAccountResult, 0, len(ids))
+	seen := make(map[int]struct{}, len(ids))
+	for i, id := range ids {
+		row := contract.BatchRefreshAccountResult{Index: i, AccountID: id}
+		if id <= 0 {
+			row.Error = "invalid id"
+			results = append(results, row)
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			row.Error = "duplicate id in batch"
+			results = append(results, row)
+			continue
+		}
+		seen[id] = struct{}{}
+		// Pre-flight the row so we can apply the idempotent-NotFound rule and
+		// reject non-OAuth rows before paying the refresher round-trip.
+		account, err := s.store.FindByID(ctx, id)
+		if err != nil {
+			if errors.Is(err, ErrAccountNotFound) || strings.Contains(err.Error(), "account not found") {
+				results = append(results, row)
+				continue
+			}
+			row.Error = err.Error()
+			results = append(results, row)
+			continue
+		}
+		if account.RuntimeClass != contract.RuntimeClassOauthRefresh && account.RuntimeClass != contract.RuntimeClassOauthDeviceCode {
+			row.Error = "account is not an oauth runtime class"
+			results = append(results, row)
+			continue
+		}
+		outcome, refreshErr := s.RefreshAccessTokenWithOutcome(ctx, id, refresher)
+		row.OutcomeClass = string(outcome.Class)
+		row.Attempts = outcome.Attempts
+		row.NeedsReauthFlipped = outcome.NeedsReauthFlipped
+		if refreshErr != nil {
+			row.Error = refreshErr.Error()
+		}
+		results = append(results, row)
+	}
+	return results, nil
+}
+
+// BatchUpdateAccountCredentialsMaxItems caps the number of items per
+// BatchUpdateAccountCredentials call. Mirrors the other batch-account caps so
+// the operator-facing surface stays consistent (1000 rows / call).
+const BatchUpdateAccountCredentialsMaxItems = 1000
+
+// BatchUpdateAccountCredentials rotates the stored credential on N accounts in
+// one call, each row carrying its own partial-credential patch. Verbatim port
+// of sub2api's BatchUpdateCredentials (account_handler.go) — sub2api applied
+// a single shared {field, value} across the whole batch; srapi accepts a
+// per-row credential patch so a single call can rotate disjoint fields
+// (refresh_token on one account, api_key on another) without N round trips.
+//
+// Per-row: load current credential → merge patch on top → persist via
+// Service.Update with the merged Credential. Empty patches are rejected
+// per-row (a no-op silent succeed would mask operator mistakes). NotFound is
+// idempotent (matching BatchDeleteAccountResult), and per-row store /
+// encryption failures surface in results[i].Error without aborting the
+// batch.
+//
+// Outer error is reserved for precondition failures (empty input, > max
+// items). The audit snapshot recorded by the HTTP handler covers
+// requested/succeeded/failed counts only — credential bytes are NEVER
+// included.
+func (s *Service) BatchUpdateAccountCredentials(ctx context.Context, items []contract.BatchUpdateAccountCredentialItem) ([]contract.BatchUpdateAccountCredentialResult, error) {
+	if len(items) == 0 {
+		return nil, ErrInvalidInput
+	}
+	if len(items) > BatchUpdateAccountCredentialsMaxItems {
+		return nil, ErrInvalidInput
+	}
+	results := make([]contract.BatchUpdateAccountCredentialResult, 0, len(items))
+	seen := make(map[int]struct{}, len(items))
+	for i, item := range items {
+		row := contract.BatchUpdateAccountCredentialResult{Index: i, AccountID: item.AccountID}
+		if item.AccountID <= 0 {
+			row.Error = "invalid id"
+			results = append(results, row)
+			continue
+		}
+		if len(item.Credential) == 0 {
+			row.Error = "credential patch is empty"
+			results = append(results, row)
+			continue
+		}
+		if _, dup := seen[item.AccountID]; dup {
+			row.Error = "duplicate id in batch"
+			results = append(results, row)
+			continue
+		}
+		seen[item.AccountID] = struct{}{}
+		account, err := s.store.FindByID(ctx, item.AccountID)
+		if err != nil {
+			if errors.Is(err, ErrAccountNotFound) || strings.Contains(err.Error(), "account not found") {
+				results = append(results, row)
+				continue
+			}
+			row.Error = err.Error()
+			results = append(results, row)
+			continue
+		}
+		current, err := s.decryptCredential(account.CredentialCiphertext)
+		if err != nil {
+			row.Error = err.Error()
+			results = append(results, row)
+			continue
+		}
+		merged := cloneMap(current)
+		if merged == nil {
+			merged = map[string]any{}
+		}
+		for k, v := range item.Credential {
+			merged[k] = v
+		}
+		if _, err := s.Update(ctx, item.AccountID, contract.UpdateRequest{Credential: &merged}); err != nil {
+			if errors.Is(err, ErrAccountNotFound) || strings.Contains(err.Error(), "account not found") {
+				results = append(results, row)
+				continue
+			}
+			row.Error = err.Error()
+			results = append(results, row)
+			continue
+		}
+		results = append(results, row)
+	}
+	return results, nil
+}
+
 func (s *Service) List(ctx context.Context) ([]contract.ProviderAccount, error) {
 	accounts, err := s.store.List(ctx)
 	if err != nil {

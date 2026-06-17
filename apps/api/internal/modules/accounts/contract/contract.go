@@ -548,6 +548,47 @@ type BatchSetGroupRateMultiplierResult struct {
 	Error   string
 }
 
+// BatchRefreshAccountResult is per-row outcome from BatchRefreshAccounts.
+// Order matches the request. Verbatim port of sub2api's AccountHandler.BatchRefresh
+// (account_handler.go) — sub2api shells out to a concurrency-bounded errgroup
+// over RefreshSingleAccount; srapi uses the structured RefreshOutcome already
+// returned by the single-account /admin/accounts/{id}/refresh handler and
+// surfaces the OutcomeClass + Attempts + NeedsReauthFlipped per-row so the
+// admin UI can render mixed outcomes (success vs permanent_error vs
+// transient_error vs threshold_exceeded). NotFound is idempotent (counts as
+// success — caller intent of "this id is refreshed" is moot for a missing row).
+type BatchRefreshAccountResult struct {
+	Index              int
+	AccountID          int
+	OutcomeClass       string
+	Attempts           int
+	NeedsReauthFlipped bool
+	Error              string
+}
+
+// BatchUpdateAccountCredentialItem is one row in a BatchUpdateAccountCredentials
+// call: AccountID is the target; Credential is a partial map merged onto the
+// stored credential so callers can rotate just one field (e.g. refresh_token,
+// api_key) without round-tripping the rest. Verbatim port of sub2api's
+// BatchUpdateCredentials (account_handler.go) — sub2api accepted a single
+// shared {field, value} for the whole batch; srapi accepts a per-row credential
+// patch so a single call can rotate disjoint fields across accounts.
+type BatchUpdateAccountCredentialItem struct {
+	AccountID  int
+	Credential map[string]any
+}
+
+// BatchUpdateAccountCredentialResult is per-row outcome. Order matches the
+// request. Error is empty on a successful merge + update (and on a missing-row
+// idempotent skip, matching BatchDeleteAccountResult). Per-row failures
+// (invalid id, duplicate in batch, store/validation error) surface in Error
+// without aborting the batch.
+type BatchUpdateAccountCredentialResult struct {
+	Index     int
+	AccountID int
+	Error     string
+}
+
 type CreateRequest struct {
 	ProviderID     int
 	Name           string

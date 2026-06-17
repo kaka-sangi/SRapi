@@ -710,6 +710,30 @@ func (e BatchAccountActionRequestAction) Valid() bool {
 	}
 }
 
+// Defines values for BatchAssignAdminUserSubscriptionsRowOutcome.
+const (
+	BatchAssignAdminUserSubscriptionsRowOutcomeCreated BatchAssignAdminUserSubscriptionsRowOutcome = "created"
+	BatchAssignAdminUserSubscriptionsRowOutcomeFailed  BatchAssignAdminUserSubscriptionsRowOutcome = "failed"
+	BatchAssignAdminUserSubscriptionsRowOutcomeReused  BatchAssignAdminUserSubscriptionsRowOutcome = "reused"
+	BatchAssignAdminUserSubscriptionsRowOutcomeSkipped BatchAssignAdminUserSubscriptionsRowOutcome = "skipped"
+)
+
+// Valid indicates whether the value is a known member of the BatchAssignAdminUserSubscriptionsRowOutcome enum.
+func (e BatchAssignAdminUserSubscriptionsRowOutcome) Valid() bool {
+	switch e {
+	case BatchAssignAdminUserSubscriptionsRowOutcomeCreated:
+		return true
+	case BatchAssignAdminUserSubscriptionsRowOutcomeFailed:
+		return true
+	case BatchAssignAdminUserSubscriptionsRowOutcomeReused:
+		return true
+	case BatchAssignAdminUserSubscriptionsRowOutcomeSkipped:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BatchCreateProviderAccountsRequestDefaultsRiskLevel.
 const (
 	BatchCreateProviderAccountsRequestDefaultsRiskLevelHigh   BatchCreateProviderAccountsRequestDefaultsRiskLevel = "high"
@@ -5183,6 +5207,58 @@ type BatchAccountUsageTodayResponse struct {
 	RequestId RequestId                 `json:"request_id"`
 }
 
+// BatchAssignAdminUserSubscriptionItem defines model for BatchAssignAdminUserSubscriptionItem.
+type BatchAssignAdminUserSubscriptionItem struct {
+	// ExpiresAt Optional explicit expiry override. When absent the subscription expires at start + plan.validity_days.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	PlanId    Id         `json:"plan_id"`
+	SourceId  *string    `json:"source_id,omitempty"`
+
+	// SourceType Optional idempotency source tag — when both source_type and source_id are set, a matching existing subscription is returned idempotently (mirrors sub2api reused).
+	SourceType *string `json:"source_type,omitempty"`
+	UserId     Id      `json:"user_id"`
+}
+
+// BatchAssignAdminUserSubscriptionsErrorRow defines model for BatchAssignAdminUserSubscriptionsErrorRow.
+type BatchAssignAdminUserSubscriptionsErrorRow struct {
+	Id      Id     `json:"id"`
+	Message string `json:"message"`
+}
+
+// BatchAssignAdminUserSubscriptionsRequest defines model for BatchAssignAdminUserSubscriptionsRequest.
+type BatchAssignAdminUserSubscriptionsRequest struct {
+	Items []BatchAssignAdminUserSubscriptionItem `json:"items"`
+}
+
+// BatchAssignAdminUserSubscriptionsResponse defines model for BatchAssignAdminUserSubscriptionsResponse.
+type BatchAssignAdminUserSubscriptionsResponse struct {
+	Data      BatchAssignAdminUserSubscriptionsResult `json:"data"`
+	RequestId RequestId                               `json:"request_id"`
+}
+
+// BatchAssignAdminUserSubscriptionsResult defines model for BatchAssignAdminUserSubscriptionsResult.
+type BatchAssignAdminUserSubscriptionsResult struct {
+	CreatedCount int `json:"created_count"`
+
+	// Errors Per-id failures (invalid id, missing plan, store error, duplicate (user_id, plan_id) in batch).
+	Errors      []BatchAssignAdminUserSubscriptionsErrorRow `json:"errors"`
+	ReusedCount int                                         `json:"reused_count"`
+
+	// Rows Per-row outcome in request order — carries created/reused/failed plus the subscription id on success.
+	Rows []BatchAssignAdminUserSubscriptionsRow `json:"rows"`
+}
+
+// BatchAssignAdminUserSubscriptionsRow defines model for BatchAssignAdminUserSubscriptionsRow.
+type BatchAssignAdminUserSubscriptionsRow struct {
+	Outcome        BatchAssignAdminUserSubscriptionsRowOutcome `json:"outcome"`
+	PlanId         Id                                          `json:"plan_id"`
+	SubscriptionId *Id                                         `json:"subscription_id,omitempty"`
+	UserId         Id                                          `json:"user_id"`
+}
+
+// BatchAssignAdminUserSubscriptionsRowOutcome defines model for BatchAssignAdminUserSubscriptionsRow.Outcome.
+type BatchAssignAdminUserSubscriptionsRowOutcome string
+
 // BatchCreateProviderAccountsRequest defines model for BatchCreateProviderAccountsRequest.
 type BatchCreateProviderAccountsRequest struct {
 	// Defaults Applied to every item unless the item overrides it. Same shape as
@@ -5379,6 +5455,83 @@ type BatchOperationResult struct {
 	Succeeded      int                `json:"succeeded"`
 }
 
+// BatchRefreshAdminAccountsErrorRow defines model for BatchRefreshAdminAccountsErrorRow.
+type BatchRefreshAdminAccountsErrorRow struct {
+	Id      Id     `json:"id"`
+	Message string `json:"message"`
+}
+
+// BatchRefreshAdminAccountsRequest defines model for BatchRefreshAdminAccountsRequest.
+type BatchRefreshAdminAccountsRequest struct {
+	AccountIds []Id `json:"account_ids"`
+}
+
+// BatchRefreshAdminAccountsResponse defines model for BatchRefreshAdminAccountsResponse.
+type BatchRefreshAdminAccountsResponse struct {
+	Data      BatchRefreshAdminAccountsResult `json:"data"`
+	RequestId RequestId                       `json:"request_id"`
+}
+
+// BatchRefreshAdminAccountsResult defines model for BatchRefreshAdminAccountsResult.
+type BatchRefreshAdminAccountsResult struct {
+	// Errors Per-id failures (invalid id, duplicate in batch, non-OAuth runtime class, refresher error). NotFound is NOT a failure — idempotent semantics.
+	Errors []BatchRefreshAdminAccountsErrorRow `json:"errors"`
+
+	// RefreshedCount Number of rows that completed successfully (outcome_class=success or NotFound idempotent skip).
+	RefreshedCount int `json:"refreshed_count"`
+
+	// Rows Per-id refresh outcome — preserves request order; carries the structured class + attempts even for failure rows.
+	Rows []BatchRefreshAdminAccountsRow `json:"rows"`
+}
+
+// BatchRefreshAdminAccountsRow defines model for BatchRefreshAdminAccountsRow.
+type BatchRefreshAdminAccountsRow struct {
+	AccountId Id `json:"account_id"`
+
+	// Attempts Post-call refresh_attempts (the cumulative consecutive-failure count; 0 on success).
+	Attempts *int `json:"attempts,omitempty"`
+
+	// NeedsReauthFlipped True when this call moved needs_reauth_at from nil to non-nil.
+	NeedsReauthFlipped *bool `json:"needs_reauth_flipped,omitempty"`
+
+	// OutcomeClass Categorical refresh outcome (success / permanent_error / transient_error / threshold_exceeded). Empty string when NotFound was idempotently skipped.
+	OutcomeClass string `json:"outcome_class"`
+}
+
+// BatchSetAdminAffiliateRebateRateErrorRow defines model for BatchSetAdminAffiliateRebateRateErrorRow.
+type BatchSetAdminAffiliateRebateRateErrorRow struct {
+	Id      Id     `json:"id"`
+	Message string `json:"message"`
+}
+
+// BatchSetAdminAffiliateRebateRateItem defines model for BatchSetAdminAffiliateRebateRateItem.
+type BatchSetAdminAffiliateRebateRateItem struct {
+	// Clear When true, removes the override and falls back to the rule-derived rate. rate_percent is ignored when clear=true.
+	Clear *bool `json:"clear,omitempty"`
+
+	// RatePercent Override rate as a 0..1 fraction (e.g. 0.15 = 15%). Required unless clear=true.
+	RatePercent *float64 `json:"rate_percent,omitempty"`
+	UserId      Id       `json:"user_id"`
+}
+
+// BatchSetAdminAffiliateRebateRateRequest defines model for BatchSetAdminAffiliateRebateRateRequest.
+type BatchSetAdminAffiliateRebateRateRequest struct {
+	Items []BatchSetAdminAffiliateRebateRateItem `json:"items"`
+}
+
+// BatchSetAdminAffiliateRebateRateResponse defines model for BatchSetAdminAffiliateRebateRateResponse.
+type BatchSetAdminAffiliateRebateRateResponse struct {
+	Data      BatchSetAdminAffiliateRebateRateResult `json:"data"`
+	RequestId RequestId                              `json:"request_id"`
+}
+
+// BatchSetAdminAffiliateRebateRateResult defines model for BatchSetAdminAffiliateRebateRateResult.
+type BatchSetAdminAffiliateRebateRateResult struct {
+	// Errors Per-id failures (invalid id, rate out of range, duplicate in batch).
+	Errors       []BatchSetAdminAffiliateRebateRateErrorRow `json:"errors"`
+	UpdatedCount int                                        `json:"updated_count"`
+}
+
 // BatchSetGroupRPMOverrideErrorRow defines model for BatchSetGroupRPMOverrideErrorRow.
 type BatchSetGroupRPMOverrideErrorRow struct {
 	Id      Id     `json:"id"`
@@ -5522,6 +5675,38 @@ type BatchUpdateAccountsResult struct {
 	Errors       []string `json:"errors"`
 	UpdatedCount int      `json:"updated_count"`
 	UpdatedIds   []Id     `json:"updated_ids"`
+}
+
+// BatchUpdateAdminAccountCredentialErrorRow defines model for BatchUpdateAdminAccountCredentialErrorRow.
+type BatchUpdateAdminAccountCredentialErrorRow struct {
+	Id      Id     `json:"id"`
+	Message string `json:"message"`
+}
+
+// BatchUpdateAdminAccountCredentialItem defines model for BatchUpdateAdminAccountCredentialItem.
+type BatchUpdateAdminAccountCredentialItem struct {
+	AccountId Id `json:"account_id"`
+
+	// Credential Partial credential patch. Only fields present here overwrite the stored credential; absent fields are preserved. An empty object is rejected per-row to keep operator typos visible.
+	Credential JsonObject `json:"credential"`
+}
+
+// BatchUpdateAdminAccountCredentialsRequest defines model for BatchUpdateAdminAccountCredentialsRequest.
+type BatchUpdateAdminAccountCredentialsRequest struct {
+	Items []BatchUpdateAdminAccountCredentialItem `json:"items"`
+}
+
+// BatchUpdateAdminAccountCredentialsResponse defines model for BatchUpdateAdminAccountCredentialsResponse.
+type BatchUpdateAdminAccountCredentialsResponse struct {
+	Data      BatchUpdateAdminAccountCredentialsResult `json:"data"`
+	RequestId RequestId                                `json:"request_id"`
+}
+
+// BatchUpdateAdminAccountCredentialsResult defines model for BatchUpdateAdminAccountCredentialsResult.
+type BatchUpdateAdminAccountCredentialsResult struct {
+	// Errors Per-id failures (invalid id, empty patch, store/encryption error, duplicate in batch). NotFound is NOT a failure — idempotent semantics.
+	Errors       []BatchUpdateAdminAccountCredentialErrorRow `json:"errors"`
+	UpdatedCount int                                         `json:"updated_count"`
 }
 
 // BatchUpdateRedeemCodeErrorRow defines model for BatchUpdateRedeemCodeErrorRow.
@@ -11812,6 +11997,12 @@ type BatchUpdateAdminAccountConcurrencyJSONRequestBody = BatchUpdateAccountConcu
 // BatchDeleteAdminAccountsJSONRequestBody defines body for BatchDeleteAdminAccounts for application/json ContentType.
 type BatchDeleteAdminAccountsJSONRequestBody = BatchDeleteProviderAccountsRequest
 
+// BatchRefreshAdminAccountsJSONRequestBody defines body for BatchRefreshAdminAccounts for application/json ContentType.
+type BatchRefreshAdminAccountsJSONRequestBody = BatchRefreshAdminAccountsRequest
+
+// BatchUpdateAdminAccountCredentialsJSONRequestBody defines body for BatchUpdateAdminAccountCredentials for application/json ContentType.
+type BatchUpdateAdminAccountCredentialsJSONRequestBody = BatchUpdateAdminAccountCredentialsRequest
+
 // ImportAdminAccountsJSONRequestBody defines body for ImportAdminAccounts for application/json ContentType.
 type ImportAdminAccountsJSONRequestBody = ProviderAccountImportRequest
 
@@ -11853,6 +12044,9 @@ type CreateAdminAffiliateRuleJSONRequestBody = CreateAffiliateRuleRequest
 
 // UpdateAdminAffiliateRuleJSONRequestBody defines body for UpdateAdminAffiliateRule for application/json ContentType.
 type UpdateAdminAffiliateRuleJSONRequestBody = UpdateAffiliateRuleRequest
+
+// BatchSetAdminAffiliateRebateRateJSONRequestBody defines body for BatchSetAdminAffiliateRebateRate for application/json ContentType.
+type BatchSetAdminAffiliateRebateRateJSONRequestBody = BatchSetAdminAffiliateRebateRateRequest
 
 // CreateAdminAffiliateManualAdjustmentJSONRequestBody defines body for CreateAdminAffiliateManualAdjustment for application/json ContentType.
 type CreateAdminAffiliateManualAdjustmentJSONRequestBody = AdminAffiliateManualAdjustmentRequest
@@ -12105,6 +12299,9 @@ type UpdateAdminUserAttributeDefinitionJSONRequestBody = UpdateUserAttributeDefi
 
 // CreateAdminUserSubscriptionJSONRequestBody defines body for CreateAdminUserSubscription for application/json ContentType.
 type CreateAdminUserSubscriptionJSONRequestBody = CreateUserSubscriptionRequest
+
+// BatchAssignAdminUserSubscriptionsJSONRequestBody defines body for BatchAssignAdminUserSubscriptions for application/json ContentType.
+type BatchAssignAdminUserSubscriptionsJSONRequestBody = BatchAssignAdminUserSubscriptionsRequest
 
 // CreateAdminUserJSONRequestBody defines body for CreateAdminUser for application/json ContentType.
 type CreateAdminUserJSONRequestBody = CreateAdminUserRequest
@@ -18883,6 +19080,12 @@ type ServerInterface interface {
 	// Bulk soft-delete provider accounts.
 	// (POST /api/v1/admin/accounts/batch-delete)
 	BatchDeleteAdminAccounts(w http.ResponseWriter, r *http.Request)
+	// Bulk-trigger OAuth refresh on N accounts.
+	// (POST /api/v1/admin/accounts/batch-refresh)
+	BatchRefreshAdminAccounts(w http.ResponseWriter, r *http.Request)
+	// Bulk-rotate credential fields on N accounts.
+	// (POST /api/v1/admin/accounts/batch-update-credentials)
+	BatchUpdateAdminAccountCredentials(w http.ResponseWriter, r *http.Request)
 	// Export provider account metadata without credentials.
 	// (GET /api/v1/admin/accounts/export)
 	ExportAdminAccounts(w http.ResponseWriter, r *http.Request)
@@ -18991,6 +19194,9 @@ type ServerInterface interface {
 	// Update an affiliate rebate rule.
 	// (PATCH /api/v1/admin/affiliate-rules/{id})
 	UpdateAdminAffiliateRule(w http.ResponseWriter, r *http.Request, id Id)
+	// Bulk-set per-user affiliate rebate-rate override.
+	// (POST /api/v1/admin/affiliates/batch-rebate-rate)
+	BatchSetAdminAffiliateRebateRate(w http.ResponseWriter, r *http.Request)
 	// List affiliate invite relationships.
 	// (GET /api/v1/admin/affiliates/invites)
 	ListAdminAffiliateInvites(w http.ResponseWriter, r *http.Request, params ListAdminAffiliateInvitesParams)
@@ -19627,6 +19833,9 @@ type ServerInterface interface {
 	// Create a user subscription from an existing plan.
 	// (POST /api/v1/admin/user-subscriptions)
 	CreateAdminUserSubscription(w http.ResponseWriter, r *http.Request)
+	// Bulk-assign a subscription plan to N users.
+	// (POST /api/v1/admin/user-subscriptions/batch-assign)
+	BatchAssignAdminUserSubscriptions(w http.ResponseWriter, r *http.Request)
 	// Delete a user subscription.
 	// (DELETE /api/v1/admin/user-subscriptions/{id})
 	DeleteAdminUserSubscription(w http.ResponseWriter, r *http.Request, id Id)
@@ -21218,6 +21427,50 @@ func (siw *ServerInterfaceWrapper) BatchDeleteAdminAccounts(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
+// BatchRefreshAdminAccounts operation middleware
+func (siw *ServerInterfaceWrapper) BatchRefreshAdminAccounts(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchRefreshAdminAccounts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchUpdateAdminAccountCredentials operation middleware
+func (siw *ServerInterfaceWrapper) BatchUpdateAdminAccountCredentials(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchUpdateAdminAccountCredentials(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ExportAdminAccounts operation middleware
 func (siw *ServerInterfaceWrapper) ExportAdminAccounts(w http.ResponseWriter, r *http.Request) {
 
@@ -22332,6 +22585,28 @@ func (siw *ServerInterfaceWrapper) UpdateAdminAffiliateRule(w http.ResponseWrite
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAdminAffiliateRule(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchSetAdminAffiliateRebateRate operation middleware
+func (siw *ServerInterfaceWrapper) BatchSetAdminAffiliateRebateRate(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchSetAdminAffiliateRebateRate(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -30422,6 +30697,28 @@ func (siw *ServerInterfaceWrapper) CreateAdminUserSubscription(w http.ResponseWr
 	handler.ServeHTTP(w, r)
 }
 
+// BatchAssignAdminUserSubscriptions operation middleware
+func (siw *ServerInterfaceWrapper) BatchAssignAdminUserSubscriptions(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchAssignAdminUserSubscriptions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteAdminUserSubscription operation middleware
 func (siw *ServerInterfaceWrapper) DeleteAdminUserSubscription(w http.ResponseWriter, r *http.Request) {
 
@@ -34422,6 +34719,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-action", wrapper.BatchActionAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-concurrency", wrapper.BatchUpdateAdminAccountConcurrency)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-delete", wrapper.BatchDeleteAdminAccounts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-refresh", wrapper.BatchRefreshAdminAccounts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-update-credentials", wrapper.BatchUpdateAdminAccountCredentials)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/export", wrapper.ExportAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/health-summary", wrapper.GetAdminAccountsHealthSummary)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import", wrapper.ImportAdminAccounts)
@@ -34458,6 +34757,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliate-rules", wrapper.ListAdminAffiliateRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/affiliate-rules", wrapper.CreateAdminAffiliateRule)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/affiliate-rules/{id}", wrapper.UpdateAdminAffiliateRule)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/affiliates/batch-rebate-rate", wrapper.BatchSetAdminAffiliateRebateRate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliates/invites", wrapper.ListAdminAffiliateInvites)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliates/manual-adjustments", wrapper.ListAdminAffiliateManualAdjustments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/affiliates/manual-adjustments", wrapper.CreateAdminAffiliateManualAdjustment)
@@ -34670,6 +34970,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/user-attributes/{id}", wrapper.UpdateAdminUserAttributeDefinition)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/user-subscriptions", wrapper.ListAdminUserSubscriptions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/user-subscriptions", wrapper.CreateAdminUserSubscription)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/user-subscriptions/batch-assign", wrapper.BatchAssignAdminUserSubscriptions)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/user-subscriptions/{id}", wrapper.DeleteAdminUserSubscription)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users", wrapper.ListAdminUsers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/users", wrapper.CreateAdminUser)

@@ -60,6 +60,18 @@ export function useDeleteUserSubscription() {
   );
 }
 
+// POST /admin/user-subscriptions/batch-assign — bulk-assign a subscription
+// plan to N users in one call. Verbatim port of sub2api's
+// SubscriptionService.BulkAssignSubscription. Per-row outcome reports
+// created / reused / failed.
+export function useBatchAssignUserSubscriptions() {
+  return useAdminMutation(
+    (items: P<typeof adminApi.batchAssignUserSubscriptions>) =>
+      adminApi.batchAssignUserSubscriptions(items),
+    ["admin", "user-subscriptions"],
+  );
+}
+
 // Pricing rules
 export function useCreatePricingRule() {
   return useAdminMutation(

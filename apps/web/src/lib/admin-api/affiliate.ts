@@ -2,6 +2,7 @@
 
 import {
   approveAdminAffiliateWithdrawal,
+  batchSetAdminAffiliateRebateRate,
   cancelAdminAffiliateWithdrawal,
   createAdminAffiliateManualAdjustment,
   createAdminAffiliateRule,
@@ -18,6 +19,8 @@ import type {
   AffiliateInviteRecord,
   AffiliateLedgerEntry,
   AffiliateRule,
+  BatchSetAdminAffiliateRebateRateItem,
+  BatchSetAdminAffiliateRebateRateResult,
   CreateAffiliateRuleRequest,
   Id,
   ListAdminAffiliateInvitesData,
@@ -94,5 +97,19 @@ export const affiliateApi = {
 
   updateAffiliateRule(id: Id, body: UpdateAffiliateRuleRequest): Promise<AffiliateRule> {
     return unwrapData(() => updateAdminAffiliateRule({ path: { id }, body, throwOnError: true }));
+  },
+
+  // Bulk-set or clear per-user affiliate rebate-rate overrides (verbatim port
+  // of sub2api's AffiliateHandler.BatchSetRate). The override is held in an
+  // in-memory overlay on the affiliate service until srapi grows a persistent
+  // user_affiliates table; future rebate computations consult the overlay
+  // before falling back to the rule-derived rate. Per-row failures (invalid
+  // id, rate out of range, duplicate in batch) come back in result.errors[].
+  batchSetAffiliateRebateRate(
+    items: BatchSetAdminAffiliateRebateRateItem[],
+  ): Promise<BatchSetAdminAffiliateRebateRateResult> {
+    return unwrapData(() =>
+      batchSetAdminAffiliateRebateRate({ body: { items }, throwOnError: true }),
+    );
   },
 };

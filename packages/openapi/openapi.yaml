@@ -5051,6 +5051,108 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/accounts/batch-refresh:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: batchRefreshAdminAccounts
+      summary: Bulk-trigger OAuth refresh on N accounts.
+      description: |
+        Triggers an OAuth access-token refresh against up to 1000 accounts in
+        a single call — the same code path the single-account
+        `POST /admin/accounts/{id}/refresh` endpoint uses, batched. Verbatim
+        port of sub2api's `AccountHandler.BatchRefresh` (account_handler.go).
+
+        Per-row outcome carries the structured RefreshOutcomeClass
+        (`success` / `permanent_error` / `transient_error` /
+        `threshold_exceeded`) so the admin UI can render mixed outcomes.
+        NotFound is idempotent (the caller's intent of "refresh this id" is
+        moot for a missing row). Non-OAuth runtime classes surface as a
+        per-row error (not the whole batch).
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchRefreshAdminAccountsRequest"
+      responses:
+        "200":
+          description: Batch refresh result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchRefreshAdminAccountsResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/batch-update-credentials:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: batchUpdateAdminAccountCredentials
+      summary: Bulk-rotate credential fields on N accounts.
+      description: |
+        Rotates per-row credential fields on up to 1000 accounts in one call.
+        Each row carries a partial credential patch — only the fields present
+        in `credential` are overwritten on top of the stored credential, so
+        the caller can rotate just `refresh_token` on one account and just
+        `api_key` on another in the same request.
+
+        Verbatim port of sub2api's `AccountHandler.BatchUpdateCredentials`
+        (account_handler.go); the only shape difference is sub2api accepted a
+        single shared `{field, value}` for the whole batch, srapi accepts a
+        per-row patch so a single call can rotate disjoint fields.
+
+        NotFound is idempotent. Per-row failures (invalid id, empty patch,
+        store error) surface in `errors[]`. The audit snapshot records
+        requested/succeeded/failed counts only — credential bytes are NEVER
+        included.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchUpdateAdminAccountCredentialsRequest"
+      responses:
+        "200":
+          description: Batch credential rotation result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchUpdateAdminAccountCredentialsResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/accounts/health-summary:
     get:
       tags:
@@ -7916,6 +8018,56 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/affiliates/batch-rebate-rate:
+    post:
+      tags:
+        - AdminAffiliates
+      operationId: batchSetAdminAffiliateRebateRate
+      summary: Bulk-set per-user affiliate rebate-rate override.
+      description: |
+        Sets (or clears) the per-user affiliate rebate-rate override on up to
+        1000 users in a single call. Verbatim port of sub2api's
+        `AffiliateHandler.BatchSetRate` (affiliate_handler.go) →
+        `AffiliateRepository.BatchSetUserRebateRate` (affiliate_repo.go).
+
+        sub2api persists this to a `user_affiliates` table; srapi has no such
+        schema yet, so the override is held in an in-memory overlay on the
+        affiliate service. The future rebate-computation hot path will consult
+        the overlay before falling back to the `AffiliateRule` rate.
+
+        Per-row failures (invalid id, rate out of [0,1] range, duplicate id in
+        batch) surface in `errors[]` without aborting the batch.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchSetAdminAffiliateRebateRateRequest"
+      responses:
+        "200":
+          description: Batch rebate-rate result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchSetAdminAffiliateRebateRateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/affiliate-rules:
     get:
       tags:
@@ -8585,6 +8737,59 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserSubscriptionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/user-subscriptions/batch-assign:
+    post:
+      tags:
+        - AdminSubscriptions
+      operationId: batchAssignAdminUserSubscriptions
+      summary: Bulk-assign a subscription plan to N users.
+      description: |
+        Assigns subscription plans to up to 1000 users in a single call.
+        Verbatim port of sub2api's `SubscriptionService.BulkAssignSubscription`
+        (subscription_service.go) → `SubscriptionHandler.BulkAssign`
+        (subscription_handler.go).
+
+        Per-row outcome is one of:
+        - `created` — fresh subscription row inserted
+        - `reused`  — an existing subscription on the same
+          `(user_id, source_type, source_id)` was returned idempotently
+          (matches sub2api's `reused_count`)
+        - `failed`  — per-row validation/store error (Error is populated)
+
+        Per-row failures surface in `errors[]` without aborting the batch.
+        Duplicate `(user_id, plan_id)` tuples within the same batch flag
+        "duplicate id in batch" so a typo can't silently double-assign.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchAssignAdminUserSubscriptionsRequest"
+      responses:
+        "200":
+          description: Batch assign result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchAssignAdminUserSubscriptionsResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -18670,6 +18875,11 @@ components:
         - expired
         - cancelled
         - suspended
+      x-enum-varnames:
+        - UserSubscriptionStatusActive
+        - UserSubscriptionStatusExpired
+        - UserSubscriptionStatusCancelled
+        - UserSubscriptionStatusSuspended
 
     SubscriptionPlan:
       type: object
@@ -20649,6 +20859,305 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/BatchUpdateAccountConcurrencyResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BatchRefreshAdminAccountsRequest:
+      type: object
+      required:
+        - account_ids
+      properties:
+        account_ids:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/Id"
+
+    BatchRefreshAdminAccountsErrorRow:
+      type: object
+      required:
+        - id
+        - message
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        message:
+          type: string
+
+    BatchRefreshAdminAccountsRow:
+      type: object
+      required:
+        - account_id
+        - outcome_class
+      properties:
+        account_id:
+          $ref: "#/components/schemas/Id"
+        outcome_class:
+          type: string
+          description: Categorical refresh outcome (success / permanent_error / transient_error / threshold_exceeded). Empty string when NotFound was idempotently skipped.
+        attempts:
+          type: integer
+          description: Post-call refresh_attempts (the cumulative consecutive-failure count; 0 on success).
+        needs_reauth_flipped:
+          type: boolean
+          description: True when this call moved needs_reauth_at from nil to non-nil.
+
+    BatchRefreshAdminAccountsResult:
+      type: object
+      required:
+        - refreshed_count
+        - rows
+        - errors
+      properties:
+        refreshed_count:
+          type: integer
+          description: Number of rows that completed successfully (outcome_class=success or NotFound idempotent skip).
+        rows:
+          type: array
+          description: Per-id refresh outcome — preserves request order; carries the structured class + attempts even for failure rows.
+          items:
+            $ref: "#/components/schemas/BatchRefreshAdminAccountsRow"
+        errors:
+          type: array
+          description: Per-id failures (invalid id, duplicate in batch, non-OAuth runtime class, refresher error). NotFound is NOT a failure — idempotent semantics.
+          items:
+            $ref: "#/components/schemas/BatchRefreshAdminAccountsErrorRow"
+
+    BatchRefreshAdminAccountsResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchRefreshAdminAccountsResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BatchUpdateAdminAccountCredentialItem:
+      type: object
+      required:
+        - account_id
+        - credential
+      properties:
+        account_id:
+          $ref: "#/components/schemas/Id"
+        credential:
+          allOf:
+            - $ref: "#/components/schemas/JsonObject"
+          description: Partial credential patch. Only fields present here overwrite the stored credential; absent fields are preserved. An empty object is rejected per-row to keep operator typos visible.
+
+    BatchUpdateAdminAccountCredentialsRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/BatchUpdateAdminAccountCredentialItem"
+
+    BatchUpdateAdminAccountCredentialErrorRow:
+      type: object
+      required:
+        - id
+        - message
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        message:
+          type: string
+
+    BatchUpdateAdminAccountCredentialsResult:
+      type: object
+      required:
+        - updated_count
+        - errors
+      properties:
+        updated_count:
+          type: integer
+        errors:
+          type: array
+          description: Per-id failures (invalid id, empty patch, store/encryption error, duplicate in batch). NotFound is NOT a failure — idempotent semantics.
+          items:
+            $ref: "#/components/schemas/BatchUpdateAdminAccountCredentialErrorRow"
+
+    BatchUpdateAdminAccountCredentialsResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchUpdateAdminAccountCredentialsResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BatchSetAdminAffiliateRebateRateItem:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          $ref: "#/components/schemas/Id"
+        rate_percent:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          nullable: true
+          description: Override rate as a 0..1 fraction (e.g. 0.15 = 15%). Required unless clear=true.
+        clear:
+          type: boolean
+          description: When true, removes the override and falls back to the rule-derived rate. rate_percent is ignored when clear=true.
+
+    BatchSetAdminAffiliateRebateRateRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/BatchSetAdminAffiliateRebateRateItem"
+
+    BatchSetAdminAffiliateRebateRateErrorRow:
+      type: object
+      required:
+        - id
+        - message
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        message:
+          type: string
+
+    BatchSetAdminAffiliateRebateRateResult:
+      type: object
+      required:
+        - updated_count
+        - errors
+      properties:
+        updated_count:
+          type: integer
+        errors:
+          type: array
+          description: Per-id failures (invalid id, rate out of range, duplicate in batch).
+          items:
+            $ref: "#/components/schemas/BatchSetAdminAffiliateRebateRateErrorRow"
+
+    BatchSetAdminAffiliateRebateRateResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchSetAdminAffiliateRebateRateResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BatchAssignAdminUserSubscriptionItem:
+      type: object
+      required:
+        - user_id
+        - plan_id
+      properties:
+        user_id:
+          $ref: "#/components/schemas/Id"
+        plan_id:
+          $ref: "#/components/schemas/Id"
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Optional explicit expiry override. When absent the subscription expires at start + plan.validity_days.
+        source_type:
+          type: string
+          description: Optional idempotency source tag — when both source_type and source_id are set, a matching existing subscription is returned idempotently (mirrors sub2api reused).
+        source_id:
+          type: string
+
+    BatchAssignAdminUserSubscriptionsRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/BatchAssignAdminUserSubscriptionItem"
+
+    BatchAssignAdminUserSubscriptionsErrorRow:
+      type: object
+      required:
+        - id
+        - message
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        message:
+          type: string
+
+    BatchAssignAdminUserSubscriptionsRow:
+      type: object
+      required:
+        - user_id
+        - plan_id
+        - outcome
+      properties:
+        user_id:
+          $ref: "#/components/schemas/Id"
+        plan_id:
+          $ref: "#/components/schemas/Id"
+        outcome:
+          type: string
+          enum:
+            - created
+            - reused
+            - failed
+            - skipped
+        subscription_id:
+          $ref: "#/components/schemas/Id"
+
+    BatchAssignAdminUserSubscriptionsResult:
+      type: object
+      required:
+        - created_count
+        - reused_count
+        - rows
+        - errors
+      properties:
+        created_count:
+          type: integer
+        reused_count:
+          type: integer
+        rows:
+          type: array
+          description: Per-row outcome in request order — carries created/reused/failed plus the subscription id on success.
+          items:
+            $ref: "#/components/schemas/BatchAssignAdminUserSubscriptionsRow"
+        errors:
+          type: array
+          description: Per-id failures (invalid id, missing plan, store error, duplicate (user_id, plan_id) in batch).
+          items:
+            $ref: "#/components/schemas/BatchAssignAdminUserSubscriptionsErrorRow"
+
+    BatchAssignAdminUserSubscriptionsResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchAssignAdminUserSubscriptionsResult"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

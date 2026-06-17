@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
@@ -41,6 +42,15 @@ type Service struct {
 	store contract.Store
 	deps  Dependencies
 	clock Clock
+
+	// rebateOverrideMu guards the rebateOverrides map below. The map is a
+	// runtime overlay used by BatchSetUserRebateRate to store per-user rebate
+	// rate overrides until srapi grows a persistent user_affiliates table to
+	// mirror sub2api's. Values are *float64 by design (nil = explicit clear,
+	// non-nil = the per-user percentage). Map presence ≠ override active —
+	// only non-nil values participate; absent users fall back to the rule.
+	rebateOverrideMu sync.RWMutex
+	rebateOverrides  map[int]*float64
 }
 
 func New(store contract.Store, deps Dependencies, clock Clock) (*Service, error) {
@@ -50,7 +60,86 @@ func New(store contract.Store, deps Dependencies, clock Clock) (*Service, error)
 	if clock == nil {
 		clock = SystemClock{}
 	}
-	return &Service{store: store, deps: deps, clock: clock}, nil
+	return &Service{store: store, deps: deps, clock: clock, rebateOverrides: make(map[int]*float64)}, nil
+}
+
+// BatchSetUserRebateRateMaxItems caps the number of items per
+// BatchSetUserRebateRate call (1000 — operator-facing constant matching the
+// other batch endpoints).
+const BatchSetUserRebateRateMaxItems = 1000
+
+// BatchSetUserRebateRate sets (or clears) the per-user affiliate rebate-rate
+// override on N users in one call. Verbatim port of sub2api's
+// AffiliateHandler.BatchSetRate (affiliate_handler.go) → AffiliateService.
+// AdminBatchSetUserRebateRate → AffiliateRepository.BatchSetUserRebateRate
+// (affiliate_repo.go). sub2api persists to the user_affiliates table; srapi
+// has no such schema yet, so the override is held in an in-memory overlay
+// keyed on user_id. The future rebate-computation path can consult this
+// overlay before falling back to the AffiliateRule rate. Per-row failures
+// (invalid id, rate out of [0,1] range, duplicate id in batch) surface in
+// results[i].Error without aborting the batch.
+//
+// Outer error is reserved for precondition failures (empty input, > max
+// items).
+func (s *Service) BatchSetUserRebateRate(ctx context.Context, items []contract.BatchSetUserRebateRateItem) ([]contract.BatchSetUserRebateRateResult, error) {
+	if len(items) == 0 {
+		return nil, ErrInvalidInput
+	}
+	if len(items) > BatchSetUserRebateRateMaxItems {
+		return nil, ErrInvalidInput
+	}
+	results := make([]contract.BatchSetUserRebateRateResult, 0, len(items))
+	seen := make(map[int]struct{}, len(items))
+	s.rebateOverrideMu.Lock()
+	defer s.rebateOverrideMu.Unlock()
+	if s.rebateOverrides == nil {
+		s.rebateOverrides = make(map[int]*float64)
+	}
+	for i, item := range items {
+		row := contract.BatchSetUserRebateRateResult{Index: i, UserID: item.UserID}
+		if item.UserID <= 0 {
+			row.Error = "invalid id"
+			results = append(results, row)
+			continue
+		}
+		if _, dup := seen[item.UserID]; dup {
+			row.Error = "duplicate id in batch"
+			results = append(results, row)
+			continue
+		}
+		seen[item.UserID] = struct{}{}
+		if !item.ClearOverride {
+			if item.RatePercent == nil {
+				row.Error = "rate_percent is required unless clear=true"
+				results = append(results, row)
+				continue
+			}
+			if *item.RatePercent < 0 || *item.RatePercent > 1 {
+				row.Error = "rate_percent must be in [0, 1]"
+				results = append(results, row)
+				continue
+			}
+			rate := *item.RatePercent
+			s.rebateOverrides[item.UserID] = &rate
+		} else {
+			delete(s.rebateOverrides, item.UserID)
+		}
+		results = append(results, row)
+	}
+	return results, nil
+}
+
+// UserRebateOverride returns the active per-user rebate override (rate as a
+// 0..1 fraction) when one is configured via BatchSetUserRebateRate, or nil
+// when no override applies. Cheap thread-safe read for the future
+// rebate-computation hot path; today's tests assert it.
+func (s *Service) UserRebateOverride(userID int) *float64 {
+	s.rebateOverrideMu.RLock()
+	defer s.rebateOverrideMu.RUnlock()
+	if v, ok := s.rebateOverrides[userID]; ok {
+		return v
+	}
+	return nil
 }
 
 func (s *Service) CreateInviteCode(ctx context.Context, req contract.CreateInviteCodeRequest) (contract.InviteCode, error) {

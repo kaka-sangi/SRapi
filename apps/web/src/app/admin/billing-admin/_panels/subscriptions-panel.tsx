@@ -20,12 +20,24 @@ import {
 import {
   useAdminSubscriptionPlans,
   useAdminSubscriptions,
+  useBatchAssignUserSubscriptions,
   useCreateUserSubscription,
   useDeleteUserSubscription,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { adminErrorMessage } from "@/lib/admin-api";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { formatDate } from "@/lib/admin-format";
 import {
@@ -68,8 +80,36 @@ export function SubscriptionsPanel() {
   const userLookup = useUserEmailLookup();
   const createSub = useCreateUserSubscription();
   const deleteSub = useDeleteUserSubscription();
+  const batchAssign = useBatchAssignUserSubscriptions();
+  const { toast } = useToast();
   const [creatingSub, setCreatingSub] = useState(false);
   const [subToDelete, setSubToDelete] = useState<UserSubscription | null>(null);
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+
+  // applyBulkAssign is the verbatim wiring for the port of sub2api's
+  // SubscriptionService.BulkAssignSubscription. The dialog hands parsed items
+  // to this method; the server applies them per-row with created/reused/failed
+  // outcomes — partial-failure is the default and surfaces in the toast.
+  async function applyBulkAssign(items: { user_id: string; plan_id: string }[]) {
+    if (items.length === 0) return;
+    try {
+      const result = await batchAssign.mutateAsync(items);
+      const failedCount = result.errors.length;
+      const succeededCount = result.created_count + result.reused_count;
+      if (failedCount > 0 && succeededCount > 0) {
+        toast({
+          title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
+          tone: "warning",
+        });
+      } else if (failedCount > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: items.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
 
   const subFields: FieldConfig<UserSubscriptionFormState>[] = [
     {
@@ -141,6 +181,14 @@ export function SubscriptionsPanel() {
         actions={
           <div className="flex items-center gap-3">
             {allSubs.data ? <ListCount total={total} /> : null}
+            <Button
+              variant="outline"
+              size="sm"
+              loading={batchAssign.isPending}
+              onClick={() => setBulkAssignOpen(true)}
+            >
+              {t("adminSubscriptions.bulkAssign")}
+            </Button>
             <Button variant="primary" size="sm" onClick={() => setCreatingSub(true)}>
               ＋ {t("adminSubscriptions.createSubscription")}
             </Button>
@@ -222,7 +270,93 @@ export function SubscriptionsPanel() {
           isPending={createSub.isPending}
         />
       ) : null}
+
+      {bulkAssignOpen ? (
+        <BulkAssignSubscriptionDialog
+          isPending={batchAssign.isPending}
+          onSubmit={async (items) => {
+            await applyBulkAssign(items);
+            setBulkAssignOpen(false);
+          }}
+          onClose={() => setBulkAssignOpen(false)}
+        />
+      ) : null}
     </>
+  );
+}
+
+// Operator-friendly dialog for the verbatim port of sub2api's
+// SubscriptionService.BulkAssignSubscription. One row per line in
+// `user_id,plan_id` format; the server applies them per-row and returns
+// per-row outcomes (created / reused / failed).
+function BulkAssignSubscriptionDialog({
+  isPending,
+  onSubmit,
+  onClose,
+}: {
+  isPending: boolean;
+  onSubmit: (items: { user_id: string; plan_id: string }[]) => void | Promise<void>;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const [raw, setRaw] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    const items: { user_id: string; plan_id: string }[] = [];
+    const lines = raw.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed === "") continue;
+      const parts = trimmed.split(",").map((s) => s.trim());
+      if (parts.length !== 2) {
+        setError(t("adminSubscriptions.bulkAssignBadLine") as string);
+        return;
+      }
+      items.push({ user_id: parts[0], plan_id: parts[1] });
+    }
+    if (items.length === 0) {
+      setError(t("adminSubscriptions.bulkAssignEmpty") as string);
+      return;
+    }
+    void onSubmit(items);
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("adminSubscriptions.bulkAssignTitle")}</DialogTitle>
+          <DialogDescription>{t("adminSubscriptions.bulkAssignBody")}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-3">
+          <Label htmlFor="bulk-assign-textarea">
+            {t("adminSubscriptions.bulkAssignInputLabel")}
+          </Label>
+          <textarea
+            id="bulk-assign-textarea"
+            value={raw}
+            onChange={(e) => setRaw(e.target.value)}
+            rows={6}
+            className="w-full rounded border border-srapi-border bg-srapi-bg-secondary px-3 py-2 text-sm font-mono"
+            placeholder="123,5&#10;124,5"
+          />
+          {error ? (
+            <p className="text-xs text-srapi-error">{error}</p>
+          ) : null}
+          <DialogFooter>
+            <Button variant="ghost" type="button" onClick={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" loading={isPending}>
+              {t("adminSubscriptions.bulkAssignSubmit")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -1954,3 +1954,111 @@ func TestRecordProxyProbeSerializesConcurrentCallsPerProxy(t *testing.T) {
 // regression test. Pulling sync into the existing imports rather than the
 // test helpers section keeps the test self-contained.
 type syncwait = sync.WaitGroup
+
+// TestBatchUpdateAccountCredentialsAllSuccess pins the happy path: every row
+// has a non-empty patch and the resulting credential carries the merged keys.
+func TestBatchUpdateAccountCredentialsAllSuccess(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{ProviderID: 1, RuntimeClass: contract.RuntimeClassAPIKey}
+	items := []contract.BatchAccountItem{
+		{Name: "rot-a", Credential: map[string]any{"api_key": "old-a"}},
+		{Name: "rot-b", Credential: map[string]any{"api_key": "old-b"}},
+	}
+	created, _ := svc.BatchCreateAccounts(context.Background(), defaults, items)
+	updates := []contract.BatchUpdateAccountCredentialItem{
+		{AccountID: *created[0].AccountID, Credential: map[string]any{"api_key": "new-a"}},
+		{AccountID: *created[1].AccountID, Credential: map[string]any{"refresh_token": "rt-b"}},
+	}
+	results, err := svc.BatchUpdateAccountCredentials(context.Background(), updates)
+	if err != nil {
+		t.Fatalf("BatchUpdateAccountCredentials: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	for i, row := range results {
+		if row.Error != "" {
+			t.Fatalf("row %d unexpectedly failed: %+v", i, row)
+		}
+	}
+	// Row 0: api_key rotated. Row 1: refresh_token added without losing api_key.
+	c0, err := svc.DecryptCredential(context.Background(), *created[0].AccountID)
+	if err != nil {
+		t.Fatalf("get cred 0: %v", err)
+	}
+	if c0["api_key"] != "new-a" {
+		t.Fatalf("row 0 api_key not rotated: %+v", c0)
+	}
+	c1, err := svc.DecryptCredential(context.Background(), *created[1].AccountID)
+	if err != nil {
+		t.Fatalf("get cred 1: %v", err)
+	}
+	if c1["api_key"] != "old-b" || c1["refresh_token"] != "rt-b" {
+		t.Fatalf("row 1 merge failed: %+v", c1)
+	}
+}
+
+// TestBatchUpdateAccountCredentialsPerRowFailureSurfaces pins the per-row
+// error contract: invalid id, empty patch, duplicate-in-batch, NotFound.
+func TestBatchUpdateAccountCredentialsPerRowFailureSurfaces(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{ProviderID: 1, RuntimeClass: contract.RuntimeClassAPIKey}
+	items := []contract.BatchAccountItem{{Name: "ok", Credential: map[string]any{"api_key": "k"}}}
+	created, _ := svc.BatchCreateAccounts(context.Background(), defaults, items)
+	updates := []contract.BatchUpdateAccountCredentialItem{
+		{AccountID: *created[0].AccountID, Credential: map[string]any{"api_key": "new"}},
+		{AccountID: 0, Credential: map[string]any{"api_key": "x"}},        // invalid id
+		{AccountID: *created[0].AccountID, Credential: map[string]any{"api_key": "y"}}, // dup
+		{AccountID: 9999, Credential: map[string]any{"api_key": "z"}},   // NotFound → idempotent (no error)
+		{AccountID: 8888, Credential: map[string]any{}},                  // empty patch
+	}
+	results, err := svc.BatchUpdateAccountCredentials(context.Background(), updates)
+	if err != nil {
+		t.Fatalf("BatchUpdateAccountCredentials: %v", err)
+	}
+	if len(results) != 5 {
+		t.Fatalf("expected 5 results, got %d", len(results))
+	}
+	if results[0].Error != "" {
+		t.Fatalf("row 0 should succeed: %+v", results[0])
+	}
+	if !strings.Contains(results[1].Error, "invalid id") {
+		t.Fatalf("row 1 should report invalid id, got %+v", results[1])
+	}
+	if !strings.Contains(results[2].Error, "duplicate id") {
+		t.Fatalf("row 2 should report duplicate, got %+v", results[2])
+	}
+	if results[3].Error != "" {
+		t.Fatalf("row 3 (NotFound) should be idempotent success, got %+v", results[3])
+	}
+	if !strings.Contains(results[4].Error, "empty") {
+		t.Fatalf("row 4 should report empty patch, got %+v", results[4])
+	}
+}
+
+// TestBatchUpdateAccountCredentialsRejectsEmptyAndOversize: outer error guards.
+func TestBatchUpdateAccountCredentialsRejectsEmptyAndOversize(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if _, err := svc.BatchUpdateAccountCredentials(context.Background(), nil); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput on nil, got %v", err)
+	}
+	oversize := make([]contract.BatchUpdateAccountCredentialItem, BatchUpdateAccountCredentialsMaxItems+1)
+	for i := range oversize {
+		oversize[i] = contract.BatchUpdateAccountCredentialItem{AccountID: i + 1, Credential: map[string]any{"k": "v"}}
+	}
+	if _, err := svc.BatchUpdateAccountCredentials(context.Background(), oversize); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput on oversize, got %v", err)
+	}
+}

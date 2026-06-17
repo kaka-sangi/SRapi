@@ -93,3 +93,14 @@ export function useUpdateAffiliateRule() {
     ["admin", "affiliates", "rules"],
   );
 }
+
+// POST /admin/affiliates/batch-rebate-rate — bulk-set or clear per-user
+// rebate-rate overrides. Verbatim port of sub2api's
+// AffiliateHandler.BatchSetRate. Per-row failures come back in result.errors[].
+export function useBatchSetAffiliateRebateRate() {
+  return useAdminMutation(
+    (items: P<typeof adminApi.batchSetAffiliateRebateRate>) =>
+      adminApi.batchSetAffiliateRebateRate(items),
+    ["admin", "affiliates"],
+  );
+}

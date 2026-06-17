@@ -241,6 +241,86 @@ func (s *Service) ListUserSubscriptions(ctx context.Context) ([]contract.UserSub
 	return s.store.ListUserSubscriptions(ctx)
 }
 
+// BatchAssignSubscriptionsMaxItems caps the number of items per
+// BatchAssignSubscriptions call (1000 — matching the other admin batch
+// endpoints).
+const BatchAssignSubscriptionsMaxItems = 1000
+
+// BatchAssignSubscriptions assigns a subscription plan to N users in one
+// call. Verbatim port of sub2api's SubscriptionService.BulkAssignSubscription
+// (subscription_service.go) — sub2api iterates per user calling
+// assignSubscriptionWithReuse, which is idempotent on (user_id, group_id):
+// an existing subscription on the same (user, plan) is returned with
+// reused=true rather than re-created. srapi's port reuses CreateUserSubscription
+// which already short-circuits on a matching FindUserSubscriptionBySource, so
+// the (user_id, source_type, source_id) tuple plays the same idempotent role
+// here. Per-row failures (invalid id, missing plan, store error) surface in
+// results[i].Error without aborting the batch. Outer error is reserved for
+// precondition failures (empty input, > max items).
+//
+// Dedups (user_id, plan_id) tuples within the batch — the first occurrence
+// wins, subsequent duplicates flag "duplicate id in batch" so the operator
+// notices a typo without the silent reuse path masking it.
+func (s *Service) BatchAssignSubscriptions(ctx context.Context, items []contract.BatchAssignSubscriptionItem) ([]contract.BatchAssignSubscriptionResult, error) {
+	if len(items) == 0 {
+		return nil, ErrInvalidInput
+	}
+	if len(items) > BatchAssignSubscriptionsMaxItems {
+		return nil, ErrInvalidInput
+	}
+	type key struct{ user, plan int }
+	results := make([]contract.BatchAssignSubscriptionResult, 0, len(items))
+	seen := make(map[key]struct{}, len(items))
+	for i, item := range items {
+		row := contract.BatchAssignSubscriptionResult{Index: i, UserID: item.UserID, PlanID: item.PlanID}
+		if item.UserID <= 0 || item.PlanID <= 0 {
+			row.Outcome = "failed"
+			row.Error = "invalid id"
+			results = append(results, row)
+			continue
+		}
+		k := key{user: item.UserID, plan: item.PlanID}
+		if _, dup := seen[k]; dup {
+			row.Outcome = "failed"
+			row.Error = "duplicate id in batch"
+			results = append(results, row)
+			continue
+		}
+		seen[k] = struct{}{}
+		// Idempotent reuse: when (source_type, source_id) is set,
+		// CreateUserSubscription returns the existing row instead of creating a
+		// new one. Detect reuse by snapshotting beforehand so the result row
+		// reports the "reused" outcome — mirrors sub2api's reused_count.
+		var preexisting *contract.UserSubscription
+		if strings.TrimSpace(item.SourceType) != "" && strings.TrimSpace(item.SourceID) != "" {
+			if existing, err := s.store.FindUserSubscriptionBySource(ctx, item.SourceType, item.SourceID); err == nil {
+				preexisting = &existing
+			}
+		}
+		sub, err := s.CreateUserSubscription(ctx, contract.CreateSubscriptionRequest{
+			UserID:     item.UserID,
+			PlanID:     item.PlanID,
+			ExpiresAt:  item.ExpiresAt,
+			SourceType: item.SourceType,
+			SourceID:   item.SourceID,
+		})
+		if err != nil {
+			row.Outcome = "failed"
+			row.Error = err.Error()
+			results = append(results, row)
+			continue
+		}
+		row.SubscriptionID = sub.ID
+		if preexisting != nil && preexisting.ID == sub.ID {
+			row.Outcome = "reused"
+		} else {
+			row.Outcome = "created"
+		}
+		results = append(results, row)
+	}
+	return results, nil
+}
+
 func (s *Service) DeleteUserSubscription(ctx context.Context, id int) error {
 	if id <= 0 {
 		return ErrInvalidInput

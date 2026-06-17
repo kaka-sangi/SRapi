@@ -1,7 +1,9 @@
 package service
 
 import (
+	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -469,5 +471,90 @@ func TestUpdateRuleStatusOnlyToggle(t *testing.T) {
 	}
 	if updated.Rate != rule.Rate {
 		t.Fatalf("rate drifted: before %q after %q", rule.Rate, updated.Rate)
+	}
+}
+
+// TestBatchSetUserRebateRateAllSuccess pins the happy path: per-user
+// override is recorded on the in-memory overlay and readable via
+// UserRebateOverride.
+func TestBatchSetUserRebateRateAllSuccess(t *testing.T) {
+	h := newHarness(t)
+	rate := 0.15
+	items := []contract.BatchSetUserRebateRateItem{
+		{UserID: 1, RatePercent: &rate},
+		{UserID: 2, RatePercent: &rate},
+	}
+	results, err := h.affiliate.BatchSetUserRebateRate(context.Background(), items)
+	if err != nil {
+		t.Fatalf("BatchSetUserRebateRate: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	for i, row := range results {
+		if row.Error != "" {
+			t.Fatalf("row %d unexpectedly failed: %+v", i, row)
+		}
+	}
+	got := h.affiliate.UserRebateOverride(1)
+	if got == nil || *got != 0.15 {
+		t.Fatalf("expected user 1 override 0.15, got %v", got)
+	}
+}
+
+// TestBatchSetUserRebateRateClearOverride confirms ClearOverride removes the
+// per-user override (matches sub2api's `clear: true` semantics).
+func TestBatchSetUserRebateRateClearOverride(t *testing.T) {
+	h := newHarness(t)
+	rate := 0.20
+	if _, err := h.affiliate.BatchSetUserRebateRate(context.Background(), []contract.BatchSetUserRebateRateItem{
+		{UserID: 7, RatePercent: &rate},
+	}); err != nil {
+		t.Fatalf("seed override: %v", err)
+	}
+	if h.affiliate.UserRebateOverride(7) == nil {
+		t.Fatalf("expected seeded override, got nil")
+	}
+	if _, err := h.affiliate.BatchSetUserRebateRate(context.Background(), []contract.BatchSetUserRebateRateItem{
+		{UserID: 7, ClearOverride: true},
+	}); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+	if h.affiliate.UserRebateOverride(7) != nil {
+		t.Fatalf("expected cleared override, got non-nil")
+	}
+}
+
+// TestBatchSetUserRebateRatePerRowFailureSurfaces pins the per-row error
+// contract: invalid id, rate out of [0,1], missing rate, duplicate id.
+func TestBatchSetUserRebateRatePerRowFailureSurfaces(t *testing.T) {
+	h := newHarness(t)
+	good := 0.10
+	bad := 1.5
+	items := []contract.BatchSetUserRebateRateItem{
+		{UserID: 1, RatePercent: &good},
+		{UserID: 0, RatePercent: &good},                // invalid id
+		{UserID: 1, RatePercent: &good},                // dup
+		{UserID: 5, RatePercent: &bad},                  // out of range
+		{UserID: 6, RatePercent: nil, ClearOverride: false}, // missing rate
+	}
+	results, err := h.affiliate.BatchSetUserRebateRate(context.Background(), items)
+	if err != nil {
+		t.Fatalf("BatchSetUserRebateRate: %v", err)
+	}
+	if results[0].Error != "" {
+		t.Fatalf("row 0 should succeed: %+v", results[0])
+	}
+	if !strings.Contains(results[1].Error, "invalid id") {
+		t.Fatalf("row 1 should report invalid id, got %+v", results[1])
+	}
+	if !strings.Contains(results[2].Error, "duplicate id") {
+		t.Fatalf("row 2 should report duplicate, got %+v", results[2])
+	}
+	if !strings.Contains(results[3].Error, "must be in") {
+		t.Fatalf("row 3 should report range, got %+v", results[3])
+	}
+	if !strings.Contains(results[4].Error, "required") {
+		t.Fatalf("row 4 should report required, got %+v", results[4])
 	}
 }

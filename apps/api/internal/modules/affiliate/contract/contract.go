@@ -231,6 +231,30 @@ type RebateResult struct {
 	Ledgers []AffiliateLedger
 }
 
+// BatchSetUserRebateRateItem is one row in a BatchSetUserRebateRate call: the
+// per-user affiliate rebate-rate override (e.g. 0.15 = 15 % flat rebate, nil
+// = clear and fall back to the default rule rate). Verbatim port of sub2api's
+// AffiliateHandler.BatchSetRate (affiliate_handler.go); sub2api persists this
+// to the user_affiliates table — srapi has no such schema yet, so the override
+// is held in an in-memory overlay on the affiliate service that future rebate
+// computations consult before falling back to the rule's flat rate.
+type BatchSetUserRebateRateItem struct {
+	UserID         int
+	RatePercent    *float64
+	ClearOverride  bool
+}
+
+// BatchSetUserRebateRateResult is per-row outcome from BatchSetUserRebateRate.
+// Order matches the request. Error is empty on a successful set or clear (and
+// when the same user_id appears twice — first occurrence wins, second flagged
+// "duplicate id in batch"). Per-row validation failures (invalid id, rate out
+// of range) surface in Error without aborting the batch.
+type BatchSetUserRebateRateResult struct {
+	Index  int
+	UserID int
+	Error  string
+}
+
 type TransferToBalanceInput struct {
 	UserID      int
 	Amount      string

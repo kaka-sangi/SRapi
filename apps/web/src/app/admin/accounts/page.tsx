@@ -35,7 +35,9 @@ import {
   useResetAccountQuota,
   useBatchActionAccounts,
   useBatchDeleteAccounts,
+  useBatchRefreshAccounts,
   useBatchUpdateAccountConcurrency,
+  useBatchUpdateAccountCredentials,
   useBatchUpdateAccounts,
   useDeleteAccount,
   useDiscoverAccountModels,
@@ -145,6 +147,8 @@ function AccountsContent() {
   const batchDelete = useBatchDeleteAccounts();
   const batchConcurrency = useBatchUpdateAccountConcurrency();
   const batchUpdate = useBatchUpdateAccounts();
+  const batchRefresh = useBatchRefreshAccounts();
+  const batchRotateCreds = useBatchUpdateAccountCredentials();
   const deleteMut = useDeleteAccount();
   const discover = useDiscoverAccountModels();
   const exportMut = useExportAccounts();
@@ -174,6 +178,7 @@ function AccountsContent() {
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkConcurrencyOpen, setBulkConcurrencyOpen] = useState(false);
+  const [bulkCredentialOpen, setBulkCredentialOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProviderAccount | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
@@ -283,6 +288,65 @@ function AccountsContent() {
         });
       } else if (failedCount > 0) {
         toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
+
+  /** Bulk-refresh OAuth tokens across the selection — verbatim wiring for the
+   *  port of sub2api's BatchRefresh. Filters the selection to OAuth runtime
+   *  classes client-side so the operator gets immediate feedback when none of
+   *  the selected rows would be refresh-eligible. The server-side
+   *  /admin/accounts/batch-refresh endpoint already rejects non-OAuth rows
+   *  per-row; the client-side guard exists so the button is correctly disabled
+   *  in the toolbar when the selection is all api_key rows. */
+  async function applyBulkRefresh() {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    try {
+      const result = await batchRefresh.mutateAsync(ids);
+      list.clearSelection();
+      const failedCount = result.errors.length;
+      const succeededCount = result.refreshed_count;
+      if (failedCount > 0 && succeededCount > 0) {
+        toast({
+          title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
+          tone: "warning",
+        });
+      } else if (failedCount > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
+
+  /** Bulk-rotate credentials across the selection — verbatim wiring for the
+   *  port of sub2api's BatchUpdateCredentials. The dialog hands the parsed
+   *  items in already, so this method only consumes them and renders the
+   *  toast. Server-side: NotFound is idempotent and per-row errors come back
+   *  in result.errors[]. */
+  async function applyBulkCredentialRotation(
+    items: { account_id: string; credential: Record<string, unknown> }[],
+  ) {
+    if (items.length === 0) return;
+    try {
+      const result = await batchRotateCreds.mutateAsync(items);
+      list.clearSelection();
+      const failedCount = result.errors.length;
+      const succeededCount = result.updated_count;
+      if (failedCount > 0 && succeededCount > 0) {
+        toast({
+          title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
+          tone: "warning",
+        });
+      } else if (failedCount > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: items.length }), tone: "error" });
       } else {
         toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
       }
@@ -523,6 +587,39 @@ function AccountsContent() {
         onClick={() => setBulkConcurrencyOpen(true)}
       >
         {t("adminAccounts.bulkSetConcurrency")}
+      </Button>
+      {/* Bulk OAuth refresh — gated to selections whose rows are oauth_refresh
+          or oauth_device_code runtime classes (the server already rejects
+          other rows per-row, but disabling the button when nothing is
+          eligible matches the operator's mental model). */}
+      <Button
+        variant="outline"
+        size="sm"
+        loading={batchRefresh.isPending}
+        disabled={
+          list.selected.size === 0 ||
+          !(accounts.data?.data ?? []).some(
+            (a) =>
+              list.selected.has(a.id) &&
+              (a.runtime_class === "oauth_refresh" || a.runtime_class === "oauth_device_code"),
+          )
+        }
+        onClick={() => void applyBulkRefresh()}
+        title={t("adminAccounts.bulkRefreshTokens") as string}
+      >
+        {t("adminAccounts.bulkRefreshTokens")}
+      </Button>
+      {/* Bulk credential rotation — opens a textarea modal. Operator pastes
+          one row per line: account_id,key=value,key=value. The dialog parses
+          this into the request body. */}
+      <Button
+        variant="outline"
+        size="sm"
+        loading={batchRotateCreds.isPending}
+        disabled={list.selected.size === 0}
+        onClick={() => setBulkCredentialOpen(true)}
+      >
+        {t("adminAccounts.bulkRotateCredentials")}
       </Button>
       <Button
         variant="outline"
@@ -900,7 +997,114 @@ function AccountsContent() {
           onClose={() => setBulkConcurrencyOpen(false)}
         />
       ) : null}
+
+      {bulkCredentialOpen ? (
+        <BulkCredentialRotateDialog
+          selectedIds={[...list.selected]}
+          isPending={batchRotateCreds.isPending}
+          onSubmit={async (items) => {
+            await applyBulkCredentialRotation(items);
+            setBulkCredentialOpen(false);
+          }}
+          onClose={() => setBulkCredentialOpen(false)}
+        />
+      ) : null}
     </>
+  );
+}
+
+// Bulk-rotate-credentials dialog. Operator pastes one row per line in the
+// operator-friendly `account_id,key=value,key=value` format and the dialog
+// parses each line into a {account_id, credential:{...}} item. Verbatim
+// wiring for the port of sub2api's BatchUpdateCredentials — the server still
+// validates each row (empty patch, invalid id) so the parser only has to
+// reject syntactically malformed lines.
+function BulkCredentialRotateDialog({
+  selectedIds,
+  isPending,
+  onSubmit,
+  onClose,
+}: {
+  selectedIds: string[];
+  isPending: boolean;
+  onSubmit: (items: { account_id: string; credential: Record<string, unknown> }[]) => void | Promise<void>;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const [raw, setRaw] = useState(() => selectedIds.map((id) => `${id},`).join("\n"));
+  const [error, setError] = useState<string | null>(null);
+
+  function parseLine(line: string): { account_id: string; credential: Record<string, unknown> } | null {
+    const parts = line.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+    if (parts.length < 2) return null;
+    const accountId = parts[0];
+    const credential: Record<string, unknown> = {};
+    for (const kv of parts.slice(1)) {
+      const eq = kv.indexOf("=");
+      if (eq <= 0) return null;
+      const k = kv.slice(0, eq).trim();
+      const v = kv.slice(eq + 1).trim();
+      if (k.length === 0) return null;
+      credential[k] = v;
+    }
+    return { account_id: accountId, credential };
+  }
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    const items: { account_id: string; credential: Record<string, unknown> }[] = [];
+    const lines = raw.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed === "") continue;
+      const item = parseLine(trimmed);
+      if (!item) {
+        setError(t("adminAccounts.bulkRotateBadLine") as string);
+        return;
+      }
+      items.push(item);
+    }
+    if (items.length === 0) {
+      setError(t("adminAccounts.bulkRotateEmpty") as string);
+      return;
+    }
+    void onSubmit(items);
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("adminAccounts.bulkRotateTitle")}</DialogTitle>
+          <DialogDescription>{t("adminAccounts.bulkRotateBody")}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-3">
+          <Label htmlFor="bulk-rotate-textarea">
+            {t("adminAccounts.bulkRotateInputLabel")}
+          </Label>
+          <textarea
+            id="bulk-rotate-textarea"
+            value={raw}
+            onChange={(e) => setRaw(e.target.value)}
+            rows={Math.min(12, Math.max(4, selectedIds.length))}
+            className="w-full rounded border border-srapi-border bg-srapi-bg-secondary px-3 py-2 text-sm font-mono"
+            placeholder="123,refresh_token=abc123,api_key=sk-..."
+          />
+          {error ? (
+            <p className="text-xs text-srapi-error">{error}</p>
+          ) : null}
+          <DialogFooter>
+            <Button variant="ghost" type="button" onClick={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" loading={isPending}>
+              {t("adminAccounts.bulkRotateSubmit")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

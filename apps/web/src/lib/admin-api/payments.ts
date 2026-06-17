@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  batchAssignAdminUserSubscriptions,
   bulkImportAdminPricingRules,
   createAdminPaymentProvider,
   deleteAdminPaymentProvider,
@@ -41,6 +42,8 @@ import {
 import type {
   AdminPaymentDashboard,
   AdminTestResult,
+  BatchAssignAdminUserSubscriptionItem,
+  BatchAssignAdminUserSubscriptionsResult,
   BatchOperationResult,
   BatchUpdateRedeemCodeItem,
   BatchUpdateRedeemCodesResult,
@@ -162,6 +165,18 @@ export const paymentsApi = {
 
   deleteUserSubscription(id: Id): Promise<{ deleted: boolean }> {
     return unwrapData(() => deleteAdminUserSubscription({ path: { id }, throwOnError: true }));
+  },
+
+  // Bulk-assign a subscription plan to N users in one call (verbatim port of
+  // sub2api's SubscriptionService.BulkAssignSubscription). Per-row outcome
+  // reports created / reused / failed; idempotent on matching
+  // (source_type, source_id). Per-row failures come back in result.errors[].
+  batchAssignUserSubscriptions(
+    items: BatchAssignAdminUserSubscriptionItem[],
+  ): Promise<BatchAssignAdminUserSubscriptionsResult> {
+    return unwrapData(() =>
+      batchAssignAdminUserSubscriptions({ body: { items }, throwOnError: true }),
+    );
   },
 
   listPricingRules(query?: ListAdminPricingRulesData["query"]): Promise<AdminListResult<PricingRule>> {

@@ -260,6 +260,29 @@ export function useBatchUpdateAccountConcurrency() {
   );
 }
 
+// POST /admin/accounts/batch-refresh — bulk-trigger OAuth refresh on N
+// accounts in one call. Verbatim port of sub2api's AccountHandler.BatchRefresh.
+// NotFound is idempotent; per-row structured outcome (success / permanent_error
+// / transient_error / threshold_exceeded) comes back in result.rows[].
+export function useBatchRefreshAccounts() {
+  return useAdminMutation(
+    (accountIds: P<typeof adminApi.batchRefreshAccounts>) => adminApi.batchRefreshAccounts(accountIds),
+    ["admin", "accounts"],
+  );
+}
+
+// POST /admin/accounts/batch-update-credentials — bulk-rotate per-row
+// credential fields on N accounts in one call. Each row carries its own
+// partial credential patch; only the keys present overwrite the stored map.
+// Verbatim port of sub2api's BatchUpdateCredentials. NotFound is idempotent.
+export function useBatchUpdateAccountCredentials() {
+  return useAdminMutation(
+    (items: P<typeof adminApi.batchUpdateAccountCredentials>) =>
+      adminApi.batchUpdateAccountCredentials(items),
+    ["admin", "accounts"],
+  );
+}
+
 // PATCH /admin/accounts/batch — atomic multi-id status change.
 // Replaces the old Promise.allSettled-over-single-item-endpoint pattern that
 // fired N requests per bulk action (and couldn't roll back on partial fail).

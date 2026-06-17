@@ -171,6 +171,41 @@ type CreateStoredSubscription struct {
 	SourceID             string
 }
 
+// BatchAssignSubscriptionItem is one row in a BatchAssignSubscriptions call:
+// the target user, the plan to assign, and an optional explicit ExpiresAt
+// override (falls back to plan.ValidityDays from now). Verbatim port of
+// sub2api's SubscriptionHandler.BulkAssign (subscription_handler.go) →
+// SubscriptionService.BulkAssignSubscription (subscription_service.go).
+// sub2api scoped the call to one shared group + validity_days for the whole
+// batch; srapi's port keeps the per-row plan + per-row override so a single
+// call can switch users between plans.
+type BatchAssignSubscriptionItem struct {
+	UserID    int
+	PlanID    int
+	ExpiresAt *time.Time
+	SourceType string
+	SourceID   string
+}
+
+// BatchAssignSubscriptionResult is per-row outcome from
+// BatchAssignSubscriptions. Order matches the request. Outcome categorises the
+// per-row result so the admin UI can render mixed outcomes:
+//   - "created"   = a fresh user_subscription row was inserted
+//   - "reused"    = an existing subscription on the same (user, plan, source)
+//                   was returned idempotently (sub2api's reused_count)
+//   - "failed"    = per-row validation/store error (Error is populated)
+//   - "skipped"   = idempotent NotFound / duplicate-id-in-batch (Error empty)
+//
+// SubscriptionID is set on "created" / "reused", zero otherwise.
+type BatchAssignSubscriptionResult struct {
+	Index          int
+	UserID         int
+	PlanID         int
+	Outcome        string
+	SubscriptionID int
+	Error          string
+}
+
 type EntitlementCheckRequest struct {
 	UserID             int
 	ModelReferences    []string

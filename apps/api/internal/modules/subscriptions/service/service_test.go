@@ -578,3 +578,95 @@ func TestUpdatePlanStatusOnlyToggle(t *testing.T) {
 		t.Fatalf("validity drifted: before %d after %d", plan.ValidityDays, updated.ValidityDays)
 	}
 }
+
+// TestBatchAssignSubscriptionsCreatedAndReused pins the verbatim port of
+// sub2api's SubscriptionService.BulkAssignSubscription: a fresh user gets
+// "created" and a repeat call with the same (source_type, source_id) returns
+// "reused" with the same subscription_id.
+func TestBatchAssignSubscriptionsCreatedAndReused(t *testing.T) {
+	clock := fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
+	svc, err := service.New(subscriptionmemory.New(), clock)
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+	plan, err := svc.CreatePlan(t.Context(), contract.CreatePlanRequest{
+		Name:         "pro",
+		Price:        "9.99",
+		Currency:     "USD",
+		ValidityDays: 30,
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	items := []contract.BatchAssignSubscriptionItem{
+		{UserID: 1, PlanID: plan.ID, SourceType: "admin_bulk_assign", SourceID: "row-1"},
+		{UserID: 2, PlanID: plan.ID, SourceType: "admin_bulk_assign", SourceID: "row-2"},
+	}
+	first, err := svc.BatchAssignSubscriptions(t.Context(), items)
+	if err != nil {
+		t.Fatalf("first BatchAssign: %v", err)
+	}
+	for i, row := range first {
+		if row.Outcome != "created" || row.Error != "" {
+			t.Fatalf("row %d expected created, got %+v", i, row)
+		}
+		if row.SubscriptionID == 0 {
+			t.Fatalf("row %d missing SubscriptionID", i)
+		}
+	}
+	// Re-running the same batch should idempotently report reused.
+	second, err := svc.BatchAssignSubscriptions(t.Context(), items)
+	if err != nil {
+		t.Fatalf("second BatchAssign: %v", err)
+	}
+	for i, row := range second {
+		if row.Outcome != "reused" {
+			t.Fatalf("row %d expected reused, got %+v", i, row)
+		}
+		if row.SubscriptionID != first[i].SubscriptionID {
+			t.Fatalf("row %d subscription id changed: first=%d second=%d", i, first[i].SubscriptionID, row.SubscriptionID)
+		}
+	}
+}
+
+// TestBatchAssignSubscriptionsPerRowFailureSurfaces pins the per-row error
+// contract: invalid ids, duplicate (user, plan) within the same batch, and a
+// missing plan id all surface in row Error without aborting the rest.
+func TestBatchAssignSubscriptionsPerRowFailureSurfaces(t *testing.T) {
+	clock := fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
+	svc, err := service.New(subscriptionmemory.New(), clock)
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+	plan, err := svc.CreatePlan(t.Context(), contract.CreatePlanRequest{
+		Name:         "basic",
+		Price:        "0",
+		Currency:     "USD",
+		ValidityDays: 30,
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	items := []contract.BatchAssignSubscriptionItem{
+		{UserID: 1, PlanID: plan.ID},
+		{UserID: 0, PlanID: plan.ID},     // invalid user id
+		{UserID: 1, PlanID: plan.ID},     // duplicate (user, plan)
+		{UserID: 9, PlanID: 9999},        // missing plan
+	}
+	results, err := svc.BatchAssignSubscriptions(t.Context(), items)
+	if err != nil {
+		t.Fatalf("BatchAssignSubscriptions: %v", err)
+	}
+	if results[0].Outcome != "created" {
+		t.Fatalf("row 0 should be created, got %+v", results[0])
+	}
+	if results[1].Outcome != "failed" {
+		t.Fatalf("row 1 should be failed, got %+v", results[1])
+	}
+	if results[2].Outcome != "failed" {
+		t.Fatalf("row 2 should be failed (dup), got %+v", results[2])
+	}
+	if results[3].Outcome != "failed" {
+		t.Fatalf("row 3 should be failed (missing plan), got %+v", results[3])
+	}
+}

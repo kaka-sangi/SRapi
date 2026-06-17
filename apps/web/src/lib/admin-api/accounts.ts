@@ -5,7 +5,9 @@ import {
   batchActionAdminAccounts,
   batchCreateAdminAccounts,
   batchDeleteAdminAccounts,
+  batchRefreshAdminAccounts,
   batchUpdateAdminAccountConcurrency,
+  batchUpdateAdminAccountCredentials,
   batchUpdateAdminAccounts,
   bindAdminAccountProxy,
   clearAdminAccountError,
@@ -73,8 +75,11 @@ import type {
   BatchCreateAdminAccountsData,
   BatchCreateProviderAccountsResult,
   BatchDeleteProviderAccountsResult,
+  BatchRefreshAdminAccountsResult,
   BatchUpdateAccountConcurrencyItem,
   BatchUpdateAccountConcurrencyResult,
+  BatchUpdateAdminAccountCredentialItem,
+  BatchUpdateAdminAccountCredentialsResult,
   BatchUpdateAccountsResult,
   Id,
   CodexSessionImportResult,
@@ -146,6 +151,28 @@ export const accountsApi = {
   ): Promise<BatchUpdateAccountConcurrencyResult> {
     return unwrapData(() =>
       batchUpdateAdminAccountConcurrency({ body: { items }, throwOnError: true }),
+    );
+  },
+
+  // Bulk-trigger OAuth refresh on N accounts in one call (verbatim port of
+  // sub2api's AccountHandler.BatchRefresh). NotFound is idempotent; per-row
+  // failures and structured outcome class come back in result.errors[]
+  // and result.rows[].
+  batchRefreshAccounts(accountIds: Id[]): Promise<BatchRefreshAdminAccountsResult> {
+    return unwrapData(() =>
+      batchRefreshAdminAccounts({ body: { account_ids: accountIds }, throwOnError: true }),
+    );
+  },
+
+  // Bulk-rotate credential fields on N accounts. Each row carries a partial
+  // credential patch — only the keys present overwrite the stored credential.
+  // Verbatim port of sub2api's BatchUpdateCredentials; NotFound is idempotent
+  // and per-row failures come back in result.errors[].
+  batchUpdateAccountCredentials(
+    items: BatchUpdateAdminAccountCredentialItem[],
+  ): Promise<BatchUpdateAdminAccountCredentialsResult> {
+    return unwrapData(() =>
+      batchUpdateAdminAccountCredentials({ body: { items }, throwOnError: true }),
     );
   },
 
