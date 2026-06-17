@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Check, Copy } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { writeClipboard } from "@/components/ui/copy-button";
 
 /** Recursively flattens a React node tree to its text, so a code block can be
  * copied verbatim regardless of how react-markdown nested the tokens. */
@@ -23,7 +24,8 @@ function CodeBlock({ children }: { children?: ReactNode }) {
   const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
   const copy = () => {
-    void navigator.clipboard?.writeText(nodeToText(children)).then(() => {
+    void writeClipboard(nodeToText(children)).then((ok) => {
+      if (!ok) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });

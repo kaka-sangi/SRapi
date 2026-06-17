@@ -5,6 +5,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { writeClipboard } from "@/components/ui/copy-button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -25,9 +26,11 @@ export function BackupTab() {
 
   async function copySnapshot() {
     if (!snapshotJson) return;
-    await navigator.clipboard.writeText(snapshotJson);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    const ok = await writeClipboard(snapshotJson);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
   }
 
   async function runImport() {
