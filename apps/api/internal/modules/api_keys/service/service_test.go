@@ -260,3 +260,49 @@ func newTestServiceWithClock(t *testing.T, store contract.Store, clock Clock) *S
 	}
 	return svc
 }
+
+// TestUpdateStatusOnlyDisableAndEnable locks the contract the iter-43
+// frontend asymmetric inline toggle relies on: PATCH with only Status
+// set keeps name / scopes / allowed_models / rate-limit fields intact.
+// (The frontend disable path routes through the existing ConfirmDialog
+// but ultimately issues the same partial update.)
+func TestUpdateStatusOnlyDisableAndEnable(t *testing.T) {
+	store := newMemoryStore()
+	svc := newTestService(t, store)
+	ctx := context.Background()
+
+	created, err := svc.Create(ctx, contract.CreateRequest{
+		UserID:        7,
+		Name:          "gateway",
+		Scopes:        []string{"chat.completions"},
+		AllowedModels: []string{"gpt-4o", "gpt-4o-mini"},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if created.Key.Status != contract.StatusActive {
+		t.Fatalf("expected created Status active, got %q", created.Key.Status)
+	}
+	disabled := contract.StatusDisabled
+	updated, err := svc.Update(ctx, contract.UpdateRequest{UserID: 7, KeyID: created.Key.ID, Status: &disabled})
+	if err != nil {
+		t.Fatalf("update status-only disable: %v", err)
+	}
+	if updated.Status != contract.StatusDisabled {
+		t.Fatalf("expected Status disabled, got %q", updated.Status)
+	}
+	if updated.Name != "gateway" {
+		t.Fatalf("name leaked: %q", updated.Name)
+	}
+	if len(updated.AllowedModels) != 2 {
+		t.Fatalf("allowed_models drifted: %+v", updated.AllowedModels)
+	}
+	active := contract.StatusActive
+	updated, err = svc.Update(ctx, contract.UpdateRequest{UserID: 7, KeyID: created.Key.ID, Status: &active})
+	if err != nil {
+		t.Fatalf("update status-only enable: %v", err)
+	}
+	if updated.Status != contract.StatusActive {
+		t.Fatalf("expected Status active after re-enable, got %q", updated.Status)
+	}
+}
