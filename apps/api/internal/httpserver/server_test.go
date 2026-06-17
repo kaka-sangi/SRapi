@@ -1754,7 +1754,7 @@ func TestAdminOpsSLOAndAlertControlPlane(t *testing.T) {
 	if err := json.NewDecoder(alertsRec.Body).Decode(&alertsResp); err != nil {
 		t.Fatalf("decode alert list: %v", err)
 	}
-	if len(alertsResp.Data) != 1 || alertsResp.Data[0].Status != apiopenapi.Firing {
+	if len(alertsResp.Data) != 1 || alertsResp.Data[0].Status != apiopenapi.OpsAlertStatusFiring {
 		t.Fatalf("expected firing critical alert, got %+v", alertsResp.Data)
 	}
 
@@ -1770,7 +1770,7 @@ func TestAdminOpsSLOAndAlertControlPlane(t *testing.T) {
 	if err := json.NewDecoder(ackRec.Body).Decode(&ackResp); err != nil {
 		t.Fatalf("decode alert ack: %v", err)
 	}
-	if ackResp.Data.Status != apiopenapi.Acknowledged || ackResp.Data.AcknowledgedBy == nil {
+	if ackResp.Data.Status != apiopenapi.OpsAlertStatusAcknowledged || ackResp.Data.AcknowledgedBy == nil {
 		t.Fatalf("expected acknowledged alert response, got %+v", ackResp.Data)
 	}
 
