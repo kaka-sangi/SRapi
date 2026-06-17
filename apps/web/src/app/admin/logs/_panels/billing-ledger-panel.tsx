@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Receipt } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
@@ -46,25 +46,6 @@ function ledgerTone(type: LedgerType): QuietStatus {
   }
 }
 
-function ledgerMatch(
-  row: BillingLedgerEntry,
-  term: string,
-  filters: Record<string, string>,
-): boolean {
-  if (filters.type && row.type !== filters.type) return false;
-  if (filters.reference_type && row.reference_type !== filters.reference_type) return false;
-  if (filters.window) {
-    const since = logWindowSince(filters.window);
-    if (since && row.created_at && new Date(row.created_at) < since) return false;
-  }
-  if (!term) return true;
-  return [String(row.user_id), row.reference_id, row.reference_type, row.type]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-    .includes(term);
-}
-
 const ledgerCompare = (a: BillingLedgerEntry, b: BillingLedgerEntry) =>
   (b.created_at ?? "").localeCompare(a.created_at ?? "");
 
@@ -77,11 +58,35 @@ export function BillingLedgerPanel() {
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-billing-ledger", ["reference"]);
   const all = useBillingLedger();
+  const userLookup = useUserEmailLookup();
+  // Closure variant of ledgerMatch so the search term also hits the resolved
+  // email — the same upgrade iter-78 applied to /admin/orders.
+  const match = useCallback(
+    (
+      row: BillingLedgerEntry,
+      term: string,
+      filters: Record<string, string>,
+    ): boolean => {
+      if (filters.type && row.type !== filters.type) return false;
+      if (filters.reference_type && row.reference_type !== filters.reference_type) return false;
+      if (filters.window) {
+        const since = logWindowSince(filters.window);
+        if (since && row.created_at && new Date(row.created_at) < since) return false;
+      }
+      if (!term) return true;
+      const email = userLookup.map.get(String(row.user_id)) ?? "";
+      return [String(row.user_id), email, row.reference_id, row.reference_type, row.type]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(term);
+    },
+    [userLookup.map],
+  );
   const { query, total } = useClientPagedList(all, list, {
-    match: ledgerMatch,
+    match,
     compare: ledgerCompare,
   });
-  const userLookup = useUserEmailLookup();
 
   const rows = useMemo(() => all.data?.data ?? [], [all.data]);
   const referenceOptions = useMemo(() => distinct(rows.map((r) => r.reference_type)), [rows]);
