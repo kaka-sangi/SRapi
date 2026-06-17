@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
@@ -71,24 +71,6 @@ const ORDER_STATUSES: PaymentOrder["status"][] = [
   "failed",
 ];
 
-function orderMatch(
-  order: PaymentOrder,
-  term: string,
-  filters: Record<string, string>,
-): boolean {
-  if (filters.status && order.status !== filters.status) return false;
-  if (filters.window) {
-    const since = logWindowSince(filters.window);
-    if (since && order.created_at && new Date(order.created_at) < since) return false;
-  }
-  if (!term) return true;
-  return [order.order_no, String(order.user_id), order.product_type, order.status]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-    .includes(term);
-}
-
 const orderCompare = (a: PaymentOrder, b: PaymentOrder) =>
   (b.created_at ?? "").localeCompare(a.created_at ?? "");
 
@@ -109,8 +91,27 @@ function OrdersContent() {
   const statusOptions = ORDER_STATUSES.map((v) => ({ value: v, label: statusLabel(v) }));
   const statusFilter = (list.filters.status as PaymentOrder["status"]) || undefined;
   const all = useAdminPaymentOrders();
+  // Closure variant of orderMatch so the search term can hit the looked-up
+  // email — operators paste emails into support tickets, not numeric ids.
+  const match = useCallback(
+    (order: PaymentOrder, term: string, filters: Record<string, string>): boolean => {
+      if (filters.status && order.status !== filters.status) return false;
+      if (filters.window) {
+        const since = logWindowSince(filters.window);
+        if (since && order.created_at && new Date(order.created_at) < since) return false;
+      }
+      if (!term) return true;
+      const email = userLookup.map.get(String(order.user_id)) ?? "";
+      return [order.order_no, String(order.user_id), email, order.product_type, order.status]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(term);
+    },
+    [userLookup.map],
+  );
   const { query: orders, total } = useClientPagedList(all, list, {
-    match: orderMatch,
+    match,
     compare: orderCompare,
   });
   const [refundTarget, setRefundTarget] = useState<PaymentOrder | null>(null);
