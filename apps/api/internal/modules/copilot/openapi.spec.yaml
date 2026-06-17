@@ -5003,6 +5003,54 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/accounts/batch-concurrency:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: batchUpdateAdminAccountConcurrency
+      summary: Bulk set per-account max_concurrency ceilings.
+      description: |
+        Sets `metadata.max_concurrency` on up to 1000 provider accounts in
+        one call — the scheduler reads this at admission to cap concurrent
+        in-flight requests per account. Verbatim port of sub2api's
+        BatchUpdateConcurrency (`admin_service.go`); only difference is
+        srapi stores the ceiling on the provider account (not the user)
+        because that's where the cap lives in this codebase.
+
+        Per-id failures surface in `errors[]` without aborting the call.
+        NotFound is idempotent (the caller's intent for that id is moot if
+        the row does not exist).
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchUpdateAccountConcurrencyRequest"
+      responses:
+        "200":
+          description: Concurrency batch update result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchUpdateAccountConcurrencyResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/accounts/health-summary:
     get:
       tags:
@@ -6294,6 +6342,93 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccountGroupResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/account-groups/batch-rate-multipliers:
+    post:
+      tags:
+        - AdminAccountGroups
+      operationId: batchSetAdminAccountGroupRateMultipliers
+      summary: Bulk-set rate_multiplier on N account groups.
+      description: |
+        Verbatim port of sub2api's BatchSetGroupRateMultipliers
+        (`admin_service.go`). Sets the billing rate multiplier on up to 1000
+        account groups in one call. Per-id failures (invalid id, invalid
+        value, store error) surface in `errors[]` without aborting the call.
+        NotFound is idempotent — a missing group counts as success since
+        the caller's intent for that id is already moot.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchSetGroupRateMultipliersRequest"
+      responses:
+        "200":
+          description: Batch result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchSetGroupRateMultipliersResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/account-groups/batch-rpm-overrides:
+    post:
+      tags:
+        - AdminAccountGroups
+      operationId: batchSetAdminAccountGroupRPMOverrides
+      summary: Bulk-set per-group RPM overrides.
+      description: |
+        Verbatim port of sub2api's BatchSetGroupRPMOverrides
+        (`admin_service.go`). Sets the per-account-group RPM ceiling on up
+        to 1000 groups in one call. `rpm_override: null` clears the
+        override (the scheduler reads 0 as "no limit"). Per-id failures
+        surface in `errors[]` without aborting; NotFound is idempotent.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchSetGroupRPMOverridesRequest"
+      responses:
+        "200":
+          description: Batch result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchSetGroupRPMOverridesResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -10590,6 +10725,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BatchOperationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/redeem-codes/batch-update:
+    post:
+      tags:
+        - AdminPromotions
+      operationId: batchUpdateAdminRedeemCodes
+      summary: Bulk partial-update redeem codes.
+      description: |
+        Verbatim port of sub2api's RedeemService.BatchUpdate
+        (`admin_service_redeem.go`). Each item supplies the id + any subset
+        of mutable fields (amount, max_redemptions, expires_at, note). Per-id
+        failures surface in `errors[]` without aborting the call. NotFound is
+        idempotent. Core-field updates on already-redeemed codes are rejected
+        (matches sub2api's TouchesUsedSensitiveFields gate). Capped at 1000
+        items per call.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchUpdateRedeemCodesRequest"
+      responses:
+        "200":
+          description: Batch result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchUpdateRedeemCodesResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -20156,6 +20336,188 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    BatchUpdateAccountConcurrencyItem:
+      type: object
+      required:
+        - account_id
+        - max_concurrency
+      properties:
+        account_id:
+          $ref: "#/components/schemas/Id"
+        max_concurrency:
+          type: integer
+          minimum: 0
+          description: New per-account ceiling on concurrent in-flight requests. 0 clears the cap (the scheduler treats absent + zero identically).
+
+    BatchUpdateAccountConcurrencyRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/BatchUpdateAccountConcurrencyItem"
+
+    BatchUpdateAccountConcurrencyErrorRow:
+      type: object
+      required:
+        - id
+        - message
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        message:
+          type: string
+
+    BatchUpdateAccountConcurrencyResult:
+      type: object
+      required:
+        - updated_count
+        - errors
+      properties:
+        updated_count:
+          type: integer
+        errors:
+          type: array
+          description: Per-id failures (invalid id, duplicate in batch, store error). NotFound is NOT a failure — idempotent semantics.
+          items:
+            $ref: "#/components/schemas/BatchUpdateAccountConcurrencyErrorRow"
+
+    BatchUpdateAccountConcurrencyResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchUpdateAccountConcurrencyResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BatchSetGroupRateMultiplierItem:
+      type: object
+      required:
+        - group_id
+        - multiplier
+      properties:
+        group_id:
+          $ref: "#/components/schemas/Id"
+        multiplier:
+          type: string
+          description: Decimal string > 0 (e.g. "0.5" for 50% off, "1.5" for surcharge). Stored as 8-decimal-place fixed.
+
+    BatchSetGroupRateMultipliersRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/BatchSetGroupRateMultiplierItem"
+
+    BatchSetGroupRateMultiplierErrorRow:
+      type: object
+      required:
+        - id
+        - message
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        message:
+          type: string
+
+    BatchSetGroupRateMultipliersResult:
+      type: object
+      required:
+        - updated_count
+        - errors
+      properties:
+        updated_count:
+          type: integer
+        errors:
+          type: array
+          description: Per-id failures (invalid id, invalid multiplier, store error). NotFound is idempotent.
+          items:
+            $ref: "#/components/schemas/BatchSetGroupRateMultiplierErrorRow"
+
+    BatchSetGroupRateMultipliersResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchSetGroupRateMultipliersResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BatchSetGroupRPMOverrideItem:
+      type: object
+      required:
+        - group_id
+      properties:
+        group_id:
+          $ref: "#/components/schemas/Id"
+        rpm_override:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: New per-group RPM ceiling. null clears the override (no rate limit).
+
+    BatchSetGroupRPMOverridesRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/BatchSetGroupRPMOverrideItem"
+
+    BatchSetGroupRPMOverrideErrorRow:
+      type: object
+      required:
+        - id
+        - message
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        message:
+          type: string
+
+    BatchSetGroupRPMOverridesResult:
+      type: object
+      required:
+        - updated_count
+        - errors
+      properties:
+        updated_count:
+          type: integer
+        errors:
+          type: array
+          description: Per-id failures (invalid id, negative value, store error). NotFound is idempotent.
+          items:
+            $ref: "#/components/schemas/BatchSetGroupRPMOverrideErrorRow"
+
+    BatchSetGroupRPMOverridesResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchSetGroupRPMOverridesResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     UpdateProviderAccountRequest:
       type: object
       minProperties: 1
@@ -24067,6 +24429,80 @@ components:
           maxLength: 500
           nullable: true
           description: Free-text audit comment recorded against every code disabled by this call.
+
+    BatchUpdateRedeemCodeItem:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        amount:
+          type: string
+          nullable: true
+          description: New redemption amount (decimal string > 0; balance codes only). Null leaves unchanged.
+        max_redemptions:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: New max-redemption cap. Null leaves unchanged.
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: New expiry (RFC3339). Null in the JSON body clears the expiry (NullableTimeUpdate semantics from sub2api).
+        note:
+          type: string
+          nullable: true
+          description: New operator note (free text). Null leaves unchanged.
+
+    BatchUpdateRedeemCodesRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/BatchUpdateRedeemCodeItem"
+
+    BatchUpdateRedeemCodeErrorRow:
+      type: object
+      required:
+        - id
+        - message
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        message:
+          type: string
+
+    BatchUpdateRedeemCodesResult:
+      type: object
+      required:
+        - updated_count
+        - errors
+      properties:
+        updated_count:
+          type: integer
+        errors:
+          type: array
+          description: Per-id failures (invalid id, invalid value, already-redeemed gate, store error). NotFound is idempotent.
+          items:
+            $ref: "#/components/schemas/BatchUpdateRedeemCodeErrorRow"
+
+    BatchUpdateRedeemCodesResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchUpdateRedeemCodesResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
 
     BatchExtendRedeemCodesRequest:
       type: object

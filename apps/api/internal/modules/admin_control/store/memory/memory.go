@@ -309,6 +309,45 @@ func (s *Store) ExtendRedeemCodes(_ context.Context, ids []int, expiresAt time.T
 	return succeeded, nil
 }
 
+// UpdateRedeemCodeFields applies a partial update to one redeem code row.
+// Mirrors the entstore implementation so the memory + sql backends stay
+// interchangeable. ExpiresAtSet=true + nil clears the expiry.
+func (s *Store) UpdateRedeemCodeFields(_ context.Context, id int, fields admincontrol.RedeemCodeFieldUpdate, now time.Time) (admincontrol.RedeemCode, error) {
+	if id <= 0 {
+		return admincontrol.RedeemCode{}, admincontrol.ErrNotFound
+	}
+	stamp := now.UTC()
+	if stamp.IsZero() {
+		stamp = time.Now().UTC()
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item, ok := s.redeemCodes[id]
+	if !ok {
+		return admincontrol.RedeemCode{}, admincontrol.ErrNotFound
+	}
+	if fields.Value != nil {
+		item.Value = *fields.Value
+	}
+	if fields.MaxRedemptions != nil {
+		item.MaxRedemptions = *fields.MaxRedemptions
+	}
+	if fields.ExpiresAtSet {
+		if fields.ExpiresAt == nil {
+			item.ExpiresAt = nil
+		} else {
+			t := fields.ExpiresAt.UTC()
+			item.ExpiresAt = &t
+		}
+	}
+	if fields.Note != nil {
+		item.Note = *fields.Note
+	}
+	item.UpdatedAt = stamp
+	s.redeemCodes[id] = item
+	return item, nil
+}
+
 func (s *Store) RedeemCode(ctx context.Context, input admincontrol.RedeemCodeRedemptionInput) (admincontrol.RedeemCodeRedemptionResult, error) {
 	if input.UserID <= 0 || strings.TrimSpace(input.Code) == "" {
 		return admincontrol.RedeemCodeRedemptionResult{}, admincontrol.ErrInvalidInput

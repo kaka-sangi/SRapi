@@ -494,6 +494,47 @@ type BatchDeleteAccountResult struct {
 	Error     string
 }
 
+// BatchUpdateConcurrencyItem is one row in a BatchUpdateConcurrency call:
+// the per-account target max-concurrency ceiling (stored in account metadata
+// under "max_concurrency", which the scheduler reads at admission). Mirrors
+// sub2api's BatchUpdateConcurrency (admin_service.go), only there it lived on
+// users — srapi's equivalent ceiling lives in provider account metadata, so
+// the per-row identifier is account_id.
+type BatchUpdateConcurrencyItem struct {
+	AccountID      int
+	MaxConcurrency int
+}
+
+// BatchUpdateConcurrencyResult is per-row outcome from BatchUpdateConcurrency.
+// Order matches the request. Error is empty on a successful update (and on
+// a missing-row idempotent skip, matching BatchDeleteAccountResult). Per-row
+// failures (invalid id, store/validation error) surface in Error without
+// aborting the batch.
+type BatchUpdateConcurrencyResult struct {
+	Index     int
+	AccountID int
+	Error     string
+}
+
+// BatchSetGroupRateMultiplierItem is one row in a BatchSetGroupRateMultipliers
+// call: the per-account-group billing rate multiplier (e.g. 0.5 = 50% off,
+// 1.5 = 50% surcharge). Verbatim port of sub2api's BatchSetGroupRateMultipliers
+// (admin_service.go) — sub2api scoped this to user-groups since rate
+// multipliers live on the user-group object there; srapi's AccountGroup
+// carries the rate_multiplier field, so the per-row identifier is group_id.
+type BatchSetGroupRateMultiplierItem struct {
+	GroupID    int
+	Multiplier string
+}
+
+// BatchSetGroupRateMultiplierResult is per-row outcome — same shape as the
+// other batch-result structs so the admin UI can render mixed outcomes.
+type BatchSetGroupRateMultiplierResult struct {
+	Index   int
+	GroupID int
+	Error   string
+}
+
 type CreateRequest struct {
 	ProviderID     int
 	Name           string

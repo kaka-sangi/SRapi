@@ -7,6 +7,8 @@ import {
   listAdminGroupRateLimits,
   upsertAdminGroupRateLimit,
   deleteAdminGroupRateLimit,
+  batchSetAdminAccountGroupRateMultipliers,
+  batchSetAdminAccountGroupRpmOverrides,
   getAdminConfigSnapshot,
   importAdminConfigSnapshot,
   getAdminSettings,
@@ -27,6 +29,10 @@ import type {
   AccountGroupRateLimit,
   UpsertModelRateLimitRequest,
   UpsertGroupRateLimitRequest,
+  BatchSetGroupRateMultiplierItem,
+  BatchSetGroupRateMultipliersResult,
+  BatchSetGroupRpmOverrideItem,
+  BatchSetGroupRpmOverridesResult,
 } from "../../../../../packages/sdk/typescript/src/types.gen";
 import { configureAdminClient, unwrapData, unwrapList } from "./_shared";
 import type { AdminListResult } from "./types";
@@ -84,5 +90,26 @@ export const settingsApi = {
   async deleteGroupRateLimit(groupId: Id): Promise<void> {
     configureAdminClient();
     await deleteAdminGroupRateLimit({ path: { groupId }, throwOnError: true });
+  },
+
+  // Bulk-set rate multipliers across N account groups — verbatim port of
+  // sub2api's BatchSetGroupRateMultipliers. Per-id failures surface in
+  // result.errors[]; NotFound is idempotent server-side.
+  batchSetGroupRateMultipliers(
+    items: BatchSetGroupRateMultiplierItem[],
+  ): Promise<BatchSetGroupRateMultipliersResult> {
+    return unwrapData(() =>
+      batchSetAdminAccountGroupRateMultipliers({ body: { items }, throwOnError: true }),
+    );
+  },
+
+  // Bulk-set per-group RPM overrides — verbatim port of sub2api's
+  // BatchSetGroupRPMOverrides. rpm_override: null clears the override.
+  batchSetGroupRpmOverrides(
+    items: BatchSetGroupRpmOverrideItem[],
+  ): Promise<BatchSetGroupRpmOverridesResult> {
+    return unwrapData(() =>
+      batchSetAdminAccountGroupRpmOverrides({ body: { items }, throwOnError: true }),
+    );
   },
 };

@@ -704,6 +704,146 @@ func TestBatchExtendRedeemCodesSetsExpiryAndSkipsFullyConsumed(t *testing.T) {
 	}
 }
 
+// TestBatchUpdateRedeemCodesAllSuccess pins the happy path: per-row partial
+// updates land on the right rows.
+func TestBatchUpdateRedeemCodesAllSuccess(t *testing.T) {
+	now := time.Date(2026, time.June, 14, 9, 0, 0, 0, time.UTC)
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	a, _ := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code: "UPD1", Type: admincontrol.RedeemCodeTypeBalance, Value: "5", Currency: "USD", MaxRedemptions: 1,
+	}, 1)
+	b, _ := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code: "UPD2", Type: admincontrol.RedeemCodeTypeBalance, Value: "5", Currency: "USD", MaxRedemptions: 1,
+	}, 1)
+	newAmount := "12.34"
+	newMax := 3
+	newNote := "bumped"
+	expiresAt := now.Add(48 * time.Hour)
+	items := []admincontrol.BatchUpdateRedeemCodeItem{
+		{ID: a.ID, Value: &newAmount, Note: &newNote},
+		{ID: b.ID, MaxRedemptions: &newMax, ExpiresAtSet: true, ExpiresAt: &expiresAt},
+	}
+	results, err := svc.BatchUpdateRedeemCodes(context.Background(), items, 1)
+	if err != nil {
+		t.Fatalf("BatchUpdateRedeemCodes: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	for i, row := range results {
+		if row.Error != "" {
+			t.Fatalf("row %d failed: %+v", i, row)
+		}
+	}
+	list, _ := svc.ListRedeemCodes(context.Background(), admincontrol.ListOptions{})
+	byID := map[int]admincontrol.RedeemCode{}
+	for _, c := range list.Items {
+		byID[c.ID] = c
+	}
+	if byID[a.ID].Value != "12.34" || byID[a.ID].Note != "bumped" {
+		t.Fatalf("code A not updated: %+v", byID[a.ID])
+	}
+	if byID[b.ID].MaxRedemptions != 3 || byID[b.ID].ExpiresAt == nil {
+		t.Fatalf("code B not updated: %+v", byID[b.ID])
+	}
+}
+
+// TestBatchUpdateRedeemCodesPerRowFailureSurfaces pins per-row failure modes:
+// invalid id, invalid value, missing row (idempotent), no-fields-set.
+func TestBatchUpdateRedeemCodesPerRowFailureSurfaces(t *testing.T) {
+	now := time.Date(2026, time.June, 14, 9, 0, 0, 0, time.UTC)
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	good, _ := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code: "G", Type: admincontrol.RedeemCodeTypeBalance, Value: "5", Currency: "USD", MaxRedemptions: 1,
+	}, 1)
+	bad := "-5"
+	ok := "9"
+	items := []admincontrol.BatchUpdateRedeemCodeItem{
+		{ID: good.ID, Value: &ok},
+		{ID: 0, Value: &ok},          // invalid id
+		{ID: good.ID + 999, Value: &ok}, // missing → idempotent
+		{ID: 8888, Value: &bad},      // invalid value
+		{ID: 7777},                   // no fields
+	}
+	results, err := svc.BatchUpdateRedeemCodes(context.Background(), items, 1)
+	if err != nil {
+		t.Fatalf("BatchUpdateRedeemCodes: %v", err)
+	}
+	if len(results) != 5 {
+		t.Fatalf("expected 5 results, got %d", len(results))
+	}
+	if results[0].Error != "" {
+		t.Fatalf("row 0 should succeed: %+v", results[0])
+	}
+	if results[1].Error == "" {
+		t.Fatalf("row 1 invalid id should fail: %+v", results[1])
+	}
+	if results[2].Error != "" {
+		t.Fatalf("row 2 missing should be idempotent: %+v", results[2])
+	}
+	if results[3].Error == "" {
+		t.Fatalf("row 3 invalid value should fail: %+v", results[3])
+	}
+	if results[4].Error == "" {
+		t.Fatalf("row 4 no-fields should fail: %+v", results[4])
+	}
+}
+
+// TestBatchUpdateRedeemCodesDedupesWithinBatch: doubled id surfaces as
+// duplicate on the second occurrence.
+func TestBatchUpdateRedeemCodesDedupesWithinBatch(t *testing.T) {
+	now := time.Date(2026, time.June, 14, 9, 0, 0, 0, time.UTC)
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	a, _ := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code: "DUP", Type: admincontrol.RedeemCodeTypeBalance, Value: "5", Currency: "USD", MaxRedemptions: 1,
+	}, 1)
+	v1, v2 := "9", "11"
+	items := []admincontrol.BatchUpdateRedeemCodeItem{
+		{ID: a.ID, Value: &v1},
+		{ID: a.ID, Value: &v2},
+	}
+	results, err := svc.BatchUpdateRedeemCodes(context.Background(), items, 1)
+	if err != nil {
+		t.Fatalf("BatchUpdateRedeemCodes: %v", err)
+	}
+	if results[0].Error != "" {
+		t.Fatalf("first should succeed: %+v", results[0])
+	}
+	if results[1].Error != "duplicate id in batch" {
+		t.Fatalf("second should report duplicate, got %+v", results[1])
+	}
+}
+
+// TestBatchUpdateRedeemCodesRejectsEmptyAndOversize: outer guards.
+func TestBatchUpdateRedeemCodesRejectsEmptyAndOversize(t *testing.T) {
+	now := time.Date(2026, time.June, 14, 9, 0, 0, 0, time.UTC)
+	store := admincontrolmemory.New()
+	svc, _ := admincontrolservice.New(store, fixedClock{now: now})
+	if _, err := svc.BatchUpdateRedeemCodes(context.Background(), nil, 1); !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("empty should ErrInvalidInput, got %v", err)
+	}
+	oversize := make([]admincontrol.BatchUpdateRedeemCodeItem, 1001)
+	v := "1"
+	for i := range oversize {
+		oversize[i] = admincontrol.BatchUpdateRedeemCodeItem{ID: i + 1, Value: &v}
+	}
+	if _, err := svc.BatchUpdateRedeemCodes(context.Background(), oversize, 1); !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf(">MaxItems should ErrInvalidInput, got %v", err)
+	}
+}
+
 func TestDeleteRedeemCode(t *testing.T) {
 	now := time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)
 	store := admincontrolmemory.New()

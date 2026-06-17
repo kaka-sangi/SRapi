@@ -5281,6 +5281,70 @@ type BatchOperationResult struct {
 	Succeeded      int                `json:"succeeded"`
 }
 
+// BatchSetGroupRPMOverrideErrorRow defines model for BatchSetGroupRPMOverrideErrorRow.
+type BatchSetGroupRPMOverrideErrorRow struct {
+	Id      Id     `json:"id"`
+	Message string `json:"message"`
+}
+
+// BatchSetGroupRPMOverrideItem defines model for BatchSetGroupRPMOverrideItem.
+type BatchSetGroupRPMOverrideItem struct {
+	GroupId Id `json:"group_id"`
+
+	// RpmOverride New per-group RPM ceiling. null clears the override (no rate limit).
+	RpmOverride *int `json:"rpm_override,omitempty"`
+}
+
+// BatchSetGroupRPMOverridesRequest defines model for BatchSetGroupRPMOverridesRequest.
+type BatchSetGroupRPMOverridesRequest struct {
+	Items []BatchSetGroupRPMOverrideItem `json:"items"`
+}
+
+// BatchSetGroupRPMOverridesResponse defines model for BatchSetGroupRPMOverridesResponse.
+type BatchSetGroupRPMOverridesResponse struct {
+	Data      BatchSetGroupRPMOverridesResult `json:"data"`
+	RequestId RequestId                       `json:"request_id"`
+}
+
+// BatchSetGroupRPMOverridesResult defines model for BatchSetGroupRPMOverridesResult.
+type BatchSetGroupRPMOverridesResult struct {
+	// Errors Per-id failures (invalid id, negative value, store error). NotFound is idempotent.
+	Errors       []BatchSetGroupRPMOverrideErrorRow `json:"errors"`
+	UpdatedCount int                                `json:"updated_count"`
+}
+
+// BatchSetGroupRateMultiplierErrorRow defines model for BatchSetGroupRateMultiplierErrorRow.
+type BatchSetGroupRateMultiplierErrorRow struct {
+	Id      Id     `json:"id"`
+	Message string `json:"message"`
+}
+
+// BatchSetGroupRateMultiplierItem defines model for BatchSetGroupRateMultiplierItem.
+type BatchSetGroupRateMultiplierItem struct {
+	GroupId Id `json:"group_id"`
+
+	// Multiplier Decimal string > 0 (e.g. "0.5" for 50% off, "1.5" for surcharge). Stored as 8-decimal-place fixed.
+	Multiplier string `json:"multiplier"`
+}
+
+// BatchSetGroupRateMultipliersRequest defines model for BatchSetGroupRateMultipliersRequest.
+type BatchSetGroupRateMultipliersRequest struct {
+	Items []BatchSetGroupRateMultiplierItem `json:"items"`
+}
+
+// BatchSetGroupRateMultipliersResponse defines model for BatchSetGroupRateMultipliersResponse.
+type BatchSetGroupRateMultipliersResponse struct {
+	Data      BatchSetGroupRateMultipliersResult `json:"data"`
+	RequestId RequestId                          `json:"request_id"`
+}
+
+// BatchSetGroupRateMultipliersResult defines model for BatchSetGroupRateMultipliersResult.
+type BatchSetGroupRateMultipliersResult struct {
+	// Errors Per-id failures (invalid id, invalid multiplier, store error). NotFound is idempotent.
+	Errors       []BatchSetGroupRateMultiplierErrorRow `json:"errors"`
+	UpdatedCount int                                   `json:"updated_count"`
+}
+
 // BatchTestProxiesRequest defines model for BatchTestProxiesRequest.
 type BatchTestProxiesRequest struct {
 	ProxyIds []Id `json:"proxy_ids"`
@@ -5290,6 +5354,38 @@ type BatchTestProxiesRequest struct {
 type BatchTestProxiesResponse struct {
 	Data      []ProxyBatchTestRow `json:"data"`
 	RequestId RequestId           `json:"request_id"`
+}
+
+// BatchUpdateAccountConcurrencyErrorRow defines model for BatchUpdateAccountConcurrencyErrorRow.
+type BatchUpdateAccountConcurrencyErrorRow struct {
+	Id      Id     `json:"id"`
+	Message string `json:"message"`
+}
+
+// BatchUpdateAccountConcurrencyItem defines model for BatchUpdateAccountConcurrencyItem.
+type BatchUpdateAccountConcurrencyItem struct {
+	AccountId Id `json:"account_id"`
+
+	// MaxConcurrency New per-account ceiling on concurrent in-flight requests. 0 clears the cap (the scheduler treats absent + zero identically).
+	MaxConcurrency int `json:"max_concurrency"`
+}
+
+// BatchUpdateAccountConcurrencyRequest defines model for BatchUpdateAccountConcurrencyRequest.
+type BatchUpdateAccountConcurrencyRequest struct {
+	Items []BatchUpdateAccountConcurrencyItem `json:"items"`
+}
+
+// BatchUpdateAccountConcurrencyResponse defines model for BatchUpdateAccountConcurrencyResponse.
+type BatchUpdateAccountConcurrencyResponse struct {
+	Data      BatchUpdateAccountConcurrencyResult `json:"data"`
+	RequestId RequestId                           `json:"request_id"`
+}
+
+// BatchUpdateAccountConcurrencyResult defines model for BatchUpdateAccountConcurrencyResult.
+type BatchUpdateAccountConcurrencyResult struct {
+	// Errors Per-id failures (invalid id, duplicate in batch, store error). NotFound is NOT a failure — idempotent semantics.
+	Errors       []BatchUpdateAccountConcurrencyErrorRow `json:"errors"`
+	UpdatedCount int                                     `json:"updated_count"`
 }
 
 // BatchUpdateAccountsRequest defines model for BatchUpdateAccountsRequest.
@@ -5328,6 +5424,46 @@ type BatchUpdateAccountsResult struct {
 	Errors       []string `json:"errors"`
 	UpdatedCount int      `json:"updated_count"`
 	UpdatedIds   []Id     `json:"updated_ids"`
+}
+
+// BatchUpdateRedeemCodeErrorRow defines model for BatchUpdateRedeemCodeErrorRow.
+type BatchUpdateRedeemCodeErrorRow struct {
+	Id      Id     `json:"id"`
+	Message string `json:"message"`
+}
+
+// BatchUpdateRedeemCodeItem defines model for BatchUpdateRedeemCodeItem.
+type BatchUpdateRedeemCodeItem struct {
+	// Amount New redemption amount (decimal string > 0; balance codes only). Null leaves unchanged.
+	Amount *string `json:"amount,omitempty"`
+
+	// ExpiresAt New expiry (RFC3339). Null in the JSON body clears the expiry (NullableTimeUpdate semantics from sub2api).
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	Id        Id         `json:"id"`
+
+	// MaxRedemptions New max-redemption cap. Null leaves unchanged.
+	MaxRedemptions *int `json:"max_redemptions,omitempty"`
+
+	// Note New operator note (free text). Null leaves unchanged.
+	Note *string `json:"note,omitempty"`
+}
+
+// BatchUpdateRedeemCodesRequest defines model for BatchUpdateRedeemCodesRequest.
+type BatchUpdateRedeemCodesRequest struct {
+	Items []BatchUpdateRedeemCodeItem `json:"items"`
+}
+
+// BatchUpdateRedeemCodesResponse defines model for BatchUpdateRedeemCodesResponse.
+type BatchUpdateRedeemCodesResponse struct {
+	Data      BatchUpdateRedeemCodesResult `json:"data"`
+	RequestId RequestId                    `json:"request_id"`
+}
+
+// BatchUpdateRedeemCodesResult defines model for BatchUpdateRedeemCodesResult.
+type BatchUpdateRedeemCodesResult struct {
+	// Errors Per-id failures (invalid id, invalid value, already-redeemed gate, store error). NotFound is idempotent.
+	Errors       []BatchUpdateRedeemCodeErrorRow `json:"errors"`
+	UpdatedCount int                             `json:"updated_count"`
 }
 
 // BatchUpdateUsersRequest defines model for BatchUpdateUsersRequest.
@@ -11479,6 +11615,12 @@ type CreateRerankCompatibleRerankAliasJSONRequestBody = RerankRequest
 // CreateAdminAccountGroupJSONRequestBody defines body for CreateAdminAccountGroup for application/json ContentType.
 type CreateAdminAccountGroupJSONRequestBody = CreateAccountGroupRequest
 
+// BatchSetAdminAccountGroupRateMultipliersJSONRequestBody defines body for BatchSetAdminAccountGroupRateMultipliers for application/json ContentType.
+type BatchSetAdminAccountGroupRateMultipliersJSONRequestBody = BatchSetGroupRateMultipliersRequest
+
+// BatchSetAdminAccountGroupRPMOverridesJSONRequestBody defines body for BatchSetAdminAccountGroupRPMOverrides for application/json ContentType.
+type BatchSetAdminAccountGroupRPMOverridesJSONRequestBody = BatchSetGroupRPMOverridesRequest
+
 // UpdateAdminAccountGroupJSONRequestBody defines body for UpdateAdminAccountGroup for application/json ContentType.
 type UpdateAdminAccountGroupJSONRequestBody = UpdateAccountGroupRequest
 
@@ -11493,6 +11635,9 @@ type BatchCreateAdminAccountsJSONRequestBody = BatchCreateProviderAccountsReques
 
 // BatchActionAdminAccountsJSONRequestBody defines body for BatchActionAdminAccounts for application/json ContentType.
 type BatchActionAdminAccountsJSONRequestBody = BatchAccountActionRequest
+
+// BatchUpdateAdminAccountConcurrencyJSONRequestBody defines body for BatchUpdateAdminAccountConcurrency for application/json ContentType.
+type BatchUpdateAdminAccountConcurrencyJSONRequestBody = BatchUpdateAccountConcurrencyRequest
 
 // BatchDeleteAdminAccountsJSONRequestBody defines body for BatchDeleteAdminAccounts for application/json ContentType.
 type BatchDeleteAdminAccountsJSONRequestBody = BatchDeleteProviderAccountsRequest
@@ -11724,6 +11869,9 @@ type BatchExtendAdminRedeemCodesJSONRequestBody = BatchExtendRedeemCodesRequest
 
 // BatchGenerateAdminRedeemCodesJSONRequestBody defines body for BatchGenerateAdminRedeemCodes for application/json ContentType.
 type BatchGenerateAdminRedeemCodesJSONRequestBody = BatchGenerateRedeemCodesRequest
+
+// BatchUpdateAdminRedeemCodesJSONRequestBody defines body for BatchUpdateAdminRedeemCodes for application/json ContentType.
+type BatchUpdateAdminRedeemCodesJSONRequestBody = BatchUpdateRedeemCodesRequest
 
 // UpdateAdminRiskControlConfigJSONRequestBody defines body for UpdateAdminRiskControlConfig for application/json ContentType.
 type UpdateAdminRiskControlConfigJSONRequestBody = RiskControlConfig
@@ -18233,6 +18381,12 @@ type ServerInterface interface {
 	// Create a provider account group.
 	// (POST /api/v1/admin/account-groups)
 	CreateAdminAccountGroup(w http.ResponseWriter, r *http.Request)
+	// Bulk-set rate_multiplier on N account groups.
+	// (POST /api/v1/admin/account-groups/batch-rate-multipliers)
+	BatchSetAdminAccountGroupRateMultipliers(w http.ResponseWriter, r *http.Request)
+	// Bulk-set per-group RPM overrides.
+	// (POST /api/v1/admin/account-groups/batch-rpm-overrides)
+	BatchSetAdminAccountGroupRPMOverrides(w http.ResponseWriter, r *http.Request)
 	// Delete a provider account group (cascades members and rate limits).
 	// (DELETE /api/v1/admin/account-groups/{id})
 	DeleteAdminAccountGroup(w http.ResponseWriter, r *http.Request, id Id)
@@ -18266,6 +18420,9 @@ type ServerInterface interface {
 	// Run a bulk recovery action across provider accounts.
 	// (POST /api/v1/admin/accounts/batch-action)
 	BatchActionAdminAccounts(w http.ResponseWriter, r *http.Request)
+	// Bulk set per-account max_concurrency ceilings.
+	// (POST /api/v1/admin/accounts/batch-concurrency)
+	BatchUpdateAdminAccountConcurrency(w http.ResponseWriter, r *http.Request)
 	// Bulk soft-delete provider accounts.
 	// (POST /api/v1/admin/accounts/batch-delete)
 	BatchDeleteAdminAccounts(w http.ResponseWriter, r *http.Request)
@@ -18848,6 +19005,9 @@ type ServerInterface interface {
 	// Batch generate redeem codes.
 	// (POST /api/v1/admin/redeem-codes/batch-generate)
 	BatchGenerateAdminRedeemCodes(w http.ResponseWriter, r *http.Request)
+	// Bulk partial-update redeem codes.
+	// (POST /api/v1/admin/redeem-codes/batch-update)
+	BatchUpdateAdminRedeemCodes(w http.ResponseWriter, r *http.Request)
 	// Get redeem code statistics.
 	// (GET /api/v1/admin/redeem-codes/stats)
 	GetAdminRedeemCodeStats(w http.ResponseWriter, r *http.Request)
@@ -20035,6 +20195,50 @@ func (siw *ServerInterfaceWrapper) CreateAdminAccountGroup(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// BatchSetAdminAccountGroupRateMultipliers operation middleware
+func (siw *ServerInterfaceWrapper) BatchSetAdminAccountGroupRateMultipliers(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchSetAdminAccountGroupRateMultipliers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchSetAdminAccountGroupRPMOverrides operation middleware
+func (siw *ServerInterfaceWrapper) BatchSetAdminAccountGroupRPMOverrides(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchSetAdminAccountGroupRPMOverrides(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteAdminAccountGroup operation middleware
 func (siw *ServerInterfaceWrapper) DeleteAdminAccountGroup(w http.ResponseWriter, r *http.Request) {
 
@@ -20430,6 +20634,28 @@ func (siw *ServerInterfaceWrapper) BatchActionAdminAccounts(w http.ResponseWrite
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.BatchActionAdminAccounts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchUpdateAdminAccountConcurrency operation middleware
+func (siw *ServerInterfaceWrapper) BatchUpdateAdminAccountConcurrency(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchUpdateAdminAccountConcurrency(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -27492,6 +27718,28 @@ func (siw *ServerInterfaceWrapper) BatchGenerateAdminRedeemCodes(w http.Response
 	handler.ServeHTTP(w, r)
 }
 
+// BatchUpdateAdminRedeemCodes operation middleware
+func (siw *ServerInterfaceWrapper) BatchUpdateAdminRedeemCodes(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchUpdateAdminRedeemCodes(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAdminRedeemCodeStats operation middleware
 func (siw *ServerInterfaceWrapper) GetAdminRedeemCodeStats(w http.ResponseWriter, r *http.Request) {
 
@@ -33477,6 +33725,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/rerank-compatible/v1/rerank", wrapper.CreateRerankCompatibleRerankAlias)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.ListAdminAccountGroups)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.CreateAdminAccountGroup)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/account-groups/batch-rate-multipliers", wrapper.BatchSetAdminAccountGroupRateMultipliers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/account-groups/batch-rpm-overrides", wrapper.BatchSetAdminAccountGroupRPMOverrides)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}", wrapper.DeleteAdminAccountGroup)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}", wrapper.UpdateAdminAccountGroup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}/accounts", wrapper.ListAdminAccountGroupMembers)
@@ -33488,6 +33738,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/batch", wrapper.BatchUpdateAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch", wrapper.BatchCreateAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-action", wrapper.BatchActionAdminAccounts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-concurrency", wrapper.BatchUpdateAdminAccountConcurrency)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-delete", wrapper.BatchDeleteAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/export", wrapper.ExportAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/health-summary", wrapper.GetAdminAccountsHealthSummary)
@@ -33682,6 +33933,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-enable", wrapper.BatchEnableAdminRedeemCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-extend", wrapper.BatchExtendAdminRedeemCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-generate", wrapper.BatchGenerateAdminRedeemCodes)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-update", wrapper.BatchUpdateAdminRedeemCodes)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/redeem-codes/stats", wrapper.GetAdminRedeemCodeStats)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/redeem-codes/{id}", wrapper.DeleteAdminRedeemCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/risk-control/config", wrapper.GetAdminRiskControlConfig)

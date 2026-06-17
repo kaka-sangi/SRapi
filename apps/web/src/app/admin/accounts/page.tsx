@@ -35,6 +35,7 @@ import {
   useResetAccountQuota,
   useBatchActionAccounts,
   useBatchDeleteAccounts,
+  useBatchUpdateAccountConcurrency,
   useBatchUpdateAccounts,
   useDeleteAccount,
   useDiscoverAccountModels,
@@ -46,6 +47,16 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { formatInteger, formatMoney, formatPercent } from "@/lib/admin-format";
@@ -132,6 +143,7 @@ function AccountsContent() {
   const resetQuota = useResetAccountQuota();
   const batchAction = useBatchActionAccounts();
   const batchDelete = useBatchDeleteAccounts();
+  const batchConcurrency = useBatchUpdateAccountConcurrency();
   const batchUpdate = useBatchUpdateAccounts();
   const deleteMut = useDeleteAccount();
   const discover = useDiscoverAccountModels();
@@ -161,6 +173,7 @@ function AccountsContent() {
   const [testTarget, setTestTarget] = useState<ProviderAccount | null>(null);
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkConcurrencyOpen, setBulkConcurrencyOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProviderAccount | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
@@ -235,6 +248,34 @@ function AccountsContent() {
       list.clearSelection();
       const failedCount = result.errors.length;
       const succeededCount = result.deleted_count;
+      if (failedCount > 0 && succeededCount > 0) {
+        toast({
+          title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
+          tone: "warning",
+        });
+      } else if (failedCount > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
+
+  /** Bulk-set max_concurrency on the selection — verbatim wiring for the
+   *  port of sub2api's BatchUpdateConcurrency. NotFound is idempotent on
+   *  the server side; per-id failures come back in result.errors[]. */
+  async function applyBulkConcurrency(maxConcurrency: number) {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    try {
+      const result = await batchConcurrency.mutateAsync(
+        ids.map((account_id) => ({ account_id, max_concurrency: maxConcurrency })),
+      );
+      list.clearSelection();
+      const failedCount = result.errors.length;
+      const succeededCount = result.updated_count;
       if (failedCount > 0 && succeededCount > 0) {
         toast({
           title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
@@ -474,6 +515,14 @@ function AccountsContent() {
         onClick={() => void applyBulkAction("recover")}
       >
         {t("adminAccounts.recover")}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        loading={batchConcurrency.isPending}
+        onClick={() => setBulkConcurrencyOpen(true)}
+      >
+        {t("adminAccounts.bulkSetConcurrency")}
       </Button>
       <Button
         variant="outline"
@@ -839,7 +888,95 @@ function AccountsContent() {
         onOpenChange={setBulkAddOpen}
         defaultProviderId={providers.data?.data?.[0]?.id ?? ""}
       />
+
+      {bulkConcurrencyOpen ? (
+        <BulkConcurrencyDialog
+          count={list.selected.size}
+          isPending={batchConcurrency.isPending}
+          onSubmit={async (value) => {
+            await applyBulkConcurrency(value);
+            setBulkConcurrencyOpen(false);
+          }}
+          onClose={() => setBulkConcurrencyOpen(false)}
+        />
+      ) : null}
     </>
+  );
+}
+
+// Small focused modal: one integer input + selected-count blurb. Submits an
+// integer (0 = clear cap) to the parent's applyBulkConcurrency.
+function BulkConcurrencyDialog({
+  count,
+  isPending,
+  onSubmit,
+  onClose,
+}: {
+  count: number;
+  isPending: boolean;
+  onSubmit: (value: number) => void | Promise<void>;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const [value, setValue] = useState("4");
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    const n = Number.parseInt(value.trim(), 10);
+    if (!Number.isFinite(n) || n < 0) {
+      setError(t("adminAccounts.bulkSetConcurrencyHint"));
+      return;
+    }
+    void onSubmit(n);
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent>
+        <form onSubmit={submit}>
+          <DialogHeader>
+            <DialogTitle>
+              {t("adminAccounts.bulkSetConcurrencyTitle", { count })}
+            </DialogTitle>
+            <DialogDescription>
+              {t("adminAccounts.bulkSetConcurrencyHint")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 space-y-3">
+            <div>
+              <Label htmlFor="bulk-concurrency">
+                {t("adminAccounts.bulkSetConcurrency")}
+              </Label>
+              <Input
+                id="bulk-concurrency"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={value}
+                disabled={isPending}
+                aria-invalid={Boolean(error)}
+                onChange={(e) => setValue(e.target.value)}
+              />
+            </div>
+            {error ? (
+              <p role="alert" className="text-2xs text-srapi-error">
+                {error}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter className="mt-5">
+            <Button type="button" variant="ghost" disabled={isPending} onClick={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" variant="primary" loading={isPending}>
+              {t("common.apply")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

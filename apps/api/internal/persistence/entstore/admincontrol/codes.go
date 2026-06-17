@@ -236,6 +236,50 @@ func (s *Store) ExtendRedeemCodes(ctx context.Context, ids []int, expiresAt time
 	return eligible, nil
 }
 
+// UpdateRedeemCodeFields applies a partial update to one redeem code row.
+// Each non-nil field on RedeemCodeFieldUpdate is set; nil fields are left
+// alone. ExpiresAtSet=true + ExpiresAt=nil clears the expiry (uses Ent's
+// ClearExpiresAt). Returns ErrNotFound when the row doesn't exist.
+//
+// The service's BatchUpdateRedeemCodes wraps this for per-row best-effort
+// semantics + already-redeemed gating. The store performs the write
+// unconditionally on any row it finds, mirroring the other partial-update
+// helpers in this package (UpdatePromoCode etc.).
+func (s *Store) UpdateRedeemCodeFields(ctx context.Context, id int, fields admincontrolcontract.RedeemCodeFieldUpdate, now time.Time) (admincontrolcontract.RedeemCode, error) {
+	if s == nil || s.client == nil || id <= 0 {
+		return admincontrolcontract.RedeemCode{}, admincontrolcontract.ErrNotFound
+	}
+	stamp := now.UTC()
+	if stamp.IsZero() {
+		stamp = time.Now().UTC()
+	}
+	update := s.client.RedeemCode.UpdateOneID(id).SetUpdatedAt(stamp)
+	if fields.Value != nil {
+		update.SetValue(*fields.Value)
+	}
+	if fields.MaxRedemptions != nil {
+		update.SetMaxRedemptions(*fields.MaxRedemptions)
+	}
+	if fields.ExpiresAtSet {
+		if fields.ExpiresAt == nil {
+			update.ClearExpiresAt()
+		} else {
+			update.SetExpiresAt(fields.ExpiresAt.UTC())
+		}
+	}
+	if fields.Note != nil {
+		update.SetNote(*fields.Note)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return admincontrolcontract.RedeemCode{}, admincontrolcontract.ErrNotFound
+		}
+		return admincontrolcontract.RedeemCode{}, err
+	}
+	return toRedeemCode(row), nil
+}
+
 // ListPromoCodes returns every promo code row. The admin_control service owns
 // status derivation, filtering, sorting, and paging.
 func (s *Store) ListPromoCodes(ctx context.Context) ([]admincontrolcontract.PromoCode, error) {

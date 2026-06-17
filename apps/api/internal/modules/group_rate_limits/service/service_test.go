@@ -74,6 +74,121 @@ func TestConcurrencyForGroup(t *testing.T) {
 	}
 }
 
+// TestBatchSetRPMOverridesAllSuccess pins the happy path: every item updates
+// the right group's RPM ceiling, leaving TPM + MaxConcurrency intact on rows
+// that already had non-zero values.
+func TestBatchSetRPMOverridesAllSuccess(t *testing.T) {
+	ctx := context.Background()
+	svc := newService(t)
+	if _, err := svc.UpsertLimit(ctx, contract.UpsertLimit{GroupID: 1, RPMLimit: 100, TPMLimit: 2000, MaxConcurrency: 4, Enabled: true}); err != nil {
+		t.Fatalf("seed group 1: %v", err)
+	}
+	five := 500
+	twenty := 2000
+	items := []contract.BatchSetRPMOverrideItem{
+		{GroupID: 1, RPMOverride: &five},
+		{GroupID: 2, RPMOverride: &twenty},
+	}
+	results, err := svc.BatchSetRPMOverrides(ctx, items)
+	if err != nil {
+		t.Fatalf("BatchSetRPMOverrides: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	for i, row := range results {
+		if row.Error != "" {
+			t.Fatalf("row %d failed: %+v", i, row)
+		}
+	}
+	if got := svc.RPMForGroup(ctx, 1); got != 500 {
+		t.Fatalf("group 1 RPM: want 500 got %d", got)
+	}
+	if got := svc.RPMForGroup(ctx, 2); got != 2000 {
+		t.Fatalf("group 2 RPM: want 2000 got %d", got)
+	}
+	if got := svc.ConcurrencyForGroup(ctx, 1); got != 4 {
+		t.Fatalf("group 1 MaxConcurrency should be preserved at 4, got %d", got)
+	}
+}
+
+// TestBatchSetRPMOverridesPerRowFailureSurfaces pins the per-row error
+// contract: an invalid id or negative value reports an Error without aborting
+// the rest of the batch.
+func TestBatchSetRPMOverridesPerRowFailureSurfaces(t *testing.T) {
+	ctx := context.Background()
+	svc := newService(t)
+	bad := -1
+	ok := 100
+	items := []contract.BatchSetRPMOverrideItem{
+		{GroupID: 1, RPMOverride: &ok},
+		{GroupID: 0, RPMOverride: &ok},  // invalid id
+		{GroupID: 3, RPMOverride: &bad}, // invalid value
+		{GroupID: 4, RPMOverride: nil},  // nil clears — idempotent on missing
+	}
+	results, err := svc.BatchSetRPMOverrides(ctx, items)
+	if err != nil {
+		t.Fatalf("BatchSetRPMOverrides: %v", err)
+	}
+	if len(results) != 4 {
+		t.Fatalf("expected 4 results, got %d", len(results))
+	}
+	if results[0].Error != "" {
+		t.Fatalf("row 0 should succeed: %+v", results[0])
+	}
+	if results[1].Error == "" {
+		t.Fatalf("row 1 should report invalid id, got %+v", results[1])
+	}
+	if results[2].Error == "" {
+		t.Fatalf("row 2 should report invalid value, got %+v", results[2])
+	}
+	if results[3].Error != "" {
+		t.Fatalf("row 3 (nil clear on missing) should be idempotent success, got %+v", results[3])
+	}
+}
+
+// TestBatchSetRPMOverridesDedupesWithinBatch: an accidental double-id must
+// surface as a duplicate on the second occurrence.
+func TestBatchSetRPMOverridesDedupesWithinBatch(t *testing.T) {
+	ctx := context.Background()
+	svc := newService(t)
+	a, b := 10, 20
+	items := []contract.BatchSetRPMOverrideItem{
+		{GroupID: 7, RPMOverride: &a},
+		{GroupID: 7, RPMOverride: &b},
+	}
+	results, err := svc.BatchSetRPMOverrides(ctx, items)
+	if err != nil {
+		t.Fatalf("BatchSetRPMOverrides: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if results[0].Error != "" {
+		t.Fatalf("first occurrence should succeed: %+v", results[0])
+	}
+	if results[1].Error != "duplicate id in batch" {
+		t.Fatalf("second occurrence should report duplicate, got: %+v", results[1])
+	}
+}
+
+// TestBatchSetRPMOverridesRejectsEmptyAndOversize: outer error guards.
+func TestBatchSetRPMOverridesRejectsEmptyAndOversize(t *testing.T) {
+	ctx := context.Background()
+	svc := newService(t)
+	if _, err := svc.BatchSetRPMOverrides(ctx, nil); err == nil {
+		t.Fatal("empty should fail")
+	}
+	oversize := make([]contract.BatchSetRPMOverrideItem, service.BatchSetRPMOverridesMaxItems+1)
+	for i := range oversize {
+		v := 1
+		oversize[i] = contract.BatchSetRPMOverrideItem{GroupID: i + 1, RPMOverride: &v}
+	}
+	if _, err := svc.BatchSetRPMOverrides(ctx, oversize); err == nil {
+		t.Fatal(">MaxItems should fail")
+	}
+}
+
 func TestUpsertValidationAndDelete(t *testing.T) {
 	ctx := context.Background()
 	svc := newService(t)

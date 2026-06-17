@@ -40,6 +40,14 @@ type Store interface {
 	// are already redeemed or fully consumed (their lifecycle is over). Returns
 	// the IDs that were successfully touched.
 	ExtendRedeemCodes(ctx context.Context, ids []int, expiresAt time.Time, now time.Time) ([]int, error)
+	// UpdateRedeemCodeFields applies a partial update to one redeem code row.
+	// Each non-nil field on RedeemCodeFieldUpdate is set; nil fields are left
+	// alone. ExpiresAtSet=true + ExpiresAt=nil clears the expiry. Returns
+	// ErrNotFound when the row does not exist (service treats this as
+	// idempotent success in the batch). The service is responsible for the
+	// already-redeemed gate; the store performs the write unconditionally
+	// for any row it finds.
+	UpdateRedeemCodeFields(ctx context.Context, id int, fields RedeemCodeFieldUpdate, now time.Time) (RedeemCode, error)
 	RedeemCode(ctx context.Context, input RedeemCodeRedemptionInput) (RedeemCodeRedemptionResult, error)
 
 	// Promo code records are first-class per-row tables (not a serialized
@@ -415,6 +423,48 @@ const (
 	RedeemDisabledReasonExpired         = "expired"
 	RedeemDisabledReasonNotFound        = "not_found"
 )
+
+// BatchUpdateRedeemCodeItem is one row in a BatchUpdateRedeemCodes call —
+// a partial update of one redeem code. Each *T pointer field is "set to this
+// value when non-nil; leave unchanged when nil". Verbatim port of sub2api's
+// RedeemCodeBatchUpdateFields semantics (`redeem_service.go`), only the field
+// shape is per-row (the operator chose per-row partial in the spec) instead
+// of shared-across-the-batch.
+//
+// Note about ExpiresAt: ExpiresAtSet=true + ExpiresAt=nil clears the expiry
+// (matches sub2api's NullableTimeUpdate). The HTTP layer maps `null` in the
+// JSON body to this state.
+type BatchUpdateRedeemCodeItem struct {
+	ID             int
+	Value          *string // amount; balance codes only — string-decimal
+	MaxRedemptions *int
+	ExpiresAtSet   bool
+	ExpiresAt      *time.Time
+	Note           *string
+}
+
+// BatchUpdateRedeemCodeResult is per-row outcome from BatchUpdateRedeemCodes.
+// Order matches the request. Error is empty on a successful update; per-row
+// validation / store failures surface in Error without aborting the batch.
+// Sub2api's "core-field updates on already-redeemed codes are rejected"
+// rule is enforced in the service: a row whose Status is already
+// "redeemed" surfaces an Error.
+type BatchUpdateRedeemCodeResult struct {
+	Index int
+	ID    int
+	Error string
+}
+
+// RedeemCodeFieldUpdate is the partial-update payload the store accepts. Each
+// *T pointer matches BatchUpdateRedeemCodeItem; the store applies the non-nil
+// ones to the existing row.
+type RedeemCodeFieldUpdate struct {
+	Value          *string
+	MaxRedemptions *int
+	ExpiresAtSet   bool
+	ExpiresAt      *time.Time
+	Note           *string
+}
 
 type BatchOperationResult struct {
 	Requested int   `json:"requested"`

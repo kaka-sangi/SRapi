@@ -30,6 +30,24 @@ type UpsertLimit struct {
 	Enabled        bool
 }
 
+// BatchSetRPMOverrideItem is one row in a BatchSetRPMOverrides call: the
+// per-account-group RPM ceiling override. nil RPMOverride clears the rule
+// for that group (mirrors sub2api's BatchSetGroupRPMOverrides semantics —
+// nil pointer means "remove override"). RPMOverride must be >= 0 when set.
+type BatchSetRPMOverrideItem struct {
+	GroupID     int
+	RPMOverride *int
+}
+
+// BatchSetRPMOverrideResult is per-row outcome. Same {Index, GroupID, Error}
+// shape as the other batch-op results so the admin UI can render mixed
+// outcomes uniformly.
+type BatchSetRPMOverrideResult struct {
+	Index   int
+	GroupID int
+	Error   string
+}
+
 // Store persists per-account-group rate limits.
 type Store interface {
 	UpsertLimit(ctx context.Context, input UpsertLimit) (Limit, error)

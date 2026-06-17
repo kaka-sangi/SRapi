@@ -51,6 +51,28 @@ export function useDeleteGroupRateLimit() {
   );
 }
 
+// Bulk-set group rate multipliers (verbatim port of sub2api's
+// BatchSetGroupRateMultipliers). Invalidates the account-groups cache since
+// the multiplier lives on the AccountGroup row.
+export function useBatchSetGroupRateMultipliers() {
+  return useAdminMutation(
+    (items: P<typeof adminApi.batchSetGroupRateMultipliers>) =>
+      adminApi.batchSetGroupRateMultipliers(items),
+    ["admin", "account-groups"],
+  );
+}
+
+// Bulk-set per-group RPM overrides (verbatim port of sub2api's
+// BatchSetGroupRPMOverrides). Invalidates the group-rate-limits cache —
+// the override lives on the AccountGroupRateLimit row.
+export function useBatchSetGroupRpmOverrides() {
+  return useAdminMutation(
+    (items: P<typeof adminApi.batchSetGroupRpmOverrides>) =>
+      adminApi.batchSetGroupRpmOverrides(items),
+    ["admin", "group-rate-limits"],
+  );
+}
+
 // Models (model registry)
 export function useCreateModel() {
   return useAdminMutation(

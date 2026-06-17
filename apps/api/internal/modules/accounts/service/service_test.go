@@ -1490,6 +1490,276 @@ func TestBatchDeleteAccountsRejectsEmptyAndOversize(t *testing.T) {
 	}
 }
 
+// TestBatchUpdateConcurrencyAllSuccess pins the happy path: every item has
+// a valid id + non-negative concurrency, and the resulting metadata carries
+// the right value on every row.
+func TestBatchUpdateConcurrencyAllSuccess(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{ProviderID: 1, RuntimeClass: contract.RuntimeClassAPIKey}
+	items := []contract.BatchAccountItem{
+		{Name: "con-a", Credential: map[string]any{"api_key": "k-a"}},
+		{Name: "con-b", Credential: map[string]any{"api_key": "k-b"}},
+	}
+	created, _ := svc.BatchCreateAccounts(context.Background(), defaults, items)
+	updates := []contract.BatchUpdateConcurrencyItem{
+		{AccountID: *created[0].AccountID, MaxConcurrency: 4},
+		{AccountID: *created[1].AccountID, MaxConcurrency: 7},
+	}
+	results, err := svc.BatchUpdateConcurrency(context.Background(), updates)
+	if err != nil {
+		t.Fatalf("BatchUpdateConcurrency: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	for i, row := range results {
+		if row.Error != "" {
+			t.Fatalf("row %d unexpectedly failed: %+v", i, row)
+		}
+	}
+	for i, target := range []int{4, 7} {
+		acct, err := svc.store.FindByID(context.Background(), *created[i].AccountID)
+		if err != nil {
+			t.Fatalf("lookup created[%d]: %v", i, err)
+		}
+		raw, ok := acct.Metadata["max_concurrency"]
+		if !ok {
+			t.Fatalf("metadata[%d] missing max_concurrency: %+v", i, acct.Metadata)
+		}
+		// Memory store stores the value as int; an SQL backend may round-trip
+		// it through a numeric JSON column, so accept both int and float64.
+		var got int
+		switch v := raw.(type) {
+		case int:
+			got = v
+		case int64:
+			got = int(v)
+		case float64:
+			got = int(v)
+		default:
+			t.Fatalf("metadata[%d] max_concurrency unexpected type %T", i, raw)
+		}
+		if got != target {
+			t.Fatalf("metadata[%d] max_concurrency: want %d got %d", i, target, got)
+		}
+	}
+}
+
+// TestBatchUpdateConcurrencyPerRowFailureSurfaces pins the per-row error
+// contract: an invalid id reports an Error without aborting the rest of the
+// batch. Mirrors batch-delete's shape so the admin UI renders mixed outcomes
+// the same way.
+func TestBatchUpdateConcurrencyPerRowFailureSurfaces(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{ProviderID: 1, RuntimeClass: contract.RuntimeClassAPIKey}
+	items := []contract.BatchAccountItem{{Name: "good", Credential: map[string]any{"api_key": "k"}}}
+	created, _ := svc.BatchCreateAccounts(context.Background(), defaults, items)
+	updates := []contract.BatchUpdateConcurrencyItem{
+		{AccountID: *created[0].AccountID, MaxConcurrency: 5},
+		{AccountID: 0, MaxConcurrency: 1},                       // invalid id
+		{AccountID: *created[0].AccountID + 999, MaxConcurrency: 1}, // missing id → idempotent
+		{AccountID: 12345, MaxConcurrency: -1},                  // invalid value
+	}
+	results, err := svc.BatchUpdateConcurrency(context.Background(), updates)
+	if err != nil {
+		t.Fatalf("BatchUpdateConcurrency: %v", err)
+	}
+	if len(results) != 4 {
+		t.Fatalf("expected 4 results, got %d", len(results))
+	}
+	if results[0].Error != "" {
+		t.Fatalf("row 0 should succeed: %+v", results[0])
+	}
+	if results[1].Error == "" || !strings.Contains(results[1].Error, "invalid id") {
+		t.Fatalf("row 1 should report invalid id, got %+v", results[1])
+	}
+	if results[2].Error != "" {
+		t.Fatalf("row 2 (missing id) should be idempotent success, got %+v", results[2])
+	}
+	if results[3].Error == "" || !strings.Contains(results[3].Error, "max_concurrency must be >= 0") {
+		t.Fatalf("row 3 should report invalid value, got %+v", results[3])
+	}
+}
+
+// TestBatchUpdateConcurrencyDedupesWithinBatch: an accidental double-id must
+// surface as a duplicate on the second occurrence, not as a silent re-apply.
+// Pins the same dedup contract as batch-delete.
+func TestBatchUpdateConcurrencyDedupesWithinBatch(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{ProviderID: 1, RuntimeClass: contract.RuntimeClassAPIKey}
+	items := []contract.BatchAccountItem{{Name: "dup", Credential: map[string]any{"api_key": "k"}}}
+	created, _ := svc.BatchCreateAccounts(context.Background(), defaults, items)
+	realID := *created[0].AccountID
+	updates := []contract.BatchUpdateConcurrencyItem{
+		{AccountID: realID, MaxConcurrency: 3},
+		{AccountID: realID, MaxConcurrency: 9},
+	}
+	results, err := svc.BatchUpdateConcurrency(context.Background(), updates)
+	if err != nil {
+		t.Fatalf("BatchUpdateConcurrency: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if results[0].Error != "" {
+		t.Fatalf("first occurrence should succeed: %+v", results[0])
+	}
+	if results[1].Error != "duplicate id in batch" {
+		t.Fatalf("second occurrence should report duplicate, got: %+v", results[1])
+	}
+}
+
+// TestBatchUpdateConcurrencyRejectsEmptyAndOversize: outer error guards.
+// Empty / > MaxItems return ErrInvalidInput without touching the store.
+func TestBatchUpdateConcurrencyRejectsEmptyAndOversize(t *testing.T) {
+	store := accountmemory.New()
+	svc, _ := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if _, err := svc.BatchUpdateConcurrency(context.Background(), nil); err != ErrInvalidInput {
+		t.Fatalf("empty should ErrInvalidInput, got %v", err)
+	}
+	oversize := make([]contract.BatchUpdateConcurrencyItem, BatchUpdateConcurrencyMaxItems+1)
+	for i := range oversize {
+		oversize[i] = contract.BatchUpdateConcurrencyItem{AccountID: i + 1, MaxConcurrency: 1}
+	}
+	if _, err := svc.BatchUpdateConcurrency(context.Background(), oversize); err != ErrInvalidInput {
+		t.Fatalf(">MaxItems should ErrInvalidInput, got %v", err)
+	}
+}
+
+// TestBatchSetGroupRateMultipliersAllSuccess pins the happy path: every
+// group gets its multiplier updated and the resulting AccountGroup carries
+// the normalized (8-decimal) value.
+func TestBatchSetGroupRateMultipliersAllSuccess(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	g1, err := svc.CreateGroup(context.Background(), contract.CreateGroupRequest{Name: "rm-a"})
+	if err != nil {
+		t.Fatalf("create group 1: %v", err)
+	}
+	g2, err := svc.CreateGroup(context.Background(), contract.CreateGroupRequest{Name: "rm-b"})
+	if err != nil {
+		t.Fatalf("create group 2: %v", err)
+	}
+	items := []contract.BatchSetGroupRateMultiplierItem{
+		{GroupID: g1.ID, Multiplier: "0.5"},
+		{GroupID: g2.ID, Multiplier: "1.5"},
+	}
+	results, err := svc.BatchSetGroupRateMultipliers(context.Background(), items)
+	if err != nil {
+		t.Fatalf("BatchSetGroupRateMultipliers: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	for i, row := range results {
+		if row.Error != "" {
+			t.Fatalf("row %d failed: %+v", i, row)
+		}
+	}
+	got1, _ := svc.FindGroupByID(context.Background(), g1.ID)
+	if got1.RateMultiplier != "0.50000000" {
+		t.Fatalf("group 1 multiplier: want 0.50000000 got %q", got1.RateMultiplier)
+	}
+}
+
+// TestBatchSetGroupRateMultipliersPerRowFailureSurfaces pins the per-row
+// error contract: invalid id, invalid multiplier, and missing-group all
+// surface in the result row without aborting the batch. Missing-group is
+// idempotent (matches the other batch ops).
+func TestBatchSetGroupRateMultipliersPerRowFailureSurfaces(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	g1, _ := svc.CreateGroup(context.Background(), contract.CreateGroupRequest{Name: "x"})
+	items := []contract.BatchSetGroupRateMultiplierItem{
+		{GroupID: g1.ID, Multiplier: "1.25"},
+		{GroupID: 0, Multiplier: "1"},      // invalid id
+		{GroupID: g1.ID + 999, Multiplier: "1"}, // missing → idempotent success
+		{GroupID: 88, Multiplier: "-1"},    // invalid value
+		{GroupID: 99, Multiplier: "0"},     // zero is forbidden (sub2api: > 0)
+	}
+	results, err := svc.BatchSetGroupRateMultipliers(context.Background(), items)
+	if err != nil {
+		t.Fatalf("BatchSetGroupRateMultipliers: %v", err)
+	}
+	if len(results) != 5 {
+		t.Fatalf("expected 5 results, got %d", len(results))
+	}
+	if results[0].Error != "" {
+		t.Fatalf("row 0 should succeed: %+v", results[0])
+	}
+	if results[1].Error == "" {
+		t.Fatalf("row 1 invalid id should fail: %+v", results[1])
+	}
+	if results[2].Error != "" {
+		t.Fatalf("row 2 (missing id) should be idempotent success, got %+v", results[2])
+	}
+	if results[3].Error == "" {
+		t.Fatalf("row 3 (negative) should fail: %+v", results[3])
+	}
+	if results[4].Error == "" || !strings.Contains(results[4].Error, "> 0") {
+		t.Fatalf("row 4 (zero) should fail with >0 message, got %+v", results[4])
+	}
+}
+
+// TestBatchSetGroupRateMultipliersDedupesWithinBatch: double-id surfaces as
+// duplicate on the second occurrence.
+func TestBatchSetGroupRateMultipliersDedupesWithinBatch(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	g, _ := svc.CreateGroup(context.Background(), contract.CreateGroupRequest{Name: "dup"})
+	items := []contract.BatchSetGroupRateMultiplierItem{
+		{GroupID: g.ID, Multiplier: "1.5"},
+		{GroupID: g.ID, Multiplier: "2.0"},
+	}
+	results, err := svc.BatchSetGroupRateMultipliers(context.Background(), items)
+	if err != nil {
+		t.Fatalf("BatchSetGroupRateMultipliers: %v", err)
+	}
+	if results[0].Error != "" {
+		t.Fatalf("first should succeed: %+v", results[0])
+	}
+	if results[1].Error != "duplicate id in batch" {
+		t.Fatalf("second should report duplicate, got %+v", results[1])
+	}
+}
+
+// TestBatchSetGroupRateMultipliersRejectsEmptyAndOversize: outer guards.
+func TestBatchSetGroupRateMultipliersRejectsEmptyAndOversize(t *testing.T) {
+	store := accountmemory.New()
+	svc, _ := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if _, err := svc.BatchSetGroupRateMultipliers(context.Background(), nil); err != ErrInvalidInput {
+		t.Fatalf("empty should ErrInvalidInput, got %v", err)
+	}
+	oversize := make([]contract.BatchSetGroupRateMultiplierItem, BatchSetGroupRateMultipliersMaxItems+1)
+	for i := range oversize {
+		oversize[i] = contract.BatchSetGroupRateMultiplierItem{GroupID: i + 1, Multiplier: "1.0"}
+	}
+	if _, err := svc.BatchSetGroupRateMultipliers(context.Background(), oversize); err != ErrInvalidInput {
+		t.Fatalf(">MaxItems should ErrInvalidInput, got %v", err)
+	}
+}
+
 // TestRecordProxyProbeSerializesConcurrentCallsPerProxy is the regression
 // guard for the SQL-backend TOCTOU race in RecordProxyProbe: two probes for
 // the same proxy that both observe "no window reset needed" must both

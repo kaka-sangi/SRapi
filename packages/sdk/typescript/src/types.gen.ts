@@ -1889,6 +1889,96 @@ export type BatchDeleteProviderAccountsResponse = {
     request_id: RequestId;
 };
 
+export type BatchUpdateAccountConcurrencyItem = {
+    account_id: Id;
+    /**
+     * New per-account ceiling on concurrent in-flight requests. 0 clears the cap (the scheduler treats absent + zero identically).
+     */
+    max_concurrency: number;
+};
+
+export type BatchUpdateAccountConcurrencyRequest = {
+    items: Array<BatchUpdateAccountConcurrencyItem>;
+};
+
+export type BatchUpdateAccountConcurrencyErrorRow = {
+    id: Id;
+    message: string;
+};
+
+export type BatchUpdateAccountConcurrencyResult = {
+    updated_count: number;
+    /**
+     * Per-id failures (invalid id, duplicate in batch, store error). NotFound is NOT a failure — idempotent semantics.
+     */
+    errors: Array<BatchUpdateAccountConcurrencyErrorRow>;
+};
+
+export type BatchUpdateAccountConcurrencyResponse = {
+    data: BatchUpdateAccountConcurrencyResult;
+    request_id: RequestId;
+};
+
+export type BatchSetGroupRateMultiplierItem = {
+    group_id: Id;
+    /**
+     * Decimal string > 0 (e.g. "0.5" for 50% off, "1.5" for surcharge). Stored as 8-decimal-place fixed.
+     */
+    multiplier: string;
+};
+
+export type BatchSetGroupRateMultipliersRequest = {
+    items: Array<BatchSetGroupRateMultiplierItem>;
+};
+
+export type BatchSetGroupRateMultiplierErrorRow = {
+    id: Id;
+    message: string;
+};
+
+export type BatchSetGroupRateMultipliersResult = {
+    updated_count: number;
+    /**
+     * Per-id failures (invalid id, invalid multiplier, store error). NotFound is idempotent.
+     */
+    errors: Array<BatchSetGroupRateMultiplierErrorRow>;
+};
+
+export type BatchSetGroupRateMultipliersResponse = {
+    data: BatchSetGroupRateMultipliersResult;
+    request_id: RequestId;
+};
+
+export type BatchSetGroupRpmOverrideItem = {
+    group_id: Id;
+    /**
+     * New per-group RPM ceiling. null clears the override (no rate limit).
+     */
+    rpm_override?: number | null;
+};
+
+export type BatchSetGroupRpmOverridesRequest = {
+    items: Array<BatchSetGroupRpmOverrideItem>;
+};
+
+export type BatchSetGroupRpmOverrideErrorRow = {
+    id: Id;
+    message: string;
+};
+
+export type BatchSetGroupRpmOverridesResult = {
+    updated_count: number;
+    /**
+     * Per-id failures (invalid id, negative value, store error). NotFound is idempotent.
+     */
+    errors: Array<BatchSetGroupRpmOverrideErrorRow>;
+};
+
+export type BatchSetGroupRpmOverridesResponse = {
+    data: BatchSetGroupRpmOverridesResult;
+    request_id: RequestId;
+};
+
 export type UpdateProviderAccountRequest = {
     name?: string;
     runtime_class?: RuntimeClass;
@@ -3644,6 +3734,48 @@ export type BatchDisableRedeemCodesRequest = {
      * Free-text audit comment recorded against every code disabled by this call.
      */
     note?: string | null;
+};
+
+export type BatchUpdateRedeemCodeItem = {
+    id: Id;
+    /**
+     * New redemption amount (decimal string > 0; balance codes only). Null leaves unchanged.
+     */
+    amount?: string | null;
+    /**
+     * New max-redemption cap. Null leaves unchanged.
+     */
+    max_redemptions?: number | null;
+    /**
+     * New expiry (RFC3339). Null in the JSON body clears the expiry (NullableTimeUpdate semantics from sub2api).
+     */
+    expires_at?: string | null;
+    /**
+     * New operator note (free text). Null leaves unchanged.
+     */
+    note?: string | null;
+};
+
+export type BatchUpdateRedeemCodesRequest = {
+    items: Array<BatchUpdateRedeemCodeItem>;
+};
+
+export type BatchUpdateRedeemCodeErrorRow = {
+    id: Id;
+    message: string;
+};
+
+export type BatchUpdateRedeemCodesResult = {
+    updated_count: number;
+    /**
+     * Per-id failures (invalid id, invalid value, already-redeemed gate, store error). NotFound is idempotent.
+     */
+    errors: Array<BatchUpdateRedeemCodeErrorRow>;
+};
+
+export type BatchUpdateRedeemCodesResponse = {
+    data: BatchUpdateRedeemCodesResult;
+    request_id: RequestId;
 };
 
 export type BatchExtendRedeemCodesRequest = {
@@ -12067,6 +12199,43 @@ export type BatchActionAdminAccountsResponses = {
 
 export type BatchActionAdminAccountsResponse = BatchActionAdminAccountsResponses[keyof BatchActionAdminAccountsResponses];
 
+export type BatchUpdateAdminAccountConcurrencyData = {
+    body: BatchUpdateAccountConcurrencyRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/batch-concurrency';
+};
+
+export type BatchUpdateAdminAccountConcurrencyErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchUpdateAdminAccountConcurrencyError = BatchUpdateAdminAccountConcurrencyErrors[keyof BatchUpdateAdminAccountConcurrencyErrors];
+
+export type BatchUpdateAdminAccountConcurrencyResponses = {
+    /**
+     * Concurrency batch update result.
+     */
+    200: BatchUpdateAccountConcurrencyResponse;
+};
+
+export type BatchUpdateAdminAccountConcurrencyResponse = BatchUpdateAdminAccountConcurrencyResponses[keyof BatchUpdateAdminAccountConcurrencyResponses];
+
 export type GetAdminAccountsHealthSummaryData = {
     body?: never;
     path?: never;
@@ -13362,6 +13531,80 @@ export type CreateAdminAccountGroupResponses = {
 };
 
 export type CreateAdminAccountGroupResponse = CreateAdminAccountGroupResponses[keyof CreateAdminAccountGroupResponses];
+
+export type BatchSetAdminAccountGroupRateMultipliersData = {
+    body: BatchSetGroupRateMultipliersRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/account-groups/batch-rate-multipliers';
+};
+
+export type BatchSetAdminAccountGroupRateMultipliersErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchSetAdminAccountGroupRateMultipliersError = BatchSetAdminAccountGroupRateMultipliersErrors[keyof BatchSetAdminAccountGroupRateMultipliersErrors];
+
+export type BatchSetAdminAccountGroupRateMultipliersResponses = {
+    /**
+     * Batch result.
+     */
+    200: BatchSetGroupRateMultipliersResponse;
+};
+
+export type BatchSetAdminAccountGroupRateMultipliersResponse = BatchSetAdminAccountGroupRateMultipliersResponses[keyof BatchSetAdminAccountGroupRateMultipliersResponses];
+
+export type BatchSetAdminAccountGroupRpmOverridesData = {
+    body: BatchSetGroupRpmOverridesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/account-groups/batch-rpm-overrides';
+};
+
+export type BatchSetAdminAccountGroupRpmOverridesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchSetAdminAccountGroupRpmOverridesError = BatchSetAdminAccountGroupRpmOverridesErrors[keyof BatchSetAdminAccountGroupRpmOverridesErrors];
+
+export type BatchSetAdminAccountGroupRpmOverridesResponses = {
+    /**
+     * Batch result.
+     */
+    200: BatchSetGroupRpmOverridesResponse;
+};
+
+export type BatchSetAdminAccountGroupRpmOverridesResponse = BatchSetAdminAccountGroupRpmOverridesResponses[keyof BatchSetAdminAccountGroupRpmOverridesResponses];
 
 export type DeleteAdminAccountGroupData = {
     body?: never;
@@ -17688,6 +17931,43 @@ export type BatchDeleteAdminRedeemCodesResponses = {
 };
 
 export type BatchDeleteAdminRedeemCodesResponse = BatchDeleteAdminRedeemCodesResponses[keyof BatchDeleteAdminRedeemCodesResponses];
+
+export type BatchUpdateAdminRedeemCodesData = {
+    body: BatchUpdateRedeemCodesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/redeem-codes/batch-update';
+};
+
+export type BatchUpdateAdminRedeemCodesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchUpdateAdminRedeemCodesError = BatchUpdateAdminRedeemCodesErrors[keyof BatchUpdateAdminRedeemCodesErrors];
+
+export type BatchUpdateAdminRedeemCodesResponses = {
+    /**
+     * Batch result.
+     */
+    200: BatchUpdateRedeemCodesResponse;
+};
+
+export type BatchUpdateAdminRedeemCodesResponse = BatchUpdateAdminRedeemCodesResponses[keyof BatchUpdateAdminRedeemCodesResponses];
 
 export type GetAdminRedeemCodeStatsData = {
     body?: never;

@@ -22,6 +22,7 @@ import {
   batchDisableAdminRedeemCodes,
   batchEnableAdminRedeemCodes,
   batchExtendAdminRedeemCodes,
+  batchUpdateAdminRedeemCodes,
   batchGenerateAdminRedeemCodes,
   listAdminPaymentOrders,
   listAdminPaymentOrderAuditLogs,
@@ -41,6 +42,8 @@ import type {
   AdminPaymentDashboard,
   AdminTestResult,
   BatchOperationResult,
+  BatchUpdateRedeemCodeItem,
+  BatchUpdateRedeemCodesResult,
   PromoCodeUsage,
   BulkImportAdminPricingRulesData,
   BulkPricingRuleImportResult,
@@ -232,6 +235,18 @@ export const paymentsApi = {
   // Reuses the BatchDisableRedeemCodesRequest body shape so the type is shared.
   batchDeleteRedeemCodes(ids: Id[]): Promise<unknown> {
     return unwrapData(() => batchDeleteAdminRedeemCodes({ body: { ids }, throwOnError: true }));
+  },
+
+  // Verbatim port of sub2api's RedeemService.BatchUpdate — per-row partial
+  // update across N redeem codes in one call. Per-id failures surface in
+  // result.errors[]. NotFound is idempotent server-side; already-redeemed
+  // codes are rejected per sub2api's TouchesUsedSensitiveFields gate.
+  batchUpdateRedeemCodes(
+    items: BatchUpdateRedeemCodeItem[],
+  ): Promise<BatchUpdateRedeemCodesResult> {
+    return unwrapData(() =>
+      batchUpdateAdminRedeemCodes({ body: { items }, throwOnError: true }),
+    );
   },
 
   deleteRedeemCode(id: Id): Promise<{ deleted: boolean }> {

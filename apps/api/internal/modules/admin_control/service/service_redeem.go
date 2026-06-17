@@ -238,6 +238,129 @@ func (s *Service) BatchExtendRedeemCodes(ctx context.Context, ids []int, expires
 	}, nil
 }
 
+// BatchUpdateRedeemCodes applies per-row partial updates to N redeem codes
+// in one call. Verbatim port of sub2api's RedeemService.BatchUpdate (which
+// shared the partial-update payload across the whole batch); srapi's shape
+// is per-row partial because the task spec was explicit about that.
+//
+// Per-row semantics:
+//   - NotFound is idempotent — counts as success (matches the other batch ops).
+//   - Sub2api's "core-field updates on already-redeemed codes are rejected"
+//     gate is enforced here: a row whose Status is already "redeemed" surfaces
+//     an Error.
+//   - At least one non-nil field per row (HasChanges); a row with no changes
+//     surfaces "no fields to update".
+//
+// Outer error guards: empty / > 1000 items returns ErrInvalidInput. Per-row
+// store / validation failures stay in the result slice (best-effort).
+func (s *Service) BatchUpdateRedeemCodes(ctx context.Context, items []admincontrol.BatchUpdateRedeemCodeItem, actorUserID int) ([]admincontrol.BatchUpdateRedeemCodeResult, error) {
+	if len(items) == 0 || len(items) > 1000 {
+		return nil, admincontrol.ErrInvalidInput
+	}
+	results := make([]admincontrol.BatchUpdateRedeemCodeResult, 0, len(items))
+	seen := make(map[int]struct{}, len(items))
+	now := s.clock.Now()
+	for i, item := range items {
+		row := admincontrol.BatchUpdateRedeemCodeResult{Index: i, ID: item.ID}
+		if item.ID <= 0 {
+			row.Error = "invalid id"
+			results = append(results, row)
+			continue
+		}
+		if _, dup := seen[item.ID]; dup {
+			row.Error = "duplicate id in batch"
+			results = append(results, row)
+			continue
+		}
+		seen[item.ID] = struct{}{}
+		// HasChanges check: at least one field must be set so a row of nothing
+		// surfaces as an explicit no-op-with-error rather than a silent skip.
+		if item.Value == nil && item.MaxRedemptions == nil && !item.ExpiresAtSet && item.Note == nil {
+			row.Error = "no fields to update"
+			results = append(results, row)
+			continue
+		}
+		// Per-row value validation. The amount (Value) must be a positive
+		// decimal when set, mirroring CreateRedeemCode's validRedeemCodeValue
+		// gate.
+		if item.Value != nil {
+			amount, ok := new(big.Rat).SetString(strings.TrimSpace(*item.Value))
+			if !ok || amount.Sign() <= 0 {
+				row.Error = "invalid amount"
+				results = append(results, row)
+				continue
+			}
+		}
+		if item.MaxRedemptions != nil && *item.MaxRedemptions <= 0 {
+			row.Error = "max_redemptions must be > 0"
+			results = append(results, row)
+			continue
+		}
+		if item.ExpiresAtSet && item.ExpiresAt != nil && !item.ExpiresAt.After(now) {
+			row.Error = "expires_at must be in the future"
+			results = append(results, row)
+			continue
+		}
+		// Sub2api gate: reject core-field updates on already-redeemed codes
+		// (value mutation on a consumed code would corrupt accounting). srapi
+		// extends this to the whole row — any change on a redeemed code is
+		// rejected to mirror sub2api's TouchesUsedSensitiveFields check.
+		// NotFound is treated as idempotent success.
+		existing, err := s.findRedeemCodeForUpdate(ctx, item.ID)
+		if err != nil {
+			if err == admincontrol.ErrNotFound {
+				results = append(results, row)
+				continue
+			}
+			row.Error = err.Error()
+			results = append(results, row)
+			continue
+		}
+		if existing.Status == admincontrol.RedeemCodeStatusRedeemed {
+			row.Error = "cannot update an already-redeemed code"
+			results = append(results, row)
+			continue
+		}
+		fields := admincontrol.RedeemCodeFieldUpdate{
+			Value:          item.Value,
+			MaxRedemptions: item.MaxRedemptions,
+			ExpiresAtSet:   item.ExpiresAtSet,
+			ExpiresAt:      item.ExpiresAt,
+			Note:           item.Note,
+		}
+		if _, err := s.store.UpdateRedeemCodeFields(ctx, item.ID, fields, now); err != nil {
+			// Idempotent NotFound (handles the rare race where the row was
+			// deleted between findRedeemCodeForUpdate and the write).
+			if err == admincontrol.ErrNotFound {
+				results = append(results, row)
+				continue
+			}
+			row.Error = err.Error()
+			results = append(results, row)
+			continue
+		}
+		results = append(results, row)
+	}
+	return results, nil
+}
+
+// findRedeemCodeForUpdate looks up a redeem code by id. Used by
+// BatchUpdateRedeemCodes to gate updates on Status (and any other future
+// pre-write checks). Returns ErrNotFound for a missing id so the batch caller
+// can treat NotFound as idempotent.
+func (s *Service) findRedeemCodeForUpdate(ctx context.Context, id int) (admincontrol.RedeemCode, error) {
+	stored, err := s.store.ListRedeemCodes(ctx)
+	if err != nil {
+		return admincontrol.RedeemCode{}, err
+	}
+	for _, item := range stored {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return admincontrol.RedeemCode{}, admincontrol.ErrNotFound
+}
+
 func (s *Service) RedeemCodeStats(ctx context.Context) (admincontrol.RedeemCodeStats, error) {
 	stored, err := s.store.ListRedeemCodes(ctx)
 	if err != nil {

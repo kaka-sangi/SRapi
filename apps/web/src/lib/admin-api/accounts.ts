@@ -5,6 +5,7 @@ import {
   batchActionAdminAccounts,
   batchCreateAdminAccounts,
   batchDeleteAdminAccounts,
+  batchUpdateAdminAccountConcurrency,
   batchUpdateAdminAccounts,
   bindAdminAccountProxy,
   clearAdminAccountError,
@@ -72,6 +73,8 @@ import type {
   BatchCreateAdminAccountsData,
   BatchCreateProviderAccountsResult,
   BatchDeleteProviderAccountsResult,
+  BatchUpdateAccountConcurrencyItem,
+  BatchUpdateAccountConcurrencyResult,
   BatchUpdateAccountsResult,
   Id,
   CodexSessionImportResult,
@@ -132,6 +135,17 @@ export const accountsApi = {
   batchDeleteAccounts(accountIds: Id[]): Promise<BatchDeleteProviderAccountsResult> {
     return unwrapData(() =>
       batchDeleteAdminAccounts({ body: { account_ids: accountIds }, throwOnError: true }),
+    );
+  },
+
+  // Bulk-set per-account max_concurrency (verbatim port of sub2api's
+  // BatchUpdateConcurrency). NotFound is idempotent on the server; per-id
+  // failures surface in result.errors[].
+  batchUpdateAccountConcurrency(
+    items: BatchUpdateAccountConcurrencyItem[],
+  ): Promise<BatchUpdateAccountConcurrencyResult> {
+    return unwrapData(() =>
+      batchUpdateAdminAccountConcurrency({ body: { items }, throwOnError: true }),
     );
   },
 

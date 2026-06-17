@@ -34,6 +34,7 @@ import {
   useBatchDisableRedeemCodes,
   useBatchEnableRedeemCodes,
   useBatchExtendRedeemCodes,
+  useBatchUpdateRedeemCodes,
   useDeleteRedeemCode,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -99,6 +100,7 @@ function RedeemContent() {
   const enableMut = useBatchEnableRedeemCodes();
   const extendMut = useBatchExtendRedeemCodes();
   const batchDeleteMut = useBatchDeleteRedeemCodes();
+  const batchUpdateMut = useBatchUpdateRedeemCodes();
   const deleteMut = useDeleteRedeemCode();
 
   const [creating, setCreating] = useState(false);
@@ -108,6 +110,7 @@ function RedeemContent() {
   const [bulkDisabling, setBulkDisabling] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkExtending, setBulkExtending] = useState(false);
+  const [bulkEditing, setBulkEditing] = useState(false);
 
   /** Bulk hard-delete the selection. Unlike disable, this is irreversible —
    * the rows are gone — so it gets a destructive confirm. Failed ids
@@ -157,6 +160,50 @@ function RedeemContent() {
       list.clearSelection();
     } catch (err) {
       toast({ title: t("feedback.failed"), tone: "error" });
+      throw err;
+    }
+  }
+
+  // Verbatim port of sub2api's BatchUpdate — apply the operator-picked
+  // partial fields to every selected code. NotFound is idempotent server-side;
+  // per-id failures (already-redeemed gate, invalid value) surface in
+  // result.errors[] and are summarized in the toast.
+  async function confirmBulkUpdate(payload: {
+    amount?: string;
+    maxRedemptions?: number;
+    expiresAt?: string | null;
+    note?: string;
+  }) {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    const items = ids.map((id) => ({
+      id,
+      ...(payload.amount !== undefined ? { amount: payload.amount } : {}),
+      ...(payload.maxRedemptions !== undefined
+        ? { max_redemptions: payload.maxRedemptions }
+        : {}),
+      ...(payload.expiresAt !== undefined ? { expires_at: payload.expiresAt } : {}),
+      ...(payload.note !== undefined ? { note: payload.note } : {}),
+    }));
+    try {
+      const result = await batchUpdateMut.mutateAsync(items);
+      list.clearSelection();
+      if (result.errors.length > 0) {
+        toast({
+          title: t("feedback.batchPartial", {
+            succeeded: result.updated_count,
+            failed: result.errors.length,
+          }),
+          tone: "warning",
+        });
+      } else {
+        toast({
+          title: t("feedback.batchAllSucceeded", { count: result.updated_count }),
+          tone: "success",
+        });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
       throw err;
     }
   }
@@ -355,6 +402,15 @@ function RedeemContent() {
               <Button
                 variant="outline"
                 size="sm"
+                loading={batchUpdateMut.isPending}
+                disabled={list.selected.size === 0}
+                onClick={() => setBulkEditing(true)}
+              >
+                {t("adminPromos.bulkEditSelected")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 loading={batchDeleteMut.isPending}
                 onClick={() => setBulkDeleting(true)}
               >
@@ -482,7 +538,220 @@ function RedeemContent() {
           onConfirm={() => deleteMut.mutateAsync(deleteTarget.id)}
         />
       ) : null}
+
+      {bulkEditing ? (
+        <BulkEditDialog
+          count={list.selected.size}
+          isPending={batchUpdateMut.isPending}
+          onSubmit={async (payload) => {
+            try {
+              await confirmBulkUpdate(payload);
+              setBulkEditing(false);
+            } catch {
+              // toast already shown; keep dialog open so operator can retry
+            }
+          }}
+          onClose={() => setBulkEditing(false)}
+        />
+      ) : null}
     </>
+  );
+}
+
+// Bulk-edit dialog: lets the operator pick which fields to change across the
+// selection (any subset of amount / max_redemptions / expires_at / note).
+// Mirrors the per-row partial-update shape of the batch-update endpoint.
+function BulkEditDialog({
+  count,
+  isPending,
+  onSubmit,
+  onClose,
+}: {
+  count: number;
+  isPending: boolean;
+  onSubmit: (payload: {
+    amount?: string;
+    maxRedemptions?: number;
+    expiresAt?: string | null;
+    note?: string;
+  }) => void | Promise<void>;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const [editAmount, setEditAmount] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [editMax, setEditMax] = useState(false);
+  const [maxRedemptions, setMaxRedemptions] = useState("1");
+  const [editExpires, setEditExpires] = useState(false);
+  const [expiresAt, setExpiresAt] = useState("");
+  const [clearExpires, setClearExpires] = useState(false);
+  const [editNote, setEditNote] = useState(false);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    if (!editAmount && !editMax && !editExpires && !editNote) {
+      setError(t("adminPromos.bulkEditNothingSelected"));
+      return;
+    }
+    const payload: {
+      amount?: string;
+      maxRedemptions?: number;
+      expiresAt?: string | null;
+      note?: string;
+    } = {};
+    if (editAmount) {
+      const n = Number.parseFloat(amount.trim());
+      if (!Number.isFinite(n) || n <= 0) {
+        setError(t("adminPromos.bulkEditInvalidAmount"));
+        return;
+      }
+      payload.amount = amount.trim();
+    }
+    if (editMax) {
+      const n = Number.parseInt(maxRedemptions.trim(), 10);
+      if (!Number.isFinite(n) || n <= 0) {
+        setError(t("adminPromos.bulkEditInvalidMax"));
+        return;
+      }
+      payload.maxRedemptions = n;
+    }
+    if (editExpires) {
+      if (clearExpires) {
+        payload.expiresAt = null;
+      } else {
+        const trimmed = expiresAt.trim();
+        if (!trimmed) {
+          setError(t("adminPromos.extendRequired"));
+          return;
+        }
+        const d = new Date(trimmed);
+        if (Number.isNaN(d.getTime())) {
+          setError(t("adminPromos.extendRequired"));
+          return;
+        }
+        payload.expiresAt = d.toISOString();
+      }
+    }
+    if (editNote) {
+      payload.note = note;
+    }
+    void onSubmit(payload);
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent>
+        <form onSubmit={submit}>
+          <DialogHeader>
+            <DialogTitle>{t("adminPromos.bulkEditTitle", { count })}</DialogTitle>
+            <DialogDescription>{t("adminPromos.bulkEditBody")}</DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 space-y-4">
+            <BulkEditField
+              checked={editAmount}
+              onCheck={setEditAmount}
+              label={t("adminPromos.amount")}
+            >
+              <Input
+                inputMode="decimal"
+                value={amount}
+                disabled={!editAmount || isPending}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </BulkEditField>
+            <BulkEditField
+              checked={editMax}
+              onCheck={setEditMax}
+              label={t("adminPromos.maxRedemptions")}
+            >
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                value={maxRedemptions}
+                disabled={!editMax || isPending}
+                onChange={(e) => setMaxRedemptions(e.target.value)}
+              />
+            </BulkEditField>
+            <BulkEditField
+              checked={editExpires}
+              onCheck={setEditExpires}
+              label={t("adminCommon.expiresAt")}
+            >
+              <Input
+                type="datetime-local"
+                value={expiresAt}
+                disabled={!editExpires || isPending || clearExpires}
+                onChange={(e) => setExpiresAt(e.target.value)}
+              />
+              <label className="mt-1 flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  disabled={!editExpires || isPending}
+                  checked={clearExpires}
+                  onChange={(e) => setClearExpires(e.target.checked)}
+                />
+                {t("adminPromos.bulkEditClearExpiry")}
+              </label>
+            </BulkEditField>
+            <BulkEditField
+              checked={editNote}
+              onCheck={setEditNote}
+              label={t("adminPromos.bulkDisableNoteLabel")}
+            >
+              <Textarea
+                rows={2}
+                value={note}
+                disabled={!editNote || isPending}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </BulkEditField>
+            {error ? (
+              <p role="alert" className="text-2xs text-srapi-error">
+                {error}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter className="mt-5">
+            <Button type="button" variant="ghost" disabled={isPending} onClick={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" variant="primary" loading={isPending}>
+              {t("common.apply")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BulkEditField({
+  checked,
+  onCheck,
+  label,
+  children,
+}: {
+  checked: boolean;
+  onCheck: (v: boolean) => void;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onCheck(e.target.checked)}
+        />
+        <span>{label}</span>
+      </label>
+      <div className={checked ? "" : "opacity-50"}>{children}</div>
+    </div>
   );
 }
 

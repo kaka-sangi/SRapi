@@ -117,6 +117,18 @@ export function useBatchExtendRedeemCodes() {
     queryKeys.admin.redeemStats(),
   );
 }
+// Verbatim port of sub2api's BatchUpdate — per-row partial update across
+// N redeem codes in one call. Invalidates the same caches as the other
+// batch ops so list/stats views refresh together.
+export function useBatchUpdateRedeemCodes() {
+  return useAdminMutation(
+    (items: P<typeof adminApi.batchUpdateRedeemCodes>) =>
+      adminApi.batchUpdateRedeemCodes(items),
+    ["admin", "redeem-codes"],
+    queryKeys.admin.redeemStats(),
+  );
+}
+
 // Hard-delete a selection — the row is gone (vs disable which keeps history).
 // Same invalidation set as batch-disable so both refresh the same list views.
 export function useBatchDeleteRedeemCodes() {

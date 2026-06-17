@@ -248,6 +248,18 @@ export function useBatchDeleteAccounts() {
   );
 }
 
+// POST /admin/accounts/batch-concurrency — bulk-set per-account
+// max_concurrency ceilings in one call. Verbatim port of sub2api's
+// BatchUpdateConcurrency. NotFound is idempotent server-side; per-id
+// failures come back in result.errors[].
+export function useBatchUpdateAccountConcurrency() {
+  return useAdminMutation(
+    (items: P<typeof adminApi.batchUpdateAccountConcurrency>) =>
+      adminApi.batchUpdateAccountConcurrency(items),
+    ["admin", "accounts"],
+  );
+}
+
 // PATCH /admin/accounts/batch — atomic multi-id status change.
 // Replaces the old Promise.allSettled-over-single-item-endpoint pattern that
 // fired N requests per bulk action (and couldn't roll back on partial fail).

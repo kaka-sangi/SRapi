@@ -30,6 +30,8 @@ import {
   useGroupRateLimits,
   useUpsertGroupRateLimit,
   useDeleteGroupRateLimit,
+  useBatchSetGroupRateMultipliers,
+  useBatchSetGroupRpmOverrides,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -102,6 +104,11 @@ function GroupsContent() {
   const rateLimits = useGroupRateLimits();
   const upsertRl = useUpsertGroupRateLimit();
   const deleteRl = useDeleteGroupRateLimit();
+  const batchMultipliers = useBatchSetGroupRateMultipliers();
+  const batchRpm = useBatchSetGroupRpmOverrides();
+  const [bulkMultiplierOpen, setBulkMultiplierOpen] = useState(false);
+  const [bulkRpmOpen, setBulkRpmOpen] = useState(false);
+  const { toast } = useToast();
   const rateLimitByGroup = new Map<number, AccountGroupRateLimit>(
     (rateLimits.data?.data ?? []).map((rl) => [rl.account_group_id, rl]),
   );
@@ -216,6 +223,33 @@ function GroupsContent() {
             />
           </ListToolbar>
         }
+        selection={{
+          selected: list.selected,
+          onToggle: list.toggle,
+          onTogglePage: list.togglePage,
+          bulkActions: (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={list.selected.size === 0}
+                loading={batchMultipliers.isPending}
+                onClick={() => setBulkMultiplierOpen(true)}
+              >
+                {t("adminGroups.bulkSetMultiplier")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={list.selected.size === 0}
+                loading={batchRpm.isPending}
+                onClick={() => setBulkRpmOpen(true)}
+              >
+                {t("adminGroups.bulkSetRpmOverride")}
+              </Button>
+            </>
+          ),
+        }}
         rowActions={(g) => (
           <RowActionsMenu
             actions={[
@@ -276,7 +310,238 @@ function GroupsContent() {
           isPending={upsertRl.isPending || deleteRl.isPending}
         />
       ) : null}
+
+      {bulkMultiplierOpen ? (
+        <BulkGroupMultiplierDialog
+          count={list.selected.size}
+          isPending={batchMultipliers.isPending}
+          onSubmit={async (multiplier) => {
+            const ids = [...list.selected];
+            try {
+              const result = await batchMultipliers.mutateAsync(
+                ids.map((id) => ({ group_id: id, multiplier })),
+              );
+              list.clearSelection();
+              if (result.errors.length > 0) {
+                toast({
+                  title: t("feedback.batchPartial", {
+                    succeeded: result.updated_count,
+                    failed: result.errors.length,
+                  }),
+                  tone: "warning",
+                });
+              } else {
+                toast({
+                  title: t("feedback.batchAllSucceeded", { count: result.updated_count }),
+                  tone: "success",
+                });
+              }
+            } catch (err) {
+              toast({
+                title: t("feedback.failed"),
+                description: adminErrorMessage(err),
+                tone: "error",
+              });
+            }
+            setBulkMultiplierOpen(false);
+          }}
+          onClose={() => setBulkMultiplierOpen(false)}
+        />
+      ) : null}
+
+      {bulkRpmOpen ? (
+        <BulkGroupRpmDialog
+          count={list.selected.size}
+          isPending={batchRpm.isPending}
+          onSubmit={async (rpm) => {
+            const ids = [...list.selected];
+            try {
+              const result = await batchRpm.mutateAsync(
+                ids.map((id) => ({ group_id: id, rpm_override: rpm })),
+              );
+              list.clearSelection();
+              if (result.errors.length > 0) {
+                toast({
+                  title: t("feedback.batchPartial", {
+                    succeeded: result.updated_count,
+                    failed: result.errors.length,
+                  }),
+                  tone: "warning",
+                });
+              } else {
+                toast({
+                  title: t("feedback.batchAllSucceeded", { count: result.updated_count }),
+                  tone: "success",
+                });
+              }
+            } catch (err) {
+              toast({
+                title: t("feedback.failed"),
+                description: adminErrorMessage(err),
+                tone: "error",
+              });
+            }
+            setBulkRpmOpen(false);
+          }}
+          onClose={() => setBulkRpmOpen(false)}
+        />
+      ) : null}
     </>
+  );
+}
+
+// Small focused dialog: decimal-string multiplier input.
+function BulkGroupMultiplierDialog({
+  count,
+  isPending,
+  onSubmit,
+  onClose,
+}: {
+  count: number;
+  isPending: boolean;
+  onSubmit: (multiplier: string) => void | Promise<void>;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const [value, setValue] = useState("1.0");
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    const trimmed = value.trim();
+    const num = Number.parseFloat(trimmed);
+    if (!Number.isFinite(num) || num <= 0) {
+      setError(t("adminGroups.bulkSetMultiplierHint"));
+      return;
+    }
+    void onSubmit(trimmed);
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent>
+        <form onSubmit={submit}>
+          <DialogHeader>
+            <DialogTitle>{t("adminGroups.bulkSetMultiplierTitle", { count })}</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 space-y-3">
+            <div>
+              <Label htmlFor="bulk-multiplier">{t("adminGroups.bulkSetMultiplier")}</Label>
+              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
+                {t("adminGroups.bulkSetMultiplierHint")}
+              </p>
+              <Input
+                id="bulk-multiplier"
+                inputMode="decimal"
+                placeholder="1.00000000"
+                value={value}
+                disabled={isPending}
+                aria-invalid={Boolean(error)}
+                onChange={(e) => setValue(e.target.value)}
+              />
+            </div>
+            {error ? (
+              <p role="alert" className="text-2xs text-srapi-error">
+                {error}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter className="mt-5">
+            <Button type="button" variant="ghost" disabled={isPending} onClick={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" variant="primary" loading={isPending}>
+              {t("common.apply")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Small focused dialog: integer RPM input + "clear" checkbox.
+function BulkGroupRpmDialog({
+  count,
+  isPending,
+  onSubmit,
+  onClose,
+}: {
+  count: number;
+  isPending: boolean;
+  onSubmit: (rpm: number | null) => void | Promise<void>;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const [value, setValue] = useState("60");
+  const [clear, setClear] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    if (clear) {
+      void onSubmit(null);
+      return;
+    }
+    const n = Number.parseInt(value.trim(), 10);
+    if (!Number.isFinite(n) || n < 0) {
+      setError(t("adminGroups.bulkSetRpmOverrideHint"));
+      return;
+    }
+    void onSubmit(n);
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent>
+        <form onSubmit={submit}>
+          <DialogHeader>
+            <DialogTitle>{t("adminGroups.bulkSetRpmOverrideTitle", { count })}</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 space-y-3">
+            <div>
+              <Label htmlFor="bulk-rpm">{t("adminGroups.bulkSetRpmOverride")}</Label>
+              <p className="mb-1.5 text-2xs text-srapi-text-tertiary">
+                {t("adminGroups.bulkSetRpmOverrideHint")}
+              </p>
+              <Input
+                id="bulk-rpm"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                disabled={isPending || clear}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+              />
+              <label className="mt-2 flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={clear}
+                  disabled={isPending}
+                  onChange={(e) => setClear(e.target.checked)}
+                />
+                {t("adminGroups.bulkSetRpmOverrideClear")}
+              </label>
+            </div>
+            {error ? (
+              <p role="alert" className="text-2xs text-srapi-error">
+                {error}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter className="mt-5">
+            <Button type="button" variant="ghost" disabled={isPending} onClick={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" variant="primary" loading={isPending}>
+              {t("common.apply")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

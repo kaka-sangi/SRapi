@@ -298,6 +298,95 @@ func (s *Service) BatchDeleteAccounts(ctx context.Context, ids []int) ([]contrac
 	return results, nil
 }
 
+// BatchUpdateConcurrencyMaxItems caps the number of items per
+// BatchUpdateConcurrency call. Mirrors the other batch-account caps so the
+// operator-facing surface is consistent.
+const BatchUpdateConcurrencyMaxItems = 1000
+
+// BatchUpdateConcurrency sets the per-account max_concurrency ceiling on N
+// provider accounts in one call. Verbatim port of sub2api's
+// BatchUpdateConcurrency (admin_service.go) — sub2api scoped this to users
+// since rate-limit caps live on the user object there; srapi's equivalent
+// per-account ceiling lives in the account's metadata blob (the scheduler
+// reads metadata["max_concurrency"] at admission, see
+// runtime_gateway_resolution.go), so the per-row identifier is account_id
+// instead of user_id. Otherwise the loop shape, idempotent-NotFound +
+// per-row failure surfacing matches batch-delete (0a3c2586).
+//
+// Best-effort across the batch: a single-row failure populates that row's
+// Error and the rest of the batch continues. NotFound is treated as success
+// (the caller's intent — "this id should have concurrency X" — is moot if
+// the row does not exist). Dedups ids within the batch (first occurrence
+// wins).
+//
+// Outer error is reserved for precondition failures (empty input, > max
+// items). Per-row store / validation failures stay in the result slice.
+func (s *Service) BatchUpdateConcurrency(ctx context.Context, items []contract.BatchUpdateConcurrencyItem) ([]contract.BatchUpdateConcurrencyResult, error) {
+	if len(items) == 0 {
+		return nil, ErrInvalidInput
+	}
+	if len(items) > BatchUpdateConcurrencyMaxItems {
+		return nil, ErrInvalidInput
+	}
+	results := make([]contract.BatchUpdateConcurrencyResult, 0, len(items))
+	seen := make(map[int]struct{}, len(items))
+	for i, item := range items {
+		row := contract.BatchUpdateConcurrencyResult{Index: i, AccountID: item.AccountID}
+		if item.AccountID <= 0 {
+			row.Error = "invalid id"
+			results = append(results, row)
+			continue
+		}
+		if item.MaxConcurrency < 0 {
+			row.Error = "max_concurrency must be >= 0"
+			results = append(results, row)
+			continue
+		}
+		if _, dup := seen[item.AccountID]; dup {
+			row.Error = "duplicate id in batch"
+			results = append(results, row)
+			continue
+		}
+		seen[item.AccountID] = struct{}{}
+		account, err := s.store.FindByID(ctx, item.AccountID)
+		if err != nil {
+			// Idempotent: NotFound is not a failure since the caller's intent
+			// for that id is already moot. Match both the typed sentinel and
+			// the ad-hoc string the memory store still returns (mirrors the
+			// fallback at the batch-delete path above).
+			if errors.Is(err, ErrAccountNotFound) || strings.Contains(err.Error(), "account not found") {
+				results = append(results, row)
+				continue
+			}
+			row.Error = err.Error()
+			results = append(results, row)
+			continue
+		}
+		metadata := cloneMap(account.Metadata)
+		if metadata == nil {
+			metadata = map[string]any{}
+		}
+		// Zero clears the override (mirrors sub2api: a "set 0" call means
+		// "remove the cap"). The scheduler treats absent + zero identically.
+		if item.MaxConcurrency == 0 {
+			delete(metadata, "max_concurrency")
+		} else {
+			metadata["max_concurrency"] = item.MaxConcurrency
+		}
+		if _, err := s.Update(ctx, item.AccountID, contract.UpdateRequest{Metadata: &metadata}); err != nil {
+			if errors.Is(err, ErrAccountNotFound) || strings.Contains(err.Error(), "account not found") {
+				results = append(results, row)
+				continue
+			}
+			row.Error = err.Error()
+			results = append(results, row)
+			continue
+		}
+		results = append(results, row)
+	}
+	return results, nil
+}
+
 func (s *Service) List(ctx context.Context) ([]contract.ProviderAccount, error) {
 	accounts, err := s.store.List(ctx)
 	if err != nil {
@@ -953,6 +1042,87 @@ func (s *Service) UpdateGroup(ctx context.Context, id int, req contract.UpdateGr
 	}
 	group.UpdatedAt = s.clock.Now()
 	return s.store.UpdateGroup(ctx, group)
+}
+
+// BatchSetGroupRateMultipliersMaxItems caps the number of items per
+// BatchSetGroupRateMultipliers call. Mirrors the other batch-op caps for a
+// consistent operator-facing surface.
+const BatchSetGroupRateMultipliersMaxItems = 1000
+
+// BatchSetGroupRateMultipliers sets `rate_multiplier` on N account groups in
+// one call. Verbatim port of sub2api's BatchSetGroupRateMultipliers — sub2api
+// scoped the multiplier to user-groups (the consumer side) but srapi stores
+// the rate_multiplier on AccountGroup (the provider scheduling group), so
+// the per-row identifier is account_group_id.
+//
+// Best-effort across the batch: a single-row failure populates that row's
+// Error and the rest continues. NotFound is idempotent — a missing id counts
+// as success since the caller's intent ("this group's multiplier should be X")
+// is moot. Dedups within the batch.
+//
+// Per-row validation enforces sub2api's "multiplier must be > 0" check (the
+// sub2api impl uses RateMultiplier <= 0; the float reject below covers the
+// same surface for srapi's string-decimal representation).
+func (s *Service) BatchSetGroupRateMultipliers(ctx context.Context, items []contract.BatchSetGroupRateMultiplierItem) ([]contract.BatchSetGroupRateMultiplierResult, error) {
+	if len(items) == 0 {
+		return nil, ErrInvalidInput
+	}
+	if len(items) > BatchSetGroupRateMultipliersMaxItems {
+		return nil, ErrInvalidInput
+	}
+	results := make([]contract.BatchSetGroupRateMultiplierResult, 0, len(items))
+	seen := make(map[int]struct{}, len(items))
+	for i, item := range items {
+		row := contract.BatchSetGroupRateMultiplierResult{Index: i, GroupID: item.GroupID}
+		if item.GroupID <= 0 {
+			row.Error = "invalid id"
+			results = append(results, row)
+			continue
+		}
+		if _, dup := seen[item.GroupID]; dup {
+			row.Error = "duplicate id in batch"
+			results = append(results, row)
+			continue
+		}
+		seen[item.GroupID] = struct{}{}
+		multiplier := strings.TrimSpace(item.Multiplier)
+		if multiplier == "" {
+			row.Error = "rate_multiplier must be > 0"
+			results = append(results, row)
+			continue
+		}
+		// sub2api rejects RateMultiplier <= 0. Mirror that on the string-decimal
+		// representation using the same normalizer the per-group UpdateGroup
+		// uses, then reject zero.
+		normalized, ok := normalizeRateMultiplier(&multiplier)
+		if !ok {
+			row.Error = "invalid rate_multiplier"
+			results = append(results, row)
+			continue
+		}
+		// Zero is forbidden by sub2api (multiplier > 0). normalizeRateMultiplier
+		// permits zero (it allows non-negative), so re-check here.
+		zero, ok := new(big.Rat).SetString(normalized)
+		if !ok || zero.Sign() <= 0 {
+			row.Error = "rate_multiplier must be > 0"
+			results = append(results, row)
+			continue
+		}
+		if _, err := s.UpdateGroup(ctx, item.GroupID, contract.UpdateGroupRequest{RateMultiplier: &normalized}); err != nil {
+			// Idempotent: NotFound is not a failure. Memory store still uses
+			// errors.New("account group not found") — match both the typed
+			// sentinel (via store) and the string for safety.
+			if strings.Contains(err.Error(), "account group not found") || strings.Contains(err.Error(), "group not found") {
+				results = append(results, row)
+				continue
+			}
+			row.Error = err.Error()
+			results = append(results, row)
+			continue
+		}
+		results = append(results, row)
+	}
+	return results, nil
 }
 
 func (s *Service) FindGroupByID(ctx context.Context, id int) (contract.AccountGroup, error) {
