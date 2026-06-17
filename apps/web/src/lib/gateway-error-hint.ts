@@ -54,3 +54,38 @@ export function gatewayErrorHintKey(message: string | null | undefined): string 
   }
   return null;
 }
+
+/**
+ * Pulls the specific missing capability key out of a `capability_mismatch:<key>`
+ * reject reason (the format the backend started emitting at commit e7345d0b so
+ * operators can tell whether it was "responses", "embeddings", "vision_input"
+ * etc.). Multiple occurrences (e.g. several candidates failing on different
+ * keys) are returned as a deduped array preserving first-seen order. Returns
+ * an empty array when the message uses the bare "capability_mismatch" or none
+ * is present.
+ *
+ * Pure regex match — no allocation when nothing is present (the early bail
+ * makes this safe to call on every error message).
+ */
+export function extractMissingCapabilityKeys(
+  message: string | null | undefined,
+): string[] {
+  if (!message || !/capability_mismatch:/.test(message)) return [];
+  // The backend renders `capability_mismatch:<key>` where <key> is a
+  // canonical capability identifier (lowercase + underscore only — see
+  // capabilitiescontract.Key* constants). Match conservatively so we don't
+  // pick up unrelated colon-suffixes that may share the prefix in future
+  // log lines.
+  const pattern = /capability_mismatch:([a-z][a-z0-9_]*)/gi;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(message)) !== null) {
+    const key = match[1].toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(key);
+    }
+  }
+  return out;
+}
