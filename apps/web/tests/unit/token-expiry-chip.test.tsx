@@ -1,6 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { TokenExpiryChip } from "@/app/admin/accounts/token-expiry-chip";
 import type { ProviderAccount } from "@/lib/sdk-types";
 
@@ -42,9 +43,14 @@ function makeAccount(overrides: Partial<ProviderAccount> = {}): ProviderAccount 
 }
 
 function renderChip(account: ProviderAccount, now?: Date) {
+  // Production tree wraps everything in TooltipProvider at the root
+  // (apps/web/src/providers/index.tsx); mirror that here so the chip can
+  // render its Radix Tooltip without throwing.
   return render(
     <LanguageProvider>
-      <TokenExpiryChip account={account} now={now} />
+      <TooltipProvider>
+        <TokenExpiryChip account={account} now={now} />
+      </TooltipProvider>
     </LanguageProvider>,
   );
 }
@@ -91,5 +97,40 @@ describe("TokenExpiryChip", () => {
     expect(container.querySelector(".text-srapi-error")).not.toBeNull();
     // It must NOT also render the "Refreshes in" copy.
     expect(container.textContent).not.toMatch(/Refreshes in|后刷新/);
+  });
+
+  it("wraps the chip in a Tooltip trigger when refresh_last_error is present", () => {
+    // When operators see "Needs reauth" they need to know WHY — invalid_grant
+    // (token revoked) vs network 5xx (transient) vs client-misconfig.
+    // refresh_last_error is the single most useful signal; pin that it shows
+    // up in the tooltip trigger DOM tree even when content is portalled.
+    const flagged = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
+    const { container } = renderChip(
+      makeAccount({
+        needs_reauth_at: flagged,
+        refresh_last_error: "invalid_grant: refresh token revoked by upstream",
+        refresh_attempts: 5,
+      }),
+      now,
+    );
+    // The chip itself still renders the label (visible).
+    expect(container.textContent).toMatch(/Needs reauth|需要重新授权/);
+    // Radix wraps the trigger in a button element with data-state.
+    const trigger = container.querySelector("[data-state]");
+    expect(trigger).not.toBeNull();
+  });
+
+  it("does NOT wrap when needs_reauth_at fires with no error and no attempts (cleaner cold-start)", () => {
+    // If the account just got manually disabled or migrated, refresh_attempts
+    // can be 0 and refresh_last_error empty. The tooltip would be empty —
+    // skip the wrapper so the chip renders identically to the legacy shape.
+    const flagged = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
+    const { container } = renderChip(
+      makeAccount({ needs_reauth_at: flagged }),
+      now,
+    );
+    expect(container.textContent).toMatch(/Needs reauth|需要重新授权/);
+    // No tooltip trigger should be present.
+    expect(container.querySelector("[data-state]")).toBeNull();
   });
 });

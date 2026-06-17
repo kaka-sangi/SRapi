@@ -2,6 +2,7 @@
 
 import { useLanguage } from "@/context/LanguageContext";
 import { QuietBadge } from "@/components/ui/quiet-badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ProviderAccount } from "@/lib/sdk-types";
 
 // Compact duration formatter shared by the three render branches. Mirrors the
@@ -49,7 +50,40 @@ export function TokenExpiryChip({ account, now }: TokenExpiryChipProps) {
   }
 
   if (account.needs_reauth_at) {
-    return <QuietBadge status="error" label={t("adminAccounts.tokenNeedsReauth")} />;
+    // Pull the (already truncated to 500 chars by the backend) last refresh
+    // error so operators can tell why the refresh worker gave up — was it
+    // invalid_grant (revoked token), an upstream 5xx (transient that just
+    // crossed the attempts threshold), or a misconfigured client id? The
+    // backend snapshots this on every failed refresh path, so it's the
+    // single most informative signal for triaging needs_reauth accounts.
+    const reason = account.refresh_last_error?.trim();
+    const attempts = account.refresh_attempts ?? 0;
+    if (!reason && attempts === 0) {
+      return <QuietBadge status="error" label={t("adminAccounts.tokenNeedsReauth")} />;
+    }
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-block">
+            <QuietBadge status="error" label={t("adminAccounts.tokenNeedsReauth")} />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-sm" side="top">
+          {attempts > 0 ? (
+            <div className="mb-1 font-medium">
+              {t("adminAccounts.tokenReauthAttemptsLabel", { count: attempts })}
+            </div>
+          ) : null}
+          {reason ? (
+            <div className="break-words font-mono text-2xs leading-snug">{reason}</div>
+          ) : (
+            <div className="text-srapi-text-tertiary">
+              {t("adminAccounts.tokenReauthNoReason")}
+            </div>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    );
   }
 
   if (!account.token_expires_at) {

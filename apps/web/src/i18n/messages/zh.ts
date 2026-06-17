@@ -742,6 +742,8 @@ export const zh: Messages = {
     tokenRefreshesIn: "{duration} 后刷新",
     tokenExpiredAgo: "已过期 {duration}",
     tokenNeedsReauth: "需要重新授权",
+    tokenReauthAttemptsLabel: "已失败 {count} 次",
+    tokenReauthNoReason: "本次刷新没有捕获到上游错误。",
     discoverModels: "发现模型",
     discoverDone: "发现了 {count} 个模型",
     bindProxy: "绑定代理",

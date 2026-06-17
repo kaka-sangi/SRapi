@@ -746,6 +746,8 @@ export const en = {
     tokenRefreshesIn: "Refreshes in {duration}",
     tokenExpiredAgo: "Expired {duration} ago",
     tokenNeedsReauth: "Needs reauth",
+    tokenReauthAttemptsLabel: "{count} failed refresh attempts",
+    tokenReauthNoReason: "No upstream error was captured for the last refresh.",
     discoverModels: "Discover models",
     discoverDone: "Discovered {count} models",
     bindProxy: "Bind proxy",
