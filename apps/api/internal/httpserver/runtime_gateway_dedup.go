@@ -14,9 +14,13 @@ import (
 )
 
 // gatewayDedupTTL is the default lifetime of a cached completed response.
-// Matches chatgpt2api's chat_completion_cache default (ttl_seconds=30) — see
-// services/protocol/chat_completion_cache.py: ChatCompletionCache.get_or_compute_response.
-const gatewayDedupTTL = 30 * time.Second
+// Matches chatgpt2api's DEFAULT_CHAT_COMPLETION_CACHE.ttl_seconds in
+// services/config.py:43 verbatim (60s). PR-2 originally landed this at 30s
+// with a misattributed comment; the user directive is "完全按那三个项目来"
+// so the value is now restored to the reference default. Operators who
+// want a tighter window can override via the (future) config knob; until
+// that lands, ship the reference value as-is.
+const gatewayDedupTTL = 60 * time.Second
 
 // gatewayDedupMaxEntries bounds both the completed-result cache and the in-flight
 // map. chatgpt2api uses a single max_entries setting for the completed cache and
