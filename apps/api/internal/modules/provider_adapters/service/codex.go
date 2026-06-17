@@ -162,11 +162,21 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
+	// Wire PR-1's identity_confuse module into the outbound hot path:
+	// rewrite prompt_cache_key / installation_id / turn ids to per-account
+	// UUIDv5 derivatives so multiplexing this account across many users
+	// can't cross-contaminate the upstream prompt cache. The state lets
+	// us reverse the rewrite on the response so the client gets its own
+	// identifiers back. codexApplyOutboundWiring is a no-op when the
+	// account.ID is zero (e.g. anonymous test paths).
+	rpAccount := req.Account
+	headers := codexResponsesHeaders(req, stream, payload)
+	raw, outboundState := codexApplyOutboundWiring(rpAccount, headers, raw)
 	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
 		Account:      codexReverseProxyAccount(req),
 		Method:       http.MethodPost,
 		URL:          codexResponsesEndpoint(baseURL, req),
-		Headers:      codexResponsesHeaders(req, stream, payload),
+		Headers:      headers,
 		Body:         raw,
 		ExpectStream: stream,
 	})
@@ -179,11 +189,13 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 			if marshalErr != nil {
 				return contract.ConversationResponse{}, marshalErr
 			}
+			retryHeaders := codexResponsesHeaders(req, stream, retryPayload)
+			retryRaw, retryState := codexApplyOutboundWiring(rpAccount, retryHeaders, retryRaw)
 			retryResp, retryErr := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
 				Account:      codexReverseProxyAccount(req),
 				Method:       http.MethodPost,
 				URL:          codexResponsesEndpoint(baseURL, req),
-				Headers:      codexResponsesHeaders(req, stream, retryPayload),
+				Headers:      retryHeaders,
 				Body:         retryRaw,
 				ExpectStream: stream,
 			})
@@ -191,6 +203,10 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 				return contract.ConversationResponse{}, providerErrorFromReverseProxy(retryErr)
 			}
 			if retryResp.StatusCode >= 200 && retryResp.StatusCode < 300 {
+				// Identity expose + cache capture on the retry body too —
+				// the retry uses a fresh state so we can't share with the
+				// outer attempt.
+				retryResp.Body = codexCaptureInboundWiring(retryState, codexModelForCacheKey(req), retryResp.Body)
 				parsed, parseErr := parseCodexResponsesBody(retryResp.Body, retryResp.StatusCode)
 				if parseErr != nil {
 					return contract.ConversationResponse{}, parseErr
@@ -202,6 +218,14 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 		}
 		return contract.ConversationResponse{}, classifyCodexProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
+	// Wire PR-1's identity_expose + replay_cache.PutItems into the inbound
+	// hot path. Identity expose reverse-maps any echoed identifier so the
+	// client receives its own original ids; cache capture walks the
+	// response's `output` array and persists completed reasoning / tool-
+	// call items keyed on the ORIGINAL prompt_cache_key + model. Best
+	// effort — failures in capture must not break the response delivered
+	// to the caller.
+	runtimeResp.Body = codexCaptureInboundWiring(outboundState, codexModelForCacheKey(req), runtimeResp.Body)
 	parsed, err := parseCodexResponsesBody(runtimeResp.Body, runtimeResp.StatusCode)
 	if err != nil {
 		return contract.ConversationResponse{}, err
