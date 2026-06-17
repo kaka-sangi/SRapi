@@ -32,9 +32,11 @@ func (SystemClock) Now() time.Time {
 }
 
 type Service struct {
-	store  contract.Store
-	pepper []byte
-	clock  Clock
+	store      contract.Store
+	pepper     []byte
+	clock      Clock
+	authCache  *AuthCache  // optional; nil disables the cache (wiring + tests)
+	rpmCounter *RPMCounter // optional; nil disables per-key RPM counting
 }
 
 func New(store contract.Store, pepper string, clock Clock) (*Service, error) {
@@ -48,6 +50,62 @@ func New(store contract.Store, pepper string, clock Clock) (*Service, error) {
 		clock = SystemClock{}
 	}
 	return &Service{store: store, pepper: []byte(pepper), clock: clock}, nil
+}
+
+// SetAuthCache attaches an in-memory auth cache. Calling with nil clears it.
+// Wiring is split from New() so the runtime can layer the cache on top of an
+// already-constructed service without churning the New() signature.
+func (s *Service) SetAuthCache(cache *AuthCache) {
+	if s == nil {
+		return
+	}
+	s.authCache = cache
+}
+
+// SetRPMCounter attaches a per-key RPM counter for the wired gateway hot path.
+func (s *Service) SetRPMCounter(counter *RPMCounter) {
+	if s == nil {
+		return
+	}
+	s.rpmCounter = counter
+}
+
+// AuthCache exposes the wired cache so the runtime can bust it from non-Service
+// invalidation paths (e.g. an admin tool that bypasses Service.Update). Nil
+// when no cache is wired.
+func (s *Service) AuthCache() *AuthCache {
+	if s == nil {
+		return nil
+	}
+	return s.authCache
+}
+
+// RPMCounter exposes the wired counter (nil when not wired). Tests + admin
+// observability use this to read live counter state.
+func (s *Service) RPMCounter() *RPMCounter {
+	if s == nil {
+		return nil
+	}
+	return s.rpmCounter
+}
+
+// RPMStats returns a point-in-time projection of every key's in-flight
+// per-key request counter. Returns nil when no counter is wired. The
+// projection trades type-safety (contract.APIKeyRPMStats) for accessibility
+// — admin handlers can consume it without importing the worker types.
+func (s *Service) RPMStats() []contract.APIKeyRPMStats {
+	if s == nil || s.rpmCounter == nil {
+		return nil
+	}
+	snaps := s.rpmCounter.Snapshot()
+	if len(snaps) == 0 {
+		return nil
+	}
+	out := make([]contract.APIKeyRPMStats, 0, len(snaps))
+	for _, snap := range snaps {
+		out = append(out, contract.APIKeyRPMStats{KeyID: snap.KeyID, Requests: snap.Requests})
+	}
+	return out
 }
 
 func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contract.CreatedKey, error) {
@@ -131,7 +189,15 @@ func (s *Service) Delete(ctx context.Context, userID, keyID int) error {
 	if !found {
 		return ErrKeyNotFound
 	}
-	return s.store.Delete(ctx, keyID)
+	if err := s.store.Delete(ctx, keyID); err != nil {
+		return err
+	}
+	// Bust the auth cache so a request mid-flight with the deleted key's
+	// plaintext can no longer authenticate from the cached snapshot.
+	if s.authCache != nil {
+		s.authCache.InvalidateByKeyID(keyID)
+	}
+	return nil
 }
 
 // ResetUsage zeros the rolling cost-used counters on an API key (admin-only
@@ -144,6 +210,12 @@ func (s *Service) ResetUsage(ctx context.Context, keyID int) (contract.APIKey, e
 	key, err := s.store.ResetUsage(ctx, keyID)
 	if err != nil {
 		return contract.APIKey{}, err
+	}
+	// ResetUsage zeroes cost-used counters baked into the cached snapshot
+	// (CostUsed5h etc.), so a stale cache hit would mislead downstream
+	// quota checks until the TTL expired. Bust eagerly.
+	if s.authCache != nil {
+		s.authCache.InvalidateByKeyID(keyID)
 	}
 	return withoutHash(key), nil
 }
@@ -300,6 +372,12 @@ func (s *Service) Update(ctx context.Context, req contract.UpdateRequest) (contr
 		}
 		return contract.APIKey{}, err
 	}
+	// Status/scope/limit changes alter the cached snapshot's enforcement
+	// outcome — bust so the next auth re-reads from SQL. Notably this is
+	// the disable-key invalidation path the port directive calls out.
+	if s.authCache != nil {
+		s.authCache.InvalidateByKeyID(updated.ID)
+	}
 	return withoutHash(updated), nil
 }
 
@@ -329,6 +407,23 @@ func (s *Service) ApplyCostUsage(ctx context.Context, input contract.CostUsageUp
 }
 
 func (s *Service) Authenticate(ctx context.Context, plaintext string) (contract.AuthResult, error) {
+	// Cache fast-path: consult the in-memory LRU before SQL. The cache key
+	// is sha256(plaintext) so brute-forcing prefixes doesn't probe membership.
+	// A "notFound" cache hit short-circuits as ErrInvalidKey — identical to
+	// the SQL-not-found branch below. Critically, the cache bypasses
+	// TouchLastUsed() — that's intentional: last_used_at is observational,
+	// not load-bearing, and writing it on every cached hit would defeat the
+	// cache's purpose. The async RPM counter (Increment below at the call
+	// site, plus the periodic flush) carries the "this key is hot" signal.
+	if s.authCache != nil {
+		if cached, userID, notFound, found := s.authCache.Get(ctx, plaintext); found {
+			if notFound {
+				return contract.AuthResult{}, ErrInvalidKey
+			}
+			return contract.AuthResult{Key: cached, UserID: userID, CachedAuth: true}, nil
+		}
+	}
+
 	prefix, ok := PrefixFromPlaintext(plaintext)
 	if !ok {
 		return contract.AuthResult{}, ErrInvalidKey
@@ -336,6 +431,12 @@ func (s *Service) Authenticate(ctx context.Context, plaintext string) (contract.
 	key, err := s.store.FindByPrefix(ctx, prefix)
 	if err != nil {
 		if errors.Is(err, contract.ErrKeyNotFound) || errors.Is(err, ErrKeyNotFound) {
+			// Negative-cache: only seed when the plaintext is well-formed.
+			// A malformed plaintext would never round-trip to the SQL store,
+			// so caching it under sha256 would waste a slot.
+			if s.authCache != nil {
+				s.authCache.PutNotFound(ctx, plaintext)
+			}
 			return contract.AuthResult{}, ErrInvalidKey
 		}
 		return contract.AuthResult{}, err
@@ -354,7 +455,11 @@ func (s *Service) Authenticate(ctx context.Context, plaintext string) (contract.
 		return contract.AuthResult{}, err
 	}
 	key.LastUsedAt = &now
-	return contract.AuthResult{Key: withoutHash(key), UserID: key.UserID}, nil
+	result := contract.AuthResult{Key: withoutHash(key), UserID: key.UserID}
+	if s.authCache != nil {
+		s.authCache.PutPositive(ctx, plaintext, result.Key, result.UserID)
+	}
+	return result, nil
 }
 
 func (s *Service) HashPlaintext(plaintext string) string {

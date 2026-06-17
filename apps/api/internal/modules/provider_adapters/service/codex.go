@@ -158,10 +158,51 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
+	// Verbatim port of CLIProxyAPI ensureImageGenerationTool
+	// (codex_executor.go:1740-1773): auto-inject the image_generation
+	// tool when the client signals image-generation intent (an
+	// image_generation_call item already in the input, or the bridge
+	// feature flag on the provider/account), unless the upstream is a
+	// spark model or the account is on a free codex plan. Respects the
+	// operator-level disable switch — applyDisableImageGenerationToResponsesPayload
+	// has already run inside codexApplyResponsesPayloadDefaults so a
+	// disabled state means no tool to begin with; we re-check before
+	// injection to keep the disable switch authoritative.
+	//
+	// Gating note vs. CLIProxyAPI: their default is inject-everywhere
+	// (gated only by spark/free-plan and operator config). srapi keeps
+	// the historical opt-in default (bridge flag OR client already
+	// used image_generation_call) so existing test fixtures stay
+	// valid; the injection logic itself (idempotent append, spark/free
+	// short-circuit) is verbatim from CLIProxyAPI.
+	if !imageGenerationDisabledForConversation(req) {
+		if codexImageGenerationBridgeEnabled(req) || codexPayloadInputUsesImageGenerationCall(payload) {
+			ensureCodexImageGenerationTool(payload, contract.NormalizeCodexUpstreamModelName(codexStringValue(payload["model"])), req.Account)
+			// codexApplyImageGenerationInstructions only added the bridge
+			// marker when the tool was already in the array; re-run it now
+			// so the freshly-injected tool gets the matching instructions.
+			codexApplyImageGenerationInstructions(payload)
+		}
+	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
+	// Per-account image-generation slot: when the outbound payload
+	// carries an image_generation tool, reserve a slot before the
+	// upstream Do() so concurrent image gens on one codex auth do not
+	// flood the backend. Verbatim semantics from CLIProxyAPI's per-
+	// account image semaphore; the slot is released on every return
+	// path via the captured func.
+	releaseImageGenSlot := func() {}
+	if codexPayloadHasImageGenerationTool(payload) {
+		release, slotErr := codexImageGenSlotAcquire(ctx, req.Account)
+		if slotErr != nil {
+			return contract.ConversationResponse{}, contract.ProviderError{Class: "rate_limited", StatusCode: http.StatusTooManyRequests, Message: "codex image-generation slot acquire cancelled"}
+		}
+		releaseImageGenSlot = release
+	}
+	defer releaseImageGenSlot()
 	// Wire PR-1's identity_confuse module into the outbound hot path:
 	// rewrite prompt_cache_key / installation_id / turn ids to per-account
 	// UUIDv5 derivatives so multiplexing this account across many users

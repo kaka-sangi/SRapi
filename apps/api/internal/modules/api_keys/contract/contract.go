@@ -104,6 +104,25 @@ type CreatedKey struct {
 type AuthResult struct {
 	Key    APIKey
 	UserID int
+	// CachedAuth is true when this result came from the in-memory auth
+	// cache rather than a fresh SQL lookup. Observability-only — callers
+	// must not change enforcement based on this flag (the cached snapshot
+	// is the same APIKey shape, just sourced from the LRU). Populated by
+	// service.Authenticate when the cache fast-path serves the request.
+	CachedAuth bool
+}
+
+// APIKeyRPMStats is the read-only projection of the in-memory per-key
+// request counter exposed by the api_keys service. Lives in contract so
+// admin/observability layers can consume the snapshot without pulling in
+// the service package's worker types.
+//
+// Mirrors sub2api's billing_cache_service per-key RPM telemetry, scoped down
+// to the fields srapi actually needs today; new fields can be added without
+// touching call sites (struct is value-receiver only).
+type APIKeyRPMStats struct {
+	KeyID    int
+	Requests int64
 }
 
 type Store interface {

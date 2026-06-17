@@ -362,6 +362,10 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		// Synthesize fake upstream responses only in local/dev. In any other mode a
 		// missing base_url must hard-error so customers are never billed for fakes.
 		provideradapterservice.WithLocalStub(cfg.Server.Mode == "local"),
+		// Plumb the deployment config so the codex.go request-build path can
+		// consult the global OAuth model-alias map and DisableImageGeneration
+		// enum (ported from CLIProxyAPI). nil-safe at the helper level.
+		provideradapterservice.WithConfig(&cfg),
 	)
 	if err != nil {
 		return nil, err
@@ -795,6 +799,21 @@ func newAccessRuntime(cfg config.Config, opts runtimeOptions, allowMemoryStores 
 	if err != nil {
 		return accessRuntime{}, err
 	}
+	// Wire the in-memory auth cache + per-key RPM counter (port of
+	// sub2api's api_key_auth_cache + counter). The cache short-circuits
+	// the gateway hot path's SQL FindByPrefix; the counter is consulted by
+	// observability tooling. Both are no-op-safe when the service runs
+	// without them, so wiring is unconditional.
+	apiKeysSvc.SetAuthCache(apikeyservice.NewAuthCache())
+	rpmCounter := apikeyservice.NewRPMCounter(apikeyservice.RPMCounterConfig{})
+	apiKeysSvc.SetRPMCounter(rpmCounter)
+	// Start the periodic flush loop with a never-cancelled context — the
+	// goroutine is bounded (single ticker) and process exit reaps it. We
+	// can't easily plumb a per-process stop signal because httpserver.New
+	// is called from app.newHandler which already discards the runtime
+	// after construction. Future work: hoist the runtime stop hook into
+	// the app worker pool so this can be drained on graceful shutdown.
+	rpmCounter.Start(context.Background())
 
 	auditStore := opts.audit
 	if auditStore == nil {

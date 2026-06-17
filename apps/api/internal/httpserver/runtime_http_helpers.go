@@ -358,6 +358,12 @@ func (s *Server) requireGatewayKeyPlaintext(r *http.Request, apiKey string) (api
 	if err != nil {
 		return apikeycontract.AuthResult{}, err
 	}
+	// Per-key RPM counter increment for the gateway hot path. Cheap atomic
+	// add — flushed on a schedule by the runtime-owned ticker. Mirrors
+	// sub2api's billing_cache_service.checkRPM increment site.
+	if counter := s.runtime.apiKeys.RPMCounter(); counter != nil {
+		counter.Increment(authed.Key.ID)
+	}
 	if err := gatewayKeyIPAllowed(authed.Key, clientIP(r)); err != nil {
 		return apikeycontract.AuthResult{}, err
 	}
