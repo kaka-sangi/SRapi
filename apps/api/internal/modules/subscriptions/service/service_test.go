@@ -536,3 +536,45 @@ type fixedClock struct {
 func (c fixedClock) Now() time.Time {
 	return c.now
 }
+
+// TestUpdatePlanStatusOnlyToggle locks the contract the iter-46 frontend
+// subscription-plan toggle relies on: PATCH with only Status set keeps
+// every other plan field intact.
+func TestUpdatePlanStatusOnlyToggle(t *testing.T) {
+	clock := fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
+	store := subscriptionmemory.New()
+	svc, err := service.New(store, clock)
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+	plan, err := svc.CreatePlan(t.Context(), contract.CreatePlanRequest{
+		Name:         "pro",
+		Price:        "9.99",
+		Currency:     "usd",
+		ValidityDays: 30,
+		Entitlements: map[string]any{"allowed_models": []any{"a-model"}},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if plan.Status != contract.PlanStatusActive {
+		t.Fatalf("expected created status active, got %q", plan.Status)
+	}
+	disabled := contract.PlanStatusDisabled
+	updated, err := svc.UpdatePlan(t.Context(), plan.ID, contract.UpdatePlanRequest{Status: &disabled})
+	if err != nil {
+		t.Fatalf("update status-only: %v", err)
+	}
+	if updated.Status != contract.PlanStatusDisabled {
+		t.Fatalf("expected status disabled, got %q", updated.Status)
+	}
+	if updated.Name != "pro" {
+		t.Fatalf("name leaked: %q", updated.Name)
+	}
+	if updated.Price != plan.Price {
+		t.Fatalf("price drifted: before %q after %q", plan.Price, updated.Price)
+	}
+	if updated.ValidityDays != plan.ValidityDays {
+		t.Fatalf("validity drifted: before %d after %d", plan.ValidityDays, updated.ValidityDays)
+	}
+}
