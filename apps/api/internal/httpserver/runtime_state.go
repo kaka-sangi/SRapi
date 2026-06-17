@@ -302,6 +302,14 @@ type runtimeState struct {
 	// usage_log.aggregated_at idempotency marker. When nil the gateway uses the
 	// direct (unmarked) increment path.
 	usageAggregator usageAggregator
+
+	// requestLogFiles holds the optional file-based per-request capture
+	// (gateway HTTP envelope dumps). Lazily populated by
+	// ensureRequestLogFilesState; nil until the first call. Disabling
+	// SRAPI_REQUEST_LOG_ENABLED leaves the writer in no-op mode but still
+	// constructs a reader so admin endpoints can browse pre-existing dumps.
+	requestLogFilesMu sync.Mutex
+	requestLogFiles   *requestLogFilesState
 }
 
 type dependencyHealth struct {

@@ -8,6 +8,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { AuditLogsPanel } from "./_panels/audit-logs-panel";
 import { BillingLedgerPanel } from "./_panels/billing-ledger-panel";
 import { ErrorLogsPanel } from "./_panels/error-logs-panel";
+import { RequestLogFilesPanel } from "./_panels/request-log-files-panel";
 
 // Aggregated logs view — replaces three standalone pages (/admin/audit-logs,
 // /admin/billing-ledger, /admin/error-logs) with one tabbed surface. They
@@ -18,7 +19,7 @@ import { ErrorLogsPanel } from "./_panels/error-logs-panel";
 //
 // Standalone routes remain as 308 redirects so deeplinks + bookmarks keep
 // working. Tab is URL-synced via ?tab= for share + back-button.
-const TABS = ["audit", "billing-ledger", "error"] as const;
+const TABS = ["audit", "billing-ledger", "error", "request-files"] as const;
 
 type Tab = (typeof TABS)[number];
 
@@ -59,6 +60,7 @@ function Content() {
           <TabsTrigger value="audit">{t("nav.adminAuditLogs")}</TabsTrigger>
           <TabsTrigger value="billing-ledger">{t("nav.adminBillingLedger")}</TabsTrigger>
           <TabsTrigger value="error">{t("nav.adminErrorLogs")}</TabsTrigger>
+          <TabsTrigger value="request-files">{t("nav.adminRequestLogFiles")}</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -66,6 +68,7 @@ function Content() {
         {active === "audit" ? <AuditLogsPanel /> : null}
         {active === "billing-ledger" ? <BillingLedgerPanel /> : null}
         {active === "error" ? <ErrorLogsPanel /> : null}
+        {active === "request-files" ? <RequestLogFilesPanel /> : null}
       </div>
     </>
   );
