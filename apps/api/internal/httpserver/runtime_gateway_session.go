@@ -85,14 +85,28 @@ func explicitSessionIdentity(r *http.Request, canonical gatewaycontract.Canonica
 	if seed := anthropicSessionSeed(probe.Metadata.UserID); seed != "" {
 		return "sid:auid:" + shortDigest(seed), "derived:anthropic_metadata"
 	}
+	// previous_response_id wins over prompt_cache_key + codex metadata
+	// because it's the STRONGEST per-session anchor in the OpenAI/Codex
+	// Responses protocol: the upstream allocated this id against a
+	// specific account, that account's session store remembers it, and
+	// any other account will return HTTP 400 "previous_response_not_found"
+	// when asked to continue the same conversation (the bug Hermes hit on
+	// /v1/responses/compact with previous_response_id from a prior turn).
+	// prompt_cache_key + window/turn metadata are softer (client-supplied,
+	// may drift between turns); previous_response_id is server-allocated
+	// and unique. Bind site at runtime_gateway_failover.go:557 already
+	// records (response_id → account) on every successful response, so
+	// putting this lookup first makes every continuation route back to
+	// the correct upstream owner instead of falling through to a fresh
+	// scheduler pick.
+	if key := gatewayPreviousResponseSessionKey(probe.PreviousResponseID); key != "" {
+		return key, "derived:previous_response_id"
+	}
 	if pck := strings.TrimSpace(probe.PromptCacheKey); pck != "" {
 		return "sid:pck:" + shortDigest(pck), "derived:prompt_cache_key"
 	}
 	if key, source := codexMetadataSessionKey(probe.ClientMetadata.CodexWindowID, probe.ClientMetadata.CodexTurnMetadata); key != "" {
 		return key, source
-	}
-	if key := gatewayPreviousResponseSessionKey(probe.PreviousResponseID); key != "" {
-		return key, "derived:previous_response_id"
 	}
 	if r != nil {
 		if canonical.SourceEndpoint == string(gatewaycontract.EndpointResponseInputItems) {

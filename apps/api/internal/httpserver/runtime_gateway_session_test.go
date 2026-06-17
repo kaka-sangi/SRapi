@@ -142,6 +142,21 @@ func TestDeriveGatewaySessionAffinityCascade(t *testing.T) {
 		}
 	})
 
+	t.Run("previous response id wins over prompt cache key", func(t *testing.T) {
+		// Regression: Hermes /v1/responses/compact sends both prompt_cache_key
+		// (often drifting between turns) and previous_response_id (the strong
+		// per-account anchor). When the two pointed at different sessionKeys
+		// the lookup missed the (response_id → account) binding set on the
+		// prior turn and the scheduler picked a fresh account whose upstream
+		// returns HTTP 400 "previous_response_not_found".
+		req := conversational
+		req.RawBody = []byte(`{"prompt_cache_key":"drifted-key","previous_response_id":"resp_previous"}`)
+		key, source := deriveGatewaySessionAffinity(httptest.NewRequest("POST", "/v1/responses/compact", nil), req)
+		if !strings.HasPrefix(key, "sid:prev:") || source != "derived:previous_response_id" {
+			t.Fatalf("expected previous_response_id to outrank prompt_cache_key, got key=%q source=%q", key, source)
+		}
+	})
+
 	t.Run("response input items path id", func(t *testing.T) {
 		req := gatewaycontract.CanonicalRequest{SourceEndpoint: string(gatewaycontract.EndpointResponseInputItems)}
 		httpReq := httptest.NewRequest("GET", "/v1/responses/resp_previous/input_items?model=gpt-5", nil)
