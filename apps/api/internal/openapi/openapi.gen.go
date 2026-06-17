@@ -650,6 +650,48 @@ func (e AvailableModelStatus) Valid() bool {
 	}
 }
 
+// Defines values for BackupSnapshotKind.
+const (
+	BackupSnapshotKindManual    BackupSnapshotKind = "manual"
+	BackupSnapshotKindScheduled BackupSnapshotKind = "scheduled"
+)
+
+// Valid indicates whether the value is a known member of the BackupSnapshotKind enum.
+func (e BackupSnapshotKind) Valid() bool {
+	switch e {
+	case BackupSnapshotKindManual:
+		return true
+	case BackupSnapshotKindScheduled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BackupSnapshotStatus.
+const (
+	BackupSnapshotStatusFailed     BackupSnapshotStatus = "failed"
+	BackupSnapshotStatusRunning    BackupSnapshotStatus = "running"
+	BackupSnapshotStatusSuccess    BackupSnapshotStatus = "success"
+	BackupSnapshotStatusSuperseded BackupSnapshotStatus = "superseded"
+)
+
+// Valid indicates whether the value is a known member of the BackupSnapshotStatus enum.
+func (e BackupSnapshotStatus) Valid() bool {
+	switch e {
+	case BackupSnapshotStatusFailed:
+		return true
+	case BackupSnapshotStatusRunning:
+		return true
+	case BackupSnapshotStatusSuccess:
+		return true
+	case BackupSnapshotStatusSuperseded:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BatchAccountActionRequestAction.
 const (
 	ClearError BatchAccountActionRequestAction = "clear_error"
@@ -2629,16 +2671,16 @@ func (e ScheduledTestPlanRunStatus) Valid() bool {
 
 // Defines values for ScheduledTestPlanRunTrigger.
 const (
-	Manual   ScheduledTestPlanRunTrigger = "manual"
-	Schedule ScheduledTestPlanRunTrigger = "schedule"
+	ScheduledTestPlanRunTriggerManual   ScheduledTestPlanRunTrigger = "manual"
+	ScheduledTestPlanRunTriggerSchedule ScheduledTestPlanRunTrigger = "schedule"
 )
 
 // Valid indicates whether the value is a known member of the ScheduledTestPlanRunTrigger enum.
 func (e ScheduledTestPlanRunTrigger) Valid() bool {
 	switch e {
-	case Manual:
+	case ScheduledTestPlanRunTriggerManual:
 		return true
-	case Schedule:
+	case ScheduledTestPlanRunTriggerSchedule:
 		return true
 	default:
 		return false
@@ -3067,22 +3109,22 @@ func (e UserStatus) Valid() bool {
 
 // Defines values for UserSubscriptionStatus.
 const (
-	Active    UserSubscriptionStatus = "active"
-	Cancelled UserSubscriptionStatus = "cancelled"
-	Expired   UserSubscriptionStatus = "expired"
-	Suspended UserSubscriptionStatus = "suspended"
+	UserSubscriptionStatusActive    UserSubscriptionStatus = "active"
+	UserSubscriptionStatusCancelled UserSubscriptionStatus = "cancelled"
+	UserSubscriptionStatusExpired   UserSubscriptionStatus = "expired"
+	UserSubscriptionStatusSuspended UserSubscriptionStatus = "suspended"
 )
 
 // Valid indicates whether the value is a known member of the UserSubscriptionStatus enum.
 func (e UserSubscriptionStatus) Valid() bool {
 	switch e {
-	case Active:
+	case UserSubscriptionStatusActive:
 		return true
-	case Cancelled:
+	case UserSubscriptionStatusCancelled:
 		return true
-	case Expired:
+	case UserSubscriptionStatusExpired:
 		return true
-	case Suspended:
+	case UserSubscriptionStatusSuspended:
 		return true
 	default:
 		return false
@@ -4948,6 +4990,63 @@ type AvailableModelPricingSource string
 // AvailableModelStatus defines model for AvailableModelStatus.
 type AvailableModelStatus string
 
+// BackupSnapshot defines model for BackupSnapshot.
+type BackupSnapshot struct {
+	// CompletedAt Set when the run finished (success or failed); null while running.
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+
+	// ErrorMessage Stderr / system error captured on failed runs. Empty otherwise.
+	ErrorMessage string `json:"error_message"`
+
+	// FilePath Path of the dump on the API host's disk. Empty when retention has wiped it.
+	FilePath string `json:"file_path"`
+	Id       Id     `json:"id"`
+
+	// Kind scheduled = worker-driven daily run; manual = operator-triggered.
+	Kind BackupSnapshotKind `json:"kind"`
+
+	// Sha256 Hex-encoded SHA-256 of the dump file. Empty for failed/superseded rows.
+	Sha256 string `json:"sha256"`
+
+	// SizeBytes On-disk size of the dump file. 0 for failed/running rows.
+	SizeBytes int64     `json:"size_bytes"`
+	StartedAt Timestamp `json:"started_at"`
+
+	// Status running = pg_dump in flight; success = file written and checksummed;
+	// failed = pg_dump/IO error; superseded = retention deleted the file.
+	Status BackupSnapshotStatus `json:"status"`
+
+	// TriggeredByUserId Admin user id that pressed "Snapshot now". 0 for scheduled runs.
+	TriggeredByUserId int `json:"triggered_by_user_id"`
+}
+
+// BackupSnapshotKind scheduled = worker-driven daily run; manual = operator-triggered.
+type BackupSnapshotKind string
+
+// BackupSnapshotListResponse defines model for BackupSnapshotListResponse.
+type BackupSnapshotListResponse struct {
+	Data       []BackupSnapshot         `json:"data"`
+	Pagination BackupSnapshotPagination `json:"pagination"`
+	RequestId  RequestId                `json:"request_id"`
+}
+
+// BackupSnapshotPagination defines model for BackupSnapshotPagination.
+type BackupSnapshotPagination struct {
+	Limit  int `json:"limit"`
+	Offset int `json:"offset"`
+	Total  int `json:"total"`
+}
+
+// BackupSnapshotResponse defines model for BackupSnapshotResponse.
+type BackupSnapshotResponse struct {
+	Data      BackupSnapshot `json:"data"`
+	RequestId RequestId      `json:"request_id"`
+}
+
+// BackupSnapshotStatus running = pg_dump in flight; success = file written and checksummed;
+// failed = pg_dump/IO error; superseded = retention deleted the file.
+type BackupSnapshotStatus string
+
 // BatchAccountActionRequest defines model for BatchAccountActionRequest.
 type BatchAccountActionRequest struct {
 	AccountIds []Id `json:"account_ids"`
@@ -6196,6 +6295,18 @@ type DashboardUserUsageTrend struct {
 	RequestCount int     `json:"request_count"`
 	TokenCount   int     `json:"token_count"`
 	UserId       Id      `json:"user_id"`
+}
+
+// DeleteAdminBackupSnapshotResponse defines model for DeleteAdminBackupSnapshotResponse.
+type DeleteAdminBackupSnapshotResponse struct {
+	Data      DeleteAdminBackupSnapshotResult `json:"data"`
+	RequestId RequestId                       `json:"request_id"`
+}
+
+// DeleteAdminBackupSnapshotResult defines model for DeleteAdminBackupSnapshotResult.
+type DeleteAdminBackupSnapshotResult struct {
+	Deleted bool `json:"deleted"`
+	Id      Id   `json:"id"`
 }
 
 // DeleteApiKeyResponse defines model for DeleteApiKeyResponse.
@@ -10591,6 +10702,13 @@ type ListAdminAuditLogsParams struct {
 	// timestamp are excluded. Accepts RFC3339 or YYYY-MM-DD; missing /
 	// empty means no bound.
 	Since *time.Time `form:"since,omitempty" json:"since,omitempty"`
+}
+
+// ListAdminBackupSnapshotsParams defines parameters for ListAdminBackupSnapshots.
+type ListAdminBackupSnapshotsParams struct {
+	Offset *int                  `form:"offset,omitempty" json:"offset,omitempty"`
+	Limit  *int                  `form:"limit,omitempty" json:"limit,omitempty"`
+	Status *BackupSnapshotStatus `form:"status,omitempty" json:"status,omitempty"`
 }
 
 // ListAdminBillingLedgerParams defines parameters for ListAdminBillingLedger.
@@ -18192,6 +18310,21 @@ type ServerInterface interface {
 	// List audit logs.
 	// (GET /api/v1/admin/audit-logs)
 	ListAdminAuditLogs(w http.ResponseWriter, r *http.Request, params ListAdminAuditLogsParams)
+	// List database backup snapshots, newest first.
+	// (GET /api/v1/admin/backups)
+	ListAdminBackupSnapshots(w http.ResponseWriter, r *http.Request, params ListAdminBackupSnapshotsParams)
+	// Trigger an on-demand database backup snapshot.
+	// (POST /api/v1/admin/backups)
+	TriggerAdminBackupSnapshot(w http.ResponseWriter, r *http.Request)
+	// Delete a backup snapshot row and its on-disk file.
+	// (DELETE /api/v1/admin/backups/{id})
+	DeleteAdminBackupSnapshot(w http.ResponseWriter, r *http.Request, id Id)
+	// Fetch a single backup snapshot.
+	// (GET /api/v1/admin/backups/{id})
+	GetAdminBackupSnapshot(w http.ResponseWriter, r *http.Request, id Id)
+	// Stream the on-disk dump file for a backup snapshot.
+	// (GET /api/v1/admin/backups/{id}/download)
+	DownloadAdminBackupSnapshot(w http.ResponseWriter, r *http.Request, id Id)
 	// List billing ledger entries.
 	// (GET /api/v1/admin/billing-ledger)
 	ListAdminBillingLedger(w http.ResponseWriter, r *http.Request, params ListAdminBillingLedgerParams)
@@ -22102,6 +22235,191 @@ func (siw *ServerInterfaceWrapper) ListAdminAuditLogs(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminAuditLogs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminBackupSnapshots operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminBackupSnapshots(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminBackupSnapshotsParams
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminBackupSnapshots(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TriggerAdminBackupSnapshot operation middleware
+func (siw *ServerInterfaceWrapper) TriggerAdminBackupSnapshot(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TriggerAdminBackupSnapshot(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminBackupSnapshot operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminBackupSnapshot(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminBackupSnapshot(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminBackupSnapshot operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminBackupSnapshot(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminBackupSnapshot(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DownloadAdminBackupSnapshot operation middleware
+func (siw *ServerInterfaceWrapper) DownloadAdminBackupSnapshot(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadAdminBackupSnapshot(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -33060,6 +33378,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/api-keys/{id}/reset-usage", wrapper.ResetAdminApiKeyUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/api-keys/{id}/usage", wrapper.GetAdminApiKeyUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/audit-logs", wrapper.ListAdminAuditLogs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/backups", wrapper.ListAdminBackupSnapshots)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/backups", wrapper.TriggerAdminBackupSnapshot)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/backups/{id}", wrapper.DeleteAdminBackupSnapshot)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/backups/{id}", wrapper.GetAdminBackupSnapshot)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/backups/{id}/download", wrapper.DownloadAdminBackupSnapshot)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/billing-ledger", wrapper.ListAdminBillingLedger)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/capabilities", wrapper.ListAdminCapabilities)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/channel-monitor-templates", wrapper.ListAdminChannelMonitorTemplates)

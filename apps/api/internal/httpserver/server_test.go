@@ -1951,7 +1951,7 @@ func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 	if err := json.NewDecoder(userSubRec.Body).Decode(&userSubResp); err != nil {
 		t.Fatalf("decode user subscription: %v", err)
 	}
-	if userSubResp.Data.UserId != loginResp.Data.User.Id || userSubResp.Data.PlanId != planResp.Data.Id || userSubResp.Data.Status != apiopenapi.Active {
+	if userSubResp.Data.UserId != loginResp.Data.User.Id || userSubResp.Data.PlanId != planResp.Data.Id || userSubResp.Data.Status != apiopenapi.UserSubscriptionStatusActive {
 		t.Fatalf("unexpected user subscription response: %+v", userSubResp.Data)
 	}
 	if userSubResp.Data.EntitlementsSnapshot["scheduler_strategy"] != "cost_saver" {

@@ -36,6 +36,8 @@ type Tx struct {
 	AuditLog *AuditLogClient
 	// AuthSession is the client for interacting with the AuthSession builders.
 	AuthSession *AuthSessionClient
+	// BackupSnapshot is the client for interacting with the BackupSnapshot builders.
+	BackupSnapshot *BackupSnapshotClient
 	// BillingLedger is the client for interacting with the BillingLedger builders.
 	BillingLedger *BillingLedgerClient
 	// CapabilityDefinition is the client for interacting with the CapabilityDefinition builders.
@@ -301,6 +303,7 @@ func (tx *Tx) init() {
 	tx.AffiliateRule = NewAffiliateRuleClient(tx.config)
 	tx.AuditLog = NewAuditLogClient(tx.config)
 	tx.AuthSession = NewAuthSessionClient(tx.config)
+	tx.BackupSnapshot = NewBackupSnapshotClient(tx.config)
 	tx.BillingLedger = NewBillingLedgerClient(tx.config)
 	tx.CapabilityDefinition = NewCapabilityDefinitionClient(tx.config)
 	tx.CopilotConversation = NewCopilotConversationClient(tx.config)

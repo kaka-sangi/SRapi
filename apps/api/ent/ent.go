@@ -24,6 +24,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/apikeygroup"
 	"github.com/srapi/srapi/apps/api/ent/auditlog"
 	"github.com/srapi/srapi/apps/api/ent/authsession"
+	"github.com/srapi/srapi/apps/api/ent/backupsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/billingledger"
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
 	"github.com/srapi/srapi/apps/api/ent/copilotconversation"
@@ -157,6 +158,7 @@ func checkColumn(t, c string) error {
 			affiliaterule.Table:             affiliaterule.ValidColumn,
 			auditlog.Table:                  auditlog.ValidColumn,
 			authsession.Table:               authsession.ValidColumn,
+			backupsnapshot.Table:            backupsnapshot.ValidColumn,
 			billingledger.Table:             billingledger.ValidColumn,
 			capabilitydefinition.Table:      capabilitydefinition.ValidColumn,
 			copilotconversation.Table:       copilotconversation.ValidColumn,

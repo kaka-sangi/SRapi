@@ -396,7 +396,11 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithScheduledTestsStore(stores.ScheduledTests),
 			httpserver.WithChannelMonitorsStore(stores.ChannelMonitors),
 			httpserver.WithCopilotConversationStore(stores.CopilotConvs),
+			httpserver.WithBackupSnapshotsStore(stores.BackupSnapshots),
 		)
+		if backup != nil {
+			options = append(options, httpserver.WithBackupSnapshotsTrigger(backup))
+		}
 		if stores.UsageBilling != nil {
 			options = append(options, httpserver.WithUsageAggregator(stores.UsageBilling))
 		}
@@ -681,7 +685,8 @@ func backupWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logge
 			Database: cfg.Database.Database,
 			SSLMode:  cfg.Database.SSLMode,
 		},
-		RunGuard: optionalWorkerGuard(guards...),
+		Snapshots: stores.BackupSnapshots,
+		RunGuard:  optionalWorkerGuard(guards...),
 	})
 }
 

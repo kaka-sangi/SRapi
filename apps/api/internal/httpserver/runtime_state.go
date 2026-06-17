@@ -33,6 +33,9 @@ import (
 	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
 	authservice "github.com/srapi/srapi/apps/api/internal/modules/auth/service"
 	authmemory "github.com/srapi/srapi/apps/api/internal/modules/auth/store/memory"
+	backupsnapcontract "github.com/srapi/srapi/apps/api/internal/modules/backup_snapshots/contract"
+	backupsnapservice "github.com/srapi/srapi/apps/api/internal/modules/backup_snapshots/service"
+	backupsnapmemory "github.com/srapi/srapi/apps/api/internal/modules/backup_snapshots/store/memory"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	billingservice "github.com/srapi/srapi/apps/api/internal/modules/billing/service"
 	billingmemory "github.com/srapi/srapi/apps/api/internal/modules/billing/store/memory"
@@ -178,6 +181,8 @@ type runtimeState struct {
 	payloadRules            *payloadrulesservice.Service
 	scheduledTests          *scheduledtestsservice.Service
 	scheduledTestRunner     *scheduledtestworker.Runner
+	backupSnapshots         *backupsnapservice.Service
+	backupSnapshotsStore    backupsnapcontract.Store
 	accountProvisioning     *accountprovisioningservice.Service
 	channelMonitors         *channelmonitorsservice.Service
 	copilotEngine           *copilot.Engine
@@ -625,6 +630,24 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 		return err
 	}
 	rt.scheduledTestRunner = scheduledTestRunner
+
+	// Backup snapshots: the persistent store is wired by the bootstrap layer
+	// (apps/api/internal/app/app.go) since the dump files only live on the
+	// API host's disk. Memory-only runtimes use an in-memory store so the
+	// rest of the wiring (admin handlers, service tests) stays coherent.
+	backupSnapshotsStore := opts.backupSnapshots
+	if backupSnapshotsStore == nil {
+		if !allowMemoryStores {
+			return missingRuntimeStoreError("backup snapshots")
+		}
+		backupSnapshotsStore = backupsnapmemory.New()
+	}
+	rt.backupSnapshotsStore = backupSnapshotsStore
+	backupSnapshotsSvc, err := backupsnapservice.New(backupSnapshotsStore, opts.backupSnapshotsTrigger, nil)
+	if err != nil {
+		return err
+	}
+	rt.backupSnapshots = backupSnapshotsSvc
 
 	// Upstream-account OAuth provisioning keeps pending sessions in-memory only
 	// (short-lived, single-process); a restart simply drops in-flight wizards.

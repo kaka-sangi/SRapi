@@ -451,6 +451,39 @@ var (
 			},
 		},
 	}
+	// BackupSnapshotsColumns holds the columns for the "backup_snapshots" table.
+	BackupSnapshotsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "kind", Type: field.TypeString, Default: "scheduled"},
+		{Name: "started_at", Type: field.TypeTime},
+		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "size_bytes", Type: field.TypeInt64, Default: 0},
+		{Name: "sha256", Type: field.TypeString, Size: 64, Default: ""},
+		{Name: "status", Type: field.TypeString, Default: "running"},
+		{Name: "file_path", Type: field.TypeString, Size: 1024, Default: ""},
+		{Name: "error_message", Type: field.TypeString, Size: 1024, Default: ""},
+		{Name: "triggered_by_user_id", Type: field.TypeInt, Default: 0},
+	}
+	// BackupSnapshotsTable holds the schema information for the "backup_snapshots" table.
+	BackupSnapshotsTable = &schema.Table{
+		Name:       "backup_snapshots",
+		Columns:    BackupSnapshotsColumns,
+		PrimaryKey: []*schema.Column{BackupSnapshotsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "backupsnapshot_started_at",
+				Unique:  false,
+				Columns: []*schema.Column{BackupSnapshotsColumns[4]},
+			},
+			{
+				Name:    "backupsnapshot_status",
+				Unique:  false,
+				Columns: []*schema.Column{BackupSnapshotsColumns[8]},
+			},
+		},
+	}
 	// BillingLedgersColumns holds the columns for the "billing_ledgers" table.
 	BillingLedgersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -2834,6 +2867,7 @@ var (
 		AffiliateRulesTable,
 		AuditLogsTable,
 		AuthSessionsTable,
+		BackupSnapshotsTable,
 		BillingLedgersTable,
 		CapabilityDefinitionsTable,
 		CopilotConversationsTable,

@@ -26,6 +26,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/apikeygroup"
 	"github.com/srapi/srapi/apps/api/ent/auditlog"
 	"github.com/srapi/srapi/apps/api/ent/authsession"
+	"github.com/srapi/srapi/apps/api/ent/backupsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/billingledger"
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
 	"github.com/srapi/srapi/apps/api/ent/copilotconversation"
@@ -118,6 +119,8 @@ type Client struct {
 	AuditLog *AuditLogClient
 	// AuthSession is the client for interacting with the AuthSession builders.
 	AuthSession *AuthSessionClient
+	// BackupSnapshot is the client for interacting with the BackupSnapshot builders.
+	BackupSnapshot *BackupSnapshotClient
 	// BillingLedger is the client for interacting with the BillingLedger builders.
 	BillingLedger *BillingLedgerClient
 	// CapabilityDefinition is the client for interacting with the CapabilityDefinition builders.
@@ -263,6 +266,7 @@ func (c *Client) init() {
 	c.AffiliateRule = NewAffiliateRuleClient(c.config)
 	c.AuditLog = NewAuditLogClient(c.config)
 	c.AuthSession = NewAuthSessionClient(c.config)
+	c.BackupSnapshot = NewBackupSnapshotClient(c.config)
 	c.BillingLedger = NewBillingLedgerClient(c.config)
 	c.CapabilityDefinition = NewCapabilityDefinitionClient(c.config)
 	c.CopilotConversation = NewCopilotConversationClient(c.config)
@@ -428,6 +432,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		AffiliateRule:             NewAffiliateRuleClient(cfg),
 		AuditLog:                  NewAuditLogClient(cfg),
 		AuthSession:               NewAuthSessionClient(cfg),
+		BackupSnapshot:            NewBackupSnapshotClient(cfg),
 		BillingLedger:             NewBillingLedgerClient(cfg),
 		CapabilityDefinition:      NewCapabilityDefinitionClient(cfg),
 		CopilotConversation:       NewCopilotConversationClient(cfg),
@@ -520,6 +525,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		AffiliateRule:             NewAffiliateRuleClient(cfg),
 		AuditLog:                  NewAuditLogClient(cfg),
 		AuthSession:               NewAuthSessionClient(cfg),
+		BackupSnapshot:            NewBackupSnapshotClient(cfg),
 		BillingLedger:             NewBillingLedgerClient(cfg),
 		CapabilityDefinition:      NewCapabilityDefinitionClient(cfg),
 		CopilotConversation:       NewCopilotConversationClient(cfg),
@@ -613,14 +619,14 @@ func (c *Client) Use(hooks ...Hook) {
 		c.APIKey, c.APIKeyGroup, c.AccountAvailabilityRollup, c.AccountGroup,
 		c.AccountGroupMember, c.AccountGroupRateLimit, c.AccountHealthSnapshot,
 		c.AccountQuotaSnapshot, c.AffiliateLedger, c.AffiliateRule, c.AuditLog,
-		c.AuthSession, c.BillingLedger, c.CapabilityDefinition, c.CopilotConversation,
-		c.DomainEventsInbox, c.DomainEventsOutbox, c.EmailVerificationToken,
-		c.Entitlement, c.ErrorPassthroughRule, c.IdempotencyRecord, c.InviteCode,
-		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRateLimit,
-		c.ModelRegistry, c.MonitorDefinition, c.MonitorRequestTemplate,
-		c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule, c.ObsAlertSilence,
-		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PayloadRule,
-		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
+		c.AuthSession, c.BackupSnapshot, c.BillingLedger, c.CapabilityDefinition,
+		c.CopilotConversation, c.DomainEventsInbox, c.DomainEventsOutbox,
+		c.EmailVerificationToken, c.Entitlement, c.ErrorPassthroughRule,
+		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
+		c.ModelProviderMapping, c.ModelRateLimit, c.ModelRegistry, c.MonitorDefinition,
+		c.MonitorRequestTemplate, c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule,
+		c.ObsAlertSilence, c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken,
+		c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
 		c.PendingOAuthSession, c.PricingInterval, c.PricingRule, c.PromoCode,
 		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
 		c.QualityEvaluation, c.RedeemCode, c.Role, c.ScheduledTestPlan,
@@ -642,14 +648,14 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.APIKey, c.APIKeyGroup, c.AccountAvailabilityRollup, c.AccountGroup,
 		c.AccountGroupMember, c.AccountGroupRateLimit, c.AccountHealthSnapshot,
 		c.AccountQuotaSnapshot, c.AffiliateLedger, c.AffiliateRule, c.AuditLog,
-		c.AuthSession, c.BillingLedger, c.CapabilityDefinition, c.CopilotConversation,
-		c.DomainEventsInbox, c.DomainEventsOutbox, c.EmailVerificationToken,
-		c.Entitlement, c.ErrorPassthroughRule, c.IdempotencyRecord, c.InviteCode,
-		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRateLimit,
-		c.ModelRegistry, c.MonitorDefinition, c.MonitorRequestTemplate,
-		c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule, c.ObsAlertSilence,
-		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PayloadRule,
-		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
+		c.AuthSession, c.BackupSnapshot, c.BillingLedger, c.CapabilityDefinition,
+		c.CopilotConversation, c.DomainEventsInbox, c.DomainEventsOutbox,
+		c.EmailVerificationToken, c.Entitlement, c.ErrorPassthroughRule,
+		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
+		c.ModelProviderMapping, c.ModelRateLimit, c.ModelRegistry, c.MonitorDefinition,
+		c.MonitorRequestTemplate, c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule,
+		c.ObsAlertSilence, c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken,
+		c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
 		c.PendingOAuthSession, c.PricingInterval, c.PricingRule, c.PromoCode,
 		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
 		c.QualityEvaluation, c.RedeemCode, c.Role, c.ScheduledTestPlan,
@@ -691,6 +697,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.AuditLog.mutate(ctx, m)
 	case *AuthSessionMutation:
 		return c.AuthSession.mutate(ctx, m)
+	case *BackupSnapshotMutation:
+		return c.BackupSnapshot.mutate(ctx, m)
 	case *BillingLedgerMutation:
 		return c.BillingLedger.mutate(ctx, m)
 	case *CapabilityDefinitionMutation:
@@ -2411,6 +2419,139 @@ func (c *AuthSessionClient) mutate(ctx context.Context, m *AuthSessionMutation) 
 		return (&AuthSessionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown AuthSession mutation op: %q", m.Op())
+	}
+}
+
+// BackupSnapshotClient is a client for the BackupSnapshot schema.
+type BackupSnapshotClient struct {
+	config
+}
+
+// NewBackupSnapshotClient returns a client for the BackupSnapshot from the given config.
+func NewBackupSnapshotClient(c config) *BackupSnapshotClient {
+	return &BackupSnapshotClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `backupsnapshot.Hooks(f(g(h())))`.
+func (c *BackupSnapshotClient) Use(hooks ...Hook) {
+	c.hooks.BackupSnapshot = append(c.hooks.BackupSnapshot, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `backupsnapshot.Intercept(f(g(h())))`.
+func (c *BackupSnapshotClient) Intercept(interceptors ...Interceptor) {
+	c.inters.BackupSnapshot = append(c.inters.BackupSnapshot, interceptors...)
+}
+
+// Create returns a builder for creating a BackupSnapshot entity.
+func (c *BackupSnapshotClient) Create() *BackupSnapshotCreate {
+	mutation := newBackupSnapshotMutation(c.config, OpCreate)
+	return &BackupSnapshotCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of BackupSnapshot entities.
+func (c *BackupSnapshotClient) CreateBulk(builders ...*BackupSnapshotCreate) *BackupSnapshotCreateBulk {
+	return &BackupSnapshotCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *BackupSnapshotClient) MapCreateBulk(slice any, setFunc func(*BackupSnapshotCreate, int)) *BackupSnapshotCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &BackupSnapshotCreateBulk{err: fmt.Errorf("calling to BackupSnapshotClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*BackupSnapshotCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &BackupSnapshotCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for BackupSnapshot.
+func (c *BackupSnapshotClient) Update() *BackupSnapshotUpdate {
+	mutation := newBackupSnapshotMutation(c.config, OpUpdate)
+	return &BackupSnapshotUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *BackupSnapshotClient) UpdateOne(_m *BackupSnapshot) *BackupSnapshotUpdateOne {
+	mutation := newBackupSnapshotMutation(c.config, OpUpdateOne, withBackupSnapshot(_m))
+	return &BackupSnapshotUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *BackupSnapshotClient) UpdateOneID(id int) *BackupSnapshotUpdateOne {
+	mutation := newBackupSnapshotMutation(c.config, OpUpdateOne, withBackupSnapshotID(id))
+	return &BackupSnapshotUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for BackupSnapshot.
+func (c *BackupSnapshotClient) Delete() *BackupSnapshotDelete {
+	mutation := newBackupSnapshotMutation(c.config, OpDelete)
+	return &BackupSnapshotDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *BackupSnapshotClient) DeleteOne(_m *BackupSnapshot) *BackupSnapshotDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *BackupSnapshotClient) DeleteOneID(id int) *BackupSnapshotDeleteOne {
+	builder := c.Delete().Where(backupsnapshot.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &BackupSnapshotDeleteOne{builder}
+}
+
+// Query returns a query builder for BackupSnapshot.
+func (c *BackupSnapshotClient) Query() *BackupSnapshotQuery {
+	return &BackupSnapshotQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeBackupSnapshot},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a BackupSnapshot entity by its id.
+func (c *BackupSnapshotClient) Get(ctx context.Context, id int) (*BackupSnapshot, error) {
+	return c.Query().Where(backupsnapshot.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *BackupSnapshotClient) GetX(ctx context.Context, id int) *BackupSnapshot {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *BackupSnapshotClient) Hooks() []Hook {
+	return c.hooks.BackupSnapshot
+}
+
+// Interceptors returns the client interceptors.
+func (c *BackupSnapshotClient) Interceptors() []Interceptor {
+	return c.inters.BackupSnapshot
+}
+
+func (c *BackupSnapshotClient) mutate(ctx context.Context, m *BackupSnapshotMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&BackupSnapshotCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&BackupSnapshotUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&BackupSnapshotUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&BackupSnapshotDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown BackupSnapshot mutation op: %q", m.Op())
 	}
 }
 
@@ -10533,40 +10674,42 @@ type (
 		APIKey, APIKeyGroup, AccountAvailabilityRollup, AccountGroup,
 		AccountGroupMember, AccountGroupRateLimit, AccountHealthSnapshot,
 		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, AuthSession,
-		BillingLedger, CapabilityDefinition, CopilotConversation, DomainEventsInbox,
-		DomainEventsOutbox, EmailVerificationToken, Entitlement, ErrorPassthroughRule,
-		IdempotencyRecord, InviteCode, InviteRelationship, ModelAlias,
-		ModelProviderMapping, ModelRateLimit, ModelRegistry, MonitorDefinition,
-		MonitorRequestTemplate, MonitorRunResult, ObsAlertEvent, ObsAlertRule,
-		ObsAlertSilence, ObsSLODefinition, OpsSystemLog, PasswordResetToken,
-		PayloadRule, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
-		PendingOAuthSession, PricingInterval, PricingRule, PromoCode, Provider,
-		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, RedeemCode, Role,
-		ScheduledTestPlan, ScheduledTestPlanRun, SchedulerDecision, SchedulerFeedback,
-		SchedulerRequestSnapshot, SchedulerStrategy, Setting, SubscriptionPlan,
-		TLSFingerprintProfile, UsageLog, User, UserAnnouncementRead,
-		UserAttributeDefinition, UserAttributeValue, UserAuthIdentity,
-		UserPlatformQuota, UserPromoCodeApplication, UserRedeemCodeRedemption,
-		UserRole, UserSubscription, UserTOTPSecret, Workspace []ent.Hook
+		BackupSnapshot, BillingLedger, CapabilityDefinition, CopilotConversation,
+		DomainEventsInbox, DomainEventsOutbox, EmailVerificationToken, Entitlement,
+		ErrorPassthroughRule, IdempotencyRecord, InviteCode, InviteRelationship,
+		ModelAlias, ModelProviderMapping, ModelRateLimit, ModelRegistry,
+		MonitorDefinition, MonitorRequestTemplate, MonitorRunResult, ObsAlertEvent,
+		ObsAlertRule, ObsAlertSilence, ObsSLODefinition, OpsSystemLog,
+		PasswordResetToken, PayloadRule, PaymentAuditLog, PaymentOrder,
+		PaymentProviderInstance, PendingOAuthSession, PricingInterval, PricingRule,
+		PromoCode, Provider, ProviderAccount, Proxy, QualityEvalSample,
+		QualityEvaluation, RedeemCode, Role, ScheduledTestPlan, ScheduledTestPlanRun,
+		SchedulerDecision, SchedulerFeedback, SchedulerRequestSnapshot,
+		SchedulerStrategy, Setting, SubscriptionPlan, TLSFingerprintProfile, UsageLog,
+		User, UserAnnouncementRead, UserAttributeDefinition, UserAttributeValue,
+		UserAuthIdentity, UserPlatformQuota, UserPromoCodeApplication,
+		UserRedeemCodeRedemption, UserRole, UserSubscription, UserTOTPSecret,
+		Workspace []ent.Hook
 	}
 	inters struct {
 		APIKey, APIKeyGroup, AccountAvailabilityRollup, AccountGroup,
 		AccountGroupMember, AccountGroupRateLimit, AccountHealthSnapshot,
 		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, AuthSession,
-		BillingLedger, CapabilityDefinition, CopilotConversation, DomainEventsInbox,
-		DomainEventsOutbox, EmailVerificationToken, Entitlement, ErrorPassthroughRule,
-		IdempotencyRecord, InviteCode, InviteRelationship, ModelAlias,
-		ModelProviderMapping, ModelRateLimit, ModelRegistry, MonitorDefinition,
-		MonitorRequestTemplate, MonitorRunResult, ObsAlertEvent, ObsAlertRule,
-		ObsAlertSilence, ObsSLODefinition, OpsSystemLog, PasswordResetToken,
-		PayloadRule, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
-		PendingOAuthSession, PricingInterval, PricingRule, PromoCode, Provider,
-		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, RedeemCode, Role,
-		ScheduledTestPlan, ScheduledTestPlanRun, SchedulerDecision, SchedulerFeedback,
-		SchedulerRequestSnapshot, SchedulerStrategy, Setting, SubscriptionPlan,
-		TLSFingerprintProfile, UsageLog, User, UserAnnouncementRead,
-		UserAttributeDefinition, UserAttributeValue, UserAuthIdentity,
-		UserPlatformQuota, UserPromoCodeApplication, UserRedeemCodeRedemption,
-		UserRole, UserSubscription, UserTOTPSecret, Workspace []ent.Interceptor
+		BackupSnapshot, BillingLedger, CapabilityDefinition, CopilotConversation,
+		DomainEventsInbox, DomainEventsOutbox, EmailVerificationToken, Entitlement,
+		ErrorPassthroughRule, IdempotencyRecord, InviteCode, InviteRelationship,
+		ModelAlias, ModelProviderMapping, ModelRateLimit, ModelRegistry,
+		MonitorDefinition, MonitorRequestTemplate, MonitorRunResult, ObsAlertEvent,
+		ObsAlertRule, ObsAlertSilence, ObsSLODefinition, OpsSystemLog,
+		PasswordResetToken, PayloadRule, PaymentAuditLog, PaymentOrder,
+		PaymentProviderInstance, PendingOAuthSession, PricingInterval, PricingRule,
+		PromoCode, Provider, ProviderAccount, Proxy, QualityEvalSample,
+		QualityEvaluation, RedeemCode, Role, ScheduledTestPlan, ScheduledTestPlanRun,
+		SchedulerDecision, SchedulerFeedback, SchedulerRequestSnapshot,
+		SchedulerStrategy, Setting, SubscriptionPlan, TLSFingerprintProfile, UsageLog,
+		User, UserAnnouncementRead, UserAttributeDefinition, UserAttributeValue,
+		UserAuthIdentity, UserPlatformQuota, UserPromoCodeApplication,
+		UserRedeemCodeRedemption, UserRole, UserSubscription, UserTOTPSecret,
+		Workspace []ent.Interceptor
 	}
 )

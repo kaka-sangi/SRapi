@@ -17,6 +17,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/apikeygroup"
 	"github.com/srapi/srapi/apps/api/ent/auditlog"
 	"github.com/srapi/srapi/apps/api/ent/authsession"
+	"github.com/srapi/srapi/apps/api/ent/backupsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/billingledger"
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
 	"github.com/srapi/srapi/apps/api/ent/copilotconversation"
@@ -467,6 +468,55 @@ func init() {
 	authsessionDescStatus := authsessionFields[7].Descriptor()
 	// authsession.DefaultStatus holds the default value on creation for the status field.
 	authsession.DefaultStatus = authsessionDescStatus.Default.(string)
+	backupsnapshotMixin := schema.BackupSnapshot{}.Mixin()
+	backupsnapshotMixinFields0 := backupsnapshotMixin[0].Fields()
+	_ = backupsnapshotMixinFields0
+	backupsnapshotFields := schema.BackupSnapshot{}.Fields()
+	_ = backupsnapshotFields
+	// backupsnapshotDescCreatedAt is the schema descriptor for created_at field.
+	backupsnapshotDescCreatedAt := backupsnapshotMixinFields0[0].Descriptor()
+	// backupsnapshot.DefaultCreatedAt holds the default value on creation for the created_at field.
+	backupsnapshot.DefaultCreatedAt = backupsnapshotDescCreatedAt.Default.(func() time.Time)
+	// backupsnapshotDescUpdatedAt is the schema descriptor for updated_at field.
+	backupsnapshotDescUpdatedAt := backupsnapshotMixinFields0[1].Descriptor()
+	// backupsnapshot.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	backupsnapshot.DefaultUpdatedAt = backupsnapshotDescUpdatedAt.Default.(func() time.Time)
+	// backupsnapshot.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	backupsnapshot.UpdateDefaultUpdatedAt = backupsnapshotDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// backupsnapshotDescKind is the schema descriptor for kind field.
+	backupsnapshotDescKind := backupsnapshotFields[0].Descriptor()
+	// backupsnapshot.DefaultKind holds the default value on creation for the kind field.
+	backupsnapshot.DefaultKind = backupsnapshotDescKind.Default.(string)
+	// backupsnapshotDescSizeBytes is the schema descriptor for size_bytes field.
+	backupsnapshotDescSizeBytes := backupsnapshotFields[3].Descriptor()
+	// backupsnapshot.DefaultSizeBytes holds the default value on creation for the size_bytes field.
+	backupsnapshot.DefaultSizeBytes = backupsnapshotDescSizeBytes.Default.(int64)
+	// backupsnapshotDescSha256 is the schema descriptor for sha256 field.
+	backupsnapshotDescSha256 := backupsnapshotFields[4].Descriptor()
+	// backupsnapshot.DefaultSha256 holds the default value on creation for the sha256 field.
+	backupsnapshot.DefaultSha256 = backupsnapshotDescSha256.Default.(string)
+	// backupsnapshot.Sha256Validator is a validator for the "sha256" field. It is called by the builders before save.
+	backupsnapshot.Sha256Validator = backupsnapshotDescSha256.Validators[0].(func(string) error)
+	// backupsnapshotDescStatus is the schema descriptor for status field.
+	backupsnapshotDescStatus := backupsnapshotFields[5].Descriptor()
+	// backupsnapshot.DefaultStatus holds the default value on creation for the status field.
+	backupsnapshot.DefaultStatus = backupsnapshotDescStatus.Default.(string)
+	// backupsnapshotDescFilePath is the schema descriptor for file_path field.
+	backupsnapshotDescFilePath := backupsnapshotFields[6].Descriptor()
+	// backupsnapshot.DefaultFilePath holds the default value on creation for the file_path field.
+	backupsnapshot.DefaultFilePath = backupsnapshotDescFilePath.Default.(string)
+	// backupsnapshot.FilePathValidator is a validator for the "file_path" field. It is called by the builders before save.
+	backupsnapshot.FilePathValidator = backupsnapshotDescFilePath.Validators[0].(func(string) error)
+	// backupsnapshotDescErrorMessage is the schema descriptor for error_message field.
+	backupsnapshotDescErrorMessage := backupsnapshotFields[7].Descriptor()
+	// backupsnapshot.DefaultErrorMessage holds the default value on creation for the error_message field.
+	backupsnapshot.DefaultErrorMessage = backupsnapshotDescErrorMessage.Default.(string)
+	// backupsnapshot.ErrorMessageValidator is a validator for the "error_message" field. It is called by the builders before save.
+	backupsnapshot.ErrorMessageValidator = backupsnapshotDescErrorMessage.Validators[0].(func(string) error)
+	// backupsnapshotDescTriggeredByUserID is the schema descriptor for triggered_by_user_id field.
+	backupsnapshotDescTriggeredByUserID := backupsnapshotFields[8].Descriptor()
+	// backupsnapshot.DefaultTriggeredByUserID holds the default value on creation for the triggered_by_user_id field.
+	backupsnapshot.DefaultTriggeredByUserID = backupsnapshotDescTriggeredByUserID.Default.(int)
 	billingledgerMixin := schema.BillingLedger{}.Mixin()
 	billingledgerMixinFields0 := billingledgerMixin[0].Fields()
 	_ = billingledgerMixinFields0

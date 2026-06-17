@@ -10,6 +10,7 @@ import (
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
+	backupsnapcontract "github.com/srapi/srapi/apps/api/internal/modules/backup_snapshots/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	channelmonitorscontract "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/contract"
 	copilotconvcontract "github.com/srapi/srapi/apps/api/internal/modules/copilot/contract"
@@ -40,6 +41,7 @@ import (
 	apikeystore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/apikeys"
 	auditstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/audit"
 	authstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/auth"
+	backupsnapstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/backup_snapshots"
 	billingstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/billing"
 	channelmonitorsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/channelmonitors"
 	copilotconvstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/copilotconv"
@@ -102,6 +104,7 @@ type Stores struct {
 	ScheduledTests     scheduledtestscontract.Store
 	ChannelMonitors    channelmonitorscontract.Store
 	CopilotConvs       copilotconvcontract.ConversationStore
+	BackupSnapshots    backupsnapcontract.Store
 	// UsageBilling coordinates the cross-table billing aggregation (subscription
 	// materialized usage + API-key cost usage) gated by usage_log.aggregated_at.
 	UsageBilling *usagebillingstore.Store
@@ -228,6 +231,10 @@ func New(client *ent.Client) (Stores, error) {
 	if err != nil {
 		return Stores{}, err
 	}
+	backupSnapshots, err := backupsnapstore.New(client)
+	if err != nil {
+		return Stores{}, err
+	}
 	usageBilling, err := usagebillingstore.New(client, subscriptions, apiKeys)
 	if err != nil {
 		return Stores{}, err
@@ -265,6 +272,7 @@ func New(client *ent.Client) (Stores, error) {
 		ScheduledTests:     scheduledTests,
 		ChannelMonitors:    channelMonitors,
 		CopilotConvs:       copilotConvs,
+		BackupSnapshots:    backupSnapshots,
 		UsageBilling:       usageBilling,
 	}, nil
 }

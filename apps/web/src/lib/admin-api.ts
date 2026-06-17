@@ -6,6 +6,7 @@ import type {
 } from "../../../../packages/sdk/typescript/src/types.gen";
 import { accountsApi } from "./admin-api/accounts";
 import { affiliateApi } from "./admin-api/affiliate";
+import { backupSnapshotsApi } from "./admin-api/backup-snapshots";
 import { diagnosticsApi } from "./admin-api/diagnostics";
 import { errorLogsApi } from "./admin-api/error-logs";
 import { modelsApi } from "./admin-api/models";
@@ -81,6 +82,7 @@ export const adminApi = {
   ...settingsApi,
   ...diagnosticsApi,
   ...errorLogsApi,
+  ...backupSnapshotsApi,
 };
 
 export function statusQuery(status: string): { status?: UserStatus | AnnouncementStatus | string } {

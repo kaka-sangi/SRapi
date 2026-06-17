@@ -10,6 +10,8 @@ import (
 	"time"
 
 	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
+	backupsnapcontract "github.com/srapi/srapi/apps/api/internal/modules/backup_snapshots/contract"
+	backupsnapmemory "github.com/srapi/srapi/apps/api/internal/modules/backup_snapshots/store/memory"
 )
 
 func TestRunOnceHonorsEnabledAndRetention(t *testing.T) {
@@ -25,10 +27,12 @@ func TestRunOnceHonorsEnabledAndRetention(t *testing.T) {
 	}}
 	dir := t.TempDir()
 	runner := &fakeRunner{}
+	snapshots := backupsnapmemory.New()
 	worker, err := New(settings, slog.New(slog.NewTextHandler(io.Discard, nil)), Config{
 		BackupDir: dir,
 		Runner:    runner,
 		Clock:     fixedClock{now: now},
+		Snapshots: snapshots,
 	})
 	if err != nil {
 		t.Fatalf("new worker: %v", err)
@@ -71,6 +75,87 @@ func TestRunOnceHonorsEnabledAndRetention(t *testing.T) {
 	}
 	if _, err := os.Stat(old); !os.IsNotExist(err) {
 		t.Fatalf("expected old backup removed, err=%v", err)
+	}
+	// Snapshot history row should reflect a successful scheduled run.
+	list, err := snapshots.List(t.Context(), backupsnapcontract.ListOptions{})
+	if err != nil {
+		t.Fatalf("list snapshots: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 {
+		t.Fatalf("expected one snapshot row, got total=%d items=%d", list.Total, len(list.Items))
+	}
+	row := list.Items[0]
+	if row.Status != backupsnapcontract.StatusSuccess {
+		t.Fatalf("expected status=success, got %q (err=%q)", row.Status, row.ErrorMessage)
+	}
+	if row.Kind != backupsnapcontract.KindScheduled {
+		t.Fatalf("expected kind=scheduled, got %q", row.Kind)
+	}
+	if row.FilePath != filePath {
+		t.Fatalf("expected file_path %q, got %q", filePath, row.FilePath)
+	}
+	if row.SizeBytes <= 0 {
+		t.Fatalf("expected non-zero size_bytes, got %d", row.SizeBytes)
+	}
+	if len(row.SHA256) != 64 {
+		t.Fatalf("expected 64-char sha256, got %q", row.SHA256)
+	}
+}
+
+func TestRunOnceTriggeredBypassesDailyCoolDown(t *testing.T) {
+	now := time.Date(2026, 6, 10, 9, 0, 0, 0, time.UTC)
+	last := now.Add(-1 * time.Hour)
+	settings := &fakeSettingsService{settings: admincontrolcontract.AdminSettings{
+		Backup: admincontrolcontract.AdminSettingsBackup{
+			Enabled:       true,
+			RetentionDays: 0,
+			LastBackupAt:  &last,
+		},
+	}}
+	dir := t.TempDir()
+	runner := &fakeRunner{}
+	snapshots := backupsnapmemory.New()
+	worker, err := New(settings, slog.New(slog.NewTextHandler(io.Discard, nil)), Config{
+		BackupDir: dir,
+		Runner:    runner,
+		Clock:     fixedClock{now: now},
+		Snapshots: snapshots,
+	})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+	// Scheduled run should NO-OP because LastBackupAt is well inside the 24h
+	// window.
+	if filePath, _, err := worker.RunOnce(t.Context()); err != nil || filePath != "" {
+		t.Fatalf("scheduled cool-down should suppress run, got file=%q err=%v", filePath, err)
+	}
+	if runner.calls != 0 {
+		t.Fatalf("expected runner not to be called, got %d calls", runner.calls)
+	}
+	// Manual trigger should bypass the cool-down.
+	id, err := worker.RunOnceTriggered(t.Context(), 42)
+	if err != nil {
+		t.Fatalf("manual trigger: %v", err)
+	}
+	if id == 0 {
+		t.Fatalf("expected manual trigger to create a snapshot id, got 0")
+	}
+	if runner.calls != 1 {
+		t.Fatalf("expected one runner call, got %d", runner.calls)
+	}
+	list, err := snapshots.List(t.Context(), backupsnapcontract.ListOptions{})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one snapshot row, got %d", len(list.Items))
+	}
+	row := list.Items[0]
+	if row.Kind != backupsnapcontract.KindManual {
+		t.Fatalf("expected kind=manual, got %q", row.Kind)
+	}
+	if row.TriggeredByUserID != 42 {
+		t.Fatalf("expected triggered_by_user_id=42, got %d", row.TriggeredByUserID)
 	}
 }
 

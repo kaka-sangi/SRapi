@@ -153,6 +153,18 @@ func (f AuthSessionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value,
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AuthSessionMutation", m)
 }
 
+// The BackupSnapshotFunc type is an adapter to allow the use of ordinary
+// function as BackupSnapshot mutator.
+type BackupSnapshotFunc func(context.Context, *ent.BackupSnapshotMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BackupSnapshotFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BackupSnapshotMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BackupSnapshotMutation", m)
+}
+
 // The BillingLedgerFunc type is an adapter to allow the use of ordinary
 // function as BillingLedger mutator.
 type BillingLedgerFunc func(context.Context, *ent.BillingLedgerMutation) (ent.Value, error)

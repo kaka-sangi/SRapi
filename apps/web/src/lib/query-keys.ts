@@ -140,6 +140,7 @@ export const queryKeys = {
     contentSafetyConfig: () => ["admin", "content-safety-config"] as const,
     settings: () => ["admin", "settings"] as const,
     configSnapshot: () => ["admin", "config-snapshot"] as const,
+    backupSnapshots: (params?: unknown) => ["admin", "backup-snapshots", params ?? {}] as const,
     copilotConfig: () => ["admin", "copilot-config"] as const,
   },
 };

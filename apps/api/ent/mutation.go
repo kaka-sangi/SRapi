@@ -23,6 +23,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/apikeygroup"
 	"github.com/srapi/srapi/apps/api/ent/auditlog"
 	"github.com/srapi/srapi/apps/api/ent/authsession"
+	"github.com/srapi/srapi/apps/api/ent/backupsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/billingledger"
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
 	"github.com/srapi/srapi/apps/api/ent/copilotconversation"
@@ -108,6 +109,7 @@ const (
 	TypeAffiliateRule             = "AffiliateRule"
 	TypeAuditLog                  = "AuditLog"
 	TypeAuthSession               = "AuthSession"
+	TypeBackupSnapshot            = "BackupSnapshot"
 	TypeBillingLedger             = "BillingLedger"
 	TypeCapabilityDefinition      = "CapabilityDefinition"
 	TypeCopilotConversation       = "CopilotConversation"
@@ -12791,6 +12793,963 @@ func (m *AuthSessionMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *AuthSessionMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown AuthSession edge %s", name)
+}
+
+// BackupSnapshotMutation represents an operation that mutates the BackupSnapshot nodes in the graph.
+type BackupSnapshotMutation struct {
+	config
+	op                      Op
+	typ                     string
+	id                      *int
+	created_at              *time.Time
+	updated_at              *time.Time
+	kind                    *string
+	started_at              *time.Time
+	completed_at            *time.Time
+	size_bytes              *int64
+	addsize_bytes           *int64
+	sha256                  *string
+	status                  *string
+	file_path               *string
+	error_message           *string
+	triggered_by_user_id    *int
+	addtriggered_by_user_id *int
+	clearedFields           map[string]struct{}
+	done                    bool
+	oldValue                func(context.Context) (*BackupSnapshot, error)
+	predicates              []predicate.BackupSnapshot
+}
+
+var _ ent.Mutation = (*BackupSnapshotMutation)(nil)
+
+// backupsnapshotOption allows management of the mutation configuration using functional options.
+type backupsnapshotOption func(*BackupSnapshotMutation)
+
+// newBackupSnapshotMutation creates new mutation for the BackupSnapshot entity.
+func newBackupSnapshotMutation(c config, op Op, opts ...backupsnapshotOption) *BackupSnapshotMutation {
+	m := &BackupSnapshotMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeBackupSnapshot,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withBackupSnapshotID sets the ID field of the mutation.
+func withBackupSnapshotID(id int) backupsnapshotOption {
+	return func(m *BackupSnapshotMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *BackupSnapshot
+		)
+		m.oldValue = func(ctx context.Context) (*BackupSnapshot, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().BackupSnapshot.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withBackupSnapshot sets the old BackupSnapshot of the mutation.
+func withBackupSnapshot(node *BackupSnapshot) backupsnapshotOption {
+	return func(m *BackupSnapshotMutation) {
+		m.oldValue = func(context.Context) (*BackupSnapshot, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m BackupSnapshotMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m BackupSnapshotMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *BackupSnapshotMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *BackupSnapshotMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().BackupSnapshot.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *BackupSnapshotMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *BackupSnapshotMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the BackupSnapshot entity.
+// If the BackupSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BackupSnapshotMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *BackupSnapshotMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *BackupSnapshotMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *BackupSnapshotMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the BackupSnapshot entity.
+// If the BackupSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BackupSnapshotMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *BackupSnapshotMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetKind sets the "kind" field.
+func (m *BackupSnapshotMutation) SetKind(s string) {
+	m.kind = &s
+}
+
+// Kind returns the value of the "kind" field in the mutation.
+func (m *BackupSnapshotMutation) Kind() (r string, exists bool) {
+	v := m.kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKind returns the old "kind" field's value of the BackupSnapshot entity.
+// If the BackupSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BackupSnapshotMutation) OldKind(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKind: %w", err)
+	}
+	return oldValue.Kind, nil
+}
+
+// ResetKind resets all changes to the "kind" field.
+func (m *BackupSnapshotMutation) ResetKind() {
+	m.kind = nil
+}
+
+// SetStartedAt sets the "started_at" field.
+func (m *BackupSnapshotMutation) SetStartedAt(t time.Time) {
+	m.started_at = &t
+}
+
+// StartedAt returns the value of the "started_at" field in the mutation.
+func (m *BackupSnapshotMutation) StartedAt() (r time.Time, exists bool) {
+	v := m.started_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStartedAt returns the old "started_at" field's value of the BackupSnapshot entity.
+// If the BackupSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BackupSnapshotMutation) OldStartedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStartedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStartedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStartedAt: %w", err)
+	}
+	return oldValue.StartedAt, nil
+}
+
+// ResetStartedAt resets all changes to the "started_at" field.
+func (m *BackupSnapshotMutation) ResetStartedAt() {
+	m.started_at = nil
+}
+
+// SetCompletedAt sets the "completed_at" field.
+func (m *BackupSnapshotMutation) SetCompletedAt(t time.Time) {
+	m.completed_at = &t
+}
+
+// CompletedAt returns the value of the "completed_at" field in the mutation.
+func (m *BackupSnapshotMutation) CompletedAt() (r time.Time, exists bool) {
+	v := m.completed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCompletedAt returns the old "completed_at" field's value of the BackupSnapshot entity.
+// If the BackupSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BackupSnapshotMutation) OldCompletedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCompletedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCompletedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCompletedAt: %w", err)
+	}
+	return oldValue.CompletedAt, nil
+}
+
+// ClearCompletedAt clears the value of the "completed_at" field.
+func (m *BackupSnapshotMutation) ClearCompletedAt() {
+	m.completed_at = nil
+	m.clearedFields[backupsnapshot.FieldCompletedAt] = struct{}{}
+}
+
+// CompletedAtCleared returns if the "completed_at" field was cleared in this mutation.
+func (m *BackupSnapshotMutation) CompletedAtCleared() bool {
+	_, ok := m.clearedFields[backupsnapshot.FieldCompletedAt]
+	return ok
+}
+
+// ResetCompletedAt resets all changes to the "completed_at" field.
+func (m *BackupSnapshotMutation) ResetCompletedAt() {
+	m.completed_at = nil
+	delete(m.clearedFields, backupsnapshot.FieldCompletedAt)
+}
+
+// SetSizeBytes sets the "size_bytes" field.
+func (m *BackupSnapshotMutation) SetSizeBytes(i int64) {
+	m.size_bytes = &i
+	m.addsize_bytes = nil
+}
+
+// SizeBytes returns the value of the "size_bytes" field in the mutation.
+func (m *BackupSnapshotMutation) SizeBytes() (r int64, exists bool) {
+	v := m.size_bytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSizeBytes returns the old "size_bytes" field's value of the BackupSnapshot entity.
+// If the BackupSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BackupSnapshotMutation) OldSizeBytes(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSizeBytes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSizeBytes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSizeBytes: %w", err)
+	}
+	return oldValue.SizeBytes, nil
+}
+
+// AddSizeBytes adds i to the "size_bytes" field.
+func (m *BackupSnapshotMutation) AddSizeBytes(i int64) {
+	if m.addsize_bytes != nil {
+		*m.addsize_bytes += i
+	} else {
+		m.addsize_bytes = &i
+	}
+}
+
+// AddedSizeBytes returns the value that was added to the "size_bytes" field in this mutation.
+func (m *BackupSnapshotMutation) AddedSizeBytes() (r int64, exists bool) {
+	v := m.addsize_bytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSizeBytes resets all changes to the "size_bytes" field.
+func (m *BackupSnapshotMutation) ResetSizeBytes() {
+	m.size_bytes = nil
+	m.addsize_bytes = nil
+}
+
+// SetSha256 sets the "sha256" field.
+func (m *BackupSnapshotMutation) SetSha256(s string) {
+	m.sha256 = &s
+}
+
+// Sha256 returns the value of the "sha256" field in the mutation.
+func (m *BackupSnapshotMutation) Sha256() (r string, exists bool) {
+	v := m.sha256
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSha256 returns the old "sha256" field's value of the BackupSnapshot entity.
+// If the BackupSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BackupSnapshotMutation) OldSha256(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSha256 is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSha256 requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSha256: %w", err)
+	}
+	return oldValue.Sha256, nil
+}
+
+// ResetSha256 resets all changes to the "sha256" field.
+func (m *BackupSnapshotMutation) ResetSha256() {
+	m.sha256 = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *BackupSnapshotMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *BackupSnapshotMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the BackupSnapshot entity.
+// If the BackupSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BackupSnapshotMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *BackupSnapshotMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetFilePath sets the "file_path" field.
+func (m *BackupSnapshotMutation) SetFilePath(s string) {
+	m.file_path = &s
+}
+
+// FilePath returns the value of the "file_path" field in the mutation.
+func (m *BackupSnapshotMutation) FilePath() (r string, exists bool) {
+	v := m.file_path
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFilePath returns the old "file_path" field's value of the BackupSnapshot entity.
+// If the BackupSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BackupSnapshotMutation) OldFilePath(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFilePath is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFilePath requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFilePath: %w", err)
+	}
+	return oldValue.FilePath, nil
+}
+
+// ResetFilePath resets all changes to the "file_path" field.
+func (m *BackupSnapshotMutation) ResetFilePath() {
+	m.file_path = nil
+}
+
+// SetErrorMessage sets the "error_message" field.
+func (m *BackupSnapshotMutation) SetErrorMessage(s string) {
+	m.error_message = &s
+}
+
+// ErrorMessage returns the value of the "error_message" field in the mutation.
+func (m *BackupSnapshotMutation) ErrorMessage() (r string, exists bool) {
+	v := m.error_message
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldErrorMessage returns the old "error_message" field's value of the BackupSnapshot entity.
+// If the BackupSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BackupSnapshotMutation) OldErrorMessage(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldErrorMessage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldErrorMessage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldErrorMessage: %w", err)
+	}
+	return oldValue.ErrorMessage, nil
+}
+
+// ResetErrorMessage resets all changes to the "error_message" field.
+func (m *BackupSnapshotMutation) ResetErrorMessage() {
+	m.error_message = nil
+}
+
+// SetTriggeredByUserID sets the "triggered_by_user_id" field.
+func (m *BackupSnapshotMutation) SetTriggeredByUserID(i int) {
+	m.triggered_by_user_id = &i
+	m.addtriggered_by_user_id = nil
+}
+
+// TriggeredByUserID returns the value of the "triggered_by_user_id" field in the mutation.
+func (m *BackupSnapshotMutation) TriggeredByUserID() (r int, exists bool) {
+	v := m.triggered_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTriggeredByUserID returns the old "triggered_by_user_id" field's value of the BackupSnapshot entity.
+// If the BackupSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BackupSnapshotMutation) OldTriggeredByUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTriggeredByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTriggeredByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTriggeredByUserID: %w", err)
+	}
+	return oldValue.TriggeredByUserID, nil
+}
+
+// AddTriggeredByUserID adds i to the "triggered_by_user_id" field.
+func (m *BackupSnapshotMutation) AddTriggeredByUserID(i int) {
+	if m.addtriggered_by_user_id != nil {
+		*m.addtriggered_by_user_id += i
+	} else {
+		m.addtriggered_by_user_id = &i
+	}
+}
+
+// AddedTriggeredByUserID returns the value that was added to the "triggered_by_user_id" field in this mutation.
+func (m *BackupSnapshotMutation) AddedTriggeredByUserID() (r int, exists bool) {
+	v := m.addtriggered_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetTriggeredByUserID resets all changes to the "triggered_by_user_id" field.
+func (m *BackupSnapshotMutation) ResetTriggeredByUserID() {
+	m.triggered_by_user_id = nil
+	m.addtriggered_by_user_id = nil
+}
+
+// Where appends a list predicates to the BackupSnapshotMutation builder.
+func (m *BackupSnapshotMutation) Where(ps ...predicate.BackupSnapshot) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the BackupSnapshotMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *BackupSnapshotMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.BackupSnapshot, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *BackupSnapshotMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *BackupSnapshotMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (BackupSnapshot).
+func (m *BackupSnapshotMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *BackupSnapshotMutation) Fields() []string {
+	fields := make([]string, 0, 11)
+	if m.created_at != nil {
+		fields = append(fields, backupsnapshot.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, backupsnapshot.FieldUpdatedAt)
+	}
+	if m.kind != nil {
+		fields = append(fields, backupsnapshot.FieldKind)
+	}
+	if m.started_at != nil {
+		fields = append(fields, backupsnapshot.FieldStartedAt)
+	}
+	if m.completed_at != nil {
+		fields = append(fields, backupsnapshot.FieldCompletedAt)
+	}
+	if m.size_bytes != nil {
+		fields = append(fields, backupsnapshot.FieldSizeBytes)
+	}
+	if m.sha256 != nil {
+		fields = append(fields, backupsnapshot.FieldSha256)
+	}
+	if m.status != nil {
+		fields = append(fields, backupsnapshot.FieldStatus)
+	}
+	if m.file_path != nil {
+		fields = append(fields, backupsnapshot.FieldFilePath)
+	}
+	if m.error_message != nil {
+		fields = append(fields, backupsnapshot.FieldErrorMessage)
+	}
+	if m.triggered_by_user_id != nil {
+		fields = append(fields, backupsnapshot.FieldTriggeredByUserID)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *BackupSnapshotMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case backupsnapshot.FieldCreatedAt:
+		return m.CreatedAt()
+	case backupsnapshot.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case backupsnapshot.FieldKind:
+		return m.Kind()
+	case backupsnapshot.FieldStartedAt:
+		return m.StartedAt()
+	case backupsnapshot.FieldCompletedAt:
+		return m.CompletedAt()
+	case backupsnapshot.FieldSizeBytes:
+		return m.SizeBytes()
+	case backupsnapshot.FieldSha256:
+		return m.Sha256()
+	case backupsnapshot.FieldStatus:
+		return m.Status()
+	case backupsnapshot.FieldFilePath:
+		return m.FilePath()
+	case backupsnapshot.FieldErrorMessage:
+		return m.ErrorMessage()
+	case backupsnapshot.FieldTriggeredByUserID:
+		return m.TriggeredByUserID()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *BackupSnapshotMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case backupsnapshot.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case backupsnapshot.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case backupsnapshot.FieldKind:
+		return m.OldKind(ctx)
+	case backupsnapshot.FieldStartedAt:
+		return m.OldStartedAt(ctx)
+	case backupsnapshot.FieldCompletedAt:
+		return m.OldCompletedAt(ctx)
+	case backupsnapshot.FieldSizeBytes:
+		return m.OldSizeBytes(ctx)
+	case backupsnapshot.FieldSha256:
+		return m.OldSha256(ctx)
+	case backupsnapshot.FieldStatus:
+		return m.OldStatus(ctx)
+	case backupsnapshot.FieldFilePath:
+		return m.OldFilePath(ctx)
+	case backupsnapshot.FieldErrorMessage:
+		return m.OldErrorMessage(ctx)
+	case backupsnapshot.FieldTriggeredByUserID:
+		return m.OldTriggeredByUserID(ctx)
+	}
+	return nil, fmt.Errorf("unknown BackupSnapshot field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BackupSnapshotMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case backupsnapshot.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case backupsnapshot.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case backupsnapshot.FieldKind:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKind(v)
+		return nil
+	case backupsnapshot.FieldStartedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStartedAt(v)
+		return nil
+	case backupsnapshot.FieldCompletedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCompletedAt(v)
+		return nil
+	case backupsnapshot.FieldSizeBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSizeBytes(v)
+		return nil
+	case backupsnapshot.FieldSha256:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSha256(v)
+		return nil
+	case backupsnapshot.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case backupsnapshot.FieldFilePath:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFilePath(v)
+		return nil
+	case backupsnapshot.FieldErrorMessage:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetErrorMessage(v)
+		return nil
+	case backupsnapshot.FieldTriggeredByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTriggeredByUserID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown BackupSnapshot field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *BackupSnapshotMutation) AddedFields() []string {
+	var fields []string
+	if m.addsize_bytes != nil {
+		fields = append(fields, backupsnapshot.FieldSizeBytes)
+	}
+	if m.addtriggered_by_user_id != nil {
+		fields = append(fields, backupsnapshot.FieldTriggeredByUserID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *BackupSnapshotMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case backupsnapshot.FieldSizeBytes:
+		return m.AddedSizeBytes()
+	case backupsnapshot.FieldTriggeredByUserID:
+		return m.AddedTriggeredByUserID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BackupSnapshotMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case backupsnapshot.FieldSizeBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSizeBytes(v)
+		return nil
+	case backupsnapshot.FieldTriggeredByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddTriggeredByUserID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown BackupSnapshot numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *BackupSnapshotMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(backupsnapshot.FieldCompletedAt) {
+		fields = append(fields, backupsnapshot.FieldCompletedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *BackupSnapshotMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *BackupSnapshotMutation) ClearField(name string) error {
+	switch name {
+	case backupsnapshot.FieldCompletedAt:
+		m.ClearCompletedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown BackupSnapshot nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *BackupSnapshotMutation) ResetField(name string) error {
+	switch name {
+	case backupsnapshot.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case backupsnapshot.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case backupsnapshot.FieldKind:
+		m.ResetKind()
+		return nil
+	case backupsnapshot.FieldStartedAt:
+		m.ResetStartedAt()
+		return nil
+	case backupsnapshot.FieldCompletedAt:
+		m.ResetCompletedAt()
+		return nil
+	case backupsnapshot.FieldSizeBytes:
+		m.ResetSizeBytes()
+		return nil
+	case backupsnapshot.FieldSha256:
+		m.ResetSha256()
+		return nil
+	case backupsnapshot.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case backupsnapshot.FieldFilePath:
+		m.ResetFilePath()
+		return nil
+	case backupsnapshot.FieldErrorMessage:
+		m.ResetErrorMessage()
+		return nil
+	case backupsnapshot.FieldTriggeredByUserID:
+		m.ResetTriggeredByUserID()
+		return nil
+	}
+	return fmt.Errorf("unknown BackupSnapshot field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *BackupSnapshotMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *BackupSnapshotMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *BackupSnapshotMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *BackupSnapshotMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *BackupSnapshotMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *BackupSnapshotMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *BackupSnapshotMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown BackupSnapshot unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *BackupSnapshotMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown BackupSnapshot edge %s", name)
 }
 
 // BillingLedgerMutation represents an operation that mutates the BillingLedger nodes in the graph.

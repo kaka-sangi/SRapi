@@ -236,6 +236,7 @@ func TestAppBootstrapOnlyImportsBootstrapPackages(t *testing.T) {
 			"github.com/srapi/srapi/apps/api/internal/config":                                 true,
 			"github.com/srapi/srapi/apps/api/internal/httpserver":                             true,
 			"github.com/srapi/srapi/apps/api/internal/persistence/entstore":                   true,
+			"github.com/srapi/srapi/apps/api/internal/persistence/entstore/backup_snapshots": true,
 			"github.com/srapi/srapi/apps/api/internal/persistence/entstore/scheduler":         true,
 			"github.com/srapi/srapi/apps/api/internal/persistence/redisstore/balancereservation": true,
 			"github.com/srapi/srapi/apps/api/internal/persistence/redisstore/realtime":           true,

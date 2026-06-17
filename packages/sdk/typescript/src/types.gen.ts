@@ -2029,6 +2029,76 @@ export type ProxyDefinitionListResponse = {
     request_id: RequestId;
 };
 
+/**
+ * scheduled = worker-driven daily run; manual = operator-triggered.
+ */
+export type BackupSnapshotKind = 'scheduled' | 'manual';
+
+/**
+ * running = pg_dump in flight; success = file written and checksummed;
+ * failed = pg_dump/IO error; superseded = retention deleted the file.
+ *
+ */
+export type BackupSnapshotStatus = 'running' | 'success' | 'failed' | 'superseded';
+
+export type BackupSnapshot = {
+    id: Id;
+    kind: BackupSnapshotKind;
+    status: BackupSnapshotStatus;
+    started_at: Timestamp;
+    /**
+     * Set when the run finished (success or failed); null while running.
+     */
+    completed_at?: string | null;
+    /**
+     * On-disk size of the dump file. 0 for failed/running rows.
+     */
+    size_bytes: number;
+    /**
+     * Hex-encoded SHA-256 of the dump file. Empty for failed/superseded rows.
+     */
+    sha256: string;
+    /**
+     * Path of the dump on the API host's disk. Empty when retention has wiped it.
+     */
+    file_path: string;
+    /**
+     * Stderr / system error captured on failed runs. Empty otherwise.
+     */
+    error_message: string;
+    /**
+     * Admin user id that pressed "Snapshot now". 0 for scheduled runs.
+     */
+    triggered_by_user_id: number;
+};
+
+export type BackupSnapshotResponse = {
+    data: BackupSnapshot;
+    request_id: RequestId;
+};
+
+export type BackupSnapshotPagination = {
+    total: number;
+    offset: number;
+    limit: number;
+};
+
+export type BackupSnapshotListResponse = {
+    data: Array<BackupSnapshot>;
+    pagination: BackupSnapshotPagination;
+    request_id: RequestId;
+};
+
+export type DeleteAdminBackupSnapshotResult = {
+    id: Id;
+    deleted: boolean;
+};
+
+export type DeleteAdminBackupSnapshotResponse = {
+    data: DeleteAdminBackupSnapshotResult;
+    request_id: RequestId;
+};
+
 export type ProviderAccountExportItem = {
     provider_id: Id;
     name: string;
@@ -12310,6 +12380,201 @@ export type BatchDeleteAdminProxiesResponses = {
 };
 
 export type BatchDeleteAdminProxiesResponse = BatchDeleteAdminProxiesResponses[keyof BatchDeleteAdminProxiesResponses];
+
+export type ListAdminBackupSnapshotsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        offset?: number;
+        limit?: number;
+        status?: BackupSnapshotStatus;
+    };
+    url: '/api/v1/admin/backups';
+};
+
+export type ListAdminBackupSnapshotsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminBackupSnapshotsError = ListAdminBackupSnapshotsErrors[keyof ListAdminBackupSnapshotsErrors];
+
+export type ListAdminBackupSnapshotsResponses = {
+    /**
+     * Backup snapshot list.
+     */
+    200: BackupSnapshotListResponse;
+};
+
+export type ListAdminBackupSnapshotsResponse = ListAdminBackupSnapshotsResponses[keyof ListAdminBackupSnapshotsResponses];
+
+export type TriggerAdminBackupSnapshotData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/backups';
+};
+
+export type TriggerAdminBackupSnapshotErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type TriggerAdminBackupSnapshotError = TriggerAdminBackupSnapshotErrors[keyof TriggerAdminBackupSnapshotErrors];
+
+export type TriggerAdminBackupSnapshotResponses = {
+    /**
+     * Snapshot created.
+     */
+    200: BackupSnapshotResponse;
+};
+
+export type TriggerAdminBackupSnapshotResponse = TriggerAdminBackupSnapshotResponses[keyof TriggerAdminBackupSnapshotResponses];
+
+export type DeleteAdminBackupSnapshotData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/backups/{id}';
+};
+
+export type DeleteAdminBackupSnapshotErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminBackupSnapshotError = DeleteAdminBackupSnapshotErrors[keyof DeleteAdminBackupSnapshotErrors];
+
+export type DeleteAdminBackupSnapshotResponses = {
+    /**
+     * Deleted.
+     */
+    200: DeleteAdminBackupSnapshotResponse;
+};
+
+export type DeleteAdminBackupSnapshotResponse2 = DeleteAdminBackupSnapshotResponses[keyof DeleteAdminBackupSnapshotResponses];
+
+export type GetAdminBackupSnapshotData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/backups/{id}';
+};
+
+export type GetAdminBackupSnapshotErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminBackupSnapshotError = GetAdminBackupSnapshotErrors[keyof GetAdminBackupSnapshotErrors];
+
+export type GetAdminBackupSnapshotResponses = {
+    /**
+     * Backup snapshot.
+     */
+    200: BackupSnapshotResponse;
+};
+
+export type GetAdminBackupSnapshotResponse = GetAdminBackupSnapshotResponses[keyof GetAdminBackupSnapshotResponses];
+
+export type DownloadAdminBackupSnapshotData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/backups/{id}/download';
+};
+
+export type DownloadAdminBackupSnapshotErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DownloadAdminBackupSnapshotError = DownloadAdminBackupSnapshotErrors[keyof DownloadAdminBackupSnapshotErrors];
+
+export type DownloadAdminBackupSnapshotResponses = {
+    /**
+     * Backup dump file body.
+     */
+    200: Blob | File;
+};
+
+export type DownloadAdminBackupSnapshotResponse = DownloadAdminBackupSnapshotResponses[keyof DownloadAdminBackupSnapshotResponses];
 
 export type TestAdminAccountData = {
     body?: AdminAccountTestRequest;

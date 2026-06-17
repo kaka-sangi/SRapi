@@ -42,6 +42,9 @@ type AuditLog func(*sql.Selector)
 // AuthSession is the predicate function for authsession builders.
 type AuthSession func(*sql.Selector)
 
+// BackupSnapshot is the predicate function for backupsnapshot builders.
+type BackupSnapshot func(*sql.Selector)
+
 // BillingLedger is the predicate function for billingledger builders.
 type BillingLedger func(*sql.Selector)
 

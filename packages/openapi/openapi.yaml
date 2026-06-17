@@ -66,6 +66,8 @@ tags:
     description: Redeem code and promo code administration endpoints.
   - name: AdminRisk
     description: Risk-control administration endpoints.
+  - name: AdminBackupSnapshots
+    description: Database backup snapshot history (list / trigger / download / delete).
   - name: Gateway
     description: OpenAI and Anthropic compatible gateway endpoints.
 x-srapi-contract-stage: m1-openapi-bootstrap
@@ -5443,6 +5445,216 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/backups:
+    get:
+      tags:
+        - AdminBackupSnapshots
+      operationId: listAdminBackupSnapshots
+      summary: List database backup snapshots, newest first.
+      description: |
+        Returns the recorded backup history written by the daily backup
+        worker: one row per attempted snapshot, with status, size, sha256,
+        and (for manual runs) the admin user that triggered it. Use the
+        `status` filter to narrow to running/success/failed/superseded.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/BackupSnapshotStatus"
+      responses:
+        "200":
+          description: Backup snapshot list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackupSnapshotListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminBackupSnapshots
+      operationId: triggerAdminBackupSnapshot
+      summary: Trigger an on-demand database backup snapshot.
+      description: |
+        Runs the backup worker once, synchronously, tagged kind=manual with
+        the calling admin user as triggered_by_user_id. Bypasses the 24-hour
+        scheduled-run cool-down so an operator who pressed "Snapshot now"
+        gets a real run on the same request. Backups still respect the
+        Backup.Enabled admin setting — when disabled this returns a 400.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      responses:
+        "200":
+          description: Snapshot created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackupSnapshotResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/backups/{id}:
+    get:
+      tags:
+        - AdminBackupSnapshots
+      operationId: getAdminBackupSnapshot
+      summary: Fetch a single backup snapshot.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Backup snapshot.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackupSnapshotResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminBackupSnapshots
+      operationId: deleteAdminBackupSnapshot
+      summary: Delete a backup snapshot row and its on-disk file.
+      description: |
+        Removes the dump file (best-effort) and drops the history row.
+        Operators use this to reclaim disk before retention sweeps a
+        large/unwanted snapshot, or to retire a row that was created in
+        error. Audit-logged as `backup_snapshot.delete`.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteAdminBackupSnapshotResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/backups/{id}/download:
+    get:
+      tags:
+        - AdminBackupSnapshots
+      operationId: downloadAdminBackupSnapshot
+      summary: Stream the on-disk dump file for a backup snapshot.
+      description: |
+        Returns the pg_dump custom-format file as
+        application/octet-stream with a Content-Disposition: attachment
+        header. Refuses snapshots whose status is not "success" (running,
+        failed, or superseded by retention) — those have nothing to stream.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Backup dump file body.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            Content-Disposition:
+              schema:
+                type: string
+              description: attachment; filename="srapi-YYYYMMDDHHmmss.dump"
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/StandardError"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -20100,6 +20312,135 @@ components:
             $ref: "#/components/schemas/ProxyDefinition"
         pagination:
           $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BackupSnapshotKind:
+      type: string
+      enum:
+        - scheduled
+        - manual
+      description: scheduled = worker-driven daily run; manual = operator-triggered.
+
+    BackupSnapshotStatus:
+      type: string
+      enum:
+        - running
+        - success
+        - failed
+        - superseded
+      description: |
+        running = pg_dump in flight; success = file written and checksummed;
+        failed = pg_dump/IO error; superseded = retention deleted the file.
+
+    BackupSnapshot:
+      type: object
+      required:
+        - id
+        - kind
+        - status
+        - started_at
+        - size_bytes
+        - sha256
+        - file_path
+        - error_message
+        - triggered_by_user_id
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        kind:
+          $ref: "#/components/schemas/BackupSnapshotKind"
+        status:
+          $ref: "#/components/schemas/BackupSnapshotStatus"
+        started_at:
+          $ref: "#/components/schemas/Timestamp"
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set when the run finished (success or failed); null while running.
+        size_bytes:
+          type: integer
+          format: int64
+          minimum: 0
+          description: On-disk size of the dump file. 0 for failed/running rows.
+        sha256:
+          type: string
+          maxLength: 64
+          description: Hex-encoded SHA-256 of the dump file. Empty for failed/superseded rows.
+        file_path:
+          type: string
+          description: Path of the dump on the API host's disk. Empty when retention has wiped it.
+        error_message:
+          type: string
+          description: Stderr / system error captured on failed runs. Empty otherwise.
+        triggered_by_user_id:
+          type: integer
+          description: Admin user id that pressed "Snapshot now". 0 for scheduled runs.
+
+    BackupSnapshotResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BackupSnapshot"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BackupSnapshotPagination:
+      type: object
+      required:
+        - total
+        - offset
+        - limit
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        offset:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 0
+
+    BackupSnapshotListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupSnapshot"
+        pagination:
+          $ref: "#/components/schemas/BackupSnapshotPagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    DeleteAdminBackupSnapshotResult:
+      type: object
+      required:
+        - id
+        - deleted
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        deleted:
+          type: boolean
+
+    DeleteAdminBackupSnapshotResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/DeleteAdminBackupSnapshotResult"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

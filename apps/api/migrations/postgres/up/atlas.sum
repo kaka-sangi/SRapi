@@ -1,4 +1,4 @@
-h1:RjoE787GZIseT70i+s5dk3YkBUk4OVKNcCEvOBMSksw=
+h1:PwV00z/HYDjeEb9cYoqnPTBTNCmzu6YykJNXiiSpvNA=
 000001_initial_schema.sql h1:cyZ0pax3l7J4onSmEmgqPwpoJYXPXuJYXeTAGUOEHs4=
 000002_auth_sessions.sql h1:zJ6uEWQDpw4sa3JpABmlbbFR2Sy3JCceNl4UnBtcX9c=
 000003_api_key_concurrency_limit.sql h1:j/8OE2iF7+LUa5XCsyYSC4dvN1Vh2cihbc41rySg4OQ=
@@ -48,3 +48,4 @@ h1:RjoE787GZIseT70i+s5dk3YkBUk4OVKNcCEvOBMSksw=
 000047_redeem_code_note_and_disabled_reason.sql h1:APQiofTMDhQVccxBVIj5osOiMRpekcXhOrEQT15NriM=
 000048_proxy_country_and_availability.sql h1:R98IxXbtgXiaKKrmky2OmxQIJK3S0rsdssG6SDZwsdQ=
 000049_provider_account_oauth_refresh.sql h1:GDGG1zpT/SkvfVa0++58Ekt14m/Vx16feu41/2IlWEE=
+000050_backup_snapshots.sql h1:2IdeZ0IyC5JLkyoeTiXnHNmzW8huXx8kKl8JnvAMOl8=

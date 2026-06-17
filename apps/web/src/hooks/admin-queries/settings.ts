@@ -260,3 +260,36 @@ export function useImportConfigSnapshot() {
     },
   });
 }
+
+// Database backup history (list, trigger, delete). The backup tab calls
+// useAdminBackupSnapshots to render the table, useTriggerAdminBackup for
+// the "Snapshot now" button, and useDeleteAdminBackup for the per-row
+// delete action. Download streams through admin-api directly — it's not a
+// react-query call because the browser handles the file save.
+export function useAdminBackupSnapshots(params?: P<typeof adminApi.listBackupSnapshots>) {
+  return useQuery({
+    queryKey: queryKeys.admin.backupSnapshots(params),
+    queryFn: () => adminApi.listBackupSnapshots(params),
+  });
+}
+
+export function useTriggerAdminBackup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminApi.triggerBackupSnapshot(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "backup-snapshots"] });
+    },
+  });
+}
+
+export function useDeleteAdminBackup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: Parameters<typeof adminApi.deleteBackupSnapshot>[0]) =>
+      adminApi.deleteBackupSnapshot(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "backup-snapshots"] });
+    },
+  });
+}

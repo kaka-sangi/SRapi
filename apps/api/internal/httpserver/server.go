@@ -23,6 +23,7 @@ import (
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
+	backupsnapcontract "github.com/srapi/srapi/apps/api/internal/modules/backup_snapshots/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	channelmonitorscontract "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/contract"
@@ -73,6 +74,12 @@ type dependencyPinger interface {
 	Ping(context.Context) error
 }
 
+// backupSnapshotsTrigger is the worker hand-off used by the admin "Snapshot
+// now" handler. The backup worker satisfies it via RunOnceTriggered.
+type backupSnapshotsTrigger interface {
+	RunOnceTriggered(ctx context.Context, userID int) (int, error)
+}
+
 // usageAggregator applies the cross-table billing aggregation (subscription
 // materialized usage + API-key cost usage) for a usage_log row exactly once,
 // gated by usage_log.aggregated_at. The gateway applies it eagerly off the hot
@@ -94,6 +101,8 @@ type runtimeOptions struct {
 	accounts            accountcontract.Store
 	audit               auditcontract.Store
 	authSessions        authcontract.Store
+	backupSnapshots     backupsnapcontract.Store
+	backupSnapshotsTrigger backupSnapshotsTrigger
 	billing             billingcontract.Store
 	events              eventscontract.Store
 	affiliate           affiliatecontract.Store
@@ -182,6 +191,26 @@ func WithAuditStore(store auditcontract.Store) Option {
 func WithAuthSessionStore(store authcontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.authSessions = store
+	}
+}
+
+// WithBackupSnapshotsStore wires the persistent backup-snapshot history
+// store. Without it the admin /backups endpoints return 503 — there's no
+// in-memory fallback because the dump files only live on the API host's
+// disk, which a memory-only runtime can't reach anyway.
+func WithBackupSnapshotsStore(store backupsnapcontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.backupSnapshots = store
+	}
+}
+
+// WithBackupSnapshotsTrigger hooks the backup worker into the "Snapshot
+// now" admin action. Without it the trigger endpoint returns a 400 — the
+// list/get/delete/download endpoints still work because they only touch
+// the history store.
+func WithBackupSnapshotsTrigger(trigger backupSnapshotsTrigger) Option {
+	return func(opts *runtimeOptions) {
+		opts.backupSnapshotsTrigger = trigger
 	}
 }
 
@@ -485,6 +514,11 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("PATCH /api/v1/admin/accounts/{id}", server.handleUpdateAdminAccount)
 	mux.HandleFunc("DELETE /api/v1/admin/accounts/{id}", server.handleDeleteAdminAccount)
 	mux.HandleFunc("PATCH /api/v1/admin/accounts/{id}/proxy", server.handleBindAdminAccountProxy)
+	mux.HandleFunc("GET /api/v1/admin/backups", server.handleListAdminBackupSnapshots)
+	mux.HandleFunc("POST /api/v1/admin/backups", server.handleTriggerAdminBackupSnapshot)
+	mux.HandleFunc("GET /api/v1/admin/backups/{id}", server.handleGetAdminBackupSnapshot)
+	mux.HandleFunc("DELETE /api/v1/admin/backups/{id}", server.handleDeleteAdminBackupSnapshot)
+	mux.HandleFunc("GET /api/v1/admin/backups/{id}/download", server.handleDownloadAdminBackupSnapshot)
 	mux.HandleFunc("GET /api/v1/admin/proxies", server.handleListAdminProxies)
 	mux.HandleFunc("POST /api/v1/admin/proxies", server.handleCreateAdminProxy)
 	mux.HandleFunc("POST /api/v1/admin/proxies/batch", server.handleBatchCreateAdminProxies)
