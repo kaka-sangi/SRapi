@@ -237,6 +237,17 @@ export function useBatchCreateAccounts() {
   );
 }
 
+// POST /admin/accounts/batch-delete — soft-delete N accounts in one call.
+// Idempotent on missing ids (NotFound is not surfaced as a failure).
+// Per-id store failures come back in result.errors[] without aborting the
+// batch — the bulk-delete dialog can render mixed outcomes.
+export function useBatchDeleteAccounts() {
+  return useAdminMutation(
+    (accountIds: P<typeof adminApi.batchDeleteAccounts>) => adminApi.batchDeleteAccounts(accountIds),
+    ["admin", "accounts"],
+  );
+}
+
 // PATCH /admin/accounts/batch — atomic multi-id status change.
 // Replaces the old Promise.allSettled-over-single-item-endpoint pattern that
 // fired N requests per bulk action (and couldn't roll back on partial fail).

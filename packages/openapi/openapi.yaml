@@ -4840,6 +4840,49 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/accounts/batch-delete:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: batchDeleteAdminAccounts
+      summary: Bulk soft-delete provider accounts.
+      description: |
+        Soft-deletes the named accounts — same as the per-id DELETE handler,
+        just in one call. Per-id outcome is returned: rows that succeed
+        appear in `deleted_ids`, rows that fail (already gone, store error)
+        appear in `errors`. NotFound is treated as success since the
+        caller's "this id should not exist" intent is already true.
+        Capped at 1000 ids per call.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchDeleteProviderAccountsRequest"
+      responses:
+        "200":
+          description: Accounts deleted — see counts + per-id outcome.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchDeleteProviderAccountsResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
   /api/v1/admin/accounts/batch:
     post:
       tags:
@@ -20057,6 +20100,59 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/BatchCreateProviderAccountsResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BatchDeleteProviderAccountsRequest:
+      type: object
+      required:
+        - account_ids
+      properties:
+        account_ids:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/Id"
+
+    BatchDeleteProviderAccountsErrorRow:
+      type: object
+      required:
+        - id
+        - message
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        message:
+          type: string
+
+    BatchDeleteProviderAccountsResult:
+      type: object
+      required:
+        - deleted_count
+        - deleted_ids
+        - errors
+      properties:
+        deleted_count:
+          type: integer
+        deleted_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+        errors:
+          type: array
+          description: Per-id failures (e.g. duplicate id within the batch, decryption error). NotFound is NOT a failure here — idempotent semantics.
+          items:
+            $ref: "#/components/schemas/BatchDeleteProviderAccountsErrorRow"
+
+    BatchDeleteProviderAccountsResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchDeleteProviderAccountsResult"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

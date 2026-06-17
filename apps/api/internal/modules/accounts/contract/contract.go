@@ -482,6 +482,18 @@ type BatchCreateAccountResult struct {
 	Error     string
 }
 
+// BatchDeleteAccountResult is per-row outcome from BatchDeleteAccounts.
+// Order matches the request. Error is empty on a successful delete (or
+// when the row was already gone — idempotent semantics: NotFound is NOT
+// surfaced as a failure since the caller's intent is already achieved).
+// Any other store/validation failure surfaces in Error without aborting
+// the batch.
+type BatchDeleteAccountResult struct {
+	Index     int
+	AccountID int
+	Error     string
+}
+
 type CreateRequest struct {
 	ProviderID     int
 	Name           string

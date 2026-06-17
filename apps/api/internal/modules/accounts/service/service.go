@@ -239,6 +239,65 @@ func (s *Service) BatchCreateAccounts(ctx context.Context, defaults contract.Bat
 	return out, nil
 }
 
+// BatchDeleteAccountsMaxItems caps the number of ids per BatchDeleteAccounts
+// call. Mirrors BatchCreateAccountsMaxItems so the two batch surfaces share
+// the same operator-facing limit.
+const BatchDeleteAccountsMaxItems = 1000
+
+// BatchDeleteAccounts soft-deletes N accounts in one call, returning a
+// per-row result. The operation is best-effort across the batch — a
+// failure on any single row populates that row's Error without aborting
+// the rest. NotFound is treated as success (idempotent: the caller's
+// intent of "this id should not exist" is already true).
+//
+// The outer error is reserved for catastrophic precondition failures (zero
+// ids, more than BatchDeleteAccountsMaxItems, duplicates within the batch).
+// Per-row store/validation failures surface in the result slice.
+//
+// Dedups ids within the batch (first occurrence wins) so an accidental
+// double-id doesn't surface as a second NotFound.
+func (s *Service) BatchDeleteAccounts(ctx context.Context, ids []int) ([]contract.BatchDeleteAccountResult, error) {
+	if len(ids) == 0 {
+		return nil, ErrInvalidInput
+	}
+	if len(ids) > BatchDeleteAccountsMaxItems {
+		return nil, ErrInvalidInput
+	}
+	results := make([]contract.BatchDeleteAccountResult, 0, len(ids))
+	seen := make(map[int]struct{}, len(ids))
+	for i, id := range ids {
+		row := contract.BatchDeleteAccountResult{Index: i, AccountID: id}
+		if id <= 0 {
+			row.Error = "invalid id"
+			results = append(results, row)
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			row.Error = "duplicate id in batch"
+			results = append(results, row)
+			continue
+		}
+		seen[id] = struct{}{}
+		if err := s.Delete(ctx, id); err != nil {
+			// Idempotent: a row that's already gone is not a failure
+			// for the caller's intent. Match both the typed sentinel
+			// AND the ad-hoc "account not found" string the memory
+			// store returns today (entstore returns the typed error;
+			// memory store still uses errors.New — coordinated
+			// migration not worth the blast radius for this one path).
+			if errors.Is(err, ErrAccountNotFound) || strings.Contains(err.Error(), "account not found") {
+				results = append(results, row)
+				continue
+			}
+			row.Error = err.Error()
+			results = append(results, row)
+			continue
+		}
+		results = append(results, row)
+	}
+	return results, nil
+}
+
 func (s *Service) List(ctx context.Context) ([]contract.ProviderAccount, error) {
 	accounts, err := s.store.List(ctx)
 	if err != nil {

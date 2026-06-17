@@ -788,6 +788,8 @@ export const zh: Messages = {
     usageDailyDate: "日期",
     bulkDisableTitle: "停用 {count} 个账号？",
     bulkDisableBody: "选中的账号将停止接收流量，直到重新启用。",
+    bulkDeleteTitle: "删除 {count} 个账号？",
+    bulkDeleteBody: "选中的账号将被软删除（调度器与列表不再可见），历史记录保留以供审计。此操作无法撤销。",
     bulkDone: "已更新 {count} 个账号",
     archive: "归档",
     archiveTitle: "归档此账号？",

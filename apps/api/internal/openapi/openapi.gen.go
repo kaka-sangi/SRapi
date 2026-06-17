@@ -5183,6 +5183,32 @@ type BatchCreateProxiesSkippedRow struct {
 	Reason string `json:"reason"`
 }
 
+// BatchDeleteProviderAccountsErrorRow defines model for BatchDeleteProviderAccountsErrorRow.
+type BatchDeleteProviderAccountsErrorRow struct {
+	Id      Id     `json:"id"`
+	Message string `json:"message"`
+}
+
+// BatchDeleteProviderAccountsRequest defines model for BatchDeleteProviderAccountsRequest.
+type BatchDeleteProviderAccountsRequest struct {
+	AccountIds []Id `json:"account_ids"`
+}
+
+// BatchDeleteProviderAccountsResponse defines model for BatchDeleteProviderAccountsResponse.
+type BatchDeleteProviderAccountsResponse struct {
+	Data      BatchDeleteProviderAccountsResult `json:"data"`
+	RequestId RequestId                         `json:"request_id"`
+}
+
+// BatchDeleteProviderAccountsResult defines model for BatchDeleteProviderAccountsResult.
+type BatchDeleteProviderAccountsResult struct {
+	DeletedCount int  `json:"deleted_count"`
+	DeletedIds   []Id `json:"deleted_ids"`
+
+	// Errors Per-id failures (e.g. duplicate id within the batch, decryption error). NotFound is NOT a failure here — idempotent semantics.
+	Errors []BatchDeleteProviderAccountsErrorRow `json:"errors"`
+}
+
 // BatchDeleteProxiesErrorRow defines model for BatchDeleteProxiesErrorRow.
 type BatchDeleteProxiesErrorRow struct {
 	Id      Id     `json:"id"`
@@ -11467,6 +11493,9 @@ type BatchCreateAdminAccountsJSONRequestBody = BatchCreateProviderAccountsReques
 
 // BatchActionAdminAccountsJSONRequestBody defines body for BatchActionAdminAccounts for application/json ContentType.
 type BatchActionAdminAccountsJSONRequestBody = BatchAccountActionRequest
+
+// BatchDeleteAdminAccountsJSONRequestBody defines body for BatchDeleteAdminAccounts for application/json ContentType.
+type BatchDeleteAdminAccountsJSONRequestBody = BatchDeleteProviderAccountsRequest
 
 // ImportAdminAccountsJSONRequestBody defines body for ImportAdminAccounts for application/json ContentType.
 type ImportAdminAccountsJSONRequestBody = ProviderAccountImportRequest
@@ -18237,6 +18266,9 @@ type ServerInterface interface {
 	// Run a bulk recovery action across provider accounts.
 	// (POST /api/v1/admin/accounts/batch-action)
 	BatchActionAdminAccounts(w http.ResponseWriter, r *http.Request)
+	// Bulk soft-delete provider accounts.
+	// (POST /api/v1/admin/accounts/batch-delete)
+	BatchDeleteAdminAccounts(w http.ResponseWriter, r *http.Request)
 	// Export provider account metadata without credentials.
 	// (GET /api/v1/admin/accounts/export)
 	ExportAdminAccounts(w http.ResponseWriter, r *http.Request)
@@ -20398,6 +20430,28 @@ func (siw *ServerInterfaceWrapper) BatchActionAdminAccounts(w http.ResponseWrite
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.BatchActionAdminAccounts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchDeleteAdminAccounts operation middleware
+func (siw *ServerInterfaceWrapper) BatchDeleteAdminAccounts(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchDeleteAdminAccounts(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -33434,6 +33488,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/batch", wrapper.BatchUpdateAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch", wrapper.BatchCreateAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-action", wrapper.BatchActionAdminAccounts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-delete", wrapper.BatchDeleteAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/export", wrapper.ExportAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/health-summary", wrapper.GetAdminAccountsHealthSummary)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import", wrapper.ImportAdminAccounts)

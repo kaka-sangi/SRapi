@@ -4,6 +4,7 @@ import {
   addAdminAccountGroupMember,
   batchActionAdminAccounts,
   batchCreateAdminAccounts,
+  batchDeleteAdminAccounts,
   batchUpdateAdminAccounts,
   bindAdminAccountProxy,
   clearAdminAccountError,
@@ -70,6 +71,7 @@ import type {
   DiscoverAdminAccountModelsData,
   BatchCreateAdminAccountsData,
   BatchCreateProviderAccountsResult,
+  BatchDeleteProviderAccountsResult,
   BatchUpdateAccountsResult,
   Id,
   CodexSessionImportResult,
@@ -121,6 +123,16 @@ export const accountsApi = {
   // single-create calls" pattern from the batch tab of the import dialog.
   batchCreateAccounts(body: BatchCreateAdminAccountsData["body"]): Promise<BatchCreateProviderAccountsResult> {
     return unwrapData(() => batchCreateAdminAccounts({ body, throwOnError: true }));
+  },
+
+  // Bulk soft-delete up to 1000 accounts in one call. Idempotent on missing
+  // ids (NotFound is treated as success — the caller's "this id should not
+  // exist" intent is already true). Per-id failures surface in
+  // result.errors[] without aborting the call.
+  batchDeleteAccounts(accountIds: Id[]): Promise<BatchDeleteProviderAccountsResult> {
+    return unwrapData(() =>
+      batchDeleteAdminAccounts({ body: { account_ids: accountIds }, throwOnError: true }),
+    );
   },
 
   // Interactive upstream-account OAuth provisioning (replaces hand-pasting

@@ -1381,6 +1381,115 @@ func TestBatchCreateAccountsRejectsInvalidDefaults(t *testing.T) {
 	}
 }
 
+// TestBatchDeleteAccountsAllSuccess pins the happy path: all ids exist,
+// all get soft-deleted, results carry no error rows.
+func TestBatchDeleteAccountsAllSuccess(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{ProviderID: 1, RuntimeClass: contract.RuntimeClassAPIKey}
+	items := []contract.BatchAccountItem{
+		{Name: "del-a", Credential: map[string]any{"api_key": "k-a"}},
+		{Name: "del-b", Credential: map[string]any{"api_key": "k-b"}},
+	}
+	created, _ := svc.BatchCreateAccounts(context.Background(), defaults, items)
+	ids := []int{*created[0].AccountID, *created[1].AccountID}
+	results, err := svc.BatchDeleteAccounts(context.Background(), ids)
+	if err != nil {
+		t.Fatalf("BatchDeleteAccounts: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	for i, row := range results {
+		if row.Error != "" {
+			t.Fatalf("row %d unexpectedly failed: %+v", i, row)
+		}
+	}
+	all, _ := svc.List(context.Background())
+	if len(all) != 0 {
+		t.Fatalf("expected 0 stored accounts after delete, got %d", len(all))
+	}
+}
+
+// TestBatchDeleteAccountsIsIdempotentOnMissingIds pins the idempotent
+// semantics: NotFound on a row is NOT surfaced as an error since the
+// caller's intent ("this id should not exist") is already true. Mix
+// existing + missing ids and assert all rows come back error-free.
+func TestBatchDeleteAccountsIsIdempotentOnMissingIds(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{ProviderID: 1, RuntimeClass: contract.RuntimeClassAPIKey}
+	items := []contract.BatchAccountItem{{Name: "real-one", Credential: map[string]any{"api_key": "k"}}}
+	created, _ := svc.BatchCreateAccounts(context.Background(), defaults, items)
+	realID := *created[0].AccountID
+
+	results, err := svc.BatchDeleteAccounts(context.Background(), []int{realID, 9999, 8888})
+	if err != nil {
+		t.Fatalf("BatchDeleteAccounts: %v", err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+	for i, row := range results {
+		if row.Error != "" {
+			t.Fatalf("row %d (id=%d) should be success (idempotent NotFound), got error %q", i, row.AccountID, row.Error)
+		}
+	}
+}
+
+// TestBatchDeleteAccountsDedupesWithinBatch: an accidental double-id must
+// surface in the second occurrence's Error, not as a silent second
+// NotFound. Pin the contract.
+func TestBatchDeleteAccountsDedupesWithinBatch(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{ProviderID: 1, RuntimeClass: contract.RuntimeClassAPIKey}
+	items := []contract.BatchAccountItem{{Name: "dup-target", Credential: map[string]any{"api_key": "k"}}}
+	created, _ := svc.BatchCreateAccounts(context.Background(), defaults, items)
+	realID := *created[0].AccountID
+
+	results, err := svc.BatchDeleteAccounts(context.Background(), []int{realID, realID})
+	if err != nil {
+		t.Fatalf("BatchDeleteAccounts: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if results[0].Error != "" {
+		t.Fatalf("first occurrence should succeed: %+v", results[0])
+	}
+	if results[1].Error != "duplicate id in batch" {
+		t.Fatalf("second occurrence should report duplicate; got: %+v", results[1])
+	}
+}
+
+// TestBatchDeleteAccountsRejectsEmptyAndOversize: outer error guards.
+// Per-row failures stay in the result slice; precondition violations
+// (zero or > MaxItems) return ErrInvalidInput without touching anything.
+func TestBatchDeleteAccountsRejectsEmptyAndOversize(t *testing.T) {
+	store := accountmemory.New()
+	svc, _ := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if _, err := svc.BatchDeleteAccounts(context.Background(), nil); err != ErrInvalidInput {
+		t.Fatalf("empty ids should ErrInvalidInput, got %v", err)
+	}
+	oversize := make([]int, BatchDeleteAccountsMaxItems+1)
+	for i := range oversize {
+		oversize[i] = i + 1
+	}
+	if _, err := svc.BatchDeleteAccounts(context.Background(), oversize); err != ErrInvalidInput {
+		t.Fatalf(">MaxItems ids should ErrInvalidInput, got %v", err)
+	}
+}
+
 // TestRecordProxyProbeSerializesConcurrentCallsPerProxy is the regression
 // guard for the SQL-backend TOCTOU race in RecordProxyProbe: two probes for
 // the same proxy that both observe "no window reset needed" must both

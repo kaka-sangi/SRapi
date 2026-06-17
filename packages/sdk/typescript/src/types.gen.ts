@@ -1866,6 +1866,29 @@ export type BatchCreateProviderAccountsResponse = {
     request_id: RequestId;
 };
 
+export type BatchDeleteProviderAccountsRequest = {
+    account_ids: Array<Id>;
+};
+
+export type BatchDeleteProviderAccountsErrorRow = {
+    id: Id;
+    message: string;
+};
+
+export type BatchDeleteProviderAccountsResult = {
+    deleted_count: number;
+    deleted_ids: Array<Id>;
+    /**
+     * Per-id failures (e.g. duplicate id within the batch, decryption error). NotFound is NOT a failure here — idempotent semantics.
+     */
+    errors: Array<BatchDeleteProviderAccountsErrorRow>;
+};
+
+export type BatchDeleteProviderAccountsResponse = {
+    data: BatchDeleteProviderAccountsResult;
+    request_id: RequestId;
+};
+
 export type UpdateProviderAccountRequest = {
     name?: string;
     runtime_class?: RuntimeClass;
@@ -11895,6 +11918,43 @@ export type ImportAdminCodexSessionResponses = {
 };
 
 export type ImportAdminCodexSessionResponse = ImportAdminCodexSessionResponses[keyof ImportAdminCodexSessionResponses];
+
+export type BatchDeleteAdminAccountsData = {
+    body: BatchDeleteProviderAccountsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/batch-delete';
+};
+
+export type BatchDeleteAdminAccountsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchDeleteAdminAccountsError = BatchDeleteAdminAccountsErrors[keyof BatchDeleteAdminAccountsErrors];
+
+export type BatchDeleteAdminAccountsResponses = {
+    /**
+     * Accounts deleted — see counts + per-id outcome.
+     */
+    200: BatchDeleteProviderAccountsResponse;
+};
+
+export type BatchDeleteAdminAccountsResponse = BatchDeleteAdminAccountsResponses[keyof BatchDeleteAdminAccountsResponses];
 
 export type BatchUpdateAdminAccountsData = {
     body: BatchUpdateAccountsRequest;

@@ -792,6 +792,8 @@ export const en = {
     usageDailyDate: "Date",
     bulkDisableTitle: "Disable {count} accounts?",
     bulkDisableBody: "Selected accounts will stop receiving traffic until re-enabled.",
+    bulkDeleteTitle: "Delete {count} accounts?",
+    bulkDeleteBody: "Selected accounts will be soft-deleted (removed from the scheduler + admin lists). The history rows are kept for audit. This cannot be undone.",
     bulkDone: "{count} accounts updated",
     archive: "Archive",
     archiveTitle: "Archive this account?",

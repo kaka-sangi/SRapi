@@ -34,6 +34,7 @@ import {
   useRefreshAccount,
   useResetAccountQuota,
   useBatchActionAccounts,
+  useBatchDeleteAccounts,
   useBatchUpdateAccounts,
   useDeleteAccount,
   useDiscoverAccountModels,
@@ -130,6 +131,7 @@ function AccountsContent() {
   const refreshToken = useRefreshAccount();
   const resetQuota = useResetAccountQuota();
   const batchAction = useBatchActionAccounts();
+  const batchDelete = useBatchDeleteAccounts();
   const batchUpdate = useBatchUpdateAccounts();
   const deleteMut = useDeleteAccount();
   const discover = useDiscoverAccountModels();
@@ -158,6 +160,7 @@ function AccountsContent() {
   const [detailTarget, setDetailTarget] = useState<ProviderAccount | null>(null);
   const [testTarget, setTestTarget] = useState<ProviderAccount | null>(null);
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProviderAccount | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
@@ -205,6 +208,33 @@ function AccountsContent() {
       list.clearSelection();
       const failedCount = result.errors.length;
       const succeededCount = result.updated_count;
+      if (failedCount > 0 && succeededCount > 0) {
+        toast({
+          title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
+          tone: "warning",
+        });
+      } else if (failedCount > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
+
+  /** Soft-delete the selected accounts in one call. NotFound is idempotent
+   *  (caller intent of "this id should not exist" is already true) so missing
+   *  rows count as succeeded. Per-id store failures come back in result.errors
+   *  and surface as a partial-batch toast. */
+  async function applyBulkDelete() {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    try {
+      const result = await batchDelete.mutateAsync(ids);
+      list.clearSelection();
+      const failedCount = result.errors.length;
+      const succeededCount = result.deleted_count;
       if (failedCount > 0 && succeededCount > 0) {
         toast({
           title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
@@ -444,6 +474,15 @@ function AccountsContent() {
         onClick={() => void applyBulkAction("recover")}
       >
         {t("adminAccounts.recover")}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        loading={batchDelete.isPending}
+        onClick={() => setBulkDeleteOpen(true)}
+        className="border-srapi-error/40 text-srapi-error hover:bg-srapi-error/10"
+      >
+        {t("common.delete")}
       </Button>
     </>
   );
@@ -759,6 +798,15 @@ function AccountsContent() {
         body={t("adminAccounts.bulkDisableBody")}
         confirmLabel={t("common.disable")}
         onConfirm={() => applyBulkStatus("disabled")}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={t("adminAccounts.bulkDeleteTitle", { count: list.selected.size })}
+        body={t("adminAccounts.bulkDeleteBody")}
+        confirmLabel={t("common.delete")}
+        onConfirm={() => applyBulkDelete()}
       />
 
       <ConfirmDialog
