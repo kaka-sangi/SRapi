@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,7 +29,37 @@ const (
 	statusClientClosedRequest    = 499
 	oauthRefreshEncodingForm     = "form"
 	oauthRefreshEncodingJSON     = "json"
+	// defaultReverseProxyHTTPTimeout caps how long the upstream client will
+	// wait for a single request to complete. The historical 30s ceiling was
+	// too tight for AI completion endpoints — /v1/responses/compact in
+	// particular routinely takes 60-120s on long conversations, so the cap
+	// fired before Codex could even return a body. Live srapi.senran.net
+	// system-log diagnosis: account 178 returned 504 timeout with body
+	// "reverse proxy request timed out" after the payload was already
+	// accepted. Sub2api's repository/http_upstream.go (line 325) sets NO
+	// timeout at all and relies entirely on context cancellation; we raise
+	// the ceiling to 5 minutes here to match the industry norm for AI
+	// gateways while still keeping a backstop against truly stuck
+	// connections. Operator-tunable via SRAPI_REVERSE_PROXY_TIMEOUT_SECONDS.
+	defaultReverseProxyHTTPTimeout = 5 * time.Minute
 )
+
+// reverseProxyHTTPTimeout resolves the per-account HTTP client request
+// timeout. The default is defaultReverseProxyHTTPTimeout; the operator can
+// override via env SRAPI_REVERSE_PROXY_TIMEOUT_SECONDS. A value of 0 (or
+// negative / invalid) keeps the default rather than silently disabling
+// the backstop.
+func reverseProxyHTTPTimeout() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("SRAPI_REVERSE_PROXY_TIMEOUT_SECONDS"))
+	if raw == "" {
+		return defaultReverseProxyHTTPTimeout
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil || seconds <= 0 {
+		return defaultReverseProxyHTTPTimeout
+	}
+	return time.Duration(seconds) * time.Second
+}
 
 type oauthRefreshConfig struct {
 	TokenEndpoint string
@@ -647,7 +678,7 @@ func newIsolatedClient(account contract.AccountRuntime, blockPrivateEgress bool)
 	return &http.Client{
 		Transport: transport,
 		Jar:       jar,
-		Timeout:   30 * time.Second,
+		Timeout:   reverseProxyHTTPTimeout(),
 	}, nil
 }
 
