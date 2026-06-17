@@ -433,3 +433,41 @@ type fixedClock struct {
 func (c fixedClock) Now() time.Time {
 	return c.now
 }
+
+// TestUpdateRuleStatusOnlyToggle locks the contract the iter-44 frontend
+// inline status toggle relies on: PATCH with only Status set must not
+// drift name / rate / trigger fields.
+func TestUpdateRuleStatusOnlyToggle(t *testing.T) {
+	h := newHarness(t)
+	ctx := t.Context()
+
+	rule, err := h.affiliate.CreateRule(ctx, contract.CreateRuleRequest{
+		Name:        "ten-percent",
+		TriggerType: contract.TriggerTypePaymentPaid,
+		Rate:        "0.10",
+		Currency:    "USD",
+	})
+	if err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+	if rule.Status != contract.RuleStatusActive {
+		t.Fatalf("expected created status active, got %q", rule.Status)
+	}
+	disabled := contract.RuleStatusDisabled
+	updated, err := h.affiliate.UpdateRule(ctx, rule.ID, contract.UpdateRuleRequest{Status: &disabled})
+	if err != nil {
+		t.Fatalf("update status-only: %v", err)
+	}
+	if updated.Status != contract.RuleStatusDisabled {
+		t.Fatalf("expected status disabled, got %q", updated.Status)
+	}
+	if updated.Name != "ten-percent" {
+		t.Fatalf("name leaked: %q", updated.Name)
+	}
+	if updated.TriggerType != contract.TriggerTypePaymentPaid {
+		t.Fatalf("trigger leaked: %q", updated.TriggerType)
+	}
+	if updated.Rate != rule.Rate {
+		t.Fatalf("rate drifted: before %q after %q", rule.Rate, updated.Rate)
+	}
+}
