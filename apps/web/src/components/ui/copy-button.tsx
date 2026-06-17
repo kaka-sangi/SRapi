@@ -7,8 +7,13 @@ import { useLanguage } from "@/context/LanguageContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 /** Copy `text`, preferring the async Clipboard API with a legacy fallback for
- *  insecure / older contexts so the button never silently no-ops. */
-async function writeClipboard(text: string): Promise<boolean> {
+ *  insecure / older contexts so the button never silently no-ops.
+ *
+ *  Exported so callers with their own copy-state UI (e.g. the redeem-codes
+ *  "copy all" button, the api-keys plaintext reveal dialog, the backup
+ *  snapshot field) can opt into the same fallback chain instead of a bare
+ *  navigator.clipboard.writeText that breaks on HTTP / older browsers. */
+export async function writeClipboard(text: string): Promise<boolean> {
   try {
     if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text);

@@ -21,6 +21,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { writeClipboard } from "@/components/ui/copy-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TagInput } from "@/components/ui/tag-input";
@@ -187,9 +188,11 @@ export function ApiKeyFormDialog({
 
   async function copyKey() {
     if (!plaintext) return;
-    await navigator.clipboard.writeText(plaintext);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    const ok = await writeClipboard(plaintext);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
   }
 
   function setOpen(next: boolean) {

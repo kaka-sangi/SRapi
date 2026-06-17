@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, AlertTriangle, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { writeClipboard } from "@/components/ui/copy-button";
 import { Label } from "@/components/ui/label";
 import { useDiscoverAccountModels, useTestAccount } from "@/hooks/admin-queries";
 import { useCreateApiKey } from "@/hooks/queries";
@@ -57,9 +58,11 @@ export function ResultView({
 
   async function copyKey() {
     if (!keyPlaintext) return;
-    await navigator.clipboard.writeText(keyPlaintext);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    const ok = await writeClipboard(keyPlaintext);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
   }
 
   const providerName =

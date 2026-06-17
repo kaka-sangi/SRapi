@@ -39,7 +39,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { QuietBadge } from "@/components/ui/quiet-badge";
-import { CopyButton } from "@/components/ui/copy-button";
+import { CopyButton, writeClipboard } from "@/components/ui/copy-button";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -502,9 +502,11 @@ function RedeemBatchDialog({ onClose }: { onClose: () => void }) {
 
   async function copyAll() {
     if (!generated) return;
-    await navigator.clipboard.writeText(generated.map((c) => c.code).join("\n"));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    const ok = await writeClipboard(generated.map((c) => c.code).join("\n"));
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
   }
 
   return (
