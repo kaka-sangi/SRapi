@@ -465,6 +465,13 @@ NextCandidate:
 		attemptReq.AttemptNo = attemptNo
 		attemptReq.FallbackFromDecisionID = cloneIntPtr(fallbackFromDecisionID)
 		attemptReq.ExcludedAccountIDs = append([]int(nil), excluded...)
+		// Append accounts currently in the in-process 429 cooldown to the
+		// excluded set so the scheduler skips them. The asynchronous
+		// metadata write to cooldown_until is the source of truth — this
+		// cooldown is a per-process synchronous accelerator.
+		for _, id := range s.runtime.gatewayCooldownedAccountIDs() {
+			attemptReq.ExcludedAccountIDs = append(attemptReq.ExcludedAccountIDs, id)
+		}
 
 		// The first selection waits briefly for a concurrency slot when every
 		// account is saturated; failover attempts (after a real failure) schedule
@@ -513,16 +520,58 @@ NextCandidate:
 			continue
 		}
 
+		// Per-account in-process concurrency slot (sub2api parity). Acquired
+		// AFTER scheduler+breaker pass so we don't waste a slot on a path
+		// that would have been rejected anyway. Held for the full candidate
+		// invoke including same-candidate retries; released exactly once
+		// when this candidate either succeeds, gives up, or fails over.
+		slotRelease, slotAcquired, slotErr := s.runtime.acquireGatewayAccountConcurrencySlot(ctx, result.Candidate.Account)
+		if slotErr != nil {
+			breakerDone(false)
+			s.runtime.releaseGatewayAccountQuota(ctx, admission.EstimatedUsage, result.Candidate)
+			if errIsConcurrencySlotTransient(slotErr) {
+				// Treat as transient — failover to a different candidate.
+				excluded = append(excluded, result.Candidate.Account.ID)
+				decisionID := result.Decision.ID
+				fallbackFromDecisionID = &decisionID
+				lastFailure = gatewayFailoverResult[T]{ScheduleResult: result, Err: slotErr}
+				continue
+			}
+			return gatewayFailoverResult[T]{ScheduleResult: result, Err: slotErr}
+		}
+		releaseConcurrencySlotOnce := func() {
+			if slotAcquired && slotRelease != nil {
+				slotRelease()
+				slotRelease = nil
+			}
+		}
+
 		retryPolicy := gatewaySameCandidateRetryPolicyFor(result.Candidate, retrySettings.MaxRetryIntervalMS)
 		for sameCandidateRetries := 0; ; {
 			response, err := invoke(ctx, result.Candidate)
 			if err == nil {
 				breakerDone(true)
+				releaseConcurrencySlotOnce()
 				s.runtime.bindGatewaySessionAffinity(ctx, scheduleReq.APIKeyID, scheduleReq.SessionAffinityKey, result.Candidate.Account.ID)
 				if conversationResp, ok := any(response).(provideradaptercontract.ConversationResponse); ok {
 					s.runtime.bindGatewayPreviousResponseAffinity(ctx, scheduleReq.APIKeyID, conversationResp.ID, result.Candidate.Account.ID)
 				}
 				return gatewayFailoverResult[T]{Response: response, ScheduleResult: result}
+			}
+
+			// On failure we feed the structured ClassifyUpstreamError into
+			// the in-process cooldown — captures the Retry-After window so
+			// subsequent attempts (across this request and the next) skip
+			// the account immediately. Gated by per-account metadata flag.
+			if errorClass, upstreamStatus, _ := providerGatewayError(err); errorClass != "" || upstreamStatus > 0 {
+				decision := ClassifyUpstreamError(upstreamStatus, nil, err)
+				if decision.Class == "transient" && decision.RetryAfterMs > 0 {
+					s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, time.Duration(decision.RetryAfterMs)*time.Millisecond)
+				} else if upstreamStatus == http.StatusTooManyRequests {
+					// 429 without a Retry-After header still counts toward
+					// the consecutive-disable threshold.
+					s.runtime.recordGatewayAccountRateLimitCooldown(result.Candidate.Account, 0)
+				}
 			}
 
 			errorClass, upstreamStatus, _ := providerGatewayError(err)
@@ -532,6 +581,7 @@ NextCandidate:
 				s.runtime.logger.Info("retrying gateway provider candidate", "request_id", canonical.RequestID, "attempt_no", result.Decision.AttemptNo, "retry_no", sameCandidateRetries, "account_id", result.Candidate.Account.ID, "provider_id", result.Candidate.Provider.ID, "error_class", errorClass, "status_code", upstreamStatus, "delay_ms", int(delay/time.Millisecond))
 				if err := sleepGatewayRetryDelay(ctx, delay); err != nil {
 					breakerDone(false)
+					releaseConcurrencySlotOnce()
 					s.runtime.releaseGatewayAccountQuota(ctx, admission.EstimatedUsage, result.Candidate)
 					s.recordGatewayProviderAttemptFailure(r, authed, canonical, result, err, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
 					return gatewayFailoverResult[T]{
@@ -544,6 +594,7 @@ NextCandidate:
 			}
 
 			breakerDone(false)
+			releaseConcurrencySlotOnce()
 			s.runtime.releaseGatewayAccountQuota(ctx, admission.EstimatedUsage, result.Candidate)
 			s.recordGatewayProviderAttemptFailure(r, authed, canonical, result, err, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
 			lastFailure = gatewayFailoverResult[T]{
@@ -567,6 +618,7 @@ NextCandidate:
 }
 
 func (s *Server) recordGatewayProviderAttemptFailure(r *http.Request, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, providerErr error, errorClass string, upstreamStatus int, latencyMS int, admission gatewayAdmission) {
+	s.recordOpsErrorLog(r.Context(), authed, canonical, result, providerErr, errorClass, upstreamStatus)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,

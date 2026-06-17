@@ -44,6 +44,7 @@ import (
 	channelmonitorscontract "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/contract"
 	channelmonitorsservice "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/service"
 	channelmonitorsmemory "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/store/memory"
+	concurrencyslotsservice "github.com/srapi/srapi/apps/api/internal/modules/concurrency_slots/service"
 	contentsafetyservice "github.com/srapi/srapi/apps/api/internal/modules/content_safety/service"
 	"github.com/srapi/srapi/apps/api/internal/modules/copilot"
 	copilotconvcontract "github.com/srapi/srapi/apps/api/internal/modules/copilot/contract"
@@ -73,6 +74,9 @@ import (
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	operationsservice "github.com/srapi/srapi/apps/api/internal/modules/operations/service"
 	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
+	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
+	opserrorlogsservice "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/service"
+	opserrorlogsmemory "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/store/memory"
 	payloadrulescontract "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/contract"
 	payloadrulesservice "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/service"
 	payloadrulesmemory "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/store/memory"
@@ -82,6 +86,7 @@ import (
 	provideradapterservice "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
+	ratelimitcooldownservice "github.com/srapi/srapi/apps/api/internal/modules/rate_limit_cooldown/service"
 	providermemory "github.com/srapi/srapi/apps/api/internal/modules/providers/store/memory"
 	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
 	qualityservice "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/service"
@@ -172,6 +177,8 @@ type runtimeState struct {
 	usage                   *usageservice.Service
 	userAttributes          *userattributesservice.Service
 	errorPassthrough        *errorpassthroughservice.Service
+	opsErrorLogs            *opserrorlogsservice.Service
+	opsErrorLogsStore       opserrorlogscontract.Store
 	tlsProfiles             *tlsprofilesservice.Service
 	captcha                 *captchaservice.Service
 	healthRollups           *healthrollupsservice.Service
@@ -236,6 +243,21 @@ type runtimeState struct {
 
 	accountBreakers   map[int]*circuitbreaker.Breaker
 	accountBreakersMu sync.RWMutex
+
+	// concurrencySlots is the in-process per-account concurrency-slot
+	// manager (ported from sub2api's ConcurrencyService). The gateway hot
+	// path acquires a slot AFTER the scheduler picks a candidate but BEFORE
+	// the upstream call, gated by metadata flag `concurrency_slot_enabled`
+	// to keep existing deployments unchanged. Always non-nil after
+	// newRuntimeState; nil-checks elsewhere are defensive only.
+	concurrencySlots *concurrencyslotsservice.Service
+
+	// rateLimitCooldown is the in-process per-account 429-cooldown registry
+	// (ported from sub2api's RateLimitService). The gateway records hits
+	// when ClassifyUpstreamError returns class=transient with a non-zero
+	// RetryAfterMs, and consults it before scheduling to add cooldowned
+	// accounts to the excluded list.
+	rateLimitCooldown *ratelimitcooldownservice.Service
 
 	// accountMetaLocks serializes read-modify-write updates to a provider
 	// account's metadata (cooldown escalation and runtime-quota snapshots) so
@@ -526,6 +548,18 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 		return err
 	}
 	rt.errorPassthrough = errorPassthroughSvc
+
+	// ops_error_logs: hot-path operator-facing record of upstream failures.
+	// Bounded in-memory store by default; swap to an entstore once a schema
+	// is added. Service writes are best-effort fire-and-forget from the
+	// dispatcher so a logging failure never fails the user request.
+	opsErrorLogsStore := opserrorlogsmemory.New()
+	rt.opsErrorLogsStore = opsErrorLogsStore
+	opsErrorLogsSvc, err := opserrorlogsservice.New(opsErrorLogsStore, nil)
+	if err != nil {
+		return err
+	}
+	rt.opsErrorLogs = opsErrorLogsSvc
 
 	tlsProfilesStore := opts.tlsProfiles
 	if tlsProfilesStore == nil {
@@ -999,6 +1033,8 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		databaseProbe:        opts.database,
 		redisProbe:           opts.redis,
 		accountBreakers:      make(map[int]*circuitbreaker.Breaker),
+		concurrencySlots:     concurrencyslotsservice.New(),
+		rateLimitCooldown:    ratelimitcooldownservice.New(),
 		modelResolutionCache: localcache.New[modelcontract.ModelResolution](localcache.Config{
 			MaxEntries: 512,
 			DefaultTTL: 30 * time.Second,
