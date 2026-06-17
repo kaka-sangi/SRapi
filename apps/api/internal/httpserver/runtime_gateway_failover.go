@@ -633,6 +633,12 @@ func (s *Server) recordGatewayProviderAttemptFailure(r *http.Request, authed api
 // admin error-log surface can render the failover history of the request.
 func (s *Server) recordGatewayProviderAttemptFailureWithHistory(r *http.Request, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, providerErr error, errorClass string, upstreamStatus int, latencyMS int, admission gatewayAdmission, upstreamErrors []gatewayUpstreamErrorEvent) {
 	s.recordOpsErrorLog(r.Context(), authed, canonical, result, providerErr, errorClass, upstreamStatus)
+	// Mirror the same failure onto the in-memory error-event stream so the
+	// admin SSE subscribers (Stream C / CLIProxyAPI SubscribeErrors port) see
+	// it live without polling. Best-effort: a publish error is never allowed
+	// to fail the request, and the underlying MemoryPublisher already swallows
+	// per-subscriber overflows internally.
+	s.publishErrorEvent(r.Context(), authed, canonical, result, providerErr, errorClass, upstreamStatus)
 	headers := providerHeadersFromError(providerErr)
 	upstreamRequestID := upstreamRequestIDFromHeaders(headers)
 	phase := classifyErrorPhase(errorClass, upstreamStatus)

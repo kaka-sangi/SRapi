@@ -467,6 +467,16 @@ type healthData struct {
 }
 
 func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler {
+	handler, _ := newWithServer(cfg, logger, options...)
+	return handler
+}
+
+// newWithServer is the test-only variant of New that also returns the underlying
+// *Server. Test code uses it to publish into the in-memory error event stream
+// (and any other process-local pub/sub) without having to peel the wrapped
+// http.Handler chain. The production callers use New and ignore the second
+// return value.
+func newWithServer(cfg config.Config, logger *slog.Logger, options ...Option) (http.Handler, *Server) {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -619,6 +629,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("PATCH /api/v1/admin/error-logs/{id}/resolve", server.handleResolveAdminErrorLog)
 	mux.HandleFunc("GET /api/v1/admin/ops/error-logs", server.handleListAdminOpsErrorLogs)
 	mux.HandleFunc("PATCH /api/v1/admin/ops/error-logs/{id}", server.handleUpdateAdminOpsErrorLogResolution)
+	mux.HandleFunc("GET /api/v1/admin/error-stream", server.handleAdminErrorStream)
 	mux.HandleFunc("GET /api/v1/admin/request-log-files", server.handleListAdminRequestLogFiles)
 	mux.HandleFunc("GET /api/v1/admin/request-log-files/{name}", server.handleGetAdminRequestLogFile)
 	mux.HandleFunc("GET /api/v1/admin/request-log-files/{name}/download", server.handleDownloadAdminRequestLogFile)
@@ -713,7 +724,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	// Admin copilot dispatches approved admin calls in-process through the same
 	// RBAC gate used by external admin requests.
 	runtime.internalRouter = handler
-	return securityHeadersMiddleware(requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(handler))))
+	return securityHeadersMiddleware(requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(handler)))), server
 }
 
 func (s *Server) registerPublicRoutes(mux *http.ServeMux) {

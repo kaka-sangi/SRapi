@@ -52,6 +52,7 @@ import (
 	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
 	errorpassthroughservice "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/service"
 	errorpassthroughmemory "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/store/memory"
+	erroreventstreamservice "github.com/srapi/srapi/apps/api/internal/modules/error_event_stream/service"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
@@ -310,6 +311,13 @@ type runtimeState struct {
 	// constructs a reader so admin endpoints can browse pre-existing dumps.
 	requestLogFilesMu sync.Mutex
 	requestLogFiles   *requestLogFilesState
+
+	// errorEventStream is the in-memory pub/sub backing the admin SSE
+	// error-stream endpoint. Mirrors CLIProxyAPI's redisqueue.SubscribeErrors:
+	// every recordGatewayProviderAttemptFailure publishes a contract.Event;
+	// admin SSE subscribers receive them live with a 256-entry per-subscriber
+	// buffer (drop-on-overflow). Always non-nil after newRuntimeState.
+	errorEventStream *erroreventstreamservice.MemoryPublisher
 }
 
 type dependencyHealth struct {
@@ -1070,6 +1078,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		usageAggregator:     opts.usageAggregator,
 		proxyProbeMetrics:   opts.proxyProbeMetrics,
 		tokenRefreshMetrics: opts.tokenRefreshMetrics,
+		errorEventStream:    erroreventstreamservice.NewMemoryPublisher(erroreventstreamservice.Config{Logger: logger}),
 	}
 }
 
