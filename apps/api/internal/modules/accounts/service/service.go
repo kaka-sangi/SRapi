@@ -1174,6 +1174,129 @@ func (s *Service) RemoveAccountFromGroup(ctx context.Context, accountID int, gro
 	return s.store.RemoveAccountFromGroup(ctx, accountID, groupID)
 }
 
+// BatchGroupMembersMaxItems caps the number of account ids per
+// BatchAddAccountsToGroup / BatchRemoveAccountsFromGroup call. Mirrors
+// BatchCreateAccountsMaxItems + BatchDeleteAccountsMaxItems so every
+// operator-facing batch surface shares one ceiling.
+const BatchGroupMembersMaxItems = 1000
+
+// BatchAddAccountsToGroup adds N accounts to one group in one call. The
+// group is loaded once up-front (no N+1) and each row's add is best-effort
+// — a per-row failure populates Error without aborting the rest.
+// Idempotent on already-member rows: re-adding a member returns nil error
+// instead of a "duplicate" failure since the caller's "this account should
+// be in the group" intent is already satisfied.
+//
+// Dedups account ids within the batch (first occurrence wins) so an
+// accidental double-id doesn't surface as a second add. Outer error is
+// reserved for catastrophic precondition failures: zero ids, > MaxItems,
+// group not found.
+func (s *Service) BatchAddAccountsToGroup(ctx context.Context, groupID int, accountIDs []int) ([]contract.BatchGroupMemberResult, error) {
+	if groupID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	if len(accountIDs) == 0 {
+		return nil, ErrInvalidInput
+	}
+	if len(accountIDs) > BatchGroupMembersMaxItems {
+		return nil, ErrInvalidInput
+	}
+	// Group must exist — every per-row add would otherwise fail with the
+	// same "group not found" and the operator just gets noise.
+	if _, err := s.store.FindGroupByID(ctx, groupID); err != nil {
+		return nil, err
+	}
+
+	// Pre-fetch existing members so we can fast-path the idempotent
+	// "already a member" case without a per-row store call.
+	existing, err := s.store.ListGroupMembers(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	alreadyMember := make(map[int]struct{}, len(existing))
+	for _, m := range existing {
+		alreadyMember[m.AccountID] = struct{}{}
+	}
+
+	results := make([]contract.BatchGroupMemberResult, 0, len(accountIDs))
+	seen := make(map[int]struct{}, len(accountIDs))
+	for i, accountID := range accountIDs {
+		row := contract.BatchGroupMemberResult{Index: i, AccountID: accountID}
+		if accountID <= 0 {
+			row.Error = "invalid account id"
+			results = append(results, row)
+			continue
+		}
+		if _, dup := seen[accountID]; dup {
+			row.Error = "duplicate account id in batch"
+			results = append(results, row)
+			continue
+		}
+		seen[accountID] = struct{}{}
+		if _, already := alreadyMember[accountID]; already {
+			// Idempotent: silent success — the desired membership state
+			// is already in place.
+			results = append(results, row)
+			continue
+		}
+		if _, addErr := s.store.AddAccountToGroup(ctx, accountID, groupID); addErr != nil {
+			// "account not found" + other store errors come back per-row
+			// — operator sees which ids failed without losing the rest.
+			row.Error = addErr.Error()
+			results = append(results, row)
+			continue
+		}
+		results = append(results, row)
+	}
+	return results, nil
+}
+
+// BatchRemoveAccountsFromGroup is the sibling of BatchAddAccountsToGroup.
+// Same idempotent semantics (not-a-member counts as success since the
+// desired absence is already in place). Same per-row error handling.
+func (s *Service) BatchRemoveAccountsFromGroup(ctx context.Context, groupID int, accountIDs []int) ([]contract.BatchGroupMemberResult, error) {
+	if groupID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	if len(accountIDs) == 0 {
+		return nil, ErrInvalidInput
+	}
+	if len(accountIDs) > BatchGroupMembersMaxItems {
+		return nil, ErrInvalidInput
+	}
+	if _, err := s.store.FindGroupByID(ctx, groupID); err != nil {
+		return nil, err
+	}
+
+	results := make([]contract.BatchGroupMemberResult, 0, len(accountIDs))
+	seen := make(map[int]struct{}, len(accountIDs))
+	for i, accountID := range accountIDs {
+		row := contract.BatchGroupMemberResult{Index: i, AccountID: accountID}
+		if accountID <= 0 {
+			row.Error = "invalid account id"
+			results = append(results, row)
+			continue
+		}
+		if _, dup := seen[accountID]; dup {
+			row.Error = "duplicate account id in batch"
+			results = append(results, row)
+			continue
+		}
+		seen[accountID] = struct{}{}
+		if err := s.store.RemoveAccountFromGroup(ctx, accountID, groupID); err != nil {
+			// Some stores return a typed not-found-member; others return
+			// nil and just no-op. Match the convention used by the single
+			// Remove — surface the error verbatim but let the caller treat
+			// "not found" as idempotent at the handler/UI layer.
+			if !strings.Contains(err.Error(), "not found") {
+				row.Error = err.Error()
+			}
+		}
+		results = append(results, row)
+	}
+	return results, nil
+}
+
 func (s *Service) ListGroupMembers(ctx context.Context, groupID int) ([]contract.AccountGroupMember, error) {
 	if groupID <= 0 {
 		return nil, ErrInvalidInput

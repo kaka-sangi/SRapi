@@ -5151,6 +5151,32 @@ type BatchAccountActionRequest struct {
 // BatchAccountActionRequestAction Maintenance action to apply per account. `clear_error` clears transient error/cooldown metadata and reactivates non-healthy accounts; `recover` resets the account back to active.
 type BatchAccountActionRequestAction string
 
+// BatchAccountGroupMembersErrorRow defines model for BatchAccountGroupMembersErrorRow.
+type BatchAccountGroupMembersErrorRow struct {
+	Id      Id     `json:"id"`
+	Message string `json:"message"`
+}
+
+// BatchAccountGroupMembersRequest defines model for BatchAccountGroupMembersRequest.
+type BatchAccountGroupMembersRequest struct {
+	AccountIds []Id `json:"account_ids"`
+}
+
+// BatchAccountGroupMembersResponse defines model for BatchAccountGroupMembersResponse.
+type BatchAccountGroupMembersResponse struct {
+	Data      BatchAccountGroupMembersResult `json:"data"`
+	RequestId RequestId                      `json:"request_id"`
+}
+
+// BatchAccountGroupMembersResult defines model for BatchAccountGroupMembersResult.
+type BatchAccountGroupMembersResult struct {
+	AppliedCount int  `json:"applied_count"`
+	AppliedIds   []Id `json:"applied_ids"`
+
+	// Errors Per-id failures (account not found, duplicate within batch, store conflict). Idempotent successes (already-member on add, not-member on remove) appear in applied_ids, NOT errors.
+	Errors []BatchAccountGroupMembersErrorRow `json:"errors"`
+}
+
 // BatchAccountUsageTodayResponse defines model for BatchAccountUsageTodayResponse.
 type BatchAccountUsageTodayResponse struct {
 	Data      []AccountUsageTodayWithID `json:"data"`
@@ -11761,6 +11787,12 @@ type BatchSetAdminAccountGroupRPMOverridesJSONRequestBody = BatchSetGroupRPMOver
 
 // UpdateAdminAccountGroupJSONRequestBody defines body for UpdateAdminAccountGroup for application/json ContentType.
 type UpdateAdminAccountGroupJSONRequestBody = UpdateAccountGroupRequest
+
+// BatchAddAdminAccountGroupMembersJSONRequestBody defines body for BatchAddAdminAccountGroupMembers for application/json ContentType.
+type BatchAddAdminAccountGroupMembersJSONRequestBody = BatchAccountGroupMembersRequest
+
+// BatchRemoveAdminAccountGroupMembersJSONRequestBody defines body for BatchRemoveAdminAccountGroupMembers for application/json ContentType.
+type BatchRemoveAdminAccountGroupMembersJSONRequestBody = BatchAccountGroupMembersRequest
 
 // CreateAdminAccountJSONRequestBody defines body for CreateAdminAccount for application/json ContentType.
 type CreateAdminAccountJSONRequestBody = CreateProviderAccountRequest
@@ -18821,6 +18853,12 @@ type ServerInterface interface {
 	// Add a provider account to an account group.
 	// (POST /api/v1/admin/account-groups/{id}/accounts/{account_id})
 	AddAdminAccountGroupMember(w http.ResponseWriter, r *http.Request, id Id, accountId Id)
+	// Bulk-add up to 1000 provider accounts to an account group.
+	// (POST /api/v1/admin/account-groups/{id}/members/batch-add)
+	BatchAddAdminAccountGroupMembers(w http.ResponseWriter, r *http.Request, id Id)
+	// Bulk-remove up to 1000 provider accounts from an account group.
+	// (POST /api/v1/admin/account-groups/{id}/members/batch-remove)
+	BatchRemoveAdminAccountGroupMembers(w http.ResponseWriter, r *http.Request, id Id)
 	// List provider accounts.
 	// (GET /api/v1/admin/accounts)
 	ListAdminAccounts(w http.ResponseWriter, r *http.Request, params ListAdminAccountsParams)
@@ -20841,6 +20879,74 @@ func (siw *ServerInterfaceWrapper) AddAdminAccountGroupMember(w http.ResponseWri
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.AddAdminAccountGroupMember(w, r, id, accountId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchAddAdminAccountGroupMembers operation middleware
+func (siw *ServerInterfaceWrapper) BatchAddAdminAccountGroupMembers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchAddAdminAccountGroupMembers(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchRemoveAdminAccountGroupMembers operation middleware
+func (siw *ServerInterfaceWrapper) BatchRemoveAdminAccountGroupMembers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchRemoveAdminAccountGroupMembers(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -34306,6 +34412,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}/accounts", wrapper.ListAdminAccountGroupMembers)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}/accounts/{account_id}", wrapper.RemoveAdminAccountGroupMember)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}/accounts/{account_id}", wrapper.AddAdminAccountGroupMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}/members/batch-add", wrapper.BatchAddAdminAccountGroupMembers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}/members/batch-remove", wrapper.BatchRemoveAdminAccountGroupMembers)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts", wrapper.ListAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts", wrapper.CreateAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/availability", wrapper.ListAdminAccountsAvailability)

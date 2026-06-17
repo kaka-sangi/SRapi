@@ -494,6 +494,19 @@ type BatchDeleteAccountResult struct {
 	Error     string
 }
 
+// BatchGroupMemberResult is per-row outcome from
+// BatchAddAccountsToGroup / BatchRemoveAccountsFromGroup. Order matches
+// the request. Error is empty on success OR on the idempotent case (already
+// member / not member), so the caller can read "no errors" as "every
+// requested membership is now in the desired state". Per-row store
+// failures (account not found, group not found, store conflict) surface
+// in Error without aborting the batch.
+type BatchGroupMemberResult struct {
+	Index     int
+	AccountID int
+	Error     string
+}
+
 // BatchUpdateConcurrencyItem is one row in a BatchUpdateConcurrency call:
 // the per-account target max-concurrency ceiling (stored in account metadata
 // under "max_concurrency", which the scheduler reads at admission). Mirrors

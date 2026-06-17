@@ -6555,6 +6555,105 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/account-groups/{id}/members/batch-add:
+    post:
+      tags:
+        - AdminAccountGroups
+      operationId: batchAddAdminAccountGroupMembers
+      summary: Bulk-add up to 1000 provider accounts to an account group.
+      description: |
+        Operator shortcut: adds many accounts to one group in one call so
+        a fleet rollout doesn't require N single-add clicks. Idempotent
+        on already-member accounts (re-adding returns nil error so the
+        caller can read "no errors" as "every requested membership is in
+        the desired state"). Per-row failures (account not found, store
+        conflict) surface in `results[].error` without aborting the call.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchAccountGroupMembersRequest"
+      responses:
+        "200":
+          description: Members added — see per-row outcome.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchAccountGroupMembersResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/account-groups/{id}/members/batch-remove:
+    post:
+      tags:
+        - AdminAccountGroups
+      operationId: batchRemoveAdminAccountGroupMembers
+      summary: Bulk-remove up to 1000 provider accounts from an account group.
+      description: |
+        Sibling of batch-add. Idempotent on not-a-member accounts (the
+        desired absence is already in place). Per-row store failures
+        surface in `results[].error` without aborting the call.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchAccountGroupMembersRequest"
+      responses:
+        "200":
+          description: Members removed — see per-row outcome.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchAccountGroupMembersResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
   /api/v1/admin/account-groups/{id}/accounts/{account_id}:
     post:
       tags:
@@ -20436,6 +20535,59 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/BatchDeleteProviderAccountsResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BatchAccountGroupMembersRequest:
+      type: object
+      required:
+        - account_ids
+      properties:
+        account_ids:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/Id"
+
+    BatchAccountGroupMembersErrorRow:
+      type: object
+      required:
+        - id
+        - message
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        message:
+          type: string
+
+    BatchAccountGroupMembersResult:
+      type: object
+      required:
+        - applied_count
+        - applied_ids
+        - errors
+      properties:
+        applied_count:
+          type: integer
+        applied_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+        errors:
+          type: array
+          description: Per-id failures (account not found, duplicate within batch, store conflict). Idempotent successes (already-member on add, not-member on remove) appear in applied_ids, NOT errors.
+          items:
+            $ref: "#/components/schemas/BatchAccountGroupMembersErrorRow"
+
+    BatchAccountGroupMembersResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchAccountGroupMembersResult"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

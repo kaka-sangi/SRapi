@@ -1490,6 +1490,145 @@ func TestBatchDeleteAccountsRejectsEmptyAndOversize(t *testing.T) {
 	}
 }
 
+// helper to bootstrap a service + group + N accounts for the BatchAdd/Remove tests.
+func setupGroupAndAccounts(t *testing.T, count int) (*Service, int, []int) {
+	t.Helper()
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	group, err := svc.CreateGroup(ctx, contract.CreateGroupRequest{Name: "g"})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{ProviderID: 1, RuntimeClass: contract.RuntimeClassAPIKey}
+	items := make([]contract.BatchAccountItem, count)
+	for i := 0; i < count; i++ {
+		items[i] = contract.BatchAccountItem{
+			Name:       "acct-" + strconv.Itoa(i),
+			Credential: map[string]any{"api_key": "k-" + strconv.Itoa(i)},
+		}
+	}
+	results, _ := svc.BatchCreateAccounts(ctx, defaults, items)
+	ids := make([]int, count)
+	for i, r := range results {
+		ids[i] = *r.AccountID
+	}
+	return svc, group.ID, ids
+}
+
+func TestBatchAddAccountsToGroupAllSuccess(t *testing.T) {
+	svc, groupID, ids := setupGroupAndAccounts(t, 3)
+	results, err := svc.BatchAddAccountsToGroup(context.Background(), groupID, ids)
+	if err != nil {
+		t.Fatalf("BatchAddAccountsToGroup: %v", err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+	for i, row := range results {
+		if row.Error != "" {
+			t.Fatalf("row %d: %+v", i, row)
+		}
+	}
+	members, _ := svc.ListGroupMembers(context.Background(), groupID)
+	if len(members) != 3 {
+		t.Fatalf("expected 3 members, got %d", len(members))
+	}
+}
+
+// Re-adding existing members is silent success (idempotent). Re-running
+// the same batch produces zero error rows.
+func TestBatchAddAccountsToGroupIsIdempotentOnAlreadyMember(t *testing.T) {
+	svc, groupID, ids := setupGroupAndAccounts(t, 2)
+	ctx := context.Background()
+	if _, err := svc.BatchAddAccountsToGroup(ctx, groupID, ids); err != nil {
+		t.Fatalf("initial add: %v", err)
+	}
+	results, err := svc.BatchAddAccountsToGroup(ctx, groupID, ids)
+	if err != nil {
+		t.Fatalf("re-add: %v", err)
+	}
+	for i, row := range results {
+		if row.Error != "" {
+			t.Errorf("row %d should be idempotent success, got %q", i, row.Error)
+		}
+	}
+}
+
+// Mixed valid + non-existent ids: real ones succeed, missing ids surface
+// per-row without aborting the batch.
+func TestBatchAddAccountsToGroupSurfacesPerRowFailures(t *testing.T) {
+	svc, groupID, ids := setupGroupAndAccounts(t, 1)
+	mixed := []int{ids[0], 99999, 88888}
+	results, err := svc.BatchAddAccountsToGroup(context.Background(), groupID, mixed)
+	if err != nil {
+		t.Fatalf("BatchAddAccountsToGroup: %v", err)
+	}
+	if results[0].Error != "" {
+		t.Errorf("real id should succeed, got %q", results[0].Error)
+	}
+	if results[1].Error == "" || results[2].Error == "" {
+		t.Errorf("missing ids should surface as per-row errors, got %+v", results)
+	}
+}
+
+// Double-id within the batch: first occurrence wins, second flagged
+// "duplicate" — so an accidental double-add doesn't silently re-add.
+func TestBatchAddAccountsToGroupDedupesWithinBatch(t *testing.T) {
+	svc, groupID, ids := setupGroupAndAccounts(t, 1)
+	results, _ := svc.BatchAddAccountsToGroup(context.Background(), groupID, []int{ids[0], ids[0]})
+	if results[0].Error != "" {
+		t.Errorf("first row should succeed: %+v", results[0])
+	}
+	if results[1].Error != "duplicate account id in batch" {
+		t.Errorf("second row should be duplicate: %+v", results[1])
+	}
+}
+
+// Outer guards: zero ids, > MaxItems, missing group all return
+// ErrInvalidInput before any per-row work runs.
+func TestBatchAddAccountsToGroupRejectsBadOuterInput(t *testing.T) {
+	svc, groupID, _ := setupGroupAndAccounts(t, 0)
+	if _, err := svc.BatchAddAccountsToGroup(context.Background(), groupID, nil); err != ErrInvalidInput {
+		t.Errorf("empty ids: got %v, want ErrInvalidInput", err)
+	}
+	oversize := make([]int, BatchGroupMembersMaxItems+1)
+	for i := range oversize {
+		oversize[i] = i + 1
+	}
+	if _, err := svc.BatchAddAccountsToGroup(context.Background(), groupID, oversize); err != ErrInvalidInput {
+		t.Errorf("oversize: got %v, want ErrInvalidInput", err)
+	}
+	if _, err := svc.BatchAddAccountsToGroup(context.Background(), 9999, []int{1}); err == nil {
+		t.Errorf("non-existent group should error")
+	}
+}
+
+// Remove: same idempotent semantics. Not-member rows count as success.
+func TestBatchRemoveAccountsFromGroupIsIdempotentOnNotMember(t *testing.T) {
+	svc, groupID, ids := setupGroupAndAccounts(t, 2)
+	ctx := context.Background()
+	// Add only one of the two ids.
+	_, _ = svc.BatchAddAccountsToGroup(ctx, groupID, []int{ids[0]})
+	// Remove both — the never-added one is a silent success.
+	results, err := svc.BatchRemoveAccountsFromGroup(ctx, groupID, ids)
+	if err != nil {
+		t.Fatalf("BatchRemoveAccountsFromGroup: %v", err)
+	}
+	for i, row := range results {
+		if row.Error != "" {
+			t.Errorf("row %d should be idempotent success, got %q", i, row.Error)
+		}
+	}
+	members, _ := svc.ListGroupMembers(ctx, groupID)
+	if len(members) != 0 {
+		t.Errorf("expected 0 members after batch-remove, got %d", len(members))
+	}
+}
+
 // TestBatchUpdateConcurrencyAllSuccess pins the happy path: every item has
 // a valid id + non-negative concurrency, and the resulting metadata carries
 // the right value on every row.
