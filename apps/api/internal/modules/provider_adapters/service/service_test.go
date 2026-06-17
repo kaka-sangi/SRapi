@@ -9797,12 +9797,13 @@ func TestReverseProxyCodexCLIAdapterBridgeEnabledDoesNotInjectImageToolForSpark(
 	}
 }
 
-func TestReverseProxyCodexCLIAdapterCompactInstructionsMatchesCLIProxyAPI(t *testing.T) {
-	// Verbatim port of CLIProxyAPI's normalizeCodexInstructions
-	// (internal/runtime/executor/codex_executor.go:1732): compact must
-	// carry instructions="" — NOT the model's base prompt (which the
-	// non-compact path injects via codexEnsureResponsesInstructions) and
-	// NOT absent altogether (the upstream rejects the missing field).
+func TestReverseProxyCodexCLIAdapterCompactInstructionsMatchesSub2API(t *testing.T) {
+	// sub2api applyCodexOAuthTransform (openai_codex_transform.go:131-165)
+	// does NOT inject default instructions for compact requests — it
+	// passes the caller-supplied instructions field through unchanged (or
+	// leaves it absent if the caller didn't send one). Codex's compact
+	// endpoint accepts the absent case; what it rejects is the model base
+	// prompt we used to inject via codexEnsureResponsesInstructions.
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
 			StatusCode: http.StatusOK,
@@ -9839,12 +9840,16 @@ func TestReverseProxyCodexCLIAdapterCompactInstructionsMatchesCLIProxyAPI(t *tes
 	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
 		t.Fatalf("decode codex compact payload: %v", err)
 	}
-	value, exists := payload["instructions"]
-	if !exists {
-		t.Fatalf("compact must carry instructions field (CLIProxyAPI normalizeCodexInstructions sets to \"\"), got %+v", payload)
-	}
-	if value != "" {
-		t.Fatalf("compact instructions must be empty string (not model base prompt), got %q", value)
+	// sub2api parity: compact must NOT carry the model base prompt that the
+	// non-compact path injects. The caller's input string ("compact me" here)
+	// did not supply an instructions field, so the field must be absent OR
+	// empty — never the long Codex base instructions. The non-compact path's
+	// codexEnsureResponsesInstructions (which injects codexBaseInstructionsForModel)
+	// must NOT have run.
+	if value, exists := payload["instructions"]; exists {
+		if str, ok := value.(string); !ok || str != "" {
+			t.Fatalf("compact must not carry injected model base prompt, got instructions=%v", value)
+		}
 	}
 }
 

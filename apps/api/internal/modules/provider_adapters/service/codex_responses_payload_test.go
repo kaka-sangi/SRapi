@@ -249,15 +249,23 @@ func TestCodexResponsesPayloadAddsCodexResponseRuntimeDefaults(t *testing.T) {
 	}
 }
 
-func TestCodexResponsesCompactPayloadMatchesCLIProxyAPITranslator(t *testing.T) {
-	// Verbatim port of CLIProxyAPI's compact request shape
-	// (internal/translator/codex/openai/responses/codex_openai-responses_request.go:11-46
-	// translator + internal/runtime/executor/codex_executor.go:executeCompact post-translate):
-	//   - parallel_tool_calls = true   (set by translator, retained for compact)
-	//   - include = ["reasoning.encrypted_content"]   (set by translator)
-	//   - store = false   (set by translator)
-	//   - stream removed   (deleted by executeCompact)
-	//   - instructions = ""   (normalizeCodexInstructions forces this when missing)
+func TestCodexResponsesCompactPayloadMatchesSub2API(t *testing.T) {
+	// Verbatim port of sub2api applyCodexOAuthTransform
+	// (openai_codex_transform.go:131-165): compact is DELETE-ONLY. The
+	// transform strips store, stream, and the openAICodexOAuthUnsupportedFields
+	// list (user, metadata, prompt_cache_retention, safety_identifier,
+	// stream_options, max_output_tokens, max_completion_tokens, temperature,
+	// top_p, frequency_penalty, presence_penalty). It explicitly DOES NOT add
+	// include, parallel_tool_calls, or default instructions for compact —
+	// the comment at openai_codex_transform.go:161-162 reads "compact 端点形态
+	// 不同，单独处理，此处跳过 ensureCodexReasoningInclude".
+	//
+	// Earlier srapi tried to verbatim-port CLIProxyAPI's translator (which
+	// does add those fields), but Codex /v1/responses/compact actually
+	// rejects them with {"error":{"code":"unknown_parameter","param":"include"}}.
+	// Diagnosed live against srapi.senran.net production traffic. This test
+	// pins the sub2api-aligned compact shape so future regressions are
+	// caught immediately.
 	payload, _, err := codexResponsesPayload(contract.ConversationRequest{
 		SourceProtocol: "openai-compatible",
 		SourceEndpoint: "/v1/responses/compact",
@@ -270,27 +278,24 @@ func TestCodexResponsesCompactPayloadMatchesCLIProxyAPITranslator(t *testing.T) 
 	if err != nil {
 		t.Fatalf("build codex compact payload: %v", err)
 	}
-	if payload["parallel_tool_calls"] != true {
-		t.Fatalf("compact must set parallel_tool_calls=true (CLIProxyAPI translator), got %+v", payload["parallel_tool_calls"])
+	// Compact MUST NOT carry any of these — sub2api strips/skips them all.
+	for _, field := range []string{
+		"store",
+		"stream",
+		"include",
+		"parallel_tool_calls",
+		"client_metadata",
+	} {
+		if _, ok := payload[field]; ok {
+			t.Fatalf("compact must NOT carry %q (sub2api parity, Codex /compact rejects), got payload=%+v", field, payload)
+		}
 	}
-	if payload["store"] != false {
-		t.Fatalf("compact must set store=false (CLIProxyAPI translator), got %+v", payload["store"])
-	}
-	if _, ok := payload["stream"]; ok {
-		t.Fatalf("compact must not carry stream (CLIProxyAPI executeCompact deletes it), got %+v", payload)
-	}
-	include, ok := payload["include"].([]any)
-	if !ok || !containsStringAny(include, codexResponsesEncryptedReasoningInclude) {
-		t.Fatalf("compact must include reasoning.encrypted_content (CLIProxyAPI translator), got %+v", payload["include"])
-	}
-	if value, exists := payload["instructions"]; !exists || value != "" {
-		t.Fatalf("compact must set instructions=\"\" (CLIProxyAPI normalizeCodexInstructions), got exists=%v value=%v", exists, value)
-	}
-	if _, ok := payload["client_metadata"]; ok {
-		// Diagnosed against live srapi.senran.net traffic: Codex /compact returns
-		// {"error":{"code":"unknown_parameter","param":"client_metadata", ...}}
-		// when this srapi-specific field is present. CLIProxyAPI never sends it.
-		t.Fatalf("compact must NOT carry client_metadata (Codex /compact rejects it), got %+v", payload)
+	// instructions: sub2api compact does NOT force it to "". It only forces
+	// "" when the caller explicitly sent null/empty (via
+	// codexInstructionsWasNormalizedEmpty). For a minimal request without
+	// instructions, the field is simply absent.
+	if value, exists := payload["instructions"]; exists && value != "" && value != nil {
+		// non-empty string instructions is fine — caller supplied it
 	}
 }
 

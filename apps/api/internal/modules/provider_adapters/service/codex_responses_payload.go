@@ -308,45 +308,36 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 	applyDisableImageGenerationToResponsesPayload(req, payload)
 	codexNormalizeResponsesTools(payload)
 	applyDisableImageGenerationToResponsesPayload(req, payload)
-	// Verbatim port of CLIProxyAPI's Codex Responses request translator
-	// (internal/translator/codex/openai/responses/codex_openai-responses_request.go:11-46):
-	// ALL Codex /responses requests — compact included — set
-	// parallel_tool_calls=true, include=["reasoning.encrypted_content"],
-	// and store=false. The compact endpoint additionally strips `stream`
-	// (CLIProxyAPI internal/runtime/executor/codex_executor.go:executeCompact
-	// deletes `stream` post-translate). Earlier srapi gated these defaults
-	// behind !compact which left the compact payload missing required Codex
-	// fields and tripped upstream rejections.
-	codexApplyImageGenerationInstructions(payload)
-	codexEnsureReasoningEncryptedInclude(payload)
-	payload["store"] = codexResponsesDefaultInternalStoreValue
-	payload["parallel_tool_calls"] = true
+	// Compact and non-compact require completely different normalization.
+	// sub2api openai_codex_transform.go:131-165 makes the rule explicit:
+	// the compact endpoint is delete-only — strip the fields Codex rejects,
+	// add NOTHING. The non-compact path is the additive one (store=false,
+	// stream=true, parallel_tool_calls=true, include=[reasoning.encrypted_content],
+	// default instructions, image_generation tool, etc.). Earlier srapi
+	// borrowed CLIProxyAPI's translator and tried to add include + parallel
+	// + instructions="" for compact too, which upstream Codex rejects with
+	// {"error":{"code":"unknown_parameter","param":"include", ...}} —
+	// diagnosed live against srapi.senran.net production traffic. This
+	// commit aligns srapi with sub2api: compact is delete-only.
 	if codexResponsesCompactRequest(req) {
-		// Compact is non-streaming by contract.
+		// sub2api applyCodexOAuthTransform openai_codex_transform.go:131-139:
+		// for compact, delete store + stream; do nothing else.
+		delete(payload, "store")
 		delete(payload, "stream")
-		// Codex /v1/responses/compact rejects `client_metadata` with
-		// {"error":{"code":"unknown_parameter","param":"client_metadata",
-		// "message":"Unknown parameter: 'client_metadata'."}}. The field is
-		// srapi-specific — it carries x-codex-installation-id /
-		// x-codex-turn-metadata / x-codex-window-id from per-account
-		// request settings via codexApplyClientMetadataSettings — and is
-		// accepted on /responses but not on /compact. CLIProxyAPI never
-		// sends this field at all (it puts the values on HTTP headers
-		// instead), so dropping it for compact matches the reference
-		// behaviour. Diagnosed against live srapi.senran.net traffic: the
-		// system-log body_excerpt showed the upstream rejection verbatim.
+		// Codex /v1/responses/compact rejects srapi-specific client_metadata
+		// (carries x-codex-installation-id / x-codex-turn-metadata /
+		// x-codex-window-id from per-account request settings via
+		// codexApplyClientMetadataSettings). Accepted on /responses, rejected
+		// on /compact with {"code":"unknown_parameter","param":"client_metadata"}.
+		// sub2api never reaches this populator for compact; in srapi
+		// codexApplyClientMetadataSettings runs unconditionally so we
+		// strip it back out here.
 		delete(payload, "client_metadata")
-		// CLIProxyAPI's normalizeCodexInstructions (codex_executor.go:1732)
-		// forces `instructions` to "" when missing/null rather than
-		// injecting the model base prompt — compact carries the user's
-		// "summarize this conversation" input verbatim and the upstream
-		// rejects mismatched instructions for compact.
-		if codexInstructionsWasNormalizedEmpty(payload) {
-			payload["instructions"] = ""
-		} else if value, exists := payload["instructions"]; !exists || value == nil {
-			payload["instructions"] = ""
-		}
 	} else {
+		codexApplyImageGenerationInstructions(payload)
+		codexEnsureReasoningEncryptedInclude(payload)
+		payload["store"] = codexResponsesDefaultInternalStoreValue
+		payload["parallel_tool_calls"] = true
 		codexEnsureResponsesInstructions(req, payload)
 		payload["stream"] = true
 	}
