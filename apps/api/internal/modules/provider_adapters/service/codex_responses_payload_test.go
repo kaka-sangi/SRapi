@@ -249,7 +249,15 @@ func TestCodexResponsesPayloadAddsCodexResponseRuntimeDefaults(t *testing.T) {
 	}
 }
 
-func TestCodexResponsesCompactPayloadSkipsResponseRuntimeDefaults(t *testing.T) {
+func TestCodexResponsesCompactPayloadMatchesCLIProxyAPITranslator(t *testing.T) {
+	// Verbatim port of CLIProxyAPI's compact request shape
+	// (internal/translator/codex/openai/responses/codex_openai-responses_request.go:11-46
+	// translator + internal/runtime/executor/codex_executor.go:executeCompact post-translate):
+	//   - parallel_tool_calls = true   (set by translator, retained for compact)
+	//   - include = ["reasoning.encrypted_content"]   (set by translator)
+	//   - store = false   (set by translator)
+	//   - stream removed   (deleted by executeCompact)
+	//   - instructions = ""   (normalizeCodexInstructions forces this when missing)
 	payload, _, err := codexResponsesPayload(contract.ConversationRequest{
 		SourceProtocol: "openai-compatible",
 		SourceEndpoint: "/v1/responses/compact",
@@ -262,10 +270,21 @@ func TestCodexResponsesCompactPayloadSkipsResponseRuntimeDefaults(t *testing.T) 
 	if err != nil {
 		t.Fatalf("build codex compact payload: %v", err)
 	}
-	for _, field := range []string{"parallel_tool_calls", "include", "stream", "store"} {
-		if _, ok := payload[field]; ok {
-			t.Fatalf("compact payload should not inject %s: %+v", field, payload)
-		}
+	if payload["parallel_tool_calls"] != true {
+		t.Fatalf("compact must set parallel_tool_calls=true (CLIProxyAPI translator), got %+v", payload["parallel_tool_calls"])
+	}
+	if payload["store"] != false {
+		t.Fatalf("compact must set store=false (CLIProxyAPI translator), got %+v", payload["store"])
+	}
+	if _, ok := payload["stream"]; ok {
+		t.Fatalf("compact must not carry stream (CLIProxyAPI executeCompact deletes it), got %+v", payload)
+	}
+	include, ok := payload["include"].([]any)
+	if !ok || !containsStringAny(include, codexResponsesEncryptedReasoningInclude) {
+		t.Fatalf("compact must include reasoning.encrypted_content (CLIProxyAPI translator), got %+v", payload["include"])
+	}
+	if value, exists := payload["instructions"]; !exists || value != "" {
+		t.Fatalf("compact must set instructions=\"\" (CLIProxyAPI normalizeCodexInstructions), got exists=%v value=%v", exists, value)
 	}
 }
 

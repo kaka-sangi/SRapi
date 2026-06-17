@@ -9797,7 +9797,12 @@ func TestReverseProxyCodexCLIAdapterBridgeEnabledDoesNotInjectImageToolForSpark(
 	}
 }
 
-func TestReverseProxyCodexCLIAdapterDoesNotAddDefaultInstructionsForCompact(t *testing.T) {
+func TestReverseProxyCodexCLIAdapterCompactInstructionsMatchesCLIProxyAPI(t *testing.T) {
+	// Verbatim port of CLIProxyAPI's normalizeCodexInstructions
+	// (internal/runtime/executor/codex_executor.go:1732): compact must
+	// carry instructions="" — NOT the model's base prompt (which the
+	// non-compact path injects via codexEnsureResponsesInstructions) and
+	// NOT absent altogether (the upstream rejects the missing field).
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
 			StatusCode: http.StatusOK,
@@ -9809,7 +9814,7 @@ func TestReverseProxyCodexCLIAdapterDoesNotAddDefaultInstructionsForCompact(t *t
 		t.Fatalf("create service: %v", err)
 	}
 	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
-		RequestID:      "req_codex_compact_no_default_instructions",
+		RequestID:      "req_codex_compact_instructions_normalized",
 		SourceProtocol: "openai-compatible",
 		SourceEndpoint: "/v1/responses/compact",
 		Model:          "codex-local",
@@ -9834,8 +9839,12 @@ func TestReverseProxyCodexCLIAdapterDoesNotAddDefaultInstructionsForCompact(t *t
 	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
 		t.Fatalf("decode codex compact payload: %v", err)
 	}
-	if _, ok := payload["instructions"]; ok {
-		t.Fatalf("compact requests should not receive default instructions, got %+v", payload)
+	value, exists := payload["instructions"]
+	if !exists {
+		t.Fatalf("compact must carry instructions field (CLIProxyAPI normalizeCodexInstructions sets to \"\"), got %+v", payload)
+	}
+	if value != "" {
+		t.Fatalf("compact instructions must be empty string (not model base prompt), got %q", value)
 	}
 }
 

@@ -308,21 +308,35 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 	applyDisableImageGenerationToResponsesPayload(req, payload)
 	codexNormalizeResponsesTools(payload)
 	applyDisableImageGenerationToResponsesPayload(req, payload)
-	if !codexResponsesCompactRequest(req) {
-		codexEnsureResponsesInstructions(req, payload)
-		codexApplyImageGenerationInstructions(payload)
-		codexEnsureReasoningEncryptedInclude(payload)
-		payload["stream"] = true
-		payload["store"] = codexResponsesDefaultInternalStoreValue
-		payload["parallel_tool_calls"] = true
-	} else {
-		// Compact endpoint is non-streaming by contract — sub2api
-		// normalizeOpenAIPassthroughOAuthBody (openai_gateway_service.go:6516)
-		// strips both `stream` and `store` when forwarding to
-		// /responses/compact. The upstream rejects requests that still carry
-		// stream:true with "provider rejected request".
+	// Verbatim port of CLIProxyAPI's Codex Responses request translator
+	// (internal/translator/codex/openai/responses/codex_openai-responses_request.go:11-46):
+	// ALL Codex /responses requests — compact included — set
+	// parallel_tool_calls=true, include=["reasoning.encrypted_content"],
+	// and store=false. The compact endpoint additionally strips `stream`
+	// (CLIProxyAPI internal/runtime/executor/codex_executor.go:executeCompact
+	// deletes `stream` post-translate). Earlier srapi gated these defaults
+	// behind !compact which left the compact payload missing required Codex
+	// fields and tripped upstream rejections.
+	codexApplyImageGenerationInstructions(payload)
+	codexEnsureReasoningEncryptedInclude(payload)
+	payload["store"] = codexResponsesDefaultInternalStoreValue
+	payload["parallel_tool_calls"] = true
+	if codexResponsesCompactRequest(req) {
+		// Compact is non-streaming by contract.
 		delete(payload, "stream")
-		delete(payload, "store")
+		// CLIProxyAPI's normalizeCodexInstructions (codex_executor.go:1732)
+		// forces `instructions` to "" when missing/null rather than
+		// injecting the model base prompt — compact carries the user's
+		// "summarize this conversation" input verbatim and the upstream
+		// rejects mismatched instructions for compact.
+		if codexInstructionsWasNormalizedEmpty(payload) {
+			payload["instructions"] = ""
+		} else if value, exists := payload["instructions"]; !exists || value == nil {
+			payload["instructions"] = ""
+		}
+	} else {
+		codexEnsureResponsesInstructions(req, payload)
+		payload["stream"] = true
 	}
 	for _, field := range codexUnsupportedResponsesFields() {
 		delete(payload, field)
