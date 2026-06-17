@@ -1410,30 +1410,50 @@ func (rt *runtimeState) doRefreshReverseProxyCredential(ctx context.Context, acc
 		rt.logger.Warn("failed to load provider account before refresh", "error", err, "account_id", account.ID)
 		return credential, false, err
 	}
-	response, err := rt.reverseProxy.Refresh(ctx, reverseproxycontract.RefreshRequest{
-		Account: reverseProxyAccountRuntime(account, credential),
-	})
-	if err != nil {
+	// Route through accounts.RefreshAccessTokenWithOutcome so the inline
+	// 401-driven OAuth refresh path actually updates refresh_attempts,
+	// refresh_last_error and needs_reauth_at — those fields shipped in
+	// Item A (commit 3a8c4b34) but the inline path was calling
+	// rt.reverseProxy.Refresh + rt.accounts.Update directly, bypassing
+	// all of them. That's why production Codex accounts could sit in
+	// needs_reauth with refresh_attempts permanently 0 — the worker
+	// ran fine but every real 401 just silently failed the inline
+	// retry without bookkeeping. Uses the same adapter the operator-
+	// initiated /admin/accounts/{id}/refresh handler uses, so the two
+	// paths produce identical state transitions.
+	adapter := adminAccountRefresherAdapter{refresher: rt.reverseProxy}
+	outcome, refreshErr := rt.accounts.RefreshAccessTokenWithOutcome(ctx, account.ID, adapter)
+	if refreshErr != nil {
 		rt.recordAudit(ctx, auditcontract.RecordRequest{
 			Action:       "provider_account.oauth_refresh_failed",
 			ResourceType: "provider_account",
 			ResourceID:   strconv.Itoa(account.ID),
 			Before:       accountAuditSnapshot(before),
-			After:        map[string]any{"refresh_status": "failed", "error_class": errorClassName(err)},
-			TraceID:      requestIDFromContext(ctx),
+			After: map[string]any{
+				"refresh_status":       "failed",
+				"error_class":          errorClassName(refreshErr),
+				"outcome_class":        string(outcome.Class),
+				"refresh_attempts":     outcome.Attempts,
+				"needs_reauth_flipped": outcome.NeedsReauthFlipped,
+			},
+			TraceID: requestIDFromContext(ctx),
 		})
-		// A permanently rejected refresh token (session_invalid) parks the account
-		// for re-auth so the scheduler stops selecting it and we stop replaying a
-		// dead refresh token; transient classes (rate_limit/timeout/upstream_error)
-		// map to no status and leave the account untouched for the next attempt.
-		rt.protectProviderAccountForClass(ctx, account, errorClassName(err))
-		return credential, false, err
+		// A permanently rejected refresh token (session_invalid) parks the
+		// account for re-auth via Status so the scheduler stops selecting
+		// it. RefreshAccessTokenWithOutcome already sets the newer
+		// needs_reauth_at timestamp on permanent or threshold-exceeded
+		// outcomes; we keep BOTH so existing UI / scheduler code reading
+		// Status keeps working without a coordinated migration.
+		rt.protectProviderAccountForClass(ctx, account, errorClassName(refreshErr))
+		return credential, false, refreshErr
 	}
-	refreshed := response.Credential
-	updated, err := rt.accounts.Update(ctx, account.ID, accountcontract.UpdateRequest{Credential: &refreshed})
-	if err != nil {
-		rt.logger.Warn("failed to persist refreshed provider credential", "error", err, "account_id", account.ID)
-		return credential, false, err
+	// Fetch the refreshed credential — RefreshAccessTokenWithOutcome
+	// persisted it inside the per-account mutex, so the read here gets
+	// the post-rotation value the inline retry needs.
+	refreshed, fetchErr := rt.accounts.DecryptCredential(ctx, account.ID)
+	if fetchErr != nil {
+		rt.logger.Warn("failed to read refreshed provider credential", "error", fetchErr, "account_id", account.ID)
+		return credential, false, fetchErr
 	}
 	rt.recordAudit(ctx, auditcontract.RecordRequest{
 		Action:       "provider_account.oauth_refresh",
@@ -1442,8 +1462,9 @@ func (rt *runtimeState) doRefreshReverseProxyCredential(ctx context.Context, acc
 		Before:       accountAuditSnapshot(before),
 		After: map[string]any{
 			"refresh_status":     "success",
-			"refreshed_at":       response.RefreshedAt,
-			"credential_version": updated.CredentialVersion,
+			"outcome_class":      string(outcome.Class),
+			"refresh_attempts":   outcome.Attempts,
+			"credential_version": outcome.Account.CredentialVersion,
 		},
 		TraceID: requestIDFromContext(ctx),
 	})
