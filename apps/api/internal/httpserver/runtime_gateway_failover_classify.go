@@ -172,6 +172,104 @@ func classifyNetworkError(err error) UpstreamFailoverDecision {
 	return UpstreamFailoverDecision{Class: "transient", ShouldFailover: true}
 }
 
+// classifyErrorPhase maps an errorClass + upstream HTTP status onto one of the
+// six sub2api error-phase buckets:
+//   - "auth"     — 401/403 or auth_failed/permission_denied/credential_error
+//   - "routing"  — no_available_account (the scheduler rejected every candidate)
+//   - "upstream" — any 4xx/5xx response received from the upstream
+//   - "network"  — transport-level failure (no HTTP response, e.g. DNS/TCP)
+//   - "request"  — client-side validation rejected (invalid_request, bad payload)
+//   - "internal" — gateway internal error (panic / unexpected nil)
+//
+// Falls back to "upstream" when the inputs are ambiguous but a status was
+// received, and to "internal" otherwise so unknown failures don't get
+// silently bucketed as routing.
+func classifyErrorPhase(errorClass string, statusCode int) string {
+	switch strings.ToLower(strings.TrimSpace(errorClass)) {
+	case "no_available_account":
+		return "routing"
+	case "auth_failed", "auth_error", "permission_denied", "credential_error", "forbidden":
+		return "auth"
+	case "network_error", "transport_error":
+		return "network"
+	case "invalid_request", "validation_required", "bad_request":
+		return "request"
+	case "internal_error", "panic":
+		return "internal"
+	}
+	if statusCode == 401 || statusCode == 403 {
+		return "auth"
+	}
+	if statusCode >= 400 && statusCode < 500 {
+		// 4xx that wasn't already auth: treat as upstream (the upstream rejected).
+		if statusCode == http.StatusBadRequest {
+			return "request"
+		}
+		return "upstream"
+	}
+	if statusCode >= 500 && statusCode < 600 {
+		return "upstream"
+	}
+	if statusCode == 0 && strings.TrimSpace(errorClass) == "" {
+		return "internal"
+	}
+	if statusCode == 0 {
+		return "network"
+	}
+	return "upstream"
+}
+
+// classifyErrorOwner returns the responsibility bucket: client | provider |
+// platform. Used by the admin panel to colour-code rows by who needs to act.
+func classifyErrorOwner(phase string) string {
+	switch phase {
+	case "request":
+		return "client"
+	case "auth", "upstream", "network":
+		return "provider"
+	case "routing", "internal":
+		return "platform"
+	default:
+		return "platform"
+	}
+}
+
+// classifyErrorSource returns where the error originated, mirroring sub2api's
+// source taxonomy: client_request | upstream_http | gateway.
+func classifyErrorSource(phase string) string {
+	switch phase {
+	case "request":
+		return "client_request"
+	case "auth", "upstream":
+		return "upstream_http"
+	case "network", "routing", "internal":
+		return "gateway"
+	default:
+		return "gateway"
+	}
+}
+
+// upstreamRequestIDFromHeaders extracts an upstream provider's request id from
+// the failing response headers. Checks the OpenAI/Anthropic/Codex conventions
+// in order: x-request-id, openai-request-id, x-codex-request-id, anthropic-request-id.
+func upstreamRequestIDFromHeaders(headers http.Header) string {
+	if headers == nil {
+		return ""
+	}
+	for _, key := range []string{
+		"X-Request-Id",
+		"Openai-Request-Id",
+		"X-Codex-Request-Id",
+		"Anthropic-Request-Id",
+		"Request-Id",
+	} {
+		if value := strings.TrimSpace(headers.Get(key)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 // parseRetryAfterMillis parses the Retry-After header (RFC 7231 §7.1.3): either
 // a delta-seconds integer or an HTTP-date. Returns 0 when absent/invalid so the
 // caller falls back to its own backoff schedule.

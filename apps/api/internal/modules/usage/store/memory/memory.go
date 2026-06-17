@@ -221,7 +221,47 @@ func cloneLog(value contract.UsageLog) contract.UsageLog {
 		cloned := *value.ChargedAt
 		value.ChargedAt = &cloned
 	}
+	if value.ResolvedAt != nil {
+		cloned := *value.ResolvedAt
+		value.ResolvedAt = &cloned
+	}
+	if value.ResolvedBy != nil {
+		cloned := *value.ResolvedBy
+		value.ResolvedBy = &cloned
+	}
+	if len(value.UpstreamErrors) > 0 {
+		events := make([]contract.UpstreamErrorEvent, len(value.UpstreamErrors))
+		for i, e := range value.UpstreamErrors {
+			if e.AccountID != nil {
+				id := *e.AccountID
+				e.AccountID = &id
+			}
+			events[i] = e
+		}
+		value.UpstreamErrors = events
+	}
 	return value
+}
+
+// UpdateResolved toggles the resolved flag on an existing log. Returns
+// (zero, error) when no row exists for id.
+func (s *Store) UpdateResolved(_ context.Context, id int, resolved bool, resolvedBy *int, resolvedAt *time.Time) (contract.UsageLog, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	log, ok := s.byID[id]
+	if !ok {
+		return contract.UsageLog{}, contract.ErrNotFound
+	}
+	log.Resolved = resolved
+	if resolved {
+		log.ResolvedBy = cloneInt(resolvedBy)
+		log.ResolvedAt = resolvedAt
+	} else {
+		log.ResolvedBy = nil
+		log.ResolvedAt = nil
+	}
+	s.byID[id] = log
+	return cloneLog(log), nil
 }
 
 func cloneInt(value *int) *int {

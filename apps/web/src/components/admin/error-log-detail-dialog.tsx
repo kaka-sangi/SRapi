@@ -10,7 +10,7 @@ import { QuietBadge } from "@/components/ui/quiet-badge";
 import { CopyButton } from "@/components/ui/copy-button";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
-import { useAdminErrorLog } from "@/hooks/admin-queries";
+import { useAdminErrorLog, useResolveErrorLog } from "@/hooks/admin-queries";
 import { useAccountNameLookup } from "@/hooks/use-account-name-lookup";
 import { useApiKeyNameLookup } from "@/hooks/use-api-key-name-lookup";
 import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
@@ -70,9 +70,12 @@ function ErrorLogDetailBody({ detail }: { detail: ErrorLog }) {
   const accountLookup = useAccountNameLookup();
   const apiKeyLookup = useApiKeyNameLookup();
   const providerLookup = useProviderNameLookup();
+  const resolveMutation = useResolveErrorLog();
   const protocol = detail.target_protocol
     ? `${detail.source_protocol} → ${detail.target_protocol}`
     : detail.source_protocol;
+  const events = detail.upstream_errors ?? [];
+  const firstAt = events.length > 0 ? events[0]?.at_unix_ms ?? 0 : 0;
 
   return (
     <div className="space-y-4">
@@ -136,13 +139,130 @@ function ErrorLogDetailBody({ detail }: { detail: ErrorLog }) {
         <Field label={t("adminErrorLogs.protocol")} value={protocol} mono />
         <Field label={t("adminErrorLogs.latency")} value={formatLatency(detail.latency_ms)} mono />
         <Field label={t("adminErrorLogs.attempt")} value={formatInteger(detail.attempt_no)} mono />
+        <Field
+          label={t("adminErrorLogs.statusCode")}
+          value={detail.status_code != null ? String(detail.status_code) : "—"}
+          mono
+        />
+        <Field
+          label={t("adminErrorLogs.upstreamRequestId")}
+          value={detail.upstream_request_id || "—"}
+          mono
+          copyable
+        />
+        <Field
+          label={t("adminErrorLogs.errorPhase")}
+          value={detail.error_phase || "—"}
+          mono
+        />
+        <Field
+          label={t("adminErrorLogs.errorOwner")}
+          value={detail.error_owner || "—"}
+          mono
+        />
+        <Field
+          label={t("adminErrorLogs.errorSource")}
+          value={detail.error_source || "—"}
+          mono
+        />
         <Field label={t("adminErrorLogs.inputTokens")} value={formatInteger(detail.input_tokens)} mono />
         <Field label={t("adminErrorLogs.outputTokens")} value={formatInteger(detail.output_tokens)} mono />
         <Field label={t("adminErrorLogs.apiKey")} value={apiKeyLookup.get(detail.api_key_id)} />
         <Field label={t("adminErrorLogs.account")} value={accountLookup.get(detail.account_id)} />
         <Field label={t("adminErrorLogs.provider")} value={providerLookup.get(detail.provider_id)} />
         <Field label={t("adminErrorLogs.time")} value={formatDateTime(detail.created_at)} mono />
+        {detail.resolved_at ? (
+          <Field
+            label={t("adminErrorLogs.resolvedAt")}
+            value={formatDateTime(detail.resolved_at)}
+            mono
+          />
+        ) : null}
+        {detail.resolved_by ? (
+          <Field label={t("adminErrorLogs.resolvedBy")} value={detail.resolved_by} mono />
+        ) : null}
       </div>
+
+      {/* Resolve toggle */}
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
+        <div className="min-w-0">
+          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+            {detail.resolved ? t("adminErrorLogs.resolved") : t("adminErrorLogs.unresolved")}
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={resolveMutation.isPending}
+          onClick={() =>
+            resolveMutation.mutate({ id: detail.id, resolved: !detail.resolved })
+          }
+          className="rounded-md border border-srapi-border bg-srapi-surface px-3 py-1.5 text-xs font-medium text-srapi-text-primary transition-colors hover:bg-srapi-card-muted disabled:opacity-50"
+        >
+          {detail.resolved
+            ? t("adminErrorLogs.markUnresolved")
+            : t("adminErrorLogs.markResolved")}
+        </button>
+      </div>
+
+      {/* Per-attempt timeline */}
+      {events.length > 0 ? (
+        <div className="rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
+          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+            {t("adminErrorLogs.attemptHistory")}
+          </p>
+          <ol className="mt-2 space-y-2">
+            {events.map((ev, idx) => {
+              const offsetMs =
+                firstAt > 0 && ev.at_unix_ms > 0 ? ev.at_unix_ms - firstAt : 0;
+              return (
+                <li
+                  key={`${ev.attempt_no}-${idx}`}
+                  className="rounded-md border border-srapi-border bg-srapi-surface p-3"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-2xs font-semibold text-srapi-text-primary">
+                      {t("adminErrorLogs.attemptN", { n: ev.attempt_no })}
+                    </span>
+                    {ev.kind ? (
+                      <span className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+                        {ev.kind}
+                      </span>
+                    ) : null}
+                    {ev.upstream_status_code > 0 ? (
+                      <span className="font-mono text-2xs text-srapi-error">
+                        {ev.upstream_status_code}
+                      </span>
+                    ) : null}
+                    {offsetMs > 0 ? (
+                      <span className="font-mono text-2xs text-srapi-text-tertiary">
+                        +{offsetMs}ms
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-1 text-xs text-srapi-text-secondary">
+                    {ev.account_name || "—"}
+                    {ev.upstream_request_id ? (
+                      <span className="ml-2 font-mono text-2xs text-srapi-text-tertiary">
+                        · {ev.upstream_request_id}
+                      </span>
+                    ) : null}
+                  </div>
+                  {ev.message ? (
+                    <p className="mt-1 break-words text-xs text-srapi-text-primary">
+                      {ev.message}
+                    </p>
+                  ) : null}
+                  {ev.body_excerpt ? (
+                    <p className="mt-1 break-words font-mono text-2xs text-srapi-text-tertiary">
+                      {ev.body_excerpt}
+                    </p>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      ) : null}
     </div>
   );
 }

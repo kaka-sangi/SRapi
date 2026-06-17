@@ -2,8 +2,12 @@ package contract
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+// ErrNotFound is returned by Store.UpdateResolved when no row matches id.
+var ErrNotFound = errors.New("usage log not found")
 
 type UsageLog struct {
 	ID                    int
@@ -37,6 +41,28 @@ type UsageLog struct {
 	// short enough to be safe to inline in the admin panel but long enough
 	// to surface the relevant error code/field. Empty for successful requests.
 	ProviderErrorBodyExcerpt string
+	// StatusCode is the upstream HTTP status code for the final failing
+	// attempt (0 when no HTTP response was ever received, e.g. transport
+	// failure). Mirrors sub2api ops_error_logs.status_code.
+	StatusCode int
+	// UpstreamRequestID carries the upstream provider's request id (the
+	// value of x-request-id / openai-request-id / x-codex-request-id on
+	// the failing response). Empty when the upstream did not return one.
+	UpstreamRequestID string
+	// ErrorPhase / ErrorOwner / ErrorSource classify the failure for the
+	// admin panel. Phase: request|auth|routing|upstream|network|internal.
+	// Owner: client|provider|platform. Source: client_request|upstream_http|gateway.
+	ErrorPhase  string
+	ErrorOwner  string
+	ErrorSource string
+	// Resolved marks an operator-acknowledged error log; ResolvedBy /
+	// ResolvedAt record who and when.
+	Resolved   bool
+	ResolvedBy *int
+	ResolvedAt *time.Time
+	// UpstreamErrors is the per-attempt history mirroring sub2api's
+	// ops_upstream_error_events — one entry per failed candidate attempt.
+	UpstreamErrors        []UpstreamErrorEvent
 	Cost                  string
 	ActualCost            string
 	RateMultiplier        string
@@ -52,6 +78,25 @@ type UsageLog struct {
 	ChargedAt             *time.Time
 	CompatibilityWarnings []string
 	CreatedAt             time.Time
+}
+
+// UpstreamErrorEvent captures one failed candidate attempt for an aggregate
+// gateway request. Multiple events under the same RequestID form the failover
+// timeline shown in the admin panel. Mirrors sub2api's ops_upstream_error_events
+// row (one per attempt). AtUnixMs is wall-clock ms since epoch when the failure
+// was observed; AttemptNo is the cross-candidate attempt index (1-based).
+type UpstreamErrorEvent struct {
+	AtUnixMs           int64
+	AttemptNo          int
+	AccountID          *int
+	AccountName        string
+	UpstreamStatusCode int
+	UpstreamRequestID  string
+	UpstreamURL        string
+	// Kind is one of: http_error / request_error / retry_exhausted / failover.
+	Kind        string
+	Message     string
+	BodyExcerpt string
 }
 
 type RecordRequest struct {
@@ -78,6 +123,16 @@ type RecordRequest struct {
 	// matching fields on UsageLog for the sub2api parity rationale.
 	ProviderErrorMessage     string
 	ProviderErrorBodyExcerpt string
+	// New: see UsageLog for the per-field rationale.
+	StatusCode            int
+	UpstreamRequestID     string
+	ErrorPhase            string
+	ErrorOwner            string
+	ErrorSource           string
+	Resolved              bool
+	ResolvedBy            *int
+	ResolvedAt            *time.Time
+	UpstreamErrors        []UpstreamErrorEvent
 	Cost                  string
 	ActualCost            string
 	RateMultiplier        string
@@ -226,6 +281,13 @@ type Store interface {
 	// Implementations must honor filter.MaxDelete and filter.DryRun and return
 	// the matched/deleted counts so the caller can report whether the cap was hit.
 	CleanupLogs(ctx context.Context, filter CleanupFilter) (CleanupResult, error)
+}
+
+// ResolveUpdater is an optional Store capability that toggles an error log's
+// resolved state. Stores that do not implement it cause the admin PATCH
+// /api/v1/admin/error-logs/{id}/resolve endpoint to return 501.
+type ResolveUpdater interface {
+	UpdateResolved(ctx context.Context, id int, resolved bool, resolvedBy *int, resolvedAt *time.Time) (UsageLog, error)
 }
 
 // WindowReader is an optional Store capability that lists usage logs inside a

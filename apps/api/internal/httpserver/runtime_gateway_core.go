@@ -70,10 +70,39 @@ type gatewayUsageRecord struct {
 	// attempt (e.g. the x-codex-* rate-limit telemetry). It is populated only on
 	// failure paths so the cooldown stage can fold provider quota telemetry into
 	// account metadata without re-reading the upstream response.
-	Headers       http.Header
-	QualityPrompt string
-	QualityOutput string
-	FeedbackID    int
+	Headers http.Header
+	// UpstreamRequestID carries the upstream provider's request id extracted
+	// from the failing response headers (x-request-id / openai-request-id /
+	// x-codex-request-id). Empty when the upstream did not return one.
+	UpstreamRequestID string
+	// ErrorPhase / ErrorOwner / ErrorSource classify the failure for the
+	// admin error-log panel. See runtime_gateway_failover.go for the
+	// taxonomy mapping helpers.
+	ErrorPhase  string
+	ErrorOwner  string
+	ErrorSource string
+	// UpstreamErrors is the per-attempt failover history for this request:
+	// one event per failed candidate attempt. Carried into the persisted
+	// usage_log so the admin panel can render the timeline.
+	UpstreamErrors []gatewayUpstreamErrorEvent
+	QualityPrompt  string
+	QualityOutput  string
+	FeedbackID     int
+}
+
+// gatewayUpstreamErrorEvent mirrors the persisted UpstreamErrorEvent for the
+// in-process failover state; converted 1:1 when handed off to the usage layer.
+type gatewayUpstreamErrorEvent struct {
+	AtUnixMs           int64
+	AttemptNo          int
+	AccountID          *int
+	AccountName        string
+	UpstreamStatusCode int
+	UpstreamRequestID  string
+	UpstreamURL        string
+	Kind               string
+	Message            string
+	BodyExcerpt        string
 }
 
 type gatewayAdmission struct {

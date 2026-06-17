@@ -4505,11 +4505,42 @@ export type ErrorLog = {
      * upstream_error_detail.
      */
     error_body_excerpt?: string | null;
+    /** Upstream HTTP status code (omitted when no HTTP response was received). */
+    status_code?: number | null;
+    /** Upstream provider request id (x-request-id / openai-request-id / x-codex-request-id). */
+    upstream_request_id?: string | null;
+    /** request | auth | routing | upstream | network | internal */
+    error_phase?: string | null;
+    /** client | provider | platform */
+    error_owner?: string | null;
+    /** client_request | upstream_http | gateway */
+    error_source?: string | null;
+    /** Whether an operator has acknowledged + resolved this error. */
+    resolved: boolean;
+    /** Numeric id of the admin who marked it resolved. */
+    resolved_by?: string | null;
+    resolved_at?: Timestamp | null;
+    /** Per-attempt failover history (sub2api ops_upstream_error_events parity). */
+    upstream_errors?: Array<UpstreamErrorEvent> | null;
     latency_ms: number;
     input_tokens: number;
     output_tokens: number;
     attempt_no: number;
     usage_estimated: boolean;
+};
+
+export type UpstreamErrorEvent = {
+    at_unix_ms: number;
+    attempt_no: number;
+    account_id?: string | null;
+    account_name: string;
+    upstream_status_code: number;
+    upstream_request_id: string;
+    upstream_url: string;
+    /** http_error | request_error | retry_exhausted | failover */
+    kind: string;
+    message: string;
+    body_excerpt: string;
 };
 
 export type ErrorLogListResponse = {
@@ -14442,6 +14473,11 @@ export type ListAdminErrorLogsData = {
         source_endpoint?: string;
         start?: string;
         end?: string;
+        /**
+         * Free-text search over upstream error message + request id.
+         * Case-insensitive substring match.
+         */
+        q?: string;
     };
     url: '/api/v1/admin/error-logs';
 };
@@ -14513,6 +14549,36 @@ export type GetAdminErrorLogResponses = {
 };
 
 export type GetAdminErrorLogResponse = GetAdminErrorLogResponses[keyof GetAdminErrorLogResponses];
+
+export type ResolveAdminErrorLogData = {
+    body: {
+        resolved: boolean;
+    };
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/error-logs/{id}/resolve';
+};
+
+export type ResolveAdminErrorLogErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    default: ErrorResponse;
+};
+
+export type ResolveAdminErrorLogError = ResolveAdminErrorLogErrors[keyof ResolveAdminErrorLogErrors];
+
+export type ResolveAdminErrorLogResponses = {
+    200: {
+        data: ErrorLog;
+        request_id: RequestId;
+    };
+};
+
+export type ResolveAdminErrorLogResponse = ResolveAdminErrorLogResponses[keyof ResolveAdminErrorLogResponses];
 
 export type BatchGetAdminUsersSpendingTodayData = {
     body?: never;

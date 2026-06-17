@@ -7147,6 +7147,13 @@ paths:
           schema:
             type: string
             format: date-time
+        - name: q
+          in: query
+          description: |
+            Free-text search across error_message + request_id (case-insensitive
+            substring match). Empty/missing returns unfiltered results.
+          schema:
+            type: string
       responses:
         "200":
           description: Error log list.
@@ -7200,6 +7207,63 @@ paths:
                     $ref: "#/components/schemas/ErrorLog"
                   request_id:
                     $ref: "#/components/schemas/RequestId"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/error-logs/{id}/resolve:
+    patch:
+      tags:
+        - AdminUsage
+      operationId: resolveAdminErrorLog
+      summary: Toggle resolved state on an error log.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        admin: write
+        operator: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - resolved
+              properties:
+                resolved:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated error log.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - request_id
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ErrorLog"
+                  request_id:
+                    $ref: "#/components/schemas/RequestId"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -26711,6 +26775,48 @@ components:
         error_class:
           type: string
           nullable: true
+        error_message:
+          type: string
+          nullable: true
+          description: Verbatim upstream error message (sub2api parity).
+        error_body_excerpt:
+          type: string
+          nullable: true
+          description: Compacted upstream error envelope.
+        status_code:
+          type: integer
+          nullable: true
+          description: Upstream HTTP status code (omitted when no HTTP response).
+        upstream_request_id:
+          type: string
+          nullable: true
+          description: Upstream provider request id (x-request-id / openai-request-id).
+        error_phase:
+          type: string
+          nullable: true
+          description: request | auth | routing | upstream | network | internal
+        error_owner:
+          type: string
+          nullable: true
+          description: client | provider | platform
+        error_source:
+          type: string
+          nullable: true
+          description: client_request | upstream_http | gateway
+        resolved:
+          type: boolean
+          description: Operator acknowledgement flag.
+        resolved_by:
+          type: string
+          nullable: true
+        resolved_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+        upstream_errors:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/UpstreamErrorEvent"
         latency_ms:
           type: integer
           minimum: 0
@@ -26725,6 +26831,46 @@ components:
           minimum: 1
         usage_estimated:
           type: boolean
+
+    UpstreamErrorEvent:
+      type: object
+      description: |
+        One failed candidate attempt within a gateway request's failover history
+        (sub2api ops_upstream_error_events parity).
+      required:
+        - at_unix_ms
+        - attempt_no
+        - account_name
+        - upstream_status_code
+        - upstream_request_id
+        - upstream_url
+        - kind
+        - message
+        - body_excerpt
+      properties:
+        at_unix_ms:
+          type: integer
+          format: int64
+        attempt_no:
+          type: integer
+        account_id:
+          type: string
+          nullable: true
+        account_name:
+          type: string
+        upstream_status_code:
+          type: integer
+        upstream_request_id:
+          type: string
+        upstream_url:
+          type: string
+        kind:
+          type: string
+          description: http_error | request_error | retry_exhausted | failover
+        message:
+          type: string
+        body_excerpt:
+          type: string
 
     ErrorLogListResponse:
       type: object

@@ -63,6 +63,17 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		ErrorClass:               rec.ErrorClass,
 		ProviderErrorMessage:     rec.ProviderErrorMessage,
 		ProviderErrorBodyExcerpt: rec.ProviderErrorBodyExcerpt,
+		StatusCode: func() int {
+			if rec.StatusCode != nil {
+				return *rec.StatusCode
+			}
+			return 0
+		}(),
+		UpstreamRequestID: rec.UpstreamRequestID,
+		ErrorPhase:        rec.ErrorPhase,
+		ErrorOwner:        rec.ErrorOwner,
+		ErrorSource:       rec.ErrorSource,
+		UpstreamErrors:    gatewayUpstreamErrorEventsToContract(rec.UpstreamErrors),
 		Cost:                  pricing.Amount,
 		ActualCost:            pricing.ActualCost,
 		RateMultiplier:        rateMultiplier,
@@ -156,6 +167,35 @@ func (rt *runtimeState) recordGatewayUsageEffects(ctx context.Context, rec gatew
 	}
 	rt.recordGatewayRiskFailure(ctx, rec)
 	rt.enqueueGatewayAccountSnapshotRefresh(ctx, rec)
+}
+
+func gatewayUsageEventsToContract(events []gatewayUpstreamErrorEvent) []usagecontract.UpstreamErrorEvent {
+	if len(events) == 0 {
+		return nil
+	}
+	out := make([]usagecontract.UpstreamErrorEvent, len(events))
+	for i, e := range events {
+		out[i] = usagecontract.UpstreamErrorEvent{
+			AtUnixMs:           e.AtUnixMs,
+			AttemptNo:          e.AttemptNo,
+			AccountID:          e.AccountID,
+			AccountName:        e.AccountName,
+			UpstreamStatusCode: e.UpstreamStatusCode,
+			UpstreamRequestID:  e.UpstreamRequestID,
+			UpstreamURL:        e.UpstreamURL,
+			Kind:               e.Kind,
+			Message:            e.Message,
+			BodyExcerpt:        e.BodyExcerpt,
+		}
+	}
+	return out
+}
+
+// gatewayUpstreamErrorEventsToContract is the canonical exported converter name
+// (alias of gatewayUsageEventsToContract). Kept short for the recordGatewayUsage
+// call site.
+func gatewayUpstreamErrorEventsToContract(events []gatewayUpstreamErrorEvent) []usagecontract.UpstreamErrorEvent {
+	return gatewayUsageEventsToContract(events)
 }
 
 func gatewayUsageRequestedModel(rec gatewayUsageRecord, recordedModel string) string {

@@ -133,3 +133,67 @@ func TestClassifyUpstreamError_NonFailureStatus(t *testing.T) {
 		}
 	}
 }
+
+// TestClassifyErrorPhase pins the sub2api error-phase taxonomy mapping
+// (request/auth/routing/upstream/network/internal). The owner/source helpers
+// derive from phase, so we also assert they round-trip consistently.
+func TestClassifyErrorPhase(t *testing.T) {
+	cases := []struct {
+		name       string
+		class      string
+		status     int
+		wantPhase  string
+		wantOwner  string
+		wantSource string
+	}{
+		{"401 -> auth", "", 401, "auth", "provider", "upstream_http"},
+		{"403 -> auth", "auth_failed", 403, "auth", "provider", "upstream_http"},
+		{"no_available_account -> routing", "no_available_account", 0, "routing", "platform", "gateway"},
+		{"5xx -> upstream", "", 500, "upstream", "provider", "upstream_http"},
+		{"network -> network", "network_error", 0, "network", "provider", "gateway"},
+		{"400 -> request", "", 400, "request", "client", "client_request"},
+		{"internal_error -> internal", "internal_error", 0, "internal", "platform", "gateway"},
+		{"unknown empty -> internal", "", 0, "internal", "platform", "gateway"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			phase := classifyErrorPhase(tc.class, tc.status)
+			if phase != tc.wantPhase {
+				t.Fatalf("phase: got %q want %q", phase, tc.wantPhase)
+			}
+			owner := classifyErrorOwner(phase)
+			if owner != tc.wantOwner {
+				t.Fatalf("owner: got %q want %q", owner, tc.wantOwner)
+			}
+			source := classifyErrorSource(phase)
+			if source != tc.wantSource {
+				t.Fatalf("source: got %q want %q", source, tc.wantSource)
+			}
+		})
+	}
+}
+
+// TestUpstreamRequestIDFromHeaders covers the OpenAI / Codex / Anthropic
+// request-id header conventions used by classifyErrorPhase callers.
+func TestUpstreamRequestIDFromHeaders(t *testing.T) {
+	cases := []struct {
+		name    string
+		headers http.Header
+		want    string
+	}{
+		{"x-request-id wins", http.Header{"X-Request-Id": []string{"abc-1"}}, "abc-1"},
+		{"openai-request-id", http.Header{"Openai-Request-Id": []string{"openai-2"}}, "openai-2"},
+		{"x-codex-request-id", http.Header{"X-Codex-Request-Id": []string{"codex-3"}}, "codex-3"},
+		{"anthropic-request-id", http.Header{"Anthropic-Request-Id": []string{"a-4"}}, "a-4"},
+		{"absent -> empty", http.Header{}, ""},
+		{"nil -> empty", nil, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := upstreamRequestIDFromHeaders(tc.headers)
+			if got != tc.want {
+				t.Fatalf("got %q want %q", got, tc.want)
+			}
+		})
+	}
+}

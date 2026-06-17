@@ -114,3 +114,109 @@ func TestAdminErrorLogsDerivedFromFailedUsage(t *testing.T) {
 		t.Fatalf("unknown error-log id: expected 404, got %d body=%s", missingRec.Code, missingRec.Body.String())
 	}
 }
+
+// TestAdminErrorLogResolveToggle drives the PATCH
+// /api/v1/admin/error-logs/{id}/resolve handler: a fresh failed usage log is
+// returned with resolved=false; flipping to true returns resolved=true with
+// resolved_at populated; flipping back clears it.
+func TestAdminErrorLogResolveToggle(t *testing.T) {
+	failing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":{"message":"boom"}}`))
+	}))
+	defer failing.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	csrf := loginResp.Data.CsrfToken
+
+	badProvider := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"bad-provider","display_name":"Bad","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	badModel := mustCreateModel(t, handler, sessionCookie, csrf, `{"canonical_name":"bad-model","display_name":"Bad","status":"active","capabilities":[{"key":"streaming","level":"optional","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, csrf, string(badModel.Data.Id), `{"provider_id":"`+string(badProvider.Data.Id)+`","upstream_model_name":"bad-up","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, csrf, `{"provider_id":"`+string(badProvider.Data.Id)+`","name":"bad-account","runtime_class":"api_key","credential":{"api_key":"secret"},"metadata":{"base_url":"`+failing.URL+`/v1"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, csrf)
+
+	failReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"bad-model","messages":[{"role":"user","content":"hi"}]}`))
+	failReq.Header.Set("Authorization", "Bearer "+apiKey)
+	failReq.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(httptest.NewRecorder(), failReq)
+
+	// List to get the id.
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/error-logs?page=1&page_size=50", nil)
+	listReq.AddCookie(sessionCookie)
+	listRec := httptest.NewRecorder()
+	handler.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("list: expected 200, got %d body=%s", listRec.Code, listRec.Body.String())
+	}
+	var list apiopenapi.ErrorLogListResponse
+	if err := json.NewDecoder(listRec.Body).Decode(&list); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if len(list.Data) == 0 {
+		t.Fatalf("no error log to resolve")
+	}
+	id := string(list.Data[0].Id)
+	if list.Data[0].Resolved {
+		t.Fatalf("expected fresh error log unresolved")
+	}
+
+	// PATCH resolved=true.
+	patchReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/error-logs/"+id+"/resolve", strings.NewReader(`{"resolved":true}`))
+	patchReq.AddCookie(sessionCookie)
+	patchReq.Header.Set("Content-Type", "application/json")
+	patchReq.Header.Set("X-CSRF-Token", csrf)
+	patchRec := httptest.NewRecorder()
+	handler.ServeHTTP(patchRec, patchReq)
+	if patchRec.Code != http.StatusOK {
+		t.Fatalf("patch resolved=true: expected 200, got %d body=%s", patchRec.Code, patchRec.Body.String())
+	}
+	var patchBody struct {
+		Data apiopenapi.ErrorLog `json:"data"`
+	}
+	if err := json.NewDecoder(patchRec.Body).Decode(&patchBody); err != nil {
+		t.Fatalf("decode patch body: %v", err)
+	}
+	if !patchBody.Data.Resolved {
+		t.Fatalf("expected resolved=true after PATCH, got false")
+	}
+	if patchBody.Data.ResolvedAt == nil {
+		t.Fatalf("expected resolved_at set after PATCH")
+	}
+
+	// PATCH resolved=false clears it.
+	clearReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/error-logs/"+id+"/resolve", strings.NewReader(`{"resolved":false}`))
+	clearReq.AddCookie(sessionCookie)
+	clearReq.Header.Set("Content-Type", "application/json")
+	clearReq.Header.Set("X-CSRF-Token", csrf)
+	clearRec := httptest.NewRecorder()
+	handler.ServeHTTP(clearRec, clearReq)
+	if clearRec.Code != http.StatusOK {
+		t.Fatalf("patch resolved=false: expected 200, got %d", clearRec.Code)
+	}
+	var clearBody struct {
+		Data apiopenapi.ErrorLog `json:"data"`
+	}
+	if err := json.NewDecoder(clearRec.Body).Decode(&clearBody); err != nil {
+		t.Fatalf("decode clear body: %v", err)
+	}
+	if clearBody.Data.Resolved {
+		t.Fatalf("expected resolved=false after clear PATCH")
+	}
+	if clearBody.Data.ResolvedAt != nil {
+		t.Fatalf("expected resolved_at cleared, got %v", *clearBody.Data.ResolvedAt)
+	}
+
+	// Unknown id -> 404.
+	missingReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/error-logs/99999999/resolve", strings.NewReader(`{"resolved":true}`))
+	missingReq.AddCookie(sessionCookie)
+	missingReq.Header.Set("Content-Type", "application/json")
+	missingReq.Header.Set("X-CSRF-Token", csrf)
+	missingRec := httptest.NewRecorder()
+	handler.ServeHTTP(missingRec, missingReq)
+	if missingRec.Code != http.StatusNotFound {
+		t.Fatalf("unknown id PATCH: expected 404, got %d", missingRec.Code)
+	}
+}

@@ -6986,23 +6986,61 @@ type ErrorLog struct {
 	// (sub2api parity: ops_error_logs.upstream_error_message). Empty when
 	// the request did not record an upstream message (e.g. transport-only
 	// failures or successes).
-	ErrorMessage     *string   `json:"error_message,omitempty"`
+	ErrorMessage *string `json:"error_message,omitempty"`
 	// ErrorBodyExcerpt mirrors sub2api's upstream_error_detail — the
 	// compacted upstream error envelope (class | status | type | code |
 	// message). Empty when no envelope was captured.
-	ErrorBodyExcerpt *string   `json:"error_body_excerpt,omitempty"`
-	Id               Id        `json:"id"`
-	InputTokens      int       `json:"input_tokens"`
-	LatencyMs        int       `json:"latency_ms"`
-	Model            string    `json:"model"`
-	OutputTokens     int       `json:"output_tokens"`
-	ProviderId       *string   `json:"provider_id,omitempty"`
-	RequestId        RequestId `json:"request_id"`
-	SourceEndpoint   string    `json:"source_endpoint"`
-	SourceProtocol   string    `json:"source_protocol"`
-	TargetProtocol   string    `json:"target_protocol"`
-	UsageEstimated   bool      `json:"usage_estimated"`
-	UserId           Id        `json:"user_id"`
+	ErrorBodyExcerpt *string `json:"error_body_excerpt,omitempty"`
+	// StatusCode is the upstream HTTP status code (0 when no HTTP response was
+	// received; emitted as omitted in that case).
+	StatusCode *int `json:"status_code,omitempty"`
+	// UpstreamRequestID is the upstream provider's request id from the
+	// failing response (x-request-id / openai-request-id / x-codex-request-id).
+	UpstreamRequestId *string `json:"upstream_request_id,omitempty"`
+	// ErrorPhase / ErrorOwner / ErrorSource classify the failure for triage.
+	// Phase: request|auth|routing|upstream|network|internal.
+	// Owner: client|provider|platform. Source: client_request|upstream_http|gateway.
+	ErrorPhase  *string `json:"error_phase,omitempty"`
+	ErrorOwner  *string `json:"error_owner,omitempty"`
+	ErrorSource *string `json:"error_source,omitempty"`
+	// Resolved marks an operator-acknowledged error log; ResolvedBy /
+	// ResolvedAt record who and when.
+	Resolved   bool       `json:"resolved"`
+	ResolvedBy *string    `json:"resolved_by,omitempty"`
+	ResolvedAt *Timestamp `json:"resolved_at,omitempty"`
+	// UpstreamErrors is the per-attempt failover history. One entry per
+	// failed candidate attempt across the request's cross-credential loop.
+	UpstreamErrors *[]UpstreamErrorEvent `json:"upstream_errors,omitempty"`
+	Id             Id                    `json:"id"`
+	InputTokens    int                   `json:"input_tokens"`
+	LatencyMs      int                   `json:"latency_ms"`
+	Model          string                `json:"model"`
+	OutputTokens   int                   `json:"output_tokens"`
+	ProviderId     *string               `json:"provider_id,omitempty"`
+	RequestId      RequestId             `json:"request_id"`
+	SourceEndpoint string                `json:"source_endpoint"`
+	SourceProtocol string                `json:"source_protocol"`
+	TargetProtocol string                `json:"target_protocol"`
+	UsageEstimated bool                  `json:"usage_estimated"`
+	UserId         Id                    `json:"user_id"`
+}
+
+// UpstreamErrorEvent records one failed candidate attempt within a
+// gateway request's failover history (sub2api ops_upstream_error_events
+// parity). One ErrorLog can carry multiple events; they are ordered by
+// attempt_no.
+type UpstreamErrorEvent struct {
+	AtUnixMs           int64   `json:"at_unix_ms"`
+	AttemptNo          int     `json:"attempt_no"`
+	AccountId          *string `json:"account_id,omitempty"`
+	AccountName        string  `json:"account_name"`
+	UpstreamStatusCode int     `json:"upstream_status_code"`
+	UpstreamRequestId  string  `json:"upstream_request_id"`
+	UpstreamUrl        string  `json:"upstream_url"`
+	// Kind is one of http_error / request_error / retry_exhausted / failover.
+	Kind        string `json:"kind"`
+	Message     string `json:"message"`
+	BodyExcerpt string `json:"body_excerpt"`
 }
 
 // ErrorLogListResponse defines model for ErrorLogListResponse.

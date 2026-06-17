@@ -458,6 +458,10 @@ func invokeGatewayCandidateWithFailover[T any](
 	excluded := append([]int(nil), initialExcluded...)
 	var fallbackFromDecisionID *int
 	var lastFailure gatewayFailoverResult[T]
+	// upstreamErrors accumulates one entry per failed candidate attempt across
+	// the whole failover loop so the persisted usage_log can carry the timeline
+	// for the admin error-log surface (sub2api ops_upstream_error_events parity).
+	upstreamErrors := make([]gatewayUpstreamErrorEvent, 0, retrySettings.MaxAttempts)
 
 NextCandidate:
 	for attemptNo := 1; attemptNo <= retrySettings.MaxAttempts; attemptNo++ {
@@ -505,6 +509,7 @@ NextCandidate:
 		if err := s.reserveGatewayAccountQuotaForScheduledRequest(ctx, r, authed, canonical, result, admission, startedAt); err != nil {
 			breakerDone(false)
 			errorClass, upstreamStatus, _ := providerGatewayError(err)
+			upstreamErrors = append(upstreamErrors, buildGatewayUpstreamErrorEvent(attemptNo, result, err, upstreamStatus))
 			lastFailure = gatewayFailoverResult[T]{
 				ScheduleResult:  result,
 				Err:             err,
@@ -583,7 +588,8 @@ NextCandidate:
 					breakerDone(false)
 					releaseConcurrencySlotOnce()
 					s.runtime.releaseGatewayAccountQuota(ctx, admission.EstimatedUsage, result.Candidate)
-					s.recordGatewayProviderAttemptFailure(r, authed, canonical, result, err, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
+					upstreamErrors = append(upstreamErrors, buildGatewayUpstreamErrorEvent(attemptNo, result, err, upstreamStatus))
+					s.recordGatewayProviderAttemptFailureWithHistory(r, authed, canonical, result, err, errorClass, upstreamStatus, elapsedMillis(startedAt), admission, upstreamErrors)
 					return gatewayFailoverResult[T]{
 						ScheduleResult:  result,
 						Err:             err,
@@ -596,7 +602,8 @@ NextCandidate:
 			breakerDone(false)
 			releaseConcurrencySlotOnce()
 			s.runtime.releaseGatewayAccountQuota(ctx, admission.EstimatedUsage, result.Candidate)
-			s.recordGatewayProviderAttemptFailure(r, authed, canonical, result, err, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
+			upstreamErrors = append(upstreamErrors, buildGatewayUpstreamErrorEvent(attemptNo, result, err, upstreamStatus))
+			s.recordGatewayProviderAttemptFailureWithHistory(r, authed, canonical, result, err, errorClass, upstreamStatus, elapsedMillis(startedAt), admission, upstreamErrors)
 			lastFailure = gatewayFailoverResult[T]{
 				ScheduleResult:  result,
 				Err:             err,
@@ -618,36 +625,81 @@ NextCandidate:
 }
 
 func (s *Server) recordGatewayProviderAttemptFailure(r *http.Request, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, providerErr error, errorClass string, upstreamStatus int, latencyMS int, admission gatewayAdmission) {
+	s.recordGatewayProviderAttemptFailureWithHistory(r, authed, canonical, result, providerErr, errorClass, upstreamStatus, latencyMS, admission, nil)
+}
+
+// recordGatewayProviderAttemptFailureWithHistory is the variant that carries the
+// cumulative per-attempt UpstreamErrorEvent timeline into the usage layer so the
+// admin error-log surface can render the failover history of the request.
+func (s *Server) recordGatewayProviderAttemptFailureWithHistory(r *http.Request, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, providerErr error, errorClass string, upstreamStatus int, latencyMS int, admission gatewayAdmission, upstreamErrors []gatewayUpstreamErrorEvent) {
 	s.recordOpsErrorLog(r.Context(), authed, canonical, result, providerErr, errorClass, upstreamStatus)
+	headers := providerHeadersFromError(providerErr)
+	upstreamRequestID := upstreamRequestIDFromHeaders(headers)
+	phase := classifyErrorPhase(errorClass, upstreamStatus)
+	owner := classifyErrorOwner(phase)
+	source := classifyErrorSource(phase)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-		RequestID:             canonical.RequestID,
-		Authed:                authed,
-		DecisionID:            result.Decision.ID,
-		AttemptNo:             result.Decision.AttemptNo,
-		ProviderID:            ptrInt(result.Candidate.Provider.ID),
-		AccountID:             ptrInt(result.Candidate.Account.ID),
-		SourceProtocol:        string(canonical.SourceProtocol),
-		SourceEndpoint:        canonical.SourceEndpoint,
-		TargetProtocol:        result.Candidate.Provider.Protocol,
-		Model:                 canonical.CanonicalModel,
-		RequestedModel:        gatewayUsageRequestedSnapshot(canonical, result.Candidate),
-		UpstreamModel:         gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
-		Success:               false,
-		ErrorClass:            ptrStringValue(errorClass),
-		StatusCode:            ptrInt(upstreamStatus),
-		LatencyMS:             latencyMS,
-		InputTokens:           admission.EstimatedUsage.InputTokens,
-		OutputTokens:          admission.EstimatedUsage.OutputTokens,
-		CachedTokens:          admission.EstimatedUsage.CachedTokens,
-		UsageEstimated:        true,
-		Pricing:               admission.Pricing,
-		CompatibilityWarnings: canonical.CompatibilityWarnings,
-		ProviderQuotaSignals:  providerQuotaSignalsFromError(providerErr),
-		ProviderRetryAfter:    providerRetryAfterFromError(providerErr),
+		RequestID:                canonical.RequestID,
+		Authed:                   authed,
+		DecisionID:               result.Decision.ID,
+		AttemptNo:                result.Decision.AttemptNo,
+		ProviderID:               ptrInt(result.Candidate.Provider.ID),
+		AccountID:                ptrInt(result.Candidate.Account.ID),
+		SourceProtocol:           string(canonical.SourceProtocol),
+		SourceEndpoint:           canonical.SourceEndpoint,
+		TargetProtocol:           result.Candidate.Provider.Protocol,
+		Model:                    canonical.CanonicalModel,
+		RequestedModel:           gatewayUsageRequestedSnapshot(canonical, result.Candidate),
+		UpstreamModel:            gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
+		Success:                  false,
+		ErrorClass:               ptrStringValue(errorClass),
+		StatusCode:               ptrInt(upstreamStatus),
+		LatencyMS:                latencyMS,
+		InputTokens:              admission.EstimatedUsage.InputTokens,
+		OutputTokens:             admission.EstimatedUsage.OutputTokens,
+		CachedTokens:             admission.EstimatedUsage.CachedTokens,
+		UsageEstimated:           true,
+		Pricing:                  admission.Pricing,
+		CompatibilityWarnings:    canonical.CompatibilityWarnings,
+		ProviderQuotaSignals:     providerQuotaSignalsFromError(providerErr),
+		ProviderRetryAfter:       providerRetryAfterFromError(providerErr),
 		ProviderErrorMessage:     providerErrorMessage(providerErr),
 		ProviderErrorBodyExcerpt: providerErrorBodyExcerpt(providerErr),
-		Headers:                  providerHeadersFromError(providerErr),
+		Headers:                  headers,
+		UpstreamRequestID:        upstreamRequestID,
+		ErrorPhase:               phase,
+		ErrorOwner:               owner,
+		ErrorSource:              source,
+		UpstreamErrors:           append([]gatewayUpstreamErrorEvent(nil), upstreamErrors...),
 	})
+}
+
+// buildGatewayUpstreamErrorEvent assembles one history entry for the failing
+// attempt. AccountID/Name come from the chosen candidate; status/request id come
+// from the provider error headers; kind is "http_error" when a status was
+// received, else "request_error" (transport failure before any HTTP response).
+func buildGatewayUpstreamErrorEvent(attemptNo int, result schedulercontract.ScheduleResult, providerErr error, statusCode int) gatewayUpstreamErrorEvent {
+	headers := providerHeadersFromError(providerErr)
+	kind := "http_error"
+	if statusCode == 0 {
+		kind = "request_error"
+	}
+	var accountID *int
+	if result.Candidate.Account.ID > 0 {
+		accountID = ptrInt(result.Candidate.Account.ID)
+	}
+	return gatewayUpstreamErrorEvent{
+		AtUnixMs:           time.Now().UTC().UnixMilli(),
+		AttemptNo:          attemptNo,
+		AccountID:          accountID,
+		AccountName:        result.Candidate.Account.Name,
+		UpstreamStatusCode: statusCode,
+		UpstreamRequestID:  upstreamRequestIDFromHeaders(headers),
+		UpstreamURL:        result.Candidate.Mapping.UpstreamModelName,
+		Kind:               kind,
+		Message:            providerErrorMessage(providerErr),
+		BodyExcerpt:        providerErrorBodyExcerpt(providerErr),
+	}
 }
 
 func (s *Server) recordGatewayNoAvailableAccount(r *http.Request, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, admission gatewayAdmission, startedAt time.Time) {

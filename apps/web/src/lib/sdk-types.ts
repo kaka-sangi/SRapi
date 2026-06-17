@@ -49,6 +49,7 @@ export type {
   BillingLedgerEntry,
   DomainEventOutbox,
   ErrorLog,
+  UpstreamErrorEvent,
   ErrorPassthroughRule,
   PayloadRule,
   ScheduledTestPlan,

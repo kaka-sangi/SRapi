@@ -114,6 +114,15 @@ func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contr
 		ErrorClass:               req.ErrorClass,
 		ProviderErrorMessage:     strings.TrimSpace(req.ProviderErrorMessage),
 		ProviderErrorBodyExcerpt: strings.TrimSpace(req.ProviderErrorBodyExcerpt),
+		StatusCode:               req.StatusCode,
+		UpstreamRequestID:        strings.TrimSpace(req.UpstreamRequestID),
+		ErrorPhase:               strings.TrimSpace(req.ErrorPhase),
+		ErrorOwner:               strings.TrimSpace(req.ErrorOwner),
+		ErrorSource:              strings.TrimSpace(req.ErrorSource),
+		Resolved:                 req.Resolved,
+		ResolvedBy:               req.ResolvedBy,
+		ResolvedAt:               req.ResolvedAt,
+		UpstreamErrors:           cloneUpstreamErrorEvents(req.UpstreamErrors),
 		Cost:                  cost,
 		ActualCost:            actualCost,
 		RateMultiplier:        rateMultiplier,
@@ -312,6 +321,40 @@ func normalizeCleanupFilter(filter contract.CleanupFilter) (contract.CleanupFilt
 		return contract.CleanupFilter{}, ErrInvalidInput
 	}
 	return filter, nil
+}
+
+// Resolve toggles the resolved flag on an error log. Returns
+// ErrInvalidInput when the underlying store does not support the
+// ResolveUpdater capability.
+func (s *Service) Resolve(ctx context.Context, id int, resolved bool, actorUserID *int) (contract.UsageLog, error) {
+	if id <= 0 {
+		return contract.UsageLog{}, ErrInvalidInput
+	}
+	updater, ok := s.store.(contract.ResolveUpdater)
+	if !ok {
+		return contract.UsageLog{}, ErrInvalidInput
+	}
+	now := s.clock.Now().UTC()
+	var resolvedAt *time.Time
+	if resolved {
+		resolvedAt = &now
+	}
+	return updater.UpdateResolved(ctx, id, resolved, actorUserID, resolvedAt)
+}
+
+func cloneUpstreamErrorEvents(events []contract.UpstreamErrorEvent) []contract.UpstreamErrorEvent {
+	if len(events) == 0 {
+		return nil
+	}
+	out := make([]contract.UpstreamErrorEvent, len(events))
+	for i, e := range events {
+		if e.AccountID != nil {
+			id := *e.AccountID
+			e.AccountID = &id
+		}
+		out[i] = e
+	}
+	return out
 }
 
 func cloneStrings(values []string) []string {
