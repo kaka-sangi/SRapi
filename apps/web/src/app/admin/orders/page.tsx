@@ -257,7 +257,12 @@ function AuditDialog({ order, onClose }: { order: PaymentOrder; onClose: () => v
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t("adminOrders.audit.title")}</DialogTitle>
-          <DialogDescription>{order.order_no}</DialogDescription>
+          <DialogDescription>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="font-mono">{order.order_no}</span>
+              <CopyButton value={order.order_no} size="inline" />
+            </span>
+          </DialogDescription>
         </DialogHeader>
         <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
           {logs.isLoading ? (
