@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { exportAdminUsage } from "../../../../packages/sdk/typescript/src/index";
+import { escapeCsv } from "@/lib/csv";
 import { configureSDKClient, parseMoneyValue } from "@/lib/api/_shared";
 import type { UsageLog } from "@/lib/sdk-types";
 
@@ -50,19 +51,6 @@ const COLUMNS: { header: string; value: (log: UsageLog) => string | number }[] =
   { header: "cache_write_cost", value: (l) => parseMoneyValue(l.cache_write_cost) },
   { header: "currency", value: (l) => l.currency },
 ];
-
-// Wrap in quotes when needed; neutralise spreadsheet formula injection
-// (=, +, -, @, leading control chars) by prefixing a single quote. Same
-// approach as use-usage-export.ts — keep both in sync if you tweak it.
-function escapeCsv(value: string | number): string {
-  const str = String(value);
-  const needsFormulaGuard = /^[=+\-@\t\r]/.test(str);
-  const guarded = needsFormulaGuard ? `'${str}` : str;
-  if (/[",\n\r]/.test(guarded)) {
-    return `"${guarded.replace(/"/g, '""')}"`;
-  }
-  return guarded;
-}
 
 function rowsToCsv(rows: UsageLog[]): string {
   const header = COLUMNS.map((c) => escapeCsv(c.header)).join(",");

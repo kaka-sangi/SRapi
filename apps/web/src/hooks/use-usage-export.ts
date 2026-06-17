@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { getCurrentUserUsage } from "../../../../packages/sdk/typescript/src/index";
 import { configureSDKClient, parseMoneyValue } from "@/lib/api/_shared";
+import { escapeCsv } from "@/lib/csv";
 import type { LiveUsageLog } from "@/lib/api/types";
 
 /**
@@ -57,20 +58,6 @@ const COLUMNS: { header: string; value: (log: LiveUsageLog) => string | number }
   { header: "currency", value: (l) => l.currency ?? "USD" },
 ];
 
-/**
- * Escape a CSV field: wrap in quotes when it contains a delimiter/quote/newline,
- * and neutralise spreadsheet formula injection (=, +, -, @, leading control
- * chars) by prefixing a single quote.
- */
-function escapeCsv(value: string | number): string {
-  const str = String(value);
-  const needsFormulaGuard = /^[=+\-@\t\r]/.test(str);
-  const guarded = needsFormulaGuard ? `'${str}` : str;
-  if (/[",\n\r]/.test(guarded)) {
-    return `"${guarded.replace(/"/g, '""')}"`;
-  }
-  return guarded;
-}
 
 function rowsToCsv(rows: LiveUsageLog[]): string {
   const header = COLUMNS.map((c) => escapeCsv(c.header)).join(",");
