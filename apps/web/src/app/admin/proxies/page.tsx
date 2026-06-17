@@ -37,10 +37,12 @@ import {
   proxyFormFromProxy,
   buildCreateProxyBody,
   buildUpdateProxyBody,
+  COUNTRY_NONE,
   type ProxyFormState,
 } from "@/lib/admin-proxy-form";
 import type { ProxyDefinition } from "@/lib/sdk-types";
 import { formatDateTime, formatLatency } from "@/lib/admin-format";
+import { countryOptions } from "@/lib/countries";
 
 export default function AdminProxiesPage() {
   return (
@@ -51,15 +53,48 @@ export default function AdminProxiesPage() {
 }
 
 function ProxiesContent() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-proxies", []);
   const statusFilter = (list.filters.status as ProxyDefinition["status"]) || undefined;
+  const countryFilter = (list.filters.country as string | undefined) || undefined;
+  // Memoise the localized {value,label} pairs once per render and resolve a
+  // single code → label lookup so the table and the form share the exact same
+  // localized display name.
+  const countrySelectOptions = countryOptions(language);
+  const countryLabelByCode = new Map(countrySelectOptions.map((o) => [o.value, o.label]));
+  const localizedCountryName = (code: string | null | undefined, fallback: string | null | undefined): string => {
+    const c = (code ?? "").trim().toUpperCase();
+    if (!c) return fallback?.trim() || "";
+    const labeled = countryLabelByCode.get(c);
+    if (labeled) {
+      // Strip the trailing " (XX)" suffix that countryOptions adds for the
+      // form picker — the table already shows the code in a separate font-mono
+      // hint, so the cell stays terse.
+      return labeled.replace(/\s+\([A-Z]{2}\)$/, "");
+    }
+    return fallback?.trim() || c;
+  };
   const proxies = useAdminProxies({
     page: list.page,
     page_size: list.pageSize,
     status: statusFilter,
   });
+  // Country filter is applied client-side because the API list endpoint takes
+  // status only — adding a server-side filter would be a separate contract
+  // change. Pagination keeps the server total so the operator still sees a
+  // truthful row count; filtering only narrows the visible page.
+  const filteredProxies = countryFilter && proxies.data
+    ? {
+        ...proxies,
+        data: {
+          ...proxies.data,
+          data: proxies.data.data.filter(
+            (p) => (p.country_code ?? "").trim().toUpperCase() === countryFilter.trim().toUpperCase(),
+          ),
+        },
+      }
+    : proxies;
   const createMut = useCreateProxy();
   const updateMut = useUpdateProxy();
   const deleteMut = useDeleteProxy();
@@ -176,6 +211,20 @@ function ProxiesContent() {
       hint: isNew ? undefined : t("adminProxies.urlEditHint"),
     },
     {
+      // Country is a long select sourced from the canonical ISO list. A
+      // leading "—" sentinel clears the field (Radix Select rejects empty
+      // SelectItem values, so we use a sentinel and translate it back to ""
+      // inside withCountryName at save time). The form commits the ISO code;
+      // the snapshot label is captured into countryName at save time inside
+      // withCountryName so the list view does not depend on the viewer's
+      // locale to render a stable country column.
+      name: "countryCode",
+      label: t("adminProxies.countrySelectLabel"),
+      type: "select",
+      options: [{ value: COUNTRY_NONE, label: "— " + t("adminProxies.countrySelectPlaceholder") }, ...countrySelectOptions],
+      placeholder: t("adminProxies.countrySelectPlaceholder"),
+    },
+    {
       name: "status",
       label: t("adminCommon.status"),
       type: "select",
@@ -184,6 +233,22 @@ function ProxiesContent() {
     },
     { name: "metadata", label: t("adminCommon.metadata"), help: t("adminCommon.metadataHelp"), type: "keyvalue", advanced: true },
   ];
+
+  // Snapshot the localized country label at save time so the table shows a
+  // stable name even when the operator's locale later changes. Done in a thin
+  // wrapper around buildCreateProxyBody / buildUpdateProxyBody so the form
+  // helper stays pure and re-usable from tests.
+  // Snapshot the localized country label so the table shows a stable name
+  // even when the operator's locale later changes. buildCreate/UpdateProxyBody
+  // already normalises country_code (handles the sentinel, trims, uppercases);
+  // this thin wrapper just attaches a matching country_name.
+  const withCountryName = <T extends { country_code?: string | null; country_name?: string | null }>(body: T): T => {
+    const code = (body.country_code ?? "").trim().toUpperCase();
+    if (!code) {
+      return { ...body, country_code: null, country_name: null };
+    }
+    return { ...body, country_code: code, country_name: localizedCountryName(code, code) };
+  };
 
   const columns: Column<ProxyDefinition>[] = [
     {
@@ -199,6 +264,47 @@ function ProxiesContent() {
       render: (p) => (
         <span className="font-mono text-2xs uppercase text-srapi-text-secondary">{p.type}</span>
       ),
+    },
+    {
+      key: "country",
+      header: t("adminProxies.countryColumn"),
+      sortValue: (p) =>
+        (p.country_name ?? "") || (p.country_code ?? "") || "",
+      render: (p) => {
+        const code = (p.country_code ?? "").trim().toUpperCase();
+        const name = localizedCountryName(code, p.country_name);
+        if (!code && !name) {
+          return <span className="text-srapi-text-tertiary">—</span>;
+        }
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className="text-srapi-text-primary">{name || code}</span>
+            {code && name ? (
+              <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">{code}</span>
+            ) : null}
+          </div>
+        );
+      },
+    },
+    {
+      key: "availability",
+      header: t("adminProxies.availabilityColumn"),
+      sortValue: (p) => {
+        const total = (p.probe_success_count ?? 0) + (p.probe_failure_count ?? 0);
+        if (total <= 0) return -1;
+        return typeof p.probe_success_pct_7d === "number" ? p.probe_success_pct_7d : -1;
+      },
+      render: (p) => {
+        const total = (p.probe_success_count ?? 0) + (p.probe_failure_count ?? 0);
+        if (!p.last_probed_at || total <= 0 || typeof p.probe_success_pct_7d !== "number") {
+          return (
+            <span className="text-2xs text-srapi-text-tertiary" title={t("adminProxies.availabilityNeverProbed")}>
+              —
+            </span>
+          );
+        }
+        return <AvailabilityBadge pct={p.probe_success_pct_7d} />;
+      },
     },
     {
       key: "url",
@@ -272,7 +378,7 @@ function ProxiesContent() {
         }
       />
       <AdminListView
-        query={proxies}
+        query={filteredProxies}
         columns={columns}
         columnVisibility={colVis}
         getRowId={(p) => p.id}
@@ -285,7 +391,7 @@ function ProxiesContent() {
           </Button>
         }
         minWidth={520}
-        isFiltered={Boolean(statusFilter)}
+        isFiltered={Boolean(statusFilter) || Boolean(countryFilter)}
         onClearFilters={list.clearFilters}
         sort={list.sort}
         onSort={list.toggleSort}
@@ -296,6 +402,12 @@ function ProxiesContent() {
               onChange={(v) => list.setFilter("status", v)}
               options={enumOptions(PROXY_STATUSES)}
               allLabel={t("adminCommon.allStatuses")}
+            />
+            <FilterSelect
+              value={countryFilter}
+              onChange={(v) => list.setFilter("country", v)}
+              options={countryFilterOptions(proxies.data?.data, localizedCountryName)}
+              allLabel={t("adminProxies.countrySelectPlaceholder")}
             />
           </ListToolbar>
         }
@@ -375,7 +487,7 @@ function ProxiesContent() {
           title={t("adminProxies.create")}
           fields={fields}
           initial={emptyProxyForm()}
-          buildBody={buildCreateProxyBody}
+          buildBody={(form) => withCountryName(buildCreateProxyBody(form))}
           submit={(body) => createMut.mutateAsync(body)}
           successMessage={t("feedback.created")}
           isPending={createMut.isPending}
@@ -389,7 +501,7 @@ function ProxiesContent() {
           title={t("adminProxies.edit")}
           fields={fields}
           initial={proxyFormFromProxy(formTarget)}
-          buildBody={buildUpdateProxyBody}
+          buildBody={(form) => withCountryName(buildUpdateProxyBody(form))}
           submit={(body) => updateMut.mutateAsync({ id: formTarget.id, body })}
           successMessage={t("feedback.updated")}
           isPending={updateMut.isPending}
@@ -397,6 +509,38 @@ function ProxiesContent() {
       ) : null}
     </>
   );
+}
+
+// AvailabilityBadge renders the rolling 7-day success percentage with three
+// tone thresholds chosen to match the operator's read-at-a-glance intent:
+// >=95% is green ("ship it"), 70-94% is yellow ("watch this"), <70% is red
+// ("don't route through this"). Exported so the unit test can render it
+// directly without bootstrapping the whole admin page.
+export function AvailabilityBadge({ pct }: { pct: number }) {
+  // The QuietBadge palette uses "active"=green, "limited"=yellow, "error"=red
+  // — the same tone scheme the rest of the admin uses for at-a-glance status.
+  const tone: "active" | "limited" | "error" = pct >= 95 ? "active" : pct >= 70 ? "limited" : "error";
+  return <QuietBadge status={tone} label={`${pct}%`} />;
+}
+
+// countryFilterOptions returns one entry per unique country_code present in
+// the visible list. Operators see only the codes that actually exist in their
+// proxy roster — no point in offering 250 ISO codes when 4 are in use.
+function countryFilterOptions(
+  rows: readonly { country_code?: string | null }[] | undefined,
+  resolveName: (code: string | null | undefined, fallback: string | null | undefined) => string,
+): { value: string; label: string }[] {
+  const seen = new Set<string>();
+  const out: { value: string; label: string }[] = [];
+  for (const row of rows ?? []) {
+    const code = (row.country_code ?? "").trim().toUpperCase();
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    const name = resolveName(code, null);
+    out.push({ value: code, label: name ? `${name} (${code})` : code });
+  }
+  out.sort((a, b) => a.label.localeCompare(b.label));
+  return out;
 }
 
 interface LastProxyTest {

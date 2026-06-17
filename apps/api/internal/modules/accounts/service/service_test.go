@@ -1018,3 +1018,181 @@ func TestProxyTestErrorClassesCategorizeFailures(t *testing.T) {
 		t.Fatalf("expected ErrInvalidInput for id=0, got %v", err)
 	}
 }
+
+// stepClock is a deterministic Clock that returns the configured time and
+// advances on demand. Lets TestRecordProxyProbeWindowReset jump exactly past
+// the 7-day window boundary without sleeping.
+type stepClock struct{ now time.Time }
+
+func (c *stepClock) Now() time.Time         { return c.now }
+func (c *stepClock) advance(d time.Duration) { c.now = c.now.Add(d) }
+
+// TestRecordProxyProbeCountsSuccessAndFailure exercises the rolling
+// availability counters: a fresh proxy starts at 0/0, successes/failures
+// accumulate, last_probe_latency_ms tracks the most recent OK probe (not
+// updated on failures), and ProbeSuccessPct7d rounds correctly across each
+// snapshot. Also asserts last_probed_at advances on every call.
+func TestRecordProxyProbeCountsSuccessAndFailure(t *testing.T) {
+	store := accountmemory.New()
+	clock := &stepClock{now: time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC)}
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", clock)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name: "rolling",
+		Type: contract.ProxyTypeHTTPS,
+		URL:  "https://proxy.example.invalid:443",
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+	if pct := proxy.ProbeSuccessPct7d(); pct != nil {
+		t.Fatalf("fresh proxy availability: want nil, got %d", *pct)
+	}
+
+	clock.advance(time.Minute)
+	updated, err := svc.RecordProxyProbe(ctx, proxy.ID, true, 123)
+	if err != nil {
+		t.Fatalf("first probe: %v", err)
+	}
+	if updated.ProbeSuccessCount != 1 || updated.ProbeFailureCount != 0 {
+		t.Fatalf("counts after success: %+v", updated)
+	}
+	if updated.LastProbeLatencyMs != 123 {
+		t.Fatalf("latency snapshot: want 123, got %d", updated.LastProbeLatencyMs)
+	}
+	if updated.LastProbedAt == nil || !updated.LastProbedAt.Equal(clock.now.UTC()) {
+		t.Fatalf("last_probed_at: want %s, got %v", clock.now, updated.LastProbedAt)
+	}
+	if pct := updated.ProbeSuccessPct7d(); pct == nil || *pct != 100 {
+		t.Fatalf("availability after 1 success: want 100, got %v", pct)
+	}
+
+	clock.advance(time.Minute)
+	// Failed probes must not clobber the latency snapshot from the last success.
+	updated, err = svc.RecordProxyProbe(ctx, proxy.ID, false, 9999)
+	if err != nil {
+		t.Fatalf("second probe: %v", err)
+	}
+	if updated.ProbeSuccessCount != 1 || updated.ProbeFailureCount != 1 {
+		t.Fatalf("counts after failure: %+v", updated)
+	}
+	if updated.LastProbeLatencyMs != 123 {
+		t.Fatalf("failed probe must not clobber latency: got %d", updated.LastProbeLatencyMs)
+	}
+	if pct := updated.ProbeSuccessPct7d(); pct == nil || *pct != 50 {
+		t.Fatalf("availability after 1/2: want 50, got %v", pct)
+	}
+
+	// Three more failures to get a 25% bucket and validate rounding.
+	for i := 0; i < 2; i++ {
+		clock.advance(time.Minute)
+		if _, err := svc.RecordProxyProbe(ctx, proxy.ID, false, 0); err != nil {
+			t.Fatalf("loop probe: %v", err)
+		}
+	}
+	clock.advance(time.Minute)
+	updated, err = svc.RecordProxyProbe(ctx, proxy.ID, false, 0)
+	if err != nil {
+		t.Fatalf("final failure probe: %v", err)
+	}
+	if updated.ProbeSuccessCount != 1 || updated.ProbeFailureCount != 4 {
+		t.Fatalf("counts after 1S/4F: %+v", updated)
+	}
+	if pct := updated.ProbeSuccessPct7d(); pct == nil || *pct != 20 {
+		t.Fatalf("availability after 1/5: want 20, got %v", pct)
+	}
+}
+
+// TestRecordProxyProbeWindowResetsAfter7Days verifies the rolling-window
+// reset: once 7+ days have elapsed since the last reset marker, the very
+// next probe zeros both counters before applying its own outcome so the
+// percentage stays current rather than averaging in week-old samples.
+func TestRecordProxyProbeWindowResetsAfter7Days(t *testing.T) {
+	store := accountmemory.New()
+	clock := &stepClock{now: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)}
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", clock)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name: "weekly-reset",
+		Type: contract.ProxyTypeHTTPS,
+		URL:  "https://proxy.example.invalid:443",
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+
+	// Seed three failures so the counters are non-zero before the rollover.
+	for i := 0; i < 3; i++ {
+		clock.advance(time.Hour)
+		if _, err := svc.RecordProxyProbe(ctx, proxy.ID, false, 0); err != nil {
+			t.Fatalf("seed probe: %v", err)
+		}
+	}
+	pre, err := svc.FindProxyByID(ctx, proxy.ID)
+	if err != nil {
+		t.Fatalf("find pre-rollover: %v", err)
+	}
+	if pre.ProbeFailureCount != 3 {
+		t.Fatalf("pre-rollover failures: want 3, got %d", pre.ProbeFailureCount)
+	}
+
+	// Jump just past the 7-day window — the next probe must reset both
+	// counters before recording its own success.
+	clock.advance(7*24*time.Hour + time.Minute)
+	post, err := svc.RecordProxyProbe(ctx, proxy.ID, true, 42)
+	if err != nil {
+		t.Fatalf("post-rollover probe: %v", err)
+	}
+	if post.ProbeSuccessCount != 1 || post.ProbeFailureCount != 0 {
+		t.Fatalf("counters not reset after 7d: %+v", post)
+	}
+	if pct := post.ProbeSuccessPct7d(); pct == nil || *pct != 100 {
+		t.Fatalf("availability after rollover: want 100, got %v", pct)
+	}
+}
+
+// TestProxyCountryRoundTrip checks that the operator-supplied country fields
+// survive a Create + Update + Find round-trip and that the empty-string
+// default produces a nil API pointer (covered indirectly via the contract's
+// own field — the response mapping is exercised in the httpserver tests).
+func TestProxyCountryRoundTrip(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	code := "us"
+	name := "United States"
+	created, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name:        "us-east",
+		Type:        contract.ProxyTypeHTTPS,
+		URL:         "https://proxy.example.invalid:443",
+		CountryCode: &code,
+		CountryName: &name,
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+	if created.CountryCode != "US" {
+		t.Fatalf("country_code normalisation: want US, got %q", created.CountryCode)
+	}
+	if created.CountryName != "United States" {
+		t.Fatalf("country_name: want United States, got %q", created.CountryName)
+	}
+
+	newCode := "cn"
+	updated, err := svc.UpdateProxy(ctx, created.ID, contract.UpdateProxyRequest{CountryCode: &newCode})
+	if err != nil {
+		t.Fatalf("update proxy: %v", err)
+	}
+	if updated.CountryCode != "CN" {
+		t.Fatalf("country_code update: want CN, got %q", updated.CountryCode)
+	}
+}

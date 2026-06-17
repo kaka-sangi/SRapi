@@ -1724,6 +1724,12 @@ var (
 		{Name: "url_version", Type: field.TypeInt, Default: 1},
 		{Name: "status", Type: field.TypeString, Default: "active"},
 		{Name: "metadata_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "country_code", Type: field.TypeString, Nullable: true, Size: 2, Default: ""},
+		{Name: "country_name", Type: field.TypeString, Nullable: true, Size: 128, Default: ""},
+		{Name: "last_probed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "probe_success_count", Type: field.TypeInt, Default: 0},
+		{Name: "probe_failure_count", Type: field.TypeInt, Default: 0},
+		{Name: "last_probe_latency_ms", Type: field.TypeInt, Default: 0},
 	}
 	// ProxiesTable holds the schema information for the "proxies" table.
 	ProxiesTable = &schema.Table{

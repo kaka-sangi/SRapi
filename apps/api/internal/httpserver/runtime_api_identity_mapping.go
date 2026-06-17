@@ -266,16 +266,33 @@ func stringPtrFromAPI[T ~string](value *T) *string {
 }
 
 func toAPIProxyDefinition(proxy accountcontract.ProxyDefinition) apiopenapi.ProxyDefinition {
-	return apiopenapi.ProxyDefinition{
-		CreatedAt:     proxy.CreatedAt,
-		Id:            apiopenapi.Id(strconv.Itoa(proxy.ID)),
-		Metadata:      mapToJsonObjectPtr(proxy.Metadata),
-		Name:          proxy.Name,
-		Status:        apiopenapi.ProxyDefinitionStatus(proxy.Status),
-		Type:          apiopenapi.ProxyDefinitionType(proxy.Type),
-		UpdatedAt:     proxy.UpdatedAt,
-		UrlConfigured: proxy.URLCiphertext != "",
+	out := apiopenapi.ProxyDefinition{
+		CreatedAt:          proxy.CreatedAt,
+		Id:                 apiopenapi.Id(strconv.Itoa(proxy.ID)),
+		Metadata:           mapToJsonObjectPtr(proxy.Metadata),
+		Name:               proxy.Name,
+		Status:             apiopenapi.ProxyDefinitionStatus(proxy.Status),
+		Type:               apiopenapi.ProxyDefinitionType(proxy.Type),
+		UpdatedAt:          proxy.UpdatedAt,
+		UrlConfigured:      proxy.URLCiphertext != "",
+		ProbeSuccessCount:  proxy.ProbeSuccessCount,
+		ProbeFailureCount:  proxy.ProbeFailureCount,
+		LastProbeLatencyMs: proxy.LastProbeLatencyMs,
+		ProbeSuccessPct7d:  proxy.ProbeSuccessPct7d(),
 	}
+	if proxy.CountryCode != "" {
+		code := proxy.CountryCode
+		out.CountryCode = &code
+	}
+	if proxy.CountryName != "" {
+		name := proxy.CountryName
+		out.CountryName = &name
+	}
+	if proxy.LastProbedAt != nil {
+		ts := *proxy.LastProbedAt
+		out.LastProbedAt = &ts
+	}
+	return out
 }
 
 func (s *Server) apiAccount(ctx context.Context, account accountcontract.ProviderAccount) apiopenapi.ProviderAccount {

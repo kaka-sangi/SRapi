@@ -19669,6 +19669,9 @@ components:
         - url_configured
         - created_at
         - updated_at
+        - probe_success_count
+        - probe_failure_count
+        - last_probe_latency_ms
       properties:
         id:
           $ref: "#/components/schemas/Id"
@@ -19683,6 +19686,38 @@ components:
           description: True when an encrypted proxy URL is stored. Raw URLs are never returned.
         metadata:
           $ref: "#/components/schemas/JsonObject"
+        country_code:
+          type: string
+          maxLength: 2
+          nullable: true
+          description: ISO-3166-1 alpha-2 country code, operator-supplied.
+        country_name:
+          type: string
+          nullable: true
+          description: Display name for the country, snapshotted at write time.
+        last_probed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last time the proxy probe worker tested this proxy.
+        probe_success_count:
+          type: integer
+          minimum: 0
+          description: Successful probes since the last counter reset (rolling ~7-day window — counters reset weekly, NOT a strict trailing-7d window).
+        probe_failure_count:
+          type: integer
+          minimum: 0
+          description: Failed probes since the last counter reset.
+        last_probe_latency_ms:
+          type: integer
+          minimum: 0
+          description: Latency of the most recent successful probe in milliseconds. 0 if no successful probe yet.
+        probe_success_pct_7d:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+          description: Rolling availability percentage. Null when never probed since last reset.
         created_at:
           $ref: "#/components/schemas/Timestamp"
         updated_at:
@@ -19709,6 +19744,15 @@ components:
           $ref: "#/components/schemas/ProxyDefinitionStatus"
         metadata:
           $ref: "#/components/schemas/JsonObject"
+        country_code:
+          type: string
+          maxLength: 2
+          nullable: true
+          description: ISO-3166-1 alpha-2 country code, operator-supplied.
+        country_name:
+          type: string
+          nullable: true
+          description: Localized display name for the country, snapshotted at write time.
 
     UpdateProxyDefinitionRequest:
       type: object
@@ -19728,6 +19772,15 @@ components:
           $ref: "#/components/schemas/ProxyDefinitionStatus"
         metadata:
           $ref: "#/components/schemas/JsonObject"
+        country_code:
+          type: string
+          maxLength: 2
+          nullable: true
+          description: ISO-3166-1 alpha-2 country code, operator-supplied.
+        country_name:
+          type: string
+          nullable: true
+          description: Localized display name for the country, snapshotted at write time.
 
     BatchCreateProxiesRequest:
       type: object

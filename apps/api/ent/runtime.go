@@ -1764,6 +1764,30 @@ func init() {
 	proxyDescStatus := proxyFields[4].Descriptor()
 	// proxy.DefaultStatus holds the default value on creation for the status field.
 	proxy.DefaultStatus = proxyDescStatus.Default.(string)
+	// proxyDescCountryCode is the schema descriptor for country_code field.
+	proxyDescCountryCode := proxyFields[6].Descriptor()
+	// proxy.DefaultCountryCode holds the default value on creation for the country_code field.
+	proxy.DefaultCountryCode = proxyDescCountryCode.Default.(string)
+	// proxy.CountryCodeValidator is a validator for the "country_code" field. It is called by the builders before save.
+	proxy.CountryCodeValidator = proxyDescCountryCode.Validators[0].(func(string) error)
+	// proxyDescCountryName is the schema descriptor for country_name field.
+	proxyDescCountryName := proxyFields[7].Descriptor()
+	// proxy.DefaultCountryName holds the default value on creation for the country_name field.
+	proxy.DefaultCountryName = proxyDescCountryName.Default.(string)
+	// proxy.CountryNameValidator is a validator for the "country_name" field. It is called by the builders before save.
+	proxy.CountryNameValidator = proxyDescCountryName.Validators[0].(func(string) error)
+	// proxyDescProbeSuccessCount is the schema descriptor for probe_success_count field.
+	proxyDescProbeSuccessCount := proxyFields[9].Descriptor()
+	// proxy.DefaultProbeSuccessCount holds the default value on creation for the probe_success_count field.
+	proxy.DefaultProbeSuccessCount = proxyDescProbeSuccessCount.Default.(int)
+	// proxyDescProbeFailureCount is the schema descriptor for probe_failure_count field.
+	proxyDescProbeFailureCount := proxyFields[10].Descriptor()
+	// proxy.DefaultProbeFailureCount holds the default value on creation for the probe_failure_count field.
+	proxy.DefaultProbeFailureCount = proxyDescProbeFailureCount.Default.(int)
+	// proxyDescLastProbeLatencyMs is the schema descriptor for last_probe_latency_ms field.
+	proxyDescLastProbeLatencyMs := proxyFields[11].Descriptor()
+	// proxy.DefaultLastProbeLatencyMs holds the default value on creation for the last_probe_latency_ms field.
+	proxy.DefaultLastProbeLatencyMs = proxyDescLastProbeLatencyMs.Default.(int)
 	qualityevalsampleMixin := schema.QualityEvalSample{}.Mixin()
 	qualityevalsampleMixinFields0 := qualityevalsampleMixin[0].Fields()
 	_ = qualityevalsampleMixinFields0

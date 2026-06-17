@@ -217,6 +217,8 @@ func (s *Store) CreateProxy(_ context.Context, input contract.CreateStoredProxy)
 		URLVersion:    input.URLVersion,
 		Status:        input.Status,
 		Metadata:      cloneMap(input.Metadata),
+		CountryCode:   input.CountryCode,
+		CountryName:   input.CountryName,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -615,6 +617,10 @@ func cloneProxy(value contract.ProxyDefinition) contract.ProxyDefinition {
 	if value.DeletedAt != nil {
 		cloned := *value.DeletedAt
 		value.DeletedAt = &cloned
+	}
+	if value.LastProbedAt != nil {
+		cloned := *value.LastProbedAt
+		value.LastProbedAt = &cloned
 	}
 	return value
 }

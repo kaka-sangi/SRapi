@@ -40,7 +40,22 @@ type Config struct {
 	LiteLLMPricing   LiteLLMPricingConfig
 	ConnectivityTest ConnectivityTestConfig
 	ScheduledTest    ScheduledTestConfig
+	ProxyProbe       ProxyProbeConfig
 	OAuth            OAuthConfig
+}
+
+// ProxyProbeConfig controls the proxy availability probe worker, which dials
+// each active proxy through to a known probe URL on a fixed interval and
+// folds the outcome into the proxy's rolling 7-day success/failure counters.
+// Disabled by default; producers opt in via PROXY_PROBE_ENABLED=true so an
+// unattended deployment does not start hitting outbound URLs without explicit
+// consent.
+type ProxyProbeConfig struct {
+	Enabled       bool
+	Interval      time.Duration
+	Timeout       time.Duration
+	MaxConcurrent int
+	ProbeURL      string
 }
 
 // QuotaRefreshConfig controls the scheduled per-account quota/subscription
@@ -388,6 +403,13 @@ func Load() Config {
 			Enabled: getBoolEnv("ACCOUNT_SCHEDULED_TEST_ENABLED", false),
 			Tick:    time.Duration(getIntEnv("ACCOUNT_SCHEDULED_TEST_TICK_SECONDS", 60)) * time.Second,
 			Timeout: time.Duration(getIntEnv("ACCOUNT_SCHEDULED_TEST_TIMEOUT_SECONDS", 30)) * time.Second,
+		},
+		ProxyProbe: ProxyProbeConfig{
+			Enabled:       getBoolEnv("PROXY_PROBE_ENABLED", false),
+			Interval:      time.Duration(getIntEnv("PROXY_PROBE_INTERVAL_SECONDS", 21600)) * time.Second,
+			Timeout:       time.Duration(getIntEnv("PROXY_PROBE_TIMEOUT_SECONDS", 8)) * time.Second,
+			MaxConcurrent: getIntEnv("PROXY_PROBE_MAX_CONCURRENT", 4),
+			ProbeURL:      getEnv("PROXY_PROBE_URL", ""),
 		},
 		OAuth: OAuthConfig{
 			ClientSecrets: parseStringMapEnv("OAUTH_CLIENT_SECRETS_JSON"),

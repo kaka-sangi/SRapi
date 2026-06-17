@@ -31,6 +31,18 @@ const (
 	FieldStatus = "status"
 	// FieldMetadataJSON holds the string denoting the metadata_json field in the database.
 	FieldMetadataJSON = "metadata_json"
+	// FieldCountryCode holds the string denoting the country_code field in the database.
+	FieldCountryCode = "country_code"
+	// FieldCountryName holds the string denoting the country_name field in the database.
+	FieldCountryName = "country_name"
+	// FieldLastProbedAt holds the string denoting the last_probed_at field in the database.
+	FieldLastProbedAt = "last_probed_at"
+	// FieldProbeSuccessCount holds the string denoting the probe_success_count field in the database.
+	FieldProbeSuccessCount = "probe_success_count"
+	// FieldProbeFailureCount holds the string denoting the probe_failure_count field in the database.
+	FieldProbeFailureCount = "probe_failure_count"
+	// FieldLastProbeLatencyMs holds the string denoting the last_probe_latency_ms field in the database.
+	FieldLastProbeLatencyMs = "last_probe_latency_ms"
 	// Table holds the table name of the proxy in the database.
 	Table = "proxies"
 )
@@ -47,6 +59,12 @@ var Columns = []string{
 	FieldURLVersion,
 	FieldStatus,
 	FieldMetadataJSON,
+	FieldCountryCode,
+	FieldCountryName,
+	FieldLastProbedAt,
+	FieldProbeSuccessCount,
+	FieldProbeFailureCount,
+	FieldLastProbeLatencyMs,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -74,6 +92,20 @@ var (
 	DefaultURLVersion int
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
+	// DefaultCountryCode holds the default value on creation for the "country_code" field.
+	DefaultCountryCode string
+	// CountryCodeValidator is a validator for the "country_code" field. It is called by the builders before save.
+	CountryCodeValidator func(string) error
+	// DefaultCountryName holds the default value on creation for the "country_name" field.
+	DefaultCountryName string
+	// CountryNameValidator is a validator for the "country_name" field. It is called by the builders before save.
+	CountryNameValidator func(string) error
+	// DefaultProbeSuccessCount holds the default value on creation for the "probe_success_count" field.
+	DefaultProbeSuccessCount int
+	// DefaultProbeFailureCount holds the default value on creation for the "probe_failure_count" field.
+	DefaultProbeFailureCount int
+	// DefaultLastProbeLatencyMs holds the default value on creation for the "last_probe_latency_ms" field.
+	DefaultLastProbeLatencyMs int
 )
 
 // OrderOption defines the ordering options for the Proxy queries.
@@ -117,4 +149,34 @@ func ByURLVersion(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByCountryCode orders the results by the country_code field.
+func ByCountryCode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCountryCode, opts...).ToFunc()
+}
+
+// ByCountryName orders the results by the country_name field.
+func ByCountryName(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCountryName, opts...).ToFunc()
+}
+
+// ByLastProbedAt orders the results by the last_probed_at field.
+func ByLastProbedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastProbedAt, opts...).ToFunc()
+}
+
+// ByProbeSuccessCount orders the results by the probe_success_count field.
+func ByProbeSuccessCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProbeSuccessCount, opts...).ToFunc()
+}
+
+// ByProbeFailureCount orders the results by the probe_failure_count field.
+func ByProbeFailureCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProbeFailureCount, opts...).ToFunc()
+}
+
+// ByLastProbeLatencyMs orders the results by the last_probe_latency_ms field.
+func ByLastProbeLatencyMs(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastProbeLatencyMs, opts...).ToFunc()
 }

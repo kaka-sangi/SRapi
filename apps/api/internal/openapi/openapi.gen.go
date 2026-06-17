@@ -6038,10 +6038,15 @@ type CreateProviderRequest struct {
 
 // CreateProxyDefinitionRequest defines model for CreateProxyDefinitionRequest.
 type CreateProxyDefinitionRequest struct {
-	Metadata *JsonObject            `json:"metadata,omitempty"`
-	Name     string                 `json:"name"`
-	Status   *ProxyDefinitionStatus `json:"status,omitempty"`
-	Type     ProxyDefinitionType    `json:"type"`
+	// CountryCode ISO-3166-1 alpha-2 country code, operator-supplied.
+	CountryCode *string `json:"country_code,omitempty"`
+
+	// CountryName Localized display name for the country, snapshotted at write time.
+	CountryName *string                `json:"country_name,omitempty"`
+	Metadata    *JsonObject            `json:"metadata,omitempty"`
+	Name        string                 `json:"name"`
+	Status      *ProxyDefinitionStatus `json:"status,omitempty"`
+	Type        ProxyDefinitionType    `json:"type"`
 
 	// Url Proxy URL with credentials if needed. Stored encrypted and never returned.
 	Url *string `json:"url,omitempty"`
@@ -8369,13 +8374,33 @@ type ProxyBatchTestRow struct {
 
 // ProxyDefinition defines model for ProxyDefinition.
 type ProxyDefinition struct {
-	CreatedAt Timestamp             `json:"created_at"`
-	Id        Id                    `json:"id"`
-	Metadata  *JsonObject           `json:"metadata,omitempty"`
-	Name      string                `json:"name"`
-	Status    ProxyDefinitionStatus `json:"status"`
-	Type      ProxyDefinitionType   `json:"type"`
-	UpdatedAt Timestamp             `json:"updated_at"`
+	// CountryCode ISO-3166-1 alpha-2 country code, operator-supplied.
+	CountryCode *string `json:"country_code,omitempty"`
+
+	// CountryName Display name for the country, snapshotted at write time.
+	CountryName *string   `json:"country_name,omitempty"`
+	CreatedAt   Timestamp `json:"created_at"`
+	Id          Id        `json:"id"`
+
+	// LastProbeLatencyMs Latency of the most recent successful probe in milliseconds. 0 if no successful probe yet.
+	LastProbeLatencyMs int `json:"last_probe_latency_ms"`
+
+	// LastProbedAt Last time the proxy probe worker tested this proxy.
+	LastProbedAt *time.Time  `json:"last_probed_at,omitempty"`
+	Metadata     *JsonObject `json:"metadata,omitempty"`
+	Name         string      `json:"name"`
+
+	// ProbeFailureCount Failed probes since the last counter reset.
+	ProbeFailureCount int `json:"probe_failure_count"`
+
+	// ProbeSuccessCount Successful probes since the last counter reset (rolling ~7-day window — counters reset weekly, NOT a strict trailing-7d window).
+	ProbeSuccessCount int `json:"probe_success_count"`
+
+	// ProbeSuccessPct7d Rolling availability percentage. Null when never probed since last reset.
+	ProbeSuccessPct7d *int                  `json:"probe_success_pct_7d,omitempty"`
+	Status            ProxyDefinitionStatus `json:"status"`
+	Type              ProxyDefinitionType   `json:"type"`
+	UpdatedAt         Timestamp             `json:"updated_at"`
 
 	// UrlConfigured True when an encrypted proxy URL is stored. Raw URLs are never returned.
 	UrlConfigured bool `json:"url_configured"`
@@ -9702,10 +9727,15 @@ type UpdateProviderRequest struct {
 
 // UpdateProxyDefinitionRequest defines model for UpdateProxyDefinitionRequest.
 type UpdateProxyDefinitionRequest struct {
-	Metadata *JsonObject            `json:"metadata,omitempty"`
-	Name     *string                `json:"name,omitempty"`
-	Status   *ProxyDefinitionStatus `json:"status,omitempty"`
-	Type     *ProxyDefinitionType   `json:"type,omitempty"`
+	// CountryCode ISO-3166-1 alpha-2 country code, operator-supplied.
+	CountryCode *string `json:"country_code,omitempty"`
+
+	// CountryName Localized display name for the country, snapshotted at write time.
+	CountryName *string                `json:"country_name,omitempty"`
+	Metadata    *JsonObject            `json:"metadata,omitempty"`
+	Name        *string                `json:"name,omitempty"`
+	Status      *ProxyDefinitionStatus `json:"status,omitempty"`
+	Type        *ProxyDefinitionType   `json:"type,omitempty"`
 
 	// Url Replacement proxy URL. Omit to keep the existing encrypted URL.
 	Url *string `json:"url,omitempty"`

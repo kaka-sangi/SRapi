@@ -141,6 +141,129 @@ func (_u *ProxyUpdate) ClearMetadataJSON() *ProxyUpdate {
 	return _u
 }
 
+// SetCountryCode sets the "country_code" field.
+func (_u *ProxyUpdate) SetCountryCode(v string) *ProxyUpdate {
+	_u.mutation.SetCountryCode(v)
+	return _u
+}
+
+// SetNillableCountryCode sets the "country_code" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableCountryCode(v *string) *ProxyUpdate {
+	if v != nil {
+		_u.SetCountryCode(*v)
+	}
+	return _u
+}
+
+// ClearCountryCode clears the value of the "country_code" field.
+func (_u *ProxyUpdate) ClearCountryCode() *ProxyUpdate {
+	_u.mutation.ClearCountryCode()
+	return _u
+}
+
+// SetCountryName sets the "country_name" field.
+func (_u *ProxyUpdate) SetCountryName(v string) *ProxyUpdate {
+	_u.mutation.SetCountryName(v)
+	return _u
+}
+
+// SetNillableCountryName sets the "country_name" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableCountryName(v *string) *ProxyUpdate {
+	if v != nil {
+		_u.SetCountryName(*v)
+	}
+	return _u
+}
+
+// ClearCountryName clears the value of the "country_name" field.
+func (_u *ProxyUpdate) ClearCountryName() *ProxyUpdate {
+	_u.mutation.ClearCountryName()
+	return _u
+}
+
+// SetLastProbedAt sets the "last_probed_at" field.
+func (_u *ProxyUpdate) SetLastProbedAt(v time.Time) *ProxyUpdate {
+	_u.mutation.SetLastProbedAt(v)
+	return _u
+}
+
+// SetNillableLastProbedAt sets the "last_probed_at" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableLastProbedAt(v *time.Time) *ProxyUpdate {
+	if v != nil {
+		_u.SetLastProbedAt(*v)
+	}
+	return _u
+}
+
+// ClearLastProbedAt clears the value of the "last_probed_at" field.
+func (_u *ProxyUpdate) ClearLastProbedAt() *ProxyUpdate {
+	_u.mutation.ClearLastProbedAt()
+	return _u
+}
+
+// SetProbeSuccessCount sets the "probe_success_count" field.
+func (_u *ProxyUpdate) SetProbeSuccessCount(v int) *ProxyUpdate {
+	_u.mutation.ResetProbeSuccessCount()
+	_u.mutation.SetProbeSuccessCount(v)
+	return _u
+}
+
+// SetNillableProbeSuccessCount sets the "probe_success_count" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableProbeSuccessCount(v *int) *ProxyUpdate {
+	if v != nil {
+		_u.SetProbeSuccessCount(*v)
+	}
+	return _u
+}
+
+// AddProbeSuccessCount adds value to the "probe_success_count" field.
+func (_u *ProxyUpdate) AddProbeSuccessCount(v int) *ProxyUpdate {
+	_u.mutation.AddProbeSuccessCount(v)
+	return _u
+}
+
+// SetProbeFailureCount sets the "probe_failure_count" field.
+func (_u *ProxyUpdate) SetProbeFailureCount(v int) *ProxyUpdate {
+	_u.mutation.ResetProbeFailureCount()
+	_u.mutation.SetProbeFailureCount(v)
+	return _u
+}
+
+// SetNillableProbeFailureCount sets the "probe_failure_count" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableProbeFailureCount(v *int) *ProxyUpdate {
+	if v != nil {
+		_u.SetProbeFailureCount(*v)
+	}
+	return _u
+}
+
+// AddProbeFailureCount adds value to the "probe_failure_count" field.
+func (_u *ProxyUpdate) AddProbeFailureCount(v int) *ProxyUpdate {
+	_u.mutation.AddProbeFailureCount(v)
+	return _u
+}
+
+// SetLastProbeLatencyMs sets the "last_probe_latency_ms" field.
+func (_u *ProxyUpdate) SetLastProbeLatencyMs(v int) *ProxyUpdate {
+	_u.mutation.ResetLastProbeLatencyMs()
+	_u.mutation.SetLastProbeLatencyMs(v)
+	return _u
+}
+
+// SetNillableLastProbeLatencyMs sets the "last_probe_latency_ms" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableLastProbeLatencyMs(v *int) *ProxyUpdate {
+	if v != nil {
+		_u.SetLastProbeLatencyMs(*v)
+	}
+	return _u
+}
+
+// AddLastProbeLatencyMs adds value to the "last_probe_latency_ms" field.
+func (_u *ProxyUpdate) AddLastProbeLatencyMs(v int) *ProxyUpdate {
+	_u.mutation.AddLastProbeLatencyMs(v)
+	return _u
+}
+
 // Mutation returns the ProxyMutation object of the builder.
 func (_u *ProxyUpdate) Mutation() *ProxyMutation {
 	return _u.mutation
@@ -194,6 +317,16 @@ func (_u *ProxyUpdate) check() error {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Proxy.type": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.CountryCode(); ok {
+		if err := proxy.CountryCodeValidator(v); err != nil {
+			return &ValidationError{Name: "country_code", err: fmt.Errorf(`ent: validator failed for field "Proxy.country_code": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CountryName(); ok {
+		if err := proxy.CountryNameValidator(v); err != nil {
+			return &ValidationError{Name: "country_name", err: fmt.Errorf(`ent: validator failed for field "Proxy.country_name": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -244,6 +377,42 @@ func (_u *ProxyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.MetadataJSONCleared() {
 		_spec.ClearField(proxy.FieldMetadataJSON, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.CountryCode(); ok {
+		_spec.SetField(proxy.FieldCountryCode, field.TypeString, value)
+	}
+	if _u.mutation.CountryCodeCleared() {
+		_spec.ClearField(proxy.FieldCountryCode, field.TypeString)
+	}
+	if value, ok := _u.mutation.CountryName(); ok {
+		_spec.SetField(proxy.FieldCountryName, field.TypeString, value)
+	}
+	if _u.mutation.CountryNameCleared() {
+		_spec.ClearField(proxy.FieldCountryName, field.TypeString)
+	}
+	if value, ok := _u.mutation.LastProbedAt(); ok {
+		_spec.SetField(proxy.FieldLastProbedAt, field.TypeTime, value)
+	}
+	if _u.mutation.LastProbedAtCleared() {
+		_spec.ClearField(proxy.FieldLastProbedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ProbeSuccessCount(); ok {
+		_spec.SetField(proxy.FieldProbeSuccessCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedProbeSuccessCount(); ok {
+		_spec.AddField(proxy.FieldProbeSuccessCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.ProbeFailureCount(); ok {
+		_spec.SetField(proxy.FieldProbeFailureCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedProbeFailureCount(); ok {
+		_spec.AddField(proxy.FieldProbeFailureCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.LastProbeLatencyMs(); ok {
+		_spec.SetField(proxy.FieldLastProbeLatencyMs, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedLastProbeLatencyMs(); ok {
+		_spec.AddField(proxy.FieldLastProbeLatencyMs, field.TypeInt, value)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -378,6 +547,129 @@ func (_u *ProxyUpdateOne) ClearMetadataJSON() *ProxyUpdateOne {
 	return _u
 }
 
+// SetCountryCode sets the "country_code" field.
+func (_u *ProxyUpdateOne) SetCountryCode(v string) *ProxyUpdateOne {
+	_u.mutation.SetCountryCode(v)
+	return _u
+}
+
+// SetNillableCountryCode sets the "country_code" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableCountryCode(v *string) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetCountryCode(*v)
+	}
+	return _u
+}
+
+// ClearCountryCode clears the value of the "country_code" field.
+func (_u *ProxyUpdateOne) ClearCountryCode() *ProxyUpdateOne {
+	_u.mutation.ClearCountryCode()
+	return _u
+}
+
+// SetCountryName sets the "country_name" field.
+func (_u *ProxyUpdateOne) SetCountryName(v string) *ProxyUpdateOne {
+	_u.mutation.SetCountryName(v)
+	return _u
+}
+
+// SetNillableCountryName sets the "country_name" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableCountryName(v *string) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetCountryName(*v)
+	}
+	return _u
+}
+
+// ClearCountryName clears the value of the "country_name" field.
+func (_u *ProxyUpdateOne) ClearCountryName() *ProxyUpdateOne {
+	_u.mutation.ClearCountryName()
+	return _u
+}
+
+// SetLastProbedAt sets the "last_probed_at" field.
+func (_u *ProxyUpdateOne) SetLastProbedAt(v time.Time) *ProxyUpdateOne {
+	_u.mutation.SetLastProbedAt(v)
+	return _u
+}
+
+// SetNillableLastProbedAt sets the "last_probed_at" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableLastProbedAt(v *time.Time) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetLastProbedAt(*v)
+	}
+	return _u
+}
+
+// ClearLastProbedAt clears the value of the "last_probed_at" field.
+func (_u *ProxyUpdateOne) ClearLastProbedAt() *ProxyUpdateOne {
+	_u.mutation.ClearLastProbedAt()
+	return _u
+}
+
+// SetProbeSuccessCount sets the "probe_success_count" field.
+func (_u *ProxyUpdateOne) SetProbeSuccessCount(v int) *ProxyUpdateOne {
+	_u.mutation.ResetProbeSuccessCount()
+	_u.mutation.SetProbeSuccessCount(v)
+	return _u
+}
+
+// SetNillableProbeSuccessCount sets the "probe_success_count" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableProbeSuccessCount(v *int) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetProbeSuccessCount(*v)
+	}
+	return _u
+}
+
+// AddProbeSuccessCount adds value to the "probe_success_count" field.
+func (_u *ProxyUpdateOne) AddProbeSuccessCount(v int) *ProxyUpdateOne {
+	_u.mutation.AddProbeSuccessCount(v)
+	return _u
+}
+
+// SetProbeFailureCount sets the "probe_failure_count" field.
+func (_u *ProxyUpdateOne) SetProbeFailureCount(v int) *ProxyUpdateOne {
+	_u.mutation.ResetProbeFailureCount()
+	_u.mutation.SetProbeFailureCount(v)
+	return _u
+}
+
+// SetNillableProbeFailureCount sets the "probe_failure_count" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableProbeFailureCount(v *int) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetProbeFailureCount(*v)
+	}
+	return _u
+}
+
+// AddProbeFailureCount adds value to the "probe_failure_count" field.
+func (_u *ProxyUpdateOne) AddProbeFailureCount(v int) *ProxyUpdateOne {
+	_u.mutation.AddProbeFailureCount(v)
+	return _u
+}
+
+// SetLastProbeLatencyMs sets the "last_probe_latency_ms" field.
+func (_u *ProxyUpdateOne) SetLastProbeLatencyMs(v int) *ProxyUpdateOne {
+	_u.mutation.ResetLastProbeLatencyMs()
+	_u.mutation.SetLastProbeLatencyMs(v)
+	return _u
+}
+
+// SetNillableLastProbeLatencyMs sets the "last_probe_latency_ms" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableLastProbeLatencyMs(v *int) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetLastProbeLatencyMs(*v)
+	}
+	return _u
+}
+
+// AddLastProbeLatencyMs adds value to the "last_probe_latency_ms" field.
+func (_u *ProxyUpdateOne) AddLastProbeLatencyMs(v int) *ProxyUpdateOne {
+	_u.mutation.AddLastProbeLatencyMs(v)
+	return _u
+}
+
 // Mutation returns the ProxyMutation object of the builder.
 func (_u *ProxyUpdateOne) Mutation() *ProxyMutation {
 	return _u.mutation
@@ -442,6 +734,16 @@ func (_u *ProxyUpdateOne) check() error {
 	if v, ok := _u.mutation.GetType(); ok {
 		if err := proxy.TypeValidator(v); err != nil {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Proxy.type": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CountryCode(); ok {
+		if err := proxy.CountryCodeValidator(v); err != nil {
+			return &ValidationError{Name: "country_code", err: fmt.Errorf(`ent: validator failed for field "Proxy.country_code": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CountryName(); ok {
+		if err := proxy.CountryNameValidator(v); err != nil {
+			return &ValidationError{Name: "country_name", err: fmt.Errorf(`ent: validator failed for field "Proxy.country_name": %w`, err)}
 		}
 	}
 	return nil
@@ -511,6 +813,42 @@ func (_u *ProxyUpdateOne) sqlSave(ctx context.Context) (_node *Proxy, err error)
 	}
 	if _u.mutation.MetadataJSONCleared() {
 		_spec.ClearField(proxy.FieldMetadataJSON, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.CountryCode(); ok {
+		_spec.SetField(proxy.FieldCountryCode, field.TypeString, value)
+	}
+	if _u.mutation.CountryCodeCleared() {
+		_spec.ClearField(proxy.FieldCountryCode, field.TypeString)
+	}
+	if value, ok := _u.mutation.CountryName(); ok {
+		_spec.SetField(proxy.FieldCountryName, field.TypeString, value)
+	}
+	if _u.mutation.CountryNameCleared() {
+		_spec.ClearField(proxy.FieldCountryName, field.TypeString)
+	}
+	if value, ok := _u.mutation.LastProbedAt(); ok {
+		_spec.SetField(proxy.FieldLastProbedAt, field.TypeTime, value)
+	}
+	if _u.mutation.LastProbedAtCleared() {
+		_spec.ClearField(proxy.FieldLastProbedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ProbeSuccessCount(); ok {
+		_spec.SetField(proxy.FieldProbeSuccessCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedProbeSuccessCount(); ok {
+		_spec.AddField(proxy.FieldProbeSuccessCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.ProbeFailureCount(); ok {
+		_spec.SetField(proxy.FieldProbeFailureCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedProbeFailureCount(); ok {
+		_spec.AddField(proxy.FieldProbeFailureCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.LastProbeLatencyMs(); ok {
+		_spec.SetField(proxy.FieldLastProbeLatencyMs, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedLastProbeLatencyMs(); ok {
+		_spec.AddField(proxy.FieldLastProbeLatencyMs, field.TypeInt, value)
 	}
 	_node = &Proxy{config: _u.config}
 	_spec.Assign = _node.assignValues

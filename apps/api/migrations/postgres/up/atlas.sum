@@ -1,4 +1,4 @@
-h1:Xld2AtnsiuJd+qS0oPZvJobQBhQK84/SCT6FQ2ztuKM=
+h1:61TYA49AbcXPqMIdhr4sR4oejsCZMO76hm/h7NV4rio=
 000001_initial_schema.sql h1:cyZ0pax3l7J4onSmEmgqPwpoJYXPXuJYXeTAGUOEHs4=
 000002_auth_sessions.sql h1:zJ6uEWQDpw4sa3JpABmlbbFR2Sy3JCceNl4UnBtcX9c=
 000003_api_key_concurrency_limit.sql h1:j/8OE2iF7+LUa5XCsyYSC4dvN1Vh2cihbc41rySg4OQ=
@@ -46,3 +46,4 @@ h1:Xld2AtnsiuJd+qS0oPZvJobQBhQK84/SCT6FQ2ztuKM=
 000045_redeem_and_promo_codes.sql h1:bgQcmvcgaIrh4Q5KYUPXJ6Lm/jz2Z50ErR26jiyfA2I=
 000046_usage_aggregated_billing_marker.sql h1:qb+UxdrHuvEeoNVul6go9IYWC25AtxRVRWD2q1ETQb0=
 000047_redeem_code_note_and_disabled_reason.sql h1:APQiofTMDhQVccxBVIj5osOiMRpekcXhOrEQT15NriM=
+000048_proxy_country_and_availability.sql h1:R98IxXbtgXiaKKrmky2OmxQIJK3S0rsdssG6SDZwsdQ=

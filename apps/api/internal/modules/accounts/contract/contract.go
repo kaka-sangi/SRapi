@@ -105,9 +105,46 @@ type ProxyDefinition struct {
 	URLVersion    string
 	Status        ProxyStatus
 	Metadata      map[string]any
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	DeletedAt     *time.Time
+	// CountryCode is the operator-supplied ISO-3166-1 alpha-2 code (e.g. "US",
+	// "CN"). Empty when unset.
+	CountryCode string
+	// CountryName is the localized display name snapshotted at write time so
+	// list views render a stable label even when the frontend locale changes.
+	CountryName string
+	// LastProbedAt is set by the proxy_probe worker after each pass; nil
+	// before the proxy has ever been probed.
+	LastProbedAt *time.Time
+	// ProbeSuccessCount + ProbeFailureCount are cumulative counters that the
+	// proxy_probe worker resets every ~7 days, giving a rolling-window
+	// availability percentage without a separate snapshot table.
+	ProbeSuccessCount int
+	ProbeFailureCount int
+	// LastProbeLatencyMs records the milliseconds the most recent successful
+	// probe took. 0 when no probe has ever succeeded.
+	LastProbeLatencyMs int
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	DeletedAt          *time.Time
+}
+
+// ProbeSuccessPct7d returns the rolling 7-day availability percentage rounded
+// to the nearest integer when at least one probe has been recorded since the
+// last reset; otherwise nil. Lives on the contract (not on ent) because it is
+// purely derived — recomputing in the response mapper keeps the rule in one
+// place across HTTP, audit, and worker call sites.
+func (p ProxyDefinition) ProbeSuccessPct7d() *int {
+	total := p.ProbeSuccessCount + p.ProbeFailureCount
+	if total <= 0 {
+		return nil
+	}
+	pct := int((float64(p.ProbeSuccessCount)*100.0)/float64(total) + 0.5)
+	if pct < 0 {
+		pct = 0
+	}
+	if pct > 100 {
+		pct = 100
+	}
+	return &pct
 }
 
 type AccountGroup struct {
@@ -439,19 +476,23 @@ type UpdateGroupRequest struct {
 }
 
 type CreateProxyRequest struct {
-	Name     string
-	Type     ProxyType
-	URL      string
-	Status   *ProxyStatus
-	Metadata map[string]any
+	Name        string
+	Type        ProxyType
+	URL         string
+	Status      *ProxyStatus
+	Metadata    map[string]any
+	CountryCode *string
+	CountryName *string
 }
 
 type UpdateProxyRequest struct {
-	Name     *string
-	Type     *ProxyType
-	URL      *string
-	Status   *ProxyStatus
-	Metadata *map[string]any
+	Name        *string
+	Type        *ProxyType
+	URL         *string
+	Status      *ProxyStatus
+	Metadata    *map[string]any
+	CountryCode *string
+	CountryName *string
 }
 
 type CreateStoredAccount struct {
@@ -476,6 +517,8 @@ type CreateStoredProxy struct {
 	URLVersion    string
 	Status        ProxyStatus
 	Metadata      map[string]any
+	CountryCode   string
+	CountryName   string
 }
 
 type CreateStoredAccountGroup struct {

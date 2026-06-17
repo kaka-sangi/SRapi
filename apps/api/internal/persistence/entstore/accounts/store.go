@@ -176,6 +176,8 @@ func (s *Store) CreateProxy(ctx context.Context, input contract.CreateStoredProx
 		SetURLVersion(credentialVersionToInt(input.URLVersion)).
 		SetStatus(string(input.Status)).
 		SetMetadataJSON(cloneMap(input.Metadata)).
+		SetCountryCode(input.CountryCode).
+		SetCountryName(input.CountryName).
 		Save(ctx)
 	if err != nil {
 		return contract.ProxyDefinition{}, err
@@ -191,7 +193,17 @@ func (s *Store) UpdateProxy(ctx context.Context, proxy contract.ProxyDefinition)
 		SetURLCiphertext([]byte(proxy.URLCiphertext)).
 		SetURLVersion(credentialVersionToInt(proxy.URLVersion)).
 		SetStatus(string(proxy.Status)).
-		SetMetadataJSON(cloneMap(proxy.Metadata))
+		SetMetadataJSON(cloneMap(proxy.Metadata)).
+		SetCountryCode(proxy.CountryCode).
+		SetCountryName(proxy.CountryName).
+		SetProbeSuccessCount(proxy.ProbeSuccessCount).
+		SetProbeFailureCount(proxy.ProbeFailureCount).
+		SetLastProbeLatencyMs(proxy.LastProbeLatencyMs)
+	if proxy.LastProbedAt != nil {
+		update.SetLastProbedAt(*proxy.LastProbedAt)
+	} else {
+		update.ClearLastProbedAt()
+	}
 	if !proxy.UpdatedAt.IsZero() {
 		update.SetUpdatedAt(proxy.UpdatedAt)
 	}
@@ -534,16 +546,22 @@ func toAccount(row *ent.ProviderAccount) contract.ProviderAccount {
 
 func toProxy(row *ent.Proxy) contract.ProxyDefinition {
 	return contract.ProxyDefinition{
-		ID:            row.ID,
-		Name:          row.Name,
-		Type:          contract.ProxyType(row.Type),
-		URLCiphertext: string(row.URLCiphertext),
-		URLVersion:    credentialVersionToString(row.URLVersion),
-		Status:        contract.ProxyStatus(row.Status),
-		Metadata:      cloneMap(row.MetadataJSON),
-		CreatedAt:     row.CreatedAt,
-		UpdatedAt:     row.UpdatedAt,
-		DeletedAt:     cloneTime(row.DeletedAt),
+		ID:                 row.ID,
+		Name:               row.Name,
+		Type:               contract.ProxyType(row.Type),
+		URLCiphertext:      string(row.URLCiphertext),
+		URLVersion:         credentialVersionToString(row.URLVersion),
+		Status:             contract.ProxyStatus(row.Status),
+		Metadata:           cloneMap(row.MetadataJSON),
+		CountryCode:        row.CountryCode,
+		CountryName:        row.CountryName,
+		LastProbedAt:       cloneTime(row.LastProbedAt),
+		ProbeSuccessCount:  row.ProbeSuccessCount,
+		ProbeFailureCount:  row.ProbeFailureCount,
+		LastProbeLatencyMs: row.LastProbeLatencyMs,
+		CreatedAt:          row.CreatedAt,
+		UpdatedAt:          row.UpdatedAt,
+		DeletedAt:          cloneTime(row.DeletedAt),
 	}
 }
 

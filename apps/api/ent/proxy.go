@@ -36,7 +36,19 @@ type Proxy struct {
 	Status string `json:"status,omitempty"`
 	// MetadataJSON holds the value of the "metadata_json" field.
 	MetadataJSON map[string]interface{} `json:"metadata_json,omitempty"`
-	selectValues sql.SelectValues
+	// ISO-3166-1 alpha-2 country code (operator-supplied).
+	CountryCode string `json:"country_code,omitempty"`
+	// Display name for the country, snapshotted at write time.
+	CountryName string `json:"country_name,omitempty"`
+	// Last time the probe worker tested this proxy.
+	LastProbedAt *time.Time `json:"last_probed_at,omitempty"`
+	// Successful probes since last counter reset (~7 days). Used for availability %.
+	ProbeSuccessCount int `json:"probe_success_count,omitempty"`
+	// Failed probes since last counter reset (~7 days).
+	ProbeFailureCount int `json:"probe_failure_count,omitempty"`
+	// Latency of the most recent successful probe, in milliseconds. 0 if never succeeded.
+	LastProbeLatencyMs int `json:"last_probe_latency_ms,omitempty"`
+	selectValues       sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -46,11 +58,11 @@ func (*Proxy) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case proxy.FieldURLCiphertext, proxy.FieldMetadataJSON:
 			values[i] = new([]byte)
-		case proxy.FieldID, proxy.FieldURLVersion:
+		case proxy.FieldID, proxy.FieldURLVersion, proxy.FieldProbeSuccessCount, proxy.FieldProbeFailureCount, proxy.FieldLastProbeLatencyMs:
 			values[i] = new(sql.NullInt64)
-		case proxy.FieldName, proxy.FieldType, proxy.FieldStatus:
+		case proxy.FieldName, proxy.FieldType, proxy.FieldStatus, proxy.FieldCountryCode, proxy.FieldCountryName:
 			values[i] = new(sql.NullString)
-		case proxy.FieldCreatedAt, proxy.FieldUpdatedAt, proxy.FieldDeletedAt:
+		case proxy.FieldCreatedAt, proxy.FieldUpdatedAt, proxy.FieldDeletedAt, proxy.FieldLastProbedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -130,6 +142,43 @@ func (_m *Proxy) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field metadata_json: %w", err)
 				}
 			}
+		case proxy.FieldCountryCode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field country_code", values[i])
+			} else if value.Valid {
+				_m.CountryCode = value.String
+			}
+		case proxy.FieldCountryName:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field country_name", values[i])
+			} else if value.Valid {
+				_m.CountryName = value.String
+			}
+		case proxy.FieldLastProbedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field last_probed_at", values[i])
+			} else if value.Valid {
+				_m.LastProbedAt = new(time.Time)
+				*_m.LastProbedAt = value.Time
+			}
+		case proxy.FieldProbeSuccessCount:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field probe_success_count", values[i])
+			} else if value.Valid {
+				_m.ProbeSuccessCount = int(value.Int64)
+			}
+		case proxy.FieldProbeFailureCount:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field probe_failure_count", values[i])
+			} else if value.Valid {
+				_m.ProbeFailureCount = int(value.Int64)
+			}
+		case proxy.FieldLastProbeLatencyMs:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field last_probe_latency_ms", values[i])
+			} else if value.Valid {
+				_m.LastProbeLatencyMs = int(value.Int64)
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -193,6 +242,26 @@ func (_m *Proxy) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("metadata_json=")
 	builder.WriteString(fmt.Sprintf("%v", _m.MetadataJSON))
+	builder.WriteString(", ")
+	builder.WriteString("country_code=")
+	builder.WriteString(_m.CountryCode)
+	builder.WriteString(", ")
+	builder.WriteString("country_name=")
+	builder.WriteString(_m.CountryName)
+	builder.WriteString(", ")
+	if v := _m.LastProbedAt; v != nil {
+		builder.WriteString("last_probed_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("probe_success_count=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ProbeSuccessCount))
+	builder.WriteString(", ")
+	builder.WriteString("probe_failure_count=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ProbeFailureCount))
+	builder.WriteString(", ")
+	builder.WriteString("last_probe_latency_ms=")
+	builder.WriteString(fmt.Sprintf("%v", _m.LastProbeLatencyMs))
 	builder.WriteByte(')')
 	return builder.String()
 }

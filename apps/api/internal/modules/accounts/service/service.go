@@ -178,6 +178,8 @@ func (s *Service) CreateProxy(ctx context.Context, req contract.CreateProxyReque
 		}
 		status = *req.Status
 	}
+	countryCode := normalizeCountryCode(req.CountryCode)
+	countryName := normalizeCountryName(req.CountryName)
 	return s.store.CreateProxy(ctx, contract.CreateStoredProxy{
 		Name:          name,
 		Type:          proxyType,
@@ -185,6 +187,8 @@ func (s *Service) CreateProxy(ctx context.Context, req contract.CreateProxyReque
 		URLVersion:    credentialVersionV1,
 		Status:        status,
 		Metadata:      cloneMap(req.Metadata),
+		CountryCode:   countryCode,
+		CountryName:   countryName,
 	})
 }
 
@@ -241,8 +245,95 @@ func (s *Service) UpdateProxy(ctx context.Context, id int, req contract.UpdatePr
 	if req.Metadata != nil {
 		proxy.Metadata = cloneMap(*req.Metadata)
 	}
+	if req.CountryCode != nil {
+		proxy.CountryCode = normalizeCountryCode(req.CountryCode)
+	}
+	if req.CountryName != nil {
+		proxy.CountryName = normalizeCountryName(req.CountryName)
+	}
 	proxy.UpdatedAt = s.clock.Now()
 	return s.store.UpdateProxy(ctx, proxy)
+}
+
+// proxyCounterResetMetadataKey records the last time the rolling success/failure
+// counters were zeroed. Lives on metadata so adding a rolling window does not
+// require a separate ent column — see RecordProxyProbe.
+const proxyCounterResetMetadataKey = "_probe_counter_reset_at"
+
+// proxyCounterResetWindow is how long the rolling availability window is in
+// wall-clock time. After this many days of probe results the counters get
+// zeroed on the next probe, giving the UI a "since-last-reset" availability
+// that approximates a trailing 7-day window without a separate snapshot table.
+const proxyCounterResetWindow = 7 * 24 * time.Hour
+
+// RecordProxyProbe folds one probe outcome into the proxy's rolling counters
+// and updates last_probed_at + last_probe_latency_ms. Called by the
+// proxy_probe worker after each pass and by the operator-initiated "probe
+// now" handler so the availability percentage stays current between worker
+// ticks.
+//
+// The counters reset every ~7 days (see proxyCounterResetWindow) so the
+// availability percentage is a rolling-window value rather than a lifetime
+// success rate — fresh signals weigh as much as old ones after enough time
+// passes. The reset timestamp lives in metadata under
+// proxyCounterResetMetadataKey to keep the ent schema delta minimal.
+func (s *Service) RecordProxyProbe(ctx context.Context, proxyID int, success bool, latencyMs int) (contract.ProxyDefinition, error) {
+	if proxyID <= 0 {
+		return contract.ProxyDefinition{}, ErrInvalidInput
+	}
+	proxy, err := s.store.FindProxyByID(ctx, proxyID)
+	if err != nil {
+		return contract.ProxyDefinition{}, err
+	}
+	now := s.clock.Now().UTC()
+	metadata := cloneMap(proxy.Metadata)
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	lastReset := metadataOptionalTime(metadata, proxyCounterResetMetadataKey)
+	if lastReset == nil || now.Sub(*lastReset) >= proxyCounterResetWindow {
+		proxy.ProbeSuccessCount = 0
+		proxy.ProbeFailureCount = 0
+		metadata[proxyCounterResetMetadataKey] = now.Format(time.RFC3339)
+	}
+	if success {
+		proxy.ProbeSuccessCount++
+		if latencyMs > 0 {
+			proxy.LastProbeLatencyMs = latencyMs
+		}
+	} else {
+		proxy.ProbeFailureCount++
+	}
+	probedAt := now
+	proxy.LastProbedAt = &probedAt
+	proxy.Metadata = metadata
+	proxy.UpdatedAt = now
+	return s.store.UpdateProxy(ctx, proxy)
+}
+
+// normalizeCountryCode trims and uppercases the operator-supplied country
+// code, capping at the schema's 2-char MaxLen so a stray longer string from a
+// future client cannot get past the contract layer.
+func normalizeCountryCode(value *string) string {
+	if value == nil {
+		return ""
+	}
+	trimmed := strings.ToUpper(strings.TrimSpace(*value))
+	if len(trimmed) > 2 {
+		trimmed = trimmed[:2]
+	}
+	return trimmed
+}
+
+func normalizeCountryName(value *string) string {
+	if value == nil {
+		return ""
+	}
+	trimmed := strings.TrimSpace(*value)
+	if len(trimmed) > 128 {
+		trimmed = trimmed[:128]
+	}
+	return trimmed
 }
 
 func (s *Service) FindProxyByID(ctx context.Context, id int) (contract.ProxyDefinition, error) {

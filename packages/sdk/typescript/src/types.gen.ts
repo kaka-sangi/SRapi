@@ -1821,6 +1821,34 @@ export type ProxyDefinition = {
      */
     url_configured: boolean;
     metadata?: JsonObject;
+    /**
+     * ISO-3166-1 alpha-2 country code, operator-supplied.
+     */
+    country_code?: string | null;
+    /**
+     * Display name for the country, snapshotted at write time.
+     */
+    country_name?: string | null;
+    /**
+     * Last time the proxy probe worker tested this proxy.
+     */
+    last_probed_at?: string | null;
+    /**
+     * Successful probes since the last counter reset (rolling ~7-day window — counters reset weekly, NOT a strict trailing-7d window).
+     */
+    probe_success_count: number;
+    /**
+     * Failed probes since the last counter reset.
+     */
+    probe_failure_count: number;
+    /**
+     * Latency of the most recent successful probe in milliseconds. 0 if no successful probe yet.
+     */
+    last_probe_latency_ms: number;
+    /**
+     * Rolling availability percentage. Null when never probed since last reset.
+     */
+    probe_success_pct_7d?: number | null;
     created_at: Timestamp;
     updated_at: Timestamp;
 };
@@ -1830,6 +1858,14 @@ export type CreateProxyDefinitionRequest = {
     type: ProxyDefinitionType;
     status?: ProxyDefinitionStatus;
     metadata?: JsonObject;
+    /**
+     * ISO-3166-1 alpha-2 country code, operator-supplied.
+     */
+    country_code?: string | null;
+    /**
+     * Localized display name for the country, snapshotted at write time.
+     */
+    country_name?: string | null;
 };
 
 export type UpdateProxyDefinitionRequest = {
@@ -1837,6 +1873,14 @@ export type UpdateProxyDefinitionRequest = {
     type?: ProxyDefinitionType;
     status?: ProxyDefinitionStatus;
     metadata?: JsonObject;
+    /**
+     * ISO-3166-1 alpha-2 country code, operator-supplied.
+     */
+    country_code?: string | null;
+    /**
+     * Localized display name for the country, snapshotted at write time.
+     */
+    country_name?: string | null;
 };
 
 export type BatchCreateProxiesRequest = {
@@ -6299,6 +6343,14 @@ export type CreateProxyDefinitionRequestWritable = {
     url: string;
     status?: ProxyDefinitionStatus;
     metadata?: JsonObject;
+    /**
+     * ISO-3166-1 alpha-2 country code, operator-supplied.
+     */
+    country_code?: string | null;
+    /**
+     * Localized display name for the country, snapshotted at write time.
+     */
+    country_name?: string | null;
 };
 
 export type UpdateProxyDefinitionRequestWritable = {
@@ -6310,6 +6362,14 @@ export type UpdateProxyDefinitionRequestWritable = {
     url?: string;
     status?: ProxyDefinitionStatus;
     metadata?: JsonObject;
+    /**
+     * ISO-3166-1 alpha-2 country code, operator-supplied.
+     */
+    country_code?: string | null;
+    /**
+     * Localized display name for the country, snapshotted at write time.
+     */
+    country_name?: string | null;
 };
 
 export type BatchCreateProxiesRequestWritable = {

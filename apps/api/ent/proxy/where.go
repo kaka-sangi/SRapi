@@ -94,6 +94,36 @@ func Status(v string) predicate.Proxy {
 	return predicate.Proxy(sql.FieldEQ(FieldStatus, v))
 }
 
+// CountryCode applies equality check predicate on the "country_code" field. It's identical to CountryCodeEQ.
+func CountryCode(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldCountryCode, v))
+}
+
+// CountryName applies equality check predicate on the "country_name" field. It's identical to CountryNameEQ.
+func CountryName(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldCountryName, v))
+}
+
+// LastProbedAt applies equality check predicate on the "last_probed_at" field. It's identical to LastProbedAtEQ.
+func LastProbedAt(v time.Time) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldLastProbedAt, v))
+}
+
+// ProbeSuccessCount applies equality check predicate on the "probe_success_count" field. It's identical to ProbeSuccessCountEQ.
+func ProbeSuccessCount(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldProbeSuccessCount, v))
+}
+
+// ProbeFailureCount applies equality check predicate on the "probe_failure_count" field. It's identical to ProbeFailureCountEQ.
+func ProbeFailureCount(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldProbeFailureCount, v))
+}
+
+// LastProbeLatencyMs applies equality check predicate on the "last_probe_latency_ms" field. It's identical to LastProbeLatencyMsEQ.
+func LastProbeLatencyMs(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldLastProbeLatencyMs, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.Proxy {
 	return predicate.Proxy(sql.FieldEQ(FieldCreatedAt, v))
@@ -517,6 +547,326 @@ func MetadataJSONIsNil() predicate.Proxy {
 // MetadataJSONNotNil applies the NotNil predicate on the "metadata_json" field.
 func MetadataJSONNotNil() predicate.Proxy {
 	return predicate.Proxy(sql.FieldNotNull(FieldMetadataJSON))
+}
+
+// CountryCodeEQ applies the EQ predicate on the "country_code" field.
+func CountryCodeEQ(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldCountryCode, v))
+}
+
+// CountryCodeNEQ applies the NEQ predicate on the "country_code" field.
+func CountryCodeNEQ(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldCountryCode, v))
+}
+
+// CountryCodeIn applies the In predicate on the "country_code" field.
+func CountryCodeIn(vs ...string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldCountryCode, vs...))
+}
+
+// CountryCodeNotIn applies the NotIn predicate on the "country_code" field.
+func CountryCodeNotIn(vs ...string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldCountryCode, vs...))
+}
+
+// CountryCodeGT applies the GT predicate on the "country_code" field.
+func CountryCodeGT(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldCountryCode, v))
+}
+
+// CountryCodeGTE applies the GTE predicate on the "country_code" field.
+func CountryCodeGTE(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldCountryCode, v))
+}
+
+// CountryCodeLT applies the LT predicate on the "country_code" field.
+func CountryCodeLT(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldCountryCode, v))
+}
+
+// CountryCodeLTE applies the LTE predicate on the "country_code" field.
+func CountryCodeLTE(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldCountryCode, v))
+}
+
+// CountryCodeContains applies the Contains predicate on the "country_code" field.
+func CountryCodeContains(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldContains(FieldCountryCode, v))
+}
+
+// CountryCodeHasPrefix applies the HasPrefix predicate on the "country_code" field.
+func CountryCodeHasPrefix(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldHasPrefix(FieldCountryCode, v))
+}
+
+// CountryCodeHasSuffix applies the HasSuffix predicate on the "country_code" field.
+func CountryCodeHasSuffix(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldHasSuffix(FieldCountryCode, v))
+}
+
+// CountryCodeIsNil applies the IsNil predicate on the "country_code" field.
+func CountryCodeIsNil() predicate.Proxy {
+	return predicate.Proxy(sql.FieldIsNull(FieldCountryCode))
+}
+
+// CountryCodeNotNil applies the NotNil predicate on the "country_code" field.
+func CountryCodeNotNil() predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotNull(FieldCountryCode))
+}
+
+// CountryCodeEqualFold applies the EqualFold predicate on the "country_code" field.
+func CountryCodeEqualFold(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEqualFold(FieldCountryCode, v))
+}
+
+// CountryCodeContainsFold applies the ContainsFold predicate on the "country_code" field.
+func CountryCodeContainsFold(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldContainsFold(FieldCountryCode, v))
+}
+
+// CountryNameEQ applies the EQ predicate on the "country_name" field.
+func CountryNameEQ(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldCountryName, v))
+}
+
+// CountryNameNEQ applies the NEQ predicate on the "country_name" field.
+func CountryNameNEQ(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldCountryName, v))
+}
+
+// CountryNameIn applies the In predicate on the "country_name" field.
+func CountryNameIn(vs ...string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldCountryName, vs...))
+}
+
+// CountryNameNotIn applies the NotIn predicate on the "country_name" field.
+func CountryNameNotIn(vs ...string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldCountryName, vs...))
+}
+
+// CountryNameGT applies the GT predicate on the "country_name" field.
+func CountryNameGT(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldCountryName, v))
+}
+
+// CountryNameGTE applies the GTE predicate on the "country_name" field.
+func CountryNameGTE(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldCountryName, v))
+}
+
+// CountryNameLT applies the LT predicate on the "country_name" field.
+func CountryNameLT(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldCountryName, v))
+}
+
+// CountryNameLTE applies the LTE predicate on the "country_name" field.
+func CountryNameLTE(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldCountryName, v))
+}
+
+// CountryNameContains applies the Contains predicate on the "country_name" field.
+func CountryNameContains(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldContains(FieldCountryName, v))
+}
+
+// CountryNameHasPrefix applies the HasPrefix predicate on the "country_name" field.
+func CountryNameHasPrefix(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldHasPrefix(FieldCountryName, v))
+}
+
+// CountryNameHasSuffix applies the HasSuffix predicate on the "country_name" field.
+func CountryNameHasSuffix(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldHasSuffix(FieldCountryName, v))
+}
+
+// CountryNameIsNil applies the IsNil predicate on the "country_name" field.
+func CountryNameIsNil() predicate.Proxy {
+	return predicate.Proxy(sql.FieldIsNull(FieldCountryName))
+}
+
+// CountryNameNotNil applies the NotNil predicate on the "country_name" field.
+func CountryNameNotNil() predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotNull(FieldCountryName))
+}
+
+// CountryNameEqualFold applies the EqualFold predicate on the "country_name" field.
+func CountryNameEqualFold(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEqualFold(FieldCountryName, v))
+}
+
+// CountryNameContainsFold applies the ContainsFold predicate on the "country_name" field.
+func CountryNameContainsFold(v string) predicate.Proxy {
+	return predicate.Proxy(sql.FieldContainsFold(FieldCountryName, v))
+}
+
+// LastProbedAtEQ applies the EQ predicate on the "last_probed_at" field.
+func LastProbedAtEQ(v time.Time) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldLastProbedAt, v))
+}
+
+// LastProbedAtNEQ applies the NEQ predicate on the "last_probed_at" field.
+func LastProbedAtNEQ(v time.Time) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldLastProbedAt, v))
+}
+
+// LastProbedAtIn applies the In predicate on the "last_probed_at" field.
+func LastProbedAtIn(vs ...time.Time) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldLastProbedAt, vs...))
+}
+
+// LastProbedAtNotIn applies the NotIn predicate on the "last_probed_at" field.
+func LastProbedAtNotIn(vs ...time.Time) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldLastProbedAt, vs...))
+}
+
+// LastProbedAtGT applies the GT predicate on the "last_probed_at" field.
+func LastProbedAtGT(v time.Time) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldLastProbedAt, v))
+}
+
+// LastProbedAtGTE applies the GTE predicate on the "last_probed_at" field.
+func LastProbedAtGTE(v time.Time) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldLastProbedAt, v))
+}
+
+// LastProbedAtLT applies the LT predicate on the "last_probed_at" field.
+func LastProbedAtLT(v time.Time) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldLastProbedAt, v))
+}
+
+// LastProbedAtLTE applies the LTE predicate on the "last_probed_at" field.
+func LastProbedAtLTE(v time.Time) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldLastProbedAt, v))
+}
+
+// LastProbedAtIsNil applies the IsNil predicate on the "last_probed_at" field.
+func LastProbedAtIsNil() predicate.Proxy {
+	return predicate.Proxy(sql.FieldIsNull(FieldLastProbedAt))
+}
+
+// LastProbedAtNotNil applies the NotNil predicate on the "last_probed_at" field.
+func LastProbedAtNotNil() predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotNull(FieldLastProbedAt))
+}
+
+// ProbeSuccessCountEQ applies the EQ predicate on the "probe_success_count" field.
+func ProbeSuccessCountEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldProbeSuccessCount, v))
+}
+
+// ProbeSuccessCountNEQ applies the NEQ predicate on the "probe_success_count" field.
+func ProbeSuccessCountNEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldProbeSuccessCount, v))
+}
+
+// ProbeSuccessCountIn applies the In predicate on the "probe_success_count" field.
+func ProbeSuccessCountIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldProbeSuccessCount, vs...))
+}
+
+// ProbeSuccessCountNotIn applies the NotIn predicate on the "probe_success_count" field.
+func ProbeSuccessCountNotIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldProbeSuccessCount, vs...))
+}
+
+// ProbeSuccessCountGT applies the GT predicate on the "probe_success_count" field.
+func ProbeSuccessCountGT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldProbeSuccessCount, v))
+}
+
+// ProbeSuccessCountGTE applies the GTE predicate on the "probe_success_count" field.
+func ProbeSuccessCountGTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldProbeSuccessCount, v))
+}
+
+// ProbeSuccessCountLT applies the LT predicate on the "probe_success_count" field.
+func ProbeSuccessCountLT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldProbeSuccessCount, v))
+}
+
+// ProbeSuccessCountLTE applies the LTE predicate on the "probe_success_count" field.
+func ProbeSuccessCountLTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldProbeSuccessCount, v))
+}
+
+// ProbeFailureCountEQ applies the EQ predicate on the "probe_failure_count" field.
+func ProbeFailureCountEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldProbeFailureCount, v))
+}
+
+// ProbeFailureCountNEQ applies the NEQ predicate on the "probe_failure_count" field.
+func ProbeFailureCountNEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldProbeFailureCount, v))
+}
+
+// ProbeFailureCountIn applies the In predicate on the "probe_failure_count" field.
+func ProbeFailureCountIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldProbeFailureCount, vs...))
+}
+
+// ProbeFailureCountNotIn applies the NotIn predicate on the "probe_failure_count" field.
+func ProbeFailureCountNotIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldProbeFailureCount, vs...))
+}
+
+// ProbeFailureCountGT applies the GT predicate on the "probe_failure_count" field.
+func ProbeFailureCountGT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldProbeFailureCount, v))
+}
+
+// ProbeFailureCountGTE applies the GTE predicate on the "probe_failure_count" field.
+func ProbeFailureCountGTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldProbeFailureCount, v))
+}
+
+// ProbeFailureCountLT applies the LT predicate on the "probe_failure_count" field.
+func ProbeFailureCountLT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldProbeFailureCount, v))
+}
+
+// ProbeFailureCountLTE applies the LTE predicate on the "probe_failure_count" field.
+func ProbeFailureCountLTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldProbeFailureCount, v))
+}
+
+// LastProbeLatencyMsEQ applies the EQ predicate on the "last_probe_latency_ms" field.
+func LastProbeLatencyMsEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldLastProbeLatencyMs, v))
+}
+
+// LastProbeLatencyMsNEQ applies the NEQ predicate on the "last_probe_latency_ms" field.
+func LastProbeLatencyMsNEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldLastProbeLatencyMs, v))
+}
+
+// LastProbeLatencyMsIn applies the In predicate on the "last_probe_latency_ms" field.
+func LastProbeLatencyMsIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldLastProbeLatencyMs, vs...))
+}
+
+// LastProbeLatencyMsNotIn applies the NotIn predicate on the "last_probe_latency_ms" field.
+func LastProbeLatencyMsNotIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldLastProbeLatencyMs, vs...))
+}
+
+// LastProbeLatencyMsGT applies the GT predicate on the "last_probe_latency_ms" field.
+func LastProbeLatencyMsGT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldLastProbeLatencyMs, v))
+}
+
+// LastProbeLatencyMsGTE applies the GTE predicate on the "last_probe_latency_ms" field.
+func LastProbeLatencyMsGTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldLastProbeLatencyMs, v))
+}
+
+// LastProbeLatencyMsLT applies the LT predicate on the "last_probe_latency_ms" field.
+func LastProbeLatencyMsLT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldLastProbeLatencyMs, v))
+}
+
+// LastProbeLatencyMsLTE applies the LTE predicate on the "last_probe_latency_ms" field.
+func LastProbeLatencyMsLTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldLastProbeLatencyMs, v))
 }
 
 // And groups predicates with the AND operator between them.

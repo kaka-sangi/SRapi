@@ -45774,23 +45774,32 @@ func (m *ProviderAccountMutation) ResetEdge(name string) error {
 // ProxyMutation represents an operation that mutates the Proxy nodes in the graph.
 type ProxyMutation struct {
 	config
-	op             Op
-	typ            string
-	id             *int
-	created_at     *time.Time
-	updated_at     *time.Time
-	deleted_at     *time.Time
-	name           *string
-	_type          *string
-	url_ciphertext *[]byte
-	url_version    *int
-	addurl_version *int
-	status         *string
-	metadata_json  *map[string]interface{}
-	clearedFields  map[string]struct{}
-	done           bool
-	oldValue       func(context.Context) (*Proxy, error)
-	predicates     []predicate.Proxy
+	op                       Op
+	typ                      string
+	id                       *int
+	created_at               *time.Time
+	updated_at               *time.Time
+	deleted_at               *time.Time
+	name                     *string
+	_type                    *string
+	url_ciphertext           *[]byte
+	url_version              *int
+	addurl_version           *int
+	status                   *string
+	metadata_json            *map[string]interface{}
+	country_code             *string
+	country_name             *string
+	last_probed_at           *time.Time
+	probe_success_count      *int
+	addprobe_success_count   *int
+	probe_failure_count      *int
+	addprobe_failure_count   *int
+	last_probe_latency_ms    *int
+	addlast_probe_latency_ms *int
+	clearedFields            map[string]struct{}
+	done                     bool
+	oldValue                 func(context.Context) (*Proxy, error)
+	predicates               []predicate.Proxy
 }
 
 var _ ent.Mutation = (*ProxyMutation)(nil)
@@ -46274,6 +46283,321 @@ func (m *ProxyMutation) ResetMetadataJSON() {
 	delete(m.clearedFields, proxy.FieldMetadataJSON)
 }
 
+// SetCountryCode sets the "country_code" field.
+func (m *ProxyMutation) SetCountryCode(s string) {
+	m.country_code = &s
+}
+
+// CountryCode returns the value of the "country_code" field in the mutation.
+func (m *ProxyMutation) CountryCode() (r string, exists bool) {
+	v := m.country_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCountryCode returns the old "country_code" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldCountryCode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCountryCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCountryCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCountryCode: %w", err)
+	}
+	return oldValue.CountryCode, nil
+}
+
+// ClearCountryCode clears the value of the "country_code" field.
+func (m *ProxyMutation) ClearCountryCode() {
+	m.country_code = nil
+	m.clearedFields[proxy.FieldCountryCode] = struct{}{}
+}
+
+// CountryCodeCleared returns if the "country_code" field was cleared in this mutation.
+func (m *ProxyMutation) CountryCodeCleared() bool {
+	_, ok := m.clearedFields[proxy.FieldCountryCode]
+	return ok
+}
+
+// ResetCountryCode resets all changes to the "country_code" field.
+func (m *ProxyMutation) ResetCountryCode() {
+	m.country_code = nil
+	delete(m.clearedFields, proxy.FieldCountryCode)
+}
+
+// SetCountryName sets the "country_name" field.
+func (m *ProxyMutation) SetCountryName(s string) {
+	m.country_name = &s
+}
+
+// CountryName returns the value of the "country_name" field in the mutation.
+func (m *ProxyMutation) CountryName() (r string, exists bool) {
+	v := m.country_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCountryName returns the old "country_name" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldCountryName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCountryName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCountryName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCountryName: %w", err)
+	}
+	return oldValue.CountryName, nil
+}
+
+// ClearCountryName clears the value of the "country_name" field.
+func (m *ProxyMutation) ClearCountryName() {
+	m.country_name = nil
+	m.clearedFields[proxy.FieldCountryName] = struct{}{}
+}
+
+// CountryNameCleared returns if the "country_name" field was cleared in this mutation.
+func (m *ProxyMutation) CountryNameCleared() bool {
+	_, ok := m.clearedFields[proxy.FieldCountryName]
+	return ok
+}
+
+// ResetCountryName resets all changes to the "country_name" field.
+func (m *ProxyMutation) ResetCountryName() {
+	m.country_name = nil
+	delete(m.clearedFields, proxy.FieldCountryName)
+}
+
+// SetLastProbedAt sets the "last_probed_at" field.
+func (m *ProxyMutation) SetLastProbedAt(t time.Time) {
+	m.last_probed_at = &t
+}
+
+// LastProbedAt returns the value of the "last_probed_at" field in the mutation.
+func (m *ProxyMutation) LastProbedAt() (r time.Time, exists bool) {
+	v := m.last_probed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastProbedAt returns the old "last_probed_at" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldLastProbedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastProbedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastProbedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastProbedAt: %w", err)
+	}
+	return oldValue.LastProbedAt, nil
+}
+
+// ClearLastProbedAt clears the value of the "last_probed_at" field.
+func (m *ProxyMutation) ClearLastProbedAt() {
+	m.last_probed_at = nil
+	m.clearedFields[proxy.FieldLastProbedAt] = struct{}{}
+}
+
+// LastProbedAtCleared returns if the "last_probed_at" field was cleared in this mutation.
+func (m *ProxyMutation) LastProbedAtCleared() bool {
+	_, ok := m.clearedFields[proxy.FieldLastProbedAt]
+	return ok
+}
+
+// ResetLastProbedAt resets all changes to the "last_probed_at" field.
+func (m *ProxyMutation) ResetLastProbedAt() {
+	m.last_probed_at = nil
+	delete(m.clearedFields, proxy.FieldLastProbedAt)
+}
+
+// SetProbeSuccessCount sets the "probe_success_count" field.
+func (m *ProxyMutation) SetProbeSuccessCount(i int) {
+	m.probe_success_count = &i
+	m.addprobe_success_count = nil
+}
+
+// ProbeSuccessCount returns the value of the "probe_success_count" field in the mutation.
+func (m *ProxyMutation) ProbeSuccessCount() (r int, exists bool) {
+	v := m.probe_success_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProbeSuccessCount returns the old "probe_success_count" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldProbeSuccessCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProbeSuccessCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProbeSuccessCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProbeSuccessCount: %w", err)
+	}
+	return oldValue.ProbeSuccessCount, nil
+}
+
+// AddProbeSuccessCount adds i to the "probe_success_count" field.
+func (m *ProxyMutation) AddProbeSuccessCount(i int) {
+	if m.addprobe_success_count != nil {
+		*m.addprobe_success_count += i
+	} else {
+		m.addprobe_success_count = &i
+	}
+}
+
+// AddedProbeSuccessCount returns the value that was added to the "probe_success_count" field in this mutation.
+func (m *ProxyMutation) AddedProbeSuccessCount() (r int, exists bool) {
+	v := m.addprobe_success_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetProbeSuccessCount resets all changes to the "probe_success_count" field.
+func (m *ProxyMutation) ResetProbeSuccessCount() {
+	m.probe_success_count = nil
+	m.addprobe_success_count = nil
+}
+
+// SetProbeFailureCount sets the "probe_failure_count" field.
+func (m *ProxyMutation) SetProbeFailureCount(i int) {
+	m.probe_failure_count = &i
+	m.addprobe_failure_count = nil
+}
+
+// ProbeFailureCount returns the value of the "probe_failure_count" field in the mutation.
+func (m *ProxyMutation) ProbeFailureCount() (r int, exists bool) {
+	v := m.probe_failure_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProbeFailureCount returns the old "probe_failure_count" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldProbeFailureCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProbeFailureCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProbeFailureCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProbeFailureCount: %w", err)
+	}
+	return oldValue.ProbeFailureCount, nil
+}
+
+// AddProbeFailureCount adds i to the "probe_failure_count" field.
+func (m *ProxyMutation) AddProbeFailureCount(i int) {
+	if m.addprobe_failure_count != nil {
+		*m.addprobe_failure_count += i
+	} else {
+		m.addprobe_failure_count = &i
+	}
+}
+
+// AddedProbeFailureCount returns the value that was added to the "probe_failure_count" field in this mutation.
+func (m *ProxyMutation) AddedProbeFailureCount() (r int, exists bool) {
+	v := m.addprobe_failure_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetProbeFailureCount resets all changes to the "probe_failure_count" field.
+func (m *ProxyMutation) ResetProbeFailureCount() {
+	m.probe_failure_count = nil
+	m.addprobe_failure_count = nil
+}
+
+// SetLastProbeLatencyMs sets the "last_probe_latency_ms" field.
+func (m *ProxyMutation) SetLastProbeLatencyMs(i int) {
+	m.last_probe_latency_ms = &i
+	m.addlast_probe_latency_ms = nil
+}
+
+// LastProbeLatencyMs returns the value of the "last_probe_latency_ms" field in the mutation.
+func (m *ProxyMutation) LastProbeLatencyMs() (r int, exists bool) {
+	v := m.last_probe_latency_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastProbeLatencyMs returns the old "last_probe_latency_ms" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldLastProbeLatencyMs(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastProbeLatencyMs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastProbeLatencyMs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastProbeLatencyMs: %w", err)
+	}
+	return oldValue.LastProbeLatencyMs, nil
+}
+
+// AddLastProbeLatencyMs adds i to the "last_probe_latency_ms" field.
+func (m *ProxyMutation) AddLastProbeLatencyMs(i int) {
+	if m.addlast_probe_latency_ms != nil {
+		*m.addlast_probe_latency_ms += i
+	} else {
+		m.addlast_probe_latency_ms = &i
+	}
+}
+
+// AddedLastProbeLatencyMs returns the value that was added to the "last_probe_latency_ms" field in this mutation.
+func (m *ProxyMutation) AddedLastProbeLatencyMs() (r int, exists bool) {
+	v := m.addlast_probe_latency_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetLastProbeLatencyMs resets all changes to the "last_probe_latency_ms" field.
+func (m *ProxyMutation) ResetLastProbeLatencyMs() {
+	m.last_probe_latency_ms = nil
+	m.addlast_probe_latency_ms = nil
+}
+
 // Where appends a list predicates to the ProxyMutation builder.
 func (m *ProxyMutation) Where(ps ...predicate.Proxy) {
 	m.predicates = append(m.predicates, ps...)
@@ -46308,7 +46632,7 @@ func (m *ProxyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProxyMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 15)
 	if m.created_at != nil {
 		fields = append(fields, proxy.FieldCreatedAt)
 	}
@@ -46336,6 +46660,24 @@ func (m *ProxyMutation) Fields() []string {
 	if m.metadata_json != nil {
 		fields = append(fields, proxy.FieldMetadataJSON)
 	}
+	if m.country_code != nil {
+		fields = append(fields, proxy.FieldCountryCode)
+	}
+	if m.country_name != nil {
+		fields = append(fields, proxy.FieldCountryName)
+	}
+	if m.last_probed_at != nil {
+		fields = append(fields, proxy.FieldLastProbedAt)
+	}
+	if m.probe_success_count != nil {
+		fields = append(fields, proxy.FieldProbeSuccessCount)
+	}
+	if m.probe_failure_count != nil {
+		fields = append(fields, proxy.FieldProbeFailureCount)
+	}
+	if m.last_probe_latency_ms != nil {
+		fields = append(fields, proxy.FieldLastProbeLatencyMs)
+	}
 	return fields
 }
 
@@ -46362,6 +46704,18 @@ func (m *ProxyMutation) Field(name string) (ent.Value, bool) {
 		return m.Status()
 	case proxy.FieldMetadataJSON:
 		return m.MetadataJSON()
+	case proxy.FieldCountryCode:
+		return m.CountryCode()
+	case proxy.FieldCountryName:
+		return m.CountryName()
+	case proxy.FieldLastProbedAt:
+		return m.LastProbedAt()
+	case proxy.FieldProbeSuccessCount:
+		return m.ProbeSuccessCount()
+	case proxy.FieldProbeFailureCount:
+		return m.ProbeFailureCount()
+	case proxy.FieldLastProbeLatencyMs:
+		return m.LastProbeLatencyMs()
 	}
 	return nil, false
 }
@@ -46389,6 +46743,18 @@ func (m *ProxyMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldStatus(ctx)
 	case proxy.FieldMetadataJSON:
 		return m.OldMetadataJSON(ctx)
+	case proxy.FieldCountryCode:
+		return m.OldCountryCode(ctx)
+	case proxy.FieldCountryName:
+		return m.OldCountryName(ctx)
+	case proxy.FieldLastProbedAt:
+		return m.OldLastProbedAt(ctx)
+	case proxy.FieldProbeSuccessCount:
+		return m.OldProbeSuccessCount(ctx)
+	case proxy.FieldProbeFailureCount:
+		return m.OldProbeFailureCount(ctx)
+	case proxy.FieldLastProbeLatencyMs:
+		return m.OldLastProbeLatencyMs(ctx)
 	}
 	return nil, fmt.Errorf("unknown Proxy field %s", name)
 }
@@ -46461,6 +46827,48 @@ func (m *ProxyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetMetadataJSON(v)
 		return nil
+	case proxy.FieldCountryCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCountryCode(v)
+		return nil
+	case proxy.FieldCountryName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCountryName(v)
+		return nil
+	case proxy.FieldLastProbedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastProbedAt(v)
+		return nil
+	case proxy.FieldProbeSuccessCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProbeSuccessCount(v)
+		return nil
+	case proxy.FieldProbeFailureCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProbeFailureCount(v)
+		return nil
+	case proxy.FieldLastProbeLatencyMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastProbeLatencyMs(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Proxy field %s", name)
 }
@@ -46472,6 +46880,15 @@ func (m *ProxyMutation) AddedFields() []string {
 	if m.addurl_version != nil {
 		fields = append(fields, proxy.FieldURLVersion)
 	}
+	if m.addprobe_success_count != nil {
+		fields = append(fields, proxy.FieldProbeSuccessCount)
+	}
+	if m.addprobe_failure_count != nil {
+		fields = append(fields, proxy.FieldProbeFailureCount)
+	}
+	if m.addlast_probe_latency_ms != nil {
+		fields = append(fields, proxy.FieldLastProbeLatencyMs)
+	}
 	return fields
 }
 
@@ -46482,6 +46899,12 @@ func (m *ProxyMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case proxy.FieldURLVersion:
 		return m.AddedURLVersion()
+	case proxy.FieldProbeSuccessCount:
+		return m.AddedProbeSuccessCount()
+	case proxy.FieldProbeFailureCount:
+		return m.AddedProbeFailureCount()
+	case proxy.FieldLastProbeLatencyMs:
+		return m.AddedLastProbeLatencyMs()
 	}
 	return nil, false
 }
@@ -46497,6 +46920,27 @@ func (m *ProxyMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddURLVersion(v)
+		return nil
+	case proxy.FieldProbeSuccessCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddProbeSuccessCount(v)
+		return nil
+	case proxy.FieldProbeFailureCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddProbeFailureCount(v)
+		return nil
+	case proxy.FieldLastProbeLatencyMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLastProbeLatencyMs(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Proxy numeric field %s", name)
@@ -46514,6 +46958,15 @@ func (m *ProxyMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(proxy.FieldMetadataJSON) {
 		fields = append(fields, proxy.FieldMetadataJSON)
+	}
+	if m.FieldCleared(proxy.FieldCountryCode) {
+		fields = append(fields, proxy.FieldCountryCode)
+	}
+	if m.FieldCleared(proxy.FieldCountryName) {
+		fields = append(fields, proxy.FieldCountryName)
+	}
+	if m.FieldCleared(proxy.FieldLastProbedAt) {
+		fields = append(fields, proxy.FieldLastProbedAt)
 	}
 	return fields
 }
@@ -46537,6 +46990,15 @@ func (m *ProxyMutation) ClearField(name string) error {
 		return nil
 	case proxy.FieldMetadataJSON:
 		m.ClearMetadataJSON()
+		return nil
+	case proxy.FieldCountryCode:
+		m.ClearCountryCode()
+		return nil
+	case proxy.FieldCountryName:
+		m.ClearCountryName()
+		return nil
+	case proxy.FieldLastProbedAt:
+		m.ClearLastProbedAt()
 		return nil
 	}
 	return fmt.Errorf("unknown Proxy nullable field %s", name)
@@ -46572,6 +47034,24 @@ func (m *ProxyMutation) ResetField(name string) error {
 		return nil
 	case proxy.FieldMetadataJSON:
 		m.ResetMetadataJSON()
+		return nil
+	case proxy.FieldCountryCode:
+		m.ResetCountryCode()
+		return nil
+	case proxy.FieldCountryName:
+		m.ResetCountryName()
+		return nil
+	case proxy.FieldLastProbedAt:
+		m.ResetLastProbedAt()
+		return nil
+	case proxy.FieldProbeSuccessCount:
+		m.ResetProbeSuccessCount()
+		return nil
+	case proxy.FieldProbeFailureCount:
+		m.ResetProbeFailureCount()
+		return nil
+	case proxy.FieldLastProbeLatencyMs:
+		m.ResetLastProbeLatencyMs()
 		return nil
 	}
 	return fmt.Errorf("unknown Proxy field %s", name)
