@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
@@ -73,21 +74,83 @@ func (s *Server) recordOpsErrorLog(ctx context.Context, authed apikeycontract.Au
 	if err := s.runtime.opsErrorLogs.RecordError(ctx, req); err != nil && s.runtime.logger != nil {
 		s.runtime.logger.Warn("ops_error_logs RecordError failed", "request_id", canonical.RequestID, "error", err)
 	}
+	// Mirror the same event onto the system-log stream so the operator's
+	// 系统日志 panel (admin_control.OpsSystemLog) shows what just failed.
+	// Without this hook the table is permanently empty — the wiring exists
+	// (admin_control.CreateSystemLog + service.RecordSystemLog), but until
+	// now nothing in the gateway hot path actually called it. sub2api
+	// parity: every recorded upstream failure produces both an
+	// ops_error_logs row AND a system_logs entry, so the operator can
+	// triage from either surface.
+	s.recordGatewaySystemLog(ctx, canonical, result, providerErr, errorClass, upstreamStatus)
 }
 
-// opsErrorLogShouldRecord mirrors sub2api's gate. The taxonomy maps from the
-// gateway's four-class scheme:
-//   - "server_bad" → always
-//   - "transient" → only when upstreamStatus >= 500 (5xx transients);
-//     non-5xx transients are usually 408/429/network blips that the failover
-//     loop will retry and that don't warrant operator attention.
-//   - "network_error" (the platform-side alias used by tests) → always
+// recordGatewaySystemLog forwards a failed gateway attempt onto the
+// admin_control system-log buffer that backs the 系统日志 admin panel.
+// Mirrors sub2api's structured log fan-out: WARN level for any upstream
+// HTTP rejection (4xx + 5xx) and for transport-class failures, INFO for
+// no-available-account decisions (operator should still see them but
+// they're not anomalies). Best-effort; failures are warn-logged and
+// swallowed so the gateway hot path is never blocked.
+func (s *Server) recordGatewaySystemLog(ctx context.Context, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, providerErr error, errorClass string, upstreamStatus int) {
+	if s == nil || s.runtime == nil || s.runtime.adminControl == nil {
+		return
+	}
+	level := admincontrolcontract.OpsSystemLogLevelWarn
+	if errorClass == "no_available_account" {
+		level = admincontrolcontract.OpsSystemLogLevelInfo
+	} else if upstreamStatus >= 500 || errorClass == "network_error" {
+		level = admincontrolcontract.OpsSystemLogLevelError
+	}
+	message := providerErrorMessage(providerErr)
+	if strings.TrimSpace(message) == "" {
+		message = errorClass
+	}
+	metadata := map[string]any{
+		"request_id":       canonical.RequestID,
+		"source_endpoint":  canonical.SourceEndpoint,
+		"source_protocol":  string(canonical.SourceProtocol),
+		"canonical_model":  canonical.CanonicalModel,
+		"error_class":      errorClass,
+		"upstream_status":  upstreamStatus,
+		"body_excerpt":     providerErrorBodyExcerpt(providerErr),
+	}
+	if result.Candidate.Account.ID > 0 {
+		metadata["account_id"] = result.Candidate.Account.ID
+	}
+	if result.Candidate.Provider.ID > 0 {
+		metadata["provider_id"] = result.Candidate.Provider.ID
+	}
+	if _, err := s.runtime.adminControl.RecordSystemLog(ctx, admincontrolcontract.RecordSystemLogRequest{
+		Level:     level,
+		Message:   message,
+		Source:    "gateway",
+		RequestID: canonical.RequestID,
+		TraceID:   requestIDFromContext(ctx),
+		Metadata:  metadata,
+		CreatedAt: time.Now().UTC(),
+	}); err != nil && s.runtime.logger != nil {
+		s.runtime.logger.Warn("admin_control RecordSystemLog failed", "request_id", canonical.RequestID, "error", err)
+	}
+}
+
+// opsErrorLogShouldRecord decides whether a failed upstream attempt is
+// operator-actionable enough to persist in ops_error_logs. Earlier this gate
+// dropped every 4xx (so an upstream "provider rejected request" 400 — exactly
+// the Hermes /compact case — never surfaced in the admin panel). The widened
+// gate mirrors sub2api: any upstream HTTP response in the 4xx-5xx range is
+// recorded (operator needs to see Codex's actual rejection reason), and
+// transport-level failures (network_error class) are always recorded. Pure
+// client-side failures with no upstream call (decode error, model_not_found
+// before the scheduler, etc.) are still skipped — they live on usage_log
+// rows but do not pollute the system-log timeline.
 func opsErrorLogShouldRecord(class string, status int) bool {
+	if status >= 400 && status < 600 {
+		return true
+	}
 	switch class {
 	case "server_bad", "network_error":
 		return true
-	case "transient":
-		return status >= 500
 	}
 	return false
 }

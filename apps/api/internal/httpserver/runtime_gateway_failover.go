@@ -703,6 +703,10 @@ func buildGatewayUpstreamErrorEvent(attemptNo int, result schedulercontract.Sche
 }
 
 func (s *Server) recordGatewayNoAvailableAccount(r *http.Request, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, admission gatewayAdmission, startedAt time.Time) {
+	// Also surface the scheduler-side "no candidate" decision on the system-log
+	// panel so operators see the reason (e.g. capability_mismatch:responses_compact)
+	// alongside actual upstream rejections.
+	s.recordGatewaySystemLog(r.Context(), canonical, result, nil, "no_available_account", 0)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
