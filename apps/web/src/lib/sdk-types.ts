@@ -130,6 +130,8 @@ export type {
   ContentSafetyConfig,
   ContentSafetyMode,
   ProviderAccountImportResult,
+  BatchCreateProviderAccountsResult,
+  BatchCreateProviderAccountsResultRow,
   GatewayUsageResponse,
   GatewayUsageModel,
   GatewayUsageRequest,

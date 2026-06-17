@@ -55,6 +55,7 @@ import {
   type AccountBatchAction,
 } from "@/lib/admin-account-form";
 import { AccountImportDialog } from "@/components/admin/account-import-dialog";
+import { BulkAddAccountsDialog } from "./bulk-add-dialog";
 import type { Provider, ProviderAccount } from "@/lib/sdk-types";
 import { type AccountListMode, metadataString } from "./account-types";
 import { AccountHealthCell, AccountQuotaCell, HealthSummaryStrip } from "./account-health-cells";
@@ -159,6 +160,7 @@ function AccountsContent() {
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProviderAccount | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const [listMode, setListMode] = useState<AccountListMode>("cards");
 
   useEffect(() => {
@@ -602,6 +604,9 @@ function AccountsContent() {
                 <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
                   {t("batchAdd.tab")} / {t("adminAccounts.importAction")}
                 </Button>
+                <Button variant="outline" size="sm" onClick={() => setBulkAddOpen(true)}>
+                  {t("adminAccounts.bulkAdd")}
+                </Button>
                 <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
                   + {t("adminAccounts.create")}
                 </Button>
@@ -778,6 +783,12 @@ function AccountsContent() {
         codexProviderOptions={providerOptions
           .filter((o) => o.adapterType === "reverse-proxy-codex-cli")
           .map((o) => ({ value: o.value, label: o.label }))}
+        defaultProviderId={providers.data?.data?.[0]?.id ?? ""}
+      />
+
+      <BulkAddAccountsDialog
+        open={bulkAddOpen}
+        onOpenChange={setBulkAddOpen}
         defaultProviderId={providers.data?.data?.[0]?.id ?? ""}
       />
     </>

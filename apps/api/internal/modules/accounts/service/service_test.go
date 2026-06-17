@@ -1196,3 +1196,186 @@ func TestProxyCountryRoundTrip(t *testing.T) {
 		t.Fatalf("country_code update: want CN, got %q", updated.CountryCode)
 	}
 }
+
+func TestBatchCreateAccountsAllSuccess(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{
+		ProviderID:   1,
+		RuntimeClass: contract.RuntimeClassAPIKey,
+	}
+	items := []contract.BatchAccountItem{
+		{Name: "fleet-a", Credential: map[string]any{"api_key": "k-a"}},
+		{Name: "fleet-b", Credential: map[string]any{"api_key": "k-b"}},
+		{Name: "fleet-c", Credential: map[string]any{"api_key": "k-c"}},
+	}
+	results, err := svc.BatchCreateAccounts(context.Background(), defaults, items)
+	if err != nil {
+		t.Fatalf("BatchCreateAccounts: %v", err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+	for i, row := range results {
+		if row.Error != "" || row.AccountID == nil {
+			t.Fatalf("row %d unexpectedly failed: %+v", i, row)
+		}
+	}
+	all, _ := svc.List(context.Background())
+	if len(all) != 3 {
+		t.Fatalf("expected 3 stored accounts, got %d", len(all))
+	}
+}
+
+func TestBatchCreateAccountsPerRowValidationSurfaces(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{
+		ProviderID:   1,
+		RuntimeClass: contract.RuntimeClassAPIKey,
+	}
+	items := []contract.BatchAccountItem{
+		{Name: "ok", Credential: map[string]any{"api_key": "k1"}},
+		{Name: "", Credential: map[string]any{"api_key": "k2"}},       // bad name
+		{Name: "no-cred", Credential: map[string]any{}},                // missing credential
+		{Name: "ok2", Credential: map[string]any{"api_key": "k4"}},
+	}
+	results, err := svc.BatchCreateAccounts(context.Background(), defaults, items)
+	if err != nil {
+		t.Fatalf("BatchCreateAccounts unexpected outer error: %v", err)
+	}
+	if len(results) != 4 {
+		t.Fatalf("expected 4 results, got %d", len(results))
+	}
+	if results[0].AccountID == nil || results[0].Error != "" {
+		t.Fatalf("row 0 should succeed, got %+v", results[0])
+	}
+	if results[1].Error == "" || results[1].AccountID != nil {
+		t.Fatalf("row 1 (empty name) should fail, got %+v", results[1])
+	}
+	if results[2].Error == "" || results[2].AccountID != nil {
+		t.Fatalf("row 2 (no credential) should fail, got %+v", results[2])
+	}
+	if results[3].AccountID == nil || results[3].Error != "" {
+		t.Fatalf("row 3 should succeed (subsequent rows not aborted), got %+v", results[3])
+	}
+}
+
+func TestBatchCreateAccountsDeduplicatesInBatch(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{
+		ProviderID:   1,
+		RuntimeClass: contract.RuntimeClassAPIKey,
+	}
+	items := []contract.BatchAccountItem{
+		{Name: "dup", Credential: map[string]any{"api_key": "k-1"}},
+		{Name: "Dup", Credential: map[string]any{"api_key": "k-2"}}, // case-insensitive dup
+		{Name: "ok", Credential: map[string]any{"api_key": "k-3"}},
+	}
+	results, err := svc.BatchCreateAccounts(context.Background(), defaults, items)
+	if err != nil {
+		t.Fatalf("BatchCreateAccounts: %v", err)
+	}
+	if results[0].Error != "" || results[0].AccountID == nil {
+		t.Fatalf("first occurrence should win, got %+v", results[0])
+	}
+	if results[1].Error == "" || results[1].AccountID != nil {
+		t.Fatalf("second occurrence should be flagged duplicate, got %+v", results[1])
+	}
+	if !strings.Contains(strings.ToLower(results[1].Error), "duplicate") {
+		t.Fatalf("expected duplicate error, got %q", results[1].Error)
+	}
+	if results[2].AccountID == nil {
+		t.Fatalf("third unique row should succeed, got %+v", results[2])
+	}
+}
+
+func TestBatchCreateAccountsRejectsExistingName(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if _, err := svc.Create(context.Background(), contract.CreateRequest{
+		ProviderID:   1,
+		Name:         "preexisting",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "old"},
+	}); err != nil {
+		t.Fatalf("seed account: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{
+		ProviderID:   1,
+		RuntimeClass: contract.RuntimeClassAPIKey,
+	}
+	items := []contract.BatchAccountItem{
+		{Name: "preexisting", Credential: map[string]any{"api_key": "new"}},
+		{Name: "newcomer", Credential: map[string]any{"api_key": "new2"}},
+	}
+	results, err := svc.BatchCreateAccounts(context.Background(), defaults, items)
+	if err != nil {
+		t.Fatalf("BatchCreateAccounts: %v", err)
+	}
+	if results[0].Error == "" || results[0].AccountID != nil {
+		t.Fatalf("row 0 should reject preexisting, got %+v", results[0])
+	}
+	if results[1].AccountID == nil {
+		t.Fatalf("row 1 should succeed, got %+v", results[1])
+	}
+}
+
+func TestBatchCreateAccountsRejectsEmptyAndOversize(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	defaults := contract.BatchCreateAccountsDefaults{
+		ProviderID:   1,
+		RuntimeClass: contract.RuntimeClassAPIKey,
+	}
+	if _, err := svc.BatchCreateAccounts(context.Background(), defaults, nil); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("empty items should be rejected, got %v", err)
+	}
+	tooMany := make([]contract.BatchAccountItem, BatchCreateAccountsMaxItems+1)
+	for i := range tooMany {
+		tooMany[i] = contract.BatchAccountItem{Name: "x" + strconv.Itoa(i), Credential: map[string]any{"api_key": "k"}}
+	}
+	if _, err := svc.BatchCreateAccounts(context.Background(), defaults, tooMany); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("oversize batch should be rejected, got %v", err)
+	}
+}
+
+func TestBatchCreateAccountsRejectsInvalidDefaults(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	items := []contract.BatchAccountItem{
+		{Name: "ok", Credential: map[string]any{"api_key": "k"}},
+	}
+	// Missing provider id.
+	if _, err := svc.BatchCreateAccounts(context.Background(), contract.BatchCreateAccountsDefaults{
+		RuntimeClass: contract.RuntimeClassAPIKey,
+	}, items); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("missing provider id should fail, got %v", err)
+	}
+	// Bad runtime class.
+	if _, err := svc.BatchCreateAccounts(context.Background(), contract.BatchCreateAccountsDefaults{
+		ProviderID:   1,
+		RuntimeClass: contract.RuntimeClass("bogus"),
+	}, items); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("bad runtime class should fail, got %v", err)
+	}
+}

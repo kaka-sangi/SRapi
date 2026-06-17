@@ -226,6 +226,17 @@ export function useBatchActionAccounts() {
     ["admin", "accounts"],
   );
 }
+// POST /admin/accounts/batch — bulk-create up to 1000 accounts in one call
+// against a shared defaults set. Replaces the old import-dialog batch tab
+// that fired N single-create requests client-side. Per-row errors come back
+// in result.results[i].error so the caller can render mixed outcomes.
+export function useBatchCreateAccounts() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.batchCreateAccounts>) => adminApi.batchCreateAccounts(body),
+    ["admin", "accounts"],
+  );
+}
+
 // PATCH /admin/accounts/batch — atomic multi-id status change.
 // Replaces the old Promise.allSettled-over-single-item-endpoint pattern that
 // fired N requests per bulk action (and couldn't roll back on partial fail).

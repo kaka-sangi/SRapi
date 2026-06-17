@@ -114,6 +114,121 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 	return stored, nil
 }
 
+// BatchCreateAccountsMaxItems is the hard cap on the number of rows per
+// BatchCreateAccounts call. Mirrors the OpenAPI maxItems on the request body.
+const BatchCreateAccountsMaxItems = 1000
+
+// BatchCreateAccounts inserts many provider accounts in one call against a
+// shared `defaults` (provider, runtime_class, …) so a fleet rollout does not
+// require N single-create requests. Dedupes by name within the batch (first
+// occurrence wins) AND against existing non-deleted accounts. Per-row
+// validation/dedup/store failures surface in result.Error without aborting
+// the call — successful rows still apply.
+//
+// When defaults.GroupID is set (or a per-row override is set), the created
+// account is also added to that group; a group-add failure flips the row
+// into an Error outcome but does NOT roll back the account create — same
+// best-effort semantics the bulk import uses.
+//
+// Returns an outer error only for catastrophic preconditions (empty items,
+// too many items, defaults invalid before any item is touched).
+func (s *Service) BatchCreateAccounts(ctx context.Context, defaults contract.BatchCreateAccountsDefaults, items []contract.BatchAccountItem) ([]contract.BatchCreateAccountResult, error) {
+	if len(items) == 0 {
+		return nil, ErrInvalidInput
+	}
+	if len(items) > BatchCreateAccountsMaxItems {
+		return nil, ErrInvalidInput
+	}
+	if defaults.ProviderID <= 0 || !validRuntimeClass(defaults.RuntimeClass) {
+		return nil, ErrInvalidInput
+	}
+	if defaults.RiskLevel != nil {
+		if _, ok := normalizeRiskLevel(*defaults.RiskLevel); !ok {
+			return nil, ErrInvalidInput
+		}
+	}
+	if defaults.GroupID != nil && *defaults.GroupID <= 0 {
+		return nil, ErrInvalidInput
+	}
+
+	existing, err := s.store.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	taken := make(map[string]struct{}, len(existing))
+	for _, account := range existing {
+		if account.DeletedAt != nil {
+			continue
+		}
+		taken[strings.ToLower(strings.TrimSpace(account.Name))] = struct{}{}
+	}
+
+	out := make([]contract.BatchCreateAccountResult, len(items))
+	for i, item := range items {
+		name := strings.TrimSpace(item.Name)
+		row := contract.BatchCreateAccountResult{Index: i, Name: name}
+		if name == "" {
+			row.Error = "name required"
+			out[i] = row
+			continue
+		}
+		if len(item.Credential) == 0 {
+			row.Error = "credential required"
+			out[i] = row
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, dup := taken[key]; dup {
+			row.Error = "duplicate name"
+			out[i] = row
+			continue
+		}
+		// Per-row overrides win over defaults.
+		priority := defaults.Priority
+		if item.Priority != nil {
+			priority = item.Priority
+		}
+		weight := defaults.Weight
+		if item.Weight != nil {
+			weight = item.Weight
+		}
+		groupID := defaults.GroupID
+		if item.GroupID != nil {
+			groupID = item.GroupID
+		}
+		created, createErr := s.Create(ctx, contract.CreateRequest{
+			ProviderID:     defaults.ProviderID,
+			Name:           name,
+			RuntimeClass:   defaults.RuntimeClass,
+			Credential:     item.Credential,
+			Metadata:       cloneMap(defaults.Metadata),
+			ProxyID:        defaults.ProxyID,
+			Priority:       priority,
+			Weight:         weight,
+			RiskLevel:      defaults.RiskLevel,
+			UpstreamClient: defaults.UpstreamClient,
+		})
+		if createErr != nil {
+			row.Error = createErr.Error()
+			out[i] = row
+			continue
+		}
+		taken[key] = struct{}{}
+		accountID := created.ID
+		row.AccountID = &accountID
+		if groupID != nil && *groupID > 0 {
+			if _, addErr := s.AddAccountToGroup(ctx, created.ID, *groupID); addErr != nil {
+				// Flip the row to an error so the operator sees why this row
+				// did not end up in the requested group, but keep AccountID set
+				// — the account itself was created and is usable on its own.
+				row.Error = "added to provider but failed to add to group: " + addErr.Error()
+			}
+		}
+		out[i] = row
+	}
+	return out, nil
+}
+
 func (s *Service) List(ctx context.Context) ([]contract.ProviderAccount, error) {
 	accounts, err := s.store.List(ctx)
 	if err != nil {

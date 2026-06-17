@@ -54,6 +54,10 @@ vi.mock("@/components/admin/account-import-dialog", () => ({
   AccountImportDialog: () => null,
 }));
 
+vi.mock("@/app/admin/accounts/bulk-add-dialog", () => ({
+  BulkAddAccountsDialog: () => null,
+}));
+
 const account = providerAccount({
   id: "acct-1",
   name: "codex-main",

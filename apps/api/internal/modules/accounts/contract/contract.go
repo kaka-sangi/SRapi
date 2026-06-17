@@ -445,6 +445,43 @@ type ProxyBatchTestRow struct {
 	Result  ProxyTestResult
 }
 
+// BatchCreateAccountsDefaults is the shared set of fields applied to every
+// row of a BatchCreateAccounts call unless the per-row item overrides them.
+// Mirrors CreateRequest minus Name + Credential, which are per-row required.
+type BatchCreateAccountsDefaults struct {
+	ProviderID     int
+	RuntimeClass   RuntimeClass
+	UpstreamClient *string
+	GroupID        *int
+	ProxyID        *string
+	Priority       *int
+	Weight         *float32
+	RiskLevel      *string
+	Metadata       map[string]any
+}
+
+// BatchAccountItem is one row in a BatchCreateAccounts call. Name + Credential
+// are mandatory per row; GroupID / Priority / Weight, when non-nil, override
+// the defaults on this row only.
+type BatchAccountItem struct {
+	Name       string
+	Credential map[string]any
+	GroupID    *int
+	Priority   *int
+	Weight     *float32
+}
+
+// BatchCreateAccountResult is per-row outcome from BatchCreateAccounts. On
+// success, AccountID is set and Error is empty; on validation/dedup/store
+// failure, AccountID is nil and Error carries the message. Order matches
+// the request.
+type BatchCreateAccountResult struct {
+	Index     int
+	Name      string
+	AccountID *int
+	Error     string
+}
+
 type CreateRequest struct {
 	ProviderID     int
 	Name           string

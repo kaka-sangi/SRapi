@@ -1124,6 +1124,142 @@ func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// handleBatchCreateAdminAccount bulk-creates provider accounts in one call
+// against a shared defaults set (provider, runtime_class, …). Dedupes by
+// name within the batch + against existing accounts; per-row failures
+// surface in `results[].error` and the rest still apply. Pattern mirrors
+// handleBatchCreateAdminProxies — one place to look when this needs to
+// evolve.
+func (s *Server) handleBatchCreateAdminAccount(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.BatchCreateProviderAccountsRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid batch account create request", requestID)
+		return
+	}
+	if len(body.Items) == 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "items must be non-empty", requestID)
+		return
+	}
+	if len(body.Items) > accountservice.BatchCreateAccountsMaxItems {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "too many items", requestID)
+		return
+	}
+	providerID, err := strconv.Atoi(string(body.Defaults.ProviderId))
+	if err != nil || providerID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid provider id", requestID)
+		return
+	}
+	provider, err := s.runtime.providers.FindByID(r.Context(), providerID)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "provider not found", requestID)
+		return
+	}
+	runtimeClass := accountcontract.RuntimeClass(body.Defaults.RuntimeClass)
+	if !accountRuntimeClassAllowed(provider.ConfigSchema, runtimeClass) {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "authentication method not allowed for this provider", requestID)
+		return
+	}
+	// Apply the provider's account_template (e.g. default base_url) once to the
+	// shared metadata so every row inherits it without per-row work; the service
+	// clones the map before persisting per-row.
+	defaultsMetadata := applyProviderTemplateMetadata(provider, jsonObjectToMap(body.Defaults.Metadata))
+	var defaultsRiskLevel *string
+	if body.Defaults.RiskLevel != nil {
+		rl := string(*body.Defaults.RiskLevel)
+		defaultsRiskLevel = &rl
+	}
+	defaults := accountcontract.BatchCreateAccountsDefaults{
+		ProviderID:     providerID,
+		RuntimeClass:   runtimeClass,
+		UpstreamClient: body.Defaults.UpstreamClient,
+		GroupID:        body.Defaults.GroupId,
+		ProxyID:        body.Defaults.ProxyId,
+		Priority:       body.Defaults.Priority,
+		Weight:         body.Defaults.Weight,
+		RiskLevel:      defaultsRiskLevel,
+		Metadata:       defaultsMetadata,
+	}
+	items := make([]accountcontract.BatchAccountItem, 0, len(body.Items))
+	for _, item := range body.Items {
+		credential := map[string]any{}
+		if item.Credential != nil {
+			credential = *item.Credential
+		}
+		items = append(items, accountcontract.BatchAccountItem{
+			Name:       item.Name,
+			Credential: credential,
+			GroupID:    item.GroupId,
+			Priority:   item.Priority,
+			Weight:     item.Weight,
+		})
+	}
+	results, err := s.runtime.accounts.BatchCreateAccounts(r.Context(), defaults, items)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid batch account create request", requestID)
+		return
+	}
+	apiResults := make([]apiopenapi.BatchCreateProviderAccountsResultRow, 0, len(results))
+	succeeded := 0
+	failed := 0
+	firstError := ""
+	for _, row := range results {
+		apiRow := apiopenapi.BatchCreateProviderAccountsResultRow{
+			Index: row.Index,
+			Name:  row.Name,
+		}
+		if row.AccountID != nil {
+			id := apiopenapi.Id(strconv.Itoa(*row.AccountID))
+			apiRow.AccountId = &id
+		}
+		if row.Error != "" {
+			err := row.Error
+			apiRow.Error = &err
+			failed++
+			if firstError == "" {
+				firstError = err
+			}
+		} else if row.AccountID != nil {
+			succeeded++
+		}
+		apiResults = append(apiResults, apiRow)
+	}
+	// Audit snapshot intentionally excludes per-row credentials. Defaults
+	// summary records the provider/runtime_class/group binding only — never
+	// the credential map.
+	auditDelta := map[string]any{
+		"requested":     len(body.Items),
+		"succeeded":     succeeded,
+		"failed":        failed,
+		"provider_id":   providerID,
+		"runtime_class": string(runtimeClass),
+	}
+	if defaults.GroupID != nil {
+		auditDelta["group_id"] = *defaults.GroupID
+	}
+	if firstError != "" {
+		auditDelta["first_error"] = firstError
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.batch_create", "provider_account", "bulk", nil, auditDelta))
+	writeJSONAny(w, http.StatusOK, apiopenapi.BatchCreateProviderAccountsResponse{
+		Data: apiopenapi.BatchCreateProviderAccountsResult{
+			Results:   apiResults,
+			Succeeded: succeeded,
+			Failed:    failed,
+		},
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleExportAdminAccounts(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {

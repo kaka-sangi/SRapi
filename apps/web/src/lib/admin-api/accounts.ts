@@ -3,6 +3,7 @@
 import {
   addAdminAccountGroupMember,
   batchActionAdminAccounts,
+  batchCreateAdminAccounts,
   batchUpdateAdminAccounts,
   bindAdminAccountProxy,
   clearAdminAccountError,
@@ -67,6 +68,8 @@ import type {
   AccountOAuthDeviceCode,
   AccountOAuthPending,
   DiscoverAdminAccountModelsData,
+  BatchCreateAdminAccountsData,
+  BatchCreateProviderAccountsResult,
   BatchUpdateAccountsResult,
   Id,
   CodexSessionImportResult,
@@ -110,6 +113,14 @@ export const accountsApi = {
 
   createAccount(body: CreateAdminAccountData["body"]): Promise<ProviderAccount> {
     return unwrapData(() => createAdminAccount({ body, throwOnError: true }));
+  },
+
+  // Bulk-create — one server call inserts up to 1000 accounts under a shared
+  // defaults set. Per-row credential failures surface in result.results[i].error
+  // without aborting the rest. Replaces the old "loop client-side over N
+  // single-create calls" pattern from the batch tab of the import dialog.
+  batchCreateAccounts(body: BatchCreateAdminAccountsData["body"]): Promise<BatchCreateProviderAccountsResult> {
+    return unwrapData(() => batchCreateAdminAccounts({ body, throwOnError: true }));
   },
 
   // Interactive upstream-account OAuth provisioning (replaces hand-pasting

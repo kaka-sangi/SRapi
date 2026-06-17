@@ -1807,6 +1807,65 @@ export type CreateProviderAccountRequest = {
     metadata?: JsonObject;
 };
 
+export type BatchCreateProviderAccountsRequest = {
+    /**
+     * Applied to every item unless the item overrides it. Same shape as
+     * CreateProviderAccountRequest minus name + credential, which must
+     * be supplied per row.
+     *
+     */
+    defaults: {
+        provider_id: Id;
+        runtime_class: RuntimeClass;
+        upstream_client?: string | null;
+        /**
+         * When set, every successfully created account is added to this group.
+         */
+        group_id?: number | null;
+        /**
+         * Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+         */
+        proxy_id?: string | null;
+        priority?: number;
+        weight?: number;
+        risk_level?: 'normal' | 'medium' | 'high';
+        metadata?: JsonObject;
+    };
+    items: Array<{
+        name: string;
+        /**
+         * Per-row override of defaults.group_id.
+         */
+        group_id?: number | null;
+        priority?: number | null;
+        weight?: number | null;
+    }>;
+};
+
+export type BatchCreateProviderAccountsResultRow = {
+    /**
+     * Zero-based index in the request `items` array.
+     */
+    index: number;
+    name: string;
+    account_id?: Id | null;
+    /**
+     * Empty when account_id is set; non-empty when account_id is null (validation, dedup, store failure).
+     */
+    error?: string | null;
+};
+
+export type BatchCreateProviderAccountsResult = {
+    results: Array<BatchCreateProviderAccountsResultRow>;
+    succeeded: number;
+    failed: number;
+};
+
+export type BatchCreateProviderAccountsResponse = {
+    data: BatchCreateProviderAccountsResult;
+    request_id: RequestId;
+};
+
 export type UpdateProviderAccountRequest = {
     name?: string;
     runtime_class?: RuntimeClass;
@@ -6403,6 +6462,47 @@ export type CreateProviderAccountRequestWritable = {
     weight?: number;
     risk_level?: 'normal' | 'medium' | 'high';
     metadata?: JsonObject;
+};
+
+export type BatchCreateProviderAccountsRequestWritable = {
+    /**
+     * Applied to every item unless the item overrides it. Same shape as
+     * CreateProviderAccountRequest minus name + credential, which must
+     * be supplied per row.
+     *
+     */
+    defaults: {
+        provider_id: Id;
+        runtime_class: RuntimeClass;
+        upstream_client?: string | null;
+        /**
+         * When set, every successfully created account is added to this group.
+         */
+        group_id?: number | null;
+        /**
+         * Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+         */
+        proxy_id?: string | null;
+        priority?: number;
+        weight?: number;
+        risk_level?: 'normal' | 'medium' | 'high';
+        metadata?: JsonObject;
+    };
+    items: Array<{
+        name: string;
+        /**
+         * OAuth/api-key credential map; same shape as the single-create endpoint's credential field.
+         */
+        credential: {
+            [key: string]: unknown;
+        };
+        /**
+         * Per-row override of defaults.group_id.
+         */
+        group_id?: number | null;
+        priority?: number | null;
+        weight?: number | null;
+    }>;
 };
 
 export type UpdateProviderAccountRequestWritable = {
@@ -11832,6 +11932,43 @@ export type BatchUpdateAdminAccountsResponses = {
 };
 
 export type BatchUpdateAdminAccountsResponse = BatchUpdateAdminAccountsResponses[keyof BatchUpdateAdminAccountsResponses];
+
+export type BatchCreateAdminAccountsData = {
+    body: BatchCreateProviderAccountsRequestWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/batch';
+};
+
+export type BatchCreateAdminAccountsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchCreateAdminAccountsError = BatchCreateAdminAccountsErrors[keyof BatchCreateAdminAccountsErrors];
+
+export type BatchCreateAdminAccountsResponses = {
+    /**
+     * Accounts created — see per-row outcome + counts.
+     */
+    200: BatchCreateProviderAccountsResponse;
+};
+
+export type BatchCreateAdminAccountsResponse = BatchCreateAdminAccountsResponses[keyof BatchCreateAdminAccountsResponses];
 
 export type BatchActionAdminAccountsData = {
     body: BatchAccountActionRequest;

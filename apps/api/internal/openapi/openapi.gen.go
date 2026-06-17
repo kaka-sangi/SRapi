@@ -710,6 +710,27 @@ func (e BatchAccountActionRequestAction) Valid() bool {
 	}
 }
 
+// Defines values for BatchCreateProviderAccountsRequestDefaultsRiskLevel.
+const (
+	BatchCreateProviderAccountsRequestDefaultsRiskLevelHigh   BatchCreateProviderAccountsRequestDefaultsRiskLevel = "high"
+	BatchCreateProviderAccountsRequestDefaultsRiskLevelMedium BatchCreateProviderAccountsRequestDefaultsRiskLevel = "medium"
+	BatchCreateProviderAccountsRequestDefaultsRiskLevelNormal BatchCreateProviderAccountsRequestDefaultsRiskLevel = "normal"
+)
+
+// Valid indicates whether the value is a known member of the BatchCreateProviderAccountsRequestDefaultsRiskLevel enum.
+func (e BatchCreateProviderAccountsRequestDefaultsRiskLevel) Valid() bool {
+	switch e {
+	case BatchCreateProviderAccountsRequestDefaultsRiskLevelHigh:
+		return true
+	case BatchCreateProviderAccountsRequestDefaultsRiskLevelMedium:
+		return true
+	case BatchCreateProviderAccountsRequestDefaultsRiskLevelNormal:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BillingLedgerEntryType.
 const (
 	Adjustment        BillingLedgerEntryType = "adjustment"
@@ -2923,19 +2944,19 @@ func (e UpdatePayloadRuleRequestAction) Valid() bool {
 
 // Defines values for UpdateProviderAccountRequestRiskLevel.
 const (
-	UpdateProviderAccountRequestRiskLevelHigh   UpdateProviderAccountRequestRiskLevel = "high"
-	UpdateProviderAccountRequestRiskLevelMedium UpdateProviderAccountRequestRiskLevel = "medium"
-	UpdateProviderAccountRequestRiskLevelNormal UpdateProviderAccountRequestRiskLevel = "normal"
+	High   UpdateProviderAccountRequestRiskLevel = "high"
+	Medium UpdateProviderAccountRequestRiskLevel = "medium"
+	Normal UpdateProviderAccountRequestRiskLevel = "normal"
 )
 
 // Valid indicates whether the value is a known member of the UpdateProviderAccountRequestRiskLevel enum.
 func (e UpdateProviderAccountRequestRiskLevel) Valid() bool {
 	switch e {
-	case UpdateProviderAccountRequestRiskLevelHigh:
+	case High:
 		return true
-	case UpdateProviderAccountRequestRiskLevelMedium:
+	case Medium:
 		return true
-	case UpdateProviderAccountRequestRiskLevelNormal:
+	case Normal:
 		return true
 	default:
 		return false
@@ -5062,6 +5083,65 @@ type BatchAccountActionRequestAction string
 type BatchAccountUsageTodayResponse struct {
 	Data      []AccountUsageTodayWithID `json:"data"`
 	RequestId RequestId                 `json:"request_id"`
+}
+
+// BatchCreateProviderAccountsRequest defines model for BatchCreateProviderAccountsRequest.
+type BatchCreateProviderAccountsRequest struct {
+	// Defaults Applied to every item unless the item overrides it. Same shape as
+	// CreateProviderAccountRequest minus name + credential, which must
+	// be supplied per row.
+	Defaults struct {
+		// GroupId When set, every successfully created account is added to this group.
+		GroupId    *int        `json:"group_id,omitempty"`
+		Metadata   *JsonObject `json:"metadata,omitempty"`
+		Priority   *int        `json:"priority,omitempty"`
+		ProviderId Id          `json:"provider_id"`
+
+		// ProxyId Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+		ProxyId        *string                                              `json:"proxy_id,omitempty"`
+		RiskLevel      *BatchCreateProviderAccountsRequestDefaultsRiskLevel `json:"risk_level,omitempty"`
+		RuntimeClass   RuntimeClass                                         `json:"runtime_class"`
+		UpstreamClient *string                                              `json:"upstream_client,omitempty"`
+		Weight         *float32                                             `json:"weight,omitempty"`
+	} `json:"defaults"`
+	Items []struct {
+		// Credential OAuth/api-key credential map; same shape as the single-create endpoint's credential field.
+		Credential *map[string]interface{} `json:"credential,omitempty"`
+
+		// GroupId Per-row override of defaults.group_id.
+		GroupId  *int     `json:"group_id,omitempty"`
+		Name     string   `json:"name"`
+		Priority *int     `json:"priority,omitempty"`
+		Weight   *float32 `json:"weight,omitempty"`
+	} `json:"items"`
+}
+
+// BatchCreateProviderAccountsRequestDefaultsRiskLevel defines model for BatchCreateProviderAccountsRequest.Defaults.RiskLevel.
+type BatchCreateProviderAccountsRequestDefaultsRiskLevel string
+
+// BatchCreateProviderAccountsResponse defines model for BatchCreateProviderAccountsResponse.
+type BatchCreateProviderAccountsResponse struct {
+	Data      BatchCreateProviderAccountsResult `json:"data"`
+	RequestId RequestId                         `json:"request_id"`
+}
+
+// BatchCreateProviderAccountsResult defines model for BatchCreateProviderAccountsResult.
+type BatchCreateProviderAccountsResult struct {
+	Failed    int                                    `json:"failed"`
+	Results   []BatchCreateProviderAccountsResultRow `json:"results"`
+	Succeeded int                                    `json:"succeeded"`
+}
+
+// BatchCreateProviderAccountsResultRow defines model for BatchCreateProviderAccountsResultRow.
+type BatchCreateProviderAccountsResultRow struct {
+	AccountId *Id `json:"account_id,omitempty"`
+
+	// Error Empty when account_id is set; non-empty when account_id is null (validation, dedup, store failure).
+	Error *string `json:"error,omitempty"`
+
+	// Index Zero-based index in the request `items` array.
+	Index int    `json:"index"`
+	Name  string `json:"name"`
 }
 
 // BatchCreateProxiesErrorRow defines model for BatchCreateProxiesErrorRow.
@@ -11381,6 +11461,9 @@ type CreateAdminAccountJSONRequestBody = CreateProviderAccountRequest
 
 // BatchUpdateAdminAccountsJSONRequestBody defines body for BatchUpdateAdminAccounts for application/json ContentType.
 type BatchUpdateAdminAccountsJSONRequestBody = BatchUpdateAccountsRequest
+
+// BatchCreateAdminAccountsJSONRequestBody defines body for BatchCreateAdminAccounts for application/json ContentType.
+type BatchCreateAdminAccountsJSONRequestBody = BatchCreateProviderAccountsRequest
 
 // BatchActionAdminAccountsJSONRequestBody defines body for BatchActionAdminAccounts for application/json ContentType.
 type BatchActionAdminAccountsJSONRequestBody = BatchAccountActionRequest
@@ -18148,6 +18231,9 @@ type ServerInterface interface {
 	// Batch update provider account status.
 	// (PATCH /api/v1/admin/accounts/batch)
 	BatchUpdateAdminAccounts(w http.ResponseWriter, r *http.Request)
+	// Bulk-create provider accounts.
+	// (POST /api/v1/admin/accounts/batch)
+	BatchCreateAdminAccounts(w http.ResponseWriter, r *http.Request)
 	// Run a bulk recovery action across provider accounts.
 	// (POST /api/v1/admin/accounts/batch-action)
 	BatchActionAdminAccounts(w http.ResponseWriter, r *http.Request)
@@ -20268,6 +20354,28 @@ func (siw *ServerInterfaceWrapper) BatchUpdateAdminAccounts(w http.ResponseWrite
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.BatchUpdateAdminAccounts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchCreateAdminAccounts operation middleware
+func (siw *ServerInterfaceWrapper) BatchCreateAdminAccounts(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchCreateAdminAccounts(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -33324,6 +33432,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts", wrapper.CreateAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/availability", wrapper.ListAdminAccountsAvailability)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/batch", wrapper.BatchUpdateAdminAccounts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch", wrapper.BatchCreateAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-action", wrapper.BatchActionAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/export", wrapper.ExportAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/health-summary", wrapper.GetAdminAccountsHealthSummary)
