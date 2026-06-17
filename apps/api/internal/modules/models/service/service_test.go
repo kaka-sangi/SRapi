@@ -258,3 +258,45 @@ func TestCreateMappingRejectsUnknownCapabilityOverride(t *testing.T) {
 		t.Fatalf("expected ErrInvalidInput for misspelled capability override, got %v", err)
 	}
 }
+
+// TestUpdateStatusOnlyToggle locks in the contract the iter-42 frontend
+// inline status toggle relies on: PATCH with only Status set must not
+// drift display_name / capabilities / other fields.
+func TestUpdateStatusOnlyToggle(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	created, err := svc.Create(ctx, contract.CreateRequest{
+		CanonicalName: "gpt-4o",
+		DisplayName:   "GPT-4o",
+		Capabilities: []capabilitiescontract.Descriptor{{
+			Key:     capabilitiescontract.KeyStreaming,
+			Level:   capabilitiescontract.DescriptorLevelRequired,
+			Status:  capabilitiescontract.DescriptorStatusStable,
+			Version: "v1",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if created.Status != contract.StatusActive {
+		t.Fatalf("expected created Status active, got %q", created.Status)
+	}
+	disabled := contract.StatusDisabled
+	updated, err := svc.Update(ctx, created.ID, contract.UpdateRequest{Status: &disabled})
+	if err != nil {
+		t.Fatalf("update status-only: %v", err)
+	}
+	if updated.Status != contract.StatusDisabled {
+		t.Fatalf("expected Status disabled, got %q", updated.Status)
+	}
+	if updated.DisplayName != "GPT-4o" {
+		t.Fatalf("display_name leaked: %q", updated.DisplayName)
+	}
+	if len(updated.Capabilities) != 1 {
+		t.Fatalf("capabilities leaked: %+v", updated.Capabilities)
+	}
+}
