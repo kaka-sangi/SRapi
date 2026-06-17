@@ -363,3 +363,39 @@ func (a *monitorProbeAdapter) ProbeAccount(_ context.Context, req provideradapte
 	}
 	return provideradaptercontract.ProbeResponse{OK: true, StatusCode: 200, LatencyMS: 7}, nil
 }
+
+// TestUpdateDefinitionEnabledOnlyToggle locks in the contract the iter-38
+// frontend inline toggle relies on: PATCH with only Enabled set must not
+// require any of the other fields and must flip just that flag.
+func TestUpdateDefinitionEnabledOnlyToggle(t *testing.T) {
+	svc := newService(t)
+	ctx := context.Background()
+
+	def, err := svc.CreateDefinition(ctx, contract.CreateDefinition{
+		Name:    "mon",
+		Scope:   contract.ScopeAccount,
+		Enabled: true,
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	disabled := false
+	updated, err := svc.UpdateDefinition(ctx, def.ID, contract.UpdateDefinition{Enabled: &disabled})
+	if err != nil {
+		t.Fatalf("update enabled-only: %v", err)
+	}
+	if updated.Enabled {
+		t.Fatal("expected enabled flipped to false")
+	}
+	if updated.Name != "mon" || updated.Scope != contract.ScopeAccount {
+		t.Fatalf("partial update leaked into other fields: %+v", updated)
+	}
+	enabled := true
+	updated, err = svc.UpdateDefinition(ctx, def.ID, contract.UpdateDefinition{Enabled: &enabled})
+	if err != nil {
+		t.Fatalf("re-enable: %v", err)
+	}
+	if !updated.Enabled {
+		t.Fatal("expected enabled flipped back to true")
+	}
+}
