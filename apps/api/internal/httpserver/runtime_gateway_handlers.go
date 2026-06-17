@@ -328,6 +328,23 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		RawBody:        rawBody,
 	})
 	applyGatewayModelSuffix(&canonical, modelSuffix)
+	// /v1/responses/compact is non-streaming on both legs of the call:
+	//   - sub2api openai_gateway_service.go:6486 "non-compact keeps stream=true;
+	//     compact forces stream=false" — request-side stream is stripped.
+	//   - sub2api openai_gateway_service.go:3963-3993 — even when the upstream
+	//     returns SSE despite stream=false, the client-side response is
+	//     converted back to a single JSON body (handlePassthroughSSEToJSON).
+	//
+	// srapi had been honoring the client's stream flag on the response leg,
+	// which produced rendered SSE events for compact that Hermes (the Codex
+	// CLI Rust client) cannot parse — surfacing as
+	//   "stream disconnected before completion: missing field `text` at line 1 column 203"
+	// diagnosed live against srapi.senran.net. Force canonical.Stream=false
+	// for compact so the response path returns a single JSON body that
+	// matches Hermes' compact-task parser contract.
+	if gatewaySourceEndpointIsResponsesCompact(canonical.SourceEndpoint) {
+		canonical.Stream = false
+	}
 	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
