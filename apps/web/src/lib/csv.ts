@@ -18,3 +18,30 @@ export function escapeCsv(value: string | number): string {
   }
   return guarded;
 }
+
+export interface CsvColumn<T> {
+  header: string;
+  value: (row: T) => string | number;
+}
+
+// Build a CSV blob string: header row + body rows joined by CRLF, with a
+// leading UTF-8 BOM so Excel opens the file without mangling non-ASCII.
+export function rowsToCsv<T>(rows: readonly T[], columns: readonly CsvColumn<T>[]): string {
+  const header = columns.map((c) => escapeCsv(c.header)).join(",");
+  const body = rows.map((row) => columns.map((c) => escapeCsv(c.value(row))).join(","));
+  return `﻿${[header, ...body].join("\r\n")}\r\n`;
+}
+
+// Trigger a browser download for a CSV payload. Same machinery the
+// admin + per-user export hooks used inline.
+export function triggerCsvDownload(csv: string, filename: string): void {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}

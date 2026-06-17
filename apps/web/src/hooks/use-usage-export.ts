@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { getCurrentUserUsage } from "../../../../packages/sdk/typescript/src/index";
 import { configureSDKClient, parseMoneyValue } from "@/lib/api/_shared";
-import { escapeCsv } from "@/lib/csv";
+import { rowsToCsv, triggerCsvDownload } from "@/lib/csv";
 import type { LiveUsageLog } from "@/lib/api/types";
 
 /**
@@ -58,25 +58,6 @@ const COLUMNS: { header: string; value: (log: LiveUsageLog) => string | number }
   { header: "currency", value: (l) => l.currency ?? "USD" },
 ];
 
-
-function rowsToCsv(rows: LiveUsageLog[]): string {
-  const header = COLUMNS.map((c) => escapeCsv(c.header)).join(",");
-  const body = rows.map((row) => COLUMNS.map((c) => escapeCsv(c.value(row))).join(","));
-  // Leading BOM so Excel opens UTF-8 content without mangling non-ASCII.
-  return `﻿${[header, ...body].join("\r\n")}\r\n`;
-}
-
-function triggerDownload(csv: string, filename: string) {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
 
 export interface UseUsageExportResult {
   progress: UsageExportProgress;
@@ -153,7 +134,7 @@ export function useUsageExport(): UseUsageExportResult {
 
       if (collected.length > 0) {
         const stamp = new Date().toISOString().slice(0, 10);
-        triggerDownload(rowsToCsv(collected), `usage_${stamp}.csv`);
+        triggerCsvDownload(rowsToCsv(collected, COLUMNS), `usage_${stamp}.csv`);
       }
 
       setProgress({

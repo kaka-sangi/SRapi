@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { exportAdminUsage } from "../../../../packages/sdk/typescript/src/index";
-import { escapeCsv } from "@/lib/csv";
+import { rowsToCsv, triggerCsvDownload } from "@/lib/csv";
 import { configureSDKClient, parseMoneyValue } from "@/lib/api/_shared";
 import type { UsageLog } from "@/lib/sdk-types";
 
@@ -52,25 +52,6 @@ const COLUMNS: { header: string; value: (log: UsageLog) => string | number }[] =
   { header: "currency", value: (l) => l.currency },
 ];
 
-function rowsToCsv(rows: UsageLog[]): string {
-  const header = COLUMNS.map((c) => escapeCsv(c.header)).join(",");
-  const body = rows.map((row) => COLUMNS.map((c) => escapeCsv(c.value(row))).join(","));
-  // Leading BOM so Excel opens UTF-8 content without mangling non-ASCII.
-  return `﻿${[header, ...body].join("\r\n")}\r\n`;
-}
-
-function triggerDownload(csv: string, filename: string) {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
 export interface AdminUsageExportRange {
   // Optional ISO timestamps forwarded as ?start=&end= so the CSV honours the
   // window preset / explicit range the operator has applied to the table.
@@ -107,7 +88,7 @@ export function useAdminUsageExport(): UseAdminUsageExportResult {
       const logs = (response.data?.data?.logs ?? []) as UsageLog[];
       if (logs.length > 0) {
         const stamp = filenameStamp ?? new Date().toISOString().slice(0, 10);
-        triggerDownload(rowsToCsv(logs), `admin_usage_${stamp}.csv`);
+        triggerCsvDownload(rowsToCsv(logs, COLUMNS), `admin_usage_${stamp}.csv`);
       }
       setState({ phase: "done", rows: logs.length });
       return logs.length;
