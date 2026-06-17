@@ -63,6 +63,14 @@ func anthropicCompatibleRequestBody(req contract.ConversationRequest) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
+	// PR-X security wiring: strip forged Claude thinking blocks before
+	// any payload transform / upstream forward. See
+	// claude_signature_wiring.go for the rationale (forged thinking
+	// blocks can bypass upstream signature checks on permissive
+	// Claude-compatible backends). The strip is idempotent and a no-op
+	// for payloads with no thinking content, so we can run it on every
+	// outbound build without conditioning on adapter type.
+	raw = claudeThinkingSanitizeRawPayload(req.Mapping.UpstreamModelName, raw)
 	return applyPayloadTransforms(raw, req.PayloadTransforms)
 }
 

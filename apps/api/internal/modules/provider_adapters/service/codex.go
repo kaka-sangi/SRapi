@@ -207,6 +207,12 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 				// the retry uses a fresh state so we can't share with the
 				// outer attempt.
 				retryResp.Body = codexCaptureInboundWiring(retryState, codexModelForCacheKey(req), retryResp.Body)
+				// PR-X codex JWS validation: lenient by default (WARN +
+				// metric, accept body). Strict mode is one constant flip
+				// in apps/api/internal/pkg/signature/codex_jws.go.
+				if rejection, _ := codexValidateUpstreamResponseJWS(retryResp.Body); rejection != nil {
+					return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: rejection.Error()}
+				}
 				parsed, parseErr := parseCodexResponsesBody(retryResp.Body, retryResp.StatusCode)
 				if parseErr != nil {
 					return contract.ConversationResponse{}, parseErr
@@ -226,6 +232,13 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 	// effort — failures in capture must not break the response delivered
 	// to the caller.
 	runtimeResp.Body = codexCaptureInboundWiring(outboundState, codexModelForCacheKey(req), runtimeResp.Body)
+	// PR-X codex JWS validation: see codex_jws_wiring.go. Lenient by
+	// default so unsigned responses pass through; flips to strict via
+	// signature.CodexJWSEnforceMode once the OpenAI signing rollout is
+	// confirmed.
+	if rejection, _ := codexValidateUpstreamResponseJWS(runtimeResp.Body); rejection != nil {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: rejection.Error()}
+	}
 	parsed, err := parseCodexResponsesBody(runtimeResp.Body, runtimeResp.StatusCode)
 	if err != nil {
 		return contract.ConversationResponse{}, err
@@ -603,6 +616,19 @@ func parseCodexResponsesStream(body []byte, statusCode int, options codexRespons
 	frames, err := parseSSEFrames(body)
 	if err != nil {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+	}
+	// Port from CLIProxyAPI codex_executor.go: detect terminal
+	// context_length_exceeded events early so we surface them as
+	// invalid_request 400 (no retry) instead of letting the existing
+	// invalid_response 502 path eat them. The reconstruction helper sits
+	// alongside srapi's existing indexedItems/fallbackItems reconstruction
+	// (which already handles the missing-completed-output case).
+	if codexStreamHasContextLengthError(frames) {
+		return contract.ConversationResponse{}, contract.ProviderError{
+			Class:      "invalid_request",
+			StatusCode: http.StatusBadRequest,
+			Message:    "context_length_exceeded",
+		}
 	}
 	var deltaBuilder strings.Builder
 	var completedText string
