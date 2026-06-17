@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { getCurrentUserUsage } from "../../../../packages/sdk/typescript/src/index";
 import { configureSDKClient, parseMoneyValue } from "@/lib/api/_shared";
-import { rowsToCsv, triggerCsvDownload } from "@/lib/csv";
+import { rowsToCsv, triggerCsvDownload, type CsvColumn } from "@/lib/csv";
 import type { LiveUsageLog } from "@/lib/api/types";
 
 /**
@@ -40,7 +40,7 @@ const INITIAL: UsageExportProgress = {
 };
 
 /** Columns emitted to the CSV, in order. Keep header + accessor in lockstep. */
-const COLUMNS: { header: string; value: (log: LiveUsageLog) => string | number }[] = [
+const COLUMNS: CsvColumn<LiveUsageLog>[] = [
   { header: "created_at", value: (l) => l.created_at },
   { header: "request_id", value: (l) => l.request_id },
   { header: "model", value: (l) => l.model },

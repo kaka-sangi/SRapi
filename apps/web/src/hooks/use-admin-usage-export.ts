@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { exportAdminUsage } from "../../../../packages/sdk/typescript/src/index";
-import { rowsToCsv, triggerCsvDownload } from "@/lib/csv";
+import { rowsToCsv, triggerCsvDownload, type CsvColumn } from "@/lib/csv";
 import { configureSDKClient, parseMoneyValue } from "@/lib/api/_shared";
 import type { UsageLog } from "@/lib/sdk-types";
 
@@ -25,7 +25,7 @@ export interface AdminUsageExportState {
 
 const INITIAL: AdminUsageExportState = { phase: "idle", rows: 0 };
 
-const COLUMNS: { header: string; value: (log: UsageLog) => string | number }[] = [
+const COLUMNS: CsvColumn<UsageLog>[] = [
   { header: "created_at", value: (l) => l.created_at },
   { header: "request_id", value: (l) => l.request_id },
   { header: "user_id", value: (l) => l.user_id },
