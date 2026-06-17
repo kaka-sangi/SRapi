@@ -42,7 +42,9 @@ func (s *Store) CreateRedeemCode(ctx context.Context, code admincontrolcontract.
 		SetCurrency(normalizeCurrency(code.Currency)).
 		SetMaxRedemptions(code.MaxRedemptions).
 		SetRedeemedCount(code.RedeemedCount).
-		SetNillableExpiresAt(code.ExpiresAt)
+		SetNillableExpiresAt(code.ExpiresAt).
+		SetNote(code.Note).
+		SetDisabledReason(code.DisabledReason)
 	if !code.CreatedAt.IsZero() {
 		create.SetCreatedAt(code.CreatedAt)
 	}
@@ -79,7 +81,21 @@ func (s *Store) DeleteRedeemCode(ctx context.Context, id int) (admincontrolcontr
 	return toRedeemCode(row), nil
 }
 
-func (s *Store) DisableRedeemCodes(ctx context.Context, ids []int, at time.Time) ([]int, error) {
+// DisableRedeemCodes is the bulk soft-disable. Pre-fetches each row so it can
+// classify the outcome per-id; the service then aggregates this into
+// per_item_reasons + disabled_reason_breakdown for the admin UI.
+//
+// Reasons:
+//   - "not_found"          id not present
+//   - "already_disabled"   row already has status=disabled; nothing changes
+//   - "expired"            row has expires_at in the past; still disabled but
+//                          tagged with disabled_reason=expired so the operator
+//                          knows why it counts as "no-op-ish"
+//   - "admin_action"       normal operator-driven disable
+//
+// The note is written onto every row we actually flip (not rows we skip).
+// Two writes at most: one UPDATE per non-empty reason bucket.
+func (s *Store) DisableRedeemCodes(ctx context.Context, ids []int, note string, at time.Time) (map[int]string, error) {
 	if s == nil || s.client == nil {
 		return nil, admincontrolcontract.ErrInvalidInput
 	}
@@ -89,25 +105,52 @@ func (s *Store) DisableRedeemCodes(ctx context.Context, ids []int, at time.Time)
 	}
 	requested := uniquePositiveInts(ids)
 	if len(requested) == 0 {
-		return []int{}, nil
+		return map[int]string{}, nil
 	}
-	existingIDs, err := s.client.RedeemCode.Query().
+	rows, err := s.client.RedeemCode.Query().
 		Where(entredeemcode.IDIn(requested...)).
-		IDs(ctx)
+		All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(existingIDs) == 0 {
-		return []int{}, nil
+	byID := make(map[int]*ent.RedeemCode, len(rows))
+	for _, row := range rows {
+		byID[row.ID] = row
 	}
-	if _, err := s.client.RedeemCode.Update().
-		Where(entredeemcode.IDIn(existingIDs...)).
-		SetStatus(string(admincontrolcontract.RedeemCodeStatusDisabled)).
-		SetUpdatedAt(now).
-		Save(ctx); err != nil {
-		return nil, err
+	reasons := make(map[int]string, len(requested))
+	toUpdate := map[string][]int{}
+	for _, id := range requested {
+		row, ok := byID[id]
+		if !ok {
+			reasons[id] = admincontrolcontract.RedeemDisabledReasonNotFound
+			continue
+		}
+		if row.Status == string(admincontrolcontract.RedeemCodeStatusDisabled) {
+			reasons[id] = admincontrolcontract.RedeemDisabledReasonAlreadyDisabled
+			continue
+		}
+		reason := admincontrolcontract.RedeemDisabledReasonAdminAction
+		if row.ExpiresAt != nil && row.ExpiresAt.Before(now) {
+			reason = admincontrolcontract.RedeemDisabledReasonExpired
+		}
+		reasons[id] = reason
+		toUpdate[reason] = append(toUpdate[reason], id)
 	}
-	return existingIDs, nil
+	for reason, idsForReason := range toUpdate {
+		if len(idsForReason) == 0 {
+			continue
+		}
+		if _, err := s.client.RedeemCode.Update().
+			Where(entredeemcode.IDIn(idsForReason...)).
+			SetStatus(string(admincontrolcontract.RedeemCodeStatusDisabled)).
+			SetNote(note).
+			SetDisabledReason(reason).
+			SetUpdatedAt(now).
+			Save(ctx); err != nil {
+			return nil, err
+		}
+	}
+	return reasons, nil
 }
 
 // EnableRedeemCodes is the inverse of DisableRedeemCodes — flips DISABLED rows
@@ -312,6 +355,8 @@ func toRedeemCode(row *ent.RedeemCode) admincontrolcontract.RedeemCode {
 		MaxRedemptions: row.MaxRedemptions,
 		RedeemedCount:  row.RedeemedCount,
 		ExpiresAt:      cloneTimePtr(row.ExpiresAt),
+		Note:           row.Note,
+		DisabledReason: row.DisabledReason,
 		CreatedAt:      row.CreatedAt,
 		UpdatedAt:      row.UpdatedAt,
 	}

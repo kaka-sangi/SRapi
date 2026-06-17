@@ -104,6 +104,16 @@ func ExpiresAt(v time.Time) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldEQ(FieldExpiresAt, v))
 }
 
+// Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
+func Note(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldNote, v))
+}
+
+// DisabledReason applies equality check predicate on the "disabled_reason" field. It's identical to DisabledReasonEQ.
+func DisabledReason(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldDisabledReason, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldEQ(FieldCreatedAt, v))
@@ -637,6 +647,156 @@ func ExpiresAtIsNil() predicate.RedeemCode {
 // ExpiresAtNotNil applies the NotNil predicate on the "expires_at" field.
 func ExpiresAtNotNil() predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldNotNull(FieldExpiresAt))
+}
+
+// NoteEQ applies the EQ predicate on the "note" field.
+func NoteEQ(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldNote, v))
+}
+
+// NoteNEQ applies the NEQ predicate on the "note" field.
+func NoteNEQ(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNEQ(FieldNote, v))
+}
+
+// NoteIn applies the In predicate on the "note" field.
+func NoteIn(vs ...string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIn(FieldNote, vs...))
+}
+
+// NoteNotIn applies the NotIn predicate on the "note" field.
+func NoteNotIn(vs ...string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotIn(FieldNote, vs...))
+}
+
+// NoteGT applies the GT predicate on the "note" field.
+func NoteGT(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGT(FieldNote, v))
+}
+
+// NoteGTE applies the GTE predicate on the "note" field.
+func NoteGTE(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGTE(FieldNote, v))
+}
+
+// NoteLT applies the LT predicate on the "note" field.
+func NoteLT(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLT(FieldNote, v))
+}
+
+// NoteLTE applies the LTE predicate on the "note" field.
+func NoteLTE(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLTE(FieldNote, v))
+}
+
+// NoteContains applies the Contains predicate on the "note" field.
+func NoteContains(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldContains(FieldNote, v))
+}
+
+// NoteHasPrefix applies the HasPrefix predicate on the "note" field.
+func NoteHasPrefix(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldHasPrefix(FieldNote, v))
+}
+
+// NoteHasSuffix applies the HasSuffix predicate on the "note" field.
+func NoteHasSuffix(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldHasSuffix(FieldNote, v))
+}
+
+// NoteIsNil applies the IsNil predicate on the "note" field.
+func NoteIsNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIsNull(FieldNote))
+}
+
+// NoteNotNil applies the NotNil predicate on the "note" field.
+func NoteNotNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotNull(FieldNote))
+}
+
+// NoteEqualFold applies the EqualFold predicate on the "note" field.
+func NoteEqualFold(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEqualFold(FieldNote, v))
+}
+
+// NoteContainsFold applies the ContainsFold predicate on the "note" field.
+func NoteContainsFold(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldContainsFold(FieldNote, v))
+}
+
+// DisabledReasonEQ applies the EQ predicate on the "disabled_reason" field.
+func DisabledReasonEQ(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldDisabledReason, v))
+}
+
+// DisabledReasonNEQ applies the NEQ predicate on the "disabled_reason" field.
+func DisabledReasonNEQ(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNEQ(FieldDisabledReason, v))
+}
+
+// DisabledReasonIn applies the In predicate on the "disabled_reason" field.
+func DisabledReasonIn(vs ...string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIn(FieldDisabledReason, vs...))
+}
+
+// DisabledReasonNotIn applies the NotIn predicate on the "disabled_reason" field.
+func DisabledReasonNotIn(vs ...string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotIn(FieldDisabledReason, vs...))
+}
+
+// DisabledReasonGT applies the GT predicate on the "disabled_reason" field.
+func DisabledReasonGT(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGT(FieldDisabledReason, v))
+}
+
+// DisabledReasonGTE applies the GTE predicate on the "disabled_reason" field.
+func DisabledReasonGTE(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGTE(FieldDisabledReason, v))
+}
+
+// DisabledReasonLT applies the LT predicate on the "disabled_reason" field.
+func DisabledReasonLT(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLT(FieldDisabledReason, v))
+}
+
+// DisabledReasonLTE applies the LTE predicate on the "disabled_reason" field.
+func DisabledReasonLTE(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLTE(FieldDisabledReason, v))
+}
+
+// DisabledReasonContains applies the Contains predicate on the "disabled_reason" field.
+func DisabledReasonContains(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldContains(FieldDisabledReason, v))
+}
+
+// DisabledReasonHasPrefix applies the HasPrefix predicate on the "disabled_reason" field.
+func DisabledReasonHasPrefix(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldHasPrefix(FieldDisabledReason, v))
+}
+
+// DisabledReasonHasSuffix applies the HasSuffix predicate on the "disabled_reason" field.
+func DisabledReasonHasSuffix(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldHasSuffix(FieldDisabledReason, v))
+}
+
+// DisabledReasonIsNil applies the IsNil predicate on the "disabled_reason" field.
+func DisabledReasonIsNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIsNull(FieldDisabledReason))
+}
+
+// DisabledReasonNotNil applies the NotNil predicate on the "disabled_reason" field.
+func DisabledReasonNotNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotNull(FieldDisabledReason))
+}
+
+// DisabledReasonEqualFold applies the EqualFold predicate on the "disabled_reason" field.
+func DisabledReasonEqualFold(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEqualFold(FieldDisabledReason, v))
+}
+
+// DisabledReasonContainsFold applies the ContainsFold predicate on the "disabled_reason" field.
+func DisabledReasonContainsFold(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldContainsFold(FieldDisabledReason, v))
 }
 
 // And groups predicates with the AND operator between them.

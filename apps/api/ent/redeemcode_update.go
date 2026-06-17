@@ -166,6 +166,46 @@ func (_u *RedeemCodeUpdate) ClearExpiresAt() *RedeemCodeUpdate {
 	return _u
 }
 
+// SetNote sets the "note" field.
+func (_u *RedeemCodeUpdate) SetNote(v string) *RedeemCodeUpdate {
+	_u.mutation.SetNote(v)
+	return _u
+}
+
+// SetNillableNote sets the "note" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableNote(v *string) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetNote(*v)
+	}
+	return _u
+}
+
+// ClearNote clears the value of the "note" field.
+func (_u *RedeemCodeUpdate) ClearNote() *RedeemCodeUpdate {
+	_u.mutation.ClearNote()
+	return _u
+}
+
+// SetDisabledReason sets the "disabled_reason" field.
+func (_u *RedeemCodeUpdate) SetDisabledReason(v string) *RedeemCodeUpdate {
+	_u.mutation.SetDisabledReason(v)
+	return _u
+}
+
+// SetNillableDisabledReason sets the "disabled_reason" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableDisabledReason(v *string) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetDisabledReason(*v)
+	}
+	return _u
+}
+
+// ClearDisabledReason clears the value of the "disabled_reason" field.
+func (_u *RedeemCodeUpdate) ClearDisabledReason() *RedeemCodeUpdate {
+	_u.mutation.ClearDisabledReason()
+	return _u
+}
+
 // Mutation returns the RedeemCodeMutation object of the builder.
 func (_u *RedeemCodeUpdate) Mutation() *RedeemCodeMutation {
 	return _u.mutation
@@ -269,6 +309,18 @@ func (_u *RedeemCodeUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if _u.mutation.ExpiresAtCleared() {
 		_spec.ClearField(redeemcode.FieldExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.Note(); ok {
+		_spec.SetField(redeemcode.FieldNote, field.TypeString, value)
+	}
+	if _u.mutation.NoteCleared() {
+		_spec.ClearField(redeemcode.FieldNote, field.TypeString)
+	}
+	if value, ok := _u.mutation.DisabledReason(); ok {
+		_spec.SetField(redeemcode.FieldDisabledReason, field.TypeString, value)
+	}
+	if _u.mutation.DisabledReasonCleared() {
+		_spec.ClearField(redeemcode.FieldDisabledReason, field.TypeString)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -428,6 +480,46 @@ func (_u *RedeemCodeUpdateOne) ClearExpiresAt() *RedeemCodeUpdateOne {
 	return _u
 }
 
+// SetNote sets the "note" field.
+func (_u *RedeemCodeUpdateOne) SetNote(v string) *RedeemCodeUpdateOne {
+	_u.mutation.SetNote(v)
+	return _u
+}
+
+// SetNillableNote sets the "note" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableNote(v *string) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetNote(*v)
+	}
+	return _u
+}
+
+// ClearNote clears the value of the "note" field.
+func (_u *RedeemCodeUpdateOne) ClearNote() *RedeemCodeUpdateOne {
+	_u.mutation.ClearNote()
+	return _u
+}
+
+// SetDisabledReason sets the "disabled_reason" field.
+func (_u *RedeemCodeUpdateOne) SetDisabledReason(v string) *RedeemCodeUpdateOne {
+	_u.mutation.SetDisabledReason(v)
+	return _u
+}
+
+// SetNillableDisabledReason sets the "disabled_reason" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableDisabledReason(v *string) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetDisabledReason(*v)
+	}
+	return _u
+}
+
+// ClearDisabledReason clears the value of the "disabled_reason" field.
+func (_u *RedeemCodeUpdateOne) ClearDisabledReason() *RedeemCodeUpdateOne {
+	_u.mutation.ClearDisabledReason()
+	return _u
+}
+
 // Mutation returns the RedeemCodeMutation object of the builder.
 func (_u *RedeemCodeUpdateOne) Mutation() *RedeemCodeMutation {
 	return _u.mutation
@@ -561,6 +653,18 @@ func (_u *RedeemCodeUpdateOne) sqlSave(ctx context.Context) (_node *RedeemCode, 
 	}
 	if _u.mutation.ExpiresAtCleared() {
 		_spec.ClearField(redeemcode.FieldExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.Note(); ok {
+		_spec.SetField(redeemcode.FieldNote, field.TypeString, value)
+	}
+	if _u.mutation.NoteCleared() {
+		_spec.ClearField(redeemcode.FieldNote, field.TypeString)
+	}
+	if value, ok := _u.mutation.DisabledReason(); ok {
+		_spec.SetField(redeemcode.FieldDisabledReason, field.TypeString, value)
+	}
+	if _u.mutation.DisabledReasonCleared() {
+		_spec.ClearField(redeemcode.FieldDisabledReason, field.TypeString)
 	}
 	_node = &RedeemCode{config: _u.config}
 	_spec.Assign = _node.assignValues

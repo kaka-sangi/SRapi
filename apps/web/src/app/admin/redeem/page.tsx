@@ -16,6 +16,7 @@ import {
   type FieldConfig,
 } from "@/components/admin/resource-form-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -134,10 +135,25 @@ function RedeemContent() {
     .filter((c) => list.selected.has(c.id) && c.status === "disabled")
     .map((c) => c.id);
 
-  async function confirmBulkDisable() {
+  // confirmBulkDisable now accepts the operator-supplied audit note from the
+  // BulkDisableDialog and surfaces the per-reason breakdown returned by the
+  // backend so the operator sees exactly what changed (and what didn't).
+  async function confirmBulkDisable(note: string) {
     try {
-      await disableMut.mutateAsync(selectedActive.ids);
-      toast({ title: t("feedback.batchAllSucceeded", { count: selectedActive.ids.length }), tone: "success" });
+      const result = await disableMut.mutateAsync({ ids: selectedActive.ids, note });
+      const breakdown = result.disabled_reason_breakdown ?? {};
+      const description = t("adminPromos.bulkDisableBreakdown", {
+        disabled:
+          (breakdown.admin_action ?? 0) + (breakdown.expired ?? 0),
+        already: breakdown.already_disabled ?? 0,
+        expired: breakdown.expired ?? 0,
+        notFound: breakdown.not_found ?? 0,
+      });
+      toast({
+        title: t("feedback.batchAllSucceeded", { count: result.succeeded }),
+        description,
+        tone: "success",
+      });
       list.clearSelection();
     } catch (err) {
       toast({ title: t("feedback.failed"), tone: "error" });
@@ -390,23 +406,26 @@ function RedeemContent() {
           body={t("feedback.confirmDeleteBody")}
           confirmLabel={t("adminPromos.disable")}
           confirmPhrase={disableTarget.code}
-          onConfirm={() => disableMut.mutateAsync([disableTarget.id])}
+          onConfirm={() => disableMut.mutateAsync({ ids: [disableTarget.id] })}
           successMessage={t("feedback.updated")}
           isPending={disableMut.isPending}
         />
       ) : null}
 
       {bulkDisabling ? (
-        <ConfirmDialog
-          open
-          onOpenChange={(open) => {
-            if (!open) setBulkDisabling(false);
-          }}
-          title={t("adminPromos.disableSelectedTitle", { count: selectedActive.ids.length })}
-          body={t("feedback.confirmDeleteBody")}
-          confirmLabel={t("adminPromos.disableSelected")}
-          onConfirm={confirmBulkDisable}
+        <BulkDisableDialog
+          count={selectedActive.ids.length}
           isPending={disableMut.isPending}
+          onSubmit={async (note) => {
+            try {
+              await confirmBulkDisable(note);
+              setBulkDisabling(false);
+            } catch {
+              // confirmBulkDisable already surfaced the error toast; keep the
+              // dialog open so the operator can retry or close it themselves.
+            }
+          }}
+          onClose={() => setBulkDisabling(false)}
         />
       ) : null}
 
@@ -629,6 +648,78 @@ function RedeemBatchDialog({ onClose }: { onClose: () => void }) {
             </DialogFooter>
           </form>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Bulk-disable confirmation with an optional free-text audit note. Mirrors
+// RedeemExtendDialog's shape — count blurb up top, single editable field,
+// confirm/cancel. The parent owns the mutation; this dialog just collects the
+// note and validates it locally (≤500 chars) before submitting.
+function BulkDisableDialog({
+  count,
+  isPending,
+  onSubmit,
+  onClose,
+}: {
+  count: number;
+  isPending: boolean;
+  onSubmit: (note: string) => void | Promise<void>;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    const trimmed = note.trim();
+    if (trimmed.length > 500) {
+      setError(t("adminPromos.bulkDisableNoteTooLong"));
+      return;
+    }
+    void onSubmit(trimmed);
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent>
+        <form onSubmit={submit}>
+          <DialogHeader>
+            <DialogTitle>{t("adminPromos.disableSelectedTitle", { count })}</DialogTitle>
+            <DialogDescription>{t("feedback.confirmDeleteBody")}</DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 space-y-3">
+            <div>
+              <Label htmlFor="bulk-disable-note">{t("adminPromos.bulkDisableNoteLabel")}</Label>
+              <Textarea
+                id="bulk-disable-note"
+                rows={3}
+                maxLength={500}
+                placeholder={t("adminPromos.bulkDisableNotePlaceholder")}
+                value={note}
+                disabled={isPending}
+                aria-invalid={Boolean(error)}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </div>
+            {error ? (
+              <p role="alert" className="text-2xs text-srapi-error">
+                {error}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter className="mt-5">
+            <Button type="button" variant="ghost" disabled={isPending} onClick={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" variant="primary" loading={isPending}>
+              {t("adminPromos.disableSelected")}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

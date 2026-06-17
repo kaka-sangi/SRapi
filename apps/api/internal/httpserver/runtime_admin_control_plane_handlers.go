@@ -288,12 +288,25 @@ func (s *Server) handleBatchDisableAdminRedeemCodes(w http.ResponseWriter, r *ht
 		writeAdminControlError(w, err, requestID)
 		return
 	}
-	result, err := s.runtime.adminControl.BatchDisableRedeemCodes(r.Context(), ids, session.User.ID)
+	note := ""
+	if body.Note != nil {
+		note = *body.Note
+	}
+	result, err := s.runtime.adminControl.BatchDisableRedeemCodes(r.Context(), ids, note, session.User.ID)
 	if err != nil {
 		writeAdminControlError(w, err, requestID)
 		return
 	}
-	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "redeem_code.batch_disable", "redeem_code", "bulk", nil, adminControlAuditSnapshot(result)))
+	// Include the operator-supplied note + per-reason breakdown in the audit
+	// snapshot so reviewers can replay the call's intent and outcome.
+	snapshot := adminControlAuditSnapshot(result)
+	if note != "" {
+		snapshot["note"] = note
+	}
+	if len(result.DisabledReasonBreakdown) > 0 {
+		snapshot["disabled_reason_breakdown"] = result.DisabledReasonBreakdown
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "redeem_code.batch_disable", "redeem_code", "bulk", nil, snapshot))
 	writeJSONAny(w, http.StatusOK, apiopenapi.BatchOperationResponse{Data: toAPIBatchOperationResult(result), RequestId: requestID})
 }
 
@@ -1234,7 +1247,7 @@ func toAPIRedeemCodes(items []admincontrol.RedeemCode) []apiopenapi.RedeemCode {
 }
 
 func toAPIRedeemCode(in admincontrol.RedeemCode) apiopenapi.RedeemCode {
-	return apiopenapi.RedeemCode{
+	out := apiopenapi.RedeemCode{
 		Code:           in.Code,
 		CreatedAt:      in.CreatedAt,
 		Currency:       in.Currency,
@@ -1247,6 +1260,15 @@ func toAPIRedeemCode(in admincontrol.RedeemCode) apiopenapi.RedeemCode {
 		UpdatedAt:      in.UpdatedAt,
 		Value:          in.Value,
 	}
+	if in.Note != "" {
+		note := in.Note
+		out.Note = &note
+	}
+	if in.DisabledReason != "" {
+		reason := in.DisabledReason
+		out.DisabledReason = &reason
+	}
+	return out
 }
 
 func toAPIRedeemCodeRedemptionResult(in admincontrol.RedeemCodeRedemptionResult) apiopenapi.RedeemCodeRedemptionResult {
@@ -1515,6 +1537,22 @@ func toAPIBatchOperationResult(in admincontrol.BatchOperationResult) apiopenapi.
 			failedIDs = append(failedIDs, apiopenapi.Id(strconv.Itoa(id)))
 		}
 		out.FailedIds = &failedIDs
+	}
+	if len(in.PerItemReasons) > 0 {
+		// Stringify ids so the JSON keys match how we expose ids elsewhere in
+		// the API surface (Id is a string in the spec).
+		perItem := make(map[string]string, len(in.PerItemReasons))
+		for id, reason := range in.PerItemReasons {
+			perItem[strconv.Itoa(id)] = reason
+		}
+		out.PerItemReasons = &perItem
+	}
+	if len(in.DisabledReasonBreakdown) > 0 {
+		breakdown := make(map[string]int, len(in.DisabledReasonBreakdown))
+		for reason, count := range in.DisabledReasonBreakdown {
+			breakdown[reason] = count
+		}
+		out.DisabledReasonBreakdown = &breakdown
 	}
 	return out
 }

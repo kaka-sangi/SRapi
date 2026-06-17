@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -589,7 +590,7 @@ func TestBatchEnableRedeemCodesFlipsDisabledBackToActive(t *testing.T) {
 
 	// Disable A and B; leave the third active. Verifies the enable path only
 	// touches rows whose stored status is DISABLED.
-	if _, err := svc.BatchDisableRedeemCodes(context.Background(), []int{a.ID, b.ID}, 1); err != nil {
+	if _, err := svc.BatchDisableRedeemCodes(context.Background(), []int{a.ID, b.ID}, "", 1); err != nil {
 		t.Fatalf("disable seed: %v", err)
 	}
 
@@ -1087,5 +1088,104 @@ func TestSystemLogsRecordListAndCleanup(t *testing.T) {
 
 	if _, err := svc.CleanupSystemLogs(context.Background(), admincontrol.SystemLogCleanupFilter{}); err == nil {
 		t.Fatal("expected cleanup without filters to fail")
+	}
+}
+
+// TestBatchDisableRedeemCodesClassifiesPerItemReasons covers the four reason
+// branches the bulk-disable now surfaces, plus note validation. Codes are
+// seeded directly through the service so the test exercises both the service
+// classification and the memory-store reason map.
+func TestBatchDisableRedeemCodesClassifiesPerItemReasons(t *testing.T) {
+	now := time.Date(2026, time.June, 12, 10, 0, 0, 0, time.UTC)
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	// Four codes covering each reason branch.
+	expiredAt := now.Add(-1 * time.Hour)
+	future := now.Add(24 * time.Hour)
+	adminCode, _ := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code: "DISABLE-ADMIN", Type: admincontrol.RedeemCodeTypeBalance, Value: "5", Currency: "USD", MaxRedemptions: 1, ExpiresAt: &future,
+	}, 1)
+	expiredCode, _ := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code: "DISABLE-EXPIRED", Type: admincontrol.RedeemCodeTypeBalance, Value: "5", Currency: "USD", MaxRedemptions: 1, ExpiresAt: &expiredAt,
+	}, 1)
+	alreadyCode, _ := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code: "DISABLE-AGAIN", Type: admincontrol.RedeemCodeTypeBalance, Value: "5", Currency: "USD", MaxRedemptions: 1,
+	}, 1)
+	// Pre-disable the "already" code so a second call classifies it as already_disabled.
+	if _, err := svc.BatchDisableRedeemCodes(context.Background(), []int{alreadyCode.ID}, "seed", 1); err != nil {
+		t.Fatalf("seed disable: %v", err)
+	}
+
+	const missingID = 9999999
+	result, err := svc.BatchDisableRedeemCodes(
+		context.Background(),
+		[]int{adminCode.ID, expiredCode.ID, alreadyCode.ID, missingID},
+		"campaign rollback",
+		1,
+	)
+	if err != nil {
+		t.Fatalf("batch disable: %v", err)
+	}
+	if result.Requested != 4 {
+		t.Fatalf("requested: want 4, got %d", result.Requested)
+	}
+	// Succeeded = admin_action + expired (both ended up disabled this call).
+	if result.Succeeded != 2 {
+		t.Fatalf("succeeded: want 2, got %d (reasons=%v)", result.Succeeded, result.PerItemReasons)
+	}
+	// Failed = already_disabled + not_found.
+	if result.Failed != 2 {
+		t.Fatalf("failed: want 2, got %d (ids=%v)", result.Failed, result.FailedIDs)
+	}
+	wantReasons := map[int]string{
+		adminCode.ID:   admincontrol.RedeemDisabledReasonAdminAction,
+		expiredCode.ID: admincontrol.RedeemDisabledReasonExpired,
+		alreadyCode.ID: admincontrol.RedeemDisabledReasonAlreadyDisabled,
+		missingID:      admincontrol.RedeemDisabledReasonNotFound,
+	}
+	for id, want := range wantReasons {
+		if got := result.PerItemReasons[id]; got != want {
+			t.Fatalf("reason for %d: want %q, got %q", id, want, got)
+		}
+	}
+	wantBreakdown := map[string]int{
+		admincontrol.RedeemDisabledReasonAdminAction:     1,
+		admincontrol.RedeemDisabledReasonExpired:         1,
+		admincontrol.RedeemDisabledReasonAlreadyDisabled: 1,
+		admincontrol.RedeemDisabledReasonNotFound:        1,
+	}
+	for reason, want := range wantBreakdown {
+		if got := result.DisabledReasonBreakdown[reason]; got != want {
+			t.Fatalf("breakdown[%s]: want %d, got %d (full=%v)", reason, want, got, result.DisabledReasonBreakdown)
+		}
+	}
+
+	// Confirm the note + disabled_reason actually persisted on the row we
+	// flipped (admin_action branch). This is the audit-trail guarantee.
+	list, _ := svc.ListRedeemCodes(context.Background(), admincontrol.ListOptions{})
+	byID := map[int]admincontrol.RedeemCode{}
+	for _, c := range list.Items {
+		byID[c.ID] = c
+	}
+	flipped := byID[adminCode.ID]
+	if flipped.Note != "campaign rollback" {
+		t.Fatalf("admin_action row note: want %q, got %q", "campaign rollback", flipped.Note)
+	}
+	if flipped.DisabledReason != admincontrol.RedeemDisabledReasonAdminAction {
+		t.Fatalf("admin_action row disabled_reason: want %q, got %q", admincontrol.RedeemDisabledReasonAdminAction, flipped.DisabledReason)
+	}
+	expiredRow := byID[expiredCode.ID]
+	if expiredRow.DisabledReason != admincontrol.RedeemDisabledReasonExpired {
+		t.Fatalf("expired row disabled_reason: want %q, got %q", admincontrol.RedeemDisabledReasonExpired, expiredRow.DisabledReason)
+	}
+
+	// Note validation: anything over 500 chars is rejected up-front.
+	longNote := strings.Repeat("x", 501)
+	if _, err := svc.BatchDisableRedeemCodes(context.Background(), []int{adminCode.ID}, longNote, 1); !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("long note should be rejected, got %v", err)
 	}
 }

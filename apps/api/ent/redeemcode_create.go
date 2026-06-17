@@ -144,6 +144,34 @@ func (_c *RedeemCodeCreate) SetNillableExpiresAt(v *time.Time) *RedeemCodeCreate
 	return _c
 }
 
+// SetNote sets the "note" field.
+func (_c *RedeemCodeCreate) SetNote(v string) *RedeemCodeCreate {
+	_c.mutation.SetNote(v)
+	return _c
+}
+
+// SetNillableNote sets the "note" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableNote(v *string) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetNote(*v)
+	}
+	return _c
+}
+
+// SetDisabledReason sets the "disabled_reason" field.
+func (_c *RedeemCodeCreate) SetDisabledReason(v string) *RedeemCodeCreate {
+	_c.mutation.SetDisabledReason(v)
+	return _c
+}
+
+// SetNillableDisabledReason sets the "disabled_reason" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableDisabledReason(v *string) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetDisabledReason(*v)
+	}
+	return _c
+}
+
 // Mutation returns the RedeemCodeMutation object of the builder.
 func (_c *RedeemCodeCreate) Mutation() *RedeemCodeMutation {
 	return _c.mutation
@@ -206,6 +234,14 @@ func (_c *RedeemCodeCreate) defaults() {
 	if _, ok := _c.mutation.RedeemedCount(); !ok {
 		v := redeemcode.DefaultRedeemedCount
 		_c.mutation.SetRedeemedCount(v)
+	}
+	if _, ok := _c.mutation.Note(); !ok {
+		v := redeemcode.DefaultNote
+		_c.mutation.SetNote(v)
+	}
+	if _, ok := _c.mutation.DisabledReason(); !ok {
+		v := redeemcode.DefaultDisabledReason
+		_c.mutation.SetDisabledReason(v)
 	}
 }
 
@@ -313,6 +349,14 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ExpiresAt(); ok {
 		_spec.SetField(redeemcode.FieldExpiresAt, field.TypeTime, value)
 		_node.ExpiresAt = &value
+	}
+	if value, ok := _c.mutation.Note(); ok {
+		_spec.SetField(redeemcode.FieldNote, field.TypeString, value)
+		_node.Note = value
+	}
+	if value, ok := _c.mutation.DisabledReason(); ok {
+		_spec.SetField(redeemcode.FieldDisabledReason, field.TypeString, value)
+		_node.DisabledReason = value
 	}
 	return _node, _spec
 }

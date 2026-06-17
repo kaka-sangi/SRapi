@@ -1889,6 +1889,14 @@ func init() {
 	redeemcodeDescRedeemedCount := redeemcodeFields[6].Descriptor()
 	// redeemcode.DefaultRedeemedCount holds the default value on creation for the redeemed_count field.
 	redeemcode.DefaultRedeemedCount = redeemcodeDescRedeemedCount.Default.(int)
+	// redeemcodeDescNote is the schema descriptor for note field.
+	redeemcodeDescNote := redeemcodeFields[8].Descriptor()
+	// redeemcode.DefaultNote holds the default value on creation for the note field.
+	redeemcode.DefaultNote = redeemcodeDescNote.Default.(string)
+	// redeemcodeDescDisabledReason is the schema descriptor for disabled_reason field.
+	redeemcodeDescDisabledReason := redeemcodeFields[9].Descriptor()
+	// redeemcode.DefaultDisabledReason holds the default value on creation for the disabled_reason field.
+	redeemcode.DefaultDisabledReason = redeemcodeDescDisabledReason.Default.(string)
 	roleMixin := schema.Role{}.Mixin()
 	roleMixinFields0 := roleMixin[0].Fields()
 	_ = roleMixinFields0

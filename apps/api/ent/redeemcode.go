@@ -36,8 +36,12 @@ type RedeemCode struct {
 	// RedeemedCount holds the value of the "redeemed_count" field.
 	RedeemedCount int `json:"redeemed_count,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
-	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
-	selectValues sql.SelectValues
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	// Note holds the value of the "note" field.
+	Note string `json:"note,omitempty"`
+	// DisabledReason holds the value of the "disabled_reason" field.
+	DisabledReason string `json:"disabled_reason,omitempty"`
+	selectValues   sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -47,7 +51,7 @@ func (*RedeemCode) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case redeemcode.FieldID, redeemcode.FieldMaxRedemptions, redeemcode.FieldRedeemedCount:
 			values[i] = new(sql.NullInt64)
-		case redeemcode.FieldCode, redeemcode.FieldType, redeemcode.FieldStatus, redeemcode.FieldValue, redeemcode.FieldCurrency:
+		case redeemcode.FieldCode, redeemcode.FieldType, redeemcode.FieldStatus, redeemcode.FieldValue, redeemcode.FieldCurrency, redeemcode.FieldNote, redeemcode.FieldDisabledReason:
 			values[i] = new(sql.NullString)
 		case redeemcode.FieldCreatedAt, redeemcode.FieldUpdatedAt, redeemcode.FieldExpiresAt:
 			values[i] = new(sql.NullTime)
@@ -133,6 +137,18 @@ func (_m *RedeemCode) assignValues(columns []string, values []any) error {
 				_m.ExpiresAt = new(time.Time)
 				*_m.ExpiresAt = value.Time
 			}
+		case redeemcode.FieldNote:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field note", values[i])
+			} else if value.Valid {
+				_m.Note = value.String
+			}
+		case redeemcode.FieldDisabledReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field disabled_reason", values[i])
+			} else if value.Valid {
+				_m.DisabledReason = value.String
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -200,6 +216,12 @@ func (_m *RedeemCode) String() string {
 		builder.WriteString("expires_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("note=")
+	builder.WriteString(_m.Note)
+	builder.WriteString(", ")
+	builder.WriteString("disabled_reason=")
+	builder.WriteString(_m.DisabledReason)
 	builder.WriteByte(')')
 	return builder.String()
 }

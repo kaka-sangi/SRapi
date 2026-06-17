@@ -40,6 +40,7 @@ import {
 import type {
   AdminPaymentDashboard,
   AdminTestResult,
+  BatchOperationResult,
   PromoCodeUsage,
   BulkImportAdminPricingRulesData,
   BulkPricingRuleImportResult,
@@ -201,8 +202,20 @@ export const paymentsApi = {
     );
   },
 
-  batchDisableRedeemCodes(ids: Id[]): Promise<unknown> {
-    return unwrapData(() => batchDisableAdminRedeemCodes({ body: { ids }, throwOnError: true }));
+  // batchDisableRedeemCodes returns the full BatchOperationResult so the caller
+  // can surface the per-item reason breakdown to the operator (admin_action /
+  // already_disabled / expired / not_found) instead of a generic count. The
+  // optional note is the operator's audit comment — written onto every code
+  // that actually gets disabled.
+  batchDisableRedeemCodes(
+    ids: Id[],
+    note?: string,
+  ): Promise<BatchOperationResult> {
+    const body: { ids: Id[]; note?: string } = { ids };
+    if (note !== undefined) body.note = note;
+    return unwrapData(() =>
+      batchDisableAdminRedeemCodes({ body, throwOnError: true }),
+    );
   },
 
   batchEnableRedeemCodes(ids: Id[]): Promise<unknown> {

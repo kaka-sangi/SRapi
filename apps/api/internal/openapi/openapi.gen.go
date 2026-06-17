@@ -5033,6 +5033,9 @@ type BatchDeleteProxiesResult struct {
 // BatchDisableRedeemCodesRequest defines model for BatchDisableRedeemCodesRequest.
 type BatchDisableRedeemCodesRequest struct {
 	Ids []Id `json:"ids"`
+
+	// Note Free-text audit comment recorded against every code disabled by this call.
+	Note *string `json:"note,omitempty"`
 }
 
 // BatchExtendRedeemCodesRequest defines model for BatchExtendRedeemCodesRequest.
@@ -5062,10 +5065,15 @@ type BatchOperationResponse struct {
 
 // BatchOperationResult defines model for BatchOperationResult.
 type BatchOperationResult struct {
-	Failed    int   `json:"failed"`
-	FailedIds *[]Id `json:"failed_ids,omitempty"`
-	Requested int   `json:"requested"`
-	Succeeded int   `json:"succeeded"`
+	// DisabledReasonBreakdown Aggregate counts grouped by reason. Same value vocabulary as per_item_reasons.
+	DisabledReasonBreakdown *map[string]int `json:"disabled_reason_breakdown,omitempty"`
+	Failed                  int             `json:"failed"`
+	FailedIds               *[]Id           `json:"failed_ids,omitempty"`
+
+	// PerItemReasons Per-id reason for each code processed. Keys are the redeem-code id (stringified). Values: admin_action, already_disabled, expired, not_found.
+	PerItemReasons *map[string]string `json:"per_item_reasons,omitempty"`
+	Requested      int                `json:"requested"`
+	Succeeded      int                `json:"succeeded"`
 }
 
 // BatchTestProxiesRequest defines model for BatchTestProxiesRequest.
@@ -8465,16 +8473,22 @@ type RealtimeSlotKind string
 
 // RedeemCode defines model for RedeemCode.
 type RedeemCode struct {
-	Code           string           `json:"code"`
-	CreatedAt      Timestamp        `json:"created_at"`
-	Currency       string           `json:"currency"`
-	ExpiresAt      *Timestamp       `json:"expires_at,omitempty"`
-	Id             Id               `json:"id"`
-	MaxRedemptions int              `json:"max_redemptions"`
-	RedeemedCount  int              `json:"redeemed_count"`
-	Status         RedeemCodeStatus `json:"status"`
-	Type           RedeemCodeType   `json:"type"`
-	UpdatedAt      Timestamp        `json:"updated_at"`
+	Code      string    `json:"code"`
+	CreatedAt Timestamp `json:"created_at"`
+	Currency  string    `json:"currency"`
+
+	// DisabledReason Why this code is in disabled status, if applicable. Empty for active/used codes.
+	DisabledReason *string    `json:"disabled_reason,omitempty"`
+	ExpiresAt      *Timestamp `json:"expires_at,omitempty"`
+	Id             Id         `json:"id"`
+	MaxRedemptions int        `json:"max_redemptions"`
+
+	// Note Free-text audit comment last applied to this code (set by bulk-disable).
+	Note          *string          `json:"note,omitempty"`
+	RedeemedCount int              `json:"redeemed_count"`
+	Status        RedeemCodeStatus `json:"status"`
+	Type          RedeemCodeType   `json:"type"`
+	UpdatedAt     Timestamp        `json:"updated_at"`
 
 	// Value Balance amount for balance codes, or subscription plan id for subscription codes.
 	Value string `json:"value"`

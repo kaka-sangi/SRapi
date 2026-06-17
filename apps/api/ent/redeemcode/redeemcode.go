@@ -33,6 +33,10 @@ const (
 	FieldRedeemedCount = "redeemed_count"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
 	FieldExpiresAt = "expires_at"
+	// FieldNote holds the string denoting the note field in the database.
+	FieldNote = "note"
+	// FieldDisabledReason holds the string denoting the disabled_reason field in the database.
+	FieldDisabledReason = "disabled_reason"
 	// Table holds the table name of the redeemcode in the database.
 	Table = "redeem_codes"
 )
@@ -50,6 +54,8 @@ var Columns = []string{
 	FieldMaxRedemptions,
 	FieldRedeemedCount,
 	FieldExpiresAt,
+	FieldNote,
+	FieldDisabledReason,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -83,6 +89,10 @@ var (
 	DefaultMaxRedemptions int
 	// DefaultRedeemedCount holds the default value on creation for the "redeemed_count" field.
 	DefaultRedeemedCount int
+	// DefaultNote holds the default value on creation for the "note" field.
+	DefaultNote string
+	// DefaultDisabledReason holds the default value on creation for the "disabled_reason" field.
+	DefaultDisabledReason string
 )
 
 // OrderOption defines the ordering options for the RedeemCode queries.
@@ -141,4 +151,14 @@ func ByRedeemedCount(opts ...sql.OrderTermOption) OrderOption {
 // ByExpiresAt orders the results by the expires_at field.
 func ByExpiresAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldExpiresAt, opts...).ToFunc()
+}
+
+// ByNote orders the results by the note field.
+func ByNote(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNote, opts...).ToFunc()
+}
+
+// ByDisabledReason orders the results by the disabled_reason field.
+func ByDisabledReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDisabledReason, opts...).ToFunc()
 }

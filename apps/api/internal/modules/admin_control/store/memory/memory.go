@@ -210,25 +210,46 @@ func (s *Store) DeleteRedeemCode(_ context.Context, id int) (admincontrol.Redeem
 	return item, nil
 }
 
-func (s *Store) DisableRedeemCodes(_ context.Context, ids []int, at time.Time) ([]int, error) {
+// DisableRedeemCodes classifies each id and writes the note + disabled_reason
+// for every row that gets disabled. Mirrors the ent-store behavior so the two
+// backends stay interchangeable.
+//
+// Reasons:
+//   - "not_found"          id not present in the store
+//   - "already_disabled"   row is already in disabled status; left untouched
+//   - "expired"            row has expires_at in the past; still disabled with
+//                          disabled_reason="expired" (the note still lands)
+//   - "admin_action"       normal operator-driven disable
+func (s *Store) DisableRedeemCodes(_ context.Context, ids []int, note string, at time.Time) (map[int]string, error) {
 	now := at.UTC()
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	succeeded := make([]int, 0, len(ids))
+	reasons := make(map[int]string, len(ids))
 	for _, id := range ids {
 		item, ok := s.redeemCodes[id]
 		if !ok {
+			reasons[id] = admincontrol.RedeemDisabledReasonNotFound
 			continue
 		}
+		if item.Status == admincontrol.RedeemCodeStatusDisabled {
+			reasons[id] = admincontrol.RedeemDisabledReasonAlreadyDisabled
+			continue
+		}
+		reason := admincontrol.RedeemDisabledReasonAdminAction
+		if item.ExpiresAt != nil && item.ExpiresAt.Before(now) {
+			reason = admincontrol.RedeemDisabledReasonExpired
+		}
 		item.Status = admincontrol.RedeemCodeStatusDisabled
+		item.Note = note
+		item.DisabledReason = reason
 		item.UpdatedAt = now
 		s.redeemCodes[id] = item
-		succeeded = append(succeeded, id)
+		reasons[id] = reason
 	}
-	return succeeded, nil
+	return reasons, nil
 }
 
 func (s *Store) EnableRedeemCodes(_ context.Context, ids []int, at time.Time) ([]int, error) {

@@ -2371,6 +2371,18 @@ export type BatchOperationResult = {
     succeeded: number;
     failed: number;
     failed_ids?: Array<Id>;
+    /**
+     * Per-id reason for each code processed. Keys are the redeem-code id (stringified). Values: admin_action, already_disabled, expired, not_found.
+     */
+    per_item_reasons?: {
+        [key: string]: string;
+    };
+    /**
+     * Aggregate counts grouped by reason. Same value vocabulary as per_item_reasons.
+     */
+    disabled_reason_breakdown?: {
+        [key: string]: number;
+    };
 };
 
 export type BatchOperationResponse = {
@@ -3340,6 +3352,14 @@ export type RedeemCode = {
     max_redemptions: number;
     redeemed_count: number;
     expires_at?: Timestamp;
+    /**
+     * Free-text audit comment last applied to this code (set by bulk-disable).
+     */
+    note?: string;
+    /**
+     * Why this code is in disabled status, if applicable. Empty for active/used codes.
+     */
+    disabled_reason?: string;
     created_at: Timestamp;
     updated_at: Timestamp;
 };
@@ -3402,6 +3422,10 @@ export type BatchGenerateRedeemCodesRequest = {
 
 export type BatchDisableRedeemCodesRequest = {
     ids: Array<Id>;
+    /**
+     * Free-text audit comment recorded against every code disabled by this call.
+     */
+    note?: string | null;
 };
 
 export type BatchExtendRedeemCodesRequest = {

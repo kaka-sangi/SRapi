@@ -1309,6 +1309,11 @@ export const en = {
     disable: "Disable",
     disableSelected: "Disable selected",
     disableSelectedTitle: "Disable {count} redeem codes?",
+    bulkDisableNoteLabel: "Reason / audit note",
+    bulkDisableNotePlaceholder: "Why are these codes being disabled? (optional)",
+    bulkDisableBreakdown:
+      "{disabled} disabled · {already} already disabled · {expired} expired · {notFound} not found",
+    bulkDisableNoteTooLong: "Note must be ≤500 characters",
     enableSelected: "Enable selected",
     extendSelected: "Extend expiry",
     extendSelectedTitle: "Extend expiry on {count} redeem codes",

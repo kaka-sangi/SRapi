@@ -49144,6 +49144,8 @@ type RedeemCodeMutation struct {
 	redeemed_count     *int
 	addredeemed_count  *int
 	expires_at         *time.Time
+	note               *string
+	disabled_reason    *string
 	clearedFields      map[string]struct{}
 	done               bool
 	oldValue           func(context.Context) (*RedeemCode, error)
@@ -49661,6 +49663,104 @@ func (m *RedeemCodeMutation) ResetExpiresAt() {
 	delete(m.clearedFields, redeemcode.FieldExpiresAt)
 }
 
+// SetNote sets the "note" field.
+func (m *RedeemCodeMutation) SetNote(s string) {
+	m.note = &s
+}
+
+// Note returns the value of the "note" field in the mutation.
+func (m *RedeemCodeMutation) Note() (r string, exists bool) {
+	v := m.note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNote returns the old "note" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldNote(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNote: %w", err)
+	}
+	return oldValue.Note, nil
+}
+
+// ClearNote clears the value of the "note" field.
+func (m *RedeemCodeMutation) ClearNote() {
+	m.note = nil
+	m.clearedFields[redeemcode.FieldNote] = struct{}{}
+}
+
+// NoteCleared returns if the "note" field was cleared in this mutation.
+func (m *RedeemCodeMutation) NoteCleared() bool {
+	_, ok := m.clearedFields[redeemcode.FieldNote]
+	return ok
+}
+
+// ResetNote resets all changes to the "note" field.
+func (m *RedeemCodeMutation) ResetNote() {
+	m.note = nil
+	delete(m.clearedFields, redeemcode.FieldNote)
+}
+
+// SetDisabledReason sets the "disabled_reason" field.
+func (m *RedeemCodeMutation) SetDisabledReason(s string) {
+	m.disabled_reason = &s
+}
+
+// DisabledReason returns the value of the "disabled_reason" field in the mutation.
+func (m *RedeemCodeMutation) DisabledReason() (r string, exists bool) {
+	v := m.disabled_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDisabledReason returns the old "disabled_reason" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldDisabledReason(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDisabledReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDisabledReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDisabledReason: %w", err)
+	}
+	return oldValue.DisabledReason, nil
+}
+
+// ClearDisabledReason clears the value of the "disabled_reason" field.
+func (m *RedeemCodeMutation) ClearDisabledReason() {
+	m.disabled_reason = nil
+	m.clearedFields[redeemcode.FieldDisabledReason] = struct{}{}
+}
+
+// DisabledReasonCleared returns if the "disabled_reason" field was cleared in this mutation.
+func (m *RedeemCodeMutation) DisabledReasonCleared() bool {
+	_, ok := m.clearedFields[redeemcode.FieldDisabledReason]
+	return ok
+}
+
+// ResetDisabledReason resets all changes to the "disabled_reason" field.
+func (m *RedeemCodeMutation) ResetDisabledReason() {
+	m.disabled_reason = nil
+	delete(m.clearedFields, redeemcode.FieldDisabledReason)
+}
+
 // Where appends a list predicates to the RedeemCodeMutation builder.
 func (m *RedeemCodeMutation) Where(ps ...predicate.RedeemCode) {
 	m.predicates = append(m.predicates, ps...)
@@ -49695,7 +49795,7 @@ func (m *RedeemCodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RedeemCodeMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 12)
 	if m.created_at != nil {
 		fields = append(fields, redeemcode.FieldCreatedAt)
 	}
@@ -49726,6 +49826,12 @@ func (m *RedeemCodeMutation) Fields() []string {
 	if m.expires_at != nil {
 		fields = append(fields, redeemcode.FieldExpiresAt)
 	}
+	if m.note != nil {
+		fields = append(fields, redeemcode.FieldNote)
+	}
+	if m.disabled_reason != nil {
+		fields = append(fields, redeemcode.FieldDisabledReason)
+	}
 	return fields
 }
 
@@ -49754,6 +49860,10 @@ func (m *RedeemCodeMutation) Field(name string) (ent.Value, bool) {
 		return m.RedeemedCount()
 	case redeemcode.FieldExpiresAt:
 		return m.ExpiresAt()
+	case redeemcode.FieldNote:
+		return m.Note()
+	case redeemcode.FieldDisabledReason:
+		return m.DisabledReason()
 	}
 	return nil, false
 }
@@ -49783,6 +49893,10 @@ func (m *RedeemCodeMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldRedeemedCount(ctx)
 	case redeemcode.FieldExpiresAt:
 		return m.OldExpiresAt(ctx)
+	case redeemcode.FieldNote:
+		return m.OldNote(ctx)
+	case redeemcode.FieldDisabledReason:
+		return m.OldDisabledReason(ctx)
 	}
 	return nil, fmt.Errorf("unknown RedeemCode field %s", name)
 }
@@ -49862,6 +49976,20 @@ func (m *RedeemCodeMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetExpiresAt(v)
 		return nil
+	case redeemcode.FieldNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNote(v)
+		return nil
+	case redeemcode.FieldDisabledReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDisabledReason(v)
+		return nil
 	}
 	return fmt.Errorf("unknown RedeemCode field %s", name)
 }
@@ -49922,6 +50050,12 @@ func (m *RedeemCodeMutation) ClearedFields() []string {
 	if m.FieldCleared(redeemcode.FieldExpiresAt) {
 		fields = append(fields, redeemcode.FieldExpiresAt)
 	}
+	if m.FieldCleared(redeemcode.FieldNote) {
+		fields = append(fields, redeemcode.FieldNote)
+	}
+	if m.FieldCleared(redeemcode.FieldDisabledReason) {
+		fields = append(fields, redeemcode.FieldDisabledReason)
+	}
 	return fields
 }
 
@@ -49938,6 +50072,12 @@ func (m *RedeemCodeMutation) ClearField(name string) error {
 	switch name {
 	case redeemcode.FieldExpiresAt:
 		m.ClearExpiresAt()
+		return nil
+	case redeemcode.FieldNote:
+		m.ClearNote()
+		return nil
+	case redeemcode.FieldDisabledReason:
+		m.ClearDisabledReason()
 		return nil
 	}
 	return fmt.Errorf("unknown RedeemCode nullable field %s", name)
@@ -49976,6 +50116,12 @@ func (m *RedeemCodeMutation) ResetField(name string) error {
 		return nil
 	case redeemcode.FieldExpiresAt:
 		m.ResetExpiresAt()
+		return nil
+	case redeemcode.FieldNote:
+		m.ResetNote()
+		return nil
+	case redeemcode.FieldDisabledReason:
+		m.ResetDisabledReason()
 		return nil
 	}
 	return fmt.Errorf("unknown RedeemCode field %s", name)

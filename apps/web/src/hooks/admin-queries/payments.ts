@@ -92,9 +92,12 @@ export function useBatchGenerateRedeemCodes() {
     queryKeys.admin.redeemStats(),
   );
 }
+// Accepts an optional free-text audit note. The caller surfaces the resolved
+// BatchOperationResult (per-item reasons + breakdown) in the post-action UX.
 export function useBatchDisableRedeemCodes() {
   return useAdminMutation(
-    (ids: string[]) => adminApi.batchDisableRedeemCodes(ids),
+    (vars: { ids: string[]; note?: string }) =>
+      adminApi.batchDisableRedeemCodes(vars.ids, vars.note),
     ["admin", "redeem-codes"],
     queryKeys.admin.redeemStats(),
   );

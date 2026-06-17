@@ -1864,6 +1864,8 @@ var (
 		{Name: "max_redemptions", Type: field.TypeInt, Default: 1},
 		{Name: "redeemed_count", Type: field.TypeInt, Default: 0},
 		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Default: ""},
+		{Name: "disabled_reason", Type: field.TypeString, Nullable: true, Default: ""},
 	}
 	// RedeemCodesTable holds the schema information for the "redeem_codes" table.
 	RedeemCodesTable = &schema.Table{

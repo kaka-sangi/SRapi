@@ -25,7 +25,12 @@ type Store interface {
 	ListRedeemCodes(ctx context.Context) ([]RedeemCode, error)
 	CreateRedeemCode(ctx context.Context, code RedeemCode) (RedeemCode, error)
 	DeleteRedeemCode(ctx context.Context, id int) (RedeemCode, error)
-	DisableRedeemCodes(ctx context.Context, ids []int, at time.Time) ([]int, error)
+	// DisableRedeemCodes is a bulk soft-disable. Pre-fetches each row to
+	// classify the outcome (admin_action / already_disabled / expired /
+	// not_found) and persists the audit note + disabled_reason on every row
+	// that gets disabled. Returns per-id reasons keyed by RedeemDisabledReason*
+	// constants. Note is capped/validated at the service layer.
+	DisableRedeemCodes(ctx context.Context, ids []int, note string, at time.Time) (map[int]string, error)
 	// EnableRedeemCodes flips DISABLED rows back to ACTIVE — the inverse of
 	// DisableRedeemCodes. Codes whose lifecycle is over (redeemed, expired,
 	// fully consumed) are skipped; the service treats their omission from the
@@ -331,8 +336,14 @@ type RedeemCode struct {
 	MaxRedemptions int              `json:"max_redemptions"`
 	RedeemedCount  int              `json:"redeemed_count"`
 	ExpiresAt      *time.Time       `json:"expires_at,omitempty"`
-	CreatedAt      time.Time        `json:"created_at"`
-	UpdatedAt      time.Time        `json:"updated_at"`
+	// Note carries the most recent operator-supplied audit comment (set by
+	// bulk-disable). Free-text, capped at 500 chars by the service.
+	Note string `json:"note,omitempty"`
+	// DisabledReason classifies why a code is in disabled status. Empty for
+	// active/used codes; one of: admin_action, already_disabled, expired.
+	DisabledReason string    `json:"disabled_reason,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 type RedeemCodeRedemptionRequest struct {
 	Code string
@@ -390,11 +401,34 @@ type RedeemCodeStats struct {
 	Disabled int `json:"disabled"`
 	Expired  int `json:"expired"`
 }
+// BatchDisableReason classifies the per-row outcome of a bulk-disable. Used
+// both in the persisted disabled_reason column and in the BatchOperationResult
+// breakdown returned to the admin UI.
+//
+// Success/failure accounting for BatchDisable: a row counts as Succeeded if
+// the call resulted in a status change to disabled (i.e. reason ==
+// admin_action OR reason == expired). Already-disabled and not-found rows
+// count as Failed — nothing changed, the operator's intent was a no-op.
+const (
+	RedeemDisabledReasonAdminAction     = "admin_action"
+	RedeemDisabledReasonAlreadyDisabled = "already_disabled"
+	RedeemDisabledReasonExpired         = "expired"
+	RedeemDisabledReasonNotFound        = "not_found"
+)
+
 type BatchOperationResult struct {
 	Requested int   `json:"requested"`
 	Succeeded int   `json:"succeeded"`
 	Failed    int   `json:"failed"`
 	FailedIDs []int `json:"failed_ids"`
+	// PerItemReasons maps each requested id (where known) to a reason string.
+	// Vocabulary depends on the operation; for BatchDisableRedeemCodes the
+	// values are the RedeemDisabledReason* constants above. Nil/empty for
+	// operations that don't classify outcomes.
+	PerItemReasons map[int]string `json:"per_item_reasons,omitempty"`
+	// DisabledReasonBreakdown is the aggregate count of PerItemReasons, keyed
+	// by reason string. Populated alongside PerItemReasons.
+	DisabledReasonBreakdown map[string]int `json:"disabled_reason_breakdown,omitempty"`
 }
 
 type PromoCodeStatus string

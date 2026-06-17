@@ -78,8 +78,30 @@ func (s *Service) BatchGenerateRedeemCodes(ctx context.Context, req admincontrol
 	return created, nil
 }
 
-func (s *Service) BatchDisableRedeemCodes(ctx context.Context, ids []int, actorUserID int) (admincontrol.BatchOperationResult, error) {
+// redeemBatchDisableNoteMaxLen caps the free-text audit note for bulk-disable.
+// Kept short enough to comfortably fit in a database varchar and to survive a
+// roundtrip in audit/notification payloads without truncation surprises.
+const redeemBatchDisableNoteMaxLen = 500
+
+// BatchDisableRedeemCodes is the operator-facing bulk soft-disable. Accepts
+// an optional free-text audit note (validated ≤500 chars) and returns a
+// per-id reason map + aggregate breakdown so the admin UI can show operators
+// *why* the call did / didn't change each row.
+//
+// Success/failure accounting:
+//   - succeeded == rows that flipped to disabled this call (admin_action or
+//     expired — both ended up in disabled status with disabled_reason set)
+//   - failed    == rows that did NOT change (already_disabled or not_found)
+//
+// "expired" counts as succeeded because the store does perform the disable
+// write — the reason tag is just operator feedback that the expiry was the
+// reason, not a fresh policy decision.
+func (s *Service) BatchDisableRedeemCodes(ctx context.Context, ids []int, note string, actorUserID int) (admincontrol.BatchOperationResult, error) {
 	if len(ids) == 0 || len(ids) > 1000 {
+		return admincontrol.BatchOperationResult{}, admincontrol.ErrInvalidInput
+	}
+	note = strings.TrimSpace(note)
+	if len(note) > redeemBatchDisableNoteMaxLen {
 		return admincontrol.BatchOperationResult{}, admincontrol.ErrInvalidInput
 	}
 	requested := make([]int, 0, len(ids))
@@ -94,26 +116,37 @@ func (s *Service) BatchDisableRedeemCodes(ctx context.Context, ids []int, actorU
 		seen[id] = true
 		requested = append(requested, id)
 	}
-	succeededIDs, err := s.store.DisableRedeemCodes(ctx, requested, s.clock.Now())
+	reasons, err := s.store.DisableRedeemCodes(ctx, requested, note, s.clock.Now())
 	if err != nil {
 		return admincontrol.BatchOperationResult{}, err
 	}
-	succeededSet := map[int]bool{}
-	for _, id := range succeededIDs {
-		succeededSet[id] = true
-	}
-	failedIDs := make([]int, 0, len(requested))
+	breakdown := map[string]int{}
+	failedIDs := make([]int, 0)
+	succeeded := 0
 	for _, id := range requested {
-		if !succeededSet[id] {
+		reason, ok := reasons[id]
+		if !ok {
+			// Defensive: store didn't classify this id. Treat as not_found so
+			// the breakdown is internally consistent.
+			reason = admincontrol.RedeemDisabledReasonNotFound
+			reasons[id] = reason
+		}
+		breakdown[reason]++
+		switch reason {
+		case admincontrol.RedeemDisabledReasonAdminAction, admincontrol.RedeemDisabledReasonExpired:
+			succeeded++
+		default:
 			failedIDs = append(failedIDs, id)
 		}
 	}
 	sort.Ints(failedIDs)
 	return admincontrol.BatchOperationResult{
-		Requested: len(ids),
-		Succeeded: len(succeededIDs),
-		Failed:    len(failedIDs),
-		FailedIDs: failedIDs,
+		Requested:               len(ids),
+		Succeeded:               succeeded,
+		Failed:                  len(failedIDs),
+		FailedIDs:               failedIDs,
+		PerItemReasons:          reasons,
+		DisabledReasonBreakdown: breakdown,
 	}, nil
 }
 
