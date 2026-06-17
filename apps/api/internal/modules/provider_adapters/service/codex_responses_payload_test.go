@@ -266,7 +266,7 @@ func TestCodexResponsesCompactPayloadMatchesSub2API(t *testing.T) {
 	// Diagnosed live against srapi.senran.net production traffic. This test
 	// pins the sub2api-aligned compact shape so future regressions are
 	// caught immediately.
-	payload, _, err := codexResponsesPayload(contract.ConversationRequest{
+	payload, stream, err := codexResponsesPayload(contract.ConversationRequest{
 		SourceProtocol: "openai-compatible",
 		SourceEndpoint: "/v1/responses/compact",
 		RawBody: []byte(`{
@@ -296,6 +296,18 @@ func TestCodexResponsesCompactPayloadMatchesSub2API(t *testing.T) {
 	// instructions, the field is simply absent.
 	if value, exists := payload["instructions"]; exists && value != "" && value != nil {
 		// non-empty string instructions is fine — caller supplied it
+	}
+	// stream return MUST be false for compact even though payload["stream"]
+	// was deleted. The historical codexResponsesPayloadStream returns true
+	// when the field is absent — without the explicit compact override in
+	// codexResponsesPayload, the codex adapter would set Accept:
+	// text/event-stream + ExpectStream:true on the upstream request,
+	// surfacing on the client as "stream disconnected before completion:
+	// missing field 'text' at line 1 column 203". Pin the override so a
+	// future refactor of codexResponsesPayloadStream cannot reintroduce
+	// the streaming-route regression.
+	if stream {
+		t.Fatalf("compact must return stream=false even when payload[\"stream\"] is absent, got stream=true")
 	}
 }
 

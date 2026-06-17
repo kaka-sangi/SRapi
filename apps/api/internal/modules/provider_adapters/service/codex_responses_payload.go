@@ -19,7 +19,25 @@ func codexResponsesPayload(req contract.ConversationRequest) (map[string]any, bo
 		payload = codexCanonicalResponsesPayload(req)
 	}
 	codexApplyResponsesPayloadDefaults(req, payload)
-	return payload, codexResponsesPayloadStream(payload), nil
+	stream := codexResponsesPayloadStream(payload)
+	if codexResponsesCompactRequest(req) {
+		// /v1/responses/compact is non-streaming by contract — sub2api
+		// applyCodexOAuthTransform deletes the stream field outright
+		// (openai_codex_transform.go:131-139), and Hermes (Codex CLI in
+		// Rust) sends stream:false on the client-side request. After the
+		// compact body normalizer deletes payload["stream"] entirely the
+		// historical codexResponsesPayloadStream returns true for an
+		// absent field, so without this explicit override we route the
+		// request through the streaming proxy path with Accept:
+		// text/event-stream — the upstream then returns SSE that Hermes
+		// cannot parse, producing the client-side error "stream
+		// disconnected before completion: missing field 'text' at line 1
+		// column 203" (diagnosed live via the new system-log panel). Force
+		// stream=false here so the codex adapter buffers the upstream
+		// response and returns it as a single JSON body the client expects.
+		stream = false
+	}
+	return payload, stream, nil
 }
 
 func codexRawResponsesPayload(req contract.ConversationRequest) (map[string]any, error) {
