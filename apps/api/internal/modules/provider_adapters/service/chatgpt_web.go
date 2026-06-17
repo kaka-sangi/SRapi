@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/httputil"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -119,34 +121,299 @@ func (s *Service) invokeReverseProxyChatGPTWebConversation(ctx context.Context, 
 	if chatGPTWebRuntimeIsAPIKey(req) {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "chatgpt web reverse proxy requires OAuth/session/client-token runtime credentials"}
 	}
+
+	// Wiring #3: per-account image-generation concurrency cap. chatgpt2api
+	// gates this in account_service.get_available_access_token; we apply
+	// the same cap here whenever the request is flagged as image-gen.
+	slotKey := ""
+	if chatGPTWebRequestIsImageGeneration(req) {
+		slotKey = chatGPTWebImageSlotKey(req.Account.ID, credentialString(req.Credential, "access_token"))
+		if slotKey != "" {
+			cap := chatGPTWebAccountConcurrencyCap(req)
+			if err := chatGPTWebImageSlotLimiter().Acquire(ctx, slotKey, cap); err != nil {
+				return contract.ConversationResponse{}, contract.ProviderError{Class: "rate_limited", StatusCode: http.StatusTooManyRequests, Message: "chatgpt web image account at concurrency cap"}
+			}
+			defer chatGPTWebImageSlotLimiter().Release(slotKey)
+		}
+	}
+
 	path := chatGPTWebPath(req)
+	endpoint := chatGPTWebConversationEndpoint(baseURL, path)
+	proxyURL := chatGPTWebProxyURLForRequest(req)
+
 	headers, err := s.chatGPTWebConversationHeaders(ctx, req, baseURL, path)
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
-	raw, err := json.Marshal(chatGPTWebConversationPayload(req))
+
+	// Wiring #2: upload any binary InputPart and replace it with the
+	// asset_pointer; build a multimodal payload when uploads succeed.
+	rawPayload, err := s.chatGPTWebBuildConversationBody(ctx, req, baseURL, headers)
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
+
+	// Wiring #1: inject any cached CF clearance cookies on the outbound
+	// request. A miss is silent; the request proceeds normally and we'll
+	// detect a challenge on the response side.
+	account := chatGPTWebReverseProxyAccount(req)
+	applyClearanceHeaders(headers, &account, endpoint, proxyURL)
+
 	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
-		Account:      chatGPTWebReverseProxyAccount(req),
+		Account:      account,
 		Method:       http.MethodPost,
-		URL:          chatGPTWebConversationEndpoint(baseURL, path),
+		URL:          endpoint,
 		Headers:      headers,
-		Body:         raw,
+		Body:         rawPayload,
 		ExpectStream: true,
 	})
+
+	// Wiring #1 (continued): if the upstream returned a CF challenge,
+	// invalidate the cache, resolve a new bundle via the configured
+	// provider (FlareSolverr), and retry once. Matches chatgpt2api's
+	// reset_session_status_codes={403} policy. The reverse-proxy runtime
+	// returns the failure as a RuntimeError that carries the body in the
+	// message; we look there too because the response headers were
+	// consumed.
+	if challenge, statusCode, errBody := chatGPTWebDetectChallenge(runtimeResp, err); challenge {
+		host := httputil.HostFromURL(endpoint)
+		chatGPTWebClearanceCache().Invalidate(host, proxyURL)
+		ok, resolveErr := resolveAndCacheClearance(ctx, endpoint, proxyURL)
+		if ok {
+			applyClearanceHeaders(headers, &account, endpoint, proxyURL)
+			runtimeResp, err = s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+				Account:      account,
+				Method:       http.MethodPost,
+				URL:          endpoint,
+				Headers:      headers,
+				Body:         rawPayload,
+				ExpectStream: true,
+			})
+		} else if resolveErr != nil {
+			// Provider unconfigured: surface a clear configuration error to
+			// the operator so they know to either disable the upstream or
+			// stand up a FlareSolverr container.
+			_ = statusCode
+			return contract.ConversationResponse{}, contract.ProviderError{
+				Class:      "challenge_required",
+				StatusCode: http.StatusForbidden,
+				Message:    "chatgpt web cloudflare challenge; configure FLARESOLVERR_URL to auto-resolve: " + resolveErr.Error() + httputil.FormatCloudflareChallengeMessage("", nil, errBody),
+			}
+		}
+	}
 	if err != nil {
 		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
+
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
+
+	// Wiring #4: record SSE / WS fallback metrics + surface a debug
+	// header so ops can grep for fallback occurrences.
+	outcome := ChatGPTWebWSFallbackInspect(runtimeResp.Body)
 	parsed, err := parseChatGPTWebConversationBody(runtimeResp.Body, runtimeResp.StatusCode)
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
-	return withConversationResponseHeaders(parsed, runtimeResp.Headers), nil
+	resp := withConversationResponseHeaders(parsed, runtimeResp.Headers)
+	if hv := chatGPTWebWSFallbackHeaderValue(outcome); hv != "" {
+		if resp.Headers == nil {
+			resp.Headers = http.Header{}
+		}
+		resp.Headers.Set(ChatGPTWebWSFallbackResponseHeader, hv)
+	}
+	return resp, nil
+}
+
+// chatGPTWebDetectChallenge inspects both a successful runtime response
+// (rare for CF) and the error returned by Do when classifyRuntimeError
+// consumed the body. Returns (true, status, body) when a CF challenge is
+// indicated. chatgpt2api uses reset_session_status_codes=(403,) so we
+// match 403 and 429 (CF's two challenge codes).
+func chatGPTWebDetectChallenge(resp reverseproxycontract.Response, err error) (bool, int, []byte) {
+	if err != nil {
+		var rerr reverseproxycontract.RuntimeError
+		if errors.As(err, &rerr) {
+			body := []byte(rerr.Message)
+			if httputil.IsCloudflareChallengeResponse(rerr.StatusCode, nil, body) {
+				return true, rerr.StatusCode, body
+			}
+		}
+		return false, 0, nil
+	}
+	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
+		if httputil.IsCloudflareChallengeResponse(resp.StatusCode, resp.Headers, resp.Body) {
+			return true, resp.StatusCode, resp.Body
+		}
+	}
+	return false, 0, nil
+}
+
+// chatGPTWebBuildConversationBody is the payload builder that consults the
+// file-upload helper (Wiring #2) for any binary InputParts before falling
+// back to the text-only payload.
+func (s *Service) chatGPTWebBuildConversationBody(ctx context.Context, req contract.ConversationRequest, baseURL string, headers http.Header) ([]byte, error) {
+	uploadedParts, attachments := s.chatGPTWebUploadInputParts(ctx, req, baseURL, headers)
+	if len(uploadedParts) > 0 {
+		return chatGPTWebMultimodalPayloadBytes(req, uploadedParts, attachments)
+	}
+	return json.Marshal(chatGPTWebConversationPayload(req))
+}
+
+// chatGPTWebUploadInputParts walks req.InputParts and the parts of each
+// req.Messages entry, uploads any image content with a non-empty
+// MediaBase64 / MediaURL pointing at a data: URI, and returns the resulting
+// multimodal parts + attachments arrays.
+//
+// Errors are swallowed (best-effort): if an upload fails the part is
+// dropped and we fall back to the text-only payload. The chatgpt2api
+// behaviour is to raise; we choose graceful degradation here so a transient
+// upload failure doesn't break the entire conversation. Operators get a
+// metric (chatgpt_web_uploads counter is not yet wired) but the request
+// proceeds.
+func (s *Service) chatGPTWebUploadInputParts(ctx context.Context, req contract.ConversationRequest, baseURL string, headers http.Header) ([]map[string]any, []map[string]any) {
+	binaries := chatGPTWebCollectBinaryInputs(req)
+	if len(binaries) == 0 {
+		return nil, nil
+	}
+	uploader := newChatGPTWebFileUploader(s.reverseProxy)
+	sess := ChatGPTWebUploadSession{
+		Account:   chatGPTWebReverseProxyAccount(req),
+		BaseURL:   strings.TrimRight(baseURL, "/"),
+		Origin:    chatGPTWebOrigin(baseURL),
+		UserAgent: chatGPTWebUserAgent(req),
+		Headers:   headers,
+	}
+	parts := make([]map[string]any, 0, len(binaries))
+	attachments := make([]map[string]any, 0, len(binaries))
+	for _, bin := range binaries {
+		asset, err := uploader.uploadImage(ctx, sess, bin.body, bin.mime, bin.name)
+		if err != nil || asset == nil {
+			continue
+		}
+		if part := chatGPTWebAssetPointerPart(asset); part != nil {
+			parts = append(parts, part)
+		}
+		if att := chatGPTWebAttachmentEntry(asset); att != nil {
+			attachments = append(attachments, att)
+		}
+	}
+	return parts, attachments
+}
+
+type chatGPTWebBinaryInput struct {
+	body []byte
+	mime string
+	name string
+}
+
+// chatGPTWebCollectBinaryInputs gathers the binary content parts we know
+// how to upload. Only image parts with MediaBase64 are uploaded today —
+// chatgpt2api supports data URIs + filesystem paths; the gateway only
+// receives base64-bound traffic.
+func chatGPTWebCollectBinaryInputs(req contract.ConversationRequest) []chatGPTWebBinaryInput {
+	out := make([]chatGPTWebBinaryInput, 0)
+	collect := func(parts []contract.ContentPart) {
+		for _, part := range parts {
+			if part.Kind != contract.ContentPartImage {
+				continue
+			}
+			if data, mime, ok := decodeBase64MediaPart(part); ok {
+				out = append(out, chatGPTWebBinaryInput{body: data, mime: mime, name: ""})
+			}
+		}
+	}
+	collect(req.InputParts)
+	for _, msg := range req.Messages {
+		collect(msg.Parts)
+	}
+	return out
+}
+
+// decodeBase64MediaPart pulls the bytes out of a base64-encoded
+// MediaBase64 (or a data: URI in MediaURL). Returns ok=false when the part
+// has no decodable bytes.
+func decodeBase64MediaPart(part contract.ContentPart) ([]byte, string, bool) {
+	mime := strings.TrimSpace(part.MIMEType)
+	if data := strings.TrimSpace(part.MediaBase64); data != "" {
+		decoded, err := base64.StdEncoding.DecodeString(data)
+		if err != nil {
+			return nil, "", false
+		}
+		return decoded, mime, true
+	}
+	if u := strings.TrimSpace(part.MediaURL); strings.HasPrefix(u, "data:") {
+		idx := strings.Index(u, ",")
+		if idx < 0 {
+			return nil, "", false
+		}
+		header := u[5:idx]
+		payload := u[idx+1:]
+		if semi := strings.Index(header, ";"); semi >= 0 {
+			mime = header[:semi]
+		} else if header != "" {
+			mime = header
+		}
+		decoded, err := base64.StdEncoding.DecodeString(payload)
+		if err != nil {
+			return nil, "", false
+		}
+		return decoded, mime, true
+	}
+	return nil, "", false
+}
+
+// chatGPTWebMultimodalPayloadBytes constructs the chatgpt2api-shaped
+// multimodal payload (parts = [<asset_pointer>..., "<prompt text>"]).
+func chatGPTWebMultimodalPayloadBytes(req contract.ConversationRequest, assetParts []map[string]any, attachments []map[string]any) ([]byte, error) {
+	base := chatGPTWebConversationPayload(req)
+	prompt := chatGPTWebMultimodalPrompt(req)
+	parts := make([]any, 0, len(assetParts)+1)
+	for _, p := range assetParts {
+		parts = append(parts, p)
+	}
+	parts = append(parts, prompt)
+	content := map[string]any{
+		"content_type": "multimodal_text",
+		"parts":        parts,
+	}
+	metadata := map[string]any{
+		"system_hints": []string{"picture_v2"},
+		"serialization_metadata": map[string]any{
+			"custom_symbol_offsets": []any{},
+		},
+	}
+	if len(attachments) > 0 {
+		metadata["attachments"] = attachments
+	}
+	userMessage := map[string]any{
+		"id":      chatGPTWebStableID(req, "multimodal-user"),
+		"author":  map[string]any{"role": "user"},
+		"content": content,
+		"metadata": metadata,
+	}
+	// Marshal base then merge: keeps every chatgpt_web payload field we
+	// already set (timezone, conversation_mode, etc.) and only swaps the
+	// `messages` array for the multimodal user message.
+	raw, err := json.Marshal(base)
+	if err != nil {
+		return nil, err
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, err
+	}
+	payload["messages"] = []any{userMessage}
+	return json.Marshal(payload)
+}
+
+func chatGPTWebMultimodalPrompt(req contract.ConversationRequest) string {
+	prompt := conversationPrompt(req)
+	if prompt == "" {
+		prompt = strings.TrimSpace(req.Instructions)
+	}
+	return prompt
 }
 
 func chatGPTWebConversationPayload(req contract.ConversationRequest) chatGPTWebConversationRequest {

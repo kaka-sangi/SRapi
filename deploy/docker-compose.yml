@@ -176,6 +176,22 @@ services:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager_data:/alertmanager
 
+  # FlareSolverr — automated Cloudflare clearance for the ChatGPT-web
+  # reverse-proxy pathway. Disabled by default (profile "cf-clearance");
+  # enable with `--profile cf-clearance` and point the api container at
+  # FLARESOLVERR_URL=http://flaresolverr:8191/v1. Optional FLARESOLVERR_TIMEOUT
+  # (seconds; default 60) and FLARESOLVERR_SESSION_TTL (seconds; cache window
+  # for resolved bundles) override the defaults.
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    profiles: ["cf-clearance"]
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=info
+      - TZ=UTC
+    ports:
+      - "${FLARESOLVERR_PORT:-8191}:8191"
+
 volumes:
   postgres_data:
   redis_data:

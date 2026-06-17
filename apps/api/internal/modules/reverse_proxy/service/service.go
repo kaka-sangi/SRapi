@@ -739,7 +739,7 @@ func forbiddenHeader(key string, values []string, opts ...sanitizeHeaderOptions)
 func injectAuth(headers http.Header, account contract.AccountRuntime) {
 	switch account.RuntimeClass {
 	case "api_key":
-		return
+		// fall through to clearance injection
 	case "cli_client_token":
 		if token := firstCredentialString(account.Credential, "cli_client_token", "cli_token", "device_token", "access_token"); token != "" {
 			headers.Set("Authorization", "Bearer "+token)
@@ -752,6 +752,24 @@ func injectAuth(headers http.Header, account contract.AccountRuntime) {
 		headers.Del("Authorization")
 		if cookie := credentialString(account.Credential, "cookie"); cookie != "" {
 			headers.Set("Cookie", cookie)
+		}
+	}
+	// Cloudflare clearance cookie + UA. The clearance helper stuffs these
+	// into the per-account credential map under "cf_clearance_cookie" and
+	// "cf_clearance_user_agent" so they survive the caller-header sanitiser
+	// (which strips Cookie + User-Agent). When present they are merged
+	// (existing Cookie/UA on the request takes precedence).
+	if cookie := credentialString(account.Credential, "cf_clearance_cookie"); cookie != "" {
+		existing := strings.TrimSpace(headers.Get("Cookie"))
+		if existing == "" {
+			headers.Set("Cookie", cookie)
+		} else if !strings.Contains(existing, "cf_clearance=") {
+			headers.Set("Cookie", existing+"; "+cookie)
+		}
+	}
+	if ua := credentialString(account.Credential, "cf_clearance_user_agent"); ua != "" {
+		if strings.TrimSpace(headers.Get("User-Agent")) == "" {
+			headers.Set("User-Agent", ua)
 		}
 	}
 }
