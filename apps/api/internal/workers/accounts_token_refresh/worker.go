@@ -85,6 +85,48 @@ type Worker struct {
 	mu     sync.Mutex
 	cancel context.CancelFunc
 	done   chan struct{}
+
+	metricsMu sync.Mutex
+	metrics   MetricsSnapshot
+}
+
+// MetricsSnapshot is the prometheus-friendly counter set exported by the
+// worker. RefreshAttempted increments once per attempted refresh
+// (regardless of outcome); the four outcome counters are mutually
+// exclusive and sum to RefreshAttempted.
+type MetricsSnapshot struct {
+	RefreshAttempted         int
+	RefreshSucceeded         int
+	RefreshFailedPermanent   int
+	RefreshFailedTransient   int
+	RefreshThresholdExceeded int
+}
+
+// Metrics returns a copy of the current counter snapshot so the runtime
+// metrics collector can render it without holding the worker lock.
+func (w *Worker) Metrics() MetricsSnapshot {
+	if w == nil {
+		return MetricsSnapshot{}
+	}
+	w.metricsMu.Lock()
+	defer w.metricsMu.Unlock()
+	return w.metrics
+}
+
+func (w *Worker) recordOutcome(class accountservice.RefreshOutcomeClass) {
+	w.metricsMu.Lock()
+	defer w.metricsMu.Unlock()
+	w.metrics.RefreshAttempted++
+	switch class {
+	case accountservice.RefreshOutcomeSuccess:
+		w.metrics.RefreshSucceeded++
+	case accountservice.RefreshOutcomePermanentError:
+		w.metrics.RefreshFailedPermanent++
+	case accountservice.RefreshOutcomeThresholdExceeded:
+		w.metrics.RefreshThresholdExceeded++
+	default:
+		w.metrics.RefreshFailedTransient++
+	}
 }
 
 // New constructs the worker. accounts is required; refresher defaults to a
@@ -278,7 +320,9 @@ func (w *Worker) refreshPass(ctx context.Context) (Result, error) {
 			defer func() { <-sem }()
 			refreshCtx, cancel := context.WithTimeout(ctx, w.timeout)
 			defer cancel()
-			if _, err := w.accounts.RefreshAccessToken(refreshCtx, account.ID, adapter); err != nil {
+			outcome, err := w.accounts.RefreshAccessTokenWithOutcome(refreshCtx, account.ID, adapter)
+			w.recordOutcome(outcome.Class)
+			if err != nil {
 				mu.Lock()
 				result.Failed++
 				firstErr = errors.Join(firstErr, fmt.Errorf("account %d: %w", account.ID, err))

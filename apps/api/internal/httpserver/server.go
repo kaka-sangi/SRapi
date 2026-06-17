@@ -80,6 +80,34 @@ type backupSnapshotsTrigger interface {
 	RunOnceTriggered(ctx context.Context, userID int) (int, error)
 }
 
+// ProxyProbeMetricsSnapshot mirrors the proxy_probe worker's MetricsSnapshot
+// so /metrics can render the counters without importing the worker package
+// (which would invert the dependency direction). Populate via
+// WithProxyProbeMetricsProvider.
+type ProxyProbeMetricsSnapshot struct {
+	ProbeAttempted int
+	ProbeSucceeded int
+	ProbeFailed    int
+}
+
+// TokenRefreshMetricsSnapshot mirrors the accounts_token_refresh worker's
+// MetricsSnapshot for the same reason as ProxyProbeMetricsSnapshot.
+type TokenRefreshMetricsSnapshot struct {
+	RefreshAttempted         int
+	RefreshSucceeded         int
+	RefreshFailedPermanent   int
+	RefreshFailedTransient   int
+	RefreshThresholdExceeded int
+}
+
+// ProxyProbeMetricsProvider returns the current proxy_probe counter
+// snapshot. Called once per /metrics scrape.
+type ProxyProbeMetricsProvider func() ProxyProbeMetricsSnapshot
+
+// TokenRefreshMetricsProvider returns the current accounts_token_refresh
+// counter snapshot. Called once per /metrics scrape.
+type TokenRefreshMetricsProvider func() TokenRefreshMetricsSnapshot
+
 // usageAggregator applies the cross-table billing aggregation (subscription
 // materialized usage + API-key cost usage) for a usage_log row exactly once,
 // gated by usage_log.aggregated_at. The gateway applies it eagerly off the hot
@@ -132,6 +160,8 @@ type runtimeOptions struct {
 	metrics             *runtimeMetricsState
 	backgroundDrainSink *func(context.Context)
 	usageAggregator     usageAggregator
+	proxyProbeMetrics   ProxyProbeMetricsProvider
+	tokenRefreshMetrics TokenRefreshMetricsProvider
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -211,6 +241,23 @@ func WithBackupSnapshotsStore(store backupsnapcontract.Store) Option {
 func WithBackupSnapshotsTrigger(trigger backupSnapshotsTrigger) Option {
 	return func(opts *runtimeOptions) {
 		opts.backupSnapshotsTrigger = trigger
+	}
+}
+
+// WithProxyProbeMetricsProvider wires the proxy_probe worker's counter
+// snapshot into /metrics. Optional; without it the per-worker counters
+// are absent from the scrape output but everything else still works.
+func WithProxyProbeMetricsProvider(provider ProxyProbeMetricsProvider) Option {
+	return func(opts *runtimeOptions) {
+		opts.proxyProbeMetrics = provider
+	}
+}
+
+// WithTokenRefreshMetricsProvider does the same for the
+// accounts_token_refresh worker.
+func WithTokenRefreshMetricsProvider(provider TokenRefreshMetricsProvider) Option {
+	return func(opts *runtimeOptions) {
+		opts.tokenRefreshMetrics = provider
 	}
 }
 

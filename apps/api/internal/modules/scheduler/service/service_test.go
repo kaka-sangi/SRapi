@@ -46,7 +46,7 @@ func TestScheduleRejectsRuntimeLimitAndCapabilityFailures(t *testing.T) {
 	assertRejectReason(t, result.Decision.RejectReasons, 1, "concurrency_full")
 	assertRejectReason(t, result.Decision.RejectReasons, 2, "rpm_limit_exceeded")
 	assertRejectReason(t, result.Decision.RejectReasons, 3, "tpm_limit_exceeded")
-	assertRejectReason(t, result.Decision.RejectReasons, 4, "capability_mismatch")
+	assertRejectReason(t, result.Decision.RejectReasons, 4, "capability_mismatch:"+capabilitiescontract.KeyToolCalling)
 	if result.Decision.RejectedCount != 4 || result.Decision.CandidateCount != 5 {
 		t.Fatalf("unexpected decision counts: %+v", result.Decision)
 	}

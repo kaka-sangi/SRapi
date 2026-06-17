@@ -1061,7 +1061,15 @@ func rejectReason(candidate contract.Candidate, req contract.ScheduleRequest) st
 	if candidate.Account.ProviderID != candidate.Provider.ID || candidate.Mapping.ProviderID != candidate.Provider.ID {
 		return "model_not_supported"
 	}
-	if requestCapabilityMismatch(req.RequestCapabilities, candidate.EffectiveCapabilities) {
+	if mismatched, missingKey := requestCapabilityMismatch(req.RequestCapabilities, candidate.EffectiveCapabilities); mismatched {
+		// Embed the missing/unsupported capability key in the reject reason
+		// so the operator-visible aggregate ("20 rejected [capability_mismatch]")
+		// can show *which* capability flunked the gate. The OpenAPI enum still
+		// accepts the bare prefix "capability_mismatch" — anything after the
+		// colon is treated as free-form metadata by readers.
+		if missingKey != "" {
+			return "capability_mismatch:" + missingKey
+		}
 		return "capability_mismatch"
 	}
 	if strings.TrimSpace(candidate.Account.CredentialCiphertext) == "" {
@@ -1100,9 +1108,15 @@ func costWindowExceeded(limit *float64, used float64) bool {
 	return limit != nil && *limit > 0 && used >= *limit
 }
 
-func requestCapabilityMismatch(requested []capabilitiescontract.Descriptor, effective []capabilitiescontract.Descriptor) bool {
+// requestCapabilityMismatch returns (mismatched, missingKey). When
+// mismatched is true, missingKey is the first request capability that was
+// either absent from the candidate's EffectiveCapabilities or present at
+// Unsupported level — operators get "capability_mismatch:responses"
+// instead of an unspecific "capability_mismatch" when one of twenty
+// candidates is missing a single key.
+func requestCapabilityMismatch(requested []capabilitiescontract.Descriptor, effective []capabilitiescontract.Descriptor) (bool, string) {
 	if len(requested) == 0 {
-		return false
+		return false, ""
 	}
 	effectiveByKey := map[string]capabilitiescontract.Descriptor{}
 	for _, descriptor := range effective {
@@ -1119,15 +1133,16 @@ func requestCapabilityMismatch(requested []capabilitiescontract.Descriptor, effe
 		if descriptor.Level != capabilitiescontract.DescriptorLevelRequired {
 			continue
 		}
-		effectiveDescriptor, ok := effectiveByKey[strings.TrimSpace(descriptor.Key)]
+		key := strings.TrimSpace(descriptor.Key)
+		effectiveDescriptor, ok := effectiveByKey[key]
 		if !ok {
-			return true
+			return true, key
 		}
 		if effectiveDescriptor.Level == capabilitiescontract.DescriptorLevelUnsupported {
-			return true
+			return true, key
 		}
 	}
-	return false
+	return false, ""
 }
 
 func rejectAllCandidates(candidates []contract.Candidate, reason string) map[string]any {

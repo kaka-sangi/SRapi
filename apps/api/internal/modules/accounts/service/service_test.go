@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1379,3 +1380,59 @@ func TestBatchCreateAccountsRejectsInvalidDefaults(t *testing.T) {
 		t.Fatalf("bad runtime class should fail, got %v", err)
 	}
 }
+
+// TestRecordProxyProbeSerializesConcurrentCallsPerProxy is the regression
+// guard for the SQL-backend TOCTOU race in RecordProxyProbe: two probes for
+// the same proxy that both observe "no window reset needed" must both
+// increment the counter — not have one overwrite the other. Fires N
+// goroutines at the same proxy concurrently and asserts the final
+// success+failure tally equals N.
+func TestRecordProxyProbeSerializesConcurrentCallsPerProxy(t *testing.T) {
+	store := accountmemory.New()
+	clock := &stepClock{now: time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC)}
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", clock)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name: "race",
+		Type: contract.ProxyTypeHTTPS,
+		URL:  "https://proxy.example.invalid:443",
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+	const goroutines = 16
+	var wg syncwait
+	wg.Add(goroutines)
+	// Half successes, half failures, fired in parallel.
+	for i := 0; i < goroutines; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			ok := i%2 == 0
+			if _, err := svc.RecordProxyProbe(ctx, proxy.ID, ok, 100); err != nil {
+				t.Errorf("probe goroutine %d: %v", i, err)
+			}
+		}()
+	}
+	wg.Wait()
+	persisted, err := svc.FindProxyByID(ctx, proxy.ID)
+	if err != nil {
+		t.Fatalf("find proxy: %v", err)
+	}
+	if total := persisted.ProbeSuccessCount + persisted.ProbeFailureCount; total != goroutines {
+		t.Fatalf("expected success+failure=%d after concurrent probes, got %d (s=%d f=%d)",
+			goroutines, total, persisted.ProbeSuccessCount, persisted.ProbeFailureCount)
+	}
+	if persisted.ProbeSuccessCount != goroutines/2 || persisted.ProbeFailureCount != goroutines/2 {
+		t.Fatalf("expected %d success and %d failure, got s=%d f=%d",
+			goroutines/2, goroutines/2, persisted.ProbeSuccessCount, persisted.ProbeFailureCount)
+	}
+}
+
+// syncwait is a tiny alias for sync.WaitGroup used by the concurrent
+// regression test. Pulling sync into the existing imports rather than the
+// test helpers section keeps the test self-contained.
+type syncwait = sync.WaitGroup

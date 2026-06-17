@@ -1737,8 +1737,9 @@ func (s *Server) handleRefreshAdminAccount(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	adapter := adminAccountRefresherAdapter{refresher: s.runtime.reverseProxy}
-	updated, refreshErr := s.runtime.accounts.RefreshAccessToken(r.Context(), accountID, adapter)
-	auditOutcome := map[string]any{"ok": refreshErr == nil}
+	outcome, refreshErr := s.runtime.accounts.RefreshAccessTokenWithOutcome(r.Context(), accountID, adapter)
+	updated := outcome.Account
+	auditOutcome := map[string]any{"ok": refreshErr == nil, "class": string(outcome.Class), "attempts": outcome.Attempts, "needs_reauth_flipped": outcome.NeedsReauthFlipped}
 	if refreshErr != nil {
 		auditOutcome["error"] = refreshErr.Error()
 	}

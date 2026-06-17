@@ -38,6 +38,16 @@ type Service struct {
 	store     contract.Store
 	masterKey []byte
 	clock     Clock
+	// proxyLocks serializes the (FindProxyByID → mutate counters → UpdateProxy)
+	// sequence inside RecordProxyProbe per proxy id so two concurrent probes
+	// can't both observe the same "no reset needed" state and both write back,
+	// dropping one increment on the SQL backend. Keyed by proxy id; values are
+	// *sync.Mutex.
+	proxyLocks sync.Map
+	// refreshLocks does the same for RefreshAccessToken so the worker + the
+	// manual /admin/accounts/{id}/refresh endpoint can't race on the same
+	// account row. Keyed by account id; values are *sync.Mutex.
+	refreshLocks sync.Map
 }
 
 func New(store contract.Store, masterKey string, clock Clock) (*Service, error) {
@@ -396,6 +406,13 @@ func (s *Service) RecordProxyProbe(ctx context.Context, proxyID int, success boo
 	if proxyID <= 0 {
 		return contract.ProxyDefinition{}, ErrInvalidInput
 	}
+	// Serialize per-proxy so two concurrent probes (e.g. worker + admin "probe
+	// now") can't both observe the same counter snapshot and both write back,
+	// dropping one increment. The memory store has its own mutex; the SQL
+	// backend is vulnerable to this lost-update race.
+	lock := s.proxyLockFor(proxyID)
+	lock.Lock()
+	defer lock.Unlock()
 	proxy, err := s.store.FindProxyByID(ctx, proxyID)
 	if err != nil {
 		return contract.ProxyDefinition{}, err
@@ -424,6 +441,19 @@ func (s *Service) RecordProxyProbe(ctx context.Context, proxyID int, success boo
 	proxy.Metadata = metadata
 	proxy.UpdatedAt = now
 	return s.store.UpdateProxy(ctx, proxy)
+}
+
+// proxyLockFor returns a per-proxy mutex used to serialize the
+// FindProxyByID → mutate → UpdateProxy sequence in RecordProxyProbe.
+// Loaded lazily; stale entries are left in the map (low cardinality in
+// practice — one per proxy that has ever been probed).
+func (s *Service) proxyLockFor(proxyID int) *sync.Mutex {
+	if existing, ok := s.proxyLocks.Load(proxyID); ok {
+		return existing.(*sync.Mutex)
+	}
+	created := &sync.Mutex{}
+	actual, _ := s.proxyLocks.LoadOrStore(proxyID, created)
+	return actual.(*sync.Mutex)
 }
 
 // normalizeCountryCode trims and uppercases the operator-supplied country

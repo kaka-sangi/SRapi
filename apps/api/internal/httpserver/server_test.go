@@ -10843,24 +10843,35 @@ func jsonObjectContainsString(value apiopenapi.JsonObject, target string) bool {
 	for _, item := range value {
 		switch item := item.(type) {
 		case string:
-			if item == target {
+			if rejectionStringMatches(item, target) {
 				return true
 			}
 		case []any:
 			for _, nested := range item {
-				if nested == target {
+				if s, ok := nested.(string); ok && rejectionStringMatches(s, target) {
 					return true
 				}
 			}
 		case []string:
 			for _, nested := range item {
-				if nested == target {
+				if rejectionStringMatches(nested, target) {
 					return true
 				}
 			}
 		}
 	}
 	return false
+}
+
+// rejectionStringMatches matches an exact reject reason or accepts a
+// colon-suffix variant (e.g. "capability_mismatch:vision_input" matches
+// "capability_mismatch"). The colon-suffix carries the missing capability
+// key for operator observability without expanding the OpenAPI enum.
+func rejectionStringMatches(actual string, target string) bool {
+	if actual == target {
+		return true
+	}
+	return strings.HasPrefix(actual, target+":")
 }
 
 func intFromJSONValue(value any) int {
@@ -10887,6 +10898,9 @@ func intFromJSONValue(value any) int {
 
 func rejectionReasonsContain(value apiopenapi.JsonObject, target string) bool {
 	for _, item := range value {
+		if s, ok := item.(string); ok && rejectionStringMatches(s, target) {
+			return true
+		}
 		if item == target {
 			return true
 		}

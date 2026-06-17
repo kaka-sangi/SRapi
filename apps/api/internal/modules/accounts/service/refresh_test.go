@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -198,6 +199,226 @@ func TestRefreshAccessTokenPermanentErrorFlipsReauthImmediately(t *testing.T) {
 	if updated.NeedsReauthAt == nil {
 		t.Fatalf("expected needs_reauth_at set immediately on permanent error")
 	}
+	// Assert the exact timestamp matches the service clock so an audit replay
+	// can correlate needs_reauth_at with the refresh attempt that flipped it,
+	// not just "some time near now".
+	if !updated.NeedsReauthAt.Equal(now) {
+		t.Fatalf("expected needs_reauth_at=%v, got %v", now, updated.NeedsReauthAt)
+	}
+}
+
+// TestIsPermanentRefreshErrorMatchesAllPatterns exercises every alternative
+// in permanentRefreshErrorRegex (the original test only covered
+// invalid_grant). Case-variation is folded into the table so a future
+// case-sensitive refactor would surface here.
+func TestIsPermanentRefreshErrorMatchesAllPatterns(t *testing.T) {
+	cases := []struct {
+		name    string
+		message string
+		want    bool
+	}{
+		{"invalid_grant_lower", "invalid_grant", true},
+		{"invalid_grant_mixed", "OAuth Invalid_Grant: refresh expired", true},
+		{"invalid_client", "invalid_client", true},
+		{"unauthorized_client", "ERROR unauthorized_client", true},
+		{"invalid_token", "session expired: invalid_token", true},
+		{"access_denied", "access_denied by upstream", true},
+		{"consent_required", "consent_required: re-grant", true},
+		{"login_required", "login_required after timeout", true},
+		{"transient_network", "network timeout reading body", false},
+		{"transient_5xx", "503 service unavailable", false},
+		{"transient_generic", "context deadline exceeded", false},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := isPermanentRefreshError(errors.New(tc.message))
+			if got != tc.want {
+				t.Fatalf("isPermanentRefreshError(%q) = %v, want %v", tc.message, got, tc.want)
+			}
+		})
+	}
+	if isPermanentRefreshError(nil) {
+		t.Fatalf("isPermanentRefreshError(nil) must return false")
+	}
+}
+
+// TestTruncateRefreshErrorCapsAtMaxLength guards the contract the admin row
+// depends on: a verbose upstream body cannot bloat the column. 600 chars in,
+// exactly maxRefreshErrorLength chars out.
+func TestTruncateRefreshErrorCapsAtMaxLength(t *testing.T) {
+	long := strings.Repeat("x", 600)
+	got := truncateRefreshError(long)
+	if len(got) != maxRefreshErrorLength {
+		t.Fatalf("expected truncated length %d, got %d", maxRefreshErrorLength, len(got))
+	}
+	if got != strings.Repeat("x", maxRefreshErrorLength) {
+		t.Fatalf("expected truncated string of %d x's, got %q", maxRefreshErrorLength, got)
+	}
+	short := "  oops  "
+	if truncateRefreshError(short) != "oops" {
+		t.Fatalf("expected trimmed short message, got %q", truncateRefreshError(short))
+	}
+}
+
+// TestRefreshAccessTokenSuccessClearsMetadataHints seeds the three transient
+// hint keys ShouldRefreshOAuthCredential reads and asserts they're cleared
+// after a successful refresh — otherwise the gateway flips the account
+// straight back into "needs refresh" on the next call.
+func TestRefreshAccessTokenSuccessClearsMetadataHints(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	svc, _ := newRefreshTestService(t, now)
+	account := newOAuthAccount(t, ctx, svc, now.Add(2*time.Minute))
+
+	// Seed the hint keys directly on the account row so the worker would
+	// otherwise see "needs to re-refresh" on the next pass.
+	account.Metadata = map[string]any{
+		"force_refresh":        true,
+		"access_token_expired": true,
+		"needs_reauth_reason":  "operator-marked",
+		"keep_this":            "ok",
+	}
+	if _, err := svc.store.Update(ctx, account); err != nil {
+		t.Fatalf("seed metadata hints: %v", err)
+	}
+
+	newExpiry := now.Add(45 * time.Minute)
+	refresher := &stubRefresher{credential: map[string]any{
+		"access_token":  "fresh",
+		"refresh_token": "fresh",
+		"expires_at":    newExpiry.Format(time.RFC3339),
+	}}
+	updated, err := svc.RefreshAccessToken(ctx, account.ID, refresher)
+	if err != nil {
+		t.Fatalf("RefreshAccessToken returned err: %v", err)
+	}
+	for _, key := range []string{"force_refresh", "access_token_expired", "needs_reauth_reason"} {
+		if _, present := updated.Metadata[key]; present {
+			t.Fatalf("expected metadata key %q cleared, still present in %+v", key, updated.Metadata)
+		}
+	}
+	if _, ok := updated.Metadata["keep_this"]; !ok {
+		t.Fatalf("expected unrelated metadata key %q preserved, got %+v", "keep_this", updated.Metadata)
+	}
+}
+
+// TestRefreshAccessTokenSerializesConcurrentCallsPerAccount fires N goroutines
+// at the same account concurrently and asserts the final RefreshAttempts
+// count equals N — i.e. no Find/Update race lost an increment. This regresses
+// the SQL-backend lost-update race the per-account mutex closes.
+func TestRefreshAccessTokenSerializesConcurrentCallsPerAccount(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	svc, _ := newRefreshTestService(t, now)
+	account := newOAuthAccount(t, ctx, svc, now.Add(2*time.Minute))
+
+	refresher := &stubRefresher{err: errors.New("transient upstream timeout")}
+	const goroutines = 8
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for i := 0; i < goroutines; i++ {
+		go func() {
+			defer wg.Done()
+			// Errors are expected (transient). We only care about the bookkeeping.
+			_, _ = svc.RefreshAccessToken(ctx, account.ID, refresher)
+		}()
+	}
+	wg.Wait()
+	persisted, err := svc.FindByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("find account: %v", err)
+	}
+	if persisted.RefreshAttempts != goroutines {
+		t.Fatalf("expected RefreshAttempts=%d after %d concurrent transient failures, got %d", goroutines, goroutines, persisted.RefreshAttempts)
+	}
+	if refresher.calls != goroutines {
+		t.Fatalf("expected refresher invoked %d times, got %d", goroutines, refresher.calls)
+	}
+	// Threshold-crossed flip happens once attempts >= refreshFailureThreshold,
+	// and with 8 attempts we should have a stable needs_reauth_at equal to now.
+	if persisted.NeedsReauthAt == nil || !persisted.NeedsReauthAt.Equal(now) {
+		t.Fatalf("expected needs_reauth_at=%v, got %v", now, persisted.NeedsReauthAt)
+	}
+}
+
+// TestRefreshAccessTokenWithOutcomeReturnsStructuredClass asserts the
+// outcome carries the right Class on each branch — the audit snapshot
+// downstream uses this to answer "WHY did needs_reauth fire?".
+func TestRefreshAccessTokenWithOutcomeReturnsStructuredClass(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		ctx := context.Background()
+		now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+		svc, _ := newRefreshTestService(t, now)
+		account := newOAuthAccount(t, ctx, svc, now.Add(2*time.Minute))
+		refresher := &stubRefresher{credential: map[string]any{
+			"access_token":  "ok",
+			"refresh_token": "ok",
+			"expires_at":    now.Add(30 * time.Minute).Format(time.RFC3339),
+		}}
+		outcome, err := svc.RefreshAccessTokenWithOutcome(ctx, account.ID, refresher)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if outcome.Class != RefreshOutcomeSuccess {
+			t.Fatalf("expected class=%s, got %s", RefreshOutcomeSuccess, outcome.Class)
+		}
+	})
+	t.Run("permanent_error", func(t *testing.T) {
+		ctx := context.Background()
+		now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+		svc, _ := newRefreshTestService(t, now)
+		account := newOAuthAccount(t, ctx, svc, now.Add(2*time.Minute))
+		refresher := &stubRefresher{err: errors.New("invalid_grant: revoked")}
+		outcome, err := svc.RefreshAccessTokenWithOutcome(ctx, account.ID, refresher)
+		if err == nil {
+			t.Fatalf("expected err")
+		}
+		if outcome.Class != RefreshOutcomePermanentError {
+			t.Fatalf("expected class=%s, got %s", RefreshOutcomePermanentError, outcome.Class)
+		}
+		if !outcome.NeedsReauthFlipped {
+			t.Fatalf("expected NeedsReauthFlipped=true on first permanent error")
+		}
+	})
+	t.Run("threshold_exceeded", func(t *testing.T) {
+		ctx := context.Background()
+		now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+		svc, _ := newRefreshTestService(t, now)
+		account := newOAuthAccount(t, ctx, svc, now.Add(2*time.Minute))
+		account.RefreshAttempts = refreshFailureThreshold - 1
+		if _, err := svc.store.Update(ctx, account); err != nil {
+			t.Fatalf("seed attempts: %v", err)
+		}
+		refresher := &stubRefresher{err: errors.New("503 upstream")}
+		outcome, err := svc.RefreshAccessTokenWithOutcome(ctx, account.ID, refresher)
+		if err == nil {
+			t.Fatalf("expected err")
+		}
+		if outcome.Class != RefreshOutcomeThresholdExceeded {
+			t.Fatalf("expected class=%s, got %s", RefreshOutcomeThresholdExceeded, outcome.Class)
+		}
+		if !outcome.NeedsReauthFlipped {
+			t.Fatalf("expected NeedsReauthFlipped=true after crossing threshold")
+		}
+	})
+	t.Run("transient_error", func(t *testing.T) {
+		ctx := context.Background()
+		now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+		svc, _ := newRefreshTestService(t, now)
+		account := newOAuthAccount(t, ctx, svc, now.Add(2*time.Minute))
+		refresher := &stubRefresher{err: errors.New("network timeout")}
+		outcome, err := svc.RefreshAccessTokenWithOutcome(ctx, account.ID, refresher)
+		if err == nil {
+			t.Fatalf("expected err")
+		}
+		if outcome.Class != RefreshOutcomeTransientError {
+			t.Fatalf("expected class=%s, got %s", RefreshOutcomeTransientError, outcome.Class)
+		}
+		if outcome.NeedsReauthFlipped {
+			t.Fatalf("expected NeedsReauthFlipped=false below threshold")
+		}
+	})
 }
 
 func TestRefreshAccessTokenSuccessAfterFailuresClearsState(t *testing.T) {

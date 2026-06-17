@@ -56,6 +56,10 @@ type Result struct {
 	Failed   int
 }
 
+// workerName is the slog "worker" field value used in every log line emitted
+// from this worker, to match the convention the other workers use.
+const workerName = "proxy_probe"
+
 // Worker periodically probes each active proxy and folds the outcome into the
 // proxy's rolling counters via accounts.RecordProxyProbe.
 type Worker struct {
@@ -70,6 +74,40 @@ type Worker struct {
 	mu     sync.Mutex
 	cancel context.CancelFunc
 	done   chan struct{}
+
+	metricsMu sync.Mutex
+	metrics   MetricsSnapshot
+}
+
+// MetricsSnapshot is the prometheus-friendly counter set exported by the
+// worker. ProbeAttempted increments once per attempted probe (regardless of
+// outcome); ProbeSucceeded + ProbeFailed sum to ProbeAttempted.
+type MetricsSnapshot struct {
+	ProbeAttempted int
+	ProbeSucceeded int
+	ProbeFailed    int
+}
+
+// Metrics returns a copy of the current counter snapshot so the runtime
+// metrics collector can render it without holding the worker lock.
+func (w *Worker) Metrics() MetricsSnapshot {
+	if w == nil {
+		return MetricsSnapshot{}
+	}
+	w.metricsMu.Lock()
+	defer w.metricsMu.Unlock()
+	return w.metrics
+}
+
+func (w *Worker) recordOutcome(ok bool) {
+	w.metricsMu.Lock()
+	defer w.metricsMu.Unlock()
+	w.metrics.ProbeAttempted++
+	if ok {
+		w.metrics.ProbeSucceeded++
+	} else {
+		w.metrics.ProbeFailed++
+	}
 }
 
 // New wires the worker from a raw accounts store. Returns nil, nil when
@@ -125,7 +163,7 @@ func (w *Worker) Start(parent context.Context) {
 		defer close(done)
 		defer func() {
 			if r := recover(); r != nil {
-				w.logger.Error("worker panicked; goroutine stopped", "worker", "proxy_probe", "panic", r, "stack", string(debug.Stack()))
+				w.logger.Error("worker panicked; goroutine stopped", "worker", workerName, "panic", r, "stack", string(debug.Stack()))
 			}
 		}()
 		w.run(ctx)
@@ -174,7 +212,7 @@ func (w *Worker) RunOnce(ctx context.Context) (Result, error) {
 		return Result{}, nil
 	}
 	var result Result
-	_, err := runonceguard.Run(ctx, w.guard, "proxy_probe", func(runCtx context.Context) error {
+	_, err := runonceguard.Run(ctx, w.guard, workerName, func(runCtx context.Context) error {
 		var runErr error
 		result, runErr = w.probePass(runCtx)
 		return runErr
@@ -199,11 +237,12 @@ func (w *Worker) run(ctx context.Context) {
 func (w *Worker) runAndLog(ctx context.Context) {
 	result, err := w.RunOnce(ctx)
 	if err != nil && !errors.Is(err, context.Canceled) {
-		w.logger.Warn("scheduled proxy probe failed", "error", err)
+		w.logger.Warn("scheduled proxy probe failed", "worker", workerName, "error", err)
 	}
 	if result.Probed > 0 || result.Failed > 0 {
 		w.logger.Debug(
 			"scheduled proxy probe completed",
+			"worker", workerName,
 			"selected", result.Selected,
 			"probed", result.Probed,
 			"skipped", result.Skipped,
@@ -235,7 +274,7 @@ func (w *Worker) probePass(ctx context.Context) (Result, error) {
 			defer wg.Done()
 			defer func() {
 				if r := recover(); r != nil {
-					w.logger.Error("worker panicked; goroutine stopped", "worker", "proxy_probe", "proxy_id", proxy.ID, "panic", r, "stack", string(debug.Stack()))
+					w.logger.Error("worker panicked; goroutine stopped", "worker", workerName, "proxy_id", proxy.ID, "panic", r, "stack", string(debug.Stack()))
 				}
 			}()
 			select {
@@ -245,8 +284,9 @@ func (w *Worker) probePass(ctx context.Context) (Result, error) {
 			}
 			defer func() { <-sem }()
 			ok, latency := w.probeOne(ctx, proxy)
+			w.recordOutcome(ok)
 			if _, err := w.accounts.RecordProxyProbe(ctx, proxy.ID, ok, latency); err != nil && !errors.Is(err, context.Canceled) {
-				w.logger.Debug("record proxy probe failed", "proxy_id", proxy.ID, "error", err)
+				w.logger.Debug("record proxy probe failed", "worker", workerName, "proxy_id", proxy.ID, "error", err)
 			}
 			mu.Lock()
 			defer mu.Unlock()

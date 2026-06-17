@@ -257,6 +257,13 @@ type runtimeState struct {
 	// (backpressure) rather than dropping billing data. usageWG tracks the
 	// outstanding async writes so graceful shutdown can drain them before the DB
 	// connection closes.
+	// proxyProbeMetrics + tokenRefreshMetrics return the latest worker counter
+	// snapshots so /metrics can render them. Nil when the worker is disabled or
+	// the test runtime doesn't bother wiring them; the collector treats nil as
+	// "emit nothing".
+	proxyProbeMetrics   ProxyProbeMetricsProvider
+	tokenRefreshMetrics TokenRefreshMetricsProvider
+
 	usageSem chan struct{}
 	usageWG  sync.WaitGroup
 	// usageMu guards usageDraining. Dispatch takes the read lock around its
@@ -996,8 +1003,10 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 			MaxEntries: 512,
 			DefaultTTL: 30 * time.Second,
 		}),
-		eventHub:        eventsub.NewHub(),
-		usageAggregator: opts.usageAggregator,
+		eventHub:            eventsub.NewHub(),
+		usageAggregator:     opts.usageAggregator,
+		proxyProbeMetrics:   opts.proxyProbeMetrics,
+		tokenRefreshMetrics: opts.tokenRefreshMetrics,
 	}
 }
 

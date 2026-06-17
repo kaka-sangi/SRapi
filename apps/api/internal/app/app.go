@@ -401,6 +401,32 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		if backup != nil {
 			options = append(options, httpserver.WithBackupSnapshotsTrigger(backup))
 		}
+		if proxyProbe != nil {
+			// Capture the worker pointer so /metrics can pull the latest counter
+			// snapshot without the httpserver package having to import workers.
+			worker := proxyProbe
+			options = append(options, httpserver.WithProxyProbeMetricsProvider(func() httpserver.ProxyProbeMetricsSnapshot {
+				snapshot := worker.Metrics()
+				return httpserver.ProxyProbeMetricsSnapshot{
+					ProbeAttempted: snapshot.ProbeAttempted,
+					ProbeSucceeded: snapshot.ProbeSucceeded,
+					ProbeFailed:    snapshot.ProbeFailed,
+				}
+			}))
+		}
+		if tokenRefresh != nil {
+			worker := tokenRefresh
+			options = append(options, httpserver.WithTokenRefreshMetricsProvider(func() httpserver.TokenRefreshMetricsSnapshot {
+				snapshot := worker.Metrics()
+				return httpserver.TokenRefreshMetricsSnapshot{
+					RefreshAttempted:         snapshot.RefreshAttempted,
+					RefreshSucceeded:         snapshot.RefreshSucceeded,
+					RefreshFailedPermanent:   snapshot.RefreshFailedPermanent,
+					RefreshFailedTransient:   snapshot.RefreshFailedTransient,
+					RefreshThresholdExceeded: snapshot.RefreshThresholdExceeded,
+				}
+			}))
+		}
 		if stores.UsageBilling != nil {
 			options = append(options, httpserver.WithUsageAggregator(stores.UsageBilling))
 		}

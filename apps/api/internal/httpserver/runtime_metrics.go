@@ -62,6 +62,10 @@ type runtimeMetricDescs struct {
 	reverseProxyAccountLocked     *prometheus.Desc
 	reverseProxyAccountBanned     *prometheus.Desc
 	reverseProxyOAuthRefreshes    *prometheus.Desc
+	proxyProbeAttempts            *prometheus.Desc
+	proxyProbeOutcomes            *prometheus.Desc
+	accountsTokenRefreshAttempts  *prometheus.Desc
+	accountsTokenRefreshOutcomes  *prometheus.Desc
 }
 
 func newRuntimeMetricsCollector(ctx context.Context, rt *runtimeState) *runtimeMetricsCollector {
@@ -228,6 +232,30 @@ func newRuntimeMetricsCollector(ctx context.Context, rt *runtimeState) *runtimeM
 				[]string{"status"},
 				nil,
 			),
+			proxyProbeAttempts: prometheus.NewDesc(
+				"srapi_proxy_probe_attempts_total",
+				"Proxy probe attempts emitted by the proxy_probe worker.",
+				nil,
+				nil,
+			),
+			proxyProbeOutcomes: prometheus.NewDesc(
+				"srapi_proxy_probe_outcomes_total",
+				"Proxy probe outcomes (succeeded/failed) emitted by the proxy_probe worker.",
+				[]string{"outcome"},
+				nil,
+			),
+			accountsTokenRefreshAttempts: prometheus.NewDesc(
+				"srapi_accounts_token_refresh_attempts_total",
+				"OAuth token refresh attempts emitted by the accounts_token_refresh worker.",
+				nil,
+				nil,
+			),
+			accountsTokenRefreshOutcomes: prometheus.NewDesc(
+				"srapi_accounts_token_refresh_outcomes_total",
+				"OAuth token refresh outcomes by class emitted by the accounts_token_refresh worker.",
+				[]string{"outcome"},
+				nil,
+			),
 		},
 	}
 }
@@ -269,6 +297,10 @@ func (d runtimeMetricDescs) all() []*prometheus.Desc {
 		d.reverseProxyAccountLocked,
 		d.reverseProxyAccountBanned,
 		d.reverseProxyOAuthRefreshes,
+		d.proxyProbeAttempts,
+		d.proxyProbeOutcomes,
+		d.accountsTokenRefreshAttempts,
+		d.accountsTokenRefreshOutcomes,
 	}
 }
 
@@ -285,7 +317,25 @@ func (c *runtimeMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 	c.collectReverseProxyMetrics(ch, emitted)
 	c.collectOpsAlertMetrics(ch, emitted)
 	c.collectProviderProbeMetrics(ch, emitted)
+	c.collectWorkerMetrics(ch, emitted)
 	c.collectBaselineMetrics(ch, emitted)
+}
+
+func (c *runtimeMetricsCollector) collectWorkerMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {
+	if c.rt.proxyProbeMetrics != nil {
+		snapshot := c.rt.proxyProbeMetrics()
+		emitConstMetric(ch, emitted, "srapi_proxy_probe_attempts_total", c.descs.proxyProbeAttempts, prometheus.CounterValue, float64(snapshot.ProbeAttempted))
+		emitConstMetric(ch, emitted, "srapi_proxy_probe_outcomes_total", c.descs.proxyProbeOutcomes, prometheus.CounterValue, float64(snapshot.ProbeSucceeded), "succeeded")
+		emitConstMetric(ch, emitted, "srapi_proxy_probe_outcomes_total", c.descs.proxyProbeOutcomes, prometheus.CounterValue, float64(snapshot.ProbeFailed), "failed")
+	}
+	if c.rt.tokenRefreshMetrics != nil {
+		snapshot := c.rt.tokenRefreshMetrics()
+		emitConstMetric(ch, emitted, "srapi_accounts_token_refresh_attempts_total", c.descs.accountsTokenRefreshAttempts, prometheus.CounterValue, float64(snapshot.RefreshAttempted))
+		emitConstMetric(ch, emitted, "srapi_accounts_token_refresh_outcomes_total", c.descs.accountsTokenRefreshOutcomes, prometheus.CounterValue, float64(snapshot.RefreshSucceeded), "succeeded")
+		emitConstMetric(ch, emitted, "srapi_accounts_token_refresh_outcomes_total", c.descs.accountsTokenRefreshOutcomes, prometheus.CounterValue, float64(snapshot.RefreshFailedPermanent), "failed_permanent")
+		emitConstMetric(ch, emitted, "srapi_accounts_token_refresh_outcomes_total", c.descs.accountsTokenRefreshOutcomes, prometheus.CounterValue, float64(snapshot.RefreshFailedTransient), "failed_transient")
+		emitConstMetric(ch, emitted, "srapi_accounts_token_refresh_outcomes_total", c.descs.accountsTokenRefreshOutcomes, prometheus.CounterValue, float64(snapshot.RefreshThresholdExceeded), "threshold_exceeded")
+	}
 }
 
 func (c *runtimeMetricsCollector) collectUsageMetrics(ch chan<- prometheus.Metric, emitted map[string]bool, snapshot runtimeMetricsSnapshot) {
