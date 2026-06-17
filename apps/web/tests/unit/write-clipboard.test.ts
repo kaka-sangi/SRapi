@@ -26,7 +26,6 @@ describe("writeClipboard", () => {
     vi.restoreAllMocks();
     // happy-dom carries clipboard state across tests if not reset.
     if ("clipboard" in navigator) {
-      // @ts-expect-error — delete the test stub between cases.
       delete (navigator as { clipboard?: unknown }).clipboard;
     }
   });

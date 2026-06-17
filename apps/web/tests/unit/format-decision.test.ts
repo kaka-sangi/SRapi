@@ -17,15 +17,23 @@ function baseDecision(
   overrides?: Partial<SchedulerDecisionSummary>,
 ): SchedulerDecisionSummary {
   return {
+    created_at: "2026-01-01T00:00:00Z",
     request_id: "req-1",
     model: "gpt-5",
+    source_endpoint: "/v1/chat/completions",
     candidate_count: 3,
+    selected_account_id: "acct-id-a",
     selected_account_name: "acct-a",
+    rejected_count: 0,
     rejected_reasons: [],
     scores: [],
+    warnings: [],
+    logs: [],
     ...overrides,
   };
 }
+
+const SCORE_DEFAULTS = { latency: 0, cost: 0, quota: 0 };
 
 describe("decisionToLines", () => {
   it("emits exactly 5 numbered lines for a minimal decision (no rejections, no scores)", () => {
@@ -62,7 +70,7 @@ describe("decisionToLines", () => {
       baseDecision({
         selected_account_name: "acct-a",
         scores: [
-          { account: "acct-a", score: 0.875 },
+          { account: "acct-a", score: 0.875, ...SCORE_DEFAULTS },
         ],
       }),
     );
@@ -71,12 +79,12 @@ describe("decisionToLines", () => {
 
   it("appends up to 4 score detail rows below the selected line", () => {
     const scores = [
-      { account: "a", score: 0.9 },
-      { account: "b", score: 0.8 },
-      { account: "c", score: 0.7 },
-      { account: "d", score: 0.6 },
-      { account: "e", score: 0.5 },
-      { account: "f", score: 0.4 },
+      { account: "a", score: 0.9, ...SCORE_DEFAULTS },
+      { account: "b", score: 0.8, ...SCORE_DEFAULTS },
+      { account: "c", score: 0.7, ...SCORE_DEFAULTS },
+      { account: "d", score: 0.6, ...SCORE_DEFAULTS },
+      { account: "e", score: 0.5, ...SCORE_DEFAULTS },
+      { account: "f", score: 0.4, ...SCORE_DEFAULTS },
     ];
     const lines = decisionToLines(baseDecision({ scores }));
     expect(lines).toHaveLength(5 + 4);

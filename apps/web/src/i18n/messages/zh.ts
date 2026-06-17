@@ -2523,6 +2523,9 @@ export const zh: Messages = {
     code: "兑换码",
     submit: "兑换",
     success: "兑换成功",
+    successBalance: "已充值 +{amount} {currency}",
+    successSubscription: "订阅已开通",
+    alreadyRedeemed: "该兑换码已被使用",
   },
   affiliate: {
     title: "推广",

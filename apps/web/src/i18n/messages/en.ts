@@ -2538,6 +2538,9 @@ export const en = {
     code: "Redeem code",
     submit: "Redeem",
     success: "Code redeemed",
+    successBalance: "+{amount} {currency} credited",
+    successSubscription: "Subscription activated",
+    alreadyRedeemed: "This code was already redeemed",
   },
   affiliate: {
     title: "Affiliate",

@@ -36,7 +36,7 @@ describe("descriptorsToCapabilityKeys", () => {
     expect(
       descriptorsToCapabilityKeys([
         { key: "images", version: "v1", status: "stable", level: "required" },
-        { key: "rerank", version: "v2", status: "beta", level: "preferred" },
+        { key: "rerank", version: "v2", status: "experimental", level: "optional" },
       ]),
     ).toEqual(["images", "rerank"]);
   });

@@ -31,8 +31,25 @@ function RedeemContent() {
     event.preventDefault();
     setError(null);
     try {
-      await redeemMut.mutateAsync({ code: code.trim() });
-      toast({ title: t("redeem.success"), tone: "success" });
+      const result = await redeemMut.mutateAsync({ code: code.trim() });
+      if (result.already_redeemed) {
+        toast({ title: t("redeem.alreadyRedeemed"), tone: "warning" });
+      } else if (result.redemption.type === "balance") {
+        toast({
+          title: t("redeem.success"),
+          description: t("redeem.successBalance", {
+            amount: result.redemption.amount,
+            currency: result.redemption.currency,
+          }),
+          tone: "success",
+        });
+      } else {
+        toast({
+          title: t("redeem.success"),
+          description: t("redeem.successSubscription"),
+          tone: "success",
+        });
+      }
       setCode("");
     } catch (err) {
       setError(meErrorMessage(err));
@@ -54,9 +71,12 @@ function RedeemContent() {
               <Input
                 id="code"
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
                 placeholder="SR-XXXX-XXXX"
                 className="font-mono"
+                autoFocus
+                autoComplete="off"
+                spellCheck={false}
               />
             </div>
             {error ? (
