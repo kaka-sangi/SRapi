@@ -1491,13 +1491,44 @@ func (rt *runtimeState) applyProviderAccountProtection(ctx context.Context, acco
 		return
 	}
 	var providerErr provideradaptercontract.ProviderError
-	if !errors.As(err, &providerErr) {
+	hasProviderErr := errors.As(err, &providerErr)
+	// Layer the structured failover classifier on top of the existing
+	// class-based protection. The decision is observation-only here — actual
+	// failover routing is owned by gatewayShouldFailover further up the stack,
+	// and blacklist transitions stay driven by protectProviderAccountForClass.
+	// Surfacing it lets operators audit the upstream-error policy without
+	// changing existing protection semantics.
+	rt.logUpstreamFailoverDecision(ctx, account, hasProviderErr, providerErr, err)
+	if !hasProviderErr {
 		return
 	}
 	if !gatewayAccountFailureStatusHandled(account.Metadata, &providerErr.StatusCode) {
 		return
 	}
 	rt.protectProviderAccountForClass(ctx, account, providerErr.Class)
+}
+
+// logUpstreamFailoverDecision records the structured ClassifyUpstreamError
+// verdict so the existing protection path and the new directive-shaped failover
+// decision stay observable side-by-side. No state is mutated.
+func (rt *runtimeState) logUpstreamFailoverDecision(ctx context.Context, account accountcontract.ProviderAccount, hasProviderErr bool, providerErr provideradaptercontract.ProviderError, err error) {
+	if rt == nil || rt.logger == nil {
+		return
+	}
+	statusCode := 0
+	if hasProviderErr {
+		statusCode = providerErr.StatusCode
+	}
+	decision := ClassifyUpstreamError(statusCode, nil, err)
+	rt.logger.Debug("upstream failover classification",
+		"account_id", account.ID,
+		"status_code", statusCode,
+		"class", decision.Class,
+		"should_failover", decision.ShouldFailover,
+		"should_blacklist", decision.ShouldBlacklist,
+		"retry_after_ms", decision.RetryAfterMs,
+		"trace_id", requestIDFromContext(ctx),
+	)
 }
 
 // protectProviderAccountForClass transitions a non-api_key account to the

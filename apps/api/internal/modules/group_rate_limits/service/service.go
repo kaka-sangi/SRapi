@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/srapi/srapi/apps/api/internal/modules/group_rate_limits/contract"
 	"github.com/srapi/srapi/apps/api/internal/platform/localcache"
 )
@@ -23,6 +25,12 @@ const ruleCacheTTL = 15 * time.Second
 type Service struct {
 	store contract.Store
 	cache *localcache.Cache[contract.Limit]
+	// sf collapses concurrent cache-miss store reads for the same group_id into
+	// a single round-trip. Mirrors sub2api's userGroupRateResolver (see
+	// /backend/internal/service/user_group_rate_resolver.go): N concurrent
+	// gateway requests for the same group survive a brief cache stampede
+	// without N parallel DB hits.
+	sf singleflight.Group
 }
 
 func New(store contract.Store) (*Service, error) {
@@ -72,17 +80,36 @@ func (s *Service) findCached(ctx context.Context, groupID int) contract.Limit {
 	if cached, ok := s.cache.Get(key); ok {
 		return cached
 	}
-	limit, err := s.store.FindByGroup(ctx, groupID)
-	switch {
-	case err == nil:
-		s.cache.Set(key, limit)
-		return limit
-	case errors.Is(err, contract.ErrNotFound):
-		s.cache.Set(key, contract.Limit{})
-		return contract.Limit{}
-	default:
+	// Collapse concurrent stampedes onto a single store read. The shared
+	// closure re-checks the cache first so a caller that arrives after the
+	// owner populated it still gets a hit (and the owner's followers reuse
+	// the same Limit without a second store hop).
+	value, err, _ := s.sf.Do(key, func() (any, error) {
+		if cached, ok := s.cache.Get(key); ok {
+			return cached, nil
+		}
+		limit, storeErr := s.store.FindByGroup(ctx, groupID)
+		switch {
+		case storeErr == nil:
+			s.cache.Set(key, limit)
+			return limit, nil
+		case errors.Is(storeErr, contract.ErrNotFound):
+			s.cache.Set(key, contract.Limit{})
+			return contract.Limit{}, nil
+		default:
+			// Transient store error: do NOT cache the zero value (mirrors the
+			// pre-singleflight behaviour — fail-open on this request only).
+			return contract.Limit{}, storeErr
+		}
+	})
+	if err != nil {
 		return contract.Limit{}
 	}
+	limit, ok := value.(contract.Limit)
+	if !ok {
+		return contract.Limit{}
+	}
+	return limit
 }
 
 // RPMForGroup returns the active RPM ceiling for a group, or 0 when none applies

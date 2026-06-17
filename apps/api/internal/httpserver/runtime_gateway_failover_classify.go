@@ -1,0 +1,200 @@
+package httpserver
+
+import (
+	"context"
+	"errors"
+	"io"
+	"net"
+	"net/http"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
+)
+
+// UpstreamFailoverDecision is the structured verdict for an upstream failure.
+//
+// Class names mirror the directive's four buckets ("transient", "account_bad",
+// "client_bad", "server_bad"). The existing srapi error_class taxonomy
+// (rate_limit / quota_exhausted / auth_failed / etc.) is still used by
+// gatewayShouldFailover for finer-grained per-candidate retry decisions — this
+// classifier sits on top to give callers a single boolean failover/blacklist
+// answer that mirrors sub2api's transport-error + status-code policy.
+type UpstreamFailoverDecision struct {
+	// Class is one of: "transient", "account_bad", "client_bad", "server_bad".
+	Class string
+	// ShouldFailover requests the caller to retry against a different candidate.
+	ShouldFailover bool
+	// ShouldBlacklist requests the caller to mark the credential bad and stop
+	// scheduling it (auth revoked / forbidden). Maps to applyProviderAccountProtection.
+	ShouldBlacklist bool
+	// RetryAfterMs is parsed from the Retry-After header (seconds or HTTP-date)
+	// when the upstream returned 429/503 with one. 0 when absent/invalid.
+	RetryAfterMs int
+}
+
+// upstreamFailoverTransientNetworkMarkers are case-insensitive substrings that
+// indicate a transient network-layer blip — match sub2api's
+// classifyOpenAITransportError "transient" inverse set (timeouts, EOFs, resets).
+var upstreamFailoverTransientNetworkMarkers = []string{
+	"i/o timeout",
+	"deadline exceeded",
+	"connection reset by peer",
+	"unexpected eof",
+	"broken pipe",
+	"timeout exceeded while awaiting headers",
+}
+
+// upstreamFailoverPersistentNetworkMarkers mirrors sub2api's
+// openAIPersistentTransportErrorMarkers — string markers for proxy/DNS faults
+// that are operator-actionable rather than retry-worthy on the same credential.
+var upstreamFailoverPersistentNetworkMarkers = []string{
+	"authentication failed",
+	"proxy authentication required",
+	"connection refused",
+	"no route to host",
+	"network is unreachable",
+	"no such host",
+}
+
+// ClassifyUpstreamError returns a UpstreamFailoverDecision for an upstream
+// failure. Inputs:
+//   - statusCode: HTTP status from the upstream (0 when network failed before headers).
+//   - errBody:    response body (used to parse Retry-After when only headers absent;
+//                 currently a placeholder for body-based rate-limit hints).
+//   - networkErr: the transport error returned by Do() (nil when HTTP status received).
+//
+// Decision policy (matches the user directive verbatim):
+//   - 401 / 403       -> "account_bad",  Blacklist=true,  Failover=true
+//   - 429             -> "transient",    Failover=true,   RetryAfterMs parsed
+//   - 5xx             -> "server_bad",   Failover=true,   RetryAfterMs parsed for 503
+//   - 408 / EOF / net timeout / context.DeadlineExceeded -> "transient", Failover=true
+//   - other 4xx       -> "client_bad",   no failover (caller's request is wrong)
+//   - context.Canceled -> "transient" with Failover=false (client gone — don't burn another credential)
+//   - persistent network markers (proxy/DNS down) -> "account_bad", Blacklist=true, Failover=true
+//   - other network errors -> "transient", Failover=true
+func ClassifyUpstreamError(statusCode int, errBody []byte, networkErr error) UpstreamFailoverDecision {
+	return classifyUpstreamErrorWithHeader(statusCode, nil, errBody, networkErr)
+}
+
+// classifyUpstreamErrorWithHeader is the header-aware variant used internally
+// when the caller has access to the upstream response headers (preferred over
+// scraping errBody for Retry-After). Kept separate so the public API stays
+// minimal until the header path is wired through.
+func classifyUpstreamErrorWithHeader(statusCode int, headers http.Header, _ []byte, networkErr error) UpstreamFailoverDecision {
+	// Network failure preempts status code — no HTTP round-trip completed.
+	if statusCode == 0 && networkErr != nil {
+		return classifyNetworkError(networkErr)
+	}
+
+	switch {
+	case statusCode == http.StatusUnauthorized, statusCode == http.StatusForbidden:
+		return UpstreamFailoverDecision{
+			Class:           "account_bad",
+			ShouldFailover:  true,
+			ShouldBlacklist: true,
+		}
+	case statusCode == http.StatusTooManyRequests:
+		return UpstreamFailoverDecision{
+			Class:          "transient",
+			ShouldFailover: true,
+			RetryAfterMs:   parseRetryAfterMillis(headers),
+		}
+	case statusCode == http.StatusRequestTimeout:
+		return UpstreamFailoverDecision{
+			Class:          "transient",
+			ShouldFailover: true,
+		}
+	case statusCode >= http.StatusInternalServerError && statusCode <= 599:
+		return UpstreamFailoverDecision{
+			Class:          "server_bad",
+			ShouldFailover: true,
+			RetryAfterMs:   parseRetryAfterMillis(headers),
+		}
+	case statusCode >= 400 && statusCode < 500:
+		return UpstreamFailoverDecision{
+			Class:          "client_bad",
+			ShouldFailover: false,
+		}
+	}
+
+	// 1xx/2xx/3xx — not a failure. Caller should not be invoking the classifier;
+	// return a transient no-op so we don't accidentally mark traffic as failed.
+	return UpstreamFailoverDecision{Class: "transient"}
+}
+
+func classifyNetworkError(err error) UpstreamFailoverDecision {
+	// Client disconnect — don't burn another credential.
+	if errors.Is(err, context.Canceled) {
+		return UpstreamFailoverDecision{Class: "transient", ShouldFailover: false}
+	}
+	// Typed checks first — portable and unambiguous (mirrors
+	// sub2api/openai_upstream_transport_error.go).
+	if errors.Is(err, syscall.ECONNREFUSED) ||
+		errors.Is(err, syscall.EHOSTUNREACH) ||
+		errors.Is(err, syscall.ENETUNREACH) {
+		return UpstreamFailoverDecision{
+			Class:           "account_bad",
+			ShouldFailover:  true,
+			ShouldBlacklist: true,
+		}
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+		return UpstreamFailoverDecision{
+			Class:           "account_bad",
+			ShouldFailover:  true,
+			ShouldBlacklist: true,
+		}
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, context.DeadlineExceeded) {
+		return UpstreamFailoverDecision{Class: "transient", ShouldFailover: true}
+	}
+
+	msg := strings.ToLower(err.Error())
+	for _, marker := range upstreamFailoverPersistentNetworkMarkers {
+		if strings.Contains(msg, marker) {
+			return UpstreamFailoverDecision{
+				Class:           "account_bad",
+				ShouldFailover:  true,
+				ShouldBlacklist: true,
+			}
+		}
+	}
+	for _, marker := range upstreamFailoverTransientNetworkMarkers {
+		if strings.Contains(msg, marker) {
+			return UpstreamFailoverDecision{Class: "transient", ShouldFailover: true}
+		}
+	}
+
+	// Unknown — treat as transient and let the same-candidate retry policy +
+	// gatewayShouldFailover decide whether to actually retry.
+	return UpstreamFailoverDecision{Class: "transient", ShouldFailover: true}
+}
+
+// parseRetryAfterMillis parses the Retry-After header (RFC 7231 §7.1.3): either
+// a delta-seconds integer or an HTTP-date. Returns 0 when absent/invalid so the
+// caller falls back to its own backoff schedule.
+func parseRetryAfterMillis(headers http.Header) int {
+	if headers == nil {
+		return 0
+	}
+	raw := strings.TrimSpace(headers.Get("Retry-After"))
+	if raw == "" {
+		return 0
+	}
+	if secs, err := strconv.Atoi(raw); err == nil {
+		if secs < 0 {
+			return 0
+		}
+		return secs * 1000
+	}
+	if t, err := http.ParseTime(raw); err == nil {
+		delta := time.Until(t)
+		if delta <= 0 {
+			return 0
+		}
+		return int(delta / time.Millisecond)
+	}
+	return 0
+}
