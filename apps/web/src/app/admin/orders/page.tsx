@@ -373,7 +373,12 @@ function RefundDialog({ order, onClose }: { order: PaymentOrder; onClose: () => 
         <form onSubmit={submit}>
           <DialogHeader>
             <DialogTitle>{t("adminOrders.refundTitle")}</DialogTitle>
-            <DialogDescription>{order.order_no}</DialogDescription>
+            <DialogDescription>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="font-mono">{order.order_no}</span>
+                <CopyButton value={order.order_no} size="inline" />
+              </span>
+            </DialogDescription>
           </DialogHeader>
           <div className="mt-4 space-y-4">
             <dl className="rounded-xl border border-srapi-border bg-srapi-card-muted px-3.5 py-3 text-sm">
