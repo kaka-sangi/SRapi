@@ -2126,6 +2126,8 @@ export const en = {
     account: "Account",
     model: "Model",
     errorClass: "Error",
+    upstreamMessage: "Upstream message",
+    upstreamBodyExcerpt: "Upstream body",
     latency: "Latency",
     requestId: "Request ID",
     sourceEndpoint: "Endpoint",

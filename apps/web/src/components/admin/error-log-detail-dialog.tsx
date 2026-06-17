@@ -95,6 +95,39 @@ function ErrorLogDetailBody({ detail }: { detail: ErrorLog }) {
         />
       </div>
 
+      {/* Upstream verbatim message — sub2api parity (ops_error_logs.upstream_error_message).
+          Surfaced verbatim so operators can see what the provider actually returned
+          instead of srapi's generic class-level substitution. */}
+      {detail.error_message ? (
+        <div className="rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
+          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+            {t("adminErrorLogs.upstreamMessage")}
+          </p>
+          <div className="mt-1 flex items-start gap-1.5">
+            <p className="min-w-0 whitespace-pre-wrap break-words text-sm text-srapi-text-primary">
+              {detail.error_message}
+            </p>
+            <CopyButton value={detail.error_message} size="inline" />
+          </div>
+        </div>
+      ) : null}
+
+      {/* Upstream body excerpt (compacted envelope) — sub2api parity for
+          upstream_error_detail. */}
+      {detail.error_body_excerpt ? (
+        <div className="rounded-xl border border-srapi-border bg-srapi-card-muted p-4">
+          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+            {t("adminErrorLogs.upstreamBodyExcerpt")}
+          </p>
+          <div className="mt-1 flex items-start gap-1.5">
+            <p className="min-w-0 whitespace-pre-wrap break-words font-mono text-2xs text-srapi-text-primary">
+              {detail.error_body_excerpt}
+            </p>
+            <CopyButton value={detail.error_body_excerpt} size="inline" />
+          </div>
+        </div>
+      ) : null}
+
       {/* Metadata grid */}
       <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
         <Field label={t("adminErrorLogs.requestId")} value={detail.request_id} mono copyable />

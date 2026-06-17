@@ -4492,6 +4492,19 @@ export type ErrorLog = {
     source_protocol: string;
     target_protocol: string;
     error_class?: string | null;
+    /**
+     * Verbatim upstream provider error message (sub2api parity:
+     * ops_error_logs.upstream_error_message). Surfaced so operators can
+     * see what the upstream actually returned instead of srapi's generic
+     * class-level substitution.
+     */
+    error_message?: string | null;
+    /**
+     * Compacted upstream error envelope
+     * (class | status | type | code | message) — sub2api parity for
+     * upstream_error_detail.
+     */
+    error_body_excerpt?: string | null;
     latency_ms: number;
     input_tokens: number;
     output_tokens: number;

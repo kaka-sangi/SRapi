@@ -60,6 +60,12 @@ type gatewayUsageRecord struct {
 	ProviderQuotaSignals  []provideradaptercontract.QuotaSignal
 	ProviderRetryAfter    *time.Time
 	ProviderErrorMessage  string
+	// ProviderErrorBodyExcerpt mirrors sub2api's upstream_error_detail
+	// (ops_error_logs.upstream_error_detail / migrations/034). It carries
+	// the upstream error envelope ({class, type, code, message}) compacted
+	// into a single string so the admin panel can render the verbatim
+	// upstream error without re-reading the upstream response body.
+	ProviderErrorBodyExcerpt string
 	// Headers carries the upstream provider response headers from a failed
 	// attempt (e.g. the x-codex-* rate-limit telemetry). It is populated only on
 	// failure paths so the cooldown stage can fold provider quota telemetry into

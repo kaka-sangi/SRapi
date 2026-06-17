@@ -6977,23 +6977,32 @@ type ErrorCode string
 
 // ErrorLog defines model for ErrorLog.
 type ErrorLog struct {
-	AccountId      *string   `json:"account_id,omitempty"`
-	ApiKeyId       Id        `json:"api_key_id"`
-	AttemptNo      int       `json:"attempt_no"`
-	CreatedAt      Timestamp `json:"created_at"`
-	ErrorClass     *string   `json:"error_class,omitempty"`
-	Id             Id        `json:"id"`
-	InputTokens    int       `json:"input_tokens"`
-	LatencyMs      int       `json:"latency_ms"`
-	Model          string    `json:"model"`
-	OutputTokens   int       `json:"output_tokens"`
-	ProviderId     *string   `json:"provider_id,omitempty"`
-	RequestId      RequestId `json:"request_id"`
-	SourceEndpoint string    `json:"source_endpoint"`
-	SourceProtocol string    `json:"source_protocol"`
-	TargetProtocol string    `json:"target_protocol"`
-	UsageEstimated bool      `json:"usage_estimated"`
-	UserId         Id        `json:"user_id"`
+	AccountId        *string   `json:"account_id,omitempty"`
+	ApiKeyId         Id        `json:"api_key_id"`
+	AttemptNo        int       `json:"attempt_no"`
+	CreatedAt        Timestamp `json:"created_at"`
+	ErrorClass       *string   `json:"error_class,omitempty"`
+	// ErrorMessage carries the upstream provider's verbatim error.message
+	// (sub2api parity: ops_error_logs.upstream_error_message). Empty when
+	// the request did not record an upstream message (e.g. transport-only
+	// failures or successes).
+	ErrorMessage     *string   `json:"error_message,omitempty"`
+	// ErrorBodyExcerpt mirrors sub2api's upstream_error_detail — the
+	// compacted upstream error envelope (class | status | type | code |
+	// message). Empty when no envelope was captured.
+	ErrorBodyExcerpt *string   `json:"error_body_excerpt,omitempty"`
+	Id               Id        `json:"id"`
+	InputTokens      int       `json:"input_tokens"`
+	LatencyMs        int       `json:"latency_ms"`
+	Model            string    `json:"model"`
+	OutputTokens     int       `json:"output_tokens"`
+	ProviderId       *string   `json:"provider_id,omitempty"`
+	RequestId        RequestId `json:"request_id"`
+	SourceEndpoint   string    `json:"source_endpoint"`
+	SourceProtocol   string    `json:"source_protocol"`
+	TargetProtocol   string    `json:"target_protocol"`
+	UsageEstimated   bool      `json:"usage_estimated"`
+	UserId           Id        `json:"user_id"`
 }
 
 // ErrorLogListResponse defines model for ErrorLogListResponse.

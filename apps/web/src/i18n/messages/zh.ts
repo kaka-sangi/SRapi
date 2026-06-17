@@ -2103,6 +2103,8 @@ export const zh: Messages = {
     account: "账号",
     model: "模型",
     errorClass: "错误",
+    upstreamMessage: "上游错误信息",
+    upstreamBodyExcerpt: "上游错误正文",
     latency: "延迟",
     requestId: "请求 ID",
     sourceEndpoint: "端点",

@@ -26,6 +26,17 @@ type UsageLog struct {
 	LatencyMS             int
 	Success               bool
 	ErrorClass            *string
+	// ProviderErrorMessage carries the upstream's verbatim error.message
+	// (truncated + redacted) so operators can see what Codex / OpenAI /
+	// Anthropic actually returned for a failed request. Mirrors sub2api's
+	// ops_error_logs.upstream_error_message (migrations/034_ops_upstream_error_events.sql).
+	// Empty for successful requests.
+	ProviderErrorMessage string
+	// ProviderErrorBodyExcerpt is a bounded slice of the raw upstream
+	// response body. Mirrors sub2api's upstream_error_detail field — kept
+	// short enough to be safe to inline in the admin panel but long enough
+	// to surface the relevant error code/field. Empty for successful requests.
+	ProviderErrorBodyExcerpt string
 	Cost                  string
 	ActualCost            string
 	RateMultiplier        string
@@ -62,6 +73,11 @@ type RecordRequest struct {
 	LatencyMS             int
 	Success               bool
 	ErrorClass            *string
+	// ProviderErrorMessage / ProviderErrorBodyExcerpt carry the upstream's
+	// verbatim error.message + body excerpt for failed requests. See the
+	// matching fields on UsageLog for the sub2api parity rationale.
+	ProviderErrorMessage     string
+	ProviderErrorBodyExcerpt string
 	Cost                  string
 	ActualCost            string
 	RateMultiplier        string

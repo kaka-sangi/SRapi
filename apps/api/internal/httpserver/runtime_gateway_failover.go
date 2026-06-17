@@ -644,8 +644,9 @@ func (s *Server) recordGatewayProviderAttemptFailure(r *http.Request, authed api
 		CompatibilityWarnings: canonical.CompatibilityWarnings,
 		ProviderQuotaSignals:  providerQuotaSignalsFromError(providerErr),
 		ProviderRetryAfter:    providerRetryAfterFromError(providerErr),
-		ProviderErrorMessage:  providerErrorMessage(providerErr),
-		Headers:               providerHeadersFromError(providerErr),
+		ProviderErrorMessage:     providerErrorMessage(providerErr),
+		ProviderErrorBodyExcerpt: providerErrorBodyExcerpt(providerErr),
+		Headers:                  providerHeadersFromError(providerErr),
 	})
 }
 
@@ -934,6 +935,47 @@ func providerErrorMessage(err error) string {
 		return ""
 	}
 	return strings.TrimSpace(providerErr.Message)
+}
+
+// providerErrorBodyExcerpt composes a compact upstream-error envelope that
+// mirrors sub2api's ops_error_logs.upstream_error_detail field. The intent
+// is to give operators the four facts they actually need when triaging an
+// upstream rejection — class, status, type/code, message — in a single
+// string the admin panel can render verbatim. Sensitive material in the
+// raw response body is NOT included here; that path goes through the
+// passthrough metadata gate (gatewayProviderErrorMessageEnabled). The
+// result is truncated to providerErrorBodyExcerptMaxLength runes so it is
+// safe to inline in lists.
+const providerErrorBodyExcerptMaxLength = 2048
+
+func providerErrorBodyExcerpt(err error) string {
+	var providerErr provideradaptercontract.ProviderError
+	if !errors.As(err, &providerErr) {
+		return ""
+	}
+	parts := make([]string, 0, 4)
+	if class := strings.TrimSpace(providerErr.Class); class != "" {
+		parts = append(parts, "class="+class)
+	}
+	if providerErr.StatusCode > 0 {
+		parts = append(parts, "status="+strconv.Itoa(providerErr.StatusCode))
+	}
+	if providerErr.Metadata != nil {
+		if value := strings.TrimSpace(metadataString(providerErr.Metadata, "type")); value != "" {
+			parts = append(parts, "type="+value)
+		}
+		if value := strings.TrimSpace(metadataString(providerErr.Metadata, "code")); value != "" {
+			parts = append(parts, "code="+value)
+		}
+	}
+	if message := strings.TrimSpace(providerErr.Message); message != "" {
+		parts = append(parts, "message="+message)
+	}
+	excerpt := strings.Join(parts, " | ")
+	if runes := []rune(excerpt); len(runes) > providerErrorBodyExcerptMaxLength {
+		excerpt = string(runes[:providerErrorBodyExcerptMaxLength]) + "..."
+	}
+	return excerpt
 }
 
 func gatewayProviderErrorMessage(err error) string {

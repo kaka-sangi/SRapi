@@ -3,6 +3,7 @@ package httpserver
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -100,22 +101,37 @@ func errorLogsFromUsageLogs(items []usagecontract.UsageLog) []usagecontract.Usag
 // pointers, absent when the underlying value is nil.
 func toAPIErrorLog(log usagecontract.UsageLog) apiopenapi.ErrorLog {
 	return apiopenapi.ErrorLog{
-		AccountId:      optionalIDString(log.AccountID),
-		ApiKeyId:       apiopenapi.Id(strconv.Itoa(log.APIKeyID)),
-		AttemptNo:      log.AttemptNo,
-		CreatedAt:      log.CreatedAt,
-		ErrorClass:     log.ErrorClass,
-		Id:             apiopenapi.Id(strconv.Itoa(log.ID)),
-		InputTokens:    log.InputTokens,
-		LatencyMs:      log.LatencyMS,
-		Model:          log.Model,
-		OutputTokens:   log.OutputTokens,
-		ProviderId:     optionalIDString(log.ProviderID),
-		RequestId:      log.RequestID,
-		SourceEndpoint: log.SourceEndpoint,
-		SourceProtocol: log.SourceProtocol,
-		TargetProtocol: log.TargetProtocol,
-		UsageEstimated: log.UsageEstimated,
-		UserId:         apiopenapi.Id(strconv.Itoa(log.UserID)),
+		AccountId:        optionalIDString(log.AccountID),
+		ApiKeyId:         apiopenapi.Id(strconv.Itoa(log.APIKeyID)),
+		AttemptNo:        log.AttemptNo,
+		CreatedAt:        log.CreatedAt,
+		ErrorClass:       log.ErrorClass,
+		ErrorMessage:     nonEmptyStringPtr(log.ProviderErrorMessage),
+		ErrorBodyExcerpt: nonEmptyStringPtr(log.ProviderErrorBodyExcerpt),
+		Id:               apiopenapi.Id(strconv.Itoa(log.ID)),
+		InputTokens:      log.InputTokens,
+		LatencyMs:        log.LatencyMS,
+		Model:            log.Model,
+		OutputTokens:     log.OutputTokens,
+		ProviderId:       optionalIDString(log.ProviderID),
+		RequestId:        log.RequestID,
+		SourceEndpoint:   log.SourceEndpoint,
+		SourceProtocol:   log.SourceProtocol,
+		TargetProtocol:   log.TargetProtocol,
+		UsageEstimated:   log.UsageEstimated,
+		UserId:           apiopenapi.Id(strconv.Itoa(log.UserID)),
 	}
+}
+
+// nonEmptyStringPtr returns &value when value is non-empty after trimming
+// whitespace; nil otherwise. Used to project optional upstream-error
+// fields onto the openapi DTO's *string members so they marshal as absent
+// (rather than as the empty string) when the usage log carries no upstream
+// message.
+func nonEmptyStringPtr(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
 }

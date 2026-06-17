@@ -125,6 +125,19 @@ export function ErrorLogsPanel() {
       ),
     },
     {
+      // Verbatim upstream provider message (sub2api parity:
+      // ops_error_logs.upstream_error_message). Truncated visually but the
+      // full text + body excerpt live in the detail dialog.
+      key: "error_message",
+      header: t("adminErrorLogs.upstreamMessage"),
+      hideOnMobile: true,
+      render: (e) => (
+        <span className="line-clamp-2 break-words text-xs text-srapi-text-secondary">
+          {e.error_message || "—"}
+        </span>
+      ),
+    },
+    {
       key: "latency",
       header: t("adminErrorLogs.latency"),
       align: "right",
