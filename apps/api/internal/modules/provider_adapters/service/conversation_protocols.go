@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
+	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/translator"
+	_ "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/translator/translators"
 )
 
 type anthropicMessagesRequest struct {
@@ -58,19 +60,37 @@ func anthropicCompatibleMaxTokens(req contract.ConversationRequest) int {
 	return maxTokens
 }
 
+// anthropicCompatibleRequestBody builds the universal Claude
+// /v1/messages-shaped outbound payload. It is the per-call seam for the
+// claude_messages → openai_responses translator registered in
+// apps/api/internal/modules/provider_adapters/translator/translators/.
+//
+// Wiring order (preserved from pre-refactor inline code byte-for-byte):
+//  1. Build raw payload (rawSameProtocolPayload or anthropicCompatiblePayload).
+//  2. PR-X security strip: drop forged Claude thinking blocks. The strip
+//     is idempotent and a no-op for payloads with no thinking content,
+//     so we run it on every outbound build without conditioning on
+//     adapter type.
+//  3. Consult the registered translator (currently an identity — see
+//     translator/translators/claude_messages_to_openai_responses.go for
+//     the rationale). The registry mediates so future per-pair changes
+//     are a one-file edit. Identity output means byte-for-byte parity
+//     with the prior inline path — existing tests still pass.
+//  4. Apply per-request payload transforms (operator-supplied JSON
+//     surgery), unchanged from the pre-refactor wiring.
 func anthropicCompatibleRequestBody(req contract.ConversationRequest) ([]byte, error) {
 	raw, err := anthropicCompatibleRequestBodyRaw(req)
 	if err != nil {
 		return nil, err
 	}
-	// PR-X security wiring: strip forged Claude thinking blocks before
-	// any payload transform / upstream forward. See
-	// claude_signature_wiring.go for the rationale (forged thinking
-	// blocks can bypass upstream signature checks on permissive
-	// Claude-compatible backends). The strip is idempotent and a no-op
-	// for payloads with no thinking content, so we can run it on every
-	// outbound build without conditioning on adapter type.
 	raw = claudeThinkingSanitizeRawPayload(req.Mapping.UpstreamModelName, raw)
+	raw = translator.Default().TranslateRequest(
+		translator.FormatClaudeMessages,
+		translator.FormatOpenAIResponses,
+		req.Mapping.UpstreamModelName,
+		raw,
+		req.Stream,
+	)
 	return applyPayloadTransforms(raw, req.PayloadTransforms)
 }
 

@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
+	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/translator"
+	_ "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/translator/translators"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	"github.com/srapi/srapi/apps/api/internal/pkg/httputil"
 	"golang.org/x/crypto/sha3"
@@ -253,12 +255,36 @@ func chatGPTWebDetectChallenge(resp reverseproxycontract.Response, err error) (b
 // chatGPTWebBuildConversationBody is the payload builder that consults the
 // file-upload helper (Wiring #2) for any binary InputParts before falling
 // back to the text-only payload.
+//
+// Stage-2 translator registry wiring: route the synthesised bytes
+// through the registered chatgpt_web → openai_responses translator
+// (currently an identity — see
+// translator/translators/chatgpt_web_to_openai_responses.go for the
+// rationale; the inline shape helpers own canonical synthesis). The
+// PR-3 transport-layer wiring (FlareSolverr clearance, file upload,
+// image slot, WS fallback) stays in this file because none of it
+// touches the payload bytes — it manipulates headers / cookies /
+// concurrency slots which are not payload transforms.
 func (s *Service) chatGPTWebBuildConversationBody(ctx context.Context, req contract.ConversationRequest, baseURL string, headers http.Header) ([]byte, error) {
 	uploadedParts, attachments := s.chatGPTWebUploadInputParts(ctx, req, baseURL, headers)
+	var raw []byte
+	var err error
 	if len(uploadedParts) > 0 {
-		return chatGPTWebMultimodalPayloadBytes(req, uploadedParts, attachments)
+		raw, err = chatGPTWebMultimodalPayloadBytes(req, uploadedParts, attachments)
+	} else {
+		raw, err = json.Marshal(chatGPTWebConversationPayload(req))
 	}
-	return json.Marshal(chatGPTWebConversationPayload(req))
+	if err != nil {
+		return nil, err
+	}
+	raw = translator.Default().TranslateRequest(
+		translator.FormatChatGPTWeb,
+		translator.FormatOpenAIResponses,
+		req.Mapping.UpstreamModelName,
+		raw,
+		req.Stream,
+	)
+	return raw, nil
 }
 
 // chatGPTWebUploadInputParts walks req.InputParts and the parts of each

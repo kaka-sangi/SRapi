@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
+	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/translator"
+	_ "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/translator/translators"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 )
 
@@ -73,6 +75,22 @@ func (s *Service) invokeReverseProxyAntigravity(ctx context.Context, req contrac
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
+	// Stage-2 translator registry wiring: route the synthesised
+	// payload through the registered antigravity → openai_responses
+	// translator. The currently-registered translator is an identity
+	// (see translator/translators/antigravity_to_openai_responses.go
+	// for the rationale — the inline antigravityPayload already owns
+	// the canonical envelope synthesis), so the byte sequence is
+	// unchanged. The registry-mediated call keeps the hot path
+	// observable in metrics and lets a future per-pair transform be
+	// a one-file translator edit instead of a service/ edit.
+	raw = translator.Default().TranslateRequest(
+		translator.FormatAntigravity,
+		translator.FormatOpenAIResponses,
+		req.Mapping.UpstreamModelName,
+		raw,
+		req.Stream,
+	)
 	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
 		Account:      antigravityReverseProxyAccount(req),
 		Method:       http.MethodPost,

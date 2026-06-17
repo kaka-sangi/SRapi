@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
+	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/translator"
+	_ "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/translator/translators"
 )
 
 type geminiGenerateContentRequest struct {
@@ -60,11 +62,27 @@ func geminiCompatiblePayload(req contract.ConversationRequest) geminiGenerateCon
 	return payload
 }
 
+// geminiCompatibleRequestBody builds the gemini /v1beta:generateContent
+// outbound payload. The registered translator for the
+// gemini_request → openai_responses pair is an identity (see
+// translator/translators/gemini_request_to_openai_responses.go for the
+// rationale — srapi's gemini handling is upstream-native, no
+// cross-format rewriting is required at the request side). Consulting
+// the registry here keeps the call-site on the hot path so future
+// per-pair transforms become a one-file translator edit instead of a
+// service/ edit.
 func geminiCompatibleRequestBody(req contract.ConversationRequest) ([]byte, error) {
 	raw, err := geminiCompatibleRequestBodyRaw(req)
 	if err != nil {
 		return nil, err
 	}
+	raw = translator.Default().TranslateRequest(
+		translator.FormatGeminiRequest,
+		translator.FormatOpenAIResponses,
+		req.Mapping.UpstreamModelName,
+		raw,
+		req.Stream,
+	)
 	return applyPayloadTransforms(raw, req.PayloadTransforms)
 }
 
