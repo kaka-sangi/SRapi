@@ -1544,6 +1544,84 @@ func (s *Server) handleRecoverAdminAccount(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+// adminAccountRefresherAdapter bridges the reverse-proxy Refresher into the
+// accounts service's AccountRefresher contract for the on-demand
+// /admin/accounts/{id}/refresh path. The proactive worker uses an identical
+// adapter; this one is inline so the handler does not pull in the worker
+// package just for the adapter type.
+type adminAccountRefresherAdapter struct {
+	refresher reverseproxycontract.Refresher
+}
+
+func (a adminAccountRefresherAdapter) RefreshAccount(ctx context.Context, req accountservice.RefreshRequest) (accountservice.RefreshResult, error) {
+	resp, err := a.refresher.Refresh(ctx, reverseproxycontract.RefreshRequest{
+		Account: reverseproxycontract.AccountRuntime{
+			AccountID:      req.AccountID,
+			RuntimeClass:   string(req.RuntimeClass),
+			UpstreamClient: req.UpstreamClient,
+			ProxyID:        req.ProxyID,
+			UserAgent:      mapString(req.Metadata, "user_agent"),
+			Metadata:       req.Metadata,
+			Credential:     req.Credential,
+		},
+	})
+	if err != nil {
+		return accountservice.RefreshResult{}, err
+	}
+	return accountservice.RefreshResult{Credential: resp.Credential}, nil
+}
+
+func (s *Server) handleRefreshAdminAccount(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	accountID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || accountID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account id", requestID)
+		return
+	}
+	before, err := s.runtime.accounts.FindByID(r.Context(), accountID)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "account not found", requestID)
+		return
+	}
+	if before.RuntimeClass != accountcontract.RuntimeClassOauthRefresh && before.RuntimeClass != accountcontract.RuntimeClassOauthDeviceCode {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "account is not an oauth runtime class", requestID)
+		return
+	}
+	if s.runtime.reverseProxy == nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "reverse proxy refresher unavailable", requestID)
+		return
+	}
+	adapter := adminAccountRefresherAdapter{refresher: s.runtime.reverseProxy}
+	updated, refreshErr := s.runtime.accounts.RefreshAccessToken(r.Context(), accountID, adapter)
+	auditOutcome := map[string]any{"ok": refreshErr == nil}
+	if refreshErr != nil {
+		auditOutcome["error"] = refreshErr.Error()
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account.refresh_token", "provider_account", strconv.Itoa(accountID), accountAuditSnapshot(before), auditOutcome))
+	if refreshErr != nil {
+		// The accounts service has already persisted the failure (incremented
+		// refresh_attempts, captured the error, flipped needs_reauth_at when
+		// permanent / threshold-crossed). Surface 502 so the UI can show a
+		// "refresh failed" toast; the row will reflect the new state on
+		// re-fetch.
+		writeStandardError(w, http.StatusBadGateway, apiopenapi.INTERNALERROR, "oauth refresh failed: "+refreshErr.Error(), requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountResponse{
+		Data:      s.apiAccount(r.Context(), updated),
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleClearAdminAccountError(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)

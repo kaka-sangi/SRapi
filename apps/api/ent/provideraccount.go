@@ -50,7 +50,17 @@ type ProviderAccount struct {
 	RiskLevel string `json:"risk_level,omitempty"`
 	// MetadataJSON holds the value of the "metadata_json" field.
 	MetadataJSON map[string]interface{} `json:"metadata_json,omitempty"`
-	selectValues sql.SelectValues
+	// TokenExpiresAt holds the value of the "token_expires_at" field.
+	TokenExpiresAt *time.Time `json:"token_expires_at,omitempty"`
+	// LastRefreshedAt holds the value of the "last_refreshed_at" field.
+	LastRefreshedAt *time.Time `json:"last_refreshed_at,omitempty"`
+	// NeedsReauthAt holds the value of the "needs_reauth_at" field.
+	NeedsReauthAt *time.Time `json:"needs_reauth_at,omitempty"`
+	// RefreshAttempts holds the value of the "refresh_attempts" field.
+	RefreshAttempts int `json:"refresh_attempts,omitempty"`
+	// RefreshLastError holds the value of the "refresh_last_error" field.
+	RefreshLastError string `json:"refresh_last_error,omitempty"`
+	selectValues     sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -62,11 +72,11 @@ func (*ProviderAccount) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case provideraccount.FieldWeight:
 			values[i] = new(sql.NullFloat64)
-		case provideraccount.FieldID, provideraccount.FieldProviderID, provideraccount.FieldCredentialVersion, provideraccount.FieldPriority:
+		case provideraccount.FieldID, provideraccount.FieldProviderID, provideraccount.FieldCredentialVersion, provideraccount.FieldPriority, provideraccount.FieldRefreshAttempts:
 			values[i] = new(sql.NullInt64)
-		case provideraccount.FieldName, provideraccount.FieldAccountType, provideraccount.FieldRuntimeClass, provideraccount.FieldUpstreamClient, provideraccount.FieldProxyID, provideraccount.FieldStatus, provideraccount.FieldRiskLevel:
+		case provideraccount.FieldName, provideraccount.FieldAccountType, provideraccount.FieldRuntimeClass, provideraccount.FieldUpstreamClient, provideraccount.FieldProxyID, provideraccount.FieldStatus, provideraccount.FieldRiskLevel, provideraccount.FieldRefreshLastError:
 			values[i] = new(sql.NullString)
-		case provideraccount.FieldCreatedAt, provideraccount.FieldUpdatedAt, provideraccount.FieldDeletedAt:
+		case provideraccount.FieldCreatedAt, provideraccount.FieldUpdatedAt, provideraccount.FieldDeletedAt, provideraccount.FieldTokenExpiresAt, provideraccount.FieldLastRefreshedAt, provideraccount.FieldNeedsReauthAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -190,6 +200,39 @@ func (_m *ProviderAccount) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field metadata_json: %w", err)
 				}
 			}
+		case provideraccount.FieldTokenExpiresAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field token_expires_at", values[i])
+			} else if value.Valid {
+				_m.TokenExpiresAt = new(time.Time)
+				*_m.TokenExpiresAt = value.Time
+			}
+		case provideraccount.FieldLastRefreshedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field last_refreshed_at", values[i])
+			} else if value.Valid {
+				_m.LastRefreshedAt = new(time.Time)
+				*_m.LastRefreshedAt = value.Time
+			}
+		case provideraccount.FieldNeedsReauthAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field needs_reauth_at", values[i])
+			} else if value.Valid {
+				_m.NeedsReauthAt = new(time.Time)
+				*_m.NeedsReauthAt = value.Time
+			}
+		case provideraccount.FieldRefreshAttempts:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field refresh_attempts", values[i])
+			} else if value.Valid {
+				_m.RefreshAttempts = int(value.Int64)
+			}
+		case provideraccount.FieldRefreshLastError:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field refresh_last_error", values[i])
+			} else if value.Valid {
+				_m.RefreshLastError = value.String
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -278,6 +321,27 @@ func (_m *ProviderAccount) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("metadata_json=")
 	builder.WriteString(fmt.Sprintf("%v", _m.MetadataJSON))
+	builder.WriteString(", ")
+	if v := _m.TokenExpiresAt; v != nil {
+		builder.WriteString("token_expires_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.LastRefreshedAt; v != nil {
+		builder.WriteString("last_refreshed_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.NeedsReauthAt; v != nil {
+		builder.WriteString("needs_reauth_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("refresh_attempts=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RefreshAttempts))
+	builder.WriteString(", ")
+	builder.WriteString("refresh_last_error=")
+	builder.WriteString(_m.RefreshLastError)
 	builder.WriteByte(')')
 	return builder.String()
 }

@@ -95,6 +95,23 @@ type ProviderAccount struct {
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 	DeletedAt            *time.Time
+	// TokenExpiresAt is snapshotted from the OAuth credential's "expires_at"
+	// after a refresh. The admin list/worker use it to drive the proactive
+	// refresh window without decrypting credential_ciphertext.
+	TokenExpiresAt *time.Time
+	// LastRefreshedAt is the wall-clock time of the most recent successful
+	// OAuth refresh on this account.
+	LastRefreshedAt *time.Time
+	// NeedsReauthAt is set when refresh is hopeless (permanent OAuth error
+	// such as invalid_grant, or refresh_attempts >= 5). While non-nil, the
+	// proactive worker skips this account so the upstream is not hammered.
+	NeedsReauthAt *time.Time
+	// RefreshAttempts counts consecutive refresh failures. Zeroed on success.
+	RefreshAttempts int
+	// RefreshLastError is the most recent refresh error message, truncated
+	// to 500 chars before persistence so operators can see WHY the account
+	// flipped into needs_reauth.
+	RefreshLastError string
 }
 
 type ProxyDefinition struct {

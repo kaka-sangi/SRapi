@@ -65,7 +65,9 @@ func (s *Store) Update(ctx context.Context, account contract.ProviderAccount) (c
 		SetStatus(string(account.Status)).
 		SetPriority(account.Priority).
 		SetWeight(float64(account.Weight)).
-		SetMetadataJSON(cloneMap(account.Metadata))
+		SetMetadataJSON(cloneMap(account.Metadata)).
+		SetRefreshAttempts(account.RefreshAttempts).
+		SetRefreshLastError(account.RefreshLastError)
 	if account.ProxyID == nil {
 		update.ClearProxyID()
 	} else {
@@ -73,6 +75,21 @@ func (s *Store) Update(ctx context.Context, account contract.ProviderAccount) (c
 	}
 	if account.RiskLevel != nil {
 		update.SetRiskLevel(*account.RiskLevel)
+	}
+	if account.TokenExpiresAt != nil {
+		update.SetTokenExpiresAt(*account.TokenExpiresAt)
+	} else {
+		update.ClearTokenExpiresAt()
+	}
+	if account.LastRefreshedAt != nil {
+		update.SetLastRefreshedAt(*account.LastRefreshedAt)
+	} else {
+		update.ClearLastRefreshedAt()
+	}
+	if account.NeedsReauthAt != nil {
+		update.SetNeedsReauthAt(*account.NeedsReauthAt)
+	} else {
+		update.ClearNeedsReauthAt()
 	}
 	if !account.UpdatedAt.IsZero() {
 		update.SetUpdatedAt(account.UpdatedAt)
@@ -541,6 +558,11 @@ func toAccount(row *ent.ProviderAccount) contract.ProviderAccount {
 		CreatedAt:            row.CreatedAt,
 		UpdatedAt:            row.UpdatedAt,
 		DeletedAt:            cloneTime(row.DeletedAt),
+		TokenExpiresAt:       cloneTime(row.TokenExpiresAt),
+		LastRefreshedAt:      cloneTime(row.LastRefreshedAt),
+		NeedsReauthAt:        cloneTime(row.NeedsReauthAt),
+		RefreshAttempts:      row.RefreshAttempts,
+		RefreshLastError:     row.RefreshLastError,
 	}
 }
 

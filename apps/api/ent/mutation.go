@@ -44428,6 +44428,12 @@ type ProviderAccountMutation struct {
 	addweight             *float64
 	risk_level            *string
 	metadata_json         *map[string]interface{}
+	token_expires_at      *time.Time
+	last_refreshed_at     *time.Time
+	needs_reauth_at       *time.Time
+	refresh_attempts      *int
+	addrefresh_attempts   *int
+	refresh_last_error    *string
 	clearedFields         map[string]struct{}
 	done                  bool
 	oldValue              func(context.Context) (*ProviderAccount, error)
@@ -45253,6 +45259,245 @@ func (m *ProviderAccountMutation) ResetMetadataJSON() {
 	delete(m.clearedFields, provideraccount.FieldMetadataJSON)
 }
 
+// SetTokenExpiresAt sets the "token_expires_at" field.
+func (m *ProviderAccountMutation) SetTokenExpiresAt(t time.Time) {
+	m.token_expires_at = &t
+}
+
+// TokenExpiresAt returns the value of the "token_expires_at" field in the mutation.
+func (m *ProviderAccountMutation) TokenExpiresAt() (r time.Time, exists bool) {
+	v := m.token_expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTokenExpiresAt returns the old "token_expires_at" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldTokenExpiresAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTokenExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTokenExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTokenExpiresAt: %w", err)
+	}
+	return oldValue.TokenExpiresAt, nil
+}
+
+// ClearTokenExpiresAt clears the value of the "token_expires_at" field.
+func (m *ProviderAccountMutation) ClearTokenExpiresAt() {
+	m.token_expires_at = nil
+	m.clearedFields[provideraccount.FieldTokenExpiresAt] = struct{}{}
+}
+
+// TokenExpiresAtCleared returns if the "token_expires_at" field was cleared in this mutation.
+func (m *ProviderAccountMutation) TokenExpiresAtCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldTokenExpiresAt]
+	return ok
+}
+
+// ResetTokenExpiresAt resets all changes to the "token_expires_at" field.
+func (m *ProviderAccountMutation) ResetTokenExpiresAt() {
+	m.token_expires_at = nil
+	delete(m.clearedFields, provideraccount.FieldTokenExpiresAt)
+}
+
+// SetLastRefreshedAt sets the "last_refreshed_at" field.
+func (m *ProviderAccountMutation) SetLastRefreshedAt(t time.Time) {
+	m.last_refreshed_at = &t
+}
+
+// LastRefreshedAt returns the value of the "last_refreshed_at" field in the mutation.
+func (m *ProviderAccountMutation) LastRefreshedAt() (r time.Time, exists bool) {
+	v := m.last_refreshed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastRefreshedAt returns the old "last_refreshed_at" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldLastRefreshedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastRefreshedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastRefreshedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastRefreshedAt: %w", err)
+	}
+	return oldValue.LastRefreshedAt, nil
+}
+
+// ClearLastRefreshedAt clears the value of the "last_refreshed_at" field.
+func (m *ProviderAccountMutation) ClearLastRefreshedAt() {
+	m.last_refreshed_at = nil
+	m.clearedFields[provideraccount.FieldLastRefreshedAt] = struct{}{}
+}
+
+// LastRefreshedAtCleared returns if the "last_refreshed_at" field was cleared in this mutation.
+func (m *ProviderAccountMutation) LastRefreshedAtCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldLastRefreshedAt]
+	return ok
+}
+
+// ResetLastRefreshedAt resets all changes to the "last_refreshed_at" field.
+func (m *ProviderAccountMutation) ResetLastRefreshedAt() {
+	m.last_refreshed_at = nil
+	delete(m.clearedFields, provideraccount.FieldLastRefreshedAt)
+}
+
+// SetNeedsReauthAt sets the "needs_reauth_at" field.
+func (m *ProviderAccountMutation) SetNeedsReauthAt(t time.Time) {
+	m.needs_reauth_at = &t
+}
+
+// NeedsReauthAt returns the value of the "needs_reauth_at" field in the mutation.
+func (m *ProviderAccountMutation) NeedsReauthAt() (r time.Time, exists bool) {
+	v := m.needs_reauth_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNeedsReauthAt returns the old "needs_reauth_at" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldNeedsReauthAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNeedsReauthAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNeedsReauthAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNeedsReauthAt: %w", err)
+	}
+	return oldValue.NeedsReauthAt, nil
+}
+
+// ClearNeedsReauthAt clears the value of the "needs_reauth_at" field.
+func (m *ProviderAccountMutation) ClearNeedsReauthAt() {
+	m.needs_reauth_at = nil
+	m.clearedFields[provideraccount.FieldNeedsReauthAt] = struct{}{}
+}
+
+// NeedsReauthAtCleared returns if the "needs_reauth_at" field was cleared in this mutation.
+func (m *ProviderAccountMutation) NeedsReauthAtCleared() bool {
+	_, ok := m.clearedFields[provideraccount.FieldNeedsReauthAt]
+	return ok
+}
+
+// ResetNeedsReauthAt resets all changes to the "needs_reauth_at" field.
+func (m *ProviderAccountMutation) ResetNeedsReauthAt() {
+	m.needs_reauth_at = nil
+	delete(m.clearedFields, provideraccount.FieldNeedsReauthAt)
+}
+
+// SetRefreshAttempts sets the "refresh_attempts" field.
+func (m *ProviderAccountMutation) SetRefreshAttempts(i int) {
+	m.refresh_attempts = &i
+	m.addrefresh_attempts = nil
+}
+
+// RefreshAttempts returns the value of the "refresh_attempts" field in the mutation.
+func (m *ProviderAccountMutation) RefreshAttempts() (r int, exists bool) {
+	v := m.refresh_attempts
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRefreshAttempts returns the old "refresh_attempts" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldRefreshAttempts(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRefreshAttempts is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRefreshAttempts requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRefreshAttempts: %w", err)
+	}
+	return oldValue.RefreshAttempts, nil
+}
+
+// AddRefreshAttempts adds i to the "refresh_attempts" field.
+func (m *ProviderAccountMutation) AddRefreshAttempts(i int) {
+	if m.addrefresh_attempts != nil {
+		*m.addrefresh_attempts += i
+	} else {
+		m.addrefresh_attempts = &i
+	}
+}
+
+// AddedRefreshAttempts returns the value that was added to the "refresh_attempts" field in this mutation.
+func (m *ProviderAccountMutation) AddedRefreshAttempts() (r int, exists bool) {
+	v := m.addrefresh_attempts
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRefreshAttempts resets all changes to the "refresh_attempts" field.
+func (m *ProviderAccountMutation) ResetRefreshAttempts() {
+	m.refresh_attempts = nil
+	m.addrefresh_attempts = nil
+}
+
+// SetRefreshLastError sets the "refresh_last_error" field.
+func (m *ProviderAccountMutation) SetRefreshLastError(s string) {
+	m.refresh_last_error = &s
+}
+
+// RefreshLastError returns the value of the "refresh_last_error" field in the mutation.
+func (m *ProviderAccountMutation) RefreshLastError() (r string, exists bool) {
+	v := m.refresh_last_error
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRefreshLastError returns the old "refresh_last_error" field's value of the ProviderAccount entity.
+// If the ProviderAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderAccountMutation) OldRefreshLastError(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRefreshLastError is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRefreshLastError requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRefreshLastError: %w", err)
+	}
+	return oldValue.RefreshLastError, nil
+}
+
+// ResetRefreshLastError resets all changes to the "refresh_last_error" field.
+func (m *ProviderAccountMutation) ResetRefreshLastError() {
+	m.refresh_last_error = nil
+}
+
 // Where appends a list predicates to the ProviderAccountMutation builder.
 func (m *ProviderAccountMutation) Where(ps ...predicate.ProviderAccount) {
 	m.predicates = append(m.predicates, ps...)
@@ -45287,7 +45532,7 @@ func (m *ProviderAccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProviderAccountMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 21)
 	if m.created_at != nil {
 		fields = append(fields, provideraccount.FieldCreatedAt)
 	}
@@ -45336,6 +45581,21 @@ func (m *ProviderAccountMutation) Fields() []string {
 	if m.metadata_json != nil {
 		fields = append(fields, provideraccount.FieldMetadataJSON)
 	}
+	if m.token_expires_at != nil {
+		fields = append(fields, provideraccount.FieldTokenExpiresAt)
+	}
+	if m.last_refreshed_at != nil {
+		fields = append(fields, provideraccount.FieldLastRefreshedAt)
+	}
+	if m.needs_reauth_at != nil {
+		fields = append(fields, provideraccount.FieldNeedsReauthAt)
+	}
+	if m.refresh_attempts != nil {
+		fields = append(fields, provideraccount.FieldRefreshAttempts)
+	}
+	if m.refresh_last_error != nil {
+		fields = append(fields, provideraccount.FieldRefreshLastError)
+	}
 	return fields
 }
 
@@ -45376,6 +45636,16 @@ func (m *ProviderAccountMutation) Field(name string) (ent.Value, bool) {
 		return m.RiskLevel()
 	case provideraccount.FieldMetadataJSON:
 		return m.MetadataJSON()
+	case provideraccount.FieldTokenExpiresAt:
+		return m.TokenExpiresAt()
+	case provideraccount.FieldLastRefreshedAt:
+		return m.LastRefreshedAt()
+	case provideraccount.FieldNeedsReauthAt:
+		return m.NeedsReauthAt()
+	case provideraccount.FieldRefreshAttempts:
+		return m.RefreshAttempts()
+	case provideraccount.FieldRefreshLastError:
+		return m.RefreshLastError()
 	}
 	return nil, false
 }
@@ -45417,6 +45687,16 @@ func (m *ProviderAccountMutation) OldField(ctx context.Context, name string) (en
 		return m.OldRiskLevel(ctx)
 	case provideraccount.FieldMetadataJSON:
 		return m.OldMetadataJSON(ctx)
+	case provideraccount.FieldTokenExpiresAt:
+		return m.OldTokenExpiresAt(ctx)
+	case provideraccount.FieldLastRefreshedAt:
+		return m.OldLastRefreshedAt(ctx)
+	case provideraccount.FieldNeedsReauthAt:
+		return m.OldNeedsReauthAt(ctx)
+	case provideraccount.FieldRefreshAttempts:
+		return m.OldRefreshAttempts(ctx)
+	case provideraccount.FieldRefreshLastError:
+		return m.OldRefreshLastError(ctx)
 	}
 	return nil, fmt.Errorf("unknown ProviderAccount field %s", name)
 }
@@ -45538,6 +45818,41 @@ func (m *ProviderAccountMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetMetadataJSON(v)
 		return nil
+	case provideraccount.FieldTokenExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTokenExpiresAt(v)
+		return nil
+	case provideraccount.FieldLastRefreshedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastRefreshedAt(v)
+		return nil
+	case provideraccount.FieldNeedsReauthAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNeedsReauthAt(v)
+		return nil
+	case provideraccount.FieldRefreshAttempts:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRefreshAttempts(v)
+		return nil
+	case provideraccount.FieldRefreshLastError:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRefreshLastError(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ProviderAccount field %s", name)
 }
@@ -45558,6 +45873,9 @@ func (m *ProviderAccountMutation) AddedFields() []string {
 	if m.addweight != nil {
 		fields = append(fields, provideraccount.FieldWeight)
 	}
+	if m.addrefresh_attempts != nil {
+		fields = append(fields, provideraccount.FieldRefreshAttempts)
+	}
 	return fields
 }
 
@@ -45574,6 +45892,8 @@ func (m *ProviderAccountMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedPriority()
 	case provideraccount.FieldWeight:
 		return m.AddedWeight()
+	case provideraccount.FieldRefreshAttempts:
+		return m.AddedRefreshAttempts()
 	}
 	return nil, false
 }
@@ -45611,6 +45931,13 @@ func (m *ProviderAccountMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddWeight(v)
 		return nil
+	case provideraccount.FieldRefreshAttempts:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRefreshAttempts(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ProviderAccount numeric field %s", name)
 }
@@ -45633,6 +45960,15 @@ func (m *ProviderAccountMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(provideraccount.FieldMetadataJSON) {
 		fields = append(fields, provideraccount.FieldMetadataJSON)
+	}
+	if m.FieldCleared(provideraccount.FieldTokenExpiresAt) {
+		fields = append(fields, provideraccount.FieldTokenExpiresAt)
+	}
+	if m.FieldCleared(provideraccount.FieldLastRefreshedAt) {
+		fields = append(fields, provideraccount.FieldLastRefreshedAt)
+	}
+	if m.FieldCleared(provideraccount.FieldNeedsReauthAt) {
+		fields = append(fields, provideraccount.FieldNeedsReauthAt)
 	}
 	return fields
 }
@@ -45662,6 +45998,15 @@ func (m *ProviderAccountMutation) ClearField(name string) error {
 		return nil
 	case provideraccount.FieldMetadataJSON:
 		m.ClearMetadataJSON()
+		return nil
+	case provideraccount.FieldTokenExpiresAt:
+		m.ClearTokenExpiresAt()
+		return nil
+	case provideraccount.FieldLastRefreshedAt:
+		m.ClearLastRefreshedAt()
+		return nil
+	case provideraccount.FieldNeedsReauthAt:
+		m.ClearNeedsReauthAt()
 		return nil
 	}
 	return fmt.Errorf("unknown ProviderAccount nullable field %s", name)
@@ -45718,6 +46063,21 @@ func (m *ProviderAccountMutation) ResetField(name string) error {
 		return nil
 	case provideraccount.FieldMetadataJSON:
 		m.ResetMetadataJSON()
+		return nil
+	case provideraccount.FieldTokenExpiresAt:
+		m.ResetTokenExpiresAt()
+		return nil
+	case provideraccount.FieldLastRefreshedAt:
+		m.ResetLastRefreshedAt()
+		return nil
+	case provideraccount.FieldNeedsReauthAt:
+		m.ResetNeedsReauthAt()
+		return nil
+	case provideraccount.FieldRefreshAttempts:
+		m.ResetRefreshAttempts()
+		return nil
+	case provideraccount.FieldRefreshLastError:
+		m.ResetRefreshLastError()
 		return nil
 	}
 	return fmt.Errorf("unknown ProviderAccount field %s", name)

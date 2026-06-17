@@ -29,6 +29,27 @@ func (ProviderAccount) Fields() []ent.Field {
 		field.Float("weight").Default(1),
 		field.String("risk_level").Default("normal"),
 		field.JSON("metadata_json", map[string]any{}).Optional(),
+		// token_expires_at is snapshotted from the OAuth credential map after a
+		// refresh so the admin list/worker can filter on expiry without having
+		// to decrypt credential_ciphertext. The authoritative expires_at still
+		// lives inside the encrypted credential.
+		field.Time("token_expires_at").Optional().Nillable(),
+		// last_refreshed_at is the wall-clock time of the most recent successful
+		// OAuth refresh. Cleared until the first success.
+		field.Time("last_refreshed_at").Optional().Nillable(),
+		// needs_reauth_at is set by the refresh worker (or the on-demand admin
+		// endpoint) when refresh has become hopeless — either the upstream
+		// returned a permanent OAuth error (invalid_grant et al.) or
+		// refresh_attempts crossed the failure threshold. While non-nil, the
+		// worker skips this account so it stops hammering the upstream.
+		field.Time("needs_reauth_at").Optional().Nillable(),
+		// refresh_attempts is the consecutive-failure counter. Reset to 0 on a
+		// successful refresh.
+		field.Int("refresh_attempts").Default(0),
+		// refresh_last_error captures the most recent refresh error message
+		// (truncated server-side to 500 chars) so operators can see WHY the
+		// account flipped into needs_reauth.
+		field.String("refresh_last_error").Default("").MaxLen(500),
 	}
 }
 

@@ -8230,16 +8230,31 @@ type ProviderAccount struct {
 	GroupIds  []Id      `json:"group_ids"`
 	Id        Id        `json:"id"`
 
+	// LastRefreshedAt Time of the most recent successful OAuth refresh.
+	LastRefreshedAt *Timestamp `json:"last_refreshed_at,omitempty"`
+
 	// Metadata Free-form per-account configuration. Recognized convention keys (no schema migration; read at scheduling time): `base_url` (override the upstream base URL); `supported_models` (string array — exact-match inclusion whitelist of upstream model names this account may serve; absent = serve all); `excluded_models` (string array of `*` wildcard patterns — exclude any catalog or upstream model name matching a pattern; takes precedence over `supported_models` and hides the model from `/v1/models` when every serving account excludes it); `model_mapping` (object mapping a canonical catalog model name to a per-account upstream model name override).
-	Metadata       *JsonObject           `json:"metadata,omitempty"`
-	Name           string                `json:"name"`
-	Priority       int                   `json:"priority"`
-	ProviderId     Id                    `json:"provider_id"`
-	RiskLevel      *string               `json:"risk_level,omitempty"`
-	RuntimeClass   RuntimeClass          `json:"runtime_class"`
-	Status         ProviderAccountStatus `json:"status"`
-	UpstreamClient *string               `json:"upstream_client,omitempty"`
-	Weight         float32               `json:"weight"`
+	Metadata *JsonObject `json:"metadata,omitempty"`
+	Name     string      `json:"name"`
+
+	// NeedsReauthAt Set when refresh has become hopeless (permanent OAuth error such as invalid_grant, OR refresh_attempts >= 5). The proactive refresh worker skips accounts with this set so the upstream is not hammered; an operator must re-bind the account to clear it.
+	NeedsReauthAt *Timestamp `json:"needs_reauth_at,omitempty"`
+	Priority      int        `json:"priority"`
+	ProviderId    Id         `json:"provider_id"`
+
+	// RefreshAttempts Consecutive refresh-failure count; reset to 0 on a success.
+	RefreshAttempts *int `json:"refresh_attempts,omitempty"`
+
+	// RefreshLastError Most recent refresh error message (truncated to 500 chars).
+	RefreshLastError *string               `json:"refresh_last_error,omitempty"`
+	RiskLevel        *string               `json:"risk_level,omitempty"`
+	RuntimeClass     RuntimeClass          `json:"runtime_class"`
+	Status           ProviderAccountStatus `json:"status"`
+
+	// TokenExpiresAt Wall-clock expiry of the OAuth access token, snapshotted from the credential after the last successful refresh. Null when the account has never been refreshed or the credential carries no expires_at. OAuth runtime classes only.
+	TokenExpiresAt *Timestamp `json:"token_expires_at,omitempty"`
+	UpstreamClient *string    `json:"upstream_client,omitempty"`
+	Weight         float32    `json:"weight"`
 }
 
 // ProviderAccountExportItem defines model for ProviderAccountExportItem.
@@ -18096,6 +18111,9 @@ type ServerInterface interface {
 	// Recover a protected provider account after operator remediation.
 	// (POST /api/v1/admin/accounts/{id}/recover)
 	RecoverAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
+	// Refresh an OAuth account's access token on demand.
+	// (POST /api/v1/admin/accounts/{id}/refresh)
+	RefreshAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
 	// Clear quota error state for a provider account.
 	// (POST /api/v1/admin/accounts/{id}/reset-quota)
 	ResetAdminAccountQuota(w http.ResponseWriter, r *http.Request, id Id)
@@ -20908,6 +20926,40 @@ func (siw *ServerInterfaceWrapper) RecoverAdminAccount(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RecoverAdminAccount(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RefreshAdminAccount operation middleware
+func (siw *ServerInterfaceWrapper) RefreshAdminAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RefreshAdminAccount(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -32981,6 +33033,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/quota", wrapper.GetAdminAccountQuota)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/quota-fetch", wrapper.FetchAdminAccountQuota)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/recover", wrapper.RecoverAdminAccount)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/refresh", wrapper.RefreshAdminAccount)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/reset-quota", wrapper.ResetAdminAccountQuota)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/rpm-status", wrapper.GetAdminAccountRpmStatus)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/test", wrapper.TestAdminAccount)

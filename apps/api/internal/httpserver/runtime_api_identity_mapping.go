@@ -233,20 +233,35 @@ func toAPIModelProviderMapping(mapping modelcontract.ModelProviderMapping) apiop
 }
 
 func toAPIAccount(account accountcontract.ProviderAccount) apiopenapi.ProviderAccount {
-	return apiopenapi.ProviderAccount{
-		CreatedAt:      account.CreatedAt,
-		GroupIds:       []apiopenapi.Id{},
-		Id:             apiopenapi.Id(strconv.Itoa(account.ID)),
-		Metadata:       mapToJsonObjectPtr(account.Metadata),
-		Name:           account.Name,
-		Priority:       account.Priority,
-		ProviderId:     apiopenapi.Id(strconv.Itoa(account.ProviderID)),
-		RiskLevel:      account.RiskLevel,
-		RuntimeClass:   apiopenapi.RuntimeClass(account.RuntimeClass),
-		Status:         apiopenapi.ProviderAccountStatus(account.Status),
-		UpstreamClient: account.UpstreamClient,
-		Weight:         account.Weight,
+	out := apiopenapi.ProviderAccount{
+		CreatedAt:        account.CreatedAt,
+		GroupIds:         []apiopenapi.Id{},
+		Id:               apiopenapi.Id(strconv.Itoa(account.ID)),
+		Metadata:         mapToJsonObjectPtr(account.Metadata),
+		Name:             account.Name,
+		Priority:         account.Priority,
+		ProviderId:       apiopenapi.Id(strconv.Itoa(account.ProviderID)),
+		RiskLevel:        account.RiskLevel,
+		RuntimeClass:     apiopenapi.RuntimeClass(account.RuntimeClass),
+		Status:           apiopenapi.ProviderAccountStatus(account.Status),
+		UpstreamClient:   account.UpstreamClient,
+		Weight:           account.Weight,
+		RefreshAttempts:  &account.RefreshAttempts,
+		RefreshLastError: &account.RefreshLastError,
 	}
+	if account.TokenExpiresAt != nil {
+		ts := *account.TokenExpiresAt
+		out.TokenExpiresAt = &ts
+	}
+	if account.LastRefreshedAt != nil {
+		ts := *account.LastRefreshedAt
+		out.LastRefreshedAt = &ts
+	}
+	if account.NeedsReauthAt != nil {
+		ts := *account.NeedsReauthAt
+		out.NeedsReauthAt = &ts
+	}
+	return out
 }
 
 func apiStringPtr[T ~string](value *string) *T {

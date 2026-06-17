@@ -5773,6 +5773,58 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/accounts/{id}/refresh:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: refreshAdminAccount
+      summary: Refresh an OAuth account's access token on demand.
+      description: >
+        Runs the same code path as the proactive accounts_token_refresh worker
+        against this one account: calls the upstream OAuth refresh endpoint,
+        persists the new credential + token_expires_at + last_refreshed_at on
+        success, or increments refresh_attempts (and sets needs_reauth_at on
+        a permanent / 5-strike failure) on failure. Only oauth_refresh and
+        oauth_device_code accounts are accepted.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Provider account refreshed.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderAccountResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          description: Upstream OAuth refresh failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/accounts/{id}/health:
     get:
       tags:
@@ -19550,6 +19602,36 @@ components:
             every serving account excludes it);
             `model_mapping` (object mapping a canonical catalog model name to a
             per-account upstream model name override).
+        token_expires_at:
+          allOf:
+            - $ref: "#/components/schemas/Timestamp"
+          nullable: true
+          description: >
+            Wall-clock expiry of the OAuth access token, snapshotted from the
+            credential after the last successful refresh. Null when the
+            account has never been refreshed or the credential carries no
+            expires_at. OAuth runtime classes only.
+        last_refreshed_at:
+          allOf:
+            - $ref: "#/components/schemas/Timestamp"
+          nullable: true
+          description: Time of the most recent successful OAuth refresh.
+        needs_reauth_at:
+          allOf:
+            - $ref: "#/components/schemas/Timestamp"
+          nullable: true
+          description: >
+            Set when refresh has become hopeless (permanent OAuth error such
+            as invalid_grant, OR refresh_attempts >= 5). The proactive
+            refresh worker skips accounts with this set so the upstream is
+            not hammered; an operator must re-bind the account to clear it.
+        refresh_attempts:
+          type: integer
+          default: 0
+          description: Consecutive refresh-failure count; reset to 0 on a success.
+        refresh_last_error:
+          type: string
+          description: Most recent refresh error message (truncated to 500 chars).
         created_at:
           $ref: "#/components/schemas/Timestamp"
 

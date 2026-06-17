@@ -37,6 +37,7 @@ type Config struct {
 	Observability    ObservabilityConfig
 	Captcha          CaptchaConfig
 	QuotaRefresh     QuotaRefreshConfig
+	AccountsTokenRefresh AccountsTokenRefreshConfig
 	LiteLLMPricing   LiteLLMPricingConfig
 	ConnectivityTest ConnectivityTestConfig
 	ScheduledTest    ScheduledTestConfig
@@ -66,6 +67,21 @@ type QuotaRefreshConfig struct {
 	Interval      time.Duration
 	Timeout       time.Duration
 	MaxConcurrent int
+}
+
+// AccountsTokenRefreshConfig controls the proactive OAuth access-token
+// refresh worker. The worker only acts on accounts whose runtime_class is
+// oauth_refresh or oauth_device_code, whose status is active, whose
+// needs_reauth_at is nil, and whose token_expires_at falls inside the
+// RefreshThreshold window. Enabled by default — the upstream cost per pass
+// is one refresh request per due account, and silently letting tokens
+// expire is exactly the failure mode this worker exists to prevent.
+type AccountsTokenRefreshConfig struct {
+	Enabled          bool
+	Interval         time.Duration
+	RefreshThreshold time.Duration
+	Timeout          time.Duration
+	MaxConcurrent    int
 }
 
 // LiteLLMPricingConfig controls optional remote LiteLLM price-list sync.
@@ -387,6 +403,13 @@ func Load() Config {
 			Interval:      time.Duration(getIntEnv("ACCOUNT_QUOTA_REFRESH_INTERVAL_SECONDS", 1800)) * time.Second,
 			Timeout:       time.Duration(getIntEnv("ACCOUNT_QUOTA_REFRESH_TIMEOUT_SECONDS", 15)) * time.Second,
 			MaxConcurrent: getIntEnv("ACCOUNT_QUOTA_REFRESH_MAX_CONCURRENT", 4),
+		},
+		AccountsTokenRefresh: AccountsTokenRefreshConfig{
+			Enabled:          getBoolEnv("ACCOUNTS_TOKEN_REFRESH_ENABLED", true),
+			Interval:         time.Duration(getIntEnv("ACCOUNTS_TOKEN_REFRESH_INTERVAL_SECONDS", 300)) * time.Second,
+			RefreshThreshold: time.Duration(getIntEnv("ACCOUNTS_TOKEN_REFRESH_THRESHOLD_SECONDS", 300)) * time.Second,
+			Timeout:          time.Duration(getIntEnv("ACCOUNTS_TOKEN_REFRESH_TIMEOUT_SECONDS", 30)) * time.Second,
+			MaxConcurrent:    getIntEnv("ACCOUNTS_TOKEN_REFRESH_MAX_CONCURRENT", 4),
 		},
 		LiteLLMPricing: LiteLLMPricingConfig{
 			SourceURL: getEnv("LITELLM_PRICING_SOURCE_URL", ""),

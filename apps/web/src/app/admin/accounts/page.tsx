@@ -31,6 +31,7 @@ import {
   useUpdateAccount,
   useClearAccountError,
   useRecoverAccount,
+  useRefreshAccount,
   useResetAccountQuota,
   useBatchActionAccounts,
   useBatchUpdateAccounts,
@@ -58,6 +59,7 @@ import type { Provider, ProviderAccount } from "@/lib/sdk-types";
 import { type AccountListMode, metadataString } from "./account-types";
 import { AccountHealthCell, AccountQuotaCell, HealthSummaryStrip } from "./account-health-cells";
 import { AccountStatusCell } from "./account-status-cell";
+import { TokenExpiryChip } from "./token-expiry-chip";
 import { AutoRefreshButton, ViewModeToggle } from "./accounts-toolbar";
 import { AccountsCardView } from "./account-card";
 
@@ -124,6 +126,7 @@ function AccountsContent() {
   const updateMut = useUpdateAccount();
   const clearErr = useClearAccountError();
   const recover = useRecoverAccount();
+  const refreshToken = useRefreshAccount();
   const resetQuota = useResetAccountQuota();
   const batchAction = useBatchActionAccounts();
   const batchUpdate = useBatchUpdateAccounts();
@@ -349,11 +352,14 @@ function AccountsContent() {
       key: "status",
       header: t("common.active"),
       render: (a) => (
-        <AccountStatusCell
-          account={a}
-          busy={setStatus.isPending}
-          onToggle={readOnlyHealthView ? undefined : () => toggleAccountStatus(a)}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <AccountStatusCell
+            account={a}
+            busy={setStatus.isPending}
+            onToggle={readOnlyHealthView ? undefined : () => toggleAccountStatus(a)}
+          />
+          <TokenExpiryChip account={a} />
+        </div>
       ),
     },
     {
@@ -527,6 +533,16 @@ function AccountsContent() {
       { label: t("adminAccounts.discoverModels"), onSelect: () => void runDiscover(a.id) },
       { label: t("adminAccounts.bindProxy"), onSelect: () => setProxyTarget(a) },
     );
+    if (a.runtime_class === "oauth_refresh" || a.runtime_class === "oauth_device_code") {
+      actions.push({
+        label: t("adminAccounts.refreshTokenAction"),
+        onSelect: () =>
+          void runAction(
+            () => refreshToken.mutateAsync(a.id),
+            t("adminAccounts.refreshSuccess"),
+          ),
+      });
+    }
     if (isRecoverable(a.status)) {
       actions.push(
         {

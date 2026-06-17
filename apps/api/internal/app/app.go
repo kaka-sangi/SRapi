@@ -20,6 +20,7 @@ import (
 	platformotel "github.com/srapi/srapi/apps/api/internal/platform/otel"
 	platformredis "github.com/srapi/srapi/apps/api/internal/platform/redis"
 	accountquotaalertworker "github.com/srapi/srapi/apps/api/internal/workers/account_quota_alert"
+	accountstokenrefreshworker "github.com/srapi/srapi/apps/api/internal/workers/accounts_token_refresh"
 	authcleanupworker "github.com/srapi/srapi/apps/api/internal/workers/auth_session_cleanup"
 	availabilityrollupworker "github.com/srapi/srapi/apps/api/internal/workers/availability_rollup"
 	backupworker "github.com/srapi/srapi/apps/api/internal/workers/backup"
@@ -59,6 +60,7 @@ type App struct {
 	authClean        *authcleanupworker.Worker
 	idemClean        *idempotencycleanupworker.Worker
 	quotaRefresh     *quotarefreshworker.Worker
+	tokenRefresh     *accountstokenrefreshworker.Worker
 	liteLLMPricing   *litellmpricingworker.Worker
 	connectivityTest *connectivitytestworker.Worker
 	scheduledTest    *scheduledtestworker.Worker
@@ -105,7 +107,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 
 	var usageDrain func(context.Context)
 	var usageReconciler *usageaggregationreconcilerworker.Worker
-	handler, outbox, retention, availability, backup, authClean, expirer, reconcile, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, liteLLMPricing, connectivityTest, scheduledTest, channelMonitor, proxyProbe, err := newHandler(cfg, logger, dbClient, redisClient, &usageDrain, &usageReconciler)
+	handler, outbox, retention, availability, backup, authClean, expirer, reconcile, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, liteLLMPricing, connectivityTest, scheduledTest, channelMonitor, proxyProbe, tokenRefresh, err := newHandler(cfg, logger, dbClient, redisClient, &usageDrain, &usageReconciler)
 	if err != nil {
 		_ = dbClient.Close()
 		_ = redisClient.Close()
@@ -132,6 +134,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		authClean:        authClean,
 		idemClean:        idemClean,
 		quotaRefresh:     quotaRefresh,
+		tokenRefresh:     tokenRefresh,
 		liteLLMPricing:   liteLLMPricing,
 		connectivityTest: connectivityTest,
 		scheduledTest:    scheduledTest,
@@ -223,7 +226,7 @@ func Healthcheck(ctx context.Context, cfg config.Config, path string) error {
 	return httpserver.Healthcheck(ctx, cfg.HealthcheckAddress(), path)
 }
 
-func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client, usageDrainSink *func(context.Context), reconcilerSink **usageaggregationreconcilerworker.Worker) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *availabilityrollupworker.Worker, *backupworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *paymentreconcileworker.Worker, *subscriptionexpirerworker.Worker, *accountquotaalertworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, *idempotencycleanupworker.Worker, *quotarefreshworker.Worker, *litellmpricingworker.Worker, *connectivitytestworker.Worker, *scheduledtestworker.Worker, *channelmonitorworker.Worker, *proxyprobeworker.Worker, error) {
+func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client, usageDrainSink *func(context.Context), reconcilerSink **usageaggregationreconcilerworker.Worker) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *availabilityrollupworker.Worker, *backupworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *paymentreconcileworker.Worker, *subscriptionexpirerworker.Worker, *accountquotaalertworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, *idempotencycleanupworker.Worker, *quotarefreshworker.Worker, *litellmpricingworker.Worker, *connectivitytestworker.Worker, *scheduledtestworker.Worker, *channelmonitorworker.Worker, *proxyprobeworker.Worker, *accountstokenrefreshworker.Worker, error) {
 	var (
 		handler http.Handler
 		err     error
@@ -240,21 +243,21 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	}
 	realtimeStore, err := realtimeSlotStore(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if realtimeStore != nil {
 		options = append(options, httpserver.WithRealtimeStore(realtimeStore))
 	}
 	balanceReservationStore, err := balanceReservationGateStore(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if balanceReservationStore != nil {
 		options = append(options, httpserver.WithBalanceReservationStore(balanceReservationStore))
 	}
 	sessionAffinity, err := sessionAffinityStore(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if sessionAffinity != nil {
 		options = append(options, httpserver.WithSessionAffinityStore(sessionAffinity))
@@ -264,98 +267,102 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	}
 	rateLimiterOption, err := gatewayRateLimiterOption(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if rateLimiterOption != nil {
 		options = append(options, rateLimiterOption)
 	}
 	stores, err := persistentStores(context.Background(), cfg, logger, dbClient, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	workerGuard, err := newWorkerLeaderGuard(dbClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	outbox, err := domainEventsWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	retention, err := retentionCleanupWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	availability, err := availabilityRollupWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	backup, err := backupWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	authClean, err := authSessionCleanupWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	idemClean, err := idempotencyCleanupWorker(stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	expirer, err := paymentOrderExpirerWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	reconcile, err := paymentReconcileWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	subExpiry, err := subscriptionExpirerWorker(stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	quota, err := accountQuotaAlertWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	balance, err := balanceChargerWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	health, err := accountHealthProbeWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	quality, err := qualityEvalWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	sloEval, err := sloEvaluatorWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	channelMonitor, err := channelMonitorWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	quotaRefresh, err := quotaRefreshWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	liteLLMPricing, err := liteLLMPricingWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	connectivityTest, err := connectivityTestWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	scheduledTest, err := scheduledTestWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	proxyProbe, err := proxyProbeWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+	}
+	tokenRefresh, err := accountsTokenRefreshWorker(cfg, stores, logger, workerGuard)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if stores != nil {
 		options = append(options,
@@ -413,7 +420,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		handler = httpserver.New(cfg, logger, options...)
 	}()
 
-	return handler, outbox, retention, availability, backup, authClean, expirer, reconcile, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, liteLLMPricing, connectivityTest, scheduledTest, channelMonitor, proxyProbe, err
+	return handler, outbox, retention, availability, backup, authClean, expirer, reconcile, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, liteLLMPricing, connectivityTest, scheduledTest, channelMonitor, proxyProbe, tokenRefresh, err
 }
 
 func persistentStores(ctx context.Context, cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (*entstore.Stores, error) {
@@ -784,6 +791,26 @@ func accountHealthProbeWorker(cfg config.Config, stores *entstore.Stores, logger
 	})
 }
 
+// accountsTokenRefreshWorker builds the proactive OAuth access-token refresh
+// worker. Always wires up when persistent stores are available and the config
+// flag is true (default true); the worker's eligibility filter
+// (oauth_refresh / oauth_device_code + active + token_expires_at set) means
+// it is a no-op cost on fleets without OAuth accounts.
+func accountsTokenRefreshWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger, guards ...*workerLeaderGuard) (*accountstokenrefreshworker.Worker, error) {
+	if stores == nil || stores.Accounts == nil || !cfg.AccountsTokenRefresh.Enabled {
+		return nil, nil
+	}
+	return accountstokenrefreshworker.New(stores.Accounts, logger, accountstokenrefreshworker.Config{
+		Interval:           cfg.AccountsTokenRefresh.Interval,
+		RefreshThreshold:   cfg.AccountsTokenRefresh.RefreshThreshold,
+		Timeout:            cfg.AccountsTokenRefresh.Timeout,
+		MaxConcurrent:      cfg.AccountsTokenRefresh.MaxConcurrent,
+		MasterKey:          cfg.Security.MasterKey,
+		BlockPrivateEgress: cfg.Server.Mode != "local",
+		RunGuard:           optionalWorkerGuard(guards...),
+	})
+}
+
 func quotaRefreshWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger, guards ...*workerLeaderGuard) (*quotarefreshworker.Worker, error) {
 	if stores == nil || stores.Accounts == nil || stores.Providers == nil || !cfg.QuotaRefresh.Enabled {
 		return nil, nil
@@ -960,6 +987,9 @@ func (a *App) startWorkers() {
 	if a.proxyProbe != nil {
 		a.proxyProbe.Start(context.Background())
 	}
+	if a.tokenRefresh != nil {
+		a.tokenRefresh.Start(context.Background())
+	}
 }
 
 func (a *App) stopWorkers(ctx context.Context) error {
@@ -1029,6 +1059,9 @@ func (a *App) stopWorkers(ctx context.Context) error {
 	}
 	if a.proxyProbe != nil {
 		errs = append(errs, a.proxyProbe.Shutdown(ctx))
+	}
+	if a.tokenRefresh != nil {
+		errs = append(errs, a.tokenRefresh.Shutdown(ctx))
 	}
 	return errors.Join(errs...)
 }

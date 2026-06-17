@@ -45,6 +45,16 @@ const (
 	FieldRiskLevel = "risk_level"
 	// FieldMetadataJSON holds the string denoting the metadata_json field in the database.
 	FieldMetadataJSON = "metadata_json"
+	// FieldTokenExpiresAt holds the string denoting the token_expires_at field in the database.
+	FieldTokenExpiresAt = "token_expires_at"
+	// FieldLastRefreshedAt holds the string denoting the last_refreshed_at field in the database.
+	FieldLastRefreshedAt = "last_refreshed_at"
+	// FieldNeedsReauthAt holds the string denoting the needs_reauth_at field in the database.
+	FieldNeedsReauthAt = "needs_reauth_at"
+	// FieldRefreshAttempts holds the string denoting the refresh_attempts field in the database.
+	FieldRefreshAttempts = "refresh_attempts"
+	// FieldRefreshLastError holds the string denoting the refresh_last_error field in the database.
+	FieldRefreshLastError = "refresh_last_error"
 	// Table holds the table name of the provideraccount in the database.
 	Table = "provider_accounts"
 )
@@ -68,6 +78,11 @@ var Columns = []string{
 	FieldWeight,
 	FieldRiskLevel,
 	FieldMetadataJSON,
+	FieldTokenExpiresAt,
+	FieldLastRefreshedAt,
+	FieldNeedsReauthAt,
+	FieldRefreshAttempts,
+	FieldRefreshLastError,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -103,6 +118,12 @@ var (
 	DefaultWeight float64
 	// DefaultRiskLevel holds the default value on creation for the "risk_level" field.
 	DefaultRiskLevel string
+	// DefaultRefreshAttempts holds the default value on creation for the "refresh_attempts" field.
+	DefaultRefreshAttempts int
+	// DefaultRefreshLastError holds the default value on creation for the "refresh_last_error" field.
+	DefaultRefreshLastError string
+	// RefreshLastErrorValidator is a validator for the "refresh_last_error" field. It is called by the builders before save.
+	RefreshLastErrorValidator func(string) error
 )
 
 // OrderOption defines the ordering options for the ProviderAccount queries.
@@ -181,4 +202,29 @@ func ByWeight(opts ...sql.OrderTermOption) OrderOption {
 // ByRiskLevel orders the results by the risk_level field.
 func ByRiskLevel(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRiskLevel, opts...).ToFunc()
+}
+
+// ByTokenExpiresAt orders the results by the token_expires_at field.
+func ByTokenExpiresAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTokenExpiresAt, opts...).ToFunc()
+}
+
+// ByLastRefreshedAt orders the results by the last_refreshed_at field.
+func ByLastRefreshedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastRefreshedAt, opts...).ToFunc()
+}
+
+// ByNeedsReauthAt orders the results by the needs_reauth_at field.
+func ByNeedsReauthAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNeedsReauthAt, opts...).ToFunc()
+}
+
+// ByRefreshAttempts orders the results by the refresh_attempts field.
+func ByRefreshAttempts(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRefreshAttempts, opts...).ToFunc()
+}
+
+// ByRefreshLastError orders the results by the refresh_last_error field.
+func ByRefreshLastError(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRefreshLastError, opts...).ToFunc()
 }

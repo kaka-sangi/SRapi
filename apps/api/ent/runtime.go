@@ -1733,6 +1733,16 @@ func init() {
 	provideraccountDescRiskLevel := provideraccountFields[11].Descriptor()
 	// provideraccount.DefaultRiskLevel holds the default value on creation for the risk_level field.
 	provideraccount.DefaultRiskLevel = provideraccountDescRiskLevel.Default.(string)
+	// provideraccountDescRefreshAttempts is the schema descriptor for refresh_attempts field.
+	provideraccountDescRefreshAttempts := provideraccountFields[16].Descriptor()
+	// provideraccount.DefaultRefreshAttempts holds the default value on creation for the refresh_attempts field.
+	provideraccount.DefaultRefreshAttempts = provideraccountDescRefreshAttempts.Default.(int)
+	// provideraccountDescRefreshLastError is the schema descriptor for refresh_last_error field.
+	provideraccountDescRefreshLastError := provideraccountFields[17].Descriptor()
+	// provideraccount.DefaultRefreshLastError holds the default value on creation for the refresh_last_error field.
+	provideraccount.DefaultRefreshLastError = provideraccountDescRefreshLastError.Default.(string)
+	// provideraccount.RefreshLastErrorValidator is a validator for the "refresh_last_error" field. It is called by the builders before save.
+	provideraccount.RefreshLastErrorValidator = provideraccountDescRefreshLastError.Validators[0].(func(string) error)
 	proxyMixin := schema.Proxy{}.Mixin()
 	proxyMixinFields0 := proxyMixin[0].Fields()
 	_ = proxyMixinFields0

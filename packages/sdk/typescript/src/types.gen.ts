@@ -1766,6 +1766,28 @@ export type ProviderAccount = {
      *
      */
     metadata?: JsonObject;
+    /**
+     * Wall-clock expiry of the OAuth access token, snapshotted from the credential after the last successful refresh. Null when the account has never been refreshed or the credential carries no expires_at. OAuth runtime classes only.
+     *
+     */
+    token_expires_at?: Timestamp | null;
+    /**
+     * Time of the most recent successful OAuth refresh.
+     */
+    last_refreshed_at?: Timestamp | null;
+    /**
+     * Set when refresh has become hopeless (permanent OAuth error such as invalid_grant, OR refresh_attempts >= 5). The proactive refresh worker skips accounts with this set so the upstream is not hammered; an operator must re-bind the account to clear it.
+     *
+     */
+    needs_reauth_at?: Timestamp | null;
+    /**
+     * Consecutive refresh-failure count; reset to 0 on a success.
+     */
+    refresh_attempts?: number;
+    /**
+     * Most recent refresh error message (truncated to 500 chars).
+     */
+    refresh_last_error?: string;
     created_at: Timestamp;
 };
 
@@ -12632,6 +12654,53 @@ export type EnableAdminAccountResponses = {
 };
 
 export type EnableAdminAccountResponse = EnableAdminAccountResponses[keyof EnableAdminAccountResponses];
+
+export type RefreshAdminAccountData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}/refresh';
+};
+
+export type RefreshAdminAccountErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Upstream OAuth refresh failed.
+     */
+    502: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RefreshAdminAccountError = RefreshAdminAccountErrors[keyof RefreshAdminAccountErrors];
+
+export type RefreshAdminAccountResponses = {
+    /**
+     * Provider account refreshed.
+     */
+    200: ProviderAccountResponse;
+};
+
+export type RefreshAdminAccountResponse = RefreshAdminAccountResponses[keyof RefreshAdminAccountResponses];
 
 export type GetAdminAccountHealthData = {
     body?: never;

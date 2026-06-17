@@ -212,6 +212,76 @@ func (_c *ProviderAccountCreate) SetMetadataJSON(v map[string]interface{}) *Prov
 	return _c
 }
 
+// SetTokenExpiresAt sets the "token_expires_at" field.
+func (_c *ProviderAccountCreate) SetTokenExpiresAt(v time.Time) *ProviderAccountCreate {
+	_c.mutation.SetTokenExpiresAt(v)
+	return _c
+}
+
+// SetNillableTokenExpiresAt sets the "token_expires_at" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableTokenExpiresAt(v *time.Time) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetTokenExpiresAt(*v)
+	}
+	return _c
+}
+
+// SetLastRefreshedAt sets the "last_refreshed_at" field.
+func (_c *ProviderAccountCreate) SetLastRefreshedAt(v time.Time) *ProviderAccountCreate {
+	_c.mutation.SetLastRefreshedAt(v)
+	return _c
+}
+
+// SetNillableLastRefreshedAt sets the "last_refreshed_at" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableLastRefreshedAt(v *time.Time) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetLastRefreshedAt(*v)
+	}
+	return _c
+}
+
+// SetNeedsReauthAt sets the "needs_reauth_at" field.
+func (_c *ProviderAccountCreate) SetNeedsReauthAt(v time.Time) *ProviderAccountCreate {
+	_c.mutation.SetNeedsReauthAt(v)
+	return _c
+}
+
+// SetNillableNeedsReauthAt sets the "needs_reauth_at" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableNeedsReauthAt(v *time.Time) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetNeedsReauthAt(*v)
+	}
+	return _c
+}
+
+// SetRefreshAttempts sets the "refresh_attempts" field.
+func (_c *ProviderAccountCreate) SetRefreshAttempts(v int) *ProviderAccountCreate {
+	_c.mutation.SetRefreshAttempts(v)
+	return _c
+}
+
+// SetNillableRefreshAttempts sets the "refresh_attempts" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableRefreshAttempts(v *int) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetRefreshAttempts(*v)
+	}
+	return _c
+}
+
+// SetRefreshLastError sets the "refresh_last_error" field.
+func (_c *ProviderAccountCreate) SetRefreshLastError(v string) *ProviderAccountCreate {
+	_c.mutation.SetRefreshLastError(v)
+	return _c
+}
+
+// SetNillableRefreshLastError sets the "refresh_last_error" field if the given value is not nil.
+func (_c *ProviderAccountCreate) SetNillableRefreshLastError(v *string) *ProviderAccountCreate {
+	if v != nil {
+		_c.SetRefreshLastError(*v)
+	}
+	return _c
+}
+
 // Mutation returns the ProviderAccountMutation object of the builder.
 func (_c *ProviderAccountCreate) Mutation() *ProviderAccountMutation {
 	return _c.mutation
@@ -283,6 +353,14 @@ func (_c *ProviderAccountCreate) defaults() {
 		v := provideraccount.DefaultRiskLevel
 		_c.mutation.SetRiskLevel(v)
 	}
+	if _, ok := _c.mutation.RefreshAttempts(); !ok {
+		v := provideraccount.DefaultRefreshAttempts
+		_c.mutation.SetRefreshAttempts(v)
+	}
+	if _, ok := _c.mutation.RefreshLastError(); !ok {
+		v := provideraccount.DefaultRefreshLastError
+		_c.mutation.SetRefreshLastError(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -324,6 +402,17 @@ func (_c *ProviderAccountCreate) check() error {
 	}
 	if _, ok := _c.mutation.RiskLevel(); !ok {
 		return &ValidationError{Name: "risk_level", err: errors.New(`ent: missing required field "ProviderAccount.risk_level"`)}
+	}
+	if _, ok := _c.mutation.RefreshAttempts(); !ok {
+		return &ValidationError{Name: "refresh_attempts", err: errors.New(`ent: missing required field "ProviderAccount.refresh_attempts"`)}
+	}
+	if _, ok := _c.mutation.RefreshLastError(); !ok {
+		return &ValidationError{Name: "refresh_last_error", err: errors.New(`ent: missing required field "ProviderAccount.refresh_last_error"`)}
+	}
+	if v, ok := _c.mutation.RefreshLastError(); ok {
+		if err := provideraccount.RefreshLastErrorValidator(v); err != nil {
+			return &ValidationError{Name: "refresh_last_error", err: fmt.Errorf(`ent: validator failed for field "ProviderAccount.refresh_last_error": %w`, err)}
+		}
 	}
 	return nil
 }
@@ -414,6 +503,26 @@ func (_c *ProviderAccountCreate) createSpec() (*ProviderAccount, *sqlgraph.Creat
 	if value, ok := _c.mutation.MetadataJSON(); ok {
 		_spec.SetField(provideraccount.FieldMetadataJSON, field.TypeJSON, value)
 		_node.MetadataJSON = value
+	}
+	if value, ok := _c.mutation.TokenExpiresAt(); ok {
+		_spec.SetField(provideraccount.FieldTokenExpiresAt, field.TypeTime, value)
+		_node.TokenExpiresAt = &value
+	}
+	if value, ok := _c.mutation.LastRefreshedAt(); ok {
+		_spec.SetField(provideraccount.FieldLastRefreshedAt, field.TypeTime, value)
+		_node.LastRefreshedAt = &value
+	}
+	if value, ok := _c.mutation.NeedsReauthAt(); ok {
+		_spec.SetField(provideraccount.FieldNeedsReauthAt, field.TypeTime, value)
+		_node.NeedsReauthAt = &value
+	}
+	if value, ok := _c.mutation.RefreshAttempts(); ok {
+		_spec.SetField(provideraccount.FieldRefreshAttempts, field.TypeInt, value)
+		_node.RefreshAttempts = value
+	}
+	if value, ok := _c.mutation.RefreshLastError(); ok {
+		_spec.SetField(provideraccount.FieldRefreshLastError, field.TypeString, value)
+		_node.RefreshLastError = value
 	}
 	return _node, _spec
 }

@@ -609,6 +609,18 @@ func cloneAccount(value contract.ProviderAccount) contract.ProviderAccount {
 	value.RiskLevel = cloneString(value.RiskLevel)
 	value.UpstreamClient = cloneString(value.UpstreamClient)
 	value.ProxyID = cloneString(value.ProxyID)
+	if value.TokenExpiresAt != nil {
+		t := *value.TokenExpiresAt
+		value.TokenExpiresAt = &t
+	}
+	if value.LastRefreshedAt != nil {
+		t := *value.LastRefreshedAt
+		value.LastRefreshedAt = &t
+	}
+	if value.NeedsReauthAt != nil {
+		t := *value.NeedsReauthAt
+		value.NeedsReauthAt = &t
+	}
 	return value
 }
 

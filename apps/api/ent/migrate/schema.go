@@ -1693,6 +1693,11 @@ var (
 		{Name: "weight", Type: field.TypeFloat64, Default: 1},
 		{Name: "risk_level", Type: field.TypeString, Default: "normal"},
 		{Name: "metadata_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "token_expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_refreshed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "needs_reauth_at", Type: field.TypeTime, Nullable: true},
+		{Name: "refresh_attempts", Type: field.TypeInt, Default: 0},
+		{Name: "refresh_last_error", Type: field.TypeString, Size: 500, Default: ""},
 	}
 	// ProviderAccountsTable holds the schema information for the "provider_accounts" table.
 	ProviderAccountsTable = &schema.Table{

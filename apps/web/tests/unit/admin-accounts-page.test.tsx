@@ -114,6 +114,7 @@ vi.mock("@/hooks/admin-queries", () => ({
   useUpdateAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useClearAccountError: () => ({ mutateAsync: vi.fn() }),
   useRecoverAccount: () => ({ mutateAsync: vi.fn() }),
+  useRefreshAccount: () => ({ mutateAsync: vi.fn() }),
   useResetAccountQuota: () => ({ mutateAsync: vi.fn() }),
   useBatchActionAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useBatchUpdateAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),

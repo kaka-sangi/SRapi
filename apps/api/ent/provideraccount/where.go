@@ -129,6 +129,31 @@ func RiskLevel(v string) predicate.ProviderAccount {
 	return predicate.ProviderAccount(sql.FieldEQ(FieldRiskLevel, v))
 }
 
+// TokenExpiresAt applies equality check predicate on the "token_expires_at" field. It's identical to TokenExpiresAtEQ.
+func TokenExpiresAt(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldTokenExpiresAt, v))
+}
+
+// LastRefreshedAt applies equality check predicate on the "last_refreshed_at" field. It's identical to LastRefreshedAtEQ.
+func LastRefreshedAt(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldLastRefreshedAt, v))
+}
+
+// NeedsReauthAt applies equality check predicate on the "needs_reauth_at" field. It's identical to NeedsReauthAtEQ.
+func NeedsReauthAt(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldNeedsReauthAt, v))
+}
+
+// RefreshAttempts applies equality check predicate on the "refresh_attempts" field. It's identical to RefreshAttemptsEQ.
+func RefreshAttempts(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldRefreshAttempts, v))
+}
+
+// RefreshLastError applies equality check predicate on the "refresh_last_error" field. It's identical to RefreshLastErrorEQ.
+func RefreshLastError(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldRefreshLastError, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.ProviderAccount {
 	return predicate.ProviderAccount(sql.FieldEQ(FieldCreatedAt, v))
@@ -952,6 +977,261 @@ func MetadataJSONIsNil() predicate.ProviderAccount {
 // MetadataJSONNotNil applies the NotNil predicate on the "metadata_json" field.
 func MetadataJSONNotNil() predicate.ProviderAccount {
 	return predicate.ProviderAccount(sql.FieldNotNull(FieldMetadataJSON))
+}
+
+// TokenExpiresAtEQ applies the EQ predicate on the "token_expires_at" field.
+func TokenExpiresAtEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldTokenExpiresAt, v))
+}
+
+// TokenExpiresAtNEQ applies the NEQ predicate on the "token_expires_at" field.
+func TokenExpiresAtNEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldTokenExpiresAt, v))
+}
+
+// TokenExpiresAtIn applies the In predicate on the "token_expires_at" field.
+func TokenExpiresAtIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldTokenExpiresAt, vs...))
+}
+
+// TokenExpiresAtNotIn applies the NotIn predicate on the "token_expires_at" field.
+func TokenExpiresAtNotIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldTokenExpiresAt, vs...))
+}
+
+// TokenExpiresAtGT applies the GT predicate on the "token_expires_at" field.
+func TokenExpiresAtGT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldTokenExpiresAt, v))
+}
+
+// TokenExpiresAtGTE applies the GTE predicate on the "token_expires_at" field.
+func TokenExpiresAtGTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldTokenExpiresAt, v))
+}
+
+// TokenExpiresAtLT applies the LT predicate on the "token_expires_at" field.
+func TokenExpiresAtLT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldTokenExpiresAt, v))
+}
+
+// TokenExpiresAtLTE applies the LTE predicate on the "token_expires_at" field.
+func TokenExpiresAtLTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldTokenExpiresAt, v))
+}
+
+// TokenExpiresAtIsNil applies the IsNil predicate on the "token_expires_at" field.
+func TokenExpiresAtIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldTokenExpiresAt))
+}
+
+// TokenExpiresAtNotNil applies the NotNil predicate on the "token_expires_at" field.
+func TokenExpiresAtNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldTokenExpiresAt))
+}
+
+// LastRefreshedAtEQ applies the EQ predicate on the "last_refreshed_at" field.
+func LastRefreshedAtEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldLastRefreshedAt, v))
+}
+
+// LastRefreshedAtNEQ applies the NEQ predicate on the "last_refreshed_at" field.
+func LastRefreshedAtNEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldLastRefreshedAt, v))
+}
+
+// LastRefreshedAtIn applies the In predicate on the "last_refreshed_at" field.
+func LastRefreshedAtIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldLastRefreshedAt, vs...))
+}
+
+// LastRefreshedAtNotIn applies the NotIn predicate on the "last_refreshed_at" field.
+func LastRefreshedAtNotIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldLastRefreshedAt, vs...))
+}
+
+// LastRefreshedAtGT applies the GT predicate on the "last_refreshed_at" field.
+func LastRefreshedAtGT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldLastRefreshedAt, v))
+}
+
+// LastRefreshedAtGTE applies the GTE predicate on the "last_refreshed_at" field.
+func LastRefreshedAtGTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldLastRefreshedAt, v))
+}
+
+// LastRefreshedAtLT applies the LT predicate on the "last_refreshed_at" field.
+func LastRefreshedAtLT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldLastRefreshedAt, v))
+}
+
+// LastRefreshedAtLTE applies the LTE predicate on the "last_refreshed_at" field.
+func LastRefreshedAtLTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldLastRefreshedAt, v))
+}
+
+// LastRefreshedAtIsNil applies the IsNil predicate on the "last_refreshed_at" field.
+func LastRefreshedAtIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldLastRefreshedAt))
+}
+
+// LastRefreshedAtNotNil applies the NotNil predicate on the "last_refreshed_at" field.
+func LastRefreshedAtNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldLastRefreshedAt))
+}
+
+// NeedsReauthAtEQ applies the EQ predicate on the "needs_reauth_at" field.
+func NeedsReauthAtEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldNeedsReauthAt, v))
+}
+
+// NeedsReauthAtNEQ applies the NEQ predicate on the "needs_reauth_at" field.
+func NeedsReauthAtNEQ(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldNeedsReauthAt, v))
+}
+
+// NeedsReauthAtIn applies the In predicate on the "needs_reauth_at" field.
+func NeedsReauthAtIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldNeedsReauthAt, vs...))
+}
+
+// NeedsReauthAtNotIn applies the NotIn predicate on the "needs_reauth_at" field.
+func NeedsReauthAtNotIn(vs ...time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldNeedsReauthAt, vs...))
+}
+
+// NeedsReauthAtGT applies the GT predicate on the "needs_reauth_at" field.
+func NeedsReauthAtGT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldNeedsReauthAt, v))
+}
+
+// NeedsReauthAtGTE applies the GTE predicate on the "needs_reauth_at" field.
+func NeedsReauthAtGTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldNeedsReauthAt, v))
+}
+
+// NeedsReauthAtLT applies the LT predicate on the "needs_reauth_at" field.
+func NeedsReauthAtLT(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldNeedsReauthAt, v))
+}
+
+// NeedsReauthAtLTE applies the LTE predicate on the "needs_reauth_at" field.
+func NeedsReauthAtLTE(v time.Time) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldNeedsReauthAt, v))
+}
+
+// NeedsReauthAtIsNil applies the IsNil predicate on the "needs_reauth_at" field.
+func NeedsReauthAtIsNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIsNull(FieldNeedsReauthAt))
+}
+
+// NeedsReauthAtNotNil applies the NotNil predicate on the "needs_reauth_at" field.
+func NeedsReauthAtNotNil() predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotNull(FieldNeedsReauthAt))
+}
+
+// RefreshAttemptsEQ applies the EQ predicate on the "refresh_attempts" field.
+func RefreshAttemptsEQ(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldRefreshAttempts, v))
+}
+
+// RefreshAttemptsNEQ applies the NEQ predicate on the "refresh_attempts" field.
+func RefreshAttemptsNEQ(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldRefreshAttempts, v))
+}
+
+// RefreshAttemptsIn applies the In predicate on the "refresh_attempts" field.
+func RefreshAttemptsIn(vs ...int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldRefreshAttempts, vs...))
+}
+
+// RefreshAttemptsNotIn applies the NotIn predicate on the "refresh_attempts" field.
+func RefreshAttemptsNotIn(vs ...int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldRefreshAttempts, vs...))
+}
+
+// RefreshAttemptsGT applies the GT predicate on the "refresh_attempts" field.
+func RefreshAttemptsGT(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldRefreshAttempts, v))
+}
+
+// RefreshAttemptsGTE applies the GTE predicate on the "refresh_attempts" field.
+func RefreshAttemptsGTE(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldRefreshAttempts, v))
+}
+
+// RefreshAttemptsLT applies the LT predicate on the "refresh_attempts" field.
+func RefreshAttemptsLT(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldRefreshAttempts, v))
+}
+
+// RefreshAttemptsLTE applies the LTE predicate on the "refresh_attempts" field.
+func RefreshAttemptsLTE(v int) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldRefreshAttempts, v))
+}
+
+// RefreshLastErrorEQ applies the EQ predicate on the "refresh_last_error" field.
+func RefreshLastErrorEQ(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEQ(FieldRefreshLastError, v))
+}
+
+// RefreshLastErrorNEQ applies the NEQ predicate on the "refresh_last_error" field.
+func RefreshLastErrorNEQ(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNEQ(FieldRefreshLastError, v))
+}
+
+// RefreshLastErrorIn applies the In predicate on the "refresh_last_error" field.
+func RefreshLastErrorIn(vs ...string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldIn(FieldRefreshLastError, vs...))
+}
+
+// RefreshLastErrorNotIn applies the NotIn predicate on the "refresh_last_error" field.
+func RefreshLastErrorNotIn(vs ...string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldNotIn(FieldRefreshLastError, vs...))
+}
+
+// RefreshLastErrorGT applies the GT predicate on the "refresh_last_error" field.
+func RefreshLastErrorGT(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGT(FieldRefreshLastError, v))
+}
+
+// RefreshLastErrorGTE applies the GTE predicate on the "refresh_last_error" field.
+func RefreshLastErrorGTE(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldGTE(FieldRefreshLastError, v))
+}
+
+// RefreshLastErrorLT applies the LT predicate on the "refresh_last_error" field.
+func RefreshLastErrorLT(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLT(FieldRefreshLastError, v))
+}
+
+// RefreshLastErrorLTE applies the LTE predicate on the "refresh_last_error" field.
+func RefreshLastErrorLTE(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldLTE(FieldRefreshLastError, v))
+}
+
+// RefreshLastErrorContains applies the Contains predicate on the "refresh_last_error" field.
+func RefreshLastErrorContains(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldContains(FieldRefreshLastError, v))
+}
+
+// RefreshLastErrorHasPrefix applies the HasPrefix predicate on the "refresh_last_error" field.
+func RefreshLastErrorHasPrefix(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldHasPrefix(FieldRefreshLastError, v))
+}
+
+// RefreshLastErrorHasSuffix applies the HasSuffix predicate on the "refresh_last_error" field.
+func RefreshLastErrorHasSuffix(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldHasSuffix(FieldRefreshLastError, v))
+}
+
+// RefreshLastErrorEqualFold applies the EqualFold predicate on the "refresh_last_error" field.
+func RefreshLastErrorEqualFold(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldEqualFold(FieldRefreshLastError, v))
+}
+
+// RefreshLastErrorContainsFold applies the ContainsFold predicate on the "refresh_last_error" field.
+func RefreshLastErrorContainsFold(v string) predicate.ProviderAccount {
+	return predicate.ProviderAccount(sql.FieldContainsFold(FieldRefreshLastError, v))
 }
 
 // And groups predicates with the AND operator between them.

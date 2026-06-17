@@ -246,6 +246,7 @@ func TestAppBootstrapOnlyImportsBootstrapPackages(t *testing.T) {
 			"github.com/srapi/srapi/apps/api/internal/platform/otel":                          true,
 			"github.com/srapi/srapi/apps/api/internal/platform/redis":                         true,
 			"github.com/srapi/srapi/apps/api/internal/workers/account_quota_alert":            true,
+			"github.com/srapi/srapi/apps/api/internal/workers/accounts_token_refresh":        true,
 			"github.com/srapi/srapi/apps/api/internal/workers/auth_session_cleanup":           true,
 			"github.com/srapi/srapi/apps/api/internal/workers/availability_rollup":            true,
 			"github.com/srapi/srapi/apps/api/internal/workers/backup":                         true,

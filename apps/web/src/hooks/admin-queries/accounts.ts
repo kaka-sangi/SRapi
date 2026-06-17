@@ -183,6 +183,12 @@ export function useClearAccountError() {
 export function useRecoverAccount() {
   return useAdminMutation((id: string) => adminApi.recoverAccount(id), ["admin", "accounts"]);
 }
+// On-demand OAuth token refresh — the row's token_expires_at, needs_reauth_at
+// and refresh_last_error can all change as a result, so invalidate every
+// account list view so the new state is rendered.
+export function useRefreshAccount() {
+  return useAdminMutation((id: string) => adminApi.refreshAccount(id), ["admin", "accounts"]);
+}
 export function useResetAccountQuota() {
   const qc = useQueryClient();
   return useMutation({

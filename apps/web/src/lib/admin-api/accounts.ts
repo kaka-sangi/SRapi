@@ -35,6 +35,7 @@ import {
   listAdminAccountGroupMembers,
   listAdminAccounts,
   recoverAdminAccount,
+  refreshAdminAccount,
   removeAdminAccountGroupMember,
   resetAdminAccountQuota,
   testAdminAccount,
@@ -196,6 +197,13 @@ export const accountsApi = {
 
   recoverAccount(id: Id): Promise<ProviderAccount> {
     return unwrapData(() => recoverAdminAccount({ path: { id }, throwOnError: true }));
+  },
+
+  // Trigger an on-demand OAuth access-token refresh against the upstream
+  // (same code path the accounts_token_refresh worker uses). Returns the
+  // updated account so the UI re-renders in place.
+  refreshAccount(id: Id): Promise<ProviderAccount> {
+    return unwrapData(() => refreshAdminAccount({ path: { id }, throwOnError: true }));
   },
 
   resetAccountQuota(id: Id): Promise<ProviderAccount> {
