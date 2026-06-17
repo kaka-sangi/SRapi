@@ -48,3 +48,31 @@ describe("escapeCsv", () => {
     expect(escapeCsv("=a,b")).toBe('"\'=a,b"');
   });
 });
+
+describe("rowsToCsv", () => {
+  it("routes BOTH header and value cells through escapeCsv", async () => {
+    // Imported here to keep escapeCsv assertion + this in one file. A regression
+    // where rowsToCsv skips escapeCsv on the header (or on the values) would
+    // make CSV exports vulnerable to formula injection — same severity as
+    // bypassing it entirely.
+    const { rowsToCsv } = await import("@/lib/csv");
+    const csv = rowsToCsv([{ name: "=2+2", note: "a,b" }], [
+      { header: "user,email", value: (r) => r.name },
+      { header: "note", value: (r) => r.note },
+    ]);
+    // Body line: the user-supplied "=2+2" must be formula-guarded; "a,b" must
+    // be quote-wrapped. Header line: "user,email" must be quote-wrapped.
+    expect(csv).toContain('"user,email"');
+    expect(csv).toContain("'=2+2");
+    expect(csv).toContain('"a,b"');
+  });
+
+  it("starts with the UTF-8 BOM and ends every record with CRLF", async () => {
+    const { rowsToCsv } = await import("@/lib/csv");
+    const csv = rowsToCsv([{ x: 1 }], [{ header: "x", value: (r) => r.x }]);
+    // BOM first (Excel-friendly UTF-8 detection).
+    expect(csv.charCodeAt(0)).toBe(0xfeff);
+    // CRLF after each record (RFC 4180).
+    expect(csv.endsWith("\r\n")).toBe(true);
+  });
+});
