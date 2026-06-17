@@ -149,3 +149,44 @@ func TestCreateProviderRejectsDuplicateName(t *testing.T) {
 		t.Fatalf("expected ErrProviderExists, got %v", err)
 	}
 }
+
+// TestUpdateProviderStatusOnlyToggle locks the contract the iter-39
+// frontend inline status toggle relies on: PATCH with only Status set
+// keeps adapter_type / protocol / display_name intact.
+func TestUpdateProviderStatusOnlyToggle(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	created, err := svc.Create(ctx, contract.CreateRequest{
+		Name:        "openai-compatible",
+		DisplayName: "OpenAI Compatible",
+		AdapterType: "openai-compatible",
+		Protocol:    "openai-compatible",
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if created.Status != contract.StatusActive {
+		t.Fatalf("expected created status active, got %q", created.Status)
+	}
+	disabled := contract.StatusDisabled
+	updated, err := svc.Update(ctx, created.ID, contract.UpdateRequest{Status: &disabled})
+	if err != nil {
+		t.Fatalf("update status-only: %v", err)
+	}
+	if updated.Status != contract.StatusDisabled {
+		t.Fatalf("expected status disabled, got %q", updated.Status)
+	}
+	if updated.DisplayName != "OpenAI Compatible" {
+		t.Fatalf("display_name leaked: %q", updated.DisplayName)
+	}
+	if updated.AdapterType != "openai-compatible" {
+		t.Fatalf("adapter_type leaked: %q", updated.AdapterType)
+	}
+	if updated.Protocol != "openai-compatible" {
+		t.Fatalf("protocol leaked: %q", updated.Protocol)
+	}
+}
