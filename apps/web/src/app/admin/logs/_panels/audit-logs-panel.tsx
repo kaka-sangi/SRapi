@@ -222,7 +222,7 @@ export function AuditLogsPanel() {
               <AuditMeta label={t("adminAudit.actor")} value={userLookup.get(detail.actor_user_id)} />
               <AuditMeta label={t("adminAudit.ip")} value={detail.ip || "—"} copyable />
               <AuditMeta label={t("adminAudit.trace")} value={detail.trace_id || "—"} copyable />
-              <AuditMeta label={t("adminAudit.userAgent")} value={detail.user_agent || "—"} />
+              <AuditMeta label={t("adminAudit.userAgent")} value={detail.user_agent || "—"} copyable />
               <JsonBlock label={t("adminAudit.before")} value={detail.before} />
               <JsonBlock label={t("adminAudit.after")} value={detail.after} />
             </div>
