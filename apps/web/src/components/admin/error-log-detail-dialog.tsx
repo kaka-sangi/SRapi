@@ -82,9 +82,12 @@ function ErrorLogDetailBody({ detail }: { detail: ErrorLog }) {
           <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
             {t("adminErrorLogs.errorClass")}
           </p>
-          <p className="mt-1 truncate text-sm font-medium text-srapi-text-primary">
-            {detail.error_class || "—"}
-          </p>
+          <div className="mt-1 flex items-center gap-1.5">
+            <p className="truncate text-sm font-medium text-srapi-text-primary">
+              {detail.error_class || "—"}
+            </p>
+            {detail.error_class ? <CopyButton value={detail.error_class} size="inline" /> : null}
+          </div>
         </div>
         <QuietBadge
           status={detail.usage_estimated ? "limited" : "active"}
