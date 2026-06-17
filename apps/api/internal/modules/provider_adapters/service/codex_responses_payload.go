@@ -592,6 +592,15 @@ func codexNormalizeResponsesInputItem(item any) any {
 		roleValue = "user"
 	}
 	role := codexResponsesRole(roleValue)
+	// Codex Responses upstream rejects role=system in the input array
+	// (CLIProxyAPI translator codex_openai-responses_request.go:65-86
+	// convertSystemRoleToDeveloper). Rewrite to "developer" before the
+	// payload leaves the gateway; preserves the system-channel semantics
+	// while satisfying the upstream contract.
+	if role == "system" {
+		out["role"] = "developer"
+		role = "developer"
+	}
 	if _, hasType := out["type"]; !hasType && codexStringValue(out["role"]) != "" {
 		out["type"] = "message"
 	}

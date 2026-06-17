@@ -269,6 +269,38 @@ func TestCodexResponsesCompactPayloadSkipsResponseRuntimeDefaults(t *testing.T) 
 	}
 }
 
+func TestCodexResponsesPayloadStrandedSystemRoleBecomesDeveloper(t *testing.T) {
+	// Two-layer defence against the Codex upstream rejecting role="system"
+	// in the input array (CLIProxyAPI translator
+	// codex_openai-responses_request.go:65-86 convertSystemRoleToDeveloper):
+	//   1. The common case — system items with textual content — is handled
+	//      by codexLiftInstructionInputItems which lifts the text into the
+	//      top-level "instructions" field and removes the system item from
+	//      input entirely (see TestCodexResponsesPayload* / sub2api parity).
+	//   2. The edge case here — a system item whose content the lifter
+	//      cannot extract into plain text (e.g. only image attachments) —
+	//      is still removed from input by the same lift in srapi today,
+	//      but the input-item normalizer also rewrites role=system to
+	//      role=developer as a defence in depth, mirroring CLIProxyAPI.
+	//      Exercise it directly so future lifter changes don't silently
+	//      reintroduce a role=system message into the outbound payload.
+	for _, endpoint := range []string{"/v1/responses", "/v1/responses/compact"} {
+		t.Run(endpoint, func(t *testing.T) {
+			normalized := codexNormalizeResponsesInputItem(map[string]any{
+				"role":    "system",
+				"content": []any{map[string]any{"type": "input_text", "text": "you are helpful"}},
+			})
+			object, ok := normalized.(map[string]any)
+			if !ok {
+				t.Fatalf("expected map, got %T(%v)", normalized, normalized)
+			}
+			if got := codexStringValue(object["role"]); got != "developer" {
+				t.Fatalf("[%s] expected role=developer, got %q", endpoint, got)
+			}
+		})
+	}
+}
+
 func containsStringAny(values []any, want string) bool {
 	for _, value := range values {
 		if text, ok := value.(string); ok && text == want {
