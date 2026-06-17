@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ScrollText } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
@@ -29,22 +29,6 @@ import {
   logWindowSince,
 } from "@/lib/log-window-filter";
 
-function auditMatch(row: AuditLog, term: string, filters: Record<string, string>): boolean {
-  if (filters.action && row.action !== filters.action) return false;
-  if (filters.resource_type && row.resource_type !== filters.resource_type) return false;
-  if (filters.actor_user_id && String(row.actor_user_id ?? "") !== filters.actor_user_id) return false;
-  if (filters.window) {
-    const since = logWindowSince(filters.window);
-    if (since && row.created_at && new Date(row.created_at) < since) return false;
-  }
-  if (!term) return true;
-  return [row.actor_user_id, row.resource_id, row.resource_type, row.action, row.ip, row.trace_id]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-    .includes(term);
-}
-
 const auditCompare = (a: AuditLog, b: AuditLog) => (b.created_at ?? "").localeCompare(a.created_at ?? "");
 
 function distinct(values: Array<string | null | undefined>): string[] {
@@ -56,11 +40,34 @@ export function AuditLogsPanel() {
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-audit-logs", []);
   const all = useAuditLogs();
+  const [detail, setDetail] = useState<AuditLog | null>(null);
+  const userLookup = useUserEmailLookup();
+  // Closure variant of auditMatch — same upgrade iter-78/79 applied to
+  // /admin/orders and billing-ledger. Operators search by email when
+  // investigating "who did what".
+  const match = useCallback(
+    (row: AuditLog, term: string, filters: Record<string, string>): boolean => {
+      if (filters.action && row.action !== filters.action) return false;
+      if (filters.resource_type && row.resource_type !== filters.resource_type) return false;
+      if (filters.actor_user_id && String(row.actor_user_id ?? "") !== filters.actor_user_id) return false;
+      if (filters.window) {
+        const since = logWindowSince(filters.window);
+        if (since && row.created_at && new Date(row.created_at) < since) return false;
+      }
+      if (!term) return true;
+      const email = userLookup.map.get(String(row.actor_user_id)) ?? "";
+      return [row.actor_user_id, email, row.resource_id, row.resource_type, row.action, row.ip, row.trace_id]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(term);
+    },
+    [userLookup.map],
+  );
   const { query, total } = useClientPagedList(all, list, {
-    match: auditMatch,
+    match,
     compare: auditCompare,
   });
-  const [detail, setDetail] = useState<AuditLog | null>(null);
 
   const rows = useMemo(() => all.data?.data ?? [], [all.data]);
   const actionOptions = useMemo(() => distinct(rows.map((r) => r.action)), [rows]);
@@ -68,7 +75,6 @@ export function AuditLogsPanel() {
   // Reuse the iter-15/error-logs pattern: 200-user lookup for actor labels
   // gives us readable {email} options in the dropdown. Larger installs whose
   // actors are past row 200 still see the actor_user_id in the table.
-  const userLookup = useUserEmailLookup();
   const actorOptions = useMemo(
     () =>
       (userLookup.query.data?.data ?? []).map((u) => ({
