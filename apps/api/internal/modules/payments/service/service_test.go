@@ -2205,3 +2205,44 @@ func (f *fakeCheckoutProvider) QueryOrder(req checkoutprovider.QueryRequest) (ch
 	}
 	return f.query, nil
 }
+
+// TestUpdateProviderInstanceStatusOnlyToggle locks the contract the
+// iter-47 frontend payment-provider toggle relies on: PATCH with only
+// Status set keeps name / config / supported methods intact.
+func TestUpdateProviderInstanceStatusOnlyToggle(t *testing.T) {
+	h := newHarness(t)
+	ctx := t.Context()
+
+	provider, err := h.payments.CreateProviderInstance(ctx, contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "primary",
+		Config:           easypayTestConfig("provider-signing-secret"),
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "USD", "min_amount": "1.00", "max_amount": "100.00"},
+		Metadata:         map[string]any{"display_name": "AliPay"},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if provider.Status != contract.ProviderStatusActive {
+		t.Fatalf("expected created status active, got %q", provider.Status)
+	}
+	originalCipher := provider.ConfigCiphertext
+	disabled := contract.ProviderStatusDisabled
+	updated, err := h.payments.UpdateProviderInstance(ctx, provider.ID, contract.UpdateProviderInstanceRequest{Status: &disabled})
+	if err != nil {
+		t.Fatalf("update status-only: %v", err)
+	}
+	if updated.Status != contract.ProviderStatusDisabled {
+		t.Fatalf("expected status disabled, got %q", updated.Status)
+	}
+	if updated.Name != "primary" {
+		t.Fatalf("name leaked: %q", updated.Name)
+	}
+	if updated.ConfigCiphertext != originalCipher {
+		t.Fatal("config ciphertext drifted on status-only update (must not re-encrypt)")
+	}
+	if len(updated.SupportedMethods) != 1 || updated.SupportedMethods[0] != "alipay" {
+		t.Fatalf("supported_methods drifted: %+v", updated.SupportedMethods)
+	}
+}
