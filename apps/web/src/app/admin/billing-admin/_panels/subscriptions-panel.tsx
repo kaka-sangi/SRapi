@@ -20,7 +20,6 @@ import {
 import {
   useAdminSubscriptionPlans,
   useAdminSubscriptions,
-  useAdminUsers,
   useCreateUserSubscription,
   useDeleteUserSubscription,
 } from "@/hooks/admin-queries";
@@ -66,7 +65,6 @@ export function SubscriptionsPanel() {
     compare: (a, b) => (b.starts_at ?? "").localeCompare(a.starts_at ?? ""),
   });
   const statusFilter = list.filters.status as UserSubscription["status"] | undefined;
-  const users = useAdminUsers();
   const userLookup = useUserEmailLookup();
   const createSub = useCreateUserSubscription();
   const deleteSub = useDeleteUserSubscription();
@@ -79,7 +77,7 @@ export function SubscriptionsPanel() {
       label: t("adminSubscriptions.user"),
       type: "select",
       required: true,
-      options: (users.data?.data ?? []).map((u) => ({ value: u.id, label: u.email })),
+      options: (userLookup.query.data?.data ?? []).map((u) => ({ value: u.id, label: u.email })),
     },
     {
       name: "planId",
