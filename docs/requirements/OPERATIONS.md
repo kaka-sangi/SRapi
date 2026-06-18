@@ -321,6 +321,13 @@ make smoke-release
 
 `auth_session_cleanup` worker 在持久化 AuthSession store 可用时随 API 进程启动，默认每 24 小时运行一次。它只处理 `expires_at <= now` 的 `active` 控制台 session，将其标记为 `expired` 并设置 `deleted_at`；登出产生的 `revoked` session 保持原状态。相关配置项为 `AUTH_SESSION_CLEANUP_INTERVAL_SECONDS`。
 
+可选 gateway 请求转储通过 `SRAPI_REQUEST_LOG_ENABLED=true` 开启，目录由
+`SRAPI_REQUEST_LOG_DIR` 控制，默认 `./logs/gateway`。该目录只存放
+`request-*` / `error-*` 受控文件；后台 cleaner 按文件年龄、error 文件数量和总
+managed 文件大小三层约束清理。`SRAPI_REQUEST_LOG_MAX_TOTAL_MB` 默认 512 MiB，
+`0` 使用默认值，负数禁用总大小上限。该能力用于短期排障，不能替代结构化
+`ops_system_logs`、`ops_error_logs` 和 `usage_logs`。
+
 ### 余额扣费
 
 `balance_charger` worker 由 `internal/app` 在持久化 usage charge store 可用时启动。它默认每 1 分钟扫描未扣费且成功的 `usage_logs`，按 user/currency 聚合为 `billing_ledgers`，扣减用户余额并标记 `charged_at`。

@@ -38,9 +38,12 @@ func (rt *runtimeState) ensureRequestLogFilesState() *requestLogFilesState {
 	enabled := rlfservice.ResolveEnabled(false)
 	logDir := rlfservice.ResolveLogDir("")
 	state := &requestLogFilesState{
-		writer:  rlfservice.NewFileWriter(rlfservice.Config{Enabled: enabled, LogDir: logDir}),
-		reader:  rlfservice.NewFileReader(logDir),
-		cleaner: rlfservice.NewCleaner(rlfservice.CleanerConfig{LogDir: logDir}),
+		writer: rlfservice.NewFileWriter(rlfservice.Config{Enabled: enabled, LogDir: logDir}),
+		reader: rlfservice.NewFileReader(logDir),
+		cleaner: rlfservice.NewCleaner(rlfservice.CleanerConfig{
+			LogDir:        logDir,
+			MaxTotalBytes: rlfservice.ResolveMaxTotalBytes(),
+		}),
 	}
 	if enabled {
 		// Start the background sweep so disk usage is bounded even when

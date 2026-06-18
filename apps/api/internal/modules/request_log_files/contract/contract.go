@@ -10,7 +10,8 @@
 // The capture is OFF by default (disk cost) and gated by either the global
 // env flag SRAPI_REQUEST_LOG_ENABLED=true or an account/group metadata
 // opt-in. Retention is enforced by a background cleaner: files older than
-// the configured age, AND error files exceeding the per-file-count cap, are
+// the configured age, error files exceeding the per-file-count cap, and the
+// oldest managed files beyond the configured total directory size cap are
 // removed.
 //
 // Storage layout: one file per request, named

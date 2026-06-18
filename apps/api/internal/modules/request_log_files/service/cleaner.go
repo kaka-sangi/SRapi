@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -23,8 +24,40 @@ const DefaultRetention = 7 * 24 * time.Hour
 // directory holds more than this, the cleaner removes the oldest first.
 const DefaultMaxErrorFiles = 500
 
+// DefaultMaxTotalBytes caps managed request-log-file disk usage. The request
+// capture is an operator-controlled diagnostic tool; a hard default prevents
+// an accidentally enabled deployment from growing without bound.
+const DefaultMaxTotalBytes = 512 * 1024 * 1024
+
+// EnvMaxTotalMB caps total managed request-log-file disk usage in MiB. Zero or
+// unset uses DefaultMaxTotalBytes; negative values disable size-based eviction.
+const EnvMaxTotalMB = "SRAPI_REQUEST_LOG_MAX_TOTAL_MB"
+
 // DefaultCleanupInterval is how often the background goroutine sweeps.
 const DefaultCleanupInterval = time.Hour
+
+const maxTotalMiB = (1<<63 - 1) / (1024 * 1024)
+
+// ResolveMaxTotalBytes returns the configured total-size cap for managed
+// request-log files. Invalid values fall back to DefaultMaxTotalBytes so a
+// typo does not silently disable disk protection.
+func ResolveMaxTotalBytes() int64 {
+	value := strings.TrimSpace(os.Getenv(EnvMaxTotalMB))
+	if value == "" || value == "0" {
+		return DefaultMaxTotalBytes
+	}
+	mb, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || mb == 0 {
+		return DefaultMaxTotalBytes
+	}
+	if mb < 0 {
+		return -1
+	}
+	if mb > maxTotalMiB {
+		return DefaultMaxTotalBytes
+	}
+	return mb * 1024 * 1024
+}
 
 // CleanerConfig configures the retention sweep.
 type CleanerConfig struct {
@@ -37,6 +70,10 @@ type CleanerConfig struct {
 	// MaxErrorFiles is the per-prefix cap for error-* files. Zero falls
 	// back to DefaultMaxErrorFiles; a negative value disables the cap.
 	MaxErrorFiles int
+	// MaxTotalBytes caps the total size of managed request-/error-* files.
+	// Zero falls back to DefaultMaxTotalBytes; a negative value disables
+	// size-based eviction.
+	MaxTotalBytes int64
 	// Interval is how often the goroutine runs. Zero falls back to
 	// DefaultCleanupInterval.
 	Interval time.Duration
@@ -57,6 +94,9 @@ func NewCleaner(cfg CleanerConfig) *Cleaner {
 	}
 	if cfg.MaxErrorFiles == 0 {
 		cfg.MaxErrorFiles = DefaultMaxErrorFiles
+	}
+	if cfg.MaxTotalBytes == 0 {
+		cfg.MaxTotalBytes = DefaultMaxTotalBytes
 	}
 	if cfg.Interval == 0 {
 		cfg.Interval = DefaultCleanupInterval
@@ -127,6 +167,7 @@ func (c *Cleaner) SweepOnce(ctx context.Context) (int, error) {
 
 	type fileMeta struct {
 		path    string
+		size    int64
 		modTime time.Time
 		isError bool
 	}
@@ -148,6 +189,7 @@ func (c *Cleaner) SweepOnce(ctx context.Context) (int, error) {
 		}
 		files = append(files, fileMeta{
 			path:    filepath.Join(c.cfg.LogDir, name),
+			size:    info.Size(),
 			modTime: info.ModTime(),
 			isError: strings.HasPrefix(name, "error-"),
 		})
@@ -187,10 +229,45 @@ func (c *Cleaner) SweepOnce(ctx context.Context) (int, error) {
 				return errorFiles[i].modTime.Before(errorFiles[j].modTime)
 			})
 			surplus := len(errorFiles) - c.cfg.MaxErrorFiles
+			removed := make(map[string]struct{}, surplus)
 			for i := 0; i < surplus; i++ {
 				if err := os.Remove(errorFiles[i].path); err == nil {
+					removed[errorFiles[i].path] = struct{}{}
 					deleted++
 				}
+			}
+			if len(removed) > 0 {
+				kept := files[:0]
+				for _, f := range files {
+					if _, ok := removed[f.path]; ok {
+						continue
+					}
+					kept = append(kept, f)
+				}
+				files = kept
+			}
+		}
+	}
+
+	// Stage 3: total managed-directory size cap. This is intentionally last:
+	// age and error-count policies express stronger retention intent, then
+	// the size cap protects disk by deleting the oldest remaining managed
+	// captures across request-* and error-* files.
+	if c.cfg.MaxTotalBytes > 0 {
+		sort.Slice(files, func(i, j int) bool {
+			return files[i].modTime.Before(files[j].modTime)
+		})
+		total := int64(0)
+		for _, f := range files {
+			total += f.size
+		}
+		for _, f := range files {
+			if total <= c.cfg.MaxTotalBytes {
+				break
+			}
+			if err := os.Remove(f.path); err == nil {
+				total -= f.size
+				deleted++
 			}
 		}
 	}
