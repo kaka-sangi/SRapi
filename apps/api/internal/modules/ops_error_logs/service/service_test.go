@@ -24,13 +24,13 @@ func newTestService(t *testing.T) *Service {
 func TestRecordError_RedactsSensitiveJSON(t *testing.T) {
 	svc := newTestService(t)
 	status := 502
-	body := `{"error":"upstream","authorization":"Bearer sk-abc","payload":{"api_key":"xyz","nested":{"token":"t"}}}`
+	body := `{"error":"upstream","authorization":"Bearer sk-abc","provider_error":"Authorization: Bearer raw-token refresh_token=raw-refresh","payload":{"api_key":"xyz","nested":{"token":"t"}}}`
 	if err := svc.RecordError(context.Background(), contract.RecordRequest{
 		RequestID:        "req-1",
 		StatusCode:       &status,
 		ErrorClass:       "server_bad",
 		ErrorBodyExcerpt: body,
-		ErrorMessage:     "upstream\x00 5xx",
+		ErrorMessage:     "upstream\x00 Authorization: Bearer raw-token api_key=sk-abc123456789",
 	}); err != nil {
 		t.Fatalf("RecordError: %v", err)
 	}
@@ -51,8 +51,62 @@ func TestRecordError_RedactsSensitiveJSON(t *testing.T) {
 	if strings.Contains(got.ErrorBodyExcerpt, "sk-abc") || strings.Contains(got.ErrorBodyExcerpt, "xyz") {
 		t.Fatalf("leaked secret in excerpt: %q", got.ErrorBodyExcerpt)
 	}
-	if strings.Contains(got.ErrorMessage, "\x00") {
-		t.Fatalf("control char survived sanitization: %q", got.ErrorMessage)
+	if strings.Contains(got.ErrorBodyExcerpt, "raw-token") || strings.Contains(got.ErrorBodyExcerpt, "raw-refresh") {
+		t.Fatalf("leaked secret in JSON string value: %q", got.ErrorBodyExcerpt)
+	}
+	if strings.Contains(got.ErrorMessage, "\x00") || strings.Contains(got.ErrorMessage, "raw-token") || strings.Contains(got.ErrorMessage, "sk-abc123456789") {
+		t.Fatalf("error message was not sanitized: %q", got.ErrorMessage)
+	}
+	if !strings.Contains(got.ErrorMessage, "Bearer [REDACTED]") || !strings.Contains(got.ErrorMessage, "api_key=[REDACTED]") {
+		t.Fatalf("expected redaction markers in error message, got %q", got.ErrorMessage)
+	}
+}
+
+func TestRecordError_RedactsSensitivePlainTextEvidence(t *testing.T) {
+	svc := newTestService(t)
+	status := 502
+	if err := svc.RecordError(context.Background(), contract.RecordRequest{
+		RequestID:        "req-plain",
+		StatusCode:       &status,
+		ErrorClass:       "server_bad",
+		ErrorMessage:     "Authorization: Bearer raw-token access_token=raw-access key sk-abc123456789",
+		ErrorBodyExcerpt: "upstream said Authorization: Bearer body-token refresh_token=body-refresh api_key=sk_111111111111_22222222222222222222222222222222",
+		UpstreamErrors: []contract.UpstreamErrorEvent{{
+			AttemptNo:          1,
+			UpstreamStatusCode: 502,
+			UpstreamURL:        "https://upstream.example/v1?access_token=url-token&client_secret=url-secret&safe=1",
+			Message:            "nested Authorization: Bearer nested-token client_secret=nested-secret",
+			BodyExcerpt:        "nested api_key=sk-plain123456789 refresh_token=nested-refresh",
+		}},
+	}); err != nil {
+		t.Fatalf("RecordError: %v", err)
+	}
+	list, err := svc.List(context.Background(), contract.ListFilter{})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(list.Items))
+	}
+	got := list.Items[0]
+	for _, leaked := range []string{
+		"raw-token", "raw-access", "sk-abc123456789", "body-token", "body-refresh",
+		"22222222222222222222222222222222", "url-token", "url-secret", "nested-token",
+		"nested-secret", "sk-plain123456789", "nested-refresh",
+	} {
+		if strings.Contains(got.ErrorMessage, leaked) ||
+			strings.Contains(got.ErrorBodyExcerpt, leaked) ||
+			strings.Contains(got.UpstreamErrors[0].UpstreamURL, leaked) ||
+			strings.Contains(got.UpstreamErrors[0].Message, leaked) ||
+			strings.Contains(got.UpstreamErrors[0].BodyExcerpt, leaked) {
+			t.Fatalf("leaked %q in entry %+v", leaked, got)
+		}
+	}
+	if !strings.Contains(got.ErrorMessage, "Bearer [REDACTED]") || !strings.Contains(got.ErrorBodyExcerpt, "api_key=[REDACTED]") {
+		t.Fatalf("expected top-level redaction markers, got message=%q body=%q", got.ErrorMessage, got.ErrorBodyExcerpt)
+	}
+	if got.UpstreamErrors[0].UpstreamURL != "https://upstream.example/v1?access_token=[REDACTED]&client_secret=[REDACTED]&safe=1" {
+		t.Fatalf("unexpected redacted upstream url: %q", got.UpstreamErrors[0].UpstreamURL)
 	}
 }
 

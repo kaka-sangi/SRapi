@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 
@@ -36,6 +37,15 @@ const DefaultRetention = 30 * 24 * time.Hour
 // ErrInvalidInput is returned by service methods when required fields are
 // missing or malformed.
 var ErrInvalidInput = errors.New("ops_error_logs: invalid input")
+
+var (
+	authorizationPattern    = regexp.MustCompile(`(?i)\b(authorization|proxy_authorization)(\s*[:=]\s*)(bearer|basic)\s+[A-Za-z0-9._~+/\-=]+`)
+	credentialPattern       = regexp.MustCompile(`(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/\-=]+`)
+	secretAssignmentPattern = regexp.MustCompile(`(?i)\b(access_token|refresh_token|id_token|api_key|client_secret|password|cookie|session|session_id|token|secret)(\s*[:=]\s*)([^&\s,;}]+)`)
+	secretQueryPattern      = regexp.MustCompile(`(?i)([?&](?:access_token|refresh_token|id_token|api_key|client_secret|password|session|session_id|token|secret)=)([^&#\s]+)`)
+	openAIKeyPattern        = regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{10,}\b`)
+	srapiKeyPattern         = regexp.MustCompile(`\b(sk_[0-9a-fA-F]+)_[0-9a-fA-F]{10,}\b`)
+)
 
 // Service is the ops_error_logs application service.
 type Service struct {
@@ -207,7 +217,7 @@ func sanitizeUpstreamErrors(events []contract.UpstreamErrorEvent) []contract.Ups
 			AccountName:        truncate(strings.TrimSpace(event.AccountName), 128),
 			UpstreamStatusCode: validUpstreamStatus(event.UpstreamStatusCode),
 			UpstreamRequestID:  truncate(strings.TrimSpace(event.UpstreamRequestID), 128),
-			UpstreamURL:        truncate(strings.TrimSpace(event.UpstreamURL), 256),
+			UpstreamURL:        truncate(redactSecretText(event.UpstreamURL), 256),
 			Kind:               truncate(defaultString(event.Kind, "request_error"), 64),
 			Message:            truncate(sanitizeMessage(event.Message), MaxMessageBytes),
 			BodyExcerpt:        redactExcerpt(event.BodyExcerpt, MaxBodyExcerptBytes),
@@ -240,7 +250,7 @@ func redactExcerpt(raw string, maxBytes int) string {
 			return truncate(string(encoded), maxBytes)
 		}
 	}
-	return truncate(raw, maxBytes)
+	return truncate(redactSecretText(raw), maxBytes)
 }
 
 func redactSensitiveJSON(v any) any {
@@ -261,6 +271,8 @@ func redactSensitiveJSON(v any) any {
 			out = append(out, redactSensitiveJSON(vv))
 		}
 		return out
+	case string:
+		return redactSecretText(t)
 	default:
 		return v
 	}
@@ -284,13 +296,31 @@ func isSensitiveKey(key string) bool {
 // sanitizeMessage strips control characters that would otherwise wreck a
 // log viewer. Mirrors sub2api's sanitizeUpstreamErrorMessage.
 func sanitizeMessage(msg string) string {
-	msg = strings.TrimSpace(msg)
-	if msg == "" {
+	return redactSecretText(msg)
+}
+
+func redactSecretText(value string) string {
+	value = cleanLogText(value)
+	if value == "" {
+		return ""
+	}
+	value = authorizationPattern.ReplaceAllString(value, "${1}${2}${3} [REDACTED]")
+	value = credentialPattern.ReplaceAllString(value, "${1} [REDACTED]")
+	value = secretQueryPattern.ReplaceAllString(value, "${1}[REDACTED]")
+	value = secretAssignmentPattern.ReplaceAllString(value, "${1}${2}[REDACTED]")
+	value = openAIKeyPattern.ReplaceAllString(value, "sk-[REDACTED]")
+	value = srapiKeyPattern.ReplaceAllString(value, "${1}_[REDACTED]")
+	return strings.TrimSpace(value)
+}
+
+func cleanLogText(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
 		return ""
 	}
 	var b strings.Builder
-	b.Grow(len(msg))
-	for _, r := range msg {
+	b.Grow(len(value))
+	for _, r := range value {
 		if r == '\n' || r == '\t' {
 			b.WriteRune(' ')
 			continue
