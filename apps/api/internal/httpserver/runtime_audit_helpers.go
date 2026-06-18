@@ -34,7 +34,7 @@ func auditRecordFromRequest(r *http.Request, actorUserID int, action, resourceTy
 		After:        after,
 		IP:           clientIP(r),
 		UserAgent:    r.UserAgent(),
-		TraceID:      requestIDFromContext(r.Context()),
+		TraceID:      traceIDFromContext(r.Context()),
 	}
 }
 

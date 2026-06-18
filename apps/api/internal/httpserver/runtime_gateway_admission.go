@@ -175,7 +175,7 @@ func (rt *runtimeState) applyGatewayContentSafety(ctx context.Context, canonical
 			"warnings":        nonNilStrings(result.Warnings),
 			"findings":        contentSafetyFindingsAudit(result.Findings),
 		},
-		TraceID: requestIDFromContext(ctx),
+		TraceID: traceIDFromContext(ctx),
 	})
 	return updated, result, nil
 }

@@ -1203,6 +1203,14 @@ func requestIDFromContext(ctx context.Context) string {
 	return requestID
 }
 
+func traceIDFromContext(ctx context.Context) string {
+	traceID := trace.SpanContextFromContext(ctx).TraceID()
+	if !traceID.IsValid() {
+		return ""
+	}
+	return traceID.String()
+}
+
 type gatewayConcurrencyContextKey struct{}
 
 type gatewayRouteContextKey struct{}

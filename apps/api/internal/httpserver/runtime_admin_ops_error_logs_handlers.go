@@ -39,7 +39,7 @@ func (s *Server) recordOpsErrorLog(ctx context.Context, rec gatewayUsageRecord) 
 	req := opserrorlogscontract.RecordRequest{
 		OccurredAt:        time.Now().UTC(),
 		RequestID:         rec.RequestID,
-		TraceID:           requestIDFromContext(ctx),
+		TraceID:           traceIDFromContext(ctx),
 		Platform:          rec.SourceProtocol,
 		SourceEndpoint:    rec.SourceEndpoint,
 		TargetProtocol:    rec.TargetProtocol,
@@ -144,7 +144,7 @@ func (rt *runtimeState) recordGatewaySystemLog(ctx context.Context, rec gatewayU
 		Message:   message,
 		Source:    "gateway",
 		RequestID: rec.RequestID,
-		TraceID:   requestIDFromContext(ctx),
+		TraceID:   traceIDFromContext(ctx),
 		Metadata:  metadata,
 		CreatedAt: time.Now().UTC(),
 	}); err != nil && rt.logger != nil {

@@ -143,7 +143,7 @@ func (rt *runtimeState) recordGatewayUsageWriteFailure(ctx context.Context, rec 
 		Message:   "failed to record gateway usage log",
 		Source:    "gateway.usage",
 		RequestID: rec.RequestID,
-		TraceID:   requestIDFromContext(ctx),
+		TraceID:   traceIDFromContext(ctx),
 		Metadata:  metadata,
 		CreatedAt: time.Now().UTC(),
 	}); err != nil && rt.logger != nil {
@@ -522,7 +522,7 @@ func (rt *runtimeState) applyProviderAccountCooldown(ctx context.Context, rec ga
 		ResourceID:   strconv.Itoa(*rec.AccountID),
 		Before:       before,
 		After:        accountAuditSnapshot(updated),
-		TraceID:      requestIDFromContext(ctx),
+		TraceID:      traceIDFromContext(ctx),
 	})
 }
 

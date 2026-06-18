@@ -1471,7 +1471,7 @@ func (rt *runtimeState) doRefreshReverseProxyCredential(ctx context.Context, acc
 				"refresh_attempts":     outcome.Attempts,
 				"needs_reauth_flipped": outcome.NeedsReauthFlipped,
 			},
-			TraceID: requestIDFromContext(ctx),
+			TraceID: traceIDFromContext(ctx),
 		})
 		// A permanently rejected refresh token (session_invalid) parks the
 		// account for re-auth via Status so the scheduler stops selecting
@@ -1501,7 +1501,7 @@ func (rt *runtimeState) doRefreshReverseProxyCredential(ctx context.Context, acc
 			"refresh_attempts":   outcome.Attempts,
 			"credential_version": outcome.Account.CredentialVersion,
 		},
-		TraceID: requestIDFromContext(ctx),
+		TraceID: traceIDFromContext(ctx),
 	})
 	return refreshed, true, nil
 }
@@ -1583,7 +1583,7 @@ func (rt *runtimeState) logUpstreamFailoverDecision(ctx context.Context, account
 		"should_failover", decision.ShouldFailover,
 		"should_blacklist", decision.ShouldBlacklist,
 		"retry_after_ms", decision.RetryAfterMs,
-		"trace_id", requestIDFromContext(ctx),
+		"trace_id", traceIDFromContext(ctx),
 	)
 }
 
@@ -1614,7 +1614,7 @@ func (rt *runtimeState) protectProviderAccountForClass(ctx context.Context, acco
 		ResourceID:   strconv.Itoa(account.ID),
 		Before:       accountAuditSnapshot(before),
 		After:        accountAuditSnapshot(updated),
-		TraceID:      requestIDFromContext(ctx),
+		TraceID:      traceIDFromContext(ctx),
 	})
 }
 

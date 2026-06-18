@@ -413,7 +413,7 @@ func (rt *runtimeState) recordGatewayAuthFailure(ctx context.Context, rec gatewa
 		Message:   "gateway API key authentication failed",
 		Source:    "gateway.auth",
 		RequestID: rec.RequestID,
-		TraceID:   requestIDFromContext(ctx),
+		TraceID:   traceIDFromContext(ctx),
 		Metadata:  metadata,
 		CreatedAt: time.Now().UTC(),
 	}); err != nil && rt.logger != nil {
