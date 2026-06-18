@@ -373,12 +373,31 @@ function KV({ label, value }: { label: string; value: string }) {
 }
 
 function EvidenceSummary({ log }: { log: OpsSystemLog }) {
+  const { t } = useLanguage();
   const items = opsSystemLogEvidenceItems(log);
-  if (items.length === 0) {
+  const errorHref = adminErrorLogsHref(log);
+  const requestDumpHref = adminRequestDumpsHref(log);
+  if (items.length === 0 && !errorHref && !requestDumpHref) {
     return <span className="text-2xs text-srapi-text-tertiary font-mono">—</span>;
   }
   return (
     <div className="flex max-w-md flex-wrap gap-1.5">
+      {errorHref ? (
+        <Link
+          href={errorHref}
+          className="max-w-full truncate rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+        >
+          {t("adminOpsSystemLogs.openErrorLogs")}
+        </Link>
+      ) : null}
+      {requestDumpHref ? (
+        <Link
+          href={requestDumpHref}
+          className="max-w-full truncate rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+        >
+          {t("adminOpsSystemLogs.openRequestDumps")}
+        </Link>
+      ) : null}
       {items.map((item) => (
         <span
           key={`${item.key}:${item.value}`}
