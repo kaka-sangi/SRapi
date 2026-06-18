@@ -112,7 +112,7 @@ func systemLogFromRecordRequest(req contract.RecordSystemLogRequest, now time.Ti
 	if level == "" {
 		level = contract.OpsSystemLogLevelInfo
 	}
-	message := strings.TrimSpace(req.Message)
+	message := scrubSystemLogString(req.Message)
 	source := strings.TrimSpace(req.Source)
 	if !level.Valid() || message == "" || source == "" {
 		return contract.OpsSystemLog{}, ErrInvalidInput

@@ -216,6 +216,37 @@ func TestRecordSystemLogSanitizesMetadataAtServiceBoundary(t *testing.T) {
 	}
 }
 
+func TestRecordSystemLogSanitizesMessageAtServiceBoundary(t *testing.T) {
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	longSuffix := strings.Repeat("x", systemLogMetadataMaxString)
+	created, err := svc.RecordSystemLog(t.Context(), contract.RecordSystemLogRequest{
+		Level:   contract.OpsSystemLogLevelError,
+		Source:  "gateway",
+		Message: "upstream Authorization: Bearer raw-token refresh_token=raw-refresh api_key=sk-abc123456789 " + longSuffix,
+	})
+	if err != nil {
+		t.Fatalf("record system log: %v", err)
+	}
+	if strings.Contains(created.Message, "raw-token") ||
+		strings.Contains(created.Message, "raw-refresh") ||
+		strings.Contains(created.Message, "sk-abc123456789") {
+		t.Fatalf("system log message leaked secret: %q", created.Message)
+	}
+	if !strings.Contains(created.Message, "Bearer [REDACTED]") ||
+		!strings.Contains(created.Message, "refresh_token=[REDACTED]") ||
+		!strings.Contains(created.Message, "api_key=[REDACTED]") {
+		t.Fatalf("expected redacted markers in system log message, got %q", created.Message)
+	}
+	if !strings.HasSuffix(created.Message, "...[TRUNCATED]") {
+		t.Fatalf("expected long system log message to be truncated, got length=%d", len([]rune(created.Message)))
+	}
+}
+
 type captureRetentionStore struct {
 	cutoffs contract.RetentionCutoffs
 }
