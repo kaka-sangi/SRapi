@@ -19,6 +19,11 @@ import { useAccountNameLookup } from "@/hooks/use-account-name-lookup";
 import { useAdminEventStream } from "@/hooks/use-admin-events";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
+import {
+  cacheHealthSummary,
+  circuitBreakerStateLabelKey,
+  circuitBreakerSummary,
+} from "@/lib/admin-diagnostics-summary";
 import { quietStatusFor } from "@/lib/status-badge";
 import type { CircuitBreakerEntry } from "@/lib/admin-api";
 
@@ -139,41 +144,56 @@ function DiagnosticsContent() {
               </p>
             ) : (
               <div className="divide-y divide-srapi-border">
-                {breakers.data.map((entry) => (
-                  <div
-                    key={entry.account_id}
-                    className="flex flex-wrap items-center justify-between gap-3 py-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-sm text-srapi-text-primary">
-                        {accountLookup.get(entry.account_id)}
-                      </span>
-                      <QuietBadge status={breakerBadgeVariant(entry.state)} label={entry.state} />
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex gap-3 font-mono text-2xs text-srapi-text-tertiary">
-                        <span className={entry.success_rate >= 0.95 ? "text-srapi-success" : entry.success_rate >= 0.8 ? "text-srapi-warning" : "text-srapi-error"}>
+                {breakers.data.map((entry) => {
+                  const summary = circuitBreakerSummary(entry);
+                  return (
+                    <div
+                      key={entry.account_id}
+                      className="flex flex-wrap items-center justify-between gap-3 py-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-sm text-srapi-text-primary">
+                            {accountLookup.get(entry.account_id)}
+                          </span>
+                          <QuietBadge
+                            status={breakerBadgeVariant(entry.state)}
+                            label={t(circuitBreakerStateLabelKey(entry.state))}
+                          />
+                          <QuietBadge status={summary.tone} label={t(summary.labelKey)} />
+                        </div>
+                        <div className="mt-1 font-mono text-2xs text-srapi-text-tertiary">
+                          {summary.detail}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span
+                          className={
+                            "font-mono text-2xs tabular " +
+                            (entry.success_rate >= 0.95
+                              ? "text-srapi-success"
+                              : entry.success_rate >= 0.8
+                                ? "text-srapi-warning"
+                                : "text-srapi-error")
+                          }
+                        >
                           {Math.round(entry.success_rate * 100)}%
                         </span>
-                        <span>req: {entry.requests}</span>
-                        <span className="text-srapi-success">ok: {entry.total_successes}</span>
-                        <span className="text-srapi-error">fail: {entry.total_failures}</span>
-                        <span>streak: +{entry.consecutive_successes} / -{entry.consecutive_failures}</span>
+                        {entry.state !== "closed" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleReset(entry.account_id)}
+                            loading={resetMut.isPending}
+                          >
+                            <RotateCcw className="mr-1 size-3" />
+                            {t("common.reset")}
+                          </Button>
+                        )}
                       </div>
-                      {entry.state !== "closed" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleReset(entry.account_id)}
-                          loading={resetMut.isPending}
-                        >
-                          <RotateCcw className="mr-1 size-3" />
-                          {t("common.reset")}
-                        </Button>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -226,16 +246,23 @@ function DiagnosticsContent() {
               <div className="divide-y divide-srapi-border">
                 {cacheStats.data.map((cache) => {
                   const rateNum = parseFloat(cache.hit_rate) || 0;
+                  const summary = cacheHealthSummary(cache);
                   return (
                     <div key={cache.name} className="space-y-2 py-3">
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <span className="font-mono text-sm text-srapi-text-primary">{cache.name}</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-sm text-srapi-text-primary">{cache.name}</span>
+                          <QuietBadge status={summary.tone} label={t(summary.labelKey)} />
+                        </div>
                         <div className="flex gap-4 font-mono text-2xs text-srapi-text-tertiary">
                           <span>size: {cache.size}</span>
                           <span className="text-srapi-success">hits: {cache.hits}</span>
                           <span className="text-srapi-error">misses: {cache.misses}</span>
                           <span>evictions: {cache.evictions}</span>
                         </div>
+                      </div>
+                      <div className="font-mono text-2xs text-srapi-text-tertiary">
+                        {summary.detail}
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-srapi-border">
