@@ -19,6 +19,7 @@ const (
 	systemLogMetadataMaxKeys   = 64
 	systemLogMetadataMaxDepth  = 4
 	systemLogMetadataMaxString = 512
+	systemLogIndexedFieldMax   = 128
 )
 
 var (
@@ -113,7 +114,7 @@ func systemLogFromRecordRequest(req contract.RecordSystemLogRequest, now time.Ti
 		level = contract.OpsSystemLogLevelInfo
 	}
 	message := scrubSystemLogString(req.Message)
-	source := strings.TrimSpace(req.Source)
+	source := sanitizeSystemLogIndexedField(req.Source)
 	if !level.Valid() || message == "" || source == "" {
 		return contract.OpsSystemLog{}, ErrInvalidInput
 	}
@@ -125,8 +126,8 @@ func systemLogFromRecordRequest(req contract.RecordSystemLogRequest, now time.Ti
 		Level:     level,
 		Message:   message,
 		Source:    source,
-		RequestID: strings.TrimSpace(req.RequestID),
-		TraceID:   strings.TrimSpace(req.TraceID),
+		RequestID: sanitizeSystemLogIndexedField(req.RequestID),
+		TraceID:   sanitizeSystemLogIndexedField(req.TraceID),
 		Metadata:  sanitizeSystemLogMetadata(req.Metadata),
 		CreatedAt: createdAt.UTC(),
 	}, nil
@@ -143,10 +144,10 @@ func validateSystemLogListOptions(opts contract.SystemLogListOptions) error {
 }
 
 func normalizeSystemLogCleanupFilter(filter contract.SystemLogCleanupFilter) (contract.SystemLogCleanupFilter, error) {
-	filter.Source = strings.TrimSpace(filter.Source)
+	filter.Source = sanitizeSystemLogIndexedField(filter.Source)
 	filter.Query = strings.TrimSpace(filter.Query)
-	filter.RequestID = strings.TrimSpace(filter.RequestID)
-	filter.TraceID = strings.TrimSpace(filter.TraceID)
+	filter.RequestID = sanitizeSystemLogIndexedField(filter.RequestID)
+	filter.TraceID = sanitizeSystemLogIndexedField(filter.TraceID)
 	if filter.Level != "" && !filter.Level.Valid() {
 		return contract.SystemLogCleanupFilter{}, ErrInvalidInput
 	}
@@ -163,6 +164,22 @@ func normalizeSystemLogCleanupFilter(filter contract.SystemLogCleanupFilter) (co
 		return contract.SystemLogCleanupFilter{}, ErrInvalidInput
 	}
 	return filter, nil
+}
+
+func sanitizeSystemLogIndexedField(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(value))
+	for _, r := range value {
+		if r < 0x20 || r == 0x7f {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return truncateSystemLogRunes(strings.TrimSpace(b.String()), systemLogIndexedFieldMax)
 }
 
 func systemLogMatches(log contract.OpsSystemLog, filter contract.SystemLogCleanupFilter) bool {
@@ -430,4 +447,15 @@ func truncateSystemLogString(value string) string {
 		return value
 	}
 	return string(runes[:systemLogMetadataMaxString]) + "...[TRUNCATED]"
+}
+
+func truncateSystemLogRunes(value string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	runes := []rune(value)
+	if len(runes) <= max {
+		return value
+	}
+	return string(runes[:max])
 }

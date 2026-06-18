@@ -247,6 +247,47 @@ func TestRecordSystemLogSanitizesMessageAtServiceBoundary(t *testing.T) {
 	}
 }
 
+func TestRecordSystemLogSanitizesIndexedFieldsAtServiceBoundary(t *testing.T) {
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	long := strings.Repeat("源", systemLogIndexedFieldMax+8)
+	created, err := svc.RecordSystemLog(t.Context(), contract.RecordSystemLogRequest{
+		Level:     contract.OpsSystemLogLevelWarn,
+		Source:    "  ops.dashboard\n\t",
+		Message:   "clean message",
+		RequestID: "  req_trace_\n\treally-long-" + long,
+		TraceID:   "  trace_\n\t" + long,
+	})
+	if err != nil {
+		t.Fatalf("record system log: %v", err)
+	}
+	if created.Source != "ops.dashboard" {
+		t.Fatalf("expected source to be trimmed and cleaned, got %q", created.Source)
+	}
+	if strings.Contains(created.RequestID, "\n") || strings.Contains(created.TraceID, "\t") {
+		t.Fatalf("indexed fields should not contain control characters: %+v", created)
+	}
+	if len([]rune(created.RequestID)) != systemLogIndexedFieldMax || len([]rune(created.TraceID)) != systemLogIndexedFieldMax {
+		t.Fatalf("expected indexed fields to be rune-truncated, got request_id=%d trace_id=%d", len([]rune(created.RequestID)), len([]rune(created.TraceID)))
+	}
+
+	list, err := svc.ListSystemLogs(t.Context(), contract.SystemLogListOptions{
+		RequestID: created.RequestID,
+		TraceID:   created.TraceID,
+		Source:    created.Source,
+	})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 {
+		t.Fatalf("expected cleaned indexed fields to remain queryable, got %+v", list)
+	}
+}
+
 type captureRetentionStore struct {
 	cutoffs contract.RetentionCutoffs
 }
