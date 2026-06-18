@@ -445,6 +445,17 @@ hash = "hmac-sha256:" + hex(HMAC-SHA256(server_pepper, full_api_key))
 - 在日志、错误、audit before/after 中输出完整 API Key。
 - 使用 prefix 作为认证依据。
 
+删除行为：
+
+- 删除 API Key 必须退出认证路径，后续请求返回 `invalid_api_key`。
+- 删除后的软删除行可以继续保存 `prefix`、HMAC `hash`、owner user id 和 key name，
+  用作认证失败排障墓碑。
+- 墓碑归因必须同时满足合法 SRapi key 格式、prefix 命中软删除行、full API key
+  HMAC 常量时间匹配；只命中 prefix 不得归因。
+- `gateway.auth` 系统日志可以保存 `attempted_key_prefix`、`deleted_key_id`、
+  `deleted_key_owner_user_id` 和 `deleted_key_name`；不得保存完整 API Key、secret
+  段、Authorization header 或 HMAC。
+
 ## 5. Provider 凭证安全
 
 Provider Account 的凭证包括：

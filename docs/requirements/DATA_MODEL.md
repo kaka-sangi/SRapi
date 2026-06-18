@@ -595,6 +595,10 @@ index(expires_at)
 - 不存 API Key 原文。
 - `hash` 使用安全哈希。
 - `prefix` 用于定位，不用于认证。
+- 删除 API Key 只让它退出认证路径；软删除行仍保留 `prefix`、`hash`、`user_id`
+  和 `name` 作为低敏墓碑证据。Gateway 认证失败日志只能在请求 plaintext
+  与该墓碑通过 `prefix + HMAC` 精确匹配后引用 `key id / owner user id / name / prefix`，
+  不得保存或输出完整 API Key、secret 段或 HMAC 值。
 - 持久化创建 API Key 时如果未指定 `workspace_id`，会继承 owner user 的 `workspace_id`；显式指定时用于后续多租户管理面。
 
 ### 7.2 api_key_groups

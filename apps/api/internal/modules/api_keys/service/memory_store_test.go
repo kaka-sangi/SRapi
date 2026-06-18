@@ -14,6 +14,7 @@ type memoryStore struct {
 	nextID   int
 	byID     map[int]contract.APIKey
 	byPrefix map[string]int
+	deleted  map[int]contract.APIKey
 }
 
 func newMemoryStore() *memoryStore {
@@ -21,6 +22,7 @@ func newMemoryStore() *memoryStore {
 		nextID:   1,
 		byID:     map[int]contract.APIKey{},
 		byPrefix: map[string]int{},
+		deleted:  map[int]contract.APIKey{},
 	}
 }
 
@@ -97,6 +99,7 @@ func (s *memoryStore) Delete(_ context.Context, id int) error {
 	}
 	delete(s.byPrefix, key.Prefix)
 	delete(s.byID, id)
+	s.deleted[id] = key
 	return nil
 }
 
@@ -108,6 +111,17 @@ func (s *memoryStore) FindByPrefix(_ context.Context, prefix string) (contract.A
 		return contract.APIKey{}, ErrKeyNotFound
 	}
 	return s.byID[id], nil
+}
+
+func (s *memoryStore) FindDeletedByPrefix(_ context.Context, prefix string) (contract.APIKey, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, key := range s.deleted {
+		if key.Prefix == prefix {
+			return key, nil
+		}
+	}
+	return contract.APIKey{}, ErrKeyNotFound
 }
 
 func (s *memoryStore) FindByID(_ context.Context, id int) (contract.APIKey, error) {

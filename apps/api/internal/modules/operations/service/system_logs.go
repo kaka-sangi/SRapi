@@ -392,7 +392,8 @@ func systemLogMetadataKeyNeedsRedaction(key string) bool {
 
 func systemLogMetadataSafeAPIKeyReference(key string) bool {
 	switch key {
-	case "api_key_id", "api_key_prefix", "attempted_key_prefix":
+	case "api_key_id", "api_key_prefix", "attempted_key_prefix",
+		"deleted_key_id", "deleted_key_owner_user_id", "deleted_key_name":
 		return true
 	default:
 		return false

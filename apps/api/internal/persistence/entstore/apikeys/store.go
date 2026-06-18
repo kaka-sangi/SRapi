@@ -200,6 +200,19 @@ func (s *Store) FindByPrefix(ctx context.Context, prefix string) (contract.APIKe
 	return s.toAPIKey(ctx, found)
 }
 
+func (s *Store) FindDeletedByPrefix(ctx context.Context, prefix string) (contract.APIKey, error) {
+	found, err := s.client.APIKey.Query().
+		Where(entapikey.PrefixEQ(prefix), entapikey.DeletedAtNotNil()).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.APIKey{}, contract.ErrKeyNotFound
+		}
+		return contract.APIKey{}, err
+	}
+	return s.toAPIKey(ctx, found)
+}
+
 func (s *Store) FindByID(ctx context.Context, id int) (contract.APIKey, error) {
 	found, err := s.client.APIKey.Query().
 		Where(entapikey.IDEQ(id), entapikey.DeletedAtIsNil()).

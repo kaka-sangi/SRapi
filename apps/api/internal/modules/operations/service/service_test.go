@@ -152,21 +152,24 @@ func TestRecordSystemLogSanitizesMetadataAtServiceBoundary(t *testing.T) {
 		Source:  "gateway",
 		Message: "upstream failed",
 		Metadata: map[string]any{
-			"access_token":          "raw-access-token",
-			"authorization":         "Bearer raw-token",
-			"cookie":                "session=raw-cookie",
-			"prompt":                "user prompt",
-			"body_excerpt":          `{"prompt":"secret"}`,
-			"api_key":               "sk_111111111111_22222222222222222222222222222222",
-			"api_key_id":            42,
-			"api_key_prefix":        "sk_111111111111",
-			"attempted_key_prefix":  "sk_aaaaaaaaaaaa",
-			"max_tokens":            8192,
-			"prompt_tokens":         32,
-			"provider_error_url":    "https://upstream.example/v1?access_token=raw&client_secret=hidden",
-			"provider_error_detail": "provider said Authorization: Bearer nested-token refresh_token: nested-refresh key sk_111111111111_22222222222222222222222222222222",
-			"long":                  long,
-			"opaque":                struct{ Secret string }{Secret: "raw-secret"},
+			"access_token":              "raw-access-token",
+			"authorization":             "Bearer raw-token",
+			"cookie":                    "session=raw-cookie",
+			"prompt":                    "user prompt",
+			"body_excerpt":              `{"prompt":"secret"}`,
+			"api_key":                   "sk_111111111111_22222222222222222222222222222222",
+			"api_key_id":                42,
+			"api_key_prefix":            "sk_111111111111",
+			"attempted_key_prefix":      "sk_aaaaaaaaaaaa",
+			"deleted_key_id":            24,
+			"deleted_key_owner_user_id": 7,
+			"deleted_key_name":          "deleted-gateway",
+			"max_tokens":                8192,
+			"prompt_tokens":             32,
+			"provider_error_url":        "https://upstream.example/v1?access_token=raw&client_secret=hidden",
+			"provider_error_detail":     "provider said Authorization: Bearer nested-token refresh_token: nested-refresh key sk_111111111111_22222222222222222222222222222222",
+			"long":                      long,
+			"opaque":                    struct{ Secret string }{Secret: "raw-secret"},
 			"headers": map[string]any{
 				"Authorization": "Bearer nested",
 			},
@@ -185,7 +188,8 @@ func TestRecordSystemLogSanitizesMetadataAtServiceBoundary(t *testing.T) {
 			t.Fatalf("expected %s to be redacted, got %#v in %#v", key, meta[key], meta)
 		}
 	}
-	if meta["api_key_id"] != 42 || meta["api_key_prefix"] != "sk_111111111111" || meta["attempted_key_prefix"] != "sk_aaaaaaaaaaaa" {
+	if meta["api_key_id"] != 42 || meta["api_key_prefix"] != "sk_111111111111" || meta["attempted_key_prefix"] != "sk_aaaaaaaaaaaa" ||
+		meta["deleted_key_id"] != 24 || meta["deleted_key_owner_user_id"] != 7 || meta["deleted_key_name"] != "deleted-gateway" {
 		t.Fatalf("expected low-sensitive api key references preserved, got %#v", meta)
 	}
 	if meta["max_tokens"] != 8192 || meta["prompt_tokens"] != 32 {

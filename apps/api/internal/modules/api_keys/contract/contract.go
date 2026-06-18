@@ -112,6 +112,16 @@ type AuthResult struct {
 	CachedAuth bool
 }
 
+// DeletedKeyMatch is low-sensitive evidence that a failed plaintext key exactly
+// matches a soft-deleted API key tombstone. It never carries the full key,
+// secret segment, or stored HMAC.
+type DeletedKeyMatch struct {
+	KeyID  int
+	UserID int
+	Name   string
+	Prefix string
+}
+
 // APIKeyRPMStats is the read-only projection of the in-memory per-key
 // request counter exposed by the api_keys service. Lives in contract so
 // admin/observability layers can consume the snapshot without pulling in
@@ -130,6 +140,7 @@ type Store interface {
 	Update(ctx context.Context, key APIKey) (APIKey, error)
 	Delete(ctx context.Context, id int) error
 	FindByPrefix(ctx context.Context, prefix string) (APIKey, error)
+	FindDeletedByPrefix(ctx context.Context, prefix string) (APIKey, error)
 	FindByID(ctx context.Context, id int) (APIKey, error)
 	List(ctx context.Context) ([]APIKey, error)
 	ListByUser(ctx context.Context, userID int) ([]APIKey, error)

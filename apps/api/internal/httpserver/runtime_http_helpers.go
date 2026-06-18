@@ -377,6 +377,7 @@ func (s *Server) recordGatewayAuthFailure(r *http.Request, plaintext string, err
 		Method:             r.Method,
 		Reason:             gatewayAuthFailureReason(err),
 		AttemptedKeyPrefix: gatewayAttemptedKeyPrefix(plaintext, err),
+		DeletedKey:         s.gatewayDeletedKeyMatch(r, plaintext, err),
 	})
 }
 
@@ -386,6 +387,7 @@ type gatewayAuthFailureRecord struct {
 	Method             string
 	Reason             string
 	AttemptedKeyPrefix string
+	DeletedKey         *apikeycontract.DeletedKeyMatch
 }
 
 func (rt *runtimeState) recordGatewayAuthFailure(ctx context.Context, rec gatewayAuthFailureRecord) {
@@ -400,6 +402,11 @@ func (rt *runtimeState) recordGatewayAuthFailure(ctx context.Context, rec gatewa
 	}
 	if rec.AttemptedKeyPrefix != "" {
 		metadata["attempted_key_prefix"] = rec.AttemptedKeyPrefix
+	}
+	if rec.DeletedKey != nil {
+		metadata["deleted_key_id"] = rec.DeletedKey.KeyID
+		metadata["deleted_key_owner_user_id"] = rec.DeletedKey.UserID
+		metadata["deleted_key_name"] = rec.DeletedKey.Name
 	}
 	if _, err := rt.operations.RecordSystemLog(ctx, operationscontract.RecordSystemLogRequest{
 		Level:     operationscontract.OpsSystemLogLevelWarn,
@@ -447,6 +454,23 @@ func gatewayAttemptedKeyPrefix(plaintext string, err error) string {
 		return ""
 	}
 	return prefix
+}
+
+func (s *Server) gatewayDeletedKeyMatch(r *http.Request, plaintext string, err error) *apikeycontract.DeletedKeyMatch {
+	if s == nil || s.runtime == nil || s.runtime.apiKeys == nil || !errors.Is(err, apikeyservice.ErrInvalidKey) {
+		return nil
+	}
+	match, ok, lookupErr := s.runtime.apiKeys.DeletedKeyMatchFromPlaintext(r.Context(), plaintext)
+	if lookupErr != nil {
+		if s.runtime.logger != nil {
+			s.runtime.logger.Warn("deleted api key tombstone lookup failed", "request_id", requestIDFromContext(r.Context()), "error", lookupErr)
+		}
+		return nil
+	}
+	if !ok {
+		return nil
+	}
+	return &match
 }
 
 func gatewayAuthFailureReasonAllowsPrefix(reason string) bool {

@@ -228,6 +228,9 @@ func (p panicStore) Delete(ctx context.Context, id int) error {
 func (p panicStore) FindByPrefix(ctx context.Context, prefix string) (contract.APIKey, error) {
 	panic("FindByPrefix should not be called when cache is warm: " + prefix)
 }
+func (p panicStore) FindDeletedByPrefix(ctx context.Context, prefix string) (contract.APIKey, error) {
+	return p.inner.FindDeletedByPrefix(ctx, prefix)
+}
 func (p panicStore) FindByID(ctx context.Context, id int) (contract.APIKey, error) {
 	return p.inner.FindByID(ctx, id)
 }

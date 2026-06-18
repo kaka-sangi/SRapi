@@ -217,6 +217,66 @@ func TestGatewayInvalidAPIKeyCreatesLowSensitiveSystemLog(t *testing.T) {
 	}
 }
 
+func TestGatewayDeletedAPIKeyCreatesTombstoneSystemLogEvidence(t *testing.T) {
+	ctx := context.Background()
+	operationsStore := operationsmemory.New()
+	handler := New(config.Load(), nil, WithOperationsStore(operationsStore))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"deleted-gateway","scopes":["gateway:invoke"]}`)
+	apiKey := keyResp.Data.PlaintextKey
+	apiKeyID := string(keyResp.Data.ApiKey.Id)
+	apiKeyIDInt, err := strconv.Atoi(apiKeyID)
+	if err != nil {
+		t.Fatalf("parse api key id: %v", err)
+	}
+	userIDInt, err := strconv.Atoi(string(loginResp.Data.User.Id))
+	if err != nil {
+		t.Fatalf("parse user id: %v", err)
+	}
+
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/api-keys/"+apiKeyID, nil)
+	deleteReq.AddCookie(sessionCookie)
+	deleteReq.Header.Set(csrfHeaderName, loginResp.Data.CsrfToken)
+	deleteRec := httptest.NewRecorder()
+	handler.ServeHTTP(deleteRec, deleteReq)
+	if deleteRec.Code != http.StatusOK {
+		t.Fatalf("expected api key delete 200, got %d body=%s", deleteRec.Code, deleteRec.Body.String())
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected deleted key 401, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	list, err := operationsStore.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	var authLog *operationscontract.OpsSystemLog
+	for i := range list.Items {
+		if list.Items[i].Source == "gateway.auth" {
+			authLog = &list.Items[i]
+			break
+		}
+	}
+	if authLog == nil {
+		t.Fatalf("expected gateway.auth system log, got %+v", list.Items)
+	}
+	if authLog.Metadata["reason"] != "invalid_api_key" ||
+		authLog.Metadata["attempted_key_prefix"] != keyResp.Data.ApiKey.Prefix ||
+		metadataNumber(authLog.Metadata["deleted_key_id"]) != apiKeyIDInt ||
+		metadataNumber(authLog.Metadata["deleted_key_owner_user_id"]) != userIDInt ||
+		authLog.Metadata["deleted_key_name"] != "deleted-gateway" {
+		t.Fatalf("unexpected deleted key auth metadata: %+v", authLog.Metadata)
+	}
+	if strings.Contains(authLog.Message, apiKey) || metadataContainsString(authLog.Metadata, apiKey) {
+		t.Fatalf("deleted key auth system log leaked full key: %+v", authLog)
+	}
+}
+
 func TestGatewayMissingAPIKeyDoesNotCreateSystemLogNoise(t *testing.T) {
 	ctx := context.Background()
 	operationsStore := operationsmemory.New()

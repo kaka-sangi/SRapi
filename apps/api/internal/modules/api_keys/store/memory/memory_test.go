@@ -92,6 +92,34 @@ func TestFindByPrefixReturnsDefensiveCopy(t *testing.T) {
 	}
 }
 
+func TestDeleteMovesKeyToDeletedPrefixLookup(t *testing.T) {
+	store := New()
+	ctx := context.Background()
+	created, err := store.Create(ctx, contract.CreateStoredKey{
+		UserID: 7,
+		Name:   "deleted-gateway",
+		Prefix: "sk_deleted",
+		Hash:   "hmac-sha256:deleted",
+		Status: contract.StatusActive,
+	})
+	if err != nil {
+		t.Fatalf("create key: %v", err)
+	}
+	if err := store.Delete(ctx, created.ID); err != nil {
+		t.Fatalf("delete key: %v", err)
+	}
+	if _, err := store.FindByPrefix(ctx, created.Prefix); err == nil {
+		t.Fatal("deleted key must not be returned by active prefix lookup")
+	}
+	deleted, err := store.FindDeletedByPrefix(ctx, created.Prefix)
+	if err != nil {
+		t.Fatalf("find deleted key: %v", err)
+	}
+	if deleted.ID != created.ID || deleted.UserID != 7 || deleted.Name != "deleted-gateway" || deleted.Hash != "hmac-sha256:deleted" {
+		t.Fatalf("unexpected deleted tombstone: %+v", deleted)
+	}
+}
+
 func TestApplyCostUsageAccumulatesAndResetsWindows(t *testing.T) {
 	store := New()
 	ctx := context.Background()

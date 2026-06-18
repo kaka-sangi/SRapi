@@ -462,6 +462,35 @@ func (s *Service) Authenticate(ctx context.Context, plaintext string) (contract.
 	return result, nil
 }
 
+// DeletedKeyMatchFromPlaintext returns low-sensitive tombstone evidence when
+// plaintext exactly matches a soft-deleted API key. It is intended for
+// operator-facing auth-failure logs; callers must not use it for authentication.
+func (s *Service) DeletedKeyMatchFromPlaintext(ctx context.Context, plaintext string) (contract.DeletedKeyMatch, bool, error) {
+	if s == nil {
+		return contract.DeletedKeyMatch{}, false, ErrInvalidInput
+	}
+	prefix, ok := PrefixFromPlaintext(plaintext)
+	if !ok {
+		return contract.DeletedKeyMatch{}, false, nil
+	}
+	key, err := s.store.FindDeletedByPrefix(ctx, prefix)
+	if err != nil {
+		if errors.Is(err, contract.ErrKeyNotFound) || errors.Is(err, ErrKeyNotFound) {
+			return contract.DeletedKeyMatch{}, false, nil
+		}
+		return contract.DeletedKeyMatch{}, false, err
+	}
+	if !hmac.Equal([]byte(key.Hash), []byte(s.HashPlaintext(plaintext))) {
+		return contract.DeletedKeyMatch{}, false, nil
+	}
+	return contract.DeletedKeyMatch{
+		KeyID:  key.ID,
+		UserID: key.UserID,
+		Name:   key.Name,
+		Prefix: key.Prefix,
+	}, true, nil
+}
+
 func (s *Service) HashPlaintext(plaintext string) string {
 	mac := hmac.New(sha256.New, s.pepper)
 	mac.Write([]byte(plaintext))

@@ -122,6 +122,52 @@ func TestAuthenticateRejectsExpiredKey(t *testing.T) {
 	}
 }
 
+func TestDeletedKeyMatchFromPlaintextMatchesSoftDeletedTombstone(t *testing.T) {
+	store := newMemoryStore()
+	svc := newTestService(t, store)
+	created, err := svc.Create(context.Background(), contract.CreateRequest{UserID: 7, Name: "deleted-gateway"})
+	if err != nil {
+		t.Fatalf("create api key: %v", err)
+	}
+	if err := svc.Delete(context.Background(), 7, created.Key.ID); err != nil {
+		t.Fatalf("delete api key: %v", err)
+	}
+
+	match, ok, err := svc.DeletedKeyMatchFromPlaintext(context.Background(), created.PlaintextKey)
+	if err != nil {
+		t.Fatalf("deleted key match: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected deleted key match")
+	}
+	if match.KeyID != created.Key.ID || match.UserID != 7 || match.Name != "deleted-gateway" || match.Prefix != created.Key.Prefix {
+		t.Fatalf("unexpected deleted key match: %+v", match)
+	}
+	if _, err := svc.Authenticate(context.Background(), created.PlaintextKey); !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("deleted key must not authenticate, got %v", err)
+	}
+}
+
+func TestDeletedKeyMatchFromPlaintextRejectsActiveAndTamperedKeys(t *testing.T) {
+	store := newMemoryStore()
+	svc := newTestService(t, store)
+	created, err := svc.Create(context.Background(), contract.CreateRequest{UserID: 7, Name: "gateway"})
+	if err != nil {
+		t.Fatalf("create api key: %v", err)
+	}
+
+	if _, ok, err := svc.DeletedKeyMatchFromPlaintext(context.Background(), created.PlaintextKey); err != nil || ok {
+		t.Fatalf("active key must not match deleted tombstone: ok=%v err=%v", ok, err)
+	}
+	if err := svc.Delete(context.Background(), 7, created.Key.ID); err != nil {
+		t.Fatalf("delete api key: %v", err)
+	}
+	tampered := created.Key.Prefix + "_" + strings.Repeat("c", 64)
+	if _, ok, err := svc.DeletedKeyMatchFromPlaintext(context.Background(), tampered); err != nil || ok {
+		t.Fatalf("tampered key must not match deleted tombstone: ok=%v err=%v", ok, err)
+	}
+}
+
 func TestUpdateChangesMutableFieldsAndPreservesSecretMaterial(t *testing.T) {
 	expiresAt := time.Now().UTC().Add(time.Hour)
 	rpmLimit := 120

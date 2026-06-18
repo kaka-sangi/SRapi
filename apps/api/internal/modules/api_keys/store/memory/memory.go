@@ -14,6 +14,7 @@ type Store struct {
 	nextID   int
 	byID     map[int]contract.APIKey
 	byPrefix map[string]int
+	deleted  map[int]contract.APIKey
 }
 
 func New() *Store {
@@ -21,6 +22,7 @@ func New() *Store {
 		nextID:   1,
 		byID:     map[int]contract.APIKey{},
 		byPrefix: map[string]int{},
+		deleted:  map[int]contract.APIKey{},
 	}
 }
 
@@ -133,6 +135,7 @@ func (s *Store) Delete(_ context.Context, id int) error {
 	}
 	delete(s.byPrefix, key.Prefix)
 	delete(s.byID, id)
+	s.deleted[id] = key
 	return nil
 }
 
@@ -144,6 +147,17 @@ func (s *Store) FindByPrefix(_ context.Context, prefix string) (contract.APIKey,
 		return contract.APIKey{}, contract.ErrKeyNotFound
 	}
 	return cloneKey(s.byID[id]), nil
+}
+
+func (s *Store) FindDeletedByPrefix(_ context.Context, prefix string) (contract.APIKey, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, key := range s.deleted {
+		if key.Prefix == prefix {
+			return cloneKey(key), nil
+		}
+	}
+	return contract.APIKey{}, contract.ErrKeyNotFound
 }
 
 func (s *Store) FindByID(_ context.Context, id int) (contract.APIKey, error) {

@@ -2,6 +2,7 @@ package apikeys
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -173,6 +174,43 @@ func TestStoreUpdateAPIKeyPreservesSecretMaterialAndReplacesGroups(t *testing.T)
 	}
 	if found.Hash != "hmac-sha256:original" || found.Name != "renamed" {
 		t.Fatalf("unexpected persisted api key: %+v", found)
+	}
+}
+
+func TestStoreFindDeletedByPrefixReturnsSoftDeletedTombstone(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+	userID, _ := createUserWithWorkspace(t, ctx, client, "deleted-key")
+	created, err := store.Create(ctx, contract.CreateStoredKey{
+		UserID: userID,
+		Name:   "deleted-gateway",
+		Prefix: "sk_deleted",
+		Hash:   "hmac-sha256:deleted",
+		Status: contract.StatusActive,
+		Scopes: []string{"gateway:invoke"},
+	})
+	if err != nil {
+		t.Fatalf("create api key: %v", err)
+	}
+	if err := store.Delete(ctx, created.ID); err != nil {
+		t.Fatalf("delete api key: %v", err)
+	}
+	if _, err := store.FindByPrefix(ctx, "sk_deleted"); !errors.Is(err, contract.ErrKeyNotFound) {
+		t.Fatalf("active lookup should hide deleted key, got %v", err)
+	}
+	deleted, err := store.FindDeletedByPrefix(ctx, "sk_deleted")
+	if err != nil {
+		t.Fatalf("find deleted by prefix: %v", err)
+	}
+	if deleted.ID != created.ID || deleted.UserID != userID || deleted.Name != "deleted-gateway" || deleted.Hash != "hmac-sha256:deleted" {
+		t.Fatalf("unexpected deleted tombstone: %+v", deleted)
 	}
 }
 
