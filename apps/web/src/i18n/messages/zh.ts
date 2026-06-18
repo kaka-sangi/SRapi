@@ -2189,6 +2189,7 @@ export const zh: Messages = {
     outputTokens: "输出 Token",
     attempt: "尝试次数",
     apiKey: "API 密钥",
+    apiKeyPrefix: "API 密钥前缀",
     provider: "供应商",
     usageEstimated: "用量",
     estimated: "估算",

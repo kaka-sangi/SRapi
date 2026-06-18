@@ -150,6 +150,7 @@ func (s *Service) prepareEntry(req contract.RecordRequest) (contract.Entry, bool
 		TraceID:           truncate(strings.TrimSpace(req.TraceID), 128),
 		UserID:            req.UserID,
 		APIKeyID:          req.APIKeyID,
+		APIKeyPrefix:      truncate(strings.TrimSpace(req.APIKeyPrefix), 32),
 		AccountID:         req.AccountID,
 		ProviderID:        req.ProviderID,
 		Platform:          truncate(strings.TrimSpace(req.Platform), 64),

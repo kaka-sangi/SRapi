@@ -51,6 +51,7 @@ func (s *Store) Insert(ctx context.Context, entry contract.Entry) (contract.Entr
 		SetTraceID(trim(entry.TraceID, 128)).
 		SetNillableUserID(entry.UserID).
 		SetNillableAPIKeyID(entry.APIKeyID).
+		SetAPIKeyPrefix(trim(entry.APIKeyPrefix, 32)).
 		SetNillableAccountID(entry.AccountID).
 		SetNillableProviderID(entry.ProviderID).
 		SetPlatform(trim(entry.Platform, 64)).
@@ -180,6 +181,7 @@ func listPredicates(filter contract.ListFilter) []predicate.OpsErrorLog {
 		predicates = append(predicates, entopserrorlog.Or(
 			entopserrorlog.RequestIDContainsFold(query),
 			entopserrorlog.TraceIDContainsFold(query),
+			entopserrorlog.APIKeyPrefixContainsFold(query),
 			entopserrorlog.SourceEndpointContainsFold(query),
 			entopserrorlog.TargetProtocolContainsFold(query),
 			entopserrorlog.ModelContainsFold(query),
@@ -232,6 +234,7 @@ func toContract(row *ent.OpsErrorLog) contract.Entry {
 		OccurredAt:        row.OccurredAt.UTC(),
 		RequestID:         row.RequestID,
 		TraceID:           row.TraceID,
+		APIKeyPrefix:      row.APIKeyPrefix,
 		UserID:            row.UserID,
 		APIKeyID:          row.APIKeyID,
 		AccountID:         row.AccountID,

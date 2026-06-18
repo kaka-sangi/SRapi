@@ -187,6 +187,7 @@ func entryMatchesQuery(entry contract.Entry, query string) bool {
 	fields := []string{
 		entry.RequestID,
 		entry.TraceID,
+		entry.APIKeyPrefix,
 		entry.SourceEndpoint,
 		entry.TargetProtocol,
 		entry.Model,

@@ -110,6 +110,20 @@ func (_c *OpsErrorLogCreate) SetNillableAPIKeyID(v *int) *OpsErrorLogCreate {
 	return _c
 }
 
+// SetAPIKeyPrefix sets the "api_key_prefix" field.
+func (_c *OpsErrorLogCreate) SetAPIKeyPrefix(v string) *OpsErrorLogCreate {
+	_c.mutation.SetAPIKeyPrefix(v)
+	return _c
+}
+
+// SetNillableAPIKeyPrefix sets the "api_key_prefix" field if the given value is not nil.
+func (_c *OpsErrorLogCreate) SetNillableAPIKeyPrefix(v *string) *OpsErrorLogCreate {
+	if v != nil {
+		_c.SetAPIKeyPrefix(*v)
+	}
+	return _c
+}
+
 // SetAccountID sets the "account_id" field.
 func (_c *OpsErrorLogCreate) SetAccountID(v int) *OpsErrorLogCreate {
 	_c.mutation.SetAccountID(v)
@@ -489,6 +503,10 @@ func (_c *OpsErrorLogCreate) defaults() {
 		v := opserrorlog.DefaultTraceID
 		_c.mutation.SetTraceID(v)
 	}
+	if _, ok := _c.mutation.APIKeyPrefix(); !ok {
+		v := opserrorlog.DefaultAPIKeyPrefix
+		_c.mutation.SetAPIKeyPrefix(v)
+	}
 	if _, ok := _c.mutation.Platform(); !ok {
 		v := opserrorlog.DefaultPlatform
 		_c.mutation.SetPlatform(v)
@@ -579,6 +597,9 @@ func (_c *OpsErrorLogCreate) check() error {
 	}
 	if _, ok := _c.mutation.TraceID(); !ok {
 		return &ValidationError{Name: "trace_id", err: errors.New(`ent: missing required field "OpsErrorLog.trace_id"`)}
+	}
+	if _, ok := _c.mutation.APIKeyPrefix(); !ok {
+		return &ValidationError{Name: "api_key_prefix", err: errors.New(`ent: missing required field "OpsErrorLog.api_key_prefix"`)}
 	}
 	if _, ok := _c.mutation.Platform(); !ok {
 		return &ValidationError{Name: "platform", err: errors.New(`ent: missing required field "OpsErrorLog.platform"`)}
@@ -687,6 +708,10 @@ func (_c *OpsErrorLogCreate) createSpec() (*OpsErrorLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.APIKeyID(); ok {
 		_spec.SetField(opserrorlog.FieldAPIKeyID, field.TypeInt, value)
 		_node.APIKeyID = &value
+	}
+	if value, ok := _c.mutation.APIKeyPrefix(); ok {
+		_spec.SetField(opserrorlog.FieldAPIKeyPrefix, field.TypeString, value)
+		_node.APIKeyPrefix = value
 	}
 	if value, ok := _c.mutation.AccountID(); ok {
 		_spec.SetField(opserrorlog.FieldAccountID, field.TypeInt, value)

@@ -62,6 +62,7 @@ func TestRecordError_PreservesStructuredAttemptEvidence(t *testing.T) {
 	if err := svc.RecordError(context.Background(), contract.RecordRequest{
 		RequestID:         "req-attempt",
 		StatusCode:        &status,
+		APIKeyPrefix:      "sk_abc123",
 		TargetProtocol:    "openai-compatible",
 		UpstreamRequestID: "upstream_req",
 		AttemptNo:         2,
@@ -92,7 +93,7 @@ func TestRecordError_PreservesStructuredAttemptEvidence(t *testing.T) {
 		t.Fatalf("List: %v", err)
 	}
 	got := list.Items[0]
-	if got.AttemptNo != 2 || got.LatencyMS != 345 || !got.UsageEstimated || got.TargetProtocol != "openai-compatible" || got.UpstreamRequestID != "upstream_req" {
+	if got.AttemptNo != 2 || got.LatencyMS != 345 || !got.UsageEstimated || got.TargetProtocol != "openai-compatible" || got.UpstreamRequestID != "upstream_req" || got.APIKeyPrefix != "sk_abc123" {
 		t.Fatalf("attempt evidence mismatch: %+v", got)
 	}
 	if len(got.UpstreamErrors) != 1 || got.UpstreamErrors[0].AccountID == nil || *got.UpstreamErrors[0].AccountID != accountID {

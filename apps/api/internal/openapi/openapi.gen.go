@@ -8322,6 +8322,7 @@ type OpsErrorDistributionResponse struct {
 type OpsErrorLog struct {
 	AccountId        *Id                    `json:"account_id,omitempty"`
 	ApiKeyId         *Id                    `json:"api_key_id,omitempty"`
+	ApiKeyPrefix     *string                `json:"api_key_prefix,omitempty"`
 	AttemptNo        *int                   `json:"attempt_no,omitempty"`
 	CreatedAt        *time.Time             `json:"created_at,omitempty"`
 	ErrorBodyExcerpt *string                `json:"error_body_excerpt,omitempty"`
@@ -17184,6 +17185,14 @@ func (a *OpsErrorLog) UnmarshalJSON(b []byte) error {
 		delete(object, "api_key_id")
 	}
 
+	if raw, found := object["api_key_prefix"]; found {
+		err = json.Unmarshal(raw, &a.ApiKeyPrefix)
+		if err != nil {
+			return fmt.Errorf("error reading 'api_key_prefix': %w", err)
+		}
+		delete(object, "api_key_prefix")
+	}
+
 	if raw, found := object["attempt_no"]; found {
 		err = json.Unmarshal(raw, &a.AttemptNo)
 		if err != nil {
@@ -17462,6 +17471,13 @@ func (a OpsErrorLog) MarshalJSON() ([]byte, error) {
 		object["api_key_id"], err = json.Marshal(a.ApiKeyId)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'api_key_id': %w", err)
+		}
+	}
+
+	if a.ApiKeyPrefix != nil {
+		object["api_key_prefix"], err = json.Marshal(a.ApiKeyPrefix)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'api_key_prefix': %w", err)
 		}
 	}
 

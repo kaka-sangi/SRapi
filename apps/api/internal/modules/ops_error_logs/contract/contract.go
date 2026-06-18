@@ -38,6 +38,7 @@ type Entry struct {
 	TraceID           string
 	UserID            *int
 	APIKeyID          *int
+	APIKeyPrefix      string
 	AccountID         *int
 	ProviderID        *int
 	Platform          string
@@ -75,6 +76,7 @@ type RecordRequest struct {
 	TraceID           string
 	UserID            *int
 	APIKeyID          *int
+	APIKeyPrefix      string
 	AccountID         *int
 	ProviderID        *int
 	Platform          string

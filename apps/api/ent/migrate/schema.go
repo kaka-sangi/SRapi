@@ -1242,6 +1242,7 @@ var (
 		{Name: "trace_id", Type: field.TypeString, Default: ""},
 		{Name: "user_id", Type: field.TypeInt, Nullable: true},
 		{Name: "api_key_id", Type: field.TypeInt, Nullable: true},
+		{Name: "api_key_prefix", Type: field.TypeString, Default: ""},
 		{Name: "account_id", Type: field.TypeInt, Nullable: true},
 		{Name: "provider_id", Type: field.TypeInt, Nullable: true},
 		{Name: "platform", Type: field.TypeString, Default: ""},
@@ -1281,22 +1282,22 @@ var (
 			{
 				Name:    "opserrorlog_resolution_occurred_at",
 				Unique:  false,
-				Columns: []*schema.Column{OpsErrorLogsColumns[28], OpsErrorLogsColumns[3]},
+				Columns: []*schema.Column{OpsErrorLogsColumns[29], OpsErrorLogsColumns[3]},
 			},
 			{
 				Name:    "opserrorlog_error_class_occurred_at",
 				Unique:  false,
-				Columns: []*schema.Column{OpsErrorLogsColumns[21], OpsErrorLogsColumns[3]},
+				Columns: []*schema.Column{OpsErrorLogsColumns[22], OpsErrorLogsColumns[3]},
 			},
 			{
 				Name:    "opserrorlog_platform_occurred_at",
 				Unique:  false,
-				Columns: []*schema.Column{OpsErrorLogsColumns[10], OpsErrorLogsColumns[3]},
+				Columns: []*schema.Column{OpsErrorLogsColumns[11], OpsErrorLogsColumns[3]},
 			},
 			{
 				Name:    "opserrorlog_target_protocol_occurred_at",
 				Unique:  false,
-				Columns: []*schema.Column{OpsErrorLogsColumns[12], OpsErrorLogsColumns[3]},
+				Columns: []*schema.Column{OpsErrorLogsColumns[13], OpsErrorLogsColumns[3]},
 			},
 			{
 				Name:    "opserrorlog_user_id_occurred_at",
@@ -1309,24 +1310,29 @@ var (
 				Columns: []*schema.Column{OpsErrorLogsColumns[7], OpsErrorLogsColumns[3]},
 			},
 			{
-				Name:    "opserrorlog_account_id_occurred_at",
+				Name:    "opserrorlog_api_key_prefix_occurred_at",
 				Unique:  false,
 				Columns: []*schema.Column{OpsErrorLogsColumns[8], OpsErrorLogsColumns[3]},
 			},
 			{
-				Name:    "opserrorlog_provider_id_occurred_at",
+				Name:    "opserrorlog_account_id_occurred_at",
 				Unique:  false,
 				Columns: []*schema.Column{OpsErrorLogsColumns[9], OpsErrorLogsColumns[3]},
 			},
 			{
+				Name:    "opserrorlog_provider_id_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[10], OpsErrorLogsColumns[3]},
+			},
+			{
 				Name:    "opserrorlog_status_code_occurred_at",
 				Unique:  false,
-				Columns: []*schema.Column{OpsErrorLogsColumns[14], OpsErrorLogsColumns[3]},
+				Columns: []*schema.Column{OpsErrorLogsColumns[15], OpsErrorLogsColumns[3]},
 			},
 			{
 				Name:    "opserrorlog_upstream_request_id",
 				Unique:  false,
-				Columns: []*schema.Column{OpsErrorLogsColumns[15]},
+				Columns: []*schema.Column{OpsErrorLogsColumns[16]},
 			},
 			{
 				Name:    "opserrorlog_request_id",

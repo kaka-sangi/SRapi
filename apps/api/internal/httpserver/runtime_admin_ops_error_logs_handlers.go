@@ -69,6 +69,9 @@ func (s *Server) recordOpsErrorLog(ctx context.Context, rec gatewayUsageRecord) 
 		kid := rec.Authed.Key.ID
 		req.APIKeyID = &kid
 	}
+	if prefix := strings.TrimSpace(rec.Authed.Key.Prefix); prefix != "" {
+		req.APIKeyPrefix = prefix
+	}
 	if rec.AccountID != nil && *rec.AccountID > 0 {
 		req.AccountID = rec.AccountID
 	}
@@ -405,6 +408,7 @@ func opsErrorLogToDTO(entry opserrorlogscontract.Entry) map[string]any {
 		"occurred_at":         entry.OccurredAt.Format(time.RFC3339Nano),
 		"request_id":          entry.RequestID,
 		"trace_id":            entry.TraceID,
+		"api_key_prefix":      entry.APIKeyPrefix,
 		"platform":            entry.Platform,
 		"source_endpoint":     entry.SourceEndpoint,
 		"source_protocol":     entry.Platform,

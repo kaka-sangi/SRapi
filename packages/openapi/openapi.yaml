@@ -24071,6 +24071,8 @@ components:
           $ref: "#/components/schemas/Id"
         api_key_id:
           $ref: "#/components/schemas/Id"
+        api_key_prefix:
+          type: string
         account_id:
           $ref: "#/components/schemas/Id"
         provider_id:

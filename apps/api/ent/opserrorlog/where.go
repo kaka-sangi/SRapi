@@ -89,6 +89,11 @@ func APIKeyID(v int) predicate.OpsErrorLog {
 	return predicate.OpsErrorLog(sql.FieldEQ(FieldAPIKeyID, v))
 }
 
+// APIKeyPrefix applies equality check predicate on the "api_key_prefix" field. It's identical to APIKeyPrefixEQ.
+func APIKeyPrefix(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldEQ(FieldAPIKeyPrefix, v))
+}
+
 // AccountID applies equality check predicate on the "account_id" field. It's identical to AccountIDEQ.
 func AccountID(v int) predicate.OpsErrorLog {
 	return predicate.OpsErrorLog(sql.FieldEQ(FieldAccountID, v))
@@ -552,6 +557,71 @@ func APIKeyIDIsNil() predicate.OpsErrorLog {
 // APIKeyIDNotNil applies the NotNil predicate on the "api_key_id" field.
 func APIKeyIDNotNil() predicate.OpsErrorLog {
 	return predicate.OpsErrorLog(sql.FieldNotNull(FieldAPIKeyID))
+}
+
+// APIKeyPrefixEQ applies the EQ predicate on the "api_key_prefix" field.
+func APIKeyPrefixEQ(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldEQ(FieldAPIKeyPrefix, v))
+}
+
+// APIKeyPrefixNEQ applies the NEQ predicate on the "api_key_prefix" field.
+func APIKeyPrefixNEQ(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldNEQ(FieldAPIKeyPrefix, v))
+}
+
+// APIKeyPrefixIn applies the In predicate on the "api_key_prefix" field.
+func APIKeyPrefixIn(vs ...string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldIn(FieldAPIKeyPrefix, vs...))
+}
+
+// APIKeyPrefixNotIn applies the NotIn predicate on the "api_key_prefix" field.
+func APIKeyPrefixNotIn(vs ...string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldNotIn(FieldAPIKeyPrefix, vs...))
+}
+
+// APIKeyPrefixGT applies the GT predicate on the "api_key_prefix" field.
+func APIKeyPrefixGT(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldGT(FieldAPIKeyPrefix, v))
+}
+
+// APIKeyPrefixGTE applies the GTE predicate on the "api_key_prefix" field.
+func APIKeyPrefixGTE(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldGTE(FieldAPIKeyPrefix, v))
+}
+
+// APIKeyPrefixLT applies the LT predicate on the "api_key_prefix" field.
+func APIKeyPrefixLT(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldLT(FieldAPIKeyPrefix, v))
+}
+
+// APIKeyPrefixLTE applies the LTE predicate on the "api_key_prefix" field.
+func APIKeyPrefixLTE(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldLTE(FieldAPIKeyPrefix, v))
+}
+
+// APIKeyPrefixContains applies the Contains predicate on the "api_key_prefix" field.
+func APIKeyPrefixContains(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldContains(FieldAPIKeyPrefix, v))
+}
+
+// APIKeyPrefixHasPrefix applies the HasPrefix predicate on the "api_key_prefix" field.
+func APIKeyPrefixHasPrefix(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldHasPrefix(FieldAPIKeyPrefix, v))
+}
+
+// APIKeyPrefixHasSuffix applies the HasSuffix predicate on the "api_key_prefix" field.
+func APIKeyPrefixHasSuffix(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldHasSuffix(FieldAPIKeyPrefix, v))
+}
+
+// APIKeyPrefixEqualFold applies the EqualFold predicate on the "api_key_prefix" field.
+func APIKeyPrefixEqualFold(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldEqualFold(FieldAPIKeyPrefix, v))
+}
+
+// APIKeyPrefixContainsFold applies the ContainsFold predicate on the "api_key_prefix" field.
+func APIKeyPrefixContainsFold(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldContainsFold(FieldAPIKeyPrefix, v))
 }
 
 // AccountIDEQ applies the EQ predicate on the "account_id" field.

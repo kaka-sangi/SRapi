@@ -36,6 +36,7 @@ func TestStoreListsFiltersAndUpdatesResolution(t *testing.T) {
 		OccurredAt:        now.Add(-time.Minute),
 		RequestID:         "req_first",
 		TraceID:           "trace_first",
+		APIKeyPrefix:      "sk_first",
 		UserID:            &userID,
 		APIKeyID:          &apiKeyID,
 		AccountID:         &accountID,
@@ -80,6 +81,7 @@ func TestStoreListsFiltersAndUpdatesResolution(t *testing.T) {
 		OccurredAt:     now,
 		RequestID:      "req_second",
 		TraceID:        "trace_second",
+		APIKeyPrefix:   "sk_second",
 		AccountID:      &accountID,
 		ProviderID:     &providerID,
 		Platform:       "openai-compatible",
@@ -103,6 +105,14 @@ func TestStoreListsFiltersAndUpdatesResolution(t *testing.T) {
 	}
 	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != second.ID {
 		t.Fatalf("expected only quota row, got %+v", list)
+	}
+
+	list, err = store.List(ctx, contract.ListFilter{Query: "sk_first", Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("list api key prefix filtered: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != first.ID {
+		t.Fatalf("expected only api key prefix row, got %+v", list)
 	}
 
 	list, err = store.List(ctx, contract.ListFilter{StatusCodeMin: &statusBadGateway, Page: 1, PageSize: 10})
@@ -157,7 +167,7 @@ func TestStoreListsFiltersAndUpdatesResolution(t *testing.T) {
 	if found.Resolution != contract.ResolutionInvestigating || found.ResolutionNote != "still happening" {
 		t.Fatalf("unexpected found row: %+v", found)
 	}
-	if found.TargetProtocol != "openai-compatible" || found.UpstreamRequestID != "upstream_req_first" || found.AttemptNo != 2 || found.LatencyMS != latencyMS || !found.UsageEstimated {
+	if found.TargetProtocol != "openai-compatible" || found.UpstreamRequestID != "upstream_req_first" || found.AttemptNo != 2 || found.LatencyMS != latencyMS || !found.UsageEstimated || found.APIKeyPrefix != "sk_first" {
 		t.Fatalf("missing structured evidence on found row: %+v", found)
 	}
 	if len(found.UpstreamErrors) != 1 || found.UpstreamErrors[0].AccountID == nil || *found.UpstreamErrors[0].AccountID != accountID {

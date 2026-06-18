@@ -145,6 +145,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
         />
         <Field label={t("adminErrorLogs.user")} value={userLookup.get(detail.user_id)} />
         <Field label={t("adminErrorLogs.apiKey")} value={apiKeyLookup.get(detail.api_key_id)} />
+        <Field label={t("adminErrorLogs.apiKeyPrefix")} value={detail.api_key_prefix || "—"} mono copyable />
         <Field label={t("adminErrorLogs.account")} value={accountLookup.get(detail.account_id)} />
         <Field label={t("adminErrorLogs.provider")} value={providerLookup.get(detail.provider_id)} />
         <Field label={t("adminErrorLogs.time")} value={formatDateTime(detail.occurred_at)} mono />

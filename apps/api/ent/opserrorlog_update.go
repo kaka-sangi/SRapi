@@ -131,6 +131,20 @@ func (_u *OpsErrorLogUpdate) ClearAPIKeyID() *OpsErrorLogUpdate {
 	return _u
 }
 
+// SetAPIKeyPrefix sets the "api_key_prefix" field.
+func (_u *OpsErrorLogUpdate) SetAPIKeyPrefix(v string) *OpsErrorLogUpdate {
+	_u.mutation.SetAPIKeyPrefix(v)
+	return _u
+}
+
+// SetNillableAPIKeyPrefix sets the "api_key_prefix" field if the given value is not nil.
+func (_u *OpsErrorLogUpdate) SetNillableAPIKeyPrefix(v *string) *OpsErrorLogUpdate {
+	if v != nil {
+		_u.SetAPIKeyPrefix(*v)
+	}
+	return _u
+}
+
 // SetAccountID sets the "account_id" field.
 func (_u *OpsErrorLogUpdate) SetAccountID(v int) *OpsErrorLogUpdate {
 	_u.mutation.ResetAccountID()
@@ -637,6 +651,9 @@ func (_u *OpsErrorLogUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	if _u.mutation.APIKeyIDCleared() {
 		_spec.ClearField(opserrorlog.FieldAPIKeyID, field.TypeInt)
 	}
+	if value, ok := _u.mutation.APIKeyPrefix(); ok {
+		_spec.SetField(opserrorlog.FieldAPIKeyPrefix, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.AccountID(); ok {
 		_spec.SetField(opserrorlog.FieldAccountID, field.TypeInt, value)
 	}
@@ -875,6 +892,20 @@ func (_u *OpsErrorLogUpdateOne) AddAPIKeyID(v int) *OpsErrorLogUpdateOne {
 // ClearAPIKeyID clears the value of the "api_key_id" field.
 func (_u *OpsErrorLogUpdateOne) ClearAPIKeyID() *OpsErrorLogUpdateOne {
 	_u.mutation.ClearAPIKeyID()
+	return _u
+}
+
+// SetAPIKeyPrefix sets the "api_key_prefix" field.
+func (_u *OpsErrorLogUpdateOne) SetAPIKeyPrefix(v string) *OpsErrorLogUpdateOne {
+	_u.mutation.SetAPIKeyPrefix(v)
+	return _u
+}
+
+// SetNillableAPIKeyPrefix sets the "api_key_prefix" field if the given value is not nil.
+func (_u *OpsErrorLogUpdateOne) SetNillableAPIKeyPrefix(v *string) *OpsErrorLogUpdateOne {
+	if v != nil {
+		_u.SetAPIKeyPrefix(*v)
+	}
 	return _u
 }
 
@@ -1413,6 +1444,9 @@ func (_u *OpsErrorLogUpdateOne) sqlSave(ctx context.Context) (_node *OpsErrorLog
 	}
 	if _u.mutation.APIKeyIDCleared() {
 		_spec.ClearField(opserrorlog.FieldAPIKeyID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.APIKeyPrefix(); ok {
+		_spec.SetField(opserrorlog.FieldAPIKeyPrefix, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.AccountID(); ok {
 		_spec.SetField(opserrorlog.FieldAccountID, field.TypeInt, value)

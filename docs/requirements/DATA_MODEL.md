@@ -1892,6 +1892,7 @@ request_id
 trace_id
 user_id nullable
 api_key_id nullable
+api_key_prefix
 account_id nullable
 provider_id nullable
 platform
@@ -1930,6 +1931,7 @@ index(platform, occurred_at)
 index(target_protocol, occurred_at)
 index(user_id, occurred_at)
 index(api_key_id, occurred_at)
+index(api_key_prefix, occurred_at)
 index(account_id, occurred_at)
 index(provider_id, occurred_at)
 index(status_code, occurred_at)
@@ -1937,6 +1939,10 @@ index(upstream_request_id)
 index(request_id)
 index(trace_id)
 ```
+
+`api_key_prefix` 是错误发生时认证成功的 Gateway API key 前缀快照
+（形如 `sk_<prefix-hex>`），用于 key 后续删除、改名或 tombstone 后仍能定位
+事故来源；它不是认证材料，不得保存完整 API key 或 secret 部分。
 
 规则：
 

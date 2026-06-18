@@ -3203,6 +3203,7 @@ export type OpsErrorLog = {
     trace_id?: string;
     user_id?: Id;
     api_key_id?: Id;
+    api_key_prefix?: string;
     account_id?: Id;
     provider_id?: Id;
     platform?: string;

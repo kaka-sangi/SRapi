@@ -33661,6 +33661,7 @@ type OpsErrorLogMutation struct {
 	adduser_id                 *int
 	api_key_id                 *int
 	addapi_key_id              *int
+	api_key_prefix             *string
 	account_id                 *int
 	addaccount_id              *int
 	provider_id                *int
@@ -34116,6 +34117,42 @@ func (m *OpsErrorLogMutation) ResetAPIKeyID() {
 	m.api_key_id = nil
 	m.addapi_key_id = nil
 	delete(m.clearedFields, opserrorlog.FieldAPIKeyID)
+}
+
+// SetAPIKeyPrefix sets the "api_key_prefix" field.
+func (m *OpsErrorLogMutation) SetAPIKeyPrefix(s string) {
+	m.api_key_prefix = &s
+}
+
+// APIKeyPrefix returns the value of the "api_key_prefix" field in the mutation.
+func (m *OpsErrorLogMutation) APIKeyPrefix() (r string, exists bool) {
+	v := m.api_key_prefix
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAPIKeyPrefix returns the old "api_key_prefix" field's value of the OpsErrorLog entity.
+// If the OpsErrorLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OpsErrorLogMutation) OldAPIKeyPrefix(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAPIKeyPrefix is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAPIKeyPrefix requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAPIKeyPrefix: %w", err)
+	}
+	return oldValue.APIKeyPrefix, nil
+}
+
+// ResetAPIKeyPrefix resets all changes to the "api_key_prefix" field.
+func (m *OpsErrorLogMutation) ResetAPIKeyPrefix() {
+	m.api_key_prefix = nil
 }
 
 // SetAccountID sets the "account_id" field.
@@ -35274,7 +35311,7 @@ func (m *OpsErrorLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OpsErrorLogMutation) Fields() []string {
-	fields := make([]string, 0, 31)
+	fields := make([]string, 0, 32)
 	if m.created_at != nil {
 		fields = append(fields, opserrorlog.FieldCreatedAt)
 	}
@@ -35295,6 +35332,9 @@ func (m *OpsErrorLogMutation) Fields() []string {
 	}
 	if m.api_key_id != nil {
 		fields = append(fields, opserrorlog.FieldAPIKeyID)
+	}
+	if m.api_key_prefix != nil {
+		fields = append(fields, opserrorlog.FieldAPIKeyPrefix)
 	}
 	if m.account_id != nil {
 		fields = append(fields, opserrorlog.FieldAccountID)
@@ -35390,6 +35430,8 @@ func (m *OpsErrorLogMutation) Field(name string) (ent.Value, bool) {
 		return m.UserID()
 	case opserrorlog.FieldAPIKeyID:
 		return m.APIKeyID()
+	case opserrorlog.FieldAPIKeyPrefix:
+		return m.APIKeyPrefix()
 	case opserrorlog.FieldAccountID:
 		return m.AccountID()
 	case opserrorlog.FieldProviderID:
@@ -35461,6 +35503,8 @@ func (m *OpsErrorLogMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldUserID(ctx)
 	case opserrorlog.FieldAPIKeyID:
 		return m.OldAPIKeyID(ctx)
+	case opserrorlog.FieldAPIKeyPrefix:
+		return m.OldAPIKeyPrefix(ctx)
 	case opserrorlog.FieldAccountID:
 		return m.OldAccountID(ctx)
 	case opserrorlog.FieldProviderID:
@@ -35566,6 +35610,13 @@ func (m *OpsErrorLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAPIKeyID(v)
+		return nil
+	case opserrorlog.FieldAPIKeyPrefix:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAPIKeyPrefix(v)
 		return nil
 	case opserrorlog.FieldAccountID:
 		v, ok := value.(int)
@@ -35978,6 +36029,9 @@ func (m *OpsErrorLogMutation) ResetField(name string) error {
 		return nil
 	case opserrorlog.FieldAPIKeyID:
 		m.ResetAPIKeyID()
+		return nil
+	case opserrorlog.FieldAPIKeyPrefix:
+		m.ResetAPIKeyPrefix()
 		return nil
 	case opserrorlog.FieldAccountID:
 		m.ResetAccountID()

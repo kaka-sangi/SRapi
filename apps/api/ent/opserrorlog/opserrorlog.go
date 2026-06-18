@@ -27,6 +27,8 @@ const (
 	FieldUserID = "user_id"
 	// FieldAPIKeyID holds the string denoting the api_key_id field in the database.
 	FieldAPIKeyID = "api_key_id"
+	// FieldAPIKeyPrefix holds the string denoting the api_key_prefix field in the database.
+	FieldAPIKeyPrefix = "api_key_prefix"
 	// FieldAccountID holds the string denoting the account_id field in the database.
 	FieldAccountID = "account_id"
 	// FieldProviderID holds the string denoting the provider_id field in the database.
@@ -89,6 +91,7 @@ var Columns = []string{
 	FieldTraceID,
 	FieldUserID,
 	FieldAPIKeyID,
+	FieldAPIKeyPrefix,
 	FieldAccountID,
 	FieldProviderID,
 	FieldPlatform,
@@ -136,6 +139,8 @@ var (
 	DefaultRequestID string
 	// DefaultTraceID holds the default value on creation for the "trace_id" field.
 	DefaultTraceID string
+	// DefaultAPIKeyPrefix holds the default value on creation for the "api_key_prefix" field.
+	DefaultAPIKeyPrefix string
 	// DefaultPlatform holds the default value on creation for the "platform" field.
 	DefaultPlatform string
 	// DefaultSourceEndpoint holds the default value on creation for the "source_endpoint" field.
@@ -215,6 +220,11 @@ func ByUserID(opts ...sql.OrderTermOption) OrderOption {
 // ByAPIKeyID orders the results by the api_key_id field.
 func ByAPIKeyID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAPIKeyID, opts...).ToFunc()
+}
+
+// ByAPIKeyPrefix orders the results by the api_key_prefix field.
+func ByAPIKeyPrefix(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAPIKeyPrefix, opts...).ToFunc()
 }
 
 // ByAccountID orders the results by the account_id field.

@@ -32,6 +32,8 @@ type OpsErrorLog struct {
 	UserID *int `json:"user_id,omitempty"`
 	// APIKeyID holds the value of the "api_key_id" field.
 	APIKeyID *int `json:"api_key_id,omitempty"`
+	// APIKeyPrefix holds the value of the "api_key_prefix" field.
+	APIKeyPrefix string `json:"api_key_prefix,omitempty"`
 	// AccountID holds the value of the "account_id" field.
 	AccountID *int `json:"account_id,omitempty"`
 	// ProviderID holds the value of the "provider_id" field.
@@ -94,7 +96,7 @@ func (*OpsErrorLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case opserrorlog.FieldID, opserrorlog.FieldUserID, opserrorlog.FieldAPIKeyID, opserrorlog.FieldAccountID, opserrorlog.FieldProviderID, opserrorlog.FieldStatusCode, opserrorlog.FieldAttemptNo, opserrorlog.FieldLatencyMs, opserrorlog.FieldInputTokens, opserrorlog.FieldOutputTokens, opserrorlog.FieldResolvedByID:
 			values[i] = new(sql.NullInt64)
-		case opserrorlog.FieldRequestID, opserrorlog.FieldTraceID, opserrorlog.FieldPlatform, opserrorlog.FieldSourceEndpoint, opserrorlog.FieldTargetProtocol, opserrorlog.FieldModel, opserrorlog.FieldUpstreamRequestID, opserrorlog.FieldErrorClass, opserrorlog.FieldErrorPhase, opserrorlog.FieldErrorOwner, opserrorlog.FieldErrorSource, opserrorlog.FieldErrorMessage, opserrorlog.FieldErrorBodyExcerpt, opserrorlog.FieldResolution, opserrorlog.FieldResolutionNote:
+		case opserrorlog.FieldRequestID, opserrorlog.FieldTraceID, opserrorlog.FieldAPIKeyPrefix, opserrorlog.FieldPlatform, opserrorlog.FieldSourceEndpoint, opserrorlog.FieldTargetProtocol, opserrorlog.FieldModel, opserrorlog.FieldUpstreamRequestID, opserrorlog.FieldErrorClass, opserrorlog.FieldErrorPhase, opserrorlog.FieldErrorOwner, opserrorlog.FieldErrorSource, opserrorlog.FieldErrorMessage, opserrorlog.FieldErrorBodyExcerpt, opserrorlog.FieldResolution, opserrorlog.FieldResolutionNote:
 			values[i] = new(sql.NullString)
 		case opserrorlog.FieldCreatedAt, opserrorlog.FieldUpdatedAt, opserrorlog.FieldOccurredAt, opserrorlog.FieldResolvedAt:
 			values[i] = new(sql.NullTime)
@@ -162,6 +164,12 @@ func (_m *OpsErrorLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.APIKeyID = new(int)
 				*_m.APIKeyID = int(value.Int64)
+			}
+		case opserrorlog.FieldAPIKeyPrefix:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field api_key_prefix", values[i])
+			} else if value.Valid {
+				_m.APIKeyPrefix = value.String
 			}
 		case opserrorlog.FieldAccountID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -374,6 +382,9 @@ func (_m *OpsErrorLog) String() string {
 		builder.WriteString("api_key_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("api_key_prefix=")
+	builder.WriteString(_m.APIKeyPrefix)
 	builder.WriteString(", ")
 	if v := _m.AccountID; v != nil {
 		builder.WriteString("account_id=")

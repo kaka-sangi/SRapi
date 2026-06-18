@@ -29,6 +29,7 @@ func TestAdminOpsErrorLogsListGetAndResolve(t *testing.T) {
 		TraceID:           "trace_ops_error",
 		UserID:            &userID,
 		APIKeyID:          &apiKeyID,
+		APIKeyPrefix:      "sk_ops",
 		AccountID:         &accountID,
 		ProviderID:        &providerID,
 		Platform:          "openai-compatible",
@@ -97,7 +98,7 @@ func TestAdminOpsErrorLogsListGetAndResolve(t *testing.T) {
 		t.Fatalf("expected one filtered ops error log, got %+v", list)
 	}
 	row := list.Data[0]
-	if row.Id == nil || *row.Id != "1" || row.Model == nil || *row.Model != "ops-model" || row.StatusCode == nil || *row.StatusCode != 502 {
+	if row.Id == nil || *row.Id != "1" || row.Model == nil || *row.Model != "ops-model" || row.StatusCode == nil || *row.StatusCode != 502 || row.ApiKeyPrefix == nil || *row.ApiKeyPrefix != "sk_ops" {
 		t.Fatalf("unexpected list row: %+v", row)
 	}
 
@@ -114,6 +115,9 @@ func TestAdminOpsErrorLogsListGetAndResolve(t *testing.T) {
 	}
 	if detail.Data.RequestId == nil || *detail.Data.RequestId != inserted.RequestID {
 		t.Fatalf("unexpected detail response: %+v", detail.Data)
+	}
+	if detail.Data.ApiKeyPrefix == nil || *detail.Data.ApiKeyPrefix != "sk_ops" {
+		t.Fatalf("missing api key prefix evidence in detail response: %+v", detail.Data)
 	}
 	if detail.Data.AttemptNo == nil || *detail.Data.AttemptNo != 2 || detail.Data.LatencyMs == nil || *detail.Data.LatencyMs != latencyMS {
 		t.Fatalf("missing attempt evidence in detail response: %+v", detail.Data)

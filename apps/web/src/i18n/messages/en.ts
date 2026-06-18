@@ -2212,6 +2212,7 @@ export const en = {
     outputTokens: "Output tokens",
     attempt: "Attempt",
     apiKey: "API key",
+    apiKeyPrefix: "API key prefix",
     provider: "Provider",
     usageEstimated: "Usage",
     estimated: "Estimated",
