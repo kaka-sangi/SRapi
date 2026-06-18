@@ -57,13 +57,15 @@ type SystemLogList struct {
 
 // SystemLogListOptions filters and paginates operations system-log reads.
 type SystemLogListOptions struct {
-	Page     int
-	PageSize int
-	Level    OpsSystemLogLevel
-	Source   string
-	Query    string
-	Start    *time.Time
-	End      *time.Time
+	Page      int
+	PageSize  int
+	Level     OpsSystemLogLevel
+	Source    string
+	Query     string
+	RequestID string
+	TraceID   string
+	Start     *time.Time
+	End       *time.Time
 }
 
 // SystemLogCleanupFilter bounds system-log cleanup operations.
@@ -71,6 +73,8 @@ type SystemLogCleanupFilter struct {
 	Level     OpsSystemLogLevel
 	Source    string
 	Query     string
+	RequestID string
+	TraceID   string
 	Start     *time.Time
 	End       *time.Time
 	DryRun    bool

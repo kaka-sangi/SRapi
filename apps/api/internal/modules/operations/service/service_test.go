@@ -96,6 +96,13 @@ func TestSystemLogsRecordListCleanupAndHealth(t *testing.T) {
 	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].RequestID != "req_warn" {
 		t.Fatalf("unexpected filtered list: %+v", list)
 	}
+	list, err = svc.ListSystemLogs(t.Context(), contract.SystemLogListOptions{RequestID: "req_warn", TraceID: "trace_warn"})
+	if err != nil {
+		t.Fatalf("list system logs by request/trace: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].RequestID != "req_warn" {
+		t.Fatalf("unexpected request/trace filtered list: %+v", list)
+	}
 
 	health, err := svc.SystemLogHealth(t.Context())
 	if err != nil {
@@ -389,11 +396,13 @@ func (s *captureObservabilityStore) CreateSystemLog(_ context.Context, input con
 func (s *captureObservabilityStore) ListSystemLogs(_ context.Context, opts contract.SystemLogListOptions) (contract.SystemLogList, error) {
 	items := make([]contract.OpsSystemLog, 0, len(s.systemLogs))
 	filter := contract.SystemLogCleanupFilter{
-		Level:  opts.Level,
-		Source: opts.Source,
-		Query:  opts.Query,
-		Start:  opts.Start,
-		End:    opts.End,
+		Level:     opts.Level,
+		Source:    opts.Source,
+		Query:     opts.Query,
+		RequestID: opts.RequestID,
+		TraceID:   opts.TraceID,
+		Start:     opts.Start,
+		End:       opts.End,
 	}
 	for _, item := range s.systemLogs {
 		if systemLogMatches(item, filter) {

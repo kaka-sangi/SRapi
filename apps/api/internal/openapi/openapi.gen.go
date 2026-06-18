@@ -8550,8 +8550,10 @@ type OpsSystemLogCleanupRequest struct {
 	Level     *OpsSystemLogLevel `json:"level,omitempty"`
 	MaxDelete *int               `json:"max_delete,omitempty"`
 	Q         *string            `json:"q,omitempty"`
+	RequestId *string            `json:"request_id,omitempty"`
 	Source    *string            `json:"source,omitempty"`
 	Start     *Timestamp         `json:"start,omitempty"`
+	TraceId   *string            `json:"trace_id,omitempty"`
 }
 
 // OpsSystemLogCleanupResponse defines model for OpsSystemLogCleanupResponse.
@@ -11728,8 +11730,14 @@ type ListAdminOpsSystemLogsParams struct {
 	Level    *OpsSystemLogLevel `form:"level,omitempty" json:"level,omitempty"`
 	Source   *string            `form:"source,omitempty" json:"source,omitempty"`
 	Q        *string            `form:"q,omitempty" json:"q,omitempty"`
-	Start    *Timestamp         `form:"start,omitempty" json:"start,omitempty"`
-	End      *Timestamp         `form:"end,omitempty" json:"end,omitempty"`
+
+	// RequestId Exact request ID filter for incident correlation.
+	RequestId *string `form:"request_id,omitempty" json:"request_id,omitempty"`
+
+	// TraceId Exact trace ID filter for incident correlation.
+	TraceId *string    `form:"trace_id,omitempty" json:"trace_id,omitempty"`
+	Start   *Timestamp `form:"start,omitempty" json:"start,omitempty"`
+	End     *Timestamp `form:"end,omitempty" json:"end,omitempty"`
 }
 
 // GetAdminOpsThroughputTrendParams defines parameters for GetAdminOpsThroughputTrend.
@@ -27807,6 +27815,32 @@ func (siw *ServerInterfaceWrapper) ListAdminOpsSystemLogs(w http.ResponseWriter,
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "request_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "request_id", r.URL.Query(), &params.RequestId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "request_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "request_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "trace_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "trace_id", r.URL.Query(), &params.TraceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "trace_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "trace_id", Err: err})
 		}
 		return
 	}

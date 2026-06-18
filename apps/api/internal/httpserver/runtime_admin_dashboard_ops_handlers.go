@@ -256,6 +256,8 @@ func systemLogCleanupFilterFromAPI(body apiopenapi.OpsSystemLogCleanupRequest) o
 		Level:     level,
 		Source:    optionalStringValue(body.Source),
 		Query:     optionalStringValue(body.Q),
+		RequestID: optionalStringValue(body.RequestId),
+		TraceID:   optionalStringValue(body.TraceId),
 		Start:     start,
 		End:       end,
 		DryRun:    dryRun,
@@ -286,6 +288,12 @@ func systemLogCleanupAuditSnapshot(body apiopenapi.OpsSystemLogCleanupRequest, r
 	}
 	if source := strings.TrimSpace(optionalStringValue(body.Source)); source != "" {
 		snapshot["source"] = source
+	}
+	if requestID := strings.TrimSpace(optionalStringValue(body.RequestId)); requestID != "" {
+		snapshot["request_id"] = requestID
+	}
+	if traceID := strings.TrimSpace(optionalStringValue(body.TraceId)); traceID != "" {
+		snapshot["trace_id"] = traceID
 	}
 	if body.Start != nil {
 		snapshot["start"] = (*body.Start).UTC()
@@ -846,13 +854,15 @@ func systemLogListOptionsFromRequest(r *http.Request) operationscontract.SystemL
 		end = &parsed
 	}
 	return operationscontract.SystemLogListOptions{
-		Page:     opts.Page,
-		PageSize: opts.PageSize,
-		Level:    operationscontract.OpsSystemLogLevel(strings.TrimSpace(query.Get("level"))),
-		Source:   strings.TrimSpace(query.Get("source")),
-		Query:    strings.TrimSpace(query.Get("q")),
-		Start:    start,
-		End:      end,
+		Page:      opts.Page,
+		PageSize:  opts.PageSize,
+		Level:     operationscontract.OpsSystemLogLevel(strings.TrimSpace(query.Get("level"))),
+		Source:    strings.TrimSpace(query.Get("source")),
+		Query:     strings.TrimSpace(query.Get("q")),
+		RequestID: strings.TrimSpace(query.Get("request_id")),
+		TraceID:   strings.TrimSpace(query.Get("trace_id")),
+		Start:     start,
+		End:       end,
 	}
 }
 

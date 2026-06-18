@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +27,7 @@ import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatInteger, formatLatency } from "@/lib/admin-format";
+import { ADMIN_ROUTES } from "@/lib/routes";
 import type { OpsErrorLog, RequestLogFileDescriptor } from "@/lib/sdk-types";
 
 export interface ErrorLogDetailDialogProps {
@@ -80,6 +83,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
     : detail.source_protocol ?? detail.platform ?? "—";
   const events = detail.upstream_errors ?? [];
   const firstAt = events.length > 0 ? events[0]?.at_unix_ms ?? 0 : 0;
+  const systemLogHref = systemLogFilterHref(detail);
 
   return (
     <div className="space-y-4">
@@ -152,6 +156,17 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
           <Field label={t("adminErrorLogs.resolvedBy")} value={userLookup.get(detail.resolved_by_user_id)} />
         ) : null}
       </div>
+
+      {systemLogHref ? (
+        <div className="flex justify-end">
+          <Button asChild variant="outline" size="sm">
+            <Link href={systemLogHref}>
+              <ExternalLink aria-hidden />
+              {t("adminErrorLogs.openSystemLogs")}
+            </Link>
+          </Button>
+        </div>
+      ) : null}
 
       <RequestLogEvidence files={requestLogQuery.data?.data ?? []} loading={requestLogQuery.isFetching} />
 
@@ -232,6 +247,14 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
       ) : null}
     </div>
   );
+}
+
+function systemLogFilterHref(detail: OpsErrorLog): string | null {
+  const params = new URLSearchParams();
+  if (detail.request_id) params.set("f_request_id", detail.request_id);
+  if (detail.trace_id) params.set("f_trace_id", detail.trace_id);
+  const query = params.toString();
+  return query ? `${ADMIN_ROUTES.opsSystemLogs}?${query}` : null;
 }
 
 function RequestLogEvidence({

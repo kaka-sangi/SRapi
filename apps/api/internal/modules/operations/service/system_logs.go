@@ -131,13 +131,15 @@ func validateSystemLogListOptions(opts contract.SystemLogListOptions) error {
 func normalizeSystemLogCleanupFilter(filter contract.SystemLogCleanupFilter) (contract.SystemLogCleanupFilter, error) {
 	filter.Source = strings.TrimSpace(filter.Source)
 	filter.Query = strings.TrimSpace(filter.Query)
+	filter.RequestID = strings.TrimSpace(filter.RequestID)
+	filter.TraceID = strings.TrimSpace(filter.TraceID)
 	if filter.Level != "" && !filter.Level.Valid() {
 		return contract.SystemLogCleanupFilter{}, ErrInvalidInput
 	}
 	if filter.Start != nil && filter.End != nil && filter.Start.After(*filter.End) {
 		return contract.SystemLogCleanupFilter{}, ErrInvalidInput
 	}
-	if filter.Level == "" && filter.Source == "" && filter.Query == "" && filter.Start == nil && filter.End == nil {
+	if filter.Level == "" && filter.Source == "" && filter.Query == "" && filter.RequestID == "" && filter.TraceID == "" && filter.Start == nil && filter.End == nil {
 		return contract.SystemLogCleanupFilter{}, ErrInvalidInput
 	}
 	if filter.MaxDelete == 0 {
@@ -154,6 +156,12 @@ func systemLogMatches(log contract.OpsSystemLog, filter contract.SystemLogCleanu
 		return false
 	}
 	if filter.Source != "" && !strings.EqualFold(log.Source, filter.Source) {
+		return false
+	}
+	if filter.RequestID != "" && log.RequestID != filter.RequestID {
+		return false
+	}
+	if filter.TraceID != "" && log.TraceID != filter.TraceID {
 		return false
 	}
 	if filter.Start != nil && log.CreatedAt.Before(filter.Start.UTC()) {

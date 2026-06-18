@@ -9874,6 +9874,16 @@ paths:
           in: query
           schema:
             type: string
+        - name: request_id
+          in: query
+          description: Exact request ID filter for incident correlation.
+          schema:
+            type: string
+        - name: trace_id
+          in: query
+          description: Exact trace ID filter for incident correlation.
+          schema:
+            type: string
         - name: start
           in: query
           schema:
@@ -24306,6 +24316,10 @@ components:
         source:
           type: string
         q:
+          type: string
+        request_id:
+          type: string
+        trace_id:
           type: string
         start:
           $ref: "#/components/schemas/Timestamp"

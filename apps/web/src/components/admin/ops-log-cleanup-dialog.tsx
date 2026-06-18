@@ -46,13 +46,15 @@ export function OpsLogCleanupDialog({
   const [level, setLevel] = useState<string>(ANY);
   const [source, setSource] = useState("");
   const [q, setQ] = useState("");
+  const [requestID, setRequestID] = useState("");
+  const [traceID, setTraceID] = useState("");
   const [before, setBefore] = useState("");
   const [maxDelete, setMaxDelete] = useState("1000");
   const [dryRun, setDryRun] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OpsSystemLogCleanupResult | null>(null);
 
-  const hasFilter = level !== ANY || Boolean(source.trim() || q.trim() || before.trim());
+  const hasFilter = level !== ANY || Boolean(source.trim() || q.trim() || requestID.trim() || traceID.trim() || before.trim());
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -66,6 +68,8 @@ export function OpsLogCleanupDialog({
         level: level !== ANY ? (level as OpsSystemLogLevel) : undefined,
         source: source.trim() || undefined,
         q: q.trim() || undefined,
+        request_id: requestID.trim() || undefined,
+        trace_id: traceID.trim() || undefined,
         end: before.trim() ? new Date(before).toISOString() : undefined,
         dry_run: dryRun,
         max_delete: Number(maxDelete.trim()) || undefined,
@@ -113,6 +117,26 @@ export function OpsLogCleanupDialog({
             <div>
               <Label htmlFor="cl-q">{t("adminOpsCleanup.q")}</Label>
               <Input id="cl-q" value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="cl-request-id">{t("adminOpsCleanup.requestId")}</Label>
+                <Input
+                  id="cl-request-id"
+                  value={requestID}
+                  onChange={(e) => setRequestID(e.target.value)}
+                  className="font-mono text-2xs"
+                />
+              </div>
+              <div>
+                <Label htmlFor="cl-trace-id">{t("adminOpsCleanup.traceId")}</Label>
+                <Input
+                  id="cl-trace-id"
+                  value={traceID}
+                  onChange={(e) => setTraceID(e.target.value)}
+                  className="font-mono text-2xs"
+                />
+              </div>
             </div>
             <div>
               <Label htmlFor="cl-before">{t("adminOpsCleanup.before")}</Label>

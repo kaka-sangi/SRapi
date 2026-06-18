@@ -10,6 +10,7 @@ import { OpsLogCleanupDialog } from "@/components/admin/ops-log-cleanup-dialog";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -39,11 +40,15 @@ function Content() {
   const list = useAdminList();
   const level = (list.filters.level as OpsSystemLogLevel | undefined) ?? undefined;
   const source = list.filters.source || undefined;
+  const requestID = list.filters.request_id || undefined;
+  const traceID = list.filters.trace_id || undefined;
   const logs = useOpsSystemLogs({
     page: list.page,
     page_size: list.pageSize,
     level,
     source,
+    request_id: requestID,
+    trace_id: traceID,
     q: list.search || undefined,
   });
   const health = useOpsSystemLogHealth();
@@ -123,6 +128,24 @@ function Content() {
               allLabel={t("adminOpsSystemLogs.allLevels")}
               options={LOG_LEVELS.map((l) => ({ value: l, label: l }))}
             />
+            <ExactFilterInput
+              value={source ?? ""}
+              onChange={(value) => list.setFilter("source", value || undefined)}
+              placeholder={t("adminOpsSystemLogs.sourcePlaceholder")}
+              ariaLabel={t("adminOpsSystemLogs.source")}
+            />
+            <ExactFilterInput
+              value={requestID ?? ""}
+              onChange={(value) => list.setFilter("request_id", value || undefined)}
+              placeholder={t("adminOpsSystemLogs.requestIdPlaceholder")}
+              ariaLabel={t("adminOpsSystemLogs.requestId")}
+            />
+            <ExactFilterInput
+              value={traceID ?? ""}
+              onChange={(value) => list.setFilter("trace_id", value || undefined)}
+              placeholder={t("adminOpsSystemLogs.traceIdPlaceholder")}
+              ariaLabel={t("adminOpsSystemLogs.traceId")}
+            />
           </ListToolbar>
         }
         pagination={{
@@ -179,6 +202,28 @@ function Content() {
 
       <OpsLogCleanupDialog open={showCleanup} onOpenChange={setShowCleanup} />
     </>
+  );
+}
+
+function ExactFilterInput({
+  value,
+  onChange,
+  placeholder,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  ariaLabel: string;
+}) {
+  return (
+    <Input
+      value={value}
+      onChange={(event) => onChange(event.target.value.trim())}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      className="h-9 font-mono text-2xs sm:w-48"
+    />
   );
 }
 

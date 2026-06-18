@@ -3309,6 +3309,8 @@ export type OpsSystemLogCleanupRequest = {
     level?: OpsSystemLogLevel;
     source?: string;
     q?: string;
+    request_id?: string;
+    trace_id?: string;
     start?: Timestamp;
     end?: Timestamp;
     dry_run?: boolean;
@@ -17280,6 +17282,14 @@ export type ListAdminOpsSystemLogsData = {
         level?: OpsSystemLogLevel;
         source?: string;
         q?: string;
+        /**
+         * Exact request ID filter for incident correlation.
+         */
+        request_id?: string;
+        /**
+         * Exact trace ID filter for incident correlation.
+         */
+        trace_id?: string;
         start?: Timestamp;
         end?: Timestamp;
     };

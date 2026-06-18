@@ -115,11 +115,13 @@ func (s *Store) ListSystemLogs(ctx context.Context, opts contract.SystemLogListO
 	}
 	page, pageSize := normalizePage(opts.Page, opts.PageSize)
 	filter := contract.SystemLogCleanupFilter{
-		Level:  opts.Level,
-		Source: opts.Source,
-		Query:  opts.Query,
-		Start:  opts.Start,
-		End:    opts.End,
+		Level:     opts.Level,
+		Source:    opts.Source,
+		Query:     opts.Query,
+		RequestID: opts.RequestID,
+		TraceID:   opts.TraceID,
+		Start:     opts.Start,
+		End:       opts.End,
 	}
 	predicates := systemLogPredicates(filter)
 	total, err := s.client.OpsSystemLog.Query().Where(predicates...).Count(ctx)
@@ -660,6 +662,12 @@ func systemLogPredicates(filter contract.SystemLogCleanupFilter) []predicate.Ops
 	if source := strings.TrimSpace(filter.Source); source != "" {
 		predicates = append(predicates, entopssystemlog.SourceEqualFold(source))
 	}
+	if requestID := strings.TrimSpace(filter.RequestID); requestID != "" {
+		predicates = append(predicates, entopssystemlog.RequestIDEQ(requestID))
+	}
+	if traceID := strings.TrimSpace(filter.TraceID); traceID != "" {
+		predicates = append(predicates, entopssystemlog.TraceIDEQ(traceID))
+	}
 	if filter.Start != nil {
 		predicates = append(predicates, entopssystemlog.CreatedAtGTE(filter.Start.UTC()))
 	}
@@ -680,13 +688,15 @@ func systemLogPredicates(filter contract.SystemLogCleanupFilter) []predicate.Ops
 func normalizeSystemLogCleanupFilter(filter contract.SystemLogCleanupFilter) (contract.SystemLogCleanupFilter, error) {
 	filter.Source = strings.TrimSpace(filter.Source)
 	filter.Query = strings.TrimSpace(filter.Query)
+	filter.RequestID = strings.TrimSpace(filter.RequestID)
+	filter.TraceID = strings.TrimSpace(filter.TraceID)
 	if filter.Level != "" && !filter.Level.Valid() {
 		return contract.SystemLogCleanupFilter{}, contract.ErrInvalidInput
 	}
 	if filter.Start != nil && filter.End != nil && filter.Start.After(*filter.End) {
 		return contract.SystemLogCleanupFilter{}, contract.ErrInvalidInput
 	}
-	if filter.Level == "" && filter.Source == "" && filter.Query == "" && filter.Start == nil && filter.End == nil {
+	if filter.Level == "" && filter.Source == "" && filter.Query == "" && filter.RequestID == "" && filter.TraceID == "" && filter.Start == nil && filter.End == nil {
 		return contract.SystemLogCleanupFilter{}, contract.ErrInvalidInput
 	}
 	if filter.MaxDelete == 0 {

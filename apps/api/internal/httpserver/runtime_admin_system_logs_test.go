@@ -30,6 +30,17 @@ func TestAdminOpsSystemLogsListAndCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed system log: %v", err)
 	}
+	_, err = operationsStore.CreateSystemLog(context.Background(), operationscontract.OpsSystemLog{
+		Level:     operationscontract.OpsSystemLogLevelError,
+		Source:    "ops.dashboard",
+		Message:   "rotate logs failed",
+		RequestID: "req_cleanup",
+		TraceID:   "trace_other",
+		CreatedAt: time.Now().UTC().Add(-2 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("seed second system log: %v", err)
+	}
 
 	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/system-logs?level=warn&q=rotate", nil)
 	listReq.AddCookie(sessionCookie)
@@ -46,6 +57,21 @@ func TestAdminOpsSystemLogsListAndCleanup(t *testing.T) {
 		t.Fatalf("unexpected system log list response: %+v", listResp.Data)
 	}
 
+	exactReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/system-logs?request_id=req_cleanup&trace_id=trace_cleanup", nil)
+	exactReq.AddCookie(sessionCookie)
+	exactRec := httptest.NewRecorder()
+	handler.ServeHTTP(exactRec, exactReq)
+	if exactRec.Code != http.StatusOK {
+		t.Fatalf("expected exact list 200, got %d body=%s", exactRec.Code, exactRec.Body.String())
+	}
+	var exactResp apiopenapi.OpsSystemLogListResponse
+	if err := json.NewDecoder(exactRec.Body).Decode(&exactResp); err != nil {
+		t.Fatalf("decode exact list response: %v", err)
+	}
+	if len(exactResp.Data) != 1 || exactResp.Data[0].TraceId == nil || *exactResp.Data[0].TraceId != "trace_cleanup" {
+		t.Fatalf("unexpected request/trace filtered response: %+v", exactResp.Data)
+	}
+
 	healthReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/system-logs/health", nil)
 	healthReq.AddCookie(sessionCookie)
 	healthRec := httptest.NewRecorder()
@@ -57,11 +83,11 @@ func TestAdminOpsSystemLogsListAndCleanup(t *testing.T) {
 	if err := json.NewDecoder(healthRec.Body).Decode(&healthResp); err != nil {
 		t.Fatalf("decode health response: %v", err)
 	}
-	if healthResp.Data.StorageMode != "durable" || !healthResp.Data.Writable || healthResp.Data.TotalCount != 1 || healthResp.Data.Stale {
+	if healthResp.Data.StorageMode != "durable" || !healthResp.Data.Writable || healthResp.Data.TotalCount != 2 || healthResp.Data.Stale {
 		t.Fatalf("unexpected health response: %+v", healthResp.Data)
 	}
 
-	cleanupReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/ops/system-logs/cleanup", strings.NewReader(`{"source":"ops.dashboard","q":"rotate","dry_run":true,"max_delete":1}`))
+	cleanupReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/ops/system-logs/cleanup", strings.NewReader(`{"source":"ops.dashboard","q":"rotate","request_id":"req_cleanup","trace_id":"trace_cleanup","dry_run":true,"max_delete":1}`))
 	cleanupReq.Header.Set("Content-Type", "application/json")
 	cleanupReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
 	cleanupReq.AddCookie(sessionCookie)
@@ -92,5 +118,8 @@ func TestAdminOpsSystemLogsListAndCleanup(t *testing.T) {
 	audit := mustFindAuditLog(t, auditResp.Data, "ops_system_log.cleanup")
 	if _, ok := audit.After["q"]; ok {
 		t.Fatalf("cleanup audit must not expose raw query strings: %+v", audit.After)
+	}
+	if audit.After["request_id"] != "req_cleanup" || audit.After["trace_id"] != "trace_cleanup" {
+		t.Fatalf("cleanup audit must include exact correlation filters: %+v", audit.After)
 	}
 }
