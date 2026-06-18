@@ -185,7 +185,11 @@ function AccountsContent() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkConcurrencyOpen, setBulkConcurrencyOpen] = useState(false);
   const [bulkCredentialOpen, setBulkCredentialOpen] = useState(false);
-  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  // Mode tracks which target picker the dialog should write back to the
+  // applyBulkEdit handler: "selected" sends account_ids, "filtered" sends
+  // filters resolved server-side. Distinct from `bulkEditOpen` so closing
+  // the dialog clears the toggle on next open.
+  const [bulkEditOpen, setBulkEditOpen] = useState<false | "selected" | "filtered">(false);
   const [deleteTarget, setDeleteTarget] = useState<ProviderAccount | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
@@ -688,15 +692,33 @@ function AccountsContent() {
       </Button>
       {/* sub2api `BulkUpdate` superset — opens a modal that edits any
           subset of status / priority / weight / risk_level /
-          max_concurrency across the selection. */}
+          max_concurrency / name / proxy_id / upstream_client /
+          runtime_class across the selection. */}
       <Button
         variant="outline"
         size="sm"
         loading={bulkUpdate.isPending}
         disabled={list.selected.size === 0}
-        onClick={() => setBulkEditOpen(true)}
+        onClick={() => setBulkEditOpen("selected")}
       >
         {t("adminAccounts.bulkEdit")}
+      </Button>
+      {/* sub2api `BulkUpdate` filter-mode entry — submits the request with
+          `filters` instead of `account_ids` so the server-side resolver
+          picks up every account matching the current filter state.
+          Gated on isFiltered so the operator can't accidentally rewrite
+          the entire fleet (the backend also rejects empty filters with
+          400, but the disabled button matches the operator's mental
+          model). */}
+      <Button
+        variant="outline"
+        size="sm"
+        loading={bulkUpdate.isPending}
+        disabled={!isFiltered}
+        onClick={() => setBulkEditOpen("filtered")}
+        title={t("adminAccounts.bulkEditFilteredHint") as string}
+      >
+        {t("adminAccounts.bulkEditFiltered")}
       </Button>
       {/* sub2api `BatchRefreshTier` — fan-out per-account quota fetch
           across the selection. No modal — runs immediately. */}
@@ -1100,10 +1122,23 @@ function AccountsContent() {
 
       {bulkEditOpen ? (
         <BulkEditAccountDialog
-          count={list.selected.size}
+          mode={bulkEditOpen}
+          count={bulkEditOpen === "selected" ? list.selected.size : -1}
           isPending={bulkUpdate.isPending}
+          proxyOptions={proxyOptions}
           onSubmit={async (body) => {
-            await applyBulkEdit({ account_ids: [...list.selected], ...body });
+            if (bulkEditOpen === "filtered") {
+              await applyBulkEdit({
+                filters: {
+                  status: statusFilter || undefined,
+                  provider_id: providerFilter || undefined,
+                  group_id: groupFilter || undefined,
+                },
+                ...body,
+              });
+            } else {
+              await applyBulkEdit({ account_ids: [...list.selected], ...body });
+            }
             setBulkEditOpen(false);
           }}
           onClose={() => setBulkEditOpen(false)}
@@ -1288,35 +1323,44 @@ function hasQuotaError(account: ProviderAccount): boolean {
   return Boolean(metadataString(account.metadata, "last_quota_error_class"));
 }
 
-// sub2api `BulkEditAccountModal` skeleton port — currently exposes the
-// 5 SRapi-schema fields that have an editable backend equivalent
-// (status / priority / weight / risk_level / max_concurrency). Each
-// section has an "include this field?" toggle so only fields the
+// sub2api `BulkEditAccountModal` port — exposes the full SRapi-schema
+// editable surface (status / priority / weight / risk_level /
+// max_concurrency / name / proxy_id / upstream_client / runtime_class).
+// Each row has an "include this field?" toggle so only fields the
 // operator explicitly chose to change land in the request body,
-// matching sub2api's "delete-only-if-checked" semantics. Future
-// follow-ups will add the remaining sub2api fields (proxy_id,
-// upstream_client, runtime_class, ...) as the SRapi runtime grows the
-// matching consumers.
+// matching sub2api's "delete-only-if-checked" semantics. Two target
+// modes: `selected` (account_ids from list.selected) and `filtered`
+// (filters mode resolved server-side from the page's current query).
 function BulkEditAccountDialog({
+  mode,
   count,
   isPending,
+  proxyOptions,
   onSubmit,
   onClose,
 }: {
+  mode: "selected" | "filtered";
   count: number;
   isPending: boolean;
+  proxyOptions: { value: string; label: string }[];
   onSubmit: (
     body: {
+      name?: string;
       status?: ProviderAccountStatus;
       priority?: number;
       weight?: number;
       risk_level?: string;
       max_concurrency?: number;
+      proxy_id?: string;
+      upstream_client?: string;
+      runtime_class?: string;
     },
   ) => void | Promise<void>;
   onClose: () => void;
 }) {
   const { t } = useLanguage();
+  const [nameEnabled, setNameEnabled] = useState(false);
+  const [nameValue, setNameValue] = useState("");
   const [statusEnabled, setStatusEnabled] = useState(false);
   const [statusValue, setStatusValue] = useState<ProviderAccountStatus>("active");
   const [priorityEnabled, setPriorityEnabled] = useState(false);
@@ -1327,18 +1371,36 @@ function BulkEditAccountDialog({
   const [riskValue, setRiskValue] = useState("normal");
   const [concurrencyEnabled, setConcurrencyEnabled] = useState(false);
   const [concurrencyValue, setConcurrencyValue] = useState("4");
+  const [proxyEnabled, setProxyEnabled] = useState(false);
+  const [proxyValue, setProxyValue] = useState("");
+  const [upstreamEnabled, setUpstreamEnabled] = useState(false);
+  const [upstreamValue, setUpstreamValue] = useState("");
+  const [runtimeClassEnabled, setRuntimeClassEnabled] = useState(false);
+  const [runtimeClassValue, setRuntimeClassValue] = useState("api_key");
   const [error, setError] = useState<string | null>(null);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     const body: {
+      name?: string;
       status?: ProviderAccountStatus;
       priority?: number;
       weight?: number;
       risk_level?: string;
       max_concurrency?: number;
+      proxy_id?: string;
+      upstream_client?: string;
+      runtime_class?: string;
     } = {};
+    if (nameEnabled) {
+      const v = nameValue.trim();
+      if (!v) {
+        setError(t("adminAccounts.bulkEditPickField"));
+        return;
+      }
+      body.name = v;
+    }
     if (statusEnabled) body.status = statusValue;
     if (priorityEnabled) {
       const n = Number.parseInt(priorityValue.trim(), 10);
@@ -1372,6 +1434,17 @@ function BulkEditAccountDialog({
       }
       body.max_concurrency = n;
     }
+    if (proxyEnabled) {
+      // Empty string clears the binding (backend treats "" as "unbind").
+      body.proxy_id = proxyValue;
+    }
+    if (upstreamEnabled) {
+      // Empty string clears the override (matches the backend semantics).
+      body.upstream_client = upstreamValue.trim();
+    }
+    if (runtimeClassEnabled) {
+      body.runtime_class = runtimeClassValue;
+    }
     if (Object.keys(body).length === 0) {
       setError(t("adminAccounts.bulkEditPickField"));
       return;
@@ -1379,19 +1452,35 @@ function BulkEditAccountDialog({
     void onSubmit(body);
   }
 
+  const titleKey =
+    mode === "filtered"
+      ? "adminAccounts.bulkEditFilteredTitle"
+      : "adminAccounts.bulkEditTitle";
   return (
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent>
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>{t("adminAccounts.bulkEditTitle", { count })}</DialogTitle>
+            <DialogTitle>{t(titleKey, { count })}</DialogTitle>
             <DialogDescription>{t("adminAccounts.bulkEditHint")}</DialogDescription>
           </DialogHeader>
           <div className="mt-4 space-y-4">
             <BulkEditRow
+              enabled={nameEnabled}
+              onToggle={setNameEnabled}
+              label={t("adminCommon.name")}
+              disabled={isPending}
+            >
+              <Input
+                value={nameValue}
+                disabled={!nameEnabled || isPending}
+                onChange={(e) => setNameValue(e.target.value)}
+              />
+            </BulkEditRow>
+            <BulkEditRow
               enabled={statusEnabled}
               onToggle={setStatusEnabled}
-              label={t("common.status")}
+              label={t("adminCommon.status")}
               disabled={isPending}
             >
               <select
@@ -1465,6 +1554,59 @@ function BulkEditAccountDialog({
                 disabled={!concurrencyEnabled || isPending}
                 onChange={(e) => setConcurrencyValue(e.target.value)}
               />
+            </BulkEditRow>
+            <BulkEditRow
+              enabled={proxyEnabled}
+              onToggle={setProxyEnabled}
+              label={t("adminAccounts.proxy")}
+              disabled={isPending}
+            >
+              <select
+                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                value={proxyValue}
+                disabled={!proxyEnabled || isPending}
+                onChange={(e) => setProxyValue(e.target.value)}
+              >
+                <option value="">{t("adminAccounts.proxyNone")}</option>
+                {proxyOptions.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </BulkEditRow>
+            <BulkEditRow
+              enabled={upstreamEnabled}
+              onToggle={setUpstreamEnabled}
+              label={t("adminAccounts.upstreamClient")}
+              disabled={isPending}
+            >
+              <Input
+                value={upstreamValue}
+                disabled={!upstreamEnabled || isPending}
+                onChange={(e) => setUpstreamValue(e.target.value)}
+                placeholder={t("adminAccounts.upstreamClientPlaceholder") as string}
+              />
+            </BulkEditRow>
+            <BulkEditRow
+              enabled={runtimeClassEnabled}
+              onToggle={setRuntimeClassEnabled}
+              label={t("adminAccounts.runtimeClass")}
+              disabled={isPending}
+            >
+              <select
+                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                value={runtimeClassValue}
+                disabled={!runtimeClassEnabled || isPending}
+                onChange={(e) => setRuntimeClassValue(e.target.value)}
+              >
+                <option value="api_key">api_key</option>
+                <option value="oauth_refresh">oauth_refresh</option>
+                <option value="oauth_device_code">oauth_device_code</option>
+                <option value="web_session_cookie">web_session_cookie</option>
+                <option value="cli_client_token">cli_client_token</option>
+                <option value="custom_reverse_proxy">custom_reverse_proxy</option>
+              </select>
             </BulkEditRow>
             {error ? (
               <p role="alert" className="text-2xs text-srapi-error">
