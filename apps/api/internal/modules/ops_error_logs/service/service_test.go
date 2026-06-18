@@ -154,6 +154,22 @@ func TestRecordError_DropsEmpty(t *testing.T) {
 	}
 }
 
+func TestRecordError_RejectsInvalidHTTPStatus(t *testing.T) {
+	svc := newTestService(t)
+	status := 999
+	if err := svc.RecordError(context.Background(), contract.RecordRequest{
+		RequestID:    "req-invalid-status",
+		StatusCode:   &status,
+		ErrorMessage: "impossible upstream status",
+	}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("RecordError error = %v, want ErrInvalidInput", err)
+	}
+	list, _ := svc.List(context.Background(), contract.ListFilter{})
+	if len(list.Items) != 0 {
+		t.Fatalf("expected invalid status input to be rejected, got %d items", len(list.Items))
+	}
+}
+
 func TestSweepOlderThan(t *testing.T) {
 	store := memory.New()
 	svc, err := New(store, time.Now)

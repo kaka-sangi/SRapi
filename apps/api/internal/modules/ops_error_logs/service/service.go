@@ -140,8 +140,8 @@ func (s *Service) prepareEntry(req contract.RecordRequest) (contract.Entry, bool
 	if class == "" {
 		class = "unknown"
 	}
-	if req.StatusCode != nil && *req.StatusCode <= 0 {
-		req.StatusCode = nil
+	if req.StatusCode != nil && !validHTTPStatus(*req.StatusCode) {
+		return contract.Entry{}, false
 	}
 	entry := contract.Entry{
 		OccurredAt:        occurred.UTC(),
@@ -178,6 +178,10 @@ func (s *Service) prepareEntry(req contract.RecordRequest) (contract.Entry, bool
 		return contract.Entry{}, false
 	}
 	return entry, true
+}
+
+func validHTTPStatus(status int) bool {
+	return status >= 100 && status <= 599
 }
 
 func sanitizeUpstreamErrors(events []contract.UpstreamErrorEvent) []contract.UpstreamErrorEvent {
