@@ -80,10 +80,11 @@ func TestCodexExtractTerminalResponseJSONNoTerminalEventReturnsFalse(t *testing.
 }
 
 // TestCodexRewriteRawForNonStreamingCompactPassthroughOnJSON ensures the
-// rewrite is a no-op when the upstream already returned a JSON body — the
-// raw bytes are returned unchanged so existing JSON-passthrough callers
-// (TestReverseProxyCodexCLIAdapterUsesResponsesCompactEndpoint) continue to
-// observe the same Raw payload.
+// rewrite is a no-op when the upstream already returned a JSON body with
+// a top-level `text` field — the raw bytes are returned unchanged so
+// existing JSON-passthrough callers
+// (TestReverseProxyCodexCLIAdapterUsesResponsesCompactEndpoint) continue
+// to observe the same Raw payload.
 func TestCodexRewriteRawForNonStreamingCompactPassthroughOnJSON(t *testing.T) {
 	body := []byte(`{"id":"cmp_1","object":"response.compaction","text":"summary","input_tokens":12,"output_tokens":3}`)
 	rewritten, ok := codexRewriteRawForNonStreamingCompact(body, contract.ConversationResponse{})
@@ -92,6 +93,123 @@ func TestCodexRewriteRawForNonStreamingCompactPassthroughOnJSON(t *testing.T) {
 	}
 	if !bytes.Equal(rewritten, body) {
 		t.Fatalf("rewrite must return input unchanged on JSON, got %q want %q", string(rewritten), string(body))
+	}
+}
+
+// TestCodexRewriteRawForNonStreamingInjectsTextFromOutputArray covers the
+// live column-260 regression. The upstream Codex backend honours the
+// Accept: application/json header sub2api forces for /compact requests
+// and returns a JSON body — but in the Responses-canonical shape where
+// `text` is NESTED inside output[].content[].text instead of at the top
+// level. Hermes' Rust /compact parser requires top-level `text` and
+// rejects with "missing field `text` at line 1 column 260".
+//
+// The fix walks output[] looking for message content blocks with
+// output_text and joins them into a single top-level `text` string.
+func TestCodexRewriteRawForNonStreamingInjectsTextFromOutputArray(t *testing.T) {
+	body := []byte(`{
+		"id":"cmp_x",
+		"object":"response.compaction",
+		"output":[
+			{"type":"reasoning","summary":[],"content":null},
+			{"type":"message","role":"assistant","content":[
+				{"type":"output_text","text":"compact summary text"}
+			]}
+		],
+		"input_tokens":7,
+		"output_tokens":1
+	}`)
+	rewritten, ok := codexRewriteRawForNonStreamingCompact(body, contract.ConversationResponse{})
+	if !ok {
+		t.Fatalf("expected JSON-without-text path to inject text, got ok=false")
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(rewritten, &payload); err != nil {
+		t.Fatalf("rewritten body must be valid JSON, got %q (err=%v)", string(rewritten), err)
+	}
+	if got := payload["text"]; got != "compact summary text" {
+		t.Fatalf("text must be lifted from output[].content[].text, got %v", got)
+	}
+	if payload["id"] != "cmp_x" || payload["object"] != "response.compaction" {
+		t.Fatalf("rewrite must preserve compact metadata, got %+v", payload)
+	}
+}
+
+// TestCodexRewriteRawForNonStreamingInjectsTextFromMultipleOutputBlocks
+// guards against the upstream emitting the compact text across multiple
+// output_text content parts — they must be concatenated in order.
+func TestCodexRewriteRawForNonStreamingInjectsTextFromMultipleOutputBlocks(t *testing.T) {
+	body := []byte(`{
+		"id":"cmp_z",
+		"object":"response.compaction",
+		"output":[
+			{"type":"message","role":"assistant","content":[
+				{"type":"output_text","text":"first "},
+				{"type":"output_text","text":"second "},
+				{"type":"output_text","text":"third"}
+			]}
+		]
+	}`)
+	rewritten, ok := codexRewriteRawForNonStreamingCompact(body, contract.ConversationResponse{})
+	if !ok {
+		t.Fatalf("expected rewrite to succeed, got ok=false")
+	}
+	var payload map[string]any
+	_ = json.Unmarshal(rewritten, &payload)
+	if got := payload["text"]; got != "first second third" {
+		t.Fatalf("text must concatenate every output_text block, got %v", got)
+	}
+}
+
+// TestCodexRewriteRawForNonStreamingInjectsTextFromOutputTextTopLevel
+// covers the simpler convenience-field variant: some upstream variants
+// ship the compact text as a top-level `output_text` field instead of
+// nested under output[]. The rewrite must promote it to `text` so Hermes
+// gets the field name it expects.
+func TestCodexRewriteRawForNonStreamingInjectsTextFromOutputTextTopLevel(t *testing.T) {
+	body := []byte(`{"id":"cmp_o","object":"response.compaction","output_text":"top-level convenience text"}`)
+	rewritten, ok := codexRewriteRawForNonStreamingCompact(body, contract.ConversationResponse{})
+	if !ok {
+		t.Fatalf("expected output_text → text promotion, got ok=false")
+	}
+	var payload map[string]any
+	_ = json.Unmarshal(rewritten, &payload)
+	if got := payload["text"]; got != "top-level convenience text" {
+		t.Fatalf("text must be promoted from output_text, got %v", got)
+	}
+}
+
+// TestCodexRewriteRawForNonStreamingFallsBackToParsedOnJSONWithoutText
+// covers the pathological case: upstream returns a JSON body with no
+// recoverable text source (no output_text, no nested output[]
+// content text). The rewrite then falls back to the parsed
+// ConversationResponse's Parts text projection.
+func TestCodexRewriteRawForNonStreamingFallsBackToParsedOnJSONWithoutText(t *testing.T) {
+	body := []byte(`{"id":"cmp_p","object":"response.compaction","input_tokens":3,"output_tokens":1}`)
+	parsed := contract.ConversationResponse{
+		Parts: []contract.ContentPart{
+			{Kind: contract.ContentPartText, Text: "parsed fallback text"},
+		},
+	}
+	rewritten, ok := codexRewriteRawForNonStreamingCompact(body, parsed)
+	if !ok {
+		t.Fatalf("expected parsed-Parts fallback, got ok=false")
+	}
+	var payload map[string]any
+	_ = json.Unmarshal(rewritten, &payload)
+	if got := payload["text"]; got != "parsed fallback text" {
+		t.Fatalf("text must come from parsed.Parts, got %v", got)
+	}
+}
+
+// TestCodexRewriteRawForNonStreamingReturnsFalseOnUnrecoverableJSON is
+// the safety net: when the JSON body has no top-level text AND no
+// recoverable source anywhere, signal failure so the caller can decide
+// to surface a 502 rather than serve unparseable bytes.
+func TestCodexRewriteRawForNonStreamingReturnsFalseOnUnrecoverableJSON(t *testing.T) {
+	body := []byte(`{"id":"cmp_q","object":"response.compaction","input_tokens":3,"output_tokens":1}`)
+	if _, ok := codexRewriteRawForNonStreamingCompact(body, contract.ConversationResponse{}); ok {
+		t.Fatalf("rewrite must signal failure on unrecoverable JSON body")
 	}
 }
 

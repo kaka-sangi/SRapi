@@ -199,44 +199,139 @@ func codexSynthesizeCompactResponseFromParsed(parsed contract.ConversationRespon
 	return raw, true
 }
 
-// codexRewriteRawForNonStreamingCompact converts SSE bytes to a JSON body
-// suitable for Hermes' /v1/responses/compact parser when the upstream
-// returned SSE despite the request asking for stream=false. The rewrite is
-// best-effort and layered:
+// codexRewriteRawForNonStreamingCompact ensures the compact response body
+// has a top-level `text` field — the contract Hermes' Rust /compact
+// parser enforces. Handles both shapes the upstream Codex backend
+// actually returns:
 //
-//  1. Extract the terminal response.completed / response.done event's
-//     `response` field — happy path; matches sub2api
-//     handlePassthroughSSEToJSON (openai_gateway_service.go:4007).
+//  1. SSE body (when upstream ignores the request's stream=false and ships
+//     SSE anyway). Extracts the terminal response.completed/done event's
+//     `response` object, then ensures `text` via delta accumulation or
+//     parsed-fallback. Falls back to synthesis from parsed when no
+//     terminal event is present.
 //
-//  2. Inject a top-level `text` field if step 1 produced a JSON body
-//     without one (the upstream is allowed to ship the text via
-//     response.output_text.delta events instead of inline on the
-//     terminal event). Closes the live regression
-//     "missing field `text` at line 1 column 260".
+//  2. JSON body (the path the sub2api transform pushes the upstream
+//     toward via Accept: application/json — line 4184 of
+//     openai_gateway_service.go). If the JSON already has a non-empty
+//     `text` field at the top level, it's a no-op. If not, the
+//     normalizer extracts the text from `output_text`, from
+//     `output[].content[].text` (the nested compact shape), or from
+//     parsed.Parts and injects it at the top level. This is the column-260
+//     regression: upstream returns JSON without top-level text, the old
+//     code passed it through, Hermes 400'd.
 //
-//  3. If steps 1+2 failed (no terminal event in SSE), synthesize a minimal
-//     compact-shaped body from the parsed ConversationResponse — the SSE
-//     parser already ran and we have parts/usage/id from it.
-//
-//  4. If even synthesis fails (no recoverable text anywhere), return the
-//     original body and (false). The caller MUST decide whether to surface
-//     a 502 in that case rather than serve unparseable bytes — but the
-//     current caller path falls through to send the original Raw, which
-//     was the original bug. A follow-up should add a defensive 502 here.
-//
-// Returns (rewritten, true) when any of steps 1-3 produced a parseable
-// JSON body different from the input; otherwise returns (input, false).
+// Returns (rewritten, true) when any path produced a body different from
+// the input; otherwise (input, false). The caller's warning emit logs the
+// upstream body excerpt on every rewrite so the operator can correlate.
 func codexRewriteRawForNonStreamingCompact(body []byte, parsed contract.ConversationResponse) ([]byte, bool) {
-	if !codexBodyLooksLikeSSE(body) {
+	if codexBodyLooksLikeSSE(body) {
+		extracted, ok := codexExtractTerminalResponseJSON(body)
+		if ok {
+			rewritten := codexEnsureCompactResponseText(extracted, body, parsed)
+			return rewritten, true
+		}
+		if synthesized, ok := codexSynthesizeCompactResponseFromParsed(parsed); ok {
+			return synthesized, true
+		}
 		return body, false
 	}
-	extracted, ok := codexExtractTerminalResponseJSON(body)
-	if ok {
-		rewritten := codexEnsureCompactResponseText(extracted, body, parsed)
-		return rewritten, true
+	return codexEnsureCompactJSONBodyHasText(body, parsed)
+}
+
+// codexEnsureCompactJSONBodyHasText injects a top-level `text` field into
+// the upstream's JSON compact response when one is missing. The text is
+// pulled, in order:
+//
+//  1. The existing top-level `output_text` convenience field (some
+//     upstream variants ship it).
+//  2. The nested output[].content[].text — the canonical Responses shape
+//     where structured output items carry text under content blocks.
+//  3. The parsed ConversationResponse's Parts text projection (last
+//     resort: the SRapi parser already accumulated it).
+//
+// No-op when the body already has a non-empty top-level `text`. Returns
+// (input, false) when nothing recoverable was found — the caller may want
+// to surface a 502 in that case, but the current path falls through. See
+// codexCompactRewriteWarning for the body-excerpt log the caller emits
+// on every rewrite (success or no-op).
+func codexEnsureCompactJSONBodyHasText(body []byte, parsed contract.ConversationResponse) ([]byte, bool) {
+	var current map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(body), &current); err != nil {
+		return body, false
 	}
-	if synthesized, ok := codexSynthesizeCompactResponseFromParsed(parsed); ok {
-		return synthesized, true
+	if textValue, ok := current["text"].(string); ok && strings.TrimSpace(textValue) != "" {
+		return body, false
 	}
-	return body, false
+	text := strings.TrimSpace(codexStringValue(current["output_text"]))
+	if text == "" {
+		text = codexExtractTextFromOutputArray(current["output"])
+	}
+	if strings.TrimSpace(text) == "" {
+		text = contentPartsText(parsed.Parts)
+	}
+	if strings.TrimSpace(text) == "" {
+		return body, false
+	}
+	current["text"] = text
+	rewritten, err := json.Marshal(current)
+	if err != nil {
+		return body, false
+	}
+	return rewritten, true
+}
+
+// codexExtractTextFromOutputArray walks a Responses-shaped output array
+// and joins every `text` field on output_text / refusal content blocks.
+// The canonical shape from the upstream looks like
+//
+//	"output": [
+//	    {"type":"reasoning","summary":[...], ...},
+//	    {"type":"message","role":"assistant","content":[
+//	        {"type":"output_text","text":"..."},
+//	        ...
+//	    ]}
+//	]
+//
+// Mirrors sub2api's reconstructResponseOutputFromSSE intent (rebuild
+// what's missing at the top level), only here we walk the JSON we already
+// have instead of re-scanning SSE deltas.
+func codexExtractTextFromOutputArray(value any) string {
+	items, ok := value.([]any)
+	if !ok {
+		return ""
+	}
+	var collected strings.Builder
+	for _, raw := range items {
+		item, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		switch codexStringValue(item["type"]) {
+		case "message", "":
+			content, ok := item["content"].([]any)
+			if !ok {
+				continue
+			}
+			for _, rawPart := range content {
+				part, ok := rawPart.(map[string]any)
+				if !ok {
+					continue
+				}
+				partType := codexStringValue(part["type"])
+				if partType != "output_text" && partType != "refusal" && partType != "input_text" && partType != "" {
+					continue
+				}
+				if text, ok := part["text"].(string); ok && text != "" {
+					collected.WriteString(text)
+				} else if refusal, ok := part["refusal"].(string); ok && refusal != "" {
+					collected.WriteString(refusal)
+				}
+			}
+		case "output_text":
+			if text, ok := item["text"].(string); ok && text != "" {
+				collected.WriteString(text)
+			}
+		}
+	}
+	return collected.String()
 }
