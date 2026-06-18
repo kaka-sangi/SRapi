@@ -11,7 +11,8 @@ import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
-import { useAdminErrorLogs, useAdminModels, useResolveErrorLog } from "@/hooks/admin-queries";
+import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
+import { useAdminErrorLogs, useAdminModels } from "@/hooks/admin-queries";
 import { useAccountNameLookup } from "@/hooks/use-account-name-lookup";
 import { useApiKeyNameLookup } from "@/hooks/use-api-key-name-lookup";
 import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
@@ -54,8 +55,6 @@ export function ErrorLogsPanel() {
     start: sinceFilter,
     q: searchQuery,
   });
-  const resolveMutation = useResolveErrorLog();
-
   const models = useAdminModels({ page: 1, page_size: 100 });
   const userLookup = useUserEmailLookup();
   const modelOptions = (models.data?.data ?? []).map((m) => ({
@@ -166,19 +165,9 @@ export function ErrorLogsPanel() {
       key: "resolution",
       header: t("adminErrorLogs.resolution"),
       render: (e) => (
-        <input
-          type="checkbox"
-          checked={e.resolution === "resolved"}
-          disabled={resolveMutation.isPending || !e.id}
-          onChange={(ev) => {
-            ev.stopPropagation();
-            if (e.id) resolveMutation.mutate({ id: e.id, resolved: ev.target.checked });
-          }}
-          onClick={(ev) => ev.stopPropagation()}
-          aria-label={
-            e.resolution === "resolved" ? t("adminErrorLogs.markUnresolved") : t("adminErrorLogs.markResolved")
-          }
-          className="h-4 w-4 cursor-pointer accent-srapi-accent"
+        <QuietBadge
+          status={resolutionTone(e.resolution)}
+          label={e.resolution ? t(`adminErrorLogs.${e.resolution}`) : "—"}
         />
       ),
     },
@@ -379,4 +368,17 @@ export function ErrorLogsPanel() {
       />
     </>
   );
+}
+
+function resolutionTone(resolution: OpsErrorLog["resolution"]): QuietStatus {
+  switch (resolution) {
+    case "resolved":
+      return "active";
+    case "investigating":
+      return "limited";
+    case "muted":
+      return "disabled";
+    default:
+      return "error";
+  }
 }

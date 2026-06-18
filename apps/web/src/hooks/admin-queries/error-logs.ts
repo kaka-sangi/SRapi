@@ -31,11 +31,22 @@ export function useAdminErrorLog(id: string | null, enabled = true) {
  * Toggle the operator resolution on an error log. Invalidates the list +
  * detail queries so the next read picks up the updated resolution metadata.
  */
-export function useResolveErrorLog() {
+export function useUpdateErrorLogResolution() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, resolved }: { id: string; resolved: boolean }) =>
-      adminApi.resolveErrorLog(id, resolved),
+    mutationFn: ({
+      id,
+      resolution,
+      note,
+    }: {
+      id: string;
+      resolution: "open" | "investigating" | "resolved" | "muted";
+      note?: string;
+    }) =>
+      adminApi.updateErrorLogResolution(id, {
+        resolution,
+        ...(note !== undefined ? { note } : {}),
+      }),
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: queryKeys.admin.errorLog(vars.id) });
       // The list cache key embeds the active filters; invalidate the whole

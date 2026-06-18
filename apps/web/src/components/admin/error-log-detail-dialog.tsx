@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import {
@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import { CopyButton } from "@/components/ui/copy-button";
+import { Textarea } from "@/components/ui/textarea";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import {
@@ -19,7 +20,7 @@ import {
   useAdminErrorLog,
   useAdminRequestLogFileDownload,
   useAdminRequestLogFiles,
-  useResolveErrorLog,
+  useUpdateErrorLogResolution,
 } from "@/hooks/admin-queries";
 import { useAccountNameLookup } from "@/hooks/use-account-name-lookup";
 import { useApiKeyNameLookup } from "@/hooks/use-api-key-name-lookup";
@@ -29,6 +30,9 @@ import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatInteger, formatLatency } from "@/lib/admin-format";
 import { adminRequestDumpsHref, adminSystemLogsHref } from "@/lib/admin-log-links";
 import type { OpsErrorLog, RequestLogFileDescriptor } from "@/lib/sdk-types";
+
+const RESOLUTION_OPTIONS = ["open", "investigating", "resolved", "muted"] as const;
+type ResolutionValue = (typeof RESOLUTION_OPTIONS)[number];
 
 export interface ErrorLogDetailDialogProps {
   errorLogId: string | null;
@@ -72,8 +76,6 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
   const apiKeyLookup = useApiKeyNameLookup();
   const providerLookup = useProviderNameLookup();
   const userLookup = useUserEmailLookup();
-  const resolveMutation = useResolveErrorLog();
-  const isResolved = detail.resolution === "resolved";
   const requestLogQuery = useAdminRequestLogFiles(
     { request_id: detail.request_id || undefined, limit: 3 },
     Boolean(detail.request_id),
@@ -84,6 +86,16 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
   const events = detail.upstream_errors ?? [];
   const firstAt = events.length > 0 ? events[0]?.at_unix_ms ?? 0 : 0;
   const systemLogHref = adminSystemLogsHref(detail);
+  const [resolution, setResolution] = useState<ResolutionValue>(detail.resolution ?? "open");
+  const [note, setNote] = useState(detail.resolution_note ?? "");
+  const resolutionMutation = useUpdateErrorLogResolution();
+  const resolved = detail.resolution ?? "open";
+  const dirty = resolution !== resolved || note.trim() !== (detail.resolution_note ?? "");
+
+  useEffect(() => {
+    setResolution(detail.resolution ?? "open");
+    setNote(detail.resolution_note ?? "");
+  }, [detail.id, detail.resolution, detail.resolution_note]);
 
   return (
     <div className="space-y-4">
@@ -176,22 +188,27 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
         total={requestLogQuery.data?.pagination?.total}
       />
 
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
-        <QuietBadge
-          status={resolutionTone(detail.resolution)}
-          label={resolutionLabel(t, detail.resolution)}
-        />
-        <button
-          type="button"
-          disabled={resolveMutation.isPending || !detail.id}
-          onClick={() => {
-            if (detail.id) resolveMutation.mutate({ id: detail.id, resolved: !isResolved });
-          }}
-          className="rounded-md border border-srapi-border bg-srapi-surface px-3 py-1.5 text-xs font-medium text-srapi-text-primary transition-colors hover:bg-srapi-card-muted disabled:opacity-50"
-        >
-          {isResolved ? t("adminErrorLogs.markUnresolved") : t("adminErrorLogs.markResolved")}
-        </button>
-      </div>
+      <ResolutionEditor
+        current={detail.resolution ?? "open"}
+        value={resolution}
+        note={note}
+        pending={resolutionMutation.isPending || !detail.id}
+        dirty={dirty}
+        onResolutionChange={setResolution}
+        onNoteChange={setNote}
+        onSubmit={() => {
+          if (!detail.id) return;
+          resolutionMutation.mutate({
+            id: detail.id,
+            resolution,
+            note: note.trim() || undefined,
+          });
+        }}
+        onReset={() => {
+          setResolution(detail.resolution ?? "open");
+          setNote(detail.resolution_note ?? "");
+        }}
+      />
 
       {events.length > 0 ? (
         <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
@@ -360,6 +377,97 @@ function RequestLogEvidence({
           )}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function ResolutionEditor({
+  current,
+  value,
+  note,
+  pending,
+  dirty,
+  onResolutionChange,
+  onNoteChange,
+  onSubmit,
+  onReset,
+}: {
+  current: ResolutionValue;
+  value: ResolutionValue;
+  note: string;
+  pending: boolean;
+  dirty: boolean;
+  onResolutionChange: (value: ResolutionValue) => void;
+  onNoteChange: (value: string) => void;
+  onSubmit: () => void;
+  onReset: () => void;
+}) {
+  const { t } = useLanguage();
+  const options = useMemo(
+    () =>
+      RESOLUTION_OPTIONS.map((item) => ({
+        value: item,
+        label: t(`adminErrorLogs.${item}`),
+      })),
+    [t],
+  );
+
+  return (
+    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <QuietBadge status={resolutionTone(value)} label={resolutionLabel(t, value)} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={onReset} disabled={pending || !dirty}>
+            {t("common.reset")}
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={onSubmit} disabled={pending || !dirty}>
+            {t("adminErrorLogs.saveResolution")}
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div>
+          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+            {t("adminErrorLogs.currentResolution")}
+          </p>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {options.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onResolutionChange(option.value)}
+                className={
+                  "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors " +
+                  (value === option.value
+                    ? "border-srapi-accent bg-srapi-accent/10 text-srapi-text-primary"
+                    : "border-srapi-border bg-srapi-surface text-srapi-text-secondary hover:bg-srapi-card-muted")
+                }
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+            {t("adminErrorLogs.previousResolution")}
+          </p>
+          <p className="mt-1 text-sm text-srapi-text-secondary">{resolutionLabel(t, current)}</p>
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <label className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          {t("adminErrorLogs.resolutionNote")}
+        </label>
+        <Textarea
+          value={note}
+          onChange={(e) => onNoteChange(e.target.value)}
+          placeholder={t("adminErrorLogs.resolutionNotePlaceholder")}
+          className="mt-1 min-h-20"
+        />
+      </div>
     </div>
   );
 }
