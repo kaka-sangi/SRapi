@@ -5455,6 +5455,34 @@ type BatchOperationResult struct {
 	Succeeded      int                `json:"succeeded"`
 }
 
+// BatchQuotaFetchRequest defines model for BatchQuotaFetchRequest.
+type BatchQuotaFetchRequest struct {
+	AccountIds []Id `json:"account_ids"`
+}
+
+// BatchQuotaFetchResponse defines model for BatchQuotaFetchResponse.
+type BatchQuotaFetchResponse struct {
+	Data      BatchQuotaFetchResult `json:"data"`
+	RequestId RequestId             `json:"request_id"`
+}
+
+// BatchQuotaFetchResult defines model for BatchQuotaFetchResult.
+type BatchQuotaFetchResult struct {
+	Failed  int                  `json:"failed"`
+	Rows    []BatchQuotaFetchRow `json:"rows"`
+	Success int                  `json:"success"`
+	Total   int                  `json:"total"`
+}
+
+// BatchQuotaFetchRow defines model for BatchQuotaFetchRow.
+type BatchQuotaFetchRow struct {
+	AccountId Id `json:"account_id"`
+
+	// Error Error message when success=false (omitted on success).
+	Error   *string `json:"error,omitempty"`
+	Success bool    `json:"success"`
+}
+
 // BatchRefreshAdminAccountsErrorRow defines model for BatchRefreshAdminAccountsErrorRow.
 type BatchRefreshAdminAccountsErrorRow struct {
 	Id      Id     `json:"id"`
@@ -5842,6 +5870,85 @@ type BulkPricingRuleImportResult struct {
 	Requested int                          `json:"requested"`
 	Rules     []PricingRule                `json:"rules"`
 	Validated int                          `json:"validated"`
+}
+
+// BulkUpdateProviderAccountsFilters Server-side filter set for `BulkUpdateProviderAccountsRequest` —
+// mirrors the GET /accounts list-query knobs. The handler resolves
+// these to IDs using the same list path the admin table uses, so
+// what the caller sees IS what the bulk-edit hits. An empty filter
+// set deliberately matches nothing (refuses to operate on every
+// account by accident).
+type BulkUpdateProviderAccountsFilters struct {
+	// GroupId Restrict to members of one account group.
+	GroupId *string `json:"group_id,omitempty"`
+
+	// ProviderId Restrict to a single provider.
+	ProviderId *string `json:"provider_id,omitempty"`
+
+	// RuntimeClass Restrict to one runtime class (api_key/oauth_refresh/...).
+	RuntimeClass *string `json:"runtime_class,omitempty"`
+
+	// Search Case-insensitive substring match against the account name.
+	// Mirrors sub2api `filters.search`.
+	Search *string `json:"search,omitempty"`
+
+	// Status Restrict to a single status (active/disabled/...).
+	Status *string `json:"status,omitempty"`
+}
+
+// BulkUpdateProviderAccountsRequest sub2api `BulkUpdateAccountsRequest` superset. Either `account_ids`
+// or `filters` is required (server-side filter resolution lets the
+// UI offer "Edit Filtered" without round-tripping IDs through the
+// client). Every editable field is optional — only fields present
+// in the payload are written, so a caller can change just
+// `priority` for the selection without touching `status`. Mirrors
+// Service.BulkUpdateAccounts; per-row failures collect in `errors`.
+type BulkUpdateProviderAccountsRequest struct {
+	// AccountIds Explicit selection. Mutually exclusive with `filters` — supply
+	// one or the other. When both are present, `account_ids` wins
+	// (matches sub2api).
+	AccountIds *[]Id `json:"account_ids,omitempty"`
+
+	// Filters Server-side filter set for `BulkUpdateProviderAccountsRequest` —
+	// mirrors the GET /accounts list-query knobs. The handler resolves
+	// these to IDs using the same list path the admin table uses, so
+	// what the caller sees IS what the bulk-edit hits. An empty filter
+	// set deliberately matches nothing (refuses to operate on every
+	// account by accident).
+	Filters *BulkUpdateProviderAccountsFilters `json:"filters,omitempty"`
+
+	// MaxConcurrency Optional per-account concurrency cap (0 clears the cap).
+	// Stored in account metadata under `max_concurrency` — same key
+	// the scheduler reads at admission, identical to
+	// `/admin/accounts/batch-concurrency`.
+	MaxConcurrency *int `json:"max_concurrency,omitempty"`
+
+	// Name Optional — rename every selected account. Almost never useful
+	// for >1 account; included for sub2api parity.
+	Name *string `json:"name,omitempty"`
+
+	// Priority Optional scheduler-tier priority. Higher = preferred.
+	Priority *int `json:"priority,omitempty"`
+
+	// ProxyId Optional proxy binding. Empty string clears the binding.
+	// Encode `null` as JSON null to leave unchanged.
+	ProxyId *string `json:"proxy_id,omitempty"`
+
+	// RiskLevel Optional risk-level label for the content-safety gate.
+	RiskLevel *string `json:"risk_level,omitempty"`
+
+	// RuntimeClass Optional auth-mechanism override (api_key / oauth_refresh /
+	// etc.). Caller must ensure the runtime class is allowed by
+	// the provider — the handler does NOT re-validate here.
+	RuntimeClass *string                `json:"runtime_class,omitempty"`
+	Status       *ProviderAccountStatus `json:"status,omitempty"`
+
+	// UpstreamClient Optional upstream-client override. Empty string clears.
+	// Encode `null` (the default when omitted) to leave unchanged.
+	UpstreamClient *string `json:"upstream_client,omitempty"`
+
+	// Weight Optional load-balancer weight.
+	Weight *float32 `json:"weight,omitempty"`
 }
 
 // CapabilityDefinition defines model for CapabilityDefinition.
@@ -6977,70 +7084,50 @@ type ErrorCode string
 
 // ErrorLog defines model for ErrorLog.
 type ErrorLog struct {
-	AccountId        *string   `json:"account_id,omitempty"`
-	ApiKeyId         Id        `json:"api_key_id"`
-	AttemptNo        int       `json:"attempt_no"`
-	CreatedAt        Timestamp `json:"created_at"`
-	ErrorClass       *string   `json:"error_class,omitempty"`
-	// ErrorMessage carries the upstream provider's verbatim error.message
-	// (sub2api parity: ops_error_logs.upstream_error_message). Empty when
-	// the request did not record an upstream message (e.g. transport-only
-	// failures or successes).
-	ErrorMessage *string `json:"error_message,omitempty"`
-	// ErrorBodyExcerpt mirrors sub2api's upstream_error_detail — the
-	// compacted upstream error envelope (class | status | type | code |
-	// message). Empty when no envelope was captured.
-	ErrorBodyExcerpt *string `json:"error_body_excerpt,omitempty"`
-	// StatusCode is the upstream HTTP status code (0 when no HTTP response was
-	// received; emitted as omitted in that case).
-	StatusCode *int `json:"status_code,omitempty"`
-	// UpstreamRequestID is the upstream provider's request id from the
-	// failing response (x-request-id / openai-request-id / x-codex-request-id).
-	UpstreamRequestId *string `json:"upstream_request_id,omitempty"`
-	// ErrorPhase / ErrorOwner / ErrorSource classify the failure for triage.
-	// Phase: request|auth|routing|upstream|network|internal.
-	// Owner: client|provider|platform. Source: client_request|upstream_http|gateway.
-	ErrorPhase  *string `json:"error_phase,omitempty"`
-	ErrorOwner  *string `json:"error_owner,omitempty"`
-	ErrorSource *string `json:"error_source,omitempty"`
-	// Resolved marks an operator-acknowledged error log; ResolvedBy /
-	// ResolvedAt record who and when.
-	Resolved   bool       `json:"resolved"`
-	ResolvedBy *string    `json:"resolved_by,omitempty"`
-	ResolvedAt *Timestamp `json:"resolved_at,omitempty"`
-	// UpstreamErrors is the per-attempt failover history. One entry per
-	// failed candidate attempt across the request's cross-credential loop.
-	UpstreamErrors *[]UpstreamErrorEvent `json:"upstream_errors,omitempty"`
-	Id             Id                    `json:"id"`
-	InputTokens    int                   `json:"input_tokens"`
-	LatencyMs      int                   `json:"latency_ms"`
-	Model          string                `json:"model"`
-	OutputTokens   int                   `json:"output_tokens"`
-	ProviderId     *string               `json:"provider_id,omitempty"`
-	RequestId      RequestId             `json:"request_id"`
-	SourceEndpoint string                `json:"source_endpoint"`
-	SourceProtocol string                `json:"source_protocol"`
-	TargetProtocol string                `json:"target_protocol"`
-	UsageEstimated bool                  `json:"usage_estimated"`
-	UserId         Id                    `json:"user_id"`
-}
+	AccountId *string   `json:"account_id,omitempty"`
+	ApiKeyId  Id        `json:"api_key_id"`
+	AttemptNo int       `json:"attempt_no"`
+	CreatedAt Timestamp `json:"created_at"`
 
-// UpstreamErrorEvent records one failed candidate attempt within a
-// gateway request's failover history (sub2api ops_upstream_error_events
-// parity). One ErrorLog can carry multiple events; they are ordered by
-// attempt_no.
-type UpstreamErrorEvent struct {
-	AtUnixMs           int64   `json:"at_unix_ms"`
-	AttemptNo          int     `json:"attempt_no"`
-	AccountId          *string `json:"account_id,omitempty"`
-	AccountName        string  `json:"account_name"`
-	UpstreamStatusCode int     `json:"upstream_status_code"`
-	UpstreamRequestId  string  `json:"upstream_request_id"`
-	UpstreamUrl        string  `json:"upstream_url"`
-	// Kind is one of http_error / request_error / retry_exhausted / failover.
-	Kind        string `json:"kind"`
-	Message     string `json:"message"`
-	BodyExcerpt string `json:"body_excerpt"`
+	// ErrorBodyExcerpt Compacted upstream error envelope.
+	ErrorBodyExcerpt *string `json:"error_body_excerpt,omitempty"`
+	ErrorClass       *string `json:"error_class,omitempty"`
+
+	// ErrorMessage Verbatim upstream error message (sub2api parity).
+	ErrorMessage *string `json:"error_message,omitempty"`
+
+	// ErrorOwner client | provider | platform
+	ErrorOwner *string `json:"error_owner,omitempty"`
+
+	// ErrorPhase request | auth | routing | upstream | network | internal
+	ErrorPhase *string `json:"error_phase,omitempty"`
+
+	// ErrorSource client_request | upstream_http | gateway
+	ErrorSource  *string   `json:"error_source,omitempty"`
+	Id           Id        `json:"id"`
+	InputTokens  int       `json:"input_tokens"`
+	LatencyMs    int       `json:"latency_ms"`
+	Model        string    `json:"model"`
+	OutputTokens int       `json:"output_tokens"`
+	ProviderId   *string   `json:"provider_id,omitempty"`
+	RequestId    RequestId `json:"request_id"`
+
+	// Resolved Operator acknowledgement flag.
+	Resolved       bool       `json:"resolved"`
+	ResolvedAt     *Timestamp `json:"resolved_at,omitempty"`
+	ResolvedBy     *string    `json:"resolved_by,omitempty"`
+	SourceEndpoint string     `json:"source_endpoint"`
+	SourceProtocol string     `json:"source_protocol"`
+
+	// StatusCode Upstream HTTP status code (omitted when no HTTP response).
+	StatusCode     *int                  `json:"status_code,omitempty"`
+	TargetProtocol string                `json:"target_protocol"`
+	UpstreamErrors *[]UpstreamErrorEvent `json:"upstream_errors,omitempty"`
+
+	// UpstreamRequestId Upstream provider request id (x-request-id / openai-request-id).
+	UpstreamRequestId *string `json:"upstream_request_id,omitempty"`
+	UsageEstimated    bool    `json:"usage_estimated"`
+	UserId            Id      `json:"user_id"`
 }
 
 // ErrorLogListResponse defines model for ErrorLogListResponse.
@@ -10594,6 +10681,23 @@ type UpsertUserPlatformQuotaRequest struct {
 	WeeklyLimit  *string `json:"weekly_limit,omitempty"`
 }
 
+// UpstreamErrorEvent One failed candidate attempt within a gateway request's failover history
+// (sub2api ops_upstream_error_events parity).
+type UpstreamErrorEvent struct {
+	AccountId   *string `json:"account_id,omitempty"`
+	AccountName string  `json:"account_name"`
+	AtUnixMs    int64   `json:"at_unix_ms"`
+	AttemptNo   int     `json:"attempt_no"`
+	BodyExcerpt string  `json:"body_excerpt"`
+
+	// Kind http_error | request_error | retry_exhausted | failover
+	Kind               string `json:"kind"`
+	Message            string `json:"message"`
+	UpstreamRequestId  string `json:"upstream_request_id"`
+	UpstreamStatusCode int    `json:"upstream_status_code"`
+	UpstreamUrl        string `json:"upstream_url"`
+}
+
 // UsageAggregate defines model for UsageAggregate.
 type UsageAggregate struct {
 	AggregateId    string                  `json:"aggregate_id"`
@@ -11120,6 +11224,9 @@ type StartTime = time.Time
 // Status defines model for Status.
 type Status = string
 
+// BadRequest defines model for BadRequest.
+type BadRequest = ErrorResponse
+
 // Conflict defines model for Conflict.
 type Conflict = ErrorResponse
 
@@ -11377,6 +11484,15 @@ type ListAdminErrorLogsParams struct {
 	SourceEndpoint *string    `form:"source_endpoint,omitempty" json:"source_endpoint,omitempty"`
 	Start          *time.Time `form:"start,omitempty" json:"start,omitempty"`
 	End            *time.Time `form:"end,omitempty" json:"end,omitempty"`
+
+	// Q Free-text search across error_message + request_id (case-insensitive
+	// substring match). Empty/missing returns unfiltered results.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+}
+
+// ResolveAdminErrorLogJSONBody defines parameters for ResolveAdminErrorLog.
+type ResolveAdminErrorLogJSONBody struct {
+	Resolved bool `json:"resolved"`
 }
 
 // ListAdminModelsParams defines parameters for ListAdminModels.
@@ -12044,11 +12160,17 @@ type BatchUpdateAdminAccountConcurrencyJSONRequestBody = BatchUpdateAccountConcu
 // BatchDeleteAdminAccountsJSONRequestBody defines body for BatchDeleteAdminAccounts for application/json ContentType.
 type BatchDeleteAdminAccountsJSONRequestBody = BatchDeleteProviderAccountsRequest
 
+// BatchQuotaFetchAdminAccountsJSONRequestBody defines body for BatchQuotaFetchAdminAccounts for application/json ContentType.
+type BatchQuotaFetchAdminAccountsJSONRequestBody = BatchQuotaFetchRequest
+
 // BatchRefreshAdminAccountsJSONRequestBody defines body for BatchRefreshAdminAccounts for application/json ContentType.
 type BatchRefreshAdminAccountsJSONRequestBody = BatchRefreshAdminAccountsRequest
 
 // BatchUpdateAdminAccountCredentialsJSONRequestBody defines body for BatchUpdateAdminAccountCredentials for application/json ContentType.
 type BatchUpdateAdminAccountCredentialsJSONRequestBody = BatchUpdateAdminAccountCredentialsRequest
+
+// BulkUpdateAdminAccountsJSONRequestBody defines body for BulkUpdateAdminAccounts for application/json ContentType.
+type BulkUpdateAdminAccountsJSONRequestBody = BulkUpdateProviderAccountsRequest
 
 // ImportAdminAccountsJSONRequestBody defines body for ImportAdminAccounts for application/json ContentType.
 type ImportAdminAccountsJSONRequestBody = ProviderAccountImportRequest
@@ -12145,6 +12267,9 @@ type RenameAdminCopilotConversationJSONRequestBody = CopilotConversationRenameRe
 
 // UpdateAdminCopilotConversationJSONRequestBody defines body for UpdateAdminCopilotConversation for application/json ContentType.
 type UpdateAdminCopilotConversationJSONRequestBody = CopilotConversationCreateRequest
+
+// ResolveAdminErrorLogJSONRequestBody defines body for ResolveAdminErrorLog for application/json ContentType.
+type ResolveAdminErrorLogJSONRequestBody ResolveAdminErrorLogJSONBody
 
 // CreateAdminErrorPassthroughRuleJSONRequestBody defines body for CreateAdminErrorPassthroughRule for application/json ContentType.
 type CreateAdminErrorPassthroughRuleJSONRequestBody = CreateErrorPassthroughRuleRequest
@@ -19127,12 +19252,18 @@ type ServerInterface interface {
 	// Bulk soft-delete provider accounts.
 	// (POST /api/v1/admin/accounts/batch-delete)
 	BatchDeleteAdminAccounts(w http.ResponseWriter, r *http.Request)
+	// Refresh quota for many provider accounts in one call.
+	// (POST /api/v1/admin/accounts/batch-quota-fetch)
+	BatchQuotaFetchAdminAccounts(w http.ResponseWriter, r *http.Request)
 	// Bulk-trigger OAuth refresh on N accounts.
 	// (POST /api/v1/admin/accounts/batch-refresh)
 	BatchRefreshAdminAccounts(w http.ResponseWriter, r *http.Request)
 	// Bulk-rotate credential fields on N accounts.
 	// (POST /api/v1/admin/accounts/batch-update-credentials)
 	BatchUpdateAdminAccountCredentials(w http.ResponseWriter, r *http.Request)
+	// Apply a superset bulk-edit to many provider accounts.
+	// (POST /api/v1/admin/accounts/bulk-update)
+	BulkUpdateAdminAccounts(w http.ResponseWriter, r *http.Request)
 	// Export provider account metadata without credentials.
 	// (GET /api/v1/admin/accounts/export)
 	ExportAdminAccounts(w http.ResponseWriter, r *http.Request)
@@ -19409,6 +19540,9 @@ type ServerInterface interface {
 	// Get an error log.
 	// (GET /api/v1/admin/error-logs/{id})
 	GetAdminErrorLog(w http.ResponseWriter, r *http.Request, id Id)
+	// Toggle resolved state on an error log.
+	// (PATCH /api/v1/admin/error-logs/{id}/resolve)
+	ResolveAdminErrorLog(w http.ResponseWriter, r *http.Request, id Id)
 	// List error-passthrough rules.
 	// (GET /api/v1/admin/error-passthrough-rules)
 	ListAdminErrorPassthroughRules(w http.ResponseWriter, r *http.Request)
@@ -21474,6 +21608,28 @@ func (siw *ServerInterfaceWrapper) BatchDeleteAdminAccounts(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
+// BatchQuotaFetchAdminAccounts operation middleware
+func (siw *ServerInterfaceWrapper) BatchQuotaFetchAdminAccounts(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchQuotaFetchAdminAccounts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // BatchRefreshAdminAccounts operation middleware
 func (siw *ServerInterfaceWrapper) BatchRefreshAdminAccounts(w http.ResponseWriter, r *http.Request) {
 
@@ -21509,6 +21665,28 @@ func (siw *ServerInterfaceWrapper) BatchUpdateAdminAccountCredentials(w http.Res
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.BatchUpdateAdminAccountCredentials(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BulkUpdateAdminAccounts operation middleware
+func (siw *ServerInterfaceWrapper) BulkUpdateAdminAccounts(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BulkUpdateAdminAccounts(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -24796,6 +24974,19 @@ func (siw *ServerInterfaceWrapper) ListAdminErrorLogs(w http.ResponseWriter, r *
 		return
 	}
 
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminErrorLogs(w, r, params)
 	}))
@@ -24830,6 +25021,38 @@ func (siw *ServerInterfaceWrapper) GetAdminErrorLog(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAdminErrorLog(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResolveAdminErrorLog operation middleware
+func (siw *ServerInterfaceWrapper) ResolveAdminErrorLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResolveAdminErrorLog(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -34766,8 +34989,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-action", wrapper.BatchActionAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-concurrency", wrapper.BatchUpdateAdminAccountConcurrency)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-delete", wrapper.BatchDeleteAdminAccounts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-quota-fetch", wrapper.BatchQuotaFetchAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-refresh", wrapper.BatchRefreshAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-update-credentials", wrapper.BatchUpdateAdminAccountCredentials)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/bulk-update", wrapper.BulkUpdateAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/export", wrapper.ExportAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/health-summary", wrapper.GetAdminAccountsHealthSummary)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import", wrapper.ImportAdminAccounts)
@@ -34860,6 +35085,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/diagnostics/circuit-breakers/{accountId}/reset", wrapper.ResetAdminCircuitBreaker)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/error-logs", wrapper.ListAdminErrorLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/error-logs/{id}", wrapper.GetAdminErrorLog)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/error-logs/{id}/resolve", wrapper.ResolveAdminErrorLog)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules", wrapper.ListAdminErrorPassthroughRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules", wrapper.CreateAdminErrorPassthroughRule)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules/{id}", wrapper.DeleteAdminErrorPassthroughRule)

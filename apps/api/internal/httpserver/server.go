@@ -576,6 +576,8 @@ func newWithServer(cfg config.Config, logger *slog.Logger, options ...Option) (h
 	mux.HandleFunc("POST /api/v1/admin/accounts/batch-concurrency", server.handleBatchUpdateAdminAccountConcurrency)
 	mux.HandleFunc("POST /api/v1/admin/accounts/batch-refresh", server.handleBatchRefreshAdminAccounts)
 	mux.HandleFunc("POST /api/v1/admin/accounts/batch-update-credentials", server.handleBatchUpdateAdminAccountCredentials)
+	mux.HandleFunc("POST /api/v1/admin/accounts/bulk-update", server.handleBulkUpdateAdminAccounts)
+	mux.HandleFunc("POST /api/v1/admin/accounts/batch-quota-fetch", server.handleBatchQuotaFetchAdminAccounts)
 	mux.HandleFunc("PATCH /api/v1/admin/accounts/batch", server.handleBatchUpdateAdminAccounts)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}", server.handleGetAdminAccount)
 	mux.HandleFunc("PATCH /api/v1/admin/accounts/{id}", server.handleUpdateAdminAccount)
