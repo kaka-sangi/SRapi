@@ -30,41 +30,46 @@ func (s *Server) handleListAdminRequestLogFiles(w http.ResponseWriter, r *http.R
 	if reader == nil {
 		writeJSONAny(w, http.StatusOK, apiopenapi.RequestLogFileListResponse{
 			Data:       []apiopenapi.RequestLogFileDescriptor{},
-			Pagination: paginationWithRequest(r, 0),
+			Pagination: requestLogFilePagination(100, 0),
 			RequestId:  requestID,
 		})
+		return
+	}
+
+	from, err := parseRequestLogFileTimestamp(r.URL.Query().Get("from"))
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.VALIDATIONFAILED, "invalid from timestamp", requestID)
+		return
+	}
+	to, err := parseRequestLogFileTimestamp(r.URL.Query().Get("to"))
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.VALIDATIONFAILED, "invalid to timestamp", requestID)
+		return
+	}
+	if from != nil && to != nil && !from.Before(*to) {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.VALIDATIONFAILED, "from must be before to", requestID)
+		return
+	}
+	limit, err := parseRequestLogFileLimit(r.URL.Query().Get("limit"))
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.VALIDATIONFAILED, "invalid limit", requestID)
 		return
 	}
 
 	filter := rlfcontract.ListFilter{
 		RequestIDPrefix: strings.TrimSpace(r.URL.Query().Get("request_id")),
 		ErrorOnly:       strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("error_only")), "true"),
+		From:            from,
+		To:              to,
 	}
-	if raw := strings.TrimSpace(r.URL.Query().Get("from")); raw != "" {
-		if t, err := time.Parse(time.RFC3339, raw); err == nil {
-			filter.From = &t
-		}
-	}
-	if raw := strings.TrimSpace(r.URL.Query().Get("to")); raw != "" {
-		if t, err := time.Parse(time.RFC3339, raw); err == nil {
-			filter.To = &t
-		}
-	}
-	limit := 100
-	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
-			limit = n
-		}
-	}
-	if limit > 500 {
-		limit = 500
-	}
-	filter.Limit = limit
-
 	descs, err := reader.List(r.Context(), filter)
 	if err != nil {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list request log files", requestID)
 		return
+	}
+	total := len(descs)
+	if len(descs) > limit {
+		descs = descs[:limit]
 	}
 	data := make([]apiopenapi.RequestLogFileDescriptor, 0, len(descs))
 	for _, d := range descs {
@@ -72,7 +77,7 @@ func (s *Server) handleListAdminRequestLogFiles(w http.ResponseWriter, r *http.R
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.RequestLogFileListResponse{
 		Data:       data,
-		Pagination: paginationWithRequest(r, len(data)),
+		Pagination: requestLogFilePagination(limit, total),
 		RequestId:  requestID,
 	})
 }
@@ -163,6 +168,43 @@ func descriptorToAPI(d rlfcontract.FileDescriptor) apiopenapi.RequestLogFileDesc
 		CreatedAt:   d.CreatedAt.UTC(),
 		RequestId:   d.RequestID,
 		IsErrorOnly: d.IsErrorOnly,
+	}
+}
+
+func parseRequestLogFileTimestamp(raw string) (*time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	if parsed, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		parsed = parsed.UTC()
+		return &parsed, nil
+	}
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		parsed = parsed.UTC()
+		return &parsed, nil
+	}
+	return nil, errors.New("invalid request log file timestamp")
+}
+
+func parseRequestLogFileLimit(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 100, nil
+	}
+	limit, err := strconv.Atoi(raw)
+	if err != nil || limit < 1 || limit > 500 {
+		return 0, errors.New("invalid request log file limit")
+	}
+	return limit, nil
+}
+
+func requestLogFilePagination(limit, total int) apiopenapi.Pagination {
+	return apiopenapi.Pagination{
+		Page:     1,
+		PageSize: limit,
+		Total:    total,
+		HasNext:  total > limit,
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
 // TestAdminRequestLogFiles_ListGetDownloadDelete walks the four admin
@@ -52,7 +53,8 @@ func TestAdminRequestLogFiles_ListGetDownloadDelete(t *testing.T) {
 		t.Fatalf("list: got %d body=%s", rec.Code, rec.Body.String())
 	}
 	var list struct {
-		Data []map[string]any `json:"data"`
+		Data       []map[string]any      `json:"data"`
+		Pagination apiopenapi.Pagination `json:"pagination"`
 	}
 	if err := json.NewDecoder(rec.Body).Decode(&list); err != nil {
 		t.Fatalf("decode list: %v", err)
@@ -62,6 +64,25 @@ func TestAdminRequestLogFiles_ListGetDownloadDelete(t *testing.T) {
 	}
 	if list.Data[0]["name"] != errName {
 		t.Fatalf("expected newer error file first, got %v", list.Data[0]["name"])
+	}
+	if list.Pagination.Total != 2 || list.Pagination.PageSize != 100 || list.Pagination.HasNext {
+		t.Fatalf("unexpected list pagination: %+v", list.Pagination)
+	}
+
+	// Limit truncates the payload but keeps the real filtered total so the
+	// operator knows more evidence exists on disk.
+	limitedReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/request-log-files?limit=1", nil)
+	limitedReq.AddCookie(sessionCookie)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, limitedReq)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list limit: got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Data) != 1 || list.Pagination.Total != 2 || list.Pagination.PageSize != 1 || !list.Pagination.HasNext {
+		t.Fatalf("limit should keep real total and has_next; got data=%d pagination=%+v", len(list.Data), list.Pagination)
 	}
 
 	// List with error_only=true: just the error file.
@@ -96,6 +117,22 @@ func TestAdminRequestLogFiles_ListGetDownloadDelete(t *testing.T) {
 	}
 	if len(list.Data) != 1 || list.Data[0]["name"] != okName {
 		t.Fatalf("request_id prefix should return only matching file; got %+v", list.Data)
+	}
+
+	invalidTimeReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/request-log-files?from=not-a-time", nil)
+	invalidTimeReq.AddCookie(sessionCookie)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, invalidTimeReq)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("invalid from timestamp should be rejected, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	invalidLimitReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/request-log-files?limit=501", nil)
+	invalidLimitReq.AddCookie(sessionCookie)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, invalidLimitReq)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("out-of-range limit should be rejected, got %d body=%s", rec.Code, rec.Body.String())
 	}
 
 	// Get by name.
