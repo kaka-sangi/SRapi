@@ -40,7 +40,8 @@ func TestAdminRequestLogFiles_ListGetDownloadDelete(t *testing.T) {
 	}
 
 	handler := New(config.Load(), nil)
-	_, sessionCookie := mustLoginAdmin(t, handler)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	csrf := loginResp.Data.CsrfToken
 
 	// List without filters: newest first, both files present.
 	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/request-log-files", nil)
@@ -79,6 +80,22 @@ func TestAdminRequestLogFiles_ListGetDownloadDelete(t *testing.T) {
 	}
 	if list.Data[0]["is_error_only"] != true {
 		t.Fatalf("expected is_error_only=true on error file, got %v", list.Data[0]["is_error_only"])
+	}
+
+	// List by request_id prefix: this is the correlation path from
+	// ops_error_logs.request_id to the matching raw HTTP envelope dump.
+	listByRequestReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/request-log-files?request_id=req_o", nil)
+	listByRequestReq.AddCookie(sessionCookie)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, listByRequestReq)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list by request_id: got %d", rec.Code)
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Data) != 1 || list.Data[0]["name"] != okName {
+		t.Fatalf("request_id prefix should return only matching file; got %+v", list.Data)
 	}
 
 	// Get by name.
@@ -123,9 +140,19 @@ func TestAdminRequestLogFiles_ListGetDownloadDelete(t *testing.T) {
 		t.Fatalf("expected 404 on unknown file, got %d", rec.Code)
 	}
 
+	// Delete is a state-changing admin operation and must reject missing CSRF.
+	delNoCSRFReq := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/request-log-files/"+errName, nil)
+	delNoCSRFReq.AddCookie(sessionCookie)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, delNoCSRFReq)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("delete without csrf should be forbidden, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
 	// Delete the error file.
 	delReq := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/request-log-files/"+errName, nil)
 	delReq.AddCookie(sessionCookie)
+	delReq.Header.Set("X-CSRF-Token", csrf)
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, delReq)
 	if rec.Code != http.StatusOK {

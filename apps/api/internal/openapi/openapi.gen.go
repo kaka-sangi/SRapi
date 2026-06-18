@@ -29776,6 +29776,8 @@ func (siw *ServerInterfaceWrapper) DeleteAdminRequestLogFile(w http.ResponseWrit
 
 	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
 
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

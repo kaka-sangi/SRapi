@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { PageHeader } from "@/components/layout/page-header";
 import {
   Dialog,
@@ -12,77 +14,51 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime } from "@/lib/admin-format";
 import {
-  requestLogFilesApi,
-  type RequestLogFileDescriptor,
-} from "@/lib/admin-api/request-log-files";
+  downloadAdminRequestLogFileText,
+  requestLogFileDownloadQueryKey,
+  useAdminRequestLogFileDownload,
+  useAdminRequestLogFiles,
+  useDeleteAdminRequestLogFile,
+} from "@/hooks/admin-queries";
+import type { RequestLogFileDescriptor } from "@/lib/admin-api/request-log-files";
 
 // RequestLogFilesPanel renders the per-request HTTP envelope dumps written
 // by the gateway when SRAPI_REQUEST_LOG_ENABLED=true. The dataset is small
 // (capped by retention + count) and changes infrequently, so we use a
-// lightweight built-in fetch + 30s auto-refresh rather than the
+// small React Query wrapper with optional 30s auto-refresh rather than the
 // AdminListView machinery used by the other tabs.
 export function RequestLogFilesPanel() {
   const { t } = useLanguage();
-  const [items, setItems] = useState<RequestLogFileDescriptor[]>([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
   const [errorOnly, setErrorOnly] = useState(false);
   const [prefix, setPrefix] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [selected, setSelected] = useState<RequestLogFileDescriptor | null>(null);
-  const [previewBody, setPreviewBody] = useState<string>("");
-  const [previewError, setPreviewError] = useState<string>("");
+  const [deleteTarget, setDeleteTarget] = useState<RequestLogFileDescriptor | null>(null);
+  const queryParams = useMemo(
+    () => ({
+      request_id: prefix.trim() || undefined,
+      error_only: errorOnly,
+      limit: 200,
+    }),
+    [errorOnly, prefix],
+  );
+  const filesQuery = useAdminRequestLogFiles(queryParams, true, autoRefresh ? 30000 : false);
+  const downloadQuery = useAdminRequestLogFileDownload(selected?.name ?? null, selected !== null);
+  const deleteMutation = useDeleteAdminRequestLogFile();
+  const items = useMemo(() => filesQuery.data?.data ?? [], [filesQuery.data?.data]);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await requestLogFilesApi.list({
-        request_id: prefix.trim() || undefined,
-        error_only: errorOnly,
-        limit: 200,
-      });
-      setItems(data);
-    } catch {
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [prefix, errorOnly]);
-
-  useEffect(() => {
-    const id = window.setTimeout(() => {
-      void reload();
-    }, 0);
-    return () => window.clearTimeout(id);
-  }, [reload]);
-
-  useEffect(() => {
-    if (!autoRefresh) return undefined;
-    const id = window.setInterval(() => {
-      void reload();
-    }, 30000);
-    return () => window.clearInterval(id);
-  }, [autoRefresh, reload]);
-
-  const openPreview = useCallback(async (file: RequestLogFileDescriptor) => {
+  const openPreview = useCallback((file: RequestLogFileDescriptor) => {
     setSelected(file);
-    setPreviewBody("");
-    setPreviewError("");
-    try {
-      const text = await requestLogFilesApi.download(file.name);
-      setPreviewBody(text);
-    } catch {
-      setPreviewError(t("adminRequestLogFiles.detailLoadFailed"));
-    }
-  }, [t]);
+  }, []);
 
   const downloadFile = useCallback((file: RequestLogFileDescriptor) => {
-    // Trigger a browser download by creating a blob URL from the captured
-    // text. We do not rely on Content-Disposition because the admin fetch
-    // already wraps the response — going through a blob preserves the
-    // expected filename and avoids re-fetching.
     void (async () => {
       try {
-        const text = await requestLogFilesApi.download(file.name);
+        const text = await queryClient.fetchQuery({
+          queryKey: requestLogFileDownloadQueryKey(file.name),
+          queryFn: () => downloadAdminRequestLogFileText(file.name),
+        });
         const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -96,19 +72,7 @@ export function RequestLogFilesPanel() {
         /* ignore — operator can click again */
       }
     })();
-  }, []);
-
-  const removeFile = useCallback(async (file: RequestLogFileDescriptor) => {
-    if (typeof window !== "undefined") {
-      if (!window.confirm(t("adminRequestLogFiles.confirmDelete"))) return;
-    }
-    try {
-      await requestLogFilesApi.remove(file.name);
-      await reload();
-    } catch {
-      /* swallow — retain row so the operator can retry */
-    }
-  }, [reload, t]);
+  }, [queryClient]);
 
   const formattedRows = useMemo(
     () =>
@@ -177,7 +141,7 @@ export function RequestLogFilesPanel() {
                   <td className="px-3 py-2 font-mono text-xs">
                     <button
                       type="button"
-                      onClick={() => void openPreview(row)}
+                      onClick={() => openPreview(row)}
                       className="underline-offset-2 hover:underline"
                     >
                       {row.name}
@@ -201,7 +165,7 @@ export function RequestLogFilesPanel() {
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => void openPreview(row)}
+                        onClick={() => openPreview(row)}
                         className="rounded border border-srapi-border-subtle px-2 py-1 text-xs hover:bg-srapi-bg-card-elevated"
                       >
                         {t("adminRequestLogFiles.preview")}
@@ -215,7 +179,7 @@ export function RequestLogFilesPanel() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => void removeFile(row)}
+                        onClick={() => setDeleteTarget(row)}
                         className="rounded border border-red-500/30 px-2 py-1 text-xs text-red-300 hover:bg-red-500/10"
                       >
                         {t("adminRequestLogFiles.delete")}
@@ -229,7 +193,7 @@ export function RequestLogFilesPanel() {
         </div>
       )}
 
-      {loading ? (
+      {filesQuery.isFetching ? (
         <p className="text-xs text-srapi-text-tertiary">…</p>
       ) : null}
 
@@ -243,11 +207,11 @@ export function RequestLogFilesPanel() {
               ) : null}
             </DialogDescription>
           </DialogHeader>
-          {previewError ? (
-            <p className="text-sm text-red-300">{previewError}</p>
+          {downloadQuery.isError ? (
+            <p className="text-sm text-red-300">{t("adminRequestLogFiles.detailLoadFailed")}</p>
           ) : (
             <pre className="max-h-[60vh] overflow-auto rounded bg-srapi-bg-input p-3 text-xs">
-              {previewBody}
+              {downloadQuery.data ?? ""}
             </pre>
           )}
           {selected ? (
@@ -263,6 +227,20 @@ export function RequestLogFilesPanel() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title={t("adminRequestLogFiles.deleteTitle")}
+        body={deleteTarget ? deleteTarget.name : undefined}
+        confirmLabel={t("adminRequestLogFiles.delete")}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          await deleteMutation.mutateAsync(deleteTarget.name);
+          setDeleteTarget(null);
+        }}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

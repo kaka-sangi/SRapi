@@ -7536,6 +7536,7 @@ paths:
       summary: Delete a captured request log file.
       security:
         - cookieAuth: []
+          csrfHeader: []
       x-srapi-rbac:
         owner: write
         admin: write
@@ -7600,7 +7601,6 @@ paths:
             text/plain:
               schema:
                 type: string
-                format: binary
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":

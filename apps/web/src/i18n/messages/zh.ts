@@ -1498,7 +1498,7 @@ export const zh: Messages = {
     searchPlaceholder: "按请求 ID 前缀过滤…",
     detailTitle: "请求详情",
     detailLoadFailed: "无法加载请求转储文件。",
-    confirmDelete: "确定删除该请求转储文件？",
+    deleteTitle: "删除请求转储",
   },
   adminAudit: {
     title: "审计日志",
@@ -2216,6 +2216,10 @@ export const zh: Messages = {
     searchPlaceholder: "按错误信息或请求 ID 搜索",
     resolvedBy: "处理人",
     resolvedAt: "处理时间",
+    requestDump: "请求转储",
+    requestDumpLoading: "正在检查关联请求转储……",
+    requestDumpMissing: "该请求 ID 没有关联的请求转储。",
+    requestDumpMore: "还有 {count} 个转储使用同一请求 ID。",
   },
   adminSettings: {
     title: "设置",

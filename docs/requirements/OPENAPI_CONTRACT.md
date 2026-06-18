@@ -611,7 +611,32 @@ matched/deleted counts and normalized filter metadata. Audit payloads must not
 copy raw log messages, raw search strings, credentials, prompts, cookies, API
 keys, or provider-native frames.
 
-### 4.11 AdminOps Error Logs
+### 4.11 Admin Request Log Files
+
+Request-log-file routes are the admin surface for optional gateway HTTP
+envelope captures:
+
+```txt
+GET    /api/v1/admin/request-log-files
+GET    /api/v1/admin/request-log-files/{name}
+GET    /api/v1/admin/request-log-files/{name}/download
+DELETE /api/v1/admin/request-log-files/{name}
+```
+
+`GET /api/v1/admin/request-log-files` returns generated
+`RequestLogFileDescriptor` rows sorted newest-first. Query filters include
+`request_id` as a prefix match, `error_only`, `from`, `to`, and `limit`. This
+is the supported correlation path from `ops_error_logs.request_id` to the
+captured raw request/response envelope.
+
+`GET /api/v1/admin/request-log-files/{name}/download` returns the raw dump as
+`text/plain`; it must not be modeled as binary in OpenAPI because the browser
+SDK parses it as text for preview.
+
+`DELETE /api/v1/admin/request-log-files/{name}` removes a captured file and is
+a write route. It must require `cookieAuth` plus `csrfHeader`.
+
+### 4.12 AdminOps Error Logs
 
 AdminOps error-log routes are the durable operator-facing upstream failure
 surface:
@@ -645,7 +670,7 @@ prompts, credentials, or replay payloads. Error logs carry enough structured
 evidence to diagnose provider/account/model failures while keeping replay
 semantics in the separate idempotency and scheduler snapshot surfaces.
 
-### 4.12 Provider Account Import / Export
+### 4.13 Provider Account Import / Export
 
 账号池导入导出接口必须保持凭证安全边界：
 

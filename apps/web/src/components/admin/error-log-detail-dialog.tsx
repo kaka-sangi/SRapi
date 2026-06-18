@@ -1,23 +1,31 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import { CopyButton } from "@/components/ui/copy-button";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
-import { useAdminErrorLog, useResolveErrorLog } from "@/hooks/admin-queries";
+import {
+  downloadAdminRequestLogFileText,
+  useAdminErrorLog,
+  useAdminRequestLogFileDownload,
+  useAdminRequestLogFiles,
+  useResolveErrorLog,
+} from "@/hooks/admin-queries";
 import { useAccountNameLookup } from "@/hooks/use-account-name-lookup";
 import { useApiKeyNameLookup } from "@/hooks/use-api-key-name-lookup";
 import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatInteger, formatLatency } from "@/lib/admin-format";
-import type { OpsErrorLog } from "@/lib/sdk-types";
+import type { OpsErrorLog, RequestLogFileDescriptor } from "@/lib/sdk-types";
 
 export interface ErrorLogDetailDialogProps {
   errorLogId: string | null;
@@ -63,6 +71,10 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
   const userLookup = useUserEmailLookup();
   const resolveMutation = useResolveErrorLog();
   const isResolved = detail.resolution === "resolved";
+  const requestLogQuery = useAdminRequestLogFiles(
+    { request_id: detail.request_id || undefined, limit: 3 },
+    Boolean(detail.request_id),
+  );
   const protocol = detail.target_protocol
     ? `${detail.source_protocol ?? detail.platform ?? "—"} → ${detail.target_protocol}`
     : detail.source_protocol ?? detail.platform ?? "—";
@@ -141,6 +153,8 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
         ) : null}
       </div>
 
+      <RequestLogEvidence files={requestLogQuery.data?.data ?? []} loading={requestLogQuery.isFetching} />
+
       <div className="flex items-center justify-between gap-3 rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
         <QuietBadge
           status={resolutionTone(detail.resolution)}
@@ -214,6 +228,100 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
               );
             })}
           </ol>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function RequestLogEvidence({
+  files,
+  loading,
+}: {
+  files: RequestLogFileDescriptor[];
+  loading: boolean;
+}) {
+  const { t } = useLanguage();
+  const [selected, setSelected] = useState<RequestLogFileDescriptor | null>(null);
+  const downloadQuery = useAdminRequestLogFileDownload(selected?.name ?? null, selected !== null);
+  const first = files[0];
+
+  const downloadFile = useCallback(async (file: RequestLogFileDescriptor) => {
+    try {
+      const text = await downloadAdminRequestLogFileText(file.name);
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setSelected(file);
+    }
+  }, []);
+
+  return (
+    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+            {t("adminErrorLogs.requestDump")}
+          </p>
+          {first ? (
+            <div className="mt-1 min-w-0">
+              <p className="break-all font-mono text-2xs text-srapi-text-primary">
+                {first.name}
+              </p>
+              <p className="mt-1 text-xs text-srapi-text-tertiary">
+                {formatDateTime(first.created_at)} · {formatSize(first.size)}
+                {first.is_error_only ? ` · ${t("adminRequestLogFiles.errorOnly")}` : ""}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-1 text-xs text-srapi-text-tertiary">
+              {loading ? t("adminErrorLogs.requestDumpLoading") : t("adminErrorLogs.requestDumpMissing")}
+            </p>
+          )}
+        </div>
+        {first ? (
+          <div className="flex shrink-0 gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setSelected(first)}>
+              {t("adminRequestLogFiles.preview")}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => void downloadFile(first)}>
+              {t("adminRequestLogFiles.download")}
+            </Button>
+          </div>
+        ) : null}
+      </div>
+      {files.length > 1 ? (
+        <p className="mt-2 text-xs text-srapi-text-tertiary">
+          {t("adminErrorLogs.requestDumpMore", { count: files.length - 1 })}
+        </p>
+      ) : null}
+
+      {selected ? (
+        <div className="mt-3 rounded-md border border-srapi-border bg-srapi-surface p-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="min-w-0 break-all font-mono text-2xs text-srapi-text-tertiary">
+              {selected.name}
+            </p>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setSelected(null)}>
+              {t("common.close")}
+            </Button>
+          </div>
+          {downloadQuery.isError ? (
+            <p className="text-sm text-srapi-error">
+              {t("adminRequestLogFiles.detailLoadFailed")}
+            </p>
+          ) : (
+            <pre className="max-h-[60vh] overflow-auto rounded bg-srapi-bg-input p-3 text-xs">
+              {downloadQuery.data ?? ""}
+            </pre>
+          )}
         </div>
       ) : null}
     </div>
@@ -303,4 +411,10 @@ function resolutionLabel(
     default:
       return t("adminErrorLogs.open");
   }
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }

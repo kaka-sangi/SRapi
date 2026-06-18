@@ -17,6 +17,7 @@ import { paymentsApi } from "./admin-api/payments";
 import { providersApi } from "./admin-api/providers";
 import { proxiesApi } from "./admin-api/proxies";
 import { rbacApi } from "./admin-api/rbac";
+import { requestLogFilesApi } from "./admin-api/request-log-files";
 import { riskApi } from "./admin-api/risk";
 import { schedulerApi } from "./admin-api/scheduler";
 import { settingsApi } from "./admin-api/settings";
@@ -82,6 +83,7 @@ export const adminApi = {
   ...settingsApi,
   ...diagnosticsApi,
   ...errorLogsApi,
+  ...requestLogFilesApi,
   ...backupSnapshotsApi,
 };
 

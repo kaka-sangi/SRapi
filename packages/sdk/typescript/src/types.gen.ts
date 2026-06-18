@@ -15095,7 +15095,7 @@ export type DownloadAdminRequestLogFileResponses = {
     /**
      * Captured request log file body.
      */
-    200: Blob | File;
+    200: string;
 };
 
 export type DownloadAdminRequestLogFileResponse = DownloadAdminRequestLogFileResponses[keyof DownloadAdminRequestLogFileResponses];

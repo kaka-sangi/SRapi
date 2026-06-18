@@ -52,6 +52,7 @@ export type {
   ErrorLog,
   OpsErrorLog,
   UpstreamErrorEvent,
+  RequestLogFileDescriptor,
   ErrorPassthroughRule,
   PayloadRule,
   ScheduledTestPlan,

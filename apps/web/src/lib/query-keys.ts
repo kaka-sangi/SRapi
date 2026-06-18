@@ -87,6 +87,8 @@ export const queryKeys = {
     auditLogs: (params?: unknown) => ["admin", "audit-logs", params ?? {}] as const,
     errorLogs: (params?: unknown) => ["admin", "error-logs", params ?? {}] as const,
     errorLog: (id: string) => ["admin", "error-logs", id] as const,
+    requestLogFiles: (params?: unknown) =>
+      ["admin", "request-log-files", params ?? {}] as const,
     outboxEvents: (params?: unknown) => ["admin", "outbox-events", params ?? {}] as const,
     apiKeys: (params?: unknown) => ["admin", "api-keys", params ?? {}] as const,
     apiKeyUsage: (id: string, days: number) => ["admin", "api-key-usage", id, days] as const,

@@ -3068,7 +3068,7 @@ export const deleteAdminRequestLogFile = <ThrowOnError extends boolean = false>(
             in: 'cookie',
             name: 'srapi_session',
             type: 'apiKey'
-        }],
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
     url: '/api/v1/admin/request-log-files/{name}',
     ...options
 });

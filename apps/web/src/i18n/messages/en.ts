@@ -1520,7 +1520,7 @@ export const en = {
     searchPlaceholder: "Filter by request id prefix…",
     detailTitle: "Captured request",
     detailLoadFailed: "Failed to load the captured request file.",
-    confirmDelete: "Delete this captured request file?",
+    deleteTitle: "Delete request dump",
   },
   adminAudit: {
     title: "Audit logs",
@@ -2239,6 +2239,10 @@ export const en = {
     searchPlaceholder: "Search by error message or request id",
     resolvedBy: "Resolved by",
     resolvedAt: "Resolved at",
+    requestDump: "Request dump",
+    requestDumpLoading: "Checking captured request dumps…",
+    requestDumpMissing: "No captured request dump for this request ID.",
+    requestDumpMore: "{count} more dump(s) share this request ID.",
   },
   adminSettings: {
     title: "Settings",

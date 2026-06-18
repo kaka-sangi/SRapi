@@ -20,12 +20,6 @@ import (
 //	from / to   — RFC3339 timestamps bounding created_at
 //	limit       — cap on the number of returned descriptors (default 100,
 //	              max 500)
-//
-// The body is an inline {data, pagination, request_id} envelope. We do not
-// reuse a generated DTO here because request-log-files are not part of the
-// admin OpenAPI surface yet — the operator-facing fields (name, size,
-// created_at, request_id, is_error_only) are small enough that an inline
-// map is clearer than synthesising a generated struct.
 func (s *Server) handleListAdminRequestLogFiles(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {
@@ -34,10 +28,10 @@ func (s *Server) handleListAdminRequestLogFiles(w http.ResponseWriter, r *http.R
 	}
 	reader := s.runtime.requestLogFileReader()
 	if reader == nil {
-		writeJSONAny(w, http.StatusOK, map[string]any{
-			"data":       []any{},
-			"pagination": paginationWithRequest(r, 0),
-			"request_id": requestID,
+		writeJSONAny(w, http.StatusOK, apiopenapi.RequestLogFileListResponse{
+			Data:       []apiopenapi.RequestLogFileDescriptor{},
+			Pagination: paginationWithRequest(r, 0),
+			RequestId:  requestID,
 		})
 		return
 	}
@@ -72,14 +66,14 @@ func (s *Server) handleListAdminRequestLogFiles(w http.ResponseWriter, r *http.R
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list request log files", requestID)
 		return
 	}
-	data := make([]map[string]any, 0, len(descs))
+	data := make([]apiopenapi.RequestLogFileDescriptor, 0, len(descs))
 	for _, d := range descs {
-		data = append(data, descriptorToJSON(d))
+		data = append(data, descriptorToAPI(d))
 	}
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       data,
-		"pagination": paginationWithRequest(r, len(data)),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.RequestLogFileListResponse{
+		Data:       data,
+		Pagination: paginationWithRequest(r, len(data)),
+		RequestId:  requestID,
 	})
 }
 
@@ -101,9 +95,9 @@ func (s *Server) handleGetAdminRequestLogFile(w http.ResponseWriter, r *http.Req
 		writeRequestLogFileLookupError(w, err, requestID)
 		return
 	}
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       descriptorToJSON(desc),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.RequestLogFileResponse{
+		Data:      descriptorToAPI(desc),
+		RequestId: requestID,
 	})
 }
 
@@ -137,8 +131,13 @@ func (s *Server) handleDownloadAdminRequestLogFile(w http.ResponseWriter, r *htt
 // handleDeleteAdminRequestLogFile serves DELETE /api/v1/admin/request-log-files/{name}.
 func (s *Server) handleDeleteAdminRequestLogFile(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
-	if _, err := s.requireAdminSession(r); err != nil {
+	session, err := s.requireAdminSession(r)
+	if err != nil {
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
 		return
 	}
 	reader := s.runtime.requestLogFileReader()
@@ -151,22 +150,19 @@ func (s *Server) handleDeleteAdminRequestLogFile(w http.ResponseWriter, r *http.
 		writeRequestLogFileLookupError(w, err, requestID)
 		return
 	}
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"success":    true,
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.DeleteRequestLogFileResponse{
+		Success:   true,
+		RequestId: requestID,
 	})
 }
 
-// descriptorToJSON projects FileDescriptor into the wire format used by all
-// three admin endpoints (list/get/delete). We use snake_case to match the
-// rest of the admin API.
-func descriptorToJSON(d rlfcontract.FileDescriptor) map[string]any {
-	return map[string]any{
-		"name":          d.Name,
-		"size":          d.Size,
-		"created_at":    d.CreatedAt.UTC().Format(time.RFC3339Nano),
-		"request_id":    d.RequestID,
-		"is_error_only": d.IsErrorOnly,
+func descriptorToAPI(d rlfcontract.FileDescriptor) apiopenapi.RequestLogFileDescriptor {
+	return apiopenapi.RequestLogFileDescriptor{
+		Name:        d.Name,
+		Size:        d.Size,
+		CreatedAt:   d.CreatedAt.UTC(),
+		RequestId:   d.RequestID,
+		IsErrorOnly: d.IsErrorOnly,
 	}
 }
 
