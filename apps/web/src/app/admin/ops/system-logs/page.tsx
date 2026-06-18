@@ -28,6 +28,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { adminErrorLogsHref, adminRequestDumpsHref } from "@/lib/admin-log-links";
 import { formatDateTime, formatInteger, safeJson } from "@/lib/admin-format";
 import type { OpsSystemLog, OpsSystemLogHealth, OpsSystemLogLevel } from "@/lib/sdk-types";
+import { opsSystemLogEvidenceItems } from "./system-log-evidence";
 
 const LOG_LEVELS: OpsSystemLogLevel[] = ["debug", "info", "warn", "error"];
 export default function AdminOpsSystemLogsPage() {
@@ -89,6 +90,13 @@ function Content() {
           {row.message}
         </span>
       ),
+    },
+    {
+      key: "evidence",
+      header: t("adminOpsSystemLogs.relatedEvidence"),
+      hideOnMobile: true,
+      className: "max-w-md",
+      render: (row) => <EvidenceSummary log={row} />,
     },
   ];
 
@@ -360,6 +368,26 @@ function KV({ label, value }: { label: string; value: string }) {
         <span className="break-all">{value}</span>
         <CopyButton value={value} size="inline" />
       </dd>
+    </div>
+  );
+}
+
+function EvidenceSummary({ log }: { log: OpsSystemLog }) {
+  const items = opsSystemLogEvidenceItems(log);
+  if (items.length === 0) {
+    return <span className="text-2xs text-srapi-text-tertiary font-mono">—</span>;
+  }
+  return (
+    <div className="flex max-w-md flex-wrap gap-1.5">
+      {items.map((item) => (
+        <span
+          key={`${item.key}:${item.value}`}
+          className="bg-srapi-card-muted text-2xs text-srapi-text-secondary max-w-full truncate rounded px-1.5 py-0.5 font-mono"
+          title={`${item.key}: ${item.value}`}
+        >
+          {item.key}:{item.value}
+        </span>
+      ))}
     </div>
   );
 }
