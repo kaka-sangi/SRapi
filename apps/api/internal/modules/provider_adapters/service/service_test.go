@@ -7933,6 +7933,86 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesCompactEndpoint(t *testing.T) {
 	}
 }
 
+// TestReverseProxyCodexCLIAdapterCompactRewritesSSEUpstreamToJSON pins the
+// SSE → JSON safety net for /v1/responses/compact: the Codex backend can
+// return text/event-stream even though the body declared stream=false and
+// Accept: application/json (live reproduction against srapi.senran.net).
+// Without the rewrite, the gateway raw-passthrough path at
+// runtime_gateway_handlers.go:441 writes those SSE bytes back with
+// Content-Type: application/json and Hermes (Codex CLI in Rust) surfaces
+// "Error running remote compact task: stream disconnected before completion:
+// missing field `text` at line 1 column 203". Mirrors sub2api
+// openai_gateway_service.go:4007 handlePassthroughSSEToJSON.
+func TestReverseProxyCodexCLIAdapterCompactRewritesSSEUpstreamToJSON(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Reproduce the bug surface exactly: upstream pretends to honour
+		// the non-streaming request (200) but emits SSE in the body and
+		// labels it text/event-stream. Without the adapter rewrite, the
+		// gateway raw-passthrough writer would echo this verbatim under
+		// Content-Type: application/json.
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(
+			"data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_partial\"}}\n\n" +
+				"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"cmp_sse\",\"object\":\"response.compaction\",\"input_tokens\":7,\"output_tokens\":1}}\n\n" +
+				"data: [DONE]\n\n",
+		))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_compact_sse",
+		Model:          "codex-local",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses/compact",
+		InputParts:     textParts("compact me"),
+		RawBody:        []byte(`{"model":"codex-local","input":"compact me","stream":false}`),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": upstream.URL + "/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex compact upstream: %v", err)
+	}
+	// Raw MUST be the extracted terminal `response` JSON object, not the
+	// original SSE bytes. The gateway raw-passthrough writer would otherwise
+	// emit SSE bytes under Content-Type: application/json, which is the
+	// exact "missing field `text` at line 1 column 203" Hermes failure.
+	if bytes.Contains(resp.Raw, []byte("data:")) {
+		t.Fatalf("compact Raw must not contain SSE markers after rewrite, got %q", string(resp.Raw))
+	}
+	var compaction struct {
+		ID           string `json:"id"`
+		Object       string `json:"object"`
+		InputTokens  int    `json:"input_tokens"`
+		OutputTokens int    `json:"output_tokens"`
+	}
+	if err := json.Unmarshal(resp.Raw, &compaction); err != nil {
+		t.Fatalf("compact Raw must be valid JSON, got %q (err=%v)", string(resp.Raw), err)
+	}
+	if compaction.ID != "cmp_sse" || compaction.Object != "response.compaction" ||
+		compaction.InputTokens != 7 || compaction.OutputTokens != 1 {
+		t.Fatalf("compact Raw must mirror upstream terminal response, got %+v (raw=%q)", compaction, string(resp.Raw))
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

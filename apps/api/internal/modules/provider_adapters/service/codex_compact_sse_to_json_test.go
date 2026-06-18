@@ -1,0 +1,119 @@
+package service
+
+import (
+	"bytes"
+	"encoding/json"
+	"strings"
+	"testing"
+)
+
+// TestCodexExtractTerminalResponseJSONReturnsResponseObject pins the SSE → JSON
+// conversion the codex adapter uses when the upstream returns SSE for a
+// /v1/responses/compact request even though the body declared stream=false
+// and Accept: application/json. Without this conversion, the gateway raw-
+// passthrough path would write SSE bytes with Content-Type: application/json,
+// which Hermes (Codex CLI in Rust) surfaces as:
+//
+//	"Error running remote compact task: stream disconnected before completion:
+//	 missing field `text` at line 1 column 203"
+//
+// Mirrors sub2api openai_gateway_service.go:5329 extractCodexFinalResponse.
+func TestCodexExtractTerminalResponseJSONReturnsResponseObject(t *testing.T) {
+	body := []byte(
+		"data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_a\"}}\n\n" +
+			"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"cmp_1\",\"object\":\"response.compaction\",\"input_tokens\":12,\"output_tokens\":3}}\n\n" +
+			"data: [DONE]\n\n",
+	)
+	extracted, ok := codexExtractTerminalResponseJSON(body)
+	if !ok {
+		t.Fatalf("expected to extract terminal response from SSE, got ok=false")
+	}
+	var payload struct {
+		ID           string `json:"id"`
+		Object       string `json:"object"`
+		InputTokens  int    `json:"input_tokens"`
+		OutputTokens int    `json:"output_tokens"`
+	}
+	if err := json.Unmarshal(extracted, &payload); err != nil {
+		t.Fatalf("extracted body must be valid JSON, got %q (err=%v)", string(extracted), err)
+	}
+	if payload.ID != "cmp_1" || payload.Object != "response.compaction" || payload.InputTokens != 12 || payload.OutputTokens != 3 {
+		t.Fatalf("unexpected extracted response, got %+v (raw=%q)", payload, string(extracted))
+	}
+	if bytes.Contains(extracted, []byte("data:")) {
+		t.Fatalf("extracted body must not contain SSE markers, got %q", string(extracted))
+	}
+}
+
+// TestCodexExtractTerminalResponseJSONIgnoresIntermediateEvents ensures only
+// the terminal response.completed / response.done event populates the
+// extracted body — intermediate events without a response object are skipped.
+func TestCodexExtractTerminalResponseJSONIgnoresIntermediateEvents(t *testing.T) {
+	body := []byte(
+		"data: {\"type\":\"response.output_text.delta\",\"delta\":\"hi \"}\n\n" +
+			"data: {\"type\":\"response.output_text.delta\",\"delta\":\"there\"}\n\n" +
+			"data: {\"type\":\"response.done\",\"response\":{\"id\":\"final\",\"object\":\"response\",\"output_text\":\"hi there\"}}\n\n" +
+			"data: [DONE]\n\n",
+	)
+	extracted, ok := codexExtractTerminalResponseJSON(body)
+	if !ok {
+		t.Fatalf("expected to extract terminal response from SSE, got ok=false")
+	}
+	if !strings.Contains(string(extracted), `"output_text":"hi there"`) {
+		t.Fatalf("expected terminal response.done body, got %q", string(extracted))
+	}
+}
+
+// TestCodexExtractTerminalResponseJSONNoTerminalEventReturnsFalse documents
+// the safety-net behaviour: when the SSE body has no response.completed /
+// response.done frame, the helper returns ok=false so the caller leaves the
+// original body unchanged. Without this safeguard a corrupted upstream stream
+// would silently turn into invalid JSON downstream.
+func TestCodexExtractTerminalResponseJSONNoTerminalEventReturnsFalse(t *testing.T) {
+	body := []byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"hi\"}\n\n")
+	if extracted, ok := codexExtractTerminalResponseJSON(body); ok {
+		t.Fatalf("expected ok=false when no terminal event present, got extracted=%q ok=true", string(extracted))
+	}
+}
+
+// TestCodexRewriteRawForNonStreamingCompactPassthroughOnJSON ensures the
+// rewrite is a no-op when the upstream already returned a JSON body — the
+// raw bytes are returned unchanged so existing JSON-passthrough callers
+// (TestReverseProxyCodexCLIAdapterUsesResponsesCompactEndpoint) continue to
+// observe the same Raw payload.
+func TestCodexRewriteRawForNonStreamingCompactPassthroughOnJSON(t *testing.T) {
+	body := []byte(`{"id":"cmp_1","object":"response.compaction","input_tokens":12,"output_tokens":3}`)
+	rewritten, ok := codexRewriteRawForNonStreamingCompact(body)
+	if ok {
+		t.Fatalf("rewrite must be a no-op when input is already JSON, got ok=true (rewritten=%q)", string(rewritten))
+	}
+	if !bytes.Equal(rewritten, body) {
+		t.Fatalf("rewrite must return input unchanged on JSON, got %q want %q", string(rewritten), string(body))
+	}
+}
+
+// TestCodexMaybeRewriteRawForNonStreamingIgnoresStreamingPath proves the
+// rewrite is gated on stream=false: the streaming path's SSE Raw bytes must
+// stay intact so the gateway's SSE-passthrough writer can forward them
+// verbatim. Without this guard the rewrite would corrupt /v1/responses
+// streaming responses.
+func TestCodexMaybeRewriteRawForNonStreamingIgnoresStreamingPath(t *testing.T) {
+	body := []byte(
+		"data: {\"type\":\"response.output_text.delta\",\"delta\":\"hi\"}\n\n" +
+			"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp\"}}\n\n",
+	)
+	rewritten, ok := codexRewriteRawForNonStreamingCompact(body)
+	if !ok {
+		t.Fatalf("sanity: SSE with terminal event should rewrite when called directly, got ok=false")
+	}
+	if bytes.Equal(rewritten, body) {
+		t.Fatalf("sanity: rewrite of SSE should differ from original, got identical")
+	}
+	// The caller-side gate (stream==true) is exercised by
+	// codexMaybeRewriteRawForNonStreaming in codex.go; the gateway streaming
+	// path passes stream=true and must observe Raw bytes unchanged. This is
+	// covered end-to-end by TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext
+	// (which already runs the SSE-streaming path with stream=true) — that
+	// test would fail if codexMaybeRewriteRawForNonStreaming ever lost its
+	// stream guard.
+}

@@ -280,6 +280,7 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 					return contract.ConversationResponse{}, parseErr
 				}
 				parsed = withConversationResponseHeaders(parsed, retryResp.Headers)
+				parsed = codexMaybeRewriteRawForNonStreaming(parsed, stream)
 				return withCodexQuotaSignals(parsed, retryResp.Headers), nil
 			}
 			return contract.ConversationResponse{}, classifyCodexProviderHTTPErrorWithHeaders(retryResp.StatusCode, retryResp.Headers, retryResp.Body)
@@ -306,7 +307,30 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 		return contract.ConversationResponse{}, err
 	}
 	parsed = withConversationResponseHeaders(parsed, runtimeResp.Headers)
+	parsed = codexMaybeRewriteRawForNonStreaming(parsed, stream)
 	return withCodexQuotaSignals(parsed, runtimeResp.Headers), nil
+}
+
+// codexMaybeRewriteRawForNonStreaming rewrites ConversationResponse.Raw from
+// raw SSE bytes to the terminal `response` JSON object when the codex adapter
+// declared a non-streaming request (compact). The upstream Codex backend
+// returns SSE on /v1/responses/compact even when the body has stream=false
+// and Accept: application/json — without this rewrite, the gateway raw-
+// passthrough path writes those SSE bytes back with Content-Type:
+// application/json, breaking Hermes' compact-task body parser with
+// "Error running remote compact task: stream disconnected before completion:
+// missing field `text` at line 1 column 203". Mirrors sub2api
+// openai_gateway_service.go:4007 handlePassthroughSSEToJSON.
+func codexMaybeRewriteRawForNonStreaming(resp contract.ConversationResponse, stream bool) contract.ConversationResponse {
+	if stream {
+		return resp
+	}
+	rewritten, ok := codexRewriteRawForNonStreamingCompact(resp.Raw)
+	if !ok {
+		return resp
+	}
+	resp.Raw = append(json.RawMessage(nil), rewritten...)
+	return resp
 }
 
 func (s *Service) invokeReverseProxyCodexResponseInputItems(ctx context.Context, req contract.ResponseInputItemsRequest, baseURL string) (contract.ResponseInputItemsResponse, error) {
@@ -950,6 +974,22 @@ func codexResponsesStreamPartsAndStopReason(
 	parts = prependCodexReasoningPart(parts, completedReasoning, streamedReasoning)
 	if len(parts) == 0 && codexStreamEventsEndWithFailed(streamEvents) {
 		return []contract.ContentPart{{Kind: contract.ContentPartMetadata, Metadata: map[string]any{"type": "response.failed"}, OriginProtocol: "openai-compatible"}}, contract.StopReasonContentFilter, nil
+	}
+	// Compaction responses carry no output items — only token counts. Codex
+	// /v1/responses/compact returns `{"object":"response.compaction",
+	// "input_tokens":N,"output_tokens":M}` as the terminal SSE event's
+	// `response` field (and as the body of any non-SSE compact response).
+	// The JSON path handles this in parseCodexResponsesJSON via
+	// codexResponseIsCompaction; mirror the same shape for the SSE path so
+	// upstreams that return SSE on compact (despite stream=false in the
+	// request body) don't trip the "provider stream contained no content"
+	// guard. Without this branch the codex adapter rejects the upstream
+	// response and the gateway surfaces a 502, when Hermes was actually
+	// going to receive a valid compaction body — see
+	// codexMaybeRewriteRawForNonStreaming for the Raw rewrite that pairs
+	// with this fix.
+	if len(parts) == 0 && finalResponse != nil && codexResponseIsCompaction(*finalResponse) {
+		return nil, contract.StopReasonEndTurn, nil
 	}
 	if len(parts) == 0 {
 		return nil, "", contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no content"}
