@@ -2234,6 +2234,7 @@ export const zh: Messages = {
     errorOwner: "归属",
     errorSource: "来源",
     resolution: "处理状态",
+    relatedEvidence: "证据",
     allResolutions: "全部状态",
     open: "待处理",
     investigating: "调查中",

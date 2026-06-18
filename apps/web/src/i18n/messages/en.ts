@@ -2257,6 +2257,7 @@ export const en = {
     errorOwner: "Owner",
     errorSource: "Source",
     resolution: "Resolution",
+    relatedEvidence: "Evidence",
     allResolutions: "All resolutions",
     open: "Open",
     investigating: "Investigating",

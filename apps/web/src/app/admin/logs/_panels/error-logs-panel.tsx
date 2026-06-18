@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Bug } from "lucide-react";
+import Link from "next/link";
+import { Bug, FileText, ScrollText } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
@@ -19,6 +20,7 @@ import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatLatency } from "@/lib/admin-format";
+import { adminRequestDumpsHref, adminSystemLogsHref } from "@/lib/admin-log-links";
 import type { OpsErrorLog } from "@/lib/sdk-types";
 import {
   LOG_WINDOW_PRESETS,
@@ -170,6 +172,13 @@ export function ErrorLogsPanel() {
           label={e.resolution ? t(`adminErrorLogs.${e.resolution}`) : "—"}
         />
       ),
+    },
+    {
+      key: "evidence",
+      header: t("adminErrorLogs.relatedEvidence"),
+      hideOnMobile: true,
+      className: "w-44",
+      render: (e) => <RelatedEvidencePills log={e} />,
     },
     {
       // Verbatim upstream provider message (sub2api parity:
@@ -367,6 +376,38 @@ export function ErrorLogsPanel() {
         }}
       />
     </>
+  );
+}
+
+function RelatedEvidencePills({ log }: { log: OpsErrorLog }) {
+  const { t } = useLanguage();
+  const systemHref = adminSystemLogsHref(log);
+  const requestDumpHref = adminRequestDumpsHref(log);
+  if (!systemHref && !requestDumpHref) {
+    return <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {systemHref ? (
+        <Link
+          href={systemHref}
+          className="inline-flex max-w-full items-center gap-1 rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+        >
+          <ScrollText aria-hidden className="size-3 shrink-0" />
+          <span className="truncate">{t("adminErrorLogs.openSystemLogs")}</span>
+        </Link>
+      ) : null}
+      {requestDumpHref ? (
+        <Link
+          href={requestDumpHref}
+          className="inline-flex max-w-full items-center gap-1 rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+        >
+          <FileText aria-hidden className="size-3 shrink-0" />
+          <span className="truncate">{t("adminErrorLogs.openRequestDumps")}</span>
+        </Link>
+      ) : null}
+    </div>
   );
 }
 
