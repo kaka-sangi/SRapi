@@ -14906,6 +14906,17 @@ export type GetAdminErrorStreamData = {
 
 export type GetAdminErrorStreamErrors = {
     /**
+     * Generic 400 (the request was malformed or the resource state did
+     * not allow the operation). Lives next to ValidationError so the
+     * Ops error-log feed (and any other handler that prefers a typed
+     * bad-request alias) can $ref a real component instead of a dangling
+     * path — previously this component was referenced by
+     * /admin/ops/error-logs but never defined, which broke
+     * oapi-codegen / @hey-api/openapi-ts on every codegen run.
+     *
+     */
+    400: ErrorResponse;
+    /**
      * Authentication is missing or invalid.
      */
     401: ErrorResponse;
@@ -14927,8 +14938,10 @@ export type GetAdminErrorStreamError = GetAdminErrorStreamErrors[keyof GetAdminE
 
 export type GetAdminErrorStreamResponses = {
     /**
-     * SSE frames. `event: error` frames carry an
-     * AdminErrorStreamEvent JSON payload in their `data` line.
+     * SSE frames. `event: gateway_error` frames carry an
+     * admin error stream JSON payload in their `data` line,
+     * including request_id, trace_id, provider/account evidence,
+     * and the redacted upstream failure snapshot.
      *
      */
     200: string;
@@ -17088,6 +17101,10 @@ export type ListAdminOpsErrorLogsData = {
 };
 
 export type ListAdminOpsErrorLogsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
     /**
      * Authentication is missing or invalid.
      */

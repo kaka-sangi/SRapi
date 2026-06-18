@@ -3027,8 +3027,12 @@ export const resolveAdminErrorLog = <ThrowOnError extends boolean = false>(optio
  * Subscribe to live gateway error events.
  *
  * Opens a text/event-stream feed of gateway upstream failure events.
- * The stream emits `event: error` frames whose `data` payload is an
- * AdminErrorStreamEvent JSON object. A leading SSE comment confirms
+ * The stream emits `event: gateway_error` frames whose `data` payload is an
+ * admin error stream JSON object. Each payload includes request_id,
+ * trace_id, provider/account ids and names, canonical/requested/upstream
+ * model, source endpoint, source/target protocol, attempt number, upstream
+ * status, upstream request id, error class/phase/owner/source, message,
+ * and a redacted body excerpt. A leading SSE comment confirms
  * connection establishment, and periodic comments keep idle connections
  * alive.
  *

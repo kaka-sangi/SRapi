@@ -34,6 +34,10 @@ type Event struct {
 	// RequestID is the canonical gateway request id (matches usage_log and
 	// ops_error_logs.request_id so operators can cross-reference).
 	RequestID string `json:"request_id"`
+	// TraceID is the OpenTelemetry trace id for this gateway request, when a
+	// sampled or propagated server span is present. It matches ops_system_logs
+	// and ops_error_logs trace_id so operators can pivot across evidence.
+	TraceID string `json:"trace_id,omitempty"`
 	// UserID is the authenticated user id, when known.
 	UserID *int `json:"user_id,omitempty"`
 	// AccountID is the provider account that handled (and failed) the attempt,

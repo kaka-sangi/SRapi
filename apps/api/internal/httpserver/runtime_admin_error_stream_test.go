@@ -117,6 +117,9 @@ func TestAdminErrorStreamSSEHappyPath(t *testing.T) {
 	if got.RequestID != ev.RequestID || got.ErrorClass != ev.ErrorClass || got.StatusCode != ev.StatusCode {
 		t.Fatalf("SSE event mismatch: got %+v want %+v", got, ev)
 	}
+	if got.TraceID != "" {
+		t.Fatalf("expected empty trace_id for direct publish without span, got %q", got.TraceID)
+	}
 	if got.ProviderName != ev.ProviderName || got.AccountName != ev.AccountName || got.TargetProtocol != ev.TargetProtocol || got.UpstreamRequestID != ev.UpstreamRequestID {
 		t.Fatalf("SSE evidence fields mismatch: got %+v want %+v", got, ev)
 	}
@@ -135,6 +138,7 @@ func TestPublishErrorEventIncludesRoutingEvidence(t *testing.T) {
 	}
 	defer func() { _ = sub.Close() }()
 
+	const traceID = "4bf92f3577b34da6a3ce929d0e0e4736"
 	providerErr := newTestProviderError(429, "quota exhausted", http.Header{
 		"X-Request-Id": []string{"upstream-live-1"},
 	}, map[string]any{"code": "rate_limit_exceeded"})
@@ -153,7 +157,8 @@ func TestPublishErrorEventIncludesRoutingEvidence(t *testing.T) {
 	canonical.Model = "public-live-model"
 	canonical.CanonicalModel = "canonical-live-model"
 
-	srv.publishErrorEvent(context.Background(), testAuthResult(7, 8), canonical, result, providerErr, "transient", http.StatusTooManyRequests)
+	ctx := contextWithRequestAndTraceForTest(t, "req-live-evidence", traceID)
+	srv.publishErrorEvent(ctx, testAuthResult(7, 8), canonical, result, providerErr, "transient", http.StatusTooManyRequests)
 
 	select {
 	case got := <-sub.Receive():
@@ -183,6 +188,9 @@ func TestPublishErrorEventIncludesRoutingEvidence(t *testing.T) {
 		}
 		if got.ErrorPhase != "upstream" || got.ErrorOwner != "provider" || got.ErrorSource != "upstream_http" {
 			t.Fatalf("unexpected classification evidence: %+v", got)
+		}
+		if got.TraceID != traceID {
+			t.Fatalf("unexpected trace_id: got %q want %q", got.TraceID, traceID)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for published event")

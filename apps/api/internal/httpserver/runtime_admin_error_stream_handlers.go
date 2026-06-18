@@ -38,6 +38,7 @@ func (s *Server) publishErrorEvent(ctx context.Context, authed apikeycontract.Au
 	ev := erroreventcontract.Event{
 		AtUnixMs:          time.Now().UTC().UnixMilli(),
 		RequestID:         canonical.RequestID,
+		TraceID:           traceIDFromContext(ctx),
 		ProviderName:      strings.TrimSpace(result.Candidate.Provider.Name),
 		AccountName:       strings.TrimSpace(result.Candidate.Account.Name),
 		Model:             canonical.CanonicalModel,

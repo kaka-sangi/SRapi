@@ -73,6 +73,7 @@ describe("LiveErrorsPanel", () => {
       source.emit("gateway_error", {
         at_unix_ms: Date.UTC(2026, 5, 18, 10, 0),
         request_id: "req-live",
+        trace_id: "trace-live",
         provider_id: 9,
         provider_name: "provider-live",
         account_id: 42,
@@ -106,7 +107,7 @@ describe("LiveErrorsPanel", () => {
     );
     expect(screen.getByRole("link", { name: /系统日志/ })).toHaveAttribute(
       "href",
-      "/admin/ops/system-logs?f_request_id=req-live",
+      "/admin/ops/system-logs?f_request_id=req-live&f_trace_id=trace-live",
     );
     expect(screen.getByRole("link", { name: /请求转储/ })).toHaveAttribute(
       "href",

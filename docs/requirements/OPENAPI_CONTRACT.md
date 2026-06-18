@@ -550,7 +550,7 @@ require `cookieAuth` plus `csrfHeader`. Setup returns the enrollment secret and
 recovery codes. Recovery codes are accepted for login/disable but must be
 stored only as keyed hashes and consumed on first use.
 
-### 4.8 Current-User Redeem Codes
+### 4.10 Current-User Redeem Codes
 
 Current-user redeem-code application is a console write:
 
@@ -567,7 +567,7 @@ codes create a user subscription from the referenced plan and materialize
 entitlements. Repeating the same code for the same user returns the original
 receipt without a second balance/subscription side effect.
 
-### 4.9 Current-User Promo Codes
+### 4.11 Current-User Promo Codes
 
 Current-user promo-code application is part of payment order creation:
 
@@ -583,7 +583,7 @@ so the payment provider only sees the final payable `amount`. Persistent stores
 write the payment order, `user_promo_code_applications` receipt, and promo-code
 `used_count` increment atomically.
 
-### 4.10 AdminOps System Logs
+### 4.12 AdminOps System Logs
 
 AdminOps system-log routes are part of the console control plane:
 
@@ -614,7 +614,7 @@ matched/deleted counts and normalized filter metadata. Audit payloads must not
 copy raw log messages, raw search strings, credentials, prompts, cookies, API
 keys, or provider-native frames.
 
-### 4.11 Admin Request Log Files
+### 4.13 Admin Request Log Files
 
 Request-log-file routes are the admin surface for optional gateway HTTP
 envelope captures:
@@ -639,7 +639,7 @@ SDK parses it as text for preview.
 `DELETE /api/v1/admin/request-log-files/{name}` removes a captured file and is
 a write route. It must require `cookieAuth` plus `csrfHeader`.
 
-### 4.12 AdminOps Error Logs
+### 4.14 AdminOps Error Logs
 
 AdminOps error-log routes are the durable operator-facing upstream failure
 surface:
@@ -673,7 +673,23 @@ prompts, credentials, or replay payloads. Error logs carry enough structured
 evidence to diagnose provider/account/model failures while keeping replay
 semantics in the separate idempotency and scheduler snapshot surfaces.
 
-### 4.13 Provider Account Import / Export
+### 4.15 Admin Live Error Stream
+
+`GET /api/v1/admin/error-stream` returns a `text/event-stream` feed for live
+gateway provider-attempt failures. The stream emits `event: gateway_error`
+frames; each `data` line is a sanitized JSON payload with `request_id`,
+`trace_id`, provider/account ids and names, model mapping, endpoint/protocol,
+attempt number, upstream status/request id, error classification, message, and
+bounded redacted body excerpt.
+
+The `trace_id` must come from the request context, not from the client payload
+or provider body, and it must match the trace id written to `ops_system_logs`
+and `ops_error_logs` for the same gateway request. Admin UI deep links may use
+`request_id` plus `trace_id` to pivot from the live feed to durable system logs
+and error logs. The stream must never include raw prompt, raw request body,
+Authorization header, cookie, credential material, or provider secret.
+
+### 4.16 Provider Account Import / Export
 
 账号池导入导出接口必须保持凭证安全边界：
 
@@ -688,7 +704,7 @@ semantics in the separate idempotency and scheduler snapshot surfaces.
 - WP-530 起，Antigravity discovery 在账号缺少 project metadata 时会先通过同一 Reverse Proxy Runtime / selected account credential 调用 `{base_url}/v1internal:loadCodeAssist`，必要时调用 `{base_url}/v1internal:onboardUser`，再进行模型发现；`persist=true` 时写回解析到的 project metadata。
 - 该 discovery 结果必须用于后续 Provider Account model 选择，保持 `supported_models` 与现有 Scheduler/Gateway 边界一致。
 
-### 4.12 RBAC Matrix
+### 4.17 RBAC Matrix
 
 管理员接口必须在 OpenAPI 描述中标注权限需求。
 
@@ -711,7 +727,7 @@ semantics in the separate idempotency and scheduler snapshot surfaces.
 | `/api/v1/admin/risk-control` | yes | yes | read only | no |
 | `/api/v1/admin/audit-logs` | yes | yes | no | no |
 
-### 4.13 Ops SLO / Alert APIs
+### 4.18 Ops SLO / Alert APIs
 
 `/api/v1/admin/ops/slo` 和 `/api/v1/admin/ops/alerts` 属于 AdminOps 控制面：
 

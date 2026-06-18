@@ -27,6 +27,7 @@ const MAX_EVENTS = 200;
 interface LiveEvent {
   at_unix_ms: number;
   request_id: string;
+  trace_id?: string;
   user_id?: number;
   account_id?: number;
   provider_id?: number;
@@ -297,7 +298,7 @@ export function LiveErrorsPanel() {
                       {t("adminLiveErrors.attempt")} {row.attempt_no ?? 1}
                       {row.upstream_request_id ? ` / ${row.upstream_request_id}` : ""}
                     </div>
-                    <LiveEventEvidenceLinks requestID={row.request_id} />
+                    <LiveEventEvidenceLinks requestID={row.request_id} traceID={row.trace_id} />
                   </td>
                 </tr>
               ))}
@@ -309,10 +310,10 @@ export function LiveErrorsPanel() {
   );
 }
 
-function LiveEventEvidenceLinks({ requestID }: { requestID?: string }) {
+function LiveEventEvidenceLinks({ requestID, traceID }: { requestID?: string; traceID?: string }) {
   const { t } = useLanguage();
-  const errorHref = adminErrorLogsHref({ request_id: requestID });
-  const systemHref = adminSystemLogsHref({ request_id: requestID });
+  const errorHref = adminErrorLogsHref({ request_id: requestID, trace_id: traceID });
+  const systemHref = adminSystemLogsHref({ request_id: requestID, trace_id: traceID });
   const requestDumpHref = adminRequestDumpsHref({ request_id: requestID });
   const links = [
     errorHref ? { href: errorHref, label: t("adminRequestLogFiles.openErrorLogs") } : null,
