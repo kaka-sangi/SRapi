@@ -85,16 +85,11 @@ func (s *Service) RecordError(ctx context.Context, req contract.RecordRequest) e
 // List paginates the persisted entries for the admin console. Mirrors
 // sub2api's GetErrorLogs.
 func (s *Service) List(ctx context.Context, filter contract.ListFilter) (contract.ListResult, error) {
-	if filter.Page <= 0 {
-		filter.Page = 1
+	normalized, err := normalizeListFilter(filter)
+	if err != nil {
+		return contract.ListResult{}, err
 	}
-	if filter.PageSize <= 0 {
-		filter.PageSize = 20
-	}
-	if filter.PageSize > 200 {
-		filter.PageSize = 200
-	}
-	return s.store.List(ctx, filter)
+	return s.store.List(ctx, normalized)
 }
 
 // Get returns a single entry by id.
@@ -232,6 +227,38 @@ func validResolution(r contract.Resolution) bool {
 		return true
 	}
 	return false
+}
+
+func normalizeListFilter(filter contract.ListFilter) (contract.ListFilter, error) {
+	if filter.Resolution != "" && !validResolution(filter.Resolution) {
+		return contract.ListFilter{}, ErrInvalidInput
+	}
+	if filter.StatusCodeMin != nil && !validHTTPStatus(*filter.StatusCodeMin) {
+		return contract.ListFilter{}, ErrInvalidInput
+	}
+	if filter.StatusCodeMax != nil && !validHTTPStatus(*filter.StatusCodeMax) {
+		return contract.ListFilter{}, ErrInvalidInput
+	}
+	if filter.StatusCodeMin != nil && filter.StatusCodeMax != nil && *filter.StatusCodeMin > *filter.StatusCodeMax {
+		return contract.ListFilter{}, ErrInvalidInput
+	}
+	if filter.From != nil && filter.To != nil && filter.From.After(*filter.To) {
+		return contract.ListFilter{}, ErrInvalidInput
+	}
+	filter.Platform = truncate(cleanLogText(filter.Platform), 64)
+	filter.Model = truncate(cleanLogText(filter.Model), 128)
+	filter.ErrorClass = truncate(cleanLogText(filter.ErrorClass), 64)
+	filter.Query = truncate(redactSecretText(filter.Query), MaxMessageBytes)
+	if filter.Page <= 0 {
+		filter.Page = 1
+	}
+	if filter.PageSize <= 0 {
+		filter.PageSize = 20
+	}
+	if filter.PageSize > 200 {
+		filter.PageSize = 200
+	}
+	return filter, nil
 }
 
 // redactExcerpt sanitises a body excerpt: if it parses as JSON we recursively

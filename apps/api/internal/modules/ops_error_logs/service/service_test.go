@@ -110,6 +110,65 @@ func TestRecordError_RedactsSensitivePlainTextEvidence(t *testing.T) {
 	}
 }
 
+func TestList_NormalizesFilterAtServiceBoundary(t *testing.T) {
+	svc := newTestService(t)
+	status := 502
+	if err := svc.RecordError(context.Background(), contract.RecordRequest{
+		RequestID:    "req-filter",
+		StatusCode:   &status,
+		Platform:     "  openai-compatible\n\t",
+		Model:        "  codex-mini\n\t",
+		ErrorClass:   "  server_bad\n\t",
+		ErrorMessage: "Authorization: Bearer raw-token api_key=sk-filter123456789",
+	}); err != nil {
+		t.Fatalf("RecordError: %v", err)
+	}
+
+	list, err := svc.List(context.Background(), contract.ListFilter{
+		Platform:   "  openai-compatible\n\t",
+		Model:      "  codex-mini\n\t",
+		ErrorClass: "  server_bad\n\t",
+		Query:      "  Authorization: Bearer raw-token\n\t",
+		Page:       -1,
+		PageSize:   500,
+	})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].RequestID != "req-filter" {
+		t.Fatalf("expected normalized filter to match redacted evidence, got %+v", list)
+	}
+	if list.Page != 1 || list.PageSize != 200 {
+		t.Fatalf("expected pagination normalization, got page=%d page_size=%d", list.Page, list.PageSize)
+	}
+}
+
+func TestList_RejectsInvalidFiltersAtServiceBoundary(t *testing.T) {
+	svc := newTestService(t)
+	invalidStatus := 600
+	statusMin := 500
+	statusMax := 400
+	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	earlier := now.Add(-time.Hour)
+
+	tests := []struct {
+		name   string
+		filter contract.ListFilter
+	}{
+		{name: "resolution", filter: contract.ListFilter{Resolution: contract.Resolution("bad")}},
+		{name: "status min", filter: contract.ListFilter{StatusCodeMin: &invalidStatus}},
+		{name: "status range", filter: contract.ListFilter{StatusCodeMin: &statusMin, StatusCodeMax: &statusMax}},
+		{name: "time range", filter: contract.ListFilter{From: &now, To: &earlier}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := svc.List(context.Background(), tt.filter); !errors.Is(err, ErrInvalidInput) {
+				t.Fatalf("List error = %v, want ErrInvalidInput", err)
+			}
+		})
+	}
+}
+
 func TestRecordError_PreservesStructuredAttemptEvidence(t *testing.T) {
 	svc := newTestService(t)
 	status := 429
