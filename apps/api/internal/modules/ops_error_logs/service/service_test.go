@@ -85,6 +85,12 @@ func TestRecordError_PreservesStructuredAttemptEvidence(t *testing.T) {
 			Kind:               "http_error",
 			Message:            "first attempt",
 			BodyExcerpt:        `{"token":"secret","message":"limited"}`,
+		}, {
+			AtUnixMs:           1780000000001,
+			AttemptNo:          2,
+			UpstreamStatusCode: 999,
+			Kind:               "http_error",
+			Message:            "invalid upstream status",
 		}},
 	}); err != nil {
 		t.Fatalf("RecordError: %v", err)
@@ -97,11 +103,14 @@ func TestRecordError_PreservesStructuredAttemptEvidence(t *testing.T) {
 	if got.AttemptNo != 2 || got.LatencyMS != 345 || !got.UsageEstimated || got.TargetProtocol != "openai-compatible" || got.UpstreamRequestID != "upstream_req" || got.APIKeyPrefix != "sk_abc123" {
 		t.Fatalf("attempt evidence mismatch: %+v", got)
 	}
-	if len(got.UpstreamErrors) != 1 || got.UpstreamErrors[0].AccountID == nil || *got.UpstreamErrors[0].AccountID != accountID {
+	if len(got.UpstreamErrors) != 2 || got.UpstreamErrors[0].AccountID == nil || *got.UpstreamErrors[0].AccountID != accountID {
 		t.Fatalf("missing upstream history: %+v", got.UpstreamErrors)
 	}
 	if strings.Contains(got.UpstreamErrors[0].BodyExcerpt, "secret") {
 		t.Fatalf("upstream history leaked sensitive token: %q", got.UpstreamErrors[0].BodyExcerpt)
+	}
+	if got.UpstreamErrors[0].UpstreamStatusCode != 429 || got.UpstreamErrors[1].UpstreamStatusCode != 0 {
+		t.Fatalf("unexpected upstream status cleanup: %+v", got.UpstreamErrors)
 	}
 }
 

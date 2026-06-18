@@ -184,6 +184,13 @@ func validHTTPStatus(status int) bool {
 	return status >= 100 && status <= 599
 }
 
+func validUpstreamStatus(status int) int {
+	if validHTTPStatus(status) {
+		return status
+	}
+	return 0
+}
+
 func sanitizeUpstreamErrors(events []contract.UpstreamErrorEvent) []contract.UpstreamErrorEvent {
 	if len(events) == 0 {
 		return nil
@@ -198,7 +205,7 @@ func sanitizeUpstreamErrors(events []contract.UpstreamErrorEvent) []contract.Ups
 			AttemptNo:          positiveOrDefault(event.AttemptNo, 1),
 			AccountID:          event.AccountID,
 			AccountName:        truncate(strings.TrimSpace(event.AccountName), 128),
-			UpstreamStatusCode: positiveOrZero(event.UpstreamStatusCode),
+			UpstreamStatusCode: validUpstreamStatus(event.UpstreamStatusCode),
 			UpstreamRequestID:  truncate(strings.TrimSpace(event.UpstreamRequestID), 128),
 			UpstreamURL:        truncate(strings.TrimSpace(event.UpstreamURL), 256),
 			Kind:               truncate(defaultString(event.Kind, "request_error"), 64),
