@@ -33,15 +33,28 @@ func (s *Server) publishErrorEvent(ctx context.Context, authed apikeycontract.Au
 	if s == nil || s.runtime == nil || s.runtime.errorEventStream == nil {
 		return
 	}
+	headers := providerHeadersFromError(providerErr)
+	phase := classifyErrorPhase(errorClass, upstreamStatus)
 	ev := erroreventcontract.Event{
-		AtUnixMs:    time.Now().UTC().UnixMilli(),
-		RequestID:   canonical.RequestID,
-		Model:       canonical.CanonicalModel,
-		StatusCode:  upstreamStatus,
-		ErrorClass:  errorClass,
-		ErrorPhase:  classifyErrorPhase(errorClass, upstreamStatus),
-		Message:     providerErrorMessage(providerErr),
-		BodyExcerpt: providerErrorBodyExcerpt(providerErr),
+		AtUnixMs:          time.Now().UTC().UnixMilli(),
+		RequestID:         canonical.RequestID,
+		ProviderName:      strings.TrimSpace(result.Candidate.Provider.Name),
+		AccountName:       strings.TrimSpace(result.Candidate.Account.Name),
+		Model:             canonical.CanonicalModel,
+		RequestedModel:    gatewayUsageRequestedSnapshot(canonical, result.Candidate),
+		UpstreamModel:     gatewayUsageUpstreamSnapshot(canonical, result.Candidate),
+		SourceEndpoint:    canonical.SourceEndpoint,
+		SourceProtocol:    string(canonical.SourceProtocol),
+		TargetProtocol:    result.Candidate.Provider.Protocol,
+		AttemptNo:         result.Decision.AttemptNo,
+		StatusCode:        upstreamStatus,
+		UpstreamRequestID: upstreamRequestIDFromHeaders(headers),
+		ErrorClass:        errorClass,
+		ErrorPhase:        phase,
+		ErrorOwner:        classifyErrorOwner(phase),
+		ErrorSource:       classifyErrorSource(phase),
+		Message:           providerErrorMessage(providerErr),
+		BodyExcerpt:       providerErrorBodyExcerpt(providerErr),
 	}
 	if authed.UserID > 0 {
 		uid := authed.UserID
@@ -50,6 +63,10 @@ func (s *Server) publishErrorEvent(ctx context.Context, authed apikeycontract.Au
 	if result.Candidate.Account.ID > 0 {
 		aid := result.Candidate.Account.ID
 		ev.AccountID = &aid
+	}
+	if result.Candidate.Provider.ID > 0 {
+		pid := result.Candidate.Provider.ID
+		ev.ProviderID = &pid
 	}
 	if err := s.runtime.errorEventStream.Publish(ctx, ev); err != nil && s.runtime.logger != nil {
 		s.runtime.logger.Warn("error_event_stream publish failed",

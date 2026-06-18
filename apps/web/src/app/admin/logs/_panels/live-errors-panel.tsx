@@ -22,12 +22,36 @@ interface LiveEvent {
   request_id: string;
   user_id?: number;
   account_id?: number;
+  provider_id?: number;
+  account_name?: string;
+  provider_name?: string;
   model?: string;
+  requested_model?: string;
+  upstream_model?: string;
+  source_endpoint?: string;
+  source_protocol?: string;
+  target_protocol?: string;
+  attempt_no?: number;
   status_code: number;
+  upstream_request_id?: string;
   error_class?: string;
   error_phase?: string;
+  error_owner?: string;
+  error_source?: string;
   message?: string;
   body_excerpt?: string;
+}
+
+function identityLabel(name?: string, id?: number) {
+  if (name && id != null) return `${name} #${id}`;
+  if (name) return name;
+  if (id != null) return `#${id}`;
+  return "-";
+}
+
+function protocolLabel(source?: string, target?: string) {
+  if (source && target) return `${source} -> ${target}`;
+  return source || target || "-";
 }
 
 export function LiveErrorsPanel() {
@@ -183,10 +207,11 @@ export function LiveErrorsPanel() {
                 <th className="w-44 px-3 py-2 font-medium">{t("adminLiveErrors.time")}</th>
                 <th className="w-24 px-3 py-2 font-medium">{t("adminLiveErrors.status")}</th>
                 <th className="w-40 px-3 py-2 font-medium">{t("adminLiveErrors.errorClass")}</th>
-                <th className="w-32 px-3 py-2 font-medium">{t("adminLiveErrors.account")}</th>
-                <th className="w-40 px-3 py-2 font-medium">{t("adminLiveErrors.model")}</th>
+                <th className="w-56 px-3 py-2 font-medium">{t("adminLiveErrors.route")}</th>
+                <th className="w-56 px-3 py-2 font-medium">{t("adminLiveErrors.account")}</th>
+                <th className="w-48 px-3 py-2 font-medium">{t("adminLiveErrors.model")}</th>
                 <th className="px-3 py-2 font-medium">{t("adminLiveErrors.message")}</th>
-                <th className="w-44 px-3 py-2 font-medium">{t("adminLiveErrors.requestId")}</th>
+                <th className="w-56 px-3 py-2 font-medium">{t("adminLiveErrors.evidence")}</th>
               </tr>
             </thead>
             <tbody>
@@ -210,12 +235,47 @@ export function LiveErrorsPanel() {
                       {row.status_code || "-"}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-xs">{row.error_class ?? "-"}</td>
-                  <td className="px-3 py-2 text-xs text-srapi-text-tertiary">
-                    {row.account_id ?? "-"}
+                  <td className="px-3 py-2 text-xs">
+                    <div className="font-mono text-srapi-error">{row.error_class ?? "-"}</div>
+                    <div className="mt-0.5 font-mono text-[11px] text-srapi-text-tertiary">
+                      {[row.error_phase, row.error_owner].filter(Boolean).join(" / ") || "-"}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-xs text-srapi-text-tertiary">
-                    {row.model ?? "-"}
+                    <div className="truncate font-mono text-srapi-text-secondary" title={row.source_endpoint ?? ""}>
+                      {row.source_endpoint ?? "-"}
+                    </div>
+                    <div
+                      className="mt-0.5 truncate font-mono text-[11px]"
+                      title={protocolLabel(row.source_protocol, row.target_protocol)}
+                    >
+                      {protocolLabel(row.source_protocol, row.target_protocol)}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-srapi-text-tertiary">
+                    <div
+                      className="truncate text-srapi-text-secondary"
+                      title={identityLabel(row.provider_name, row.provider_id)}
+                    >
+                      {identityLabel(row.provider_name, row.provider_id)}
+                    </div>
+                    <div
+                      className="mt-0.5 truncate text-[11px]"
+                      title={identityLabel(row.account_name, row.account_id)}
+                    >
+                      {identityLabel(row.account_name, row.account_id)}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-srapi-text-tertiary">
+                    <div className="truncate text-srapi-text-secondary" title={row.model ?? ""}>
+                      {row.model ?? "-"}
+                    </div>
+                    <div
+                      className="mt-0.5 truncate font-mono text-[11px]"
+                      title={row.upstream_model ?? row.requested_model ?? ""}
+                    >
+                      {row.upstream_model || row.requested_model || "-"}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-xs">
                     <div className="truncate" title={row.message ?? ""}>
@@ -223,7 +283,13 @@ export function LiveErrorsPanel() {
                     </div>
                   </td>
                   <td className="px-3 py-2 font-mono text-[11px] text-srapi-text-tertiary">
-                    {row.request_id}
+                    <div className="truncate" title={row.request_id}>
+                      {row.request_id}
+                    </div>
+                    <div className="mt-0.5 truncate" title={row.upstream_request_id ?? ""}>
+                      {t("adminLiveErrors.attempt")} {row.attempt_no ?? 1}
+                      {row.upstream_request_id ? ` / ${row.upstream_request_id}` : ""}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -39,15 +39,43 @@ type Event struct {
 	// AccountID is the provider account that handled (and failed) the attempt,
 	// when known.
 	AccountID *int `json:"account_id,omitempty"`
+	// ProviderID is the provider that owns the failing account, when known.
+	ProviderID *int `json:"provider_id,omitempty"`
+	// AccountName is the operator-facing account name. It is non-secret and
+	// lets admins triage a live event without resolving ids in another panel.
+	AccountName string `json:"account_name,omitempty"`
+	// ProviderName is the stable provider key/name associated with the failed
+	// attempt.
+	ProviderName string `json:"provider_name,omitempty"`
 	// Model is the canonical model name the request targeted.
 	Model string `json:"model,omitempty"`
+	// RequestedModel is the inbound model value after gateway normalization.
+	RequestedModel string `json:"requested_model,omitempty"`
+	// UpstreamModel is the provider-side model value sent upstream.
+	UpstreamModel string `json:"upstream_model,omitempty"`
+	// SourceEndpoint is the gateway endpoint family, e.g. /v1/chat/completions.
+	SourceEndpoint string `json:"source_endpoint,omitempty"`
+	// SourceProtocol is the inbound compatibility protocol family.
+	SourceProtocol string `json:"source_protocol,omitempty"`
+	// TargetProtocol is the selected provider protocol family.
+	TargetProtocol string `json:"target_protocol,omitempty"`
+	// AttemptNo is the cross-candidate attempt number for the failing request.
+	AttemptNo int `json:"attempt_no,omitempty"`
 	// StatusCode is the upstream HTTP status (0 for transport-level failures).
 	StatusCode int `json:"status_code"`
+	// UpstreamRequestID is the provider request id extracted from response
+	// headers when the upstream returned one.
+	UpstreamRequestID string `json:"upstream_request_id,omitempty"`
 	// ErrorClass is the gateway classification (e.g. server_bad, transient,
 	// network_error, client_bad, no_available_account).
 	ErrorClass string `json:"error_class,omitempty"`
 	// ErrorPhase is the request lifecycle phase (e.g. upstream, scheduling).
 	ErrorPhase string `json:"error_phase,omitempty"`
+	// ErrorOwner classifies who likely owns remediation: client, provider,
+	// scheduler, reverse_proxy, internal, etc.
+	ErrorOwner string `json:"error_owner,omitempty"`
+	// ErrorSource names the signal source, e.g. upstream_http or gateway.
+	ErrorSource string `json:"error_source,omitempty"`
 	// Message is the short upstream error message (provider-supplied).
 	Message string `json:"message,omitempty"`
 	// BodyExcerpt is a truncated, redacted snapshot of the upstream error body.

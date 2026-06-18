@@ -7375,7 +7375,11 @@ paths:
       description: |
         Opens a text/event-stream feed of gateway upstream failure events.
         The stream emits `event: gateway_error` frames whose `data` payload is an
-        AdminErrorStreamEvent JSON object. A leading SSE comment confirms
+        admin error stream JSON object. Each payload includes request_id,
+        provider/account ids and names, canonical/requested/upstream model,
+        source endpoint, source/target protocol, attempt number, upstream status,
+        upstream request id, error class/phase/owner/source, message, and a
+        redacted body excerpt. A leading SSE comment confirms
         connection establishment, and periodic comments keep idle connections
         alive.
       security:
@@ -7423,7 +7427,7 @@ paths:
                 type: string
                 description: |
                   SSE frames. `event: gateway_error` frames carry an
-                  AdminErrorStreamEvent JSON payload in their `data` line.
+                  admin error stream JSON payload in their `data` line.
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":

@@ -11,7 +11,11 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	erroreventcontract "github.com/srapi/srapi/apps/api/internal/modules/error_event_stream/contract"
+	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
+	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 )
 
 // TestAdminErrorStreamSSEHappyPath verifies the SSE endpoint:
@@ -78,11 +82,22 @@ func TestAdminErrorStreamSSEHappyPath(t *testing.T) {
 	waitForSubscriber(t, srv, time.Second)
 
 	ev := erroreventcontract.Event{
-		AtUnixMs:   time.Now().UnixMilli(),
-		RequestID:  "req-sse-1",
-		StatusCode: 502,
-		ErrorClass: "server_bad",
-		Message:    "live test boom",
+		AtUnixMs:          time.Now().UnixMilli(),
+		RequestID:         "req-sse-1",
+		AccountName:       "acct-sse",
+		ProviderName:      "provider-sse",
+		Model:             "canonical-sse",
+		SourceEndpoint:    "/v1/chat/completions",
+		SourceProtocol:    "openai-compatible",
+		TargetProtocol:    "anthropic-compatible",
+		AttemptNo:         2,
+		StatusCode:        502,
+		UpstreamRequestID: "upstream-sse",
+		ErrorClass:        "server_bad",
+		ErrorPhase:        "upstream",
+		ErrorOwner:        "provider",
+		ErrorSource:       "upstream_http",
+		Message:           "live test boom",
 	}
 	if err := srv.runtime.errorEventStream.Publish(context.Background(), ev); err != nil {
 		t.Fatalf("publish: %v", err)
@@ -101,6 +116,91 @@ func TestAdminErrorStreamSSEHappyPath(t *testing.T) {
 	}
 	if got.RequestID != ev.RequestID || got.ErrorClass != ev.ErrorClass || got.StatusCode != ev.StatusCode {
 		t.Fatalf("SSE event mismatch: got %+v want %+v", got, ev)
+	}
+	if got.ProviderName != ev.ProviderName || got.AccountName != ev.AccountName || got.TargetProtocol != ev.TargetProtocol || got.UpstreamRequestID != ev.UpstreamRequestID {
+		t.Fatalf("SSE evidence fields mismatch: got %+v want %+v", got, ev)
+	}
+}
+
+func TestPublishErrorEventIncludesRoutingEvidence(t *testing.T) {
+	t.Parallel()
+	_, srv := newWithServer(config.Load(), nil)
+	if srv == nil || srv.runtime == nil || srv.runtime.errorEventStream == nil {
+		t.Fatal("publisher not wired into runtime")
+	}
+
+	sub, err := srv.runtime.errorEventStream.Subscribe(context.Background(), erroreventcontract.SubscribeOptions{})
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	defer func() { _ = sub.Close() }()
+
+	providerErr := newTestProviderError(429, "quota exhausted", http.Header{
+		"X-Request-Id": []string{"upstream-live-1"},
+	}, map[string]any{"code": "rate_limit_exceeded"})
+	result := newTestScheduleResultForAttempt(3, 42, "acct-live", "upstream-live-model")
+	result.Candidate.Provider = providercontract.Provider{
+		ID:       9,
+		Name:     "openai-live",
+		Protocol: "openai-compatible",
+	}
+	result.Candidate.Mapping = modelcontract.ModelProviderMapping{
+		UpstreamModelName: "upstream-live-model",
+	}
+	canonical := testCanonicalRequest("req-live-evidence")
+	canonical.SourceEndpoint = "/v1/chat/completions"
+	canonical.SourceProtocol = "openai-compatible"
+	canonical.Model = "public-live-model"
+	canonical.CanonicalModel = "canonical-live-model"
+
+	srv.publishErrorEvent(context.Background(), testAuthResult(7, 8), canonical, result, providerErr, "transient", http.StatusTooManyRequests)
+
+	select {
+	case got := <-sub.Receive():
+		if got.RequestID != "req-live-evidence" {
+			t.Fatalf("request_id: got %q", got.RequestID)
+		}
+		if got.UserID == nil || *got.UserID != 7 {
+			t.Fatalf("user_id: got %v want 7", got.UserID)
+		}
+		if got.AccountID == nil || *got.AccountID != 42 {
+			t.Fatalf("account_id: got %v want 42", got.AccountID)
+		}
+		if got.ProviderID == nil || *got.ProviderID != 9 {
+			t.Fatalf("provider_id: got %v want 9", got.ProviderID)
+		}
+		if got.AccountName != "acct-live" || got.ProviderName != "openai-live" {
+			t.Fatalf("unexpected account/provider names: %+v", got)
+		}
+		if got.Model != "canonical-live-model" || got.RequestedModel != "public-live-model" || got.UpstreamModel != "upstream-live-model" {
+			t.Fatalf("unexpected model evidence: %+v", got)
+		}
+		if got.SourceEndpoint != "/v1/chat/completions" || got.SourceProtocol != "openai-compatible" || got.TargetProtocol != "openai-compatible" {
+			t.Fatalf("unexpected protocol evidence: %+v", got)
+		}
+		if got.AttemptNo != 3 || got.UpstreamRequestID != "upstream-live-1" {
+			t.Fatalf("unexpected attempt/upstream request id: %+v", got)
+		}
+		if got.ErrorPhase != "upstream" || got.ErrorOwner != "provider" || got.ErrorSource != "upstream_http" {
+			t.Fatalf("unexpected classification evidence: %+v", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for published event")
+	}
+}
+
+func testCanonicalRequest(requestID string) gatewaycontract.CanonicalRequest {
+	return gatewaycontract.CanonicalRequest{
+		RequestID: requestID,
+	}
+}
+
+func testAuthResult(userID int, keyID int) apikeycontract.AuthResult {
+	return apikeycontract.AuthResult{
+		UserID: userID,
+		Key: apikeycontract.APIKey{
+			ID: keyID,
+		},
 	}
 }
 

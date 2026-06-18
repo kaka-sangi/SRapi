@@ -73,14 +73,33 @@ describe("LiveErrorsPanel", () => {
       source.emit("gateway_error", {
         at_unix_ms: Date.UTC(2026, 5, 18, 10, 0),
         request_id: "req-live",
+        provider_id: 9,
+        provider_name: "provider-live",
+        account_id: 42,
+        account_name: "account-live",
+        source_endpoint: "/v1/chat/completions",
+        source_protocol: "openai-compatible",
+        target_protocol: "anthropic-compatible",
+        model: "canonical-live",
+        upstream_model: "upstream-live",
+        attempt_no: 3,
+        upstream_request_id: "upstream-req-live",
         status_code: 502,
         error_class: "server_bad",
+        error_phase: "upstream",
+        error_owner: "provider",
         message: "live boom",
       });
     });
 
     expect(screen.getByText("live boom")).toBeInTheDocument();
     expect(screen.getByText("req-live")).toBeInTheDocument();
+    expect(screen.getByText("provider-live #9")).toBeInTheDocument();
+    expect(screen.getByText("account-live #42")).toBeInTheDocument();
+    expect(screen.getByText("/v1/chat/completions")).toBeInTheDocument();
+    expect(screen.getByText("openai-compatible -> anthropic-compatible")).toBeInTheDocument();
+    expect(screen.getByText("upstream-live")).toBeInTheDocument();
+    expect(screen.getByText("尝试 3 / upstream-req-live")).toBeInTheDocument();
   });
 });
 
