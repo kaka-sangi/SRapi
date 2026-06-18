@@ -8777,7 +8777,11 @@ func TestReverseProxyCodexCLIAdapterPreservesRawResponsesPayload(t *testing.T) {
 			ID:             16,
 			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
 			UpstreamClient: ptrString("codex_cli"),
-			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+			// Opt out of the default-on identity_confuse module so the
+			// prompt_cache_key assertion below can compare against the
+			// raw caller-supplied "cache-123" value — this test exists
+			// to verify byte-for-byte passthrough of the caller's body.
+			Metadata: map[string]any{"base_url": "https://upstream.example/backend-api/codex", "codex_identity_confuse": false},
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
 		Credential: map[string]any{"access_token": "oauth-token"},
@@ -8865,6 +8869,11 @@ func TestReverseProxyCodexCLIAdapterRequestSettingsOverrideAccountDefaults(t *te
 				"codex_version":           "0.100.0",
 				"codex_turn_metadata":     `{"cwd":"/default"}`,
 				"codex_client_request_id": "client-default",
+				// Opt out of default-on identity_confuse so the
+				// X-Codex-Turn-Metadata and x-codex-installation-id
+				// assertions below can compare against the literal
+				// per-request values they're testing.
+				"codex_identity_confuse": false,
 			},
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},

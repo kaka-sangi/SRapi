@@ -70,26 +70,55 @@ func codexReasoningReplayCache() *CodexReasoningReplayCache {
 }
 
 // codexIdentityConfuseConfigForAccount produces the runtime confuse config
-// for one Codex request. Gated per-account on metadata key
-// "codex_identity_confuse" (truthy enables; absent or false keeps the
-// legacy passthrough so any operator already pinning ids in their
-// integration tests is not broken). When an operator multiplexes one
-// upstream account across many users they SHOULD flip this on — the
-// CLIProxyAPI verbatim port (PR-1, see codex_identity_confuse.go) is the
-// payload-side equivalent of OpenAI's prompt_cache_key isolation.
+// for one Codex request. Default ON (opt-out): identity confusion runs
+// for every Codex account unless the account metadata explicitly sets
+// "codex_identity_confuse" to a falsy value. This mirrors CLIProxyAPI's
+// default-on routing-strategy gate but doesn't make operators discover
+// the flag — when one upstream account is multiplexed across many
+// callers, OpenAI's prompt cache and identity heuristics should not be
+// able to fingerprint the multiplexer. Operators with single-tenant
+// setups or integration tests that pin specific identifiers opt out
+// via metadata.
 //
 // CLIProxyAPI gates this internally on (SessionAffinity || routing
-// strategy == fill-first). srapi is more permissive: when the flag is on
-// we always treat the account as session-affinity to keep the rewrite
+// strategy == fill-first). srapi is more permissive: when on we always
+// treat the account as session-affinity to keep the rewrite
 // deterministic across turns of the same prompt_cache_key.
 func codexIdentityConfuseConfigForAccount(account accountcontract.ProviderAccount) CodexIdentityConfuseConfig {
-	if !metadataTruthy(account.Metadata, "codex_identity_confuse") {
+	if metadataFalsy(account.Metadata, "codex_identity_confuse") {
 		return CodexIdentityConfuseConfig{}
 	}
 	return CodexIdentityConfuseConfig{
 		Enabled:         true,
 		SessionAffinity: true,
 		RoutingStrategy: "fill-first",
+	}
+}
+
+// metadataFalsy reads a metadata key and treats explicit `false` / "false"
+// / "0" / "no" / "off" as falsy. Absent / empty / anything else is NOT
+// falsy — used by codexIdentityConfuseConfigForAccount where the default
+// is ON and operators opt out only by setting one of these explicit
+// values. Pairs with metadataTruthy for the inverse semantics.
+func metadataFalsy(metadata map[string]any, key string) bool {
+	if metadata == nil {
+		return false
+	}
+	v, ok := metadata[key]
+	if !ok {
+		return false
+	}
+	switch typed := v.(type) {
+	case bool:
+		return !typed
+	case string:
+		switch strings.ToLower(strings.TrimSpace(typed)) {
+		case "false", "0", "no", "off":
+			return true
+		}
+		return false
+	default:
+		return false
 	}
 }
 

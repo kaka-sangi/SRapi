@@ -10,27 +10,34 @@ import (
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 )
 
-// codex_identity_confuse metadata flag is the operator's opt-in for the
-// PR-1 identity_confuse module. Default OFF (back-compat with operators who
-// pin specific identifiers in their integration tests); flag ON activates
-// the verbatim CLIProxyAPI rewrite per-account.
+// codex_identity_confuse metadata flag is opt-OUT for the identity_confuse
+// module: default ON, mirroring CLIProxyAPI's default routing-strategy
+// behaviour. Operators with a single-tenant Codex account (or integration
+// tests that pin specific identifiers) explicitly set the flag to a falsy
+// value to disable. Every other case — absent metadata, truthy values,
+// even garbage strings — leaves identity confusion enabled.
 func TestCodexIdentityConfuseConfigForAccountGatedOnMetadataFlag(t *testing.T) {
 	cases := []struct {
 		name     string
 		metadata map[string]any
 		want     bool
 	}{
-		{"absent_flag_defaults_off", nil, false},
-		{"explicit_false_off", map[string]any{"codex_identity_confuse": false}, false},
-		{"empty_string_off", map[string]any{"codex_identity_confuse": ""}, false},
-		{"bool_true_on", map[string]any{"codex_identity_confuse": true}, true},
+		{"absent_flag_defaults_on", nil, true},
+		{"explicit_true_on", map[string]any{"codex_identity_confuse": true}, true},
 		{"string_true_on", map[string]any{"codex_identity_confuse": "true"}, true},
 		{"string_TRUE_on", map[string]any{"codex_identity_confuse": "TRUE"}, true},
 		{"string_1_on", map[string]any{"codex_identity_confuse": "1"}, true},
 		{"string_yes_on", map[string]any{"codex_identity_confuse": "yes"}, true},
 		{"string_on_on", map[string]any{"codex_identity_confuse": "on"}, true},
-		{"string_garbage_off", map[string]any{"codex_identity_confuse": "maybe"}, false},
-		{"non_string_non_bool_off", map[string]any{"codex_identity_confuse": 42}, false},
+		{"non_string_non_bool_on", map[string]any{"codex_identity_confuse": 42}, true},
+		{"empty_string_on", map[string]any{"codex_identity_confuse": ""}, true},
+		{"string_garbage_on", map[string]any{"codex_identity_confuse": "maybe"}, true},
+		{"explicit_false_off", map[string]any{"codex_identity_confuse": false}, false},
+		{"string_false_off", map[string]any{"codex_identity_confuse": "false"}, false},
+		{"string_FALSE_off", map[string]any{"codex_identity_confuse": "FALSE"}, false},
+		{"string_0_off", map[string]any{"codex_identity_confuse": "0"}, false},
+		{"string_no_off", map[string]any{"codex_identity_confuse": "no"}, false},
+		{"string_off_off", map[string]any{"codex_identity_confuse": "off"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -80,18 +87,23 @@ func TestCodexApplyOutboundWiringRewritesPromptCacheKeyWhenEnabled(t *testing.T)
 	}
 }
 
-// When the flag is OFF the wiring is a pure no-op — the same byte slice
-// comes back and state is zero. This is the path every pre-existing Codex
-// test relies on.
+// When the operator explicitly opts out (metadata
+// codex_identity_confuse=false) the wiring is a pure no-op — the same
+// byte slice comes back and state is zero. This is the escape hatch for
+// single-tenant accounts and for the integration tests in service_test.go
+// that pin specific identifiers on the upstream wire.
 func TestCodexApplyOutboundWiringIsNoopWhenDisabled(t *testing.T) {
 	body := []byte(`{"model":"codex-upstream","prompt_cache_key":"keep-me"}`)
-	account := accountcontract.ProviderAccount{ID: 42, Metadata: nil}
+	account := accountcontract.ProviderAccount{
+		ID:       42,
+		Metadata: map[string]any{"codex_identity_confuse": false},
+	}
 	newBody, state := codexApplyOutboundWiring(account, nil, body)
 	if state.Enabled {
-		t.Errorf("state.Enabled = true; expected false for unflagged account")
+		t.Errorf("state.Enabled = true; expected false for explicitly opted-out account")
 	}
 	if string(newBody) != string(body) {
-		t.Errorf("body was modified despite the flag being off:\n  before: %s\n   after: %s", body, newBody)
+		t.Errorf("body was modified despite explicit opt-out:\n  before: %s\n   after: %s", body, newBody)
 	}
 }
 
