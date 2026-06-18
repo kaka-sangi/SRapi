@@ -260,7 +260,8 @@ func systemLogMatches(log contract.OpsSystemLog, filter contract.SystemLogCleanu
 		if !strings.Contains(strings.ToLower(log.Message), query) &&
 			!strings.Contains(strings.ToLower(log.Source), query) &&
 			!strings.Contains(strings.ToLower(log.RequestID), query) &&
-			!strings.Contains(strings.ToLower(log.TraceID), query) {
+			!strings.Contains(strings.ToLower(log.TraceID), query) &&
+			!strings.Contains(systemLogMetadataSearchText(log.Metadata), query) {
 			return false
 		}
 	}
@@ -423,6 +424,17 @@ func sanitizeSystemLogMetadataListValue(values []any, depth int) []any {
 		out = append(out, "[TRUNCATED]")
 	}
 	return out
+}
+
+func systemLogMetadataSearchText(value map[string]any) string {
+	if len(value) == 0 {
+		return ""
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(string(raw))
 }
 
 func systemLogMetadataKeyNeedsRedaction(key string) bool {

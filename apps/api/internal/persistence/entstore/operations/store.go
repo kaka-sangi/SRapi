@@ -680,9 +680,29 @@ func systemLogPredicates(filter contract.SystemLogCleanupFilter) []predicate.Ops
 			entopssystemlog.SourceContainsFold(query),
 			entopssystemlog.RequestIDContainsFold(query),
 			entopssystemlog.TraceIDContainsFold(query),
+			systemLogMetadataContainsFold(query),
 		))
 	}
 	return predicates
+}
+
+func systemLogMetadataContainsFold(query string) predicate.OpsSystemLog {
+	return predicate.OpsSystemLog(func(s *entsql.Selector) {
+		column := s.C(entopssystemlog.FieldMetadataJSON)
+		s.Where(entsql.ExprP("LOWER(CAST("+column+" AS TEXT)) LIKE ? ESCAPE '\\'", "%"+escapeSystemLogLikePattern(strings.ToLower(query))+"%"))
+	})
+}
+
+func escapeSystemLogLikePattern(value string) string {
+	var b strings.Builder
+	b.Grow(len(value))
+	for _, r := range value {
+		if r == '%' || r == '_' || r == '\\' {
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 func normalizeSystemLogCleanupFilter(filter contract.SystemLogCleanupFilter) (contract.SystemLogCleanupFilter, error) {

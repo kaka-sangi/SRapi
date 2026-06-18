@@ -160,6 +160,62 @@ func TestCleanupRetentionHonorsBatchLimit(t *testing.T) {
 	}
 }
 
+func TestSystemLogQueryMatchesMetadataEvidence(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, "file:"+t.TempDir()+"/operations-system-log-search.db?_fk=1")
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	ctx := t.Context()
+	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
+	target, err := store.CreateSystemLog(ctx, contract.OpsSystemLog{
+		Level:     contract.OpsSystemLogLevelError,
+		Source:    "gateway.auth",
+		Message:   "gateway key rejected",
+		Metadata:  map[string]any{"attempted_key_prefix": "sk_deadbeef0000", "reason": "deleted_key"},
+		CreatedAt: now,
+	})
+	if err != nil {
+		t.Fatalf("create target log: %v", err)
+	}
+	if _, err := store.CreateSystemLog(ctx, contract.OpsSystemLog{
+		Level:     contract.OpsSystemLogLevelError,
+		Source:    "gateway.auth",
+		Message:   "gateway key rejected",
+		Metadata:  map[string]any{"attempted_key_prefix": "sk_other000000", "reason": "rate_limited"},
+		CreatedAt: now.Add(time.Second),
+	}); err != nil {
+		t.Fatalf("create other log: %v", err)
+	}
+	if _, err := store.CreateSystemLog(ctx, contract.OpsSystemLog{
+		Level:     contract.OpsSystemLogLevelError,
+		Source:    "gateway.auth",
+		Message:   "gateway key rejected",
+		Metadata:  map[string]any{"reason": "literal%value"},
+		CreatedAt: now.Add(2 * time.Second),
+	}); err != nil {
+		t.Fatalf("create wildcard log: %v", err)
+	}
+
+	list, err := store.ListSystemLogs(ctx, contract.SystemLogListOptions{Query: "DEADBEEF"})
+	if err != nil {
+		t.Fatalf("list by metadata prefix: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != target.ID {
+		t.Fatalf("expected metadata query to match only target, got %+v", list)
+	}
+
+	list, err = store.ListSystemLogs(ctx, contract.SystemLogListOptions{Query: "%"})
+	if err != nil {
+		t.Fatalf("list by literal percent: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].Metadata["reason"] != "literal%value" {
+		t.Fatalf("expected escaped percent query to match only literal percent metadata, got %+v", list)
+	}
+}
+
 func TestObservabilityStorePersistsSLOsAlertsAndUsageEvidence(t *testing.T) {
 	client := enttest.Open(t, dialect.SQLite, "file:"+t.TempDir()+"/operations-observability.db?_fk=1")
 	defer client.Close()

@@ -214,6 +214,14 @@ func TestRecordSystemLogSanitizesMetadataAtServiceBoundary(t *testing.T) {
 	if nested["request_id"] != "req_safe" || nested["refresh_token"] != "[REDACTED]" {
 		t.Fatalf("unexpected nested metadata: %#v", nested)
 	}
+
+	list, err := svc.ListSystemLogs(t.Context(), contract.SystemLogListOptions{Query: "sk_aaaaaaaaaaaa"})
+	if err != nil {
+		t.Fatalf("list system logs by metadata evidence: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != created.ID {
+		t.Fatalf("expected metadata evidence to be searchable, got %+v", list)
+	}
 }
 
 func TestRecordSystemLogSanitizesMessageAtServiceBoundary(t *testing.T) {
