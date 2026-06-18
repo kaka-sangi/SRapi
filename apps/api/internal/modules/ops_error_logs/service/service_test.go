@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -144,8 +145,8 @@ func TestUpdateResolution_TogglesResolvedAt(t *testing.T) {
 
 func TestRecordError_DropsEmpty(t *testing.T) {
 	svc := newTestService(t)
-	if err := svc.RecordError(context.Background(), contract.RecordRequest{}); err != nil {
-		t.Fatalf("RecordError: %v", err)
+	if err := svc.RecordError(context.Background(), contract.RecordRequest{}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("RecordError error = %v, want ErrInvalidInput", err)
 	}
 	list, _ := svc.List(context.Background(), contract.ListFilter{})
 	if len(list.Items) != 0 {

@@ -55,17 +55,16 @@ func New(store contract.Store, now func() time.Time) (*Service, error) {
 	return &Service{store: store, now: now}, nil
 }
 
-// RecordError persists a single upstream-failure observation. Mirrors
-// sub2api's RecordError: never bubbles up to the gateway path — callers
-// should fire-and-forget — and silently no-ops on invalid input rather than
-// erroring (the hot path must not stall on telemetry plumbing).
+// RecordError persists a single upstream-failure observation. Callers on the
+// gateway hot path should treat this as best-effort, but the service boundary
+// still returns ErrInvalidInput when the request carries no usable evidence.
 func (s *Service) RecordError(ctx context.Context, req contract.RecordRequest) error {
 	if s == nil || s.store == nil {
-		return nil
+		return ErrInvalidInput
 	}
 	entry, ok := s.prepareEntry(req)
 	if !ok {
-		return nil
+		return ErrInvalidInput
 	}
 	if _, err := s.store.Insert(ctx, entry); err != nil {
 		return err
