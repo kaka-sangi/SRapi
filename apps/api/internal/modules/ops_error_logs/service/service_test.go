@@ -169,6 +169,48 @@ func TestList_RejectsInvalidFiltersAtServiceBoundary(t *testing.T) {
 	}
 }
 
+func TestUpdateResolution_RedactsNoteAndValidatesResolverID(t *testing.T) {
+	svc := newTestService(t)
+	status := 502
+	if err := svc.RecordError(context.Background(), contract.RecordRequest{
+		RequestID:    "req-resolution",
+		StatusCode:   &status,
+		ErrorMessage: "provider returned 502",
+	}); err != nil {
+		t.Fatalf("RecordError: %v", err)
+	}
+	list, err := svc.List(context.Background(), contract.ListFilter{})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	id := list.Items[0].ID
+	resolverID := 17
+	updated, err := svc.UpdateResolution(context.Background(), contract.UpdateResolutionRequest{
+		ID:           id,
+		Resolution:   contract.ResolutionInvestigating,
+		Note:         "checked Authorization: Bearer note-token api_key=note-key",
+		ResolvedByID: &resolverID,
+	})
+	if err != nil {
+		t.Fatalf("UpdateResolution: %v", err)
+	}
+	if strings.Contains(updated.ResolutionNote, "note-token") || strings.Contains(updated.ResolutionNote, "note-key") {
+		t.Fatalf("resolution note leaked secret: %q", updated.ResolutionNote)
+	}
+	if !strings.Contains(updated.ResolutionNote, "Bearer [REDACTED]") || !strings.Contains(updated.ResolutionNote, "api_key=[REDACTED]") {
+		t.Fatalf("expected redaction markers in resolution note, got %q", updated.ResolutionNote)
+	}
+
+	invalidResolverID := 0
+	if _, err := svc.UpdateResolution(context.Background(), contract.UpdateResolutionRequest{
+		ID:           id,
+		Resolution:   contract.ResolutionResolved,
+		ResolvedByID: &invalidResolverID,
+	}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("UpdateResolution invalid resolver = %v, want ErrInvalidInput", err)
+	}
+}
+
 func TestRecordError_PreservesStructuredAttemptEvidence(t *testing.T) {
 	svc := newTestService(t)
 	status := 429

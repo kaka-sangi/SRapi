@@ -112,12 +112,15 @@ func (s *Service) UpdateResolution(ctx context.Context, req contract.UpdateResol
 	if !validResolution(req.Resolution) {
 		return contract.Entry{}, ErrInvalidInput
 	}
+	if req.ResolvedByID != nil && *req.ResolvedByID <= 0 {
+		return contract.Entry{}, ErrInvalidInput
+	}
 	if req.At.IsZero() {
 		req.At = s.now().UTC()
 	} else {
 		req.At = req.At.UTC()
 	}
-	req.Note = truncate(strings.TrimSpace(req.Note), MaxMessageBytes)
+	req.Note = truncate(redactSecretText(req.Note), MaxMessageBytes)
 	return s.store.UpdateResolution(ctx, req)
 }
 
