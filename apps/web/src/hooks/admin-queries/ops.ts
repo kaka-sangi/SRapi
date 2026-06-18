@@ -49,6 +49,14 @@ export function useOpsRequestEvidence(params?: P<typeof adminApi.listOpsRequestE
   });
 }
 
+export function useOpsRequestEvidenceDetail(requestID?: string) {
+  return useQuery({
+    queryKey: queryKeys.admin.opsRequestEvidenceDetail(requestID),
+    queryFn: () => adminApi.getOpsRequestEvidence(requestID || ""),
+    enabled: Boolean(requestID),
+  });
+}
+
 export function useOpsSystemLogHealth() {
   return useQuery({
     queryKey: queryKeys.admin.opsSystemLogHealth(),

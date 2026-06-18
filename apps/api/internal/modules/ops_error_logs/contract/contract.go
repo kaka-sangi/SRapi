@@ -123,6 +123,7 @@ type ListFilter struct {
 	UserID        *int
 	AccountID     *int
 	ProviderID    *int
+	RequestID     string
 	Platform      string
 	Model         string
 	ErrorClass    string

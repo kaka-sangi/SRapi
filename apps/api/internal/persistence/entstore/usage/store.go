@@ -109,6 +109,23 @@ func (s *Store) ListWindow(ctx context.Context, filter contract.QueryFilter, lim
 	return out, nil
 }
 
+// ListByRequestID lists all usage attempts for one exact gateway request id.
+// Implements contract.RequestReader for operator drilldowns.
+func (s *Store) ListByRequestID(ctx context.Context, requestID string) ([]contract.UsageLog, error) {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return []contract.UsageLog{}, nil
+	}
+	rows, err := s.client.UsageLog.Query().
+		Where(entusagelog.RequestIDEQ(requestID)).
+		Order(entusagelog.ByAttemptNo(), entusagelog.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return toUsageLogs(rows), nil
+}
+
 func (s *Store) ListByUser(ctx context.Context, userID int) ([]contract.UsageLog, error) {
 	rows, err := s.client.UsageLog.Query().
 		Where(entusagelog.UserIDEQ(userID)).

@@ -123,6 +123,14 @@ func TestStoreListsFiltersAndUpdatesResolution(t *testing.T) {
 		t.Fatalf("expected only 5xx row, got %+v", list)
 	}
 
+	list, err = store.List(ctx, contract.ListFilter{RequestID: "req_first", Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("list request id filter: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != first.ID {
+		t.Fatalf("expected exact request id row, got %+v", list)
+	}
+
 	list, err = store.List(ctx, contract.ListFilter{Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("list all: %v", err)

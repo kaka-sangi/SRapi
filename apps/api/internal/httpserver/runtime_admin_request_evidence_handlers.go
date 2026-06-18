@@ -21,6 +21,7 @@ const (
 	requestEvidenceDefaultWindow   = time.Hour
 	requestEvidenceOpsPageSize     = 200
 	requestEvidenceMaxOpsRows      = 2000
+	requestEvidenceDetailDumpLimit = 50
 )
 
 type requestEvidenceQuery struct {
@@ -89,6 +90,39 @@ type requestDumpEvidence struct {
 	Latest     rlfcontract.FileDescriptor
 }
 
+type requestEvidenceDetail struct {
+	RequestID string
+	Summary   requestEvidenceSummary
+	Attempts  []requestEvidenceRow
+	Dumps     []rlfcontract.FileDescriptor
+	FirstSeen time.Time
+	LastSeen  time.Time
+}
+
+type requestEvidenceSummary struct {
+	Kind                  string
+	PrimarySource         string
+	AttemptCount          int
+	UsageLogCount         int
+	OpsErrorLogCount      int
+	RequestDumpCount      int
+	RequestDumpErrorCount int
+	HasUsageLog           bool
+	HasOpsErrorLog        bool
+	HasRequestDump        bool
+	LatencyMS             *int
+	InputTokens           int
+	OutputTokens          int
+	TotalTokens           int
+	StatusCode            *int
+	ErrorClass            string
+	ErrorMessage          string
+	ErrorPhase            string
+	ErrorOwner            string
+	ErrorSource           string
+	UpstreamRequestID     string
+}
+
 // handleListAdminOpsRequestEvidence serves GET /api/v1/admin/ops/request-evidence.
 //
 // It deliberately lives in the HTTP/admin layer: request evidence is a read-only
@@ -127,6 +161,36 @@ func (s *Server) handleListAdminOpsRequestEvidence(w http.ResponseWriter, r *htt
 		Pagination: paginationFromTotal(total, query.Page, query.PageSize),
 		RequestId:  requestID,
 	})
+}
+
+// handleGetAdminOpsRequestEvidence returns an exact request-id drilldown for
+// the request evidence feed. It is intentionally metadata-only: raw dump
+// previews/downloads stay behind the existing request-log-file endpoints.
+func (s *Server) handleGetAdminOpsRequestEvidence(w http.ResponseWriter, r *http.Request) {
+	correlationID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", correlationID)
+		return
+	}
+	if s.runtime == nil || s.runtime.usageStore == nil {
+		writeStandardError(w, http.StatusServiceUnavailable, apiopenapi.INTERNALERROR, "usage logs unavailable", correlationID)
+		return
+	}
+	requestID := strings.TrimSpace(r.PathValue("request_id"))
+	if requestID == "" {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.VALIDATIONFAILED, "request_id is required", correlationID)
+		return
+	}
+	detail, err := s.requestEvidenceDetail(r.Context(), requestID)
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to get request evidence", correlationID)
+		return
+	}
+	if detail.RequestID == "" {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "request evidence not found", correlationID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, requestEvidenceDetailToAPI(detail, correlationID))
 }
 
 func (s *Server) requestEvidenceRows(ctx context.Context, query requestEvidenceQuery) ([]requestEvidenceRow, error) {
@@ -191,6 +255,51 @@ func (s *Server) requestEvidenceRows(ctx context.Context, query requestEvidenceQ
 		}
 	}
 	return filtered, nil
+}
+
+func (s *Server) requestEvidenceDetail(ctx context.Context, requestID string) (requestEvidenceDetail, error) {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return requestEvidenceDetail{}, nil
+	}
+	usageLogs, err := requestEvidenceUsageLogsByRequestID(ctx, s.runtime.usageStore, requestID)
+	if err != nil {
+		return requestEvidenceDetail{}, err
+	}
+	dumps, err := requestEvidenceDumpFilesByRequestID(ctx, s.runtime.requestLogFileReader(), requestID)
+	if err != nil {
+		return requestEvidenceDetail{}, err
+	}
+	var opsEntries []opserrorlogscontract.Entry
+	if s.runtime.opsErrorLogs != nil {
+		res, err := requestEvidenceOpsErrorLogsByRequestID(ctx, s.runtime.opsErrorLogs, requestID)
+		if err != nil {
+			return requestEvidenceDetail{}, err
+		}
+		opsEntries = res
+	}
+	dumpEvidence := requestDumpEvidenceFromDescriptors(dumps)
+	rows := requestEvidenceRowsFromExactEvidence(requestID, usageLogs, opsEntries, dumpEvidence)
+	if len(rows) == 0 && len(dumps) == 0 {
+		return requestEvidenceDetail{}, nil
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		if intPtrValue(rows[i].AttemptNo) != intPtrValue(rows[j].AttemptNo) {
+			return intPtrValue(rows[i].AttemptNo) < intPtrValue(rows[j].AttemptNo)
+		}
+		if !rows[i].CreatedAt.Equal(rows[j].CreatedAt) {
+			return rows[i].CreatedAt.Before(rows[j].CreatedAt)
+		}
+		return intPtrValue(rows[i].UsageLogID) < intPtrValue(rows[j].UsageLogID)
+	})
+	detail := requestEvidenceDetail{
+		RequestID: requestID,
+		Attempts:  rows,
+		Dumps:     dumps,
+	}
+	detail.FirstSeen, detail.LastSeen = requestEvidenceDetailBounds(rows, dumps)
+	detail.Summary = requestEvidenceSummaryFromDetail(rows, usageLogs, opsEntries, dumpEvidence)
+	return detail, nil
 }
 
 func requestEvidenceQueryFromRequest(r *http.Request, now time.Time) (requestEvidenceQuery, error) {
@@ -323,6 +432,29 @@ func requestEvidenceUsageLogs(ctx context.Context, store usagecontract.Store, qu
 	return out, nil
 }
 
+func requestEvidenceUsageLogsByRequestID(ctx context.Context, store usagecontract.Store, requestID string) ([]usagecontract.UsageLog, error) {
+	if reader, ok := store.(usagecontract.RequestReader); ok {
+		return reader.ListByRequestID(ctx, requestID)
+	}
+	items, err := store.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]usagecontract.UsageLog, 0)
+	for _, item := range items {
+		if item.RequestID == requestID {
+			out = append(out, item)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].AttemptNo == out[j].AttemptNo {
+			return out[i].ID < out[j].ID
+		}
+		return out[i].AttemptNo < out[j].AttemptNo
+	})
+	return out, nil
+}
+
 func requestEvidenceOpsErrorLogs(ctx context.Context, svc interface {
 	List(context.Context, opserrorlogscontract.ListFilter) (opserrorlogscontract.ListResult, error)
 }, query requestEvidenceQuery) ([]opserrorlogscontract.Entry, error) {
@@ -350,6 +482,56 @@ func requestEvidenceOpsErrorLogs(ctx context.Context, svc interface {
 	}
 	if len(out) > requestEvidenceMaxOpsRows {
 		out = out[:requestEvidenceMaxOpsRows]
+	}
+	return out, nil
+}
+
+func requestEvidenceOpsErrorLogsByRequestID(ctx context.Context, svc interface {
+	List(context.Context, opserrorlogscontract.ListFilter) (opserrorlogscontract.ListResult, error)
+}, requestID string) ([]opserrorlogscontract.Entry, error) {
+	filter := opserrorlogscontract.ListFilter{
+		RequestID: strings.TrimSpace(requestID),
+		PageSize:  requestEvidenceOpsPageSize,
+	}
+	out := make([]opserrorlogscontract.Entry, 0, requestEvidenceOpsPageSize)
+	for page := 1; ; page++ {
+		filter.Page = page
+		res, err := svc.List(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, res.Items...)
+		if len(out) >= requestEvidenceMaxOpsRows || len(res.Items) == 0 || page*res.PageSize >= res.Total {
+			break
+		}
+	}
+	if len(out) > requestEvidenceMaxOpsRows {
+		out = out[:requestEvidenceMaxOpsRows]
+	}
+	return out, nil
+}
+
+func requestEvidenceDumpFilesByRequestID(ctx context.Context, reader rlfcontract.Reader, requestID string) ([]rlfcontract.FileDescriptor, error) {
+	if reader == nil {
+		return nil, nil
+	}
+	descs, err := reader.List(ctx, rlfcontract.ListFilter{
+		RequestIDPrefix: requestID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]rlfcontract.FileDescriptor, 0, len(descs))
+	for _, desc := range descs {
+		if desc.RequestID == requestID {
+			out = append(out, desc)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].CreatedAt.Before(out[j].CreatedAt)
+	})
+	if len(out) > requestEvidenceDetailDumpLimit {
+		out = out[len(out)-requestEvidenceDetailDumpLimit:]
 	}
 	return out, nil
 }
@@ -382,6 +564,65 @@ func requestEvidenceDumps(ctx context.Context, reader rlfcontract.Reader, query 
 		out[desc.RequestID] = evidence
 	}
 	return out, nil
+}
+
+func requestDumpEvidenceFromDescriptors(descs []rlfcontract.FileDescriptor) map[string]requestDumpEvidence {
+	out := make(map[string]requestDumpEvidence)
+	for _, desc := range descs {
+		if desc.RequestID == "" {
+			continue
+		}
+		evidence := out[desc.RequestID]
+		evidence.Count++
+		if desc.IsErrorOnly || (desc.Success != nil && !*desc.Success) {
+			evidence.ErrorCount++
+		}
+		if evidence.Latest.Name == "" || desc.CreatedAt.After(evidence.Latest.CreatedAt) {
+			evidence.Latest = desc
+		}
+		out[desc.RequestID] = evidence
+	}
+	return out
+}
+
+func requestEvidenceRowsFromExactEvidence(requestID string, usageLogs []usagecontract.UsageLog, opsEntries []opserrorlogscontract.Entry, dumps map[string]requestDumpEvidence) []requestEvidenceRow {
+	rowsByKey := make(map[string]*requestEvidenceRow, len(usageLogs))
+	rows := make([]*requestEvidenceRow, 0, len(usageLogs)+len(opsEntries))
+	for _, log := range usageLogs {
+		if log.RequestID != requestID {
+			continue
+		}
+		row := requestEvidenceRowFromUsage(log)
+		rows = append(rows, row)
+		rowsByKey[requestEvidenceKey(row.RequestID, row.AttemptNo, row.UsageLogID)] = row
+	}
+	for _, entry := range opsEntries {
+		if entry.RequestID != requestID {
+			continue
+		}
+		row := requestEvidenceRowFromOpsError(entry)
+		key := requestEvidenceKey(row.RequestID, row.AttemptNo, nil)
+		if existing := rowsByKey[key]; existing != nil {
+			mergeRequestEvidenceOpsError(existing, entry)
+			continue
+		}
+		rows = append(rows, row)
+		rowsByKey[key] = row
+	}
+	if dump := dumps[requestID]; dump.Count > 0 {
+		if len(rows) == 0 {
+			rows = append(rows, requestEvidenceRowFromDump(dump))
+		} else {
+			for _, row := range rows {
+				attachRequestDumpEvidence(row, dump)
+			}
+		}
+	}
+	out := make([]requestEvidenceRow, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, *row)
+	}
+	return out
 }
 
 func requestEvidenceRowFromUsage(log usagecontract.UsageLog) *requestEvidenceRow {
@@ -771,6 +1012,179 @@ func requestEvidenceRowToAPI(row requestEvidenceRow) apiopenapi.RequestEvidenceR
 	}
 	out.LatestRequestDumpName = nonEmptyStringPtr(row.LatestRequestDumpName)
 	out.LatestRequestDumpCreatedAt = row.LatestRequestDumpCreatedAt
+	return out
+}
+
+func requestEvidenceDetailBounds(rows []requestEvidenceRow, dumps []rlfcontract.FileDescriptor) (time.Time, time.Time) {
+	var first time.Time
+	var last time.Time
+	observe := func(value time.Time) {
+		if value.IsZero() {
+			return
+		}
+		value = value.UTC()
+		if first.IsZero() || value.Before(first) {
+			first = value
+		}
+		if last.IsZero() || value.After(last) {
+			last = value
+		}
+	}
+	for _, row := range rows {
+		observe(row.CreatedAt)
+		if row.LatestRequestDumpCreatedAt != nil {
+			observe(*row.LatestRequestDumpCreatedAt)
+		}
+	}
+	for _, desc := range dumps {
+		observe(desc.CreatedAt)
+	}
+	return first, last
+}
+
+func requestEvidenceSummaryFromDetail(rows []requestEvidenceRow, usageLogs []usagecontract.UsageLog, opsEntries []opserrorlogscontract.Entry, dumps map[string]requestDumpEvidence) requestEvidenceSummary {
+	summary := requestEvidenceSummary{
+		Kind:             "unknown",
+		PrimarySource:    "request_dump",
+		AttemptCount:     len(rows),
+		UsageLogCount:    len(usageLogs),
+		OpsErrorLogCount: len(opsEntries),
+	}
+	for _, dump := range dumps {
+		summary.RequestDumpCount += dump.Count
+		summary.RequestDumpErrorCount += dump.ErrorCount
+	}
+	var latest *requestEvidenceRow
+	for i := range rows {
+		row := &rows[i]
+		if row.HasUsageLog {
+			summary.HasUsageLog = true
+		}
+		if row.HasOpsErrorLog {
+			summary.HasOpsErrorLog = true
+		}
+		if row.HasRequestDump {
+			summary.HasRequestDump = true
+		}
+		if row.LatencyMS != nil {
+			value := intPtrValue(summary.LatencyMS) + *row.LatencyMS
+			summary.LatencyMS = &value
+		}
+		summary.InputTokens += intPtrValue(row.InputTokens)
+		summary.OutputTokens += intPtrValue(row.OutputTokens)
+		summary.TotalTokens += intPtrValue(row.TotalTokens)
+		if latest == nil || row.CreatedAt.After(latest.CreatedAt) {
+			latest = row
+		}
+	}
+	if latest != nil {
+		summary.Kind = latest.Kind
+		summary.PrimarySource = latest.EvidenceSource
+		summary.StatusCode = latest.StatusCode
+		summary.ErrorClass = latest.ErrorClass
+		summary.ErrorMessage = latest.ErrorMessage
+		summary.ErrorPhase = latest.ErrorPhase
+		summary.ErrorOwner = latest.ErrorOwner
+		summary.ErrorSource = latest.ErrorSource
+		summary.UpstreamRequestID = latest.UpstreamRequestID
+	}
+	if summary.Kind != "error" {
+		for _, row := range rows {
+			if row.Kind == "error" {
+				summary.Kind = "error"
+				summary.StatusCode = row.StatusCode
+				summary.ErrorClass = row.ErrorClass
+				summary.ErrorMessage = row.ErrorMessage
+				summary.ErrorPhase = row.ErrorPhase
+				summary.ErrorOwner = row.ErrorOwner
+				summary.ErrorSource = row.ErrorSource
+				summary.UpstreamRequestID = row.UpstreamRequestID
+				break
+			}
+		}
+	}
+	return summary
+}
+
+func requestEvidenceDetailToAPI(detail requestEvidenceDetail, correlationID string) apiopenapi.RequestEvidenceDetailResponse {
+	attempts := make([]apiopenapi.RequestEvidenceRow, 0, len(detail.Attempts))
+	for _, row := range detail.Attempts {
+		attempts = append(attempts, requestEvidenceRowToAPI(row))
+	}
+	dumps := make([]apiopenapi.RequestEvidenceDumpDescriptor, 0, len(detail.Dumps))
+	for _, desc := range detail.Dumps {
+		dumps = append(dumps, requestEvidenceDumpDescriptorToAPI(desc))
+	}
+	out := apiopenapi.RequestEvidenceDetailResponse{
+		RequestId:         correlationID,
+		EvidenceRequestId: detail.RequestID,
+		Summary:           requestEvidenceSummaryToAPI(detail.Summary),
+		Attempts:          attempts,
+		RequestDumps:      dumps,
+	}
+	if !detail.FirstSeen.IsZero() {
+		out.FirstSeenAt = &detail.FirstSeen
+	}
+	if !detail.LastSeen.IsZero() {
+		out.LastSeenAt = &detail.LastSeen
+	}
+	return out
+}
+
+func requestEvidenceSummaryToAPI(summary requestEvidenceSummary) apiopenapi.RequestEvidenceSummary {
+	out := apiopenapi.RequestEvidenceSummary{
+		Kind:                  apiopenapi.RequestEvidenceKind(summary.Kind),
+		PrimarySource:         apiopenapi.RequestEvidenceSource(summary.PrimarySource),
+		AttemptCount:          summary.AttemptCount,
+		UsageLogCount:         summary.UsageLogCount,
+		OpsErrorLogCount:      summary.OpsErrorLogCount,
+		RequestDumpCount:      summary.RequestDumpCount,
+		RequestDumpErrorCount: summary.RequestDumpErrorCount,
+		HasUsageLog:           summary.HasUsageLog,
+		HasOpsErrorLog:        summary.HasOpsErrorLog,
+		HasRequestDump:        summary.HasRequestDump,
+	}
+	out.LatencyMs = summary.LatencyMS
+	if summary.InputTokens > 0 {
+		out.InputTokens = &summary.InputTokens
+	}
+	if summary.OutputTokens > 0 {
+		out.OutputTokens = &summary.OutputTokens
+	}
+	if summary.TotalTokens > 0 {
+		out.TotalTokens = &summary.TotalTokens
+	}
+	out.StatusCode = summary.StatusCode
+	out.ErrorClass = nonEmptyStringPtr(summary.ErrorClass)
+	out.ErrorMessage = nonEmptyStringPtr(summary.ErrorMessage)
+	out.ErrorPhase = nonEmptyStringPtr(summary.ErrorPhase)
+	out.ErrorOwner = nonEmptyStringPtr(summary.ErrorOwner)
+	out.ErrorSource = nonEmptyStringPtr(summary.ErrorSource)
+	out.UpstreamRequestId = nonEmptyStringPtr(summary.UpstreamRequestID)
+	return out
+}
+
+func requestEvidenceDumpDescriptorToAPI(desc rlfcontract.FileDescriptor) apiopenapi.RequestEvidenceDumpDescriptor {
+	out := apiopenapi.RequestEvidenceDumpDescriptor{
+		Name:           desc.Name,
+		CreatedAt:      desc.CreatedAt.UTC(),
+		SizeBytes:      desc.Size,
+		IsErrorOnly:    desc.IsErrorOnly,
+		RequestId:      desc.RequestID,
+		AttemptCount:   desc.AttemptCount,
+		ResponseCount:  desc.ResponseCount,
+		HasSummary:     desc.HasSummary,
+		SourceProtocol: nonEmptyStringPtr(desc.SourceProtocol),
+		SourceEndpoint: nonEmptyStringPtr(desc.SourceEndpoint),
+		ErrorClass:     nonEmptyStringPtr(desc.ErrorClass),
+	}
+	out.UserId = nonEmptyStringPtr(desc.UserID)
+	out.ApiKeyId = nonEmptyStringPtr(desc.APIKeyID)
+	out.AccountId = nonEmptyStringPtr(desc.AccountID)
+	out.StartedAt = desc.StartedAt
+	out.Success = desc.Success
+	out.StatusCode = desc.StatusCode
+	out.LatencyMs = desc.LatencyMS
 	return out
 }
 

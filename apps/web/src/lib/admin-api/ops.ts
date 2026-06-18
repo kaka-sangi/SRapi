@@ -18,6 +18,7 @@ import {
   getAdminOpsErrorTrend,
   getAdminOpsLatencyHistogram,
   getAdminOpsOverview,
+  getAdminOpsRequestEvidence,
   listAdminOpsRequestEvidence,
   getAdminOpsSystemLogHealth,
   getAdminOpsThroughputTrend,
@@ -45,6 +46,7 @@ import type {
   OpsErrorDistribution,
   OpsErrorTrend,
   OpsLatencyHistogram,
+  RequestEvidenceDetailResponse,
   RequestEvidenceRow,
   OpsOverview,
   OpsSlo,
@@ -103,6 +105,15 @@ export const opsApi = {
     query?: ListAdminOpsRequestEvidenceData["query"],
   ): Promise<AdminListResult<RequestEvidenceRow>> {
     return unwrapList(() => listAdminOpsRequestEvidence({ query, throwOnError: true }));
+  },
+
+  async getOpsRequestEvidence(requestID: Id): Promise<RequestEvidenceDetailResponse> {
+    configureAdminClient();
+    const response = await getAdminOpsRequestEvidence({
+      path: { request_id: requestID },
+      throwOnError: true,
+    });
+    return response.data;
   },
 
   getOpsSystemLogHealth(): Promise<OpsSystemLogHealth> {

@@ -9650,6 +9650,41 @@ type RequestEmailVerificationRequest struct {
 	Email openapi_types.Email `json:"email"`
 }
 
+// RequestEvidenceDetailResponse defines model for RequestEvidenceDetailResponse.
+type RequestEvidenceDetailResponse struct {
+	Attempts []RequestEvidenceRow `json:"attempts"`
+
+	// EvidenceRequestId Exact gateway request id being investigated.
+	EvidenceRequestId string                          `json:"evidence_request_id"`
+	FirstSeenAt       *Timestamp                      `json:"first_seen_at,omitempty"`
+	LastSeenAt        *Timestamp                      `json:"last_seen_at,omitempty"`
+	RequestDumps      []RequestEvidenceDumpDescriptor `json:"request_dumps"`
+	RequestId         RequestId                       `json:"request_id"`
+	Summary           RequestEvidenceSummary          `json:"summary"`
+}
+
+// RequestEvidenceDumpDescriptor defines model for RequestEvidenceDumpDescriptor.
+type RequestEvidenceDumpDescriptor struct {
+	AccountId      *string    `json:"account_id,omitempty"`
+	ApiKeyId       *string    `json:"api_key_id,omitempty"`
+	AttemptCount   int        `json:"attempt_count"`
+	CreatedAt      Timestamp  `json:"created_at"`
+	ErrorClass     *string    `json:"error_class,omitempty"`
+	HasSummary     bool       `json:"has_summary"`
+	IsErrorOnly    bool       `json:"is_error_only"`
+	LatencyMs      *int       `json:"latency_ms,omitempty"`
+	Name           string     `json:"name"`
+	RequestId      string     `json:"request_id"`
+	ResponseCount  int        `json:"response_count"`
+	SizeBytes      int64      `json:"size_bytes"`
+	SourceEndpoint *string    `json:"source_endpoint,omitempty"`
+	SourceProtocol *string    `json:"source_protocol,omitempty"`
+	StartedAt      *Timestamp `json:"started_at,omitempty"`
+	StatusCode     *int       `json:"status_code,omitempty"`
+	Success        *bool      `json:"success,omitempty"`
+	UserId         *string    `json:"user_id,omitempty"`
+}
+
 // RequestEvidenceKind defines model for RequestEvidenceKind.
 type RequestEvidenceKind string
 
@@ -9707,6 +9742,33 @@ type RequestEvidenceRowResolution string
 
 // RequestEvidenceSource defines model for RequestEvidenceSource.
 type RequestEvidenceSource string
+
+// RequestEvidenceSummary defines model for RequestEvidenceSummary.
+type RequestEvidenceSummary struct {
+	AttemptCount   int                 `json:"attempt_count"`
+	ErrorClass     *string             `json:"error_class,omitempty"`
+	ErrorMessage   *string             `json:"error_message,omitempty"`
+	ErrorOwner     *string             `json:"error_owner,omitempty"`
+	ErrorPhase     *string             `json:"error_phase,omitempty"`
+	ErrorSource    *string             `json:"error_source,omitempty"`
+	HasOpsErrorLog bool                `json:"has_ops_error_log"`
+	HasRequestDump bool                `json:"has_request_dump"`
+	HasUsageLog    bool                `json:"has_usage_log"`
+	InputTokens    *int                `json:"input_tokens,omitempty"`
+	Kind           RequestEvidenceKind `json:"kind"`
+
+	// LatencyMs Sum of known attempt latencies for the request.
+	LatencyMs             *int                  `json:"latency_ms,omitempty"`
+	OpsErrorLogCount      int                   `json:"ops_error_log_count"`
+	OutputTokens          *int                  `json:"output_tokens,omitempty"`
+	PrimarySource         RequestEvidenceSource `json:"primary_source"`
+	RequestDumpCount      int                   `json:"request_dump_count"`
+	RequestDumpErrorCount int                   `json:"request_dump_error_count"`
+	StatusCode            *int                  `json:"status_code,omitempty"`
+	TotalTokens           *int                  `json:"total_tokens,omitempty"`
+	UpstreamRequestId     *string               `json:"upstream_request_id,omitempty"`
+	UsageLogCount         int                   `json:"usage_log_count"`
+}
 
 // RequestId defines model for RequestId.
 type RequestId = string
@@ -20381,6 +20443,9 @@ type ServerInterface interface {
 	// List request-level operational evidence.
 	// (GET /api/v1/admin/ops/request-evidence)
 	ListAdminOpsRequestEvidence(w http.ResponseWriter, r *http.Request, params ListAdminOpsRequestEvidenceParams)
+	// Get one request evidence drilldown.
+	// (GET /api/v1/admin/ops/request-evidence/{request_id})
+	GetAdminOpsRequestEvidence(w http.ResponseWriter, r *http.Request, requestId string)
 	// Update operational monitoring settings.
 	// (PUT /api/v1/admin/ops/settings)
 	UpdateAdminOpsSettings(w http.ResponseWriter, r *http.Request)
@@ -28114,6 +28179,38 @@ func (siw *ServerInterfaceWrapper) ListAdminOpsRequestEvidence(w http.ResponseWr
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminOpsRequestEvidence(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminOpsRequestEvidence operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminOpsRequestEvidence(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "request_id" -------------
+	var requestId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "request_id", r.PathValue("request_id"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "request_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminOpsRequestEvidence(w, r, requestId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -36555,6 +36652,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/overview", wrapper.GetAdminOpsOverview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/realtime/slots", wrapper.ListAdminOpsRealtimeSlots)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/request-evidence", wrapper.ListAdminOpsRequestEvidence)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/request-evidence/{request_id}", wrapper.GetAdminOpsRequestEvidence)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/ops/settings", wrapper.UpdateAdminOpsSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/slo", wrapper.ListAdminOpsSLOs)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/slo", wrapper.CreateAdminOpsSLO)

@@ -168,6 +168,9 @@ func listPredicates(filter contract.ListFilter) []predicate.OpsErrorLog {
 	if filter.ProviderID != nil {
 		predicates = append(predicates, entopserrorlog.ProviderIDEQ(*filter.ProviderID))
 	}
+	if requestID := strings.TrimSpace(filter.RequestID); requestID != "" {
+		predicates = append(predicates, entopserrorlog.RequestIDEQ(requestID))
+	}
 	if platform := strings.TrimSpace(filter.Platform); platform != "" {
 		predicates = append(predicates, entopserrorlog.PlatformEQ(platform))
 	}

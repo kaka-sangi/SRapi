@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RequestEvidencePanel } from "@/app/admin/logs/_panels/request-evidence-panel";
@@ -68,6 +68,48 @@ vi.mock("@/hooks/admin-queries", () => ({
     isFetching: false,
     refetch: mocks.refetch,
   }),
+  useOpsRequestEvidenceDetail: (requestID?: string) => ({
+    data: requestID
+      ? {
+          evidence_request_id: "req-evidence",
+          summary: {
+            kind: "error",
+            primary_source: "usage",
+            attempt_count: 1,
+            usage_log_count: 1,
+            ops_error_log_count: 1,
+            request_dump_count: 1,
+            request_dump_error_count: 1,
+            has_usage_log: true,
+            has_ops_error_log: true,
+            has_request_dump: true,
+            latency_ms: 891,
+            total_tokens: 30,
+            status_code: 503,
+            error_class: "server_bad",
+            error_message: "upstream failed",
+          },
+          attempts: [mocks.row],
+          request_dumps: [
+            {
+              name: "error-1780000000000-req-evidence.log",
+              created_at: "2026-06-19T08:00:01Z",
+              size_bytes: 512,
+              request_id: "req-evidence",
+              is_error_only: true,
+              attempt_count: 1,
+              response_count: 1,
+              has_summary: true,
+            },
+          ],
+          first_seen_at: "2026-06-19T08:00:00Z",
+          last_seen_at: "2026-06-19T08:00:01Z",
+          request_id: "req_detail_correlation",
+        }
+      : undefined,
+    isLoading: false,
+    isError: false,
+  }),
 }));
 
 function wrap({ children }: PropsWithChildren) {
@@ -109,5 +151,17 @@ describe("RequestEvidencePanel", () => {
       "href",
       "/admin/logs?tab=request-files&f_request_id=req-evidence",
     );
+  });
+
+  it("opens a request investigation from the request id", () => {
+    render(<RequestEvidencePanel />, { wrapper: wrap });
+
+    fireEvent.click(screen.getByRole("button", { name: "req-evidence" }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("请求调查")).toBeInTheDocument();
+    expect(screen.getByText("尝试")).toBeInTheDocument();
+    expect(screen.getByText("U 1 / E 1 / D 1")).toBeInTheDocument();
+    expect(screen.getByText("error-1780000000000-req-evidence.log")).toBeInTheDocument();
   });
 });

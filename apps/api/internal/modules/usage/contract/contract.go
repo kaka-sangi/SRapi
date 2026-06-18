@@ -299,3 +299,10 @@ type ResolveUpdater interface {
 type WindowReader interface {
 	ListWindow(ctx context.Context, filter QueryFilter, limit int) ([]UsageLog, error)
 }
+
+// RequestReader is an optional Store capability that lists all usage attempts
+// for one exact gateway request id. It backs operator drilldowns where a
+// bounded time-window scan would hide historical evidence.
+type RequestReader interface {
+	ListByRequestID(ctx context.Context, requestID string) ([]UsageLog, error)
+}

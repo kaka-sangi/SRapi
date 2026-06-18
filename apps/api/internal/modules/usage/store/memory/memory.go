@@ -101,6 +101,29 @@ func (s *Store) ListWindow(_ context.Context, filter contract.QueryFilter, limit
 	return out, nil
 }
 
+// ListByRequestID implements contract.RequestReader.
+func (s *Store) ListByRequestID(_ context.Context, requestID string) ([]contract.UsageLog, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return []contract.UsageLog{}, nil
+	}
+	out := make([]contract.UsageLog, 0)
+	for _, log := range s.byID {
+		if log.RequestID == requestID {
+			out = append(out, cloneLog(log))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].AttemptNo == out[j].AttemptNo {
+			return out[i].ID < out[j].ID
+		}
+		return out[i].AttemptNo < out[j].AttemptNo
+	})
+	return out, nil
+}
+
 func (s *Store) ListByUser(_ context.Context, userID int) ([]contract.UsageLog, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

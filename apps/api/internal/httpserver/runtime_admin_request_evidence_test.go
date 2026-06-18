@@ -227,6 +227,129 @@ func TestAdminRequestEvidence_RejectsAnonymousAndInvalidQuery(t *testing.T) {
 	}
 }
 
+func TestAdminRequestEvidence_DetailUsesExactHistoricalRequestID(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SRAPI_REQUEST_LOG_DIR", dir)
+	t.Setenv("SRAPI_REQUEST_LOG_ENABLED", "false")
+
+	base := time.Date(2026, 6, 19, 8, 0, 0, 0, time.UTC)
+	usageStore := usagememory.New()
+	errorClass := "timeout"
+	accountID := 12
+	seedUsageLog(t, usageStore, usagecontract.UsageLog{
+		RequestID:             "req_historical",
+		AttemptNo:             1,
+		UserID:                44,
+		APIKeyID:              8,
+		AccountID:             &accountID,
+		SourceProtocol:        "openai-compatible",
+		SourceEndpoint:        "/v1/responses",
+		TargetProtocol:        "openai",
+		Model:                 "detail-model",
+		InputTokens:           4,
+		OutputTokens:          6,
+		TotalTokens:           10,
+		LatencyMS:             1500,
+		Success:               false,
+		ErrorClass:            &errorClass,
+		ProviderErrorMessage:  "timed out upstream",
+		StatusCode:            504,
+		Cost:                  "0.00000000",
+		Currency:              "USD",
+		CompatibilityWarnings: []string{},
+		CreatedAt:             base.Add(-48 * time.Hour),
+	})
+	seedUsageLog(t, usageStore, usagecontract.UsageLog{
+		RequestID:             "req_historical_neighbor",
+		AttemptNo:             1,
+		UserID:                44,
+		APIKeyID:              8,
+		AccountID:             &accountID,
+		SourceProtocol:        "openai-compatible",
+		SourceEndpoint:        "/v1/responses",
+		TargetProtocol:        "openai",
+		Model:                 "detail-model",
+		InputTokens:           1,
+		OutputTokens:          1,
+		TotalTokens:           2,
+		LatencyMS:             20,
+		Success:               true,
+		Cost:                  "0.00000000",
+		Currency:              "USD",
+		CompatibilityWarnings: []string{},
+		CreatedAt:             base.Add(-48 * time.Hour),
+	})
+
+	opsStore := opserrorlogsmemory.New()
+	opsSvc, err := opserrorlogsservice.New(opsStore, func() time.Time { return base })
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := 504
+	if err := opsSvc.RecordError(t.Context(), opserrorlogscontract.RecordRequest{
+		OccurredAt:     base.Add(-48*time.Hour + time.Minute),
+		RequestID:      "req_historical",
+		UserID:         intPtr(44),
+		APIKeyID:       intPtr(8),
+		AccountID:      &accountID,
+		Platform:       "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai",
+		Model:          "detail-model",
+		StatusCode:     &status,
+		AttemptNo:      1,
+		LatencyMS:      1510,
+		ErrorClass:     "timeout",
+		ErrorMessage:   "ops timeout",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	dumpName := "error-" + strconv.FormatInt(base.Add(-48*time.Hour+2*time.Minute).UnixMilli(), 10) + "-req_historical.log"
+	writeRequestEvidenceDump(t, dir, dumpName, "req_historical", false, 504, "timeout", 1515, base.Add(-48*time.Hour+2*time.Minute))
+	for i := 0; i < 60; i++ {
+		createdAt := base.Add(-47*time.Hour + time.Duration(i)*time.Second)
+		neighborID := "req_historical_neighbor_" + strconv.Itoa(i)
+		neighborDump := "error-" + strconv.FormatInt(createdAt.UnixMilli(), 10) + "-" + neighborID + ".log"
+		writeRequestEvidenceDump(t, dir, neighborDump, neighborID, false, 500, "other", 20, createdAt)
+	}
+
+	handler := New(config.Load(), nil, WithUsageStore(usageStore), WithOpsErrorLogsStore(opsStore))
+	_, sessionCookie := mustLoginAdmin(t, handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/request-evidence/req_historical", nil)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("detail request evidence: got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.RequestEvidenceDetailResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.EvidenceRequestId != "req_historical" {
+		t.Fatalf("wrong evidence request id: %+v", resp)
+	}
+	if resp.Summary.Kind != apiopenapi.RequestEvidenceKindError || resp.Summary.UsageLogCount != 1 || resp.Summary.OpsErrorLogCount != 1 || resp.Summary.RequestDumpCount != 1 {
+		t.Fatalf("summary mismatch: %+v", resp.Summary)
+	}
+	if len(resp.Attempts) != 1 || !resp.Attempts[0].HasUsageLog || !resp.Attempts[0].HasOpsErrorLog || !resp.Attempts[0].HasRequestDump {
+		t.Fatalf("attempt evidence mismatch: %+v", resp.Attempts)
+	}
+	if len(resp.RequestDumps) != 1 || resp.RequestDumps[0].Name != dumpName {
+		t.Fatalf("dump exact filter mismatch: %+v", resp.RequestDumps)
+	}
+
+	missingReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/request-evidence/req_missing", nil)
+	missingReq.AddCookie(sessionCookie)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, missingReq)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("missing evidence should return 404, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func writeRequestEvidenceDump(t *testing.T, dir, name, requestID string, success bool, status int, errorClass string, latency int, createdAt time.Time) {
 	t.Helper()
 	body := "=== REQUEST INFO ===\n" +

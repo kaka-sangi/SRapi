@@ -4853,6 +4853,67 @@ export type RequestEvidenceListResponse = {
     request_id: RequestId;
 };
 
+export type RequestEvidenceSummary = {
+    kind: RequestEvidenceKind;
+    primary_source: RequestEvidenceSource;
+    attempt_count: number;
+    usage_log_count: number;
+    ops_error_log_count: number;
+    request_dump_count: number;
+    request_dump_error_count: number;
+    has_usage_log: boolean;
+    has_ops_error_log: boolean;
+    has_request_dump: boolean;
+    /**
+     * Sum of known attempt latencies for the request.
+     */
+    latency_ms?: number;
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+    status_code?: number;
+    error_class?: string;
+    error_message?: string;
+    error_phase?: string;
+    error_owner?: string;
+    error_source?: string;
+    upstream_request_id?: string;
+};
+
+export type RequestEvidenceDumpDescriptor = {
+    name: string;
+    created_at: Timestamp;
+    size_bytes: number;
+    request_id: string;
+    is_error_only: boolean;
+    user_id?: string;
+    api_key_id?: string;
+    account_id?: string;
+    source_protocol?: string;
+    source_endpoint?: string;
+    started_at?: Timestamp;
+    success?: boolean;
+    status_code?: number;
+    error_class?: string;
+    latency_ms?: number;
+    attempt_count: number;
+    response_count: number;
+    has_summary: boolean;
+};
+
+export type RequestEvidenceDetailResponse = {
+    /**
+     * Exact gateway request id being investigated.
+     */
+    evidence_request_id: string;
+    summary: RequestEvidenceSummary;
+    attempts: Array<RequestEvidenceRow>;
+    request_dumps: Array<RequestEvidenceDumpDescriptor>;
+    first_seen_at?: Timestamp;
+    last_seen_at?: Timestamp;
+    request_id: RequestId;
+};
+
 export type DeleteRequestLogFileResponse = {
     success: boolean;
     request_id: RequestId;
@@ -17304,6 +17365,52 @@ export type ListAdminOpsRequestEvidenceResponses = {
 };
 
 export type ListAdminOpsRequestEvidenceResponse = ListAdminOpsRequestEvidenceResponses[keyof ListAdminOpsRequestEvidenceResponses];
+
+export type GetAdminOpsRequestEvidenceData = {
+    body?: never;
+    path: {
+        /**
+         * Exact gateway request id to inspect.
+         */
+        request_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/ops/request-evidence/{request_id}';
+};
+
+export type GetAdminOpsRequestEvidenceErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminOpsRequestEvidenceError = GetAdminOpsRequestEvidenceErrors[keyof GetAdminOpsRequestEvidenceErrors];
+
+export type GetAdminOpsRequestEvidenceResponses = {
+    /**
+     * Request evidence drilldown.
+     */
+    200: RequestEvidenceDetailResponse;
+};
+
+export type GetAdminOpsRequestEvidenceResponse = GetAdminOpsRequestEvidenceResponses[keyof GetAdminOpsRequestEvidenceResponses];
 
 export type GetAdminOpsErrorLogData = {
     body?: never;

@@ -149,6 +149,9 @@ func matchesFilter(entry contract.Entry, filter contract.ListFilter) bool {
 			return false
 		}
 	}
+	if requestID := strings.TrimSpace(filter.RequestID); requestID != "" && entry.RequestID != requestID {
+		return false
+	}
 	if filter.Platform != "" && entry.Platform != filter.Platform {
 		return false
 	}

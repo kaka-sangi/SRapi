@@ -1,14 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Activity, Bug, FileText, ScrollText } from "lucide-react";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { FilterSelect, ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import { PageHeader } from "@/components/layout/page-header";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAdminList } from "@/hooks/use-admin-list";
-import { useOpsRequestEvidence } from "@/hooks/admin-queries";
+import { useOpsRequestEvidence, useOpsRequestEvidenceDetail } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatLatency } from "@/lib/admin-format";
 import {
@@ -21,11 +29,12 @@ import {
   LOG_WINDOW_ALL_LABEL_KEY,
   logWindowSince,
 } from "@/lib/log-window-filter";
-import type { RequestEvidenceRow } from "@/lib/sdk-types";
+import type { RequestEvidenceDetailResponse, RequestEvidenceRow } from "@/lib/sdk-types";
 
 export function RequestEvidencePanel() {
   const { t } = useLanguage();
   const list = useAdminList({ pageSize: 50 });
+  const [detailRequestID, setDetailRequestID] = useState<string | undefined>();
   const kind = list.filters.kind || undefined;
   const source = list.filters.source || undefined;
   const windowFilter = list.filters.window || "1h";
@@ -66,10 +75,16 @@ export function RequestEvidencePanel() {
       render: (row) => (
         <div className="min-w-0">
           <div
-            className="text-srapi-text-primary truncate font-mono text-xs"
+            className="truncate"
             title={row.request_id}
           >
-            {row.request_id}
+            <button
+              type="button"
+              className="text-srapi-text-primary hover:text-srapi-accent font-mono text-xs underline-offset-2 hover:underline"
+              onClick={() => setDetailRequestID(row.request_id)}
+            >
+              {row.request_id}
+            </button>
           </div>
           <div
             className="text-2xs text-srapi-text-tertiary truncate font-mono"
@@ -282,6 +297,172 @@ export function RequestEvidencePanel() {
         noResultsBody={t("adminRequestEvidence.noResultsBody")}
         onClearFilters={list.clearFilters}
       />
+      <RequestEvidenceDetailDialog
+        requestID={detailRequestID}
+        onClose={() => setDetailRequestID(undefined)}
+      />
+    </div>
+  );
+}
+
+function RequestEvidenceDetailDialog({
+  requestID,
+  onClose,
+}: {
+  requestID?: string;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const query = useOpsRequestEvidenceDetail(requestID);
+  const detail = query.data;
+  return (
+    <Dialog open={Boolean(requestID)} onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent className="max-w-5xl gap-5">
+        <DialogHeader>
+          <DialogTitle className="font-sans text-base">
+            {t("adminRequestEvidence.detailTitle")}
+          </DialogTitle>
+          <DialogDescription className="font-mono text-xs">
+            {requestID || "—"}
+          </DialogDescription>
+        </DialogHeader>
+        {query.isLoading ? (
+          <div className="text-srapi-text-tertiary py-10 text-sm">
+            {t("adminRequestEvidence.detailLoading")}
+          </div>
+        ) : query.isError ? (
+          <div className="border-srapi-error/30 bg-srapi-error/10 text-srapi-error rounded border p-3 text-sm">
+            {t("adminRequestEvidence.detailFailed")}
+          </div>
+        ) : detail ? (
+          <RequestEvidenceDetailContent detail={detail} />
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetailResponse }) {
+  const { t } = useLanguage();
+  const summary = detail.summary;
+  const linksRow = detail.attempts[0] || ({
+    request_id: detail.evidence_request_id,
+    has_ops_error_log: summary.has_ops_error_log,
+    has_request_dump: summary.has_request_dump,
+    has_usage_log: summary.has_usage_log,
+  } as RequestEvidenceRow);
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <DetailMetric
+          label={t("adminRequestEvidence.result")}
+          value={kindLabel(t, summary.kind)}
+          tone={summary.kind === "error" ? "error" : summary.kind === "success" ? "success" : "muted"}
+        />
+        <DetailMetric
+          label={t("adminRequestEvidence.latency")}
+          value={typeof summary.latency_ms === "number" ? formatLatency(summary.latency_ms) : "—"}
+        />
+        <DetailMetric
+          label={t("adminRequestEvidence.tokens")}
+          value={summary.total_tokens ?? "—"}
+        />
+        <DetailMetric
+          label={t("adminRequestEvidence.evidence")}
+          value={t("adminRequestEvidence.detailEvidenceCounts", {
+            usage: summary.usage_log_count,
+            errors: summary.ops_error_log_count,
+            dumps: summary.request_dump_count,
+          })}
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_18rem]">
+        <div className="border-srapi-border-subtle overflow-hidden rounded border">
+          <div className="border-srapi-border-subtle bg-srapi-bg-card-elevated border-b px-3 py-2 text-xs font-semibold">
+            {t("adminRequestEvidence.detailAttempts")}
+          </div>
+          <div className="divide-srapi-border-subtle divide-y">
+            {detail.attempts.map((row, index) => (
+              <div key={`${row.request_id}-${row.attempt_no ?? index}`} className="grid gap-3 px-3 py-2 text-xs md:grid-cols-[4rem_1fr_6rem_6rem]">
+                <div className="font-mono text-srapi-text-tertiary">#{row.attempt_no ?? index + 1}</div>
+                <div className="min-w-0">
+                  <div className="text-srapi-text-primary truncate font-mono">
+                    {row.source_endpoint || row.source_protocol || "—"}
+                  </div>
+                  <div className="text-srapi-text-tertiary truncate">
+                    {row.model || "—"} {row.error_class ? `/ ${row.error_class}` : ""}
+                  </div>
+                </div>
+                <div className={statusClass(row.status_code)}>{row.status_code ?? "—"}</div>
+                <div className="text-srapi-text-tertiary font-mono">
+                  {typeof row.latency_ms === "number" ? formatLatency(row.latency_ms) : "—"}
+                </div>
+                {row.error_message ? (
+                  <div className="text-srapi-error md:col-span-4 line-clamp-2">{row.error_message}</div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="border-srapi-border-subtle rounded border p-3">
+            <div className="text-srapi-text-tertiary mb-2 text-xs font-semibold">
+              {t("adminRequestEvidence.detailLinks")}
+            </div>
+            <EvidenceLinks row={linksRow} />
+          </div>
+          <div className="border-srapi-border-subtle rounded border p-3">
+            <div className="text-srapi-text-tertiary mb-2 text-xs font-semibold">
+              {t("adminRequestEvidence.detailDumps")}
+            </div>
+            {detail.request_dumps.length > 0 ? (
+              <div className="space-y-2">
+                {detail.request_dumps.map((dump) => (
+                  <div key={dump.name} className="min-w-0 text-xs">
+                    <div className="text-srapi-text-primary truncate font-mono" title={dump.name}>
+                      {dump.name}
+                    </div>
+                    <div className="text-srapi-text-tertiary">
+                      {formatDateTime(dump.created_at)} · {dump.response_count}/{dump.attempt_count}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-srapi-text-tertiary text-xs">
+                {t("adminRequestEvidence.detailNoDumps")}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailMetric({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string | number;
+  tone?: "neutral" | "success" | "error" | "muted";
+}) {
+  const valueClass =
+    tone === "error"
+      ? "text-srapi-error"
+      : tone === "success"
+        ? "text-emerald-400"
+        : tone === "muted"
+          ? "text-srapi-text-tertiary"
+          : "text-srapi-text-primary";
+  return (
+    <div className="border-srapi-border-subtle rounded border p-3">
+      <div className="text-srapi-text-tertiary text-2xs uppercase">{label}</div>
+      <div className={`mt-1 text-sm font-semibold ${valueClass}`}>{value}</div>
     </div>
   );
 }
