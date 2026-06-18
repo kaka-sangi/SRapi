@@ -64,6 +64,78 @@ func TestFileReader_ListFiltersAndSorts(t *testing.T) {
 	}
 }
 
+func TestFileReader_DescriptorIncludesSafeSummary(t *testing.T) {
+	dir := t.TempDir()
+	r := NewFileReader(dir)
+
+	started := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
+	name := "error-2000-req_summary.log"
+	writeFile(t, dir, name, `=== REQUEST INFO ===
+Request-ID: req_summary
+User-ID: 42
+API-Key-ID: 7
+Account-ID: 9
+Source-Protocol: openai-compatible
+Source-Endpoint: /v1/chat/completions
+Started-At: 2026-06-18T10:00:00Z
+
+=== REQUEST 1 ===
+POST https://upstream.invalid/v1/chat/completions
+
+=== RESPONSE 1 ===
+Status: 429
+
+=== REQUEST 2 ===
+POST https://upstream.invalid/v1/chat/completions
+
+=== RESPONSE 2 ===
+Status: 503
+
+=== SUMMARY ===
+Success: false
+Error-Class: server_bad
+Status: 503
+Latency-MS: 891
+`, started)
+
+	desc, err := r.Get(context.Background(), name)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if desc.UserID != "42" || desc.APIKeyID != "7" || desc.AccountID != "9" {
+		t.Fatalf("unexpected actor metadata: %+v", desc)
+	}
+	if desc.SourceProtocol != "openai-compatible" || desc.SourceEndpoint != "/v1/chat/completions" {
+		t.Fatalf("unexpected source metadata: %+v", desc)
+	}
+	if desc.StartedAt == nil || !desc.StartedAt.Equal(started) {
+		t.Fatalf("unexpected started_at: %v", desc.StartedAt)
+	}
+	if desc.Success == nil || *desc.Success {
+		t.Fatalf("expected success=false, got %v", desc.Success)
+	}
+	if desc.StatusCode == nil || *desc.StatusCode != 503 {
+		t.Fatalf("expected status 503, got %v", desc.StatusCode)
+	}
+	if desc.ErrorClass != "server_bad" {
+		t.Fatalf("expected error class, got %q", desc.ErrorClass)
+	}
+	if desc.LatencyMS == nil || *desc.LatencyMS != 891 {
+		t.Fatalf("expected latency 891, got %v", desc.LatencyMS)
+	}
+	if desc.AttemptCount != 2 || desc.ResponseCount != 2 || !desc.HasSummary {
+		t.Fatalf("unexpected section summary: %+v", desc)
+	}
+
+	list, err := r.List(context.Background(), rlfcontract.ListFilter{RequestIDPrefix: "req_summary"})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(list) != 1 || list[0].StatusCode == nil || *list[0].StatusCode != 503 {
+		t.Fatalf("expected list descriptor summary, got %+v", list)
+	}
+}
+
 func TestFileReader_GetOpenDeleteValidatesName(t *testing.T) {
 	dir := t.TempDir()
 	r := NewFileReader(dir)

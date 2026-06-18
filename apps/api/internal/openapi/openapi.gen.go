@@ -9523,13 +9523,49 @@ type RequestId = string
 
 // RequestLogFileDescriptor defines model for RequestLogFileDescriptor.
 type RequestLogFileDescriptor struct {
-	CreatedAt   Timestamp `json:"created_at"`
-	IsErrorOnly bool      `json:"is_error_only"`
+	// AccountId Provider account identifier captured in REQUEST INFO, when present.
+	AccountId *string `json:"account_id,omitempty"`
+
+	// ApiKeyId API key identifier captured in REQUEST INFO, when present.
+	ApiKeyId *string `json:"api_key_id,omitempty"`
+
+	// AttemptCount Highest numbered outbound REQUEST section observed in the captured dump.
+	AttemptCount *int      `json:"attempt_count,omitempty"`
+	CreatedAt    Timestamp `json:"created_at"`
+
+	// ErrorClass Error class parsed from SUMMARY for failed requests.
+	ErrorClass *string `json:"error_class,omitempty"`
+
+	// HasSummary Whether the descriptor parser found a SUMMARY section.
+	HasSummary  *bool `json:"has_summary,omitempty"`
+	IsErrorOnly bool  `json:"is_error_only"`
+
+	// LatencyMs Request latency parsed from SUMMARY.
+	LatencyMs *int `json:"latency_ms,omitempty"`
 
 	// Name On-disk filename such as request-<unix_ms>-<request_id>.log.
 	Name      string `json:"name"`
 	RequestId string `json:"request_id"`
-	Size      int64  `json:"size"`
+
+	// ResponseCount Count of upstream RESPONSE sections observed in the captured dump.
+	ResponseCount *int  `json:"response_count,omitempty"`
+	Size          int64 `json:"size"`
+
+	// SourceEndpoint Source endpoint captured in REQUEST INFO.
+	SourceEndpoint *string `json:"source_endpoint,omitempty"`
+
+	// SourceProtocol Gateway protocol captured in REQUEST INFO, such as openai-compatible.
+	SourceProtocol *string    `json:"source_protocol,omitempty"`
+	StartedAt      *Timestamp `json:"started_at,omitempty"`
+
+	// StatusCode Final upstream or gateway status parsed from SUMMARY.
+	StatusCode *int `json:"status_code,omitempty"`
+
+	// Success Final outcome parsed from the SUMMARY section, when present.
+	Success *bool `json:"success,omitempty"`
+
+	// UserId User identifier captured in REQUEST INFO, when present.
+	UserId *string `json:"user_id,omitempty"`
 }
 
 // RequestLogFileListResponse defines model for RequestLogFileListResponse.

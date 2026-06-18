@@ -30,7 +30,28 @@ func TestAdminRequestLogFiles_ListGetDownloadDelete(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, okName), []byte("OK BODY"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, errName), []byte("ERR BODY"), 0o644); err != nil {
+	errBody := `=== REQUEST INFO ===
+Request-ID: req_err
+User-ID: 42
+API-Key-ID: 7
+Account-ID: 9
+Source-Protocol: openai-compatible
+Source-Endpoint: /v1/chat/completions
+Started-At: 2026-06-18T10:00:00Z
+
+=== REQUEST 1 ===
+POST https://upstream.invalid/v1/chat/completions
+
+=== RESPONSE 1 ===
+Status: 503
+
+=== SUMMARY ===
+Success: false
+Error-Class: server_bad
+Status: 503
+Latency-MS: 891
+`
+	if err := os.WriteFile(filepath.Join(dir, errName), []byte(errBody), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chtimes(filepath.Join(dir, okName), now.Add(-2*time.Hour), now.Add(-2*time.Hour)); err != nil {
@@ -65,6 +86,7 @@ func TestAdminRequestLogFiles_ListGetDownloadDelete(t *testing.T) {
 	if list.Data[0]["name"] != errName {
 		t.Fatalf("expected newer error file first, got %v", list.Data[0]["name"])
 	}
+	assertRequestLogFileSummary(t, list.Data[0])
 	if list.Pagination.Total != 2 || list.Pagination.PageSize != 100 || list.Pagination.HasNext {
 		t.Fatalf("unexpected list pagination: %+v", list.Pagination)
 	}
@@ -210,5 +232,29 @@ func TestAdminRequestLogFiles_RequiresAdmin(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusForbidden && rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 403/401 for anonymous caller, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func assertRequestLogFileSummary(t *testing.T, row map[string]any) {
+	t.Helper()
+	want := map[string]any{
+		"user_id":         "42",
+		"api_key_id":      "7",
+		"account_id":      "9",
+		"source_protocol": "openai-compatible",
+		"source_endpoint": "/v1/chat/completions",
+		"started_at":      "2026-06-18T10:00:00Z",
+		"success":         false,
+		"status_code":     float64(503),
+		"error_class":     "server_bad",
+		"latency_ms":      float64(891),
+		"attempt_count":   float64(1),
+		"response_count":  float64(1),
+		"has_summary":     true,
+	}
+	for key, value := range want {
+		if row[key] != value {
+			t.Fatalf("expected %s=%v, got %v in row %+v", key, value, row[key], row)
+		}
 	}
 }

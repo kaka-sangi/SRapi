@@ -18,7 +18,10 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime } from "@/lib/admin-format";
 import { adminErrorLogsHref, adminSystemLogsHref } from "@/lib/admin-log-links";
-import { parseRequestDumpSummary } from "@/lib/request-log-dump-summary";
+import {
+  parseRequestDumpSummary,
+  requestLogDescriptorSummary,
+} from "@/lib/request-log-dump-summary";
 import {
   downloadAdminRequestLogFileText,
   requestLogFileDownloadQueryKey,
@@ -103,6 +106,7 @@ export function RequestLogFilesPanel() {
         ...item,
         createdAtLabel: formatDateTime(item.created_at),
         sizeLabel: formatSize(item.size),
+        summary: requestLogDescriptorSummary(item),
       })),
     [items],
   );
@@ -159,6 +163,9 @@ export function RequestLogFilesPanel() {
                   {t("adminRequestLogFiles.createdAt")}
                 </th>
                 <th className="w-24 px-3 py-2 font-medium">{t("adminRequestLogFiles.size")}</th>
+                <th className="w-56 px-3 py-2 font-medium">
+                  {t("adminRequestLogFiles.diagnosticSummary")}
+                </th>
                 <th className="w-36 px-3 py-2 font-medium">
                   {t("adminRequestLogFiles.relatedEvidence")}
                 </th>
@@ -195,6 +202,9 @@ export function RequestLogFilesPanel() {
                   </td>
                   <td className="px-3 py-2 text-xs text-srapi-text-tertiary">
                     {row.sizeLabel}
+                  </td>
+                  <td className="px-3 py-2">
+                    <RequestDumpDescriptorSummary file={row} />
                   </td>
                   <td className="px-3 py-2">
                     <RequestDumpEvidencePills file={row} />
@@ -283,6 +293,68 @@ export function RequestLogFilesPanel() {
         }}
         isPending={deleteMutation.isPending}
       />
+    </div>
+  );
+}
+
+function RequestDumpDescriptorSummary({
+  file,
+}: {
+  file: RequestLogFileDescriptor & { summary?: ReturnType<typeof requestLogDescriptorSummary> };
+}) {
+  const { t } = useLanguage();
+  const summary = file.summary ?? requestLogDescriptorSummary(file);
+  if (!summary.hasSummary) {
+    return (
+      <span className="rounded bg-srapi-card-muted px-1.5 py-0.5 text-2xs text-srapi-text-tertiary">
+        {t("adminRequestLogFiles.summaryMissing")}
+      </span>
+    );
+  }
+  const outcome =
+    summary.success === true
+      ? t("adminRequestLogFiles.outcomeSuccess")
+      : summary.success === false
+        ? t("adminRequestLogFiles.outcomeError")
+        : t("adminRequestLogFiles.summaryMissing");
+  const outcomeClass =
+    summary.success === true
+      ? "bg-emerald-500/15 text-emerald-300"
+      : summary.success === false
+        ? "bg-red-500/15 text-red-300"
+        : "bg-srapi-card-muted text-srapi-text-tertiary";
+
+  return (
+    <div className="space-y-1 text-xs">
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        <span className={`rounded px-1.5 py-0.5 text-2xs font-medium ${outcomeClass}`}>
+          {outcome}
+        </span>
+        {summary.statusCode !== undefined ? (
+          <span className="font-mono text-srapi-text-secondary">{summary.statusCode}</span>
+        ) : null}
+        {summary.errorClass ? (
+          <span className="min-w-0 truncate font-mono text-2xs text-red-300" title={summary.errorClass}>
+            {summary.errorClass}
+          </span>
+        ) : null}
+      </div>
+      <div className="flex min-w-0 flex-wrap gap-x-2 gap-y-1 text-2xs text-srapi-text-tertiary">
+        {summary.latencyMS !== undefined ? (
+          <span>{t("adminRequestLogFiles.latencyMs", { value: summary.latencyMS })}</span>
+        ) : null}
+        <span>
+          {t("adminRequestLogFiles.attemptsValue", {
+            requests: summary.attemptCount,
+            responses: summary.responseCount,
+          })}
+        </span>
+      </div>
+      {summary.sourceEndpoint ? (
+        <div className="truncate font-mono text-2xs text-srapi-text-tertiary" title={summary.sourceEndpoint}>
+          {summary.sourceEndpoint}
+        </div>
+      ) : null}
     </div>
   );
 }

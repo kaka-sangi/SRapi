@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseRequestDumpSummary } from "@/lib/request-log-dump-summary";
+import {
+  parseRequestDumpSummary,
+  requestLogDescriptorSummary,
+} from "@/lib/request-log-dump-summary";
 
 describe("parseRequestDumpSummary", () => {
   it("extracts diagnostic fields from the SRapi/CLIProxyAPI dump format", () => {
@@ -86,5 +89,62 @@ Latency-MS: 3001
     expect(summary.errorClass).toBe("server_bad");
     expect(summary.statusCode).toBe(502);
     expect(summary.latencyMS).toBe(3001);
+  });
+
+  it("maps request log descriptors without downloading the dump body", () => {
+    const summary = requestLogDescriptorSummary({
+      name: "error-1780000000000-req-dump.log",
+      size: 512,
+      created_at: "2026-06-18T10:00:00Z",
+      request_id: "req-dump",
+      is_error_only: true,
+      user_id: "42",
+      api_key_id: "7",
+      account_id: "9",
+      source_protocol: "openai-compatible",
+      source_endpoint: "/v1/chat/completions",
+      started_at: "2026-06-18T10:00:00Z",
+      success: false,
+      status_code: 503,
+      error_class: "server_bad",
+      latency_ms: 891,
+      attempt_count: 2,
+      response_count: 1,
+      has_summary: true,
+    });
+
+    expect(summary).toMatchObject({
+      requestID: "req-dump",
+      userID: "42",
+      apiKeyID: "7",
+      accountID: "9",
+      sourceProtocol: "openai-compatible",
+      sourceEndpoint: "/v1/chat/completions",
+      success: false,
+      statusCode: 503,
+      errorClass: "server_bad",
+      latencyMS: 891,
+      attemptCount: 2,
+      responseCount: 1,
+      hasSummary: true,
+    });
+  });
+
+  it("keeps descriptor summaries explicit when old files have no SUMMARY", () => {
+    const summary = requestLogDescriptorSummary({
+      name: "request-1780000000000-req-old.log",
+      size: 128,
+      created_at: "2026-06-18T10:00:00Z",
+      request_id: "req-old",
+      is_error_only: false,
+      attempt_count: 1,
+      response_count: 0,
+      has_summary: false,
+    });
+
+    expect(summary.hasSummary).toBe(false);
+    expect(summary.success).toBeUndefined();
+    expect(summary.attemptCount).toBe(1);
+    expect(summary.responseCount).toBe(0);
   });
 });

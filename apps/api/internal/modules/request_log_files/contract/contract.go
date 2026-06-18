@@ -120,11 +120,24 @@ type Writer interface {
 // returns for one captured log file. It carries the metadata needed for the
 // list UI without forcing a read of the (potentially large) body.
 type FileDescriptor struct {
-	Name        string
-	Size        int64
-	CreatedAt   time.Time
-	RequestID   string
-	IsErrorOnly bool
+	Name           string
+	Size           int64
+	CreatedAt      time.Time
+	RequestID      string
+	IsErrorOnly    bool
+	UserID         string
+	APIKeyID       string
+	AccountID      string
+	SourceProtocol string
+	SourceEndpoint string
+	StartedAt      *time.Time
+	Success        *bool
+	StatusCode     *int
+	ErrorClass     string
+	LatencyMS      *int
+	AttemptCount   int
+	ResponseCount  int
+	HasSummary     bool
 }
 
 // Reader exposes the listing + download surface backing the admin API. It

@@ -162,13 +162,42 @@ func (s *Server) handleDeleteAdminRequestLogFile(w http.ResponseWriter, r *http.
 }
 
 func descriptorToAPI(d rlfcontract.FileDescriptor) apiopenapi.RequestLogFileDescriptor {
-	return apiopenapi.RequestLogFileDescriptor{
+	desc := apiopenapi.RequestLogFileDescriptor{
 		Name:        d.Name,
 		Size:        d.Size,
 		CreatedAt:   d.CreatedAt.UTC(),
 		RequestId:   d.RequestID,
 		IsErrorOnly: d.IsErrorOnly,
 	}
+	if d.UserID != "" {
+		desc.UserId = &d.UserID
+	}
+	if d.APIKeyID != "" {
+		desc.ApiKeyId = &d.APIKeyID
+	}
+	if d.AccountID != "" {
+		desc.AccountId = &d.AccountID
+	}
+	if d.SourceProtocol != "" {
+		desc.SourceProtocol = &d.SourceProtocol
+	}
+	if d.SourceEndpoint != "" {
+		desc.SourceEndpoint = &d.SourceEndpoint
+	}
+	if d.StartedAt != nil {
+		startedAt := d.StartedAt.UTC()
+		desc.StartedAt = &startedAt
+	}
+	desc.Success = d.Success
+	desc.StatusCode = d.StatusCode
+	if d.ErrorClass != "" {
+		desc.ErrorClass = &d.ErrorClass
+	}
+	desc.LatencyMs = d.LatencyMS
+	desc.AttemptCount = &d.AttemptCount
+	desc.ResponseCount = &d.ResponseCount
+	desc.HasSummary = &d.HasSummary
+	return desc
 }
 
 func parseRequestLogFileTimestamp(raw string) (*time.Time, error) {

@@ -26,6 +26,16 @@ const mocks = vi.hoisted(() => ({
     created_at: "2026-06-18T10:00:00Z",
     request_id: "req-dump",
     is_error_only: true,
+    account_id: "12",
+    source_protocol: "openai-compatible",
+    source_endpoint: "/v1/chat/completions",
+    success: false,
+    status_code: 503,
+    error_class: "server_bad",
+    latency_ms: 891,
+    attempt_count: 1,
+    response_count: 1,
+    has_summary: true,
   } satisfies RequestLogFileDescriptor,
   deleteFile: vi.fn(),
   downloadFile: vi.fn(),
@@ -95,6 +105,9 @@ describe("RequestLogFilesPanel", () => {
     render(<RequestLogFilesPanel />, { wrapper: wrap });
 
     expect(screen.getByText("req-dump")).toBeInTheDocument();
+    expect(screen.getByText("server_bad")).toBeInTheDocument();
+    expect(screen.getByText("891ms")).toBeInTheDocument();
+    expect(screen.getByText("1 请求 / 1 响应")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "错误日志" })).toHaveAttribute(
       "href",
       "/admin/logs?tab=error&q=req-dump",
@@ -110,12 +123,12 @@ describe("RequestLogFilesPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "预览" }));
 
-    expect(screen.getByText("诊断摘要")).toBeInTheDocument();
-    expect(screen.getByText("失败")).toBeInTheDocument();
+    expect(screen.getAllByText("诊断摘要").length).toBeGreaterThan(1);
+    expect(screen.getAllByText("失败").length).toBeGreaterThan(1);
     expect(screen.getAllByText("503").length).toBeGreaterThan(0);
-    expect(screen.getByText("server_bad")).toBeInTheDocument();
-    expect(screen.getByText("891ms")).toBeInTheDocument();
-    expect(screen.getByText("1 请求 / 1 响应")).toBeInTheDocument();
-    expect(screen.getByText("/v1/chat/completions")).toBeInTheDocument();
+    expect(screen.getAllByText("server_bad").length).toBeGreaterThan(1);
+    expect(screen.getAllByText("891ms").length).toBeGreaterThan(1);
+    expect(screen.getAllByText("1 请求 / 1 响应").length).toBeGreaterThan(1);
+    expect(screen.getAllByText("/v1/chat/completions").length).toBeGreaterThan(1);
   });
 });

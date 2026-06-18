@@ -1,8 +1,10 @@
 package service
 
 import (
+	"bufio"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,6 +14,8 @@ import (
 
 	rlfcontract "github.com/srapi/srapi/apps/api/internal/modules/request_log_files/contract"
 )
+
+const descriptorMaxLineBytes = 4 * 1024
 
 // FileReader is the disk-backed contract.Reader implementation.
 type FileReader struct {
@@ -74,6 +78,7 @@ func (r *FileReader) List(ctx context.Context, filter rlfcontract.ListFilter) ([
 		if filter.To != nil && !desc.CreatedAt.Before(*filter.To) {
 			continue
 		}
+		enrichDescriptorFromFile(filepath.Join(r.logDir, name), &desc)
 		out = append(out, desc)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -110,6 +115,7 @@ func (r *FileReader) Get(_ context.Context, name string) (rlfcontract.FileDescri
 	if !ok {
 		return rlfcontract.FileDescriptor{}, rlfcontract.ErrNotFound
 	}
+	enrichDescriptorFromFile(fullPath, &desc)
 	return desc, nil
 }
 
@@ -193,6 +199,224 @@ func descriptorFromInfo(name string, info os.FileInfo) (rlfcontract.FileDescript
 		RequestID:   requestID,
 		IsErrorOnly: isError,
 	}, true
+}
+
+func enrichDescriptorFromFile(path string, desc *rlfcontract.FileDescriptor) {
+	if desc == nil {
+		return
+	}
+	metadata, err := parseDescriptorMetadata(path)
+	if err != nil {
+		return
+	}
+	if value := metadata.requestInfo["Request-ID"]; value != "" {
+		desc.RequestID = value
+	}
+	desc.UserID = metadata.requestInfo["User-ID"]
+	desc.APIKeyID = metadata.requestInfo["API-Key-ID"]
+	desc.AccountID = metadata.requestInfo["Account-ID"]
+	desc.SourceProtocol = metadata.requestInfo["Source-Protocol"]
+	desc.SourceEndpoint = metadata.requestInfo["Source-Endpoint"]
+	if startedAt, ok := parseRFC3339Time(metadata.requestInfo["Started-At"]); ok {
+		desc.StartedAt = &startedAt
+	}
+
+	desc.Success = parseBoolPtr(metadata.summary["Success"])
+	desc.StatusCode = parsePositiveIntPtr(metadata.summary["Status"])
+	desc.ErrorClass = metadata.summary["Error-Class"]
+	desc.LatencyMS = parseNonNegativeIntPtr(metadata.summary["Latency-MS"])
+	desc.HasSummary = len(metadata.summary) > 0
+	desc.AttemptCount = metadata.attemptCount
+	desc.ResponseCount = metadata.responseCount
+}
+
+type descriptorMetadata struct {
+	requestInfo   map[string]string
+	summary       map[string]string
+	attemptCount  int
+	responseCount int
+}
+
+func parseDescriptorMetadata(path string) (descriptorMetadata, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return descriptorMetadata{}, err
+	}
+	defer f.Close()
+
+	meta := descriptorMetadata{
+		requestInfo: map[string]string{},
+		summary:     map[string]string{},
+	}
+	reader := bufio.NewReaderSize(f, 64*1024)
+	section := ""
+	for {
+		line, err := readLimitedLine(reader, descriptorMaxLineBytes)
+		if errors.Is(err, io.EOF) {
+			return meta, nil
+		}
+		if err != nil {
+			return descriptorMetadata{}, err
+		}
+		line = strings.TrimSpace(line)
+		if name, ok := parseSectionHeader(line); ok {
+			section = name
+			recordDescriptorSection(name, &meta)
+			continue
+		}
+		recordDescriptorField(section, line, &meta)
+	}
+}
+
+func readLimitedLine(r *bufio.Reader, maxBytes int) (string, error) {
+	var line []byte
+	for {
+		chunk, err := r.ReadSlice('\n')
+		if len(line) < maxBytes {
+			remaining := maxBytes - len(line)
+			if len(chunk) < remaining {
+				remaining = len(chunk)
+			}
+			line = append(line, chunk[:remaining]...)
+		}
+		switch {
+		case err == nil:
+			return strings.TrimRight(string(line), "\r\n"), nil
+		case errors.Is(err, bufio.ErrBufferFull):
+			continue
+		case errors.Is(err, io.EOF):
+			if len(line) > 0 {
+				return strings.TrimRight(string(line), "\r\n"), nil
+			}
+			return "", io.EOF
+		default:
+			return "", err
+		}
+	}
+}
+
+func parseSectionHeader(line string) (string, bool) {
+	if !strings.HasPrefix(line, "===") || !strings.HasSuffix(line, "===") {
+		return "", false
+	}
+	name := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(line, "==="), "==="))
+	if name == "" {
+		return "", false
+	}
+	return name, true
+}
+
+func recordDescriptorSection(name string, meta *descriptorMetadata) {
+	kind, value, ok := parseNumberedSectionName(name)
+	if !ok {
+		return
+	}
+	if kind == "REQUEST" {
+		if value > meta.attemptCount {
+			meta.attemptCount = value
+		}
+		return
+	}
+	meta.responseCount++
+}
+
+func parseNumberedSectionName(name string) (string, int, bool) {
+	parts := strings.Fields(name)
+	if len(parts) != 2 {
+		return "", 0, false
+	}
+	if parts[0] != "REQUEST" && parts[0] != "RESPONSE" {
+		return "", 0, false
+	}
+	value, err := strconv.Atoi(parts[1])
+	if err != nil || value < 1 {
+		return "", 0, false
+	}
+	return parts[0], value, true
+}
+
+func recordDescriptorField(section, line string, meta *descriptorMetadata) {
+	if line == "" {
+		return
+	}
+	key, value, ok := parseFieldLine(line)
+	if !ok {
+		return
+	}
+	switch section {
+	case "REQUEST INFO":
+		meta.requestInfo[key] = value
+	case "SUMMARY":
+		meta.summary[key] = value
+	}
+}
+
+func parseFieldLine(line string) (string, string, bool) {
+	sep := strings.IndexByte(line, ':')
+	if sep <= 0 {
+		return "", "", false
+	}
+	key := strings.TrimSpace(line[:sep])
+	value := strings.TrimSpace(line[sep+1:])
+	if key == "" || value == "" {
+		return "", "", false
+	}
+	return key, value, true
+}
+
+func parseRFC3339Time(value string) (time.Time, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, false
+	}
+	if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		return parsed.UTC(), true
+	}
+	if parsed, err := time.Parse(time.RFC3339, value); err == nil {
+		return parsed.UTC(), true
+	}
+	return time.Time{}, false
+}
+
+func parseBoolPtr(value string) *bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true":
+		parsed := true
+		return &parsed
+	case "false":
+		parsed := false
+		return &parsed
+	default:
+		return nil
+	}
+}
+
+func parsePositiveIntPtr(value string) *int {
+	parsed, ok := parseInt(value)
+	if !ok || parsed <= 0 {
+		return nil
+	}
+	return &parsed
+}
+
+func parseNonNegativeIntPtr(value string) *int {
+	parsed, ok := parseInt(value)
+	if !ok || parsed < 0 {
+		return nil
+	}
+	return &parsed
+}
+
+func parseInt(value string) (int, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, false
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, false
+	}
+	return parsed, true
 }
 
 // validateFileName rejects names containing path separators or other

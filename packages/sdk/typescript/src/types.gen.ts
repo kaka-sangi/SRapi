@@ -4739,6 +4739,55 @@ export type RequestLogFileDescriptor = {
     created_at: Timestamp;
     request_id: string;
     is_error_only: boolean;
+    /**
+     * User identifier captured in REQUEST INFO, when present.
+     */
+    user_id?: string;
+    /**
+     * API key identifier captured in REQUEST INFO, when present.
+     */
+    api_key_id?: string;
+    /**
+     * Provider account identifier captured in REQUEST INFO, when present.
+     */
+    account_id?: string;
+    /**
+     * Gateway protocol captured in REQUEST INFO, such as openai-compatible.
+     */
+    source_protocol?: string;
+    /**
+     * Source endpoint captured in REQUEST INFO.
+     */
+    source_endpoint?: string;
+    started_at?: Timestamp;
+    /**
+     * Final outcome parsed from the SUMMARY section, when present.
+     */
+    success?: boolean;
+    /**
+     * Final upstream or gateway status parsed from SUMMARY.
+     */
+    status_code?: number;
+    /**
+     * Error class parsed from SUMMARY for failed requests.
+     */
+    error_class?: string;
+    /**
+     * Request latency parsed from SUMMARY.
+     */
+    latency_ms?: number;
+    /**
+     * Highest numbered outbound REQUEST section observed in the captured dump.
+     */
+    attempt_count?: number;
+    /**
+     * Count of upstream RESPONSE sections observed in the captured dump.
+     */
+    response_count?: number;
+    /**
+     * Whether the descriptor parser found a SUMMARY section.
+     */
+    has_summary?: boolean;
 };
 
 export type RequestLogFileListResponse = {

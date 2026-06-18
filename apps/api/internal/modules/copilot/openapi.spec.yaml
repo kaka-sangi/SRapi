@@ -27650,6 +27650,49 @@ components:
           type: string
         is_error_only:
           type: boolean
+        user_id:
+          type: string
+          description: User identifier captured in REQUEST INFO, when present.
+        api_key_id:
+          type: string
+          description: API key identifier captured in REQUEST INFO, when present.
+        account_id:
+          type: string
+          description: Provider account identifier captured in REQUEST INFO, when present.
+        source_protocol:
+          type: string
+          description: Gateway protocol captured in REQUEST INFO, such as openai-compatible.
+        source_endpoint:
+          type: string
+          description: Source endpoint captured in REQUEST INFO.
+        started_at:
+          $ref: "#/components/schemas/Timestamp"
+        success:
+          type: boolean
+          description: Final outcome parsed from the SUMMARY section, when present.
+        status_code:
+          type: integer
+          minimum: 100
+          maximum: 599
+          description: Final upstream or gateway status parsed from SUMMARY.
+        error_class:
+          type: string
+          description: Error class parsed from SUMMARY for failed requests.
+        latency_ms:
+          type: integer
+          minimum: 0
+          description: Request latency parsed from SUMMARY.
+        attempt_count:
+          type: integer
+          minimum: 0
+          description: Highest numbered outbound REQUEST section observed in the captured dump.
+        response_count:
+          type: integer
+          minimum: 0
+          description: Count of upstream RESPONSE sections observed in the captured dump.
+        has_summary:
+          type: boolean
+          description: Whether the descriptor parser found a SUMMARY section.
 
     RequestLogFileListResponse:
       type: object

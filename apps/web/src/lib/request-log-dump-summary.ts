@@ -1,3 +1,5 @@
+import type { RequestLogFileDescriptor } from "@/lib/admin-api/request-log-files";
+
 export interface RequestDumpSummary {
   requestID?: string;
   userID?: string;
@@ -13,6 +15,34 @@ export interface RequestDumpSummary {
   attemptCount: number;
   responseCount: number;
   hasSummary: boolean;
+}
+
+export function requestLogDescriptorSummary(
+  file: RequestLogFileDescriptor,
+): RequestDumpSummary {
+  const hasSummary =
+    file.has_summary ??
+    (file.success !== undefined ||
+      file.status_code !== undefined ||
+      file.error_class !== undefined ||
+      file.latency_ms !== undefined);
+
+  return {
+    requestID: file.request_id,
+    userID: file.user_id,
+    apiKeyID: file.api_key_id,
+    accountID: file.account_id,
+    sourceProtocol: file.source_protocol,
+    sourceEndpoint: file.source_endpoint,
+    startedAt: file.started_at,
+    success: file.success,
+    statusCode: file.status_code,
+    errorClass: file.error_class,
+    latencyMS: file.latency_ms,
+    attemptCount: file.attempt_count ?? 0,
+    responseCount: file.response_count ?? 0,
+    hasSummary,
+  };
 }
 
 export function parseRequestDumpSummary(text: string): RequestDumpSummary {
