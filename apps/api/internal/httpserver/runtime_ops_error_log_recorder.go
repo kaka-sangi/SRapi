@@ -67,6 +67,7 @@ func (r *opsErrorLogRecorder) enqueue(req opserrorlogscontract.RecordRequest) bo
 	r.mu.RLock()
 	if r.draining {
 		r.mu.RUnlock()
+		r.drop("draining")
 		return false
 	}
 	r.startOnce.Do(func() {
@@ -80,11 +81,15 @@ func (r *opsErrorLogRecorder) enqueue(req opserrorlogscontract.RecordRequest) bo
 		return true
 	default:
 		r.mu.RUnlock()
-		dropped := r.dropped.Add(1)
-		if r.logger != nil && (dropped == 1 || dropped%100 == 0) {
-			r.logger.Warn("ops_error_logs async queue full; dropping error evidence", "queued", len(r.queue), "capacity", cap(r.queue), "dropped_total", dropped)
-		}
+		r.drop("queue_full")
 		return false
+	}
+}
+
+func (r *opsErrorLogRecorder) drop(reason string) {
+	dropped := r.dropped.Add(1)
+	if r.logger != nil && (dropped == 1 || dropped%100 == 0) {
+		r.logger.Warn("ops_error_logs async queue unavailable; dropping error evidence", "reason", reason, "queued", len(r.queue), "capacity", cap(r.queue), "dropped_total", dropped)
 	}
 }
 

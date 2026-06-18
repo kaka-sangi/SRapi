@@ -176,8 +176,35 @@ func TestOpsErrorLogRecorderLogsQueueDrops(t *testing.T) {
 		t.Fatal("expected third enqueue to be dropped when queue is full")
 	}
 
-	if got := buf.String(); !strings.Contains(got, "ops_error_logs async queue full; dropping error evidence") {
+	if got := buf.String(); !strings.Contains(got, "ops_error_logs async queue unavailable; dropping error evidence") || !strings.Contains(got, "reason=queue_full") {
 		t.Fatalf("expected queue drop warning, got %q", got)
+	}
+}
+
+func TestOpsErrorLogRecorderCountsDrainDrops(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	svc, err := opserrorlogsservice.New(failingOpsErrorLogStore{err: errors.New("unused")}, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	recorder := newOpsErrorLogRecorder(svc, logger, opsErrorLogRecorderConfig{QueueSize: 1, WriteTimeout: time.Second})
+
+	recorder.drain(context.Background())
+	if recorder.enqueue(opserrorlogscontract.RecordRequest{RequestID: "req_dropped_during_drain", ErrorMessage: "provider failed"}) {
+		t.Fatal("expected enqueue to be rejected while recorder is draining")
+	}
+
+	snapshot := recorder.snapshot()
+	if snapshot.Dropped != 1 || snapshot.Enqueued != 0 {
+		t.Fatalf("expected one drain drop and no enqueues, got dropped=%d enqueued=%d", snapshot.Dropped, snapshot.Enqueued)
+	}
+	if got := buf.String(); !strings.Contains(got, "ops_error_logs async queue unavailable; dropping error evidence") || !strings.Contains(got, "reason=draining") {
+		t.Fatalf("expected draining drop warning, got %q", got)
+	}
+	metrics := gatherRecorderMetrics(t, newOpsErrorLogRecorderMetricsTestCollector(recorder))
+	if expected := "srapi_ops_error_log_dropped_total 1"; !strings.Contains(metrics, expected) {
+		t.Fatalf("expected metrics to contain %q, got:\n%s", expected, metrics)
 	}
 }
 
