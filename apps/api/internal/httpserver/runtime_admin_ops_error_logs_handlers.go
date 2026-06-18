@@ -81,7 +81,13 @@ func (s *Server) recordOpsErrorLog(ctx context.Context, rec gatewayUsageRecord) 
 	}
 	// Best-effort: a failure here should never fail the request. The gateway
 	// log surface remains intact via recordGatewayUsage even if this is dropped.
-	if err := s.runtime.opsErrorLogs.RecordError(ctx, req); err != nil && s.runtime.logger != nil {
+	if s.runtime.opsErrorLogRecorder != nil {
+		_ = s.runtime.opsErrorLogRecorder.enqueue(req)
+		return
+	}
+	writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), defaultOpsErrorLogWriteTimeout)
+	defer cancel()
+	if err := s.runtime.opsErrorLogs.RecordError(writeCtx, req); err != nil && s.runtime.logger != nil {
 		s.runtime.logger.Warn("ops_error_logs RecordError failed", "request_id", rec.RequestID, "error", err)
 	}
 }

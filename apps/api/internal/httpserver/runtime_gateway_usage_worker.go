@@ -80,25 +80,31 @@ func (rt *runtimeState) dispatchUsageWrite(ctx context.Context, fn func(context.
 // the WaitGroup count cannot rise once Wait begins. It is invoked during
 // graceful shutdown AFTER the HTTP server has stopped accepting connections and
 // BEFORE the database connection is closed, so in-flight billing/feedback writes
-// are durably persisted. Safe to call more than once and when async processing
-// was never armed.
+// are durably persisted. It then drains the best-effort ops_error_logs recorder
+// with whatever budget remains. Safe to call more than once and when async
+// processing was never armed.
 func (rt *runtimeState) drainUsageWriters(ctx context.Context) {
-	if rt.usageSem == nil {
+	if rt == nil {
 		return
 	}
-	rt.usageMu.Lock()
-	rt.usageDraining = true
-	rt.usageMu.Unlock()
-	done := make(chan struct{})
-	go func() {
-		rt.usageWG.Wait()
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-ctx.Done():
-		if rt.logger != nil {
-			rt.logger.Warn("timed out draining async gateway usage writes", "error", ctx.Err())
+	if rt.usageSem != nil {
+		rt.usageMu.Lock()
+		rt.usageDraining = true
+		rt.usageMu.Unlock()
+		done := make(chan struct{})
+		go func() {
+			rt.usageWG.Wait()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-ctx.Done():
+			if rt.logger != nil {
+				rt.logger.Warn("timed out draining async gateway usage writes", "error", ctx.Err())
+			}
 		}
+	}
+	if rt.opsErrorLogRecorder != nil {
+		rt.opsErrorLogRecorder.drain(ctx)
 	}
 }

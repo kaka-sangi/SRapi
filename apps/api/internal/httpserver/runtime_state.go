@@ -180,6 +180,7 @@ type runtimeState struct {
 	errorPassthrough     *errorpassthroughservice.Service
 	opsErrorLogs         *opserrorlogsservice.Service
 	opsErrorLogsStore    opserrorlogscontract.Store
+	opsErrorLogRecorder  *opsErrorLogRecorder
 	tlsProfiles          *tlsprofilesservice.Service
 	captcha              *captchaservice.Service
 	healthRollups        *healthrollupsservice.Service
@@ -754,6 +755,7 @@ func (rt *runtimeState) buildOpsErrorLogsService(opts runtimeOptions, allowMemor
 		return err
 	}
 	rt.opsErrorLogs = service
+	rt.opsErrorLogRecorder = newOpsErrorLogRecorder(service, rt.logger, opsErrorLogRecorderConfig{})
 	return nil
 }
 
