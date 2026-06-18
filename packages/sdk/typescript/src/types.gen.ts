@@ -2598,6 +2598,132 @@ export type BatchUpdateAccountsRequest = {
     risk_level?: string;
 };
 
+/**
+ * sub2api `BulkUpdateAccountsRequest` superset. Either `account_ids`
+ * or `filters` is required (server-side filter resolution lets the
+ * UI offer "Edit Filtered" without round-tripping IDs through the
+ * client). Every editable field is optional — only fields present
+ * in the payload are written, so a caller can change just
+ * `priority` for the selection without touching `status`. Mirrors
+ * Service.BulkUpdateAccounts; per-row failures collect in `errors`.
+ *
+ */
+export type BulkUpdateProviderAccountsRequest = {
+    /**
+     * Explicit selection. Mutually exclusive with `filters` — supply
+     * one or the other. When both are present, `account_ids` wins
+     * (matches sub2api).
+     *
+     */
+    account_ids?: Array<Id>;
+    filters?: BulkUpdateProviderAccountsFilters;
+    /**
+     * Optional — rename every selected account. Almost never useful
+     * for >1 account; included for sub2api parity.
+     *
+     */
+    name?: string;
+    status?: ProviderAccountStatus;
+    /**
+     * Optional scheduler-tier priority. Higher = preferred.
+     */
+    priority?: number;
+    /**
+     * Optional load-balancer weight.
+     */
+    weight?: number;
+    /**
+     * Optional risk-level label for the content-safety gate.
+     */
+    risk_level?: string;
+    /**
+     * Optional per-account concurrency cap (0 clears the cap).
+     * Stored in account metadata under `max_concurrency` — same key
+     * the scheduler reads at admission, identical to
+     * `/admin/accounts/batch-concurrency`.
+     *
+     */
+    max_concurrency?: number;
+    /**
+     * Optional proxy binding. Empty string clears the binding.
+     * Encode `null` as JSON null to leave unchanged.
+     *
+     */
+    proxy_id?: string | null;
+    /**
+     * Optional upstream-client override. Empty string clears.
+     * Encode `null` (the default when omitted) to leave unchanged.
+     *
+     */
+    upstream_client?: string | null;
+    /**
+     * Optional auth-mechanism override (api_key / oauth_refresh /
+     * etc.). Caller must ensure the runtime class is allowed by
+     * the provider — the handler does NOT re-validate here.
+     *
+     */
+    runtime_class?: string;
+};
+
+/**
+ * Server-side filter set for `BulkUpdateProviderAccountsRequest` —
+ * mirrors the GET /accounts list-query knobs. The handler resolves
+ * these to IDs using the same list path the admin table uses, so
+ * what the caller sees IS what the bulk-edit hits. An empty filter
+ * set deliberately matches nothing (refuses to operate on every
+ * account by accident).
+ *
+ */
+export type BulkUpdateProviderAccountsFilters = {
+    /**
+     * Restrict to a single provider.
+     */
+    provider_id?: string;
+    /**
+     * Restrict to a single status (active/disabled/...).
+     */
+    status?: string;
+    /**
+     * Restrict to members of one account group.
+     */
+    group_id?: string;
+    /**
+     * Restrict to one runtime class (api_key/oauth_refresh/...).
+     */
+    runtime_class?: string;
+    /**
+     * Case-insensitive substring match against the account name.
+     * Mirrors sub2api `filters.search`.
+     *
+     */
+    search?: string;
+};
+
+export type BatchQuotaFetchRequest = {
+    account_ids: Array<Id>;
+};
+
+export type BatchQuotaFetchRow = {
+    account_id: Id;
+    success: boolean;
+    /**
+     * Error message when success=false (omitted on success).
+     */
+    error?: string;
+};
+
+export type BatchQuotaFetchResult = {
+    total: number;
+    success: number;
+    failed: number;
+    rows: Array<BatchQuotaFetchRow>;
+};
+
+export type BatchQuotaFetchResponse = {
+    data: BatchQuotaFetchResult;
+    request_id: RequestId;
+};
+
 export type BatchAccountActionRequest = {
     account_ids: Array<Id>;
     /**
@@ -4493,34 +4619,39 @@ export type ErrorLog = {
     target_protocol: string;
     error_class?: string | null;
     /**
-     * Verbatim upstream provider error message (sub2api parity:
-     * ops_error_logs.upstream_error_message). Surfaced so operators can
-     * see what the upstream actually returned instead of srapi's generic
-     * class-level substitution.
+     * Verbatim upstream error message (sub2api parity).
      */
     error_message?: string | null;
     /**
-     * Compacted upstream error envelope
-     * (class | status | type | code | message) — sub2api parity for
-     * upstream_error_detail.
+     * Compacted upstream error envelope.
      */
     error_body_excerpt?: string | null;
-    /** Upstream HTTP status code (omitted when no HTTP response was received). */
+    /**
+     * Upstream HTTP status code (omitted when no HTTP response).
+     */
     status_code?: number | null;
-    /** Upstream provider request id (x-request-id / openai-request-id / x-codex-request-id). */
+    /**
+     * Upstream provider request id (x-request-id / openai-request-id).
+     */
     upstream_request_id?: string | null;
-    /** request | auth | routing | upstream | network | internal */
+    /**
+     * request | auth | routing | upstream | network | internal
+     */
     error_phase?: string | null;
-    /** client | provider | platform */
+    /**
+     * client | provider | platform
+     */
     error_owner?: string | null;
-    /** client_request | upstream_http | gateway */
+    /**
+     * client_request | upstream_http | gateway
+     */
     error_source?: string | null;
-    /** Whether an operator has acknowledged + resolved this error. */
+    /**
+     * Operator acknowledgement flag.
+     */
     resolved: boolean;
-    /** Numeric id of the admin who marked it resolved. */
     resolved_by?: string | null;
-    resolved_at?: Timestamp | null;
-    /** Per-attempt failover history (sub2api ops_upstream_error_events parity). */
+    resolved_at?: Timestamp;
     upstream_errors?: Array<UpstreamErrorEvent> | null;
     latency_ms: number;
     input_tokens: number;
@@ -4529,6 +4660,11 @@ export type ErrorLog = {
     usage_estimated: boolean;
 };
 
+/**
+ * One failed candidate attempt within a gateway request's failover history
+ * (sub2api ops_upstream_error_events parity).
+ *
+ */
 export type UpstreamErrorEvent = {
     at_unix_ms: number;
     attempt_no: number;
@@ -4537,7 +4673,9 @@ export type UpstreamErrorEvent = {
     upstream_status_code: number;
     upstream_request_id: string;
     upstream_url: string;
-    /** http_error | request_error | retry_exhausted | failover */
+    /**
+     * http_error | request_error | retry_exhausted | failover
+     */
     kind: string;
     message: string;
     body_excerpt: string;
@@ -12429,6 +12567,80 @@ export type BatchCreateAdminAccountsResponses = {
 
 export type BatchCreateAdminAccountsResponse = BatchCreateAdminAccountsResponses[keyof BatchCreateAdminAccountsResponses];
 
+export type BulkUpdateAdminAccountsData = {
+    body: BulkUpdateProviderAccountsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/bulk-update';
+};
+
+export type BulkUpdateAdminAccountsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BulkUpdateAdminAccountsError = BulkUpdateAdminAccountsErrors[keyof BulkUpdateAdminAccountsErrors];
+
+export type BulkUpdateAdminAccountsResponses = {
+    /**
+     * Bulk update result.
+     */
+    200: BatchUpdateAccountsResponse;
+};
+
+export type BulkUpdateAdminAccountsResponse = BulkUpdateAdminAccountsResponses[keyof BulkUpdateAdminAccountsResponses];
+
+export type BatchQuotaFetchAdminAccountsData = {
+    body: BatchQuotaFetchRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/batch-quota-fetch';
+};
+
+export type BatchQuotaFetchAdminAccountsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchQuotaFetchAdminAccountsError = BatchQuotaFetchAdminAccountsErrors[keyof BatchQuotaFetchAdminAccountsErrors];
+
+export type BatchQuotaFetchAdminAccountsResponses = {
+    /**
+     * Batch quota-fetch result.
+     */
+    200: BatchQuotaFetchResponse;
+};
+
+export type BatchQuotaFetchAdminAccountsResponse = BatchQuotaFetchAdminAccountsResponses[keyof BatchQuotaFetchAdminAccountsResponses];
+
 export type BatchActionAdminAccountsData = {
     body: BatchAccountActionRequest;
     path?: never;
@@ -14474,8 +14686,9 @@ export type ListAdminErrorLogsData = {
         start?: string;
         end?: string;
         /**
-         * Free-text search over upstream error message + request id.
-         * Case-insensitive substring match.
+         * Free-text search across error_message + request_id (case-insensitive
+         * substring match). Empty/missing returns unfiltered results.
+         *
          */
         q?: string;
     };
@@ -14562,16 +14775,41 @@ export type ResolveAdminErrorLogData = {
 };
 
 export type ResolveAdminErrorLogErrors = {
+    /**
+     * Generic 400 (the request was malformed or the resource state did
+     * not allow the operation). Lives next to ValidationError so the
+     * Ops error-log feed (and any other handler that prefers a typed
+     * bad-request alias) can $ref a real component instead of a dangling
+     * path — previously this component was referenced by
+     * /admin/ops/error-logs but never defined, which broke
+     * oapi-codegen / @hey-api/openapi-ts on every codegen run.
+     *
+     */
     400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
     401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
     403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
     404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
     default: ErrorResponse;
 };
 
 export type ResolveAdminErrorLogError = ResolveAdminErrorLogErrors[keyof ResolveAdminErrorLogErrors];
 
 export type ResolveAdminErrorLogResponses = {
+    /**
+     * Updated error log.
+     */
     200: {
         data: ErrorLog;
         request_id: RequestId;

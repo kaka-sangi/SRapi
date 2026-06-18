@@ -17,6 +17,7 @@ export type {
   ModelAlias,
   ModelProviderMapping,
   ProviderAccount,
+  ProviderAccountStatus,
   AccountUsageWindow,
   AccountUsageWindowsResult,
   AccountUsageToday,

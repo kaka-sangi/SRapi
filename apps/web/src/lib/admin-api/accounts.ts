@@ -5,10 +5,12 @@ import {
   batchActionAdminAccounts,
   batchCreateAdminAccounts,
   batchDeleteAdminAccounts,
+  batchQuotaFetchAdminAccounts,
   batchRefreshAdminAccounts,
   batchUpdateAdminAccountConcurrency,
   batchUpdateAdminAccountCredentials,
   batchUpdateAdminAccounts,
+  bulkUpdateAdminAccounts,
   bindAdminAccountProxy,
   clearAdminAccountError,
   createAdminAccount,
@@ -75,6 +77,7 @@ import type {
   BatchCreateAdminAccountsData,
   BatchCreateProviderAccountsResult,
   BatchDeleteProviderAccountsResult,
+  BatchQuotaFetchResult,
   BatchRefreshAdminAccountsResult,
   BatchUpdateAccountConcurrencyItem,
   BatchUpdateAccountConcurrencyResult,
@@ -119,6 +122,28 @@ export const accountsApi = {
 
   batchActionAccounts(body: Parameters<typeof batchActionAdminAccounts>[0]["body"]): Promise<BatchUpdateAccountsResult> {
     return unwrapData(() => batchActionAdminAccounts({ body, throwOnError: true }));
+  },
+
+  // sub2api `BulkUpdateAccountsRequest` superset port. Accepts either
+  // explicit `account_ids` OR `filters` (server-side resolution) and an
+  // optional subset of editable fields. Per-row failures surface in
+  // result.errors[]; UI must surface them so the user knows which rows
+  // were skipped. See POST /admin/accounts/bulk-update.
+  bulkUpdateAccounts(
+    body: Parameters<typeof bulkUpdateAdminAccounts>[0]["body"],
+  ): Promise<BatchUpdateAccountsResult> {
+    return unwrapData(() => bulkUpdateAdminAccounts({ body, throwOnError: true }));
+  },
+
+  // sub2api `BatchRefreshTier` port — fans out per-account quota-fetch.
+  // Best-effort; per-row failures come back in result.rows[] but the
+  // outer call still returns 200, so the UI must check rows for failures.
+  batchQuotaFetchAccounts(
+    accountIds: Id[],
+  ): Promise<BatchQuotaFetchResult> {
+    return unwrapData(() =>
+      batchQuotaFetchAdminAccounts({ body: { account_ids: accountIds }, throwOnError: true }),
+    );
   },
 
   createAccount(body: CreateAdminAccountData["body"]): Promise<ProviderAccount> {

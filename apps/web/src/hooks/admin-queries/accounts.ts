@@ -292,6 +292,30 @@ export function useBatchUpdateAccounts() {
     ["admin", "accounts"],
   );
 }
+
+// POST /admin/accounts/bulk-update — sub2api `BulkUpdateAccountsRequest`
+// superset port. Takes either `account_ids` OR `filters` plus an optional
+// subset of editable fields (status / priority / weight / risk_level /
+// max_concurrency / proxy_id / upstream_client / runtime_class / name).
+// Server-side filter resolution lets the UI offer "Edit Filtered" without
+// round-tripping IDs. Per-row failures collect in result.errors[].
+export function useBulkUpdateAccounts() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.bulkUpdateAccounts>) => adminApi.bulkUpdateAccounts(body),
+    ["admin", "accounts"],
+  );
+}
+
+// POST /admin/accounts/batch-quota-fetch — sub2api `batch-refresh-tier`
+// port. Fans out per-account quota-fetch in one call. Best-effort: per-row
+// failures come back in result.rows[] but the outer call returns 200, so
+// the UI must inspect rows[] for failures.
+export function useBatchQuotaFetchAccounts() {
+  return useAdminMutation(
+    (accountIds: P<typeof adminApi.batchQuotaFetchAccounts>) => adminApi.batchQuotaFetchAccounts(accountIds),
+    ["admin", "accounts"],
+  );
+}
 /** Export is read-only; expose as a mutation so pages can trigger it on click. */
 export function useExportAccounts() {
   return useMutation({ mutationFn: () => adminApi.exportAccounts() });

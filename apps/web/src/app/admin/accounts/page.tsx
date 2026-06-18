@@ -35,10 +35,12 @@ import {
   useResetAccountQuota,
   useBatchActionAccounts,
   useBatchDeleteAccounts,
+  useBatchQuotaFetchAccounts,
   useBatchRefreshAccounts,
   useBatchUpdateAccountConcurrency,
   useBatchUpdateAccountCredentials,
   useBatchUpdateAccounts,
+  useBulkUpdateAccounts,
   useDeleteAccount,
   useDiscoverAccountModels,
   useExportAccounts,
@@ -70,7 +72,7 @@ import {
 } from "@/lib/admin-account-form";
 import { AccountImportDialog } from "@/components/admin/account-import-dialog";
 import { BulkAddAccountsDialog } from "./bulk-add-dialog";
-import type { Provider, ProviderAccount } from "@/lib/sdk-types";
+import type { Provider, ProviderAccount, ProviderAccountStatus } from "@/lib/sdk-types";
 import { type AccountListMode, metadataString } from "./account-types";
 import { AccountHealthCell, AccountQuotaCell, HealthSummaryStrip } from "./account-health-cells";
 import { AccountStatusCell } from "./account-status-cell";
@@ -149,6 +151,10 @@ function AccountsContent() {
   const batchUpdate = useBatchUpdateAccounts();
   const batchRefresh = useBatchRefreshAccounts();
   const batchRotateCreds = useBatchUpdateAccountCredentials();
+  // sub2api parity — bulk-edit superset (status / priority / weight /
+  // risk_level / max_concurrency) and batch quota-fetch (refresh-tier).
+  const bulkUpdate = useBulkUpdateAccounts();
+  const batchQuotaFetch = useBatchQuotaFetchAccounts();
   const deleteMut = useDeleteAccount();
   const discover = useDiscoverAccountModels();
   const exportMut = useExportAccounts();
@@ -179,6 +185,7 @@ function AccountsContent() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkConcurrencyOpen, setBulkConcurrencyOpen] = useState(false);
   const [bulkCredentialOpen, setBulkCredentialOpen] = useState(false);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProviderAccount | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
@@ -347,6 +354,64 @@ function AccountsContent() {
         });
       } else if (failedCount > 0) {
         toast({ title: t("feedback.batchAllFailed", { count: items.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
+
+  /** sub2api `BulkUpdate` parity — apply an arbitrary subset of editable
+   *  fields to the selection in one server call. The modal hands the
+   *  parsed body in (only fields the user actually changed are present).
+   *  Per-row failures come back in result.errors and surface as a
+   *  partial-batch toast — mirrors the toast pattern used by every other
+   *  bulk action on this page. */
+  async function applyBulkEdit(
+    body: Parameters<typeof bulkUpdate.mutateAsync>[0],
+  ) {
+    if (!body.account_ids?.length && !body.filters) return;
+    try {
+      const result = await bulkUpdate.mutateAsync(body);
+      list.clearSelection();
+      const failedCount = result.errors.length;
+      const succeededCount = result.updated_count;
+      const totalCount = body.account_ids?.length ?? succeededCount + failedCount;
+      if (failedCount > 0 && succeededCount > 0) {
+        toast({
+          title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
+          tone: "warning",
+        });
+      } else if (failedCount > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: totalCount }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
+
+  /** sub2api `BatchRefreshTier` parity — fan out per-account quota
+   *  refresh across the selection in one server call. Per-row failures
+   *  come back in result.rows[] (outer call still returns 200), so
+   *  surface them as a partial-batch toast. */
+  async function applyBulkQuotaFetch() {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    try {
+      const result = await batchQuotaFetch.mutateAsync(ids);
+      list.clearSelection();
+      const succeededCount = result.success;
+      const failedCount = result.failed;
+      if (failedCount > 0 && succeededCount > 0) {
+        toast({
+          title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
+          tone: "warning",
+        });
+      } else if (failedCount > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
       } else {
         toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
       }
@@ -620,6 +685,29 @@ function AccountsContent() {
         onClick={() => setBulkCredentialOpen(true)}
       >
         {t("adminAccounts.bulkRotateCredentials")}
+      </Button>
+      {/* sub2api `BulkUpdate` superset — opens a modal that edits any
+          subset of status / priority / weight / risk_level /
+          max_concurrency across the selection. */}
+      <Button
+        variant="outline"
+        size="sm"
+        loading={bulkUpdate.isPending}
+        disabled={list.selected.size === 0}
+        onClick={() => setBulkEditOpen(true)}
+      >
+        {t("adminAccounts.bulkEdit")}
+      </Button>
+      {/* sub2api `BatchRefreshTier` — fan-out per-account quota fetch
+          across the selection. No modal — runs immediately. */}
+      <Button
+        variant="outline"
+        size="sm"
+        loading={batchQuotaFetch.isPending}
+        disabled={list.selected.size === 0}
+        onClick={() => void applyBulkQuotaFetch()}
+      >
+        {t("adminAccounts.bulkQuotaFetch")}
       </Button>
       <Button
         variant="outline"
@@ -1009,6 +1097,18 @@ function AccountsContent() {
           onClose={() => setBulkCredentialOpen(false)}
         />
       ) : null}
+
+      {bulkEditOpen ? (
+        <BulkEditAccountDialog
+          count={list.selected.size}
+          isPending={bulkUpdate.isPending}
+          onSubmit={async (body) => {
+            await applyBulkEdit({ account_ids: [...list.selected], ...body });
+            setBulkEditOpen(false);
+          }}
+          onClose={() => setBulkEditOpen(false)}
+        />
+      ) : null}
     </>
   );
 }
@@ -1186,4 +1286,231 @@ function BulkConcurrencyDialog({
 
 function hasQuotaError(account: ProviderAccount): boolean {
   return Boolean(metadataString(account.metadata, "last_quota_error_class"));
+}
+
+// sub2api `BulkEditAccountModal` skeleton port — currently exposes the
+// 5 SRapi-schema fields that have an editable backend equivalent
+// (status / priority / weight / risk_level / max_concurrency). Each
+// section has an "include this field?" toggle so only fields the
+// operator explicitly chose to change land in the request body,
+// matching sub2api's "delete-only-if-checked" semantics. Future
+// follow-ups will add the remaining sub2api fields (proxy_id,
+// upstream_client, runtime_class, ...) as the SRapi runtime grows the
+// matching consumers.
+function BulkEditAccountDialog({
+  count,
+  isPending,
+  onSubmit,
+  onClose,
+}: {
+  count: number;
+  isPending: boolean;
+  onSubmit: (
+    body: {
+      status?: ProviderAccountStatus;
+      priority?: number;
+      weight?: number;
+      risk_level?: string;
+      max_concurrency?: number;
+    },
+  ) => void | Promise<void>;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const [statusEnabled, setStatusEnabled] = useState(false);
+  const [statusValue, setStatusValue] = useState<ProviderAccountStatus>("active");
+  const [priorityEnabled, setPriorityEnabled] = useState(false);
+  const [priorityValue, setPriorityValue] = useState("0");
+  const [weightEnabled, setWeightEnabled] = useState(false);
+  const [weightValue, setWeightValue] = useState("1");
+  const [riskEnabled, setRiskEnabled] = useState(false);
+  const [riskValue, setRiskValue] = useState("normal");
+  const [concurrencyEnabled, setConcurrencyEnabled] = useState(false);
+  const [concurrencyValue, setConcurrencyValue] = useState("4");
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    const body: {
+      status?: ProviderAccountStatus;
+      priority?: number;
+      weight?: number;
+      risk_level?: string;
+      max_concurrency?: number;
+    } = {};
+    if (statusEnabled) body.status = statusValue;
+    if (priorityEnabled) {
+      const n = Number.parseInt(priorityValue.trim(), 10);
+      if (!Number.isFinite(n) || n < 0) {
+        setError(t("adminAccounts.bulkEditNumberHint"));
+        return;
+      }
+      body.priority = n;
+    }
+    if (weightEnabled) {
+      const n = Number.parseFloat(weightValue.trim());
+      if (!Number.isFinite(n) || n < 0) {
+        setError(t("adminAccounts.bulkEditNumberHint"));
+        return;
+      }
+      body.weight = n;
+    }
+    if (riskEnabled) {
+      const v = riskValue.trim();
+      if (!v) {
+        setError(t("adminAccounts.bulkEditNumberHint"));
+        return;
+      }
+      body.risk_level = v;
+    }
+    if (concurrencyEnabled) {
+      const n = Number.parseInt(concurrencyValue.trim(), 10);
+      if (!Number.isFinite(n) || n < 0) {
+        setError(t("adminAccounts.bulkEditNumberHint"));
+        return;
+      }
+      body.max_concurrency = n;
+    }
+    if (Object.keys(body).length === 0) {
+      setError(t("adminAccounts.bulkEditPickField"));
+      return;
+    }
+    void onSubmit(body);
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent>
+        <form onSubmit={submit}>
+          <DialogHeader>
+            <DialogTitle>{t("adminAccounts.bulkEditTitle", { count })}</DialogTitle>
+            <DialogDescription>{t("adminAccounts.bulkEditHint")}</DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 space-y-4">
+            <BulkEditRow
+              enabled={statusEnabled}
+              onToggle={setStatusEnabled}
+              label={t("common.status")}
+              disabled={isPending}
+            >
+              <select
+                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                value={statusValue}
+                disabled={!statusEnabled || isPending}
+                onChange={(e) => setStatusValue(e.target.value as ProviderAccountStatus)}
+              >
+                <option value="active">active</option>
+                <option value="disabled">disabled</option>
+                <option value="needs_reauth">needs_reauth</option>
+                <option value="suspended">suspended</option>
+                <option value="dead">dead</option>
+              </select>
+            </BulkEditRow>
+            <BulkEditRow
+              enabled={priorityEnabled}
+              onToggle={setPriorityEnabled}
+              label={t("adminAccounts.priority")}
+              disabled={isPending}
+            >
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={priorityValue}
+                disabled={!priorityEnabled || isPending}
+                onChange={(e) => setPriorityValue(e.target.value)}
+              />
+            </BulkEditRow>
+            <BulkEditRow
+              enabled={weightEnabled}
+              onToggle={setWeightEnabled}
+              label={t("adminAccounts.weight")}
+              disabled={isPending}
+            >
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.1"
+                value={weightValue}
+                disabled={!weightEnabled || isPending}
+                onChange={(e) => setWeightValue(e.target.value)}
+              />
+            </BulkEditRow>
+            <BulkEditRow
+              enabled={riskEnabled}
+              onToggle={setRiskEnabled}
+              label={t("adminAccounts.riskLevel")}
+              disabled={isPending}
+            >
+              <Input
+                value={riskValue}
+                disabled={!riskEnabled || isPending}
+                onChange={(e) => setRiskValue(e.target.value)}
+                placeholder="normal"
+              />
+            </BulkEditRow>
+            <BulkEditRow
+              enabled={concurrencyEnabled}
+              onToggle={setConcurrencyEnabled}
+              label={t("adminAccounts.bulkSetConcurrency")}
+              disabled={isPending}
+            >
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={concurrencyValue}
+                disabled={!concurrencyEnabled || isPending}
+                onChange={(e) => setConcurrencyValue(e.target.value)}
+              />
+            </BulkEditRow>
+            {error ? (
+              <p role="alert" className="text-2xs text-srapi-error">
+                {error}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter className="mt-5">
+            <Button type="button" variant="ghost" disabled={isPending} onClick={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" variant="primary" loading={isPending}>
+              {t("common.apply")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BulkEditRow({
+  enabled,
+  onToggle,
+  label,
+  disabled,
+  children,
+}: {
+  enabled: boolean;
+  onToggle: (next: boolean) => void;
+  label: string;
+  disabled: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[auto_1fr_2fr] items-center gap-3">
+      <input
+        type="checkbox"
+        checked={enabled}
+        disabled={disabled}
+        onChange={(e) => onToggle(e.target.checked)}
+        className="size-4 rounded border-srapi-border"
+        aria-label={label}
+      />
+      <Label className="text-2xs">{label}</Label>
+      <div>{children}</div>
+    </div>
+  );
 }
