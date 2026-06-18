@@ -27,7 +27,7 @@ import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatInteger, formatLatency } from "@/lib/admin-format";
-import { adminSystemLogsHref } from "@/lib/admin-log-links";
+import { adminRequestDumpsHref, adminSystemLogsHref } from "@/lib/admin-log-links";
 import type { OpsErrorLog, RequestLogFileDescriptor } from "@/lib/sdk-types";
 
 export interface ErrorLogDetailDialogProps {
@@ -169,7 +169,12 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
         </div>
       ) : null}
 
-      <RequestLogEvidence files={requestLogQuery.data?.data ?? []} loading={requestLogQuery.isFetching} />
+      <RequestLogEvidence
+        files={requestLogQuery.data?.data ?? []}
+        loading={requestLogQuery.isFetching}
+        requestID={detail.request_id}
+        total={requestLogQuery.data?.pagination?.total}
+      />
 
       <div className="flex items-center justify-between gap-3 rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
         <QuietBadge
@@ -253,14 +258,21 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
 function RequestLogEvidence({
   files,
   loading,
+  requestID,
+  total,
 }: {
   files: RequestLogFileDescriptor[];
   loading: boolean;
+  requestID?: string | null;
+  total?: number;
 }) {
   const { t } = useLanguage();
   const [selected, setSelected] = useState<RequestLogFileDescriptor | null>(null);
   const downloadQuery = useAdminRequestLogFileDownload(selected?.name ?? null, selected !== null);
   const first = files[0];
+  const relatedTotal = Math.max(total ?? files.length, files.length);
+  const remaining = first ? Math.max(relatedTotal - 1, 0) : 0;
+  const requestDumpsHref = adminRequestDumpsHref({ request_id: requestID });
 
   const downloadFile = useCallback(async (file: RequestLogFileDescriptor) => {
     try {
@@ -303,19 +315,27 @@ function RequestLogEvidence({
           )}
         </div>
         {first ? (
-          <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => setSelected(first)}>
               {t("adminRequestLogFiles.preview")}
             </Button>
             <Button type="button" variant="ghost" size="sm" onClick={() => void downloadFile(first)}>
               {t("adminRequestLogFiles.download")}
             </Button>
+            {requestDumpsHref ? (
+              <Button asChild variant="ghost" size="sm">
+                <Link href={requestDumpsHref}>
+                  <ExternalLink aria-hidden />
+                  {t("adminErrorLogs.openRequestDumps")}
+                </Link>
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </div>
-      {files.length > 1 ? (
+      {remaining > 0 ? (
         <p className="mt-2 text-xs text-srapi-text-tertiary">
-          {t("adminErrorLogs.requestDumpMore", { count: files.length - 1 })}
+          {t("adminErrorLogs.requestDumpMore", { count: remaining })}
         </p>
       ) : null}
 

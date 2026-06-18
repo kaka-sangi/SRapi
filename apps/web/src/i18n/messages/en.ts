@@ -2254,6 +2254,7 @@ export const en = {
     requestDumpLoading: "Checking captured request dumps…",
     requestDumpMissing: "No captured request dump for this request ID.",
     requestDumpMore: "{count} more dump(s) share this request ID.",
+    openRequestDumps: "All dumps",
     openSystemLogs: "System logs",
   },
   adminSettings: {

@@ -2231,6 +2231,7 @@ export const zh: Messages = {
     requestDumpLoading: "正在检查关联请求转储……",
     requestDumpMissing: "该请求 ID 没有关联的请求转储。",
     requestDumpMore: "还有 {count} 个转储使用同一请求 ID。",
+    openRequestDumps: "全部转储",
     openSystemLogs: "系统日志",
   },
   adminSettings: {
