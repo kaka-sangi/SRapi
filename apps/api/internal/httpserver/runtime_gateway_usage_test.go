@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/srapi/srapi/apps/api/internal/config"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	accountservice "github.com/srapi/srapi/apps/api/internal/modules/accounts/service"
 	accountmemory "github.com/srapi/srapi/apps/api/internal/modules/accounts/store/memory"
@@ -174,6 +175,95 @@ func TestRecordGatewayUsageWriteFailureCreatesSystemLog(t *testing.T) {
 	}
 	if log.Message != "failed to record gateway usage log" || log.Metadata["error_class"] != "usage_log_write_failed" || log.Metadata["gateway_success"] != true {
 		t.Fatalf("unexpected usage failure metadata: %+v", log.Metadata)
+	}
+}
+
+func TestGatewayInvalidAPIKeyCreatesLowSensitiveSystemLog(t *testing.T) {
+	ctx := context.Background()
+	operationsStore := operationsmemory.New()
+	handler := New(config.Load(), nil, WithOperationsStore(operationsStore))
+	fullKey := "sk_aaaaaaaaaaaa_" + strings.Repeat("b", 64)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer "+fullKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected invalid key 401, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	list, err := operationsStore.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one auth failure system log, got %+v", list.Items)
+	}
+	log := list.Items[0]
+	if log.Level != operationscontract.OpsSystemLogLevelWarn || log.Source != "gateway.auth" {
+		t.Fatalf("unexpected auth failure system log: %+v", log)
+	}
+	if log.Message != "gateway API key authentication failed" {
+		t.Fatalf("unexpected auth failure message %q", log.Message)
+	}
+	if log.Metadata["reason"] != "invalid_api_key" ||
+		log.Metadata["source_endpoint"] != "/v1/models" ||
+		log.Metadata["method"] != http.MethodGet ||
+		log.Metadata["attempted_key_prefix"] != "sk_aaaaaaaaaaaa" {
+		t.Fatalf("unexpected auth failure metadata: %+v", log.Metadata)
+	}
+	if strings.Contains(log.Message, fullKey) || metadataContainsString(log.Metadata, fullKey) {
+		t.Fatalf("auth failure system log leaked full key: %+v", log)
+	}
+}
+
+func TestGatewayMissingAPIKeyDoesNotCreateSystemLogNoise(t *testing.T) {
+	ctx := context.Background()
+	operationsStore := operationsmemory.New()
+	handler := New(config.Load(), nil, WithOperationsStore(operationsStore))
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected missing key 401, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	list, err := operationsStore.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if len(list.Items) != 0 {
+		t.Fatalf("missing key should not create system log noise, got %+v", list.Items)
+	}
+}
+
+func TestGatewayAttemptedKeyPrefixOnlyForKeyScopedAuthFailures(t *testing.T) {
+	fullKey := "sk_aaaaaaaaaaaa_" + strings.Repeat("b", 64)
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{name: "invalid", err: apikeyservice.ErrInvalidKey, want: "sk_aaaaaaaaaaaa"},
+		{name: "disabled", err: apikeyservice.ErrKeyDisabled, want: "sk_aaaaaaaaaaaa"},
+		{name: "expired", err: apikeyservice.ErrKeyExpired, want: "sk_aaaaaaaaaaaa"},
+		{name: "ip", err: errGatewayKeyIPNotAllowed, want: "sk_aaaaaaaaaaaa"},
+		{name: "risk", err: errGatewayRiskControlBlocked, want: ""},
+		{name: "concurrency", err: gatewayConcurrencyLimitError{}, want: ""},
+		{name: "malformed", err: apikeyservice.ErrInvalidKey, want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plaintext := fullKey
+			if tt.name == "malformed" {
+				plaintext = "not-a-srapi-key"
+			}
+			if got := gatewayAttemptedKeyPrefix(plaintext, tt.err); got != tt.want {
+				t.Fatalf("gatewayAttemptedKeyPrefix() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -1407,4 +1497,24 @@ func metadataNumber(value any) int {
 	default:
 		return 0
 	}
+}
+
+func metadataContainsString(value any, needle string) bool {
+	switch v := value.(type) {
+	case string:
+		return strings.Contains(v, needle)
+	case map[string]any:
+		for _, item := range v {
+			if metadataContainsString(item, needle) {
+				return true
+			}
+		}
+	case []any:
+		for _, item := range v {
+			if metadataContainsString(item, needle) {
+				return true
+			}
+		}
+	}
+	return false
 }

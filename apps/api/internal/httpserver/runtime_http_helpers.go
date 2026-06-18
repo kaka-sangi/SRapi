@@ -314,25 +314,31 @@ func userHasAdminSurfaceAccess(user userscontract.User) bool {
 func (s *Server) requireGatewayKey(r *http.Request) (apikeycontract.AuthResult, error) {
 	apiKey, ok := bearerGatewayAPIKey(r)
 	if !ok {
+		if strings.TrimSpace(r.Header.Get("Authorization")) != "" {
+			s.recordGatewayAuthFailure(r, "", apikeyservice.ErrInvalidKey)
+		}
 		return apikeycontract.AuthResult{}, apikeyservice.ErrInvalidKey
 	}
-	return s.requireGatewayKeyPlaintext(r, apiKey)
+	return s.requireGatewayKeyPlaintextWithAuthFailureLog(r, apiKey)
 }
 
 func (s *Server) requireGeminiGatewayKey(r *http.Request) (apikeycontract.AuthResult, error) {
 	if apiKey := strings.TrimSpace(r.Header.Get("x-goog-api-key")); apiKey != "" {
-		return s.requireGatewayKeyPlaintext(r, apiKey)
+		return s.requireGatewayKeyPlaintextWithAuthFailureLog(r, apiKey)
 	}
 	if apiKey, ok := bearerGatewayAPIKey(r); ok {
-		return s.requireGatewayKeyPlaintext(r, apiKey)
+		return s.requireGatewayKeyPlaintextWithAuthFailureLog(r, apiKey)
 	}
 	if apiKey := strings.TrimSpace(r.Header.Get("x-api-key")); apiKey != "" {
-		return s.requireGatewayKeyPlaintext(r, apiKey)
+		return s.requireGatewayKeyPlaintextWithAuthFailureLog(r, apiKey)
 	}
 	if allowsGeminiQueryAPIKey(r.URL.Path) {
 		if apiKey := strings.TrimSpace(r.URL.Query().Get("key")); apiKey != "" {
-			return s.requireGatewayKeyPlaintext(r, apiKey)
+			return s.requireGatewayKeyPlaintextWithAuthFailureLog(r, apiKey)
 		}
+	}
+	if strings.TrimSpace(r.Header.Get("Authorization")) != "" {
+		s.recordGatewayAuthFailure(r, "", apikeyservice.ErrInvalidKey)
 	}
 	return apikeycontract.AuthResult{}, apikeyservice.ErrInvalidKey
 }
@@ -351,6 +357,105 @@ func bearerGatewayAPIKey(r *http.Request) (string, bool) {
 
 func allowsGeminiQueryAPIKey(path string) bool {
 	return path == "/v1beta/models" || strings.HasPrefix(path, "/v1beta/models/")
+}
+
+func (s *Server) requireGatewayKeyPlaintextWithAuthFailureLog(r *http.Request, apiKey string) (apikeycontract.AuthResult, error) {
+	authed, err := s.requireGatewayKeyPlaintext(r, apiKey)
+	if err != nil {
+		s.recordGatewayAuthFailure(r, apiKey, err)
+	}
+	return authed, err
+}
+
+func (s *Server) recordGatewayAuthFailure(r *http.Request, plaintext string, err error) {
+	if s == nil || s.runtime == nil {
+		return
+	}
+	s.runtime.recordGatewayAuthFailure(r.Context(), gatewayAuthFailureRecord{
+		RequestID:          requestIDFromContext(r.Context()),
+		SourceEndpoint:     r.URL.Path,
+		Method:             r.Method,
+		Reason:             gatewayAuthFailureReason(err),
+		AttemptedKeyPrefix: gatewayAttemptedKeyPrefix(plaintext, err),
+	})
+}
+
+type gatewayAuthFailureRecord struct {
+	RequestID          string
+	SourceEndpoint     string
+	Method             string
+	Reason             string
+	AttemptedKeyPrefix string
+}
+
+func (rt *runtimeState) recordGatewayAuthFailure(ctx context.Context, rec gatewayAuthFailureRecord) {
+	if rt == nil || rt.operations == nil {
+		return
+	}
+	metadata := map[string]any{
+		"request_id":      rec.RequestID,
+		"source_endpoint": rec.SourceEndpoint,
+		"method":          rec.Method,
+		"reason":          rec.Reason,
+	}
+	if rec.AttemptedKeyPrefix != "" {
+		metadata["attempted_key_prefix"] = rec.AttemptedKeyPrefix
+	}
+	if _, err := rt.operations.RecordSystemLog(ctx, operationscontract.RecordSystemLogRequest{
+		Level:     operationscontract.OpsSystemLogLevelWarn,
+		Message:   "gateway API key authentication failed",
+		Source:    "gateway.auth",
+		RequestID: rec.RequestID,
+		TraceID:   requestIDFromContext(ctx),
+		Metadata:  metadata,
+		CreatedAt: time.Now().UTC(),
+	}); err != nil && rt.logger != nil {
+		rt.logger.Warn("operations RecordSystemLog failed", "request_id", rec.RequestID, "error", err)
+	}
+}
+
+func gatewayAuthFailureReason(err error) string {
+	var concurrencyErr gatewayConcurrencyLimitError
+	switch {
+	case errors.As(err, &concurrencyErr):
+		return "concurrency_limit_exceeded"
+	case errors.Is(err, errGatewayKeyIPNotAllowed):
+		return "ip_not_allowed"
+	case errors.Is(err, errGatewayRiskControlBlocked):
+		return "risk_control_blocked"
+	case errors.Is(err, apikeyservice.ErrKeyDisabled):
+		return "api_key_disabled"
+	case errors.Is(err, apikeyservice.ErrKeyExpired):
+		return "api_key_expired"
+	case errors.Is(err, apikeyservice.ErrInvalidKey), errors.Is(err, apikeyservice.ErrInvalidInput):
+		return "invalid_api_key"
+	default:
+		return "internal_error"
+	}
+}
+
+func gatewayAttemptedKeyPrefix(plaintext string, err error) string {
+	var concurrencyErr gatewayConcurrencyLimitError
+	if errors.Is(err, errGatewayRiskControlBlocked) || errors.As(err, &concurrencyErr) {
+		return ""
+	}
+	if !gatewayAuthFailureReasonAllowsPrefix(gatewayAuthFailureReason(err)) {
+		return ""
+	}
+	prefix, ok := apikeyservice.PrefixFromPlaintext(strings.TrimSpace(plaintext))
+	if !ok {
+		return ""
+	}
+	return prefix
+}
+
+func gatewayAuthFailureReasonAllowsPrefix(reason string) bool {
+	switch reason {
+	case "invalid_api_key", "api_key_disabled", "api_key_expired", "ip_not_allowed":
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Server) requireGatewayKeyPlaintext(r *http.Request, apiKey string) (apikeycontract.AuthResult, error) {

@@ -26,6 +26,7 @@ var (
 	systemLogCredentialPattern       = regexp.MustCompile(`(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/\-=]+`)
 	systemLogSecretAssignmentPattern = regexp.MustCompile(`(?i)\b(access_token|refresh_token|id_token|api_key|client_secret|password|cookie)(\s*[:=]\s*)([^&\s,;}]+)`)
 	systemLogOpenAIKeyPattern        = regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{10,}\b`)
+	systemLogSRapiKeyPattern         = regexp.MustCompile(`\b(sk_[0-9a-fA-F]+)_[0-9a-fA-F]{10,}\b`)
 )
 
 func (s *Service) RecordSystemLog(ctx context.Context, req contract.RecordSystemLogRequest) (contract.OpsSystemLog, error) {
@@ -362,6 +363,9 @@ func systemLogMetadataKeyNeedsRedaction(key string) bool {
 	if systemLogMetadataTokenCountKey(normalized) {
 		return false
 	}
+	if systemLogMetadataSafeAPIKeyReference(normalized) {
+		return false
+	}
 	switch normalized {
 	case "body", "body_excerpt", "request_body", "response_body", "raw_body",
 		"prompt", "prompts", "messages", "input", "output", "headers", "header",
@@ -386,6 +390,15 @@ func systemLogMetadataKeyNeedsRedaction(key string) bool {
 	return strings.Contains(normalized, "token")
 }
 
+func systemLogMetadataSafeAPIKeyReference(key string) bool {
+	switch key {
+	case "api_key_id", "api_key_prefix", "attempted_key_prefix":
+		return true
+	default:
+		return false
+	}
+}
+
 func systemLogMetadataTokenCountKey(key string) bool {
 	switch key {
 	case "max_tokens", "max_output_tokens", "max_input_tokens", "max_completion_tokens",
@@ -406,6 +419,7 @@ func scrubSystemLogString(value string) string {
 	value = systemLogCredentialPattern.ReplaceAllString(value, "${1} [REDACTED]")
 	value = systemLogSecretAssignmentPattern.ReplaceAllString(value, "${1}${2}[REDACTED]")
 	value = systemLogOpenAIKeyPattern.ReplaceAllString(value, "sk-[REDACTED]")
+	value = systemLogSRapiKeyPattern.ReplaceAllString(value, "${1}_[REDACTED]")
 	return truncateSystemLogString(value)
 }
 

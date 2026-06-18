@@ -449,7 +449,7 @@ AI Gateway 专项指标以 `OBSERVABILITY_SPEC.md` 为准。
 
 HTTP server 启用 OpenTelemetry server span 和 W3C trace context 传播。默认不导出 trace；设置 `OTEL_TRACES_ENABLED=true` 后会通过 OTLP gRPC 发往 `OTEL_EXPORTER_OTLP_ENDPOINT`。`internal/platform/otel` 的本地 collector smoke 会启动进程内 OTLP gRPC receiver，验证 span 和 service resource attributes 能经真实 OTLP 协议 flush；`make smoke-jaeger-trace` 会把 span 写入真实 Jaeger all-in-one 后端并经 Query API 查回；`make smoke-tempo-trace` 会把 span 写入真实 Tempo 后端并经 Query API 查回。结构化日志 handler 会从 context 自动补充 `request_id`、`trace_id`、`user_id` 和 `api_key_id`，不得把原始 API Key、credential、prompt 或请求体加入日志字段。
 
-AdminOps `ops_system_logs` 是可查询的低敏运维时间线。Gateway 上游尝试失败、no-available-account 决策以及 usage_log 写入失败必须写入该时间线；原始上游 body、prompt、header、cookie 和凭证不得进入该表，排障详情通过 `request_id` 关联 `ops_error_logs` 和请求转储文件。`RecordSystemLog` service 边界会统一清洗 `metadata`：敏感 key 会落为 `[REDACTED]`，长字符串和超大嵌套结构会截断，token 计数字段保留为诊断信号。
+AdminOps `ops_system_logs` 是可查询的低敏运维时间线。Gateway 上游尝试失败、no-available-account 决策、Gateway API key 认证失败以及 usage_log 写入失败必须写入该时间线；原始上游 body、prompt、header、cookie 和凭证不得进入该表，排障详情通过 `request_id` 关联 `ops_error_logs` 和请求转储文件。`gateway.auth` 认证失败事件只允许保存失败原因、入口路径、方法以及从合法 SRapi API key 格式中提取出的 `attempted_key_prefix`，不得保存完整 API key、Authorization header 或 secret 段。`RecordSystemLog` service 边界会统一清洗 `metadata`：敏感 key 会落为 `[REDACTED]`，长字符串和超大嵌套结构会截断，token 计数字段、`api_key_id`、`api_key_prefix` 和 `attempted_key_prefix` 这类低敏排障字段保留为诊断信号。
 
 ## 10. 安全运营
 

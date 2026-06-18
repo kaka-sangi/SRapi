@@ -157,10 +157,14 @@ func TestRecordSystemLogSanitizesMetadataAtServiceBoundary(t *testing.T) {
 			"cookie":                "session=raw-cookie",
 			"prompt":                "user prompt",
 			"body_excerpt":          `{"prompt":"secret"}`,
+			"api_key":               "sk_111111111111_22222222222222222222222222222222",
+			"api_key_id":            42,
+			"api_key_prefix":        "sk_111111111111",
+			"attempted_key_prefix":  "sk_aaaaaaaaaaaa",
 			"max_tokens":            8192,
 			"prompt_tokens":         32,
 			"provider_error_url":    "https://upstream.example/v1?access_token=raw&client_secret=hidden",
-			"provider_error_detail": "provider said Authorization: Bearer nested-token refresh_token: nested-refresh",
+			"provider_error_detail": "provider said Authorization: Bearer nested-token refresh_token: nested-refresh key sk_111111111111_22222222222222222222222222222222",
 			"long":                  long,
 			"opaque":                struct{ Secret string }{Secret: "raw-secret"},
 			"headers": map[string]any{
@@ -176,10 +180,13 @@ func TestRecordSystemLogSanitizesMetadataAtServiceBoundary(t *testing.T) {
 		t.Fatalf("record system log: %v", err)
 	}
 	meta := created.Metadata
-	for _, key := range []string{"access_token", "authorization", "cookie", "prompt", "body_excerpt", "headers"} {
+	for _, key := range []string{"access_token", "authorization", "cookie", "prompt", "body_excerpt", "api_key", "headers"} {
 		if meta[key] != "[REDACTED]" {
 			t.Fatalf("expected %s to be redacted, got %#v in %#v", key, meta[key], meta)
 		}
+	}
+	if meta["api_key_id"] != 42 || meta["api_key_prefix"] != "sk_111111111111" || meta["attempted_key_prefix"] != "sk_aaaaaaaaaaaa" {
+		t.Fatalf("expected low-sensitive api key references preserved, got %#v", meta)
 	}
 	if meta["max_tokens"] != 8192 || meta["prompt_tokens"] != 32 {
 		t.Fatalf("token count fields should be preserved, got %#v", meta)
@@ -187,7 +194,7 @@ func TestRecordSystemLogSanitizesMetadataAtServiceBoundary(t *testing.T) {
 	if got, _ := meta["provider_error_url"].(string); got != "https://upstream.example/v1?access_token=[REDACTED]&client_secret=[REDACTED]" {
 		t.Fatalf("expected secret query values scrubbed, got %q", got)
 	}
-	if got, _ := meta["provider_error_detail"].(string); got != "provider said Authorization: Bearer [REDACTED] refresh_token: [REDACTED]" {
+	if got, _ := meta["provider_error_detail"].(string); got != "provider said Authorization: Bearer [REDACTED] refresh_token: [REDACTED] key sk_111111111111_[REDACTED]" {
 		t.Fatalf("expected bearer credential scrubbed, got %q", got)
 	}
 	if got, _ := meta["opaque"].(string); got != "struct { Secret string }" {
