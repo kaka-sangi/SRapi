@@ -288,6 +288,55 @@ func TestRecordSystemLogSanitizesIndexedFieldsAtServiceBoundary(t *testing.T) {
 	}
 }
 
+func TestSystemLogListAndCleanupNormalizeFiltersAtServiceBoundary(t *testing.T) {
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	long := strings.Repeat("源", systemLogIndexedFieldMax+8)
+	dirtySource := "  ops.dashboard\n\t"
+	dirtyRequestID := "  req_trace_\n\treally-long-" + long
+	dirtyTraceID := "  trace_\n\t" + long
+	if _, err := svc.RecordSystemLog(t.Context(), contract.RecordSystemLogRequest{
+		Level:     contract.OpsSystemLogLevelWarn,
+		Source:    dirtySource,
+		Message:   "clean message",
+		RequestID: dirtyRequestID,
+		TraceID:   dirtyTraceID,
+	}); err != nil {
+		t.Fatalf("record system log: %v", err)
+	}
+
+	list, err := svc.ListSystemLogs(t.Context(), contract.SystemLogListOptions{
+		Source:    dirtySource,
+		Query:     "\nclean\tmessage ",
+		RequestID: dirtyRequestID,
+		TraceID:   dirtyTraceID,
+	})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 {
+		t.Fatalf("expected dirty filters to normalize and match, got %+v", list)
+	}
+
+	cleanup, err := svc.CleanupSystemLogs(t.Context(), contract.SystemLogCleanupFilter{
+		Source:    dirtySource,
+		Query:     "\nclean\tmessage ",
+		RequestID: dirtyRequestID,
+		TraceID:   dirtyTraceID,
+		MaxDelete: 10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup system logs: %v", err)
+	}
+	if cleanup.Matched != 1 || cleanup.Deleted != 1 || cleanup.Limited {
+		t.Fatalf("expected dirty cleanup filters to normalize and delete once, got %+v", cleanup)
+	}
+}
+
 type captureRetentionStore struct {
 	cutoffs contract.RetentionCutoffs
 }

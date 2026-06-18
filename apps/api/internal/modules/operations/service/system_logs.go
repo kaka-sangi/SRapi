@@ -45,10 +45,11 @@ func (s *Service) ListSystemLogs(ctx context.Context, opts contract.SystemLogLis
 	if s == nil || s.systemLogStore == nil {
 		return contract.SystemLogList{}, ErrInvalidInput
 	}
-	if err := validateSystemLogListOptions(opts); err != nil {
+	normalized, err := normalizeSystemLogListOptions(opts)
+	if err != nil {
 		return contract.SystemLogList{}, err
 	}
-	return s.systemLogStore.ListSystemLogs(ctx, opts)
+	return s.systemLogStore.ListSystemLogs(ctx, normalized)
 }
 
 func (s *Service) CleanupSystemLogs(ctx context.Context, filter contract.SystemLogCleanupFilter) (contract.SystemLogCleanupResult, error) {
@@ -133,25 +134,61 @@ func systemLogFromRecordRequest(req contract.RecordSystemLogRequest, now time.Ti
 	}, nil
 }
 
-func validateSystemLogListOptions(opts contract.SystemLogListOptions) error {
+func normalizeSystemLogListOptions(opts contract.SystemLogListOptions) (contract.SystemLogListOptions, error) {
 	if opts.Level != "" && !opts.Level.Valid() {
-		return ErrInvalidInput
+		return contract.SystemLogListOptions{}, ErrInvalidInput
 	}
 	if opts.Start != nil && opts.End != nil && opts.Start.After(*opts.End) {
-		return ErrInvalidInput
+		return contract.SystemLogListOptions{}, ErrInvalidInput
 	}
-	return nil
+	rawSource := opts.Source
+	opts.Source = sanitizeSystemLogIndexedField(opts.Source)
+	if opts.Source == "" && strings.TrimSpace(rawSource) != "" {
+		return contract.SystemLogListOptions{}, ErrInvalidInput
+	}
+	rawQuery := opts.Query
+	opts.Query = sanitizeSystemLogSearchField(opts.Query)
+	if opts.Query == "" && strings.TrimSpace(rawQuery) != "" {
+		return contract.SystemLogListOptions{}, ErrInvalidInput
+	}
+	rawRequestID := opts.RequestID
+	opts.RequestID = sanitizeSystemLogIndexedField(opts.RequestID)
+	if opts.RequestID == "" && strings.TrimSpace(rawRequestID) != "" {
+		return contract.SystemLogListOptions{}, ErrInvalidInput
+	}
+	rawTraceID := opts.TraceID
+	opts.TraceID = sanitizeSystemLogIndexedField(opts.TraceID)
+	if opts.TraceID == "" && strings.TrimSpace(rawTraceID) != "" {
+		return contract.SystemLogListOptions{}, ErrInvalidInput
+	}
+	return opts, nil
 }
 
 func normalizeSystemLogCleanupFilter(filter contract.SystemLogCleanupFilter) (contract.SystemLogCleanupFilter, error) {
-	filter.Source = sanitizeSystemLogIndexedField(filter.Source)
-	filter.Query = strings.TrimSpace(filter.Query)
-	filter.RequestID = sanitizeSystemLogIndexedField(filter.RequestID)
-	filter.TraceID = sanitizeSystemLogIndexedField(filter.TraceID)
 	if filter.Level != "" && !filter.Level.Valid() {
 		return contract.SystemLogCleanupFilter{}, ErrInvalidInput
 	}
 	if filter.Start != nil && filter.End != nil && filter.Start.After(*filter.End) {
+		return contract.SystemLogCleanupFilter{}, ErrInvalidInput
+	}
+	rawSource := filter.Source
+	filter.Source = sanitizeSystemLogIndexedField(filter.Source)
+	if filter.Source == "" && strings.TrimSpace(rawSource) != "" {
+		return contract.SystemLogCleanupFilter{}, ErrInvalidInput
+	}
+	rawQuery := filter.Query
+	filter.Query = sanitizeSystemLogSearchField(filter.Query)
+	if filter.Query == "" && strings.TrimSpace(rawQuery) != "" {
+		return contract.SystemLogCleanupFilter{}, ErrInvalidInput
+	}
+	rawRequestID := filter.RequestID
+	filter.RequestID = sanitizeSystemLogIndexedField(filter.RequestID)
+	if filter.RequestID == "" && strings.TrimSpace(rawRequestID) != "" {
+		return contract.SystemLogCleanupFilter{}, ErrInvalidInput
+	}
+	rawTraceID := filter.TraceID
+	filter.TraceID = sanitizeSystemLogIndexedField(filter.TraceID)
+	if filter.TraceID == "" && strings.TrimSpace(rawTraceID) != "" {
 		return contract.SystemLogCleanupFilter{}, ErrInvalidInput
 	}
 	if filter.Level == "" && filter.Source == "" && filter.Query == "" && filter.RequestID == "" && filter.TraceID == "" && filter.Start == nil && filter.End == nil {
@@ -180,6 +217,23 @@ func sanitizeSystemLogIndexedField(value string) string {
 		b.WriteRune(r)
 	}
 	return truncateSystemLogRunes(strings.TrimSpace(b.String()), systemLogIndexedFieldMax)
+}
+
+func sanitizeSystemLogSearchField(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(value))
+	for _, r := range value {
+		if r < 0x20 || r == 0x7f {
+			b.WriteRune(' ')
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return scrubSystemLogString(strings.Join(strings.Fields(b.String()), " "))
 }
 
 func systemLogMatches(log contract.OpsSystemLog, filter contract.SystemLogCleanupFilter) bool {
