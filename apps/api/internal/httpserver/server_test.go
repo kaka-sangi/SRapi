@@ -4215,7 +4215,7 @@ func TestGatewayUsageReturnsCurrentAPIKeySnapshot(t *testing.T) {
 	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
 		t.Fatalf("decode gateway usage: %v", err)
 	}
-	if usageResp.Object != apiopenapi.Usage || usageResp.ApiKeyId != keyResp.Data.ApiKey.Id || usageResp.Mode != apiopenapi.QuotaLimited || !usageResp.IsValid {
+	if usageResp.Object != apiopenapi.GatewayUsageResponseObjectUsage || usageResp.ApiKeyId != keyResp.Data.ApiKey.Id || usageResp.Mode != apiopenapi.QuotaLimited || !usageResp.IsValid {
 		t.Fatalf("unexpected gateway usage identity fields: %+v", usageResp)
 	}
 	if usageResp.Usage.Requests != 1 || usageResp.Usage.TotalTokens != 8 || usageResp.Usage.Cost != "0.10000000" {

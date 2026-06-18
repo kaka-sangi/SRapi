@@ -4801,6 +4801,58 @@ export type RequestLogFileResponse = {
     request_id: RequestId;
 };
 
+export type RequestEvidenceKind = 'success' | 'error' | 'unknown';
+
+export type RequestEvidenceSource = 'usage' | 'ops_error' | 'request_dump';
+
+export type RequestEvidenceRow = {
+    kind: RequestEvidenceKind;
+    evidence_source: RequestEvidenceSource;
+    created_at: Timestamp;
+    request_id: string;
+    usage_log_id?: Id;
+    ops_error_log_id?: Id;
+    user_id?: Id;
+    api_key_id?: Id;
+    account_id?: string;
+    provider_id?: string;
+    source_protocol?: string;
+    source_endpoint?: string;
+    target_protocol?: string;
+    model?: string;
+    status_code?: number;
+    success?: boolean;
+    error_class?: string;
+    /**
+     * Bounded, redacted upstream error message when available.
+     */
+    error_message?: string;
+    error_phase?: string;
+    error_owner?: string;
+    error_source?: string;
+    upstream_request_id?: string;
+    attempt_no?: number;
+    latency_ms?: number;
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+    usage_estimated?: boolean;
+    resolution?: 'open' | 'investigating' | 'resolved' | 'muted';
+    has_usage_log: boolean;
+    has_ops_error_log: boolean;
+    has_request_dump: boolean;
+    request_dump_count: number;
+    request_dump_error_count: number;
+    latest_request_dump_name?: string;
+    latest_request_dump_created_at?: Timestamp;
+};
+
+export type RequestEvidenceListResponse = {
+    data: Array<RequestEvidenceRow>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
 export type DeleteRequestLogFileResponse = {
     success: boolean;
     request_id: RequestId;
@@ -17178,6 +17230,80 @@ export type ListAdminOpsErrorLogsResponses = {
 };
 
 export type ListAdminOpsErrorLogsResponse = ListAdminOpsErrorLogsResponses[keyof ListAdminOpsErrorLogsResponses];
+
+export type ListAdminOpsRequestEvidenceData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        /**
+         * Prefix filter against gateway request ids.
+         */
+        request_id?: string;
+        user_id?: Id;
+        api_key_id?: Id;
+        account_id?: Id;
+        provider_id?: Id;
+        model?: string;
+        source_endpoint?: string;
+        error_class?: string;
+        /**
+         * Filter by the final request outcome.
+         */
+        kind?: 'all' | 'success' | 'error' | 'unknown';
+        /**
+         * Filter by the primary evidence source used for the row.
+         */
+        evidence_source?: 'all' | 'usage' | 'ops_error' | 'request_dump';
+        min_latency_ms?: number;
+        max_latency_ms?: number;
+        /**
+         * Inclusive start of the evidence window. Defaults to one hour before now.
+         */
+        start?: string;
+        /**
+         * Exclusive end of the evidence window. Defaults to now.
+         */
+        end?: string;
+        sort?: 'created_at_desc' | 'latency_desc';
+        /**
+         * Case-insensitive search across request id, model, endpoint, error class, and error message.
+         */
+        q?: string;
+    };
+    url: '/api/v1/admin/ops/request-evidence';
+};
+
+export type ListAdminOpsRequestEvidenceErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminOpsRequestEvidenceError = ListAdminOpsRequestEvidenceErrors[keyof ListAdminOpsRequestEvidenceErrors];
+
+export type ListAdminOpsRequestEvidenceResponses = {
+    /**
+     * Request-level operational evidence.
+     */
+    200: RequestEvidenceListResponse;
+};
+
+export type ListAdminOpsRequestEvidenceResponse = ListAdminOpsRequestEvidenceResponses[keyof ListAdminOpsRequestEvidenceResponses];
 
 export type GetAdminOpsErrorLogData = {
     body?: never;

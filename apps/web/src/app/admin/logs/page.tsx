@@ -9,6 +9,7 @@ import { AuditLogsPanel } from "./_panels/audit-logs-panel";
 import { BillingLedgerPanel } from "./_panels/billing-ledger-panel";
 import { ErrorLogsPanel } from "./_panels/error-logs-panel";
 import { LiveErrorsPanel } from "./_panels/live-errors-panel";
+import { RequestEvidencePanel } from "./_panels/request-evidence-panel";
 import { RequestLogFilesPanel } from "./_panels/request-log-files-panel";
 
 // Aggregated logs view — replaces three standalone pages (/admin/audit-logs,
@@ -20,11 +21,18 @@ import { RequestLogFilesPanel } from "./_panels/request-log-files-panel";
 //
 // Standalone routes remain as 308 redirects so deeplinks + bookmarks keep
 // working. Tab is URL-synced via ?tab= for share + back-button.
-const TABS = ["audit", "billing-ledger", "error", "live-errors", "request-files"] as const;
+const TABS = [
+  "request-evidence",
+  "audit",
+  "billing-ledger",
+  "error",
+  "live-errors",
+  "request-files",
+] as const;
 
 type Tab = (typeof TABS)[number];
 
-const DEFAULT_TAB: Tab = "audit";
+const DEFAULT_TAB: Tab = "request-evidence";
 
 function isTab(value: string | null): value is Tab {
   return value !== null && (TABS as readonly string[]).includes(value);
@@ -58,6 +66,7 @@ function Content() {
     <>
       <Tabs value={active} onValueChange={setTab}>
         <TabsList className="flex flex-wrap">
+          <TabsTrigger value="request-evidence">{t("nav.adminRequestEvidence")}</TabsTrigger>
           <TabsTrigger value="audit">{t("nav.adminAuditLogs")}</TabsTrigger>
           <TabsTrigger value="billing-ledger">{t("nav.adminBillingLedger")}</TabsTrigger>
           <TabsTrigger value="error">{t("nav.adminErrorLogs")}</TabsTrigger>
@@ -67,6 +76,7 @@ function Content() {
       </Tabs>
 
       <div className="mt-4">
+        {active === "request-evidence" ? <RequestEvidencePanel /> : null}
         {active === "audit" ? <AuditLogsPanel /> : null}
         {active === "billing-ledger" ? <BillingLedgerPanel /> : null}
         {active === "error" ? <ErrorLogsPanel /> : null}

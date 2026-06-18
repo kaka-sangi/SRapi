@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   adminErrorLogsHref,
   adminRequestDumpsHref,
+  adminRequestEvidenceHref,
   adminSystemLogsHref,
 } from "@/lib/admin-log-links";
 
@@ -13,9 +14,7 @@ describe("admin log evidence links", () => {
   });
 
   it("falls back to trace id for error-log search", () => {
-    expect(adminErrorLogsHref({ trace_id: "trace_456" })).toBe(
-      "/admin/logs?tab=error&q=trace_456",
-    );
+    expect(adminErrorLogsHref({ trace_id: "trace_456" })).toBe("/admin/logs?tab=error&q=trace_456");
   });
 
   it("builds a request-dumps link only when request id is present", () => {
@@ -23,6 +22,13 @@ describe("admin log evidence links", () => {
       "/admin/logs?tab=request-files&f_request_id=req_123",
     );
     expect(adminRequestDumpsHref({ trace_id: "trace_456" })).toBeNull();
+  });
+
+  it("builds a request-evidence link only when request id is present", () => {
+    expect(adminRequestEvidenceHref({ request_id: "req_123", trace_id: "trace_456" })).toBe(
+      "/admin/logs?tab=request-evidence&f_request_id=req_123",
+    );
+    expect(adminRequestEvidenceHref({ trace_id: "trace_456" })).toBeNull();
   });
 
   it("builds a system-log exact filter link from request and trace ids", () => {
@@ -38,10 +44,14 @@ describe("admin log evidence links", () => {
     expect(adminSystemLogsHref({ trace_id: "  trace_456  " })).toBe(
       "/admin/ops/system-logs?f_trace_id=trace_456",
     );
+    expect(adminRequestEvidenceHref({ request_id: "  req_123  " })).toBe(
+      "/admin/logs?tab=request-evidence&f_request_id=req_123",
+    );
   });
 
   it("omits links without correlation ids", () => {
     expect(adminErrorLogsHref({})).toBeNull();
+    expect(adminRequestEvidenceHref({})).toBeNull();
     expect(adminRequestDumpsHref({})).toBeNull();
     expect(adminSystemLogsHref({})).toBeNull();
   });

@@ -24,7 +24,7 @@ func gatewayUsageResponse(key apikeycontract.APIKey, user userscontract.User, su
 		IsValid:        key.Status == apikeycontract.StatusActive,
 		Mode:           gatewayUsageMode(key),
 		ModelStats:     gatewayUsageModels(summary.ModelStats),
-		Object:         apiopenapi.Usage,
+		Object:         apiopenapi.GatewayUsageResponseObjectUsage,
 		PlanName:       &planName,
 		RecentRequests: gatewayUsageLogs(summary.RecentLogs),
 		Remaining:      user.Balance,

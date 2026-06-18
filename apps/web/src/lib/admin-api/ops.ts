@@ -18,6 +18,7 @@ import {
   getAdminOpsErrorTrend,
   getAdminOpsLatencyHistogram,
   getAdminOpsOverview,
+  listAdminOpsRequestEvidence,
   getAdminOpsSystemLogHealth,
   getAdminOpsThroughputTrend,
   listAdminOpsAlertEvents,
@@ -32,6 +33,7 @@ import type {
   AdminDashboardSnapshot,
   ListAdminOpsAlertEventsData,
   ListAdminOpsAlertsData,
+  ListAdminOpsRequestEvidenceData,
   ListAdminOpsSystemLogsData,
   OpsAlertEvent,
   OpsAlertRule,
@@ -43,6 +45,7 @@ import type {
   OpsErrorDistribution,
   OpsErrorTrend,
   OpsLatencyHistogram,
+  RequestEvidenceRow,
   OpsOverview,
   OpsSlo,
   OpsSettings,
@@ -94,6 +97,12 @@ export const opsApi = {
     query?: ListAdminOpsSystemLogsData["query"],
   ): Promise<AdminListResult<OpsSystemLog>> {
     return unwrapList(() => listAdminOpsSystemLogs({ query, throwOnError: true }));
+  },
+
+  listOpsRequestEvidence(
+    query?: ListAdminOpsRequestEvidenceData["query"],
+  ): Promise<AdminListResult<RequestEvidenceRow>> {
+    return unwrapList(() => listAdminOpsRequestEvidence({ query, throwOnError: true }));
   },
 
   getOpsSystemLogHealth(): Promise<OpsSystemLogHealth> {

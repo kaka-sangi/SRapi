@@ -30,6 +30,7 @@ describe("logWindowSince", () => {
   });
 
   it.each([
+    ["1h", 60],
     ["24h", 24 * 60],
     ["7d", 7 * 24 * 60],
     ["30d", 30 * 24 * 60],
@@ -45,7 +46,7 @@ describe("logWindowSince", () => {
     // renders the dropdown. The all-time key is read directly by the
     // FilterSelect's allLabel prop.
     expect(LOG_WINDOW_ALL_LABEL_KEY).toBe("adminLogs.allTime");
-    expect(LOG_WINDOW_PRESETS.map((p) => p.value)).toEqual(["24h", "7d", "30d"]);
+    expect(LOG_WINDOW_PRESETS.map((p) => p.value)).toEqual(["1h", "24h", "7d", "30d"]);
     for (const p of LOG_WINDOW_PRESETS) {
       expect(p.labelKey).toMatch(/^adminLogs\.window/);
     }

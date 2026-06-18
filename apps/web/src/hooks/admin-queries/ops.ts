@@ -42,6 +42,13 @@ export function useOpsSystemLogs(params?: P<typeof adminApi.listOpsSystemLogs>) 
   });
 }
 
+export function useOpsRequestEvidence(params?: P<typeof adminApi.listOpsRequestEvidence>) {
+  return useQuery({
+    queryKey: queryKeys.admin.opsRequestEvidence(params),
+    queryFn: () => adminApi.listOpsRequestEvidence(params),
+  });
+}
+
 export function useOpsSystemLogHealth() {
   return useQuery({
     queryKey: queryKeys.admin.opsSystemLogHealth(),

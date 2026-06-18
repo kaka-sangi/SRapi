@@ -16,6 +16,7 @@ export interface LogWindowPreset {
 }
 
 export const LOG_WINDOW_PRESETS: readonly LogWindowPreset[] = [
+  { value: "1h", labelKey: "adminLogs.window1h", minutes: 60 },
   { value: "24h", labelKey: "adminLogs.window24h", minutes: 24 * 60 },
   { value: "7d", labelKey: "adminLogs.window7d", minutes: 7 * 24 * 60 },
   { value: "30d", labelKey: "adminLogs.window30d", minutes: 30 * 24 * 60 },

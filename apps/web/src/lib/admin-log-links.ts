@@ -15,6 +15,14 @@ export function adminErrorLogsHref(params: LogCorrelationIDs): string | null {
   return `${ADMIN_ROUTES.logs}?${query.toString()}`;
 }
 
+/** Build a filtered Request evidence link for a request investigation. */
+export function adminRequestEvidenceHref(params: LogCorrelationIDs): string | null {
+  const query = new URLSearchParams();
+  query.set("tab", "request-evidence");
+  setIfPresent(query, "f_request_id", params.request_id);
+  return hasCorrelation(query) ? `${ADMIN_ROUTES.logs}?${query.toString()}` : null;
+}
+
 /** Build a filtered System logs link for a request/trace investigation. */
 export function adminSystemLogsHref(params: LogCorrelationIDs): string | null {
   const query = new URLSearchParams();

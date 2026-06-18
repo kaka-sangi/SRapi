@@ -1342,13 +1342,13 @@ func (e GatewayUsageResponseMode) Valid() bool {
 
 // Defines values for GatewayUsageResponseObject.
 const (
-	Usage GatewayUsageResponseObject = "usage"
+	GatewayUsageResponseObjectUsage GatewayUsageResponseObject = "usage"
 )
 
 // Valid indicates whether the value is a known member of the GatewayUsageResponseObject enum.
 func (e GatewayUsageResponseObject) Valid() bool {
 	switch e {
-	case Usage:
+	case GatewayUsageResponseObjectUsage:
 		return true
 	default:
 		return false
@@ -2600,6 +2600,72 @@ func (e RedeemCodeType) Valid() bool {
 	}
 }
 
+// Defines values for RequestEvidenceKind.
+const (
+	RequestEvidenceKindError   RequestEvidenceKind = "error"
+	RequestEvidenceKindSuccess RequestEvidenceKind = "success"
+	RequestEvidenceKindUnknown RequestEvidenceKind = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the RequestEvidenceKind enum.
+func (e RequestEvidenceKind) Valid() bool {
+	switch e {
+	case RequestEvidenceKindError:
+		return true
+	case RequestEvidenceKindSuccess:
+		return true
+	case RequestEvidenceKindUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RequestEvidenceRowResolution.
+const (
+	RequestEvidenceRowResolutionInvestigating RequestEvidenceRowResolution = "investigating"
+	RequestEvidenceRowResolutionMuted         RequestEvidenceRowResolution = "muted"
+	RequestEvidenceRowResolutionOpen          RequestEvidenceRowResolution = "open"
+	RequestEvidenceRowResolutionResolved      RequestEvidenceRowResolution = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the RequestEvidenceRowResolution enum.
+func (e RequestEvidenceRowResolution) Valid() bool {
+	switch e {
+	case RequestEvidenceRowResolutionInvestigating:
+		return true
+	case RequestEvidenceRowResolutionMuted:
+		return true
+	case RequestEvidenceRowResolutionOpen:
+		return true
+	case RequestEvidenceRowResolutionResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RequestEvidenceSource.
+const (
+	RequestEvidenceSourceOpsError    RequestEvidenceSource = "ops_error"
+	RequestEvidenceSourceRequestDump RequestEvidenceSource = "request_dump"
+	RequestEvidenceSourceUsage       RequestEvidenceSource = "usage"
+)
+
+// Valid indicates whether the value is a known member of the RequestEvidenceSource enum.
+func (e RequestEvidenceSource) Valid() bool {
+	switch e {
+	case RequestEvidenceSourceOpsError:
+		return true
+	case RequestEvidenceSourceRequestDump:
+		return true
+	case RequestEvidenceSourceUsage:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ResourceStatus.
 const (
 	ResourceStatusActive   ResourceStatus = "active"
@@ -2671,19 +2737,19 @@ func (e ResponsesResponseObject) Valid() bool {
 
 // Defines values for RiskControlLogLevel.
 const (
-	RiskControlLogLevelBlock RiskControlLogLevel = "block"
-	RiskControlLogLevelInfo  RiskControlLogLevel = "info"
-	RiskControlLogLevelWarn  RiskControlLogLevel = "warn"
+	Block RiskControlLogLevel = "block"
+	Info  RiskControlLogLevel = "info"
+	Warn  RiskControlLogLevel = "warn"
 )
 
 // Valid indicates whether the value is a known member of the RiskControlLogLevel enum.
 func (e RiskControlLogLevel) Valid() bool {
 	switch e {
-	case RiskControlLogLevelBlock:
+	case Block:
 		return true
-	case RiskControlLogLevelInfo:
+	case Info:
 		return true
-	case RiskControlLogLevelWarn:
+	case Warn:
 		return true
 	default:
 		return false
@@ -3280,22 +3346,22 @@ func (e ListOpenAICompatibleResponseInputItemsAliasParamsOrder) Valid() bool {
 
 // Defines values for ListAdminOpsErrorLogsParamsResolution.
 const (
-	ListAdminOpsErrorLogsParamsResolutionInvestigating ListAdminOpsErrorLogsParamsResolution = "investigating"
-	ListAdminOpsErrorLogsParamsResolutionMuted         ListAdminOpsErrorLogsParamsResolution = "muted"
-	ListAdminOpsErrorLogsParamsResolutionOpen          ListAdminOpsErrorLogsParamsResolution = "open"
-	ListAdminOpsErrorLogsParamsResolutionResolved      ListAdminOpsErrorLogsParamsResolution = "resolved"
+	Investigating ListAdminOpsErrorLogsParamsResolution = "investigating"
+	Muted         ListAdminOpsErrorLogsParamsResolution = "muted"
+	Open          ListAdminOpsErrorLogsParamsResolution = "open"
+	Resolved      ListAdminOpsErrorLogsParamsResolution = "resolved"
 )
 
 // Valid indicates whether the value is a known member of the ListAdminOpsErrorLogsParamsResolution enum.
 func (e ListAdminOpsErrorLogsParamsResolution) Valid() bool {
 	switch e {
-	case ListAdminOpsErrorLogsParamsResolutionInvestigating:
+	case Investigating:
 		return true
-	case ListAdminOpsErrorLogsParamsResolutionMuted:
+	case Muted:
 		return true
-	case ListAdminOpsErrorLogsParamsResolutionOpen:
+	case Open:
 		return true
-	case ListAdminOpsErrorLogsParamsResolutionResolved:
+	case Resolved:
 		return true
 	default:
 		return false
@@ -3314,6 +3380,72 @@ func (e GetAdminOpsErrorTrendParamsBucket) Valid() bool {
 	case GetAdminOpsErrorTrendParamsBucketDay:
 		return true
 	case GetAdminOpsErrorTrendParamsBucketHour:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListAdminOpsRequestEvidenceParamsKind.
+const (
+	ListAdminOpsRequestEvidenceParamsKindAll     ListAdminOpsRequestEvidenceParamsKind = "all"
+	ListAdminOpsRequestEvidenceParamsKindError   ListAdminOpsRequestEvidenceParamsKind = "error"
+	ListAdminOpsRequestEvidenceParamsKindSuccess ListAdminOpsRequestEvidenceParamsKind = "success"
+	ListAdminOpsRequestEvidenceParamsKindUnknown ListAdminOpsRequestEvidenceParamsKind = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the ListAdminOpsRequestEvidenceParamsKind enum.
+func (e ListAdminOpsRequestEvidenceParamsKind) Valid() bool {
+	switch e {
+	case ListAdminOpsRequestEvidenceParamsKindAll:
+		return true
+	case ListAdminOpsRequestEvidenceParamsKindError:
+		return true
+	case ListAdminOpsRequestEvidenceParamsKindSuccess:
+		return true
+	case ListAdminOpsRequestEvidenceParamsKindUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListAdminOpsRequestEvidenceParamsEvidenceSource.
+const (
+	ListAdminOpsRequestEvidenceParamsEvidenceSourceAll         ListAdminOpsRequestEvidenceParamsEvidenceSource = "all"
+	ListAdminOpsRequestEvidenceParamsEvidenceSourceOpsError    ListAdminOpsRequestEvidenceParamsEvidenceSource = "ops_error"
+	ListAdminOpsRequestEvidenceParamsEvidenceSourceRequestDump ListAdminOpsRequestEvidenceParamsEvidenceSource = "request_dump"
+	ListAdminOpsRequestEvidenceParamsEvidenceSourceUsage       ListAdminOpsRequestEvidenceParamsEvidenceSource = "usage"
+)
+
+// Valid indicates whether the value is a known member of the ListAdminOpsRequestEvidenceParamsEvidenceSource enum.
+func (e ListAdminOpsRequestEvidenceParamsEvidenceSource) Valid() bool {
+	switch e {
+	case ListAdminOpsRequestEvidenceParamsEvidenceSourceAll:
+		return true
+	case ListAdminOpsRequestEvidenceParamsEvidenceSourceOpsError:
+		return true
+	case ListAdminOpsRequestEvidenceParamsEvidenceSourceRequestDump:
+		return true
+	case ListAdminOpsRequestEvidenceParamsEvidenceSourceUsage:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListAdminOpsRequestEvidenceParamsSort.
+const (
+	CreatedAtDesc ListAdminOpsRequestEvidenceParamsSort = "created_at_desc"
+	LatencyDesc   ListAdminOpsRequestEvidenceParamsSort = "latency_desc"
+)
+
+// Valid indicates whether the value is a known member of the ListAdminOpsRequestEvidenceParamsSort enum.
+func (e ListAdminOpsRequestEvidenceParamsSort) Valid() bool {
+	switch e {
+	case CreatedAtDesc:
+		return true
+	case LatencyDesc:
 		return true
 	default:
 		return false
@@ -9518,6 +9650,64 @@ type RequestEmailVerificationRequest struct {
 	Email openapi_types.Email `json:"email"`
 }
 
+// RequestEvidenceKind defines model for RequestEvidenceKind.
+type RequestEvidenceKind string
+
+// RequestEvidenceListResponse defines model for RequestEvidenceListResponse.
+type RequestEvidenceListResponse struct {
+	Data       []RequestEvidenceRow `json:"data"`
+	Pagination Pagination           `json:"pagination"`
+	RequestId  RequestId            `json:"request_id"`
+}
+
+// RequestEvidenceRow defines model for RequestEvidenceRow.
+type RequestEvidenceRow struct {
+	AccountId  *string   `json:"account_id,omitempty"`
+	ApiKeyId   *Id       `json:"api_key_id,omitempty"`
+	AttemptNo  *int      `json:"attempt_no,omitempty"`
+	CreatedAt  Timestamp `json:"created_at"`
+	ErrorClass *string   `json:"error_class,omitempty"`
+
+	// ErrorMessage Bounded, redacted upstream error message when available.
+	ErrorMessage               *string                       `json:"error_message,omitempty"`
+	ErrorOwner                 *string                       `json:"error_owner,omitempty"`
+	ErrorPhase                 *string                       `json:"error_phase,omitempty"`
+	ErrorSource                *string                       `json:"error_source,omitempty"`
+	EvidenceSource             RequestEvidenceSource         `json:"evidence_source"`
+	HasOpsErrorLog             bool                          `json:"has_ops_error_log"`
+	HasRequestDump             bool                          `json:"has_request_dump"`
+	HasUsageLog                bool                          `json:"has_usage_log"`
+	InputTokens                *int                          `json:"input_tokens,omitempty"`
+	Kind                       RequestEvidenceKind           `json:"kind"`
+	LatencyMs                  *int                          `json:"latency_ms,omitempty"`
+	LatestRequestDumpCreatedAt *Timestamp                    `json:"latest_request_dump_created_at,omitempty"`
+	LatestRequestDumpName      *string                       `json:"latest_request_dump_name,omitempty"`
+	Model                      *string                       `json:"model,omitempty"`
+	OpsErrorLogId              *Id                           `json:"ops_error_log_id,omitempty"`
+	OutputTokens               *int                          `json:"output_tokens,omitempty"`
+	ProviderId                 *string                       `json:"provider_id,omitempty"`
+	RequestDumpCount           int                           `json:"request_dump_count"`
+	RequestDumpErrorCount      int                           `json:"request_dump_error_count"`
+	RequestId                  string                        `json:"request_id"`
+	Resolution                 *RequestEvidenceRowResolution `json:"resolution,omitempty"`
+	SourceEndpoint             *string                       `json:"source_endpoint,omitempty"`
+	SourceProtocol             *string                       `json:"source_protocol,omitempty"`
+	StatusCode                 *int                          `json:"status_code,omitempty"`
+	Success                    *bool                         `json:"success,omitempty"`
+	TargetProtocol             *string                       `json:"target_protocol,omitempty"`
+	TotalTokens                *int                          `json:"total_tokens,omitempty"`
+	UpstreamRequestId          *string                       `json:"upstream_request_id,omitempty"`
+	UsageEstimated             *bool                         `json:"usage_estimated,omitempty"`
+	UsageLogId                 *Id                           `json:"usage_log_id,omitempty"`
+	UserId                     *Id                           `json:"user_id,omitempty"`
+}
+
+// RequestEvidenceRowResolution defines model for RequestEvidenceRow.Resolution.
+type RequestEvidenceRowResolution string
+
+// RequestEvidenceSource defines model for RequestEvidenceSource.
+type RequestEvidenceSource string
+
 // RequestId defines model for RequestId.
 type RequestId = string
 
@@ -11753,6 +11943,49 @@ type ListAdminOpsRealtimeSlotsParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
+
+// ListAdminOpsRequestEvidenceParams defines parameters for ListAdminOpsRequestEvidence.
+type ListAdminOpsRequestEvidenceParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+
+	// RequestId Prefix filter against gateway request ids.
+	RequestId      *string `form:"request_id,omitempty" json:"request_id,omitempty"`
+	UserId         *Id     `form:"user_id,omitempty" json:"user_id,omitempty"`
+	ApiKeyId       *Id     `form:"api_key_id,omitempty" json:"api_key_id,omitempty"`
+	AccountId      *Id     `form:"account_id,omitempty" json:"account_id,omitempty"`
+	ProviderId     *Id     `form:"provider_id,omitempty" json:"provider_id,omitempty"`
+	Model          *string `form:"model,omitempty" json:"model,omitempty"`
+	SourceEndpoint *string `form:"source_endpoint,omitempty" json:"source_endpoint,omitempty"`
+	ErrorClass     *string `form:"error_class,omitempty" json:"error_class,omitempty"`
+
+	// Kind Filter by the final request outcome.
+	Kind *ListAdminOpsRequestEvidenceParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// EvidenceSource Filter by the primary evidence source used for the row.
+	EvidenceSource *ListAdminOpsRequestEvidenceParamsEvidenceSource `form:"evidence_source,omitempty" json:"evidence_source,omitempty"`
+	MinLatencyMs   *int                                             `form:"min_latency_ms,omitempty" json:"min_latency_ms,omitempty"`
+	MaxLatencyMs   *int                                             `form:"max_latency_ms,omitempty" json:"max_latency_ms,omitempty"`
+
+	// Start Inclusive start of the evidence window. Defaults to one hour before now.
+	Start *time.Time `form:"start,omitempty" json:"start,omitempty"`
+
+	// End Exclusive end of the evidence window. Defaults to now.
+	End  *time.Time                             `form:"end,omitempty" json:"end,omitempty"`
+	Sort *ListAdminOpsRequestEvidenceParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// Q Case-insensitive search across request id, model, endpoint, error class, and error message.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+}
+
+// ListAdminOpsRequestEvidenceParamsKind defines parameters for ListAdminOpsRequestEvidence.
+type ListAdminOpsRequestEvidenceParamsKind string
+
+// ListAdminOpsRequestEvidenceParamsEvidenceSource defines parameters for ListAdminOpsRequestEvidence.
+type ListAdminOpsRequestEvidenceParamsEvidenceSource string
+
+// ListAdminOpsRequestEvidenceParamsSort defines parameters for ListAdminOpsRequestEvidence.
+type ListAdminOpsRequestEvidenceParamsSort string
 
 // ListAdminOpsSLOsParams defines parameters for ListAdminOpsSLOs.
 type ListAdminOpsSLOsParams struct {
@@ -20145,6 +20378,9 @@ type ServerInterface interface {
 	// List active realtime WebSocket slots on this API node.
 	// (GET /api/v1/admin/ops/realtime/slots)
 	ListAdminOpsRealtimeSlots(w http.ResponseWriter, r *http.Request, params ListAdminOpsRealtimeSlotsParams)
+	// List request-level operational evidence.
+	// (GET /api/v1/admin/ops/request-evidence)
+	ListAdminOpsRequestEvidence(w http.ResponseWriter, r *http.Request, params ListAdminOpsRequestEvidenceParams)
 	// Update operational monitoring settings.
 	// (PUT /api/v1/admin/ops/settings)
 	UpdateAdminOpsSettings(w http.ResponseWriter, r *http.Request)
@@ -27618,6 +27854,266 @@ func (siw *ServerInterfaceWrapper) ListAdminOpsRealtimeSlots(w http.ResponseWrit
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminOpsRealtimeSlots(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminOpsRequestEvidence operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminOpsRequestEvidence(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminOpsRequestEvidenceParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "request_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "request_id", r.URL.Query(), &params.RequestId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "request_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "request_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "api_key_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "api_key_id", r.URL.Query(), &params.ApiKeyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "api_key_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "api_key_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "account_id", r.URL.Query(), &params.AccountId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "provider_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "provider_id", r.URL.Query(), &params.ProviderId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "provider_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "model" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "model", r.URL.Query(), &params.Model, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "model"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "source_endpoint" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "source_endpoint", r.URL.Query(), &params.SourceEndpoint, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "source_endpoint"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source_endpoint", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error_class" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_class", r.URL.Query(), &params.ErrorClass, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_class"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_class", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "evidence_source" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "evidence_source", r.URL.Query(), &params.EvidenceSource, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "evidence_source"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "evidence_source", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "min_latency_ms" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "min_latency_ms", r.URL.Query(), &params.MinLatencyMs, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "min_latency_ms"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "min_latency_ms", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "max_latency_ms" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "max_latency_ms", r.URL.Query(), &params.MaxLatencyMs, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "max_latency_ms"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "max_latency_ms", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminOpsRequestEvidence(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -36058,6 +36554,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/latency-histogram", wrapper.GetAdminOpsLatencyHistogram)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/overview", wrapper.GetAdminOpsOverview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/realtime/slots", wrapper.ListAdminOpsRealtimeSlots)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/request-evidence", wrapper.ListAdminOpsRequestEvidence)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/ops/settings", wrapper.UpdateAdminOpsSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/slo", wrapper.ListAdminOpsSLOs)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/slo", wrapper.CreateAdminOpsSLO)

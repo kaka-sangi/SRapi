@@ -9716,6 +9716,125 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/ops/request-evidence:
+    get:
+      tags:
+        - AdminOps
+      operationId: listAdminOpsRequestEvidence
+      summary: List request-level operational evidence.
+      description: |
+        Returns a unified request evidence feed built from usage logs,
+        operator error logs, and captured request dump descriptors. The
+        response only includes safe metadata; raw request and response bodies
+        remain available through the request-log-file preview/download APIs.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: request_id
+          in: query
+          description: Prefix filter against gateway request ids.
+          schema:
+            type: string
+        - name: user_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: api_key_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: account_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: provider_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: model
+          in: query
+          schema:
+            type: string
+        - name: source_endpoint
+          in: query
+          schema:
+            type: string
+        - name: error_class
+          in: query
+          schema:
+            type: string
+        - name: kind
+          in: query
+          description: Filter by the final request outcome.
+          schema:
+            type: string
+            enum: [all, success, error, unknown]
+            default: all
+        - name: evidence_source
+          in: query
+          description: Filter by the primary evidence source used for the row.
+          schema:
+            type: string
+            enum: [all, usage, ops_error, request_dump]
+            default: all
+        - name: min_latency_ms
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+        - name: max_latency_ms
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+        - name: start
+          in: query
+          description: Inclusive start of the evidence window. Defaults to one hour before now.
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          description: Exclusive end of the evidence window. Defaults to now.
+          schema:
+            type: string
+            format: date-time
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_at_desc, latency_desc]
+            default: created_at_desc
+        - name: q
+          in: query
+          description: Case-insensitive search across request id, model, endpoint, error class, and error message.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Request-level operational evidence.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestEvidenceListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/ops/error-logs/{id}:
     get:
       tags:
@@ -27718,6 +27837,133 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/RequestLogFileDescriptor"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RequestEvidenceKind:
+      type: string
+      enum:
+        - success
+        - error
+        - unknown
+
+    RequestEvidenceSource:
+      type: string
+      enum:
+        - usage
+        - ops_error
+        - request_dump
+
+    RequestEvidenceRow:
+      type: object
+      required:
+        - kind
+        - evidence_source
+        - created_at
+        - request_id
+        - has_usage_log
+        - has_ops_error_log
+        - has_request_dump
+        - request_dump_count
+        - request_dump_error_count
+      properties:
+        kind:
+          $ref: "#/components/schemas/RequestEvidenceKind"
+        evidence_source:
+          $ref: "#/components/schemas/RequestEvidenceSource"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        request_id:
+          type: string
+        usage_log_id:
+          $ref: "#/components/schemas/Id"
+        ops_error_log_id:
+          $ref: "#/components/schemas/Id"
+        user_id:
+          $ref: "#/components/schemas/Id"
+        api_key_id:
+          $ref: "#/components/schemas/Id"
+        account_id:
+          type: string
+        provider_id:
+          type: string
+        source_protocol:
+          type: string
+        source_endpoint:
+          type: string
+        target_protocol:
+          type: string
+        model:
+          type: string
+        status_code:
+          type: integer
+          minimum: 100
+          maximum: 599
+        success:
+          type: boolean
+        error_class:
+          type: string
+        error_message:
+          type: string
+          description: Bounded, redacted upstream error message when available.
+        error_phase:
+          type: string
+        error_owner:
+          type: string
+        error_source:
+          type: string
+        upstream_request_id:
+          type: string
+        attempt_no:
+          type: integer
+          minimum: 1
+        latency_ms:
+          type: integer
+          minimum: 0
+        input_tokens:
+          type: integer
+          minimum: 0
+        output_tokens:
+          type: integer
+          minimum: 0
+        total_tokens:
+          type: integer
+          minimum: 0
+        usage_estimated:
+          type: boolean
+        resolution:
+          type: string
+          enum: [open, investigating, resolved, muted]
+        has_usage_log:
+          type: boolean
+        has_ops_error_log:
+          type: boolean
+        has_request_dump:
+          type: boolean
+        request_dump_count:
+          type: integer
+          minimum: 0
+        request_dump_error_count:
+          type: integer
+          minimum: 0
+        latest_request_dump_name:
+          type: string
+        latest_request_dump_created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    RequestEvidenceListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequestEvidenceRow"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
         request_id:
           $ref: "#/components/schemas/RequestId"
 
