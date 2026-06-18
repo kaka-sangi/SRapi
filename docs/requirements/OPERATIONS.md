@@ -441,6 +441,12 @@ srapi_provider_errors_total
 srapi_provider_probe_latency_seconds
 srapi_usage_tokens_total
 srapi_reverse_proxy_ban_signals_total
+srapi_ops_error_log_queue_depth
+srapi_ops_error_log_queue_capacity
+srapi_ops_error_log_enqueued_total
+srapi_ops_error_log_processed_total
+srapi_ops_error_log_dropped_total
+srapi_ops_error_log_write_failures_total
 ```
 
 AI Gateway 专项指标以 `OBSERVABILITY_SPEC.md` 为准。

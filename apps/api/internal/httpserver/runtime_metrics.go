@@ -66,6 +66,12 @@ type runtimeMetricDescs struct {
 	proxyProbeOutcomes            *prometheus.Desc
 	accountsTokenRefreshAttempts  *prometheus.Desc
 	accountsTokenRefreshOutcomes  *prometheus.Desc
+	opsErrorLogQueueDepth         *prometheus.Desc
+	opsErrorLogQueueCapacity      *prometheus.Desc
+	opsErrorLogEnqueued           *prometheus.Desc
+	opsErrorLogProcessed          *prometheus.Desc
+	opsErrorLogDropped            *prometheus.Desc
+	opsErrorLogWriteFailures      *prometheus.Desc
 }
 
 func newRuntimeMetricsCollector(ctx context.Context, rt *runtimeState) *runtimeMetricsCollector {
@@ -256,6 +262,42 @@ func newRuntimeMetricsCollector(ctx context.Context, rt *runtimeState) *runtimeM
 				[]string{"outcome"},
 				nil,
 			),
+			opsErrorLogQueueDepth: prometheus.NewDesc(
+				"srapi_ops_error_log_queue_depth",
+				"Current queued ops_error_logs records waiting for asynchronous persistence.",
+				nil,
+				nil,
+			),
+			opsErrorLogQueueCapacity: prometheus.NewDesc(
+				"srapi_ops_error_log_queue_capacity",
+				"Capacity of the asynchronous ops_error_logs queue.",
+				nil,
+				nil,
+			),
+			opsErrorLogEnqueued: prometheus.NewDesc(
+				"srapi_ops_error_log_enqueued_total",
+				"Ops error log records accepted into the asynchronous persistence queue.",
+				nil,
+				nil,
+			),
+			opsErrorLogProcessed: prometheus.NewDesc(
+				"srapi_ops_error_log_processed_total",
+				"Ops error log records processed by the asynchronous persistence worker.",
+				nil,
+				nil,
+			),
+			opsErrorLogDropped: prometheus.NewDesc(
+				"srapi_ops_error_log_dropped_total",
+				"Ops error log records dropped because the asynchronous queue was full or draining.",
+				nil,
+				nil,
+			),
+			opsErrorLogWriteFailures: prometheus.NewDesc(
+				"srapi_ops_error_log_write_failures_total",
+				"Ops error log records whose asynchronous persistence write failed.",
+				nil,
+				nil,
+			),
 		},
 	}
 }
@@ -301,6 +343,12 @@ func (d runtimeMetricDescs) all() []*prometheus.Desc {
 		d.proxyProbeOutcomes,
 		d.accountsTokenRefreshAttempts,
 		d.accountsTokenRefreshOutcomes,
+		d.opsErrorLogQueueDepth,
+		d.opsErrorLogQueueCapacity,
+		d.opsErrorLogEnqueued,
+		d.opsErrorLogProcessed,
+		d.opsErrorLogDropped,
+		d.opsErrorLogWriteFailures,
 	}
 }
 
@@ -322,6 +370,15 @@ func (c *runtimeMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (c *runtimeMetricsCollector) collectWorkerMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {
+	if c.rt.opsErrorLogRecorder != nil {
+		snapshot := c.rt.opsErrorLogRecorder.snapshot()
+		emitConstMetric(ch, emitted, "srapi_ops_error_log_queue_depth", c.descs.opsErrorLogQueueDepth, prometheus.GaugeValue, float64(snapshot.Queued))
+		emitConstMetric(ch, emitted, "srapi_ops_error_log_queue_capacity", c.descs.opsErrorLogQueueCapacity, prometheus.GaugeValue, float64(snapshot.Capacity))
+		emitConstMetric(ch, emitted, "srapi_ops_error_log_enqueued_total", c.descs.opsErrorLogEnqueued, prometheus.CounterValue, float64(snapshot.Enqueued))
+		emitConstMetric(ch, emitted, "srapi_ops_error_log_processed_total", c.descs.opsErrorLogProcessed, prometheus.CounterValue, float64(snapshot.Processed))
+		emitConstMetric(ch, emitted, "srapi_ops_error_log_dropped_total", c.descs.opsErrorLogDropped, prometheus.CounterValue, float64(snapshot.Dropped))
+		emitConstMetric(ch, emitted, "srapi_ops_error_log_write_failures_total", c.descs.opsErrorLogWriteFailures, prometheus.CounterValue, float64(snapshot.WriteFailed))
+	}
 	if c.rt.proxyProbeMetrics != nil {
 		snapshot := c.rt.proxyProbeMetrics()
 		emitConstMetric(ch, emitted, "srapi_proxy_probe_attempts_total", c.descs.proxyProbeAttempts, prometheus.CounterValue, float64(snapshot.ProbeAttempted))

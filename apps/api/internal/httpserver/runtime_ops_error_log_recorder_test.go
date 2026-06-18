@@ -5,11 +5,14 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
 	opserrorlogsservice "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/service"
 )
@@ -176,4 +179,102 @@ func TestOpsErrorLogRecorderLogsQueueDrops(t *testing.T) {
 	if got := buf.String(); !strings.Contains(got, "ops_error_logs async queue full; dropping error evidence") {
 		t.Fatalf("expected queue drop warning, got %q", got)
 	}
+}
+
+func TestOpsErrorLogRecorderMetricsExposeDropsAndFailures(t *testing.T) {
+	store := newBlockingOpsErrorLogStore()
+	svc, err := opserrorlogsservice.New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	recorder := newOpsErrorLogRecorder(svc, nil, opsErrorLogRecorderConfig{QueueSize: 1, WriteTimeout: time.Second})
+	defer func() {
+		close(store.release)
+		recorder.drain(context.Background())
+	}()
+
+	if !recorder.enqueue(opserrorlogscontract.RecordRequest{RequestID: "req_blocking", ErrorMessage: "provider failed"}) {
+		t.Fatal("expected first enqueue to start worker")
+	}
+	select {
+	case <-store.entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("async worker did not enter blocking store")
+	}
+	if !recorder.enqueue(opserrorlogscontract.RecordRequest{RequestID: "req_buffered", ErrorMessage: "provider failed"}) {
+		t.Fatal("expected second enqueue to fill queue buffer")
+	}
+	if recorder.enqueue(opserrorlogscontract.RecordRequest{RequestID: "req_dropped", ErrorMessage: "provider failed"}) {
+		t.Fatal("expected third enqueue to be dropped when queue is full")
+	}
+
+	collector := newOpsErrorLogRecorderMetricsTestCollector(recorder)
+	metrics := gatherRecorderMetrics(t, collector)
+	for _, expected := range []string{
+		"srapi_ops_error_log_dropped_total 1",
+		"srapi_ops_error_log_enqueued_total 2",
+		"srapi_ops_error_log_processed_total 0",
+		"srapi_ops_error_log_queue_capacity 1",
+		"srapi_ops_error_log_queue_depth 1",
+		"srapi_ops_error_log_write_failures_total 0",
+	} {
+		if !strings.Contains(metrics, expected) {
+			t.Fatalf("expected metrics to contain %q, got:\n%s", expected, metrics)
+		}
+	}
+}
+
+func TestOpsErrorLogRecorderMetricsExposeWriteFailures(t *testing.T) {
+	svc, err := opserrorlogsservice.New(failingOpsErrorLogStore{err: errors.New("store unavailable")}, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	recorder := newOpsErrorLogRecorder(svc, nil, opsErrorLogRecorderConfig{QueueSize: 1, WriteTimeout: time.Second})
+	if !recorder.enqueue(opserrorlogscontract.RecordRequest{RequestID: "req_failed_ops", ErrorMessage: "provider failed"}) {
+		t.Fatal("expected enqueue to succeed")
+	}
+	recorder.drain(context.Background())
+
+	metrics := gatherRecorderMetrics(t, newOpsErrorLogRecorderMetricsTestCollector(recorder))
+	if expected := "srapi_ops_error_log_write_failures_total 1"; !strings.Contains(metrics, expected) {
+		t.Fatalf("expected metrics to contain %q, got:\n%s", expected, metrics)
+	}
+}
+
+type opsErrorLogRecorderMetricsTestCollector struct {
+	inner *runtimeMetricsCollector
+}
+
+func newOpsErrorLogRecorderMetricsTestCollector(recorder *opsErrorLogRecorder) opsErrorLogRecorderMetricsTestCollector {
+	return opsErrorLogRecorderMetricsTestCollector{
+		inner: newRuntimeMetricsCollector(context.Background(), &runtimeState{opsErrorLogRecorder: recorder}),
+	}
+}
+
+func (c opsErrorLogRecorderMetricsTestCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- c.inner.descs.opsErrorLogQueueDepth
+	ch <- c.inner.descs.opsErrorLogQueueCapacity
+	ch <- c.inner.descs.opsErrorLogEnqueued
+	ch <- c.inner.descs.opsErrorLogProcessed
+	ch <- c.inner.descs.opsErrorLogDropped
+	ch <- c.inner.descs.opsErrorLogWriteFailures
+}
+
+func (c opsErrorLogRecorderMetricsTestCollector) Collect(ch chan<- prometheus.Metric) {
+	c.inner.collectWorkerMetrics(ch, map[string]bool{})
+}
+
+func gatherRecorderMetrics(t *testing.T, collector prometheus.Collector) string {
+	t.Helper()
+	registry := prometheus.NewPedanticRegistry()
+	if err := registry.Register(collector); err != nil {
+		t.Fatalf("register collector: %v", err)
+	}
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	rec := httptest.NewRecorder()
+	promhttp.HandlerFor(registry, promhttp.HandlerOpts{ErrorHandling: promhttp.HTTPErrorOnError}).ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("expected metrics 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	return rec.Body.String()
 }

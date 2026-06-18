@@ -32,7 +32,10 @@ type opsErrorLogRecorder struct {
 	started      atomic.Bool
 	stopOnce     sync.Once
 	done         chan struct{}
+	enqueued     atomic.Int64
+	processed    atomic.Int64
 	dropped      atomic.Int64
+	writeFailed  atomic.Int64
 }
 
 func newOpsErrorLogRecorder(service *opserrorlogsservice.Service, logger *slog.Logger, cfg opsErrorLogRecorderConfig) *opsErrorLogRecorder {
@@ -72,6 +75,7 @@ func (r *opsErrorLogRecorder) enqueue(req opserrorlogscontract.RecordRequest) bo
 	})
 	select {
 	case r.queue <- req:
+		r.enqueued.Add(1)
 		r.mu.RUnlock()
 		return true
 	default:
@@ -117,7 +121,41 @@ func (r *opsErrorLogRecorder) run() {
 func (r *opsErrorLogRecorder) record(req opserrorlogscontract.RecordRequest) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.writeTimeout)
 	defer cancel()
-	if err := r.service.RecordError(ctx, req); err != nil && r.logger != nil {
-		r.logger.Warn("ops_error_logs RecordError failed", "request_id", req.RequestID, "error", err)
+	if err := r.service.RecordError(ctx, req); err != nil {
+		r.writeFailed.Add(1)
+		if r.logger != nil {
+			r.logger.Warn("ops_error_logs RecordError failed", "request_id", req.RequestID, "error", err)
+		}
+	}
+	r.processed.Add(1)
+}
+
+type opsErrorLogRecorderSnapshot struct {
+	Queued      int
+	Capacity    int
+	Enqueued    int64
+	Processed   int64
+	Dropped     int64
+	WriteFailed int64
+	Started     bool
+	Draining    bool
+}
+
+func (r *opsErrorLogRecorder) snapshot() opsErrorLogRecorderSnapshot {
+	if r == nil {
+		return opsErrorLogRecorderSnapshot{}
+	}
+	r.mu.RLock()
+	draining := r.draining
+	r.mu.RUnlock()
+	return opsErrorLogRecorderSnapshot{
+		Queued:      len(r.queue),
+		Capacity:    cap(r.queue),
+		Enqueued:    r.enqueued.Load(),
+		Processed:   r.processed.Load(),
+		Dropped:     r.dropped.Load(),
+		WriteFailed: r.writeFailed.Load(),
+		Started:     r.started.Load(),
+		Draining:    draining,
 	}
 }
