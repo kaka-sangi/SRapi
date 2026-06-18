@@ -1592,6 +1592,9 @@ export const en = {
     total: "Total",
     emptyTitle: "No system logs",
     emptyBody: "Application logs will appear here once events are emitted.",
+    relatedEvidence: "Related evidence",
+    openErrorLogs: "Error logs",
+    openRequestDumps: "Request dumps",
   },
   adminOpsCleanup: {
     action: "Clean up logs",

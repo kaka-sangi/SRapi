@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { PageHeader } from "@/components/layout/page-header";
@@ -30,8 +30,8 @@ import type { RequestLogFileDescriptor } from "@/lib/admin-api/request-log-files
 export function RequestLogFilesPanel() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
-  const [errorOnly, setErrorOnly] = useState(false);
-  const [prefix, setPrefix] = useState("");
+  const [errorOnly, setErrorOnly] = useState(() => readInitialErrorOnly());
+  const [prefix, setPrefix] = useState(() => readInitialRequestIDPrefix());
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [selected, setSelected] = useState<RequestLogFileDescriptor | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RequestLogFileDescriptor | null>(null);
@@ -47,6 +47,19 @@ export function RequestLogFilesPanel() {
   const downloadQuery = useAdminRequestLogFileDownload(selected?.name ?? null, selected !== null);
   const deleteMutation = useDeleteAdminRequestLogFile();
   const items = useMemo(() => filesQuery.data?.data ?? [], [filesQuery.data?.data]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    sp.delete("f_request_id");
+    sp.delete("f_error_only");
+    const trimmed = prefix.trim();
+    if (trimmed) sp.set("f_request_id", trimmed);
+    if (errorOnly) sp.set("f_error_only", "true");
+    const qs = sp.toString();
+    const next = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(window.history.state, "", next);
+  }, [errorOnly, prefix]);
 
   const openPreview = useCallback((file: RequestLogFileDescriptor) => {
     setSelected(file);
@@ -243,6 +256,18 @@ export function RequestLogFilesPanel() {
       />
     </div>
   );
+}
+
+function readInitialRequestIDPrefix(): string {
+  if (typeof window === "undefined") return "";
+  const sp = new URLSearchParams(window.location.search);
+  return sp.get("f_request_id") ?? "";
+}
+
+function readInitialErrorOnly(): boolean {
+  if (typeof window === "undefined") return false;
+  const sp = new URLSearchParams(window.location.search);
+  return sp.get("f_error_only") === "true";
 }
 
 function formatSize(bytes: number): string {

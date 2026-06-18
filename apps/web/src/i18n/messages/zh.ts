@@ -1570,6 +1570,9 @@ export const zh: Messages = {
     total: "总数",
     emptyTitle: "暂无系统日志",
     emptyBody: "应用发出日志事件后会在此显示。",
+    relatedEvidence: "关联证据",
+    openErrorLogs: "错误日志",
+    openRequestDumps: "请求转储",
   },
   adminOpsCleanup: {
     action: "清理日志",

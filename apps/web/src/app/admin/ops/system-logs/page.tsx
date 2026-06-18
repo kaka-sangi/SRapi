@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { FileText } from "lucide-react";
+import Link from "next/link";
+import { Bug, ExternalLink, FileText } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
@@ -10,6 +11,7 @@ import { OpsLogCleanupDialog } from "@/components/admin/ops-log-cleanup-dialog";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -23,6 +25,7 @@ import { QuietBadge } from "@/components/ui/quiet-badge";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useOpsSystemLogHealth, useOpsSystemLogs } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { adminErrorLogsHref, adminRequestDumpsHref } from "@/lib/admin-log-links";
 import { formatDateTime, formatInteger, safeJson } from "@/lib/admin-format";
 import type { OpsSystemLog, OpsSystemLogHealth, OpsSystemLogLevel } from "@/lib/sdk-types";
 
@@ -195,6 +198,7 @@ function Content() {
                   </pre>
                 </div>
               ) : null}
+              <RelatedEvidenceLinks log={detail} />
             </div>
           ) : null}
         </DialogContent>
@@ -352,7 +356,45 @@ function KV({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-3">
       <dt className="w-24 shrink-0 text-2xs uppercase text-srapi-text-tertiary">{label}</dt>
-      <dd className="font-mono text-2xs text-srapi-text-secondary break-all">{value}</dd>
+      <dd className="flex min-w-0 items-center gap-1.5 font-mono text-2xs text-srapi-text-secondary">
+        <span className="break-all">{value}</span>
+        <CopyButton value={value} size="inline" />
+      </dd>
+    </div>
+  );
+}
+
+function RelatedEvidenceLinks({ log }: { log: OpsSystemLog }) {
+  const { t } = useLanguage();
+  const errorHref = adminErrorLogsHref(log);
+  const requestDumpHref = adminRequestDumpsHref(log);
+  if (!errorHref && !requestDumpHref) return null;
+
+  return (
+    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-3">
+      <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+        {t("adminOpsSystemLogs.relatedEvidence")}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {errorHref ? (
+          <Button asChild variant="outline" size="sm">
+            <Link href={errorHref}>
+              <Bug aria-hidden />
+              {t("adminOpsSystemLogs.openErrorLogs")}
+              <ExternalLink aria-hidden />
+            </Link>
+          </Button>
+        ) : null}
+        {requestDumpHref ? (
+          <Button asChild variant="outline" size="sm">
+            <Link href={requestDumpHref}>
+              <FileText aria-hidden />
+              {t("adminOpsSystemLogs.openRequestDumps")}
+              <ExternalLink aria-hidden />
+            </Link>
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
