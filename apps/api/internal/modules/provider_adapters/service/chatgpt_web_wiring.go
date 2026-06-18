@@ -1,9 +1,9 @@
 // Activation glue for the four ChatGPT-web components ported from chatgpt2api:
 //
-//   1. cloudflare_clearance        (pkg/httputil)
-//   2. chatgpt_web_files           (multimodal upload)
-//   3. chatgpt_web_image_slots     (per-account concurrency)
-//   4. chatgpt_web_ws_fallback     (always-SSE policy + metrics)
+//  1. cloudflare_clearance        (pkg/httputil)
+//  2. chatgpt_web_files           (multimodal upload)
+//  3. chatgpt_web_image_slots     (per-account concurrency)
+//  4. chatgpt_web_ws_fallback     (always-SSE policy + metrics)
 //
 // PR-1 & PR-2 shipped components as dead code; this wiring file is the
 // explicit contrast. Every helper here has a call site in chatgpt_web.go

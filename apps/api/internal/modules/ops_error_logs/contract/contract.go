@@ -32,28 +32,28 @@ const (
 // + user + request identifiers, a redacted body excerpt, and resolution
 // metadata. Bodies are pre-sanitized before they reach the store.
 type Entry struct {
-	ID              int64
-	OccurredAt      time.Time
-	RequestID       string
-	TraceID         string
-	UserID          *int
-	APIKeyID        *int
-	AccountID       *int
-	ProviderID      *int
-	Platform        string
-	SourceEndpoint  string
-	Model           string
-	StatusCode      *int
-	ErrorClass      string
-	ErrorPhase      string
-	ErrorMessage    string
+	ID               int64
+	OccurredAt       time.Time
+	RequestID        string
+	TraceID          string
+	UserID           *int
+	APIKeyID         *int
+	AccountID        *int
+	ProviderID       *int
+	Platform         string
+	SourceEndpoint   string
+	Model            string
+	StatusCode       *int
+	ErrorClass       string
+	ErrorPhase       string
+	ErrorMessage     string
 	ErrorBodyExcerpt string
-	Resolution      Resolution
-	ResolutionNote  string
-	ResolvedAt      *time.Time
-	ResolvedByID    *int
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	Resolution       Resolution
+	ResolutionNote   string
+	ResolvedAt       *time.Time
+	ResolvedByID     *int
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // RecordRequest is the write input handed to Service.RecordError. It carries
@@ -81,18 +81,18 @@ type RecordRequest struct {
 // surface (paginated list with optional user/account/status/resolution
 // filters and a time window).
 type ListFilter struct {
-	UserID       *int
-	AccountID    *int
-	ProviderID   *int
-	Platform     string
-	ErrorClass   string
-	Resolution   Resolution
+	UserID        *int
+	AccountID     *int
+	ProviderID    *int
+	Platform      string
+	ErrorClass    string
+	Resolution    Resolution
 	StatusCodeMin *int
 	StatusCodeMax *int
-	From         *time.Time
-	To           *time.Time
-	Page         int
-	PageSize     int
+	From          *time.Time
+	To            *time.Time
+	Page          int
+	PageSize      int
 }
 
 // ListResult is the paginated envelope returned by Service.List.

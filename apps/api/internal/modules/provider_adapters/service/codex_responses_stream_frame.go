@@ -161,7 +161,9 @@ func (s *codexResponsesStreamFrameParser) Finalize() []contract.ConversationStre
 	return cloneConversationStreamEventsTail(s.streamEvents, before)
 }
 
-type codexResponsesUpstreamStreamParser struct{ state *codexResponsesStreamFrameParser }
+type codexResponsesUpstreamStreamParser struct {
+	state *codexResponsesStreamFrameParser
+}
 
 func (p *codexResponsesUpstreamStreamParser) FeedFrame(eventType, data string) ([]contract.ConversationStreamEvent, bool, error) {
 	return p.state.FeedFrame(sseFrame{Event: eventType, Data: data})

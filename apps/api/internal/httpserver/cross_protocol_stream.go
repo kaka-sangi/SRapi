@@ -146,7 +146,9 @@ type clientStreamTranscoder interface {
 
 // chatTranscoder serializes Chat Completions chunks ("data: {json}\n\n",
 // terminated by data: [DONE]).
-type chatTranscoder struct{ renderer *gatewayservice.ChatStreamRenderer }
+type chatTranscoder struct {
+	renderer *gatewayservice.ChatStreamRenderer
+}
 
 func (t *chatTranscoder) feed(events []gatewaycontract.StreamEvent) []byte {
 	var b bytes.Buffer
@@ -179,7 +181,9 @@ func writeChatChunkSSE(b *bytes.Buffer, chunk map[string]any) {
 
 // anthropicTranscoder serializes Anthropic Messages named events
 // ("event: X\ndata: {json}\n\n"); there is no [DONE] sentinel.
-type anthropicTranscoder struct{ renderer *gatewayservice.AnthropicStreamRenderer }
+type anthropicTranscoder struct {
+	renderer *gatewayservice.AnthropicStreamRenderer
+}
 
 func (t *anthropicTranscoder) feed(events []gatewaycontract.StreamEvent) []byte {
 	var b bytes.Buffer
@@ -216,7 +220,9 @@ func writeAnthropicEventSSE(b *bytes.Buffer, event gatewayservice.StreamEvent) {
 
 // geminiTranscoder serializes Gemini streamGenerateContent chunks
 // ("data: {json}\n\n"); there is no event name or [DONE] sentinel.
-type geminiTranscoder struct{ renderer *gatewayservice.GeminiStreamRenderer }
+type geminiTranscoder struct {
+	renderer *gatewayservice.GeminiStreamRenderer
+}
 
 func (t *geminiTranscoder) feed(events []gatewaycontract.StreamEvent) []byte {
 	var b bytes.Buffer
@@ -252,7 +258,9 @@ func writeGeminiChunkSSE(b *bytes.Buffer, event gatewayservice.StreamEvent) {
 // responsesTranscoder serializes OpenAI Responses named events
 // ("event: X\ndata: {json}\n\n"), terminated by [DONE] to match SRapi's existing
 // /v1/responses stream path.
-type responsesTranscoder struct{ renderer *gatewayservice.ResponsesStreamRenderer }
+type responsesTranscoder struct {
+	renderer *gatewayservice.ResponsesStreamRenderer
+}
 
 func (t *responsesTranscoder) feed(events []gatewaycontract.StreamEvent) []byte {
 	var b bytes.Buffer

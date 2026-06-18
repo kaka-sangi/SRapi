@@ -55,8 +55,8 @@ type Translator struct {
 // the hot path vastly outnumber registrations (which happen once at
 // package init).
 type Registry struct {
-	mu           sync.RWMutex
-	translators  map[Pair]Translator
+	mu          sync.RWMutex
+	translators map[Pair]Translator
 }
 
 // NewRegistry returns an empty registry with no translators registered.

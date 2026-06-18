@@ -214,8 +214,8 @@ func (st *wsIdleSessionStore) sweep() {
 	timeout := st.timeout
 
 	type expiredSession struct {
-		sess     *wsIdleSession
-		idleFor  time.Duration
+		sess    *wsIdleSession
+		idleFor time.Duration
 	}
 	var expired []expiredSession
 

@@ -450,12 +450,12 @@ func sortStrings(values []string) {
 // bearer-style credentials. Anything matching (case-insensitively) is
 // redacted in the on-disk dump.
 var sensitiveHeaders = map[string]struct{}{
-	"authorization":   {},
+	"authorization":       {},
 	"proxy-authorization": {},
-	"cookie":          {},
-	"set-cookie":      {},
-	"x-api-key":       {},
-	"x-goog-api-key":  {},
+	"cookie":              {},
+	"set-cookie":          {},
+	"x-api-key":           {},
+	"x-goog-api-key":      {},
 	"x-anthropic-api-key": {},
 }
 

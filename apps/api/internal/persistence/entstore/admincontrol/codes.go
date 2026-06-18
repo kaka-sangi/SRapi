@@ -89,8 +89,8 @@ func (s *Store) DeleteRedeemCode(ctx context.Context, id int) (admincontrolcontr
 //   - "not_found"          id not present
 //   - "already_disabled"   row already has status=disabled; nothing changes
 //   - "expired"            row has expires_at in the past; still disabled but
-//                          tagged with disabled_reason=expired so the operator
-//                          knows why it counts as "no-op-ish"
+//     tagged with disabled_reason=expired so the operator
+//     knows why it counts as "no-op-ish"
 //   - "admin_action"       normal operator-driven disable
 //
 // The note is written onto every row we actually flip (not rows we skip).

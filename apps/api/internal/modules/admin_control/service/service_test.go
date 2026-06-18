@@ -768,10 +768,10 @@ func TestBatchUpdateRedeemCodesPerRowFailureSurfaces(t *testing.T) {
 	ok := "9"
 	items := []admincontrol.BatchUpdateRedeemCodeItem{
 		{ID: good.ID, Value: &ok},
-		{ID: 0, Value: &ok},          // invalid id
+		{ID: 0, Value: &ok},             // invalid id
 		{ID: good.ID + 999, Value: &ok}, // missing → idempotent
-		{ID: 8888, Value: &bad},      // invalid value
-		{ID: 7777},                   // no fields
+		{ID: 8888, Value: &bad},         // invalid value
+		{ID: 7777},                      // no fields
 	}
 	results, err := svc.BatchUpdateRedeemCodes(context.Background(), items, 1)
 	if err != nil {

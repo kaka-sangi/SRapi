@@ -43,10 +43,10 @@ const maxRefreshErrorLength = 500
 type RefreshOutcomeClass string
 
 const (
-	RefreshOutcomeSuccess            RefreshOutcomeClass = "success"
-	RefreshOutcomePermanentError     RefreshOutcomeClass = "permanent_error"
-	RefreshOutcomeTransientError     RefreshOutcomeClass = "transient_error"
-	RefreshOutcomeThresholdExceeded  RefreshOutcomeClass = "threshold_exceeded"
+	RefreshOutcomeSuccess           RefreshOutcomeClass = "success"
+	RefreshOutcomePermanentError    RefreshOutcomeClass = "permanent_error"
+	RefreshOutcomeTransientError    RefreshOutcomeClass = "transient_error"
+	RefreshOutcomeThresholdExceeded RefreshOutcomeClass = "threshold_exceeded"
 )
 
 // RefreshOutcome is the structured result of one RefreshAccessToken call.

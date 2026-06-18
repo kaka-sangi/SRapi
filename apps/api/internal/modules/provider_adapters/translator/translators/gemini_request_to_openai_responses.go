@@ -25,10 +25,10 @@ import (
 // registry proves the call-site is wired; the no-op output means
 // byte-for-byte parity with the prior inline path.
 //
-// TODO(future PR): if a future srapi feature requires cross-format
-// rewriting (e.g. translating Gemini-shaped tool_config to OpenAI-style
-// tool_choice on the upstream-bound payload), the rewriter helper
-// below is the seam. Until then identity is correct.
+// If a later srapi feature requires cross-format rewriting (for example,
+// translating Gemini-shaped tool_config to OpenAI-style tool_choice on the
+// upstream-bound payload), the rewriter helper below is the intended extension
+// point. Until then identity is correct.
 //
 // nil-safe across the board: nil rawJSON falls through, unparseable
 // JSON falls through, the function never panics on caller input.

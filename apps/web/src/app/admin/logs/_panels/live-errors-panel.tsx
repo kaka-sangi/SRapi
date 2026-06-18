@@ -39,7 +39,10 @@ export function LiveErrorsPanel() {
   const [errorClass, setErrorClass] = useState("");
   const [appliedFilters, setAppliedFilters] = useState({ accountId: "", errorClass: "" });
   const pausedRef = useRef(paused);
-  pausedRef.current = paused;
+
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
 
   // EventSource is opened against the SSE endpoint with the applied filters
   // baked into the URL. Changing filters tears the connection down and

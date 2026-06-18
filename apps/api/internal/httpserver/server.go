@@ -119,49 +119,49 @@ type usageAggregator interface {
 type Option func(*runtimeOptions)
 
 type runtimeOptions struct {
-	adminControl        admincontrolcontract.Store
-	database            dependencyPinger
-	redis               dependencyPinger
-	users               userscontract.Store
-	apiKeys             apikeycontract.Store
-	providers           providercontract.Store
-	models              modelcontract.Store
-	accounts            accountcontract.Store
-	audit               auditcontract.Store
-	authSessions        authcontract.Store
-	backupSnapshots     backupsnapcontract.Store
+	adminControl           admincontrolcontract.Store
+	database               dependencyPinger
+	redis                  dependencyPinger
+	users                  userscontract.Store
+	apiKeys                apikeycontract.Store
+	providers              providercontract.Store
+	models                 modelcontract.Store
+	accounts               accountcontract.Store
+	audit                  auditcontract.Store
+	authSessions           authcontract.Store
+	backupSnapshots        backupsnapcontract.Store
 	backupSnapshotsTrigger backupSnapshotsTrigger
-	billing             billingcontract.Store
-	events              eventscontract.Store
-	affiliate           affiliatecontract.Store
-	idempotency         idempotencycontract.Store
-	operations          operationscontract.Store
-	payments            paymentcontract.Store
-	qualityEval         qualitycontract.Store
-	realtime            realtimecontract.Store
-	balanceReservation  balanceReservationStore
-	rateLimiter         *ratelimit.Limiter
-	scheduler           schedulercontract.Store
-	sessionAffinity     sessionaffinitycontract.Store
-	subscriptions       subscriptioncontract.Store
-	totp                totpcontract.Store
-	usage               usagecontract.Store
-	userAttributes      userattributescontract.Store
-	errorPassthrough    errorpassthroughcontract.Store
-	tlsProfiles         tlsprofilescontract.Store
-	healthRollups       healthrollupscontract.Store
-	modelRateLimits     modelratelimitscontract.Store
-	groupRateLimits     groupratelimitscontract.Store
-	userPlatformQuotas  userplatformquotascontract.Store
-	payloadRules        payloadrulescontract.Store
-	scheduledTests      scheduledtestscontract.Store
-	channelMonitors     channelmonitorscontract.Store
-	copilotConvs        copilotconvcontract.ConversationStore
-	metrics             *runtimeMetricsState
-	backgroundDrainSink *func(context.Context)
-	usageAggregator     usageAggregator
-	proxyProbeMetrics   ProxyProbeMetricsProvider
-	tokenRefreshMetrics TokenRefreshMetricsProvider
+	billing                billingcontract.Store
+	events                 eventscontract.Store
+	affiliate              affiliatecontract.Store
+	idempotency            idempotencycontract.Store
+	operations             operationscontract.Store
+	payments               paymentcontract.Store
+	qualityEval            qualitycontract.Store
+	realtime               realtimecontract.Store
+	balanceReservation     balanceReservationStore
+	rateLimiter            *ratelimit.Limiter
+	scheduler              schedulercontract.Store
+	sessionAffinity        sessionaffinitycontract.Store
+	subscriptions          subscriptioncontract.Store
+	totp                   totpcontract.Store
+	usage                  usagecontract.Store
+	userAttributes         userattributescontract.Store
+	errorPassthrough       errorpassthroughcontract.Store
+	tlsProfiles            tlsprofilescontract.Store
+	healthRollups          healthrollupscontract.Store
+	modelRateLimits        modelratelimitscontract.Store
+	groupRateLimits        groupratelimitscontract.Store
+	userPlatformQuotas     userplatformquotascontract.Store
+	payloadRules           payloadrulescontract.Store
+	scheduledTests         scheduledtestscontract.Store
+	channelMonitors        channelmonitorscontract.Store
+	copilotConvs           copilotconvcontract.ConversationStore
+	metrics                *runtimeMetricsState
+	backgroundDrainSink    *func(context.Context)
+	usageAggregator        usageAggregator
+	proxyProbeMetrics      ProxyProbeMetricsProvider
+	tokenRefreshMetrics    TokenRefreshMetricsProvider
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -650,75 +650,7 @@ func newWithServer(cfg config.Config, logger *slog.Logger, options ...Option) (h
 	mux.HandleFunc("POST /api/v1/admin/accounts/sync/crs/preview", server.handleAdminCRSPreview)
 	mux.HandleFunc("POST /api/v1/admin/accounts/sync/crs", server.handleAdminCRSSync)
 	mux.HandleFunc("GET /api/v1/admin/audit-logs", server.handleListAdminAuditLogs)
-	mux.HandleFunc("GET /api/v1/admin/billing-ledger", server.handleListAdminBillingLedger)
-	mux.HandleFunc("GET /api/v1/admin/affiliates/invites", server.handleListAdminAffiliateInvites)
-	mux.HandleFunc("GET /api/v1/admin/affiliates/rebates", server.handleListAdminAffiliateRebates)
-	mux.HandleFunc("GET /api/v1/admin/affiliates/transfers", server.handleListAdminAffiliateTransfers)
-	mux.HandleFunc("GET /api/v1/admin/affiliates/manual-adjustments", server.handleListAdminAffiliateManualAdjustments)
-	mux.HandleFunc("POST /api/v1/admin/affiliates/manual-adjustments", server.handleCreateAdminAffiliateManualAdjustment)
-	mux.HandleFunc("POST /api/v1/admin/affiliates/batch-rebate-rate", server.handleBatchSetAdminAffiliateRebateRate)
-	mux.HandleFunc("POST /api/v1/admin/affiliates/withdrawals/{id}/approve", server.handleApproveAdminAffiliateWithdrawal)
-	mux.HandleFunc("POST /api/v1/admin/affiliates/withdrawals/{id}/cancel", server.handleCancelAdminAffiliateWithdrawal)
-	mux.HandleFunc("GET /api/v1/admin/affiliate-rules", server.handleListAdminAffiliateRules)
-	mux.HandleFunc("POST /api/v1/admin/affiliate-rules", server.handleCreateAdminAffiliateRule)
-	mux.HandleFunc("PATCH /api/v1/admin/affiliate-rules/{id}", server.handleUpdateAdminAffiliateRule)
-	mux.HandleFunc("GET /api/v1/admin/payments/providers", server.handleListAdminPaymentProviders)
-	mux.HandleFunc("POST /api/v1/admin/payments/providers", server.handleCreateAdminPaymentProvider)
-	mux.HandleFunc("PATCH /api/v1/admin/payments/providers/{id}", server.handleUpdateAdminPaymentProvider)
-	mux.HandleFunc("DELETE /api/v1/admin/payments/providers/{id}", server.handleDeleteAdminPaymentProvider)
-	mux.HandleFunc("POST /api/v1/admin/payments/providers/{id}/test", server.handleTestAdminPaymentProvider)
-	mux.HandleFunc("GET /api/v1/admin/payments/orders", server.handleListAdminPaymentOrders)
-	mux.HandleFunc("GET /api/v1/admin/payments/dashboard", server.handleGetAdminPaymentDashboard)
-	mux.HandleFunc("POST /api/v1/admin/payments/orders/{id}/refund", server.handleRefundAdminPaymentOrder)
-	mux.HandleFunc("GET /api/v1/admin/payment-orders/{id}/audit-logs", server.handleListAdminPaymentOrderAuditLogs)
-	mux.HandleFunc("GET /api/v1/admin/subscription-plans", server.handleListAdminSubscriptionPlans)
-	mux.HandleFunc("POST /api/v1/admin/subscription-plans", server.handleCreateAdminSubscriptionPlan)
-	mux.HandleFunc("PATCH /api/v1/admin/subscription-plans/{id}", server.handleUpdateAdminSubscriptionPlan)
-	mux.HandleFunc("DELETE /api/v1/admin/subscription-plans/{id}", server.handleDeleteAdminSubscriptionPlan)
-	mux.HandleFunc("GET /api/v1/admin/user-subscriptions", server.handleListAdminUserSubscriptions)
-	mux.HandleFunc("POST /api/v1/admin/user-subscriptions", server.handleCreateAdminUserSubscription)
-	mux.HandleFunc("POST /api/v1/admin/user-subscriptions/batch-assign", server.handleBatchAssignAdminUserSubscriptions)
-	mux.HandleFunc("DELETE /api/v1/admin/user-subscriptions/{id}", server.handleDeleteAdminUserSubscription)
-	mux.HandleFunc("GET /api/v1/admin/pricing-rules", server.handleListAdminPricingRules)
-	mux.HandleFunc("POST /api/v1/admin/pricing-rules", server.handleCreateAdminPricingRule)
-	mux.HandleFunc("POST /api/v1/admin/pricing-rules:bulk", server.handleBulkImportAdminPricingRules)
-	mux.HandleFunc("PATCH /api/v1/admin/pricing-rules/{id}", server.handleUpdateAdminPricingRule)
-	mux.HandleFunc("DELETE /api/v1/admin/pricing-rules/{id}", server.handleDeleteAdminPricingRule)
-	server.registerAdminOpsRoutes(mux)
-	server.registerAlertRulesRoutes(mux)
-	mux.HandleFunc("GET /api/v1/admin/settings", server.handleGetAdminSettings)
-	mux.HandleFunc("PUT /api/v1/admin/settings", server.handleUpdateAdminSettings)
-	mux.HandleFunc("POST /api/v1/admin/settings/send-test-email", server.handleSendAdminTestEmail)
-	mux.HandleFunc("GET /api/v1/admin/copilot/config", server.handleAdminCopilotConfig)
-	mux.HandleFunc("POST /api/v1/admin/copilot/chat", server.handleAdminCopilotChat)
-	mux.HandleFunc("GET /api/v1/admin/copilot/conversations", server.handleListAdminCopilotConversations)
-	mux.HandleFunc("POST /api/v1/admin/copilot/conversations", server.handleCreateAdminCopilotConversation)
-	mux.HandleFunc("GET /api/v1/admin/copilot/conversations/{id}", server.handleGetAdminCopilotConversation)
-	mux.HandleFunc("PUT /api/v1/admin/copilot/conversations/{id}", server.handleUpdateAdminCopilotConversation)
-	mux.HandleFunc("PATCH /api/v1/admin/copilot/conversations/{id}", server.handleRenameAdminCopilotConversation)
-	mux.HandleFunc("DELETE /api/v1/admin/copilot/conversations/{id}", server.handleDeleteAdminCopilotConversation)
-	mux.HandleFunc("GET /api/v1/admin/notifications/email-templates", server.handleListAdminNotificationEmailTemplates)
-	mux.HandleFunc("POST /api/v1/admin/notifications/email-template-preview", server.handlePreviewAdminNotificationEmailTemplate)
-	mux.HandleFunc("GET /api/v1/admin/notifications/email-templates/{event}", server.handleGetAdminNotificationEmailTemplate)
-	mux.HandleFunc("PUT /api/v1/admin/notifications/email-templates/{event}", server.handleUpdateAdminNotificationEmailTemplate)
-	mux.HandleFunc("POST /api/v1/admin/notifications/email-templates/{event}/restore", server.handleRestoreAdminNotificationEmailTemplate)
-	server.registerAdminPromotionRoutes(mux)
-	mux.HandleFunc("GET /api/v1/admin/risk-control/config", server.handleGetAdminRiskControlConfig)
-	mux.HandleFunc("PUT /api/v1/admin/risk-control/config", server.handleUpdateAdminRiskControlConfig)
-	mux.HandleFunc("GET /api/v1/admin/risk-control/status", server.handleGetAdminRiskControlStatus)
-	mux.HandleFunc("GET /api/v1/admin/risk-control/logs", server.handleListAdminRiskControlLogs)
-	mux.HandleFunc("GET /api/v1/admin/content-safety/config", server.handleGetAdminContentSafetyConfig)
-	mux.HandleFunc("PUT /api/v1/admin/content-safety/config", server.handleUpdateAdminContentSafetyConfig)
-	mux.HandleFunc("GET /api/v1/admin/capabilities", server.handleListAdminCapabilities)
-	mux.HandleFunc("GET /api/v1/admin/scheduler/overview", server.handleAdminSchedulerOverview)
-	mux.HandleFunc("GET /api/v1/admin/scheduler/decisions", server.handleListAdminSchedulerDecisions)
-	mux.HandleFunc("GET /api/v1/admin/scheduler/strategies", server.handleListSchedulerStrategies)
-	mux.HandleFunc("POST /api/v1/admin/scheduler/strategies", server.handleCreateSchedulerStrategy)
-	mux.HandleFunc("PATCH /api/v1/admin/scheduler/strategies/{id}", server.handleUpdateSchedulerStrategy)
-	mux.HandleFunc("DELETE /api/v1/admin/scheduler/strategies/{id}", server.handleDeprecateSchedulerStrategy)
-	mux.HandleFunc("POST /api/v1/admin/scheduler/strategies/{id}/activate", server.handleActivateSchedulerStrategy)
-	mux.HandleFunc("POST /api/v1/admin/scheduler/simulate", server.handleSimulateSchedulerStrategy)
-	mux.HandleFunc("POST /api/v1/admin/scheduler/replay", server.handleReplaySchedulerStrategy)
+	server.registerAdminBillingRoutes(mux)
 	server.registerGatewayEndpointRoutes(mux)
 	server.registerGatewayProviderAliases(mux)
 
@@ -727,6 +659,78 @@ func newWithServer(cfg config.Config, logger *slog.Logger, options ...Option) (h
 	// RBAC gate used by external admin requests.
 	runtime.internalRouter = handler
 	return securityHeadersMiddleware(requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(handler)))), server
+}
+
+func (s *Server) registerAdminBillingRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/admin/billing-ledger", s.handleListAdminBillingLedger)
+	mux.HandleFunc("GET /api/v1/admin/affiliates/invites", s.handleListAdminAffiliateInvites)
+	mux.HandleFunc("GET /api/v1/admin/affiliates/rebates", s.handleListAdminAffiliateRebates)
+	mux.HandleFunc("GET /api/v1/admin/affiliates/transfers", s.handleListAdminAffiliateTransfers)
+	mux.HandleFunc("GET /api/v1/admin/affiliates/manual-adjustments", s.handleListAdminAffiliateManualAdjustments)
+	mux.HandleFunc("POST /api/v1/admin/affiliates/manual-adjustments", s.handleCreateAdminAffiliateManualAdjustment)
+	mux.HandleFunc("POST /api/v1/admin/affiliates/batch-rebate-rate", s.handleBatchSetAdminAffiliateRebateRate)
+	mux.HandleFunc("POST /api/v1/admin/affiliates/withdrawals/{id}/approve", s.handleApproveAdminAffiliateWithdrawal)
+	mux.HandleFunc("POST /api/v1/admin/affiliates/withdrawals/{id}/cancel", s.handleCancelAdminAffiliateWithdrawal)
+	mux.HandleFunc("GET /api/v1/admin/affiliate-rules", s.handleListAdminAffiliateRules)
+	mux.HandleFunc("POST /api/v1/admin/affiliate-rules", s.handleCreateAdminAffiliateRule)
+	mux.HandleFunc("PATCH /api/v1/admin/affiliate-rules/{id}", s.handleUpdateAdminAffiliateRule)
+	mux.HandleFunc("GET /api/v1/admin/payments/providers", s.handleListAdminPaymentProviders)
+	mux.HandleFunc("POST /api/v1/admin/payments/providers", s.handleCreateAdminPaymentProvider)
+	mux.HandleFunc("PATCH /api/v1/admin/payments/providers/{id}", s.handleUpdateAdminPaymentProvider)
+	mux.HandleFunc("DELETE /api/v1/admin/payments/providers/{id}", s.handleDeleteAdminPaymentProvider)
+	mux.HandleFunc("POST /api/v1/admin/payments/providers/{id}/test", s.handleTestAdminPaymentProvider)
+	mux.HandleFunc("GET /api/v1/admin/payments/orders", s.handleListAdminPaymentOrders)
+	mux.HandleFunc("GET /api/v1/admin/payments/dashboard", s.handleGetAdminPaymentDashboard)
+	mux.HandleFunc("POST /api/v1/admin/payments/orders/{id}/refund", s.handleRefundAdminPaymentOrder)
+	mux.HandleFunc("GET /api/v1/admin/payment-orders/{id}/audit-logs", s.handleListAdminPaymentOrderAuditLogs)
+	mux.HandleFunc("GET /api/v1/admin/subscription-plans", s.handleListAdminSubscriptionPlans)
+	mux.HandleFunc("POST /api/v1/admin/subscription-plans", s.handleCreateAdminSubscriptionPlan)
+	mux.HandleFunc("PATCH /api/v1/admin/subscription-plans/{id}", s.handleUpdateAdminSubscriptionPlan)
+	mux.HandleFunc("DELETE /api/v1/admin/subscription-plans/{id}", s.handleDeleteAdminSubscriptionPlan)
+	mux.HandleFunc("GET /api/v1/admin/user-subscriptions", s.handleListAdminUserSubscriptions)
+	mux.HandleFunc("POST /api/v1/admin/user-subscriptions", s.handleCreateAdminUserSubscription)
+	mux.HandleFunc("POST /api/v1/admin/user-subscriptions/batch-assign", s.handleBatchAssignAdminUserSubscriptions)
+	mux.HandleFunc("DELETE /api/v1/admin/user-subscriptions/{id}", s.handleDeleteAdminUserSubscription)
+	mux.HandleFunc("GET /api/v1/admin/pricing-rules", s.handleListAdminPricingRules)
+	mux.HandleFunc("POST /api/v1/admin/pricing-rules", s.handleCreateAdminPricingRule)
+	mux.HandleFunc("POST /api/v1/admin/pricing-rules:bulk", s.handleBulkImportAdminPricingRules)
+	mux.HandleFunc("PATCH /api/v1/admin/pricing-rules/{id}", s.handleUpdateAdminPricingRule)
+	mux.HandleFunc("DELETE /api/v1/admin/pricing-rules/{id}", s.handleDeleteAdminPricingRule)
+	s.registerAdminOpsRoutes(mux)
+	s.registerAlertRulesRoutes(mux)
+	mux.HandleFunc("GET /api/v1/admin/settings", s.handleGetAdminSettings)
+	mux.HandleFunc("PUT /api/v1/admin/settings", s.handleUpdateAdminSettings)
+	mux.HandleFunc("POST /api/v1/admin/settings/send-test-email", s.handleSendAdminTestEmail)
+	mux.HandleFunc("GET /api/v1/admin/copilot/config", s.handleAdminCopilotConfig)
+	mux.HandleFunc("POST /api/v1/admin/copilot/chat", s.handleAdminCopilotChat)
+	mux.HandleFunc("GET /api/v1/admin/copilot/conversations", s.handleListAdminCopilotConversations)
+	mux.HandleFunc("POST /api/v1/admin/copilot/conversations", s.handleCreateAdminCopilotConversation)
+	mux.HandleFunc("GET /api/v1/admin/copilot/conversations/{id}", s.handleGetAdminCopilotConversation)
+	mux.HandleFunc("PUT /api/v1/admin/copilot/conversations/{id}", s.handleUpdateAdminCopilotConversation)
+	mux.HandleFunc("PATCH /api/v1/admin/copilot/conversations/{id}", s.handleRenameAdminCopilotConversation)
+	mux.HandleFunc("DELETE /api/v1/admin/copilot/conversations/{id}", s.handleDeleteAdminCopilotConversation)
+	mux.HandleFunc("GET /api/v1/admin/notifications/email-templates", s.handleListAdminNotificationEmailTemplates)
+	mux.HandleFunc("POST /api/v1/admin/notifications/email-template-preview", s.handlePreviewAdminNotificationEmailTemplate)
+	mux.HandleFunc("GET /api/v1/admin/notifications/email-templates/{event}", s.handleGetAdminNotificationEmailTemplate)
+	mux.HandleFunc("PUT /api/v1/admin/notifications/email-templates/{event}", s.handleUpdateAdminNotificationEmailTemplate)
+	mux.HandleFunc("POST /api/v1/admin/notifications/email-templates/{event}/restore", s.handleRestoreAdminNotificationEmailTemplate)
+	s.registerAdminPromotionRoutes(mux)
+	mux.HandleFunc("GET /api/v1/admin/risk-control/config", s.handleGetAdminRiskControlConfig)
+	mux.HandleFunc("PUT /api/v1/admin/risk-control/config", s.handleUpdateAdminRiskControlConfig)
+	mux.HandleFunc("GET /api/v1/admin/risk-control/status", s.handleGetAdminRiskControlStatus)
+	mux.HandleFunc("GET /api/v1/admin/risk-control/logs", s.handleListAdminRiskControlLogs)
+	mux.HandleFunc("GET /api/v1/admin/content-safety/config", s.handleGetAdminContentSafetyConfig)
+	mux.HandleFunc("PUT /api/v1/admin/content-safety/config", s.handleUpdateAdminContentSafetyConfig)
+	mux.HandleFunc("GET /api/v1/admin/capabilities", s.handleListAdminCapabilities)
+	mux.HandleFunc("GET /api/v1/admin/scheduler/overview", s.handleAdminSchedulerOverview)
+	mux.HandleFunc("GET /api/v1/admin/scheduler/decisions", s.handleListAdminSchedulerDecisions)
+	mux.HandleFunc("GET /api/v1/admin/scheduler/strategies", s.handleListSchedulerStrategies)
+	mux.HandleFunc("POST /api/v1/admin/scheduler/strategies", s.handleCreateSchedulerStrategy)
+	mux.HandleFunc("PATCH /api/v1/admin/scheduler/strategies/{id}", s.handleUpdateSchedulerStrategy)
+	mux.HandleFunc("DELETE /api/v1/admin/scheduler/strategies/{id}", s.handleDeprecateSchedulerStrategy)
+	mux.HandleFunc("POST /api/v1/admin/scheduler/strategies/{id}/activate", s.handleActivateSchedulerStrategy)
+	mux.HandleFunc("POST /api/v1/admin/scheduler/simulate", s.handleSimulateSchedulerStrategy)
+	mux.HandleFunc("POST /api/v1/admin/scheduler/replay", s.handleReplaySchedulerStrategy)
 }
 
 func (s *Server) registerPublicRoutes(mux *http.ServeMux) {

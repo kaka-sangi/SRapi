@@ -37,7 +37,7 @@ func (s *blockingStore) FindByGroup(_ context.Context, groupID int) (contract.Li
 func (s *blockingStore) UpsertLimit(_ context.Context, in contract.UpsertLimit) (contract.Limit, error) {
 	return contract.Limit{GroupID: in.GroupID}, nil
 }
-func (s *blockingStore) DeleteByGroup(_ context.Context, _ int) error          { return nil }
+func (s *blockingStore) DeleteByGroup(_ context.Context, _ int) error           { return nil }
 func (s *blockingStore) ListLimits(_ context.Context) ([]contract.Limit, error) { return nil, nil }
 
 func TestGroupRateLimits_Singleflight_CoalescesConcurrentLookups(t *testing.T) {

@@ -7366,6 +7366,252 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/error-stream:
+    get:
+      tags:
+        - AdminUsage
+      operationId: getAdminErrorStream
+      summary: Subscribe to live gateway error events.
+      description: |
+        Opens a text/event-stream feed of gateway upstream failure events.
+        The stream emits `event: error` frames whose `data` payload is an
+        AdminErrorStreamEvent JSON object. A leading SSE comment confirms
+        connection establishment, and periodic comments keep idle connections
+        alive.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: account_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: error_class
+          in: query
+          schema:
+            type: string
+        - name: min_status
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: max_status
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: since
+          in: query
+          description: Unix-millisecond cursor used to replay buffered events.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        "200":
+          description: SSE stream of gateway error events.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  SSE frames. `event: error` frames carry an
+                  AdminErrorStreamEvent JSON payload in their `data` line.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/StandardError"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/request-log-files:
+    get:
+      tags:
+        - AdminUsage
+      operationId: listAdminRequestLogFiles
+      summary: List captured request log files.
+      description: |
+        Lists on-disk gateway HTTP envelope captures produced by the optional
+        request log file writer. Results are sorted newest-first.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: request_id
+          in: query
+          description: Prefix filter against the request id embedded in the filename.
+          schema:
+            type: string
+        - name: error_only
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        "200":
+          description: Captured request log files.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestLogFileListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/request-log-files/{name}:
+    get:
+      tags:
+        - AdminUsage
+      operationId: getAdminRequestLogFile
+      summary: Get captured request log file metadata.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Captured request log file descriptor.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestLogFileResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminUsage
+      operationId: deleteAdminRequestLogFile
+      summary: Delete a captured request log file.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+        operator: write
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Request log file deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteRequestLogFileResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/request-log-files/{name}/download:
+    get:
+      tags:
+        - AdminUsage
+      operationId: downloadAdminRequestLogFile
+      summary: Download a captured request log file.
+      description: Returns the raw request/response envelope dump as text/plain.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Captured request log file body.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            Content-Disposition:
+              schema:
+                type: string
+              description: attachment; filename="<name>"
+          content:
+            text/plain:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/users/spending-today/batch:
     get:
       tags:
@@ -20665,6 +20911,8 @@ components:
             `model_mapping` (object mapping a canonical catalog model name to a
             per-account upstream model name override).
         token_expires_at:
+          type: string
+          format: date-time
           allOf:
             - $ref: "#/components/schemas/Timestamp"
           nullable: true
@@ -20674,11 +20922,15 @@ components:
             account has never been refreshed or the credential carries no
             expires_at. OAuth runtime classes only.
         last_refreshed_at:
+          type: string
+          format: date-time
           allOf:
             - $ref: "#/components/schemas/Timestamp"
           nullable: true
           description: Time of the most recent successful OAuth refresh.
         needs_reauth_at:
+          type: string
+          format: date-time
           allOf:
             - $ref: "#/components/schemas/Timestamp"
           nullable: true
@@ -20833,6 +21085,7 @@ components:
         name:
           type: string
         account_id:
+          type: string
           allOf:
             - $ref: "#/components/schemas/Id"
           nullable: true
@@ -27149,6 +27402,67 @@ components:
             $ref: "#/components/schemas/ErrorLog"
         pagination:
           $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RequestLogFileDescriptor:
+      type: object
+      required:
+        - name
+        - size
+        - created_at
+        - request_id
+        - is_error_only
+      properties:
+        name:
+          type: string
+          description: On-disk filename such as request-<unix_ms>-<request_id>.log.
+        size:
+          type: integer
+          format: int64
+          minimum: 0
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        request_id:
+          type: string
+        is_error_only:
+          type: boolean
+
+    RequestLogFileListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequestLogFileDescriptor"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RequestLogFileResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/RequestLogFileDescriptor"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    DeleteRequestLogFileResponse:
+      type: object
+      required:
+        - success
+        - request_id
+      properties:
+        success:
+          type: boolean
         request_id:
           $ref: "#/components/schemas/RequestId"
 

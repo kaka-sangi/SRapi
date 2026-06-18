@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	"github.com/srapi/srapi/apps/api/internal/config"
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"

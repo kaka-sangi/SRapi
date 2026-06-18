@@ -143,15 +143,15 @@ func modelAuditSnapshot(model modelcontract.Model) map[string]any {
 
 func accountAuditSnapshot(account accountcontract.ProviderAccount) map[string]any {
 	return map[string]any{
-		"provider_id":        account.ProviderID,
-		"name":               account.Name,
-		"runtime_class":      account.RuntimeClass,
-		"upstream_client":    account.UpstreamClient,
-		"proxy_id":           account.ProxyID,
-		"status":             account.Status,
-		"priority":           account.Priority,
-		"weight":             account.Weight,
-		"risk_level":         account.RiskLevel,
+		"provider_id":     account.ProviderID,
+		"name":            account.Name,
+		"runtime_class":   account.RuntimeClass,
+		"upstream_client": account.UpstreamClient,
+		"proxy_id":        account.ProxyID,
+		"status":          account.Status,
+		"priority":        account.Priority,
+		"weight":          account.Weight,
+		"risk_level":      account.RiskLevel,
 		// Audit log persists indefinitely, so strip any token-ish keys from
 		// the metadata snapshot via the same allowlist the admin GET
 		// responses use (sensitiveMetadataKey: authorization, bearer, cookie,
@@ -170,7 +170,7 @@ func proxyAuditSnapshot(proxy accountcontract.ProxyDefinition) map[string]any {
 		"url_version":    proxy.URLVersion,
 		// Same redaction policy as account metadata — proxies seldom carry
 		// secrets but the audit log is forever, so don't gamble.
-		"metadata":       sanitizedExportMetadata(cloneAnyMap(proxy.Metadata)),
+		"metadata": sanitizedExportMetadata(cloneAnyMap(proxy.Metadata)),
 	}
 }
 

@@ -232,45 +232,9 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		err     error
 	)
 
-	options := []httpserver.Option{httpserver.WithRedisPinger(redisClient)}
-	if usageDrainSink != nil {
-		options = append(options, httpserver.WithBackgroundDrainHook(usageDrainSink))
-	}
-	if cfg.UsesMemoryStorage() {
-		options = append(options, httpserver.WithDatabasePinger(notRequiredPinger{}))
-	} else {
-		options = append(options, httpserver.WithDatabasePinger(dbClient))
-	}
-	realtimeStore, err := realtimeSlotStore(context.Background(), cfg, logger, redisClient)
+	options, err := runtimeHTTPOptions(cfg, logger, dbClient, redisClient, usageDrainSink)
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
-	}
-	if realtimeStore != nil {
-		options = append(options, httpserver.WithRealtimeStore(realtimeStore))
-	}
-	balanceReservationStore, err := balanceReservationGateStore(context.Background(), cfg, logger, redisClient)
-	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
-	}
-	if balanceReservationStore != nil {
-		options = append(options, httpserver.WithBalanceReservationStore(balanceReservationStore))
-	}
-	sessionAffinity, err := sessionAffinityStore(context.Background(), cfg, logger, redisClient)
-	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
-	}
-	if sessionAffinity != nil {
-		options = append(options, httpserver.WithSessionAffinityStore(sessionAffinity))
-	} else {
-		// No Redis: fall back to per-instance in-memory stickiness (best-effort).
-		options = append(options, httpserver.WithSessionAffinityStore(httpserver.NewMemorySessionAffinityStore()))
-	}
-	rateLimiterOption, err := gatewayRateLimiterOption(context.Background(), cfg, logger, redisClient)
-	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
-	}
-	if rateLimiterOption != nil {
-		options = append(options, rateLimiterOption)
 	}
 	stores, err := persistentStores(context.Background(), cfg, logger, dbClient, redisClient)
 	if err != nil {
@@ -451,6 +415,50 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	}()
 
 	return handler, outbox, retention, availability, backup, authClean, expirer, reconcile, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, liteLLMPricing, connectivityTest, scheduledTest, channelMonitor, proxyProbe, tokenRefresh, err
+}
+
+func runtimeHTTPOptions(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client, usageDrainSink *func(context.Context)) ([]httpserver.Option, error) {
+	options := []httpserver.Option{httpserver.WithRedisPinger(redisClient)}
+	if usageDrainSink != nil {
+		options = append(options, httpserver.WithBackgroundDrainHook(usageDrainSink))
+	}
+	if cfg.UsesMemoryStorage() {
+		options = append(options, httpserver.WithDatabasePinger(notRequiredPinger{}))
+	} else {
+		options = append(options, httpserver.WithDatabasePinger(dbClient))
+	}
+	realtimeStore, err := realtimeSlotStore(context.Background(), cfg, logger, redisClient)
+	if err != nil {
+		return nil, err
+	}
+	if realtimeStore != nil {
+		options = append(options, httpserver.WithRealtimeStore(realtimeStore))
+	}
+	balanceReservationStore, err := balanceReservationGateStore(context.Background(), cfg, logger, redisClient)
+	if err != nil {
+		return nil, err
+	}
+	if balanceReservationStore != nil {
+		options = append(options, httpserver.WithBalanceReservationStore(balanceReservationStore))
+	}
+	sessionAffinity, err := sessionAffinityStore(context.Background(), cfg, logger, redisClient)
+	if err != nil {
+		return nil, err
+	}
+	if sessionAffinity != nil {
+		options = append(options, httpserver.WithSessionAffinityStore(sessionAffinity))
+	} else {
+		// No Redis: fall back to per-instance in-memory stickiness (best-effort).
+		options = append(options, httpserver.WithSessionAffinityStore(httpserver.NewMemorySessionAffinityStore()))
+	}
+	rateLimiterOption, err := gatewayRateLimiterOption(context.Background(), cfg, logger, redisClient)
+	if err != nil {
+		return nil, err
+	}
+	if rateLimiterOption != nil {
+		options = append(options, rateLimiterOption)
+	}
+	return options, nil
 }
 
 func persistentStores(ctx context.Context, cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (*entstore.Stores, error) {

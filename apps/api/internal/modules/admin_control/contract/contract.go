@@ -409,6 +409,7 @@ type RedeemCodeStats struct {
 	Disabled int `json:"disabled"`
 	Expired  int `json:"expired"`
 }
+
 // BatchDisableReason classifies the per-row outcome of a bulk-disable. Used
 // both in the persisted disabled_reason column and in the BatchOperationResult
 // breakdown returned to the admin UI.

@@ -107,13 +107,13 @@ func (s *Server) recordGatewaySystemLog(ctx context.Context, canonical gatewayco
 		message = errorClass
 	}
 	metadata := map[string]any{
-		"request_id":       canonical.RequestID,
-		"source_endpoint":  canonical.SourceEndpoint,
-		"source_protocol":  string(canonical.SourceProtocol),
-		"canonical_model":  canonical.CanonicalModel,
-		"error_class":      errorClass,
-		"upstream_status":  upstreamStatus,
-		"body_excerpt":     providerErrorBodyExcerpt(providerErr),
+		"request_id":      canonical.RequestID,
+		"source_endpoint": canonical.SourceEndpoint,
+		"source_protocol": string(canonical.SourceProtocol),
+		"canonical_model": canonical.CanonicalModel,
+		"error_class":     errorClass,
+		"upstream_status": upstreamStatus,
+		"body_excerpt":    providerErrorBodyExcerpt(providerErr),
 	}
 	if result.Candidate.Account.ID > 0 {
 		metadata["account_id"] = result.Candidate.Account.ID

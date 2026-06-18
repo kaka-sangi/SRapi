@@ -147,6 +147,7 @@ func codexExtractFinalResponse(body string) ([]byte, bool) {
 type codexResponsesStreamEvent struct {
 	Type        string                    `json:"type"`
 	Delta       string                    `json:"delta"`
+	Text        string                    `json:"text"`
 	OutputIndex int                       `json:"output_index"`
 	Item        *codexResponsesStreamItem `json:"item,omitempty"`
 }
@@ -191,6 +192,11 @@ func (a *codexBufferedResponseAccumulator) ProcessEvent(event codexResponsesStre
 	case "response.output_text.delta":
 		if event.Delta != "" {
 			_, _ = a.text.WriteString(event.Delta)
+		}
+	case "response.output_text.done":
+		if event.Text != "" {
+			a.text.Reset()
+			_, _ = a.text.WriteString(event.Text)
 		}
 	case "response.output_item.added":
 		if event.Item != nil && (event.Item.Type == "function_call" || event.Item.Type == "custom_tool_call") {
@@ -257,6 +263,7 @@ func (a *codexBufferedResponseAccumulator) BuildOutput() []map[string]any {
 func codexResponsesStreamEventMayContributeToOutput(eventType string) bool {
 	switch eventType {
 	case "response.output_text.delta",
+		"response.output_text.done",
 		"response.output_item.added",
 		"response.function_call_arguments.delta",
 		"response.custom_tool_call_input.delta",
@@ -315,13 +322,14 @@ func codexConvertCompactSSEBodyToJSON(body []byte) ([]byte, bool) {
 	if !ok {
 		return nil, false
 	}
-	// Reconstruct output[] if the terminal response.completed event
-	// shipped an empty array (the compact path normally does — the
-	// summary text lives in response.output_text.delta events).
+	// Reconstruct output[] if the terminal response.completed event shipped an
+	// empty array, or if it contains output_text parts without the required text
+	// field. Codex CLI deserializes compact output strictly and rejects the
+	// latter shape with "missing field `text`".
 	var inspect struct {
 		Output []json.RawMessage `json:"output"`
 	}
-	if err := json.Unmarshal(finalResponse, &inspect); err == nil && len(inspect.Output) == 0 {
+	if err := json.Unmarshal(finalResponse, &inspect); err == nil && (len(inspect.Output) == 0 || codexOutputHasTextlessContent(inspect.Output)) {
 		if rebuilt, ok := codexReconstructResponseOutputFromSSE(bodyText); ok {
 			patched, err := codexSetRawJSONField(finalResponse, "output", rebuilt)
 			if err == nil {
@@ -330,6 +338,44 @@ func codexConvertCompactSSEBodyToJSON(body []byte) ([]byte, bool) {
 		}
 	}
 	return finalResponse, true
+}
+
+func codexOutputHasTextlessContent(output []json.RawMessage) bool {
+	for _, rawItem := range output {
+		var item map[string]json.RawMessage
+		if err := json.Unmarshal(rawItem, &item); err != nil {
+			continue
+		}
+		contentRaw, ok := item["content"]
+		if !ok {
+			continue
+		}
+		var content []map[string]json.RawMessage
+		if err := json.Unmarshal(contentRaw, &content); err != nil {
+			continue
+		}
+		for _, part := range content {
+			partType := jsonRawString(part["type"])
+			if partType != "" && partType != "output_text" && partType != "text" {
+				continue
+			}
+			if _, ok := part["text"]; !ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func jsonRawString(raw json.RawMessage) string {
+	var value string
+	if len(raw) == 0 {
+		return ""
+	}
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return ""
+	}
+	return value
 }
 
 // codexSetRawJSONField sets a top-level JSON field to a raw JSON value

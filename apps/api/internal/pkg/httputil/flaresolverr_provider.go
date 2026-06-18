@@ -2,15 +2,17 @@
 // services/proxy_service.FlareSolverrClearanceProvider.
 //
 // Reference Python:
-//   payload = {"cmd":"request.get","url":target,"maxTimeout":timeout*1000}
-//   if proxy: payload["proxy"] = {"url": proxy}
-//   resp = POST flaresolverr_url + "/v1" json=payload
-//   solution = resp["solution"]; cookies (filtered by host) + userAgent → bundle.
+//
+//	payload = {"cmd":"request.get","url":target,"maxTimeout":timeout*1000}
+//	if proxy: payload["proxy"] = {"url": proxy}
+//	resp = POST flaresolverr_url + "/v1" json=payload
+//	solution = resp["solution"]; cookies (filtered by host) + userAgent → bundle.
 //
 // Defaults read from env (and fall back to chatgpt2api defaults):
-//   FLARESOLVERR_URL          — empty → ErrClearanceProviderNotConfigured
-//   FLARESOLVERR_SESSION_TTL  — seconds; expiry stamped on returned bundle
-//   FLARESOLVERR_TIMEOUT      — seconds; per-request maxTimeout
+//
+//	FLARESOLVERR_URL          — empty → ErrClearanceProviderNotConfigured
+//	FLARESOLVERR_SESSION_TTL  — seconds; expiry stamped on returned bundle
+//	FLARESOLVERR_TIMEOUT      — seconds; per-request maxTimeout
 package httputil
 
 import (

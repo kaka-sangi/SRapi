@@ -261,7 +261,7 @@ type CodexStreamErrorVerdict struct {
 // Policy:
 //   - context_length_exceeded → terminal, no retry.
 //   - rate_limit_exceeded     → retryable with RetryAfter (parsed from
-//                               error.retry_after or 0 when absent).
+//     error.retry_after or 0 when absent).
 //   - 5xx-shaped upstream     → retryable, no specific RetryAfter.
 //   - transient network/EOF   → retryable.
 //   - anything else           → unknown, no retry.

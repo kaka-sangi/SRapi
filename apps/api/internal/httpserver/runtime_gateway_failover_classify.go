@@ -61,7 +61,7 @@ var upstreamFailoverPersistentNetworkMarkers = []string{
 // failure. Inputs:
 //   - statusCode: HTTP status from the upstream (0 when network failed before headers).
 //   - errBody:    response body (used to parse Retry-After when only headers absent;
-//                 currently a placeholder for body-based rate-limit hints).
+//     currently a placeholder for body-based rate-limit hints).
 //   - networkErr: the transport error returned by Do() (nil when HTTP status received).
 //
 // Decision policy (matches the user directive verbatim):

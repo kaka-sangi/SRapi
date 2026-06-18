@@ -414,9 +414,9 @@ func chatGPTWebMultimodalPayloadBytes(req contract.ConversationRequest, assetPar
 		metadata["attachments"] = attachments
 	}
 	userMessage := map[string]any{
-		"id":      chatGPTWebStableID(req, "multimodal-user"),
-		"author":  map[string]any{"role": "user"},
-		"content": content,
+		"id":       chatGPTWebStableID(req, "multimodal-user"),
+		"author":   map[string]any{"role": "user"},
+		"content":  content,
 		"metadata": metadata,
 	}
 	// Marshal base then merge: keeps every chatgpt_web payload field we

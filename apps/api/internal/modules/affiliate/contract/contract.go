@@ -239,9 +239,9 @@ type RebateResult struct {
 // is held in an in-memory overlay on the affiliate service that future rebate
 // computations consult before falling back to the rule's flat rate.
 type BatchSetUserRebateRateItem struct {
-	UserID         int
-	RatePercent    *float64
-	ClearOverride  bool
+	UserID        int
+	RatePercent   *float64
+	ClearOverride bool
 }
 
 // BatchSetUserRebateRateResult is per-row outcome from BatchSetUserRebateRate.

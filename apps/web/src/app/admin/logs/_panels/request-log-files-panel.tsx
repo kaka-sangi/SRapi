@@ -49,7 +49,10 @@ export function RequestLogFilesPanel() {
   }, [prefix, errorOnly]);
 
   useEffect(() => {
-    void reload();
+    const id = window.setTimeout(() => {
+      void reload();
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [reload]);
 
   useEffect(() => {

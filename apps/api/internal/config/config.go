@@ -20,29 +20,29 @@ const (
 )
 
 type Config struct {
-	Server           ServerConfig
-	Storage          StorageConfig
-	Database         DependencyConfig
-	Redis            DependencyConfig
-	Gateway          GatewayConfig
-	Security         SecurityConfig
-	Bootstrap        BootstrapConfig
-	Retention        RetentionConfig
-	AuthCleanup      AuthCleanupConfig
-	BalanceCharger   BalanceChargerConfig
-	HealthProbe      HealthProbeConfig
-	QualityEval      QualityEvalConfig
-	SLOEvaluator     SLOEvaluatorConfig
-	Email            EmailConfig
-	Observability    ObservabilityConfig
-	Captcha          CaptchaConfig
-	QuotaRefresh     QuotaRefreshConfig
+	Server               ServerConfig
+	Storage              StorageConfig
+	Database             DependencyConfig
+	Redis                DependencyConfig
+	Gateway              GatewayConfig
+	Security             SecurityConfig
+	Bootstrap            BootstrapConfig
+	Retention            RetentionConfig
+	AuthCleanup          AuthCleanupConfig
+	BalanceCharger       BalanceChargerConfig
+	HealthProbe          HealthProbeConfig
+	QualityEval          QualityEvalConfig
+	SLOEvaluator         SLOEvaluatorConfig
+	Email                EmailConfig
+	Observability        ObservabilityConfig
+	Captcha              CaptchaConfig
+	QuotaRefresh         QuotaRefreshConfig
 	AccountsTokenRefresh AccountsTokenRefreshConfig
-	LiteLLMPricing   LiteLLMPricingConfig
-	ConnectivityTest ConnectivityTestConfig
-	ScheduledTest    ScheduledTestConfig
-	ProxyProbe       ProxyProbeConfig
-	OAuth            OAuthConfig
+	LiteLLMPricing       LiteLLMPricingConfig
+	ConnectivityTest     ConnectivityTestConfig
+	ScheduledTest        ScheduledTestConfig
+	ProxyProbe           ProxyProbeConfig
+	OAuth                OAuthConfig
 	// Codex carries the global Codex provider modes ported from CLIProxyAPI:
 	// the per-channel OAuth model-name alias map and the global
 	// disable-image-generation enum. Both are no-ops when unset, which is the

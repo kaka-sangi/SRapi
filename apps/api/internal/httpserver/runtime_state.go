@@ -49,10 +49,10 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/modules/copilot"
 	copilotconvcontract "github.com/srapi/srapi/apps/api/internal/modules/copilot/contract"
 	copilotconvmemory "github.com/srapi/srapi/apps/api/internal/modules/copilot/store/memory"
+	erroreventstreamservice "github.com/srapi/srapi/apps/api/internal/modules/error_event_stream/service"
 	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
 	errorpassthroughservice "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/service"
 	errorpassthroughmemory "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/store/memory"
-	erroreventstreamservice "github.com/srapi/srapi/apps/api/internal/modules/error_event_stream/service"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
@@ -87,11 +87,11 @@ import (
 	provideradapterservice "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
-	ratelimitcooldownservice "github.com/srapi/srapi/apps/api/internal/modules/rate_limit_cooldown/service"
 	providermemory "github.com/srapi/srapi/apps/api/internal/modules/providers/store/memory"
 	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
 	qualityservice "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/service"
 	qualitymemory "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/store/memory"
+	ratelimitcooldownservice "github.com/srapi/srapi/apps/api/internal/modules/rate_limit_cooldown/service"
 	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	realtimeservice "github.com/srapi/srapi/apps/api/internal/modules/realtime/service"
 	reverseproxyservice "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/service"
@@ -147,75 +147,75 @@ const (
 var errRequestTooLarge = errors.New("request body too large")
 
 type runtimeState struct {
-	cfg                     config.Config
-	logger                  *slog.Logger
-	setupComplete           atomic.Bool
-	users                   *usersservice.Service
-	auth                    *authservice.Service
-	apiKeys                 *apikeyservice.Service
-	audit                   *auditservice.Service
-	billing                 *billingservice.Service
-	events                  *eventsservice.Service
-	affiliate               *affiliateservice.Service
-	idempotency             *idempotencyservice.Service
-	notificationContacts    *notificationsservice.ContactService
-	userAvatars             *usersservice.AvatarService
-	contentSafety           *contentsafetyservice.Service
-	gateway                 *gatewayservice.Service
-	providers               *providerservice.Service
-	models                  *modelservice.Service
-	adapters                *provideradapterservice.Service
-	realtime                *realtimeservice.Service
-	reverseProxy            *reverseproxyservice.Service
-	accounts                *accountservice.Service
-	adminControl            *admincontrolservice.Service
-	qualityEval             *qualityservice.Service
-	scheduler               *schedulerservice.Service
-	subscriptions           *subscriptionservice.Service
-	totp                    *totpservice.Service
-	payments                *paymentservice.Service
-	operations              *operationsservice.Service
-	usage                   *usageservice.Service
-	userAttributes          *userattributesservice.Service
-	errorPassthrough        *errorpassthroughservice.Service
-	opsErrorLogs            *opserrorlogsservice.Service
-	opsErrorLogsStore       opserrorlogscontract.Store
-	tlsProfiles             *tlsprofilesservice.Service
-	captcha                 *captchaservice.Service
-	healthRollups           *healthrollupsservice.Service
-	modelRateLimits         *modelratelimitsservice.Service
-	groupRateLimits         *groupratelimitsservice.Service
-	userPlatformQuotas      *userplatformquotasservice.Service
-	payloadRules            *payloadrulesservice.Service
-	scheduledTests          *scheduledtestsservice.Service
-	scheduledTestRunner     *scheduledtestworker.Runner
-	backupSnapshots         *backupsnapservice.Service
-	backupSnapshotsStore    backupsnapcontract.Store
-	accountProvisioning     *accountprovisioningservice.Service
-	channelMonitors         *channelmonitorsservice.Service
-	copilotEngine           *copilot.Engine
-	internalRouter          http.Handler
-	userStore               userscontract.Store
-	sessionStore            authcontract.Store
-	apiKeyStore             apikeycontract.Store
-	auditStore              auditcontract.Store
-	billingStore            billingcontract.Store
-	eventsStore             eventscontract.Store
-	affiliateStore          affiliatecontract.Store
-	operationsStore         operationscontract.Store
-	providerStore           providercontract.Store
-	modelStore              modelcontract.Store
-	accountStore            accountcontract.Store
-	adminControlStore       admincontrolcontract.Store
-	paymentStore            paymentcontract.Store
-	qualityEvalStore        qualitycontract.Store
-	realtimeStore           realtimecontract.Store
+	cfg                  config.Config
+	logger               *slog.Logger
+	setupComplete        atomic.Bool
+	users                *usersservice.Service
+	auth                 *authservice.Service
+	apiKeys              *apikeyservice.Service
+	audit                *auditservice.Service
+	billing              *billingservice.Service
+	events               *eventsservice.Service
+	affiliate            *affiliateservice.Service
+	idempotency          *idempotencyservice.Service
+	notificationContacts *notificationsservice.ContactService
+	userAvatars          *usersservice.AvatarService
+	contentSafety        *contentsafetyservice.Service
+	gateway              *gatewayservice.Service
+	providers            *providerservice.Service
+	models               *modelservice.Service
+	adapters             *provideradapterservice.Service
+	realtime             *realtimeservice.Service
+	reverseProxy         *reverseproxyservice.Service
+	accounts             *accountservice.Service
+	adminControl         *admincontrolservice.Service
+	qualityEval          *qualityservice.Service
+	scheduler            *schedulerservice.Service
+	subscriptions        *subscriptionservice.Service
+	totp                 *totpservice.Service
+	payments             *paymentservice.Service
+	operations           *operationsservice.Service
+	usage                *usageservice.Service
+	userAttributes       *userattributesservice.Service
+	errorPassthrough     *errorpassthroughservice.Service
+	opsErrorLogs         *opserrorlogsservice.Service
+	opsErrorLogsStore    opserrorlogscontract.Store
+	tlsProfiles          *tlsprofilesservice.Service
+	captcha              *captchaservice.Service
+	healthRollups        *healthrollupsservice.Service
+	modelRateLimits      *modelratelimitsservice.Service
+	groupRateLimits      *groupratelimitsservice.Service
+	userPlatformQuotas   *userplatformquotasservice.Service
+	payloadRules         *payloadrulesservice.Service
+	scheduledTests       *scheduledtestsservice.Service
+	scheduledTestRunner  *scheduledtestworker.Runner
+	backupSnapshots      *backupsnapservice.Service
+	backupSnapshotsStore backupsnapcontract.Store
+	accountProvisioning  *accountprovisioningservice.Service
+	channelMonitors      *channelmonitorsservice.Service
+	copilotEngine        *copilot.Engine
+	internalRouter       http.Handler
+	userStore            userscontract.Store
+	sessionStore         authcontract.Store
+	apiKeyStore          apikeycontract.Store
+	auditStore           auditcontract.Store
+	billingStore         billingcontract.Store
+	eventsStore          eventscontract.Store
+	affiliateStore       affiliatecontract.Store
+	operationsStore      operationscontract.Store
+	providerStore        providercontract.Store
+	modelStore           modelcontract.Store
+	accountStore         accountcontract.Store
+	adminControlStore    admincontrolcontract.Store
+	paymentStore         paymentcontract.Store
+	qualityEvalStore     qualitycontract.Store
+	realtimeStore        realtimecontract.Store
 	// balanceReservation is the optional atomic-reservation gate that prevents
 	// concurrent gateway requests from collectively over-spending a user's
 	// balance before the asynchronous balance_charger has a chance to debit.
 	// Nil when Redis isn't configured — the balance gate then falls back to
 	// the single-instance read-only check.
-	balanceReservation balanceReservationStore
+	balanceReservation      balanceReservationStore
 	rateLimiter             *ratelimit.Limiter
 	schedulerStore          schedulercontract.Store
 	sessionAffinity         sessionaffinitycontract.Store

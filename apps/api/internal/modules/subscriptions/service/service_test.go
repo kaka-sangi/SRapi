@@ -649,9 +649,9 @@ func TestBatchAssignSubscriptionsPerRowFailureSurfaces(t *testing.T) {
 	}
 	items := []contract.BatchAssignSubscriptionItem{
 		{UserID: 1, PlanID: plan.ID},
-		{UserID: 0, PlanID: plan.ID},     // invalid user id
-		{UserID: 1, PlanID: plan.ID},     // duplicate (user, plan)
-		{UserID: 9, PlanID: 9999},        // missing plan
+		{UserID: 0, PlanID: plan.ID}, // invalid user id
+		{UserID: 1, PlanID: plan.ID}, // duplicate (user, plan)
+		{UserID: 9, PlanID: 9999},    // missing plan
 	}
 	results, err := svc.BatchAssignSubscriptions(t.Context(), items)
 	if err != nil {

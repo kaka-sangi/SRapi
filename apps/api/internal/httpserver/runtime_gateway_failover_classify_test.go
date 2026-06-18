@@ -17,11 +17,11 @@ import (
 // 5xx -> server_bad+failover, 408 -> transient, other 4xx -> client_bad.
 func TestClassifyUpstreamError_StatusCodes(t *testing.T) {
 	cases := []struct {
-		name            string
-		status          int
-		wantClass       string
-		wantFailover    bool
-		wantBlacklist   bool
+		name          string
+		status        int
+		wantClass     string
+		wantFailover  bool
+		wantBlacklist bool
 	}{
 		{"401 unauthorized", 401, "account_bad", true, true},
 		{"403 forbidden", 403, "account_bad", true, true},
@@ -83,11 +83,11 @@ func TestClassifyUpstreamError_RetryAfter_Garbage(t *testing.T) {
 // classifyOpenAITransportError taxonomy: typed-errors first, then string markers.
 func TestClassifyUpstreamError_NetworkErrors(t *testing.T) {
 	cases := []struct {
-		name            string
-		err             error
-		wantClass       string
-		wantFailover    bool
-		wantBlacklist   bool
+		name          string
+		err           error
+		wantClass     string
+		wantFailover  bool
+		wantBlacklist bool
 	}{
 		{"context canceled", context.Canceled, "transient", false, false},
 		{"wrapped context canceled", fmt.Errorf("http: %w", context.Canceled), "transient", false, false},

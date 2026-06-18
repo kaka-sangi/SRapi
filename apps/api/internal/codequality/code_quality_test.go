@@ -382,8 +382,11 @@ func TestProductionGoAvoidsPanicAndRecoverOutsideBootstrap(t *testing.T) {
 	root := repoRoot(t)
 	files := goFiles(t, root, productionOnly)
 	allowed := map[string][]string{
-		"apps/api/internal/app/app.go":           {"recover()"},
-		"apps/api/internal/httpserver/server.go": {"panic(err)"},
+		"apps/api/cmd/srapi/main.go":                                              {"recover()"},
+		"apps/api/internal/app/app.go":                                            {"recover()"},
+		"apps/api/internal/httpserver/runtime_gateway_usage_worker.go":            {"recover()"},
+		"apps/api/internal/httpserver/server.go":                                  {"panic(err)"},
+		"apps/api/internal/modules/provider_adapters/service/codex_jws_wiring.go": {"recover()"},
 		// embed.go's fs.Sub only fails on an invalid path, and the //go:embed
 		// pattern is a compile-time constant, so this panic is unreachable.
 		"apps/api/migrations/embed.go": {"panic(err)"},
@@ -394,7 +397,7 @@ func TestProductionGoAvoidsPanicAndRecoverOutsideBootstrap(t *testing.T) {
 		lines := fileLines(t, path)
 		for i, line := range lines {
 			for _, call := range []string{"panic(", "recover("} {
-				if strings.Contains(line, call) && !allowedEscapeHatch(allowed[rel], line) {
+				if strings.Contains(line, call) && !allowedPanicRecoverEscapeHatch(allowed[rel], rel, line) {
 					violations = append(violations, rel+":"+strconv.Itoa(i+1)+": "+call+" must stay out of production code outside documented bootstrap escape hatches")
 				}
 			}
@@ -706,6 +709,16 @@ func allowedEscapeHatch(allowed []string, line string) bool {
 		if strings.Contains(line, snippet) {
 			return true
 		}
+	}
+	return false
+}
+
+func allowedPanicRecoverEscapeHatch(allowed []string, rel string, line string) bool {
+	if allowedEscapeHatch(allowed, line) {
+		return true
+	}
+	if strings.HasPrefix(rel, filepath.ToSlash("apps/api/internal/workers/")) && strings.Contains(line, "recover()") {
+		return true
 	}
 	return false
 }

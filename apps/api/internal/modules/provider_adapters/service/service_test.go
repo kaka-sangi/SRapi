@@ -8024,6 +8024,76 @@ func TestReverseProxyCodexCLIAdapterCompactConvertsSSEToJSON(t *testing.T) {
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterCompactRepairsTextlessSSEOutput(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(
+			"data: {\"type\":\"response.output_text.delta\",\"delta\":\"fixed \"}\n\n" +
+				"data: {\"type\":\"response.output_text.done\",\"text\":\"fixed text\"}\n\n" +
+				"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"cmp_textless\",\"object\":\"response.compaction\",\"output\":[{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\"}]}],\"input_tokens\":7,\"output_tokens\":1}}\n\n" +
+				"data: [DONE]\n\n",
+		))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_compact_textless_sse",
+		Model:          "codex-local",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses/compact",
+		InputParts:     textParts("compact me"),
+		RawBody:        []byte(`{"model":"codex-local","input":"compact me","stream":false}`),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": upstream.URL + "/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex compact upstream: %v", err)
+	}
+	if bytes.Contains(resp.Raw, []byte("data:")) {
+		t.Fatalf("compact Raw must be JSON after conversion, got %q", string(resp.Raw))
+	}
+	var payload struct {
+		Output []struct {
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"output"`
+	}
+	if err := json.Unmarshal(resp.Raw, &payload); err != nil {
+		t.Fatalf("Raw must be valid JSON, got %q (err=%v)", string(resp.Raw), err)
+	}
+	if len(payload.Output) != 1 || len(payload.Output[0].Content) != 1 {
+		t.Fatalf("expected repaired compact output, got %+v", payload.Output)
+	}
+	part := payload.Output[0].Content[0]
+	if part.Type != "output_text" || part.Text != "fixed text" {
+		t.Fatalf("expected repaired output_text text, got %+v in %s", part, string(resp.Raw))
+	}
+	if got := resp.Headers.Get("Content-Type"); got != "application/json" {
+		t.Fatalf("compact Headers must be flipped to application/json after conversion, got %q", got)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

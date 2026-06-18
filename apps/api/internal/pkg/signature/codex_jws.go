@@ -35,20 +35,20 @@ import (
 // the reference, otherwise the parsing of a real Codex ID token will
 // silently drop fields the rest of the system depends on.
 type CodexJWTClaims struct {
-	AtHash        string             `json:"at_hash"`
-	Aud           []string           `json:"aud"`
-	AuthProvider  string             `json:"auth_provider"`
-	AuthTime      int                `json:"auth_time"`
-	Email         string             `json:"email"`
-	EmailVerified bool               `json:"email_verified"`
-	Exp           int                `json:"exp"`
-	CodexAuthInfo CodexJWTAuthInfo   `json:"https://api.openai.com/auth"`
-	Iat           int                `json:"iat"`
-	Iss           string             `json:"iss"`
-	Jti           string             `json:"jti"`
-	Rat           int                `json:"rat"`
-	Sid           string             `json:"sid"`
-	Sub           string             `json:"sub"`
+	AtHash        string           `json:"at_hash"`
+	Aud           []string         `json:"aud"`
+	AuthProvider  string           `json:"auth_provider"`
+	AuthTime      int              `json:"auth_time"`
+	Email         string           `json:"email"`
+	EmailVerified bool             `json:"email_verified"`
+	Exp           int              `json:"exp"`
+	CodexAuthInfo CodexJWTAuthInfo `json:"https://api.openai.com/auth"`
+	Iat           int              `json:"iat"`
+	Iss           string           `json:"iss"`
+	Jti           string           `json:"jti"`
+	Rat           int              `json:"rat"`
+	Sid           string           `json:"sid"`
+	Sub           string           `json:"sub"`
 }
 
 // CodexJWTAuthInfo mirrors CLIProxyAPI CodexAuthInfo.

@@ -27,10 +27,10 @@ import (
 
 // stubClearanceProvider records Resolve calls and returns a canned bundle.
 type stubClearanceProvider struct {
-	mu       sync.Mutex
-	calls    []httputil.ResolveRequest
-	bundle   *httputil.ClearanceBundle
-	err      error
+	mu     sync.Mutex
+	calls  []httputil.ResolveRequest
+	bundle *httputil.ClearanceBundle
+	err    error
 }
 
 func (s *stubClearanceProvider) Resolve(r httputil.ResolveRequest) (*httputil.ClearanceBundle, error) {

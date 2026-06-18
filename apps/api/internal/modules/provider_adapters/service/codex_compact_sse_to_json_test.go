@@ -164,6 +164,36 @@ func TestCodexConvertCompactSSEBodyToJSONLeavesPopulatedOutputAlone(t *testing.T
 	}
 }
 
+func TestCodexConvertCompactSSEBodyToJSONRepairsTextlessOutput(t *testing.T) {
+	body := []byte(
+		"data: {\"type\":\"response.output_text.delta\",\"delta\":\"fixed \"}\n\n" +
+			"data: {\"type\":\"response.output_text.done\",\"text\":\"fixed text\"}\n\n" +
+			"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"cmp\",\"object\":\"response.compaction\",\"output\":[{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\"}]}]}}\n\n",
+	)
+	rewritten, ok := codexConvertCompactSSEBodyToJSON(body)
+	if !ok {
+		t.Fatalf("expected ok=true, got false")
+	}
+	var payload struct {
+		Output []struct {
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"output"`
+	}
+	if err := json.Unmarshal(rewritten, &payload); err != nil {
+		t.Fatalf("rewritten body must be valid JSON, got %q (err=%v)", string(rewritten), err)
+	}
+	if len(payload.Output) != 1 || len(payload.Output[0].Content) != 1 {
+		t.Fatalf("expected one repaired output_text content part, got %+v", payload.Output)
+	}
+	part := payload.Output[0].Content[0]
+	if part.Type != "output_text" || part.Text != "fixed text" {
+		t.Fatalf("expected repaired output_text text, got %+v in %s", part, string(rewritten))
+	}
+}
+
 // TestCodexConvertCompactSSEBodyToJSONReturnsFalseOnPureJSON guards
 // the gate: when the body is already JSON (not SSE), the helper
 // returns ok=false so the caller skips conversion. The gateway then

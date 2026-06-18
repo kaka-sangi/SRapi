@@ -10,26 +10,26 @@ import (
 var ErrNotFound = errors.New("usage log not found")
 
 type UsageLog struct {
-	ID                    int
-	RequestID             string
-	AttemptNo             int
-	UserID                int
-	APIKeyID              int
-	ProviderID            *int
-	AccountID             *int
-	SourceProtocol        string
-	SourceEndpoint        string
-	TargetProtocol        string
-	Model                 string
-	InputTokens           int
-	OutputTokens          int
-	CachedTokens          int
-	CacheCreationTokens   int
-	TotalTokens           int
-	UsageEstimated        bool
-	LatencyMS             int
-	Success               bool
-	ErrorClass            *string
+	ID                  int
+	RequestID           string
+	AttemptNo           int
+	UserID              int
+	APIKeyID            int
+	ProviderID          *int
+	AccountID           *int
+	SourceProtocol      string
+	SourceEndpoint      string
+	TargetProtocol      string
+	Model               string
+	InputTokens         int
+	OutputTokens        int
+	CachedTokens        int
+	CacheCreationTokens int
+	TotalTokens         int
+	UsageEstimated      bool
+	LatencyMS           int
+	Success             bool
+	ErrorClass          *string
 	// ProviderErrorMessage carries the upstream's verbatim error.message
 	// (truncated + redacted) so operators can see what Codex / OpenAI /
 	// Anthropic actually returned for a failed request. Mirrors sub2api's
@@ -100,24 +100,24 @@ type UpstreamErrorEvent struct {
 }
 
 type RecordRequest struct {
-	RequestID             string
-	AttemptNo             int
-	UserID                int
-	APIKeyID              int
-	ProviderID            *int
-	AccountID             *int
-	SourceProtocol        string
-	SourceEndpoint        string
-	TargetProtocol        string
-	Model                 string
-	InputTokens           int
-	OutputTokens          int
-	CachedTokens          int
-	CacheCreationTokens   int
-	UsageEstimated        bool
-	LatencyMS             int
-	Success               bool
-	ErrorClass            *string
+	RequestID           string
+	AttemptNo           int
+	UserID              int
+	APIKeyID            int
+	ProviderID          *int
+	AccountID           *int
+	SourceProtocol      string
+	SourceEndpoint      string
+	TargetProtocol      string
+	Model               string
+	InputTokens         int
+	OutputTokens        int
+	CachedTokens        int
+	CacheCreationTokens int
+	UsageEstimated      bool
+	LatencyMS           int
+	Success             bool
+	ErrorClass          *string
 	// ProviderErrorMessage / ProviderErrorBodyExcerpt carry the upstream's
 	// verbatim error.message + body excerpt for failed requests. See the
 	// matching fields on UsageLog for the sub2api parity rationale.

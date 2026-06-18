@@ -6947,6 +6947,12 @@ type DeleteApiKeyResponse struct {
 	RequestId RequestId `json:"request_id"`
 }
 
+// DeleteRequestLogFileResponse defines model for DeleteRequestLogFileResponse.
+type DeleteRequestLogFileResponse struct {
+	RequestId RequestId `json:"request_id"`
+	Success   bool      `json:"success"`
+}
+
 // DeleteResponse defines model for DeleteResponse.
 type DeleteResponse struct {
 	Data struct {
@@ -9450,6 +9456,30 @@ type RequestEmailVerificationRequest struct {
 // RequestId defines model for RequestId.
 type RequestId = string
 
+// RequestLogFileDescriptor defines model for RequestLogFileDescriptor.
+type RequestLogFileDescriptor struct {
+	CreatedAt   Timestamp `json:"created_at"`
+	IsErrorOnly bool      `json:"is_error_only"`
+
+	// Name On-disk filename such as request-<unix_ms>-<request_id>.log.
+	Name      string `json:"name"`
+	RequestId string `json:"request_id"`
+	Size      int64  `json:"size"`
+}
+
+// RequestLogFileListResponse defines model for RequestLogFileListResponse.
+type RequestLogFileListResponse struct {
+	Data       []RequestLogFileDescriptor `json:"data"`
+	Pagination Pagination                 `json:"pagination"`
+	RequestId  RequestId                  `json:"request_id"`
+}
+
+// RequestLogFileResponse defines model for RequestLogFileResponse.
+type RequestLogFileResponse struct {
+	Data      RequestLogFileDescriptor `json:"data"`
+	RequestId RequestId                `json:"request_id"`
+}
+
 // RequestPasswordResetRequest defines model for RequestPasswordResetRequest.
 type RequestPasswordResetRequest struct {
 	Email openapi_types.Email `json:"email"`
@@ -11495,6 +11525,17 @@ type ResolveAdminErrorLogJSONBody struct {
 	Resolved bool `json:"resolved"`
 }
 
+// GetAdminErrorStreamParams defines parameters for GetAdminErrorStream.
+type GetAdminErrorStreamParams struct {
+	AccountId  *int    `form:"account_id,omitempty" json:"account_id,omitempty"`
+	ErrorClass *string `form:"error_class,omitempty" json:"error_class,omitempty"`
+	MinStatus  *int    `form:"min_status,omitempty" json:"min_status,omitempty"`
+	MaxStatus  *int    `form:"max_status,omitempty" json:"max_status,omitempty"`
+
+	// Since Unix-millisecond cursor used to replay buffered events.
+	Since *int64 `form:"since,omitempty" json:"since,omitempty"`
+}
+
 // ListAdminModelsParams defines parameters for ListAdminModels.
 type ListAdminModelsParams struct {
 	Page     *Page        `form:"page,omitempty" json:"page,omitempty"`
@@ -11708,6 +11749,16 @@ type ListAdminRedeemCodesParams struct {
 
 	// Code Case-insensitive substring filter on the redeem code value.
 	Code *string `form:"code,omitempty" json:"code,omitempty"`
+}
+
+// ListAdminRequestLogFilesParams defines parameters for ListAdminRequestLogFiles.
+type ListAdminRequestLogFilesParams struct {
+	// RequestId Prefix filter against the request id embedded in the filename.
+	RequestId *string    `form:"request_id,omitempty" json:"request_id,omitempty"`
+	ErrorOnly *bool      `form:"error_only,omitempty" json:"error_only,omitempty"`
+	From      *time.Time `form:"from,omitempty" json:"from,omitempty"`
+	To        *time.Time `form:"to,omitempty" json:"to,omitempty"`
+	Limit     *int       `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListAdminRiskControlLogsParams defines parameters for ListAdminRiskControlLogs.
@@ -19555,6 +19606,9 @@ type ServerInterface interface {
 	// Update an error-passthrough rule.
 	// (PATCH /api/v1/admin/error-passthrough-rules/{id})
 	UpdateAdminErrorPassthroughRule(w http.ResponseWriter, r *http.Request, id Id)
+	// Subscribe to live gateway error events.
+	// (GET /api/v1/admin/error-stream)
+	GetAdminErrorStream(w http.ResponseWriter, r *http.Request, params GetAdminErrorStreamParams)
 	// Server-Sent Events stream for real-time admin notifications.
 	// (GET /api/v1/admin/events)
 	GetAdminEventStream(w http.ResponseWriter, r *http.Request)
@@ -19864,6 +19918,18 @@ type ServerInterface interface {
 	// Delete a redeem code.
 	// (DELETE /api/v1/admin/redeem-codes/{id})
 	DeleteAdminRedeemCode(w http.ResponseWriter, r *http.Request, id Id)
+	// List captured request log files.
+	// (GET /api/v1/admin/request-log-files)
+	ListAdminRequestLogFiles(w http.ResponseWriter, r *http.Request, params ListAdminRequestLogFilesParams)
+	// Delete a captured request log file.
+	// (DELETE /api/v1/admin/request-log-files/{name})
+	DeleteAdminRequestLogFile(w http.ResponseWriter, r *http.Request, name string)
+	// Get captured request log file metadata.
+	// (GET /api/v1/admin/request-log-files/{name})
+	GetAdminRequestLogFile(w http.ResponseWriter, r *http.Request, name string)
+	// Download a captured request log file.
+	// (GET /api/v1/admin/request-log-files/{name}/download)
+	DownloadAdminRequestLogFile(w http.ResponseWriter, r *http.Request, name string)
 	// Get risk-control configuration.
 	// (GET /api/v1/admin/risk-control/config)
 	GetAdminRiskControlConfig(w http.ResponseWriter, r *http.Request)
@@ -25172,6 +25238,97 @@ func (siw *ServerInterfaceWrapper) UpdateAdminErrorPassthroughRule(w http.Respon
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminErrorStream operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminErrorStream(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminErrorStreamParams
+
+	// ------------- Optional query parameter "account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "account_id", r.URL.Query(), &params.AccountId, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error_class" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_class", r.URL.Query(), &params.ErrorClass, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_class"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_class", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "min_status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "min_status", r.URL.Query(), &params.MinStatus, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "min_status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "min_status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "max_status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "max_status", r.URL.Query(), &params.MaxStatus, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "max_status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "max_status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "since" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "since", r.URL.Query(), &params.Since, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "since"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "since", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminErrorStream(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAdminEventStream operation middleware
 func (siw *ServerInterfaceWrapper) GetAdminEventStream(w http.ResponseWriter, r *http.Request) {
 
@@ -29010,6 +29167,193 @@ func (siw *ServerInterfaceWrapper) DeleteAdminRedeemCode(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteAdminRedeemCode(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminRequestLogFiles operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminRequestLogFiles(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminRequestLogFilesParams
+
+	// ------------- Optional query parameter "request_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "request_id", r.URL.Query(), &params.RequestId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "request_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "request_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error_only" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_only", r.URL.Query(), &params.ErrorOnly, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_only"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_only", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminRequestLogFiles(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminRequestLogFile operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminRequestLogFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", r.PathValue("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminRequestLogFile(w, r, name)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminRequestLogFile operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminRequestLogFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", r.PathValue("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminRequestLogFile(w, r, name)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DownloadAdminRequestLogFile operation middleware
+func (siw *ServerInterfaceWrapper) DownloadAdminRequestLogFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", r.PathValue("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadAdminRequestLogFile(w, r, name)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -35090,6 +35434,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules", wrapper.CreateAdminErrorPassthroughRule)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules/{id}", wrapper.DeleteAdminErrorPassthroughRule)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules/{id}", wrapper.UpdateAdminErrorPassthroughRule)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/error-stream", wrapper.GetAdminErrorStream)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/events", wrapper.GetAdminEventStream)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/group-rate-limits", wrapper.ListAdminGroupRateLimits)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/group-rate-limits", wrapper.UpsertAdminGroupRateLimit)
@@ -35193,6 +35538,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-update", wrapper.BatchUpdateAdminRedeemCodes)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/redeem-codes/stats", wrapper.GetAdminRedeemCodeStats)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/redeem-codes/{id}", wrapper.DeleteAdminRedeemCode)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/request-log-files", wrapper.ListAdminRequestLogFiles)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/request-log-files/{name}", wrapper.DeleteAdminRequestLogFile)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/request-log-files/{name}", wrapper.GetAdminRequestLogFile)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/request-log-files/{name}/download", wrapper.DownloadAdminRequestLogFile)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/risk-control/config", wrapper.GetAdminRiskControlConfig)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/risk-control/config", wrapper.UpdateAdminRiskControlConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/risk-control/logs", wrapper.ListAdminRiskControlLogs)

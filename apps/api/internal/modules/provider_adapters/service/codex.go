@@ -314,8 +314,8 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 // codexConvertSSEResponseToJSONIfNonStreaming applies sub2api's
 // handlePassthroughSSEToJSON (openai_gateway_service.go:4007) when:
 //  1. The adapter declared a non-streaming request (stream=false; i.e. /compact).
-//  2. The upstream Content-Type is text/event-stream (codex backend ships SSE on
-//     /compact even when the request body said stream=false).
+//  2. The upstream is SSE, either by Content-Type or by body sniffing. Some
+//     Codex-compatible upstreams mislabel /compact SSE as application/json.
 //
 // On a successful conversion the rewritten JSON body replaces Raw AND the
 // outbound Content-Type header is flipped to application/json so the gateway's
@@ -328,11 +328,11 @@ func codexConvertSSEResponseToJSONIfNonStreaming(resp contract.ConversationRespo
 	if stream {
 		return resp
 	}
-	if upstreamHeaders == nil {
-		return resp
+	contentType := ""
+	if upstreamHeaders != nil {
+		contentType = strings.ToLower(strings.TrimSpace(upstreamHeaders.Get("Content-Type")))
 	}
-	contentType := strings.ToLower(strings.TrimSpace(upstreamHeaders.Get("Content-Type")))
-	if !strings.Contains(contentType, "text/event-stream") {
+	if !strings.Contains(contentType, "text/event-stream") && !codexBodyLooksLikeSSE(resp.Raw) {
 		return resp
 	}
 	converted, ok := codexConvertCompactSSEBodyToJSON(resp.Raw)
@@ -903,30 +903,71 @@ func parseCodexResponsesStream(body []byte, statusCode int, options codexRespons
 	if options.RequireTerminalEvent && !seenTerminalEvent {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before terminal event"}
 	}
+	streamResult := codexResponsesStreamResult{
+		body:                   body,
+		statusCode:             statusCode,
+		responseID:             responseID,
+		finalResponse:          finalResponse,
+		indexedItems:           indexedItems,
+		fallbackItems:          fallbackItems,
+		completedText:          completedText,
+		streamedText:           deltaBuilder.String(),
+		completedRefusal:       completedRefusal,
+		streamedRefusal:        refusalBuilder.String(),
+		completedReasoning:     completedReasoning,
+		streamedReasoning:      reasoningBuilder.String(),
+		textAnnotationsByIndex: textAnnotationsByIndex,
+		streamEvents:           streamEvents,
+		nextEventIndex:         eventIndex,
+		usage:                  usage,
+	}
+	return streamResult.response()
+}
+
+type codexResponsesStreamResult struct {
+	body                   []byte
+	statusCode             int
+	responseID             string
+	finalResponse          *codexResponsesResponse
+	indexedItems           map[int]codexResponsesOutputItem
+	fallbackItems          []codexResponsesOutputItem
+	completedText          string
+	streamedText           string
+	completedRefusal       string
+	streamedRefusal        string
+	completedReasoning     string
+	streamedReasoning      string
+	textAnnotationsByIndex map[codexTextAnnotationKey][]map[string]any
+	streamEvents           []contract.ConversationStreamEvent
+	nextEventIndex         int
+	usage                  *openAIUsage
+}
+
+func (r codexResponsesStreamResult) response() (contract.ConversationResponse, error) {
 	parts, stopReason, err := codexResponsesStreamPartsAndStopReason(
-		finalResponse,
-		indexedItems,
-		fallbackItems,
-		completedText,
-		deltaBuilder.String(),
-		completedRefusal,
-		refusalBuilder.String(),
-		completedReasoning,
-		reasoningBuilder.String(),
-		textAnnotationsByIndex,
-		streamEvents,
+		r.finalResponse,
+		r.indexedItems,
+		r.fallbackItems,
+		r.completedText,
+		r.streamedText,
+		r.completedRefusal,
+		r.streamedRefusal,
+		r.completedReasoning,
+		r.streamedReasoning,
+		r.textAnnotationsByIndex,
+		r.streamEvents,
 	)
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
 	text := contentPartsText(parts)
 	parsedUsage := estimatedUsage(text)
-	if usage != nil {
-		parsedUsage = usage.ToUsage(text)
+	if r.usage != nil {
+		parsedUsage = r.usage.ToUsage(text)
 	}
-	if len(streamEvents) > 0 && streamEvents[len(streamEvents)-1].Type != contract.ConversationStreamEventStop {
-		streamEvents = append(streamEvents, contract.ConversationStreamEvent{
-			Index:          eventIndex,
+	if len(r.streamEvents) > 0 && r.streamEvents[len(r.streamEvents)-1].Type != contract.ConversationStreamEventStop {
+		r.streamEvents = append(r.streamEvents, contract.ConversationStreamEvent{
+			Index:          r.nextEventIndex,
 			Type:           contract.ConversationStreamEventStop,
 			StopReason:     stopReason,
 			RawEventType:   "done",
@@ -934,13 +975,13 @@ func parseCodexResponsesStream(body []byte, statusCode int, options codexRespons
 		})
 	}
 	return contract.ConversationResponse{
-		ID:           responseID,
+		ID:           r.responseID,
 		Parts:        parts,
 		StopReason:   stopReason,
-		StatusCode:   statusCode,
+		StatusCode:   r.statusCode,
 		Usage:        parsedUsage,
-		Raw:          append(json.RawMessage(nil), body...),
-		StreamEvents: streamEvents,
+		Raw:          append(json.RawMessage(nil), r.body...),
+		StreamEvents: r.streamEvents,
 	}, nil
 }
 

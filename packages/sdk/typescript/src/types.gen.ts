@@ -4687,6 +4687,33 @@ export type ErrorLogListResponse = {
     request_id: RequestId;
 };
 
+export type RequestLogFileDescriptor = {
+    /**
+     * On-disk filename such as request-<unix_ms>-<request_id>.log.
+     */
+    name: string;
+    size: number;
+    created_at: Timestamp;
+    request_id: string;
+    is_error_only: boolean;
+};
+
+export type RequestLogFileListResponse = {
+    data: Array<RequestLogFileDescriptor>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type RequestLogFileResponse = {
+    data: RequestLogFileDescriptor;
+    request_id: RequestId;
+};
+
+export type DeleteRequestLogFileResponse = {
+    success: boolean;
+    request_id: RequestId;
+};
+
 export type AuditLog = {
     id: Id;
     actor_user_id?: string | null;
@@ -14817,6 +14844,221 @@ export type ResolveAdminErrorLogResponses = {
 };
 
 export type ResolveAdminErrorLogResponse = ResolveAdminErrorLogResponses[keyof ResolveAdminErrorLogResponses];
+
+export type GetAdminErrorStreamData = {
+    body?: never;
+    path?: never;
+    query?: {
+        account_id?: number;
+        error_class?: string;
+        min_status?: number;
+        max_status?: number;
+        /**
+         * Unix-millisecond cursor used to replay buffered events.
+         */
+        since?: number;
+    };
+    url: '/api/v1/admin/error-stream';
+};
+
+export type GetAdminErrorStreamErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    503: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminErrorStreamError = GetAdminErrorStreamErrors[keyof GetAdminErrorStreamErrors];
+
+export type GetAdminErrorStreamResponses = {
+    /**
+     * SSE frames. `event: error` frames carry an
+     * AdminErrorStreamEvent JSON payload in their `data` line.
+     *
+     */
+    200: string;
+};
+
+export type GetAdminErrorStreamResponse = GetAdminErrorStreamResponses[keyof GetAdminErrorStreamResponses];
+
+export type ListAdminRequestLogFilesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Prefix filter against the request id embedded in the filename.
+         */
+        request_id?: string;
+        error_only?: boolean;
+        from?: string;
+        to?: string;
+        limit?: number;
+    };
+    url: '/api/v1/admin/request-log-files';
+};
+
+export type ListAdminRequestLogFilesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminRequestLogFilesError = ListAdminRequestLogFilesErrors[keyof ListAdminRequestLogFilesErrors];
+
+export type ListAdminRequestLogFilesResponses = {
+    /**
+     * Captured request log files.
+     */
+    200: RequestLogFileListResponse;
+};
+
+export type ListAdminRequestLogFilesResponse = ListAdminRequestLogFilesResponses[keyof ListAdminRequestLogFilesResponses];
+
+export type DeleteAdminRequestLogFileData = {
+    body?: never;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/request-log-files/{name}';
+};
+
+export type DeleteAdminRequestLogFileErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminRequestLogFileError = DeleteAdminRequestLogFileErrors[keyof DeleteAdminRequestLogFileErrors];
+
+export type DeleteAdminRequestLogFileResponses = {
+    /**
+     * Request log file deleted.
+     */
+    200: DeleteRequestLogFileResponse;
+};
+
+export type DeleteAdminRequestLogFileResponse = DeleteAdminRequestLogFileResponses[keyof DeleteAdminRequestLogFileResponses];
+
+export type GetAdminRequestLogFileData = {
+    body?: never;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/request-log-files/{name}';
+};
+
+export type GetAdminRequestLogFileErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminRequestLogFileError = GetAdminRequestLogFileErrors[keyof GetAdminRequestLogFileErrors];
+
+export type GetAdminRequestLogFileResponses = {
+    /**
+     * Captured request log file descriptor.
+     */
+    200: RequestLogFileResponse;
+};
+
+export type GetAdminRequestLogFileResponse = GetAdminRequestLogFileResponses[keyof GetAdminRequestLogFileResponses];
+
+export type DownloadAdminRequestLogFileData = {
+    body?: never;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/request-log-files/{name}/download';
+};
+
+export type DownloadAdminRequestLogFileErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DownloadAdminRequestLogFileError = DownloadAdminRequestLogFileErrors[keyof DownloadAdminRequestLogFileErrors];
+
+export type DownloadAdminRequestLogFileResponses = {
+    /**
+     * Captured request log file body.
+     */
+    200: Blob | File;
+};
+
+export type DownloadAdminRequestLogFileResponse = DownloadAdminRequestLogFileResponses[keyof DownloadAdminRequestLogFileResponses];
 
 export type BatchGetAdminUsersSpendingTodayData = {
     body?: never;

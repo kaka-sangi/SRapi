@@ -218,7 +218,7 @@ func (s *Store) DeleteRedeemCode(_ context.Context, id int) (admincontrol.Redeem
 //   - "not_found"          id not present in the store
 //   - "already_disabled"   row is already in disabled status; left untouched
 //   - "expired"            row has expires_at in the past; still disabled with
-//                          disabled_reason="expired" (the note still lands)
+//     disabled_reason="expired" (the note still lands)
 //   - "admin_action"       normal operator-driven disable
 func (s *Store) DisableRedeemCodes(_ context.Context, ids []int, note string, at time.Time) (map[int]string, error) {
 	now := at.UTC()

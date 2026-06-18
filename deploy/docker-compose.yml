@@ -183,7 +183,7 @@ services:
   # (seconds; default 60) and FLARESOLVERR_SESSION_TTL (seconds; cache window
   # for resolved bundles) override the defaults.
   flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:latest
+    image: ghcr.io/flaresolverr/flaresolverr:v3.4.1
     profiles: ["cf-clearance"]
     restart: unless-stopped
     environment:

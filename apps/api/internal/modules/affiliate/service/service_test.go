@@ -533,9 +533,9 @@ func TestBatchSetUserRebateRatePerRowFailureSurfaces(t *testing.T) {
 	bad := 1.5
 	items := []contract.BatchSetUserRebateRateItem{
 		{UserID: 1, RatePercent: &good},
-		{UserID: 0, RatePercent: &good},                // invalid id
-		{UserID: 1, RatePercent: &good},                // dup
-		{UserID: 5, RatePercent: &bad},                  // out of range
+		{UserID: 0, RatePercent: &good},                     // invalid id
+		{UserID: 1, RatePercent: &good},                     // dup
+		{UserID: 5, RatePercent: &bad},                      // out of range
 		{UserID: 6, RatePercent: nil, ClearOverride: false}, // missing rate
 	}
 	results, err := h.affiliate.BatchSetUserRebateRate(context.Background(), items)

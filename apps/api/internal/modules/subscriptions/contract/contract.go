@@ -180,9 +180,9 @@ type CreateStoredSubscription struct {
 // batch; srapi's port keeps the per-row plan + per-row override so a single
 // call can switch users between plans.
 type BatchAssignSubscriptionItem struct {
-	UserID    int
-	PlanID    int
-	ExpiresAt *time.Time
+	UserID     int
+	PlanID     int
+	ExpiresAt  *time.Time
 	SourceType string
 	SourceID   string
 }
@@ -192,7 +192,7 @@ type BatchAssignSubscriptionItem struct {
 // per-row result so the admin UI can render mixed outcomes:
 //   - "created"   = a fresh user_subscription row was inserted
 //   - "reused"    = an existing subscription on the same (user, plan, source)
-//                   was returned idempotently (sub2api's reused_count)
+//     was returned idempotently (sub2api's reused_count)
 //   - "failed"    = per-row validation/store error (Error is populated)
 //   - "skipped"   = idempotent NotFound / duplicate-id-in-batch (Error empty)
 //

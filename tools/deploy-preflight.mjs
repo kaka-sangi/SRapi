@@ -156,7 +156,7 @@ function assertComposeConfig(content, errors) {
     ["api key pepper interpolation", /API_KEY_PEPPER: \$\{API_KEY_PEPPER:-/],
     [
       "bootstrap admin password interpolation",
-      /BOOTSTRAP_ADMIN_PASSWORD: \$\{BOOTSTRAP_ADMIN_PASSWORD:-/,
+      /BOOTSTRAP_ADMIN_PASSWORD: \$\{BOOTSTRAP_ADMIN_PASSWORD:\?/,
     ],
   ];
   for (const [name, pattern] of required) {

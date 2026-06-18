@@ -99,9 +99,14 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 	// openai_gateway_service.openAICompactSupportTier which treats compact
 	// support as a tier on top of /responses rather than an parallel
 	// capability requirement.
+	disableCompact := disableResponsesCompactOptedOut(provider, account)
+	if disableCompact {
+		delete(merged, capabilitiescontract.KeyResponsesCompact)
+		delete(providerScoped, capabilitiescontract.KeyResponsesCompact)
+	}
 	if _, hasResponses := merged[capabilitiescontract.KeyResponses]; hasResponses &&
 		!explicitlyDisabled[capabilitiescontract.KeyResponsesCompact] &&
-		!disableResponsesCompactOptedOut(provider, account) {
+		!disableCompact {
 		if _, ok := merged[capabilitiescontract.KeyResponsesCompact]; !ok {
 			merged[capabilitiescontract.KeyResponsesCompact] = capabilityRequirement(capabilitiescontract.KeyResponsesCompact)
 			providerScoped[capabilitiescontract.KeyResponsesCompact] = capabilityRequirement(capabilitiescontract.KeyResponsesCompact)

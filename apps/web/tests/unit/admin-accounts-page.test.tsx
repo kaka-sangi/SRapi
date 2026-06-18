@@ -65,73 +65,80 @@ const account = providerAccount({
   runtime_class: "oauth_refresh",
 });
 
-vi.mock("@/hooks/admin-queries", () => ({
-  useAdminAccounts: () => ({
-    data: {
-      data: [account],
-      pagination: { page: 1, page_size: 20, total: 1, has_next: false },
-    },
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
-  useAdminModels: () => ({
-    data: { data: [] },
-    isLoading: false,
-    isError: false,
-  }),
-  useAdminProviders: () => ({
-    data: { data: [{ id: "provider-1", name: "codex", display_name: "Codex" }] },
-    isLoading: false,
-    isError: false,
-  }),
-  useAdminProxies: () => ({
-    data: { data: [] },
-    isLoading: false,
-    isError: false,
-  }),
-  useAccountsHealthSummary: () => ({
-    data: [
-      {
-        account_id: "acct-1",
-        provider_id: "provider-1",
-        runtime_class: "oauth_refresh",
-        status: "healthy",
-        success_rate: 1,
-        error_rate: 0,
-        latency_p50_ms: 0,
-        latency_p95_ms: 0,
-        quota_remaining_ratio: 0.72,
-        quota_exhausted: false,
-        rate_limit_count: 0,
-        timeout_count: 0,
-        circuit_state: "closed",
-        snapshot_at: "2026-06-11T00:00:00Z",
+vi.mock("@/hooks/admin-queries", async () => {
+  const actual = await vi.importActual<typeof import("@/hooks/admin-queries")>(
+    "@/hooks/admin-queries",
+  );
+  return {
+    ...actual,
+    useAdminAccounts: () => ({
+      data: {
+        data: [account],
+        pagination: { page: 1, page_size: 20, total: 1, has_next: false },
       },
-    ],
-    isLoading: false,
-    isError: false,
-  }),
-  useSetAccountStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useTestAccount: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false }),
-  useCreateAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useUpdateAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useClearAccountError: () => ({ mutateAsync: vi.fn() }),
-  useRecoverAccount: () => ({ mutateAsync: vi.fn() }),
-  useRefreshAccount: () => ({ mutateAsync: vi.fn() }),
-  useResetAccountQuota: () => ({ mutateAsync: vi.fn() }),
-  useBatchActionAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useBatchDeleteAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useBatchUpdateAccountConcurrency: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useBatchRefreshAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useBatchUpdateAccountCredentials: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useBatchUpdateAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useAdminGroups: () => ({ data: { data: [] }, isLoading: false, isError: false }),
-  useAccountsUsageTodayBatch: () => ({ data: [], isLoading: false, isError: false }),
-  useDeleteAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useDiscoverAccountModels: () => ({ mutateAsync: vi.fn() }),
-  useExportAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
-}));
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    }),
+    useAdminModels: () => ({
+      data: { data: [] },
+      isLoading: false,
+      isError: false,
+    }),
+    useAdminProviders: () => ({
+      data: { data: [{ id: "provider-1", name: "codex", display_name: "Codex" }] },
+      isLoading: false,
+      isError: false,
+    }),
+    useAdminProxies: () => ({
+      data: { data: [] },
+      isLoading: false,
+      isError: false,
+    }),
+    useAccountsHealthSummary: () => ({
+      data: [
+        {
+          account_id: "acct-1",
+          provider_id: "provider-1",
+          runtime_class: "oauth_refresh",
+          status: "healthy",
+          success_rate: 1,
+          error_rate: 0,
+          latency_p50_ms: 0,
+          latency_p95_ms: 0,
+          quota_remaining_ratio: 0.72,
+          quota_exhausted: false,
+          rate_limit_count: 0,
+          timeout_count: 0,
+          circuit_state: "closed",
+          snapshot_at: "2026-06-11T00:00:00Z",
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    }),
+    useSetAccountStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useTestAccount: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false }),
+    useCreateAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useUpdateAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useClearAccountError: () => ({ mutateAsync: vi.fn() }),
+    useRecoverAccount: () => ({ mutateAsync: vi.fn() }),
+    useRefreshAccount: () => ({ mutateAsync: vi.fn() }),
+    useResetAccountQuota: () => ({ mutateAsync: vi.fn() }),
+    useBatchActionAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useBatchDeleteAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useBatchUpdateAccountConcurrency: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useBatchRefreshAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useBatchUpdateAccountCredentials: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useBatchUpdateAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useBatchQuotaFetchAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useAdminGroups: () => ({ data: { data: [] }, isLoading: false, isError: false }),
+    useAccountsUsageTodayBatch: () => ({ data: [], isLoading: false, isError: false }),
+    useDeleteAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useDiscoverAccountModels: () => ({ mutateAsync: vi.fn() }),
+    useExportAccounts: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  };
+});
 
 describe("AdminAccountsPage", () => {
   it("defaults to cards and can switch to the table list", async () => {

@@ -1025,7 +1025,7 @@ func TestProxyTestErrorClassesCategorizeFailures(t *testing.T) {
 // the 7-day window boundary without sleeping.
 type stepClock struct{ now time.Time }
 
-func (c *stepClock) Now() time.Time         { return c.now }
+func (c *stepClock) Now() time.Time          { return c.now }
 func (c *stepClock) advance(d time.Duration) { c.now = c.now.Add(d) }
 
 // TestRecordProxyProbeCountsSuccessAndFailure exercises the rolling
@@ -1243,8 +1243,8 @@ func TestBatchCreateAccountsPerRowValidationSurfaces(t *testing.T) {
 	}
 	items := []contract.BatchAccountItem{
 		{Name: "ok", Credential: map[string]any{"api_key": "k1"}},
-		{Name: "", Credential: map[string]any{"api_key": "k2"}},       // bad name
-		{Name: "no-cred", Credential: map[string]any{}},                // missing credential
+		{Name: "", Credential: map[string]any{"api_key": "k2"}}, // bad name
+		{Name: "no-cred", Credential: map[string]any{}},         // missing credential
 		{Name: "ok2", Credential: map[string]any{"api_key": "k4"}},
 	}
 	results, err := svc.BatchCreateAccounts(context.Background(), defaults, items)
@@ -1703,9 +1703,9 @@ func TestBatchUpdateConcurrencyPerRowFailureSurfaces(t *testing.T) {
 	created, _ := svc.BatchCreateAccounts(context.Background(), defaults, items)
 	updates := []contract.BatchUpdateConcurrencyItem{
 		{AccountID: *created[0].AccountID, MaxConcurrency: 5},
-		{AccountID: 0, MaxConcurrency: 1},                       // invalid id
+		{AccountID: 0, MaxConcurrency: 1},                           // invalid id
 		{AccountID: *created[0].AccountID + 999, MaxConcurrency: 1}, // missing id → idempotent
-		{AccountID: 12345, MaxConcurrency: -1},                  // invalid value
+		{AccountID: 12345, MaxConcurrency: -1},                      // invalid value
 	}
 	results, err := svc.BatchUpdateConcurrency(context.Background(), updates)
 	if err != nil {
@@ -1829,10 +1829,10 @@ func TestBatchSetGroupRateMultipliersPerRowFailureSurfaces(t *testing.T) {
 	g1, _ := svc.CreateGroup(context.Background(), contract.CreateGroupRequest{Name: "x"})
 	items := []contract.BatchSetGroupRateMultiplierItem{
 		{GroupID: g1.ID, Multiplier: "1.25"},
-		{GroupID: 0, Multiplier: "1"},      // invalid id
+		{GroupID: 0, Multiplier: "1"},           // invalid id
 		{GroupID: g1.ID + 999, Multiplier: "1"}, // missing → idempotent success
-		{GroupID: 88, Multiplier: "-1"},    // invalid value
-		{GroupID: 99, Multiplier: "0"},     // zero is forbidden (sub2api: > 0)
+		{GroupID: 88, Multiplier: "-1"},         // invalid value
+		{GroupID: 99, Multiplier: "0"},          // zero is forbidden (sub2api: > 0)
 	}
 	results, err := svc.BatchSetGroupRateMultipliers(context.Background(), items)
 	if err != nil {
@@ -2015,10 +2015,10 @@ func TestBatchUpdateAccountCredentialsPerRowFailureSurfaces(t *testing.T) {
 	created, _ := svc.BatchCreateAccounts(context.Background(), defaults, items)
 	updates := []contract.BatchUpdateAccountCredentialItem{
 		{AccountID: *created[0].AccountID, Credential: map[string]any{"api_key": "new"}},
-		{AccountID: 0, Credential: map[string]any{"api_key": "x"}},        // invalid id
+		{AccountID: 0, Credential: map[string]any{"api_key": "x"}},                     // invalid id
 		{AccountID: *created[0].AccountID, Credential: map[string]any{"api_key": "y"}}, // dup
-		{AccountID: 9999, Credential: map[string]any{"api_key": "z"}},   // NotFound → idempotent (no error)
-		{AccountID: 8888, Credential: map[string]any{}},                  // empty patch
+		{AccountID: 9999, Credential: map[string]any{"api_key": "z"}},                  // NotFound → idempotent (no error)
+		{AccountID: 8888, Credential: map[string]any{}},                                // empty patch
 	}
 	results, err := svc.BatchUpdateAccountCredentials(context.Background(), updates)
 	if err != nil {

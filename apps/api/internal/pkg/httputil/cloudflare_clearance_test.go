@@ -66,10 +66,10 @@ func TestClearanceBundleCookieHeader(t *testing.T) {
 
 func TestHostFromURLNormalisation(t *testing.T) {
 	cases := map[string]string{
-		"https://Chatgpt.COM/conversation":  "chatgpt.com",
-		"chatgpt.com":                       "chatgpt.com",
-		"  https://chat.openai.com/  ":      "chat.openai.com",
-		"":                                  "",
+		"https://Chatgpt.COM/conversation": "chatgpt.com",
+		"chatgpt.com":                      "chatgpt.com",
+		"  https://chat.openai.com/  ":     "chat.openai.com",
+		"":                                 "",
 	}
 	for in, want := range cases {
 		if got := HostFromURL(in); got != want {

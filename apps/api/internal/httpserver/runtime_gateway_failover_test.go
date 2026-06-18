@@ -155,7 +155,7 @@ func TestBuildGatewayUpstreamErrorEvent(t *testing.T) {
 	// Build a synthetic provider error with headers carrying x-request-id +
 	// metadata so providerErrorBodyExcerpt produces a non-empty excerpt.
 	providerErr := newTestProviderError(503, "boom", http.Header{
-		"X-Request-Id":     []string{"req-abc"},
+		"X-Request-Id":         []string{"req-abc"},
 		"Anthropic-Request-Id": []string{"a-z"},
 	}, map[string]any{"type": "overloaded_error"})
 

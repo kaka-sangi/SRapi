@@ -3,17 +3,17 @@
 // and the multimodal_text payload construction at _start_image_generation.
 //
 // The upload sequence verbatim from chatgpt2api:
-//   1. POST /backend-api/files  body: {file_name, file_size, use_case:
-//        "multimodal", width, height}  →  {file_id, upload_url}
-//   2. PUT  <upload_url>          headers: Content-Type=<mime>,
-//        x-ms-blob-type: BlockBlob, x-ms-version: 2020-04-08, Origin,
-//        Referer, User-Agent, Accept, Accept-Language
-//        body: raw bytes
-//   3. POST /backend-api/files/{file_id}/uploaded   body: "{}"
-//   4. Reference the file as a part:
-//        {"content_type":"image_asset_pointer",
-//         "asset_pointer":"file-service://<file_id>",
-//         "width":W,"height":H,"size_bytes":N}
+//  1. POST /backend-api/files  body: {file_name, file_size, use_case:
+//     "multimodal", width, height}  →  {file_id, upload_url}
+//  2. PUT  <upload_url>          headers: Content-Type=<mime>,
+//     x-ms-blob-type: BlockBlob, x-ms-version: 2020-04-08, Origin,
+//     Referer, User-Agent, Accept, Accept-Language
+//     body: raw bytes
+//  3. POST /backend-api/files/{file_id}/uploaded   body: "{}"
+//  4. Reference the file as a part:
+//     {"content_type":"image_asset_pointer",
+//     "asset_pointer":"file-service://<file_id>",
+//     "width":W,"height":H,"size_bytes":N}
 //
 // Width/height extraction uses image/png and image/jpeg from the stdlib
 // (Pillow equivalent). Non-PNG/JPEG images upload with their declared width
