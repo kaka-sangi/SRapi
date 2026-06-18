@@ -7933,28 +7933,28 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesCompactEndpoint(t *testing.T) {
 	}
 }
 
-// TestReverseProxyCodexCLIAdapterCompactPassesUpstreamSSEThrough pins the
-// post-revert behaviour for /v1/responses/compact: the adapter is now a
-// pass-through (CLIProxyAPI executeCompact parity,
-// internal/runtime/executor/codex_executor.go:1064). When the upstream
-// returns SSE — which it routinely does despite Accept: application/json
-// — the Raw bytes MUST reach the gateway untouched, AND the upstream's
-// Content-Type must be preserved (the gateway raw-passthrough writer
-// now uses writeRawUpstreamResponse, which honours the upstream header).
-// Previously the adapter rewrote SSE → JSON via a "missing field text"
-// reconstruction; multiple production rejections proved I was guessing
-// at the upstream-expected shape. Pass-through avoids the entire
-// guessing game — codex CLI agrees with its own upstream on the wire
-// format, all SRapi has to do is not corrupt it.
-func TestReverseProxyCodexCLIAdapterCompactPassesUpstreamSSEThrough(t *testing.T) {
-	upstreamBody := []byte(
-		"data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_partial\"}}\n\n" +
-			"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"cmp_sse\",\"object\":\"response.compaction\",\"input_tokens\":7,\"output_tokens\":1}}\n\n" +
-			"data: [DONE]\n\n",
-	)
+// TestReverseProxyCodexCLIAdapterCompactConvertsSSEToJSON pins sub2api
+// handlePassthroughSSEToJSON parity end-to-end for /v1/responses/compact.
+// The upstream Codex backend returns text/event-stream on /compact even
+// with Accept: application/json. Codex CLI's compact-task Rust parser
+// expects JSON containing an `output[]` with a message item whose
+// content[].text holds the summary. Without the conversion+reconstruction
+// the parser explodes with "missing field `text` at line 1 column N".
+//
+// The adapter now (1) extracts the terminal response.completed event's
+// `response` field, (2) reconstructs output[] from
+// response.output_text.delta events when the terminal arrived with an
+// empty output array, and (3) flips Content-Type to application/json
+// so the gateway forwards JSON to codex CLI.
+func TestReverseProxyCodexCLIAdapterCompactConvertsSSEToJSON(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write(upstreamBody)
+		_, _ = w.Write([]byte(
+			"data: {\"type\":\"response.output_text.delta\",\"delta\":\"summary \"}\n\n" +
+				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"text.\"}\n\n" +
+				"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"cmp_e2e\",\"object\":\"response.compaction\",\"output\":[],\"input_tokens\":7,\"output_tokens\":1}}\n\n" +
+				"data: [DONE]\n\n",
+		))
 	}))
 	defer upstream.Close()
 
@@ -7990,14 +7990,37 @@ func TestReverseProxyCodexCLIAdapterCompactPassesUpstreamSSEThrough(t *testing.T
 	if err != nil {
 		t.Fatalf("invoke codex compact upstream: %v", err)
 	}
-	// Raw MUST equal the upstream SSE bytes verbatim — no rewrite.
-	if !bytes.Equal(resp.Raw, upstreamBody) {
-		t.Fatalf("compact Raw must pass through verbatim, got %q want %q", string(resp.Raw), string(upstreamBody))
+	// Raw must be JSON (no SSE markers) with the reconstructed output[].
+	if bytes.Contains(resp.Raw, []byte("data:")) {
+		t.Fatalf("compact Raw must be JSON after conversion, got %q", string(resp.Raw))
 	}
-	// Upstream's Content-Type must be on the adapter's Headers so the
-	// gateway's writeRawUpstreamResponse can forward it to the client.
-	if got := resp.Headers.Get("Content-Type"); got != "text/event-stream" {
-		t.Fatalf("compact Headers must carry upstream Content-Type=text/event-stream, got %q", got)
+	var payload struct {
+		ID     string `json:"id"`
+		Object string `json:"object"`
+		Output []struct {
+			Type    string `json:"type"`
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"output"`
+	}
+	if err := json.Unmarshal(resp.Raw, &payload); err != nil {
+		t.Fatalf("Raw must be valid JSON, got %q (err=%v)", string(resp.Raw), err)
+	}
+	if payload.ID != "cmp_e2e" || payload.Object != "response.compaction" {
+		t.Fatalf("compact metadata lost, got %+v", payload)
+	}
+	if len(payload.Output) != 1 || payload.Output[0].Type != "message" {
+		t.Fatalf("output[] must contain a message item, got %+v", payload.Output)
+	}
+	if len(payload.Output[0].Content) != 1 || payload.Output[0].Content[0].Text != "summary text." {
+		t.Fatalf("output[].content[].text must reconstruct delta text, got %+v", payload.Output[0].Content)
+	}
+	// Headers must be flipped to application/json so the gateway emits
+	// the correct content-type to codex CLI.
+	if got := resp.Headers.Get("Content-Type"); got != "application/json" {
+		t.Fatalf("compact Headers must be flipped to application/json after conversion, got %q", got)
 	}
 }
 

@@ -280,6 +280,7 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 					return contract.ConversationResponse{}, parseErr
 				}
 				parsed = withConversationResponseHeaders(parsed, retryResp.Headers)
+				parsed = codexConvertSSEResponseToJSONIfNonStreaming(parsed, retryResp.Headers, stream)
 				return withCodexQuotaSignals(parsed, retryResp.Headers), nil
 			}
 			return contract.ConversationResponse{}, classifyCodexProviderHTTPErrorWithHeaders(retryResp.StatusCode, retryResp.Headers, retryResp.Body)
@@ -306,7 +307,46 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 		return contract.ConversationResponse{}, err
 	}
 	parsed = withConversationResponseHeaders(parsed, runtimeResp.Headers)
+	parsed = codexConvertSSEResponseToJSONIfNonStreaming(parsed, runtimeResp.Headers, stream)
 	return withCodexQuotaSignals(parsed, runtimeResp.Headers), nil
+}
+
+// codexConvertSSEResponseToJSONIfNonStreaming applies sub2api's
+// handlePassthroughSSEToJSON (openai_gateway_service.go:4007) when:
+//  1. The adapter declared a non-streaming request (stream=false; i.e. /compact).
+//  2. The upstream Content-Type is text/event-stream (codex backend ships SSE on
+//     /compact even when the request body said stream=false).
+//
+// On a successful conversion the rewritten JSON body replaces Raw AND the
+// outbound Content-Type header is flipped to application/json so the gateway's
+// writeRawUpstreamResponse forwards the new content-type instead of the
+// upstream's text/event-stream. On any conversion failure (no terminal event,
+// malformed SSE) the response is returned unchanged — the gateway then passes
+// the SSE through with the original content-type, matching sub2api's fallback
+// at openai_gateway_service.go:4050-4056.
+func codexConvertSSEResponseToJSONIfNonStreaming(resp contract.ConversationResponse, upstreamHeaders http.Header, stream bool) contract.ConversationResponse {
+	if stream {
+		return resp
+	}
+	if upstreamHeaders == nil {
+		return resp
+	}
+	contentType := strings.ToLower(strings.TrimSpace(upstreamHeaders.Get("Content-Type")))
+	if !strings.Contains(contentType, "text/event-stream") {
+		return resp
+	}
+	converted, ok := codexConvertCompactSSEBodyToJSON(resp.Raw)
+	if !ok {
+		return resp
+	}
+	resp.Raw = append(json.RawMessage(nil), converted...)
+	if resp.Headers == nil {
+		resp.Headers = http.Header{}
+	} else {
+		resp.Headers = resp.Headers.Clone()
+	}
+	resp.Headers.Set("Content-Type", "application/json")
+	return resp
 }
 
 func (s *Service) invokeReverseProxyCodexResponseInputItems(ctx context.Context, req contract.ResponseInputItemsRequest, baseURL string) (contract.ResponseInputItemsResponse, error) {
