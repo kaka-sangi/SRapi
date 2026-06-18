@@ -100,6 +100,18 @@ describe("LiveErrorsPanel", () => {
     expect(screen.getByText("openai-compatible -> anthropic-compatible")).toBeInTheDocument();
     expect(screen.getByText("upstream-live")).toBeInTheDocument();
     expect(screen.getByText("尝试 3 / upstream-req-live")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /错误日志/ })).toHaveAttribute(
+      "href",
+      "/admin/logs?tab=error&q=req-live",
+    );
+    expect(screen.getByRole("link", { name: /系统日志/ })).toHaveAttribute(
+      "href",
+      "/admin/ops/system-logs?f_request_id=req-live",
+    );
+    expect(screen.getByRole("link", { name: /请求转储/ })).toHaveAttribute(
+      "href",
+      "/admin/logs?tab=request-files&f_request_id=req-live",
+    );
   });
 });
 

@@ -1,9 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime } from "@/lib/admin-format";
+import {
+  adminErrorLogsHref,
+  adminRequestDumpsHref,
+  adminSystemLogsHref,
+} from "@/lib/admin-log-links";
 
 // LiveErrorsPanel subscribes to the in-memory SSE error stream backed by the
 // error_event_stream module on the API side. It mirrors the CLIProxyAPI
@@ -290,6 +297,7 @@ export function LiveErrorsPanel() {
                       {t("adminLiveErrors.attempt")} {row.attempt_no ?? 1}
                       {row.upstream_request_id ? ` / ${row.upstream_request_id}` : ""}
                     </div>
+                    <LiveEventEvidenceLinks requestID={row.request_id} />
                   </td>
                 </tr>
               ))}
@@ -297,6 +305,35 @@ export function LiveErrorsPanel() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function LiveEventEvidenceLinks({ requestID }: { requestID?: string }) {
+  const { t } = useLanguage();
+  const errorHref = adminErrorLogsHref({ request_id: requestID });
+  const systemHref = adminSystemLogsHref({ request_id: requestID });
+  const requestDumpHref = adminRequestDumpsHref({ request_id: requestID });
+  const links = [
+    errorHref ? { href: errorHref, label: t("adminRequestLogFiles.openErrorLogs") } : null,
+    systemHref ? { href: systemHref, label: t("adminRequestLogFiles.openSystemLogs") } : null,
+    requestDumpHref ? { href: requestDumpHref, label: t("adminOpsSystemLogs.openRequestDumps") } : null,
+  ].filter((item): item is { href: string; label: string } => item !== null);
+
+  if (links.length === 0) return null;
+
+  return (
+    <div className="mt-1 flex flex-wrap gap-1.5">
+      {links.map((link) => (
+        <Link
+          key={link.href}
+          href={link.href}
+          className="inline-flex items-center gap-1 rounded border border-srapi-border-subtle px-1.5 py-0.5 text-[10px] text-srapi-text-secondary hover:bg-srapi-bg-card-elevated hover:text-srapi-text-primary"
+        >
+          {link.label}
+          <ExternalLink className="size-2.5" aria-hidden />
+        </Link>
+      ))}
     </div>
   );
 }
