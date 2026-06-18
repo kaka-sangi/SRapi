@@ -640,6 +640,8 @@ export const zh: Messages = {
     lastLogin: "上次登录",
     enable: "启用",
     disable: "停用",
+    bulkEdit: "批量编辑",
+    bulkEditTitle: "批量编辑 {count} 个用户",
     delete: "删除用户",
     deleteWarning: "软删除该用户：邮箱将被匿名化、登录身份被解绑，账户无法再登录。",
     emptyTitle: "暂无用户",

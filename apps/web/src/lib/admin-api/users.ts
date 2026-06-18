@@ -2,6 +2,7 @@
 
 import {
   batchGetAdminUsersSpendingToday,
+  batchUpdateAdminUsers,
   createAdminUser,
   createAdminUserAttributeDefinition,
   deleteAdminUser,
@@ -21,6 +22,8 @@ import {
   updateAdminUserBalance,
 } from "../../../../../packages/sdk/typescript/src/index";
 import type {
+  BatchUpdateUsersRequest,
+  BatchUpdateUsersResult,
   CreateUserAttributeDefinitionRequest,
   UserAttributeDefinition,
   UserAttributeValue,
@@ -72,6 +75,14 @@ export const usersApi = {
     return enabled
       ? unwrapData(() => enableAdminUser({ path: { id }, throwOnError: true }))
       : unwrapData(() => disableAdminUser({ path: { id }, throwOnError: true }));
+  },
+
+  // PATCH /admin/users/batch — atomic multi-user field update. Supports
+  // status / rpm_limit / roles in one request (backend already implemented;
+  // the existing Enable/Disable bulk buttons used to fire N single-item
+  // calls). Per-row failures collect in result.errors[].
+  batchUpdateUsers(body: BatchUpdateUsersRequest): Promise<BatchUpdateUsersResult> {
+    return unwrapData(() => batchUpdateAdminUsers({ body, throwOnError: true }));
   },
 
   listUserAttributeDefinitions(): Promise<AdminListResult<UserAttributeDefinition>> {

@@ -70,6 +70,19 @@ export function useBulkSetUsersEnabled() {
   });
 }
 
+// PATCH /admin/users/batch — atomic multi-user field update for
+// status / rpm_limit / roles in one request. Replaces the
+// Promise.all-over-single-item pattern used by useBulkSetUsersEnabled
+// for any caller that wants to update more than just status (or that
+// wants the atomic per-row error reporting the backend already
+// produces).
+export function useBatchUpdateUsers() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.batchUpdateUsers>) => adminApi.batchUpdateUsers(body),
+    [...USERS_KEY],
+  );
+}
+
 // ---- Per-user platform spend quotas ----
 export function useUserPlatformQuotas(userId: string, enabled = true) {
   return useQuery({

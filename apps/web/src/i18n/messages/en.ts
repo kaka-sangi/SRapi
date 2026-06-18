@@ -643,6 +643,8 @@ export const en = {
     lastLogin: "Last login",
     enable: "Enable",
     disable: "Disable",
+    bulkEdit: "Bulk edit",
+    bulkEditTitle: "Bulk-edit {count} users",
     delete: "Delete user",
     deleteWarning: "Soft-deletes the user — their email is anonymised, auth identities are severed, and they can no longer sign in.",
     emptyTitle: "No users",

@@ -7,6 +7,14 @@ import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { UserPlatformQuotasDialog } from "@/components/admin/user-platform-quotas-dialog";
 import { UserBalanceHistoryDialog } from "@/components/admin/user-balance-history-dialog";
 import { UserAttributeValuesDialog } from "@/components/admin/user-attribute-values-dialog";
@@ -24,6 +32,7 @@ import {
   useAdminUsers,
   useSetUserEnabled,
   useBulkSetUsersEnabled,
+  useBatchUpdateUsers,
   useCreateAdminUser,
   useUpdateAdminUser,
   useDeleteAdminUser,
@@ -79,6 +88,7 @@ function UsersContent() {
   });
   const setEnabled = useSetUserEnabled();
   const bulkEnabled = useBulkSetUsersEnabled();
+  const batchUpdate = useBatchUpdateUsers();
   // Attribute values for the current page in one round-trip. Group by user_id
   // so the column can pick up to N chips per row without re-scanning the list.
   const visibleUserIds = (users.data?.data ?? []).map((u) => u.id);
@@ -111,6 +121,7 @@ function UsersContent() {
   const [disableTarget, setDisableTarget] = useState<User | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
 
   const isFiltered = Boolean(list.search || statusFilter || roleFilter);
 
@@ -132,6 +143,42 @@ function UsersContent() {
       await bulkEnabled.mutateAsync({ ids, enabled });
       list.clearSelection();
       toast({ title: t("feedback.saved"), description: `${ids.length}`, tone: "success" });
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
+
+  /** PATCH /admin/users/batch — atomic multi-user field update for any
+   *  subset of status / rpm_limit / roles. Replaces the N-single-item
+   *  pattern used by runBulk (kept for the existing Enable/Disable
+   *  buttons because their optimistic update is row-targeted) when the
+   *  operator picks the more flexible "Bulk edit" path. Per-row failures
+   *  collect in result.errors and surface as a partial-batch toast. */
+  async function applyBulkEdit(body: {
+    status?: UserStatus;
+    rpm_limit?: number | null;
+    roles?: string[];
+  }) {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    try {
+      const result = await batchUpdate.mutateAsync({
+        user_ids: ids,
+        ...body,
+      });
+      list.clearSelection();
+      const failedCount = result.errors.length;
+      const succeededCount = result.updated_count;
+      if (failedCount > 0 && succeededCount > 0) {
+        toast({
+          title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
+          tone: "warning",
+        });
+      } else if (failedCount > 0) {
+        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
+      } else {
+        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
+      }
     } catch (err) {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
     }
@@ -351,6 +398,17 @@ function UsersContent() {
               >
                 {t("adminUsers.disable")}
               </Button>
+              {/* Atomic multi-user field update — exposes status / rpm_limit /
+                  roles in one modal. Backed by PATCH /admin/users/batch
+                  (already exists; was only wired for enable/disable). */}
+              <Button
+                variant="outline"
+                size="sm"
+                loading={batchUpdate.isPending}
+                onClick={() => setBulkEditOpen(true)}
+              >
+                {t("adminUsers.bulkEdit")}
+              </Button>
             </>
           ),
         }}
@@ -489,6 +547,18 @@ function UsersContent() {
         onConfirm={() => runBulk(false)}
       />
 
+      {bulkEditOpen ? (
+        <BulkEditUsersDialog
+          count={list.selected.size}
+          isPending={batchUpdate.isPending}
+          onSubmit={async (body) => {
+            await applyBulkEdit(body);
+            setBulkEditOpen(false);
+          }}
+          onClose={() => setBulkEditOpen(false)}
+        />
+      ) : null}
+
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => {
@@ -509,5 +579,181 @@ function UsersContent() {
         }}
       />
     </>
+  );
+}
+
+// Atomic multi-user bulk-edit modal. Mirrors the accounts page
+// BulkEditAccountDialog pattern — each row has an "include this
+// field?" toggle so only ticked fields land in the request body.
+// Backed by PATCH /admin/users/batch which already accepts status /
+// rpm_limit / roles. The previous Enable/Disable buttons stay (they
+// keep their row-targeted optimistic update via N single-item calls);
+// this modal is for the cross-cutting cases (role change, rpm-limit
+// rollout, status set to suspended/etc) that the simple toggles
+// can't reach.
+function BulkEditUsersDialog({
+  count,
+  isPending,
+  onSubmit,
+  onClose,
+}: {
+  count: number;
+  isPending: boolean;
+  onSubmit: (
+    body: { status?: UserStatus; rpm_limit?: number | null; roles?: string[] },
+  ) => void | Promise<void>;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const [statusEnabled, setStatusEnabled] = useState(false);
+  const [statusValue, setStatusValue] = useState<UserStatus>("active");
+  const [rpmEnabled, setRpmEnabled] = useState(false);
+  const [rpmValue, setRpmValue] = useState("");
+  const [rolesEnabled, setRolesEnabled] = useState(false);
+  const [rolesValue, setRolesValue] = useState("user");
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    const body: { status?: UserStatus; rpm_limit?: number | null; roles?: string[] } = {};
+    if (statusEnabled) body.status = statusValue;
+    if (rpmEnabled) {
+      const trimmed = rpmValue.trim();
+      if (trimmed === "") {
+        body.rpm_limit = null;
+      } else {
+        const n = Number.parseInt(trimmed, 10);
+        if (!Number.isFinite(n) || n < 0) {
+          setError(t("adminAccounts.bulkEditNumberHint"));
+          return;
+        }
+        body.rpm_limit = n;
+      }
+    }
+    if (rolesEnabled) {
+      const parsed = rolesValue
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      if (parsed.length === 0) {
+        setError(t("adminAccounts.bulkEditPickField"));
+        return;
+      }
+      body.roles = parsed;
+    }
+    if (Object.keys(body).length === 0) {
+      setError(t("adminAccounts.bulkEditPickField"));
+      return;
+    }
+    void onSubmit(body);
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent>
+        <form onSubmit={submit}>
+          <DialogHeader>
+            <DialogTitle>{t("adminUsers.bulkEditTitle", { count })}</DialogTitle>
+            <DialogDescription>{t("adminAccounts.bulkEditHint")}</DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 space-y-4">
+            <BulkEditUserRow
+              enabled={statusEnabled}
+              onToggle={setStatusEnabled}
+              label={t("adminCommon.status")}
+              disabled={isPending}
+            >
+              <select
+                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                value={statusValue}
+                disabled={!statusEnabled || isPending}
+                onChange={(e) => setStatusValue(e.target.value as UserStatus)}
+              >
+                {USER_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </BulkEditUserRow>
+            <BulkEditUserRow
+              enabled={rpmEnabled}
+              onToggle={setRpmEnabled}
+              label={t("adminUsers.rpmLimit")}
+              disabled={isPending}
+            >
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                value={rpmValue}
+                disabled={!rpmEnabled || isPending}
+                onChange={(e) => setRpmValue(e.target.value)}
+                placeholder={t("adminUsers.unlimited") as string}
+              />
+            </BulkEditUserRow>
+            <BulkEditUserRow
+              enabled={rolesEnabled}
+              onToggle={setRolesEnabled}
+              label={t("adminUsers.roles")}
+              disabled={isPending}
+            >
+              <input
+                type="text"
+                className="w-full rounded-md border border-srapi-border bg-srapi-card px-2 py-1.5 text-2xs"
+                value={rolesValue}
+                disabled={!rolesEnabled || isPending}
+                onChange={(e) => setRolesValue(e.target.value)}
+                placeholder="user, admin"
+              />
+            </BulkEditUserRow>
+            {error ? (
+              <p role="alert" className="text-2xs text-srapi-error">
+                {error}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter className="mt-5">
+            <Button type="button" variant="ghost" disabled={isPending} onClick={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" variant="primary" loading={isPending}>
+              {t("common.apply")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BulkEditUserRow({
+  enabled,
+  onToggle,
+  label,
+  disabled,
+  children,
+}: {
+  enabled: boolean;
+  onToggle: (next: boolean) => void;
+  label: string;
+  disabled: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[auto_1fr_2fr] items-center gap-3">
+      <input
+        type="checkbox"
+        checked={enabled}
+        disabled={disabled}
+        onChange={(e) => onToggle(e.target.checked)}
+        className="size-4 rounded border-srapi-border"
+        aria-label={label}
+      />
+      <span className="text-2xs text-srapi-text-secondary">{label}</span>
+      <div>{children}</div>
+    </div>
   );
 }
