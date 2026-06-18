@@ -50,6 +50,16 @@ interface LiveEvent {
   body_excerpt?: string;
 }
 
+function eventKey(ev: LiveEvent): string {
+  return [
+    ev.request_id,
+    ev.trace_id ?? "",
+    ev.upstream_request_id ?? "",
+    ev.attempt_no ?? "",
+    ev.at_unix_ms,
+  ].join("|");
+}
+
 function identityLabel(name?: string, id?: number) {
   if (name && id != null) return `${name} #${id}`;
   if (name) return name;
@@ -71,6 +81,7 @@ export function LiveErrorsPanel() {
   const [errorClass, setErrorClass] = useState("");
   const [appliedFilters, setAppliedFilters] = useState({ accountId: "", errorClass: "" });
   const pausedRef = useRef(paused);
+  const lastSeenUnixMsRef = useRef(0);
 
   useEffect(() => {
     pausedRef.current = paused;
@@ -88,6 +99,9 @@ export function LiveErrorsPanel() {
     if (appliedFilters.errorClass.trim() !== "") {
       params.set("error_class", appliedFilters.errorClass.trim());
     }
+    if (lastSeenUnixMsRef.current > 0) {
+      params.set("since", String(lastSeenUnixMsRef.current + 1));
+    }
     const qs = params.toString();
     const url = `/api/v1/admin/error-stream${qs ? `?${qs}` : ""}`;
     const es = new EventSource(url, { withCredentials: true });
@@ -97,7 +111,14 @@ export function LiveErrorsPanel() {
       if (pausedRef.current) return;
       try {
         const parsed = JSON.parse(ev.data) as LiveEvent;
+        if (parsed.at_unix_ms > lastSeenUnixMsRef.current) {
+          lastSeenUnixMsRef.current = parsed.at_unix_ms;
+        }
         setEvents((prev) => {
+          const parsedKey = eventKey(parsed);
+          if (prev.some((item) => eventKey(item) === parsedKey)) {
+            return prev;
+          }
           const next = [parsed, ...prev];
           return next.length > MAX_EVENTS ? next.slice(0, MAX_EVENTS) : next;
         });

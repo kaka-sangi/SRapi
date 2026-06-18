@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LiveErrorsPanel } from "@/app/admin/logs/_panels/live-errors-panel";
@@ -113,6 +113,41 @@ describe("LiveErrorsPanel", () => {
       "href",
       "/admin/logs?tab=request-files&f_request_id=req-live",
     );
+  });
+
+  it("reconnects with a replay cursor and de-duplicates replayed events", async () => {
+    globalThis.EventSource = MockEventSource as unknown as typeof EventSource;
+    renderWithLanguage(<LiveErrorsPanel />);
+
+    const source = eventSources[0];
+    const event = {
+      at_unix_ms: Date.UTC(2026, 5, 18, 10, 5),
+      request_id: "req-replay",
+      trace_id: "trace-replay",
+      status_code: 502,
+      error_class: "server_bad",
+      message: "replay boom",
+    };
+
+    act(() => {
+      source.emit("gateway_error", event);
+    });
+    expect(screen.getAllByText("replay boom")).toHaveLength(1);
+
+    fireEvent.change(screen.getByPlaceholderText("错误分类（如 server_bad）"), {
+      target: { value: "server_bad" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "应用筛选" }));
+
+    const reconnected = eventSources[1];
+    expect(reconnected.url).toBe(
+      `/api/v1/admin/error-stream?error_class=server_bad&since=${event.at_unix_ms + 1}`,
+    );
+
+    act(() => {
+      reconnected.emit("gateway_error", event);
+    });
+    expect(screen.getAllByText("replay boom")).toHaveLength(1);
   });
 });
 
