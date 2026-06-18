@@ -180,6 +180,7 @@ func (s *Service) applyRefreshSuccess(ctx context.Context, account contract.Prov
 	if len(credential) == 0 {
 		return account, RefreshOutcome{Class: RefreshOutcomeTransientError, Attempts: account.RefreshAttempts}, errors.New("oauth refresh returned empty credential")
 	}
+	credential = credentialWithTokenVersion(credential, now)
 	ciphertext, err := s.encryptCredential(credential)
 	if err != nil {
 		return account, RefreshOutcome{Class: RefreshOutcomeTransientError, Attempts: account.RefreshAttempts}, err
@@ -233,6 +234,12 @@ func (s *Service) applyRefreshFailure(ctx context.Context, account contract.Prov
 		return account, RefreshOutcome{Class: class, Attempts: account.RefreshAttempts}, refreshErr
 	}
 	return account, RefreshOutcome{Class: class, Attempts: account.RefreshAttempts}, refreshErr
+}
+
+func credentialWithTokenVersion(credential map[string]any, now time.Time) map[string]any {
+	out := cloneMap(credential)
+	out["_token_version"] = now.UTC().UnixMilli()
+	return out
 }
 
 func isPermanentRefreshError(err error) bool {

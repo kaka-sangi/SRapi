@@ -9,7 +9,9 @@ import (
 
 const (
 	CodexOAuthTokenURL       = "https://auth.openai.com/oauth/token"
+	CodexOAuthAuthorizeURL   = "https://auth.openai.com/oauth/authorize?codex_cli_simplified_flow=true&id_token_add_organizations=true&prompt=login"
 	CodexOAuthClientID       = "app_EMoamEEZ73f0CkXaXp7hrann"
+	CodexOAuthAuthorizeScope = "openid profile email offline_access"
 	CodexOAuthRefreshScope   = "openid profile email"
 	ClaudeCodeOAuthTokenURL  = "https://api.anthropic.com/v1/oauth/token"
 	ClaudeCodeOAuthClientID  = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"

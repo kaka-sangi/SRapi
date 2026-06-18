@@ -1,6 +1,7 @@
 package preset
 
 import (
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -250,10 +251,20 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		t.Fatalf("expected root ChatGPT Web alias to be unregistered")
 	}
 	if !containsRuntimeClass(chatGPTWebPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassWebSessionCookie) ||
-		containsRuntimeClass(chatGPTWebPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) ||
+		!containsRuntimeClass(chatGPTWebPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) ||
 		chatGPTWebPreset.AccountTemplate == nil ||
 		chatGPTWebPreset.AccountTemplate.UpstreamClient != "chatgpt_web" {
 		t.Fatalf("unexpected chatgpt-web auth/template preset: %+v", chatGPTWebPreset)
+	}
+	for _, key := range []string{"chatgpt_account_id", "originator", "version"} {
+		if chatGPTWebPreset.AccountTemplate.MetadataHints[key] == "" {
+			t.Fatalf("expected chatgpt-web metadata hint for %s", key)
+		}
+	}
+	if chatGPTWebPreset.QuotaConfig["quota_url"] != "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27" ||
+		chatGPTWebPreset.QuotaConfig["quota_headers"] == "" ||
+		chatGPTWebPreset.QuotaConfig["quota_plan_path"] != "account_plan.account_plan_id" {
+		t.Fatalf("unexpected chatgpt-web quota config: %+v", chatGPTWebPreset.QuotaConfig)
 	}
 
 	deepseekPreset, ok := registry.Lookup("deepseek")
@@ -358,6 +369,13 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if codexPreset.OAuthConfig == nil || codexPreset.OAuthConfig.ClientID == "" || codexPreset.OAuthConfig.TokenURL == "" {
 		t.Fatalf("expected codex-cli to include OAuth defaults")
 	}
+	assertOpenAICodexOAuthDefaults(t, "codex-cli", codexPreset.OAuthConfig)
+	if chatGPTWebPreset.OAuthConfig == nil ||
+		chatGPTWebPreset.OAuthConfig.ClientID != codexPreset.OAuthConfig.ClientID ||
+		chatGPTWebPreset.OAuthConfig.TokenURL != codexPreset.OAuthConfig.TokenURL {
+		t.Fatalf("expected chatgpt-web to reuse OpenAI OAuth defaults, got %+v", chatGPTWebPreset.OAuthConfig)
+	}
+	assertOpenAICodexOAuthDefaults(t, "chatgpt-web", chatGPTWebPreset.OAuthConfig)
 
 	geminiPreset, ok := registry.Lookup("gemini")
 	if !ok {
@@ -419,12 +437,37 @@ func oauthConfigHasProvisioningDefaults(config *OAuthConfig, runtimeClass accoun
 	return true
 }
 
+func assertOpenAICodexOAuthDefaults(t *testing.T, name string, config *OAuthConfig) {
+	t.Helper()
+	if config == nil {
+		t.Fatalf("expected %s OAuth config", name)
+	}
+	authorizeURL, err := url.Parse(config.AuthorizeURL)
+	if err != nil {
+		t.Fatalf("parse %s authorize url: %v", name, err)
+	}
+	if authorizeURL.Scheme != "https" || authorizeURL.Host != "auth.openai.com" || authorizeURL.Path != "/oauth/authorize" {
+		t.Fatalf("unexpected %s authorize url: %s", name, config.AuthorizeURL)
+	}
+	q := authorizeURL.Query()
+	if q.Get("prompt") != "login" ||
+		q.Get("id_token_add_organizations") != "true" ||
+		q.Get("codex_cli_simplified_flow") != "true" {
+		t.Fatalf("expected %s OpenAI Codex authorize params, got %s", name, config.AuthorizeURL)
+	}
+	for _, wantScope := range []string{"openid", "profile", "email", "offline_access"} {
+		if !containsString(config.Scopes, wantScope) {
+			t.Fatalf("expected %s OAuth scope %s, got %+v", name, wantScope, config.Scopes)
+		}
+	}
+}
+
 func presetUsesRefreshableUpstreamClient(preset Preset) bool {
 	if preset.AccountTemplate == nil {
 		return false
 	}
 	switch preset.AccountTemplate.UpstreamClient {
-	case "codex_cli", "claude_code_cli", "antigravity_desktop", "antigravity":
+	case "codex_cli", "chatgpt_web", "claude_code_cli", "antigravity_desktop", "antigravity":
 		return true
 	default:
 		return false

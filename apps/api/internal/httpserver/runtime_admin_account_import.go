@@ -9,6 +9,7 @@ import (
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	"github.com/srapi/srapi/apps/api/internal/pkg/signature"
 )
 
 func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +64,7 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 			continue
 		}
 		metadata := jsonObjectToMap(item.Metadata)
+		metadata = enrichOpenAIImportIdentity(accountcontract.RuntimeClass(item.RuntimeClass), item.UpstreamClient, metadata, credential)
 		identityKeys := buildImportIdentityKeys(providerID, item.Name, accountcontract.RuntimeClass(item.RuntimeClass), item.UpstreamClient, metadata, credential)
 		if dup, ok := firstSeenImportIdentity(seen, identityKeys); ok {
 			message := fmt.Sprintf("duplicate of import entry #%d; skipped", dup)
@@ -199,6 +201,50 @@ func importResultItem(index int, name string, action apiopenapi.CodexSessionImpo
 		item.Message = ptrString(message)
 	}
 	return item
+}
+
+func enrichOpenAIImportIdentity(runtimeClass accountcontract.RuntimeClass, upstreamClient *string, metadata map[string]any, credential map[string]any) map[string]any {
+	if !isOpenAIOAuthImport(runtimeClass, upstreamClient) {
+		return metadata
+	}
+	idToken := mapString(credential, "id_token")
+	if idToken == "" {
+		return metadata
+	}
+	signature.MergeOpenAIJWTCredential(credential, idToken)
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	for _, key := range []string{"email", "plan_type", "chatgpt_account_id", "chatgpt_user_id", "organization_id", "subscription_expires_at"} {
+		setImportStringIfMissing(metadata, key, mapString(credential, key))
+	}
+	return metadata
+}
+
+func isOpenAIOAuthImport(runtimeClass accountcontract.RuntimeClass, upstreamClient *string) bool {
+	if runtimeClass != accountcontract.RuntimeClassOauthRefresh && runtimeClass != accountcontract.RuntimeClassOauthDeviceCode {
+		return false
+	}
+	if upstreamClient == nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(*upstreamClient)) {
+	case "codex_cli", "chatgpt_web":
+		return true
+	default:
+		return false
+	}
+}
+
+func setImportStringIfMissing(values map[string]any, key string, value string) {
+	if values == nil {
+		return
+	}
+	value = strings.TrimSpace(value)
+	if value == "" || mapString(values, key) != "" {
+		return
+	}
+	values[key] = value
 }
 
 func (s *Server) buildAccountImportIndex(ctx context.Context) *importIdentityIndex {

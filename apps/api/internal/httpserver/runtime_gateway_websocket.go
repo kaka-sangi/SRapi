@@ -384,6 +384,7 @@ func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Con
 			if msg.Type == reverseproxycontract.WebSocketMessageBinary {
 				messageType = websocket.MessageBinary
 			}
+			msg = applyProviderRealtimeResponseReplacements(msg, session.ResponseReplacements)
 			if err := conn.Write(ctx, messageType, msg.Data); err != nil {
 				cancelRelay()
 				if forwardedUpstreamMessage {
@@ -475,7 +476,7 @@ func (s *Server) relayOfficialAPIKeyRealtimeWebSocket(ctx context.Context, conn 
 	upstreamForwarded := make(chan struct{}, 1)
 	forwardedUpstreamMessage := false
 	go relayWebSocketClientToUpstream(ctx, conn, upstream, clientDone, idleSession)
-	go relayWebSocketUpstreamToClient(ctx, upstream, conn, upstreamDone, upstreamForwarded, idleSession)
+	go relayWebSocketUpstreamToClient(ctx, upstream, conn, upstreamDone, upstreamForwarded, idleSession, session.ResponseReplacements)
 	for {
 		select {
 		case <-upstreamForwarded:
@@ -538,7 +539,7 @@ func relayWebSocketClientToUpstream(ctx context.Context, client *websocket.Conn,
 	}
 }
 
-func relayWebSocketUpstreamToClient(ctx context.Context, upstream *websocket.Conn, client *websocket.Conn, done chan<- realtimeDirectRelayResult, forwardedOnce chan<- struct{}, idleSession *wsIdleSession) {
+func relayWebSocketUpstreamToClient(ctx context.Context, upstream *websocket.Conn, client *websocket.Conn, done chan<- realtimeDirectRelayResult, forwardedOnce chan<- struct{}, idleSession *wsIdleSession, replacements []provideradaptercontract.RealtimePayloadReplacement) {
 	forwarded := false
 	for {
 		messageType, payload, err := upstream.Read(ctx)
@@ -555,6 +556,9 @@ func relayWebSocketUpstreamToClient(ctx context.Context, upstream *websocket.Con
 			return
 		}
 		idleSession.SetActive()
+		if messageType == websocket.MessageText {
+			payload = applyProviderRealtimeResponsePayloadReplacements(payload, replacements)
+		}
 		if err := client.Write(ctx, messageType, payload); err != nil {
 			done <- realtimeDirectRelayResult{err: err, forwarded: forwarded}
 			return
@@ -739,7 +743,7 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 	}()
 	clientToUpstream <- reverseproxycontract.WebSocketMessage{Type: reverseproxycontract.WebSocketMessageText, Data: session.InitialFrame}
 	close(clientToUpstream)
-	success, errorClass, statusCode, usage, terminalForwarded, turnState := s.bridgeResponsesWebSocketRelay(r.Context(), conn, upstreamToClient, relayDone, idleSession)
+	success, errorClass, statusCode, usage, terminalForwarded, turnState := s.bridgeResponsesWebSocketRelay(r.Context(), conn, upstreamToClient, relayDone, idleSession, session.ResponseReplacements)
 	s.recordResponsesWebSocketUsage(r.Context(), authed, canonical, model.ID, result, success, errorClass, statusCode, elapsedMillis(startedAt), admission, usage, "")
 	if !success && errorClass != "client_closed" && !terminalForwarded {
 		return true, turnState, provideradaptercontract.ProviderError{Class: errorClass, StatusCode: statusCode, Message: providerGatewayMessage(errorClass)}
@@ -762,13 +766,38 @@ type responsesWebSocketRelayResult struct {
 }
 
 type providerRealtimeSession struct {
-	URL          string
-	Headers      http.Header
-	InitialFrame []byte
-	Account      reverseproxycontract.AccountRuntime
+	URL                  string
+	Headers              http.Header
+	InitialFrame         []byte
+	Account              reverseproxycontract.AccountRuntime
+	ResponseReplacements []provideradaptercontract.RealtimePayloadReplacement
 }
 
-func (s *Server) bridgeResponsesWebSocketRelay(ctx context.Context, conn *websocket.Conn, upstreamToClient <-chan reverseproxycontract.WebSocketMessage, relayDone <-chan responsesWebSocketRelayResult, idleSession *wsIdleSession) (bool, string, int, *gatewaycontract.Usage, bool, responsesWebSocketTurnState) {
+func applyProviderRealtimeResponseReplacements(msg reverseproxycontract.WebSocketMessage, replacements []provideradaptercontract.RealtimePayloadReplacement) reverseproxycontract.WebSocketMessage {
+	if msg.Type != reverseproxycontract.WebSocketMessageText || len(msg.Data) == 0 || len(replacements) == 0 {
+		return msg
+	}
+	msg.Data = applyProviderRealtimeResponsePayloadReplacements(msg.Data, replacements)
+	return msg
+}
+
+func applyProviderRealtimeResponsePayloadReplacements(payload []byte, replacements []provideradaptercontract.RealtimePayloadReplacement) []byte {
+	if len(payload) == 0 || len(replacements) == 0 {
+		return payload
+	}
+	out := payload
+	for _, replacement := range replacements {
+		from := strings.TrimSpace(replacement.From)
+		to := strings.TrimSpace(replacement.To)
+		if from == "" || to == "" || from == to || !bytes.Contains(out, []byte(from)) {
+			continue
+		}
+		out = bytes.ReplaceAll(out, []byte(from), []byte(to))
+	}
+	return out
+}
+
+func (s *Server) bridgeResponsesWebSocketRelay(ctx context.Context, conn *websocket.Conn, upstreamToClient <-chan reverseproxycontract.WebSocketMessage, relayDone <-chan responsesWebSocketRelayResult, idleSession *wsIdleSession, replacements []provideradaptercontract.RealtimePayloadReplacement) (bool, string, int, *gatewaycontract.Usage, bool, responsesWebSocketTurnState) {
 	var usage *gatewaycontract.Usage
 	var turnState responsesWebSocketTurnState
 	relayDoneCh := relayDone
@@ -793,6 +822,7 @@ func (s *Server) bridgeResponsesWebSocketRelay(ctx context.Context, conn *websoc
 			if msg.Type != reverseproxycontract.WebSocketMessageText {
 				continue
 			}
+			msg = applyProviderRealtimeResponseReplacements(msg, replacements)
 			turnState.merge(responsesWebSocketTurnStateFromEvent(msg.Data))
 			if eventUsage, ok := responsesWebSocketUsage(msg.Data); ok {
 				usage = &eventUsage
@@ -895,10 +925,11 @@ func (rt *runtimeState) prepareProviderRealtime(ctx context.Context, req provide
 		return providerRealtimeSession{}, nil, err
 	}
 	return providerRealtimeSession{
-		URL:          session.URL,
-		Headers:      session.Headers,
-		InitialFrame: session.InitialFrame,
-		Account:      reverseProxyAccountRuntime(req.Account, credential),
+		URL:                  session.URL,
+		Headers:              session.Headers,
+		InitialFrame:         session.InitialFrame,
+		Account:              reverseProxyAccountRuntime(req.Account, credential),
+		ResponseReplacements: append([]provideradaptercontract.RealtimePayloadReplacement(nil), session.ResponseReplacements...),
 	}, credential, nil
 }
 
@@ -1196,7 +1227,27 @@ func responsesWebSocketRequestPayload(payload []byte, fallbackModel string) ([]b
 			requestPayload = flatPayload
 		}
 	}
+	requestPayload, err := normalizeResponsesWebSocketServiceTier(requestPayload)
+	if err != nil {
+		return nil, err
+	}
 	return injectResponsesWebSocketModel(requestPayload, fallbackModel)
+}
+
+func normalizeResponsesWebSocketServiceTier(payload []byte) ([]byte, error) {
+	var request map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(payload), &request); err != nil {
+		return nil, errors.New("response.create payload must be a JSON object")
+	}
+	raw, ok := request["service_tier"].(string)
+	if !ok {
+		return payload, nil
+	}
+	if strings.EqualFold(strings.TrimSpace(raw), "fast") {
+		request["service_tier"] = "priority"
+		return json.Marshal(request)
+	}
+	return payload, nil
 }
 
 func injectResponsesWebSocketModel(payload []byte, fallbackModel string) ([]byte, error) {

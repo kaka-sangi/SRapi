@@ -172,24 +172,25 @@ func providerEmbeddingRequest(req gatewaycontract.CanonicalRequest, candidate sc
 	}
 }
 
-func providerImageGenerationRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.ImageGenerationRequest {
+func providerImageGenerationRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate, source ...*http.Request) provideradaptercontract.ImageGenerationRequest {
 	return provideradaptercontract.ImageGenerationRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		Prompt:         req.ImagePrompt,
-		Stream:         req.ImageStream,
-		Count:          req.ImageCount,
-		Size:           req.ImageSize,
-		Quality:        req.ImageQuality,
-		Style:          req.ImageStyle,
-		ResponseFormat: req.ImageResponseFormat,
-		User:           req.ImageUser,
-		Extra:          cloneAnyMap(req.ImageExtra),
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
+		RequestID:       req.RequestID,
+		SourceProtocol:  string(req.SourceProtocol),
+		SourceEndpoint:  req.SourceEndpoint,
+		Model:           req.CanonicalModel,
+		Prompt:          req.ImagePrompt,
+		Stream:          req.ImageStream,
+		Count:           req.ImageCount,
+		Size:            req.ImageSize,
+		Quality:         req.ImageQuality,
+		Style:           req.ImageStyle,
+		ResponseFormat:  req.ImageResponseFormat,
+		User:            req.ImageUser,
+		Extra:           cloneAnyMap(req.ImageExtra),
+		Provider:        candidate.Provider,
+		Account:         candidate.Account,
+		Mapping:         candidate.Mapping,
+		RequestSettings: gatewayProviderRequestSettings(sourceHTTPRequest(source), req),
 	}
 }
 

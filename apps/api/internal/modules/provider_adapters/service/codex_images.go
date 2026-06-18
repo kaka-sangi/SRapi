@@ -32,11 +32,13 @@ func (s *Service) invokeReverseProxyCodexImageGeneration(ctx context.Context, re
 	if err != nil {
 		return contract.ImageGenerationResponse{}, err
 	}
+	headers := codexImageGenerationHeaders(req, payload)
+	raw, outboundState := codexApplyOutboundWiring(req.Account, headers, raw)
 	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
 		Account: codexImageGenerationReverseProxyAccount(req),
 		Method:  http.MethodPost,
 		URL:     strings.TrimRight(baseURL, "/") + "/responses",
-		Headers: codexImageGenerationHeaders(req, payload),
+		Headers: headers,
 		Body:    raw,
 	})
 	if err != nil {
@@ -45,7 +47,8 @@ func (s *Service) invokeReverseProxyCodexImageGeneration(ctx context.Context, re
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ImageGenerationResponse{}, classifyCodexProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
-	parsed, err := parseCodexImageGenerationResponse(runtimeResp.Body, runtimeResp.StatusCode, req)
+	body := codexCaptureInboundWiring(outboundState, codexReasoningReplayScope{}, runtimeResp.Body)
+	parsed, err := parseCodexImageGenerationResponse(body, runtimeResp.StatusCode, req)
 	if err != nil {
 		return contract.ImageGenerationResponse{}, err
 	}
@@ -80,11 +83,13 @@ func (s *Service) StreamImageGeneration(ctx context.Context, req contract.ImageG
 	if err != nil {
 		return contract.ImageGenerationResponse{}, err
 	}
+	headers := codexImageGenerationHeaders(req, payload)
+	raw, outboundState := codexApplyOutboundWiring(req.Account, headers, raw)
 	runtimeResp, err := streamer.DoStream(ctx, reverseproxycontract.Request{
 		Account:      codexImageGenerationReverseProxyAccount(req),
 		Method:       http.MethodPost,
 		URL:          strings.TrimRight(baseURL, "/") + "/responses",
-		Headers:      codexImageGenerationHeaders(req, payload),
+		Headers:      headers,
 		Body:         raw,
 		ExpectStream: true,
 	})
@@ -95,7 +100,7 @@ func (s *Service) StreamImageGeneration(ctx context.Context, req contract.ImageG
 		StatusCode:   runtimeResp.StatusCode,
 		Headers:      runtimeResp.Headers,
 		QuotaSignals: codexQuotaSignalsFromHeaders(runtimeResp.Headers, time.Now().UTC()),
-		StreamBody:   newCodexImageGenerationStreamBody(runtimeResp.Body, req),
+		StreamBody:   newCodexImageGenerationStreamBody(codexExposeStreamBody(runtimeResp.Body, outboundState, nil), req),
 		StreamParse: func(body []byte, statusCode int) (contract.ImageGenerationResponse, error) {
 			parsed, err := parseCodexImageGenerationRenderedStream(body, statusCode, req)
 			if err != nil {
@@ -154,9 +159,40 @@ func codexImageGenerationResponsesPayload(req contract.ImageGenerationRequest) (
 	}
 	codexEnsureResponsesInstructions(codexImageGenerationConversationRequest(req), payload)
 	codexApplyImageGenerationInstructions(payload)
+	codexApplyImageGenerationSessionSettings(req, payload)
 	codexEnsureReasoningEncryptedInclude(payload)
 	payload["store"] = codexResponsesDefaultInternalStoreValue
 	return payload, nil
+}
+
+func codexApplyImageGenerationSessionSettings(req contract.ImageGenerationRequest, payload map[string]any) {
+	if payload == nil {
+		return
+	}
+	if promptCacheKey := codexImageGenerationSetting(req, "codex_prompt_cache_key", "prompt_cache_key"); promptCacheKey != "" {
+		payload["prompt_cache_key"] = promptCacheKey
+	}
+	codexApplyImageGenerationClientMetadataSettings(req, payload)
+}
+
+func codexApplyImageGenerationClientMetadataSettings(req contract.ImageGenerationRequest, payload map[string]any) {
+	if payload == nil {
+		return
+	}
+	metadata := codexPayloadClientMetadata(payload)
+	setMetadata := func(key string, value string) {
+		if value = strings.TrimSpace(value); value != "" {
+			metadata[key] = value
+		}
+	}
+	setMetadata("x-codex-installation-id", codexImageGenerationSetting(req, "codex_installation_id", "x_codex_installation_id"))
+	setMetadata("x-codex-turn-metadata", codexImageGenerationSetting(req, "codex_turn_metadata", "x_codex_turn_metadata", "X-Codex-Turn-Metadata"))
+	setMetadata("x-codex-window-id", codexImageGenerationSetting(req, "codex_window_id", "x_codex_window_id", "X-Codex-Window-Id"))
+	setMetadata("x-codex-beta-features", codexImageGenerationSetting(req, "codex_beta_features", "x_codex_beta_features", "X-Codex-Beta-Features"))
+	setMetadata("x-responsesapi-include-timing-metrics", codexImageGenerationSetting(req, "x_responsesapi_include_timing_metrics", "X-ResponsesAPI-Include-Timing-Metrics"))
+	if len(metadata) > 0 {
+		payload["client_metadata"] = metadata
+	}
 }
 
 func codexImageGenerationResponsesModel(req contract.ImageGenerationRequest) string {
@@ -721,17 +757,33 @@ func codexImageGenerationHeaders(req contract.ImageGenerationRequest, payload ma
 	} else if strings.TrimSpace(req.RequestID) != "" {
 		headers.Set("X-Client-Request-Id", strings.TrimSpace(req.RequestID))
 	}
+	if turnMetadata := codexImageGenerationSetting(req, "codex_turn_metadata", "x_codex_turn_metadata", "X-Codex-Turn-Metadata"); turnMetadata != "" {
+		headers.Set("X-Codex-Turn-Metadata", turnMetadata)
+	}
+	windowID := codexImageGenerationSetting(req, "codex_window_id", "x_codex_window_id", "X-Codex-Window-Id")
+	if windowID != "" {
+		headers.Set("X-Codex-Window-Id", windowID)
+	}
+	if betaFeatures := codexImageGenerationSetting(req, "codex_beta_features", "x_codex_beta_features", "X-Codex-Beta-Features"); betaFeatures != "" {
+		headers.Set("X-Codex-Beta-Features", betaFeatures)
+	}
+	if includeTiming := codexImageGenerationSetting(req, "x_responsesapi_include_timing_metrics", "X-ResponsesAPI-Include-Timing-Metrics"); includeTiming != "" {
+		headers.Set("X-ResponsesAPI-Include-Timing-Metrics", includeTiming)
+	}
 	if sessionID := codexImageGenerationSetting(req, "codex_session_id", "session_id", "Session_id"); sessionID != "" {
 		headers.Set("Session_id", sessionID)
 	} else if req.Account.ID > 0 {
 		headers.Set("Session_id", codexDefaultAccountSessionID(req.Account.ID))
 	}
-	codexApplySessionIdentityHeaders(headers, codexPayloadPromptCacheKey(payload))
+	codexApplySessionIdentityHeaders(headers, codexPayloadPromptCacheKey(payload), windowID)
+	if al := codexImageGenerationSetting(req, "accept-language"); al != "" {
+		headers.Set("Accept-Language", al)
+	}
 	return headers
 }
 
 func codexImageGenerationSetting(req contract.ImageGenerationRequest, keys ...string) string {
-	for _, values := range []map[string]any{req.Credential, req.Extra, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+	for _, values := range []map[string]any{req.RequestSettings, req.Credential, req.Extra, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
 		for _, key := range keys {
 			if value := mapString(values, key); value != "" {
 				return value
@@ -743,11 +795,12 @@ func codexImageGenerationSetting(req contract.ImageGenerationRequest, keys ...st
 
 func codexImageGenerationConversationRequest(req contract.ImageGenerationRequest) contract.ConversationRequest {
 	return contract.ConversationRequest{
-		RequestID:  req.RequestID,
-		Model:      req.Model,
-		Provider:   req.Provider,
-		Account:    req.Account,
-		Mapping:    req.Mapping,
-		Credential: req.Credential,
+		RequestID:       req.RequestID,
+		Model:           req.Model,
+		Provider:        req.Provider,
+		Account:         req.Account,
+		Mapping:         req.Mapping,
+		Credential:      req.Credential,
+		RequestSettings: req.RequestSettings,
 	}
 }

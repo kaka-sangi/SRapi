@@ -107,5 +107,10 @@ func (c MintedCredential) Credential() map[string]any {
 	if c.ExpiresInSec > 0 {
 		out["expires_in"] = c.ExpiresInSec
 	}
+	for _, key := range []string{"email", "chatgpt_account_id", "chatgpt_user_id", "organization_id", "plan_type", "subscription_expires_at"} {
+		if value, ok := c.Raw[key].(string); ok && value != "" {
+			out[key] = value
+		}
+	}
 	return out
 }

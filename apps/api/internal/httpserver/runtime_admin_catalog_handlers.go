@@ -1538,7 +1538,7 @@ func supportsRefreshTokenOnlyImport(upstreamClient *string) bool {
 		return false
 	}
 	switch strings.ToLower(strings.TrimSpace(*upstreamClient)) {
-	case "codex_cli", "claude_code_cli", "antigravity_desktop", "antigravity":
+	case "codex_cli", "chatgpt_web", "claude_code_cli", "antigravity_desktop", "antigravity":
 		return true
 	default:
 		return false

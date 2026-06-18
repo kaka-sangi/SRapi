@@ -23,16 +23,17 @@ const (
 	// (no OS/arch/terminal suffix) is fingerprinted upstream as a non-official
 	// client, which gets newer models (e.g. gpt-5.5) rejected as
 	// model_unavailable. Value mirrors the sub2api reference verbatim.
-	codexDefaultUserAgent                   = codexOriginator + "/" + codexDefaultVersion + " (Ubuntu 22.4.0; x86_64) xterm-256color"
-	codexImageGenerationBridgeMarker        = "<srapi-codex-image-generation>"
-	codexImageGenerationBridgeText          = codexImageGenerationBridgeMarker + "\nWhen the user asks for raster image generation or editing, use the OpenAI Responses native `image_generation` tool attached to this request. The local Codex client may not expose an `image_gen` namespace, but image generation is still available through this tool.\n</srapi-codex-image-generation>"
-	codexSparkImageUnsupportedMarker        = "<srapi-codex-spark-image-unsupported>"
-	codexSparkImageUnsupportedText          = codexSparkImageUnsupportedMarker + "\nThe current model is gpt-5.3-codex-spark, which does not support image generation, image editing, image input, the `image_generation` tool, or Codex `image_gen` workflows. If the user asks for image generation or image editing, explain this model limitation and ask them to switch to a non-Spark Codex model such as gpt-5.3-codex or gpt-5.4.\n</srapi-codex-spark-image-unsupported>"
-	codexResponsesBetaHeaderValue           = "responses=experimental"
-	codexResponsesWebsocketBetaHeaderValue  = "responses_websockets=2026-02-06"
-	codexDefaultAccountSessionIDPrefix      = "srapi-codex-account-"
-	codexResponsesDefaultInternalStoreValue = false
-	codexResponsesEncryptedReasoningInclude = "reasoning.encrypted_content"
+	codexDefaultUserAgent                    = codexOriginator + "/" + codexDefaultVersion + " (Ubuntu 22.4.0; x86_64) xterm-256color"
+	codexImageGenerationBridgeMarker         = "<srapi-codex-image-generation>"
+	codexImageGenerationBridgeText           = codexImageGenerationBridgeMarker + "\nWhen the user asks for raster image generation or editing, use the OpenAI Responses native `image_generation` tool attached to this request. The local Codex client may not expose an `image_gen` namespace, but image generation is still available through this tool.\n</srapi-codex-image-generation>"
+	codexSparkImageUnsupportedMarker         = "<srapi-codex-spark-image-unsupported>"
+	codexSparkImageUnsupportedText           = codexSparkImageUnsupportedMarker + "\nThe current model is gpt-5.3-codex-spark, which does not support image generation, image editing, image input, the `image_generation` tool, or Codex `image_gen` workflows. If the user asks for image generation or image editing, explain this model limitation and ask them to switch to a non-Spark Codex model such as gpt-5.3-codex or gpt-5.4.\n</srapi-codex-spark-image-unsupported>"
+	codexResponsesBetaHeaderValue            = "responses=experimental"
+	codexResponsesWebsocketBetaV1HeaderValue = "responses_websockets=2026-02-04"
+	codexResponsesWebsocketBetaHeaderValue   = "responses_websockets=2026-02-06"
+	codexDefaultAccountSessionIDPrefix       = "srapi-codex-account-"
+	codexResponsesDefaultInternalStoreValue  = false
+	codexResponsesEncryptedReasoningInclude  = "reasoning.encrypted_content"
 )
 
 type codexResponsesInputItem struct {
@@ -175,35 +176,9 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 	// used image_generation_call) so existing test fixtures stay
 	// valid; the injection logic itself (idempotent append, spark/free
 	// short-circuit) is verbatim from CLIProxyAPI.
-	if !imageGenerationDisabledForConversation(req) {
-		if codexImageGenerationBridgeEnabled(req) || codexPayloadInputUsesImageGenerationCall(payload) {
-			ensureCodexImageGenerationTool(payload, contract.NormalizeCodexUpstreamModelName(codexStringValue(payload["model"])), req.Account)
-			// codexApplyImageGenerationInstructions only added the bridge
-			// marker when the tool was already in the array; re-run it now
-			// so the freshly-injected tool gets the matching instructions.
-			codexApplyImageGenerationInstructions(payload)
-		}
-	}
-	// Global config modes ported verbatim from CLIProxyAPI: the
-	// OAuthModelAlias map and the DisableImageGeneration enum. Both
-	// consult s.cfg via nil-safe helpers in codex_config_modes.go — when
-	// the deployment hasn't opted in this is a no-op.
-	//
-	// The alias swap rewrites the upstream `model` field AFTER the auto-
-	// inject block above (so spark/free-plan gating sees the canonical
-	// model) but BEFORE the request marshal, so the upstream sees the
-	// rewritten name. The disable-image-gen gate runs after the
-	// auto-inject so it can short-circuit even on requests that did not
-	// arrive with a tool but had one synthesized into them.
-	if aliased := ResolveCodexModelAlias(s.cfg, "openai", codexStringValue(payload["model"])); aliased != "" {
-		payload["model"] = aliased
-	}
-	if ShouldDisableCodexImageGeneration(s.cfg, codexUserAgent(req)) && codexPayloadHasImageGenerationTool(payload) {
-		return contract.ConversationResponse{}, contract.ProviderError{
-			Class:      "image_generation_disabled",
-			StatusCode: http.StatusBadRequest,
-			Message:    "image_generation tool is disabled for this gateway deployment",
-		}
+	replayScope, err := s.codexPrepareResponsesPayload(req, payload)
+	if err != nil {
+		return contract.ConversationResponse{}, err
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -268,7 +243,7 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 				// Identity expose + cache capture on the retry body too —
 				// the retry uses a fresh state so we can't share with the
 				// outer attempt.
-				retryResp.Body = codexCaptureInboundWiring(retryState, codexModelForCacheKey(req), retryResp.Body)
+				retryResp.Body = codexCaptureInboundWiring(retryState, codexReasoningReplayScopeFromRequest(req, retryPayload), retryResp.Body)
 				// PR-X codex JWS validation: lenient by default (WARN +
 				// metric, accept body). Strict mode is one constant flip
 				// in apps/api/internal/pkg/signature/codex_jws.go.
@@ -283,8 +258,10 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 				parsed = codexConvertSSEResponseToJSONIfNonStreaming(parsed, retryResp.Headers, stream)
 				return withCodexQuotaSignals(parsed, retryResp.Headers), nil
 			}
+			codexClearReasoningReplayOnInvalidSignature(codexReasoningReplayScopeFromRequest(req, retryPayload), retryResp.StatusCode, retryResp.Body)
 			return contract.ConversationResponse{}, classifyCodexProviderHTTPErrorWithHeaders(retryResp.StatusCode, retryResp.Headers, retryResp.Body)
 		}
+		codexClearReasoningReplayOnInvalidSignature(replayScope, runtimeResp.StatusCode, runtimeResp.Body)
 		return contract.ConversationResponse{}, classifyCodexProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	// Wire PR-1's identity_expose + replay_cache.PutItems into the inbound
@@ -294,7 +271,7 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 	// call items keyed on the ORIGINAL prompt_cache_key + model. Best
 	// effort — failures in capture must not break the response delivered
 	// to the caller.
-	runtimeResp.Body = codexCaptureInboundWiring(outboundState, codexModelForCacheKey(req), runtimeResp.Body)
+	runtimeResp.Body = codexCaptureInboundWiring(outboundState, replayScope, runtimeResp.Body)
 	// PR-X codex JWS validation: see codex_jws_wiring.go. Lenient by
 	// default so unsigned responses pass through; flips to strict via
 	// signature.CodexJWSEnforceMode once the OpenAI signing rollout is
@@ -387,12 +364,38 @@ func (s *Service) prepareCodexRealtime(_ context.Context, req contract.RealtimeR
 		return contract.RealtimeSession{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
 	initialFrame := codexRealtimeInitialFrame(req)
+	initialFrame, identityState := codexApplyOutboundWiring(req.Account, nil, initialFrame)
 	headers := codexRealtimeHeaders(req, initialFrame)
+	ApplyCodexIdentityConfuseHeaders(headers, &identityState)
 	return contract.RealtimeSession{
-		URL:          wsURL,
-		Headers:      headers,
-		InitialFrame: initialFrame,
+		URL:                  wsURL,
+		Headers:              headers,
+		InitialFrame:         initialFrame,
+		ResponseReplacements: codexRealtimeResponseReplacements(identityState),
 	}, nil
+}
+
+func codexRealtimeResponseReplacements(state CodexIdentityConfuseState) []contract.RealtimePayloadReplacement {
+	if !state.Enabled {
+		return nil
+	}
+	replacements := make([]contract.RealtimePayloadReplacement, 0, 1+len(state.TurnIDs))
+	if strings.TrimSpace(state.PromptCacheKey) != "" && strings.TrimSpace(state.OriginalPromptCacheKey) != "" {
+		replacements = append(replacements, contract.RealtimePayloadReplacement{
+			From: state.PromptCacheKey,
+			To:   state.OriginalPromptCacheKey,
+		})
+	}
+	for _, turnID := range state.TurnIDs {
+		if strings.TrimSpace(turnID.Confused) == "" || strings.TrimSpace(turnID.Original) == "" {
+			continue
+		}
+		replacements = append(replacements, contract.RealtimePayloadReplacement{
+			From: turnID.Confused,
+			To:   turnID.Original,
+		})
+	}
+	return replacements
 }
 
 func codexResponsesHeaders(req contract.ConversationRequest, stream bool, payload map[string]any) http.Header {
@@ -546,9 +549,8 @@ func responseInputItemsSetting(req contract.ResponseInputItemsRequest, keys ...s
 }
 
 func codexRealtimeHeaders(req contract.RealtimeRequest, initialFrame []byte) http.Header {
-	headers := http.Header{
-		"OpenAI-Beta": {codexResponsesWebsocketBetaHeaderValue},
-	}
+	headers := http.Header{}
+	headers.Set("OpenAI-Beta", codexRealtimeBetaHeaderValue(req))
 	headers.Set("Originator", codexRealtimeOriginator(req))
 	headers.Set("User-Agent", codexRealtimeUserAgent(req))
 	if accountID := realtimeSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
@@ -588,6 +590,13 @@ func codexRealtimeHeaders(req contract.RealtimeRequest, initialFrame []byte) htt
 		headers.Set("Accept-Language", al)
 	}
 	return headers
+}
+
+func codexRealtimeBetaHeaderValue(req contract.RealtimeRequest) string {
+	if enabled, ok := realtimeBoolSetting(req, "openai_oauth_responses_websockets_v2_enabled", "responses_websockets_v2_enabled"); ok && !enabled {
+		return codexResponsesWebsocketBetaV1HeaderValue
+	}
+	return codexResponsesWebsocketBetaHeaderValue
 }
 
 func codexRealtimeUserAgent(req contract.RealtimeRequest) string {
@@ -693,6 +702,42 @@ func realtimeSetting(req contract.RealtimeRequest, keys ...string) string {
 		}
 	}
 	return ""
+}
+
+func realtimeBoolSetting(req contract.RealtimeRequest, keys ...string) (bool, bool) {
+	for _, values := range []map[string]any{req.RequestSettings, req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range keys {
+			if value, ok := mapBoolValue(values, key); ok {
+				return value, true
+			}
+		}
+	}
+	return false, false
+}
+
+func mapBoolValue(values map[string]any, key string) (bool, bool) {
+	if values == nil {
+		return false, false
+	}
+	value, ok := values[key]
+	if !ok || value == nil {
+		return false, false
+	}
+	switch typed := value.(type) {
+	case bool:
+		return typed, true
+	case string:
+		switch strings.ToLower(strings.TrimSpace(typed)) {
+		case "1", "true", "yes", "on", "enabled":
+			return true, true
+		case "0", "false", "no", "off", "disabled":
+			return false, true
+		default:
+			return false, false
+		}
+	default:
+		return false, false
+	}
 }
 
 func parseCodexResponsesBody(body []byte, statusCode int) (contract.ConversationResponse, error) {

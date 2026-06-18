@@ -264,6 +264,127 @@ func TestChatGPTWebWiringFileUploadProducesAssetPointer(t *testing.T) {
 	}
 }
 
+func TestChatGPTWebWiringFileUploadFailureStopsConversation(t *testing.T) {
+	pngB64 := base64.StdEncoding.EncodeToString(buildTestPNG(t, 2, 2))
+	var registerHit, conversationHit int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/backend-api/files" && r.Method == http.MethodPost:
+			atomic.AddInt32(&registerHit, 1)
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"error":"upload unavailable"}`))
+		case r.URL.Path == "/backend-api/conversation" && r.Method == http.MethodPost:
+			atomic.AddInt32(&conversationHit, 1)
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = w.Write([]byte("data: {\"message\":{\"author\":{\"role\":\"assistant\"},\"content\":{\"parts\":[\"should-not-send\"]}}}\n\ndata: [DONE]\n\n"))
+		default:
+			t.Errorf("unexpected upstream call %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID: "req_upload_fail",
+		Model:     "chatgpt-upload",
+		InputParts: []contract.ContentPart{
+			{Kind: contract.ContentPartText, Text: "describe this image"},
+			{Kind: contract.ContentPartImage, MediaBase64: pngB64, MIMEType: "image/png"},
+		},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-chatgpt-web",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           34,
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Metadata: map[string]any{
+				"base_url":                   upstream.URL,
+				"chatgpt_requirements_token": "tok-up",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5-chat"},
+		Credential: map[string]any{"access_token": "tok-up"},
+	})
+	if err == nil {
+		t.Fatal("expected upload failure to abort the ChatGPT web request")
+	}
+	if atomic.LoadInt32(&registerHit) != 1 {
+		t.Fatalf("expected one upload registration attempt, got %d", registerHit)
+	}
+	if got := atomic.LoadInt32(&conversationHit); got != 0 {
+		t.Fatalf("conversation request should not be sent after upload failure, got %d hits", got)
+	}
+}
+
+func TestChatGPTWebWiringSendsChatGPTAccountHeaders(t *testing.T) {
+	var capturedHeaders http.Header
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedHeaders = r.Header.Clone()
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"message\":{\"author\":{\"role\":\"assistant\"},\"content\":{\"parts\":[\"ok\"]}}}\n\ndata: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_header_wired",
+		Model:      "chatgpt-header",
+		InputParts: []contract.ContentPart{{Kind: contract.ContentPartText, Text: "hello"}},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-chatgpt-web",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           35,
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Metadata: map[string]any{
+				"base_url":                   upstream.URL,
+				"chatgpt_requirements_token": "tok-head",
+				"chatgpt_account_id":         "metadata-account",
+				"originator":                 "metadata-originator",
+				"version":                    "0.124.0",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5-chat"},
+		Credential: map[string]any{"access_token": "tok-head", "chatgpt_account_id": "credential-account"},
+		RequestSettings: map[string]any{
+			"chatgpt_account_id": "chatgpt-account-123",
+			"originator":         "codex_cli_rs",
+			"version":            "0.125.0",
+		},
+	})
+	if err != nil {
+		t.Fatalf("invoke chatgpt web: %v", err)
+	}
+	if got := capturedHeaders.Get("chatgpt-account-id"); got != "chatgpt-account-123" {
+		t.Fatalf("chatgpt-account-id = %q, want %q", got, "chatgpt-account-123")
+	}
+	if got := capturedHeaders.Get("originator"); got != "codex_cli_rs" {
+		t.Fatalf("originator = %q, want %q", got, "codex_cli_rs")
+	}
+	if got := capturedHeaders.Get("version"); got != "0.125.0" {
+		t.Fatalf("version = %q, want %q", got, "0.125.0")
+	}
+}
+
 // TestChatGPTWebWiringImageSlotLimiterReleasedOnReturn proves that the per-
 // account image-slot is acquired AND released across an invocation (so the
 // next request gets the slot).

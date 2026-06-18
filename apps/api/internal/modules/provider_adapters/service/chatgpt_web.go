@@ -266,9 +266,11 @@ func chatGPTWebDetectChallenge(resp reverseproxycontract.Response, err error) (b
 // touches the payload bytes — it manipulates headers / cookies /
 // concurrency slots which are not payload transforms.
 func (s *Service) chatGPTWebBuildConversationBody(ctx context.Context, req contract.ConversationRequest, baseURL string, headers http.Header) ([]byte, error) {
-	uploadedParts, attachments := s.chatGPTWebUploadInputParts(ctx, req, baseURL, headers)
+	uploadedParts, attachments, err := s.chatGPTWebUploadInputParts(ctx, req, baseURL, headers)
+	if err != nil {
+		return nil, err
+	}
 	var raw []byte
-	var err error
 	if len(uploadedParts) > 0 {
 		raw, err = chatGPTWebMultimodalPayloadBytes(req, uploadedParts, attachments)
 	} else {
@@ -292,16 +294,13 @@ func (s *Service) chatGPTWebBuildConversationBody(ctx context.Context, req contr
 // MediaBase64 / MediaURL pointing at a data: URI, and returns the resulting
 // multimodal parts + attachments arrays.
 //
-// Errors are swallowed (best-effort): if an upload fails the part is
-// dropped and we fall back to the text-only payload. The chatgpt2api
-// behaviour is to raise; we choose graceful degradation here so a transient
-// upload failure doesn't break the entire conversation. Operators get a
-// metric (chatgpt_web_uploads counter is not yet wired) but the request
-// proceeds.
-func (s *Service) chatGPTWebUploadInputParts(ctx context.Context, req contract.ConversationRequest, baseURL string, headers http.Header) ([]map[string]any, []map[string]any) {
+// Upload failures are fatal: a request that carries image parts should not
+// silently degrade into a text-only prompt, because that hides broken file
+// handling from the caller and changes the request semantics.
+func (s *Service) chatGPTWebUploadInputParts(ctx context.Context, req contract.ConversationRequest, baseURL string, headers http.Header) ([]map[string]any, []map[string]any, error) {
 	binaries := chatGPTWebCollectBinaryInputs(req)
 	if len(binaries) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	uploader := newChatGPTWebFileUploader(s.reverseProxy)
 	sess := ChatGPTWebUploadSession{
@@ -315,8 +314,11 @@ func (s *Service) chatGPTWebUploadInputParts(ctx context.Context, req contract.C
 	attachments := make([]map[string]any, 0, len(binaries))
 	for _, bin := range binaries {
 		asset, err := uploader.uploadImage(ctx, sess, bin.body, bin.mime, bin.name)
-		if err != nil || asset == nil {
-			continue
+		if err != nil {
+			return nil, nil, err
+		}
+		if asset == nil {
+			return nil, nil, fmt.Errorf("chatgpt web uploader returned no asset for %s", bin.name)
 		}
 		if part := chatGPTWebAssetPointerPart(asset); part != nil {
 			parts = append(parts, part)
@@ -325,7 +327,7 @@ func (s *Service) chatGPTWebUploadInputParts(ctx context.Context, req contract.C
 			attachments = append(attachments, att)
 		}
 	}
-	return parts, attachments
+	return parts, attachments, nil
 }
 
 type chatGPTWebBinaryInput struct {
@@ -618,7 +620,7 @@ func chatGPTWebBuildRequirements(req contract.ConversationRequest, decoded chatG
 
 func chatGPTWebBaseHeaders(req contract.ConversationRequest, baseURL string, path string) http.Header {
 	origin := chatGPTWebOrigin(baseURL)
-	return http.Header{
+	headers := http.Header{
 		"Accept":                      {"text/event-stream"},
 		"Origin":                      {origin},
 		"Referer":                     {strings.TrimRight(origin, "/") + "/"},
@@ -646,6 +648,16 @@ func chatGPTWebBaseHeaders(req contract.ConversationRequest, baseURL string, pat
 		"X-OpenAI-Target-Path":        {path},
 		"X-OpenAI-Target-Route":       {path},
 	}
+	if accountID := chatGPTWebAccountSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
+		headers.Set("chatgpt-account-id", accountID)
+	}
+	if originator := chatGPTWebAccountSetting(req, "originator", "chatgpt_originator"); originator != "" {
+		headers.Set("originator", originator)
+	}
+	if version := chatGPTWebAccountSetting(req, "version", "chatgpt_version", "client_version"); version != "" {
+		headers.Set("version", version)
+	}
+	return headers
 }
 
 func chatGPTWebJSONHeaders(req contract.ConversationRequest, baseURL string, path string) http.Header {
@@ -1033,6 +1045,17 @@ func chatGPTWebStringSetting(req contract.ConversationRequest, fallback string, 
 		return value
 	}
 	return fallback
+}
+
+func chatGPTWebAccountSetting(req contract.ConversationRequest, keys ...string) string {
+	for _, values := range []map[string]any{req.RequestSettings, req.Credential, req.Account.Metadata, req.Provider.ConfigSchema} {
+		for _, key := range keys {
+			if value := mapString(values, key); value != "" {
+				return value
+			}
+		}
+	}
+	return ""
 }
 
 func chatGPTWebSettingOrStableID(req contract.ConversationRequest, suffix string, keys ...string) string {

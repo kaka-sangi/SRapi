@@ -922,6 +922,7 @@ func openAIResponsesBody(req contract.ConversationRequest) ([]byte, error) {
 		if err := normalizeOpenAIResponsesImageOnlyModel(req, payload); err != nil {
 			return nil, err
 		}
+		normalizeOpenAIResponsesServiceTier(payload)
 		normalizeOpenAIResponsesImageGenerationTools(payload)
 		applyDisableImageGenerationToResponsesPayload(req, payload)
 		return json.Marshal(payload)
@@ -931,6 +932,7 @@ func openAIResponsesBody(req contract.ConversationRequest) ([]byte, error) {
 	if err := normalizeOpenAIResponsesImageOnlyModel(req, payload); err != nil {
 		return nil, err
 	}
+	normalizeOpenAIResponsesServiceTier(payload)
 	normalizeOpenAIResponsesImageGenerationTools(payload)
 	applyDisableImageGenerationToResponsesPayload(req, payload)
 	return json.Marshal(payload)
@@ -980,6 +982,30 @@ func openAIApplyResponsesPayloadDefaults(req contract.ConversationRequest, paylo
 		payload["model"] = model
 	}
 	payload["stream"] = req.Stream
+}
+
+func normalizeOpenAIResponsesServiceTier(payload map[string]any) {
+	if payload == nil {
+		return
+	}
+	raw, ok := payload["service_tier"].(string)
+	if !ok {
+		return
+	}
+	value := strings.ToLower(strings.TrimSpace(raw))
+	if value == "" {
+		delete(payload, "service_tier")
+		return
+	}
+	if value == "fast" {
+		value = "priority"
+	}
+	switch value {
+	case "priority", "flex", "auto", "default", "scale":
+		payload["service_tier"] = value
+	default:
+		delete(payload, "service_tier")
+	}
 }
 
 func normalizeOpenAIResponsesImageGenerationTools(payload map[string]any) {
@@ -1129,6 +1155,7 @@ func openAIResponsesCompactBody(req contract.ConversationRequest) ([]byte, error
 		if model := strings.TrimSpace(req.Mapping.UpstreamModelName); model != "" {
 			payload["model"] = model
 		}
+		normalizeOpenAIResponsesServiceTier(payload)
 		return json.Marshal(payload)
 	}
 	prompt := strings.TrimSpace(conversationPrompt(req))

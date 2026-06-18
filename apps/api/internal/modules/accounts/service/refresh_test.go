@@ -121,6 +121,9 @@ func TestRefreshAccessTokenSuccessResetsState(t *testing.T) {
 	if access, _ := decrypted["access_token"].(string); access != "fresh-access" {
 		t.Fatalf("expected new access_token persisted, got %q", access)
 	}
+	if version, ok := decrypted["_token_version"].(float64); !ok || int64(version) != now.UnixMilli() {
+		t.Fatalf("expected _token_version=%d, got %#v", now.UnixMilli(), decrypted["_token_version"])
+	}
 }
 
 func TestRefreshAccessTokenTransientFailureBelowThresholdDoesNotFlipReauth(t *testing.T) {

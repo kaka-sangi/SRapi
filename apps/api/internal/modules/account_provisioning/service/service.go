@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/account_provisioning/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/signature"
 )
 
 var (
@@ -547,18 +548,20 @@ func parseDeviceAuthorizationResponse(body map[string]any) (deviceAuthorizationR
 }
 
 func parseTokenResponse(body map[string]any) (contract.MintedCredential, error) {
+	idToken := stringValue(body["id_token"])
 	credential := contract.MintedCredential{
 		AccessToken:  stringValue(body["access_token"]),
 		RefreshToken: stringValue(body["refresh_token"]),
 		TokenType:    stringValue(body["token_type"]),
 		Scope:        stringValue(body["scope"]),
-		IDToken:      stringValue(body["id_token"]),
+		IDToken:      idToken,
 		ExpiresInSec: intValue(body["expires_in"]),
 		Raw:          body,
 	}
 	if credential.AccessToken == "" && credential.RefreshToken == "" {
 		return contract.MintedCredential{}, ErrProviderRejected
 	}
+	signature.MergeOpenAIJWTCredential(credential.Raw, idToken)
 	return credential, nil
 }
 

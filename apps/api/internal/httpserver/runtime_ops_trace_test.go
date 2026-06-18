@@ -2,6 +2,8 @@ package httpserver
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
@@ -12,6 +14,27 @@ import (
 	opserrorlogsmemory "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/store/memory"
 	"go.opentelemetry.io/otel/trace"
 )
+
+func TestAuditTraceIDFromRequestUsesTraceIDWhenPresent(t *testing.T) {
+	const requestID = "req_audit_trace"
+	const traceID = "4bf92f3577b34da6a3ce929d0e0e4736"
+	ctx := contextWithRequestAndTraceForTest(t, requestID, traceID)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/providers", nil).WithContext(ctx)
+
+	if got := auditTraceIDFromRequest(req); got != traceID {
+		t.Fatalf("audit trace id = %q, want trace id %q", got, traceID)
+	}
+}
+
+func TestAuditTraceIDFromRequestFallsBackToRequestID(t *testing.T) {
+	const requestID = "req_audit_no_trace"
+	ctx := context.WithValue(context.Background(), requestIDContextKey{}, requestID)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/providers", nil).WithContext(ctx)
+
+	if got := auditTraceIDFromRequest(req); got != requestID {
+		t.Fatalf("audit trace fallback = %q, want request id %q", got, requestID)
+	}
+}
 
 func TestGatewayOperationalEvidenceUsesTraceIDNotRequestID(t *testing.T) {
 	const requestID = "req_trace_evidence"

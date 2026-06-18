@@ -80,6 +80,28 @@ func TestWarnDefaultZeroGatewayPricingIgnoresExplicitSources(t *testing.T) {
 	}
 }
 
+func TestGatewayServiceTierNormalizesOpenAITiers(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{name: "fast alias", raw: " fast ", want: "priority"},
+		{name: "official tier", raw: "AUTO", want: "auto"},
+		{name: "unknown tier", raw: "turbo", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := gatewayServiceTier(gatewaycontract.CanonicalRequest{
+				RawBody: []byte(`{"service_tier":` + strconv.Quote(tt.raw) + `}`),
+			})
+			if got != tt.want {
+				t.Fatalf("gatewayServiceTier() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRecordGatewaySystemLogDoesNotDependOnOpsErrorLogs(t *testing.T) {
 	ctx := context.Background()
 	operationsStore := operationsmemory.New()

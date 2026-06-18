@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -1051,6 +1052,108 @@ func TestRuntimeRefreshUsesPerAccountLockAndDoesNotOverwriteOnFailure(t *testing
 	}
 }
 
+func TestChatGPTWebRefreshUsesOpenAIOAuthDefaults(t *testing.T) {
+	var gotBody string
+	var gotAccountCheckAuth string
+	var gotAccountCheckOrigin string
+	var gotAccountCheckReferer string
+	var gotSubscriptionAccountID string
+	idToken := reverseProxyTestJWT(t, map[string]any{
+		"email": "chatgpt@example.test",
+		"https://api.openai.com/auth": map[string]any{
+			"chatgpt_account_id": "chatgpt-account",
+			"chatgpt_user_id":    "chatgpt-user",
+			"chatgpt_plan_type":  "team",
+		},
+	})
+	accessToken := reverseProxyTestJWT(t, map[string]any{
+		"https://api.openai.com/auth": map[string]any{
+			"poid": "workspace-account",
+		},
+	})
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/oauth/token":
+			body, _ := io.ReadAll(r.Body)
+			gotBody = string(body)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":` + strconv.Quote(accessToken) + `,"refresh_token":"chatgpt-refresh-token","id_token":` + strconv.Quote(idToken) + `,"token_type":"Bearer","expires_in":3600}`))
+		case "/backend-api/accounts/check/v4-2023-04-27":
+			gotAccountCheckAuth = r.Header.Get("Authorization")
+			gotAccountCheckOrigin = r.Header.Get("Origin")
+			gotAccountCheckReferer = r.Header.Get("Referer")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"accounts": {
+					"personal": {
+						"account": {"id": "personal", "plan_type": "free", "is_default": true},
+						"entitlement": {"subscription_plan": "free"}
+					},
+					"workspace-account": {
+						"account": {"id": "workspace-account", "plan_type": "team", "is_default": false},
+						"entitlement": {"subscription_plan": "team"}
+					}
+				}
+			}`))
+		case "/backend-api/subscriptions":
+			gotSubscriptionAccountID = r.URL.Query().Get("account_id")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"plan_type":"team","active_until":"2026-08-01T00:00:00Z","will_renew":true}`))
+		default:
+			t.Fatalf("unexpected token endpoint path %s", r.URL.Path)
+		}
+	}))
+	defer tokenServer.Close()
+
+	svc, err := New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	resp, err := svc.Refresh(context.Background(), contract.RefreshRequest{
+		Account: contract.AccountRuntime{
+			AccountID:      2,
+			RuntimeClass:   "oauth_refresh",
+			UpstreamClient: ptrString("chatgpt_web"),
+			Metadata: map[string]any{
+				"oauth_token_url":            tokenServer.URL + "/oauth/token",
+				"chatgpt_accounts_check_url": tokenServer.URL + "/backend-api/accounts/check/v4-2023-04-27",
+				"chatgpt_subscriptions_url":  tokenServer.URL + "/backend-api/subscriptions",
+			},
+			Credential: map[string]any{"refresh_token": "chatgpt-refresh"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("refresh ChatGPT Web token: %v", err)
+	}
+	if resp.Credential["access_token"] != accessToken {
+		t.Fatalf("unexpected refresh response: %+v", resp)
+	}
+	for key, want := range map[string]any{
+		"email":                   "chatgpt@example.test",
+		"chatgpt_account_id":      "chatgpt-account",
+		"chatgpt_user_id":         "chatgpt-user",
+		"plan_type":               "team",
+		"subscription_expires_at": "2026-08-01T00:00:00Z",
+	} {
+		if resp.Credential[key] != want {
+			t.Fatalf("expected credential[%s]=%q, got %+v", key, want, resp.Credential)
+		}
+	}
+	if gotAccountCheckAuth != "Bearer "+accessToken {
+		t.Fatalf("unexpected account check authorization %q", gotAccountCheckAuth)
+	}
+	if gotAccountCheckOrigin != "https://chatgpt.com" || gotAccountCheckReferer != "https://chatgpt.com/" {
+		t.Fatalf("unexpected account check browser headers origin=%q referer=%q", gotAccountCheckOrigin, gotAccountCheckReferer)
+	}
+	if gotSubscriptionAccountID != "chatgpt-account" {
+		t.Fatalf("unexpected subscription account_id %q", gotSubscriptionAccountID)
+	}
+	if !strings.Contains(gotBody, "client_id="+url.QueryEscape(contract.CodexOAuthClientID)) ||
+		!strings.Contains(gotBody, "scope="+url.QueryEscape(contract.CodexOAuthRefreshScope)) {
+		t.Fatalf("unexpected ChatGPT Web refresh body %q", gotBody)
+	}
+}
+
 func TestClaudeRefreshUsesJSONTokenRequest(t *testing.T) {
 	var gotUserAgent string
 	var gotPayload map[string]string
@@ -1354,6 +1457,17 @@ func TestDecompressResponseBody(t *testing.T) {
 
 func ptrString(value string) *string {
 	return &value
+}
+
+func reverseProxyTestJWT(t *testing.T, claims map[string]any) string {
+	t.Helper()
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
+	payloadJSON, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatalf("marshal jwt claims: %v", err)
+	}
+	payload := base64.RawURLEncoding.EncodeToString(payloadJSON)
+	return header + "." + payload + ".sig"
 }
 
 func cloneURLValues(values url.Values) url.Values {

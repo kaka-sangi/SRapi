@@ -61,6 +61,7 @@ type CodexJWTAuthInfo struct {
 	ChatgptUserID                  string                  `json:"chatgpt_user_id"`
 	Groups                         []any                   `json:"groups"`
 	Organizations                  []CodexJWTOrganizations `json:"organizations"`
+	POID                           string                  `json:"poid"`
 	UserID                         string                  `json:"user_id"`
 }
 
@@ -78,6 +79,91 @@ func (c *CodexJWTClaims) GetUserEmail() string { return c.Email }
 // GetAccountID mirrors CLIProxyAPI.
 func (c *CodexJWTClaims) GetAccountID() string {
 	return c.CodexAuthInfo.ChatgptAccountID
+}
+
+// MergeOpenAIJWTCredential copies useful OpenAI OAuth claims from idToken into
+// credential. It mirrors sub2api/CLIProxyAPI's decoded token fields so Codex
+// and ChatGPT Web accounts are usable immediately after OAuth provisioning.
+func MergeOpenAIJWTCredential(credential map[string]any, idToken string) {
+	if credential == nil {
+		return
+	}
+	claims, err := ParseCodexJWT(idToken)
+	if err != nil || claims == nil {
+		return
+	}
+	setMapStringIfNotEmpty(credential, "email", claims.Email)
+	auth := claims.CodexAuthInfo
+	setMapStringIfNotEmpty(credential, "chatgpt_account_id", auth.ChatgptAccountID)
+	userID := strings.TrimSpace(auth.ChatgptUserID)
+	if userID == "" {
+		userID = auth.UserID
+	}
+	setMapStringIfNotEmpty(credential, "chatgpt_user_id", userID)
+	setMapStringIfNotEmpty(credential, "plan_type", auth.ChatgptPlanType)
+	setMapStringIfNotEmpty(credential, "subscription_expires_at", codexJWTTimeString(auth.ChatgptSubscriptionActiveUntil))
+	if mapString(credential, "organization_id") == "" {
+		setMapStringIfNotEmpty(credential, "organization_id", DefaultOpenAIOrganizationID(auth.Organizations))
+	}
+}
+
+// OpenAIAuthPOID extracts the organization/account id OpenAI places in access
+// token claims. sub2api uses it as the preferred accounts/check selector.
+func OpenAIAuthPOID(token string) string {
+	claims, err := ParseCodexJWT(token)
+	if err != nil || claims == nil {
+		return ""
+	}
+	return strings.TrimSpace(claims.CodexAuthInfo.POID)
+}
+
+// DefaultOpenAIOrganizationID returns the default organization claim, falling
+// back to the first organization to match sub2api's ID-token handling.
+func DefaultOpenAIOrganizationID(organizations []CodexJWTOrganizations) string {
+	for _, organization := range organizations {
+		if organization.IsDefault && strings.TrimSpace(organization.ID) != "" {
+			return strings.TrimSpace(organization.ID)
+		}
+	}
+	for _, organization := range organizations {
+		if strings.TrimSpace(organization.ID) != "" {
+			return strings.TrimSpace(organization.ID)
+		}
+	}
+	return ""
+}
+
+func codexJWTTimeString(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case time.Time:
+		if typed.IsZero() {
+			return ""
+		}
+		return typed.UTC().Format(time.RFC3339)
+	default:
+		return ""
+	}
+}
+
+func setMapStringIfNotEmpty(values map[string]any, key string, value string) {
+	value = strings.TrimSpace(value)
+	if value != "" {
+		values[key] = value
+	}
+}
+
+func mapString(values map[string]any, key string) string {
+	value, ok := values[key]
+	if !ok {
+		return ""
+	}
+	text, ok := value.(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(text)
 }
 
 // CodexJWSEnforceMode toggles strict rejection of unsigned / missing

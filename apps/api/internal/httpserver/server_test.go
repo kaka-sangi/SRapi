@@ -6163,7 +6163,7 @@ func TestAdminInstallProviderPresetsIsIdempotent(t *testing.T) {
 		t.Fatalf("expected chatgpt-web config schema")
 	}
 	chatGPTWebAuthMethods, _ := (*chatGPTWebSchema)["auth_methods"].([]any)
-	expectedChatGPTWebAuthMethods := []any{"web_session_cookie", "custom_reverse_proxy"}
+	expectedChatGPTWebAuthMethods := []any{"oauth_refresh", "web_session_cookie", "custom_reverse_proxy"}
 	if !reflect.DeepEqual(chatGPTWebAuthMethods, expectedChatGPTWebAuthMethods) {
 		t.Fatalf("unexpected chatgpt-web auth methods: %+v", chatGPTWebAuthMethods)
 	}
@@ -6183,6 +6183,22 @@ func TestAdminInstallProviderPresetsIsIdempotent(t *testing.T) {
 		oauthResp.Data.Config.TokenUrl == nil ||
 		*oauthResp.Data.Config.TokenUrl != "https://api.anthropic.com/v1/oauth/token" {
 		t.Fatalf("unexpected provider oauth config: %+v", oauthResp.Data)
+	}
+	oauthReq = httptest.NewRequest(http.MethodGet, "/api/v1/admin/providers/"+string(chatGPTWebProvider.Id)+"/oauth-config", nil)
+	oauthReq.AddCookie(sessionCookie)
+	oauthRec = httptest.NewRecorder()
+	handler.ServeHTTP(oauthRec, oauthReq)
+	if oauthRec.Code != http.StatusOK {
+		t.Fatalf("expected chatgpt-web provider oauth config 200, got %d body=%s", oauthRec.Code, oauthRec.Body.String())
+	}
+	if err := json.NewDecoder(oauthRec.Body).Decode(&oauthResp); err != nil {
+		t.Fatalf("decode chatgpt-web provider oauth config: %v", err)
+	}
+	if oauthResp.Data.ProviderName != "chatgpt-web" ||
+		oauthResp.Data.Config.ClientId == "" ||
+		oauthResp.Data.Config.TokenUrl == nil ||
+		*oauthResp.Data.Config.TokenUrl != "https://auth.openai.com/oauth/token" {
+		t.Fatalf("unexpected chatgpt-web provider oauth config: %+v", oauthResp.Data)
 	}
 
 	for _, preset := range []struct {
@@ -9909,6 +9925,84 @@ func TestGatewayReverseProxyOAuthRefreshPersistsCredentialAndAudits(t *testing.T
 	handler.ServeHTTP(metricsRec, metricsReq)
 	if !strings.Contains(metricsRec.Body.String(), `reverse_proxy_oauth_refresh_total{status="success"} 1`) {
 		t.Fatalf("expected reverse proxy refresh success metric, got:\n%s", metricsRec.Body.String())
+	}
+}
+
+func TestGatewayChatGPTWebRefreshTokenOnlyCreateCanRequestConversation(t *testing.T) {
+	var tokenCalls int
+	var conversationCalls int
+	var tokenForm url.Values
+	var conversationAuthorization string
+	var conversationAccountID string
+	idToken := codexTestJWT(t, map[string]any{
+		"email": "chatgpt-create@example.test",
+		"https://api.openai.com/auth": map[string]any{
+			"chatgpt_account_id": "chatgpt-created-account",
+			"chatgpt_user_id":    "chatgpt-created-user",
+			"chatgpt_plan_type":  "team",
+			"organizations": []map[string]any{
+				{"id": "chatgpt-created-org", "is_default": true},
+			},
+		},
+	})
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/oauth/token":
+			tokenCalls++
+			if err := r.ParseForm(); err != nil {
+				t.Fatalf("parse ChatGPT Web token form: %v", err)
+			}
+			tokenForm = cloneURLValues(r.PostForm)
+			if r.Method != http.MethodPost ||
+				r.PostForm.Get("grant_type") != "refresh_token" ||
+				r.PostForm.Get("refresh_token") != "chatgpt-create-refresh" ||
+				r.PostForm.Get("client_id") != codexOAuthClientIDForTest ||
+				r.PostForm.Get("scope") != "openid profile email" {
+				t.Fatalf("unexpected ChatGPT Web refresh request: method=%s form=%v", r.Method, r.PostForm)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":"chatgpt-create-access","refresh_token":"chatgpt-create-refresh-rotated","id_token":` + strconv.Quote(idToken) + `,"token_type":"Bearer","expires_in":3600}`))
+		case "/backend-api/conversation":
+			conversationCalls++
+			conversationAuthorization = r.Header.Get("Authorization")
+			conversationAccountID = r.Header.Get("chatgpt-account-id")
+			if r.Header.Get("OpenAI-Sentinel-Chat-Requirements-Token") != "requirements-token" {
+				t.Fatalf("unexpected ChatGPT Web conversation headers: %+v", r.Header)
+			}
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = w.Write([]byte("data: {\"type\":\"conversation.delta\",\"delta\":\"chatgpt create ok\"}\n\ndata: [DONE]\n\n"))
+		default:
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"chatgpt-refresh-create-provider","display_name":"ChatGPT Refresh Create","adapter_type":"reverse-proxy-chatgpt-web","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"chatgpt-refresh-create-model","display_name":"ChatGPT Refresh Create Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gpt-5-chat","status":"active"}`)
+
+	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"chatgpt-refresh-create-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"refresh_token":"chatgpt-create-refresh"},"metadata":{"base_url":"` + upstream.URL + `","oauth_token_url":"` + upstream.URL + `/oauth/token","user_agent":"ChatGPT/1.0","chatgpt_requirements_token":"requirements-token"},"status":"active"}`
+	_, rawAccount := mustCreateAdminAccountRaw(t, handler, sessionCookie, loginResp.Data.CsrfToken, accountBody)
+	if strings.Contains(rawAccount, "chatgpt-create-refresh") || strings.Contains(rawAccount, "chatgpt-create-access") {
+		t.Fatalf("account create response leaked credential: %s", rawAccount)
+	}
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"chatgpt-refresh-create-model","messages":[{"role":"user","content":"hello chatgpt"}]}`)
+	if !strings.Contains(rec.Body.String(), "chatgpt create ok") {
+		t.Fatalf("expected ChatGPT Web response text, got %s", rec.Body.String())
+	}
+	if tokenCalls != 1 {
+		t.Fatalf("expected one token refresh call, got %d form=%v", tokenCalls, tokenForm)
+	}
+	if conversationCalls != 1 || conversationAuthorization != "Bearer chatgpt-create-access" {
+		t.Fatalf("unexpected ChatGPT Web upstream calls=%d auth=%q", conversationCalls, conversationAuthorization)
+	}
+	if conversationAccountID != "chatgpt-created-account" {
+		t.Fatalf("expected ChatGPT account id from refreshed id_token, got %q", conversationAccountID)
 	}
 }
 

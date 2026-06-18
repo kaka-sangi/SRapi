@@ -174,23 +174,24 @@ type EmbeddingRequest struct {
 }
 
 type ImageGenerationRequest struct {
-	RequestID      string
-	SourceProtocol string
-	SourceEndpoint string
-	Model          string
-	Prompt         string
-	Stream         bool
-	Count          int
-	Size           string
-	Quality        string
-	Style          string
-	ResponseFormat string
-	User           string
-	Extra          map[string]any
-	Provider       providercontract.Provider
-	Account        accountcontract.ProviderAccount
-	Mapping        modelcontract.ModelProviderMapping
-	Credential     map[string]any
+	RequestID       string
+	SourceProtocol  string
+	SourceEndpoint  string
+	Model           string
+	Prompt          string
+	Stream          bool
+	Count           int
+	Size            string
+	Quality         string
+	Style           string
+	ResponseFormat  string
+	User            string
+	Extra           map[string]any
+	Provider        providercontract.Provider
+	Account         accountcontract.ProviderAccount
+	Mapping         modelcontract.ModelProviderMapping
+	Credential      map[string]any
+	RequestSettings map[string]any
 }
 
 type ImageInput struct {
@@ -628,10 +629,19 @@ type RealtimeRequest struct {
 	RequestSettings map[string]any
 }
 
+// RealtimePayloadReplacement describes a literal text-frame rewrite applied to
+// upstream WebSocket messages before they are sent back to the gateway client.
+// From is the upstream-visible value, To is the client-visible value.
+type RealtimePayloadReplacement struct {
+	From string
+	To   string
+}
+
 type RealtimeSession struct {
-	URL          string
-	Headers      http.Header
-	InitialFrame []byte
+	URL                  string
+	Headers              http.Header
+	InitialFrame         []byte
+	ResponseReplacements []RealtimePayloadReplacement
 }
 
 type ProviderError struct {

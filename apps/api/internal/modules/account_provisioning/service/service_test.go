@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -18,11 +21,22 @@ type fixedClock struct{ now time.Time }
 
 func (c *fixedClock) Now() time.Time { return c.now }
 
+func makeOAuthTestJWT(t *testing.T, claims map[string]any) string {
+	t.Helper()
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
+	body, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatalf("marshal jwt claims: %v", err)
+	}
+	payload := base64.RawURLEncoding.EncodeToString(body)
+	return fmt.Sprintf("%s.%s.sig", header, payload)
+}
+
 func TestStartAuthorizationURLBuildsPKCERedirect(t *testing.T) {
 	svc := New()
 	res, err := svc.StartAuthorizationURL(contract.ProviderOAuthConfig{
 		ClientID:     "client-abc",
-		AuthorizeURL: "https://provider.example/authorize",
+		AuthorizeURL: "https://provider.example/authorize?codex_cli_simplified_flow=true&id_token_add_organizations=true&prompt=login",
 		TokenURL:     "https://provider.example/token",
 		RedirectURI:  "http://localhost:8080/admin/accounts/oauth/callback",
 		Scopes:       []string{"openid", "offline_access"},
@@ -51,6 +65,11 @@ func TestStartAuthorizationURLBuildsPKCERedirect(t *testing.T) {
 	if q.Get("scope") != "openid offline_access" {
 		t.Fatalf("unexpected scope: %q", q.Get("scope"))
 	}
+	if q.Get("prompt") != "login" ||
+		q.Get("id_token_add_organizations") != "true" ||
+		q.Get("codex_cli_simplified_flow") != "true" {
+		t.Fatalf("expected provider authorize query to be preserved: %s", res.AuthorizationURL)
+	}
 }
 
 func TestStartAuthorizationURLRejectsBadConfig(t *testing.T) {
@@ -70,11 +89,25 @@ func TestStartAuthorizationURLRejectsBadConfig(t *testing.T) {
 
 func TestExchangeCodeHappyPathMintsCredential(t *testing.T) {
 	var gotForm url.Values
+	idToken := makeOAuthTestJWT(t, map[string]any{
+		"email": "alice@example.test",
+		"https://api.openai.com/auth": map[string]any{
+			"chatgpt_account_id":                "account-123",
+			"chatgpt_user_id":                   "user-123",
+			"chatgpt_plan_type":                 "team",
+			"chatgpt_subscription_active_until": "2026-08-01T00:00:00Z",
+			"organizations": []map[string]any{
+				{"id": "org-secondary", "is_default": false},
+				{"id": "org-default", "is_default": true},
+			},
+		},
+	})
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = r.ParseForm()
 		gotForm = r.PostForm
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"access_token":"acc-1","refresh_token":"ref-1","token_type":"Bearer","expires_in":3600,"scope":"openid"}`)
+		body := fmt.Sprintf(`{"access_token":"acc-1","refresh_token":"ref-1","id_token":%q,"token_type":"Bearer","expires_in":3600,"scope":"openid"}`, idToken)
+		_, _ = io.WriteString(w, body)
 	}))
 	defer upstream.Close()
 
@@ -105,6 +138,19 @@ func TestExchangeCodeHappyPathMintsCredential(t *testing.T) {
 	credMap := cred.Credential()
 	if credMap["access_token"] != "acc-1" || credMap["refresh_token"] != "ref-1" {
 		t.Fatalf("unexpected credential map: %v", credMap)
+	}
+	wantClaims := map[string]string{
+		"email":                   "alice@example.test",
+		"chatgpt_account_id":      "account-123",
+		"chatgpt_user_id":         "user-123",
+		"organization_id":         "org-default",
+		"plan_type":               "team",
+		"subscription_expires_at": "2026-08-01T00:00:00Z",
+	}
+	for key, want := range wantClaims {
+		if got := credMap[key]; got != want {
+			t.Fatalf("expected credential %s=%q, got %v in %v", key, want, got, credMap)
+		}
 	}
 	status, err := svc.Status(start.SessionID)
 	if err != nil || status.Status != contract.StatusCompleted {

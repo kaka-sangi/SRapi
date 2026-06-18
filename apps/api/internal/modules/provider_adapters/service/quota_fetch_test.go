@@ -432,6 +432,86 @@ func TestFetchAccountQuotaMapsCodexAccountsCheckPlan(t *testing.T) {
 	}
 }
 
+func TestFetchAccountQuotaMapsChatGPTWebAccountsCheckPlan(t *testing.T) {
+	var gotAuthorization string
+	var gotAccountID string
+	var gotOrigin string
+	var gotReferer string
+	var gotUserAgent string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuthorization = r.Header.Get("Authorization")
+		gotAccountID = r.Header.Get("ChatGPT-Account-ID")
+		gotOrigin = r.Header.Get("Origin")
+		gotReferer = r.Header.Get("Referer")
+		gotUserAgent = r.Header.Get("User-Agent")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"accounts": {
+				"personal": {
+					"account": {"id": "personal", "plan_type": "free", "is_default": true},
+					"entitlement": {"subscription_plan": "free"}
+				},
+				"workspace-account": {
+					"account": {"id": "workspace-account", "plan_type": "team", "is_default": false},
+					"account_plan": {
+						"subscription_plan": {
+							"allowance": 2400,
+							"usage": 600,
+							"limit": 3000,
+							"currency": "credits"
+						}
+					}
+				}
+			}
+		}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	report, err := svc.FetchAccountQuota(context.Background(), contract.ProbeRequest{
+		Provider: providercontract.Provider{
+			ID:          23,
+			Name:        "chatgpt-web",
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+			Status:      providercontract.StatusActive,
+			ConfigSchema: map[string]any{
+				"quota_url": upstream.URL + "/backend-api/accounts/check/v4-2023-04-27",
+			},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             230,
+			ProviderID:     23,
+			Name:           "chatgpt-web-oauth",
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			Status:         accountcontract.StatusActive,
+			UpstreamClient: ptrString("chatgpt_web"),
+			Metadata: map[string]any{
+				"chatgpt_account_id": "workspace-account",
+				"user_agent":         "chatgpt-web/test",
+			},
+		},
+		Credential: map[string]any{"access_token": "chatgpt-web-access-token"},
+	})
+	if err != nil {
+		t.Fatalf("fetch chatgpt-web quota: %v", err)
+	}
+	if gotAuthorization != "Bearer chatgpt-web-access-token" || gotAccountID != "workspace-account" || gotOrigin != "https://chatgpt.com" || gotReferer != "https://chatgpt.com/" || gotUserAgent != "chatgpt-web/test" {
+		t.Fatalf("unexpected ChatGPT Web quota headers auth=%q account=%q origin=%q referer=%q ua=%q", gotAuthorization, gotAccountID, gotOrigin, gotReferer, gotUserAgent)
+	}
+	if !report.Supported ||
+		report.Plan != "team" ||
+		report.CreditsRemaining != "2400" ||
+		report.CreditsUsed != "600" ||
+		report.CreditsLimit != "3000" ||
+		report.Currency != "credits" {
+		t.Fatalf("unexpected chatgpt-web accounts/check quota report: %+v", report)
+	}
+}
+
 func TestFetchAccountQuotaAntigravityUsesProjectHeaderAndSupportsQuota(t *testing.T) {
 	var gotMethod, gotBody, gotContentType, gotUserAgent string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

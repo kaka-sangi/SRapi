@@ -46,6 +46,48 @@ func TestParseCodexJWT_BadFormat(t *testing.T) {
 	}
 }
 
+func TestMergeOpenAIJWTCredentialExtractsAccountFields(t *testing.T) {
+	tok := makeCodexJWS(t, map[string]any{
+		"email": "alice@example.com",
+		"https://api.openai.com/auth": map[string]any{
+			"chatgpt_account_id":                "account-123",
+			"user_id":                           "fallback-user",
+			"chatgpt_plan_type":                 "plus",
+			"chatgpt_subscription_active_until": "2026-08-01T00:00:00Z",
+			"organizations": []map[string]any{
+				{"id": "org-secondary", "is_default": false},
+				{"id": "org-default", "is_default": true},
+			},
+		},
+	})
+	credential := map[string]any{}
+	MergeOpenAIJWTCredential(credential, tok)
+	want := map[string]string{
+		"email":                   "alice@example.com",
+		"chatgpt_account_id":      "account-123",
+		"chatgpt_user_id":         "fallback-user",
+		"organization_id":         "org-default",
+		"plan_type":               "plus",
+		"subscription_expires_at": "2026-08-01T00:00:00Z",
+	}
+	for key, expected := range want {
+		if credential[key] != expected {
+			t.Fatalf("expected %s=%q, got %v in %+v", key, expected, credential[key], credential)
+		}
+	}
+}
+
+func TestOpenAIAuthPOIDExtractsAccessTokenOrganization(t *testing.T) {
+	tok := makeCodexJWS(t, map[string]any{
+		"https://api.openai.com/auth": map[string]any{
+			"poid": "workspace-account",
+		},
+	})
+	if got := OpenAIAuthPOID(tok); got != "workspace-account" {
+		t.Fatalf("unexpected poid: %q", got)
+	}
+}
+
 func TestValidateCodexResponseJWS_LenientNoToken(t *testing.T) {
 	res, err := ValidateCodexResponseJWS([]byte(`{"hello":"world"}`), nil)
 	if err != nil {

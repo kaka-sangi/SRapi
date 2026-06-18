@@ -76,230 +76,254 @@ type runtimeMetricDescs struct {
 
 func newRuntimeMetricsCollector(ctx context.Context, rt *runtimeState) *runtimeMetricsCollector {
 	return &runtimeMetricsCollector{
-		ctx: ctx,
-		rt:  rt,
-		descs: runtimeMetricDescs{
-			gatewayRequests: prometheus.NewDesc(
-				"srapi_gateway_requests_total",
-				"Gateway requests recorded by endpoint family, model, provider protocol, and result.",
-				[]string{"endpoint_family", "model", "provider_protocol", "result"},
-				nil,
-			),
-			gatewayDuration: prometheus.NewDesc(
-				"srapi_gateway_request_duration_seconds",
-				"Gateway request latency histogram derived from usage logs.",
-				[]string{"endpoint_family", "model", "provider_protocol", "result"},
-				nil,
-			),
-			gatewayInflight: prometheus.NewDesc(
-				"srapi_gateway_inflight_requests",
-				"Gateway requests with pending scheduler leases.",
-				nil,
-				nil,
-			),
-			realtimeActiveSlots: prometheus.NewDesc(
-				"srapi_realtime_active_slots",
-				"Active realtime WebSocket slots.",
-				nil,
-				nil,
-			),
-			realtimeActiveSlotsByEndpoint: prometheus.NewDesc(
-				"srapi_realtime_active_slots_by_endpoint",
-				"Active realtime WebSocket slots by source endpoint.",
-				[]string{"source_endpoint"},
-				nil,
-			),
-			realtimeSlots: prometheus.NewDesc(
-				"srapi_realtime_slots_total",
-				"Realtime WebSocket slot lifecycle events.",
-				[]string{"event"},
-				nil,
-			),
-			gatewayErrors: prometheus.NewDesc(
-				"srapi_gateway_errors_total",
-				"Gateway request errors recorded by error class.",
-				[]string{"error_class"},
-				nil,
-			),
-			gatewayFailover: prometheus.NewDesc(
-				"srapi_gateway_failover_total",
-				"Gateway fallback attempts by endpoint family, model, provider protocol, and result.",
-				[]string{"endpoint_family", "model", "provider_protocol", "result"},
-				nil,
-			),
-			schedulerDecisions: prometheus.NewDesc(
-				"srapi_scheduler_decisions_total",
-				"Scheduler decisions by strategy and outcome.",
-				[]string{"strategy", "outcome", "reason"},
-				nil,
-			),
-			schedulerCostScore: prometheus.NewDesc(
-				"srapi_scheduler_cost_score_avg",
-				"Average scheduler cost score by strategy, derived from persisted decision score breakdowns.",
-				[]string{"strategy"},
-				nil,
-			),
-			schedulerStrategySelected: prometheus.NewDesc(
-				"scheduler_strategy_selected_total",
-				"Scheduler selections by strategy and version.",
-				[]string{"strategy", "version"},
-				nil,
-			),
-			schedulerStrategyFallback: prometheus.NewDesc(
-				"scheduler_strategy_fallback_total",
-				"Scheduler fallback attempts by strategy and version.",
-				[]string{"strategy", "version"},
-				nil,
-			),
-			schedulerStrategyShadowDiff: prometheus.NewDesc(
-				"scheduler_strategy_shadow_diff",
-				"Scheduler real-traffic shadow rollout decisions by selected side.",
-				[]string{"strategy", "version", "shadow_strategy", "selection"},
-				nil,
-			),
-			schedulerStrategyCostDelta: prometheus.NewDesc(
-				"scheduler_strategy_cost_delta",
-				"Average selected cost score minus candidate-set average cost score by strategy and version.",
-				[]string{"strategy", "version"},
-				nil,
-			),
-			schedulerStrategyLatencyDelta: prometheus.NewDesc(
-				"scheduler_strategy_latency_delta",
-				"Average selected latency score minus candidate-set average latency score by strategy and version.",
-				[]string{"strategy", "version"},
-				nil,
-			),
-			schedulerStrategyErrorRate: prometheus.NewDesc(
-				"scheduler_strategy_error_rate",
-				"Usage-log error rate for scheduler decisions by strategy and version.",
-				[]string{"strategy", "version"},
-				nil,
-			),
-			schedulerStrategyRejectReason: prometheus.NewDesc(
-				"scheduler_strategy_reject_reason_total",
-				"Scheduler rejected candidates by strategy, version, and reject reason.",
-				[]string{"strategy", "version", "reason"},
-				nil,
-			),
-			opsAlertEvents: prometheus.NewDesc(
-				"srapi_ops_alert_events",
-				"Current operational alert events by severity and status.",
-				[]string{"severity", "status"},
-				nil,
-			),
-			providerErrors: prometheus.NewDesc(
-				"srapi_provider_errors_total",
-				"Provider-facing errors recorded by protocol and error class.",
-				[]string{"provider_protocol", "error_class"},
-				nil,
-			),
-			providerProbeLatency: prometheus.NewDesc(
-				"srapi_provider_probe_latency_seconds",
-				"Provider account probe availability signal derived from materialized health rollups.",
-				[]string{"provider_protocol", "status"},
-				nil,
-			),
-			usageTokens: prometheus.NewDesc(
-				"srapi_usage_tokens_total",
-				"Usage tokens by model, provider protocol, and token kind.",
-				[]string{"model", "provider_protocol", "token_kind"},
-				nil,
-			),
-			reverseProxyBanSignals: prometheus.NewDesc(
-				"srapi_reverse_proxy_ban_signals_total",
-				"Reverse proxy ban signals observed by risk class.",
-				[]string{"risk_class"},
-				nil,
-			),
-			reverseProxyRequests: prometheus.NewDesc("reverse_proxy_request_total", "Reverse proxy requests.", nil, nil),
-			reverseProxyRequestSuccesses: prometheus.NewDesc(
-				"reverse_proxy_request_success_total",
-				"Reverse proxy successful requests.",
-				nil,
-				nil,
-			),
-			reverseProxyRequestErrors: prometheus.NewDesc(
-				"reverse_proxy_request_error_total",
-				"Reverse proxy request errors by class.",
-				[]string{"error_class"},
-				nil,
-			),
-			reverseProxyChallenges: prometheus.NewDesc(
-				"reverse_proxy_challenge_total",
-				"Reverse proxy challenges by strategy.",
-				[]string{"strategy"},
-				nil,
-			),
-			reverseProxyAccountLocked: prometheus.NewDesc("reverse_proxy_account_locked_total", "Reverse proxy account locked events.", nil, nil),
-			reverseProxyAccountBanned: prometheus.NewDesc("reverse_proxy_account_banned_total", "Reverse proxy account banned events.", nil, nil),
-			reverseProxyOAuthRefreshes: prometheus.NewDesc(
-				"reverse_proxy_oauth_refresh_total",
-				"Reverse proxy OAuth refresh attempts by status.",
-				[]string{"status"},
-				nil,
-			),
-			proxyProbeAttempts: prometheus.NewDesc(
-				"srapi_proxy_probe_attempts_total",
-				"Proxy probe attempts emitted by the proxy_probe worker.",
-				nil,
-				nil,
-			),
-			proxyProbeOutcomes: prometheus.NewDesc(
-				"srapi_proxy_probe_outcomes_total",
-				"Proxy probe outcomes (succeeded/failed) emitted by the proxy_probe worker.",
-				[]string{"outcome"},
-				nil,
-			),
-			accountsTokenRefreshAttempts: prometheus.NewDesc(
-				"srapi_accounts_token_refresh_attempts_total",
-				"OAuth token refresh attempts emitted by the accounts_token_refresh worker.",
-				nil,
-				nil,
-			),
-			accountsTokenRefreshOutcomes: prometheus.NewDesc(
-				"srapi_accounts_token_refresh_outcomes_total",
-				"OAuth token refresh outcomes by class emitted by the accounts_token_refresh worker.",
-				[]string{"outcome"},
-				nil,
-			),
-			opsErrorLogQueueDepth: prometheus.NewDesc(
-				"srapi_ops_error_log_queue_depth",
-				"Current queued ops_error_logs records waiting for asynchronous persistence.",
-				nil,
-				nil,
-			),
-			opsErrorLogQueueCapacity: prometheus.NewDesc(
-				"srapi_ops_error_log_queue_capacity",
-				"Capacity of the asynchronous ops_error_logs queue.",
-				nil,
-				nil,
-			),
-			opsErrorLogEnqueued: prometheus.NewDesc(
-				"srapi_ops_error_log_enqueued_total",
-				"Ops error log records accepted into the asynchronous persistence queue.",
-				nil,
-				nil,
-			),
-			opsErrorLogProcessed: prometheus.NewDesc(
-				"srapi_ops_error_log_processed_total",
-				"Ops error log records processed by the asynchronous persistence worker.",
-				nil,
-				nil,
-			),
-			opsErrorLogDropped: prometheus.NewDesc(
-				"srapi_ops_error_log_dropped_total",
-				"Ops error log records dropped because the asynchronous queue was full or draining.",
-				nil,
-				nil,
-			),
-			opsErrorLogWriteFailures: prometheus.NewDesc(
-				"srapi_ops_error_log_write_failures_total",
-				"Ops error log records whose asynchronous persistence write failed.",
-				nil,
-				nil,
-			),
-		},
+		ctx:   ctx,
+		rt:    rt,
+		descs: newRuntimeMetricDescs(),
 	}
+}
+
+func newRuntimeMetricDescs() runtimeMetricDescs {
+	descs := runtimeMetricDescs{}
+	initGatewayMetricDescs(&descs)
+	initSchedulerMetricDescs(&descs)
+	initProviderMetricDescs(&descs)
+	initWorkerMetricDescs(&descs)
+	initOpsErrorLogMetricDescs(&descs)
+	return descs
+}
+
+func initGatewayMetricDescs(descs *runtimeMetricDescs) {
+	descs.gatewayRequests = prometheus.NewDesc(
+		"srapi_gateway_requests_total",
+		"Gateway requests recorded by endpoint family, model, provider protocol, and result.",
+		[]string{"endpoint_family", "model", "provider_protocol", "result"},
+		nil,
+	)
+	descs.gatewayDuration = prometheus.NewDesc(
+		"srapi_gateway_request_duration_seconds",
+		"Gateway request latency histogram derived from usage logs.",
+		[]string{"endpoint_family", "model", "provider_protocol", "result"},
+		nil,
+	)
+	descs.gatewayInflight = prometheus.NewDesc(
+		"srapi_gateway_inflight_requests",
+		"Gateway requests with pending scheduler leases.",
+		nil,
+		nil,
+	)
+	descs.realtimeActiveSlots = prometheus.NewDesc(
+		"srapi_realtime_active_slots",
+		"Active realtime WebSocket slots.",
+		nil,
+		nil,
+	)
+	descs.realtimeActiveSlotsByEndpoint = prometheus.NewDesc(
+		"srapi_realtime_active_slots_by_endpoint",
+		"Active realtime WebSocket slots by source endpoint.",
+		[]string{"source_endpoint"},
+		nil,
+	)
+	descs.realtimeSlots = prometheus.NewDesc(
+		"srapi_realtime_slots_total",
+		"Realtime WebSocket slot lifecycle events.",
+		[]string{"event"},
+		nil,
+	)
+	descs.gatewayErrors = prometheus.NewDesc(
+		"srapi_gateway_errors_total",
+		"Gateway request errors recorded by error class.",
+		[]string{"error_class"},
+		nil,
+	)
+	descs.gatewayFailover = prometheus.NewDesc(
+		"srapi_gateway_failover_total",
+		"Gateway fallback attempts by endpoint family, model, provider protocol, and result.",
+		[]string{"endpoint_family", "model", "provider_protocol", "result"},
+		nil,
+	)
+}
+
+func initSchedulerMetricDescs(descs *runtimeMetricDescs) {
+	descs.schedulerDecisions = prometheus.NewDesc(
+		"srapi_scheduler_decisions_total",
+		"Scheduler decisions by strategy and outcome.",
+		[]string{"strategy", "outcome", "reason"},
+		nil,
+	)
+	descs.schedulerCostScore = prometheus.NewDesc(
+		"srapi_scheduler_cost_score_avg",
+		"Average scheduler cost score by strategy, derived from persisted decision score breakdowns.",
+		[]string{"strategy"},
+		nil,
+	)
+	descs.schedulerStrategySelected = prometheus.NewDesc(
+		"scheduler_strategy_selected_total",
+		"Scheduler selections by strategy and version.",
+		[]string{"strategy", "version"},
+		nil,
+	)
+	descs.schedulerStrategyFallback = prometheus.NewDesc(
+		"scheduler_strategy_fallback_total",
+		"Scheduler fallback attempts by strategy and version.",
+		[]string{"strategy", "version"},
+		nil,
+	)
+	descs.schedulerStrategyShadowDiff = prometheus.NewDesc(
+		"scheduler_strategy_shadow_diff",
+		"Scheduler real-traffic shadow rollout decisions by selected side.",
+		[]string{"strategy", "version", "shadow_strategy", "selection"},
+		nil,
+	)
+	descs.schedulerStrategyCostDelta = prometheus.NewDesc(
+		"scheduler_strategy_cost_delta",
+		"Average selected cost score minus candidate-set average cost score by strategy and version.",
+		[]string{"strategy", "version"},
+		nil,
+	)
+	descs.schedulerStrategyLatencyDelta = prometheus.NewDesc(
+		"scheduler_strategy_latency_delta",
+		"Average selected latency score minus candidate-set average latency score by strategy and version.",
+		[]string{"strategy", "version"},
+		nil,
+	)
+	descs.schedulerStrategyErrorRate = prometheus.NewDesc(
+		"scheduler_strategy_error_rate",
+		"Usage-log error rate for scheduler decisions by strategy and version.",
+		[]string{"strategy", "version"},
+		nil,
+	)
+	descs.schedulerStrategyRejectReason = prometheus.NewDesc(
+		"scheduler_strategy_reject_reason_total",
+		"Scheduler rejected candidates by strategy, version, and reject reason.",
+		[]string{"strategy", "version", "reason"},
+		nil,
+	)
+}
+
+func initProviderMetricDescs(descs *runtimeMetricDescs) {
+	descs.opsAlertEvents = prometheus.NewDesc(
+		"srapi_ops_alert_events",
+		"Current operational alert events by severity and status.",
+		[]string{"severity", "status"},
+		nil,
+	)
+	descs.providerErrors = prometheus.NewDesc(
+		"srapi_provider_errors_total",
+		"Provider-facing errors recorded by protocol and error class.",
+		[]string{"provider_protocol", "error_class"},
+		nil,
+	)
+	descs.providerProbeLatency = prometheus.NewDesc(
+		"srapi_provider_probe_latency_seconds",
+		"Provider account probe availability signal derived from materialized health rollups.",
+		[]string{"provider_protocol", "status"},
+		nil,
+	)
+	descs.usageTokens = prometheus.NewDesc(
+		"srapi_usage_tokens_total",
+		"Usage tokens by model, provider protocol, and token kind.",
+		[]string{"model", "provider_protocol", "token_kind"},
+		nil,
+	)
+	descs.reverseProxyBanSignals = prometheus.NewDesc(
+		"srapi_reverse_proxy_ban_signals_total",
+		"Reverse proxy ban signals observed by risk class.",
+		[]string{"risk_class"},
+		nil,
+	)
+	descs.reverseProxyRequests = prometheus.NewDesc("reverse_proxy_request_total", "Reverse proxy requests.", nil, nil)
+	descs.reverseProxyRequestSuccesses = prometheus.NewDesc(
+		"reverse_proxy_request_success_total",
+		"Reverse proxy successful requests.",
+		nil,
+		nil,
+	)
+	descs.reverseProxyRequestErrors = prometheus.NewDesc(
+		"reverse_proxy_request_error_total",
+		"Reverse proxy request errors by class.",
+		[]string{"error_class"},
+		nil,
+	)
+	descs.reverseProxyChallenges = prometheus.NewDesc(
+		"reverse_proxy_challenge_total",
+		"Reverse proxy challenges by strategy.",
+		[]string{"strategy"},
+		nil,
+	)
+	descs.reverseProxyAccountLocked = prometheus.NewDesc("reverse_proxy_account_locked_total", "Reverse proxy account locked events.", nil, nil)
+	descs.reverseProxyAccountBanned = prometheus.NewDesc("reverse_proxy_account_banned_total", "Reverse proxy account banned events.", nil, nil)
+	descs.reverseProxyOAuthRefreshes = prometheus.NewDesc(
+		"reverse_proxy_oauth_refresh_total",
+		"Reverse proxy OAuth refresh attempts by status.",
+		[]string{"status"},
+		nil,
+	)
+}
+
+func initWorkerMetricDescs(descs *runtimeMetricDescs) {
+	descs.proxyProbeAttempts = prometheus.NewDesc(
+		"srapi_proxy_probe_attempts_total",
+		"Proxy probe attempts emitted by the proxy_probe worker.",
+		nil,
+		nil,
+	)
+	descs.proxyProbeOutcomes = prometheus.NewDesc(
+		"srapi_proxy_probe_outcomes_total",
+		"Proxy probe outcomes (succeeded/failed) emitted by the proxy_probe worker.",
+		[]string{"outcome"},
+		nil,
+	)
+	descs.accountsTokenRefreshAttempts = prometheus.NewDesc(
+		"srapi_accounts_token_refresh_attempts_total",
+		"OAuth token refresh attempts emitted by the accounts_token_refresh worker.",
+		nil,
+		nil,
+	)
+	descs.accountsTokenRefreshOutcomes = prometheus.NewDesc(
+		"srapi_accounts_token_refresh_outcomes_total",
+		"OAuth token refresh outcomes by class emitted by the accounts_token_refresh worker.",
+		[]string{"outcome"},
+		nil,
+	)
+}
+
+func initOpsErrorLogMetricDescs(descs *runtimeMetricDescs) {
+	descs.opsErrorLogQueueDepth = prometheus.NewDesc(
+		"srapi_ops_error_log_queue_depth",
+		"Current queued ops_error_logs records waiting for asynchronous persistence.",
+		nil,
+		nil,
+	)
+	descs.opsErrorLogQueueCapacity = prometheus.NewDesc(
+		"srapi_ops_error_log_queue_capacity",
+		"Capacity of the asynchronous ops_error_logs queue.",
+		nil,
+		nil,
+	)
+	descs.opsErrorLogEnqueued = prometheus.NewDesc(
+		"srapi_ops_error_log_enqueued_total",
+		"Ops error log records accepted into the asynchronous persistence queue.",
+		nil,
+		nil,
+	)
+	descs.opsErrorLogProcessed = prometheus.NewDesc(
+		"srapi_ops_error_log_processed_total",
+		"Ops error log records processed by the asynchronous persistence worker.",
+		nil,
+		nil,
+	)
+	descs.opsErrorLogDropped = prometheus.NewDesc(
+		"srapi_ops_error_log_dropped_total",
+		"Ops error log records dropped because the asynchronous queue was full or draining.",
+		nil,
+		nil,
+	)
+	descs.opsErrorLogWriteFailures = prometheus.NewDesc(
+		"srapi_ops_error_log_write_failures_total",
+		"Ops error log records whose asynchronous persistence write failed.",
+		nil,
+		nil,
+	)
 }
 
 func (c *runtimeMetricsCollector) Describe(ch chan<- *prometheus.Desc) {

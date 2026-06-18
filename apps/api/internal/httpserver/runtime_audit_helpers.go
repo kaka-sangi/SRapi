@@ -34,8 +34,15 @@ func auditRecordFromRequest(r *http.Request, actorUserID int, action, resourceTy
 		After:        after,
 		IP:           clientIP(r),
 		UserAgent:    r.UserAgent(),
-		TraceID:      traceIDFromContext(r.Context()),
+		TraceID:      auditTraceIDFromRequest(r),
 	}
+}
+
+func auditTraceIDFromRequest(r *http.Request) string {
+	if traceID := traceIDFromContext(r.Context()); traceID != "" {
+		return traceID
+	}
+	return requestIDFromContext(r.Context())
 }
 
 func adminControlAuditSnapshot(value any) map[string]any {

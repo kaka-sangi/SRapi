@@ -1413,15 +1413,20 @@ type credentialRefreshOutcome struct {
 func (rt *runtimeState) singleflightRefreshReverseProxyCredential(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any, force bool) (map[string]any, bool, error) {
 	result, err, _ := rt.credentialRefreshGroup.Do(strconv.Itoa(account.ID), func() (any, error) {
 		if current, err := rt.accounts.DecryptCredential(ctx, account.ID); err == nil && len(current) > 0 {
+			latestAccount := account
+			if latest, err := rt.accounts.FindByID(ctx, account.ID); err == nil {
+				latestAccount = latest
+			}
 			currentToken := mapString(current, "access_token")
 			if force {
 				if currentToken != "" && currentToken != mapString(credential, "access_token") {
 					return credentialRefreshOutcome{credential: current, refreshed: true}, nil
 				}
-			} else if !accountcontract.ShouldRefreshOAuthCredential(account, current, time.Now().UTC()) {
+			} else if !accountcontract.ShouldRefreshOAuthCredential(latestAccount, current, time.Now().UTC()) {
 				return credentialRefreshOutcome{credential: current, refreshed: true}, nil
 			}
 			credential = current
+			account = latestAccount
 		}
 		refreshed, ok, err := rt.doRefreshReverseProxyCredential(ctx, account, credential)
 		if err != nil {

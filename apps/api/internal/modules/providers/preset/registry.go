@@ -194,10 +194,10 @@ func codexCLIPreset() Preset {
 		},
 		OAuthConfig: &OAuthConfig{
 			ClientID:           reverseproxycontract.CodexOAuthClientID,
-			AuthorizeURL:       "https://auth.openai.com/oauth/authorize",
+			AuthorizeURL:       reverseproxycontract.CodexOAuthAuthorizeURL,
 			TokenURL:           reverseproxycontract.CodexOAuthTokenURL,
 			DeviceAuthorizeURL: "https://auth.openai.com/oauth/device/code",
-			Scopes:             strings.Fields(reverseproxycontract.CodexOAuthRefreshScope),
+			Scopes:             strings.Fields(reverseproxycontract.CodexOAuthAuthorizeScope),
 			UsePKCE:            true,
 		},
 	}
@@ -371,6 +371,7 @@ func chatGPTWebPreset() Preset {
 		DefaultBaseURL: "https://chatgpt.com",
 		AuthModes:      []AuthMode{AuthModeBearer, AuthModeCustomHeader},
 		RuntimeClassAllowlist: []accountscontract.RuntimeClass{
+			accountscontract.RuntimeClassOauthRefresh,
 			accountscontract.RuntimeClassWebSessionCookie,
 			accountscontract.RuntimeClassCustomReverseProxy,
 		},
@@ -384,7 +385,26 @@ func chatGPTWebPreset() Preset {
 			MetadataHints: map[string]string{
 				"chatgpt_requirements_token": "OpenAI Sentinel chat requirements token, or enable requirements_auto",
 				"user_agent":                 "Browser user agent for ChatGPT web requests",
+				"chatgpt_account_id":         "ChatGPT account id from the OpenAI session/account check response",
+				"originator":                 "Optional upstream originator header, e.g. codex_cli_rs",
+				"version":                    "Optional upstream client version header",
 			},
+		},
+		QuotaConfig: map[string]string{
+			"quota_url":                    "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27",
+			"quota_headers":                `{"Origin":"https://chatgpt.com","Referer":"https://chatgpt.com/","User-Agent":"{{user_agent}}","ChatGPT-Account-ID":"{{chatgpt_account_id}}"}`,
+			"quota_plan_path":              "account_plan.account_plan_id",
+			"quota_credits_remaining_path": "account_plan.subscription_plan.allowance",
+			"quota_credits_used_path":      "account_plan.subscription_plan.usage",
+			"quota_credits_limit_path":     "account_plan.subscription_plan.limit",
+		},
+		OAuthConfig: &OAuthConfig{
+			ClientID:           reverseproxycontract.CodexOAuthClientID,
+			AuthorizeURL:       reverseproxycontract.CodexOAuthAuthorizeURL,
+			TokenURL:           reverseproxycontract.CodexOAuthTokenURL,
+			DeviceAuthorizeURL: "https://auth.openai.com/oauth/device/code",
+			Scopes:             strings.Fields(reverseproxycontract.CodexOAuthAuthorizeScope),
+			UsePKCE:            true,
 		},
 	}
 }

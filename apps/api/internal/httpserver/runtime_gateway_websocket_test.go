@@ -15,7 +15,9 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/config"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
+	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
+	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	"nhooyr.io/websocket"
@@ -265,7 +267,8 @@ func TestResponsesWebSocketRequestPayloadAcceptsFlatResponseCreateEvent(t *testi
 	payload, err := responsesWebSocketRequestPayload([]byte(`{
 		"type":"response.create",
 		"event_id":"evt_flat",
-		"input":"hello flat websocket"
+		"input":"hello flat websocket",
+		"service_tier":"fast"
 	}`), "fallback-model")
 	if err != nil {
 		t.Fatalf("normalize flat response.create payload: %v", err)
@@ -279,6 +282,9 @@ func TestResponsesWebSocketRequestPayloadAcceptsFlatResponseCreateEvent(t *testi
 	}
 	if request["model"] != "fallback-model" || request["input"] != "hello flat websocket" {
 		t.Fatalf("unexpected normalized flat response.create payload: %+v", request)
+	}
+	if request["service_tier"] != "priority" {
+		t.Fatalf("expected fast service_tier alias to normalize to priority, got %+v", request)
 	}
 }
 
@@ -436,6 +442,31 @@ func TestResponsesWebSocketUsageKeepsCacheCreationBreakdown(t *testing.T) {
 	}
 	if usage.CacheCreationTokens != 6 || usage.CacheCreation5mTokens != 6 {
 		t.Fatalf("unexpected cache-only websocket usage: %+v", usage)
+	}
+}
+
+func TestProviderRealtimeResponseReplacementsExposeOriginalCodexSession(t *testing.T) {
+	replacements := []provideradaptercontract.RealtimePayloadReplacement{
+		{From: "confused-session", To: "cache-ws"},
+		{From: "confused-turn", To: "turn-ws"},
+	}
+	msg := reverseproxycontract.WebSocketMessage{
+		Type: reverseproxycontract.WebSocketMessageText,
+		Data: []byte(`{"type":"response.completed","response":{"prompt_cache_key":"confused-session","turn_id":"confused-turn"}}`),
+	}
+
+	got := applyProviderRealtimeResponseReplacements(msg, replacements)
+	if strings.Contains(string(got.Data), "confused-session") || strings.Contains(string(got.Data), "confused-turn") {
+		t.Fatalf("expected upstream identifiers to be hidden from client, got %s", got.Data)
+	}
+	if !strings.Contains(string(got.Data), "cache-ws") || !strings.Contains(string(got.Data), "turn-ws") {
+		t.Fatalf("expected original identifiers to be restored for client, got %s", got.Data)
+	}
+
+	binary := reverseproxycontract.WebSocketMessage{Type: reverseproxycontract.WebSocketMessageBinary, Data: []byte("confused-session")}
+	gotBinary := applyProviderRealtimeResponseReplacements(binary, replacements)
+	if string(gotBinary.Data) != "confused-session" {
+		t.Fatalf("binary frames must not be rewritten, got %q", string(gotBinary.Data))
 	}
 }
 

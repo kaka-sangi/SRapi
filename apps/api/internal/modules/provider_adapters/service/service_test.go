@@ -433,6 +433,9 @@ func TestOpenAICompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
 		if payload["model"] != "gpt-upstream" || payload["parallel_tool_calls"] != true || payload["user"] != "user-raw" {
 			t.Fatalf("expected raw OpenAI fields to be preserved with mapped model, got %+v", payload)
 		}
+		if payload["service_tier"] != "priority" {
+			t.Fatalf("expected raw fast service_tier alias to normalize to priority, got %+v", payload)
+		}
 		if streamOptions, _ := payload["stream_options"].(map[string]any); streamOptions["include_usage"] != false {
 			t.Fatalf("expected raw stream usage option to be preserved, got %+v", payload["stream_options"])
 		}
@@ -452,7 +455,7 @@ func TestOpenAICompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
 		TargetProtocol: "openai-compatible",
 		Model:          "gpt-local",
 		InputParts:     textParts("canonical fallback"),
-		RawBody:        []byte(`{"model":"gpt-local","messages":[{"role":"user","content":"raw"}],"parallel_tool_calls":true,"stream_options":{"include_usage":false},"user":"user-raw"}`),
+		RawBody:        []byte(`{"model":"gpt-local","messages":[{"role":"user","content":"raw"}],"parallel_tool_calls":true,"stream_options":{"include_usage":false},"service_tier":"fast","user":"user-raw"}`),
 		Provider:       providercontract.Provider{AdapterType: "openai-compatible", Protocol: "openai-compatible"},
 		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
 		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
@@ -608,6 +611,60 @@ func TestNativeOpenAIAdapterUsesResponsesEndpoint(t *testing.T) {
 	}
 	if resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 2 || resp.Usage.CachedTokens != 1 || resp.Usage.Estimated {
 		t.Fatalf("expected native Responses usage, got %+v", resp.Usage)
+	}
+}
+
+func TestNativeOpenAIAdapterNormalizesResponsesServiceTier(t *testing.T) {
+	tests := []struct {
+		name        string
+		rawTier     string
+		wantTier    string
+		wantPresent bool
+	}{
+		{name: "fast alias", rawTier: " fast ", wantTier: "priority", wantPresent: true},
+		{name: "official tier", rawTier: "AUTO", wantTier: "auto", wantPresent: true},
+		{name: "unknown tier", rawTier: "turbo", wantPresent: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var payload map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+					t.Fatalf("decode upstream request: %v", err)
+				}
+				gotTier, ok := payload["service_tier"]
+				if ok != tt.wantPresent {
+					t.Fatalf("service_tier presence = %v, want %v in %+v", ok, tt.wantPresent, payload)
+				}
+				if tt.wantPresent && gotTier != tt.wantTier {
+					t.Fatalf("service_tier = %v, want %s in %+v", gotTier, tt.wantTier, payload)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"id":"resp_native_tier","object":"response","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}],"usage":{"input_tokens":1,"output_tokens":1}}`))
+			}))
+			defer upstream.Close()
+
+			svc, err := service.New(upstream.Client())
+			if err != nil {
+				t.Fatalf("create service: %v", err)
+			}
+			_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+				RequestID:      "req_native_openai_tier",
+				SourceProtocol: "openai-compatible",
+				SourceEndpoint: "/v1/responses",
+				TargetProtocol: "openai-compatible",
+				Model:          "gpt-local",
+				InputParts:     textParts("canonical fallback"),
+				RawBody:        []byte(`{"model":"gpt-local","input":"raw responses input","stream":false,"service_tier":` + strconv.Quote(tt.rawTier) + `}`),
+				Provider:       providercontract.Provider{AdapterType: "native-openai", Protocol: "openai-compatible"},
+				Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+				Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+				Credential:     map[string]any{"api_key": "upstream-secret"},
+			})
+			if err != nil {
+				t.Fatalf("invoke native OpenAI Responses upstream: %v", err)
+			}
+		})
 	}
 }
 
@@ -1039,7 +1096,7 @@ func TestReverseProxyOpenAICompatibleAdapterUsesResponsesEndpointWhenOptedIn(t *
 		TargetProtocol: "openai-compatible",
 		Model:          "gpt-local",
 		InputParts:     textParts("canonical fallback"),
-		RawBody:        []byte(`{"model":"gpt-local","input":"raw responses input","stream":true,"metadata":{"trace_id":"trace-stream"}}`),
+		RawBody:        []byte(`{"model":"gpt-local","input":"raw responses input","stream":true,"service_tier":"fast","metadata":{"trace_id":"trace-stream"}}`),
 		Stream:         true,
 		Provider:       providercontract.Provider{AdapterType: "reverse-proxy-openai-compatible", Protocol: "openai-compatible", ConfigSchema: map[string]any{"native_responses": true}},
 		Account:        accountcontract.ProviderAccount{ID: 9, RuntimeClass: accountcontract.RuntimeClassOauthRefresh, Metadata: map[string]any{"base_url": "https://openai.example/v1"}},
@@ -1058,6 +1115,9 @@ func TestReverseProxyOpenAICompatibleAdapterUsesResponsesEndpointWhenOptedIn(t *
 	}
 	if payload["model"] != "gpt-upstream" || payload["input"] != "raw responses input" || payload["stream"] != true {
 		t.Fatalf("expected mapped reverse native Responses payload, got %+v", payload)
+	}
+	if payload["service_tier"] != "priority" {
+		t.Fatalf("expected fast service_tier alias to normalize to priority, got %+v", payload)
 	}
 	if string(resp.Raw) != rawSSE {
 		t.Fatalf("expected raw native Responses SSE, got %q", string(resp.Raw))
@@ -1119,6 +1179,45 @@ func TestOpenAICompatibleAdapterUsesResponsesCompactEndpoint(t *testing.T) {
 	}
 	if resp.Usage.InputTokens != 9 || resp.Usage.OutputTokens != 2 || resp.Usage.Estimated {
 		t.Fatalf("expected compact usage from raw response, got %+v", resp.Usage)
+	}
+}
+
+func TestOpenAICompatibleAdapterNormalizesResponsesCompactServiceTier(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/responses/compact" {
+			t.Fatalf("expected compact upstream path, got %s", r.URL.Path)
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode compact upstream request: %v", err)
+		}
+		if payload["service_tier"] != "priority" {
+			t.Fatalf("expected compact fast service_tier alias to normalize to priority, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"cmp_tier","object":"response.compaction","input_tokens":1,"output_tokens":1}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_openai_compact_tier",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses/compact",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("compact input"),
+		RawBody:        []byte(`{"model":"gpt-local","input":"compact input","service_tier":"fast"}`),
+		Provider:       providercontract.Provider{AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke compact upstream: %v", err)
 	}
 }
 
@@ -8279,6 +8378,156 @@ func TestReverseProxyCodexCLIAdapterBridgesImageGenerationToResponses(t *testing
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterImageGenerationConfusesSessionIdentity(t *testing.T) {
+	runtime := codexImageIdentityRuntime{}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	account := accountcontract.ProviderAccount{
+		ID:             9,
+		RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+		UpstreamClient: ptrString("codex_cli"),
+		Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+	}
+	req := contract.ImageGenerationRequest{
+		RequestID: "req_codex_image_identity",
+		Model:     "gpt-image-1",
+		Prompt:    "paint a quiet control room",
+		Extra: map[string]any{
+			"prompt_cache_key":      "image-cache-1",
+			"codex_turn_metadata":   `{"prompt_cache_key":"image-cache-1","turn_id":"turn-image-1","window_id":"image-cache-1:0"}`,
+			"codex_window_id":       "image-cache-1:0",
+			"codex_installation_id": "install-image-1",
+		},
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account:    account,
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.4"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	}
+	resp, err := svc.InvokeImageGeneration(context.Background(), req)
+	if err != nil {
+		t.Fatalf("invoke codex image generation bridge: %v", err)
+	}
+	var outbound map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &outbound); err != nil {
+		t.Fatalf("decode outbound image payload: %v", err)
+	}
+	promptCacheKey := strings.TrimSpace(fmt.Sprint(outbound["prompt_cache_key"]))
+	if promptCacheKey == "" || promptCacheKey == "image-cache-1" {
+		t.Fatalf("expected confused image prompt_cache_key in body, got %+v", outbound)
+	}
+	metadata, ok := outbound["client_metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected image client_metadata in outbound body, got %+v", outbound)
+	}
+	if metadata["x-codex-installation-id"] == "install-image-1" ||
+		metadata["x-codex-window-id"] != promptCacheKey+":0" {
+		t.Fatalf("expected confused image client_metadata, got %+v", metadata)
+	}
+	bodyTurnMetadata := strings.TrimSpace(fmt.Sprint(metadata["x-codex-turn-metadata"]))
+	if !strings.Contains(bodyTurnMetadata, promptCacheKey) || strings.Contains(bodyTurnMetadata, "image-cache-1") || strings.Contains(bodyTurnMetadata, "turn-image-1") {
+		t.Fatalf("expected confused image body turn metadata, got %q", bodyTurnMetadata)
+	}
+	if runtime.request.Headers.Get("Session_id") != promptCacheKey ||
+		runtime.request.Headers.Get("X-Client-Request-Id") != promptCacheKey ||
+		runtime.request.Headers.Get("X-Codex-Window-Id") != promptCacheKey+":0" {
+		t.Fatalf("expected confused image session headers, got %+v", runtime.request.Headers)
+	}
+	turnMetadata := runtime.request.Headers.Get("X-Codex-Turn-Metadata")
+	if !strings.Contains(turnMetadata, promptCacheKey) || strings.Contains(turnMetadata, "image-cache-1") || strings.Contains(turnMetadata, "turn-image-1") {
+		t.Fatalf("expected confused image turn metadata, got %q", turnMetadata)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].Base64JSON != "aW1hZ2U=" || resp.Data[0].RevisedPrompt != "image for image-cache-1 and turn-image-1" {
+		t.Fatalf("unexpected codex image response: %+v", resp)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterImageGenerationUsesRequestSettings(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"ig_1\",\"type\":\"image_generation_call\",\"status\":\"completed\",\"result\":\"aW1hZ2U=\",\"output_format\":\"png\"}}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_img\",\"status\":\"completed\",\"output\":[]}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID: "req_codex_image_settings",
+		Model:     "gpt-image-1",
+		Prompt:    "paint a quiet control room",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata: map[string]any{
+				"base_url":               "https://upstream.example/backend-api/codex",
+				"chatgpt_account_id":     "account-default",
+				"codex_originator":       "originator-default",
+				"codex_session_id":       "session-default",
+				"codex_version":          "0.100.0",
+				"codex_identity_confuse": false,
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5.4"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+		RequestSettings: map[string]any{
+			"chatgpt_account_id":                    "account-request",
+			"codex_originator":                      "Codex Desktop",
+			"codex_session_id":                      "session-request",
+			"codex_version":                         "0.118.0",
+			"codex_prompt_cache_key":                "image-cache-request",
+			"codex_turn_metadata":                   `{"prompt_cache_key":"image-cache-request","turn_id":"turn-request","window_id":"window-request"}`,
+			"codex_window_id":                       "window-request",
+			"codex_client_request_id":               "client-request",
+			"codex_installation_id":                 "install-request",
+			"x_responsesapi_include_timing_metrics": "true",
+			"accept-language":                       "fr-FR",
+		},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex image generation bridge: %v", err)
+	}
+	if headerValue(runtime.request.Headers, "ChatGPT-Account-ID") != "account-request" ||
+		headerValue(runtime.request.Headers, "Originator") != "Codex Desktop" ||
+		headerValue(runtime.request.Headers, "Session_id") != "session-request" ||
+		headerValue(runtime.request.Headers, "Version") != "0.118.0" ||
+		headerValue(runtime.request.Headers, "X-Codex-Turn-Metadata") != `{"prompt_cache_key":"image-cache-request","turn_id":"turn-request","window_id":"window-request"}` ||
+		headerValue(runtime.request.Headers, "X-Codex-Window-Id") != "window-request" ||
+		headerValue(runtime.request.Headers, "X-Client-Request-Id") != "client-request" ||
+		headerValue(runtime.request.Headers, "X-ResponsesAPI-Include-Timing-Metrics") != "true" ||
+		headerValue(runtime.request.Headers, "Accept-Language") != "fr-FR" {
+		t.Fatalf("request settings did not override codex image headers: %+v", runtime.request.Headers)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode codex image payload: %v", err)
+	}
+	if payload["prompt_cache_key"] != "image-cache-request" {
+		t.Fatalf("request settings did not populate prompt_cache_key: %+v", payload)
+	}
+	metadata, _ := payload["client_metadata"].(map[string]any)
+	if metadata["x-codex-installation-id"] != "install-request" ||
+		metadata["x-codex-turn-metadata"] != `{"prompt_cache_key":"image-cache-request","turn_id":"turn-request","window_id":"window-request"}` ||
+		metadata["x-codex-window-id"] != "window-request" ||
+		metadata["x-responsesapi-include-timing-metrics"] != "true" {
+		t.Fatalf("request settings did not populate image client_metadata: %+v", metadata)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterRejectsSparkImageGenerationBridge(t *testing.T) {
 	runtime := capturingRuntime{}
 	svc, err := service.NewWithReverseProxy(nil, &runtime)
@@ -9250,13 +9499,13 @@ func TestReverseProxyCodexCLIAdapterClassifiesCapacityAsRateLimit(t *testing.T) 
 	assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
 }
 
-func TestReverseProxyCodexCLIAdapterPinsSessionHeadersToPromptCacheKey(t *testing.T) {
+func TestReverseProxyCodexCLIAdapterConfusesSessionHeadersToPromptCacheKey(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
 			StatusCode: http.StatusOK,
 			Body: []byte(
 				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\n" +
-					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\",\"prompt_cache_key\":\"cache-abc\"}}\n\ndata: [DONE]\n\n",
 			),
 		},
 	}
@@ -9289,11 +9538,21 @@ func TestReverseProxyCodexCLIAdapterPinsSessionHeadersToPromptCacheKey(t *testin
 	if conversationResponseText(resp) != "ok" {
 		t.Fatalf("unexpected codex response: %+v", resp)
 	}
-	if headerValue(runtime.request.Headers, "Session_id") != "cache-abc" ||
-		headerValue(runtime.request.Headers, "Conversation_id") != "cache-abc" ||
-		headerValue(runtime.request.Headers, "Thread-Id") != "cache-abc" ||
-		headerValue(runtime.request.Headers, "X-Codex-Window-Id") != "cache-abc:0" {
-		t.Fatalf("expected prompt_cache_key session headers, got %+v", runtime.request.Headers)
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode codex payload: %v", err)
+	}
+	sessionID, _ := payload["prompt_cache_key"].(string)
+	if sessionID == "" || sessionID == "cache-abc" ||
+		headerValue(runtime.request.Headers, "Session_id") != sessionID ||
+		headerValue(runtime.request.Headers, "Conversation_id") != sessionID ||
+		headerValue(runtime.request.Headers, "Thread-Id") != sessionID ||
+		headerValue(runtime.request.Headers, "X-Codex-Window-Id") != sessionID+":0" ||
+		headerValue(runtime.request.Headers, "X-Client-Request-Id") != sessionID {
+		t.Fatalf("expected confused prompt_cache_key session headers, session=%q headers=%+v body=%+v", sessionID, runtime.request.Headers, payload)
+	}
+	if !strings.Contains(string(resp.Raw), "cache-abc") || strings.Contains(string(resp.Raw), sessionID) {
+		t.Fatalf("expected response to expose original prompt_cache_key, got %s", string(resp.Raw))
 	}
 }
 
@@ -10164,6 +10423,65 @@ func TestReverseProxyCodexCLIPrepareRealtimeUsesConfiguredOriginator(t *testing.
 	}
 }
 
+func TestReverseProxyCodexCLIPrepareRealtimeSelectsWebSocketBetaVersion(t *testing.T) {
+	tests := []struct {
+		name     string
+		metadata map[string]any
+		want     string
+	}{
+		{
+			name:     "default v2",
+			metadata: map[string]any{},
+			want:     "responses_websockets=2026-02-06",
+		},
+		{
+			name:     "explicit oauth v2 disabled uses v1",
+			metadata: map[string]any{"openai_oauth_responses_websockets_v2_enabled": false},
+			want:     "responses_websockets=2026-02-04",
+		},
+		{
+			name:     "generic v2 enabled uses v2",
+			metadata: map[string]any{"responses_websockets_v2_enabled": true},
+			want:     "responses_websockets=2026-02-06",
+		},
+	}
+	svc, err := service.New(nil)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metadata := map[string]any{"base_url": "https://chatgpt.example/backend-api/codex"}
+			for key, value := range tt.metadata {
+				metadata[key] = value
+			}
+			session, err := svc.PrepareRealtime(context.Background(), contract.RealtimeRequest{
+				RequestID:      "req_codex_ws_beta",
+				Model:          "codex-local",
+				RequestPayload: []byte(`{"model":"codex-local","input":"hello","stream":true}`),
+				Provider: providercontract.Provider{
+					AdapterType: "reverse-proxy-codex-cli",
+					Protocol:    "openai-compatible",
+				},
+				Account: accountcontract.ProviderAccount{
+					ID:             22,
+					RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+					UpstreamClient: ptrString("codex_cli"),
+					Metadata:       metadata,
+				},
+				Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+				Credential: map[string]any{"cli_client_token": "cli-token"},
+			})
+			if err != nil {
+				t.Fatalf("prepare codex realtime: %v", err)
+			}
+			if got := session.Headers.Get("OpenAI-Beta"); got != tt.want {
+				t.Fatalf("OpenAI-Beta = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestReverseProxyCodexCLIPrepareRealtimePinsSessionHeadersToPromptCacheKey(t *testing.T) {
 	svc, err := service.New(nil)
 	if err != nil {
@@ -10189,18 +10507,82 @@ func TestReverseProxyCodexCLIPrepareRealtimePinsSessionHeadersToPromptCacheKey(t
 	if err != nil {
 		t.Fatalf("prepare codex realtime: %v", err)
 	}
-	if headerValue(session.Headers, "session_id") != "cache-ws" ||
-		headerValue(session.Headers, "Conversation_id") != "cache-ws" ||
-		headerValue(session.Headers, "Thread-Id") != "cache-ws" ||
-		headerValue(session.Headers, "X-Codex-Window-Id") != "cache-ws:0" {
+	sessionID := headerValue(session.Headers, "session_id")
+	if sessionID == "" || sessionID == "cache-ws" ||
+		headerValue(session.Headers, "Conversation_id") != sessionID ||
+		headerValue(session.Headers, "Thread-Id") != sessionID ||
+		headerValue(session.Headers, "X-Codex-Window-Id") != sessionID+":0" {
 		t.Fatalf("expected prompt_cache_key websocket session headers, got %+v", session.Headers)
 	}
 	var frame map[string]any
 	if err := json.Unmarshal(session.InitialFrame, &frame); err != nil {
 		t.Fatalf("decode initial frame: %v", err)
 	}
-	if frame["prompt_cache_key"] != "cache-ws" || frame["type"] != "response.create" {
-		t.Fatalf("expected prompt_cache_key to stay in initial frame, got %+v", frame)
+	if frame["prompt_cache_key"] != sessionID || frame["type"] != "response.create" {
+		t.Fatalf("expected prompt_cache_key to be confused consistently, got headers=%+v frame=%+v", session.Headers, frame)
+	}
+	if len(session.ResponseReplacements) != 1 ||
+		session.ResponseReplacements[0].From != sessionID ||
+		session.ResponseReplacements[0].To != "cache-ws" {
+		t.Fatalf("expected websocket response replacement to expose original prompt_cache_key, got %+v", session.ResponseReplacements)
+	}
+}
+
+func TestReverseProxyCodexCLIPrepareRealtimeConfusesExplicitSessionHeaders(t *testing.T) {
+	svc, err := service.New(nil)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	session, err := svc.PrepareRealtime(context.Background(), contract.RealtimeRequest{
+		RequestID:      "req_codex_ws_prompt_cache",
+		Model:          "codex-local",
+		RequestPayload: []byte(`{"model":"codex-local","input":"hello","prompt_cache_key":"cache-ws","stream":true}`),
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             36,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata: map[string]any{
+				"base_url":                "https://chatgpt.example/backend-api/codex",
+				"codex_session_id":        "explicit-session",
+				"codex_client_request_id": "explicit-client-request",
+				"codex_window_id":         "explicit-window",
+				"codex_turn_metadata":     `{"prompt_cache_key":"cache-ws","turn_id":"turn-ws","window_id":"cache-ws:0"}`,
+				"codex_identity_confuse":  true,
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("prepare codex realtime: %v", err)
+	}
+	sessionID := headerValue(session.Headers, "session_id")
+	if sessionID == "" || sessionID == "cache-ws" || sessionID == "explicit-session" {
+		t.Fatalf("expected websocket session_id to be confused, got headers=%+v", session.Headers)
+	}
+	if got := headerValue(session.Headers, "X-Client-Request-Id"); got != sessionID {
+		t.Fatalf("X-Client-Request-Id = %q, want confused session %q", got, sessionID)
+	}
+	if got := headerValue(session.Headers, "X-Codex-Window-Id"); got != sessionID+":0" {
+		t.Fatalf("X-Codex-Window-Id = %q, want %q", got, sessionID+":0")
+	}
+	var turnMetadata map[string]any
+	if err := json.Unmarshal([]byte(headerValue(session.Headers, "X-Codex-Turn-Metadata")), &turnMetadata); err != nil {
+		t.Fatalf("decode turn metadata: %v", err)
+	}
+	if turnMetadata["prompt_cache_key"] != sessionID || turnMetadata["window_id"] != sessionID+":0" {
+		t.Fatalf("turn metadata prompt/window were not confused: %+v", turnMetadata)
+	}
+	turnID, _ := turnMetadata["turn_id"].(string)
+	if turnID == "" || turnID == "turn-ws" {
+		t.Fatalf("turn metadata turn_id was not confused: %+v", turnMetadata)
+	}
+	if len(session.ResponseReplacements) != 2 {
+		t.Fatalf("expected prompt_cache_key and turn_id response replacements, got %+v", session.ResponseReplacements)
 	}
 }
 
@@ -11644,6 +12026,42 @@ func (r *capturingRuntime) DoStream(_ context.Context, req reverseproxycontract.
 }
 
 func (r *capturingRuntime) ManagedEgressClient(reverseproxycontract.AccountRuntime) (*http.Client, bool, error) {
+	return nil, false, nil
+}
+
+type codexImageIdentityRuntime struct {
+	request reverseproxycontract.Request
+}
+
+func (r *codexImageIdentityRuntime) Do(_ context.Context, req reverseproxycontract.Request) (reverseproxycontract.Response, error) {
+	r.request = req
+	var payload map[string]any
+	_ = json.Unmarshal(req.Body, &payload)
+	promptCacheKey := strings.TrimSpace(fmt.Sprint(payload["prompt_cache_key"]))
+	if promptCacheKey == "" {
+		promptCacheKey = "missing-prompt-cache-key"
+	}
+	turnID := "missing-turn-id"
+	if raw := strings.TrimSpace(req.Headers.Get("X-Codex-Turn-Metadata")); raw != "" {
+		var metadata map[string]any
+		if err := json.Unmarshal([]byte(raw), &metadata); err == nil {
+			if value := strings.TrimSpace(fmt.Sprint(metadata["turn_id"])); value != "" {
+				turnID = value
+			}
+		}
+	}
+	body := fmt.Sprintf(
+		"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"ig_1\",\"type\":\"image_generation_call\",\"status\":\"completed\",\"result\":\"aW1hZ2U=\",\"revised_prompt\":%q,\"output_format\":\"png\"}}\n\n"+
+			"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_img\",\"status\":\"completed\",\"prompt_cache_key\":%q,\"turn_id\":%q,\"output\":[]}}\n\n"+
+			"data: [DONE]\n\n",
+		"image for "+promptCacheKey+" and "+turnID,
+		promptCacheKey,
+		turnID,
+	)
+	return reverseproxycontract.Response{StatusCode: http.StatusOK, Body: []byte(body)}, nil
+}
+
+func (r *codexImageIdentityRuntime) ManagedEgressClient(reverseproxycontract.AccountRuntime) (*http.Client, bool, error) {
 	return nil, false, nil
 }
 

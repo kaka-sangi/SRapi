@@ -541,7 +541,18 @@ func mapStringAccount(value any) (map[string]any, bool) {
 }
 
 func isCodexQuotaProbe(req contract.ProbeRequest) bool {
-	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-codex-cli")
+	if strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-codex-cli") {
+		return true
+	}
+	if req.Account.UpstreamClient == nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(*req.Account.UpstreamClient)) {
+	case "codex_cli", "chatgpt_web":
+		return true
+	default:
+		return false
+	}
 }
 
 func isAntigravityQuotaProbe(req contract.ProbeRequest) bool {

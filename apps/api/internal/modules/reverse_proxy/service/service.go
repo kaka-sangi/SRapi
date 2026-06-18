@@ -13,6 +13,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,14 +22,16 @@ import (
 	"github.com/andybalholm/brotli"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/signature"
 	"nhooyr.io/websocket"
 )
 
 const (
-	maxReverseProxyResponseBytes = 8 << 20
-	statusClientClosedRequest    = 499
-	oauthRefreshEncodingForm     = "form"
-	oauthRefreshEncodingJSON     = "json"
+	maxReverseProxyResponseBytes   = 8 << 20
+	statusClientClosedRequest      = 499
+	oauthRefreshEncodingForm       = "form"
+	oauthRefreshEncodingJSON       = "json"
+	openAIBackendEnrichmentTimeout = 15 * time.Second
 	// defaultReverseProxyHTTPTimeout caps how long the upstream client will
 	// wait for a single request to complete. The historical 30s ceiling was
 	// too tight for AI completion endpoints — /v1/responses/compact in
@@ -434,6 +437,7 @@ func (s *Service) refreshOAuthCredential(ctx context.Context, req contract.Refre
 		s.recordRefresh("invalid_response")
 		return contract.RefreshResponse{}, err
 	}
+	refreshed = s.enrichOpenAIOAuthCredential(ctx, req.Account, refreshed)
 	s.recordRefresh("success")
 	return contract.RefreshResponse{AccountID: req.Account.AccountID, Credential: refreshed, RefreshedAt: refreshedAt}, nil
 }
@@ -1047,7 +1051,7 @@ func oauthRefreshSettings(account contract.AccountRuntime) oauthRefreshConfig {
 		config.ClientSecret = credentialString(account.Credential, "client_secret")
 	}
 	switch {
-	case upstreamClientIs(account, "codex_cli"):
+	case upstreamClientIs(account, "codex_cli") || upstreamClientIs(account, "chatgpt_web"):
 		if config.TokenEndpoint == "" {
 			config.TokenEndpoint = contract.CodexOAuthTokenURL
 		}
@@ -1175,6 +1179,7 @@ func mergeOAuthTokenResponse(existing map[string]any, body []byte) (map[string]a
 	}
 	if idToken := credentialString(payload, "id_token"); idToken != "" {
 		refreshed["id_token"] = idToken
+		signature.MergeOpenAIJWTCredential(refreshed, idToken)
 	}
 	if tokenType := credentialString(payload, "token_type"); tokenType != "" {
 		refreshed["token_type"] = tokenType
@@ -1185,6 +1190,247 @@ func mergeOAuthTokenResponse(existing map[string]any, body []byte) (map[string]a
 	refreshedAt := now.Format(time.RFC3339)
 	refreshed["refreshed_at"] = refreshedAt
 	return refreshed, refreshedAt, nil
+}
+
+func (s *Service) enrichOpenAIOAuthCredential(ctx context.Context, account contract.AccountRuntime, credential map[string]any) map[string]any {
+	if !upstreamClientIs(account, "codex_cli") && !upstreamClientIs(account, "chatgpt_web") {
+		return credential
+	}
+	accessToken := credentialString(credential, "access_token")
+	if accessToken == "" {
+		return credential
+	}
+	enrichCtx, cancel := context.WithTimeout(ctx, openAIBackendEnrichmentTimeout)
+	defer cancel()
+	enriched := cloneCredential(credential)
+	orgID := credentialString(enriched, "organization_id")
+	if orgID == "" {
+		orgID = signature.OpenAIAuthPOID(accessToken)
+	}
+	accountInfo, ok := s.fetchChatGPTAccountInfo(enrichCtx, account, accessToken, orgID)
+	if ok {
+		setCredentialIfNotEmpty(enriched, "plan_type", accountInfo.PlanType)
+		setCredentialIfNotEmpty(enriched, "subscription_expires_at", accountInfo.SubscriptionExpiresAt)
+	}
+	if credentialString(enriched, "subscription_expires_at") == "" {
+		accountID := firstCredentialValue(enriched, orgID, "chatgpt_account_id", "organization_id")
+		if expiresAt := s.fetchChatGPTSubscriptionExpiresAt(enrichCtx, account, accessToken, accountID); expiresAt != "" {
+			enriched["subscription_expires_at"] = expiresAt
+		}
+	}
+	return enriched
+}
+
+type chatGPTAccountInfo struct {
+	PlanType              string
+	SubscriptionExpiresAt string
+}
+
+func (s *Service) fetchChatGPTAccountInfo(ctx context.Context, account contract.AccountRuntime, accessToken string, orgID string) (chatGPTAccountInfo, bool) {
+	endpoint := accountSetting(account, "chatgpt_accounts_check_url", "accounts_check_url")
+	if endpoint == "" {
+		endpoint = "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27"
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return chatGPTAccountInfo{}, false
+	}
+	setChatGPTBackendHeaders(req.Header, accessToken)
+	client, err := s.clientFor(openAIBackendAccount(account))
+	if err != nil {
+		return chatGPTAccountInfo{}, false
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return chatGPTAccountInfo{}, false
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxReverseProxyResponseBytes))
+	if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return chatGPTAccountInfo{}, false
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return chatGPTAccountInfo{}, false
+	}
+	accounts, ok := parsed["accounts"].(map[string]any)
+	if !ok {
+		return chatGPTAccountInfo{}, false
+	}
+	selected := selectChatGPTAccount(accounts, orgID)
+	if selected == nil {
+		return chatGPTAccountInfo{}, false
+	}
+	info := chatGPTAccountInfo{
+		PlanType:              chatGPTPlanType(selected),
+		SubscriptionExpiresAt: chatGPTEntitlementExpiresAt(selected),
+	}
+	return info, info.PlanType != ""
+}
+
+func (s *Service) fetchChatGPTSubscriptionExpiresAt(ctx context.Context, account contract.AccountRuntime, accessToken string, accountID string) string {
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return ""
+	}
+	endpoint := accountSetting(account, "chatgpt_subscriptions_url", "subscriptions_url")
+	if endpoint == "" {
+		endpoint = "https://chatgpt.com/backend-api/subscriptions"
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return ""
+	}
+	setChatGPTBackendHeaders(req.Header, accessToken)
+	query := req.URL.Query()
+	query.Set("account_id", accountID)
+	req.URL.RawQuery = query.Encode()
+	client, err := s.clientFor(openAIBackendAccount(account))
+	if err != nil {
+		return ""
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxReverseProxyResponseBytes))
+	if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return ""
+	}
+	var parsed struct {
+		ActiveUntil string `json:"active_until"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return ""
+	}
+	activeUntil := strings.TrimSpace(parsed.ActiveUntil)
+	if activeUntil == "" {
+		return ""
+	}
+	if _, err := time.Parse(time.RFC3339, activeUntil); err != nil {
+		return ""
+	}
+	return activeUntil
+}
+
+func setChatGPTBackendHeaders(headers http.Header, accessToken string) {
+	headers.Set("Authorization", "Bearer "+accessToken)
+	headers.Set("Origin", "https://chatgpt.com")
+	headers.Set("Referer", "https://chatgpt.com/")
+	headers.Set("Accept", "application/json")
+}
+
+func openAIBackendAccount(account contract.AccountRuntime) contract.AccountRuntime {
+	if account.Metadata == nil {
+		account.Metadata = map[string]any{}
+	}
+	if account.Metadata["egress_profile"] != nil ||
+		credentialString(account.Metadata, "tls_template") != "" ||
+		credentialString(account.Metadata, "egress_tls_template") != "" ||
+		credentialString(account.Metadata, "tls_profile") != "" {
+		return account
+	}
+	metadata := cloneCredential(account.Metadata)
+	metadata["tls_template"] = "chrome"
+	account.Metadata = metadata
+	return account
+}
+
+func selectChatGPTAccount(accounts map[string]any, orgID string) map[string]any {
+	orgID = strings.TrimSpace(orgID)
+	if orgID != "" {
+		if account, ok := asMap(accounts[orgID]); ok && chatGPTPlanType(account) != "" {
+			return account
+		}
+	}
+	keys := make([]string, 0, len(accounts))
+	for key := range accounts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var defaultAccount map[string]any
+	var paidAccount map[string]any
+	var anyAccount map[string]any
+	for _, key := range keys {
+		account, ok := asMap(accounts[key])
+		if !ok {
+			continue
+		}
+		planType := chatGPTPlanType(account)
+		if planType == "" {
+			continue
+		}
+		if anyAccount == nil {
+			anyAccount = account
+		}
+		if defaultAccount == nil && nestedBool(account, "account", "is_default") {
+			defaultAccount = account
+		}
+		if paidAccount == nil && !strings.EqualFold(planType, "free") {
+			paidAccount = account
+		}
+	}
+	switch {
+	case defaultAccount != nil:
+		return defaultAccount
+	case paidAccount != nil:
+		return paidAccount
+	default:
+		return anyAccount
+	}
+}
+
+func chatGPTPlanType(account map[string]any) string {
+	if nested, ok := asMap(account["account"]); ok {
+		if value := credentialString(nested, "plan_type"); value != "" {
+			return value
+		}
+	}
+	if nested, ok := asMap(account["entitlement"]); ok {
+		if value := credentialString(nested, "subscription_plan"); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func chatGPTEntitlementExpiresAt(account map[string]any) string {
+	if nested, ok := asMap(account["entitlement"]); ok {
+		return credentialString(nested, "expires_at")
+	}
+	return ""
+}
+
+func asMap(value any) (map[string]any, bool) {
+	typed, ok := value.(map[string]any)
+	return typed, ok
+}
+
+func nestedBool(value map[string]any, objectKey string, fieldKey string) bool {
+	nested, ok := asMap(value[objectKey])
+	if !ok {
+		return false
+	}
+	typed, ok := nested[fieldKey].(bool)
+	return ok && typed
+}
+
+func firstCredentialValue(credential map[string]any, fallback string, keys ...string) string {
+	for _, key := range keys {
+		if value := credentialString(credential, key); value != "" {
+			return value
+		}
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func setCredentialIfNotEmpty(credential map[string]any, key string, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return
+	}
+	credential[key] = value
 }
 
 func tokenExpiresIn(value any) time.Duration {

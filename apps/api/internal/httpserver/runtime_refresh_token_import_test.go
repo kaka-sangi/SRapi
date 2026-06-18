@@ -6,16 +6,92 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
 const (
 	claudeCodeOAuthClientIDForTest  = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 	antigravityOAuthClientIDForTest = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
 )
+
+func TestAdminAccountImportChatGPTWebEnrichesIdentityFromIDToken(t *testing.T) {
+	var conversationAccountID string
+	var conversationAuthorization string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/conversation" {
+			t.Fatalf("expected ChatGPT Web conversation path, got %s", r.URL.Path)
+		}
+		conversationAccountID = r.Header.Get("chatgpt-account-id")
+		conversationAuthorization = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"message\":{\"author\":{\"role\":\"assistant\"},\"content\":{\"parts\":[\"chatgpt import id token ok\"]}}}\n\ndata: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	idToken := codexTestJWT(t, map[string]any{
+		"email": "import-chatgpt@example.test",
+		"https://api.openai.com/auth": map[string]any{
+			"chatgpt_account_id":                "chatgpt-import-account",
+			"chatgpt_user_id":                   "chatgpt-import-user",
+			"chatgpt_plan_type":                 "team",
+			"chatgpt_subscription_active_until": "2026-08-01T00:00:00Z",
+			"organizations":                     []map[string]any{{"id": "org-import-default", "is_default": true}},
+		},
+	})
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"chatgpt-import-id-token-provider","display_name":"ChatGPT Import ID Token","adapter_type":"reverse-proxy-chatgpt-web","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"chatgpt-import-id-token-model","display_name":"ChatGPT Import ID Token Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gpt-5-chat-web","status":"active"}`)
+
+	body := `{"accounts":[{"provider_id":"` + string(providerResp.Data.Id) + `","name":"chatgpt-import-id-token-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"chatgpt-import-access","id_token":` + strconv.Quote(idToken) + `},"metadata":{"base_url":"` + upstream.URL + `","user_agent":"ChatGPT/1.0","chatgpt_requirements_token":"requirements-token"},"status":"active"}]}`
+	importResp, rawBody := mustImportAdminAccountsRaw(t, handler, sessionCookie, loginResp.Data.CsrfToken, body)
+	if importResp.Data.CreatedCount != 1 || importResp.Data.SkippedCount != 0 || len(importResp.Data.Errors) != 0 {
+		t.Fatalf("unexpected ChatGPT Web import response: %+v", importResp.Data)
+	}
+	if strings.Contains(rawBody, "chatgpt-import-access") || strings.Contains(rawBody, idToken) {
+		t.Fatalf("ChatGPT Web import response leaked credential: %s", rawBody)
+	}
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"chatgpt-import-id-token-model","messages":[{"role":"user","content":"hello import id token"}]}`)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "chatgpt import id token ok") {
+		t.Fatalf("expected ChatGPT Web import account response, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if conversationAuthorization != "Bearer chatgpt-import-access" || conversationAccountID != "chatgpt-import-account" {
+		t.Fatalf("expected id_token identity on upstream request, authorization=%q account_id=%q", conversationAuthorization, conversationAccountID)
+	}
+
+	if importResp.Data.Items[0].AccountId == nil {
+		t.Fatalf("expected imported account id in response: %+v", importResp.Data.Items[0])
+	}
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(*importResp.Data.Items[0].AccountId), nil)
+	getReq.AddCookie(sessionCookie)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected imported account GET 200, got %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var accountResp apiopenapi.ProviderAccountResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&accountResp); err != nil {
+		t.Fatalf("decode imported account response: %v", err)
+	}
+	if accountResp.Data.Metadata == nil {
+		t.Fatalf("expected imported account metadata")
+	}
+	metadata := *accountResp.Data.Metadata
+	if metadata["subscription_expires_at"] != "2026-08-01T00:00:00Z" ||
+		metadata["chatgpt_account_id"] != "chatgpt-import-account" ||
+		metadata["plan_type"] != "team" {
+		t.Fatalf("expected id_token claims in imported metadata, got %+v", metadata)
+	}
+}
 
 func TestGatewayClaudeRefreshTokenOnlyCreateCanRequestMessages(t *testing.T) {
 	var tokenCalls int

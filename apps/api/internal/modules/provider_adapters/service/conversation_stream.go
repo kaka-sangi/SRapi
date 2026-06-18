@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -373,20 +374,52 @@ func (s *Service) streamReverseProxyCodexResponses(ctx context.Context, streamer
 	if !stream {
 		return contract.ConversationResponse{}, contract.ErrStreamingUnsupported
 	}
+	replayScope, err := s.codexPrepareResponsesPayload(req, payload)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
+	var releaseImageGenSlot func()
+	if codexPayloadHasImageGenerationTool(payload) {
+		release, slotErr := codexImageGenSlotAcquire(ctx, req.Account)
+		if slotErr != nil {
+			return contract.ConversationResponse{}, contract.ProviderError{Class: "rate_limited", StatusCode: http.StatusTooManyRequests, Message: "codex image-generation slot acquire cancelled"}
+		}
+		releaseImageGenSlot = release
+	}
+	releaseStreamResources := true
+	defer func() {
+		if releaseStreamResources && releaseImageGenSlot != nil {
+			releaseImageGenSlot()
+		}
+	}()
+	headers := codexResponsesHeaders(req, stream, payload)
+	raw, outboundState := codexApplyOutboundWiring(req.Account, headers, raw)
 	resp, err := streamer.DoStream(ctx, reverseproxycontract.Request{
 		Account:      codexReverseProxyAccount(req),
 		Method:       http.MethodPost,
 		URL:          codexResponsesEndpoint(baseURL, req),
-		Headers:      codexResponsesHeaders(req, stream, payload),
+		Headers:      headers,
 		Body:         raw,
 		ExpectStream: stream,
 	})
 	if err != nil {
 		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
+	}
+	releaseStreamResources = false
+	streamBody := codexExposeStreamBody(resp.Body, outboundState, releaseImageGenSlot)
+	parseStreamBody := func(body []byte, statusCode int) (contract.ConversationResponse, error) {
+		clientBody := codexCaptureInboundWiring(outboundState, replayScope, body)
+		parsed, parseErr := parseCodexResponsesBody(clientBody, statusCode)
+		if parseErr != nil {
+			codexClearReasoningReplayOnInvalidSignature(replayScope, statusCode, body)
+			return contract.ConversationResponse{}, parseErr
+		}
+		parsed = withConversationResponseHeaders(parsed, resp.Headers)
+		return withCodexQuotaSignals(parsed, resp.Headers), nil
 	}
 	// A chat/completions client cannot parse Codex /responses SSE, so transform it
 	// into chat.completion.chunk SSE on the fly (true incremental streaming). A
@@ -395,17 +428,143 @@ func (s *Service) streamReverseProxyCodexResponses(ctx context.Context, streamer
 	// so the cross-protocol reader re-renders it into that client's protocol. Usage
 	// is always recovered from the retained raw bytes via parseCodexResponsesBody.
 	if isChatCompletionsClient(req) {
-		reader := newCodexChatStreamReader(resp.Body, req)
+		reader := newCodexChatStreamReader(streamBody, req)
 		return contract.ConversationResponse{
 			StatusCode: resp.StatusCode,
 			Headers:    resp.Headers,
 			StreamBody: reader,
 			StreamParse: func(_ []byte, statusCode int) (contract.ConversationResponse, error) {
-				return parseCodexResponsesBody(reader.rawBytes(), statusCode)
+				return parseStreamBody(reader.rawBytes(), statusCode)
 			},
 		}, nil
 	}
-	return streamConversationResponse(resp, parseCodexResponsesBody), nil
+	return contract.ConversationResponse{
+		StatusCode:  resp.StatusCode,
+		Headers:     resp.Headers,
+		StreamBody:  streamBody,
+		StreamParse: parseStreamBody,
+	}, nil
+}
+
+type codexExposeStreamBodyReader struct {
+	upstream io.ReadCloser
+	scanner  *bufio.Scanner
+	state    CodexIdentityConfuseState
+	release  func()
+
+	frame  bytes.Buffer
+	out    bytes.Buffer
+	done   bool
+	closed bool
+}
+
+func codexExposeStreamBody(upstream io.ReadCloser, state CodexIdentityConfuseState, release func()) io.ReadCloser {
+	if upstream == nil {
+		if release != nil {
+			release()
+		}
+		return io.NopCloser(bytes.NewReader(nil))
+	}
+	if !state.Enabled && release == nil {
+		return upstream
+	}
+	if !state.Enabled {
+		return &codexReleaseStreamBody{upstream: upstream, release: release}
+	}
+	scanner := bufio.NewScanner(upstream)
+	scanner.Buffer(make([]byte, 0, 64*1024), 52_428_800)
+	return &codexExposeStreamBodyReader{
+		upstream: upstream,
+		scanner:  scanner,
+		state:    state,
+		release:  release,
+	}
+}
+
+type codexReleaseStreamBody struct {
+	upstream io.ReadCloser
+	release  func()
+	closed   bool
+}
+
+func (r *codexReleaseStreamBody) Read(p []byte) (int, error) {
+	if r.upstream == nil {
+		return 0, io.EOF
+	}
+	return r.upstream.Read(p)
+}
+
+func (r *codexReleaseStreamBody) Close() error {
+	if r.closed {
+		return nil
+	}
+	r.closed = true
+	var err error
+	if r.upstream != nil {
+		err = r.upstream.Close()
+		r.upstream = nil
+	}
+	if r.release != nil {
+		r.release()
+		r.release = nil
+	}
+	return err
+}
+
+func (r *codexExposeStreamBodyReader) Read(p []byte) (int, error) {
+	for r.out.Len() == 0 && !r.done {
+		r.pump()
+	}
+	if r.out.Len() > 0 {
+		return r.out.Read(p)
+	}
+	return 0, io.EOF
+}
+
+func (r *codexExposeStreamBodyReader) Close() error {
+	if r.closed {
+		return nil
+	}
+	r.closed = true
+	var err error
+	if r.upstream != nil {
+		err = r.upstream.Close()
+		r.upstream = nil
+	}
+	if r.release != nil {
+		r.release()
+		r.release = nil
+	}
+	return err
+}
+
+func (r *codexExposeStreamBodyReader) pump() {
+	if r.done {
+		return
+	}
+	for r.scanner.Scan() {
+		line := strings.TrimRight(r.scanner.Text(), "\r")
+		if line == "" {
+			if r.frame.Len() > 0 {
+				exposed := ApplyCodexIdentityExposeResponsePayload(append([]byte(nil), r.frame.Bytes()...), r.state)
+				r.out.Write(exposed)
+				r.out.WriteByte('\n')
+				r.frame.Reset()
+			} else {
+				r.out.WriteByte('\n')
+			}
+			return
+		}
+		r.frame.WriteString(line)
+		r.frame.WriteByte('\n')
+	}
+	if r.frame.Len() > 0 {
+		exposed := ApplyCodexIdentityExposeResponsePayload(append([]byte(nil), r.frame.Bytes()...), r.state)
+		r.out.Write(exposed)
+		r.out.WriteByte('\n')
+		r.frame.Reset()
+	}
+	r.done = true
 }
 
 // isChatCompletionsClient reports whether the inbound request is an OpenAI

@@ -105,6 +105,7 @@ func openAICompatibleRequestBodyRaw(req contract.ConversationRequest) ([]byte, e
 		if req.Stream {
 			ensureOpenAIStreamOptions(payload)
 		}
+		normalizeOpenAICompatibleServiceTier(payload)
 		return json.Marshal(payload)
 	}
 	payload := openAICompatiblePayload(req)
@@ -112,6 +113,19 @@ func openAICompatibleRequestBodyRaw(req contract.ConversationRequest) ([]byte, e
 		payload.StreamOptions = &openAIStreamOptions{IncludeUsage: true}
 	}
 	return json.Marshal(payload)
+}
+
+func normalizeOpenAICompatibleServiceTier(payload map[string]any) {
+	if payload == nil {
+		return
+	}
+	raw, ok := payload["service_tier"].(string)
+	if !ok {
+		return
+	}
+	if strings.EqualFold(strings.TrimSpace(raw), "fast") {
+		payload["service_tier"] = "priority"
+	}
 }
 
 func openAIEmbeddingPayload(req contract.EmbeddingRequest) openAIEmbeddingRequest {

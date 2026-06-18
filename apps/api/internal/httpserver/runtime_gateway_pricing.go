@@ -65,7 +65,23 @@ func gatewayServiceTier(canonical gatewaycontract.CanonicalRequest) string {
 	if err := json.Unmarshal(canonical.RawBody, &raw); err != nil {
 		return ""
 	}
-	return mapString(raw, "service_tier")
+	return normalizeGatewayServiceTier(mapString(raw, "service_tier"))
+}
+
+func normalizeGatewayServiceTier(raw string) string {
+	value := strings.ToLower(strings.TrimSpace(raw))
+	if value == "" {
+		return ""
+	}
+	if value == "fast" {
+		value = "priority"
+	}
+	switch value {
+	case "priority", "flex", "auto", "default", "scale":
+		return value
+	default:
+		return ""
+	}
 }
 
 func gatewayRequestedModel(canonical gatewaycontract.CanonicalRequest) string {
