@@ -597,7 +597,10 @@ POST /api/v1/admin/ops/system-logs/cleanup
 `ops_system_logs`. Query filters may include `level`, `source`, `q`, `start`,
 and `end`; pagination uses the existing admin list defaults. System-log
 record/list/cleanup/health behavior is owned by the operations module, not by
-admin-control settings state.
+admin-control settings state. Gateway provider-attempt failures and gateway
+usage-log write failures must be visible here even when the richer
+`ops_error_logs` writer is unavailable, so operators can diagnose observability
+breakage from the console.
 
 `GET /api/v1/admin/ops/system-logs/health` returns store health evidence:
 storage mode, writable/degraded/stale flags, total rows, level counts, last log

@@ -80,10 +80,6 @@ func (s *Server) recordOpsErrorLog(ctx context.Context, rec gatewayUsageRecord) 
 	if err := s.runtime.opsErrorLogs.RecordError(ctx, req); err != nil && s.runtime.logger != nil {
 		s.runtime.logger.Warn("ops_error_logs RecordError failed", "request_id", rec.RequestID, "error", err)
 	}
-	// Mirror the same event onto the operations evidence stream so the
-	// operator can correlate structured error rows with a compact system-log
-	// timeline.
-	s.recordGatewaySystemLog(ctx, rec)
 }
 
 // recordGatewaySystemLog forwards a failed gateway attempt onto the
@@ -91,7 +87,18 @@ func (s *Server) recordOpsErrorLog(ctx context.Context, rec gatewayUsageRecord) 
 // ERROR for server/transport failures, and INFO for no-available-account
 // decisions that are operator-visible but not anomalous.
 func (s *Server) recordGatewaySystemLog(ctx context.Context, rec gatewayUsageRecord) {
-	if s == nil || s.runtime == nil || s.runtime.operations == nil {
+	if s == nil || s.runtime == nil {
+		return
+	}
+	s.runtime.recordGatewaySystemLog(ctx, rec)
+}
+
+// recordGatewaySystemLog forwards a failed gateway attempt onto the
+// operations-owned system-log stream. It is intentionally independent from
+// ops_error_logs so the compact operational timeline remains available when
+// the structured error-log store is down or filtered.
+func (rt *runtimeState) recordGatewaySystemLog(ctx context.Context, rec gatewayUsageRecord) {
+	if rt == nil || rt.operations == nil {
 		return
 	}
 	errorClass := stringValue(rec.ErrorClass)
@@ -115,7 +122,6 @@ func (s *Server) recordGatewaySystemLog(ctx context.Context, rec gatewayUsageRec
 		"attempt_no":      rec.AttemptNo,
 		"error_class":     errorClass,
 		"upstream_status": upstreamStatus,
-		"body_excerpt":    rec.ProviderErrorBodyExcerpt,
 	}
 	if rec.AccountID != nil && *rec.AccountID > 0 {
 		metadata["account_id"] = *rec.AccountID
@@ -123,7 +129,7 @@ func (s *Server) recordGatewaySystemLog(ctx context.Context, rec gatewayUsageRec
 	if rec.ProviderID != nil && *rec.ProviderID > 0 {
 		metadata["provider_id"] = *rec.ProviderID
 	}
-	if _, err := s.runtime.operations.RecordSystemLog(ctx, operationscontract.RecordSystemLogRequest{
+	if _, err := rt.operations.RecordSystemLog(ctx, operationscontract.RecordSystemLogRequest{
 		Level:     level,
 		Message:   message,
 		Source:    "gateway",
@@ -131,8 +137,8 @@ func (s *Server) recordGatewaySystemLog(ctx context.Context, rec gatewayUsageRec
 		TraceID:   requestIDFromContext(ctx),
 		Metadata:  metadata,
 		CreatedAt: time.Now().UTC(),
-	}); err != nil && s.runtime.logger != nil {
-		s.runtime.logger.Warn("operations RecordSystemLog failed", "request_id", rec.RequestID, "error", err)
+	}); err != nil && rt.logger != nil {
+		rt.logger.Warn("operations RecordSystemLog failed", "request_id", rec.RequestID, "error", err)
 	}
 }
 

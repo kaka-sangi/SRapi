@@ -3,6 +3,7 @@ package httpserver
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"math"
 	"net/http"
@@ -25,6 +26,9 @@ import (
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+	operationsservice "github.com/srapi/srapi/apps/api/internal/modules/operations/service"
+	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
@@ -72,6 +76,104 @@ func TestWarnDefaultZeroGatewayPricingIgnoresExplicitSources(t *testing.T) {
 
 	if got := logs.String(); got != "" {
 		t.Fatalf("did not expect warning for explicit pricing source, got %q", got)
+	}
+}
+
+func TestRecordGatewaySystemLogDoesNotDependOnOpsErrorLogs(t *testing.T) {
+	ctx := context.Background()
+	operationsStore := operationsmemory.New()
+	operations, err := operationsservice.NewWithStores(operationsStore, operationsStore, nil)
+	if err != nil {
+		t.Fatalf("new operations service: %v", err)
+	}
+	rt := &runtimeState{
+		logger:     slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		operations: operations,
+	}
+
+	rt.recordGatewaySystemLog(ctx, gatewayUsageRecord{
+		RequestID:                "req_gateway_system_log",
+		SourceProtocol:           "openai-compatible",
+		SourceEndpoint:           "/v1/responses",
+		TargetProtocol:           "openai-compatible",
+		Model:                    "codex-model",
+		ProviderID:               ptrInt(11),
+		AccountID:                ptrInt(22),
+		AttemptNo:                2,
+		Success:                  false,
+		ErrorClass:               ptrStringValue("invalid_request"),
+		StatusCode:               ptrInt(http.StatusBadRequest),
+		ProviderErrorMessage:     "upstream rejected compact payload",
+		ProviderErrorBodyExcerpt: `{"error":"bad request"}`,
+	})
+
+	list, err := operationsStore.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one system log, got %+v", list.Items)
+	}
+	log := list.Items[0]
+	if log.Level != operationscontract.OpsSystemLogLevelWarn || log.Source != "gateway" || log.RequestID != "req_gateway_system_log" {
+		t.Fatalf("unexpected system log: %+v", log)
+	}
+	if log.Metadata["error_class"] != "invalid_request" ||
+		metadataNumber(log.Metadata["upstream_status"]) != 400 ||
+		metadataNumber(log.Metadata["provider_id"]) != 11 ||
+		metadataNumber(log.Metadata["account_id"]) != 22 {
+		t.Fatalf("unexpected system log metadata: %+v", log.Metadata)
+	}
+}
+
+func TestRecordGatewayUsageWriteFailureCreatesSystemLog(t *testing.T) {
+	ctx := context.Background()
+	operationsStore := operationsmemory.New()
+	operations, err := operationsservice.NewWithStores(operationsStore, operationsStore, nil)
+	if err != nil {
+		t.Fatalf("new operations service: %v", err)
+	}
+	usage, err := usageservice.New(failingUsageStore{err: errors.New("usage store down")}, nil)
+	if err != nil {
+		t.Fatalf("new usage service: %v", err)
+	}
+	events, err := eventsservice.New(eventsmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	rt := &runtimeState{
+		logger:     slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		operations: operations,
+		usage:      usage,
+		events:     events,
+	}
+
+	rt.recordGatewayUsage(ctx, gatewayUsageRecord{
+		RequestID:      "req_usage_write_failure",
+		Authed:         apikeycontract.AuthResult{UserID: 1, Key: apikeycontract.APIKey{ID: 2}},
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/chat/completions",
+		TargetProtocol: "openai-compatible",
+		Model:          "broken-usage-model",
+		ProviderID:     ptrInt(7),
+		AccountID:      ptrInt(8),
+		Success:        true,
+		StatusCode:     ptrInt(http.StatusOK),
+	})
+
+	list, err := operationsStore.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one usage failure system log, got %+v", list.Items)
+	}
+	log := list.Items[0]
+	if log.Level != operationscontract.OpsSystemLogLevelError || log.Source != "gateway.usage" || log.RequestID != "req_usage_write_failure" {
+		t.Fatalf("unexpected usage failure system log: %+v", log)
+	}
+	if log.Message != "failed to record gateway usage log" || log.Metadata["error_class"] != "usage_log_write_failed" || log.Metadata["gateway_success"] != true {
+		t.Fatalf("unexpected usage failure metadata: %+v", log.Metadata)
 	}
 }
 
@@ -1263,5 +1365,46 @@ func TestGatewayErrorClassUsesCooldownNetworkError(t *testing.T) {
 	// An unrelated class still yields no cooldown decision.
 	if _, ok := gatewayCooldownDecisionForFailure(nil, "invalid_request", nil, "", nil); ok {
 		t.Fatalf("expected invalid_request to produce no cooldown decision")
+	}
+}
+
+type failingUsageStore struct {
+	err error
+}
+
+func (s failingUsageStore) Create(context.Context, usagecontract.UsageLog) (usagecontract.UsageLog, error) {
+	return usagecontract.UsageLog{}, s.err
+}
+
+func (s failingUsageStore) List(context.Context) ([]usagecontract.UsageLog, error) {
+	return nil, s.err
+}
+
+func (s failingUsageStore) ListByUser(context.Context, int) ([]usagecontract.UsageLog, error) {
+	return nil, s.err
+}
+
+func (s failingUsageStore) ListByAccountWindow(context.Context, usagecontract.AccountWindowFilter) ([]usagecontract.UsageLog, error) {
+	return nil, s.err
+}
+
+func (s failingUsageStore) SummarizeUserWindow(context.Context, usagecontract.UserWindowFilter) (usagecontract.UserWindowSummary, error) {
+	return usagecontract.UserWindowSummary{}, s.err
+}
+
+func (s failingUsageStore) CleanupLogs(context.Context, usagecontract.CleanupFilter) (usagecontract.CleanupResult, error) {
+	return usagecontract.CleanupResult{}, s.err
+}
+
+func metadataNumber(value any) int {
+	switch v := value.(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	default:
+		return 0
 	}
 }

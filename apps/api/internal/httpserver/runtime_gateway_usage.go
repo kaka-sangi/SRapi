@@ -13,6 +13,7 @@ import (
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
@@ -90,6 +91,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	})
 	if usageErr != nil {
 		rt.logger.Warn("failed to record usage log", "error", usageErr, "request_id", rec.RequestID)
+		rt.recordGatewayUsageWriteFailure(ctx, rec, model)
 		rt.enqueueGatewayUsageFailureEvent(ctx, rec, model)
 	} else {
 		if rt.metrics != nil {
@@ -113,6 +115,40 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	rt.dispatchUsageWrite(detached, func(c context.Context) {
 		rt.recordGatewayUsageEffects(c, rec, model, pricing, usageLogID)
 	})
+}
+
+func (rt *runtimeState) recordGatewayUsageWriteFailure(ctx context.Context, rec gatewayUsageRecord, model string) {
+	if rt == nil || rt.operations == nil {
+		return
+	}
+	errorClass := "usage_log_write_failed"
+	metadata := map[string]any{
+		"request_id":      rec.RequestID,
+		"source_endpoint": rec.SourceEndpoint,
+		"source_protocol": rec.SourceProtocol,
+		"target_protocol": rec.TargetProtocol,
+		"canonical_model": model,
+		"attempt_no":      rec.AttemptNo,
+		"error_class":     errorClass,
+		"gateway_success": rec.Success,
+	}
+	if rec.AccountID != nil && *rec.AccountID > 0 {
+		metadata["account_id"] = *rec.AccountID
+	}
+	if rec.ProviderID != nil && *rec.ProviderID > 0 {
+		metadata["provider_id"] = *rec.ProviderID
+	}
+	if _, err := rt.operations.RecordSystemLog(ctx, operationscontract.RecordSystemLogRequest{
+		Level:     operationscontract.OpsSystemLogLevelError,
+		Message:   "failed to record gateway usage log",
+		Source:    "gateway.usage",
+		RequestID: rec.RequestID,
+		TraceID:   requestIDFromContext(ctx),
+		Metadata:  metadata,
+		CreatedAt: time.Now().UTC(),
+	}); err != nil && rt.logger != nil {
+		rt.logger.Warn("operations RecordSystemLog failed", "request_id", rec.RequestID, "error", err)
+	}
 }
 
 // recordGatewayUsageEffects applies the follow-on writes that are not the

@@ -677,6 +677,7 @@ func (s *Server) recordGatewayProviderAttemptFailureWithHistory(r *http.Request,
 		ErrorSource:              source,
 		UpstreamErrors:           append([]gatewayUpstreamErrorEvent(nil), upstreamErrors...),
 	}
+	s.recordGatewaySystemLog(r.Context(), rec)
 	s.recordOpsErrorLog(r.Context(), rec)
 	s.runtime.recordGatewayUsage(r.Context(), rec)
 }

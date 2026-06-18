@@ -1877,7 +1877,8 @@ index(trace_id)
 - `level` 使用 `debug`、`info`、`warn`、`error`。
 - `source` 是稳定低基数来源，例如 `ops.dashboard` 或 `ops.worker`。
 - `message` 必须是安全摘要，不得保存 prompt、请求体、Authorization header、Cookie、API Key、OAuth token 或 Provider 凭证。
-- `metadata_json` 只保存低敏诊断字段；高基数明细应通过 `request_id` / `trace_id` 跳转到对应证据链。
+- `metadata_json` 只保存低敏诊断字段；不得保存上游 body excerpt，详细错误证据应通过 `request_id` / `trace_id` 跳转到 `ops_error_logs` 或请求转储文件。
+- Gateway provider-attempt failure 和 gateway usage-log write failure 都必须写入该表，且不得依赖 `ops_error_logs` 写入成功。
 - Admin cleanup 必须要求至少一个过滤条件，支持 dry-run，限制 `max_delete`，并写入不包含原始搜索字符串或日志正文的 audit 摘要。
 
 ### 15B.4 ops_error_logs
