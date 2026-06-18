@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -135,6 +136,72 @@ func TestSystemLogsRecordListCleanupAndHealth(t *testing.T) {
 	}
 	if remaining.Total != 1 || remaining.Items[0].RequestID != "req_error" {
 		t.Fatalf("unexpected remaining logs: %+v", remaining)
+	}
+}
+
+func TestRecordSystemLogSanitizesMetadataAtServiceBoundary(t *testing.T) {
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	long := strings.Repeat("x", systemLogMetadataMaxString+8)
+	created, err := svc.RecordSystemLog(t.Context(), contract.RecordSystemLogRequest{
+		Level:   contract.OpsSystemLogLevelError,
+		Source:  "gateway",
+		Message: "upstream failed",
+		Metadata: map[string]any{
+			"access_token":          "raw-access-token",
+			"authorization":         "Bearer raw-token",
+			"cookie":                "session=raw-cookie",
+			"prompt":                "user prompt",
+			"body_excerpt":          `{"prompt":"secret"}`,
+			"max_tokens":            8192,
+			"prompt_tokens":         32,
+			"provider_error_url":    "https://upstream.example/v1?access_token=raw&client_secret=hidden",
+			"provider_error_detail": "provider said Authorization: Bearer nested-token refresh_token: nested-refresh",
+			"long":                  long,
+			"opaque":                struct{ Secret string }{Secret: "raw-secret"},
+			"headers": map[string]any{
+				"Authorization": "Bearer nested",
+			},
+			"safe_nested": map[string]any{
+				"request_id":    "req_safe",
+				"refresh_token": "nested-refresh",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("record system log: %v", err)
+	}
+	meta := created.Metadata
+	for _, key := range []string{"access_token", "authorization", "cookie", "prompt", "body_excerpt", "headers"} {
+		if meta[key] != "[REDACTED]" {
+			t.Fatalf("expected %s to be redacted, got %#v in %#v", key, meta[key], meta)
+		}
+	}
+	if meta["max_tokens"] != 8192 || meta["prompt_tokens"] != 32 {
+		t.Fatalf("token count fields should be preserved, got %#v", meta)
+	}
+	if got, _ := meta["provider_error_url"].(string); got != "https://upstream.example/v1?access_token=[REDACTED]&client_secret=[REDACTED]" {
+		t.Fatalf("expected secret query values scrubbed, got %q", got)
+	}
+	if got, _ := meta["provider_error_detail"].(string); got != "provider said Authorization: Bearer [REDACTED] refresh_token: [REDACTED]" {
+		t.Fatalf("expected bearer credential scrubbed, got %q", got)
+	}
+	if got, _ := meta["opaque"].(string); got != "struct { Secret string }" {
+		t.Fatalf("expected unknown metadata type name only, got %q", got)
+	}
+	if got, _ := meta["long"].(string); !strings.HasSuffix(got, "...[TRUNCATED]") {
+		t.Fatalf("expected long metadata string truncated, got length=%d", len(got))
+	}
+	nested, ok := meta["safe_nested"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected safe_nested object, got %#v", meta["safe_nested"])
+	}
+	if nested["request_id"] != "req_safe" || nested["refresh_token"] != "[REDACTED]" {
+		t.Fatalf("unexpected nested metadata: %#v", nested)
 	}
 }
 

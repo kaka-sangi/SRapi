@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -13,6 +16,16 @@ const (
 	defaultSystemLogCleanupMax = 1000
 	maxSystemLogCleanupMax     = 10000
 	systemLogStaleAfter        = 24 * time.Hour
+	systemLogMetadataMaxKeys   = 64
+	systemLogMetadataMaxDepth  = 4
+	systemLogMetadataMaxString = 512
+)
+
+var (
+	systemLogAuthorizationPattern    = regexp.MustCompile(`(?i)\b(authorization|proxy_authorization)(\s*[:=]\s*)(bearer|basic)\s+[A-Za-z0-9._~+/\-=]+`)
+	systemLogCredentialPattern       = regexp.MustCompile(`(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/\-=]+`)
+	systemLogSecretAssignmentPattern = regexp.MustCompile(`(?i)\b(access_token|refresh_token|id_token|api_key|client_secret|password|cookie)(\s*[:=]\s*)([^&\s,;}]+)`)
+	systemLogOpenAIKeyPattern        = regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{10,}\b`)
 )
 
 func (s *Service) RecordSystemLog(ctx context.Context, req contract.RecordSystemLogRequest) (contract.OpsSystemLog, error) {
@@ -113,7 +126,7 @@ func systemLogFromRecordRequest(req contract.RecordSystemLogRequest, now time.Ti
 		Source:    source,
 		RequestID: strings.TrimSpace(req.RequestID),
 		TraceID:   strings.TrimSpace(req.TraceID),
-		Metadata:  cloneAnyMap(req.Metadata),
+		Metadata:  sanitizeSystemLogMetadata(req.Metadata),
 		CreatedAt: createdAt.UTC(),
 	}, nil
 }
@@ -191,13 +204,215 @@ func sortSystemLogsNewestFirst(items []contract.OpsSystemLog) {
 	})
 }
 
-func cloneAnyMap(value map[string]any) map[string]any {
+func sanitizeSystemLogMetadata(value map[string]any) map[string]any {
 	if value == nil {
 		return nil
 	}
-	out := make(map[string]any, len(value))
-	for key, item := range value {
-		out[key] = item
+	keys := make([]string, 0, len(value))
+	for key := range value {
+		if strings.TrimSpace(key) != "" {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	if len(keys) == 0 {
+		return nil
+	}
+	out := make(map[string]any, min(len(keys), systemLogMetadataMaxKeys+1))
+	for idx, key := range keys {
+		if idx >= systemLogMetadataMaxKeys {
+			out["metadata_truncated"] = true
+			break
+		}
+		cleanKey := strings.TrimSpace(key)
+		if systemLogMetadataKeyNeedsRedaction(cleanKey) {
+			out[cleanKey] = "[REDACTED]"
+			continue
+		}
+		if sanitized, ok := sanitizeSystemLogMetadataValue(value[key], 0); ok {
+			out[cleanKey] = sanitized
+		}
+	}
+	if len(out) == 0 {
+		return nil
 	}
 	return out
+}
+
+func sanitizeSystemLogMetadataValue(value any, depth int) (any, bool) {
+	if value == nil {
+		return nil, true
+	}
+	if depth >= systemLogMetadataMaxDepth {
+		return "[TRUNCATED]", true
+	}
+	switch typed := value.(type) {
+	case string:
+		return scrubSystemLogString(typed), true
+	case bool:
+		return typed, true
+	case int:
+		return typed, true
+	case int8:
+		return typed, true
+	case int16:
+		return typed, true
+	case int32:
+		return typed, true
+	case int64:
+		return typed, true
+	case uint:
+		return typed, true
+	case uint8:
+		return typed, true
+	case uint16:
+		return typed, true
+	case uint32:
+		return typed, true
+	case uint64:
+		return typed, true
+	case float32:
+		return typed, true
+	case float64:
+		return typed, true
+	case json.Number:
+		return typed.String(), true
+	case time.Time:
+		return typed.UTC().Format(time.RFC3339Nano), true
+	case error:
+		return scrubSystemLogString(typed.Error()), true
+	case fmt.Stringer:
+		return scrubSystemLogString(typed.String()), true
+	case map[string]any:
+		return sanitizeSystemLogMetadataMapValue(typed, depth+1), true
+	case map[string]string:
+		nested := make(map[string]any, len(typed))
+		for k, v := range typed {
+			nested[k] = v
+		}
+		return sanitizeSystemLogMetadataMapValue(nested, depth+1), true
+	case []any:
+		return sanitizeSystemLogMetadataListValue(typed, depth+1), true
+	case []string:
+		values := make([]any, 0, len(typed))
+		for _, item := range typed {
+			values = append(values, item)
+		}
+		return sanitizeSystemLogMetadataListValue(values, depth+1), true
+	default:
+		return fmt.Sprintf("%T", typed), true
+	}
+}
+
+func sanitizeSystemLogMetadataMapValue(value map[string]any, depth int) map[string]any {
+	if value == nil {
+		return nil
+	}
+	keys := make([]string, 0, len(value))
+	for key := range value {
+		if strings.TrimSpace(key) != "" {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	out := make(map[string]any, min(len(keys), systemLogMetadataMaxKeys+1))
+	for idx, key := range keys {
+		if idx >= systemLogMetadataMaxKeys {
+			out["metadata_truncated"] = true
+			break
+		}
+		cleanKey := strings.TrimSpace(key)
+		if systemLogMetadataKeyNeedsRedaction(cleanKey) {
+			out[cleanKey] = "[REDACTED]"
+			continue
+		}
+		if sanitized, ok := sanitizeSystemLogMetadataValue(value[key], depth); ok {
+			out[cleanKey] = sanitized
+		}
+	}
+	return out
+}
+
+func sanitizeSystemLogMetadataListValue(values []any, depth int) []any {
+	if len(values) == 0 {
+		return nil
+	}
+	limit := len(values)
+	if limit > systemLogMetadataMaxKeys {
+		limit = systemLogMetadataMaxKeys
+	}
+	out := make([]any, 0, limit+1)
+	for idx := 0; idx < limit; idx++ {
+		if sanitized, ok := sanitizeSystemLogMetadataValue(values[idx], depth); ok {
+			out = append(out, sanitized)
+		}
+	}
+	if len(values) > limit {
+		out = append(out, "[TRUNCATED]")
+	}
+	return out
+}
+
+func systemLogMetadataKeyNeedsRedaction(key string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(key))
+	normalized = strings.NewReplacer("-", "_", ".", "_", " ", "_").Replace(normalized)
+	if normalized == "" {
+		return false
+	}
+	if systemLogMetadataTokenCountKey(normalized) {
+		return false
+	}
+	switch normalized {
+	case "body", "body_excerpt", "request_body", "response_body", "raw_body",
+		"prompt", "prompts", "messages", "input", "output", "headers", "header",
+		"authorization", "proxy_authorization", "cookie", "set_cookie",
+		"api_key", "access_token", "refresh_token", "id_token", "session_token",
+		"csrf_token", "client_secret", "private_key", "secret", "password",
+		"credential", "credentials", "jwt":
+		return true
+	}
+	if strings.Contains(normalized, "authorization") ||
+		strings.Contains(normalized, "cookie") ||
+		strings.Contains(normalized, "credential") ||
+		strings.Contains(normalized, "secret") ||
+		strings.Contains(normalized, "password") ||
+		strings.Contains(normalized, "private_key") ||
+		strings.Contains(normalized, "api_key") ||
+		strings.Contains(normalized, "body") ||
+		strings.Contains(normalized, "prompt") ||
+		strings.Contains(normalized, "payload") {
+		return true
+	}
+	return strings.Contains(normalized, "token")
+}
+
+func systemLogMetadataTokenCountKey(key string) bool {
+	switch key {
+	case "max_tokens", "max_output_tokens", "max_input_tokens", "max_completion_tokens",
+		"max_tokens_to_sample", "budget_tokens", "prompt_tokens", "completion_tokens",
+		"input_tokens", "output_tokens", "total_tokens", "token_count", "estimated_tokens":
+		return true
+	default:
+		return false
+	}
+}
+
+func scrubSystemLogString(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	value = systemLogAuthorizationPattern.ReplaceAllString(value, "${1}${2}${3} [REDACTED]")
+	value = systemLogCredentialPattern.ReplaceAllString(value, "${1} [REDACTED]")
+	value = systemLogSecretAssignmentPattern.ReplaceAllString(value, "${1}${2}[REDACTED]")
+	value = systemLogOpenAIKeyPattern.ReplaceAllString(value, "sk-[REDACTED]")
+	return truncateSystemLogString(value)
+}
+
+func truncateSystemLogString(value string) string {
+	runes := []rune(value)
+	if len(runes) <= systemLogMetadataMaxString {
+		return value
+	}
+	return string(runes[:systemLogMetadataMaxString]) + "...[TRUNCATED]"
 }
