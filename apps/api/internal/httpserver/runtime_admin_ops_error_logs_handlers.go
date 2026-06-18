@@ -18,6 +18,7 @@ import (
 
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
+	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
 // recordOpsErrorLog persists an operator-facing record of an upstream
@@ -214,49 +215,16 @@ func (s *Server) handleListAdminOpsErrorLogs(w http.ResponseWriter, r *http.Requ
 		writeJSONString(w, http.StatusServiceUnavailable, `{"error":{"code":"UNAVAILABLE","message":"ops error logs unavailable"},"request_id":"`+requestID+`"}`)
 		return
 	}
-	filter := opserrorlogscontract.ListFilter{
-		Resolution: opserrorlogscontract.Resolution(strings.TrimSpace(r.URL.Query().Get("resolution"))),
-		ErrorClass: strings.TrimSpace(r.URL.Query().Get("error_class")),
-		Platform:   strings.TrimSpace(r.URL.Query().Get("platform")),
-		Model:      strings.TrimSpace(r.URL.Query().Get("model")),
-		Query:      strings.TrimSpace(r.URL.Query().Get("q")),
+	filter, err := opsErrorLogListFilterFromRequest(r)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.VALIDATIONFAILED, err.Error(), requestID)
+		return
 	}
-	if v := strings.TrimSpace(r.URL.Query().Get("user_id")); v != "" {
-		if id, err := strconv.Atoi(v); err == nil && id > 0 {
-			filter.UserID = &id
-		}
+	page, pageSize, err := parseOpsErrorLogsPagination(r)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.VALIDATIONFAILED, err.Error(), requestID)
+		return
 	}
-	if v := strings.TrimSpace(r.URL.Query().Get("account_id")); v != "" {
-		if id, err := strconv.Atoi(v); err == nil && id > 0 {
-			filter.AccountID = &id
-		}
-	}
-	if v := strings.TrimSpace(r.URL.Query().Get("provider_id")); v != "" {
-		if id, err := strconv.Atoi(v); err == nil && id > 0 {
-			filter.ProviderID = &id
-		}
-	}
-	if v := strings.TrimSpace(r.URL.Query().Get("status_min")); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			filter.StatusCodeMin = &n
-		}
-	}
-	if v := strings.TrimSpace(r.URL.Query().Get("status_max")); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			filter.StatusCodeMax = &n
-		}
-	}
-	if v := strings.TrimSpace(r.URL.Query().Get("start")); v != "" {
-		if at, err := time.Parse(time.RFC3339, v); err == nil {
-			filter.From = &at
-		}
-	}
-	if v := strings.TrimSpace(r.URL.Query().Get("end")); v != "" {
-		if at, err := time.Parse(time.RFC3339, v); err == nil {
-			filter.To = &at
-		}
-	}
-	page, pageSize := parseOpsErrorLogsPagination(r)
 	filter.Page = page
 	filter.PageSize = pageSize
 	res, err := s.runtime.opsErrorLogs.List(r.Context(), filter)
@@ -282,6 +250,98 @@ func (s *Server) handleListAdminOpsErrorLogs(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(encoded)
+}
+
+func opsErrorLogListFilterFromRequest(r *http.Request) (opserrorlogscontract.ListFilter, error) {
+	q := r.URL.Query()
+	filter := opserrorlogscontract.ListFilter{
+		Resolution: opserrorlogscontract.Resolution(strings.TrimSpace(q.Get("resolution"))),
+		ErrorClass: strings.TrimSpace(q.Get("error_class")),
+		Platform:   strings.TrimSpace(q.Get("platform")),
+		Model:      strings.TrimSpace(q.Get("model")),
+		Query:      strings.TrimSpace(q.Get("q")),
+	}
+	if filter.Resolution != "" && !validOpsErrorLogResolution(filter.Resolution) {
+		return opserrorlogscontract.ListFilter{}, errors.New("invalid resolution")
+	}
+	if id, ok, err := parseOptionalPositiveInt(q.Get("user_id"), "user_id"); err != nil {
+		return opserrorlogscontract.ListFilter{}, err
+	} else if ok {
+		filter.UserID = &id
+	}
+	if id, ok, err := parseOptionalPositiveInt(q.Get("account_id"), "account_id"); err != nil {
+		return opserrorlogscontract.ListFilter{}, err
+	} else if ok {
+		filter.AccountID = &id
+	}
+	if id, ok, err := parseOptionalPositiveInt(q.Get("provider_id"), "provider_id"); err != nil {
+		return opserrorlogscontract.ListFilter{}, err
+	} else if ok {
+		filter.ProviderID = &id
+	}
+	if status, ok, err := parseOptionalHTTPStatus(q.Get("status_min"), "status_min"); err != nil {
+		return opserrorlogscontract.ListFilter{}, err
+	} else if ok {
+		filter.StatusCodeMin = &status
+	}
+	if status, ok, err := parseOptionalHTTPStatus(q.Get("status_max"), "status_max"); err != nil {
+		return opserrorlogscontract.ListFilter{}, err
+	} else if ok {
+		filter.StatusCodeMax = &status
+	}
+	if filter.StatusCodeMin != nil && filter.StatusCodeMax != nil && *filter.StatusCodeMin > *filter.StatusCodeMax {
+		return opserrorlogscontract.ListFilter{}, errors.New("status_min must be <= status_max")
+	}
+	if start, err := parseOptionalRFC3339(q.Get("start")); err != nil {
+		return opserrorlogscontract.ListFilter{}, errors.New("invalid start timestamp")
+	} else if start != nil {
+		filter.From = start
+	}
+	if end, err := parseOptionalRFC3339(q.Get("end")); err != nil {
+		return opserrorlogscontract.ListFilter{}, errors.New("invalid end timestamp")
+	} else if end != nil {
+		filter.To = end
+	}
+	if filter.From != nil && filter.To != nil && filter.From.After(*filter.To) {
+		return opserrorlogscontract.ListFilter{}, errors.New("start must be before end")
+	}
+	return filter, nil
+}
+
+func validOpsErrorLogResolution(resolution opserrorlogscontract.Resolution) bool {
+	switch resolution {
+	case opserrorlogscontract.ResolutionOpen,
+		opserrorlogscontract.ResolutionInvestigating,
+		opserrorlogscontract.ResolutionResolved,
+		opserrorlogscontract.ResolutionMuted:
+		return true
+	default:
+		return false
+	}
+}
+
+func parseOptionalPositiveInt(raw string, field string) (int, bool, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, false, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n <= 0 {
+		return 0, false, errors.New("invalid " + field)
+	}
+	return n, true, nil
+}
+
+func parseOptionalHTTPStatus(raw string, field string) (int, bool, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, false, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 100 || n > 599 {
+		return 0, false, errors.New("invalid " + field)
+	}
+	return n, true, nil
 }
 
 // handleGetAdminOpsErrorLog serves GET /api/v1/admin/ops/error-logs/{id}.
@@ -375,23 +435,27 @@ func (s *Server) handleUpdateAdminOpsErrorLogResolution(w http.ResponseWriter, r
 	_, _ = w.Write(encoded)
 }
 
-func parseOpsErrorLogsPagination(r *http.Request) (page, pageSize int) {
+func parseOpsErrorLogsPagination(r *http.Request) (page, pageSize int, err error) {
 	page = 1
 	pageSize = 20
 	if v := strings.TrimSpace(r.URL.Query().Get("page")); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			page = n
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			return 0, 0, errors.New("invalid page")
 		}
+		page = n
 	}
 	if v := strings.TrimSpace(r.URL.Query().Get("page_size")); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			pageSize = n
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			return 0, 0, errors.New("invalid page_size")
 		}
+		pageSize = n
 	}
 	if pageSize > 200 {
 		pageSize = 200
 	}
-	return page, pageSize
+	return page, pageSize, nil
 }
 
 func opsErrorLogsToDTOs(items []opserrorlogscontract.Entry) []map[string]any {

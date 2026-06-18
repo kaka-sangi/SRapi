@@ -102,6 +102,28 @@ func TestAdminOpsErrorLogsListGetAndResolve(t *testing.T) {
 		t.Fatalf("unexpected list row: %+v", row)
 	}
 
+	invalidFilters := []string{
+		"/api/v1/admin/ops/error-logs?account_id=not-an-int",
+		"/api/v1/admin/ops/error-logs?status_min=600",
+		"/api/v1/admin/ops/error-logs?status_min=500&status_max=400",
+		"/api/v1/admin/ops/error-logs?resolution=ignored",
+		"/api/v1/admin/ops/error-logs?start=not-a-time",
+		"/api/v1/admin/ops/error-logs?start=2026-06-18T11:00:00Z&end=2026-06-18T10:00:00Z",
+		"/api/v1/admin/ops/error-logs?page=0",
+		"/api/v1/admin/ops/error-logs?page_size=not-an-int",
+	}
+	for _, path := range invalidFilters {
+		t.Run("invalid filter "+path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			req.AddCookie(sessionCookie)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+
 	detailReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/error-logs/1", nil)
 	detailReq.AddCookie(sessionCookie)
 	detailRec := httptest.NewRecorder()
