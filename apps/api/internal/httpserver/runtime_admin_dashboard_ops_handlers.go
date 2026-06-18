@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"errors"
 	"net/http"
 	"sort"
 	"strconv"
@@ -173,7 +174,12 @@ func (s *Server) handleListAdminOpsSystemLogs(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	list, err := s.runtime.operations.ListSystemLogs(r.Context(), systemLogListOptionsFromRequest(r))
+	opts, err := systemLogListOptionsFromRequest(r)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.VALIDATIONFAILED, err.Error(), requestID)
+		return
+	}
+	list, err := s.runtime.operations.ListSystemLogs(r.Context(), opts)
 	if err != nil {
 		writeOperationsServiceError(w, err, requestID)
 		return
@@ -843,15 +849,19 @@ func listOptionsFromRequest(r *http.Request) admincontrol.ListOptions {
 	}
 }
 
-func systemLogListOptionsFromRequest(r *http.Request) operationscontract.SystemLogListOptions {
+func systemLogListOptionsFromRequest(r *http.Request) (operationscontract.SystemLogListOptions, error) {
 	opts := listOptionsFromRequest(r)
 	query := r.URL.Query()
 	var start, end *time.Time
-	if parsed, ok := parseOptionalRFC3339(query.Get("start")); ok {
-		start = &parsed
+	if parsed, err := parseOptionalRFC3339(query.Get("start")); err != nil {
+		return operationscontract.SystemLogListOptions{}, errors.New("invalid start timestamp")
+	} else if parsed != nil {
+		start = parsed
 	}
-	if parsed, ok := parseOptionalRFC3339(query.Get("end")); ok {
-		end = &parsed
+	if parsed, err := parseOptionalRFC3339(query.Get("end")); err != nil {
+		return operationscontract.SystemLogListOptions{}, errors.New("invalid end timestamp")
+	} else if parsed != nil {
+		end = parsed
 	}
 	return operationscontract.SystemLogListOptions{
 		Page:      opts.Page,
@@ -863,21 +873,23 @@ func systemLogListOptionsFromRequest(r *http.Request) operationscontract.SystemL
 		TraceID:   strings.TrimSpace(query.Get("trace_id")),
 		Start:     start,
 		End:       end,
-	}
+	}, nil
 }
 
-func parseOptionalRFC3339(raw string) (time.Time, bool) {
+func parseOptionalRFC3339(raw string) (*time.Time, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return time.Time{}, false
+		return nil, nil
 	}
 	if parsed, err := time.Parse(time.RFC3339Nano, raw); err == nil {
-		return parsed.UTC(), true
+		parsed = parsed.UTC()
+		return &parsed, nil
 	}
 	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
-		return parsed.UTC(), true
+		parsed = parsed.UTC()
+		return &parsed, nil
 	}
-	return time.Time{}, false
+	return nil, errors.New("invalid RFC3339 timestamp")
 }
 
 func paginationWithRequest(r *http.Request, total int) apiopenapi.Pagination {

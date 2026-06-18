@@ -59,8 +59,8 @@ export function LiveErrorsPanel() {
     const qs = params.toString();
     const url = `/api/v1/admin/error-stream${qs ? `?${qs}` : ""}`;
     const es = new EventSource(url, { withCredentials: true });
-    es.addEventListener("open", () => setConnected(true));
-    es.addEventListener("error", () => setConnected(false));
+    es.onopen = () => setConnected(true);
+    es.onerror = () => setConnected(false);
     const handler = (ev: MessageEvent) => {
       if (pausedRef.current) return;
       try {
@@ -73,14 +73,7 @@ export function LiveErrorsPanel() {
         /* malformed frame — ignore */
       }
     };
-    es.addEventListener("error" satisfies "error", () => {});
-    es.addEventListener("message", handler);
-    es.addEventListener("error" satisfies "error", () => {});
-    // The handler registers events under the explicit event: error name we
-    // emit on the server. EventSource maps any unnamed events to "message",
-    // but we standardised on "error" — listen for both so a future protocol
-    // simplification doesn't break the live view.
-    es.addEventListener("error" as never, handler as never);
+    es.addEventListener("gateway_error", handler);
     return () => {
       es.close();
       setConnected(false);

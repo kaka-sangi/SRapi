@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { useCleanupAdminUsage } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { localDateTimeInputToIso } from "@/lib/datetime-local";
 import type { UsageCleanupResult } from "@/lib/sdk-types";
 
 const ANY = "any";
@@ -63,11 +64,21 @@ export function UsageCleanupDialog({
       setError(t("adminUsageCleanup.needFilter"));
       return;
     }
+    const startIso = localDateTimeInputToIso(start);
+    const endIso = localDateTimeInputToIso(before);
+    if (start.trim() && !startIso) {
+      setError(t("adminUsageCleanup.invalidStart"));
+      return;
+    }
+    if (before.trim() && !endIso) {
+      setError(t("adminUsageCleanup.invalidBefore"));
+      return;
+    }
     try {
       const res = await cleanup.mutateAsync({
         model: model !== ANY ? model : undefined,
-        start: start.trim() ? new Date(start).toISOString() : undefined,
-        end: before.trim() ? new Date(before).toISOString() : undefined,
+        start: startIso ?? undefined,
+        end: endIso ?? undefined,
         dry_run: dryRun,
         max_delete: Number(maxDelete.trim()) || undefined,
       });

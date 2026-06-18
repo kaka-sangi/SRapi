@@ -7374,7 +7374,7 @@ paths:
       summary: Subscribe to live gateway error events.
       description: |
         Opens a text/event-stream feed of gateway upstream failure events.
-        The stream emits `event: error` frames whose `data` payload is an
+        The stream emits `event: gateway_error` frames whose `data` payload is an
         AdminErrorStreamEvent JSON object. A leading SSE comment confirms
         connection establishment, and periodic comments keep idle connections
         alive.
@@ -7422,8 +7422,10 @@ paths:
               schema:
                 type: string
                 description: |
-                  SSE frames. `event: error` frames carry an
+                  SSE frames. `event: gateway_error` frames carry an
                   AdminErrorStreamEvent JSON payload in their `data` line.
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":

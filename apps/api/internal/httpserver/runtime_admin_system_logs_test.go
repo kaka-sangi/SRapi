@@ -57,6 +57,22 @@ func TestAdminOpsSystemLogsListAndCleanup(t *testing.T) {
 		t.Fatalf("unexpected system log list response: %+v", listResp.Data)
 	}
 
+	invalidStartReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/system-logs?start=not-a-timestamp", nil)
+	invalidStartReq.AddCookie(sessionCookie)
+	invalidStartRec := httptest.NewRecorder()
+	handler.ServeHTTP(invalidStartRec, invalidStartReq)
+	if invalidStartRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid start to fail with 400, got %d body=%s", invalidStartRec.Code, invalidStartRec.Body.String())
+	}
+
+	invalidEndReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/system-logs?end=not-a-timestamp", nil)
+	invalidEndReq.AddCookie(sessionCookie)
+	invalidEndRec := httptest.NewRecorder()
+	handler.ServeHTTP(invalidEndRec, invalidEndReq)
+	if invalidEndRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid end to fail with 400, got %d body=%s", invalidEndRec.Code, invalidEndRec.Body.String())
+	}
+
 	exactReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/system-logs?request_id=req_cleanup&trace_id=trace_cleanup", nil)
 	exactReq.AddCookie(sessionCookie)
 	exactRec := httptest.NewRecorder()

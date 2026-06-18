@@ -92,12 +92,46 @@ func TestAdminErrorStreamSSEHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read SSE frame: %v", err)
 	}
+	if frame.Event != "gateway_error" {
+		t.Fatalf("expected gateway_error SSE event, got %q", frame.Event)
+	}
 	var got erroreventcontract.Event
-	if err := json.Unmarshal([]byte(frame), &got); err != nil {
-		t.Fatalf("decode SSE payload %q: %v", frame, err)
+	if err := json.Unmarshal([]byte(frame.Data), &got); err != nil {
+		t.Fatalf("decode SSE payload %q: %v", frame.Data, err)
 	}
 	if got.RequestID != ev.RequestID || got.ErrorClass != ev.ErrorClass || got.StatusCode != ev.StatusCode {
 		t.Fatalf("SSE event mismatch: got %+v want %+v", got, ev)
+	}
+}
+
+func TestAdminErrorStreamRejectsInvalidFilters(t *testing.T) {
+	t.Parallel()
+	handler, _ := newWithServer(config.Load(), nil)
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	loginReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/auth/login",
+		strings.NewReader(`{"email":"admin@srapi.local","password":"password123"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginResp, err := http.DefaultClient.Do(loginReq)
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	cookies := loginResp.Cookies()
+	_ = loginResp.Body.Close()
+
+	invalidReq, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/admin/error-stream?min_status=500&max_status=400", nil)
+	for _, c := range cookies {
+		invalidReq.AddCookie(c)
+	}
+	invalidResp, err := http.DefaultClient.Do(invalidReq)
+	if err != nil {
+		t.Fatalf("open filtered SSE: %v", err)
+	}
+	defer invalidResp.Body.Close()
+
+	if invalidResp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid filters, got %d", invalidResp.StatusCode)
 	}
 }
 
@@ -113,17 +147,23 @@ func waitForSubscriber(t *testing.T, srv *Server, timeout time.Duration) {
 	t.Fatal("subscriber never registered")
 }
 
-// readSSEFrame reads one "data: …" line from the SSE body and returns the JSON
-// payload. Skips comments + event: lines.
-func readSSEFrame(body io.Reader, timeout time.Duration) (string, error) {
+type sseFrame struct {
+	Event string
+	Data  string
+}
+
+// readSSEFrame reads one SSE frame from the stream and returns its event name
+// and JSON payload. Comments are skipped.
+func readSSEFrame(body io.Reader, timeout time.Duration) (sseFrame, error) {
 	type result struct {
-		s   string
+		s   sseFrame
 		err error
 	}
 	ch := make(chan result, 1)
 	go func() {
 		buf := make([]byte, 0, 4096)
 		tmp := make([]byte, 256)
+		frame := sseFrame{}
 		for {
 			n, err := body.Read(tmp)
 			if n > 0 {
@@ -135,9 +175,24 @@ func readSSEFrame(body io.Reader, timeout time.Duration) (string, error) {
 					}
 					line := string(buf[:nl])
 					buf = buf[nl+1:]
+					line = strings.TrimSuffix(line, "\r")
+					if line == "" {
+						if frame.Data != "" {
+							ch <- result{s: frame}
+							return
+						}
+						continue
+					}
+					if strings.HasPrefix(line, ":") {
+						continue
+					}
+					if strings.HasPrefix(line, "event: ") {
+						frame.Event = strings.TrimSpace(strings.TrimPrefix(line, "event: "))
+						continue
+					}
 					if strings.HasPrefix(line, "data: ") {
-						ch <- result{s: strings.TrimPrefix(line, "data: ")}
-						return
+						frame.Data = strings.TrimPrefix(line, "data: ")
+						continue
 					}
 				}
 			}
@@ -151,7 +206,7 @@ func readSSEFrame(body io.Reader, timeout time.Duration) (string, error) {
 	case r := <-ch:
 		return r.s, r.err
 	case <-time.After(timeout):
-		return "", context.DeadlineExceeded
+		return sseFrame{}, context.DeadlineExceeded
 	}
 }
 

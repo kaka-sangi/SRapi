@@ -87,7 +87,11 @@ func (s *Server) handleAdminErrorStream(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	opts := parseAdminErrorStreamOptions(r)
+	opts, err := parseAdminErrorStreamOptions(r)
+	if err != nil {
+		writeJSONString(w, http.StatusBadRequest, `{"error":{"code":"VALIDATION_FAILED","message":"`+err.Error()+`"},"request_id":"`+requestID+`"}`)
+		return
+	}
 	sub, err := s.runtime.errorEventStream.Subscribe(r.Context(), opts)
 	if err != nil {
 		if errors.Is(err, erroreventcontract.ErrTooManySubscribers) {
@@ -138,41 +142,51 @@ func (s *Server) handleAdminErrorStream(w http.ResponseWriter, r *http.Request) 
 }
 
 // parseAdminErrorStreamOptions extracts the optional SSE filters from the
-// request query string. Invalid values are silently ignored (the stream then
-// remains broad rather than 4xx the caller — matches the CPA SubscribeErrors
-// behaviour where the wire protocol has no filter at all).
-func parseAdminErrorStreamOptions(r *http.Request) erroreventcontract.SubscribeOptions {
+// request query string. Invalid filters fail closed so an operator never thinks
+// they are watching a narrow stream while the backend opened a broad one.
+func parseAdminErrorStreamOptions(r *http.Request) (erroreventcontract.SubscribeOptions, error) {
 	q := r.URL.Query()
 	opts := erroreventcontract.SubscribeOptions{}
 	if v := strings.TrimSpace(q.Get("account_id")); v != "" {
-		if id, err := strconv.Atoi(v); err == nil && id > 0 {
-			opts.AccountID = &id
+		id, err := strconv.Atoi(v)
+		if err != nil || id <= 0 {
+			return erroreventcontract.SubscribeOptions{}, errors.New("invalid account_id")
 		}
+		opts.AccountID = &id
 	}
 	if v := strings.TrimSpace(q.Get("error_class")); v != "" {
 		opts.ErrorClass = v
 	}
 	if v := strings.TrimSpace(q.Get("min_status")); v != "" {
-		if code, err := strconv.Atoi(v); err == nil && code > 0 {
-			opts.MinStatusCode = code
+		code, err := strconv.Atoi(v)
+		if err != nil || code <= 0 {
+			return erroreventcontract.SubscribeOptions{}, errors.New("invalid min_status")
 		}
+		opts.MinStatusCode = code
 	}
 	if v := strings.TrimSpace(q.Get("max_status")); v != "" {
-		if code, err := strconv.Atoi(v); err == nil && code > 0 {
-			opts.MaxStatusCode = code
+		code, err := strconv.Atoi(v)
+		if err != nil || code <= 0 {
+			return erroreventcontract.SubscribeOptions{}, errors.New("invalid max_status")
 		}
+		opts.MaxStatusCode = code
+	}
+	if opts.MinStatusCode > 0 && opts.MaxStatusCode > 0 && opts.MinStatusCode > opts.MaxStatusCode {
+		return erroreventcontract.SubscribeOptions{}, errors.New("min_status must be <= max_status")
 	}
 	if v := strings.TrimSpace(q.Get("since")); v != "" {
-		if since, err := strconv.ParseInt(v, 10, 64); err == nil && since > 0 {
-			opts.SinceUnixMs = since
+		since, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || since <= 0 {
+			return erroreventcontract.SubscribeOptions{}, errors.New("invalid since")
 		}
+		opts.SinceUnixMs = since
 	}
-	return opts
+	return opts, nil
 }
 
 // writeAdminErrorStreamEvent encodes ev as a single SSE frame:
 //
-//	event: error
+//	event: gateway_error
 //	data: {<json>}
 //
 // followed by the blank-line terminator. Returns the underlying Write error
@@ -182,7 +196,7 @@ func writeAdminErrorStreamEvent(w http.ResponseWriter, ev erroreventcontract.Eve
 	if err != nil {
 		return err
 	}
-	if _, err := w.Write([]byte("event: error\n")); err != nil {
+	if _, err := w.Write([]byte("event: gateway_error\n")); err != nil {
 		return err
 	}
 	if _, err := w.Write([]byte("data: ")); err != nil {

@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { useCleanupOpsSystemLogs } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { localDateTimeInputToIso } from "@/lib/datetime-local";
 import type { OpsSystemLogCleanupResult, OpsSystemLogLevel } from "@/lib/sdk-types";
 
 const LEVELS: OpsSystemLogLevel[] = ["debug", "info", "warn", "error"];
@@ -63,6 +64,11 @@ export function OpsLogCleanupDialog({
       setError(t("adminOpsCleanup.needFilter"));
       return;
     }
+    const end = localDateTimeInputToIso(before);
+    if (before.trim() && !end) {
+      setError(t("adminOpsCleanup.invalidBefore"));
+      return;
+    }
     try {
       const res = await cleanup.mutateAsync({
         level: level !== ANY ? (level as OpsSystemLogLevel) : undefined,
@@ -70,7 +76,7 @@ export function OpsLogCleanupDialog({
         q: q.trim() || undefined,
         request_id: requestID.trim() || undefined,
         trace_id: traceID.trim() || undefined,
-        end: before.trim() ? new Date(before).toISOString() : undefined,
+        end: end ?? undefined,
         dry_run: dryRun,
         max_delete: Number(maxDelete.trim()) || undefined,
       });
