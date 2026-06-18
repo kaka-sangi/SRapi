@@ -146,9 +146,16 @@ export function RequestLogFilesPanel() {
             <thead className="border-b border-srapi-border-subtle bg-srapi-bg-card-elevated">
               <tr>
                 <th className="px-3 py-2 font-medium">{t("adminRequestLogFiles.name")}</th>
-                <th className="px-3 py-2 font-medium">{t("adminRequestLogFiles.requestId")}</th>
-                <th className="px-3 py-2 font-medium">{t("adminRequestLogFiles.createdAt")}</th>
-                <th className="px-3 py-2 font-medium">{t("adminRequestLogFiles.size")}</th>
+                <th className="w-44 px-3 py-2 font-medium">
+                  {t("adminRequestLogFiles.requestId")}
+                </th>
+                <th className="w-40 px-3 py-2 font-medium">
+                  {t("adminRequestLogFiles.createdAt")}
+                </th>
+                <th className="w-24 px-3 py-2 font-medium">{t("adminRequestLogFiles.size")}</th>
+                <th className="w-36 px-3 py-2 font-medium">
+                  {t("adminRequestLogFiles.relatedEvidence")}
+                </th>
                 <th className="w-48 px-3 py-2 font-medium">&nbsp;</th>
               </tr>
             </thead>
@@ -156,27 +163,35 @@ export function RequestLogFilesPanel() {
               {formattedRows.map((row) => (
                 <tr key={row.name} className="border-t border-srapi-border-subtle">
                   <td className="px-3 py-2 font-mono text-xs">
-                    <button
-                      type="button"
-                      onClick={() => openPreview(row)}
-                      className="underline-offset-2 hover:underline"
-                    >
-                      {row.name}
-                    </button>
-                    {row.is_error_only ? (
-                      <span className="ml-2 rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-red-300">
-                        error
-                      </span>
-                    ) : null}
+                    <div className="flex min-w-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openPreview(row)}
+                        title={row.name}
+                        className="min-w-0 truncate underline-offset-2 hover:underline"
+                      >
+                        {row.name}
+                      </button>
+                      {row.is_error_only ? (
+                        <span className="shrink-0 rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-red-300">
+                          error
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-srapi-text-secondary">
-                    {row.request_id}
+                    <div className="truncate" title={row.request_id}>
+                      {row.request_id}
+                    </div>
                   </td>
-                  <td className="px-3 py-2 text-xs text-srapi-text-tertiary">
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-srapi-text-tertiary">
                     {row.createdAtLabel}
                   </td>
                   <td className="px-3 py-2 text-xs text-srapi-text-tertiary">
                     {row.sizeLabel}
+                  </td>
+                  <td className="px-3 py-2">
+                    <RequestDumpEvidencePills file={row} />
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex gap-2">
@@ -261,6 +276,35 @@ export function RequestLogFilesPanel() {
         }}
         isPending={deleteMutation.isPending}
       />
+    </div>
+  );
+}
+
+function RequestDumpEvidencePills({ file }: { file: RequestLogFileDescriptor }) {
+  const { t } = useLanguage();
+  const errorHref = adminErrorLogsHref({ request_id: file.request_id });
+  const systemHref = adminSystemLogsHref({ request_id: file.request_id });
+  if (!errorHref && !systemHref) {
+    return <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>;
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {errorHref ? (
+        <Link
+          href={errorHref}
+          className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+        >
+          {t("adminRequestLogFiles.openErrorLogs")}
+        </Link>
+      ) : null}
+      {systemHref ? (
+        <Link
+          href={systemHref}
+          className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+        >
+          {t("adminRequestLogFiles.openSystemLogs")}
+        </Link>
+      ) : null}
     </div>
   );
 }
