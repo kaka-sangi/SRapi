@@ -589,12 +589,20 @@ AdminOps system-log routes are part of the console control plane:
 
 ```txt
 GET  /api/v1/admin/ops/system-logs
+GET  /api/v1/admin/ops/system-logs/health
 POST /api/v1/admin/ops/system-logs/cleanup
 ```
 
 `GET /api/v1/admin/ops/system-logs` returns sanitized structured events from
 `ops_system_logs`. Query filters may include `level`, `source`, `q`, `start`,
-and `end`; pagination uses the existing admin list defaults.
+and `end`; pagination uses the existing admin list defaults. System-log
+record/list/cleanup/health behavior is owned by the operations module, not by
+admin-control settings state.
+
+`GET /api/v1/admin/ops/system-logs/health` returns store health evidence:
+storage mode, writable/degraded/stale flags, total rows, level counts, last log
+time, and last error summary. It must derive these facts from store statistics,
+not from a sampled list page.
 
 `POST /api/v1/admin/ops/system-logs/cleanup` is a write route and must require
 `cookieAuth` plus `csrfHeader`. Cleanup requires at least one bounded filter,

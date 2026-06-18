@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +22,8 @@ type Store struct {
 	alerts        map[int]contract.AlertEvent
 	rules         map[int]contract.AlertRule
 	silences      map[int]contract.AlertSilence
+	systemLogs    []contract.OpsSystemLog
+	nextLogID     int
 	usage         usagecontract.Store
 }
 
@@ -38,12 +41,114 @@ func NewWithUsageStore(usage usagecontract.Store) *Store {
 		alerts:        map[int]contract.AlertEvent{},
 		rules:         map[int]contract.AlertRule{},
 		silences:      map[int]contract.AlertSilence{},
+		nextLogID:     1,
 		usage:         usage,
 	}
 }
 
 func (s *Store) Cleanup(context.Context, contract.RetentionCutoffs) (contract.CleanupResult, error) {
 	return contract.CleanupResult{}, nil
+}
+
+func (s *Store) CreateSystemLog(_ context.Context, input contract.OpsSystemLog) (contract.OpsSystemLog, error) {
+	if strings.TrimSpace(input.Source) == "" || strings.TrimSpace(input.Message) == "" || !input.Level.Valid() {
+		return contract.OpsSystemLog{}, contract.ErrInvalidInput
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item := cloneSystemLog(input)
+	if item.ID <= 0 {
+		item.ID = s.nextLogID
+		s.nextLogID++
+	}
+	if item.CreatedAt.IsZero() {
+		item.CreatedAt = time.Now().UTC()
+	}
+	s.systemLogs = append(s.systemLogs, item)
+	return cloneSystemLog(item), nil
+}
+
+func (s *Store) ListSystemLogs(_ context.Context, opts contract.SystemLogListOptions) (contract.SystemLogList, error) {
+	if opts.Level != "" && !opts.Level.Valid() {
+		return contract.SystemLogList{}, contract.ErrInvalidInput
+	}
+	if opts.Start != nil && opts.End != nil && opts.Start.After(*opts.End) {
+		return contract.SystemLogList{}, contract.ErrInvalidInput
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	filter := contract.SystemLogCleanupFilter{
+		Level:  opts.Level,
+		Source: opts.Source,
+		Query:  opts.Query,
+		Start:  opts.Start,
+		End:    opts.End,
+	}
+	items := make([]contract.OpsSystemLog, 0, len(s.systemLogs))
+	for _, item := range s.systemLogs {
+		if systemLogMatches(item, filter) {
+			items = append(items, cloneSystemLog(item))
+		}
+	}
+	sortSystemLogsNewestFirst(items)
+	return contract.SystemLogList{Items: pageSystemLogs(items, opts.Page, opts.PageSize), Total: len(items)}, nil
+}
+
+func (s *Store) SystemLogStats(_ context.Context) (contract.SystemLogStats, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	stats := contract.SystemLogStats{
+		TotalCount:  len(s.systemLogs),
+		LevelCounts: map[contract.OpsSystemLogLevel]int{},
+	}
+	for _, item := range s.systemLogs {
+		stats.LevelCounts[item.Level]++
+		if stats.LastLog == nil || systemLogIsNewer(item, *stats.LastLog) {
+			cloned := cloneSystemLog(item)
+			stats.LastLog = &cloned
+		}
+		if item.Level != contract.OpsSystemLogLevelError {
+			continue
+		}
+		if stats.LastError == nil || systemLogIsNewer(item, *stats.LastError) {
+			cloned := cloneSystemLog(item)
+			stats.LastError = &cloned
+		}
+	}
+	return stats, nil
+}
+
+func (s *Store) CleanupSystemLogs(_ context.Context, filter contract.SystemLogCleanupFilter) (contract.SystemLogCleanupResult, error) {
+	normalized, err := normalizeSystemLogCleanupFilter(filter)
+	if err != nil {
+		return contract.SystemLogCleanupResult{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	kept := s.systemLogs[:0]
+	var matched, deleted int
+	for _, item := range s.systemLogs {
+		if !systemLogMatches(item, normalized) {
+			kept = append(kept, item)
+			continue
+		}
+		matched++
+		if normalized.DryRun || deleted >= normalized.MaxDelete {
+			kept = append(kept, item)
+			continue
+		}
+		deleted++
+	}
+	if !normalized.DryRun {
+		s.systemLogs = kept
+	}
+	return contract.SystemLogCleanupResult{
+		Matched:   matched,
+		Deleted:   deleted,
+		DryRun:    normalized.DryRun,
+		MaxDelete: normalized.MaxDelete,
+		Limited:   matched > deleted && !normalized.DryRun,
+	}, nil
 }
 
 func (s *Store) CreateSLO(_ context.Context, input contract.SLODefinition) (contract.SLODefinition, error) {
@@ -289,6 +394,91 @@ func cloneSilence(value contract.AlertSilence) contract.AlertSilence {
 	value.Matcher.ProviderID = cloneInt(value.Matcher.ProviderID)
 	value.CreatedBy = cloneInt(value.CreatedBy)
 	return value
+}
+
+func cloneSystemLog(value contract.OpsSystemLog) contract.OpsSystemLog {
+	value.Metadata = cloneMap(value.Metadata)
+	return value
+}
+
+func systemLogMatches(log contract.OpsSystemLog, filter contract.SystemLogCleanupFilter) bool {
+	if filter.Level != "" && log.Level != filter.Level {
+		return false
+	}
+	if filter.Source != "" && !strings.EqualFold(log.Source, strings.TrimSpace(filter.Source)) {
+		return false
+	}
+	if filter.Start != nil && log.CreatedAt.Before(filter.Start.UTC()) {
+		return false
+	}
+	if filter.End != nil && !log.CreatedAt.Before(filter.End.UTC()) {
+		return false
+	}
+	if query := strings.TrimSpace(filter.Query); query != "" {
+		query = strings.ToLower(query)
+		if !strings.Contains(strings.ToLower(log.Message), query) &&
+			!strings.Contains(strings.ToLower(log.Source), query) &&
+			!strings.Contains(strings.ToLower(log.RequestID), query) &&
+			!strings.Contains(strings.ToLower(log.TraceID), query) {
+			return false
+		}
+	}
+	return true
+}
+
+func sortSystemLogsNewestFirst(items []contract.OpsSystemLog) {
+	sort.SliceStable(items, func(i, j int) bool {
+		return systemLogIsNewer(items[i], items[j])
+	})
+}
+
+func systemLogIsNewer(left, right contract.OpsSystemLog) bool {
+	if left.CreatedAt.Equal(right.CreatedAt) {
+		return left.ID > right.ID
+	}
+	return left.CreatedAt.After(right.CreatedAt)
+}
+
+func pageSystemLogs(items []contract.OpsSystemLog, page, pageSize int) []contract.OpsSystemLog {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 1000 {
+		pageSize = 1000
+	}
+	start := (page - 1) * pageSize
+	if start >= len(items) {
+		return []contract.OpsSystemLog{}
+	}
+	end := start + pageSize
+	if end > len(items) {
+		end = len(items)
+	}
+	return append([]contract.OpsSystemLog(nil), items[start:end]...)
+}
+
+func normalizeSystemLogCleanupFilter(filter contract.SystemLogCleanupFilter) (contract.SystemLogCleanupFilter, error) {
+	filter.Source = strings.TrimSpace(filter.Source)
+	filter.Query = strings.TrimSpace(filter.Query)
+	if filter.Level != "" && !filter.Level.Valid() {
+		return contract.SystemLogCleanupFilter{}, contract.ErrInvalidInput
+	}
+	if filter.Start != nil && filter.End != nil && filter.Start.After(*filter.End) {
+		return contract.SystemLogCleanupFilter{}, contract.ErrInvalidInput
+	}
+	if filter.Level == "" && filter.Source == "" && filter.Query == "" && filter.Start == nil && filter.End == nil {
+		return contract.SystemLogCleanupFilter{}, contract.ErrInvalidInput
+	}
+	if filter.MaxDelete == 0 {
+		filter.MaxDelete = 1000
+	}
+	if filter.MaxDelete < 0 || filter.MaxDelete > 10000 {
+		return contract.SystemLogCleanupFilter{}, contract.ErrInvalidInput
+	}
+	return filter, nil
 }
 
 func cloneSLO(value contract.SLODefinition) contract.SLODefinition {

@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
@@ -74,33 +74,25 @@ func (s *Server) recordOpsErrorLog(ctx context.Context, authed apikeycontract.Au
 	if err := s.runtime.opsErrorLogs.RecordError(ctx, req); err != nil && s.runtime.logger != nil {
 		s.runtime.logger.Warn("ops_error_logs RecordError failed", "request_id", canonical.RequestID, "error", err)
 	}
-	// Mirror the same event onto the system-log stream so the operator's
-	// 系统日志 panel (admin_control.OpsSystemLog) shows what just failed.
-	// Without this hook the table is permanently empty — the wiring exists
-	// (admin_control.CreateSystemLog + service.RecordSystemLog), but until
-	// now nothing in the gateway hot path actually called it. sub2api
-	// parity: every recorded upstream failure produces both an
-	// ops_error_logs row AND a system_logs entry, so the operator can
-	// triage from either surface.
+	// Mirror the same event onto the operations evidence stream so the
+	// operator can correlate structured error rows with a compact system-log
+	// timeline.
 	s.recordGatewaySystemLog(ctx, canonical, result, providerErr, errorClass, upstreamStatus)
 }
 
 // recordGatewaySystemLog forwards a failed gateway attempt onto the
-// admin_control system-log buffer that backs the 系统日志 admin panel.
-// Mirrors sub2api's structured log fan-out: WARN level for any upstream
-// HTTP rejection (4xx + 5xx) and for transport-class failures, INFO for
-// no-available-account decisions (operator should still see them but
-// they're not anomalies). Best-effort; failures are warn-logged and
-// swallowed so the gateway hot path is never blocked.
+// operations-owned system-log stream. WARN is used for upstream rejections,
+// ERROR for server/transport failures, and INFO for no-available-account
+// decisions that are operator-visible but not anomalous.
 func (s *Server) recordGatewaySystemLog(ctx context.Context, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, providerErr error, errorClass string, upstreamStatus int) {
-	if s == nil || s.runtime == nil || s.runtime.adminControl == nil {
+	if s == nil || s.runtime == nil || s.runtime.operations == nil {
 		return
 	}
-	level := admincontrolcontract.OpsSystemLogLevelWarn
+	level := operationscontract.OpsSystemLogLevelWarn
 	if errorClass == "no_available_account" {
-		level = admincontrolcontract.OpsSystemLogLevelInfo
+		level = operationscontract.OpsSystemLogLevelInfo
 	} else if upstreamStatus >= 500 || errorClass == "network_error" {
-		level = admincontrolcontract.OpsSystemLogLevelError
+		level = operationscontract.OpsSystemLogLevelError
 	}
 	message := providerErrorMessage(providerErr)
 	if strings.TrimSpace(message) == "" {
@@ -121,7 +113,7 @@ func (s *Server) recordGatewaySystemLog(ctx context.Context, canonical gatewayco
 	if result.Candidate.Provider.ID > 0 {
 		metadata["provider_id"] = result.Candidate.Provider.ID
 	}
-	if _, err := s.runtime.adminControl.RecordSystemLog(ctx, admincontrolcontract.RecordSystemLogRequest{
+	if _, err := s.runtime.operations.RecordSystemLog(ctx, operationscontract.RecordSystemLogRequest{
 		Level:     level,
 		Message:   message,
 		Source:    "gateway",
@@ -130,7 +122,7 @@ func (s *Server) recordGatewaySystemLog(ctx context.Context, canonical gatewayco
 		Metadata:  metadata,
 		CreatedAt: time.Now().UTC(),
 	}); err != nil && s.runtime.logger != nil {
-		s.runtime.logger.Warn("admin_control RecordSystemLog failed", "request_id", canonical.RequestID, "error", err)
+		s.runtime.logger.Warn("operations RecordSystemLog failed", "request_id", canonical.RequestID, "error", err)
 	}
 }
 

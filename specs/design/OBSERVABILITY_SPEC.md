@@ -370,6 +370,7 @@ GET   /api/v1/admin/ops/latency-histogram
 GET   /api/v1/admin/ops/concurrency
 GET   /api/v1/admin/ops/realtime/slots
 GET   /api/v1/admin/ops/system-logs
+GET   /api/v1/admin/ops/system-logs/health
 POST  /api/v1/admin/ops/system-logs/cleanup
 GET   /api/v1/admin/ops/events/outbox
 GET   /api/v1/admin/ops/settings

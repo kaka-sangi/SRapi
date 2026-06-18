@@ -92,6 +92,7 @@ GET /api/v1/admin/ops/error-distribution
 GET /api/v1/admin/ops/latency-histogram
 GET /api/v1/admin/ops/concurrency
 GET /api/v1/admin/ops/system-logs
+GET /api/v1/admin/ops/system-logs/health
 POST /api/v1/admin/ops/system-logs/cleanup
 GET /api/v1/admin/ops/alert-events
 PUT /api/v1/admin/ops/settings
@@ -104,11 +105,13 @@ Ops v1 is read-model based:
 - Scheduler and account evidence comes from existing scheduler/accounts
   contracts where available.
 - Alert events reuse the existing operations alert control plane.
-- System logs are structured, sanitized events stored in `ops_system_logs`.
-  Listing supports bounded filters by level, source, text query, and time
-  range. Cleanup is a CSRF-protected admin write with dry-run support,
-  `max_delete` caps, and safe audit summaries that do not copy raw query text.
-  The endpoint must not read local stdout/stderr files.
+- System logs are structured, sanitized events stored in `ops_system_logs` and
+  owned by the operations module. Listing supports bounded filters by level,
+  source, text query, and time range. Health evidence reports durable-store
+  mode, writability, freshness, level counts, and last-error summary from
+  store statistics. Cleanup is a CSRF-protected admin write with dry-run
+  support, `max_delete` caps, and safe audit summaries that do not copy raw
+  query text. The endpoint must not read local stdout/stderr files.
 
 The API must preserve low-cardinality labels and must not return raw API keys,
 session affinity keys, credentials, prompts, cookies, or provider-native frames.

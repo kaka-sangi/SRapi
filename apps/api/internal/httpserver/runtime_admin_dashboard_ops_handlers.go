@@ -10,6 +10,7 @@ import (
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	admincontrol "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	usersservice "github.com/srapi/srapi/apps/api/internal/modules/users/service"
@@ -172,15 +173,32 @@ func (s *Server) handleListAdminOpsSystemLogs(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	list, err := s.runtime.adminControl.ListSystemLogs(r.Context(), systemLogListOptionsFromRequest(r))
+	list, err := s.runtime.operations.ListSystemLogs(r.Context(), systemLogListOptionsFromRequest(r))
 	if err != nil {
-		writeAdminControlError(w, err, requestID)
+		writeOperationsServiceError(w, err, requestID)
 		return
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpsSystemLogListResponse{
 		Data:       toAPIOpsSystemLogs(list.Items),
 		Pagination: paginationWithRequest(r, list.Total),
 		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleAdminOpsSystemLogHealth(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	health, err := s.runtime.operations.SystemLogHealth(r.Context())
+	if err != nil {
+		writeOperationsServiceError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.OpsSystemLogHealthResponse{
+		Data:      toAPIOpsSystemLogHealth(health),
+		RequestId: requestID,
 	})
 }
 
@@ -200,9 +218,9 @@ func (s *Server) handleCleanupAdminOpsSystemLogs(w http.ResponseWriter, r *http.
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid system log cleanup request", requestID)
 		return
 	}
-	result, err := s.runtime.adminControl.CleanupSystemLogs(r.Context(), systemLogCleanupFilterFromAPI(body))
+	result, err := s.runtime.operations.CleanupSystemLogs(r.Context(), systemLogCleanupFilterFromAPI(body))
 	if err != nil {
-		writeAdminControlError(w, err, requestID)
+		writeOperationsServiceError(w, err, requestID)
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "ops_system_log.cleanup", "ops_system_log", "bulk", nil, systemLogCleanupAuditSnapshot(body, result)))
@@ -212,10 +230,10 @@ func (s *Server) handleCleanupAdminOpsSystemLogs(w http.ResponseWriter, r *http.
 	})
 }
 
-func systemLogCleanupFilterFromAPI(body apiopenapi.OpsSystemLogCleanupRequest) admincontrol.SystemLogCleanupFilter {
-	var level admincontrol.OpsSystemLogLevel
+func systemLogCleanupFilterFromAPI(body apiopenapi.OpsSystemLogCleanupRequest) operationscontract.SystemLogCleanupFilter {
+	var level operationscontract.OpsSystemLogLevel
 	if body.Level != nil {
-		level = admincontrol.OpsSystemLogLevel(*body.Level)
+		level = operationscontract.OpsSystemLogLevel(*body.Level)
 	}
 	var start, end *time.Time
 	if body.Start != nil {
@@ -234,7 +252,7 @@ func systemLogCleanupFilterFromAPI(body apiopenapi.OpsSystemLogCleanupRequest) a
 	if body.DryRun != nil {
 		dryRun = *body.DryRun
 	}
-	return admincontrol.SystemLogCleanupFilter{
+	return operationscontract.SystemLogCleanupFilter{
 		Level:     level,
 		Source:    optionalStringValue(body.Source),
 		Query:     optionalStringValue(body.Q),
@@ -245,7 +263,7 @@ func systemLogCleanupFilterFromAPI(body apiopenapi.OpsSystemLogCleanupRequest) a
 	}
 }
 
-func toAPISystemLogCleanupResult(result admincontrol.SystemLogCleanupResult) apiopenapi.OpsSystemLogCleanupResult {
+func toAPISystemLogCleanupResult(result operationscontract.SystemLogCleanupResult) apiopenapi.OpsSystemLogCleanupResult {
 	return apiopenapi.OpsSystemLogCleanupResult{
 		Deleted:   result.Deleted,
 		DryRun:    result.DryRun,
@@ -255,7 +273,7 @@ func toAPISystemLogCleanupResult(result admincontrol.SystemLogCleanupResult) api
 	}
 }
 
-func systemLogCleanupAuditSnapshot(body apiopenapi.OpsSystemLogCleanupRequest, result admincontrol.SystemLogCleanupResult) map[string]any {
+func systemLogCleanupAuditSnapshot(body apiopenapi.OpsSystemLogCleanupRequest, result operationscontract.SystemLogCleanupResult) map[string]any {
 	snapshot := map[string]any{
 		"dry_run":    result.DryRun,
 		"limited":    result.Limited,
@@ -817,7 +835,7 @@ func listOptionsFromRequest(r *http.Request) admincontrol.ListOptions {
 	}
 }
 
-func systemLogListOptionsFromRequest(r *http.Request) admincontrol.SystemLogListOptions {
+func systemLogListOptionsFromRequest(r *http.Request) operationscontract.SystemLogListOptions {
 	opts := listOptionsFromRequest(r)
 	query := r.URL.Query()
 	var start, end *time.Time
@@ -827,10 +845,10 @@ func systemLogListOptionsFromRequest(r *http.Request) admincontrol.SystemLogList
 	if parsed, ok := parseOptionalRFC3339(query.Get("end")); ok {
 		end = &parsed
 	}
-	return admincontrol.SystemLogListOptions{
+	return operationscontract.SystemLogListOptions{
 		Page:     opts.Page,
 		PageSize: opts.PageSize,
-		Level:    admincontrol.OpsSystemLogLevel(strings.TrimSpace(query.Get("level"))),
+		Level:    operationscontract.OpsSystemLogLevel(strings.TrimSpace(query.Get("level"))),
 		Source:   strings.TrimSpace(query.Get("source")),
 		Query:    strings.TrimSpace(query.Get("q")),
 		Start:    start,

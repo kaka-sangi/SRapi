@@ -7,6 +7,7 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	admincontrol "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -1507,7 +1508,7 @@ func toAPIRiskControlLogs(items []admincontrol.RiskControlLog) []apiopenapi.Risk
 	return out
 }
 
-func toAPIOpsSystemLogs(items []admincontrol.OpsSystemLog) []apiopenapi.OpsSystemLog {
+func toAPIOpsSystemLogs(items []operationscontract.OpsSystemLog) []apiopenapi.OpsSystemLog {
 	out := make([]apiopenapi.OpsSystemLog, 0, len(items))
 	for _, item := range items {
 		log := apiopenapi.OpsSystemLog{
@@ -1523,6 +1524,26 @@ func toAPIOpsSystemLogs(items []admincontrol.OpsSystemLog) []apiopenapi.OpsSyste
 		out = append(out, log)
 	}
 	return out
+}
+
+func toAPIOpsSystemLogHealth(health operationscontract.SystemLogHealth) apiopenapi.OpsSystemLogHealth {
+	levelCounts := map[string]int{}
+	for level, count := range health.LevelCounts {
+		levelCounts[string(level)] = count
+	}
+	return apiopenapi.OpsSystemLogHealth{
+		CheckedAt:        health.CheckedAt,
+		Degraded:         health.Degraded,
+		LastErrorAt:      cloneTimePtr(health.LastErrorAt),
+		LastErrorMessage: optionalString(health.LastErrorMessage),
+		LastErrorSource:  optionalString(health.LastErrorSource),
+		LastLogAt:        cloneTimePtr(health.LastLogAt),
+		LevelCounts:      levelCounts,
+		Stale:            health.Stale,
+		StorageMode:      apiopenapi.OpsSystemLogHealthStorageMode(health.StorageMode),
+		TotalCount:       health.TotalCount,
+		Writable:         health.Writable,
+	}
 }
 
 func toAPIBatchOperationResult(in admincontrol.BatchOperationResult) apiopenapi.BatchOperationResult {

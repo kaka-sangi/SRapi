@@ -57,6 +57,80 @@ func TestCleanupRetentionSkipsDisabledPolicies(t *testing.T) {
 	}
 }
 
+func TestSystemLogsRecordListCleanupAndHealth(t *testing.T) {
+	now := time.Date(2026, 5, 28, 15, 0, 0, 0, time.UTC)
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	first, err := svc.RecordSystemLog(t.Context(), contract.RecordSystemLogRequest{
+		Level:     contract.OpsSystemLogLevelWarn,
+		Source:    "gateway",
+		Message:   "provider quota warning",
+		RequestID: "req_warn",
+		TraceID:   "trace_warn",
+		Metadata:  map[string]any{"safe": true},
+	})
+	if err != nil {
+		t.Fatalf("record first system log: %v", err)
+	}
+	if first.ID == 0 || first.CreatedAt.IsZero() {
+		t.Fatalf("expected generated id/time, got %+v", first)
+	}
+	if _, err := svc.RecordSystemLog(t.Context(), contract.RecordSystemLogRequest{
+		Level:     contract.OpsSystemLogLevelError,
+		Source:    "gateway",
+		Message:   "upstream failed",
+		RequestID: "req_error",
+		CreatedAt: now.Add(-time.Minute),
+	}); err != nil {
+		t.Fatalf("record second system log: %v", err)
+	}
+
+	list, err := svc.ListSystemLogs(t.Context(), contract.SystemLogListOptions{Level: contract.OpsSystemLogLevelWarn, Query: "quota"})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].RequestID != "req_warn" {
+		t.Fatalf("unexpected filtered list: %+v", list)
+	}
+
+	health, err := svc.SystemLogHealth(t.Context())
+	if err != nil {
+		t.Fatalf("system log health: %v", err)
+	}
+	if health.StorageMode != "durable" || !health.Writable || health.Degraded || health.Stale || health.TotalCount != 2 {
+		t.Fatalf("unexpected health basics: %+v", health)
+	}
+	if health.LevelCounts[contract.OpsSystemLogLevelWarn] != 1 || health.LevelCounts[contract.OpsSystemLogLevelError] != 1 {
+		t.Fatalf("unexpected level counts: %+v", health.LevelCounts)
+	}
+	if health.LastErrorAt == nil || health.LastErrorSource != "gateway" || health.LastErrorMessage != "upstream failed" {
+		t.Fatalf("unexpected last error evidence: %+v", health)
+	}
+
+	cleanup, err := svc.CleanupSystemLogs(t.Context(), contract.SystemLogCleanupFilter{
+		Level:     contract.OpsSystemLogLevelWarn,
+		MaxDelete: 10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup system logs: %v", err)
+	}
+	if cleanup.Matched != 1 || cleanup.Deleted != 1 || cleanup.Limited {
+		t.Fatalf("unexpected cleanup result: %+v", cleanup)
+	}
+
+	remaining, err := svc.ListSystemLogs(t.Context(), contract.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list remaining logs: %v", err)
+	}
+	if remaining.Total != 1 || remaining.Items[0].RequestID != "req_error" {
+		t.Fatalf("unexpected remaining logs: %+v", remaining)
+	}
+}
+
 type captureRetentionStore struct {
 	cutoffs contract.RetentionCutoffs
 }
@@ -282,10 +356,12 @@ type captureObservabilityStore struct {
 	nextAlertID   int
 	nextRuleID    int
 	nextSilenceID int
+	nextLogID     int
 	slos          map[int]contract.SLODefinition
 	alerts        map[int]contract.AlertEvent
 	rules         map[int]contract.AlertRule
 	silences      map[int]contract.AlertSilence
+	systemLogs    []contract.OpsSystemLog
 	usageLogs     []usagecontract.UsageLog
 }
 
@@ -295,11 +371,93 @@ func newCaptureObservabilityStore() *captureObservabilityStore {
 		nextAlertID:   1,
 		nextRuleID:    1,
 		nextSilenceID: 1,
+		nextLogID:     1,
 		slos:          map[int]contract.SLODefinition{},
 		alerts:        map[int]contract.AlertEvent{},
 		rules:         map[int]contract.AlertRule{},
 		silences:      map[int]contract.AlertSilence{},
 	}
+}
+
+func (s *captureObservabilityStore) CreateSystemLog(_ context.Context, input contract.OpsSystemLog) (contract.OpsSystemLog, error) {
+	input.ID = s.nextLogID
+	s.nextLogID++
+	s.systemLogs = append(s.systemLogs, input)
+	return input, nil
+}
+
+func (s *captureObservabilityStore) ListSystemLogs(_ context.Context, opts contract.SystemLogListOptions) (contract.SystemLogList, error) {
+	items := make([]contract.OpsSystemLog, 0, len(s.systemLogs))
+	filter := contract.SystemLogCleanupFilter{
+		Level:  opts.Level,
+		Source: opts.Source,
+		Query:  opts.Query,
+		Start:  opts.Start,
+		End:    opts.End,
+	}
+	for _, item := range s.systemLogs {
+		if systemLogMatches(item, filter) {
+			items = append(items, item)
+		}
+	}
+	sortSystemLogsNewestFirst(items)
+	return contract.SystemLogList{Items: items, Total: len(items)}, nil
+}
+
+func (s *captureObservabilityStore) SystemLogStats(context.Context) (contract.SystemLogStats, error) {
+	stats := contract.SystemLogStats{
+		TotalCount:  len(s.systemLogs),
+		LevelCounts: map[contract.OpsSystemLogLevel]int{},
+	}
+	for _, item := range s.systemLogs {
+		stats.LevelCounts[item.Level]++
+		if stats.LastLog == nil || systemLogIsNewerForTest(item, *stats.LastLog) {
+			cloned := item
+			stats.LastLog = &cloned
+		}
+		if item.Level != contract.OpsSystemLogLevelError {
+			continue
+		}
+		if stats.LastError == nil || systemLogIsNewerForTest(item, *stats.LastError) {
+			cloned := item
+			stats.LastError = &cloned
+		}
+	}
+	return stats, nil
+}
+
+func (s *captureObservabilityStore) CleanupSystemLogs(_ context.Context, filter contract.SystemLogCleanupFilter) (contract.SystemLogCleanupResult, error) {
+	kept := s.systemLogs[:0]
+	var matched, deleted int
+	for _, item := range s.systemLogs {
+		if !systemLogMatches(item, filter) {
+			kept = append(kept, item)
+			continue
+		}
+		matched++
+		if filter.DryRun || deleted >= filter.MaxDelete {
+			kept = append(kept, item)
+			continue
+		}
+		deleted++
+	}
+	if !filter.DryRun {
+		s.systemLogs = kept
+	}
+	return contract.SystemLogCleanupResult{
+		Matched:   matched,
+		Deleted:   deleted,
+		DryRun:    filter.DryRun,
+		MaxDelete: filter.MaxDelete,
+		Limited:   matched > deleted && !filter.DryRun,
+	}, nil
+}
+
+func systemLogIsNewerForTest(left, right contract.OpsSystemLog) bool {
+	if left.CreatedAt.Equal(right.CreatedAt) {
+		return left.ID > right.ID
+	}
+	return left.CreatedAt.After(right.CreatedAt)
 }
 
 func (s *captureObservabilityStore) CreateSLO(_ context.Context, input contract.SLODefinition) (contract.SLODefinition, error) {

@@ -9,6 +9,113 @@ import (
 )
 
 var ErrNotFound = errors.New("operations resource not found")
+var ErrInvalidInput = errors.New("invalid operations input")
+
+// OpsSystemLogLevel is the normalized severity for sanitized operations logs.
+type OpsSystemLogLevel string
+
+const (
+	OpsSystemLogLevelDebug OpsSystemLogLevel = "debug"
+	OpsSystemLogLevelInfo  OpsSystemLogLevel = "info"
+	OpsSystemLogLevelWarn  OpsSystemLogLevel = "warn"
+	OpsSystemLogLevelError OpsSystemLogLevel = "error"
+)
+
+// Valid reports whether the level is one of the contract-defined severities.
+func (l OpsSystemLogLevel) Valid() bool {
+	return l == OpsSystemLogLevelDebug || l == OpsSystemLogLevelInfo || l == OpsSystemLogLevelWarn || l == OpsSystemLogLevelError
+}
+
+// OpsSystemLog is a sanitized operational event persisted for admin evidence.
+type OpsSystemLog struct {
+	ID        int
+	Level     OpsSystemLogLevel
+	Message   string
+	Source    string
+	RequestID string
+	TraceID   string
+	Metadata  map[string]any
+	CreatedAt time.Time
+}
+
+// RecordSystemLogRequest carries a sanitized event into the operations service.
+type RecordSystemLogRequest struct {
+	Level     OpsSystemLogLevel
+	Message   string
+	Source    string
+	RequestID string
+	TraceID   string
+	Metadata  map[string]any
+	CreatedAt time.Time
+}
+
+// SystemLogList is a paginated list result plus the total matching row count.
+type SystemLogList struct {
+	Items []OpsSystemLog
+	Total int
+}
+
+// SystemLogListOptions filters and paginates operations system-log reads.
+type SystemLogListOptions struct {
+	Page     int
+	PageSize int
+	Level    OpsSystemLogLevel
+	Source   string
+	Query    string
+	Start    *time.Time
+	End      *time.Time
+}
+
+// SystemLogCleanupFilter bounds system-log cleanup operations.
+type SystemLogCleanupFilter struct {
+	Level     OpsSystemLogLevel
+	Source    string
+	Query     string
+	Start     *time.Time
+	End       *time.Time
+	DryRun    bool
+	MaxDelete int
+}
+
+// SystemLogCleanupResult summarizes a bounded cleanup or dry-run.
+type SystemLogCleanupResult struct {
+	Matched   int
+	Deleted   int
+	DryRun    bool
+	MaxDelete int
+	Limited   bool
+}
+
+// SystemLogStats is store-level evidence used to build log health responses.
+type SystemLogStats struct {
+	TotalCount  int
+	LevelCounts map[OpsSystemLogLevel]int
+	LastLog     *OpsSystemLog
+	LastError   *OpsSystemLog
+}
+
+// SystemLogHealth reports whether the operations log store is usable and fresh.
+type SystemLogHealth struct {
+	StorageMode      string
+	Writable         bool
+	Degraded         bool
+	Stale            bool
+	TotalCount       int
+	LevelCounts      map[OpsSystemLogLevel]int
+	LastLogAt        *time.Time
+	LastErrorAt      *time.Time
+	LastErrorSource  string
+	LastErrorMessage string
+	CheckedAt        time.Time
+}
+
+// SystemLogStore persists sanitized operations system logs.
+type SystemLogStore interface {
+	CreateSystemLog(ctx context.Context, input OpsSystemLog) (OpsSystemLog, error)
+	ListSystemLogs(ctx context.Context, opts SystemLogListOptions) (SystemLogList, error)
+	SystemLogStats(ctx context.Context) (SystemLogStats, error)
+	CleanupSystemLogs(ctx context.Context, filter SystemLogCleanupFilter) (SystemLogCleanupResult, error)
+}
 
 type RetentionPolicy struct {
 	UsageLogs              time.Duration
@@ -309,4 +416,5 @@ type ObservabilityStore interface {
 type Store interface {
 	RetentionStore
 	ObservabilityStore
+	SystemLogStore
 }

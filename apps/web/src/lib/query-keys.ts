@@ -50,6 +50,7 @@ export const queryKeys = {
     opsLogs: (params?: unknown) => ["admin", "ops", "logs", params ?? {}] as const,
     opsAlerts: (params?: unknown) => ["admin", "ops", "alerts", params ?? {}] as const,
     opsSystemLogs: (params?: unknown) => ["admin", "ops", "system-logs", params ?? {}] as const,
+    opsSystemLogHealth: () => ["admin", "ops", "system-logs", "health"] as const,
     opsAlertEvents: (params?: unknown) => ["admin", "ops", "alert-events", params ?? {}] as const,
     opsRealtimeSlots: () => ["admin", "ops", "realtime-slots"] as const,
     opsSlos: () => ["admin", "ops", "slos"] as const,

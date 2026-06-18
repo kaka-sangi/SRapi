@@ -15,8 +15,6 @@ import (
 
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/srapi/srapi/apps/api/ent"
-	entopssystemlog "github.com/srapi/srapi/apps/api/ent/opssystemlog"
-	"github.com/srapi/srapi/apps/api/ent/predicate"
 	entredeemcode "github.com/srapi/srapi/apps/api/ent/redeemcode"
 	entsetting "github.com/srapi/srapi/apps/api/ent/setting"
 	entsubscriptionplan "github.com/srapi/srapi/apps/api/ent/subscriptionplan"
@@ -294,97 +292,6 @@ func (s *Store) ListPromoCodeUsages(ctx context.Context, promoCodeID, limit int)
 		return nil, admincontrolcontract.ErrInvalidInput
 	}
 	return ListPromoCodeUsagesWithClient(ctx, s.client, promoCodeID, limit)
-}
-
-func (s *Store) CreateSystemLog(ctx context.Context, input admincontrolcontract.OpsSystemLog) (admincontrolcontract.OpsSystemLog, error) {
-	if strings.TrimSpace(input.Source) == "" || strings.TrimSpace(input.Message) == "" || !input.Level.Valid() {
-		return admincontrolcontract.OpsSystemLog{}, admincontrolcontract.ErrInvalidInput
-	}
-	create := s.client.OpsSystemLog.Create().
-		SetLevel(string(input.Level)).
-		SetSource(strings.TrimSpace(input.Source)).
-		SetMessage(strings.TrimSpace(input.Message)).
-		SetRequestID(strings.TrimSpace(input.RequestID)).
-		SetTraceID(strings.TrimSpace(input.TraceID)).
-		SetMetadataJSON(cloneMap(input.Metadata))
-	if !input.CreatedAt.IsZero() {
-		create.SetCreatedAt(input.CreatedAt.UTC())
-	}
-	row, err := create.Save(ctx)
-	if err != nil {
-		return admincontrolcontract.OpsSystemLog{}, err
-	}
-	return toSystemLog(row), nil
-}
-
-func (s *Store) ListSystemLogs(ctx context.Context, opts admincontrolcontract.SystemLogListOptions) (admincontrolcontract.SystemLogList, error) {
-	if err := validateSystemLogListOptions(opts); err != nil {
-		return admincontrolcontract.SystemLogList{}, err
-	}
-	page, pageSize := normalizePage(opts.Page, opts.PageSize)
-	filter := admincontrolcontract.SystemLogCleanupFilter{
-		Level:  opts.Level,
-		Source: opts.Source,
-		Query:  opts.Query,
-		Start:  opts.Start,
-		End:    opts.End,
-	}
-	predicates := systemLogPredicates(filter)
-	total, err := s.client.OpsSystemLog.Query().Where(predicates...).Count(ctx)
-	if err != nil {
-		return admincontrolcontract.SystemLogList{}, err
-	}
-	rows, err := s.client.OpsSystemLog.Query().
-		Where(predicates...).
-		Order(entopssystemlog.ByCreatedAt(entsql.OrderDesc()), entopssystemlog.ByID(entsql.OrderDesc())).
-		Offset((page - 1) * pageSize).
-		Limit(pageSize).
-		All(ctx)
-	if err != nil {
-		return admincontrolcontract.SystemLogList{}, err
-	}
-	items := make([]admincontrolcontract.OpsSystemLog, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, toSystemLog(row))
-	}
-	return admincontrolcontract.SystemLogList{Items: items, Total: total}, nil
-}
-
-func (s *Store) CleanupSystemLogs(ctx context.Context, filter admincontrolcontract.SystemLogCleanupFilter) (admincontrolcontract.SystemLogCleanupResult, error) {
-	normalized, err := normalizeSystemLogCleanupFilter(filter)
-	if err != nil {
-		return admincontrolcontract.SystemLogCleanupResult{}, err
-	}
-	predicates := systemLogPredicates(normalized)
-	matched, err := s.client.OpsSystemLog.Query().Where(predicates...).Count(ctx)
-	if err != nil {
-		return admincontrolcontract.SystemLogCleanupResult{}, err
-	}
-	result := admincontrolcontract.SystemLogCleanupResult{
-		Matched:   matched,
-		DryRun:    normalized.DryRun,
-		MaxDelete: normalized.MaxDelete,
-	}
-	if normalized.DryRun || matched == 0 {
-		return result, nil
-	}
-	rows, err := s.client.OpsSystemLog.Query().
-		Where(predicates...).
-		Order(entopssystemlog.ByCreatedAt(), entopssystemlog.ByID()).
-		Limit(normalized.MaxDelete).
-		IDs(ctx)
-	if err != nil {
-		return admincontrolcontract.SystemLogCleanupResult{}, err
-	}
-	deleted, err := s.client.OpsSystemLog.Delete().
-		Where(entopssystemlog.IDIn(rows...)).
-		Exec(ctx)
-	if err != nil {
-		return admincontrolcontract.SystemLogCleanupResult{}, err
-	}
-	result.Deleted = deleted
-	result.Limited = matched > deleted
-	return result, nil
 }
 
 func cloneMap(value map[string]any) map[string]any {
@@ -678,91 +585,6 @@ func uniquePositiveInts(values []int) []int {
 		out = append(out, value)
 	}
 	return out
-}
-
-func validateSystemLogListOptions(opts admincontrolcontract.SystemLogListOptions) error {
-	if opts.Level != "" && !opts.Level.Valid() {
-		return admincontrolcontract.ErrInvalidInput
-	}
-	if opts.Start != nil && opts.End != nil && opts.Start.After(*opts.End) {
-		return admincontrolcontract.ErrInvalidInput
-	}
-	return nil
-}
-
-func normalizeSystemLogCleanupFilter(filter admincontrolcontract.SystemLogCleanupFilter) (admincontrolcontract.SystemLogCleanupFilter, error) {
-	filter.Source = strings.TrimSpace(filter.Source)
-	filter.Query = strings.TrimSpace(filter.Query)
-	if filter.Level != "" && !filter.Level.Valid() {
-		return admincontrolcontract.SystemLogCleanupFilter{}, admincontrolcontract.ErrInvalidInput
-	}
-	if filter.Start != nil && filter.End != nil && filter.Start.After(*filter.End) {
-		return admincontrolcontract.SystemLogCleanupFilter{}, admincontrolcontract.ErrInvalidInput
-	}
-	if filter.Level == "" && filter.Source == "" && filter.Query == "" && filter.Start == nil && filter.End == nil {
-		return admincontrolcontract.SystemLogCleanupFilter{}, admincontrolcontract.ErrInvalidInput
-	}
-	if filter.MaxDelete == 0 {
-		filter.MaxDelete = 1000
-	}
-	if filter.MaxDelete < 0 || filter.MaxDelete > 10000 {
-		return admincontrolcontract.SystemLogCleanupFilter{}, admincontrolcontract.ErrInvalidInput
-	}
-	return filter, nil
-}
-
-func systemLogPredicates(filter admincontrolcontract.SystemLogCleanupFilter) []predicate.OpsSystemLog {
-	var predicates []predicate.OpsSystemLog
-	if filter.Level != "" {
-		predicates = append(predicates, entopssystemlog.LevelEQ(string(filter.Level)))
-	}
-	if source := strings.TrimSpace(filter.Source); source != "" {
-		predicates = append(predicates, entopssystemlog.SourceEqualFold(source))
-	}
-	if filter.Start != nil {
-		predicates = append(predicates, entopssystemlog.CreatedAtGTE(filter.Start.UTC()))
-	}
-	if filter.End != nil {
-		predicates = append(predicates, entopssystemlog.CreatedAtLT(filter.End.UTC()))
-	}
-	if query := strings.TrimSpace(filter.Query); query != "" {
-		predicates = append(predicates, entopssystemlog.Or(
-			entopssystemlog.MessageContainsFold(query),
-			entopssystemlog.SourceContainsFold(query),
-			entopssystemlog.RequestIDContainsFold(query),
-			entopssystemlog.TraceIDContainsFold(query),
-		))
-	}
-	return predicates
-}
-
-func normalizePage(page, pageSize int) (int, int) {
-	if page <= 0 {
-		page = 1
-	}
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-	if pageSize > 1000 {
-		pageSize = 1000
-	}
-	return page, pageSize
-}
-
-func toSystemLog(row *ent.OpsSystemLog) admincontrolcontract.OpsSystemLog {
-	if row == nil {
-		return admincontrolcontract.OpsSystemLog{}
-	}
-	return admincontrolcontract.OpsSystemLog{
-		ID:        row.ID,
-		Level:     admincontrolcontract.OpsSystemLogLevel(row.Level),
-		Message:   row.Message,
-		Source:    row.Source,
-		RequestID: row.RequestID,
-		TraceID:   row.TraceID,
-		Metadata:  cloneMap(row.MetadataJSON),
-		CreatedAt: row.CreatedAt,
-	}
 }
 
 func toAnnouncementRead(row *ent.UserAnnouncementRead) admincontrolcontract.AnnouncementRead {

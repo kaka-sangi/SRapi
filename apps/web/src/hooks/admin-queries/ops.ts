@@ -16,7 +16,8 @@ export function useOpsSlos() {
 export function useCleanupOpsSystemLogs() {
   return useAdminMutation(
     (body: P<typeof adminApi.cleanupOpsSystemLogs>) => adminApi.cleanupOpsSystemLogs(body),
-    ["admin", "ops"],
+    ["admin", "ops", "system-logs"],
+    queryKeys.admin.opsSystemLogHealth(),
   );
 }
 // Operator on-demand usage-record cleanup. Invalidates the usage-* queries so
@@ -38,6 +39,14 @@ export function useOpsSystemLogs(params?: P<typeof adminApi.listOpsSystemLogs>) 
   return useQuery({
     queryKey: queryKeys.admin.opsSystemLogs(params),
     queryFn: () => adminApi.listOpsSystemLogs(params),
+  });
+}
+
+export function useOpsSystemLogHealth() {
+  return useQuery({
+    queryKey: queryKeys.admin.opsSystemLogHealth(),
+    queryFn: () => adminApi.getOpsSystemLogHealth(),
+    refetchInterval: 30_000,
   });
 }
 

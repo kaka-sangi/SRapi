@@ -79,7 +79,7 @@ last_completed:
 | WP-630 | OpenAI-compatible API-key Realtime relay; non-api-key stays on proxy. |
 | WP-700 | Admin Control Plane v1: dashboard, ops, settings, codes, risk APIs. |
 | WP-710 | Incremental migration workflow: Atlas diff/hash targets, pairing checks. |
-| WP-760 | AdminOps durable system logs in `ops_system_logs` with filters/cleanup. |
+| WP-760 | AdminOps durable system logs owned by operations, with health evidence, filters, cleanup. |
 | WP-770 | Console TOTP 2FA: encrypted secrets, HMAC recovery codes, challenges. |
 | WP-780 | Current-user announcement inbox with per-user read receipts. |
 | WP-790 | Current-user redeem-code redemption with idempotent per-user receipts. |
@@ -460,7 +460,7 @@ notes:
 - Antigravity refresh-token-only import requires encrypted credential `oauth_client_secret` / `client_secret`; SRapi intentionally does not hard-code the Google OAuth client secret or expose it through account metadata.
 - WP-700 added `../design/ADMIN_CONTROL_PLANE_SPEC.md`, settings-backed admin-control persistence through the existing `settings` table, global API-key inventory listing, dashboard/ops read models from existing usage/account/user/realtime evidence, and `TestAdminControlPlaneV1EndpointsAndAudit` proving new admin writes require CSRF and record audit evidence.
 - WP-700 intentionally stores low-frequency console-managed state as typed settings-backed collections first; high-volume transactional histories such as redeem redemption events can be promoted to dedicated Ent schemas in a later package when the product needs per-redemption concurrency semantics.
-- WP-760 added `ops_system_logs` Ent/PostgreSQL persistence, `RecordSystemLog`/filtered list/bounded cleanup service APIs, memory and Ent store coverage, `POST /api/v1/admin/ops/system-logs/cleanup`, OpenAPI/SDK generation, and `TestSystemLogsRecordListAndCleanup` plus `TestAdminOpsSystemLogsListAndCleanup` proving dry-run cleanup, CSRF, request/trace fields, and audit omission of raw search strings.
+- WP-760 added `ops_system_logs` Ent/PostgreSQL persistence, operations-owned `RecordSystemLog`/filtered list/bounded cleanup/health service APIs, memory and Ent store coverage, `GET /api/v1/admin/ops/system-logs/health`, `POST /api/v1/admin/ops/system-logs/cleanup`, OpenAPI/SDK generation, and `TestSystemLogsRecordListAndCleanup` plus `TestAdminOpsSystemLogsListAndCleanup` proving dry-run cleanup, CSRF, request/trace fields, store health evidence, and audit omission of raw search strings. The old admin-control system-log contract/store duplicate has been removed so logs remain operational evidence rather than settings state.
 - WP-770 added `TOTP_ENCRYPTION_KEY`, `user_totp_secrets`, TOTP memory/Ent stores, password-login 202 second-factor challenges, `/api/v1/auth/login/2fa`, `/api/v1/me/totp/*` APIs, and service/HTTP regressions proving no session cookie is issued before second-factor verification.
 - WP-780 added `user_announcement_reads`, `/api/v1/me/announcements`, `/api/v1/me/announcements/{id}/read`, OpenAPI/SDK generation, and `TestUserAnnouncementsFilterVisibleAndTrackReadState` plus `TestCurrentUserAnnouncementsListAndReadState` proving audience/time-window filtering, CSRF, invisible-announcement 404, idempotent receipts, and unread reset after announcement edits.
 - WP-790 added `user_redeem_code_redemptions`, `/api/v1/me/redeem-codes/redeem`, `redeem_code_credit` billing ledger evidence, balance/subscription code fulfillment, OpenAPI/SDK generation, and `TestRedeemCodeCreditsBalanceOnce`, `TestRedeemCodeCreditsBalanceOncePersistently`, and `TestCurrentUserRedeemCodeCreditsBalanceOnce` proving current-user CSRF, persistent receipt uniqueness, and no duplicate side effects on repeated redemption.
@@ -559,7 +559,7 @@ notes:
 | WP-730 | completed | C3.1 Workspace schema, nullable User/APIKey workspace scope, personal workspace defaults, API Key inheritance, incremental migration, and docs/spec governance. |
 | WP-740 | completed | C3.2 Role permissions, admin roles API, entitlement cache table/materialization, payment_order:read RBAC, incremental migration, and docs/spec governance. |
 | WP-750 | completed | B1.2.1 usage charging pending-scan index, oldest-first batch ordering, migration, and data-model/spec governance. |
-| WP-760 | completed | AdminOps durable system logs table, filters, bounded cleanup, OpenAPI/SDK, migration, and docs/spec governance. |
+| WP-760 | completed | AdminOps durable system logs table owned by operations, health evidence, filters, bounded cleanup, OpenAPI/SDK, migration, and docs/spec governance. |
 | WP-770 | completed | Console TOTP 2FA v1 with encrypted user TOTP secrets, recovery-code hashes, login second-factor challenge, current-user TOTP APIs, OpenAPI/SDK, migration, and docs/spec governance. |
 | WP-780 | completed | Current-user announcement inbox with role/time-window visibility, per-user read receipts, CSRF mark-read API, OpenAPI/SDK, migration, and docs/spec governance. |
 | WP-790 | completed | Current-user redeem-code redemption with durable receipts, balance/subscription fulfillment, CSRF, OpenAPI/SDK, migration, and docs/spec governance. |

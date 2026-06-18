@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { FileText } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
@@ -9,6 +9,8 @@ import { ListToolbar, SearchInput, FilterSelect } from "@/components/admin/list-
 import { OpsLogCleanupDialog } from "@/components/admin/ops-log-cleanup-dialog";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -18,17 +20,12 @@ import {
 } from "@/components/ui/dialog";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { useAdminList } from "@/hooks/use-admin-list";
-import { useOpsSystemLogs } from "@/hooks/admin-queries";
+import { useOpsSystemLogHealth, useOpsSystemLogs } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatDateTime, safeJson } from "@/lib/admin-format";
-import type { OpsSystemLog, OpsSystemLogLevel } from "@/lib/sdk-types";
+import { formatDateTime, formatInteger, safeJson } from "@/lib/admin-format";
+import type { OpsSystemLog, OpsSystemLogHealth, OpsSystemLogLevel } from "@/lib/sdk-types";
 
 const LOG_LEVELS: OpsSystemLogLevel[] = ["debug", "info", "warn", "error"];
-
-// Admin view of the application's structured log buffer. Backed by the existing
-// /admin/ops/system-logs endpoint that has had real rows since launch but no
-// page to render them. Read-only for now — bounded cleanup (cleanupOpsSystemLogs)
-// is wired in the SDK and can be added behind a confirm dialog later.
 export default function AdminOpsSystemLogsPage() {
   return (
     <AdminShell>
@@ -49,6 +46,7 @@ function Content() {
     source,
     q: list.search || undefined,
   });
+  const health = useOpsSystemLogHealth();
   const [detail, setDetail] = useState<OpsSystemLog | null>(null);
   const [showCleanup, setShowCleanup] = useState(false);
 
@@ -103,6 +101,7 @@ function Content() {
           </div>
         }
       />
+      <SystemLogEvidencePanel health={health.data} loading={health.isLoading} />
       <AdminListView
         query={logs}
         columns={columns}
@@ -180,6 +179,127 @@ function Content() {
 
       <OpsLogCleanupDialog open={showCleanup} onOpenChange={setShowCleanup} />
     </>
+  );
+}
+
+function SystemLogEvidencePanel({
+  health,
+  loading,
+}: {
+  health: OpsSystemLogHealth | undefined;
+  loading: boolean;
+}) {
+  const { t } = useLanguage();
+  if (loading && !health) {
+    return (
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <EvidenceTileSkeleton />
+        <EvidenceTileSkeleton />
+        <EvidenceTileSkeleton />
+        <EvidenceTileSkeleton />
+      </div>
+    );
+  }
+  const total = health?.total_count ?? 0;
+  const lastErrorHint = health?.last_error_at
+    ? [formatDateTime(health.last_error_at), health.last_error_source].filter(Boolean).join(" · ")
+    : t("adminOpsSystemLogs.noRecentError");
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <EvidenceTile
+        label={t("adminOpsSystemLogs.backend")}
+        value={health?.storage_mode ?? "-"}
+        footer={
+          <span className="flex flex-wrap gap-1.5">
+            <QuietBadge
+              status={health?.writable ? "active" : "error"}
+              label={
+                health?.writable
+                  ? t("adminOpsSystemLogs.writable")
+                  : t("adminOpsSystemLogs.readOnly")
+              }
+            />
+            {health?.degraded ? (
+              <QuietBadge status="error" label={t("adminOpsSystemLogs.degraded")} />
+            ) : (
+              <QuietBadge status="active" label={t("adminOpsSystemLogs.healthy")} />
+            )}
+          </span>
+        }
+      />
+      <EvidenceTile
+        label={t("adminOpsSystemLogs.lastWrite")}
+        value={formatDateTime(health?.last_log_at)}
+        footer={
+          <QuietBadge
+            status={health?.stale ? "limited" : "active"}
+            label={health?.stale ? t("adminOpsSystemLogs.stale") : t("adminOpsSystemLogs.fresh")}
+          />
+        }
+      />
+      <EvidenceTile
+        label={t("adminOpsSystemLogs.lastError")}
+        value={health?.last_error_message || "-"}
+        footer={
+          <span className="block truncate" title={lastErrorHint}>
+            {lastErrorHint}
+          </span>
+        }
+      />
+      <EvidenceTile
+        label={t("adminOpsSystemLogs.total")}
+        value={formatInteger(total)}
+        footer={<LevelCounts counts={health?.level_counts} />}
+      />
+    </div>
+  );
+}
+
+function EvidenceTile({
+  label,
+  value,
+  footer,
+}: {
+  label: string;
+  value: string;
+  footer: ReactNode;
+}) {
+  return (
+    <Card className="flex min-h-28 flex-col justify-between p-4">
+      <div>
+        <div className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</div>
+        <div className="mt-2 line-clamp-2 break-words text-sm font-medium text-srapi-text-primary">
+          {value}
+        </div>
+      </div>
+      <div className="mt-3 font-mono text-2xs text-srapi-text-tertiary">{footer}</div>
+    </Card>
+  );
+}
+
+function EvidenceTileSkeleton() {
+  return (
+    <Card className="flex min-h-28 flex-col justify-between p-4">
+      <div>
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="mt-3 h-4 w-32" />
+      </div>
+      <Skeleton className="mt-4 h-5 w-40" />
+    </Card>
+  );
+}
+
+function LevelCounts({ counts }: { counts: OpsSystemLogHealth["level_counts"] | undefined }) {
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      {LOG_LEVELS.map((level) => (
+        <QuietBadge
+          key={level}
+          status={levelTone(level)}
+          label={`${level}:${formatInteger(counts?.[level] ?? 0)}`}
+        />
+      ))}
+    </span>
   );
 }
 

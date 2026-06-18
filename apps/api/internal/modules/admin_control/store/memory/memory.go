@@ -19,8 +19,6 @@ import (
 type Store struct {
 	mu                     sync.Mutex
 	values                 map[string]map[string]any
-	systemLogs             []admincontrol.OpsSystemLog
-	nextLogID              int
 	reads                  map[int]map[int]admincontrol.AnnouncementRead
 	nextReadID             int
 	users                  userscontract.Store
@@ -43,7 +41,6 @@ func New() *Store {
 func NewWithFulfillment(users userscontract.Store, billing billingcontract.Store, subs subscriptioncontract.Store) *Store {
 	return &Store{
 		values:                 map[string]map[string]any{},
-		nextLogID:              1,
 		reads:                  map[int]map[int]admincontrol.AnnouncementRead{},
 		nextReadID:             1,
 		users:                  users,
@@ -589,77 +586,6 @@ func (s *Store) ListPromoCodeUsages(_ context.Context, promoCodeID, limit int) (
 	return usages, nil
 }
 
-func (s *Store) CreateSystemLog(_ context.Context, input admincontrol.OpsSystemLog) (admincontrol.OpsSystemLog, error) {
-	if strings.TrimSpace(input.Source) == "" || strings.TrimSpace(input.Message) == "" || !input.Level.Valid() {
-		return admincontrol.OpsSystemLog{}, admincontrol.ErrInvalidInput
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if input.ID <= 0 {
-		input.ID = s.nextLogID
-		s.nextLogID++
-	}
-	if input.CreatedAt.IsZero() {
-		input.CreatedAt = time.Now().UTC()
-	}
-	input.Metadata = cloneMap(input.Metadata)
-	s.systemLogs = append(s.systemLogs, input)
-	return cloneSystemLog(input), nil
-}
-
-func (s *Store) ListSystemLogs(_ context.Context, opts admincontrol.SystemLogListOptions) (admincontrol.SystemLogList, error) {
-	if opts.Level != "" && !opts.Level.Valid() {
-		return admincontrol.SystemLogList{}, admincontrol.ErrInvalidInput
-	}
-	if opts.Start != nil && opts.End != nil && opts.Start.After(*opts.End) {
-		return admincontrol.SystemLogList{}, admincontrol.ErrInvalidInput
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	items := make([]admincontrol.OpsSystemLog, 0, len(s.systemLogs))
-	filter := systemLogCleanupFilterFromListOptions(opts)
-	for _, item := range s.systemLogs {
-		if systemLogMatches(item, filter) {
-			items = append(items, cloneSystemLog(item))
-		}
-	}
-	sort.SliceStable(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
-	return admincontrol.SystemLogList{Items: pageSystemLogs(items, opts.Page, opts.PageSize), Total: len(items)}, nil
-}
-
-func (s *Store) CleanupSystemLogs(_ context.Context, filter admincontrol.SystemLogCleanupFilter) (admincontrol.SystemLogCleanupResult, error) {
-	normalized, err := normalizeSystemLogCleanupFilter(filter)
-	if err != nil {
-		return admincontrol.SystemLogCleanupResult{}, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	kept := s.systemLogs[:0]
-	var matched, deleted int
-	for _, item := range s.systemLogs {
-		if !systemLogMatches(item, normalized) {
-			kept = append(kept, item)
-			continue
-		}
-		matched++
-		if normalized.DryRun || deleted >= normalized.MaxDelete {
-			kept = append(kept, item)
-			continue
-		}
-		deleted++
-	}
-	if !normalized.DryRun {
-		s.systemLogs = kept
-	}
-	return admincontrol.SystemLogCleanupResult{
-		Matched:   matched,
-		Deleted:   deleted,
-		DryRun:    normalized.DryRun,
-		MaxDelete: normalized.MaxDelete,
-		Limited:   matched > deleted && !normalized.DryRun,
-	}, nil
-}
-
 func cloneMap(value map[string]any) map[string]any {
 	if value == nil {
 		return map[string]any{}
@@ -669,85 +595,6 @@ func cloneMap(value map[string]any) map[string]any {
 		out[key] = item
 	}
 	return out
-}
-
-func cloneSystemLog(value admincontrol.OpsSystemLog) admincontrol.OpsSystemLog {
-	value.Metadata = cloneMap(value.Metadata)
-	return value
-}
-
-func systemLogCleanupFilterFromListOptions(opts admincontrol.SystemLogListOptions) admincontrol.SystemLogCleanupFilter {
-	return admincontrol.SystemLogCleanupFilter{
-		Level:  opts.Level,
-		Source: strings.TrimSpace(opts.Source),
-		Query:  strings.TrimSpace(opts.Query),
-		Start:  opts.Start,
-		End:    opts.End,
-	}
-}
-
-func normalizeSystemLogCleanupFilter(filter admincontrol.SystemLogCleanupFilter) (admincontrol.SystemLogCleanupFilter, error) {
-	filter.Source = strings.TrimSpace(filter.Source)
-	filter.Query = strings.TrimSpace(filter.Query)
-	if filter.Level != "" && !filter.Level.Valid() {
-		return admincontrol.SystemLogCleanupFilter{}, admincontrol.ErrInvalidInput
-	}
-	if filter.Start != nil && filter.End != nil && filter.Start.After(*filter.End) {
-		return admincontrol.SystemLogCleanupFilter{}, admincontrol.ErrInvalidInput
-	}
-	if filter.Level == "" && filter.Source == "" && filter.Query == "" && filter.Start == nil && filter.End == nil {
-		return admincontrol.SystemLogCleanupFilter{}, admincontrol.ErrInvalidInput
-	}
-	if filter.MaxDelete == 0 {
-		filter.MaxDelete = 1000
-	}
-	if filter.MaxDelete < 0 || filter.MaxDelete > 10000 {
-		return admincontrol.SystemLogCleanupFilter{}, admincontrol.ErrInvalidInput
-	}
-	return filter, nil
-}
-
-func systemLogMatches(log admincontrol.OpsSystemLog, filter admincontrol.SystemLogCleanupFilter) bool {
-	if filter.Level != "" && log.Level != filter.Level {
-		return false
-	}
-	if filter.Source != "" && !strings.EqualFold(log.Source, filter.Source) {
-		return false
-	}
-	if filter.Start != nil && log.CreatedAt.Before(filter.Start.UTC()) {
-		return false
-	}
-	if filter.End != nil && !log.CreatedAt.Before(filter.End.UTC()) {
-		return false
-	}
-	if filter.Query != "" {
-		query := strings.ToLower(filter.Query)
-		if !strings.Contains(strings.ToLower(log.Message), query) && !strings.Contains(strings.ToLower(log.Source), query) && !strings.Contains(strings.ToLower(log.RequestID), query) && !strings.Contains(strings.ToLower(log.TraceID), query) {
-			return false
-		}
-	}
-	return true
-}
-
-func pageSystemLogs(items []admincontrol.OpsSystemLog, page, pageSize int) []admincontrol.OpsSystemLog {
-	if page <= 0 {
-		page = 1
-	}
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-	if pageSize > 1000 {
-		pageSize = 1000
-	}
-	start := (page - 1) * pageSize
-	if start >= len(items) {
-		return []admincontrol.OpsSystemLog{}
-	}
-	end := start + pageSize
-	if end > len(items) {
-		end = len(items)
-	}
-	return items[start:end]
 }
 
 // findPromoCode locates a promo code row by its normalized code, applying

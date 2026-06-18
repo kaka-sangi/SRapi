@@ -104,6 +104,7 @@ export type {
   OpsSettings,
   OpsSystemLog,
   OpsSystemLogLevel,
+  OpsSystemLogHealth,
   OpsSystemLogCleanupResult,
   ModelRateLimit,
   AccountGroupRateLimit,

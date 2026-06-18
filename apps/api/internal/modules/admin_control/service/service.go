@@ -61,11 +61,6 @@ func (s *Service) saveTyped(ctx context.Context, key string, value any, actorUse
 	return s.store.Set(ctx, key, raw, &actorUserID)
 }
 
-func (s *Service) systemLogStore() (admincontrol.SystemLogStore, bool) {
-	store, ok := s.store.(admincontrol.SystemLogStore)
-	return store, ok
-}
-
 func cloneAnyMap(value map[string]any) map[string]any {
 	if value == nil {
 		return nil

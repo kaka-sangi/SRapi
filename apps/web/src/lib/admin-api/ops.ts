@@ -18,6 +18,7 @@ import {
   getAdminOpsErrorTrend,
   getAdminOpsLatencyHistogram,
   getAdminOpsOverview,
+  getAdminOpsSystemLogHealth,
   getAdminOpsThroughputTrend,
   listAdminOpsAlertEvents,
   listAdminOpsAlerts,
@@ -48,6 +49,7 @@ import type {
   OpsSloDefinition,
   UpdateAdminOpsSloData,
   OpsSystemLog,
+  OpsSystemLogHealth,
   OpsSystemLogCleanupRequest,
   OpsSystemLogCleanupResult,
   OpsThroughputTrend,
@@ -93,6 +95,11 @@ export const opsApi = {
   ): Promise<AdminListResult<OpsSystemLog>> {
     return unwrapList(() => listAdminOpsSystemLogs({ query, throwOnError: true }));
   },
+
+  getOpsSystemLogHealth(): Promise<OpsSystemLogHealth> {
+    return unwrapData(() => getAdminOpsSystemLogHealth({ throwOnError: true }));
+  },
+
   // Bounded deletion of sanitized system logs (requires ≥1 filter; dry_run
   // previews without deleting). Returns matched/deleted counts.
   cleanupOpsSystemLogs(body: OpsSystemLogCleanupRequest): Promise<OpsSystemLogCleanupResult> {

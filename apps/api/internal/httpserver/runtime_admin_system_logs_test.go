@@ -10,22 +10,22 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
-	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
-	admincontrolmemory "github.com/srapi/srapi/apps/api/internal/modules/admin_control/store/memory"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
 func TestAdminOpsSystemLogsListAndCleanup(t *testing.T) {
-	adminStore := admincontrolmemory.New()
-	handler := New(config.Load(), nil, WithAdminControlStore(adminStore))
+	operationsStore := operationsmemory.New()
+	handler := New(config.Load(), nil, WithOperationsStore(operationsStore))
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
-	_, err := adminStore.CreateSystemLog(context.Background(), admincontrolcontract.OpsSystemLog{
-		Level:     admincontrolcontract.OpsSystemLogLevelWarn,
+	_, err := operationsStore.CreateSystemLog(context.Background(), operationscontract.OpsSystemLog{
+		Level:     operationscontract.OpsSystemLogLevelWarn,
 		Source:    "ops.dashboard",
 		Message:   "rotate logs",
 		RequestID: "req_cleanup",
 		TraceID:   "trace_cleanup",
-		CreatedAt: time.Date(2026, time.May, 28, 12, 0, 0, 0, time.UTC),
+		CreatedAt: time.Now().UTC().Add(-time.Minute),
 	})
 	if err != nil {
 		t.Fatalf("seed system log: %v", err)
@@ -44,6 +44,21 @@ func TestAdminOpsSystemLogsListAndCleanup(t *testing.T) {
 	}
 	if len(listResp.Data) != 1 || listResp.Data[0].RequestId == nil || *listResp.Data[0].RequestId != "req_cleanup" {
 		t.Fatalf("unexpected system log list response: %+v", listResp.Data)
+	}
+
+	healthReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/system-logs/health", nil)
+	healthReq.AddCookie(sessionCookie)
+	healthRec := httptest.NewRecorder()
+	handler.ServeHTTP(healthRec, healthReq)
+	if healthRec.Code != http.StatusOK {
+		t.Fatalf("expected health 200, got %d body=%s", healthRec.Code, healthRec.Body.String())
+	}
+	var healthResp apiopenapi.OpsSystemLogHealthResponse
+	if err := json.NewDecoder(healthRec.Body).Decode(&healthResp); err != nil {
+		t.Fatalf("decode health response: %v", err)
+	}
+	if healthResp.Data.StorageMode != "durable" || !healthResp.Data.Writable || healthResp.Data.TotalCount != 1 || healthResp.Data.Stale {
+		t.Fatalf("unexpected health response: %+v", healthResp.Data)
 	}
 
 	cleanupReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/ops/system-logs/cleanup", strings.NewReader(`{"source":"ops.dashboard","q":"rotate","dry_run":true,"max_delete":1}`))

@@ -30,6 +30,7 @@ func (SystemClock) Now() time.Time { return time.Now().UTC() }
 type Service struct {
 	retentionStore     contract.RetentionStore
 	observabilityStore contract.ObservabilityStore
+	systemLogStore     contract.SystemLogStore
 	clock              Clock
 }
 
@@ -44,7 +45,16 @@ func NewWithStores(retentionStore contract.RetentionStore, observabilityStore co
 	if clock == nil {
 		clock = SystemClock{}
 	}
-	return &Service{retentionStore: retentionStore, observabilityStore: observabilityStore, clock: clock}, nil
+	systemLogStore, _ := observabilityStore.(contract.SystemLogStore)
+	if systemLogStore == nil {
+		systemLogStore, _ = retentionStore.(contract.SystemLogStore)
+	}
+	return &Service{
+		retentionStore:     retentionStore,
+		observabilityStore: observabilityStore,
+		systemLogStore:     systemLogStore,
+		clock:              clock,
+	}, nil
 }
 
 func (s *Service) CleanupRetention(ctx context.Context, policy contract.RetentionPolicy) (contract.CleanupResult, error) {

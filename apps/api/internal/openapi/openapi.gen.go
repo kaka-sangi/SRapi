@@ -2018,6 +2018,24 @@ func (e OpsSLOStatus) Valid() bool {
 	}
 }
 
+// Defines values for OpsSystemLogHealthStorageMode.
+const (
+	Durable     OpsSystemLogHealthStorageMode = "durable"
+	Unavailable OpsSystemLogHealthStorageMode = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the OpsSystemLogHealthStorageMode enum.
+func (e OpsSystemLogHealthStorageMode) Valid() bool {
+	switch e {
+	case Durable:
+		return true
+	case Unavailable:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OpsSystemLogLevel.
 const (
 	OpsSystemLogLevelDebug OpsSystemLogLevel = "debug"
@@ -8529,6 +8547,30 @@ type OpsSystemLogCleanupResult struct {
 	Limited   bool `json:"limited"`
 	Matched   int  `json:"matched"`
 	MaxDelete int  `json:"max_delete"`
+}
+
+// OpsSystemLogHealth defines model for OpsSystemLogHealth.
+type OpsSystemLogHealth struct {
+	CheckedAt        Timestamp                     `json:"checked_at"`
+	Degraded         bool                          `json:"degraded"`
+	LastErrorAt      *Timestamp                    `json:"last_error_at,omitempty"`
+	LastErrorMessage *string                       `json:"last_error_message,omitempty"`
+	LastErrorSource  *string                       `json:"last_error_source,omitempty"`
+	LastLogAt        *Timestamp                    `json:"last_log_at,omitempty"`
+	LevelCounts      map[string]int                `json:"level_counts"`
+	Stale            bool                          `json:"stale"`
+	StorageMode      OpsSystemLogHealthStorageMode `json:"storage_mode"`
+	TotalCount       int                           `json:"total_count"`
+	Writable         bool                          `json:"writable"`
+}
+
+// OpsSystemLogHealthStorageMode defines model for OpsSystemLogHealth.StorageMode.
+type OpsSystemLogHealthStorageMode string
+
+// OpsSystemLogHealthResponse defines model for OpsSystemLogHealthResponse.
+type OpsSystemLogHealthResponse struct {
+	Data      OpsSystemLogHealth `json:"data"`
+	RequestId RequestId          `json:"request_id"`
 }
 
 // OpsSystemLogLevel defines model for OpsSystemLogLevel.
@@ -19762,6 +19804,9 @@ type ServerInterface interface {
 	// Cleanup sanitized system log events by bounded filter.
 	// (POST /api/v1/admin/ops/system-logs/cleanup)
 	CleanupAdminOpsSystemLogs(w http.ResponseWriter, r *http.Request)
+	// Get sanitized system log evidence health.
+	// (GET /api/v1/admin/ops/system-logs/health)
+	GetAdminOpsSystemLogHealth(w http.ResponseWriter, r *http.Request)
 	// Get request and token throughput trend.
 	// (GET /api/v1/admin/ops/throughput-trend)
 	GetAdminOpsThroughputTrend(w http.ResponseWriter, r *http.Request, params GetAdminOpsThroughputTrendParams)
@@ -27391,6 +27436,26 @@ func (siw *ServerInterfaceWrapper) CleanupAdminOpsSystemLogs(w http.ResponseWrit
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CleanupAdminOpsSystemLogs(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminOpsSystemLogHealth operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminOpsSystemLogHealth(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminOpsSystemLogHealth(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -35486,6 +35551,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/ops/slo/{id}", wrapper.UpdateAdminOpsSLO)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/system-logs", wrapper.ListAdminOpsSystemLogs)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/system-logs/cleanup", wrapper.CleanupAdminOpsSystemLogs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/system-logs/health", wrapper.GetAdminOpsSystemLogHealth)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/throughput-trend", wrapper.GetAdminOpsThroughputTrend)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/overview", wrapper.GetAdminOverview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payload-rules", wrapper.ListAdminPayloadRules)

@@ -2653,7 +2653,8 @@ Required gates:
 
 Objective: finish the AdminOps system-log follow-up from the control-plane
 phase by moving sanitized system logs out of settings-backed placeholder state
-and into a durable, queryable, bounded-cleanup store.
+and into a durable, queryable, bounded-cleanup operations store. System logs
+are operational evidence, not admin-control settings state.
 
 Read first:
 
@@ -2667,22 +2668,29 @@ Read first:
 Owns:
 
 - `ops_system_logs` Ent schema and incremental PostgreSQL migration.
-- Admin-control service/store contract for recording, listing, and cleaning
+- Operations service/store contract for recording, listing, and cleaning
   sanitized system-log events.
 - In-memory and Ent-backed store implementations.
 - `GET /api/v1/admin/ops/system-logs` filters for level, source, text query,
   and time range.
+- `GET /api/v1/admin/ops/system-logs/health` exposes durable-store health,
+  freshness, total count, level counts, and last-error evidence.
 - `POST /api/v1/admin/ops/system-logs/cleanup` with CSRF, dry-run,
   `max_delete` caps, and safe audit summaries.
 - Generated OpenAPI Go types and TypeScript SDK.
-- Focused service, HTTP, migration, and contract drift tests.
+- Admin UI evidence panel for store mode, freshness, last error, total count,
+  and level distribution.
+- Focused service, HTTP, frontend, migration, and contract drift tests.
 
 Definition of Done:
 
 - System logs persist to `ops_system_logs` with indexed level/source/time and
   request/trace correlation fields.
+- The operations module owns system-log record/list/cleanup/health behavior;
+  `admin_control` must not keep duplicate system-log contracts or stores.
 - List responses include request and trace IDs and never include credentials,
   prompts, cookies, raw API keys, or provider-native frames.
+- Health evidence is derived from store stats, not from a sampled list page.
 - Cleanup rejects unbounded requests, supports dry-run, caps deletion volume,
   and records audit evidence without raw search strings or log bodies.
 - Admin Control Plane and data-model docs no longer describe durable system
@@ -2697,7 +2705,8 @@ Required gates:
 - `make openapi-codegen-check`
 - `make openapi-ts-codegen-check`
 - `make sdk-ts-typecheck`
-- `cd apps/api && go test ./internal/modules/admin_control/... ./internal/persistence/entstore/admincontrol ./internal/platform/db ./internal/httpserver -run 'TestSystemLogsRecordListAndCleanup|TestAdminOpsSystemLogsListAndCleanup|TestConsoleWriteRoutesRequireCSRF|Test(PostgresVersionedUpMigrationsMatchEntSchema|PostgresDownMigrationsCoverCreatedTables|PostgresIncrementalMigrationsArePairedAndContiguous|EntSchemaAppliesToEmptyDatabase)' -count=1`
+- `cd apps/api && go test ./internal/modules/admin_control/... ./internal/modules/operations/... ./internal/persistence/entstore/admincontrol ./internal/persistence/entstore/operations ./internal/httpserver -run 'TestSystemLogs|TestAdminOpsSystemLogs|TestBatchDisableRedeemCodesClassifiesPerItemReasons' -count=1`
+- `pnpm --filter @srapi/web typecheck`
 - `make architecture-check`
 - `make code-quality-check`
 - `git diff --check`

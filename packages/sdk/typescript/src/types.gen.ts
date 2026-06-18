@@ -3265,6 +3265,27 @@ export type OpsSystemLogListResponse = {
     request_id: RequestId;
 };
 
+export type OpsSystemLogHealth = {
+    storage_mode: 'durable' | 'unavailable';
+    writable: boolean;
+    degraded: boolean;
+    stale: boolean;
+    total_count: number;
+    level_counts: {
+        [key: string]: number;
+    };
+    last_log_at?: Timestamp;
+    last_error_at?: Timestamp;
+    last_error_source?: string;
+    last_error_message?: string;
+    checked_at: Timestamp;
+};
+
+export type OpsSystemLogHealthResponse = {
+    data: OpsSystemLogHealth;
+    request_id: RequestId;
+};
+
 export type OpsSystemLogCleanupRequest = {
     level?: OpsSystemLogLevel;
     source?: string;
@@ -17218,6 +17239,39 @@ export type ListAdminOpsSystemLogsResponses = {
 };
 
 export type ListAdminOpsSystemLogsResponse = ListAdminOpsSystemLogsResponses[keyof ListAdminOpsSystemLogsResponses];
+
+export type GetAdminOpsSystemLogHealthData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/ops/system-logs/health';
+};
+
+export type GetAdminOpsSystemLogHealthErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminOpsSystemLogHealthError = GetAdminOpsSystemLogHealthErrors[keyof GetAdminOpsSystemLogHealthErrors];
+
+export type GetAdminOpsSystemLogHealthResponses = {
+    /**
+     * System log evidence health.
+     */
+    200: OpsSystemLogHealthResponse;
+};
+
+export type GetAdminOpsSystemLogHealthResponse = GetAdminOpsSystemLogHealthResponses[keyof GetAdminOpsSystemLogHealthResponses];
 
 export type CleanupAdminOpsSystemLogsData = {
     body: OpsSystemLogCleanupRequest;

@@ -9829,6 +9829,36 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/ops/system-logs/health:
+    get:
+      tags:
+        - AdminOps
+      operationId: getAdminOpsSystemLogHealth
+      summary: Get sanitized system log evidence health.
+      description: Reports the active system-log evidence backend and latest safe write/error signals for operator diagnostics.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: System log evidence health.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsSystemLogHealthResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/ops/system-logs/cleanup:
     post:
       tags:
@@ -24100,6 +24130,58 @@ components:
             $ref: "#/components/schemas/OpsSystemLog"
         pagination:
           $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsSystemLogHealth:
+      type: object
+      required:
+        - storage_mode
+        - writable
+        - degraded
+        - stale
+        - total_count
+        - level_counts
+        - checked_at
+      properties:
+        storage_mode:
+          type: string
+          enum:
+            - durable
+            - unavailable
+        writable:
+          type: boolean
+        degraded:
+          type: boolean
+        stale:
+          type: boolean
+        total_count:
+          type: integer
+          minimum: 0
+        level_counts:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        last_log_at:
+          $ref: "#/components/schemas/Timestamp"
+        last_error_at:
+          $ref: "#/components/schemas/Timestamp"
+        last_error_source:
+          type: string
+        last_error_message:
+          type: string
+        checked_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    OpsSystemLogHealthResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsSystemLogHealth"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

@@ -776,6 +776,7 @@ func (s *Server) registerAdminOpsRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/admin/ops/latency-histogram", s.handleAdminOpsLatencyHistogram)
 	mux.HandleFunc("GET /api/v1/admin/ops/concurrency", s.handleAdminOpsConcurrency)
 	mux.HandleFunc("GET /api/v1/admin/ops/system-logs", s.handleListAdminOpsSystemLogs)
+	mux.HandleFunc("GET /api/v1/admin/ops/system-logs/health", s.handleAdminOpsSystemLogHealth)
 	mux.HandleFunc("POST /api/v1/admin/ops/system-logs/cleanup", s.handleCleanupAdminOpsSystemLogs)
 	// Operator on-demand usage-record cleanup — the counterpart to the
 	// background retention worker; lives here alongside the system-log cleanup.

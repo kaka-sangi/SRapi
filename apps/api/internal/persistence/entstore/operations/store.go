@@ -8,11 +8,14 @@ import (
 	"strings"
 	"time"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/srapi/srapi/apps/api/ent"
 	entaccounthealthsnapshot "github.com/srapi/srapi/apps/api/ent/accounthealthsnapshot"
 	entauditlog "github.com/srapi/srapi/apps/api/ent/auditlog"
 	entobsalertevent "github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	entobsslodefinition "github.com/srapi/srapi/apps/api/ent/obsslodefinition"
+	entopssystemlog "github.com/srapi/srapi/apps/api/ent/opssystemlog"
+	"github.com/srapi/srapi/apps/api/ent/predicate"
 	entschedulerdecision "github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	entschedulerfeedback "github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
 	entusagelog "github.com/srapi/srapi/apps/api/ent/usagelog"
@@ -79,6 +82,143 @@ func (s *Store) Cleanup(ctx context.Context, cutoffs contract.RetentionCutoffs) 
 		result.AccountHealthSnapshots = deleted
 		result.Limited = result.Limited || limited
 	}
+	return result, nil
+}
+
+func (s *Store) CreateSystemLog(ctx context.Context, input contract.OpsSystemLog) (contract.OpsSystemLog, error) {
+	if strings.TrimSpace(input.Source) == "" || strings.TrimSpace(input.Message) == "" || !input.Level.Valid() {
+		return contract.OpsSystemLog{}, contract.ErrInvalidInput
+	}
+	create := s.client.OpsSystemLog.Create().
+		SetLevel(string(input.Level)).
+		SetSource(strings.TrimSpace(input.Source)).
+		SetMessage(strings.TrimSpace(input.Message)).
+		SetRequestID(strings.TrimSpace(input.RequestID)).
+		SetTraceID(strings.TrimSpace(input.TraceID)).
+		SetMetadataJSON(cloneMap(input.Metadata))
+	if !input.CreatedAt.IsZero() {
+		create.SetCreatedAt(input.CreatedAt.UTC())
+	}
+	row, err := create.Save(ctx)
+	if err != nil {
+		return contract.OpsSystemLog{}, err
+	}
+	return toSystemLog(row), nil
+}
+
+func (s *Store) ListSystemLogs(ctx context.Context, opts contract.SystemLogListOptions) (contract.SystemLogList, error) {
+	if opts.Level != "" && !opts.Level.Valid() {
+		return contract.SystemLogList{}, contract.ErrInvalidInput
+	}
+	if opts.Start != nil && opts.End != nil && opts.Start.After(*opts.End) {
+		return contract.SystemLogList{}, contract.ErrInvalidInput
+	}
+	page, pageSize := normalizePage(opts.Page, opts.PageSize)
+	filter := contract.SystemLogCleanupFilter{
+		Level:  opts.Level,
+		Source: opts.Source,
+		Query:  opts.Query,
+		Start:  opts.Start,
+		End:    opts.End,
+	}
+	predicates := systemLogPredicates(filter)
+	total, err := s.client.OpsSystemLog.Query().Where(predicates...).Count(ctx)
+	if err != nil {
+		return contract.SystemLogList{}, err
+	}
+	rows, err := s.client.OpsSystemLog.Query().
+		Where(predicates...).
+		Order(entopssystemlog.ByCreatedAt(entsql.OrderDesc()), entopssystemlog.ByID(entsql.OrderDesc())).
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		All(ctx)
+	if err != nil {
+		return contract.SystemLogList{}, err
+	}
+	items := make([]contract.OpsSystemLog, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, toSystemLog(row))
+	}
+	return contract.SystemLogList{Items: items, Total: total}, nil
+}
+
+func (s *Store) SystemLogStats(ctx context.Context) (contract.SystemLogStats, error) {
+	stats := contract.SystemLogStats{LevelCounts: map[contract.OpsSystemLogLevel]int{}}
+	total, err := s.client.OpsSystemLog.Query().Count(ctx)
+	if err != nil {
+		return contract.SystemLogStats{}, err
+	}
+	stats.TotalCount = total
+	for _, level := range []contract.OpsSystemLogLevel{
+		contract.OpsSystemLogLevelDebug,
+		contract.OpsSystemLogLevelInfo,
+		contract.OpsSystemLogLevelWarn,
+		contract.OpsSystemLogLevelError,
+	} {
+		count, err := s.client.OpsSystemLog.Query().Where(entopssystemlog.LevelEQ(string(level))).Count(ctx)
+		if err != nil {
+			return contract.SystemLogStats{}, err
+		}
+		stats.LevelCounts[level] = count
+	}
+	row, err := s.client.OpsSystemLog.Query().
+		Order(entopssystemlog.ByCreatedAt(entsql.OrderDesc()), entopssystemlog.ByID(entsql.OrderDesc())).
+		First(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return contract.SystemLogStats{}, err
+	}
+	if row != nil {
+		lastLog := toSystemLog(row)
+		stats.LastLog = &lastLog
+	}
+	errorRow, err := s.client.OpsSystemLog.Query().
+		Where(entopssystemlog.LevelEQ(string(contract.OpsSystemLogLevelError))).
+		Order(entopssystemlog.ByCreatedAt(entsql.OrderDesc()), entopssystemlog.ByID(entsql.OrderDesc())).
+		First(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return contract.SystemLogStats{}, err
+	}
+	if errorRow != nil {
+		lastError := toSystemLog(errorRow)
+		stats.LastError = &lastError
+	}
+	return stats, nil
+}
+
+func (s *Store) CleanupSystemLogs(ctx context.Context, filter contract.SystemLogCleanupFilter) (contract.SystemLogCleanupResult, error) {
+	normalized, err := normalizeSystemLogCleanupFilter(filter)
+	if err != nil {
+		return contract.SystemLogCleanupResult{}, err
+	}
+	predicates := systemLogPredicates(normalized)
+	matched, err := s.client.OpsSystemLog.Query().Where(predicates...).Count(ctx)
+	if err != nil {
+		return contract.SystemLogCleanupResult{}, err
+	}
+	result := contract.SystemLogCleanupResult{
+		Matched:   matched,
+		DryRun:    normalized.DryRun,
+		MaxDelete: normalized.MaxDelete,
+	}
+	if normalized.DryRun || matched == 0 {
+		return result, nil
+	}
+	rows, err := s.client.OpsSystemLog.Query().
+		Where(predicates...).
+		Order(entopssystemlog.ByCreatedAt(), entopssystemlog.ByID()).
+		Limit(normalized.MaxDelete).
+		IDs(ctx)
+	if err != nil {
+		return contract.SystemLogCleanupResult{}, err
+	}
+	deleted, err := s.client.OpsSystemLog.Delete().
+		Where(entopssystemlog.IDIn(rows...)).
+		Exec(ctx)
+	if err != nil {
+		return contract.SystemLogCleanupResult{}, err
+	}
+	result.Deleted = deleted
+	result.Limited = matched > deleted
 	return result, nil
 }
 
@@ -510,6 +650,81 @@ func mapNotFound(err error) error {
 		return contract.ErrNotFound
 	}
 	return err
+}
+
+func systemLogPredicates(filter contract.SystemLogCleanupFilter) []predicate.OpsSystemLog {
+	var predicates []predicate.OpsSystemLog
+	if filter.Level != "" {
+		predicates = append(predicates, entopssystemlog.LevelEQ(string(filter.Level)))
+	}
+	if source := strings.TrimSpace(filter.Source); source != "" {
+		predicates = append(predicates, entopssystemlog.SourceEqualFold(source))
+	}
+	if filter.Start != nil {
+		predicates = append(predicates, entopssystemlog.CreatedAtGTE(filter.Start.UTC()))
+	}
+	if filter.End != nil {
+		predicates = append(predicates, entopssystemlog.CreatedAtLT(filter.End.UTC()))
+	}
+	if query := strings.TrimSpace(filter.Query); query != "" {
+		predicates = append(predicates, entopssystemlog.Or(
+			entopssystemlog.MessageContainsFold(query),
+			entopssystemlog.SourceContainsFold(query),
+			entopssystemlog.RequestIDContainsFold(query),
+			entopssystemlog.TraceIDContainsFold(query),
+		))
+	}
+	return predicates
+}
+
+func normalizeSystemLogCleanupFilter(filter contract.SystemLogCleanupFilter) (contract.SystemLogCleanupFilter, error) {
+	filter.Source = strings.TrimSpace(filter.Source)
+	filter.Query = strings.TrimSpace(filter.Query)
+	if filter.Level != "" && !filter.Level.Valid() {
+		return contract.SystemLogCleanupFilter{}, contract.ErrInvalidInput
+	}
+	if filter.Start != nil && filter.End != nil && filter.Start.After(*filter.End) {
+		return contract.SystemLogCleanupFilter{}, contract.ErrInvalidInput
+	}
+	if filter.Level == "" && filter.Source == "" && filter.Query == "" && filter.Start == nil && filter.End == nil {
+		return contract.SystemLogCleanupFilter{}, contract.ErrInvalidInput
+	}
+	if filter.MaxDelete == 0 {
+		filter.MaxDelete = 1000
+	}
+	if filter.MaxDelete < 0 || filter.MaxDelete > 10000 {
+		return contract.SystemLogCleanupFilter{}, contract.ErrInvalidInput
+	}
+	return filter, nil
+}
+
+func normalizePage(page, pageSize int) (int, int) {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 1000 {
+		pageSize = 1000
+	}
+	return page, pageSize
+}
+
+func toSystemLog(row *ent.OpsSystemLog) contract.OpsSystemLog {
+	if row == nil {
+		return contract.OpsSystemLog{}
+	}
+	return contract.OpsSystemLog{
+		ID:        row.ID,
+		Level:     contract.OpsSystemLogLevel(row.Level),
+		Message:   row.Message,
+		Source:    row.Source,
+		RequestID: row.RequestID,
+		TraceID:   row.TraceID,
+		Metadata:  cloneMap(row.MetadataJSON),
+		CreatedAt: row.CreatedAt,
+	}
 }
 
 func stringFromMap(value map[string]any, key string) string {
