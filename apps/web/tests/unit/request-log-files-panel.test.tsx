@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RequestLogFilesPanel } from "@/app/admin/logs/_panels/request-log-files-panel";
@@ -39,7 +39,27 @@ vi.mock("@/hooks/admin-queries", () => ({
     "download",
     name ?? "",
   ],
-  useAdminRequestLogFileDownload: () => ({ data: "", isError: false }),
+  useAdminRequestLogFileDownload: () => ({
+    data: `=== REQUEST INFO ===
+Request-ID: req-dump
+Account-ID: 12
+Source-Protocol: openai-compatible
+Source-Endpoint: /v1/chat/completions
+
+=== REQUEST 1 ===
+POST https://upstream.invalid/v1/chat/completions
+
+=== RESPONSE 1 ===
+Status: 503
+
+=== SUMMARY ===
+Success: false
+Error-Class: server_bad
+Status: 503
+Latency-MS: 891
+`,
+    isError: false,
+  }),
   useAdminRequestLogFiles: () => ({
     data: {
       data: [mocks.file],
@@ -83,5 +103,19 @@ describe("RequestLogFilesPanel", () => {
       "href",
       "/admin/ops/system-logs?f_request_id=req-dump",
     );
+  });
+
+  it("shows a compact diagnostic summary in the preview dialog", () => {
+    render(<RequestLogFilesPanel />, { wrapper: wrap });
+
+    fireEvent.click(screen.getByRole("button", { name: "预览" }));
+
+    expect(screen.getByText("诊断摘要")).toBeInTheDocument();
+    expect(screen.getByText("失败")).toBeInTheDocument();
+    expect(screen.getAllByText("503").length).toBeGreaterThan(0);
+    expect(screen.getByText("server_bad")).toBeInTheDocument();
+    expect(screen.getByText("891ms")).toBeInTheDocument();
+    expect(screen.getByText("1 请求 / 1 响应")).toBeInTheDocument();
+    expect(screen.getByText("/v1/chat/completions")).toBeInTheDocument();
   });
 });

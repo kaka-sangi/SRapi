@@ -17,6 +17,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime } from "@/lib/admin-format";
 import { adminErrorLogsHref, adminSystemLogsHref } from "@/lib/admin-log-links";
+import { parseRequestDumpSummary, type RequestDumpSummary } from "./request-log-dump-summary";
 import {
   downloadAdminRequestLogFileText,
   requestLogFileDownloadQueryKey,
@@ -51,6 +52,10 @@ export function RequestLogFilesPanel() {
   const downloadQuery = useAdminRequestLogFileDownload(selected?.name ?? null, selected !== null);
   const deleteMutation = useDeleteAdminRequestLogFile();
   const items = useMemo(() => filesQuery.data?.data ?? [], [filesQuery.data?.data]);
+  const dumpSummary = useMemo(
+    () => (downloadQuery.data ? parseRequestDumpSummary(downloadQuery.data) : null),
+    [downloadQuery.data],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -244,6 +249,7 @@ export function RequestLogFilesPanel() {
           ) : (
             <div className="space-y-3">
               {selected ? <RequestDumpEvidenceLinks file={selected} /> : null}
+              {dumpSummary ? <RequestDumpSummaryGrid summary={dumpSummary} /> : null}
               <pre className="max-h-[60vh] overflow-auto rounded bg-srapi-bg-input p-3 text-xs">
                 {downloadQuery.data ?? ""}
               </pre>
@@ -276,6 +282,74 @@ export function RequestLogFilesPanel() {
         }}
         isPending={deleteMutation.isPending}
       />
+    </div>
+  );
+}
+
+function RequestDumpSummaryGrid({ summary }: { summary: RequestDumpSummary }) {
+  const { t } = useLanguage();
+  const outcome =
+    summary.success === true
+      ? t("adminRequestLogFiles.outcomeSuccess")
+      : summary.success === false
+        ? t("adminRequestLogFiles.outcomeError")
+        : "—";
+  const tone =
+    summary.success === true
+      ? "text-srapi-success"
+      : summary.success === false
+        ? "text-srapi-error"
+        : "text-srapi-text-secondary";
+  const items = [
+    { label: t("adminRequestLogFiles.outcome"), value: outcome, className: tone },
+    { label: t("adminRequestLogFiles.statusCode"), value: formatOptional(summary.statusCode) },
+    { label: t("adminRequestLogFiles.errorClass"), value: summary.errorClass || "—" },
+    {
+      label: t("adminRequestLogFiles.latency"),
+      value:
+        summary.latencyMS === undefined
+          ? "—"
+          : t("adminRequestLogFiles.latencyMs", { value: summary.latencyMS }),
+    },
+    {
+      label: t("adminRequestLogFiles.attempts"),
+      value: t("adminRequestLogFiles.attemptsValue", {
+        requests: summary.attemptCount,
+        responses: summary.responseCount,
+      }),
+    },
+    { label: t("adminRequestLogFiles.sourceProtocol"), value: summary.sourceProtocol || "—" },
+    { label: t("adminRequestLogFiles.sourceEndpoint"), value: summary.sourceEndpoint || "—" },
+    { label: t("adminRequestLogFiles.accountId"), value: summary.accountID || "—" },
+  ];
+
+  return (
+    <div className="rounded-md border border-srapi-border-subtle bg-srapi-bg-card-elevated px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+          {t("adminRequestLogFiles.diagnosticSummary")}
+        </span>
+        {summary.hasSummary ? null : (
+          <span className="font-mono text-2xs text-srapi-warning">
+            {t("adminRequestLogFiles.summaryMissing")}
+          </span>
+        )}
+      </div>
+      <dl className="grid gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((item) => (
+          <div key={item.label} className="min-w-0">
+            <dt className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              {item.label}
+            </dt>
+            <dd
+              className={`mt-0.5 truncate font-mono text-xs ${item.className ?? "text-srapi-text-primary"}`}
+              title={String(item.value)}
+            >
+              {item.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
@@ -360,4 +434,9 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function formatOptional(value: number | string | undefined): string {
+  if (value === undefined || value === "") return "—";
+  return String(value);
 }
