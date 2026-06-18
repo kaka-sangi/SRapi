@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRequestDumpSummary } from "@/app/admin/logs/_panels/request-log-dump-summary";
+import { parseRequestDumpSummary } from "@/lib/request-log-dump-summary";
 
 describe("parseRequestDumpSummary", () => {
   it("extracts diagnostic fields from the SRapi/CLIProxyAPI dump format", () => {

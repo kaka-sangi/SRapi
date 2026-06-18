@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -15,6 +16,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { Textarea } from "@/components/ui/textarea";
 import { DialogListSkeleton } from "@/components/charts/chart-skeleton";
 import { PageQueryState } from "@/components/layout/page-query-state";
+import { RequestDumpSummaryGrid } from "@/components/admin/request-log-dump-summary-panel";
 import {
   downloadAdminRequestLogFileText,
   useAdminErrorLog,
@@ -29,6 +31,7 @@ import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatInteger, formatLatency } from "@/lib/admin-format";
 import { adminRequestDumpsHref, adminSystemLogsHref } from "@/lib/admin-log-links";
+import { parseRequestDumpSummary } from "@/lib/request-log-dump-summary";
 import type { OpsErrorLog, RequestLogFileDescriptor } from "@/lib/sdk-types";
 
 const RESOLUTION_OPTIONS = ["open", "investigating", "resolved", "muted"] as const;
@@ -60,6 +63,7 @@ export function ErrorLogDetailDialog({
               <span className="font-mono text-srapi-text-tertiary"> · {userEmail}</span>
             ) : null}
           </DialogTitle>
+          <DialogDescription className="sr-only">{t("adminErrorLogs.subtitle")}</DialogDescription>
         </DialogHeader>
 
         <PageQueryState query={query} skeleton={<DialogListSkeleton rows={6} />}>
@@ -86,16 +90,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
   const events = detail.upstream_errors ?? [];
   const firstAt = events.length > 0 ? events[0]?.at_unix_ms ?? 0 : 0;
   const systemLogHref = adminSystemLogsHref(detail);
-  const [resolution, setResolution] = useState<ResolutionValue>(detail.resolution ?? "open");
-  const [note, setNote] = useState(detail.resolution_note ?? "");
   const resolutionMutation = useUpdateErrorLogResolution();
-  const resolved = detail.resolution ?? "open";
-  const dirty = resolution !== resolved || note.trim() !== (detail.resolution_note ?? "");
-
-  useEffect(() => {
-    setResolution(detail.resolution ?? "open");
-    setNote(detail.resolution_note ?? "");
-  }, [detail.id, detail.resolution, detail.resolution_note]);
 
   return (
     <div className="space-y-4">
@@ -188,25 +183,18 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
         total={requestLogQuery.data?.pagination?.total}
       />
 
-      <ResolutionEditor
+      <ResolutionEditorShell
+        key={`${detail.id ?? ""}:${detail.resolution ?? "open"}:${detail.resolution_note ?? ""}`}
         current={detail.resolution ?? "open"}
-        value={resolution}
-        note={note}
+        note={detail.resolution_note ?? ""}
         pending={resolutionMutation.isPending || !detail.id}
-        dirty={dirty}
-        onResolutionChange={setResolution}
-        onNoteChange={setNote}
-        onSubmit={() => {
+        onSubmit={(resolution, note) => {
           if (!detail.id) return;
           resolutionMutation.mutate({
             id: detail.id,
             resolution,
             note: note.trim() || undefined,
           });
-        }}
-        onReset={() => {
-          setResolution(detail.resolution ?? "open");
-          setNote(detail.resolution_note ?? "");
         }}
       />
 
@@ -272,6 +260,39 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
   );
 }
 
+function ResolutionEditorShell({
+  current,
+  note,
+  pending,
+  onSubmit,
+}: {
+  current: ResolutionValue;
+  note: string;
+  pending: boolean;
+  onSubmit: (resolution: ResolutionValue, note: string) => void;
+}) {
+  const [resolution, setResolution] = useState<ResolutionValue>(current);
+  const [draftNote, setDraftNote] = useState(note);
+  const dirty = resolution !== current || draftNote.trim() !== note.trim();
+
+  return (
+    <ResolutionEditor
+      current={current}
+      value={resolution}
+      note={draftNote}
+      pending={pending}
+      dirty={dirty}
+      onResolutionChange={setResolution}
+      onNoteChange={setDraftNote}
+      onSubmit={() => onSubmit(resolution, draftNote)}
+      onReset={() => {
+        setResolution(current);
+        setDraftNote(note);
+      }}
+    />
+  );
+}
+
 function RequestLogEvidence({
   files,
   loading,
@@ -286,6 +307,10 @@ function RequestLogEvidence({
   const { t } = useLanguage();
   const [selected, setSelected] = useState<RequestLogFileDescriptor | null>(null);
   const downloadQuery = useAdminRequestLogFileDownload(selected?.name ?? null, selected !== null);
+  const dumpSummary = useMemo(
+    () => (downloadQuery.data ? parseRequestDumpSummary(downloadQuery.data) : null),
+    [downloadQuery.data],
+  );
   const first = files[0];
   const relatedTotal = Math.max(total ?? files.length, files.length);
   const remaining = first ? Math.max(relatedTotal - 1, 0) : 0;
@@ -371,9 +396,12 @@ function RequestLogEvidence({
               {t("adminRequestLogFiles.detailLoadFailed")}
             </p>
           ) : (
-            <pre className="max-h-[60vh] overflow-auto rounded bg-srapi-bg-input p-3 text-xs">
-              {downloadQuery.data ?? ""}
-            </pre>
+            <div className="space-y-3">
+              {dumpSummary ? <RequestDumpSummaryGrid summary={dumpSummary} /> : null}
+              <pre className="max-h-[60vh] overflow-auto rounded bg-srapi-bg-input p-3 text-xs">
+                {downloadQuery.data ?? ""}
+              </pre>
+            </div>
           )}
         </div>
       ) : null}
