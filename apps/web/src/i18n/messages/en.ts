@@ -1570,6 +1570,7 @@ export const en = {
     event: "Event",
     producer: "Producer",
     attempts: "Attempts",
+    diagnostic: "Diagnostic",
     viewDetails: "View details",
     detailTitle: "Outbox entry",
     aggregate: "Aggregate",

@@ -1548,6 +1548,7 @@ export const zh: Messages = {
     event: "事件",
     producer: "生产者",
     attempts: "尝试次数",
+    diagnostic: "诊断",
     viewDetails: "查看详情",
     detailTitle: "出站箱记录",
     aggregate: "聚合",

@@ -95,6 +95,13 @@ function OutboxContent() {
       ),
     },
     {
+      key: "diagnostic",
+      header: t("adminOutbox.diagnostic"),
+      hideOnMobile: true,
+      className: "max-w-md",
+      render: (e) => <OutboxDiagnosticSummary event={e} />,
+    },
+    {
       key: "status",
       header: t("adminCommon.status"),
       sortValue: (e) => e.status,
@@ -203,6 +210,26 @@ function Meta({ label, value }: { label: string; value: string }) {
       </span>
       <span className="break-all font-mono text-xs text-srapi-text-secondary">{value}</span>
     </div>
+  );
+}
+
+function OutboxDiagnosticSummary({ event }: { event: DomainEventOutbox }) {
+  const { t } = useLanguage();
+  const value =
+    event.status === "failed"
+      ? event.last_error || "—"
+      : event.status === "pending"
+        ? event.next_retry_at
+          ? `${t("adminOutbox.nextRetry")} ${formatDateTime(event.next_retry_at)}`
+          : "—"
+        : event.published_at
+          ? `${t("adminOutbox.publishedAt")} ${formatDateTime(event.published_at)}`
+          : "—";
+
+  return (
+    <span className="block truncate font-mono text-2xs text-srapi-text-secondary" title={value}>
+      {value}
+    </span>
   );
 }
 
