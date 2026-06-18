@@ -550,12 +550,84 @@ func codexResponsesPayloadStream(payload map[string]any) bool {
 
 func codexNormalizeResponsesText(payload map[string]any) {
 	responseFormat, ok := payload["response_format"]
+	if ok {
+		if _, hasText := payload["text"]; !hasText {
+			payload["text"] = map[string]any{"format": cloneAny(responseFormat)}
+		}
+	}
+	codexEnsureResponsesTextFormatType(payload)
+}
+
+// codexEnsureResponsesTextFormatType backstops a long-standing upstream
+// rejection on /v1/responses:
+//
+//	{"error":{"message":"Missing required parameter: 'text.format.type'.",
+//	          "type":"invalid_request_error","param":"text.format.type",
+//	          "code":"missing_required_parameter"}}
+//
+// (Diagnosed live against srapi.senran.net on req_c480b448... — provider 25,
+// account 238, model gpt-5.5.) The Codex Responses upstream requires
+// `text.format.type` whenever `text.format` is present. Two real-world
+// shapes hit us:
+//
+//  1. Chat-completions-style payload forwarded raw to /v1/responses where
+//     the caller's `response_format` was lifted into `text.format` but the
+//     lift dropped the `type` field. CLIProxyAPI's chat-completions
+//     translator (codex_openai_request.go:238-265) handles this case by
+//     explicit-mapping `response_format.type` → `text.format.type`; we
+//     mirror that mapping here so the same input shape is accepted on the
+//     /responses path.
+//
+//  2. Caller sends a Codex Responses-native payload where `text.format`
+//     carries `json_schema` (the legacy chat-completions wrapper) or a
+//     bare `schema` instead of inline `type:"json_schema"` + `schema`.
+//     Lift the wrapper into the outer format object and pin
+//     `type:"json_schema"`.
+//
+// Fallback: when text.format exists but no type can be inferred (only
+// verbosity, only an unknown field, etc.) coerce to `type:"text"` — the
+// upstream default — instead of letting the request 400. The original
+// caller fields are preserved; only the missing `type` is filled in.
+func codexEnsureResponsesTextFormatType(payload map[string]any) {
+	if payload == nil {
+		return
+	}
+	text, ok := payload["text"].(map[string]any)
 	if !ok {
 		return
 	}
-	if _, hasText := payload["text"]; !hasText {
-		payload["text"] = map[string]any{"format": cloneAny(responseFormat)}
+	format, ok := text["format"].(map[string]any)
+	if !ok {
+		return
 	}
+	if value, hasType := format["type"]; hasType {
+		if typed, ok := value.(string); ok && strings.TrimSpace(typed) != "" {
+			return
+		}
+	}
+	// Shape (1): chat-completions response_format wrapper has
+	// `json_schema:{name,strict,schema}`. Lift the wrapper into the format
+	// object inline (sub2api / CLIProxyAPI parity) and pin type.
+	if wrapped, ok := format["json_schema"].(map[string]any); ok {
+		format["type"] = "json_schema"
+		for _, key := range []string{"name", "strict", "schema"} {
+			if value, ok := wrapped[key]; ok {
+				if _, exists := format[key]; !exists {
+					format[key] = cloneAny(value)
+				}
+			}
+		}
+		delete(format, "json_schema")
+		return
+	}
+	// Shape (2): inline schema without `type`. Infer json_schema.
+	if _, ok := format["schema"]; ok {
+		format["type"] = "json_schema"
+		return
+	}
+	// Fallback: unknown shape — coerce to "text" so the request is not
+	// rejected outright. Preserves whatever extra fields the caller sent.
+	format["type"] = "text"
 }
 
 func codexNormalizeServiceTier(req contract.ConversationRequest, payload map[string]any) {
