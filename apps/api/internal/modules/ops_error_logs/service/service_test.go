@@ -211,6 +211,38 @@ func TestUpdateResolution_RedactsNoteAndValidatesResolverID(t *testing.T) {
 	}
 }
 
+func TestRecordError_SanitizesIndexedFields(t *testing.T) {
+	svc := newTestService(t)
+	status := 502
+	if err := svc.RecordError(context.Background(), contract.RecordRequest{
+		RequestID:      "  req\n\tindexed  ",
+		TraceID:        "  trace\r\nindexed  ",
+		APIKeyPrefix:   "sk_abcdef1234567890abcdef1234567890",
+		Platform:       "  openai-compatible\n\t",
+		SourceEndpoint: "  /v1/responses\r\n",
+		TargetProtocol: "  openai-compatible\n\t",
+		Model:          "  codex-mini\n\t",
+		StatusCode:     &status,
+		ErrorMessage:   "provider returned 502",
+	}); err != nil {
+		t.Fatalf("RecordError: %v", err)
+	}
+	list, err := svc.List(context.Background(), contract.ListFilter{})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	got := list.Items[0]
+	if got.RequestID != "req indexed" || got.TraceID != "trace indexed" {
+		t.Fatalf("expected cleaned identifiers, got request_id=%q trace_id=%q", got.RequestID, got.TraceID)
+	}
+	if got.Platform != "openai-compatible" || got.SourceEndpoint != "/v1/responses" || got.TargetProtocol != "openai-compatible" || got.Model != "codex-mini" {
+		t.Fatalf("expected cleaned indexed fields, got %+v", got)
+	}
+	if got.APIKeyPrefix != "sk_[REDACTED]" {
+		t.Fatalf("expected api key prefix to be redacted, got %q", got.APIKeyPrefix)
+	}
+}
+
 func TestRecordError_PreservesStructuredAttemptEvidence(t *testing.T) {
 	svc := newTestService(t)
 	status := 429

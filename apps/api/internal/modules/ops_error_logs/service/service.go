@@ -43,6 +43,7 @@ var (
 	credentialPattern       = regexp.MustCompile(`(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/\-=]+`)
 	secretAssignmentPattern = regexp.MustCompile(`(?i)\b(access_token|refresh_token|id_token|api_key|client_secret|password|cookie|session|session_id|token|secret)(\s*[:=]\s*)([^&\s,;}]+)`)
 	secretQueryPattern      = regexp.MustCompile(`(?i)([?&](?:access_token|refresh_token|id_token|api_key|client_secret|password|session|session_id|token|secret)=)([^&#\s]+)`)
+	apiKeyPlaintextPattern  = regexp.MustCompile(`(?i)^(sk_[0-9a-fA-F]{12})_[0-9a-fA-F]{16,}$`)
 	openAIKeyPattern        = regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{10,}\b`)
 	srapiKeyPattern         = regexp.MustCompile(`\b(sk_[0-9a-fA-F]+)_[0-9a-fA-F]{10,}\b`)
 )
@@ -151,21 +152,22 @@ func (s *Service) prepareEntry(req contract.RecordRequest) (contract.Entry, bool
 	if req.StatusCode != nil && !validHTTPStatus(*req.StatusCode) {
 		return contract.Entry{}, false
 	}
+	apiKeyPrefix := sanitizeAPIKeyPrefix(req.APIKeyPrefix)
 	entry := contract.Entry{
 		OccurredAt:        occurred.UTC(),
-		RequestID:         truncate(strings.TrimSpace(req.RequestID), 128),
-		TraceID:           truncate(strings.TrimSpace(req.TraceID), 128),
+		RequestID:         truncate(cleanLogText(req.RequestID), 128),
+		TraceID:           truncate(cleanLogText(req.TraceID), 128),
 		UserID:            req.UserID,
 		APIKeyID:          req.APIKeyID,
-		APIKeyPrefix:      truncate(strings.TrimSpace(req.APIKeyPrefix), 32),
+		APIKeyPrefix:      apiKeyPrefix,
 		AccountID:         req.AccountID,
 		ProviderID:        req.ProviderID,
-		Platform:          truncate(strings.TrimSpace(req.Platform), 64),
-		SourceEndpoint:    truncate(strings.TrimSpace(req.SourceEndpoint), 128),
-		TargetProtocol:    truncate(strings.TrimSpace(req.TargetProtocol), 64),
-		Model:             truncate(strings.TrimSpace(req.Model), 128),
+		Platform:          truncate(cleanLogText(req.Platform), 64),
+		SourceEndpoint:    truncate(cleanLogText(req.SourceEndpoint), 128),
+		TargetProtocol:    truncate(cleanLogText(req.TargetProtocol), 64),
+		Model:             truncate(cleanLogText(req.Model), 128),
 		StatusCode:        req.StatusCode,
-		UpstreamRequestID: truncate(strings.TrimSpace(req.UpstreamRequestID), 128),
+		UpstreamRequestID: truncate(cleanLogText(req.UpstreamRequestID), 128),
 		AttemptNo:         positiveOrDefault(req.AttemptNo, 1),
 		LatencyMS:         positiveOrZero(req.LatencyMS),
 		InputTokens:       positiveOrZero(req.InputTokens),
@@ -186,6 +188,20 @@ func (s *Service) prepareEntry(req contract.RecordRequest) (contract.Entry, bool
 		return contract.Entry{}, false
 	}
 	return entry, true
+}
+
+func sanitizeAPIKeyPrefix(value string) string {
+	value = cleanLogText(value)
+	if value == "" {
+		return ""
+	}
+	if match := apiKeyPlaintextPattern.FindStringSubmatch(value); len(match) == 2 {
+		return match[1]
+	}
+	if strings.HasPrefix(strings.ToLower(value), "sk_") && len([]rune(value)) > 16 {
+		return "sk_[REDACTED]"
+	}
+	return truncate(value, 32)
 }
 
 func validHTTPStatus(status int) bool {
@@ -360,7 +376,7 @@ func cleanLogText(value string) string {
 		}
 		b.WriteRune(r)
 	}
-	return strings.TrimSpace(b.String())
+	return strings.Join(strings.Fields(b.String()), " ")
 }
 
 func truncate(s string, max int) string {
