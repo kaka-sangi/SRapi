@@ -48,6 +48,33 @@ var codexUpstreamModelAliases = map[string]string{
 	"gpt-5.5":                    "gpt-5.5",
 }
 
+// CodexUpstreamModelSupportsVerbosity reports whether the given canonical
+// upstream Codex model accepts the `text.verbosity` field. Mirrors
+// sub2api's SupportsVerbosity helper (openai_codex_transform.go:851): the
+// upstream contract added verbosity in the gpt-5.3 generation and onwards,
+// so any model normalized to gpt-5.2 (and the bare gpt-5/gpt-5.0/5.1 — but
+// the alias map already rewrites those to gpt-5.4) must have the field
+// stripped before the request is forwarded, else upstream rejects with
+// `{"error":{"message":"Unknown parameter: 'text.verbosity'.", ...}}`.
+//
+// Returns true for unknown models so that operator-defined custom mappings
+// continue to be forwarded with whatever the caller sent — the upstream
+// contract is the source of truth for those.
+func CodexUpstreamModelSupportsVerbosity(upstreamModel string) bool {
+	trimmed := strings.ToLower(strings.TrimSpace(upstreamModel))
+	if trimmed == "" {
+		return false
+	}
+	switch trimmed {
+	case "gpt-5.2",
+		"gpt-5.1",
+		"gpt-5",
+		"gpt-5.0":
+		return false
+	}
+	return true
+}
+
 // NormalizeCodexUpstreamModelName canonicalizes known OpenAI/Codex client
 // model aliases to the upstream names Codex accepts. Unknown model names are
 // left intact so operator-defined custom mappings continue to pass through.

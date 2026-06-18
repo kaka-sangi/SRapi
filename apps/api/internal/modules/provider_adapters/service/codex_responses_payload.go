@@ -319,6 +319,17 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 			reasoning["summary"] = "auto"
 		}
 	}
+	// Drop text.verbosity when the resolved upstream model doesn't accept it
+	// — mirrors sub2api's SupportsVerbosity gate
+	// (openai_gateway_service.go:2631-2633). Models normalized to gpt-5.2 and
+	// earlier reject `text.verbosity` with
+	//	{"error":{"message":"Unknown parameter: 'text.verbosity'.","type":
+	//	          "invalid_request_error","param":"text.verbosity",
+	//	          "code":"unknown_parameter"}}
+	// The current SRapi alias map remaps gpt-5/gpt-5.1 to gpt-5.4, so in
+	// practice this only fires on gpt-5.2 today — but the helper also covers
+	// the legacy aliases so a future remap revert can't silently regress.
+	codexDropVerbosityForUnsupportedModel(payload)
 	codexNormalizeServiceTier(req, payload)
 	if !codexResponsesCompactRequest(req) {
 		codexApplyImageGenerationBridgeTool(req, payload)
@@ -600,17 +611,35 @@ func codexEnsureResponsesTextFormatType(payload map[string]any) {
 	if !ok {
 		return
 	}
-	if value, hasType := format["type"]; hasType {
-		if typed, ok := value.(string); ok && strings.TrimSpace(typed) != "" {
-			return
+	// Pre-pass: misplaced verbosity on text.format. The upstream
+	// /v1/responses contract puts verbosity at `text.verbosity`, not
+	// `text.format.verbosity` (live rejection req_ae057a05... — provider
+	// 25, account 271, model gpt-5.5:
+	//	{"error":{"message":"Unknown parameter: 'text.format.verbosity'.",
+	//	          "type":"invalid_request_error",
+	//	          "param":"text.format.verbosity",
+	//	          "code":"unknown_parameter"}}
+	// CLIProxyAPI's chat-completions translator (codex_openai_request.go:
+	// 268-272) also reads source verbosity from text.verbosity, not
+	// text.format.verbosity. Hoist it up before the type inference below
+	// so the fallback ("only verbosity → type=text") still fires AFTER
+	// the misplacement is fixed, and so the verbosity itself reaches the
+	// upstream at the right path.
+	if v, ok := format["verbosity"]; ok {
+		if _, alreadySet := text["verbosity"]; !alreadySet {
+			text["verbosity"] = v
 		}
+		delete(format, "verbosity")
 	}
 	// Shape (1): chat-completions response_format wrapper has
 	// `json_schema:{name,strict,schema}`. Lift the wrapper into the format
-	// object inline (sub2api / CLIProxyAPI parity) and pin type.
+	// object inline (sub2api / CLIProxyAPI parity) and pin type. Runs
+	// BEFORE the type-already-set short-circuit because some callers send
+	// both `type` and the wrapper — we still want the wrapper contents
+	// lifted up so they reach the upstream at the right path.
 	if wrapped, ok := format["json_schema"].(map[string]any); ok {
 		format["type"] = "json_schema"
-		for _, key := range []string{"name", "strict", "schema"} {
+		for _, key := range []string{"name", "strict", "schema", "description"} {
 			if value, ok := wrapped[key]; ok {
 				if _, exists := format[key]; !exists {
 					format[key] = cloneAny(value)
@@ -618,16 +647,108 @@ func codexEnsureResponsesTextFormatType(payload map[string]any) {
 			}
 		}
 		delete(format, "json_schema")
-		return
+		// Continue to the whitelist pass below so any remaining unknown
+		// fields the wrapper carried (e.g. response_format wrappers from
+		// third-party clients that bolt on extras) get stripped.
 	}
-	// Shape (2): inline schema without `type`. Infer json_schema.
+	// Type inference for shapes that didn't already set it.
+	hasValidType := false
+	if value, hasType := format["type"]; hasType {
+		if typed, ok := value.(string); ok && strings.TrimSpace(typed) != "" {
+			hasValidType = true
+		}
+	}
+	if !hasValidType {
+		switch {
+		case codexFormatLooksLikeJSONSchema(format):
+			// Shape (2): inline schema without `type`. Infer json_schema.
+			format["type"] = "json_schema"
+		default:
+			// Fallback: unknown shape — coerce to "text" so the request is
+			// not rejected outright.
+			format["type"] = "text"
+		}
+	}
+	// Final pass: strict whitelist on text.format. Upstream Codex /responses
+	// rejects ANY unknown key on text.format with
+	//	{"error":{"code":"unknown_parameter","param":"text.format.<key>"}}
+	// The only fields the upstream contract accepts are {type, name,
+	// strict, schema, description}. Anything else came from a forwarded
+	// chat-completions wrapper that wasn't fully unwrapped, a third-party
+	// client extension, or a misplaced caller field. Strip them after the
+	// lift+inference above so the legitimate fields survive but stray
+	// extras don't 400 the request.
+	codexStripUnknownTextFormatFields(format)
+}
+
+// codexFormatLooksLikeJSONSchema returns true when text.format carries a
+// concrete schema-shaped field — `schema` (the new Responses-native shape)
+// or, defensively, a non-empty `json_schema` (callers that left the
+// wrapper in despite our earlier lift). Used to choose between
+// json_schema vs text when the caller forgot `type`.
+func codexFormatLooksLikeJSONSchema(format map[string]any) bool {
 	if _, ok := format["schema"]; ok {
-		format["type"] = "json_schema"
+		return true
+	}
+	if wrapped, ok := format["json_schema"].(map[string]any); ok && len(wrapped) > 0 {
+		return true
+	}
+	return false
+}
+
+// codexDropVerbosityForUnsupportedModel removes `text.verbosity` when the
+// payload's resolved upstream model does NOT accept the verbosity field.
+// sub2api openai_gateway_service.go:2631-2633 gates verbosity by
+// `SupportsVerbosity(upstreamModel)` for exactly this reason — the field
+// was introduced in the gpt-5.3 generation and older models reject it
+// with `Unknown parameter: 'text.verbosity'`. Runs after the
+// default-substitution above so the additive default we just set is
+// stripped back out when the resolved model can't accept it.
+//
+// If, after the strip, `text` becomes empty AND no format object was
+// requested, drop `text` entirely so the request doesn't carry an
+// empty text object the upstream would also reject.
+func codexDropVerbosityForUnsupportedModel(payload map[string]any) {
+	if payload == nil {
 		return
 	}
-	// Fallback: unknown shape — coerce to "text" so the request is not
-	// rejected outright. Preserves whatever extra fields the caller sent.
-	format["type"] = "text"
+	model, _ := payload["model"].(string)
+	if model == "" {
+		return
+	}
+	if contract.CodexUpstreamModelSupportsVerbosity(model) {
+		return
+	}
+	text, ok := payload["text"].(map[string]any)
+	if !ok {
+		return
+	}
+	if _, hasVerbosity := text["verbosity"]; !hasVerbosity {
+		return
+	}
+	delete(text, "verbosity")
+	if len(text) == 0 {
+		delete(payload, "text")
+	}
+}
+
+// codexStripUnknownTextFormatFields enforces the upstream /responses
+// contract for text.format keys. Anything not in the allow-list is
+// removed in-place. See codexEnsureResponsesTextFormatType for the live
+// production rejection this guards.
+func codexStripUnknownTextFormatFields(format map[string]any) {
+	allowed := map[string]struct{}{
+		"type":        {},
+		"name":        {},
+		"strict":      {},
+		"schema":      {},
+		"description": {},
+	}
+	for key := range format {
+		if _, ok := allowed[key]; !ok {
+			delete(format, key)
+		}
+	}
 }
 
 func codexNormalizeServiceTier(req contract.ConversationRequest, payload map[string]any) {
