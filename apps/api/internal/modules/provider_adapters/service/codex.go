@@ -280,7 +280,6 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 					return contract.ConversationResponse{}, parseErr
 				}
 				parsed = withConversationResponseHeaders(parsed, retryResp.Headers)
-				parsed = codexMaybeRewriteRawForNonStreaming(parsed, stream)
 				return withCodexQuotaSignals(parsed, retryResp.Headers), nil
 			}
 			return contract.ConversationResponse{}, classifyCodexProviderHTTPErrorWithHeaders(retryResp.StatusCode, retryResp.Headers, retryResp.Body)
@@ -307,64 +306,7 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 		return contract.ConversationResponse{}, err
 	}
 	parsed = withConversationResponseHeaders(parsed, runtimeResp.Headers)
-	parsed = codexMaybeRewriteRawForNonStreaming(parsed, stream)
 	return withCodexQuotaSignals(parsed, runtimeResp.Headers), nil
-}
-
-// codexMaybeRewriteRawForNonStreaming rewrites ConversationResponse.Raw from
-// raw SSE bytes to the terminal `response` JSON object when the codex adapter
-// declared a non-streaming request (compact). The upstream Codex backend
-// returns SSE on /v1/responses/compact even when the body has stream=false
-// and Accept: application/json — without this rewrite, the gateway raw-
-// passthrough path writes those SSE bytes back with Content-Type:
-// application/json, breaking Hermes' compact-task body parser with
-// "Error running remote compact task: stream disconnected before completion:
-// missing field `text` at line 1 column 203". Mirrors sub2api
-// openai_gateway_service.go:4007 handlePassthroughSSEToJSON.
-func codexMaybeRewriteRawForNonStreaming(resp contract.ConversationResponse, stream bool) contract.ConversationResponse {
-	if stream {
-		return resp
-	}
-	originalRaw := resp.Raw
-	rewritten, ok := codexRewriteRawForNonStreamingCompact(originalRaw, resp)
-	if !ok {
-		return resp
-	}
-	resp.Raw = append(json.RawMessage(nil), rewritten...)
-	// Emit a structured warning so the gateway records the rewrite in
-	// usage_logs.compatibility_warnings — without this, the only signal
-	// that the adapter performed an SSE → JSON rewrite (and which
-	// upstream-body shape triggered it) is server stdout, which is not
-	// visible from the admin /系统日志 panel. The warning carries the
-	// upstream body excerpt the rewrite operated on, so when Hermes
-	// rejects a body the operator can correlate the rewrite back to the
-	// upstream's actual shape. The excerpt is bounded to 4 KiB to keep
-	// the warning row small.
-	resp.Warnings = append(resp.Warnings, codexCompactRewriteWarning(originalRaw, rewritten))
-	return resp
-}
-
-// codexCompactRewriteWarning formats a structured warning string that
-// summarizes the SSE → JSON rewrite. Lands on
-// usage_logs.compatibility_warnings so the admin /系统日志 panel and the
-// per-request usage row both surface it. The format is
-//
-//	"codex.compact_rewrite original_bytes=N rewritten_bytes=M
-//	 upstream_excerpt=<bounded byte prefix>"
-//
-// Excerpt is intentionally bounded to keep warning rows small (avoid
-// blowing up the usage_logs row size on large compact bodies). 4 KiB is
-// large enough to capture the leading SSE frames where the terminal
-// event would normally live, and bounded enough that an operator
-// pasting the row into a triage thread is fine.
-func codexCompactRewriteWarning(original, rewritten []byte) string {
-	const excerptCap = 4 * 1024
-	excerpt := original
-	if len(excerpt) > excerptCap {
-		excerpt = excerpt[:excerptCap]
-	}
-	return fmt.Sprintf("codex.compact_rewrite original_bytes=%d rewritten_bytes=%d upstream_excerpt=%q",
-		len(original), len(rewritten), string(excerpt))
 }
 
 func (s *Service) invokeReverseProxyCodexResponseInputItems(ctx context.Context, req contract.ResponseInputItemsRequest, baseURL string) (contract.ResponseInputItemsResponse, error) {

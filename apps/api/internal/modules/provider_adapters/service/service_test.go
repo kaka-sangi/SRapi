@@ -7933,29 +7933,28 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesCompactEndpoint(t *testing.T) {
 	}
 }
 
-// TestReverseProxyCodexCLIAdapterCompactRewritesSSEUpstreamToJSON pins the
-// SSE → JSON safety net for /v1/responses/compact: the Codex backend can
-// return text/event-stream even though the body declared stream=false and
-// Accept: application/json (live reproduction against srapi.senran.net).
-// Without the rewrite, the gateway raw-passthrough path at
-// runtime_gateway_handlers.go:441 writes those SSE bytes back with
-// Content-Type: application/json and Hermes (Codex CLI in Rust) surfaces
-// "Error running remote compact task: stream disconnected before completion:
-// missing field `text` at line 1 column 203". Mirrors sub2api
-// openai_gateway_service.go:4007 handlePassthroughSSEToJSON.
-func TestReverseProxyCodexCLIAdapterCompactRewritesSSEUpstreamToJSON(t *testing.T) {
+// TestReverseProxyCodexCLIAdapterCompactPassesUpstreamSSEThrough pins the
+// post-revert behaviour for /v1/responses/compact: the adapter is now a
+// pass-through (CLIProxyAPI executeCompact parity,
+// internal/runtime/executor/codex_executor.go:1064). When the upstream
+// returns SSE — which it routinely does despite Accept: application/json
+// — the Raw bytes MUST reach the gateway untouched, AND the upstream's
+// Content-Type must be preserved (the gateway raw-passthrough writer
+// now uses writeRawUpstreamResponse, which honours the upstream header).
+// Previously the adapter rewrote SSE → JSON via a "missing field text"
+// reconstruction; multiple production rejections proved I was guessing
+// at the upstream-expected shape. Pass-through avoids the entire
+// guessing game — codex CLI agrees with its own upstream on the wire
+// format, all SRapi has to do is not corrupt it.
+func TestReverseProxyCodexCLIAdapterCompactPassesUpstreamSSEThrough(t *testing.T) {
+	upstreamBody := []byte(
+		"data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_partial\"}}\n\n" +
+			"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"cmp_sse\",\"object\":\"response.compaction\",\"input_tokens\":7,\"output_tokens\":1}}\n\n" +
+			"data: [DONE]\n\n",
+	)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Reproduce the bug surface exactly: upstream pretends to honour
-		// the non-streaming request (200) but emits SSE in the body and
-		// labels it text/event-stream. Without the adapter rewrite, the
-		// gateway raw-passthrough writer would echo this verbatim under
-		// Content-Type: application/json.
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte(
-			"data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_partial\"}}\n\n" +
-				"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"cmp_sse\",\"object\":\"response.compaction\",\"input_tokens\":7,\"output_tokens\":1}}\n\n" +
-				"data: [DONE]\n\n",
-		))
+		_, _ = w.Write(upstreamBody)
 	}))
 	defer upstream.Close()
 
@@ -7991,25 +7990,14 @@ func TestReverseProxyCodexCLIAdapterCompactRewritesSSEUpstreamToJSON(t *testing.
 	if err != nil {
 		t.Fatalf("invoke codex compact upstream: %v", err)
 	}
-	// Raw MUST be the extracted terminal `response` JSON object, not the
-	// original SSE bytes. The gateway raw-passthrough writer would otherwise
-	// emit SSE bytes under Content-Type: application/json, which is the
-	// exact "missing field `text` at line 1 column 203" Hermes failure.
-	if bytes.Contains(resp.Raw, []byte("data:")) {
-		t.Fatalf("compact Raw must not contain SSE markers after rewrite, got %q", string(resp.Raw))
+	// Raw MUST equal the upstream SSE bytes verbatim — no rewrite.
+	if !bytes.Equal(resp.Raw, upstreamBody) {
+		t.Fatalf("compact Raw must pass through verbatim, got %q want %q", string(resp.Raw), string(upstreamBody))
 	}
-	var compaction struct {
-		ID           string `json:"id"`
-		Object       string `json:"object"`
-		InputTokens  int    `json:"input_tokens"`
-		OutputTokens int    `json:"output_tokens"`
-	}
-	if err := json.Unmarshal(resp.Raw, &compaction); err != nil {
-		t.Fatalf("compact Raw must be valid JSON, got %q (err=%v)", string(resp.Raw), err)
-	}
-	if compaction.ID != "cmp_sse" || compaction.Object != "response.compaction" ||
-		compaction.InputTokens != 7 || compaction.OutputTokens != 1 {
-		t.Fatalf("compact Raw must mirror upstream terminal response, got %+v (raw=%q)", compaction, string(resp.Raw))
+	// Upstream's Content-Type must be on the adapter's Headers so the
+	// gateway's writeRawUpstreamResponse can forward it to the client.
+	if got := resp.Headers.Get("Content-Type"); got != "text/event-stream" {
+		t.Fatalf("compact Headers must carry upstream Content-Type=text/event-stream, got %q", got)
 	}
 }
 

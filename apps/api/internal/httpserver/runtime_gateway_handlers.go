@@ -237,7 +237,7 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 	}
 	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
 		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
-		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
+		writeRawUpstreamResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata, providerResp.Headers)
 		return
 	}
 	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
@@ -440,7 +440,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
 		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
-		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
+		writeRawUpstreamResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata, providerResp.Headers)
 		return
 	}
 	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
@@ -751,7 +751,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
 		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
-		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
+		writeRawUpstreamResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata, providerResp.Headers)
 		return
 	}
 	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
@@ -1090,7 +1090,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 	}
 	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
 		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
-		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
+		writeRawUpstreamResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata, providerResp.Headers)
 		return
 	}
 	s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
@@ -1195,7 +1195,34 @@ func looksLikeSSE(raw []byte) bool {
 }
 
 func writeRawJSONResponse(w http.ResponseWriter, status int, raw []byte) {
-	w.Header().Set("Content-Type", "application/json")
+	writeRawUpstreamResponse(w, status, raw, nil)
+}
+
+// writeRawUpstreamResponse passes an upstream body through verbatim with
+// the upstream's Content-Type header preserved. Critical for /v1/responses
+// and /v1/responses/compact: the codex CLI Rust client decides whether to
+// parse the body as JSON or as an SSE event stream based on the
+// Content-Type header. If the upstream returned SSE
+// (Content-Type: text/event-stream) and we force application/json, the
+// client's JSON parser walks the SSE bytes and fails with
+// "missing field `text` at line 1 column N" — the live regression
+// log from /v1/responses/compact. This mirrors CLIProxyAPI's
+// executeCompact (internal/runtime/executor/codex_executor.go:1064)
+// which returns the upstream body and headers byte-for-byte to the
+// caller.
+//
+// Falls back to application/json when the upstream omitted Content-Type
+// (some adapters do — sub2api openai_gateway_service.go:5198 uses the
+// same fallback in handleNonStreamingResponse).
+func writeRawUpstreamResponse(w http.ResponseWriter, status int, raw []byte, upstream http.Header) {
+	contentType := ""
+	if upstream != nil {
+		contentType = strings.TrimSpace(upstream.Get("Content-Type"))
+	}
+	if contentType == "" {
+		contentType = "application/json"
+	}
+	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(status)
 	_, _ = w.Write(bytes.TrimSpace(raw))
 }
