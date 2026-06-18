@@ -32,49 +32,86 @@ const (
 // + user + request identifiers, a redacted body excerpt, and resolution
 // metadata. Bodies are pre-sanitized before they reach the store.
 type Entry struct {
-	ID               int64
-	OccurredAt       time.Time
-	RequestID        string
-	TraceID          string
-	UserID           *int
-	APIKeyID         *int
-	AccountID        *int
-	ProviderID       *int
-	Platform         string
-	SourceEndpoint   string
-	Model            string
-	StatusCode       *int
-	ErrorClass       string
-	ErrorPhase       string
-	ErrorMessage     string
-	ErrorBodyExcerpt string
-	Resolution       Resolution
-	ResolutionNote   string
-	ResolvedAt       *time.Time
-	ResolvedByID     *int
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                int64
+	OccurredAt        time.Time
+	RequestID         string
+	TraceID           string
+	UserID            *int
+	APIKeyID          *int
+	AccountID         *int
+	ProviderID        *int
+	Platform          string
+	SourceEndpoint    string
+	TargetProtocol    string
+	Model             string
+	StatusCode        *int
+	UpstreamRequestID string
+	AttemptNo         int
+	LatencyMS         int
+	InputTokens       int
+	OutputTokens      int
+	UsageEstimated    bool
+	ErrorClass        string
+	ErrorPhase        string
+	ErrorOwner        string
+	ErrorSource       string
+	ErrorMessage      string
+	ErrorBodyExcerpt  string
+	UpstreamErrors    []UpstreamErrorEvent
+	Resolution        Resolution
+	ResolutionNote    string
+	ResolvedAt        *time.Time
+	ResolvedByID      *int
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 // RecordRequest is the write input handed to Service.RecordError. It carries
 // raw fields; the service normalises, sanitises, and truncates before
 // persisting.
 type RecordRequest struct {
-	OccurredAt       time.Time
-	RequestID        string
-	TraceID          string
-	UserID           *int
-	APIKeyID         *int
-	AccountID        *int
-	ProviderID       *int
-	Platform         string
-	SourceEndpoint   string
-	Model            string
-	StatusCode       *int
-	ErrorClass       string
-	ErrorPhase       string
-	ErrorMessage     string
-	ErrorBodyExcerpt string
+	OccurredAt        time.Time
+	RequestID         string
+	TraceID           string
+	UserID            *int
+	APIKeyID          *int
+	AccountID         *int
+	ProviderID        *int
+	Platform          string
+	SourceEndpoint    string
+	TargetProtocol    string
+	Model             string
+	StatusCode        *int
+	UpstreamRequestID string
+	AttemptNo         int
+	LatencyMS         int
+	InputTokens       int
+	OutputTokens      int
+	UsageEstimated    bool
+	ErrorClass        string
+	ErrorPhase        string
+	ErrorOwner        string
+	ErrorSource       string
+	ErrorMessage      string
+	ErrorBodyExcerpt  string
+	UpstreamErrors    []UpstreamErrorEvent
+}
+
+// UpstreamErrorEvent captures one failed candidate attempt inside a gateway
+// request's failover history. It intentionally contains only operational
+// evidence: no raw request body, headers, credentials, prompts, or response
+// payload beyond the bounded/redacted body excerpt.
+type UpstreamErrorEvent struct {
+	AtUnixMs           int64
+	AttemptNo          int
+	AccountID          *int
+	AccountName        string
+	UpstreamStatusCode int
+	UpstreamRequestID  string
+	UpstreamURL        string
+	Kind               string
+	Message            string
+	BodyExcerpt        string
 }
 
 // ListFilter narrows admin list queries. Matches sub2api's OpsErrorLogFilter
@@ -85,7 +122,9 @@ type ListFilter struct {
 	AccountID     *int
 	ProviderID    *int
 	Platform      string
+	Model         string
 	ErrorClass    string
+	Query         string
 	Resolution    Resolution
 	StatusCodeMin *int
 	StatusCodeMax *int

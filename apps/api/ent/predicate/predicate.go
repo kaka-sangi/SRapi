@@ -111,6 +111,9 @@ type ObsAlertSilence func(*sql.Selector)
 // ObsSLODefinition is the predicate function for obsslodefinition builders.
 type ObsSLODefinition func(*sql.Selector)
 
+// OpsErrorLog is the predicate function for opserrorlog builders.
+type OpsErrorLog func(*sql.Selector)
+
 // OpsSystemLog is the predicate function for opssystemlog builders.
 type OpsSystemLog func(*sql.Selector)
 

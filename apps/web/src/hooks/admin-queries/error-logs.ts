@@ -7,7 +7,7 @@ import { type P } from "./_shared";
 
 // ---- Error logs ----
 //
-// Failed-request records. The list is server-side paginated/filtered (it can
+// AdminOps upstream-failure records. The list is server-side paginated/filtered (it can
 // grow unbounded), so page + filters drive the query. The detail query is
 // lazy: it only fires once a row is clicked (id present + dialog open), mirroring
 // `useUserBalanceHistory`'s `enabled` gating.
@@ -28,8 +28,8 @@ export function useAdminErrorLog(id: string | null, enabled = true) {
 }
 
 /**
- * Toggle the resolved flag on an error log. Invalidates the list + detail
- * queries so the next read picks up the updated resolved_at/by + flag.
+ * Toggle the operator resolution on an error log. Invalidates the list +
+ * detail queries so the next read picks up the updated resolution metadata.
  */
 export function useResolveErrorLog() {
   const qc = useQueryClient();
@@ -40,7 +40,7 @@ export function useResolveErrorLog() {
       void qc.invalidateQueries({ queryKey: queryKeys.admin.errorLog(vars.id) });
       // The list cache key embeds the active filters; invalidate the whole
       // errorLogs surface so any paginated/filtered list is refetched.
-      void qc.invalidateQueries({ queryKey: ["admin", "errorLogs"] });
+      void qc.invalidateQueries({ queryKey: ["admin", "error-logs"] });
     },
   });
 }

@@ -89,6 +89,7 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"obs_alert_rules",
 		"obs_alert_silences",
 		"obs_slo_definitions",
+		"ops_error_logs",
 		"ops_system_logs",
 		"password_reset_tokens",
 		"payload_rules",

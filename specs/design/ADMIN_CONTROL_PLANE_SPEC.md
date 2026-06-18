@@ -89,6 +89,9 @@ GET /api/v1/admin/ops/overview
 GET /api/v1/admin/ops/throughput-trend
 GET /api/v1/admin/ops/error-trend
 GET /api/v1/admin/ops/error-distribution
+GET /api/v1/admin/ops/error-logs
+GET /api/v1/admin/ops/error-logs/{id}
+PATCH /api/v1/admin/ops/error-logs/{id}
 GET /api/v1/admin/ops/latency-histogram
 GET /api/v1/admin/ops/concurrency
 GET /api/v1/admin/ops/system-logs
@@ -105,6 +108,13 @@ Ops v1 is read-model based:
 - Scheduler and account evidence comes from existing scheduler/accounts
   contracts where available.
 - Alert events reuse the existing operations alert control plane.
+- Error logs are durable upstream-failure evidence stored in `ops_error_logs`,
+  not temporary memory state and not usage-log guesses. List/detail routes
+  support operator filters by identity, account/provider/model/status,
+  resolution, time range, and free-text query. Resolution updates are
+  CSRF-protected writes. Rows include structured attempt/protocol/latency/token
+  and sanitized upstream-attempt history evidence, but must not include raw
+  request bodies, headers, credentials, prompts, or replay payloads.
 - System logs are structured, sanitized events stored in `ops_system_logs` and
   owned by the operations module. Listing supports bounded filters by level,
   source, text query, and time range. Health evidence reports durable-store

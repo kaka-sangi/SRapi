@@ -18,14 +18,14 @@ import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatLatency } from "@/lib/admin-format";
-import type { ErrorLog } from "@/lib/sdk-types";
+import type { OpsErrorLog } from "@/lib/sdk-types";
 import {
   LOG_WINDOW_PRESETS,
   LOG_WINDOW_ALL_LABEL_KEY,
   logWindowSince,
 } from "@/lib/log-window-filter";
 
-const DEFAULT_HIDDEN_COLUMNS = ["api_key_id", "provider_id", "protocol", "attempt_no"];
+const DEFAULT_HIDDEN_COLUMNS = ["api_key_id", "provider_id", "source_endpoint", "error_owner"];
 
 export function ErrorLogsPanel() {
   const { t } = useLanguage();
@@ -39,13 +39,8 @@ export function ErrorLogsPanel() {
   const modelFilter = list.filters.model || undefined;
   const userFilter = list.filters.user || undefined;
   const accountFilter = list.filters.account || undefined;
-  // The search box now drives the q free-text filter against error_message +
-  // request_id; the legacy error_class shortcut was removed when search took
-  // its place. Operators filter by error class via the URL/error_class query.
-  const errorClassFilter: string | undefined = undefined;
+  const resolutionFilter = list.filters.resolution || undefined;
   const windowFilter = list.filters.window;
-  // Resolve the preset to an ISO timestamp the backend's start/end filter
-  // honours. logWindowSince returns null when the preset is unset.
   const sinceFilter = logWindowSince(windowFilter)?.toISOString();
 
   const searchQuery = list.search || undefined;
@@ -55,7 +50,7 @@ export function ErrorLogsPanel() {
     model: modelFilter,
     user_id: userFilter,
     account_id: accountFilter,
-    error_class: errorClassFilter,
+    resolution: resolutionFilter as "open" | "investigating" | "resolved" | "muted" | undefined,
     start: sinceFilter,
     q: searchQuery,
   });
@@ -75,19 +70,20 @@ export function ErrorLogsPanel() {
     label: u.email,
   }));
 
-  const isFiltered = Boolean(modelFilter || userFilter || accountFilter || errorClassFilter || windowFilter || searchQuery);
-  // Reuse the iter-56 accountLookup's underlying query.data for the dropdown
-  // (the panel already fetches it for the column render).
+  const isFiltered = Boolean(modelFilter || userFilter || accountFilter || resolutionFilter || windowFilter || searchQuery);
   const accountOptions = (accountLookup.query.data?.data ?? []).map((a) => ({
     value: String(a.id),
     label: a.name,
   }));
   const total = errorLogs.data?.pagination?.total ?? errorLogs.data?.data.length ?? 0;
 
-  const emailFor = (e: ErrorLog) => userLookup.get(e.user_id);
-  const openDetail = (e: ErrorLog) => setDetail({ id: e.id, email: emailFor(e) });
+  const emailFor = (e: OpsErrorLog) => userLookup.get(e.user_id);
+  const openDetail = (e: OpsErrorLog) => {
+    if (!e.id) return;
+    setDetail({ id: e.id, email: emailFor(e) });
+  };
 
-  const columns: Column<ErrorLog>[] = [
+  const columns: Column<OpsErrorLog>[] = [
     {
       key: "time",
       header: t("adminErrorLogs.time"),
@@ -98,7 +94,7 @@ export function ErrorLogsPanel() {
           onClick={() => openDetail(e)}
           className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular underline-offset-2 transition-colors hover:text-srapi-text-primary hover:underline"
         >
-          {formatDateTime(e.created_at)}
+          {formatDateTime(e.occurred_at ?? e.created_at)}
         </button>
       ),
     },
@@ -167,20 +163,20 @@ export function ErrorLogsPanel() {
       ),
     },
     {
-      key: "resolved",
-      header: t("adminErrorLogs.resolved"),
+      key: "resolution",
+      header: t("adminErrorLogs.resolution"),
       render: (e) => (
         <input
           type="checkbox"
-          checked={Boolean(e.resolved)}
-          disabled={resolveMutation.isPending}
+          checked={e.resolution === "resolved"}
+          disabled={resolveMutation.isPending || !e.id}
           onChange={(ev) => {
             ev.stopPropagation();
-            resolveMutation.mutate({ id: e.id, resolved: ev.target.checked });
+            if (e.id) resolveMutation.mutate({ id: e.id, resolved: ev.target.checked });
           }}
           onClick={(ev) => ev.stopPropagation()}
           aria-label={
-            e.resolved ? t("adminErrorLogs.markUnresolved") : t("adminErrorLogs.markResolved")
+            e.resolution === "resolved" ? t("adminErrorLogs.markUnresolved") : t("adminErrorLogs.markResolved")
           }
           className="h-4 w-4 cursor-pointer accent-srapi-accent"
         />
@@ -206,7 +202,7 @@ export function ErrorLogsPanel() {
       hideOnMobile: true,
       render: (e) => (
         <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
-          {formatLatency(e.latency_ms)}
+          {formatLatency(e.latency_ms ?? 0)}
         </span>
       ),
     },
@@ -216,7 +212,7 @@ export function ErrorLogsPanel() {
       hideOnMobile: true,
       render: (e) => (
         <span className="font-mono text-2xs text-srapi-text-tertiary">
-          {e.source_protocol}
+          {e.source_protocol ?? e.platform ?? "—"}
           {e.target_protocol ? ` → ${e.target_protocol}` : ""}
         </span>
       ),
@@ -227,7 +223,29 @@ export function ErrorLogsPanel() {
       align: "right",
       hideOnMobile: true,
       render: (e) => (
-        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">{e.attempt_no}</span>
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {e.attempt_no ?? 1}
+        </span>
+      ),
+    },
+    {
+      key: "source_endpoint",
+      header: t("adminErrorLogs.sourceEndpoint"),
+      hideOnMobile: true,
+      render: (e) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary">
+          {e.source_endpoint || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "error_owner",
+      header: t("adminErrorLogs.errorOwner"),
+      hideOnMobile: true,
+      render: (e) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary">
+          {e.error_owner || "—"}
+        </span>
       ),
     },
     {
@@ -318,6 +336,17 @@ export function ErrorLogsPanel() {
               onChange={(v) => list.setFilter("account", v)}
               options={accountOptions}
               allLabel={t("adminAccounts.allAccounts")}
+            />
+            <FilterSelect
+              value={list.filters.resolution}
+              onChange={(v) => list.setFilter("resolution", v)}
+              options={[
+                { value: "open", label: t("adminErrorLogs.open") },
+                { value: "investigating", label: t("adminErrorLogs.investigating") },
+                { value: "resolved", label: t("adminErrorLogs.resolved") },
+                { value: "muted", label: t("adminErrorLogs.muted") },
+              ]}
+              allLabel={t("adminErrorLogs.allResolutions")}
             />
             <FilterSelect
               value={list.filters.window}

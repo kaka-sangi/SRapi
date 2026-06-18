@@ -55,6 +55,54 @@ func TestRecordError_RedactsSensitiveJSON(t *testing.T) {
 	}
 }
 
+func TestRecordError_PreservesStructuredAttemptEvidence(t *testing.T) {
+	svc := newTestService(t)
+	status := 429
+	accountID := 42
+	if err := svc.RecordError(context.Background(), contract.RecordRequest{
+		RequestID:         "req-attempt",
+		StatusCode:        &status,
+		TargetProtocol:    "openai-compatible",
+		UpstreamRequestID: "upstream_req",
+		AttemptNo:         2,
+		LatencyMS:         345,
+		InputTokens:       12,
+		OutputTokens:      3,
+		UsageEstimated:    true,
+		ErrorOwner:        "provider",
+		ErrorSource:       "upstream_http",
+		ErrorMessage:      "rate limited",
+		UpstreamErrors: []contract.UpstreamErrorEvent{{
+			AtUnixMs:           1780000000000,
+			AttemptNo:          1,
+			AccountID:          &accountID,
+			AccountName:        "primary-account",
+			UpstreamStatusCode: 429,
+			UpstreamRequestID:  "upstream_req_1",
+			UpstreamURL:        "gpt-4o",
+			Kind:               "http_error",
+			Message:            "first attempt",
+			BodyExcerpt:        `{"token":"secret","message":"limited"}`,
+		}},
+	}); err != nil {
+		t.Fatalf("RecordError: %v", err)
+	}
+	list, err := svc.List(context.Background(), contract.ListFilter{})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	got := list.Items[0]
+	if got.AttemptNo != 2 || got.LatencyMS != 345 || !got.UsageEstimated || got.TargetProtocol != "openai-compatible" || got.UpstreamRequestID != "upstream_req" {
+		t.Fatalf("attempt evidence mismatch: %+v", got)
+	}
+	if len(got.UpstreamErrors) != 1 || got.UpstreamErrors[0].AccountID == nil || *got.UpstreamErrors[0].AccountID != accountID {
+		t.Fatalf("missing upstream history: %+v", got.UpstreamErrors)
+	}
+	if strings.Contains(got.UpstreamErrors[0].BodyExcerpt, "secret") {
+		t.Fatalf("upstream history leaked sensitive token: %q", got.UpstreamErrors[0].BodyExcerpt)
+	}
+}
+
 func TestUpdateResolution_TogglesResolvedAt(t *testing.T) {
 	svc := newTestService(t)
 	if err := svc.RecordError(context.Background(), contract.RecordRequest{

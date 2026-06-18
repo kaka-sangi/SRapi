@@ -632,7 +632,6 @@ func (s *Server) recordGatewayProviderAttemptFailure(r *http.Request, authed api
 // cumulative per-attempt UpstreamErrorEvent timeline into the usage layer so the
 // admin error-log surface can render the failover history of the request.
 func (s *Server) recordGatewayProviderAttemptFailureWithHistory(r *http.Request, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, providerErr error, errorClass string, upstreamStatus int, latencyMS int, admission gatewayAdmission, upstreamErrors []gatewayUpstreamErrorEvent) {
-	s.recordOpsErrorLog(r.Context(), authed, canonical, result, providerErr, errorClass, upstreamStatus)
 	// Mirror the same failure onto the in-memory error-event stream so the
 	// admin SSE subscribers (Stream C / CLIProxyAPI SubscribeErrors port) see
 	// it live without polling. Best-effort: a publish error is never allowed
@@ -644,7 +643,7 @@ func (s *Server) recordGatewayProviderAttemptFailureWithHistory(r *http.Request,
 	phase := classifyErrorPhase(errorClass, upstreamStatus)
 	owner := classifyErrorOwner(phase)
 	source := classifyErrorSource(phase)
-	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+	rec := gatewayUsageRecord{
 		RequestID:                canonical.RequestID,
 		Authed:                   authed,
 		DecisionID:               result.Decision.ID,
@@ -677,7 +676,9 @@ func (s *Server) recordGatewayProviderAttemptFailureWithHistory(r *http.Request,
 		ErrorOwner:               owner,
 		ErrorSource:              source,
 		UpstreamErrors:           append([]gatewayUpstreamErrorEvent(nil), upstreamErrors...),
-	})
+	}
+	s.recordOpsErrorLog(r.Context(), rec)
+	s.runtime.recordGatewayUsage(r.Context(), rec)
 }
 
 // buildGatewayUpstreamErrorEvent assembles one history entry for the failing
@@ -712,8 +713,7 @@ func (s *Server) recordGatewayNoAvailableAccount(r *http.Request, authed apikeyc
 	// Also surface the scheduler-side "no candidate" decision on the system-log
 	// panel so operators see the reason (e.g. capability_mismatch:responses_compact)
 	// alongside actual upstream rejections.
-	s.recordGatewaySystemLog(r.Context(), canonical, result, nil, "no_available_account", 0)
-	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+	rec := gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
 		DecisionID:            result.Decision.ID,
@@ -731,7 +731,9 @@ func (s *Server) recordGatewayNoAvailableAccount(r *http.Request, authed apikeyc
 		UsageEstimated:        true,
 		Pricing:               admission.Pricing,
 		CompatibilityWarnings: canonical.CompatibilityWarnings,
-	})
+	}
+	s.recordGatewaySystemLog(r.Context(), rec)
+	s.runtime.recordGatewayUsage(r.Context(), rec)
 }
 
 func providerRetryAfterFromError(err error) *time.Time {

@@ -8320,21 +8320,41 @@ type OpsErrorDistributionResponse struct {
 // gateway hot path. Body excerpts are sanitised and credential-like
 // keys are redacted to "[REDACTED]" before persistence.
 type OpsErrorLog struct {
-	CreatedAt            *time.Time             `json:"created_at,omitempty"`
-	ErrorBodyExcerpt     *string                `json:"error_body_excerpt,omitempty"`
-	ErrorClass           *string                `json:"error_class,omitempty"`
-	ErrorMessage         *string                `json:"error_message,omitempty"`
-	ErrorPhase           *string                `json:"error_phase,omitempty"`
-	Id                   *string                `json:"id,omitempty"`
-	Model                *string                `json:"model,omitempty"`
-	OccurredAt           *time.Time             `json:"occurred_at,omitempty"`
-	Platform             *string                `json:"platform,omitempty"`
-	RequestId            *string                `json:"request_id,omitempty"`
-	Resolution           *OpsErrorLogResolution `json:"resolution,omitempty"`
-	ResolutionNote       *string                `json:"resolution_note,omitempty"`
-	SourceEndpoint       *string                `json:"source_endpoint,omitempty"`
+	AccountId        *Id                    `json:"account_id,omitempty"`
+	ApiKeyId         *Id                    `json:"api_key_id,omitempty"`
+	AttemptNo        *int                   `json:"attempt_no,omitempty"`
+	CreatedAt        *time.Time             `json:"created_at,omitempty"`
+	ErrorBodyExcerpt *string                `json:"error_body_excerpt,omitempty"`
+	ErrorClass       *string                `json:"error_class,omitempty"`
+	ErrorMessage     *string                `json:"error_message,omitempty"`
+	ErrorOwner       *string                `json:"error_owner,omitempty"`
+	ErrorPhase       *string                `json:"error_phase,omitempty"`
+	ErrorSource      *string                `json:"error_source,omitempty"`
+	Id               *string                `json:"id,omitempty"`
+	InputTokens      *int                   `json:"input_tokens,omitempty"`
+	LatencyMs        *int                   `json:"latency_ms,omitempty"`
+	Model            *string                `json:"model,omitempty"`
+	OccurredAt       *time.Time             `json:"occurred_at,omitempty"`
+	OutputTokens     *int                   `json:"output_tokens,omitempty"`
+	Platform         *string                `json:"platform,omitempty"`
+	ProviderId       *Id                    `json:"provider_id,omitempty"`
+	RequestId        *string                `json:"request_id,omitempty"`
+	Resolution       *OpsErrorLogResolution `json:"resolution,omitempty"`
+	ResolutionNote   *string                `json:"resolution_note,omitempty"`
+	ResolvedAt       *time.Time             `json:"resolved_at,omitempty"`
+	ResolvedByUserId *Id                    `json:"resolved_by_user_id,omitempty"`
+	SourceEndpoint   *string                `json:"source_endpoint,omitempty"`
+
+	// SourceProtocol Alias for platform, kept for error-log UI parity.
+	SourceProtocol       *string                `json:"source_protocol,omitempty"`
+	StatusCode           *int                   `json:"status_code,omitempty"`
+	TargetProtocol       *string                `json:"target_protocol,omitempty"`
 	TraceId              *string                `json:"trace_id,omitempty"`
 	UpdatedAt            *time.Time             `json:"updated_at,omitempty"`
+	UpstreamErrors       *[]UpstreamErrorEvent  `json:"upstream_errors,omitempty"`
+	UpstreamRequestId    *string                `json:"upstream_request_id,omitempty"`
+	UsageEstimated       *bool                  `json:"usage_estimated,omitempty"`
+	UserId               *Id                    `json:"user_id,omitempty"`
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
@@ -8343,9 +8363,9 @@ type OpsErrorLogResolution string
 
 // OpsErrorLogListResponse defines model for OpsErrorLogListResponse.
 type OpsErrorLogListResponse struct {
-	Data       []OpsErrorLog          `json:"data"`
-	Pagination map[string]interface{} `json:"pagination"`
-	RequestId  RequestId              `json:"request_id"`
+	Data       []OpsErrorLog `json:"data"`
+	Pagination Pagination    `json:"pagination"`
+	RequestId  RequestId     `json:"request_id"`
 }
 
 // OpsErrorLogResolutionUpdate defines model for OpsErrorLogResolutionUpdate.
@@ -11629,11 +11649,20 @@ type ListAdminOpsErrorLogsParams struct {
 	PageSize   *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 	UserId     *Id       `form:"user_id,omitempty" json:"user_id,omitempty"`
 	AccountId  *Id       `form:"account_id,omitempty" json:"account_id,omitempty"`
+	ProviderId *Id       `form:"provider_id,omitempty" json:"provider_id,omitempty"`
+	Model      *string   `form:"model,omitempty" json:"model,omitempty"`
 	ErrorClass *string   `form:"error_class,omitempty" json:"error_class,omitempty"`
 	Platform   *string   `form:"platform,omitempty" json:"platform,omitempty"`
 
 	// Resolution Filter by operator-supplied resolution status.
 	Resolution *ListAdminOpsErrorLogsParamsResolution `form:"resolution,omitempty" json:"resolution,omitempty"`
+	StatusMin  *int                                   `form:"status_min,omitempty" json:"status_min,omitempty"`
+	StatusMax  *int                                   `form:"status_max,omitempty" json:"status_max,omitempty"`
+	Start      *time.Time                             `form:"start,omitempty" json:"start,omitempty"`
+	End        *time.Time                             `form:"end,omitempty" json:"end,omitempty"`
+
+	// Q Case-insensitive search across request ids, model, endpoint, class, phase, message, and body excerpt.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
 }
 
 // ListAdminOpsErrorLogsParamsResolution defines parameters for ListAdminOpsErrorLogs.
@@ -17131,6 +17160,30 @@ func (a *OpsErrorLog) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
+	if raw, found := object["account_id"]; found {
+		err = json.Unmarshal(raw, &a.AccountId)
+		if err != nil {
+			return fmt.Errorf("error reading 'account_id': %w", err)
+		}
+		delete(object, "account_id")
+	}
+
+	if raw, found := object["api_key_id"]; found {
+		err = json.Unmarshal(raw, &a.ApiKeyId)
+		if err != nil {
+			return fmt.Errorf("error reading 'api_key_id': %w", err)
+		}
+		delete(object, "api_key_id")
+	}
+
+	if raw, found := object["attempt_no"]; found {
+		err = json.Unmarshal(raw, &a.AttemptNo)
+		if err != nil {
+			return fmt.Errorf("error reading 'attempt_no': %w", err)
+		}
+		delete(object, "attempt_no")
+	}
+
 	if raw, found := object["created_at"]; found {
 		err = json.Unmarshal(raw, &a.CreatedAt)
 		if err != nil {
@@ -17163,6 +17216,14 @@ func (a *OpsErrorLog) UnmarshalJSON(b []byte) error {
 		delete(object, "error_message")
 	}
 
+	if raw, found := object["error_owner"]; found {
+		err = json.Unmarshal(raw, &a.ErrorOwner)
+		if err != nil {
+			return fmt.Errorf("error reading 'error_owner': %w", err)
+		}
+		delete(object, "error_owner")
+	}
+
 	if raw, found := object["error_phase"]; found {
 		err = json.Unmarshal(raw, &a.ErrorPhase)
 		if err != nil {
@@ -17171,12 +17232,36 @@ func (a *OpsErrorLog) UnmarshalJSON(b []byte) error {
 		delete(object, "error_phase")
 	}
 
+	if raw, found := object["error_source"]; found {
+		err = json.Unmarshal(raw, &a.ErrorSource)
+		if err != nil {
+			return fmt.Errorf("error reading 'error_source': %w", err)
+		}
+		delete(object, "error_source")
+	}
+
 	if raw, found := object["id"]; found {
 		err = json.Unmarshal(raw, &a.Id)
 		if err != nil {
 			return fmt.Errorf("error reading 'id': %w", err)
 		}
 		delete(object, "id")
+	}
+
+	if raw, found := object["input_tokens"]; found {
+		err = json.Unmarshal(raw, &a.InputTokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'input_tokens': %w", err)
+		}
+		delete(object, "input_tokens")
+	}
+
+	if raw, found := object["latency_ms"]; found {
+		err = json.Unmarshal(raw, &a.LatencyMs)
+		if err != nil {
+			return fmt.Errorf("error reading 'latency_ms': %w", err)
+		}
+		delete(object, "latency_ms")
 	}
 
 	if raw, found := object["model"]; found {
@@ -17195,12 +17280,28 @@ func (a *OpsErrorLog) UnmarshalJSON(b []byte) error {
 		delete(object, "occurred_at")
 	}
 
+	if raw, found := object["output_tokens"]; found {
+		err = json.Unmarshal(raw, &a.OutputTokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'output_tokens': %w", err)
+		}
+		delete(object, "output_tokens")
+	}
+
 	if raw, found := object["platform"]; found {
 		err = json.Unmarshal(raw, &a.Platform)
 		if err != nil {
 			return fmt.Errorf("error reading 'platform': %w", err)
 		}
 		delete(object, "platform")
+	}
+
+	if raw, found := object["provider_id"]; found {
+		err = json.Unmarshal(raw, &a.ProviderId)
+		if err != nil {
+			return fmt.Errorf("error reading 'provider_id': %w", err)
+		}
+		delete(object, "provider_id")
 	}
 
 	if raw, found := object["request_id"]; found {
@@ -17227,12 +17328,52 @@ func (a *OpsErrorLog) UnmarshalJSON(b []byte) error {
 		delete(object, "resolution_note")
 	}
 
+	if raw, found := object["resolved_at"]; found {
+		err = json.Unmarshal(raw, &a.ResolvedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'resolved_at': %w", err)
+		}
+		delete(object, "resolved_at")
+	}
+
+	if raw, found := object["resolved_by_user_id"]; found {
+		err = json.Unmarshal(raw, &a.ResolvedByUserId)
+		if err != nil {
+			return fmt.Errorf("error reading 'resolved_by_user_id': %w", err)
+		}
+		delete(object, "resolved_by_user_id")
+	}
+
 	if raw, found := object["source_endpoint"]; found {
 		err = json.Unmarshal(raw, &a.SourceEndpoint)
 		if err != nil {
 			return fmt.Errorf("error reading 'source_endpoint': %w", err)
 		}
 		delete(object, "source_endpoint")
+	}
+
+	if raw, found := object["source_protocol"]; found {
+		err = json.Unmarshal(raw, &a.SourceProtocol)
+		if err != nil {
+			return fmt.Errorf("error reading 'source_protocol': %w", err)
+		}
+		delete(object, "source_protocol")
+	}
+
+	if raw, found := object["status_code"]; found {
+		err = json.Unmarshal(raw, &a.StatusCode)
+		if err != nil {
+			return fmt.Errorf("error reading 'status_code': %w", err)
+		}
+		delete(object, "status_code")
+	}
+
+	if raw, found := object["target_protocol"]; found {
+		err = json.Unmarshal(raw, &a.TargetProtocol)
+		if err != nil {
+			return fmt.Errorf("error reading 'target_protocol': %w", err)
+		}
+		delete(object, "target_protocol")
 	}
 
 	if raw, found := object["trace_id"]; found {
@@ -17249,6 +17390,38 @@ func (a *OpsErrorLog) UnmarshalJSON(b []byte) error {
 			return fmt.Errorf("error reading 'updated_at': %w", err)
 		}
 		delete(object, "updated_at")
+	}
+
+	if raw, found := object["upstream_errors"]; found {
+		err = json.Unmarshal(raw, &a.UpstreamErrors)
+		if err != nil {
+			return fmt.Errorf("error reading 'upstream_errors': %w", err)
+		}
+		delete(object, "upstream_errors")
+	}
+
+	if raw, found := object["upstream_request_id"]; found {
+		err = json.Unmarshal(raw, &a.UpstreamRequestId)
+		if err != nil {
+			return fmt.Errorf("error reading 'upstream_request_id': %w", err)
+		}
+		delete(object, "upstream_request_id")
+	}
+
+	if raw, found := object["usage_estimated"]; found {
+		err = json.Unmarshal(raw, &a.UsageEstimated)
+		if err != nil {
+			return fmt.Errorf("error reading 'usage_estimated': %w", err)
+		}
+		delete(object, "usage_estimated")
+	}
+
+	if raw, found := object["user_id"]; found {
+		err = json.Unmarshal(raw, &a.UserId)
+		if err != nil {
+			return fmt.Errorf("error reading 'user_id': %w", err)
+		}
+		delete(object, "user_id")
 	}
 
 	if len(object) != 0 {
@@ -17269,6 +17442,27 @@ func (a *OpsErrorLog) UnmarshalJSON(b []byte) error {
 func (a OpsErrorLog) MarshalJSON() ([]byte, error) {
 	var err error
 	object := make(map[string]json.RawMessage)
+
+	if a.AccountId != nil {
+		object["account_id"], err = json.Marshal(a.AccountId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'account_id': %w", err)
+		}
+	}
+
+	if a.ApiKeyId != nil {
+		object["api_key_id"], err = json.Marshal(a.ApiKeyId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'api_key_id': %w", err)
+		}
+	}
+
+	if a.AttemptNo != nil {
+		object["attempt_no"], err = json.Marshal(a.AttemptNo)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'attempt_no': %w", err)
+		}
+	}
 
 	if a.CreatedAt != nil {
 		object["created_at"], err = json.Marshal(a.CreatedAt)
@@ -17298,6 +17492,13 @@ func (a OpsErrorLog) MarshalJSON() ([]byte, error) {
 		}
 	}
 
+	if a.ErrorOwner != nil {
+		object["error_owner"], err = json.Marshal(a.ErrorOwner)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'error_owner': %w", err)
+		}
+	}
+
 	if a.ErrorPhase != nil {
 		object["error_phase"], err = json.Marshal(a.ErrorPhase)
 		if err != nil {
@@ -17305,10 +17506,31 @@ func (a OpsErrorLog) MarshalJSON() ([]byte, error) {
 		}
 	}
 
+	if a.ErrorSource != nil {
+		object["error_source"], err = json.Marshal(a.ErrorSource)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'error_source': %w", err)
+		}
+	}
+
 	if a.Id != nil {
 		object["id"], err = json.Marshal(a.Id)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'id': %w", err)
+		}
+	}
+
+	if a.InputTokens != nil {
+		object["input_tokens"], err = json.Marshal(a.InputTokens)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'input_tokens': %w", err)
+		}
+	}
+
+	if a.LatencyMs != nil {
+		object["latency_ms"], err = json.Marshal(a.LatencyMs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'latency_ms': %w", err)
 		}
 	}
 
@@ -17326,10 +17548,24 @@ func (a OpsErrorLog) MarshalJSON() ([]byte, error) {
 		}
 	}
 
+	if a.OutputTokens != nil {
+		object["output_tokens"], err = json.Marshal(a.OutputTokens)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'output_tokens': %w", err)
+		}
+	}
+
 	if a.Platform != nil {
 		object["platform"], err = json.Marshal(a.Platform)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'platform': %w", err)
+		}
+	}
+
+	if a.ProviderId != nil {
+		object["provider_id"], err = json.Marshal(a.ProviderId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'provider_id': %w", err)
 		}
 	}
 
@@ -17354,10 +17590,45 @@ func (a OpsErrorLog) MarshalJSON() ([]byte, error) {
 		}
 	}
 
+	if a.ResolvedAt != nil {
+		object["resolved_at"], err = json.Marshal(a.ResolvedAt)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'resolved_at': %w", err)
+		}
+	}
+
+	if a.ResolvedByUserId != nil {
+		object["resolved_by_user_id"], err = json.Marshal(a.ResolvedByUserId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'resolved_by_user_id': %w", err)
+		}
+	}
+
 	if a.SourceEndpoint != nil {
 		object["source_endpoint"], err = json.Marshal(a.SourceEndpoint)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'source_endpoint': %w", err)
+		}
+	}
+
+	if a.SourceProtocol != nil {
+		object["source_protocol"], err = json.Marshal(a.SourceProtocol)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'source_protocol': %w", err)
+		}
+	}
+
+	if a.StatusCode != nil {
+		object["status_code"], err = json.Marshal(a.StatusCode)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'status_code': %w", err)
+		}
+	}
+
+	if a.TargetProtocol != nil {
+		object["target_protocol"], err = json.Marshal(a.TargetProtocol)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'target_protocol': %w", err)
 		}
 	}
 
@@ -17372,6 +17643,34 @@ func (a OpsErrorLog) MarshalJSON() ([]byte, error) {
 		object["updated_at"], err = json.Marshal(a.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'updated_at': %w", err)
+		}
+	}
+
+	if a.UpstreamErrors != nil {
+		object["upstream_errors"], err = json.Marshal(a.UpstreamErrors)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'upstream_errors': %w", err)
+		}
+	}
+
+	if a.UpstreamRequestId != nil {
+		object["upstream_request_id"], err = json.Marshal(a.UpstreamRequestId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'upstream_request_id': %w", err)
+		}
+	}
+
+	if a.UsageEstimated != nil {
+		object["usage_estimated"], err = json.Marshal(a.UsageEstimated)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'usage_estimated': %w", err)
+		}
+	}
+
+	if a.UserId != nil {
+		object["user_id"], err = json.Marshal(a.UserId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user_id': %w", err)
 		}
 	}
 
@@ -19765,6 +20064,9 @@ type ServerInterface interface {
 	// List operator-facing upstream error logs.
 	// (GET /api/v1/admin/ops/error-logs)
 	ListAdminOpsErrorLogs(w http.ResponseWriter, r *http.Request, params ListAdminOpsErrorLogsParams)
+	// Get one operator-facing upstream error log.
+	// (GET /api/v1/admin/ops/error-logs/{id})
+	GetAdminOpsErrorLog(w http.ResponseWriter, r *http.Request, id Id)
 	// Update operator-supplied resolution for an upstream error.
 	// (PATCH /api/v1/admin/ops/error-logs/{id})
 	UpdateAdminOpsErrorLogResolution(w http.ResponseWriter, r *http.Request, id Id)
@@ -26761,6 +27063,32 @@ func (siw *ServerInterfaceWrapper) ListAdminOpsErrorLogs(w http.ResponseWriter, 
 		return
 	}
 
+	// ------------- Optional query parameter "provider_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "provider_id", r.URL.Query(), &params.ProviderId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "provider_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "model" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "model", r.URL.Query(), &params.Model, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "model"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "error_class" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_class", r.URL.Query(), &params.ErrorClass, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
@@ -26800,8 +27128,105 @@ func (siw *ServerInterfaceWrapper) ListAdminOpsErrorLogs(w http.ResponseWriter, 
 		return
 	}
 
+	// ------------- Optional query parameter "status_min" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status_min", r.URL.Query(), &params.StatusMin, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status_min"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status_min", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status_max" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status_max", r.URL.Query(), &params.StatusMax, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status_max"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status_max", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminOpsErrorLogs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminOpsErrorLog operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminOpsErrorLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminOpsErrorLog(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -35538,6 +35963,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/concurrency", wrapper.GetAdminOpsConcurrency)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-distribution", wrapper.GetAdminOpsErrorDistribution)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-logs", wrapper.ListAdminOpsErrorLogs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-logs/{id}", wrapper.GetAdminOpsErrorLog)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/ops/error-logs/{id}", wrapper.UpdateAdminOpsErrorLogResolution)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-trend", wrapper.GetAdminOpsErrorTrend)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/events/outbox", wrapper.ListAdminOutboxEvents)

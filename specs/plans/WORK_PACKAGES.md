@@ -5015,3 +5015,68 @@ Required gates:
 - `cd apps/web && npx vitest run tests/unit/messages.test.ts`
 - For the group-members backend endpoint: `make openapi-lint`, `make openapi-codegen-check`, `make openapi-ts-codegen-check`, `make sdk-ts-typecheck`, and `cd apps/api && go test ./internal/httpserver -run TestAdminListAccountGroupMembers`.
 - Browser verification for substantial UI work (desktop + mobile screenshots), per `../../docs/requirements/QUALITY_GATES.md` §9.
+
+## WP-1320: AdminOps Durable Error Evidence v1
+
+Objective: move operator-facing upstream error logs out of ephemeral memory and
+usage-derived guesses into a durable AdminOps evidence surface. This package
+uses sub2api/CLIProxyAPI only as reference input; it intentionally does not
+copy retry/replay request-body storage because that would expand hot-path writes,
+retain sensitive payloads, and confuse diagnostics with replay semantics.
+
+Read first:
+
+- `../../docs/requirements/DATA_MODEL.md`
+- `../../docs/requirements/OPENAPI_CONTRACT.md`
+- `../design/OBSERVABILITY_SPEC.md`
+- `../design/ADMIN_CONTROL_PLANE_SPEC.md`
+- `apps/api/internal/modules/ops_error_logs`
+- `apps/web/src/app/admin/logs/_panels/error-logs-panel.tsx`
+
+Owns:
+
+- `ops_error_logs` Ent schema and incremental PostgreSQL migration.
+- Ent store implementation for `internal/modules/ops_error_logs/contract.Store`.
+- Persistent runtime wiring through `entstore.Stores` and `httpserver.WithOpsErrorLogsStore`.
+- AdminOps APIs:
+  - `GET /api/v1/admin/ops/error-logs`
+  - `GET /api/v1/admin/ops/error-logs/{id}`
+  - `PATCH /api/v1/admin/ops/error-logs/{id}`
+- OpenAPI/Go/TypeScript generated clients.
+- Admin error-log panel and detail dialog switched to the AdminOps endpoint and
+  `OpsErrorLog` type.
+- Data model, OpenAPI, observability, and admin-control-plane docs.
+
+Definition of Done:
+
+- Gateway upstream failures persist into `ops_error_logs` when a durable store
+  is injected; memory store remains test/dev fallback only.
+- List filters cover operator workflows: user/account/provider/model/platform,
+  error class, status range, resolution, time window, and free-text evidence
+  query.
+- Detail and resolution-update routes return standard `{data, request_id}`
+  envelopes; write route requires CSRF.
+- DTO id fields follow OpenAPI `Id` string semantics and list pagination uses
+  the shared `Pagination` schema.
+- Frontend error-log list and detail surfaces consume `OpsErrorLog` and no
+  longer infer rows from usage logs; latency, attempts, tokens, source/target
+  protocol, owner/source classification, upstream request id, and attempt
+  history are first-class sanitized fields on the durable ops row.
+- Error logs store sanitized bounded excerpts only; no raw request body, prompt,
+  Authorization header, Cookie, API key, OAuth token, provider credential, or
+  replay payload is persisted.
+- `STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make ent-generate-check`
+- `make migration-check`
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `pnpm --filter @srapi/web typecheck`
+- `cd apps/api && go test ./internal/modules/ops_error_logs/... ./internal/persistence/entstore/opserrorlogs ./internal/persistence/entstore ./internal/httpserver -run 'TestRecordError|TestUpdateResolution|TestSweepOlderThan|TestStoreListsFiltersAndUpdatesResolution|TestStoreDeleteOlderThanAndNotFound|TestRuntimeStoresPersistRecords|TestAdminOpsErrorLogsListGetAndResolve' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`

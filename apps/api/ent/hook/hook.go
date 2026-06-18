@@ -429,6 +429,18 @@ func (f ObsSLODefinitionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.V
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ObsSLODefinitionMutation", m)
 }
 
+// The OpsErrorLogFunc type is an adapter to allow the use of ordinary
+// function as OpsErrorLog mutator.
+type OpsErrorLogFunc func(context.Context, *ent.OpsErrorLogMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f OpsErrorLogFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.OpsErrorLogMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.OpsErrorLogMutation", m)
+}
+
 // The OpsSystemLogFunc type is an adapter to allow the use of ordinary
 // function as OpsSystemLog mutator.
 type OpsSystemLogFunc func(context.Context, *ent.OpsSystemLogMutation) (ent.Value, error)

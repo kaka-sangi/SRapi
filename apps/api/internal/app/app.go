@@ -343,6 +343,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithAffiliateStore(stores.Affiliate),
 			httpserver.WithOperationsStore(stores.Operations),
 			httpserver.WithIdempotencyStore(stores.Idempotency),
+			httpserver.WithOpsErrorLogsStore(stores.OpsErrorLogs),
 			httpserver.WithPaymentStore(stores.Payments),
 			httpserver.WithQualityEvalStore(stores.QualityEval),
 			httpserver.WithSchedulerStore(stores.Scheduler),

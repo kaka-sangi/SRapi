@@ -82,6 +82,8 @@ type Tx struct {
 	ObsAlertSilence *ObsAlertSilenceClient
 	// ObsSLODefinition is the client for interacting with the ObsSLODefinition builders.
 	ObsSLODefinition *ObsSLODefinitionClient
+	// OpsErrorLog is the client for interacting with the OpsErrorLog builders.
+	OpsErrorLog *OpsErrorLogClient
 	// OpsSystemLog is the client for interacting with the OpsSystemLog builders.
 	OpsSystemLog *OpsSystemLogClient
 	// PasswordResetToken is the client for interacting with the PasswordResetToken builders.
@@ -326,6 +328,7 @@ func (tx *Tx) init() {
 	tx.ObsAlertRule = NewObsAlertRuleClient(tx.config)
 	tx.ObsAlertSilence = NewObsAlertSilenceClient(tx.config)
 	tx.ObsSLODefinition = NewObsSLODefinitionClient(tx.config)
+	tx.OpsErrorLog = NewOpsErrorLogClient(tx.config)
 	tx.OpsSystemLog = NewOpsSystemLogClient(tx.config)
 	tx.PasswordResetToken = NewPasswordResetTokenClient(tx.config)
 	tx.PayloadRule = NewPayloadRuleClient(tx.config)

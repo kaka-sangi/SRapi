@@ -611,7 +611,41 @@ matched/deleted counts and normalized filter metadata. Audit payloads must not
 copy raw log messages, raw search strings, credentials, prompts, cookies, API
 keys, or provider-native frames.
 
-### 4.11 Provider Account Import / Export
+### 4.11 AdminOps Error Logs
+
+AdminOps error-log routes are the durable operator-facing upstream failure
+surface:
+
+```txt
+GET   /api/v1/admin/ops/error-logs
+GET   /api/v1/admin/ops/error-logs/{id}
+PATCH /api/v1/admin/ops/error-logs/{id}
+```
+
+`GET /api/v1/admin/ops/error-logs` returns persisted `ops_error_logs` rows,
+not usage-derived guesses. Query filters may include `user_id`, `account_id`,
+`provider_id`, `model`, `error_class`, `platform`, `resolution`, `status_min`,
+`status_max`, `start`, `end`, and `q`. Pagination uses the shared `Pagination`
+schema.
+
+`GET /api/v1/admin/ops/error-logs/{id}` returns the same sanitized row in a
+`{data, request_id}` envelope for detail dialogs and incident links. The row
+includes structured operational evidence such as source/target protocol,
+attempt number, latency, estimated token counts, upstream request id,
+error owner/source, and bounded `upstream_errors` attempt history.
+
+`PATCH /api/v1/admin/ops/error-logs/{id}` is a write route and must require
+`cookieAuth` plus `csrfHeader`. It accepts `resolution` (`open`,
+`investigating`, `resolved`, `muted`) and optional `note`, sets `resolved_at`
+only for `resolved`, and returns the updated row. Response IDs follow the
+OpenAPI `Id` type as strings.
+
+These routes intentionally do not store or expose raw request bodies, headers,
+prompts, credentials, or replay payloads. Error logs carry enough structured
+evidence to diagnose provider/account/model failures while keeping replay
+semantics in the separate idempotency and scheduler snapshot surfaces.
+
+### 4.12 Provider Account Import / Export
 
 账号池导入导出接口必须保持凭证安全边界：
 

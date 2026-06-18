@@ -40,6 +40,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
 	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
+	"github.com/srapi/srapi/apps/api/ent/opserrorlog"
 	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
 	"github.com/srapi/srapi/apps/api/ent/passwordresettoken"
 	"github.com/srapi/srapi/apps/api/ent/payloadrule"
@@ -1255,6 +1256,101 @@ func init() {
 	obsslodefinitionDescStatus := obsslodefinitionFields[4].Descriptor()
 	// obsslodefinition.DefaultStatus holds the default value on creation for the status field.
 	obsslodefinition.DefaultStatus = obsslodefinitionDescStatus.Default.(string)
+	opserrorlogMixin := schema.OpsErrorLog{}.Mixin()
+	opserrorlogMixinFields0 := opserrorlogMixin[0].Fields()
+	_ = opserrorlogMixinFields0
+	opserrorlogFields := schema.OpsErrorLog{}.Fields()
+	_ = opserrorlogFields
+	// opserrorlogDescCreatedAt is the schema descriptor for created_at field.
+	opserrorlogDescCreatedAt := opserrorlogMixinFields0[0].Descriptor()
+	// opserrorlog.DefaultCreatedAt holds the default value on creation for the created_at field.
+	opserrorlog.DefaultCreatedAt = opserrorlogDescCreatedAt.Default.(func() time.Time)
+	// opserrorlogDescUpdatedAt is the schema descriptor for updated_at field.
+	opserrorlogDescUpdatedAt := opserrorlogMixinFields0[1].Descriptor()
+	// opserrorlog.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	opserrorlog.DefaultUpdatedAt = opserrorlogDescUpdatedAt.Default.(func() time.Time)
+	// opserrorlog.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	opserrorlog.UpdateDefaultUpdatedAt = opserrorlogDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// opserrorlogDescRequestID is the schema descriptor for request_id field.
+	opserrorlogDescRequestID := opserrorlogFields[1].Descriptor()
+	// opserrorlog.DefaultRequestID holds the default value on creation for the request_id field.
+	opserrorlog.DefaultRequestID = opserrorlogDescRequestID.Default.(string)
+	// opserrorlogDescTraceID is the schema descriptor for trace_id field.
+	opserrorlogDescTraceID := opserrorlogFields[2].Descriptor()
+	// opserrorlog.DefaultTraceID holds the default value on creation for the trace_id field.
+	opserrorlog.DefaultTraceID = opserrorlogDescTraceID.Default.(string)
+	// opserrorlogDescPlatform is the schema descriptor for platform field.
+	opserrorlogDescPlatform := opserrorlogFields[7].Descriptor()
+	// opserrorlog.DefaultPlatform holds the default value on creation for the platform field.
+	opserrorlog.DefaultPlatform = opserrorlogDescPlatform.Default.(string)
+	// opserrorlogDescSourceEndpoint is the schema descriptor for source_endpoint field.
+	opserrorlogDescSourceEndpoint := opserrorlogFields[8].Descriptor()
+	// opserrorlog.DefaultSourceEndpoint holds the default value on creation for the source_endpoint field.
+	opserrorlog.DefaultSourceEndpoint = opserrorlogDescSourceEndpoint.Default.(string)
+	// opserrorlogDescTargetProtocol is the schema descriptor for target_protocol field.
+	opserrorlogDescTargetProtocol := opserrorlogFields[9].Descriptor()
+	// opserrorlog.DefaultTargetProtocol holds the default value on creation for the target_protocol field.
+	opserrorlog.DefaultTargetProtocol = opserrorlogDescTargetProtocol.Default.(string)
+	// opserrorlogDescModel is the schema descriptor for model field.
+	opserrorlogDescModel := opserrorlogFields[10].Descriptor()
+	// opserrorlog.DefaultModel holds the default value on creation for the model field.
+	opserrorlog.DefaultModel = opserrorlogDescModel.Default.(string)
+	// opserrorlogDescUpstreamRequestID is the schema descriptor for upstream_request_id field.
+	opserrorlogDescUpstreamRequestID := opserrorlogFields[12].Descriptor()
+	// opserrorlog.DefaultUpstreamRequestID holds the default value on creation for the upstream_request_id field.
+	opserrorlog.DefaultUpstreamRequestID = opserrorlogDescUpstreamRequestID.Default.(string)
+	// opserrorlogDescAttemptNo is the schema descriptor for attempt_no field.
+	opserrorlogDescAttemptNo := opserrorlogFields[13].Descriptor()
+	// opserrorlog.DefaultAttemptNo holds the default value on creation for the attempt_no field.
+	opserrorlog.DefaultAttemptNo = opserrorlogDescAttemptNo.Default.(int)
+	// opserrorlogDescLatencyMs is the schema descriptor for latency_ms field.
+	opserrorlogDescLatencyMs := opserrorlogFields[14].Descriptor()
+	// opserrorlog.DefaultLatencyMs holds the default value on creation for the latency_ms field.
+	opserrorlog.DefaultLatencyMs = opserrorlogDescLatencyMs.Default.(int)
+	// opserrorlogDescInputTokens is the schema descriptor for input_tokens field.
+	opserrorlogDescInputTokens := opserrorlogFields[15].Descriptor()
+	// opserrorlog.DefaultInputTokens holds the default value on creation for the input_tokens field.
+	opserrorlog.DefaultInputTokens = opserrorlogDescInputTokens.Default.(int)
+	// opserrorlogDescOutputTokens is the schema descriptor for output_tokens field.
+	opserrorlogDescOutputTokens := opserrorlogFields[16].Descriptor()
+	// opserrorlog.DefaultOutputTokens holds the default value on creation for the output_tokens field.
+	opserrorlog.DefaultOutputTokens = opserrorlogDescOutputTokens.Default.(int)
+	// opserrorlogDescUsageEstimated is the schema descriptor for usage_estimated field.
+	opserrorlogDescUsageEstimated := opserrorlogFields[17].Descriptor()
+	// opserrorlog.DefaultUsageEstimated holds the default value on creation for the usage_estimated field.
+	opserrorlog.DefaultUsageEstimated = opserrorlogDescUsageEstimated.Default.(bool)
+	// opserrorlogDescErrorClass is the schema descriptor for error_class field.
+	opserrorlogDescErrorClass := opserrorlogFields[18].Descriptor()
+	// opserrorlog.DefaultErrorClass holds the default value on creation for the error_class field.
+	opserrorlog.DefaultErrorClass = opserrorlogDescErrorClass.Default.(string)
+	// opserrorlogDescErrorPhase is the schema descriptor for error_phase field.
+	opserrorlogDescErrorPhase := opserrorlogFields[19].Descriptor()
+	// opserrorlog.DefaultErrorPhase holds the default value on creation for the error_phase field.
+	opserrorlog.DefaultErrorPhase = opserrorlogDescErrorPhase.Default.(string)
+	// opserrorlogDescErrorOwner is the schema descriptor for error_owner field.
+	opserrorlogDescErrorOwner := opserrorlogFields[20].Descriptor()
+	// opserrorlog.DefaultErrorOwner holds the default value on creation for the error_owner field.
+	opserrorlog.DefaultErrorOwner = opserrorlogDescErrorOwner.Default.(string)
+	// opserrorlogDescErrorSource is the schema descriptor for error_source field.
+	opserrorlogDescErrorSource := opserrorlogFields[21].Descriptor()
+	// opserrorlog.DefaultErrorSource holds the default value on creation for the error_source field.
+	opserrorlog.DefaultErrorSource = opserrorlogDescErrorSource.Default.(string)
+	// opserrorlogDescErrorMessage is the schema descriptor for error_message field.
+	opserrorlogDescErrorMessage := opserrorlogFields[22].Descriptor()
+	// opserrorlog.DefaultErrorMessage holds the default value on creation for the error_message field.
+	opserrorlog.DefaultErrorMessage = opserrorlogDescErrorMessage.Default.(string)
+	// opserrorlogDescErrorBodyExcerpt is the schema descriptor for error_body_excerpt field.
+	opserrorlogDescErrorBodyExcerpt := opserrorlogFields[23].Descriptor()
+	// opserrorlog.DefaultErrorBodyExcerpt holds the default value on creation for the error_body_excerpt field.
+	opserrorlog.DefaultErrorBodyExcerpt = opserrorlogDescErrorBodyExcerpt.Default.(string)
+	// opserrorlogDescResolution is the schema descriptor for resolution field.
+	opserrorlogDescResolution := opserrorlogFields[25].Descriptor()
+	// opserrorlog.DefaultResolution holds the default value on creation for the resolution field.
+	opserrorlog.DefaultResolution = opserrorlogDescResolution.Default.(string)
+	// opserrorlogDescResolutionNote is the schema descriptor for resolution_note field.
+	opserrorlogDescResolutionNote := opserrorlogFields[26].Descriptor()
+	// opserrorlog.DefaultResolutionNote holds the default value on creation for the resolution_note field.
+	opserrorlog.DefaultResolutionNote = opserrorlogDescResolutionNote.Default.(string)
 	opssystemlogMixin := schema.OpsSystemLog{}.Mixin()
 	opssystemlogMixinFields0 := opssystemlogMixin[0].Fields()
 	_ = opssystemlogMixinFields0

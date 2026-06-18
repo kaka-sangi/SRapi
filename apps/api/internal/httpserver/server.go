@@ -37,6 +37,7 @@ import (
 	modelratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/model_rate_limits/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
 	payloadrulescontract "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
@@ -136,6 +137,7 @@ type runtimeOptions struct {
 	affiliate              affiliatecontract.Store
 	idempotency            idempotencycontract.Store
 	operations             operationscontract.Store
+	opsErrorLogs           opserrorlogscontract.Store
 	payments               paymentcontract.Store
 	qualityEval            qualitycontract.Store
 	realtime               realtimecontract.Store
@@ -282,6 +284,12 @@ func WithAffiliateStore(store affiliatecontract.Store) Option {
 func WithOperationsStore(store operationscontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.operations = store
+	}
+}
+
+func WithOpsErrorLogsStore(store opserrorlogscontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.opsErrorLogs = store
 	}
 }
 
@@ -630,6 +638,7 @@ func newWithServer(cfg config.Config, logger *slog.Logger, options ...Option) (h
 	mux.HandleFunc("GET /api/v1/admin/error-logs/{id}", server.handleGetAdminErrorLog)
 	mux.HandleFunc("PATCH /api/v1/admin/error-logs/{id}/resolve", server.handleResolveAdminErrorLog)
 	mux.HandleFunc("GET /api/v1/admin/ops/error-logs", server.handleListAdminOpsErrorLogs)
+	mux.HandleFunc("GET /api/v1/admin/ops/error-logs/{id}", server.handleGetAdminOpsErrorLog)
 	mux.HandleFunc("PATCH /api/v1/admin/ops/error-logs/{id}", server.handleUpdateAdminOpsErrorLogResolution)
 	mux.HandleFunc("GET /api/v1/admin/error-stream", server.handleAdminErrorStream)
 	mux.HandleFunc("GET /api/v1/admin/request-log-files", server.handleListAdminRequestLogFiles)

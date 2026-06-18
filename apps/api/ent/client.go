@@ -49,6 +49,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
 	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
+	"github.com/srapi/srapi/apps/api/ent/opserrorlog"
 	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
 	"github.com/srapi/srapi/apps/api/ent/passwordresettoken"
 	"github.com/srapi/srapi/apps/api/ent/payloadrule"
@@ -165,6 +166,8 @@ type Client struct {
 	ObsAlertSilence *ObsAlertSilenceClient
 	// ObsSLODefinition is the client for interacting with the ObsSLODefinition builders.
 	ObsSLODefinition *ObsSLODefinitionClient
+	// OpsErrorLog is the client for interacting with the OpsErrorLog builders.
+	OpsErrorLog *OpsErrorLogClient
 	// OpsSystemLog is the client for interacting with the OpsSystemLog builders.
 	OpsSystemLog *OpsSystemLogClient
 	// PasswordResetToken is the client for interacting with the PasswordResetToken builders.
@@ -289,6 +292,7 @@ func (c *Client) init() {
 	c.ObsAlertRule = NewObsAlertRuleClient(c.config)
 	c.ObsAlertSilence = NewObsAlertSilenceClient(c.config)
 	c.ObsSLODefinition = NewObsSLODefinitionClient(c.config)
+	c.OpsErrorLog = NewOpsErrorLogClient(c.config)
 	c.OpsSystemLog = NewOpsSystemLogClient(c.config)
 	c.PasswordResetToken = NewPasswordResetTokenClient(c.config)
 	c.PayloadRule = NewPayloadRuleClient(c.config)
@@ -455,6 +459,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ObsAlertRule:              NewObsAlertRuleClient(cfg),
 		ObsAlertSilence:           NewObsAlertSilenceClient(cfg),
 		ObsSLODefinition:          NewObsSLODefinitionClient(cfg),
+		OpsErrorLog:               NewOpsErrorLogClient(cfg),
 		OpsSystemLog:              NewOpsSystemLogClient(cfg),
 		PasswordResetToken:        NewPasswordResetTokenClient(cfg),
 		PayloadRule:               NewPayloadRuleClient(cfg),
@@ -548,6 +553,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ObsAlertRule:              NewObsAlertRuleClient(cfg),
 		ObsAlertSilence:           NewObsAlertSilenceClient(cfg),
 		ObsSLODefinition:          NewObsSLODefinitionClient(cfg),
+		OpsErrorLog:               NewOpsErrorLogClient(cfg),
 		OpsSystemLog:              NewOpsSystemLogClient(cfg),
 		PasswordResetToken:        NewPasswordResetTokenClient(cfg),
 		PayloadRule:               NewPayloadRuleClient(cfg),
@@ -625,17 +631,18 @@ func (c *Client) Use(hooks ...Hook) {
 		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
 		c.ModelProviderMapping, c.ModelRateLimit, c.ModelRegistry, c.MonitorDefinition,
 		c.MonitorRequestTemplate, c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule,
-		c.ObsAlertSilence, c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken,
-		c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
-		c.PendingOAuthSession, c.PricingInterval, c.PricingRule, c.PromoCode,
-		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
-		c.QualityEvaluation, c.RedeemCode, c.Role, c.ScheduledTestPlan,
-		c.ScheduledTestPlanRun, c.SchedulerDecision, c.SchedulerFeedback,
-		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
-		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
-		c.UserPlatformQuota, c.UserPromoCodeApplication, c.UserRedeemCodeRedemption,
-		c.UserRole, c.UserSubscription, c.UserTOTPSecret, c.Workspace,
+		c.ObsAlertSilence, c.ObsSLODefinition, c.OpsErrorLog, c.OpsSystemLog,
+		c.PasswordResetToken, c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder,
+		c.PaymentProviderInstance, c.PendingOAuthSession, c.PricingInterval,
+		c.PricingRule, c.PromoCode, c.Provider, c.ProviderAccount, c.Proxy,
+		c.QualityEvalSample, c.QualityEvaluation, c.RedeemCode, c.Role,
+		c.ScheduledTestPlan, c.ScheduledTestPlanRun, c.SchedulerDecision,
+		c.SchedulerFeedback, c.SchedulerRequestSnapshot, c.SchedulerStrategy,
+		c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageLog, c.User,
+		c.UserAnnouncementRead, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.UserAuthIdentity, c.UserPlatformQuota, c.UserPromoCodeApplication,
+		c.UserRedeemCodeRedemption, c.UserRole, c.UserSubscription, c.UserTOTPSecret,
+		c.Workspace,
 	} {
 		n.Use(hooks...)
 	}
@@ -654,17 +661,18 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
 		c.ModelProviderMapping, c.ModelRateLimit, c.ModelRegistry, c.MonitorDefinition,
 		c.MonitorRequestTemplate, c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule,
-		c.ObsAlertSilence, c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken,
-		c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
-		c.PendingOAuthSession, c.PricingInterval, c.PricingRule, c.PromoCode,
-		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
-		c.QualityEvaluation, c.RedeemCode, c.Role, c.ScheduledTestPlan,
-		c.ScheduledTestPlanRun, c.SchedulerDecision, c.SchedulerFeedback,
-		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
-		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
-		c.UserPlatformQuota, c.UserPromoCodeApplication, c.UserRedeemCodeRedemption,
-		c.UserRole, c.UserSubscription, c.UserTOTPSecret, c.Workspace,
+		c.ObsAlertSilence, c.ObsSLODefinition, c.OpsErrorLog, c.OpsSystemLog,
+		c.PasswordResetToken, c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder,
+		c.PaymentProviderInstance, c.PendingOAuthSession, c.PricingInterval,
+		c.PricingRule, c.PromoCode, c.Provider, c.ProviderAccount, c.Proxy,
+		c.QualityEvalSample, c.QualityEvaluation, c.RedeemCode, c.Role,
+		c.ScheduledTestPlan, c.ScheduledTestPlanRun, c.SchedulerDecision,
+		c.SchedulerFeedback, c.SchedulerRequestSnapshot, c.SchedulerStrategy,
+		c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageLog, c.User,
+		c.UserAnnouncementRead, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.UserAuthIdentity, c.UserPlatformQuota, c.UserPromoCodeApplication,
+		c.UserRedeemCodeRedemption, c.UserRole, c.UserSubscription, c.UserTOTPSecret,
+		c.Workspace,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -743,6 +751,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ObsAlertSilence.mutate(ctx, m)
 	case *ObsSLODefinitionMutation:
 		return c.ObsSLODefinition.mutate(ctx, m)
+	case *OpsErrorLogMutation:
+		return c.OpsErrorLog.mutate(ctx, m)
 	case *OpsSystemLogMutation:
 		return c.OpsSystemLog.mutate(ctx, m)
 	case *PasswordResetTokenMutation:
@@ -5478,6 +5488,139 @@ func (c *ObsSLODefinitionClient) mutate(ctx context.Context, m *ObsSLODefinition
 		return (&ObsSLODefinitionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ObsSLODefinition mutation op: %q", m.Op())
+	}
+}
+
+// OpsErrorLogClient is a client for the OpsErrorLog schema.
+type OpsErrorLogClient struct {
+	config
+}
+
+// NewOpsErrorLogClient returns a client for the OpsErrorLog from the given config.
+func NewOpsErrorLogClient(c config) *OpsErrorLogClient {
+	return &OpsErrorLogClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `opserrorlog.Hooks(f(g(h())))`.
+func (c *OpsErrorLogClient) Use(hooks ...Hook) {
+	c.hooks.OpsErrorLog = append(c.hooks.OpsErrorLog, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `opserrorlog.Intercept(f(g(h())))`.
+func (c *OpsErrorLogClient) Intercept(interceptors ...Interceptor) {
+	c.inters.OpsErrorLog = append(c.inters.OpsErrorLog, interceptors...)
+}
+
+// Create returns a builder for creating a OpsErrorLog entity.
+func (c *OpsErrorLogClient) Create() *OpsErrorLogCreate {
+	mutation := newOpsErrorLogMutation(c.config, OpCreate)
+	return &OpsErrorLogCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of OpsErrorLog entities.
+func (c *OpsErrorLogClient) CreateBulk(builders ...*OpsErrorLogCreate) *OpsErrorLogCreateBulk {
+	return &OpsErrorLogCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *OpsErrorLogClient) MapCreateBulk(slice any, setFunc func(*OpsErrorLogCreate, int)) *OpsErrorLogCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &OpsErrorLogCreateBulk{err: fmt.Errorf("calling to OpsErrorLogClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*OpsErrorLogCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &OpsErrorLogCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for OpsErrorLog.
+func (c *OpsErrorLogClient) Update() *OpsErrorLogUpdate {
+	mutation := newOpsErrorLogMutation(c.config, OpUpdate)
+	return &OpsErrorLogUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *OpsErrorLogClient) UpdateOne(_m *OpsErrorLog) *OpsErrorLogUpdateOne {
+	mutation := newOpsErrorLogMutation(c.config, OpUpdateOne, withOpsErrorLog(_m))
+	return &OpsErrorLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *OpsErrorLogClient) UpdateOneID(id int) *OpsErrorLogUpdateOne {
+	mutation := newOpsErrorLogMutation(c.config, OpUpdateOne, withOpsErrorLogID(id))
+	return &OpsErrorLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for OpsErrorLog.
+func (c *OpsErrorLogClient) Delete() *OpsErrorLogDelete {
+	mutation := newOpsErrorLogMutation(c.config, OpDelete)
+	return &OpsErrorLogDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *OpsErrorLogClient) DeleteOne(_m *OpsErrorLog) *OpsErrorLogDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *OpsErrorLogClient) DeleteOneID(id int) *OpsErrorLogDeleteOne {
+	builder := c.Delete().Where(opserrorlog.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &OpsErrorLogDeleteOne{builder}
+}
+
+// Query returns a query builder for OpsErrorLog.
+func (c *OpsErrorLogClient) Query() *OpsErrorLogQuery {
+	return &OpsErrorLogQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeOpsErrorLog},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a OpsErrorLog entity by its id.
+func (c *OpsErrorLogClient) Get(ctx context.Context, id int) (*OpsErrorLog, error) {
+	return c.Query().Where(opserrorlog.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *OpsErrorLogClient) GetX(ctx context.Context, id int) *OpsErrorLog {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *OpsErrorLogClient) Hooks() []Hook {
+	return c.hooks.OpsErrorLog
+}
+
+// Interceptors returns the client interceptors.
+func (c *OpsErrorLogClient) Interceptors() []Interceptor {
+	return c.inters.OpsErrorLog
+}
+
+func (c *OpsErrorLogClient) mutate(ctx context.Context, m *OpsErrorLogMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&OpsErrorLogCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&OpsErrorLogUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&OpsErrorLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&OpsErrorLogDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown OpsErrorLog mutation op: %q", m.Op())
 	}
 }
 
@@ -10679,7 +10822,7 @@ type (
 		ErrorPassthroughRule, IdempotencyRecord, InviteCode, InviteRelationship,
 		ModelAlias, ModelProviderMapping, ModelRateLimit, ModelRegistry,
 		MonitorDefinition, MonitorRequestTemplate, MonitorRunResult, ObsAlertEvent,
-		ObsAlertRule, ObsAlertSilence, ObsSLODefinition, OpsSystemLog,
+		ObsAlertRule, ObsAlertSilence, ObsSLODefinition, OpsErrorLog, OpsSystemLog,
 		PasswordResetToken, PayloadRule, PaymentAuditLog, PaymentOrder,
 		PaymentProviderInstance, PendingOAuthSession, PricingInterval, PricingRule,
 		PromoCode, Provider, ProviderAccount, Proxy, QualityEvalSample,
@@ -10700,7 +10843,7 @@ type (
 		ErrorPassthroughRule, IdempotencyRecord, InviteCode, InviteRelationship,
 		ModelAlias, ModelProviderMapping, ModelRateLimit, ModelRegistry,
 		MonitorDefinition, MonitorRequestTemplate, MonitorRunResult, ObsAlertEvent,
-		ObsAlertRule, ObsAlertSilence, ObsSLODefinition, OpsSystemLog,
+		ObsAlertRule, ObsAlertSilence, ObsSLODefinition, OpsErrorLog, OpsSystemLog,
 		PasswordResetToken, PayloadRule, PaymentAuditLog, PaymentOrder,
 		PaymentProviderInstance, PendingOAuthSession, PricingInterval, PricingRule,
 		PromoCode, Provider, ProviderAccount, Proxy, QualityEvalSample,

@@ -8,6 +8,7 @@ package memory
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -41,6 +42,7 @@ func (s *Store) Insert(_ context.Context, entry contract.Entry) (contract.Entry,
 	if entry.OccurredAt.IsZero() {
 		entry.OccurredAt = entry.CreatedAt
 	}
+	entry.UpstreamErrors = cloneUpstreamErrors(entry.UpstreamErrors)
 	s.entries[entry.ID] = entry
 	return entry, nil
 }
@@ -52,7 +54,7 @@ func (s *Store) Get(_ context.Context, id int64) (contract.Entry, error) {
 	if !ok {
 		return contract.Entry{}, contract.ErrNotFound
 	}
-	return entry, nil
+	return cloneEntry(entry), nil
 }
 
 func (s *Store) List(_ context.Context, filter contract.ListFilter) (contract.ListResult, error) {
@@ -89,7 +91,7 @@ func (s *Store) List(_ context.Context, filter contract.ListFilter) (contract.Li
 		end = total
 	}
 	return contract.ListResult{
-		Items:    append([]contract.Entry(nil), all[start:end]...),
+		Items:    cloneEntries(all[start:end]),
 		Total:    total,
 		Page:     page,
 		PageSize: size,
@@ -112,9 +114,10 @@ func (s *Store) UpdateResolution(_ context.Context, req contract.UpdateResolutio
 		entry.ResolvedAt = &t
 	} else {
 		entry.ResolvedAt = nil
+		entry.ResolvedByID = nil
 	}
 	s.entries[req.ID] = entry
-	return entry, nil
+	return cloneEntry(entry), nil
 }
 
 func (s *Store) DeleteOlderThan(_ context.Context, before time.Time) (int, error) {
@@ -149,7 +152,13 @@ func matchesFilter(entry contract.Entry, filter contract.ListFilter) bool {
 	if filter.Platform != "" && entry.Platform != filter.Platform {
 		return false
 	}
+	if filter.Model != "" && entry.Model != filter.Model {
+		return false
+	}
 	if filter.ErrorClass != "" && entry.ErrorClass != filter.ErrorClass {
+		return false
+	}
+	if query := strings.ToLower(strings.TrimSpace(filter.Query)); query != "" && !entryMatchesQuery(entry, query) {
 		return false
 	}
 	if filter.Resolution != "" && entry.Resolution != filter.Resolution {
@@ -172,4 +181,55 @@ func matchesFilter(entry contract.Entry, filter contract.ListFilter) bool {
 		return false
 	}
 	return true
+}
+
+func entryMatchesQuery(entry contract.Entry, query string) bool {
+	fields := []string{
+		entry.RequestID,
+		entry.TraceID,
+		entry.SourceEndpoint,
+		entry.TargetProtocol,
+		entry.Model,
+		entry.UpstreamRequestID,
+		entry.ErrorClass,
+		entry.ErrorPhase,
+		entry.ErrorOwner,
+		entry.ErrorSource,
+		entry.ErrorMessage,
+		entry.ErrorBodyExcerpt,
+	}
+	for _, field := range fields {
+		if strings.Contains(strings.ToLower(field), query) {
+			return true
+		}
+	}
+	return false
+}
+
+func cloneEntries(entries []contract.Entry) []contract.Entry {
+	out := make([]contract.Entry, 0, len(entries))
+	for _, entry := range entries {
+		out = append(out, cloneEntry(entry))
+	}
+	return out
+}
+
+func cloneEntry(entry contract.Entry) contract.Entry {
+	entry.UpstreamErrors = cloneUpstreamErrors(entry.UpstreamErrors)
+	return entry
+}
+
+func cloneUpstreamErrors(events []contract.UpstreamErrorEvent) []contract.UpstreamErrorEvent {
+	if len(events) == 0 {
+		return nil
+	}
+	out := make([]contract.UpstreamErrorEvent, 0, len(events))
+	for _, event := range events {
+		if event.AccountID != nil {
+			id := *event.AccountID
+			event.AccountID = &id
+		}
+		out = append(out, event)
+	}
+	return out
 }

@@ -47,6 +47,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
 	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
+	"github.com/srapi/srapi/apps/api/ent/opserrorlog"
 	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
 	"github.com/srapi/srapi/apps/api/ent/passwordresettoken"
 	"github.com/srapi/srapi/apps/api/ent/payloadrule"
@@ -181,6 +182,7 @@ func checkColumn(t, c string) error {
 			obsalertrule.Table:              obsalertrule.ValidColumn,
 			obsalertsilence.Table:           obsalertsilence.ValidColumn,
 			obsslodefinition.Table:          obsslodefinition.ValidColumn,
+			opserrorlog.Table:               opserrorlog.ValidColumn,
 			opssystemlog.Table:              opssystemlog.ValidColumn,
 			passwordresettoken.Table:        passwordresettoken.ValidColumn,
 			payloadrule.Table:               payloadrule.ValidColumn,

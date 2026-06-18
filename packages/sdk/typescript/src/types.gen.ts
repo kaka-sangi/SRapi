@@ -3201,25 +3201,44 @@ export type OpsErrorLog = {
     occurred_at?: string;
     request_id?: string;
     trace_id?: string;
+    user_id?: Id;
+    api_key_id?: Id;
+    account_id?: Id;
+    provider_id?: Id;
     platform?: string;
     source_endpoint?: string;
+    /**
+     * Alias for platform, kept for error-log UI parity.
+     */
+    source_protocol?: string;
+    target_protocol?: string;
     model?: string;
+    status_code?: number;
+    upstream_request_id?: string;
+    attempt_no?: number;
+    latency_ms?: number;
+    input_tokens?: number;
+    output_tokens?: number;
+    usage_estimated?: boolean;
     error_class?: string;
     error_phase?: string;
+    error_owner?: string;
+    error_source?: string;
     error_message?: string;
     error_body_excerpt?: string;
+    upstream_errors?: Array<UpstreamErrorEvent>;
     resolution?: 'open' | 'investigating' | 'resolved' | 'muted';
     resolution_note?: string;
     created_at?: string;
     updated_at?: string;
+    resolved_at?: string;
+    resolved_by_user_id?: Id;
     [key: string]: unknown;
 };
 
 export type OpsErrorLogListResponse = {
     data: Array<OpsErrorLog>;
-    pagination: {
-        [key: string]: unknown;
-    };
+    pagination: Pagination;
     request_id: RequestId;
 };
 
@@ -17045,12 +17064,22 @@ export type ListAdminOpsErrorLogsData = {
         page_size?: number;
         user_id?: Id;
         account_id?: Id;
+        provider_id?: Id;
+        model?: string;
         error_class?: string;
         platform?: string;
         /**
          * Filter by operator-supplied resolution status.
          */
         resolution?: 'open' | 'investigating' | 'resolved' | 'muted';
+        status_min?: number;
+        status_max?: number;
+        start?: string;
+        end?: string;
+        /**
+         * Case-insensitive search across request ids, model, endpoint, class, phase, message, and body excerpt.
+         */
+        q?: string;
     };
     url: '/api/v1/admin/ops/error-logs';
 };
@@ -17080,6 +17109,49 @@ export type ListAdminOpsErrorLogsResponses = {
 };
 
 export type ListAdminOpsErrorLogsResponse = ListAdminOpsErrorLogsResponses[keyof ListAdminOpsErrorLogsResponses];
+
+export type GetAdminOpsErrorLogData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/ops/error-logs/{id}';
+};
+
+export type GetAdminOpsErrorLogErrors = {
+    /**
+     * Standard SRapi error.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminOpsErrorLogError = GetAdminOpsErrorLogErrors[keyof GetAdminOpsErrorLogErrors];
+
+export type GetAdminOpsErrorLogResponses = {
+    /**
+     * Operator-facing error log entry.
+     */
+    200: OpsErrorLogResponse;
+};
+
+export type GetAdminOpsErrorLogResponse = GetAdminOpsErrorLogResponses[keyof GetAdminOpsErrorLogResponses];
 
 export type UpdateAdminOpsErrorLogResolutionData = {
     body: OpsErrorLogResolutionUpdate;

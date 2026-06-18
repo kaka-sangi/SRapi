@@ -1,38 +1,36 @@
 "use client";
 
 import {
-  getAdminErrorLog,
-  listAdminErrorLogs,
-  resolveAdminErrorLog,
+  getAdminOpsErrorLog,
+  listAdminOpsErrorLogs,
+  updateAdminOpsErrorLogResolution,
 } from "../../../../../packages/sdk/typescript/src/index";
 import type {
-  ErrorLog,
-  ListAdminErrorLogsData,
+  ListAdminOpsErrorLogsData,
+  OpsErrorLog,
 } from "../../../../../packages/sdk/typescript/src/types.gen";
 import { unwrapList, unwrapData } from "./_shared";
 import type { AdminListResult } from "./types";
 
 export const errorLogsApi = {
-  // Server-side paginated/filtered list of failed-request records. The query
-  // shape mirrors the generated `ListAdminErrorLogsData["query"]`
-  // (page/page_size + user/account/model/error_class/source_endpoint/time-range/q).
+  // Server-side paginated/filtered AdminOps upstream-failure evidence feed.
+  // The legacy /admin/error-logs usage-derived endpoint is intentionally not
+  // used here; operators need durable ops_error_logs rows, not inferred rows.
   listErrorLogs(
-    query?: ListAdminErrorLogsData["query"],
-  ): Promise<AdminListResult<ErrorLog>> {
-    return unwrapList(() => listAdminErrorLogs({ query, throwOnError: true }));
+    query?: ListAdminOpsErrorLogsData["query"],
+  ): Promise<AdminListResult<OpsErrorLog>> {
+    return unwrapList(() => listAdminOpsErrorLogs({ query, throwOnError: true }));
   },
 
-  // Full metadata for a single failed request (opened from a list row click).
-  getErrorLog(id: string): Promise<ErrorLog> {
-    return unwrapData(() => getAdminErrorLog({ path: { id }, throwOnError: true }));
+  getErrorLog(id: string): Promise<OpsErrorLog> {
+    return unwrapData(() => getAdminOpsErrorLog({ path: { id }, throwOnError: true }));
   },
 
-  // Toggle the resolved flag on an error log. Returns the updated ErrorLog.
-  resolveErrorLog(id: string, resolved: boolean): Promise<ErrorLog> {
+  resolveErrorLog(id: string, resolved: boolean): Promise<OpsErrorLog> {
     return unwrapData(() =>
-      resolveAdminErrorLog({
+      updateAdminOpsErrorLogResolution({
         path: { id },
-        body: { resolved },
+        body: { resolution: resolved ? "resolved" : "open" },
         throwOnError: true,
       }),
     );

@@ -569,17 +569,9 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 	}
 	rt.errorPassthrough = errorPassthroughSvc
 
-	// ops_error_logs: hot-path operator-facing record of upstream failures.
-	// Bounded in-memory store by default; swap to an entstore once a schema
-	// is added. Service writes are best-effort fire-and-forget from the
-	// dispatcher so a logging failure never fails the user request.
-	opsErrorLogsStore := opserrorlogsmemory.New()
-	rt.opsErrorLogsStore = opsErrorLogsStore
-	opsErrorLogsSvc, err := opserrorlogsservice.New(opsErrorLogsStore, nil)
-	if err != nil {
+	if err := rt.buildOpsErrorLogsService(opts, allowMemoryStores); err != nil {
 		return err
 	}
-	rt.opsErrorLogs = opsErrorLogsSvc
 
 	tlsProfilesStore := opts.tlsProfiles
 	if tlsProfilesStore == nil {
@@ -744,6 +736,24 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 	} else {
 		rt.copilotEngine = copilot.NewEngine(catalog)
 	}
+	return nil
+}
+
+func (rt *runtimeState) buildOpsErrorLogsService(opts runtimeOptions, allowMemoryStores bool) error {
+	store := opts.opsErrorLogs
+	if store == nil {
+		if !allowMemoryStores {
+			return missingRuntimeStoreError("ops error logs")
+		}
+		store = opserrorlogsmemory.New()
+	}
+
+	rt.opsErrorLogsStore = store
+	service, err := opserrorlogsservice.New(store, nil)
+	if err != nil {
+		return err
+	}
+	rt.opsErrorLogs = service
 	return nil
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
+	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
 	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
@@ -31,6 +32,7 @@ func TestRuntimeStoresPersistRecords(t *testing.T) {
 	providerID := 10
 	accountID := 20
 	errorClass := "rate_limit"
+	statusCode := 429
 
 	usage, err := stores.Usage.Create(ctx, usagecontract.UsageLog{
 		RequestID:             "req_runtime_store",
@@ -64,6 +66,32 @@ func TestRuntimeStoresPersistRecords(t *testing.T) {
 	}
 	if len(usageByUser) != 1 || usageByUser[0].ID != usage.ID || usageByUser[0].ProviderID == nil || usageByUser[0].ErrorClass == nil {
 		t.Fatalf("expected persisted usage with optional fields, got %+v", usageByUser)
+	}
+
+	if stores.OpsErrorLogs == nil {
+		t.Fatalf("expected ops error logs store to be wired")
+	}
+	if _, err := stores.OpsErrorLogs.Insert(ctx, opserrorlogscontract.Entry{
+		OccurredAt:     now,
+		RequestID:      "req_runtime_store",
+		AccountID:      &accountID,
+		ProviderID:     &providerID,
+		Platform:       "openai-compatible",
+		SourceEndpoint: "/v1/chat/completions",
+		Model:          "persist-model",
+		StatusCode:     &statusCode,
+		ErrorClass:     "rate_limit",
+		ErrorPhase:     "upstream",
+		ErrorMessage:   "rate limited",
+	}); err != nil {
+		t.Fatalf("insert ops error log: %v", err)
+	}
+	opsErrors, err := stores.OpsErrorLogs.List(ctx, opserrorlogscontract.ListFilter{AccountID: &accountID, Query: "rate", Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("list ops error logs: %v", err)
+	}
+	if opsErrors.Total != 1 || len(opsErrors.Items) != 1 || opsErrors.Items[0].RequestID != "req_runtime_store" {
+		t.Fatalf("expected persisted ops error log, got %+v", opsErrors)
 	}
 
 	decision, err := stores.Scheduler.CreateDecision(ctx, schedulercontract.Decision{
@@ -100,7 +128,6 @@ func TestRuntimeStoresPersistRecords(t *testing.T) {
 		t.Fatalf("expected persisted scheduler decision, got %+v", decisions)
 	}
 
-	statusCode := 429
 	if _, err := stores.Scheduler.CreateFeedback(ctx, schedulercontract.Feedback{
 		RequestID:    "req_runtime_store",
 		DecisionID:   decision.ID,

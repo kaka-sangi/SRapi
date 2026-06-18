@@ -24,6 +24,11 @@ const MaxBodyExcerptBytes = 8 * 1024
 // MaxMessageBytes bounds the upstream error message.
 const MaxMessageBytes = 2048
 
+// MaxUpstreamErrorEvents bounds the per-row failover timeline shown in the
+// admin panel. Real gateway failover is much smaller; this cap protects
+// manual/test callers and future integrations.
+const MaxUpstreamErrorEvents = 20
+
 // DefaultRetention is the upper bound on how long an entry is kept by an
 // optional retention sweep. Aligns with sub2api ops defaults (30d).
 const DefaultRetention = 30 * 24 * time.Hour
@@ -140,29 +145,64 @@ func (s *Service) prepareEntry(req contract.RecordRequest) (contract.Entry, bool
 		req.StatusCode = nil
 	}
 	entry := contract.Entry{
-		OccurredAt:       occurred.UTC(),
-		RequestID:        truncate(strings.TrimSpace(req.RequestID), 128),
-		TraceID:          truncate(strings.TrimSpace(req.TraceID), 128),
-		UserID:           req.UserID,
-		APIKeyID:         req.APIKeyID,
-		AccountID:        req.AccountID,
-		ProviderID:       req.ProviderID,
-		Platform:         truncate(strings.TrimSpace(req.Platform), 64),
-		SourceEndpoint:   truncate(strings.TrimSpace(req.SourceEndpoint), 128),
-		Model:            truncate(strings.TrimSpace(req.Model), 128),
-		StatusCode:       req.StatusCode,
-		ErrorClass:       truncate(class, 64),
-		ErrorPhase:       truncate(phase, 64),
-		ErrorMessage:     truncate(sanitizeMessage(req.ErrorMessage), MaxMessageBytes),
-		ErrorBodyExcerpt: redactExcerpt(req.ErrorBodyExcerpt, MaxBodyExcerptBytes),
-		Resolution:       contract.ResolutionOpen,
-		CreatedAt:        now,
-		UpdatedAt:        now,
+		OccurredAt:        occurred.UTC(),
+		RequestID:         truncate(strings.TrimSpace(req.RequestID), 128),
+		TraceID:           truncate(strings.TrimSpace(req.TraceID), 128),
+		UserID:            req.UserID,
+		APIKeyID:          req.APIKeyID,
+		AccountID:         req.AccountID,
+		ProviderID:        req.ProviderID,
+		Platform:          truncate(strings.TrimSpace(req.Platform), 64),
+		SourceEndpoint:    truncate(strings.TrimSpace(req.SourceEndpoint), 128),
+		TargetProtocol:    truncate(strings.TrimSpace(req.TargetProtocol), 64),
+		Model:             truncate(strings.TrimSpace(req.Model), 128),
+		StatusCode:        req.StatusCode,
+		UpstreamRequestID: truncate(strings.TrimSpace(req.UpstreamRequestID), 128),
+		AttemptNo:         positiveOrDefault(req.AttemptNo, 1),
+		LatencyMS:         positiveOrZero(req.LatencyMS),
+		InputTokens:       positiveOrZero(req.InputTokens),
+		OutputTokens:      positiveOrZero(req.OutputTokens),
+		UsageEstimated:    req.UsageEstimated,
+		ErrorClass:        truncate(class, 64),
+		ErrorPhase:        truncate(phase, 64),
+		ErrorOwner:        truncate(defaultString(req.ErrorOwner, "provider"), 64),
+		ErrorSource:       truncate(defaultString(req.ErrorSource, "upstream_http"), 64),
+		ErrorMessage:      truncate(sanitizeMessage(req.ErrorMessage), MaxMessageBytes),
+		ErrorBodyExcerpt:  redactExcerpt(req.ErrorBodyExcerpt, MaxBodyExcerptBytes),
+		UpstreamErrors:    sanitizeUpstreamErrors(req.UpstreamErrors),
+		Resolution:        contract.ResolutionOpen,
+		CreatedAt:         now,
+		UpdatedAt:         now,
 	}
 	if entry.RequestID == "" && entry.StatusCode == nil && entry.ErrorMessage == "" && entry.ErrorBodyExcerpt == "" {
 		return contract.Entry{}, false
 	}
 	return entry, true
+}
+
+func sanitizeUpstreamErrors(events []contract.UpstreamErrorEvent) []contract.UpstreamErrorEvent {
+	if len(events) == 0 {
+		return nil
+	}
+	if len(events) > MaxUpstreamErrorEvents {
+		events = events[len(events)-MaxUpstreamErrorEvents:]
+	}
+	out := make([]contract.UpstreamErrorEvent, 0, len(events))
+	for _, event := range events {
+		out = append(out, contract.UpstreamErrorEvent{
+			AtUnixMs:           positiveInt64(event.AtUnixMs),
+			AttemptNo:          positiveOrDefault(event.AttemptNo, 1),
+			AccountID:          event.AccountID,
+			AccountName:        truncate(strings.TrimSpace(event.AccountName), 128),
+			UpstreamStatusCode: positiveOrZero(event.UpstreamStatusCode),
+			UpstreamRequestID:  truncate(strings.TrimSpace(event.UpstreamRequestID), 128),
+			UpstreamURL:        truncate(strings.TrimSpace(event.UpstreamURL), 256),
+			Kind:               truncate(defaultString(event.Kind, "request_error"), 64),
+			Message:            truncate(sanitizeMessage(event.Message), MaxMessageBytes),
+			BodyExcerpt:        redactExcerpt(event.BodyExcerpt, MaxBodyExcerptBytes),
+		})
+	}
+	return out
 }
 
 func validResolution(r contract.Resolution) bool {
@@ -257,4 +297,33 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max]
+}
+
+func defaultString(value, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func positiveOrDefault(value, fallback int) int {
+	if value > 0 {
+		return value
+	}
+	return fallback
+}
+
+func positiveOrZero(value int) int {
+	if value > 0 {
+		return value
+	}
+	return 0
+}
+
+func positiveInt64(value int64) int64 {
+	if value > 0 {
+		return value
+	}
+	return 0
 }

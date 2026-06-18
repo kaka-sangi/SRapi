@@ -50,6 +50,7 @@ export type {
   BillingLedgerEntry,
   DomainEventOutbox,
   ErrorLog,
+  OpsErrorLog,
   UpstreamErrorEvent,
   ErrorPassthroughRule,
   PayloadRule,

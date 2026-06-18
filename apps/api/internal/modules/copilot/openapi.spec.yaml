@@ -9640,6 +9640,14 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/Id"
+        - name: provider_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: model
+          in: query
+          schema:
+            type: string
         - name: error_class
           in: query
           schema:
@@ -9654,6 +9662,31 @@ paths:
           schema:
             type: string
             enum: [open, investigating, resolved, muted]
+        - name: status_min
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: status_max
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: q
+          in: query
+          description: Case-insensitive search across request ids, model, endpoint, class, phase, message, and body excerpt.
+          schema:
+            type: string
       responses:
         "200":
           description: Operator-facing error log feed.
@@ -9672,6 +9705,43 @@ paths:
           $ref: "#/components/responses/StandardError"
 
   /api/v1/admin/ops/error-logs/{id}:
+    get:
+      tags:
+        - AdminOps
+      operationId: getAdminOpsErrorLog
+      summary: Get one operator-facing upstream error log.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Operator-facing error log entry.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsErrorLogResponse"
+        "400":
+          $ref: "#/components/responses/StandardError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
     patch:
       tags:
         - AdminOps
@@ -23987,20 +24057,59 @@ components:
           type: string
         trace_id:
           type: string
+        user_id:
+          $ref: "#/components/schemas/Id"
+        api_key_id:
+          $ref: "#/components/schemas/Id"
+        account_id:
+          $ref: "#/components/schemas/Id"
+        provider_id:
+          $ref: "#/components/schemas/Id"
         platform:
           type: string
         source_endpoint:
           type: string
+        source_protocol:
+          type: string
+          description: Alias for platform, kept for error-log UI parity.
+        target_protocol:
+          type: string
         model:
           type: string
+        status_code:
+          type: integer
+        upstream_request_id:
+          type: string
+        attempt_no:
+          type: integer
+          minimum: 1
+        latency_ms:
+          type: integer
+          minimum: 0
+        input_tokens:
+          type: integer
+          minimum: 0
+        output_tokens:
+          type: integer
+          minimum: 0
+        usage_estimated:
+          type: boolean
         error_class:
           type: string
         error_phase:
+          type: string
+        error_owner:
+          type: string
+        error_source:
           type: string
         error_message:
           type: string
         error_body_excerpt:
           type: string
+        upstream_errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpstreamErrorEvent"
         resolution:
           type: string
           enum: [open, investigating, resolved, muted]
@@ -24012,6 +24121,11 @@ components:
         updated_at:
           type: string
           format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+        resolved_by_user_id:
+          $ref: "#/components/schemas/Id"
 
     OpsErrorLogListResponse:
       type: object
@@ -24025,8 +24139,7 @@ components:
           items:
             $ref: "#/components/schemas/OpsErrorLog"
         pagination:
-          type: object
-          additionalProperties: true
+          $ref: "#/components/schemas/Pagination"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

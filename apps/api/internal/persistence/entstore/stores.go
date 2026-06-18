@@ -22,6 +22,7 @@ import (
 	modelratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/model_rate_limits/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
 	payloadrulescontract "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
@@ -53,6 +54,7 @@ import (
 	modelratelimitsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/modelratelimits"
 	modelstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/models"
 	operationsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/operations"
+	opserrorlogsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/opserrorlogs"
 	payloadrulesstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/payloadrules"
 	paymentstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/payments"
 	providerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/providers"
@@ -87,6 +89,7 @@ type Stores struct {
 	Events             eventscontract.Store
 	Idempotency        idempotencycontract.Store
 	Operations         operationscontract.Store
+	OpsErrorLogs       opserrorlogscontract.Store
 	Payments           paymentcontract.Store
 	QualityEval        qualitycontract.Store
 	Scheduler          schedulercontract.Store
@@ -155,6 +158,10 @@ func New(client *ent.Client) (Stores, error) {
 		return Stores{}, err
 	}
 	operations, err := operationsstore.New(client)
+	if err != nil {
+		return Stores{}, err
+	}
+	opsErrorLogs, err := opserrorlogsstore.New(client)
 	if err != nil {
 		return Stores{}, err
 	}
@@ -255,6 +262,7 @@ func New(client *ent.Client) (Stores, error) {
 		Events:             events,
 		Idempotency:        idempotency,
 		Operations:         operations,
+		OpsErrorLogs:       opsErrorLogs,
 		Payments:           payments,
 		QualityEval:        qualityEval,
 		Scheduler:          scheduler,

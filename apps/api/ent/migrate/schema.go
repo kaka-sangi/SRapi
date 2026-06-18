@@ -1232,6 +1232,114 @@ var (
 			},
 		},
 	}
+	// OpsErrorLogsColumns holds the columns for the "ops_error_logs" table.
+	OpsErrorLogsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "occurred_at", Type: field.TypeTime},
+		{Name: "request_id", Type: field.TypeString, Default: ""},
+		{Name: "trace_id", Type: field.TypeString, Default: ""},
+		{Name: "user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "api_key_id", Type: field.TypeInt, Nullable: true},
+		{Name: "account_id", Type: field.TypeInt, Nullable: true},
+		{Name: "provider_id", Type: field.TypeInt, Nullable: true},
+		{Name: "platform", Type: field.TypeString, Default: ""},
+		{Name: "source_endpoint", Type: field.TypeString, Default: ""},
+		{Name: "target_protocol", Type: field.TypeString, Default: ""},
+		{Name: "model", Type: field.TypeString, Default: ""},
+		{Name: "status_code", Type: field.TypeInt, Nullable: true},
+		{Name: "upstream_request_id", Type: field.TypeString, Default: ""},
+		{Name: "attempt_no", Type: field.TypeInt, Default: 1},
+		{Name: "latency_ms", Type: field.TypeInt, Default: 0},
+		{Name: "input_tokens", Type: field.TypeInt, Default: 0},
+		{Name: "output_tokens", Type: field.TypeInt, Default: 0},
+		{Name: "usage_estimated", Type: field.TypeBool, Default: false},
+		{Name: "error_class", Type: field.TypeString, Default: "unknown"},
+		{Name: "error_phase", Type: field.TypeString, Default: "upstream"},
+		{Name: "error_owner", Type: field.TypeString, Default: "provider"},
+		{Name: "error_source", Type: field.TypeString, Default: "upstream_http"},
+		{Name: "error_message", Type: field.TypeString, Size: 2147483647, Default: ""},
+		{Name: "error_body_excerpt", Type: field.TypeString, Size: 2147483647, Default: ""},
+		{Name: "upstream_errors_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "resolution", Type: field.TypeString, Default: "open"},
+		{Name: "resolution_note", Type: field.TypeString, Size: 2147483647, Default: ""},
+		{Name: "resolved_at", Type: field.TypeTime, Nullable: true},
+		{Name: "resolved_by_id", Type: field.TypeInt, Nullable: true},
+	}
+	// OpsErrorLogsTable holds the schema information for the "ops_error_logs" table.
+	OpsErrorLogsTable = &schema.Table{
+		Name:       "ops_error_logs",
+		Columns:    OpsErrorLogsColumns,
+		PrimaryKey: []*schema.Column{OpsErrorLogsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "opserrorlog_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[3]},
+			},
+			{
+				Name:    "opserrorlog_resolution_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[28], OpsErrorLogsColumns[3]},
+			},
+			{
+				Name:    "opserrorlog_error_class_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[21], OpsErrorLogsColumns[3]},
+			},
+			{
+				Name:    "opserrorlog_platform_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[10], OpsErrorLogsColumns[3]},
+			},
+			{
+				Name:    "opserrorlog_target_protocol_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[12], OpsErrorLogsColumns[3]},
+			},
+			{
+				Name:    "opserrorlog_user_id_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[6], OpsErrorLogsColumns[3]},
+			},
+			{
+				Name:    "opserrorlog_api_key_id_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[7], OpsErrorLogsColumns[3]},
+			},
+			{
+				Name:    "opserrorlog_account_id_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[8], OpsErrorLogsColumns[3]},
+			},
+			{
+				Name:    "opserrorlog_provider_id_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[9], OpsErrorLogsColumns[3]},
+			},
+			{
+				Name:    "opserrorlog_status_code_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[14], OpsErrorLogsColumns[3]},
+			},
+			{
+				Name:    "opserrorlog_upstream_request_id",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[15]},
+			},
+			{
+				Name:    "opserrorlog_request_id",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[4]},
+			},
+			{
+				Name:    "opserrorlog_trace_id",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[5]},
+			},
+		},
+	}
 	// OpsSystemLogsColumns holds the columns for the "ops_system_logs" table.
 	OpsSystemLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -2890,6 +2998,7 @@ var (
 		ObsAlertRulesTable,
 		ObsAlertSilencesTable,
 		ObsSloDefinitionsTable,
+		OpsErrorLogsTable,
 		OpsSystemLogsTable,
 		PasswordResetTokensTable,
 		PayloadRulesTable,

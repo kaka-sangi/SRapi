@@ -16,12 +16,8 @@ import (
 	"strings"
 	"time"
 
-	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
-	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
-	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
-	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 )
 
 // recordOpsErrorLog persists an operator-facing record of an upstream
@@ -30,100 +26,150 @@ import (
 // sub2api's RecordError emit conditions — server-side or network-class
 // failures (5xx, transport errors) are persisted; client-bad classes (4xx
 // from policy) are skipped because they're not actionable for operators.
-func (s *Server) recordOpsErrorLog(ctx context.Context, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, providerErr error, errorClass string, upstreamStatus int) {
+func (s *Server) recordOpsErrorLog(ctx context.Context, rec gatewayUsageRecord) {
 	if s == nil || s.runtime == nil || s.runtime.opsErrorLogs == nil {
 		return
 	}
+	errorClass := stringValue(rec.ErrorClass)
+	upstreamStatus := opsErrorLogIntValue(rec.StatusCode)
 	if !opsErrorLogShouldRecord(errorClass, upstreamStatus) {
 		return
 	}
 	req := opserrorlogscontract.RecordRequest{
-		OccurredAt:       time.Now().UTC(),
-		RequestID:        canonical.RequestID,
-		TraceID:          requestIDFromContext(ctx),
-		Platform:         string(canonical.SourceProtocol),
-		SourceEndpoint:   canonical.SourceEndpoint,
-		Model:            canonical.CanonicalModel,
-		ErrorClass:       errorClass,
-		ErrorPhase:       "upstream",
-		ErrorMessage:     providerErrorMessage(providerErr),
-		ErrorBodyExcerpt: opsErrorLogExcerpt(providerErr),
+		OccurredAt:        time.Now().UTC(),
+		RequestID:         rec.RequestID,
+		TraceID:           requestIDFromContext(ctx),
+		Platform:          rec.SourceProtocol,
+		SourceEndpoint:    rec.SourceEndpoint,
+		TargetProtocol:    rec.TargetProtocol,
+		Model:             rec.Model,
+		ErrorClass:        errorClass,
+		ErrorPhase:        rec.ErrorPhase,
+		ErrorOwner:        rec.ErrorOwner,
+		ErrorSource:       rec.ErrorSource,
+		ErrorMessage:      rec.ProviderErrorMessage,
+		ErrorBodyExcerpt:  rec.ProviderErrorBodyExcerpt,
+		UpstreamRequestID: rec.UpstreamRequestID,
+		AttemptNo:         rec.AttemptNo,
+		LatencyMS:         rec.LatencyMS,
+		InputTokens:       rec.InputTokens,
+		OutputTokens:      rec.OutputTokens,
+		UsageEstimated:    rec.UsageEstimated,
+		UpstreamErrors:    opsErrorLogEventsFromGateway(rec.UpstreamErrors),
 	}
 	if upstreamStatus > 0 {
 		code := upstreamStatus
 		req.StatusCode = &code
 	}
-	if authed.UserID > 0 {
-		uid := authed.UserID
+	if rec.Authed.UserID > 0 {
+		uid := rec.Authed.UserID
 		req.UserID = &uid
 	}
-	if authed.Key.ID > 0 {
-		kid := authed.Key.ID
+	if rec.Authed.Key.ID > 0 {
+		kid := rec.Authed.Key.ID
 		req.APIKeyID = &kid
 	}
-	if result.Candidate.Account.ID > 0 {
-		aid := result.Candidate.Account.ID
-		req.AccountID = &aid
+	if rec.AccountID != nil && *rec.AccountID > 0 {
+		req.AccountID = rec.AccountID
 	}
-	if result.Candidate.Provider.ID > 0 {
-		pid := result.Candidate.Provider.ID
-		req.ProviderID = &pid
+	if rec.ProviderID != nil && *rec.ProviderID > 0 {
+		req.ProviderID = rec.ProviderID
 	}
 	// Best-effort: a failure here should never fail the request. The gateway
 	// log surface remains intact via recordGatewayUsage even if this is dropped.
 	if err := s.runtime.opsErrorLogs.RecordError(ctx, req); err != nil && s.runtime.logger != nil {
-		s.runtime.logger.Warn("ops_error_logs RecordError failed", "request_id", canonical.RequestID, "error", err)
+		s.runtime.logger.Warn("ops_error_logs RecordError failed", "request_id", rec.RequestID, "error", err)
 	}
 	// Mirror the same event onto the operations evidence stream so the
 	// operator can correlate structured error rows with a compact system-log
 	// timeline.
-	s.recordGatewaySystemLog(ctx, canonical, result, providerErr, errorClass, upstreamStatus)
+	s.recordGatewaySystemLog(ctx, rec)
 }
 
 // recordGatewaySystemLog forwards a failed gateway attempt onto the
 // operations-owned system-log stream. WARN is used for upstream rejections,
 // ERROR for server/transport failures, and INFO for no-available-account
 // decisions that are operator-visible but not anomalous.
-func (s *Server) recordGatewaySystemLog(ctx context.Context, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, providerErr error, errorClass string, upstreamStatus int) {
+func (s *Server) recordGatewaySystemLog(ctx context.Context, rec gatewayUsageRecord) {
 	if s == nil || s.runtime == nil || s.runtime.operations == nil {
 		return
 	}
+	errorClass := stringValue(rec.ErrorClass)
+	upstreamStatus := opsErrorLogIntValue(rec.StatusCode)
 	level := operationscontract.OpsSystemLogLevelWarn
 	if errorClass == "no_available_account" {
 		level = operationscontract.OpsSystemLogLevelInfo
 	} else if upstreamStatus >= 500 || errorClass == "network_error" {
 		level = operationscontract.OpsSystemLogLevelError
 	}
-	message := providerErrorMessage(providerErr)
+	message := strings.TrimSpace(rec.ProviderErrorMessage)
 	if strings.TrimSpace(message) == "" {
 		message = errorClass
 	}
 	metadata := map[string]any{
-		"request_id":      canonical.RequestID,
-		"source_endpoint": canonical.SourceEndpoint,
-		"source_protocol": string(canonical.SourceProtocol),
-		"canonical_model": canonical.CanonicalModel,
+		"request_id":      rec.RequestID,
+		"source_endpoint": rec.SourceEndpoint,
+		"source_protocol": rec.SourceProtocol,
+		"target_protocol": rec.TargetProtocol,
+		"canonical_model": rec.Model,
+		"attempt_no":      rec.AttemptNo,
 		"error_class":     errorClass,
 		"upstream_status": upstreamStatus,
-		"body_excerpt":    providerErrorBodyExcerpt(providerErr),
+		"body_excerpt":    rec.ProviderErrorBodyExcerpt,
 	}
-	if result.Candidate.Account.ID > 0 {
-		metadata["account_id"] = result.Candidate.Account.ID
+	if rec.AccountID != nil && *rec.AccountID > 0 {
+		metadata["account_id"] = *rec.AccountID
 	}
-	if result.Candidate.Provider.ID > 0 {
-		metadata["provider_id"] = result.Candidate.Provider.ID
+	if rec.ProviderID != nil && *rec.ProviderID > 0 {
+		metadata["provider_id"] = *rec.ProviderID
 	}
 	if _, err := s.runtime.operations.RecordSystemLog(ctx, operationscontract.RecordSystemLogRequest{
 		Level:     level,
 		Message:   message,
 		Source:    "gateway",
-		RequestID: canonical.RequestID,
+		RequestID: rec.RequestID,
 		TraceID:   requestIDFromContext(ctx),
 		Metadata:  metadata,
 		CreatedAt: time.Now().UTC(),
 	}); err != nil && s.runtime.logger != nil {
-		s.runtime.logger.Warn("operations RecordSystemLog failed", "request_id", canonical.RequestID, "error", err)
+		s.runtime.logger.Warn("operations RecordSystemLog failed", "request_id", rec.RequestID, "error", err)
 	}
+}
+
+func opsErrorLogEventsFromGateway(events []gatewayUpstreamErrorEvent) []opserrorlogscontract.UpstreamErrorEvent {
+	if len(events) == 0 {
+		return nil
+	}
+	out := make([]opserrorlogscontract.UpstreamErrorEvent, 0, len(events))
+	for _, event := range events {
+		out = append(out, opserrorlogscontract.UpstreamErrorEvent{
+			AtUnixMs:           event.AtUnixMs,
+			AttemptNo:          event.AttemptNo,
+			AccountID:          event.AccountID,
+			AccountName:        event.AccountName,
+			UpstreamStatusCode: event.UpstreamStatusCode,
+			UpstreamRequestID:  event.UpstreamRequestID,
+			UpstreamURL:        event.UpstreamURL,
+			Kind:               event.Kind,
+			Message:            event.Message,
+			BodyExcerpt:        event.BodyExcerpt,
+		})
+	}
+	return out
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func opsErrorLogIntValue(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 // opsErrorLogShouldRecord decides whether a failed upstream attempt is
@@ -147,31 +193,8 @@ func opsErrorLogShouldRecord(class string, status int) bool {
 	return false
 }
 
-// opsErrorLogExcerpt extracts a short body excerpt from a ProviderError, if
-// any. Sensitive keys are scrubbed inside the service layer; this function
-// only forwards what the adapter already exposed.
-func opsErrorLogExcerpt(err error) string {
-	if err == nil {
-		return ""
-	}
-	var providerErr provideradaptercontract.ProviderError
-	if !errors.As(err, &providerErr) {
-		return ""
-	}
-	if len(providerErr.Metadata) == 0 {
-		return ""
-	}
-	// Marshal the metadata as a JSON snapshot so the redaction pass in the
-	// service can structurally redact any sensitive keys (api_key, token, ...).
-	encoded, err := json.Marshal(providerErr.Metadata)
-	if err != nil {
-		return ""
-	}
-	return string(encoded)
-}
-
 // handleListAdminOpsErrorLogs serves GET /api/v1/admin/ops/error-logs.
-// Pagination + simple filters (resolution, error_class, user_id, account_id).
+// Pagination + filters for the operator-facing error evidence feed.
 func (s *Server) handleListAdminOpsErrorLogs(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {
@@ -186,6 +209,8 @@ func (s *Server) handleListAdminOpsErrorLogs(w http.ResponseWriter, r *http.Requ
 		Resolution: opserrorlogscontract.Resolution(strings.TrimSpace(r.URL.Query().Get("resolution"))),
 		ErrorClass: strings.TrimSpace(r.URL.Query().Get("error_class")),
 		Platform:   strings.TrimSpace(r.URL.Query().Get("platform")),
+		Model:      strings.TrimSpace(r.URL.Query().Get("model")),
+		Query:      strings.TrimSpace(r.URL.Query().Get("q")),
 	}
 	if v := strings.TrimSpace(r.URL.Query().Get("user_id")); v != "" {
 		if id, err := strconv.Atoi(v); err == nil && id > 0 {
@@ -197,6 +222,31 @@ func (s *Server) handleListAdminOpsErrorLogs(w http.ResponseWriter, r *http.Requ
 			filter.AccountID = &id
 		}
 	}
+	if v := strings.TrimSpace(r.URL.Query().Get("provider_id")); v != "" {
+		if id, err := strconv.Atoi(v); err == nil && id > 0 {
+			filter.ProviderID = &id
+		}
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("status_min")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			filter.StatusCodeMin = &n
+		}
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("status_max")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			filter.StatusCodeMax = &n
+		}
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("start")); v != "" {
+		if at, err := time.Parse(time.RFC3339, v); err == nil {
+			filter.From = &at
+		}
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("end")); v != "" {
+		if at, err := time.Parse(time.RFC3339, v); err == nil {
+			filter.To = &at
+		}
+	}
 	page, pageSize := parseOpsErrorLogsPagination(r)
 	filter.Page = page
 	filter.PageSize = pageSize
@@ -206,11 +256,54 @@ func (s *Server) handleListAdminOpsErrorLogs(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	payload := map[string]any{
-		"data":       opsErrorLogsToDTOs(res.Items),
-		"pagination": map[string]any{"page": res.Page, "page_size": res.PageSize, "total": res.Total},
+		"data": opsErrorLogsToDTOs(res.Items),
+		"pagination": map[string]any{
+			"page":      res.Page,
+			"page_size": res.PageSize,
+			"total":     res.Total,
+			"has_next":  res.Page*res.PageSize < res.Total,
+		},
 		"request_id": requestID,
 	}
 	encoded, err := json.Marshal(payload)
+	if err != nil {
+		writeJSONString(w, http.StatusInternalServerError, `{"error":{"code":"INTERNAL_ERROR","message":"encode failed"},"request_id":"`+requestID+`"}`)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(encoded)
+}
+
+// handleGetAdminOpsErrorLog serves GET /api/v1/admin/ops/error-logs/{id}.
+func (s *Server) handleGetAdminOpsErrorLog(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeJSONString(w, http.StatusForbidden, `{"error":{"code":"FORBIDDEN","message":"admin access required"},"request_id":"`+requestID+`"}`)
+		return
+	}
+	if s.runtime == nil || s.runtime.opsErrorLogs == nil {
+		writeJSONString(w, http.StatusServiceUnavailable, `{"error":{"code":"UNAVAILABLE","message":"ops error logs unavailable"},"request_id":"`+requestID+`"}`)
+		return
+	}
+	id, err := strconv.ParseInt(strings.TrimSpace(r.PathValue("id")), 10, 64)
+	if err != nil || id <= 0 {
+		writeJSONString(w, http.StatusBadRequest, `{"error":{"code":"INVALID_ID","message":"invalid id"},"request_id":"`+requestID+`"}`)
+		return
+	}
+	entry, err := s.runtime.opsErrorLogs.Get(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, opserrorlogscontract.ErrNotFound) {
+			writeJSONString(w, http.StatusNotFound, `{"error":{"code":"NOT_FOUND","message":"ops error log not found"},"request_id":"`+requestID+`"}`)
+			return
+		}
+		writeJSONString(w, http.StatusInternalServerError, `{"error":{"code":"INTERNAL_ERROR","message":"failed to get ops error log"},"request_id":"`+requestID+`"}`)
+		return
+	}
+	encoded, err := json.Marshal(map[string]any{
+		"data":       opsErrorLogToDTO(entry),
+		"request_id": requestID,
+	})
 	if err != nil {
 		writeJSONString(w, http.StatusInternalServerError, `{"error":{"code":"INTERNAL_ERROR","message":"encode failed"},"request_id":"`+requestID+`"}`)
 		return
@@ -232,9 +325,7 @@ func (s *Server) handleUpdateAdminOpsErrorLogResolution(w http.ResponseWriter, r
 		writeJSONString(w, http.StatusServiceUnavailable, `{"error":{"code":"UNAVAILABLE","message":"ops error logs unavailable"},"request_id":"`+requestID+`"}`)
 		return
 	}
-	idStr := strings.TrimPrefix(r.URL.Path, "/api/v1/admin/ops/error-logs/")
-	idStr = strings.TrimSuffix(idStr, "/")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := strconv.ParseInt(strings.TrimSpace(r.PathValue("id")), 10, 64)
 	if err != nil || id <= 0 {
 		writeJSONString(w, http.StatusBadRequest, `{"error":{"code":"INVALID_ID","message":"invalid id"},"request_id":"`+requestID+`"}`)
 		return
@@ -304,33 +395,44 @@ func opsErrorLogsToDTOs(items []opserrorlogscontract.Entry) []map[string]any {
 
 func opsErrorLogToDTO(entry opserrorlogscontract.Entry) map[string]any {
 	dto := map[string]any{
-		"id":                 strconv.FormatInt(entry.ID, 10),
-		"occurred_at":        entry.OccurredAt.Format(time.RFC3339Nano),
-		"request_id":         entry.RequestID,
-		"trace_id":           entry.TraceID,
-		"platform":           entry.Platform,
-		"source_endpoint":    entry.SourceEndpoint,
-		"model":              entry.Model,
-		"error_class":        entry.ErrorClass,
-		"error_phase":        entry.ErrorPhase,
-		"error_message":      entry.ErrorMessage,
-		"error_body_excerpt": entry.ErrorBodyExcerpt,
-		"resolution":         string(entry.Resolution),
-		"resolution_note":    entry.ResolutionNote,
-		"created_at":         entry.CreatedAt.Format(time.RFC3339Nano),
-		"updated_at":         entry.UpdatedAt.Format(time.RFC3339Nano),
+		"id":                  strconv.FormatInt(entry.ID, 10),
+		"occurred_at":         entry.OccurredAt.Format(time.RFC3339Nano),
+		"request_id":          entry.RequestID,
+		"trace_id":            entry.TraceID,
+		"platform":            entry.Platform,
+		"source_endpoint":     entry.SourceEndpoint,
+		"source_protocol":     entry.Platform,
+		"target_protocol":     entry.TargetProtocol,
+		"model":               entry.Model,
+		"upstream_request_id": entry.UpstreamRequestID,
+		"attempt_no":          entry.AttemptNo,
+		"latency_ms":          entry.LatencyMS,
+		"input_tokens":        entry.InputTokens,
+		"output_tokens":       entry.OutputTokens,
+		"usage_estimated":     entry.UsageEstimated,
+		"error_class":         entry.ErrorClass,
+		"error_phase":         entry.ErrorPhase,
+		"error_owner":         entry.ErrorOwner,
+		"error_source":        entry.ErrorSource,
+		"error_message":       entry.ErrorMessage,
+		"error_body_excerpt":  entry.ErrorBodyExcerpt,
+		"upstream_errors":     opsErrorLogEventsToDTO(entry.UpstreamErrors),
+		"resolution":          string(entry.Resolution),
+		"resolution_note":     entry.ResolutionNote,
+		"created_at":          entry.CreatedAt.Format(time.RFC3339Nano),
+		"updated_at":          entry.UpdatedAt.Format(time.RFC3339Nano),
 	}
 	if entry.UserID != nil {
-		dto["user_id"] = *entry.UserID
+		dto["user_id"] = strconv.Itoa(*entry.UserID)
 	}
 	if entry.APIKeyID != nil {
-		dto["api_key_id"] = *entry.APIKeyID
+		dto["api_key_id"] = strconv.Itoa(*entry.APIKeyID)
 	}
 	if entry.AccountID != nil {
-		dto["account_id"] = *entry.AccountID
+		dto["account_id"] = strconv.Itoa(*entry.AccountID)
 	}
 	if entry.ProviderID != nil {
-		dto["provider_id"] = *entry.ProviderID
+		dto["provider_id"] = strconv.Itoa(*entry.ProviderID)
 	}
 	if entry.StatusCode != nil {
 		dto["status_code"] = *entry.StatusCode
@@ -339,9 +441,31 @@ func opsErrorLogToDTO(entry opserrorlogscontract.Entry) map[string]any {
 		dto["resolved_at"] = entry.ResolvedAt.Format(time.RFC3339Nano)
 	}
 	if entry.ResolvedByID != nil {
-		dto["resolved_by_user_id"] = *entry.ResolvedByID
+		dto["resolved_by_user_id"] = strconv.Itoa(*entry.ResolvedByID)
 	}
 	return dto
+}
+
+func opsErrorLogEventsToDTO(events []opserrorlogscontract.UpstreamErrorEvent) []map[string]any {
+	out := make([]map[string]any, 0, len(events))
+	for _, event := range events {
+		item := map[string]any{
+			"at_unix_ms":           event.AtUnixMs,
+			"attempt_no":           event.AttemptNo,
+			"account_name":         event.AccountName,
+			"upstream_status_code": event.UpstreamStatusCode,
+			"upstream_request_id":  event.UpstreamRequestID,
+			"upstream_url":         event.UpstreamURL,
+			"kind":                 event.Kind,
+			"message":              event.Message,
+			"body_excerpt":         event.BodyExcerpt,
+		}
+		if event.AccountID != nil {
+			item["account_id"] = strconv.Itoa(*event.AccountID)
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 // writeJSONString writes a pre-formatted JSON string response. Lighter-weight
