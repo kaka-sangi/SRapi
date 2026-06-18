@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { adminErrorLogsHref, adminRequestDumpsHref } from "@/lib/admin-log-links";
+import {
+  adminErrorLogsHref,
+  adminRequestDumpsHref,
+  adminSystemLogsHref,
+} from "@/lib/admin-log-links";
 
 describe("admin log evidence links", () => {
   it("builds an error-log search link from request id first", () => {
@@ -21,8 +25,24 @@ describe("admin log evidence links", () => {
     expect(adminRequestDumpsHref({ trace_id: "trace_456" })).toBeNull();
   });
 
+  it("builds a system-log exact filter link from request and trace ids", () => {
+    expect(adminSystemLogsHref({ request_id: "req_123", trace_id: "trace_456" })).toBe(
+      "/admin/ops/system-logs?f_request_id=req_123&f_trace_id=trace_456",
+    );
+  });
+
+  it("trims correlation ids before building links", () => {
+    expect(adminErrorLogsHref({ request_id: "  req_123  " })).toBe(
+      "/admin/logs?tab=error&q=req_123",
+    );
+    expect(adminSystemLogsHref({ trace_id: "  trace_456  " })).toBe(
+      "/admin/ops/system-logs?f_trace_id=trace_456",
+    );
+  });
+
   it("omits links without correlation ids", () => {
     expect(adminErrorLogsHref({})).toBeNull();
     expect(adminRequestDumpsHref({})).toBeNull();
+    expect(adminSystemLogsHref({})).toBeNull();
   });
 });

@@ -27,7 +27,7 @@ import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatInteger, formatLatency } from "@/lib/admin-format";
-import { ADMIN_ROUTES } from "@/lib/routes";
+import { adminSystemLogsHref } from "@/lib/admin-log-links";
 import type { OpsErrorLog, RequestLogFileDescriptor } from "@/lib/sdk-types";
 
 export interface ErrorLogDetailDialogProps {
@@ -83,7 +83,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
     : detail.source_protocol ?? detail.platform ?? "—";
   const events = detail.upstream_errors ?? [];
   const firstAt = events.length > 0 ? events[0]?.at_unix_ms ?? 0 : 0;
-  const systemLogHref = systemLogFilterHref(detail);
+  const systemLogHref = adminSystemLogsHref(detail);
 
   return (
     <div className="space-y-4">
@@ -248,14 +248,6 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
       ) : null}
     </div>
   );
-}
-
-function systemLogFilterHref(detail: OpsErrorLog): string | null {
-  const params = new URLSearchParams();
-  if (detail.request_id) params.set("f_request_id", detail.request_id);
-  if (detail.trace_id) params.set("f_trace_id", detail.trace_id);
-  const query = params.toString();
-  return query ? `${ADMIN_ROUTES.opsSystemLogs}?${query}` : null;
 }
 
 function RequestLogEvidence({

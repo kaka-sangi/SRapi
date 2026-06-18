@@ -1499,6 +1499,9 @@ export const zh: Messages = {
     detailTitle: "请求详情",
     detailLoadFailed: "无法加载请求转储文件。",
     deleteTitle: "删除请求转储",
+    relatedEvidence: "关联证据",
+    openErrorLogs: "错误日志",
+    openSystemLogs: "系统日志",
   },
   adminAudit: {
     title: "审计日志",

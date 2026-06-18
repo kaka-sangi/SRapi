@@ -1521,6 +1521,9 @@ export const en = {
     detailTitle: "Captured request",
     detailLoadFailed: "Failed to load the captured request file.",
     deleteTitle: "Delete request dump",
+    relatedEvidence: "Related evidence",
+    openErrorLogs: "Error logs",
+    openSystemLogs: "System logs",
   },
   adminAudit: {
     title: "Audit logs",

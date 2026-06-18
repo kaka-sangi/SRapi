@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
+import { Bug, FileText, ExternalLink } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime } from "@/lib/admin-format";
+import { adminErrorLogsHref, adminSystemLogsHref } from "@/lib/admin-log-links";
 import {
   downloadAdminRequestLogFileText,
   requestLogFileDownloadQueryKey,
@@ -223,9 +227,12 @@ export function RequestLogFilesPanel() {
           {downloadQuery.isError ? (
             <p className="text-sm text-red-300">{t("adminRequestLogFiles.detailLoadFailed")}</p>
           ) : (
-            <pre className="max-h-[60vh] overflow-auto rounded bg-srapi-bg-input p-3 text-xs">
-              {downloadQuery.data ?? ""}
-            </pre>
+            <div className="space-y-3">
+              {selected ? <RequestDumpEvidenceLinks file={selected} /> : null}
+              <pre className="max-h-[60vh] overflow-auto rounded bg-srapi-bg-input p-3 text-xs">
+                {downloadQuery.data ?? ""}
+              </pre>
+            </div>
           )}
           {selected ? (
             <div className="flex justify-end">
@@ -254,6 +261,41 @@ export function RequestLogFilesPanel() {
         }}
         isPending={deleteMutation.isPending}
       />
+    </div>
+  );
+}
+
+function RequestDumpEvidenceLinks({ file }: { file: RequestLogFileDescriptor }) {
+  const { t } = useLanguage();
+  const errorHref = adminErrorLogsHref({ request_id: file.request_id });
+  const systemHref = adminSystemLogsHref({ request_id: file.request_id });
+  if (!errorHref && !systemHref) return null;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-srapi-border-subtle bg-srapi-bg-card-elevated px-3 py-2">
+      <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+        {t("adminRequestLogFiles.relatedEvidence")}
+      </span>
+      <div className="flex flex-wrap gap-2">
+        {errorHref ? (
+          <Button asChild variant="outline" size="sm">
+            <Link href={errorHref}>
+              <Bug aria-hidden />
+              {t("adminRequestLogFiles.openErrorLogs")}
+              <ExternalLink aria-hidden />
+            </Link>
+          </Button>
+        ) : null}
+        {systemHref ? (
+          <Button asChild variant="outline" size="sm">
+            <Link href={systemHref}>
+              <FileText aria-hidden />
+              {t("adminRequestLogFiles.openSystemLogs")}
+              <ExternalLink aria-hidden />
+            </Link>
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
