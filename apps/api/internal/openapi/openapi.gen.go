@@ -8491,6 +8491,8 @@ type OpsAlertRuleResponse struct {
 
 // OpsAlertRuleScope defines model for OpsAlertRuleScope.
 type OpsAlertRuleScope struct {
+	// ErrorClass Low-cardinality gateway or provider error class used to narrow rule evaluation.
+	ErrorClass     string `json:"error_class"`
 	Model          string `json:"model"`
 	ProviderId     *Id    `json:"provider_id,omitempty"`
 	SourceEndpoint string `json:"source_endpoint"`
@@ -8520,6 +8522,8 @@ type OpsAlertSilenceListResponse struct {
 
 // OpsAlertSilenceMatcher defines model for OpsAlertSilenceMatcher.
 type OpsAlertSilenceMatcher struct {
+	// ErrorClass Low-cardinality gateway or provider error class used to match scoped alert rules.
+	ErrorClass     *string           `json:"error_class,omitempty"`
 	Model          *string           `json:"model,omitempty"`
 	ProviderId     *Id               `json:"provider_id,omitempty"`
 	RuleId         *string           `json:"rule_id,omitempty"`

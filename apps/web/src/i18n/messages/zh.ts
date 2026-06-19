@@ -2288,7 +2288,9 @@ export const zh: Messages = {
       minRequests: "最小请求数",
       endpoint: "端点",
       model: "模型",
+      errorClass: "错误类别",
       provider: "渠道 ID",
+      globalScope: "全局",
       thresholdHint: "比率指标填 0–1，延迟填毫秒。",
       metricType: {
         error_rate: "错误率",
@@ -2315,6 +2317,7 @@ export const zh: Messages = {
       severity: "级别",
       endpoint: "端点",
       model: "模型",
+      errorClass: "错误类别",
       provider: "渠道 ID",
       startsAt: "开始时间",
       endsAt: "结束时间",

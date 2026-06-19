@@ -2352,7 +2352,9 @@ export const en = {
       minRequests: "Min requests",
       endpoint: "Endpoint",
       model: "Model",
+      errorClass: "Error class",
       provider: "Provider ID",
+      globalScope: "global",
       thresholdHint: "Ratio for rates (0–1), milliseconds for latency.",
       metricType: {
         error_rate: "Error rate",
@@ -2379,6 +2381,7 @@ export const en = {
       severity: "Severity",
       endpoint: "Endpoint",
       model: "Model",
+      errorClass: "Error class",
       provider: "Provider ID",
       startsAt: "Starts at",
       endsAt: "Ends at",

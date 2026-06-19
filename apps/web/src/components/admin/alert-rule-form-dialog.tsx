@@ -30,6 +30,7 @@ type FormState = {
   minRequestCount: string;
   sourceEndpoint: string;
   model: string;
+  errorClass: string;
   providerId: string;
 };
 
@@ -46,6 +47,7 @@ function emptyForm(): FormState {
     minRequestCount: "0",
     sourceEndpoint: "",
     model: "",
+    errorClass: "",
     providerId: "",
   };
 }
@@ -63,14 +65,16 @@ function formFromRule(rule: OpsAlertRule): FormState {
     minRequestCount: String(rule.min_request_count),
     sourceEndpoint: rule.scope.source_endpoint ?? "",
     model: rule.scope.model ?? "",
+    errorClass: rule.scope.error_class ?? "",
     providerId: rule.scope.provider_id ?? "",
   };
 }
 
 function buildScope(form: FormState) {
-  const scope: { source_endpoint: string; model: string; provider_id?: string } = {
+  const scope: { source_endpoint: string; model: string; error_class: string; provider_id?: string } = {
     source_endpoint: form.sourceEndpoint.trim(),
     model: form.model.trim(),
+    error_class: form.errorClass.trim(),
   };
   if (form.providerId.trim()) scope.provider_id = form.providerId.trim();
   return scope;
@@ -141,6 +145,11 @@ export function AlertRuleFormDialog({
       placeholder: "/v1/chat/completions",
     },
     { name: "model", label: t("adminOps.alertRules.model") },
+    {
+      name: "errorClass",
+      label: t("adminOps.alertRules.errorClass"),
+      placeholder: "provider_5xx",
+    },
     { name: "providerId", label: t("adminOps.alertRules.provider") },
     { name: "enabled", label: t("adminOps.alertRules.enabled"), type: "switch" },
   ];

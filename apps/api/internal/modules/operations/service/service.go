@@ -576,6 +576,9 @@ func addAlertRuleScopeDetails(details map[string]any, scope contract.AlertRuleSc
 	if strings.TrimSpace(scope.Model) != "" {
 		details["model"] = strings.TrimSpace(scope.Model)
 	}
+	if strings.TrimSpace(scope.ErrorClass) != "" {
+		details["error_class"] = strings.TrimSpace(scope.ErrorClass)
+	}
 	if scope.ProviderID != nil {
 		details["provider_id"] = *scope.ProviderID
 	}

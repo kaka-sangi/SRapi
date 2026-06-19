@@ -31,6 +31,7 @@ func toAPIOpsAlertRule(rule operationscontract.AlertRule) apiopenapi.OpsAlertRul
 
 func toAPIOpsAlertRuleScope(scope operationscontract.AlertRuleScope) apiopenapi.OpsAlertRuleScope {
 	out := apiopenapi.OpsAlertRuleScope{
+		ErrorClass:     scope.ErrorClass,
 		Model:          scope.Model,
 		SourceEndpoint: scope.SourceEndpoint,
 	}
@@ -78,6 +79,10 @@ func toAPIOpsAlertSilenceMatcher(matcher operationscontract.AlertSilenceMatcher)
 	if matcher.Model != "" {
 		model := matcher.Model
 		out.Model = &model
+	}
+	if matcher.ErrorClass != "" {
+		errorClass := matcher.ErrorClass
+		out.ErrorClass = &errorClass
 	}
 	if id := optionalIDString(matcher.ProviderID); id != nil {
 		providerID := apiopenapi.Id(*id)
@@ -322,6 +327,7 @@ func toAlertRuleScope(value *apiopenapi.OpsAlertRuleScope) (operationscontract.A
 		return operationscontract.AlertRuleScope{}, nil
 	}
 	scope := operationscontract.AlertRuleScope{
+		ErrorClass:     value.ErrorClass,
 		SourceEndpoint: value.SourceEndpoint,
 		Model:          value.Model,
 	}
@@ -349,6 +355,9 @@ func toAlertSilenceMatcher(value *apiopenapi.OpsAlertSilenceMatcher) (operations
 	}
 	if value.Model != nil {
 		matcher.Model = *value.Model
+	}
+	if value.ErrorClass != nil {
+		matcher.ErrorClass = *value.ErrorClass
 	}
 	providerID, err := parseOptionalProviderID(value.ProviderId)
 	if err != nil {

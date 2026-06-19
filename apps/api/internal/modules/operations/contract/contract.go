@@ -396,6 +396,7 @@ const (
 type AlertRuleScope struct {
 	SourceEndpoint string
 	Model          string
+	ErrorClass     string
 	ProviderID     *int
 }
 
@@ -448,6 +449,7 @@ type AlertSilenceMatcher struct {
 	Severity       AlertSeverity
 	SourceEndpoint string
 	Model          string
+	ErrorClass     string
 	ProviderID     *int
 }
 

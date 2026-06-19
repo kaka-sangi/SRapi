@@ -161,6 +161,7 @@ func ruleScopeJSON(scope contract.AlertRuleScope) map[string]any {
 	out := map[string]any{
 		"source_endpoint": scope.SourceEndpoint,
 		"model":           scope.Model,
+		"error_class":     scope.ErrorClass,
 	}
 	if scope.ProviderID != nil {
 		out["provider_id"] = *scope.ProviderID
@@ -172,6 +173,7 @@ func ruleScopeFromJSON(value map[string]any) contract.AlertRuleScope {
 	scope := contract.AlertRuleScope{
 		SourceEndpoint: stringFromMap(value, "source_endpoint"),
 		Model:          stringFromMap(value, "model"),
+		ErrorClass:     stringFromMap(value, "error_class"),
 	}
 	if providerID, ok := intFromMap(value, "provider_id"); ok {
 		scope.ProviderID = &providerID
@@ -185,6 +187,7 @@ func silenceMatcherJSON(matcher contract.AlertSilenceMatcher) map[string]any {
 		"severity":        string(matcher.Severity),
 		"source_endpoint": matcher.SourceEndpoint,
 		"model":           matcher.Model,
+		"error_class":     matcher.ErrorClass,
 	}
 	if matcher.ProviderID != nil {
 		out["provider_id"] = *matcher.ProviderID
@@ -198,6 +201,7 @@ func silenceMatcherFromJSON(value map[string]any) contract.AlertSilenceMatcher {
 		Severity:       contract.AlertSeverity(stringFromMap(value, "severity")),
 		SourceEndpoint: stringFromMap(value, "source_endpoint"),
 		Model:          stringFromMap(value, "model"),
+		ErrorClass:     stringFromMap(value, "error_class"),
 	}
 	if providerID, ok := intFromMap(value, "provider_id"); ok {
 		matcher.ProviderID = &providerID

@@ -373,6 +373,9 @@ func ruleScopeMatches(scope contract.AlertRuleScope, log usagecontract.UsageLog)
 	if scope.Model != "" && scope.Model != strings.TrimSpace(log.Model) {
 		return false
 	}
+	if scope.ErrorClass != "" && !usageLogErrorClassMatches(scope.ErrorClass, log) {
+		return false
+	}
 	if scope.ProviderID != nil {
 		if log.ProviderID == nil || *log.ProviderID != *scope.ProviderID {
 			return false
@@ -406,6 +409,9 @@ func silenceMatchesRule(matcher contract.AlertSilenceMatcher, rule contract.Aler
 		return false
 	}
 	if matcher.Model != "" && matcher.Model != rule.Scope.Model {
+		return false
+	}
+	if matcher.ErrorClass != "" && matcher.ErrorClass != rule.Scope.ErrorClass {
 		return false
 	}
 	if matcher.ProviderID != nil {
@@ -543,6 +549,7 @@ func validateAlertSilence(silence contract.AlertSilence) error {
 func normalizeAlertRuleScope(scope contract.AlertRuleScope) contract.AlertRuleScope {
 	scope.SourceEndpoint = strings.TrimSpace(scope.SourceEndpoint)
 	scope.Model = strings.TrimSpace(scope.Model)
+	scope.ErrorClass = strings.TrimSpace(scope.ErrorClass)
 	if scope.ProviderID != nil {
 		providerID := *scope.ProviderID
 		scope.ProviderID = &providerID
@@ -554,6 +561,7 @@ func normalizeAlertSilenceMatcher(matcher contract.AlertSilenceMatcher) contract
 	matcher.RuleID = strings.TrimSpace(matcher.RuleID)
 	matcher.SourceEndpoint = strings.TrimSpace(matcher.SourceEndpoint)
 	matcher.Model = strings.TrimSpace(matcher.Model)
+	matcher.ErrorClass = strings.TrimSpace(matcher.ErrorClass)
 	if matcher.ProviderID != nil {
 		providerID := *matcher.ProviderID
 		matcher.ProviderID = &providerID
@@ -567,6 +575,13 @@ func cloneAlertRule(value contract.AlertRule) contract.AlertRule {
 		value.Scope.ProviderID = &providerID
 	}
 	return value
+}
+
+func usageLogErrorClassMatches(errorClass string, log usagecontract.UsageLog) bool {
+	if log.ErrorClass == nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(*log.ErrorClass), strings.TrimSpace(errorClass))
 }
 
 func cloneAlertSilence(value contract.AlertSilence) contract.AlertSilence {

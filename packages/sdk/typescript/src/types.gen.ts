@@ -5508,6 +5508,10 @@ export type OpsAlertOperator = 'gt' | 'gte' | 'lt' | 'lte';
 export type OpsAlertRuleScope = {
     source_endpoint: string;
     model: string;
+    /**
+     * Low-cardinality gateway or provider error class used to narrow rule evaluation.
+     */
+    error_class: string;
     provider_id?: Id;
 };
 
@@ -5572,6 +5576,10 @@ export type OpsAlertSilenceMatcher = {
     severity?: OpsAlertSeverity;
     source_endpoint?: string;
     model?: string;
+    /**
+     * Low-cardinality gateway or provider error class used to match scoped alert rules.
+     */
+    error_class?: string;
     provider_id?: Id;
 };
 

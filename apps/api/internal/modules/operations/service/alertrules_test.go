@@ -115,6 +115,11 @@ func TestEnsureBuiltinAlertRulesCreatesMissingBaselines(t *testing.T) {
 	assertBuiltinRule(t, created, builtinAlertRuleMessagesError, contract.AlertMetricErrorRate, string(gatewaycontract.EndpointMessages), 10)
 	assertBuiltinRule(t, created, builtinAlertRuleResponsesWebSocketError, contract.AlertMetricErrorRate, "/v1/responses/ws", 5)
 	assertBuiltinRule(t, created, builtinAlertRuleRealtimeTranscriptsError, contract.AlertMetricErrorRate, string(gatewaycontract.EndpointRealtime), 5)
+	assertBuiltinErrorClassRule(t, created, builtinAlertRuleSchedulerNoAccount, "no_available_account", contract.AlertSeverityCritical, 5)
+	assertBuiltinErrorClassRule(t, created, builtinAlertRuleProvider5xxSpike, "provider_5xx", contract.AlertSeverityWarning, 10)
+	assertBuiltinErrorClassRule(t, created, builtinAlertRuleRateLimitSpike, "rate_limit", contract.AlertSeverityWarning, 10)
+	assertBuiltinErrorClassRule(t, created, builtinAlertRuleTimeoutSpike, "timeout", contract.AlertSeverityWarning, 10)
+	assertBuiltinErrorClassRule(t, created, builtinAlertRuleNetworkErrorSpike, "network_error", contract.AlertSeverityWarning, 10)
 
 	again, err := svc.EnsureBuiltinAlertRules(t.Context())
 	if err != nil {
@@ -184,6 +189,25 @@ func assertBuiltinRule(t *testing.T, rules []contract.AlertRule, name string, me
 		return
 	}
 	t.Fatalf("builtin rule %q not found in %+v", name, rules)
+}
+
+func assertBuiltinErrorClassRule(t *testing.T, rules []contract.AlertRule, name string, errorClass string, severity contract.AlertSeverity, threshold float64) {
+	t.Helper()
+	for _, rule := range rules {
+		if rule.Name != name {
+			continue
+		}
+		if rule.MetricType != contract.AlertMetricRequestCount ||
+			rule.Scope.ErrorClass != errorClass ||
+			rule.Severity != severity ||
+			rule.Threshold != threshold ||
+			rule.MinRequestCount != 1 ||
+			!rule.Enabled {
+			t.Fatalf("unexpected builtin error-class rule %q: %+v", name, rule)
+		}
+		return
+	}
+	t.Fatalf("builtin error-class rule %q not found in %+v", name, rules)
 }
 
 func TestEvaluateAlertRulesFiresUpdatesAndResolvesEvents(t *testing.T) {
@@ -369,6 +393,48 @@ func TestEvaluateAlertRulesSuppressesWithMatchingSilence(t *testing.T) {
 	}
 	if alerts[0].Status != contract.AlertStatusSuppressed || alerts[0].SuppressedBy == nil || *alerts[0].SuppressedBy != "silence.1" {
 		t.Fatalf("expected suppressed alert with silence attribution, got %+v", alerts[0])
+	}
+}
+
+func TestEvaluateAlertRulesFiltersByErrorClass(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if _, err := svc.CreateAlertRule(t.Context(), contract.CreateAlertRuleRequest{
+		Name:            "Provider 5xx spike",
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       1,
+		Severity:        contract.AlertSeverityWarning,
+		WindowSeconds:   300,
+		MinRequestCount: 1,
+		Scope:           contract.AlertRuleScope{ErrorClass: "provider_5xx"},
+	}); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+	store.usageLogs = []usagecontract.UsageLog{
+		{RequestID: "req_ok", Success: true, CreatedAt: now.Add(-time.Minute)},
+		{RequestID: "req_provider_1", Success: false, ErrorClass: ptrString("provider_5xx"), CreatedAt: now.Add(-2 * time.Minute)},
+		{RequestID: "req_provider_2", Success: false, ErrorClass: ptrString("provider_5xx"), CreatedAt: now.Add(-3 * time.Minute)},
+		{RequestID: "req_timeout", Success: false, ErrorClass: ptrString("timeout"), CreatedAt: now.Add(-4 * time.Minute)},
+	}
+
+	result, err := svc.EvaluateAlertRules(t.Context())
+	if err != nil {
+		t.Fatalf("evaluate rules: %v", err)
+	}
+	if result.Evaluated != 1 || result.Breached != 1 || result.Created != 1 {
+		t.Fatalf("unexpected evaluation result: %+v", result)
+	}
+	alerts, err := svc.ListAlerts(t.Context())
+	if err != nil {
+		t.Fatalf("list alerts: %v", err)
+	}
+	if len(alerts) != 1 || alerts[0].Details["error_class"] != "provider_5xx" || alerts[0].Details["total_requests"] != 2 {
+		t.Fatalf("expected scoped provider_5xx alert, got %+v", alerts)
 	}
 }
 

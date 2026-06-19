@@ -22,6 +22,7 @@ type FormState = {
   severity: typeof ANY_SEVERITY | OpsAlertSeverity;
   sourceEndpoint: string;
   model: string;
+  errorClass: string;
   providerId: string;
   startsAt: string;
   endsAt: string;
@@ -34,6 +35,7 @@ function emptyForm(): FormState {
     severity: ANY_SEVERITY,
     sourceEndpoint: "",
     model: "",
+    errorClass: "",
     providerId: "",
     startsAt: "",
     endsAt: defaultEnd(),
@@ -46,12 +48,14 @@ function buildBody(form: FormState) {
     severity?: OpsAlertSeverity;
     source_endpoint?: string;
     model?: string;
+    error_class?: string;
     provider_id?: string;
   } = {};
   if (form.ruleId.trim()) matcher.rule_id = form.ruleId.trim();
   if (form.severity !== ANY_SEVERITY) matcher.severity = form.severity;
   if (form.sourceEndpoint.trim()) matcher.source_endpoint = form.sourceEndpoint.trim();
   if (form.model.trim()) matcher.model = form.model.trim();
+  if (form.errorClass.trim()) matcher.error_class = form.errorClass.trim();
   if (form.providerId.trim()) matcher.provider_id = form.providerId.trim();
   return {
     comment: form.comment.trim() || undefined,
@@ -90,6 +94,7 @@ export function AlertSilenceFormDialog({
       placeholder: "/v1/chat/completions",
     },
     { name: "model", label: t("adminOps.silences.model") },
+    { name: "errorClass", label: t("adminOps.silences.errorClass"), placeholder: "provider_5xx" },
     { name: "providerId", label: t("adminOps.silences.provider") },
     { name: "startsAt", label: t("adminOps.silences.startsAt"), type: "datetime" },
     { name: "endsAt", label: t("adminOps.silences.endsAt"), type: "datetime" },

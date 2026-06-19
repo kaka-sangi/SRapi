@@ -34,14 +34,14 @@ func TestAlertRuleAndSilencePersistence(t *testing.T) {
 		WindowSeconds:   1800,
 		CooldownSeconds: 300,
 		MinRequestCount: 5,
-		Scope:           contract.AlertRuleScope{SourceEndpoint: "/v1/chat/completions", Model: "gpt-4o-mini", ProviderID: &providerID},
+		Scope:           contract.AlertRuleScope{SourceEndpoint: "/v1/chat/completions", Model: "gpt-4o-mini", ErrorClass: "provider_5xx", ProviderID: &providerID},
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	})
 	if err != nil {
 		t.Fatalf("create alert rule: %v", err)
 	}
-	if rule.ID == 0 || rule.Scope.ProviderID == nil || *rule.Scope.ProviderID != providerID {
+	if rule.ID == 0 || rule.Scope.ProviderID == nil || *rule.Scope.ProviderID != providerID || rule.Scope.ErrorClass != "provider_5xx" {
 		t.Fatalf("unexpected persisted rule: %+v", rule)
 	}
 
@@ -74,7 +74,7 @@ func TestAlertRuleAndSilencePersistence(t *testing.T) {
 	createdBy := 3
 	silence, err := store.CreateAlertSilence(ctx, contract.AlertSilence{
 		Comment:   "deploy window",
-		Matcher:   contract.AlertSilenceMatcher{RuleID: "rule.1", Severity: contract.AlertSeverityCritical, ProviderID: &providerID},
+		Matcher:   contract.AlertSilenceMatcher{RuleID: "rule.1", Severity: contract.AlertSeverityCritical, ErrorClass: "provider_5xx", ProviderID: &providerID},
 		StartsAt:  now,
 		EndsAt:    now.Add(time.Hour),
 		CreatedBy: &createdBy,
@@ -84,7 +84,7 @@ func TestAlertRuleAndSilencePersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create silence: %v", err)
 	}
-	if silence.ID == 0 || silence.Matcher.RuleID != "rule.1" || silence.Matcher.ProviderID == nil || silence.CreatedBy == nil {
+	if silence.ID == 0 || silence.Matcher.RuleID != "rule.1" || silence.Matcher.ErrorClass != "provider_5xx" || silence.Matcher.ProviderID == nil || silence.CreatedBy == nil {
 		t.Fatalf("unexpected persisted silence: %+v", silence)
 	}
 

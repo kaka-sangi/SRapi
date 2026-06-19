@@ -128,6 +128,29 @@ function OpsContent() {
   );
 }
 
+function alertRuleScopeLabel(rule: OpsAlertRule, fallback: string): string {
+  const parts = [
+    rule.scope.source_endpoint,
+    rule.scope.model,
+    rule.scope.error_class,
+    rule.scope.provider_id ? `provider:${rule.scope.provider_id}` : "",
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : fallback;
+}
+
+function alertSilenceMatcherLabel(silence: OpsAlertSilence, fallback: string): string {
+  const matcher = silence.matcher;
+  const parts = [
+    matcher.rule_id,
+    matcher.severity,
+    matcher.source_endpoint,
+    matcher.model,
+    matcher.error_class,
+    matcher.provider_id ? `provider:${matcher.provider_id}` : "",
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : fallback;
+}
+
 function OpsOverviewContent() {
   const { t } = useLanguage();
   // The shared message catalog has no keys for the new ops charts yet; fall back
@@ -458,7 +481,8 @@ function OpsOverviewContent() {
                   <div className="text-2xs text-srapi-text-tertiary tabular font-mono">
                     {t(`adminOps.alertRules.metricType.${rule.metric_type}`)}{" "}
                     {t(`adminOps.alertRules.operators.${rule.operator}`)} {rule.threshold}
-                    {rule.scope.source_endpoint ? ` · ${rule.scope.source_endpoint}` : ""}
+                    {" · "}
+                    {alertRuleScopeLabel(rule, t("adminOps.alertRules.globalScope"))}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
@@ -648,11 +672,10 @@ function OpsOverviewContent() {
             />
           ) : (
             (alertSilences.data?.data ?? []).map((silence) => {
-              const matcherText =
-                silence.matcher.rule_id ||
-                silence.matcher.source_endpoint ||
-                silence.matcher.severity ||
-                t("adminOps.silences.anyMatcher");
+              const matcherText = alertSilenceMatcherLabel(
+                silence,
+                t("adminOps.silences.anyMatcher"),
+              );
               return (
                 <div
                   key={silence.id}

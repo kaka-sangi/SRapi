@@ -17,6 +17,11 @@ const (
 	builtinAlertRuleMessagesError            = "SRapi Messages error rate baseline"
 	builtinAlertRuleResponsesWebSocketError  = "SRapi Responses WebSocket error rate baseline"
 	builtinAlertRuleRealtimeTranscriptsError = "SRapi Realtime Transcripts error rate baseline"
+	builtinAlertRuleSchedulerNoAccount       = "SRapi Scheduler no available account baseline"
+	builtinAlertRuleProvider5xxSpike         = "SRapi Provider 5xx error baseline"
+	builtinAlertRuleRateLimitSpike           = "SRapi Provider rate limit baseline"
+	builtinAlertRuleTimeoutSpike             = "SRapi Provider timeout baseline"
+	builtinAlertRuleNetworkErrorSpike        = "SRapi Provider network error baseline"
 )
 
 // EnsureBuiltinAlertRules creates missing baseline Ops alert rules without
@@ -161,6 +166,76 @@ var builtinAlertRules = []contract.AlertRule{
 		MinRequestCount: 5,
 		Scope: contract.AlertRuleScope{
 			SourceEndpoint: string(gatewaycontract.EndpointRealtime),
+		},
+	},
+	{
+		Name:            builtinAlertRuleSchedulerNoAccount,
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       5,
+		Severity:        contract.AlertSeverityCritical,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 1,
+		Scope: contract.AlertRuleScope{
+			ErrorClass: "no_available_account",
+		},
+	},
+	{
+		Name:            builtinAlertRuleProvider5xxSpike,
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       10,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 1,
+		Scope: contract.AlertRuleScope{
+			ErrorClass: "provider_5xx",
+		},
+	},
+	{
+		Name:            builtinAlertRuleRateLimitSpike,
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       10,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 1,
+		Scope: contract.AlertRuleScope{
+			ErrorClass: "rate_limit",
+		},
+	},
+	{
+		Name:            builtinAlertRuleTimeoutSpike,
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       10,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 1,
+		Scope: contract.AlertRuleScope{
+			ErrorClass: "timeout",
+		},
+	},
+	{
+		Name:            builtinAlertRuleNetworkErrorSpike,
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       10,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 1,
+		Scope: contract.AlertRuleScope{
+			ErrorClass: "network_error",
 		},
 	},
 }

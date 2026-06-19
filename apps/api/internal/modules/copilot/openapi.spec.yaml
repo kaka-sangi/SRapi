@@ -29967,11 +29967,15 @@ components:
       required:
         - source_endpoint
         - model
+        - error_class
       properties:
         source_endpoint:
           type: string
         model:
           type: string
+        error_class:
+          type: string
+          description: Low-cardinality gateway or provider error class used to narrow rule evaluation.
         provider_id:
           $ref: "#/components/schemas/Id"
           nullable: true
@@ -30124,6 +30128,9 @@ components:
           type: string
         model:
           type: string
+        error_class:
+          type: string
+          description: Low-cardinality gateway or provider error class used to match scoped alert rules.
         provider_id:
           $ref: "#/components/schemas/Id"
           nullable: true
