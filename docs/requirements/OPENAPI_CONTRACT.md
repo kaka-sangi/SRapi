@@ -650,6 +650,7 @@ surface:
 
 ```txt
 GET   /api/v1/admin/ops/error-logs
+GET   /api/v1/admin/ops/error-logs/fingerprints
 GET   /api/v1/admin/ops/error-logs/{id}
 PATCH /api/v1/admin/ops/error-logs/{id}
 ```
@@ -659,6 +660,20 @@ not usage-derived guesses. Query filters may include `user_id`, `account_id`,
 `provider_id`, `model`, `error_class`, `platform`, `resolution`, `status_min`,
 `status_max`, `start`, `end`, and `q`. Pagination uses the shared `Pagination`
 schema.
+
+`GET /api/v1/admin/ops/error-logs/fingerprints` returns a bounded real-time
+aggregation over `ops_error_logs` for incident triage. It supports the same
+safe filters as the list route plus `limit` (default 20, max 100), defaults to a
+24 hour window when `start` is omitted, and returns `{data, meta, request_id}`.
+`meta` must expose `total`, `scanned`, `truncated`, `window_start`, and
+`window_end` so operators know whether the live scan covered the requested
+window. When `truncated=true`, `total` is the number of groups discovered in
+the scanned sample before the response limit, not a full-window cardinality.
+Fingerprint keys may use only low-sensitivity dimensions such as
+endpoint, target protocol, model, status class/code, error class/phase/owner/
+source, and normalized message pattern. They must not include request ids,
+API key ids, user/account/provider raw identifiers, request or response bodies,
+prompts, credentials, cookies, or other high-cardinality secrets.
 
 `GET /api/v1/admin/ops/error-logs/{id}` returns the same sanitized row in a
 `{data, request_id}` envelope for detail dialogs and incident links. The row

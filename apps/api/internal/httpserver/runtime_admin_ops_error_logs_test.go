@@ -182,3 +182,125 @@ func TestAdminOpsErrorLogsListGetAndResolve(t *testing.T) {
 		t.Fatalf("missing ops error log: expected 404, got %d body=%s", missingRec.Code, missingRec.Body.String())
 	}
 }
+
+func TestAdminOpsErrorLogFingerprints(t *testing.T) {
+	store := opserrorlogsmemory.New()
+	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
+	statusBadGateway := 502
+	statusRateLimit := 429
+	first, err := store.Insert(t.Context(), opserrorlogscontract.Entry{
+		OccurredAt:     now.Add(-time.Minute),
+		RequestID:      "req_first",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "ops-model",
+		StatusCode:     &statusBadGateway,
+		ErrorClass:     "server_bad",
+		ErrorPhase:     "upstream",
+		ErrorOwner:     "provider",
+		ErrorSource:    "upstream_http",
+		ErrorMessage:   "provider returned 502 for request req_first after 123ms",
+		Resolution:     opserrorlogscontract.ResolutionInvestigating,
+		CreatedAt:      now.Add(-time.Minute),
+		UpdatedAt:      now.Add(-time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("insert first: %v", err)
+	}
+	second, err := store.Insert(t.Context(), opserrorlogscontract.Entry{
+		OccurredAt:     now,
+		RequestID:      "req_second",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "ops-model",
+		StatusCode:     &statusBadGateway,
+		ErrorClass:     "server_bad",
+		ErrorPhase:     "upstream",
+		ErrorOwner:     "provider",
+		ErrorSource:    "upstream_http",
+		ErrorMessage:   "provider returned 503 for request req_second after 456ms",
+		Resolution:     opserrorlogscontract.ResolutionOpen,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	})
+	if err != nil {
+		t.Fatalf("insert second: %v", err)
+	}
+	if _, err := store.Insert(t.Context(), opserrorlogscontract.Entry{
+		OccurredAt:     now,
+		RequestID:      "req_rate_limit",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "ops-model",
+		StatusCode:     &statusRateLimit,
+		ErrorClass:     "rate_limit",
+		ErrorPhase:     "upstream",
+		ErrorOwner:     "provider",
+		ErrorSource:    "upstream_http",
+		ErrorMessage:   "rate limited",
+		Resolution:     opserrorlogscontract.ResolutionOpen,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}); err != nil {
+		t.Fatalf("insert rate limit: %v", err)
+	}
+
+	handler := New(config.Load(), nil, WithOpsErrorLogsStore(store))
+	_, sessionCookie := mustLoginAdmin(t, handler)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/error-logs/fingerprints?model=ops-model&status_min=500&limit=5&start=2026-06-18T09:00:00Z&end=2026-06-18T11:00:00Z", nil)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("fingerprints: expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Data []struct {
+			Fingerprint         string `json:"fingerprint"`
+			Count               int    `json:"count"`
+			OpenCount           int    `json:"open_count"`
+			InvestigatingCount  int    `json:"investigating_count"`
+			ExampleErrorLogID   string `json:"example_error_log_id"`
+			ExampleRequestID    string `json:"example_request_id"`
+			StatusClass         string `json:"status_class"`
+			StatusCode          int    `json:"status_code"`
+			MessagePattern      string `json:"message_pattern"`
+			ExampleErrorMessage string `json:"example_error_message"`
+		} `json:"data"`
+		Meta struct {
+			Total       int    `json:"total"`
+			Scanned     int    `json:"scanned"`
+			Truncated   bool   `json:"truncated"`
+			WindowStart string `json:"window_start"`
+			WindowEnd   string `json:"window_end"`
+		} `json:"meta"`
+		RequestID string `json:"request_id"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode fingerprints: %v", err)
+	}
+	if len(resp.Data) != 1 || resp.Meta.Total != 1 || resp.Meta.Scanned != 2 || resp.Meta.Truncated {
+		t.Fatalf("unexpected fingerprint response: %+v", resp)
+	}
+	item := resp.Data[0]
+	if item.Fingerprint == "" || item.Count != 2 || item.OpenCount != 1 || item.InvestigatingCount != 1 {
+		t.Fatalf("unexpected fingerprint item: %+v", item)
+	}
+	if item.ExampleErrorLogID != "2" || item.ExampleRequestID != second.RequestID || item.StatusClass != "5xx" || item.StatusCode != statusBadGateway {
+		t.Fatalf("unexpected fingerprint example/status: %+v first=%+v", item, first)
+	}
+	if strings.Contains(item.MessagePattern, "req_first") || strings.Contains(item.MessagePattern, "req_second") || strings.Contains(item.MessagePattern, "123") || strings.Contains(item.MessagePattern, "456") {
+		t.Fatalf("message pattern leaked variable identifiers: %+v", item)
+	}
+	if resp.Meta.WindowStart == "" || resp.Meta.WindowEnd == "" || resp.RequestID == "" {
+		t.Fatalf("missing response metadata: %+v", resp)
+	}
+
+	invalidReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/error-logs/fingerprints?limit=bad", nil)
+	invalidReq.AddCookie(sessionCookie)
+	invalidRec := httptest.NewRecorder()
+	handler.ServeHTTP(invalidRec, invalidReq)
+	if invalidRec.Code != http.StatusBadRequest {
+		t.Fatalf("invalid limit: expected 400, got %d body=%s", invalidRec.Code, invalidRec.Body.String())
+	}
+}

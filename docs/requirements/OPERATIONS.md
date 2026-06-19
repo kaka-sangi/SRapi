@@ -386,6 +386,14 @@ Provider Account metadata 或 Provider config/capabilities 可以把默认 `/mod
 
 AdminOps 启动时会按规则名幂等创建内置阈值告警基线：全局 Gateway error rate、全局 Gateway p95 latency，以及 `/v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1/responses/ws` 和 `/v1/realtime` 的入口级错误率或 p95 latency baseline。已有同名规则会被视为 operator-owned 配置，不会被覆盖；需要停用默认保护时应禁用规则而不是修改数据库。
 
+AdminOps 错误日志提供实时指纹摘要：
+
+```txt
+GET /api/v1/admin/ops/error-logs/fingerprints
+```
+
+该接口按低敏稳定维度聚合最近 `ops_error_logs`，用于告警后的快速归因。默认窗口为最近 24 小时，返回前 20 个指纹；`limit` 最多 100。响应 `meta.scanned` 和 `meta.truncated` 会说明 live scan 是否覆盖完整匹配行。指纹只使用 endpoint、target protocol、model、status class/code、error class/phase/owner/source 和归一化 message pattern，不使用 request id、API key、user/account/provider 原始标识、请求体、prompt、credential 或 cookie。
+
 Prometheus alert rules 可以从 `deploy/prometheus-srapi-alerts.yaml` 加载。该文件基于 `srapi_ops_alert_events{severity,status}` 生成 critical 和 warning Ops posture 告警，也覆盖 scheduler no-available-account、Provider 错误升高，以及 `ops_error_logs` 异步错误证据 recorder 缺失、丢弃、写失败和积压。labels 只保留低基数路由字段，排障说明和 runbook 放在 annotations。修改规则后运行：
 
 ```bash
@@ -401,11 +409,12 @@ make observability-rules-check
 处置步骤：
 
 1. 打开 AdminOps 告警事件页，按 `severity=critical`、`status=firing` 过滤，确认 firing 事件的 summary、started_at、details 和 UI 处置路径。
-2. 先进入错误日志，按 details 中的 `source_endpoint`、`model`、`provider_id`、`account_id`、`error_class` 缩小范围，确认 owner、upstream status、attempt_no、latency 和 stream completion state。
-3. 如果 details 带 `request_id`，继续打开请求证据和调度决策，核对 selected provider/account、reject reasons、score breakdown、fallback_from_decision_id 和 fallback_excluded 证据。
-4. 如果 details 带 provider/account scope，打开账号健康，确认 cooldown、circuit、quota remaining、RPM/TPM、proxy quality、needs_reauth 和最近 health probe 错误。
-5. 如果 critical 由 SLO burn-rate 触发，复核 long/short window、total/bad requests、burn rate、error budget consumed 和 SLO filter 是否符合真实事故范围；不要只因为单个低流量样本恢复就确认事故结束。
-6. 缓解后等待 alert event 自动恢复或人工确认，必须在错误日志、请求证据和账号健康三处都看到趋势回落，再关闭外部事故。
+2. 先进入错误日志指纹摘要，按 details 中的 `source_endpoint`、`model`、`error_class`、`error_phase`、`error_owner` 缩小范围，确认是否集中在同一 message pattern、status class/code 和 resolution 分布。
+3. 再打开该指纹的样例错误日志，确认 owner、upstream status、attempt_no、latency、upstream request id 和 stream completion state。
+4. 如果 details 带 `request_id`，继续打开请求证据和调度决策，核对 selected provider/account、reject reasons、score breakdown、fallback_from_decision_id 和 fallback_excluded 证据。
+5. 如果 details 带 provider/account scope，打开账号健康，确认 cooldown、circuit、quota remaining、RPM/TPM、proxy quality、needs_reauth 和最近 health probe 错误。
+6. 如果 critical 由 SLO burn-rate 触发，复核 long/short window、total/bad requests、burn rate、error budget consumed 和 SLO filter 是否符合真实事故范围；不要只因为单个低流量样本恢复就确认事故结束。
+7. 缓解后等待 alert event 自动恢复或人工确认，必须在错误日志指纹、请求证据和账号健康三处都看到趋势回落，再关闭外部事故。
 
 #### SRapiWarningOpsAlertsPersisting
 

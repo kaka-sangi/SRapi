@@ -3248,6 +3248,65 @@ export type OpsErrorLogResponse = {
     request_id: RequestId;
 };
 
+/**
+ * Real-time grouping of ops_error_logs rows by stable, low-sensitivity
+ * failure dimensions. It is intended for operator triage and is not a
+ * durable long-term rollup.
+ *
+ */
+export type OpsErrorFingerprint = {
+    /**
+     * Stable hash over low-sensitivity grouping dimensions.
+     */
+    fingerprint: string;
+    count: number;
+    open_count: number;
+    investigating_count: number;
+    resolved_count: number;
+    muted_count: number;
+    first_occurred_at: string;
+    last_occurred_at: string;
+    example_error_log_id?: Id;
+    example_request_id?: string;
+    example_error_message?: string;
+    source_endpoint: string;
+    target_protocol: string;
+    model: string;
+    status_code?: number;
+    status_class: '1xx' | '2xx' | '3xx' | '4xx' | '5xx' | 'unknown';
+    error_class: string;
+    error_phase: string;
+    error_owner: string;
+    error_source: string;
+    /**
+     * Normalized error message with request ids, URLs, hashes, and numbers replaced.
+     */
+    message_pattern: string;
+};
+
+export type OpsErrorFingerprintListMeta = {
+    /**
+     * Number of discovered fingerprint groups before the response limit is applied. When truncated is true, this only covers scanned rows.
+     */
+    total: number;
+    /**
+     * Number of ops_error_logs rows scanned for this real-time summary.
+     */
+    scanned: number;
+    /**
+     * True when matching rows exceeded the bounded live scan cap.
+     */
+    truncated: boolean;
+    window_start?: string;
+    window_end?: string;
+};
+
+export type OpsErrorFingerprintListResponse = {
+    data: Array<OpsErrorFingerprint>;
+    meta: OpsErrorFingerprintListMeta;
+    request_id: RequestId;
+};
+
 export type OpsErrorLogResolutionUpdate = {
     resolution: 'open' | 'investigating' | 'resolved' | 'muted';
     note?: string;
@@ -17356,6 +17415,80 @@ export type ListAdminOpsErrorLogsResponses = {
 };
 
 export type ListAdminOpsErrorLogsResponse = ListAdminOpsErrorLogsResponses[keyof ListAdminOpsErrorLogsResponses];
+
+export type ListAdminOpsErrorLogFingerprintsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        user_id?: Id;
+        account_id?: Id;
+        provider_id?: Id;
+        model?: string;
+        error_class?: string;
+        /**
+         * Filter by gateway error phase, for example routing or upstream.
+         */
+        error_phase?: string;
+        /**
+         * Filter by responsibility bucket, for example provider or scheduler.
+         */
+        error_owner?: string;
+        platform?: string;
+        /**
+         * Filter by operator-supplied resolution status.
+         */
+        resolution?: 'open' | 'investigating' | 'resolved' | 'muted';
+        status_min?: number;
+        status_max?: number;
+        /**
+         * Inclusive start of the aggregation window. Defaults to 24 hours before end.
+         */
+        start?: string;
+        /**
+         * Inclusive end of the aggregation window. Defaults to now.
+         */
+        end?: string;
+        /**
+         * Case-insensitive search across request ids, model, endpoint, class, phase, message, and body excerpt before grouping.
+         */
+        q?: string;
+        /**
+         * Maximum fingerprint groups to return. Defaults to 20 and caps at 100.
+         */
+        limit?: number;
+    };
+    url: '/api/v1/admin/ops/error-logs/fingerprints';
+};
+
+export type ListAdminOpsErrorLogFingerprintsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminOpsErrorLogFingerprintsError = ListAdminOpsErrorLogFingerprintsErrors[keyof ListAdminOpsErrorLogFingerprintsErrors];
+
+export type ListAdminOpsErrorLogFingerprintsResponses = {
+    /**
+     * Grouped upstream error fingerprints.
+     */
+    200: OpsErrorFingerprintListResponse;
+};
+
+export type ListAdminOpsErrorLogFingerprintsResponse = ListAdminOpsErrorLogFingerprintsResponses[keyof ListAdminOpsErrorLogFingerprintsResponses];
 
 export type ListAdminOpsRequestEvidenceData = {
     body?: never;

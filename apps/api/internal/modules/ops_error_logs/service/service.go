@@ -8,9 +8,14 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,6 +39,20 @@ const MaxUpstreamErrorEvents = 20
 // optional retention sweep. Aligns with sub2api ops defaults (30d).
 const DefaultRetention = 30 * 24 * time.Hour
 
+// DefaultFingerprintWindow is the default lookback for real-time fingerprint
+// aggregation when the caller does not provide an explicit time range.
+const DefaultFingerprintWindow = 24 * time.Hour
+
+// DefaultFingerprintLimit is the default number of fingerprint groups returned.
+const DefaultFingerprintLimit = 20
+
+// MaxFingerprintLimit caps the grouped response size.
+const MaxFingerprintLimit = 100
+
+// MaxFingerprintScanRows bounds the live row scan used before a durable rollup
+// table exists.
+const MaxFingerprintScanRows = 5000
+
 // ErrInvalidInput is returned by service methods when required fields are
 // missing or malformed.
 var ErrInvalidInput = errors.New("ops_error_logs: invalid input")
@@ -46,6 +65,12 @@ var (
 	apiKeyPlaintextPattern  = regexp.MustCompile(`(?i)^(sk_[0-9a-fA-F]{12})_[0-9a-fA-F]{16,}$`)
 	openAIKeyPattern        = regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{10,}\b`)
 	srapiKeyPattern         = regexp.MustCompile(`\b(sk_[0-9a-fA-F]+)_[0-9a-fA-F]{10,}\b`)
+	fingerprintURLPattern   = regexp.MustCompile(`https?://[^\s]+`)
+	fingerprintUUIDPattern  = regexp.MustCompile(`\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b`)
+	fingerprintHexPattern   = regexp.MustCompile(`\b[0-9a-fA-F]{16,}\b`)
+	fingerprintReqPattern   = regexp.MustCompile(`(?i)\breq[_-]?[A-Za-z0-9._-]{6,}\b`)
+	fingerprintNumPattern   = regexp.MustCompile(`\d+`)
+	fingerprintSpacePattern = regexp.MustCompile(`\s+`)
 )
 
 // Service is the ops_error_logs application service.
@@ -91,6 +116,71 @@ func (s *Service) List(ctx context.Context, filter contract.ListFilter) (contrac
 		return contract.ListResult{}, err
 	}
 	return s.store.List(ctx, normalized)
+}
+
+// ListFingerprints returns a bounded real-time aggregation of recent
+// ops_error_logs rows. It intentionally groups on low-sensitivity dimensions
+// only; request ids, user/account ids, API key ids, prompts, and body excerpts
+// are not part of the fingerprint key.
+func (s *Service) ListFingerprints(ctx context.Context, filter contract.FingerprintFilter) (contract.FingerprintResult, error) {
+	if s == nil || s.store == nil {
+		return contract.FingerprintResult{}, ErrInvalidInput
+	}
+	normalized, err := normalizeListFilter(filter.ListFilter)
+	if err != nil {
+		return contract.FingerprintResult{}, err
+	}
+	now := s.now().UTC()
+	if normalized.To == nil {
+		to := now
+		normalized.To = &to
+	}
+	if normalized.From == nil {
+		from := normalized.To.Add(-DefaultFingerprintWindow)
+		normalized.From = &from
+	}
+	limit := normalizeFingerprintLimit(filter.Limit)
+	scanFilter := normalized
+	scanFilter.PageSize = 200
+	groups := make(map[string]*contract.FingerprintSummary)
+	scanned := 0
+	matched := 0
+	for page := 1; scanned < MaxFingerprintScanRows; page++ {
+		scanFilter.Page = page
+		res, err := s.store.List(ctx, scanFilter)
+		if err != nil {
+			return contract.FingerprintResult{}, err
+		}
+		if page == 1 {
+			matched = res.Total
+		}
+		if len(res.Items) == 0 {
+			break
+		}
+		for _, entry := range res.Items {
+			aggregateFingerprint(groups, entry)
+			scanned++
+			if scanned >= MaxFingerprintScanRows {
+				break
+			}
+		}
+		if page*scanFilter.PageSize >= res.Total {
+			break
+		}
+	}
+	items := fingerprintSummaries(groups)
+	total := len(items)
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return contract.FingerprintResult{
+		Items:       items,
+		Total:       total,
+		Scanned:     scanned,
+		Truncated:   matched > scanned,
+		WindowStart: normalized.From,
+		WindowEnd:   normalized.To,
+	}, nil
 }
 
 // Get returns a single entry by id.
@@ -278,6 +368,140 @@ func normalizeListFilter(filter contract.ListFilter) (contract.ListFilter, error
 		filter.PageSize = 200
 	}
 	return filter, nil
+}
+
+func normalizeFingerprintLimit(limit int) int {
+	if limit <= 0 {
+		return DefaultFingerprintLimit
+	}
+	if limit > MaxFingerprintLimit {
+		return MaxFingerprintLimit
+	}
+	return limit
+}
+
+func aggregateFingerprint(groups map[string]*contract.FingerprintSummary, entry contract.Entry) {
+	fingerprint, messagePattern, statusClass := entryFingerprint(entry)
+	group, ok := groups[fingerprint]
+	if !ok {
+		group = &contract.FingerprintSummary{
+			Fingerprint:     fingerprint,
+			FirstOccurredAt: entry.OccurredAt,
+			LastOccurredAt:  entry.OccurredAt,
+			SourceEndpoint:  entry.SourceEndpoint,
+			TargetProtocol:  entry.TargetProtocol,
+			Model:           entry.Model,
+			StatusCode:      cloneIntPointer(entry.StatusCode),
+			StatusClass:     statusClass,
+			ErrorClass:      entry.ErrorClass,
+			ErrorPhase:      entry.ErrorPhase,
+			ErrorOwner:      entry.ErrorOwner,
+			ErrorSource:     entry.ErrorSource,
+			MessagePattern:  messagePattern,
+		}
+		groups[fingerprint] = group
+	}
+	group.Count++
+	switch entry.Resolution {
+	case contract.ResolutionInvestigating:
+		group.InvestigatingCount++
+	case contract.ResolutionResolved:
+		group.ResolvedCount++
+	case contract.ResolutionMuted:
+		group.MutedCount++
+	default:
+		group.OpenCount++
+	}
+	if group.FirstOccurredAt.IsZero() || entry.OccurredAt.Before(group.FirstOccurredAt) {
+		group.FirstOccurredAt = entry.OccurredAt
+	}
+	if group.LastOccurredAt.IsZero() || entry.OccurredAt.After(group.LastOccurredAt) {
+		group.LastOccurredAt = entry.OccurredAt
+		group.ExampleEntryID = entry.ID
+		group.ExampleRequestID = entry.RequestID
+		group.ExampleErrorMessage = entry.ErrorMessage
+	}
+	if group.ExampleEntryID == 0 {
+		group.ExampleEntryID = entry.ID
+		group.ExampleRequestID = entry.RequestID
+		group.ExampleErrorMessage = entry.ErrorMessage
+	}
+}
+
+func fingerprintSummaries(groups map[string]*contract.FingerprintSummary) []contract.FingerprintSummary {
+	items := make([]contract.FingerprintSummary, 0, len(groups))
+	for _, group := range groups {
+		items = append(items, *group)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Count != items[j].Count {
+			return items[i].Count > items[j].Count
+		}
+		if !items[i].LastOccurredAt.Equal(items[j].LastOccurredAt) {
+			return items[i].LastOccurredAt.After(items[j].LastOccurredAt)
+		}
+		return items[i].Fingerprint < items[j].Fingerprint
+	})
+	return items
+}
+
+func entryFingerprint(entry contract.Entry) (string, string, string) {
+	messagePattern := normalizeFingerprintMessage(entry.ErrorMessage)
+	if messagePattern == "" {
+		messagePattern = normalizeFingerprintMessage(entry.ErrorClass)
+	}
+	statusClass := statusClass(entry.StatusCode)
+	statusCode := ""
+	if entry.StatusCode != nil {
+		statusCode = strconv.Itoa(*entry.StatusCode)
+	}
+	key := strings.Join([]string{
+		entry.SourceEndpoint,
+		entry.TargetProtocol,
+		entry.Model,
+		statusCode,
+		statusClass,
+		entry.ErrorClass,
+		entry.ErrorPhase,
+		entry.ErrorOwner,
+		entry.ErrorSource,
+		messagePattern,
+	}, "\x1f")
+	sum := sha256.Sum256([]byte(key))
+	return "errfp_" + hex.EncodeToString(sum[:8]), messagePattern, statusClass
+}
+
+func normalizeFingerprintMessage(message string) string {
+	message = strings.ToLower(redactSecretText(message))
+	message = fingerprintURLPattern.ReplaceAllString(message, "{url}")
+	message = fingerprintUUIDPattern.ReplaceAllString(message, "{uuid}")
+	message = fingerprintReqPattern.ReplaceAllString(message, "{request}")
+	message = fingerprintHexPattern.ReplaceAllString(message, "{hex}")
+	message = fingerprintNumPattern.ReplaceAllString(message, "{n}")
+	message = fingerprintSpacePattern.ReplaceAllString(message, " ")
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return ""
+	}
+	return truncate(message, 160)
+}
+
+func statusClass(status *int) string {
+	if status == nil {
+		return "unknown"
+	}
+	if *status < 100 || *status > 599 {
+		return "unknown"
+	}
+	return fmt.Sprintf("%dxx", *status/100)
+}
+
+func cloneIntPointer(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 // redactExcerpt sanitises a body excerpt: if it parses as JSON we recursively

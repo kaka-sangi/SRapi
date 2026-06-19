@@ -147,6 +147,54 @@ type ListResult struct {
 	PageSize int
 }
 
+// FingerprintFilter narrows real-time error fingerprint aggregation. It reuses
+// ListFilter's safe operator filters and adds an item limit for the grouped
+// response.
+type FingerprintFilter struct {
+	ListFilter
+	Limit int
+}
+
+// FingerprintSummary groups related ops_error_logs rows by low-cardinality,
+// low-sensitivity dimensions and a normalized error-message pattern.
+type FingerprintSummary struct {
+	Fingerprint         string
+	Count               int
+	OpenCount           int
+	InvestigatingCount  int
+	ResolvedCount       int
+	MutedCount          int
+	FirstOccurredAt     time.Time
+	LastOccurredAt      time.Time
+	ExampleEntryID      int64
+	ExampleRequestID    string
+	ExampleErrorMessage string
+	SourceEndpoint      string
+	TargetProtocol      string
+	Model               string
+	StatusCode          *int
+	StatusClass         string
+	ErrorClass          string
+	ErrorPhase          string
+	ErrorOwner          string
+	ErrorSource         string
+	MessagePattern      string
+}
+
+// FingerprintResult is the grouped operator view over a bounded scan window.
+// Total counts discovered groups before the Limit is applied. When Truncated is
+// true, Total only covers the scanned sample and is not a full-window group
+// count. Scanned and Truncated describe the underlying row scan so callers know
+// when the summary is a recent sample rather than a complete historical rollup.
+type FingerprintResult struct {
+	Items       []FingerprintSummary
+	Total       int
+	Scanned     int
+	Truncated   bool
+	WindowStart *time.Time
+	WindowEnd   *time.Time
+}
+
 // UpdateResolutionRequest captures the operator-supplied resolution update.
 type UpdateResolutionRequest struct {
 	ID           int64

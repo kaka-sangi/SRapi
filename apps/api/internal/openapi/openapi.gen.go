@@ -1880,6 +1880,36 @@ func (e OpsAlertStatus) Valid() bool {
 	}
 }
 
+// Defines values for OpsErrorFingerprintStatusClass.
+const (
+	OpsErrorFingerprintStatusClassN1xx    OpsErrorFingerprintStatusClass = "1xx"
+	OpsErrorFingerprintStatusClassN2xx    OpsErrorFingerprintStatusClass = "2xx"
+	OpsErrorFingerprintStatusClassN3xx    OpsErrorFingerprintStatusClass = "3xx"
+	OpsErrorFingerprintStatusClassN4xx    OpsErrorFingerprintStatusClass = "4xx"
+	OpsErrorFingerprintStatusClassN5xx    OpsErrorFingerprintStatusClass = "5xx"
+	OpsErrorFingerprintStatusClassUnknown OpsErrorFingerprintStatusClass = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the OpsErrorFingerprintStatusClass enum.
+func (e OpsErrorFingerprintStatusClass) Valid() bool {
+	switch e {
+	case OpsErrorFingerprintStatusClassN1xx:
+		return true
+	case OpsErrorFingerprintStatusClassN2xx:
+		return true
+	case OpsErrorFingerprintStatusClassN3xx:
+		return true
+	case OpsErrorFingerprintStatusClassN4xx:
+		return true
+	case OpsErrorFingerprintStatusClassN5xx:
+		return true
+	case OpsErrorFingerprintStatusClassUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OpsErrorLogResolution.
 const (
 	OpsErrorLogResolutionInvestigating OpsErrorLogResolution = "investigating"
@@ -2743,19 +2773,19 @@ func (e ResponsesResponseObject) Valid() bool {
 
 // Defines values for RiskControlLogLevel.
 const (
-	Block RiskControlLogLevel = "block"
-	Info  RiskControlLogLevel = "info"
-	Warn  RiskControlLogLevel = "warn"
+	RiskControlLogLevelBlock RiskControlLogLevel = "block"
+	RiskControlLogLevelInfo  RiskControlLogLevel = "info"
+	RiskControlLogLevelWarn  RiskControlLogLevel = "warn"
 )
 
 // Valid indicates whether the value is a known member of the RiskControlLogLevel enum.
 func (e RiskControlLogLevel) Valid() bool {
 	switch e {
-	case Block:
+	case RiskControlLogLevelBlock:
 		return true
-	case Info:
+	case RiskControlLogLevelInfo:
 		return true
-	case Warn:
+	case RiskControlLogLevelWarn:
 		return true
 	default:
 		return false
@@ -3352,22 +3382,46 @@ func (e ListOpenAICompatibleResponseInputItemsAliasParamsOrder) Valid() bool {
 
 // Defines values for ListAdminOpsErrorLogsParamsResolution.
 const (
-	Investigating ListAdminOpsErrorLogsParamsResolution = "investigating"
-	Muted         ListAdminOpsErrorLogsParamsResolution = "muted"
-	Open          ListAdminOpsErrorLogsParamsResolution = "open"
-	Resolved      ListAdminOpsErrorLogsParamsResolution = "resolved"
+	ListAdminOpsErrorLogsParamsResolutionInvestigating ListAdminOpsErrorLogsParamsResolution = "investigating"
+	ListAdminOpsErrorLogsParamsResolutionMuted         ListAdminOpsErrorLogsParamsResolution = "muted"
+	ListAdminOpsErrorLogsParamsResolutionOpen          ListAdminOpsErrorLogsParamsResolution = "open"
+	ListAdminOpsErrorLogsParamsResolutionResolved      ListAdminOpsErrorLogsParamsResolution = "resolved"
 )
 
 // Valid indicates whether the value is a known member of the ListAdminOpsErrorLogsParamsResolution enum.
 func (e ListAdminOpsErrorLogsParamsResolution) Valid() bool {
 	switch e {
-	case Investigating:
+	case ListAdminOpsErrorLogsParamsResolutionInvestigating:
 		return true
-	case Muted:
+	case ListAdminOpsErrorLogsParamsResolutionMuted:
 		return true
-	case Open:
+	case ListAdminOpsErrorLogsParamsResolutionOpen:
 		return true
-	case Resolved:
+	case ListAdminOpsErrorLogsParamsResolutionResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListAdminOpsErrorLogFingerprintsParamsResolution.
+const (
+	ListAdminOpsErrorLogFingerprintsParamsResolutionInvestigating ListAdminOpsErrorLogFingerprintsParamsResolution = "investigating"
+	ListAdminOpsErrorLogFingerprintsParamsResolutionMuted         ListAdminOpsErrorLogFingerprintsParamsResolution = "muted"
+	ListAdminOpsErrorLogFingerprintsParamsResolutionOpen          ListAdminOpsErrorLogFingerprintsParamsResolution = "open"
+	ListAdminOpsErrorLogFingerprintsParamsResolutionResolved      ListAdminOpsErrorLogFingerprintsParamsResolution = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the ListAdminOpsErrorLogFingerprintsParamsResolution enum.
+func (e ListAdminOpsErrorLogFingerprintsParamsResolution) Valid() bool {
+	switch e {
+	case ListAdminOpsErrorLogFingerprintsParamsResolutionInvestigating:
+		return true
+	case ListAdminOpsErrorLogFingerprintsParamsResolutionMuted:
+		return true
+	case ListAdminOpsErrorLogFingerprintsParamsResolutionOpen:
+		return true
+	case ListAdminOpsErrorLogFingerprintsParamsResolutionResolved:
 		return true
 	default:
 		return false
@@ -8475,6 +8529,61 @@ type OpsErrorEvidenceRecorderHealth struct {
 	WriteFailedCount int64 `json:"write_failed_count"`
 }
 
+// OpsErrorFingerprint Real-time grouping of ops_error_logs rows by stable, low-sensitivity
+// failure dimensions. It is intended for operator triage and is not a
+// durable long-term rollup.
+type OpsErrorFingerprint struct {
+	Count               int     `json:"count"`
+	ErrorClass          string  `json:"error_class"`
+	ErrorOwner          string  `json:"error_owner"`
+	ErrorPhase          string  `json:"error_phase"`
+	ErrorSource         string  `json:"error_source"`
+	ExampleErrorLogId   *Id     `json:"example_error_log_id,omitempty"`
+	ExampleErrorMessage *string `json:"example_error_message,omitempty"`
+	ExampleRequestId    *string `json:"example_request_id,omitempty"`
+
+	// Fingerprint Stable hash over low-sensitivity grouping dimensions.
+	Fingerprint        string    `json:"fingerprint"`
+	FirstOccurredAt    time.Time `json:"first_occurred_at"`
+	InvestigatingCount int       `json:"investigating_count"`
+	LastOccurredAt     time.Time `json:"last_occurred_at"`
+
+	// MessagePattern Normalized error message with request ids, URLs, hashes, and numbers replaced.
+	MessagePattern string                         `json:"message_pattern"`
+	Model          string                         `json:"model"`
+	MutedCount     int                            `json:"muted_count"`
+	OpenCount      int                            `json:"open_count"`
+	ResolvedCount  int                            `json:"resolved_count"`
+	SourceEndpoint string                         `json:"source_endpoint"`
+	StatusClass    OpsErrorFingerprintStatusClass `json:"status_class"`
+	StatusCode     *int                           `json:"status_code,omitempty"`
+	TargetProtocol string                         `json:"target_protocol"`
+}
+
+// OpsErrorFingerprintStatusClass defines model for OpsErrorFingerprint.StatusClass.
+type OpsErrorFingerprintStatusClass string
+
+// OpsErrorFingerprintListMeta defines model for OpsErrorFingerprintListMeta.
+type OpsErrorFingerprintListMeta struct {
+	// Scanned Number of ops_error_logs rows scanned for this real-time summary.
+	Scanned int `json:"scanned"`
+
+	// Total Number of discovered fingerprint groups before the response limit is applied. When truncated is true, this only covers scanned rows.
+	Total int `json:"total"`
+
+	// Truncated True when matching rows exceeded the bounded live scan cap.
+	Truncated   bool       `json:"truncated"`
+	WindowEnd   *time.Time `json:"window_end,omitempty"`
+	WindowStart *time.Time `json:"window_start,omitempty"`
+}
+
+// OpsErrorFingerprintListResponse defines model for OpsErrorFingerprintListResponse.
+type OpsErrorFingerprintListResponse struct {
+	Data      []OpsErrorFingerprint       `json:"data"`
+	Meta      OpsErrorFingerprintListMeta `json:"meta"`
+	RequestId RequestId                   `json:"request_id"`
+}
+
 // OpsErrorLog Operator-facing record of a single upstream failure observed by the
 // gateway hot path. Body excerpts are sanitised and credential-like
 // keys are redacted to "[REDACTED]" before persistence.
@@ -12037,6 +12146,42 @@ type ListAdminOpsErrorLogsParams struct {
 
 // ListAdminOpsErrorLogsParamsResolution defines parameters for ListAdminOpsErrorLogs.
 type ListAdminOpsErrorLogsParamsResolution string
+
+// ListAdminOpsErrorLogFingerprintsParams defines parameters for ListAdminOpsErrorLogFingerprints.
+type ListAdminOpsErrorLogFingerprintsParams struct {
+	UserId     *Id     `form:"user_id,omitempty" json:"user_id,omitempty"`
+	AccountId  *Id     `form:"account_id,omitempty" json:"account_id,omitempty"`
+	ProviderId *Id     `form:"provider_id,omitempty" json:"provider_id,omitempty"`
+	Model      *string `form:"model,omitempty" json:"model,omitempty"`
+	ErrorClass *string `form:"error_class,omitempty" json:"error_class,omitempty"`
+
+	// ErrorPhase Filter by gateway error phase, for example routing or upstream.
+	ErrorPhase *string `form:"error_phase,omitempty" json:"error_phase,omitempty"`
+
+	// ErrorOwner Filter by responsibility bucket, for example provider or scheduler.
+	ErrorOwner *string `form:"error_owner,omitempty" json:"error_owner,omitempty"`
+	Platform   *string `form:"platform,omitempty" json:"platform,omitempty"`
+
+	// Resolution Filter by operator-supplied resolution status.
+	Resolution *ListAdminOpsErrorLogFingerprintsParamsResolution `form:"resolution,omitempty" json:"resolution,omitempty"`
+	StatusMin  *int                                              `form:"status_min,omitempty" json:"status_min,omitempty"`
+	StatusMax  *int                                              `form:"status_max,omitempty" json:"status_max,omitempty"`
+
+	// Start Inclusive start of the aggregation window. Defaults to 24 hours before end.
+	Start *time.Time `form:"start,omitempty" json:"start,omitempty"`
+
+	// End Inclusive end of the aggregation window. Defaults to now.
+	End *time.Time `form:"end,omitempty" json:"end,omitempty"`
+
+	// Q Case-insensitive search across request ids, model, endpoint, class, phase, message, and body excerpt before grouping.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Limit Maximum fingerprint groups to return. Defaults to 20 and caps at 100.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListAdminOpsErrorLogFingerprintsParamsResolution defines parameters for ListAdminOpsErrorLogFingerprints.
+type ListAdminOpsErrorLogFingerprintsParamsResolution string
 
 // GetAdminOpsErrorTrendParams defines parameters for GetAdminOpsErrorTrend.
 type GetAdminOpsErrorTrendParams struct {
@@ -20577,6 +20722,9 @@ type ServerInterface interface {
 	// List operator-facing upstream error logs.
 	// (GET /api/v1/admin/ops/error-logs)
 	ListAdminOpsErrorLogs(w http.ResponseWriter, r *http.Request, params ListAdminOpsErrorLogsParams)
+	// List grouped upstream error fingerprints.
+	// (GET /api/v1/admin/ops/error-logs/fingerprints)
+	ListAdminOpsErrorLogFingerprints(w http.ResponseWriter, r *http.Request, params ListAdminOpsErrorLogFingerprintsParams)
 	// Get one operator-facing upstream error log.
 	// (GET /api/v1/admin/ops/error-logs/{id})
 	GetAdminOpsErrorLog(w http.ResponseWriter, r *http.Request, id Id)
@@ -27740,6 +27888,227 @@ func (siw *ServerInterfaceWrapper) ListAdminOpsErrorLogs(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminOpsErrorLogs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminOpsErrorLogFingerprints operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminOpsErrorLogFingerprints(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminOpsErrorLogFingerprintsParams
+
+	// ------------- Optional query parameter "user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "account_id", r.URL.Query(), &params.AccountId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "provider_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "provider_id", r.URL.Query(), &params.ProviderId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "provider_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "model" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "model", r.URL.Query(), &params.Model, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "model"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error_class" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_class", r.URL.Query(), &params.ErrorClass, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_class"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_class", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error_phase" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_phase", r.URL.Query(), &params.ErrorPhase, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_phase"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_phase", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error_owner" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_owner", r.URL.Query(), &params.ErrorOwner, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_owner"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_owner", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "platform" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "platform", r.URL.Query(), &params.Platform, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "platform"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "platform", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resolution" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resolution", r.URL.Query(), &params.Resolution, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resolution"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resolution", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status_min" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status_min", r.URL.Query(), &params.StatusMin, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status_min"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status_min", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status_max" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status_max", r.URL.Query(), &params.StatusMax, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status_max"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status_max", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminOpsErrorLogFingerprints(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -36854,6 +37223,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/concurrency", wrapper.GetAdminOpsConcurrency)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-distribution", wrapper.GetAdminOpsErrorDistribution)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-logs", wrapper.ListAdminOpsErrorLogs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-logs/fingerprints", wrapper.ListAdminOpsErrorLogFingerprints)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-logs/{id}", wrapper.GetAdminOpsErrorLog)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/ops/error-logs/{id}", wrapper.UpdateAdminOpsErrorLogResolution)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-trend", wrapper.GetAdminOpsErrorTrend)

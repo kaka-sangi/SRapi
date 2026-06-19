@@ -260,6 +260,51 @@ func (s *Server) handleListAdminOpsErrorLogs(w http.ResponseWriter, r *http.Requ
 	_, _ = w.Write(encoded)
 }
 
+// handleListAdminOpsErrorLogFingerprints serves
+// GET /api/v1/admin/ops/error-logs/fingerprints.
+func (s *Server) handleListAdminOpsErrorLogFingerprints(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeJSONString(w, http.StatusForbidden, `{"error":{"code":"FORBIDDEN","message":"admin access required"},"request_id":"`+requestID+`"}`)
+		return
+	}
+	if s.runtime == nil || s.runtime.opsErrorLogs == nil {
+		writeJSONString(w, http.StatusServiceUnavailable, `{"error":{"code":"UNAVAILABLE","message":"ops error logs unavailable"},"request_id":"`+requestID+`"}`)
+		return
+	}
+	filter, err := opsErrorLogListFilterFromRequest(r)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.VALIDATIONFAILED, err.Error(), requestID)
+		return
+	}
+	limit, err := parseOpsErrorLogFingerprintLimit(r)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.VALIDATIONFAILED, err.Error(), requestID)
+		return
+	}
+	res, err := s.runtime.opsErrorLogs.ListFingerprints(r.Context(), opserrorlogscontract.FingerprintFilter{
+		ListFilter: filter,
+		Limit:      limit,
+	})
+	if err != nil {
+		writeJSONString(w, http.StatusInternalServerError, `{"error":{"code":"INTERNAL_ERROR","message":"failed to list ops error log fingerprints"},"request_id":"`+requestID+`"}`)
+		return
+	}
+	payload := map[string]any{
+		"data":       opsErrorLogFingerprintsToDTOs(res.Items),
+		"meta":       opsErrorLogFingerprintMetaToDTO(res),
+		"request_id": requestID,
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		writeJSONString(w, http.StatusInternalServerError, `{"error":{"code":"INTERNAL_ERROR","message":"encode failed"},"request_id":"`+requestID+`"}`)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(encoded)
+}
+
 func opsErrorLogListFilterFromRequest(r *http.Request) (opserrorlogscontract.ListFilter, error) {
 	q := r.URL.Query()
 	filter := opserrorlogscontract.ListFilter{
@@ -468,6 +513,21 @@ func parseOpsErrorLogsPagination(r *http.Request) (page, pageSize int, err error
 	return page, pageSize, nil
 }
 
+func parseOpsErrorLogFingerprintLimit(r *http.Request) (int, error) {
+	value := strings.TrimSpace(r.URL.Query().Get("limit"))
+	if value == "" {
+		return 0, nil
+	}
+	limit, err := strconv.Atoi(value)
+	if err != nil || limit <= 0 {
+		return 0, errors.New("invalid limit")
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	return limit, nil
+}
+
 func opsErrorLogsToDTOs(items []opserrorlogscontract.Entry) []map[string]any {
 	out := make([]map[string]any, 0, len(items))
 	for _, item := range items {
@@ -526,6 +586,62 @@ func opsErrorLogToDTO(entry opserrorlogscontract.Entry) map[string]any {
 	}
 	if entry.ResolvedByID != nil {
 		dto["resolved_by_user_id"] = strconv.Itoa(*entry.ResolvedByID)
+	}
+	return dto
+}
+
+func opsErrorLogFingerprintsToDTOs(items []opserrorlogscontract.FingerprintSummary) []map[string]any {
+	out := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, opsErrorLogFingerprintToDTO(item))
+	}
+	return out
+}
+
+func opsErrorLogFingerprintToDTO(item opserrorlogscontract.FingerprintSummary) map[string]any {
+	dto := map[string]any{
+		"fingerprint":           item.Fingerprint,
+		"count":                 item.Count,
+		"open_count":            item.OpenCount,
+		"investigating_count":   item.InvestigatingCount,
+		"resolved_count":        item.ResolvedCount,
+		"muted_count":           item.MutedCount,
+		"first_occurred_at":     item.FirstOccurredAt.Format(time.RFC3339Nano),
+		"last_occurred_at":      item.LastOccurredAt.Format(time.RFC3339Nano),
+		"source_endpoint":       item.SourceEndpoint,
+		"target_protocol":       item.TargetProtocol,
+		"model":                 item.Model,
+		"status_class":          item.StatusClass,
+		"error_class":           item.ErrorClass,
+		"error_phase":           item.ErrorPhase,
+		"error_owner":           item.ErrorOwner,
+		"error_source":          item.ErrorSource,
+		"message_pattern":       item.MessagePattern,
+		"example_error_message": item.ExampleErrorMessage,
+	}
+	if item.ExampleEntryID > 0 {
+		dto["example_error_log_id"] = strconv.FormatInt(item.ExampleEntryID, 10)
+	}
+	if item.ExampleRequestID != "" {
+		dto["example_request_id"] = item.ExampleRequestID
+	}
+	if item.StatusCode != nil {
+		dto["status_code"] = *item.StatusCode
+	}
+	return dto
+}
+
+func opsErrorLogFingerprintMetaToDTO(res opserrorlogscontract.FingerprintResult) map[string]any {
+	dto := map[string]any{
+		"total":     res.Total,
+		"scanned":   res.Scanned,
+		"truncated": res.Truncated,
+	}
+	if res.WindowStart != nil {
+		dto["window_start"] = res.WindowStart.Format(time.RFC3339Nano)
+	}
+	if res.WindowEnd != nil {
+		dto["window_end"] = res.WindowEnd.Format(time.RFC3339Nano)
 	}
 	return dto
 }

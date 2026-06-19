@@ -9726,6 +9726,120 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/ops/error-logs/fingerprints:
+    get:
+      tags:
+        - AdminOps
+      operationId: listAdminOpsErrorLogFingerprints
+      summary: List grouped upstream error fingerprints.
+      description: |
+        Returns a bounded real-time aggregation over recent ops_error_logs rows
+        so operators can triage recurring gateway failures by stable,
+        low-sensitivity dimensions. The fingerprint key never includes request
+        ids, API key ids, user ids, account ids, body excerpts, prompts, or
+        credentials.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: account_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: provider_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: model
+          in: query
+          schema:
+            type: string
+        - name: error_class
+          in: query
+          schema:
+            type: string
+        - name: error_phase
+          in: query
+          description: Filter by gateway error phase, for example routing or upstream.
+          schema:
+            type: string
+        - name: error_owner
+          in: query
+          description: Filter by responsibility bucket, for example provider or scheduler.
+          schema:
+            type: string
+        - name: platform
+          in: query
+          schema:
+            type: string
+        - name: resolution
+          in: query
+          description: Filter by operator-supplied resolution status.
+          schema:
+            type: string
+            enum: [open, investigating, resolved, muted]
+        - name: status_min
+          in: query
+          schema:
+            type: integer
+            minimum: 100
+            maximum: 599
+        - name: status_max
+          in: query
+          schema:
+            type: integer
+            minimum: 100
+            maximum: 599
+        - name: start
+          in: query
+          description: Inclusive start of the aggregation window. Defaults to 24 hours before end.
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          description: Inclusive end of the aggregation window. Defaults to now.
+          schema:
+            type: string
+            format: date-time
+        - name: q
+          in: query
+          description: Case-insensitive search across request ids, model, endpoint, class, phase, message, and body excerpt before grouping.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum fingerprint groups to return. Defaults to 20 and caps at 100.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Grouped upstream error fingerprints.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsErrorFingerprintListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/ops/request-evidence:
     get:
       tags:
@@ -24358,6 +24472,127 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/OpsErrorLog"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsErrorFingerprint:
+      type: object
+      description: |
+        Real-time grouping of ops_error_logs rows by stable, low-sensitivity
+        failure dimensions. It is intended for operator triage and is not a
+        durable long-term rollup.
+      required:
+        - fingerprint
+        - count
+        - open_count
+        - investigating_count
+        - resolved_count
+        - muted_count
+        - first_occurred_at
+        - last_occurred_at
+        - source_endpoint
+        - target_protocol
+        - model
+        - status_class
+        - error_class
+        - error_phase
+        - error_owner
+        - error_source
+        - message_pattern
+      properties:
+        fingerprint:
+          type: string
+          description: Stable hash over low-sensitivity grouping dimensions.
+        count:
+          type: integer
+          minimum: 0
+        open_count:
+          type: integer
+          minimum: 0
+        investigating_count:
+          type: integer
+          minimum: 0
+        resolved_count:
+          type: integer
+          minimum: 0
+        muted_count:
+          type: integer
+          minimum: 0
+        first_occurred_at:
+          type: string
+          format: date-time
+        last_occurred_at:
+          type: string
+          format: date-time
+        example_error_log_id:
+          $ref: "#/components/schemas/Id"
+        example_request_id:
+          type: string
+        example_error_message:
+          type: string
+        source_endpoint:
+          type: string
+        target_protocol:
+          type: string
+        model:
+          type: string
+        status_code:
+          type: integer
+          minimum: 100
+          maximum: 599
+        status_class:
+          type: string
+          enum: [1xx, 2xx, 3xx, 4xx, 5xx, unknown]
+        error_class:
+          type: string
+        error_phase:
+          type: string
+        error_owner:
+          type: string
+        error_source:
+          type: string
+        message_pattern:
+          type: string
+          description: Normalized error message with request ids, URLs, hashes, and numbers replaced.
+
+    OpsErrorFingerprintListMeta:
+      type: object
+      required:
+        - total
+        - scanned
+        - truncated
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: Number of discovered fingerprint groups before the response limit is applied. When truncated is true, this only covers scanned rows.
+        scanned:
+          type: integer
+          minimum: 0
+          description: Number of ops_error_logs rows scanned for this real-time summary.
+        truncated:
+          type: boolean
+          description: True when matching rows exceeded the bounded live scan cap.
+        window_start:
+          type: string
+          format: date-time
+        window_end:
+          type: string
+          format: date-time
+
+    OpsErrorFingerprintListResponse:
+      type: object
+      required:
+        - data
+        - meta
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsErrorFingerprint"
+        meta:
+          $ref: "#/components/schemas/OpsErrorFingerprintListMeta"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

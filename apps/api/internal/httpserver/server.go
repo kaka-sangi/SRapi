@@ -638,6 +638,7 @@ func newWithServer(cfg config.Config, logger *slog.Logger, options ...Option) (h
 	mux.HandleFunc("GET /api/v1/admin/error-logs/{id}", server.handleGetAdminErrorLog)
 	mux.HandleFunc("PATCH /api/v1/admin/error-logs/{id}/resolve", server.handleResolveAdminErrorLog)
 	mux.HandleFunc("GET /api/v1/admin/ops/error-logs", server.handleListAdminOpsErrorLogs)
+	mux.HandleFunc("GET /api/v1/admin/ops/error-logs/fingerprints", server.handleListAdminOpsErrorLogFingerprints)
 	mux.HandleFunc("GET /api/v1/admin/ops/request-evidence", server.handleListAdminOpsRequestEvidence)
 	mux.HandleFunc("GET /api/v1/admin/ops/request-evidence/{request_id}", server.handleGetAdminOpsRequestEvidence)
 	mux.HandleFunc("GET /api/v1/admin/ops/error-logs/{id}", server.handleGetAdminOpsErrorLog)

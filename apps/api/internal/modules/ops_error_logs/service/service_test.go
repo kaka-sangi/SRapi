@@ -169,6 +169,171 @@ func TestList_RejectsInvalidFiltersAtServiceBoundary(t *testing.T) {
 	}
 }
 
+func TestListFingerprints_GroupsVariableMessagesAndTracksResolution(t *testing.T) {
+	svc := newTestService(t)
+	statusBadGateway := 502
+	statusRateLimit := 429
+	base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	records := []contract.RecordRequest{{
+		OccurredAt:     base.Add(-time.Minute),
+		RequestID:      "req_gateway_first",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "codex-mini",
+		StatusCode:     &statusBadGateway,
+		ErrorClass:     "server_bad",
+		ErrorPhase:     "upstream",
+		ErrorOwner:     "provider",
+		ErrorSource:    "upstream_http",
+		ErrorMessage:   "Provider returned 502 for request req_gateway_first after 123ms at https://upstream.example/v1/responses",
+	}, {
+		OccurredAt:     base,
+		RequestID:      "req_gateway_second",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "codex-mini",
+		StatusCode:     &statusBadGateway,
+		ErrorClass:     "server_bad",
+		ErrorPhase:     "upstream",
+		ErrorOwner:     "provider",
+		ErrorSource:    "upstream_http",
+		ErrorMessage:   "Provider returned 503 for request req_gateway_second after 456ms at https://upstream.example/v1/chat",
+	}, {
+		OccurredAt:     base.Add(-2 * time.Minute),
+		RequestID:      "req_rate_limit",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "codex-mini",
+		StatusCode:     &statusRateLimit,
+		ErrorClass:     "rate_limit",
+		ErrorPhase:     "upstream",
+		ErrorOwner:     "provider",
+		ErrorSource:    "upstream_http",
+		ErrorMessage:   "Provider returned 429",
+	}}
+	for _, rec := range records {
+		if err := svc.RecordError(context.Background(), rec); err != nil {
+			t.Fatalf("RecordError: %v", err)
+		}
+	}
+	list, err := svc.List(context.Background(), contract.ListFilter{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	for _, entry := range list.Items {
+		if entry.RequestID == "req_gateway_first" {
+			if _, err := svc.UpdateResolution(context.Background(), contract.UpdateResolutionRequest{
+				ID:         entry.ID,
+				Resolution: contract.ResolutionInvestigating,
+			}); err != nil {
+				t.Fatalf("mark investigating: %v", err)
+			}
+		}
+	}
+
+	summary, err := svc.ListFingerprints(context.Background(), contract.FingerprintFilter{
+		ListFilter: contract.ListFilter{
+			From: ptrTime(base.Add(-time.Hour)),
+			To:   ptrTime(base.Add(time.Hour)),
+		},
+		Limit: 10,
+	})
+	if err != nil {
+		t.Fatalf("ListFingerprints: %v", err)
+	}
+	if summary.Total != 2 || len(summary.Items) != 2 || summary.Scanned != 3 || summary.Truncated {
+		t.Fatalf("unexpected fingerprint summary: %+v", summary)
+	}
+	group := summary.Items[0]
+	if group.Count != 2 || group.OpenCount != 1 || group.InvestigatingCount != 1 {
+		t.Fatalf("expected grouped gateway errors with resolution counts, got %+v", group)
+	}
+	if group.StatusClass != "5xx" || group.StatusCode == nil || *group.StatusCode != statusBadGateway {
+		t.Fatalf("unexpected status summary: %+v", group)
+	}
+	for _, leaked := range []string{"req_gateway_first", "req_gateway_second", "123", "456", "upstream.example"} {
+		if strings.Contains(group.MessagePattern, leaked) || strings.Contains(group.Fingerprint, leaked) {
+			t.Fatalf("fingerprint leaked variable value %q in %+v", leaked, group)
+		}
+	}
+	if group.MessagePattern != "provider returned {n} for request {request} after {n}ms at {url}" {
+		t.Fatalf("unexpected message pattern: %q", group.MessagePattern)
+	}
+	if group.ExampleRequestID != "req_gateway_second" || group.LastOccurredAt != base {
+		t.Fatalf("expected latest row as example, got %+v", group)
+	}
+}
+
+func TestListFingerprints_DefaultWindowLimitAndTruncation(t *testing.T) {
+	store := memory.New()
+	clock := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	svc, err := New(store, func() time.Time { return clock })
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	status := 502
+	if err := svc.RecordError(context.Background(), contract.RecordRequest{
+		OccurredAt:     clock.Add(-2 * time.Hour),
+		RequestID:      "req_recent",
+		StatusCode:     &status,
+		ErrorClass:     "server_bad",
+		ErrorMessage:   "recent failure",
+		SourceEndpoint: "/v1/responses",
+	}); err != nil {
+		t.Fatalf("RecordError recent: %v", err)
+	}
+	if err := svc.RecordError(context.Background(), contract.RecordRequest{
+		OccurredAt:     clock.Add(-48 * time.Hour),
+		RequestID:      "req_old",
+		StatusCode:     &status,
+		ErrorClass:     "server_bad",
+		ErrorMessage:   "old failure",
+		SourceEndpoint: "/v1/responses",
+	}); err != nil {
+		t.Fatalf("RecordError old: %v", err)
+	}
+
+	summary, err := svc.ListFingerprints(context.Background(), contract.FingerprintFilter{})
+	if err != nil {
+		t.Fatalf("ListFingerprints: %v", err)
+	}
+	if summary.Total != 1 || len(summary.Items) != 1 || summary.Items[0].ExampleRequestID != "req_recent" {
+		t.Fatalf("expected default 24h window to exclude old row, got %+v", summary)
+	}
+	if summary.WindowStart == nil || summary.WindowEnd == nil || !summary.WindowStart.Equal(clock.Add(-DefaultFingerprintWindow)) || !summary.WindowEnd.Equal(clock) {
+		t.Fatalf("unexpected default window: start=%v end=%v", summary.WindowStart, summary.WindowEnd)
+	}
+
+	for i := 0; i < MaxFingerprintScanRows+1; i++ {
+		if _, err := store.Insert(context.Background(), contract.Entry{
+			OccurredAt:     clock.Add(time.Duration(i+1) * time.Millisecond),
+			RequestID:      "req_scan",
+			SourceEndpoint: "/v1/chat/completions",
+			ErrorClass:     "server_bad",
+			ErrorMessage:   "scan capped",
+			StatusCode:     &status,
+			Resolution:     contract.ResolutionOpen,
+		}); err != nil {
+			t.Fatalf("insert scan row %d: %v", i, err)
+		}
+	}
+	allStart := clock.Add(-time.Hour)
+	allEnd := clock.Add(time.Hour)
+	summary, err = svc.ListFingerprints(context.Background(), contract.FingerprintFilter{
+		ListFilter: contract.ListFilter{From: &allStart, To: &allEnd},
+		Limit:      MaxFingerprintLimit + 1,
+	})
+	if err != nil {
+		t.Fatalf("ListFingerprints capped scan: %v", err)
+	}
+	if summary.Scanned != MaxFingerprintScanRows || !summary.Truncated {
+		t.Fatalf("expected truncated capped scan, got scanned=%d truncated=%v", summary.Scanned, summary.Truncated)
+	}
+	if len(summary.Items) > MaxFingerprintLimit {
+		t.Fatalf("limit was not capped: %d", len(summary.Items))
+	}
+}
+
 func TestUpdateResolution_RedactsNoteAndValidatesResolverID(t *testing.T) {
 	svc := newTestService(t)
 	status := 502
@@ -209,6 +374,10 @@ func TestUpdateResolution_RedactsNoteAndValidatesResolverID(t *testing.T) {
 	}); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("UpdateResolution invalid resolver = %v, want ErrInvalidInput", err)
 	}
+}
+
+func ptrTime(value time.Time) *time.Time {
+	return &value
 }
 
 func TestRecordError_SanitizesIndexedFields(t *testing.T) {
