@@ -356,6 +356,7 @@ readLoop:
 			OutputTokens:        usageAcc.usage.OutputTokens,
 			CachedTokens:        usageAcc.usage.CacheReadInputTokens,
 			CacheCreationTokens: usageAcc.usage.CacheCreationInputTokens,
+			Observed:            true,
 			Estimated:           false,
 		}
 		usageEstimated = false

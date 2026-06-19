@@ -1778,6 +1778,7 @@ func gatewayUsageFromProviderUsage(usage provideradaptercontract.Usage) gatewayc
 		CacheCreationTokens:   usage.CacheCreationTokens,
 		CacheCreation5mTokens: usage.CacheCreation5mTokens,
 		CacheCreation1hTokens: usage.CacheCreation1hTokens,
+		Observed:              usage.Observed,
 		Estimated:             usage.Estimated,
 	}
 }
@@ -1787,6 +1788,7 @@ func gatewayUsageFromEmbeddingProvider(resp provideradaptercontract.EmbeddingRes
 		InputTokens:  resp.Usage.InputTokens,
 		OutputTokens: resp.Usage.OutputTokens,
 		CachedTokens: resp.Usage.CachedTokens,
+		Observed:     resp.Usage.Observed,
 		Estimated:    resp.Usage.Estimated,
 	}
 }
@@ -1797,6 +1799,7 @@ func gatewayUsageFromImageProvider(resp provideradaptercontract.ImageGenerationR
 		OutputTokens:      resp.Usage.OutputTokens,
 		ImageOutputTokens: resp.Usage.ImageOutputTokens,
 		CachedTokens:      resp.Usage.CachedTokens,
+		Observed:          resp.Usage.Observed,
 		Estimated:         resp.Usage.Estimated,
 	}
 }
@@ -1806,6 +1809,7 @@ func gatewayUsageFromAudioTranscriptionProvider(resp provideradaptercontract.Aud
 		InputTokens:  resp.Usage.InputTokens,
 		OutputTokens: resp.Usage.OutputTokens,
 		CachedTokens: resp.Usage.CachedTokens,
+		Observed:     resp.Usage.Observed,
 		Estimated:    resp.Usage.Estimated,
 	}
 }
@@ -1815,6 +1819,7 @@ func gatewayUsageFromAudioSpeechProvider(resp provideradaptercontract.AudioSpeec
 		InputTokens:  resp.Usage.InputTokens,
 		OutputTokens: resp.Usage.OutputTokens,
 		CachedTokens: resp.Usage.CachedTokens,
+		Observed:     resp.Usage.Observed,
 		Estimated:    resp.Usage.Estimated,
 	}
 }
@@ -1824,6 +1829,7 @@ func gatewayUsageFromModerationProvider(resp provideradaptercontract.ModerationR
 		InputTokens:  resp.Usage.InputTokens,
 		OutputTokens: resp.Usage.OutputTokens,
 		CachedTokens: resp.Usage.CachedTokens,
+		Observed:     resp.Usage.Observed,
 		Estimated:    resp.Usage.Estimated,
 	}
 }
@@ -1833,6 +1839,7 @@ func gatewayUsageFromRerankProvider(resp provideradaptercontract.RerankResponse)
 		InputTokens:  resp.Usage.InputTokens,
 		OutputTokens: resp.Usage.OutputTokens,
 		CachedTokens: resp.Usage.CachedTokens,
+		Observed:     resp.Usage.Observed,
 		Estimated:    resp.Usage.Estimated,
 	}
 }

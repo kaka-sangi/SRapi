@@ -800,7 +800,7 @@ func (u openAIUsage) ToUsage(text string) contract.Usage {
 	if output < reasoningOutput {
 		output = reasoningOutput
 	}
-	if input == 0 && output == 0 && cached == 0 && imageOutput == 0 && reasoningOutput == 0 && cacheCreation == 0 {
+	if input == 0 && output == 0 && cached == 0 && imageOutput == 0 && reasoningOutput == 0 && cacheCreation == 0 && !u.HasTokenUsage() {
 		return estimatedUsage(text)
 	}
 	return contract.Usage{
@@ -811,6 +811,7 @@ func (u openAIUsage) ToUsage(text string) contract.Usage {
 		CacheCreationTokens:   cacheCreation,
 		CacheCreation5mTokens: cacheCreation5m,
 		CacheCreation1hTokens: cacheCreation1h,
+		Observed:              true,
 		Estimated:             false,
 	}
 }

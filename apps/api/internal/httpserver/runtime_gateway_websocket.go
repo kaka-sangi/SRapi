@@ -1058,6 +1058,7 @@ func responsesWebSocketUsage(payload []byte) (gatewaycontract.Usage, bool) {
 		CacheCreationTokens:   cacheCreationTokens,
 		CacheCreation5mTokens: cacheCreation5m,
 		CacheCreation1hTokens: cacheCreation1h,
+		Observed:              true,
 	}, true
 }
 

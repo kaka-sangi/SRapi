@@ -51,7 +51,7 @@ func (u anthropicUsage) ToUsage(text string) contract.Usage {
 	if cacheCreation == 0 {
 		cacheCreation = cacheCreation5m + cacheCreation1h
 	}
-	if input == 0 && output == 0 && cacheRead == 0 && cacheCreation == 0 {
+	if input == 0 && output == 0 && cacheRead == 0 && cacheCreation == 0 && !u.HasTokenUsage() {
 		return estimatedUsage(text)
 	}
 	return contract.Usage{
@@ -61,6 +61,7 @@ func (u anthropicUsage) ToUsage(text string) contract.Usage {
 		CacheCreationTokens:   cacheCreation,
 		CacheCreation5mTokens: cacheCreation5m,
 		CacheCreation1hTokens: cacheCreation1h,
+		Observed:              true,
 		Estimated:             false,
 	}
 }
@@ -109,4 +110,15 @@ func (u *anthropicUsage) Merge(next anthropicUsage) {
 	if next.CacheCreation != nil {
 		u.CacheCreation = next.CacheCreation
 	}
+}
+
+func (u anthropicUsage) HasTokenUsage() bool {
+	return u.InputTokens != nil ||
+		u.OutputTokens != nil ||
+		u.CacheCreationInputTokens != nil ||
+		u.CacheReadInputTokens != nil ||
+		u.CachedTokens != nil ||
+		u.CacheCreation5mInputTokens != nil ||
+		u.CacheCreation1hInputTokens != nil ||
+		(u.CacheCreation != nil && (u.CacheCreation.Ephemeral5mInputTokens != nil || u.CacheCreation.Ephemeral1hInputTokens != nil))
 }

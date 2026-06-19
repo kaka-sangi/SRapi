@@ -474,7 +474,7 @@ func (s *Service) BuildCanonicalConversationResponse(req gatewaycontract.Canonic
 	}
 	outputItems = normalizeOutputItems(outputItems)
 	text := outputTextFromBlocks(outputItems)
-	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0 {
+	if shouldEstimateUsage(usage) {
 		usage = estimateUsage(text)
 	}
 	warnings = append(append([]string(nil), req.CompatibilityWarnings...), warnings...)
@@ -513,7 +513,7 @@ func (s *Service) BuildCanonicalEmbeddingResponse(req gatewaycontract.CanonicalR
 	if canonicalModel == "" {
 		canonicalModel = model
 	}
-	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0 {
+	if shouldEstimateUsage(usage) {
 		usage = embeddingEstimatedUsage(req.EmbeddingInput)
 	}
 	return gatewaycontract.EmbeddingResponse{
@@ -539,7 +539,7 @@ func (s *Service) BuildCanonicalImageGenerationResponse(req gatewaycontract.Cano
 	if created == 0 {
 		created = time.Now().Unix()
 	}
-	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0 {
+	if shouldEstimateUsage(usage) {
 		usage = imageEstimatedUsage(req)
 	}
 	return gatewaycontract.ImageGenerationResponse{
@@ -600,7 +600,7 @@ func (s *Service) BuildCanonicalModerationResponse(req gatewaycontract.Canonical
 	if id == "" {
 		id = "modr_" + randomHexString(12)
 	}
-	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0 {
+	if shouldEstimateUsage(usage) {
 		usage = moderationEstimatedUsage(req.ModerationInput)
 	}
 	return gatewaycontract.ModerationResponse{
@@ -627,7 +627,7 @@ func (s *Service) BuildCanonicalAudioTranscriptionResponse(req gatewaycontract.C
 	if id == "" {
 		id = "transcription_" + randomHexString(12)
 	}
-	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0 {
+	if shouldEstimateUsage(usage) {
 		usage = audioTranscriptionEstimatedUsage(req)
 	}
 	return gatewaycontract.AudioTranscriptionResponse{
@@ -658,7 +658,7 @@ func (s *Service) BuildCanonicalRerankResponse(req gatewaycontract.CanonicalRequ
 	if id == "" {
 		id = "rerank_" + randomHexString(12)
 	}
-	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0 {
+	if shouldEstimateUsage(usage) {
 		usage = rerankEstimatedUsage(req.RerankQuery, req.RerankDocuments)
 	}
 	return gatewaycontract.RerankResponse{
@@ -1894,6 +1894,18 @@ func estimateUsage(text string) gatewaycontract.Usage {
 		OutputTokens: tokens / 2,
 		Estimated:    true,
 	}
+}
+
+func shouldEstimateUsage(usage gatewaycontract.Usage) bool {
+	return !usage.Observed &&
+		!usage.Estimated &&
+		usage.InputTokens == 0 &&
+		usage.OutputTokens == 0 &&
+		usage.ImageOutputTokens == 0 &&
+		usage.CachedTokens == 0 &&
+		usage.CacheCreationTokens == 0 &&
+		usage.CacheCreation5mTokens == 0 &&
+		usage.CacheCreation1hTokens == 0
 }
 
 func tokenUsage(usage gatewaycontract.Usage) *apiopenapi.TokenUsage {

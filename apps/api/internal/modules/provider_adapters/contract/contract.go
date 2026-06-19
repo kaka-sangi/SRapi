@@ -155,7 +155,11 @@ type Usage struct {
 	// CacheCreationTokens remains the total for compatibility.
 	CacheCreation5mTokens int
 	CacheCreation1hTokens int
-	Estimated             bool
+	// Observed is true when the upstream response explicitly reported usage,
+	// even if every reported token count is zero. It lets gateway layers
+	// distinguish real zero usage from missing usage that should be estimated.
+	Observed  bool
+	Estimated bool
 }
 
 type EmbeddingRequest struct {

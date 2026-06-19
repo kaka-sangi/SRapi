@@ -208,7 +208,7 @@ func rerankUsage(usage openAIUsage, billedUnits *struct {
 		return out
 	}
 	if billedUnits != nil && billedUnits.SearchUnits != nil && *billedUnits.SearchUnits > 0 {
-		return contract.Usage{InputTokens: *billedUnits.SearchUnits, Estimated: false}
+		return contract.Usage{InputTokens: *billedUnits.SearchUnits, Observed: true, Estimated: false}
 	}
 	return estimatedRerankUsage(req)
 }

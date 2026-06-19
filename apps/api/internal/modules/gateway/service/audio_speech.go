@@ -63,7 +63,7 @@ func (s *Service) BuildCanonicalAudioSpeechResponse(req gatewaycontract.Canonica
 	if id == "" {
 		id = "speech_" + randomHexString(12)
 	}
-	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0 {
+	if shouldEstimateUsage(usage) {
 		usage = audioSpeechEstimatedUsage(req)
 	}
 	return gatewaycontract.AudioSpeechResponse{

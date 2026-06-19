@@ -154,7 +154,11 @@ type Usage struct {
 	CacheCreationTokens   int // cache-write tokens (billed at the cache-write rate)
 	CacheCreation5mTokens int
 	CacheCreation1hTokens int
-	Estimated             bool
+	// Observed is true when the upstream response explicitly reported usage,
+	// even if every reported token count is zero. It prevents response builders
+	// from replacing real upstream zero usage with local estimates.
+	Observed  bool
+	Estimated bool
 }
 
 // StreamEvent captures canonical stream deltas so protocol renderers do not

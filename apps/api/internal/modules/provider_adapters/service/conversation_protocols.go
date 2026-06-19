@@ -704,13 +704,14 @@ func (u geminiUsageMetadata) ToUsage(text string) contract.Usage {
 	if total > 0 && output == 0 {
 		output = max(0, total-input-cached)
 	}
-	if input == 0 && output == 0 && cached == 0 {
+	if input == 0 && output == 0 && cached == 0 && !u.HasTokenUsage() {
 		return estimatedUsage(text)
 	}
 	return contract.Usage{
 		InputTokens:  input,
 		OutputTokens: output,
 		CachedTokens: cached,
+		Observed:     true,
 		Estimated:    false,
 	}
 }

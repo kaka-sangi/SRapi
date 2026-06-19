@@ -100,6 +100,24 @@ func TestAnthropicUsagePrefersCacheReadInputTokensOverCachedTokens(t *testing.T)
 	}
 }
 
+func TestAnthropicUsagePreservesExplicitZeroTokens(t *testing.T) {
+	zero := 0
+	usage := anthropicUsage{
+		InputTokens:  &zero,
+		OutputTokens: &zero,
+	}.ToUsage("anthropic response")
+
+	if usage.Estimated {
+		t.Fatal("usage should not be estimated when Anthropic explicitly reports zero tokens")
+	}
+	if !usage.Observed {
+		t.Fatal("usage should be marked observed when Anthropic usage is present")
+	}
+	if usage.InputTokens != 0 || usage.OutputTokens != 0 || usage.CachedTokens != 0 || usage.CacheCreationTokens != 0 {
+		t.Fatalf("unexpected explicit zero anthropic usage: %+v", usage)
+	}
+}
+
 func TestOpenAIUsageHasNoCacheCreation(t *testing.T) {
 	prompt := 100
 	completion := 40
@@ -118,6 +136,25 @@ func TestOpenAIUsageHasNoCacheCreation(t *testing.T) {
 	}
 	if usage.CacheCreationTokens != 0 {
 		t.Fatalf("cache-creation tokens = %d, want 0 (OpenAI has no cache writes)", usage.CacheCreationTokens)
+	}
+}
+
+func TestOpenAIUsagePreservesExplicitZeroTokens(t *testing.T) {
+	zero := 0
+	usage := openAIUsage{
+		PromptTokens:     &zero,
+		CompletionTokens: &zero,
+		TotalTokens:      &zero,
+	}.ToUsage("openai response")
+
+	if usage.Estimated {
+		t.Fatal("usage should not be estimated when OpenAI explicitly reports zero tokens")
+	}
+	if !usage.Observed {
+		t.Fatal("usage should be marked observed when OpenAI usage is present")
+	}
+	if usage.InputTokens != 0 || usage.OutputTokens != 0 || usage.CachedTokens != 0 || usage.CacheCreationTokens != 0 {
+		t.Fatalf("unexpected explicit zero OpenAI usage: %+v", usage)
 	}
 }
 
@@ -310,5 +347,24 @@ func TestGeminiUsageTreatsThoughtsOnlyAsRealUsage(t *testing.T) {
 	}
 	if usage.InputTokens != 0 || usage.OutputTokens != 50 || usage.CachedTokens != 0 {
 		t.Fatalf("unexpected thoughts-only gemini usage: %+v", usage)
+	}
+}
+
+func TestGeminiUsagePreservesExplicitZeroTokens(t *testing.T) {
+	zero := 0
+	usage := geminiUsageMetadata{
+		PromptTokenCount:     &zero,
+		CandidatesTokenCount: &zero,
+		TotalTokenCount:      &zero,
+	}.ToUsage("gemini response")
+
+	if usage.Estimated {
+		t.Fatal("usage should not be estimated when Gemini explicitly reports zero tokens")
+	}
+	if !usage.Observed {
+		t.Fatal("usage should be marked observed when Gemini usageMetadata is present")
+	}
+	if usage.InputTokens != 0 || usage.OutputTokens != 0 || usage.CachedTokens != 0 {
+		t.Fatalf("unexpected explicit zero gemini usage: %+v", usage)
 	}
 }
