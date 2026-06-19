@@ -438,7 +438,7 @@ make observability-rules-check
 
 1. 打开 AdminOps 告警事件页，按 `severity=critical`、`status=firing` 过滤，确认 firing 事件的 summary、started_at、details 和 UI 处置路径。
 2. 先进入错误日志指纹摘要，按 details 中的 `source_endpoint`、`model`、`error_class`、`error_phase`、`error_owner` 缩小范围，确认是否集中在同一 message pattern、status class/code 和 resolution 分布。
-3. 再打开该指纹的样例错误日志，确认 owner、upstream status、attempt_no、latency、upstream request id 和 stream completion state。
+3. 再打开该指纹的样例错误日志，确认 owner、upstream status、attempt_no、latency、upstream request id 和 `stream_completion_state`。
 4. 如果 details 带 `request_id`，继续打开请求证据和调度决策，核对 selected provider/account、reject reasons、score breakdown、fallback_from_decision_id 和 fallback_excluded 证据。
 5. 如果 details 带 provider/account scope，打开账号健康，确认 cooldown、circuit、quota remaining、RPM/TPM、proxy quality、needs_reauth 和最近 health probe 错误。
 6. 如果 critical 由 SLO burn-rate 触发，复核 long/short window、total/bad requests、burn rate、error budget consumed 和 SLO filter 是否符合真实事故范围；不要只因为单个低流量样本恢复就确认事故结束。

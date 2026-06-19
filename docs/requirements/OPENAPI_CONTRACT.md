@@ -679,7 +679,8 @@ prompts, credentials, cookies, or other high-cardinality secrets.
 `{data, request_id}` envelope for detail dialogs and incident links. The row
 includes structured operational evidence such as source/target protocol,
 attempt number, latency, estimated token counts, upstream request id,
-error owner/source, and bounded `upstream_errors` attempt history.
+low-cardinality `stream_completion_state`, error owner/source, and bounded
+`upstream_errors` attempt history.
 
 `PATCH /api/v1/admin/ops/error-logs/{id}` is a write route and must require
 `cookieAuth` plus `csrfHeader`. It accepts `resolution` (`open`,

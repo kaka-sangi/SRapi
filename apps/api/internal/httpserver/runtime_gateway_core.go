@@ -75,6 +75,10 @@ type gatewayUsageRecord struct {
 	// from the failing response headers (x-request-id / openai-request-id /
 	// x-codex-request-id). Empty when the upstream did not return one.
 	UpstreamRequestID string
+	// StreamCompletionState captures gateway stream terminal state in a
+	// low-cardinality form: completed, interrupted, idle_timeout, failed, or
+	// unknown. It must never carry provider-native frames or response bodies.
+	StreamCompletionState string
 	// ErrorPhase / ErrorOwner / ErrorSource classify the failure for the
 	// admin error-log panel. See runtime_gateway_failover.go for the
 	// taxonomy mapping helpers.

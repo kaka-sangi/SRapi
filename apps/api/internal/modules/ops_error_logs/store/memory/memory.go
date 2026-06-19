@@ -204,6 +204,7 @@ func entryMatchesQuery(entry contract.Entry, query string) bool {
 		entry.TargetProtocol,
 		entry.Model,
 		entry.UpstreamRequestID,
+		entry.StreamCompletionState,
 		entry.ErrorClass,
 		entry.ErrorPhase,
 		entry.ErrorOwner,

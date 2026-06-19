@@ -45,6 +45,8 @@ const (
 	FieldStatusCode = "status_code"
 	// FieldUpstreamRequestID holds the string denoting the upstream_request_id field in the database.
 	FieldUpstreamRequestID = "upstream_request_id"
+	// FieldStreamCompletionState holds the string denoting the stream_completion_state field in the database.
+	FieldStreamCompletionState = "stream_completion_state"
 	// FieldAttemptNo holds the string denoting the attempt_no field in the database.
 	FieldAttemptNo = "attempt_no"
 	// FieldLatencyMs holds the string denoting the latency_ms field in the database.
@@ -100,6 +102,7 @@ var Columns = []string{
 	FieldModel,
 	FieldStatusCode,
 	FieldUpstreamRequestID,
+	FieldStreamCompletionState,
 	FieldAttemptNo,
 	FieldLatencyMs,
 	FieldInputTokens,
@@ -151,6 +154,8 @@ var (
 	DefaultModel string
 	// DefaultUpstreamRequestID holds the default value on creation for the "upstream_request_id" field.
 	DefaultUpstreamRequestID string
+	// DefaultStreamCompletionState holds the default value on creation for the "stream_completion_state" field.
+	DefaultStreamCompletionState string
 	// DefaultAttemptNo holds the default value on creation for the "attempt_no" field.
 	DefaultAttemptNo int
 	// DefaultLatencyMs holds the default value on creation for the "latency_ms" field.
@@ -265,6 +270,11 @@ func ByStatusCode(opts ...sql.OrderTermOption) OrderOption {
 // ByUpstreamRequestID orders the results by the upstream_request_id field.
 func ByUpstreamRequestID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpstreamRequestID, opts...).ToFunc()
+}
+
+// ByStreamCompletionState orders the results by the stream_completion_state field.
+func ByStreamCompletionState(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStreamCompletionState, opts...).ToFunc()
 }
 
 // ByAttemptNo orders the results by the attempt_no field.

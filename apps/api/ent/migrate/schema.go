@@ -1326,6 +1326,7 @@ var (
 		{Name: "model", Type: field.TypeString, Default: ""},
 		{Name: "status_code", Type: field.TypeInt, Nullable: true},
 		{Name: "upstream_request_id", Type: field.TypeString, Default: ""},
+		{Name: "stream_completion_state", Type: field.TypeString, Default: ""},
 		{Name: "attempt_no", Type: field.TypeInt, Default: 1},
 		{Name: "latency_ms", Type: field.TypeInt, Default: 0},
 		{Name: "input_tokens", Type: field.TypeInt, Default: 0},
@@ -1357,12 +1358,12 @@ var (
 			{
 				Name:    "opserrorlog_resolution_occurred_at",
 				Unique:  false,
-				Columns: []*schema.Column{OpsErrorLogsColumns[29], OpsErrorLogsColumns[3]},
+				Columns: []*schema.Column{OpsErrorLogsColumns[30], OpsErrorLogsColumns[3]},
 			},
 			{
 				Name:    "opserrorlog_error_class_occurred_at",
 				Unique:  false,
-				Columns: []*schema.Column{OpsErrorLogsColumns[22], OpsErrorLogsColumns[3]},
+				Columns: []*schema.Column{OpsErrorLogsColumns[23], OpsErrorLogsColumns[3]},
 			},
 			{
 				Name:    "opserrorlog_platform_occurred_at",
@@ -1408,6 +1409,11 @@ var (
 				Name:    "opserrorlog_upstream_request_id",
 				Unique:  false,
 				Columns: []*schema.Column{OpsErrorLogsColumns[16]},
+			},
+			{
+				Name:    "opserrorlog_stream_completion_state_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsErrorLogsColumns[17], OpsErrorLogsColumns[3]},
 			},
 			{
 				Name:    "opserrorlog_request_id",

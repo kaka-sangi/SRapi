@@ -35520,6 +35520,7 @@ type OpsErrorLogMutation struct {
 	status_code                *int
 	addstatus_code             *int
 	upstream_request_id        *string
+	stream_completion_state    *string
 	attempt_no                 *int
 	addattempt_no              *int
 	latency_ms                 *int
@@ -36392,6 +36393,42 @@ func (m *OpsErrorLogMutation) ResetUpstreamRequestID() {
 	m.upstream_request_id = nil
 }
 
+// SetStreamCompletionState sets the "stream_completion_state" field.
+func (m *OpsErrorLogMutation) SetStreamCompletionState(s string) {
+	m.stream_completion_state = &s
+}
+
+// StreamCompletionState returns the value of the "stream_completion_state" field in the mutation.
+func (m *OpsErrorLogMutation) StreamCompletionState() (r string, exists bool) {
+	v := m.stream_completion_state
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStreamCompletionState returns the old "stream_completion_state" field's value of the OpsErrorLog entity.
+// If the OpsErrorLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OpsErrorLogMutation) OldStreamCompletionState(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStreamCompletionState is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStreamCompletionState requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStreamCompletionState: %w", err)
+	}
+	return oldValue.StreamCompletionState, nil
+}
+
+// ResetStreamCompletionState resets all changes to the "stream_completion_state" field.
+func (m *OpsErrorLogMutation) ResetStreamCompletionState() {
+	m.stream_completion_state = nil
+}
+
 // SetAttemptNo sets the "attempt_no" field.
 func (m *OpsErrorLogMutation) SetAttemptNo(i int) {
 	m.attempt_no = &i
@@ -37158,7 +37195,7 @@ func (m *OpsErrorLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OpsErrorLogMutation) Fields() []string {
-	fields := make([]string, 0, 32)
+	fields := make([]string, 0, 33)
 	if m.created_at != nil {
 		fields = append(fields, opserrorlog.FieldCreatedAt)
 	}
@@ -37206,6 +37243,9 @@ func (m *OpsErrorLogMutation) Fields() []string {
 	}
 	if m.upstream_request_id != nil {
 		fields = append(fields, opserrorlog.FieldUpstreamRequestID)
+	}
+	if m.stream_completion_state != nil {
+		fields = append(fields, opserrorlog.FieldStreamCompletionState)
 	}
 	if m.attempt_no != nil {
 		fields = append(fields, opserrorlog.FieldAttemptNo)
@@ -37295,6 +37335,8 @@ func (m *OpsErrorLogMutation) Field(name string) (ent.Value, bool) {
 		return m.StatusCode()
 	case opserrorlog.FieldUpstreamRequestID:
 		return m.UpstreamRequestID()
+	case opserrorlog.FieldStreamCompletionState:
+		return m.StreamCompletionState()
 	case opserrorlog.FieldAttemptNo:
 		return m.AttemptNo()
 	case opserrorlog.FieldLatencyMs:
@@ -37368,6 +37410,8 @@ func (m *OpsErrorLogMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldStatusCode(ctx)
 	case opserrorlog.FieldUpstreamRequestID:
 		return m.OldUpstreamRequestID(ctx)
+	case opserrorlog.FieldStreamCompletionState:
+		return m.OldStreamCompletionState(ctx)
 	case opserrorlog.FieldAttemptNo:
 		return m.OldAttemptNo(ctx)
 	case opserrorlog.FieldLatencyMs:
@@ -37520,6 +37564,13 @@ func (m *OpsErrorLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpstreamRequestID(v)
+		return nil
+	case opserrorlog.FieldStreamCompletionState:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStreamCompletionState(v)
 		return nil
 	case opserrorlog.FieldAttemptNo:
 		v, ok := value.(int)
@@ -37903,6 +37954,9 @@ func (m *OpsErrorLogMutation) ResetField(name string) error {
 		return nil
 	case opserrorlog.FieldUpstreamRequestID:
 		m.ResetUpstreamRequestID()
+		return nil
+	case opserrorlog.FieldStreamCompletionState:
+		m.ResetStreamCompletionState()
 		return nil
 	case opserrorlog.FieldAttemptNo:
 		m.ResetAttemptNo()

@@ -36,26 +36,27 @@ func (s *Server) recordOpsErrorLog(ctx context.Context, rec gatewayUsageRecord) 
 		return
 	}
 	req := opserrorlogscontract.RecordRequest{
-		OccurredAt:        time.Now().UTC(),
-		RequestID:         rec.RequestID,
-		TraceID:           traceIDFromContext(ctx),
-		Platform:          rec.SourceProtocol,
-		SourceEndpoint:    rec.SourceEndpoint,
-		TargetProtocol:    rec.TargetProtocol,
-		Model:             rec.Model,
-		ErrorClass:        errorClass,
-		ErrorPhase:        rec.ErrorPhase,
-		ErrorOwner:        rec.ErrorOwner,
-		ErrorSource:       rec.ErrorSource,
-		ErrorMessage:      rec.ProviderErrorMessage,
-		ErrorBodyExcerpt:  rec.ProviderErrorBodyExcerpt,
-		UpstreamRequestID: rec.UpstreamRequestID,
-		AttemptNo:         rec.AttemptNo,
-		LatencyMS:         rec.LatencyMS,
-		InputTokens:       rec.InputTokens,
-		OutputTokens:      rec.OutputTokens,
-		UsageEstimated:    rec.UsageEstimated,
-		UpstreamErrors:    opsErrorLogEventsFromGateway(rec.UpstreamErrors),
+		OccurredAt:            time.Now().UTC(),
+		RequestID:             rec.RequestID,
+		TraceID:               traceIDFromContext(ctx),
+		Platform:              rec.SourceProtocol,
+		SourceEndpoint:        rec.SourceEndpoint,
+		TargetProtocol:        rec.TargetProtocol,
+		Model:                 rec.Model,
+		StreamCompletionState: rec.StreamCompletionState,
+		ErrorClass:            errorClass,
+		ErrorPhase:            rec.ErrorPhase,
+		ErrorOwner:            rec.ErrorOwner,
+		ErrorSource:           rec.ErrorSource,
+		ErrorMessage:          rec.ProviderErrorMessage,
+		ErrorBodyExcerpt:      rec.ProviderErrorBodyExcerpt,
+		UpstreamRequestID:     rec.UpstreamRequestID,
+		AttemptNo:             rec.AttemptNo,
+		LatencyMS:             rec.LatencyMS,
+		InputTokens:           rec.InputTokens,
+		OutputTokens:          rec.OutputTokens,
+		UsageEstimated:        rec.UsageEstimated,
+		UpstreamErrors:        opsErrorLogEventsFromGateway(rec.UpstreamErrors),
 	}
 	if upstreamStatus > 0 {
 		code := upstreamStatus
@@ -197,15 +198,16 @@ func opsErrorLogIntValue(value *int) int {
 // opsErrorLogShouldRecord decides whether a gateway failure is
 // operator-actionable enough to persist in ops_error_logs. Any upstream HTTP
 // response in the 4xx-5xx range is recorded because operators need the
-// provider's exact rejection reason. Transport-level failures and scheduler
-// no-available-account decisions are also recorded. Pure client-side failures
-// with no operator action stay on usage_log rows only.
+// provider's exact rejection reason. Transport-level failures, stream
+// interruptions, and scheduler no-available-account decisions are also
+// recorded. Pure client-side failures with no operator action stay on
+// usage_log rows only.
 func opsErrorLogShouldRecord(class string, status int) bool {
 	if status >= 400 && status < 600 {
 		return true
 	}
 	switch class {
-	case "server_bad", "network_error", "no_available_account":
+	case "server_bad", "network_error", "no_available_account", "stream_interrupted", "stream_idle_timeout":
 		return true
 	}
 	return false
@@ -581,6 +583,9 @@ func opsErrorLogToDTO(entry opserrorlogscontract.Entry) map[string]any {
 	}
 	if entry.StatusCode != nil {
 		dto["status_code"] = *entry.StatusCode
+	}
+	if entry.StreamCompletionState != "" {
+		dto["stream_completion_state"] = entry.StreamCompletionState
 	}
 	if entry.ResolvedAt != nil {
 		dto["resolved_at"] = entry.ResolvedAt.Format(time.RFC3339Nano)

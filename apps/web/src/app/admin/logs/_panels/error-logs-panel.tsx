@@ -256,6 +256,11 @@ export function ErrorLogsPanel() {
               {e.error_owner}
             </span>
           ) : null}
+          {e.stream_completion_state ? (
+            <span className="bg-srapi-card-muted text-2xs text-srapi-text-tertiary rounded px-1.5 py-0.5 font-mono">
+              {e.stream_completion_state}
+            </span>
+          ) : null}
         </div>
       ),
     },

@@ -24600,6 +24600,13 @@ components:
           type: integer
         upstream_request_id:
           type: string
+        stream_completion_state:
+          type: string
+          enum: [completed, interrupted, idle_timeout, failed, unknown]
+          description: |
+            Low-cardinality terminal state for gateway streaming requests.
+            Empty when the request was not streamed or the state was not
+            observed; never contains provider-native frames or response bodies.
         attempt_no:
           type: integer
           minimum: 1

@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
     source_endpoint: "/v1/chat/completions",
     model: "gpt-4o-mini",
     status_code: 503,
+    stream_completion_state: "failed",
     latency_ms: 891,
     attempt_no: 1,
     input_tokens: 10,
@@ -78,6 +79,7 @@ const mocks = vi.hoisted(() => ({
     source_endpoint: "/v1/chat/completions",
     model: "gpt-4o-mini",
     status_code: 503,
+    stream_completion_state: "interrupted",
     latency_ms: 891,
     attempt_no: 2,
     input_tokens: 10,
@@ -274,6 +276,8 @@ describe("ErrorLogDetailDialog request dump evidence", () => {
       "/admin/accounts?view=health&f_providerId=3&f_accountId=12",
     );
     expect(screen.getByText("尝试证据")).toBeInTheDocument();
+    expect(screen.getByText("流终止状态")).toBeInTheDocument();
+    expect(screen.getByText("interrupted")).toBeInTheDocument();
     expect(screen.getByText("real upstream detail")).toBeInTheDocument();
     expect(screen.getAllByText("overloaded_error").length).toBeGreaterThan(0);
     expect(screen.getAllByText("server_overloaded").length).toBeGreaterThan(0);

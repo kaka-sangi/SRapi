@@ -778,7 +778,7 @@ func TestUpdateCurrentUserProfileRequiresCSRFAndAllowlistsFields(t *testing.T) {
 	if updateResp.Data.Name != "Updated Name" {
 		t.Fatalf("expected updated name, got %+v", updateResp.Data)
 	}
-	if updateResp.Data.Email != "profile-update@srapi.local" || updateResp.Data.Status != apiopenapi.Active || len(updateResp.Data.Roles) != 1 || updateResp.Data.Roles[0] != "user" {
+	if updateResp.Data.Email != "profile-update@srapi.local" || updateResp.Data.Status != apiopenapi.UserStatusActive || len(updateResp.Data.Roles) != 1 || updateResp.Data.Roles[0] != "user" {
 		t.Fatalf("profile update changed protected fields: %+v", updateResp.Data)
 	}
 }

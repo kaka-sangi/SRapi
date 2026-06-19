@@ -32,71 +32,73 @@ const (
 // + user + request identifiers, a redacted body excerpt, and resolution
 // metadata. Bodies are pre-sanitized before they reach the store.
 type Entry struct {
-	ID                int64
-	OccurredAt        time.Time
-	RequestID         string
-	TraceID           string
-	UserID            *int
-	APIKeyID          *int
-	APIKeyPrefix      string
-	AccountID         *int
-	ProviderID        *int
-	Platform          string
-	SourceEndpoint    string
-	TargetProtocol    string
-	Model             string
-	StatusCode        *int
-	UpstreamRequestID string
-	AttemptNo         int
-	LatencyMS         int
-	InputTokens       int
-	OutputTokens      int
-	UsageEstimated    bool
-	ErrorClass        string
-	ErrorPhase        string
-	ErrorOwner        string
-	ErrorSource       string
-	ErrorMessage      string
-	ErrorBodyExcerpt  string
-	UpstreamErrors    []UpstreamErrorEvent
-	Resolution        Resolution
-	ResolutionNote    string
-	ResolvedAt        *time.Time
-	ResolvedByID      *int
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	ID                    int64
+	OccurredAt            time.Time
+	RequestID             string
+	TraceID               string
+	UserID                *int
+	APIKeyID              *int
+	APIKeyPrefix          string
+	AccountID             *int
+	ProviderID            *int
+	Platform              string
+	SourceEndpoint        string
+	TargetProtocol        string
+	Model                 string
+	StatusCode            *int
+	UpstreamRequestID     string
+	StreamCompletionState string
+	AttemptNo             int
+	LatencyMS             int
+	InputTokens           int
+	OutputTokens          int
+	UsageEstimated        bool
+	ErrorClass            string
+	ErrorPhase            string
+	ErrorOwner            string
+	ErrorSource           string
+	ErrorMessage          string
+	ErrorBodyExcerpt      string
+	UpstreamErrors        []UpstreamErrorEvent
+	Resolution            Resolution
+	ResolutionNote        string
+	ResolvedAt            *time.Time
+	ResolvedByID          *int
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 // RecordRequest is the write input handed to Service.RecordError. It carries
 // raw fields; the service normalises, sanitises, and truncates before
 // persisting.
 type RecordRequest struct {
-	OccurredAt        time.Time
-	RequestID         string
-	TraceID           string
-	UserID            *int
-	APIKeyID          *int
-	APIKeyPrefix      string
-	AccountID         *int
-	ProviderID        *int
-	Platform          string
-	SourceEndpoint    string
-	TargetProtocol    string
-	Model             string
-	StatusCode        *int
-	UpstreamRequestID string
-	AttemptNo         int
-	LatencyMS         int
-	InputTokens       int
-	OutputTokens      int
-	UsageEstimated    bool
-	ErrorClass        string
-	ErrorPhase        string
-	ErrorOwner        string
-	ErrorSource       string
-	ErrorMessage      string
-	ErrorBodyExcerpt  string
-	UpstreamErrors    []UpstreamErrorEvent
+	OccurredAt            time.Time
+	RequestID             string
+	TraceID               string
+	UserID                *int
+	APIKeyID              *int
+	APIKeyPrefix          string
+	AccountID             *int
+	ProviderID            *int
+	Platform              string
+	SourceEndpoint        string
+	TargetProtocol        string
+	Model                 string
+	StatusCode            *int
+	UpstreamRequestID     string
+	StreamCompletionState string
+	AttemptNo             int
+	LatencyMS             int
+	InputTokens           int
+	OutputTokens          int
+	UsageEstimated        bool
+	ErrorClass            string
+	ErrorPhase            string
+	ErrorOwner            string
+	ErrorSource           string
+	ErrorMessage          string
+	ErrorBodyExcerpt      string
+	UpstreamErrors        []UpstreamErrorEvent
 }
 
 // UpstreamErrorEvent captures one failed candidate attempt inside a gateway

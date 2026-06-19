@@ -134,6 +134,11 @@ func UpstreamRequestID(v string) predicate.OpsErrorLog {
 	return predicate.OpsErrorLog(sql.FieldEQ(FieldUpstreamRequestID, v))
 }
 
+// StreamCompletionState applies equality check predicate on the "stream_completion_state" field. It's identical to StreamCompletionStateEQ.
+func StreamCompletionState(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldEQ(FieldStreamCompletionState, v))
+}
+
 // AttemptNo applies equality check predicate on the "attempt_no" field. It's identical to AttemptNoEQ.
 func AttemptNo(v int) predicate.OpsErrorLog {
 	return predicate.OpsErrorLog(sql.FieldEQ(FieldAttemptNo, v))
@@ -1097,6 +1102,71 @@ func UpstreamRequestIDEqualFold(v string) predicate.OpsErrorLog {
 // UpstreamRequestIDContainsFold applies the ContainsFold predicate on the "upstream_request_id" field.
 func UpstreamRequestIDContainsFold(v string) predicate.OpsErrorLog {
 	return predicate.OpsErrorLog(sql.FieldContainsFold(FieldUpstreamRequestID, v))
+}
+
+// StreamCompletionStateEQ applies the EQ predicate on the "stream_completion_state" field.
+func StreamCompletionStateEQ(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldEQ(FieldStreamCompletionState, v))
+}
+
+// StreamCompletionStateNEQ applies the NEQ predicate on the "stream_completion_state" field.
+func StreamCompletionStateNEQ(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldNEQ(FieldStreamCompletionState, v))
+}
+
+// StreamCompletionStateIn applies the In predicate on the "stream_completion_state" field.
+func StreamCompletionStateIn(vs ...string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldIn(FieldStreamCompletionState, vs...))
+}
+
+// StreamCompletionStateNotIn applies the NotIn predicate on the "stream_completion_state" field.
+func StreamCompletionStateNotIn(vs ...string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldNotIn(FieldStreamCompletionState, vs...))
+}
+
+// StreamCompletionStateGT applies the GT predicate on the "stream_completion_state" field.
+func StreamCompletionStateGT(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldGT(FieldStreamCompletionState, v))
+}
+
+// StreamCompletionStateGTE applies the GTE predicate on the "stream_completion_state" field.
+func StreamCompletionStateGTE(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldGTE(FieldStreamCompletionState, v))
+}
+
+// StreamCompletionStateLT applies the LT predicate on the "stream_completion_state" field.
+func StreamCompletionStateLT(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldLT(FieldStreamCompletionState, v))
+}
+
+// StreamCompletionStateLTE applies the LTE predicate on the "stream_completion_state" field.
+func StreamCompletionStateLTE(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldLTE(FieldStreamCompletionState, v))
+}
+
+// StreamCompletionStateContains applies the Contains predicate on the "stream_completion_state" field.
+func StreamCompletionStateContains(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldContains(FieldStreamCompletionState, v))
+}
+
+// StreamCompletionStateHasPrefix applies the HasPrefix predicate on the "stream_completion_state" field.
+func StreamCompletionStateHasPrefix(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldHasPrefix(FieldStreamCompletionState, v))
+}
+
+// StreamCompletionStateHasSuffix applies the HasSuffix predicate on the "stream_completion_state" field.
+func StreamCompletionStateHasSuffix(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldHasSuffix(FieldStreamCompletionState, v))
+}
+
+// StreamCompletionStateEqualFold applies the EqualFold predicate on the "stream_completion_state" field.
+func StreamCompletionStateEqualFold(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldEqualFold(FieldStreamCompletionState, v))
+}
+
+// StreamCompletionStateContainsFold applies the ContainsFold predicate on the "stream_completion_state" field.
+func StreamCompletionStateContainsFold(v string) predicate.OpsErrorLog {
+	return predicate.OpsErrorLog(sql.FieldContainsFold(FieldStreamCompletionState, v))
 }
 
 // AttemptNoEQ applies the EQ predicate on the "attempt_no" field.

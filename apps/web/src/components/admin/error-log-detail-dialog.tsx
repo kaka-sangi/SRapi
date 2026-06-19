@@ -184,6 +184,11 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
         <Field label={t("adminErrorLogs.errorPhase")} value={detail.error_phase || "—"} mono />
         <Field label={t("adminErrorLogs.errorOwner")} value={detail.error_owner || "—"} mono />
         <Field label={t("adminErrorLogs.errorSource")} value={detail.error_source || "—"} mono />
+        <Field
+          label={t("adminErrorLogs.streamCompletionState")}
+          value={detail.stream_completion_state || "—"}
+          mono
+        />
         <Field label={t("adminErrorLogs.inputTokens")} value={formatInteger(detail.input_tokens ?? 0)} mono />
         <Field label={t("adminErrorLogs.outputTokens")} value={formatInteger(detail.output_tokens ?? 0)} mono />
         <Field

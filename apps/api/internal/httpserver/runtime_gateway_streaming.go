@@ -392,10 +392,19 @@ readLoop:
 	if interrupted {
 		if idleTimedOut {
 			record.ErrorClass = ptrStringValue("stream_idle_timeout")
+			record.StreamCompletionState = "idle_timeout"
 		} else {
 			record.ErrorClass = ptrStringValue("stream_interrupted")
+			record.StreamCompletionState = "interrupted"
 		}
+		record.ErrorPhase = "stream"
+		record.ErrorOwner = "provider"
+		record.ErrorSource = "upstream_stream"
+		record.ProviderErrorMessage = *record.ErrorClass
+	} else {
+		record.StreamCompletionState = "completed"
 	}
+	s.recordOpsErrorLog(r.Context(), record)
 	s.runtime.recordGatewayUsage(r.Context(), record)
 }
 
@@ -537,10 +546,19 @@ readLoop:
 	if interrupted {
 		if idleTimedOut {
 			record.ErrorClass = ptrStringValue("stream_idle_timeout")
+			record.StreamCompletionState = "idle_timeout"
 		} else {
 			record.ErrorClass = ptrStringValue("stream_interrupted")
+			record.StreamCompletionState = "interrupted"
 		}
+		record.ErrorPhase = "stream"
+		record.ErrorOwner = "provider"
+		record.ErrorSource = "upstream_stream"
+		record.ProviderErrorMessage = *record.ErrorClass
+	} else {
+		record.StreamCompletionState = "completed"
 	}
+	s.recordOpsErrorLog(r.Context(), record)
 	s.runtime.recordGatewayUsage(r.Context(), record)
 }
 

@@ -2566,6 +2566,7 @@ export const zh: Messages = {
     traceId: "Trace ID",
     updatedAt: "更新时间",
     upstreamRequestId: "上游请求 ID",
+    streamCompletionState: "流终止状态",
     errorPhase: "阶段",
     errorOwner: "归属",
     errorSource: "来源",

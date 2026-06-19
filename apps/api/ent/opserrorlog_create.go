@@ -236,6 +236,20 @@ func (_c *OpsErrorLogCreate) SetNillableUpstreamRequestID(v *string) *OpsErrorLo
 	return _c
 }
 
+// SetStreamCompletionState sets the "stream_completion_state" field.
+func (_c *OpsErrorLogCreate) SetStreamCompletionState(v string) *OpsErrorLogCreate {
+	_c.mutation.SetStreamCompletionState(v)
+	return _c
+}
+
+// SetNillableStreamCompletionState sets the "stream_completion_state" field if the given value is not nil.
+func (_c *OpsErrorLogCreate) SetNillableStreamCompletionState(v *string) *OpsErrorLogCreate {
+	if v != nil {
+		_c.SetStreamCompletionState(*v)
+	}
+	return _c
+}
+
 // SetAttemptNo sets the "attempt_no" field.
 func (_c *OpsErrorLogCreate) SetAttemptNo(v int) *OpsErrorLogCreate {
 	_c.mutation.SetAttemptNo(v)
@@ -527,6 +541,10 @@ func (_c *OpsErrorLogCreate) defaults() {
 		v := opserrorlog.DefaultUpstreamRequestID
 		_c.mutation.SetUpstreamRequestID(v)
 	}
+	if _, ok := _c.mutation.StreamCompletionState(); !ok {
+		v := opserrorlog.DefaultStreamCompletionState
+		_c.mutation.SetStreamCompletionState(v)
+	}
 	if _, ok := _c.mutation.AttemptNo(); !ok {
 		v := opserrorlog.DefaultAttemptNo
 		_c.mutation.SetAttemptNo(v)
@@ -615,6 +633,9 @@ func (_c *OpsErrorLogCreate) check() error {
 	}
 	if _, ok := _c.mutation.UpstreamRequestID(); !ok {
 		return &ValidationError{Name: "upstream_request_id", err: errors.New(`ent: missing required field "OpsErrorLog.upstream_request_id"`)}
+	}
+	if _, ok := _c.mutation.StreamCompletionState(); !ok {
+		return &ValidationError{Name: "stream_completion_state", err: errors.New(`ent: missing required field "OpsErrorLog.stream_completion_state"`)}
 	}
 	if _, ok := _c.mutation.AttemptNo(); !ok {
 		return &ValidationError{Name: "attempt_no", err: errors.New(`ent: missing required field "OpsErrorLog.attempt_no"`)}
@@ -744,6 +765,10 @@ func (_c *OpsErrorLogCreate) createSpec() (*OpsErrorLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.UpstreamRequestID(); ok {
 		_spec.SetField(opserrorlog.FieldUpstreamRequestID, field.TypeString, value)
 		_node.UpstreamRequestID = value
+	}
+	if value, ok := _c.mutation.StreamCompletionState(); ok {
+		_spec.SetField(opserrorlog.FieldStreamCompletionState, field.TypeString, value)
+		_node.StreamCompletionState = value
 	}
 	if value, ok := _c.mutation.AttemptNo(); ok {
 		_spec.SetField(opserrorlog.FieldAttemptNo, field.TypeInt, value)

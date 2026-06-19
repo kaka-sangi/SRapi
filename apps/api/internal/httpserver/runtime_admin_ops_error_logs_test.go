@@ -24,31 +24,32 @@ func TestAdminOpsErrorLogsListGetAndResolve(t *testing.T) {
 	statusCode := 502
 	latencyMS := 456
 	inserted, err := store.Insert(t.Context(), opserrorlogscontract.Entry{
-		OccurredAt:        now,
-		RequestID:         "req_ops_error",
-		TraceID:           "trace_ops_error",
-		UserID:            &userID,
-		APIKeyID:          &apiKeyID,
-		APIKeyPrefix:      "sk_ops",
-		AccountID:         &accountID,
-		ProviderID:        &providerID,
-		Platform:          "openai-compatible",
-		SourceEndpoint:    "/v1/responses",
-		TargetProtocol:    "openai-compatible",
-		Model:             "ops-model",
-		StatusCode:        &statusCode,
-		UpstreamRequestID: "upstream_req_ops",
-		AttemptNo:         2,
-		LatencyMS:         latencyMS,
-		InputTokens:       11,
-		OutputTokens:      5,
-		UsageEstimated:    true,
-		ErrorClass:        "server_bad",
-		ErrorPhase:        "upstream",
-		ErrorOwner:        "provider",
-		ErrorSource:       "upstream_http",
-		ErrorMessage:      "provider returned 502",
-		ErrorBodyExcerpt:  `{"error":"bad gateway"}`,
+		OccurredAt:            now,
+		RequestID:             "req_ops_error",
+		TraceID:               "trace_ops_error",
+		UserID:                &userID,
+		APIKeyID:              &apiKeyID,
+		APIKeyPrefix:          "sk_ops",
+		AccountID:             &accountID,
+		ProviderID:            &providerID,
+		Platform:              "openai-compatible",
+		SourceEndpoint:        "/v1/responses",
+		TargetProtocol:        "openai-compatible",
+		Model:                 "ops-model",
+		StatusCode:            &statusCode,
+		UpstreamRequestID:     "upstream_req_ops",
+		StreamCompletionState: "interrupted",
+		AttemptNo:             2,
+		LatencyMS:             latencyMS,
+		InputTokens:           11,
+		OutputTokens:          5,
+		UsageEstimated:        true,
+		ErrorClass:            "server_bad",
+		ErrorPhase:            "upstream",
+		ErrorOwner:            "provider",
+		ErrorSource:           "upstream_http",
+		ErrorMessage:          "provider returned 502",
+		ErrorBodyExcerpt:      `{"error":"bad gateway"}`,
 		UpstreamErrors: []opserrorlogscontract.UpstreamErrorEvent{{
 			AtUnixMs:           now.UnixMilli(),
 			AttemptNo:          1,
@@ -98,7 +99,7 @@ func TestAdminOpsErrorLogsListGetAndResolve(t *testing.T) {
 		t.Fatalf("expected one filtered ops error log, got %+v", list)
 	}
 	row := list.Data[0]
-	if row.Id == nil || *row.Id != "1" || row.Model == nil || *row.Model != "ops-model" || row.StatusCode == nil || *row.StatusCode != 502 || row.ApiKeyPrefix == nil || *row.ApiKeyPrefix != "sk_ops" {
+	if row.Id == nil || *row.Id != "1" || row.Model == nil || *row.Model != "ops-model" || row.StatusCode == nil || *row.StatusCode != 502 || row.ApiKeyPrefix == nil || *row.ApiKeyPrefix != "sk_ops" || row.StreamCompletionState == nil || *row.StreamCompletionState != apiopenapi.OpsErrorLogStreamCompletionStateInterrupted {
 		t.Fatalf("unexpected list row: %+v", row)
 	}
 
@@ -146,6 +147,9 @@ func TestAdminOpsErrorLogsListGetAndResolve(t *testing.T) {
 	}
 	if detail.Data.TargetProtocol == nil || *detail.Data.TargetProtocol != "openai-compatible" || detail.Data.UpstreamRequestId == nil || *detail.Data.UpstreamRequestId != "upstream_req_ops" {
 		t.Fatalf("missing protocol/upstream evidence in detail response: %+v", detail.Data)
+	}
+	if detail.Data.StreamCompletionState == nil || *detail.Data.StreamCompletionState != apiopenapi.OpsErrorLogStreamCompletionStateInterrupted {
+		t.Fatalf("missing stream completion evidence in detail response: %+v", detail.Data)
 	}
 	if detail.Data.UpstreamErrors == nil || len(*detail.Data.UpstreamErrors) != 1 {
 		t.Fatalf("missing upstream history in detail response: %+v", detail.Data)

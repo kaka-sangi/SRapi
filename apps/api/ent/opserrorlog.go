@@ -50,6 +50,8 @@ type OpsErrorLog struct {
 	StatusCode *int `json:"status_code,omitempty"`
 	// UpstreamRequestID holds the value of the "upstream_request_id" field.
 	UpstreamRequestID string `json:"upstream_request_id,omitempty"`
+	// StreamCompletionState holds the value of the "stream_completion_state" field.
+	StreamCompletionState string `json:"stream_completion_state,omitempty"`
 	// AttemptNo holds the value of the "attempt_no" field.
 	AttemptNo int `json:"attempt_no,omitempty"`
 	// LatencyMs holds the value of the "latency_ms" field.
@@ -96,7 +98,7 @@ func (*OpsErrorLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case opserrorlog.FieldID, opserrorlog.FieldUserID, opserrorlog.FieldAPIKeyID, opserrorlog.FieldAccountID, opserrorlog.FieldProviderID, opserrorlog.FieldStatusCode, opserrorlog.FieldAttemptNo, opserrorlog.FieldLatencyMs, opserrorlog.FieldInputTokens, opserrorlog.FieldOutputTokens, opserrorlog.FieldResolvedByID:
 			values[i] = new(sql.NullInt64)
-		case opserrorlog.FieldRequestID, opserrorlog.FieldTraceID, opserrorlog.FieldAPIKeyPrefix, opserrorlog.FieldPlatform, opserrorlog.FieldSourceEndpoint, opserrorlog.FieldTargetProtocol, opserrorlog.FieldModel, opserrorlog.FieldUpstreamRequestID, opserrorlog.FieldErrorClass, opserrorlog.FieldErrorPhase, opserrorlog.FieldErrorOwner, opserrorlog.FieldErrorSource, opserrorlog.FieldErrorMessage, opserrorlog.FieldErrorBodyExcerpt, opserrorlog.FieldResolution, opserrorlog.FieldResolutionNote:
+		case opserrorlog.FieldRequestID, opserrorlog.FieldTraceID, opserrorlog.FieldAPIKeyPrefix, opserrorlog.FieldPlatform, opserrorlog.FieldSourceEndpoint, opserrorlog.FieldTargetProtocol, opserrorlog.FieldModel, opserrorlog.FieldUpstreamRequestID, opserrorlog.FieldStreamCompletionState, opserrorlog.FieldErrorClass, opserrorlog.FieldErrorPhase, opserrorlog.FieldErrorOwner, opserrorlog.FieldErrorSource, opserrorlog.FieldErrorMessage, opserrorlog.FieldErrorBodyExcerpt, opserrorlog.FieldResolution, opserrorlog.FieldResolutionNote:
 			values[i] = new(sql.NullString)
 		case opserrorlog.FieldCreatedAt, opserrorlog.FieldUpdatedAt, opserrorlog.FieldOccurredAt, opserrorlog.FieldResolvedAt:
 			values[i] = new(sql.NullTime)
@@ -221,6 +223,12 @@ func (_m *OpsErrorLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field upstream_request_id", values[i])
 			} else if value.Valid {
 				_m.UpstreamRequestID = value.String
+			}
+		case opserrorlog.FieldStreamCompletionState:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field stream_completion_state", values[i])
+			} else if value.Valid {
+				_m.StreamCompletionState = value.String
 			}
 		case opserrorlog.FieldAttemptNo:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -415,6 +423,9 @@ func (_m *OpsErrorLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("upstream_request_id=")
 	builder.WriteString(_m.UpstreamRequestID)
+	builder.WriteString(", ")
+	builder.WriteString("stream_completion_state=")
+	builder.WriteString(_m.StreamCompletionState)
 	builder.WriteString(", ")
 	builder.WriteString("attempt_no=")
 	builder.WriteString(fmt.Sprintf("%v", _m.AttemptNo))

@@ -30,6 +30,7 @@ func (OpsErrorLog) Fields() []ent.Field {
 		field.String("model").Default(""),
 		field.Int("status_code").Optional().Nillable(),
 		field.String("upstream_request_id").Default(""),
+		field.String("stream_completion_state").Default(""),
 		field.Int("attempt_no").Default(1),
 		field.Int("latency_ms").Default(0),
 		field.Int("input_tokens").Default(0),
@@ -63,6 +64,7 @@ func (OpsErrorLog) Indexes() []ent.Index {
 		index.Fields("provider_id", "occurred_at"),
 		index.Fields("status_code", "occurred_at"),
 		index.Fields("upstream_request_id"),
+		index.Fields("stream_completion_state", "occurred_at"),
 		index.Fields("request_id"),
 		index.Fields("trace_id"),
 	}

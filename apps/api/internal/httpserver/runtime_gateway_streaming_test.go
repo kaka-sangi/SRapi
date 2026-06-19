@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
+	opserrorlogsmemory "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/store/memory"
 )
 
 // flushCapturingWriter is an http.ResponseWriter + http.Flusher that records the
@@ -689,7 +691,8 @@ func TestGatewayChatCompletionsStreamEmitsErrorOnIdleTimeout(t *testing.T) {
 	cfg := config.Load()
 	cfg.Gateway.StreamIdleTimeout = 80 * time.Millisecond
 	cfg.Gateway.StreamKeepaliveInterval = 10 * time.Second // keep keepalives out of the body
-	handler := New(cfg, nil)
+	opsStore := opserrorlogsmemory.New()
+	handler := New(cfg, nil, WithOpsErrorLogsStore(opsStore))
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"stream-idle-provider","display_name":"Stream Idle Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"stream-idle-model","display_name":"Stream Idle Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
@@ -700,6 +703,7 @@ func TestGatewayChatCompletionsStreamEmitsErrorOnIdleTimeout(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"stream-idle-model","stream":true,"messages":[{"role":"user","content":"hi"}]}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set(requestIDHeader, "req_stream_idle_timeout")
 
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -710,6 +714,29 @@ func TestGatewayChatCompletionsStreamEmitsErrorOnIdleTimeout(t *testing.T) {
 	}
 	if !strings.Contains(body, "event: error") || !strings.Contains(body, "stream_idle_timeout") {
 		t.Fatalf("expected an idle-timeout error frame, got: %q", body)
+	}
+	var opsResult opserrorlogscontract.ListResult
+	var err error
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		opsResult, err = opsStore.List(t.Context(), opserrorlogscontract.ListFilter{RequestID: "req_stream_idle_timeout"})
+		if err != nil {
+			t.Fatalf("list ops error logs: %v", err)
+		}
+		if len(opsResult.Items) > 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if len(opsResult.Items) != 1 {
+		t.Fatalf("expected stream timeout ops error log, got %+v", opsResult.Items)
+	}
+	opsLog := opsResult.Items[0]
+	if opsLog.ErrorClass != "stream_idle_timeout" ||
+		opsLog.ErrorPhase != "stream" ||
+		opsLog.ErrorSource != "upstream_stream" ||
+		opsLog.StreamCompletionState != "idle_timeout" {
+		t.Fatalf("unexpected stream timeout ops error log: %+v", opsLog)
 	}
 }
 

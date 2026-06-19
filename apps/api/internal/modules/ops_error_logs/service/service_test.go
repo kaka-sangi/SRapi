@@ -417,19 +417,20 @@ func TestRecordError_PreservesStructuredAttemptEvidence(t *testing.T) {
 	status := 429
 	accountID := 42
 	if err := svc.RecordError(context.Background(), contract.RecordRequest{
-		RequestID:         "req-attempt",
-		StatusCode:        &status,
-		APIKeyPrefix:      "sk_abc123",
-		TargetProtocol:    "openai-compatible",
-		UpstreamRequestID: "upstream_req",
-		AttemptNo:         2,
-		LatencyMS:         345,
-		InputTokens:       12,
-		OutputTokens:      3,
-		UsageEstimated:    true,
-		ErrorOwner:        "provider",
-		ErrorSource:       "upstream_http",
-		ErrorMessage:      "rate limited",
+		RequestID:             "req-attempt",
+		StatusCode:            &status,
+		APIKeyPrefix:          "sk_abc123",
+		TargetProtocol:        "openai-compatible",
+		UpstreamRequestID:     "upstream_req",
+		StreamCompletionState: "interrupted",
+		AttemptNo:             2,
+		LatencyMS:             345,
+		InputTokens:           12,
+		OutputTokens:          3,
+		UsageEstimated:        true,
+		ErrorOwner:            "provider",
+		ErrorSource:           "upstream_http",
+		ErrorMessage:          "rate limited",
 		UpstreamErrors: []contract.UpstreamErrorEvent{{
 			AtUnixMs:           1780000000000,
 			AttemptNo:          1,
@@ -456,7 +457,7 @@ func TestRecordError_PreservesStructuredAttemptEvidence(t *testing.T) {
 		t.Fatalf("List: %v", err)
 	}
 	got := list.Items[0]
-	if got.AttemptNo != 2 || got.LatencyMS != 345 || !got.UsageEstimated || got.TargetProtocol != "openai-compatible" || got.UpstreamRequestID != "upstream_req" || got.APIKeyPrefix != "sk_abc123" {
+	if got.AttemptNo != 2 || got.LatencyMS != 345 || !got.UsageEstimated || got.TargetProtocol != "openai-compatible" || got.UpstreamRequestID != "upstream_req" || got.StreamCompletionState != "interrupted" || got.APIKeyPrefix != "sk_abc123" {
 		t.Fatalf("attempt evidence mismatch: %+v", got)
 	}
 	if len(got.UpstreamErrors) != 2 || got.UpstreamErrors[0].AccountID == nil || *got.UpstreamErrors[0].AccountID != accountID {

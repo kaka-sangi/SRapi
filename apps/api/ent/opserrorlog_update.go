@@ -296,6 +296,20 @@ func (_u *OpsErrorLogUpdate) SetNillableUpstreamRequestID(v *string) *OpsErrorLo
 	return _u
 }
 
+// SetStreamCompletionState sets the "stream_completion_state" field.
+func (_u *OpsErrorLogUpdate) SetStreamCompletionState(v string) *OpsErrorLogUpdate {
+	_u.mutation.SetStreamCompletionState(v)
+	return _u
+}
+
+// SetNillableStreamCompletionState sets the "stream_completion_state" field if the given value is not nil.
+func (_u *OpsErrorLogUpdate) SetNillableStreamCompletionState(v *string) *OpsErrorLogUpdate {
+	if v != nil {
+		_u.SetStreamCompletionState(*v)
+	}
+	return _u
+}
+
 // SetAttemptNo sets the "attempt_no" field.
 func (_u *OpsErrorLogUpdate) SetAttemptNo(v int) *OpsErrorLogUpdate {
 	_u.mutation.ResetAttemptNo()
@@ -696,6 +710,9 @@ func (_u *OpsErrorLogUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	if value, ok := _u.mutation.UpstreamRequestID(); ok {
 		_spec.SetField(opserrorlog.FieldUpstreamRequestID, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.StreamCompletionState(); ok {
+		_spec.SetField(opserrorlog.FieldStreamCompletionState, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.AttemptNo(); ok {
 		_spec.SetField(opserrorlog.FieldAttemptNo, field.TypeInt, value)
 	}
@@ -1056,6 +1073,20 @@ func (_u *OpsErrorLogUpdateOne) SetUpstreamRequestID(v string) *OpsErrorLogUpdat
 func (_u *OpsErrorLogUpdateOne) SetNillableUpstreamRequestID(v *string) *OpsErrorLogUpdateOne {
 	if v != nil {
 		_u.SetUpstreamRequestID(*v)
+	}
+	return _u
+}
+
+// SetStreamCompletionState sets the "stream_completion_state" field.
+func (_u *OpsErrorLogUpdateOne) SetStreamCompletionState(v string) *OpsErrorLogUpdateOne {
+	_u.mutation.SetStreamCompletionState(v)
+	return _u
+}
+
+// SetNillableStreamCompletionState sets the "stream_completion_state" field if the given value is not nil.
+func (_u *OpsErrorLogUpdateOne) SetNillableStreamCompletionState(v *string) *OpsErrorLogUpdateOne {
+	if v != nil {
+		_u.SetStreamCompletionState(*v)
 	}
 	return _u
 }
@@ -1489,6 +1520,9 @@ func (_u *OpsErrorLogUpdateOne) sqlSave(ctx context.Context) (_node *OpsErrorLog
 	}
 	if value, ok := _u.mutation.UpstreamRequestID(); ok {
 		_spec.SetField(opserrorlog.FieldUpstreamRequestID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.StreamCompletionState(); ok {
+		_spec.SetField(opserrorlog.FieldStreamCompletionState, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.AttemptNo(); ok {
 		_spec.SetField(opserrorlog.FieldAttemptNo, field.TypeInt, value)

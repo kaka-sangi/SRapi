@@ -244,35 +244,36 @@ func (s *Service) prepareEntry(req contract.RecordRequest) (contract.Entry, bool
 	}
 	apiKeyPrefix := sanitizeAPIKeyPrefix(req.APIKeyPrefix)
 	entry := contract.Entry{
-		OccurredAt:        occurred.UTC(),
-		RequestID:         truncate(cleanLogText(req.RequestID), 128),
-		TraceID:           truncate(cleanLogText(req.TraceID), 128),
-		UserID:            req.UserID,
-		APIKeyID:          req.APIKeyID,
-		APIKeyPrefix:      apiKeyPrefix,
-		AccountID:         req.AccountID,
-		ProviderID:        req.ProviderID,
-		Platform:          truncate(cleanLogText(req.Platform), 64),
-		SourceEndpoint:    truncate(cleanLogText(req.SourceEndpoint), 128),
-		TargetProtocol:    truncate(cleanLogText(req.TargetProtocol), 64),
-		Model:             truncate(cleanLogText(req.Model), 128),
-		StatusCode:        req.StatusCode,
-		UpstreamRequestID: truncate(cleanLogText(req.UpstreamRequestID), 128),
-		AttemptNo:         positiveOrDefault(req.AttemptNo, 1),
-		LatencyMS:         positiveOrZero(req.LatencyMS),
-		InputTokens:       positiveOrZero(req.InputTokens),
-		OutputTokens:      positiveOrZero(req.OutputTokens),
-		UsageEstimated:    req.UsageEstimated,
-		ErrorClass:        truncate(class, 64),
-		ErrorPhase:        truncate(phase, 64),
-		ErrorOwner:        truncate(defaultString(req.ErrorOwner, "provider"), 64),
-		ErrorSource:       truncate(defaultString(req.ErrorSource, "upstream_http"), 64),
-		ErrorMessage:      truncate(sanitizeMessage(req.ErrorMessage), MaxMessageBytes),
-		ErrorBodyExcerpt:  redactExcerpt(req.ErrorBodyExcerpt, MaxBodyExcerptBytes),
-		UpstreamErrors:    sanitizeUpstreamErrors(req.UpstreamErrors),
-		Resolution:        contract.ResolutionOpen,
-		CreatedAt:         now,
-		UpdatedAt:         now,
+		OccurredAt:            occurred.UTC(),
+		RequestID:             truncate(cleanLogText(req.RequestID), 128),
+		TraceID:               truncate(cleanLogText(req.TraceID), 128),
+		UserID:                req.UserID,
+		APIKeyID:              req.APIKeyID,
+		APIKeyPrefix:          apiKeyPrefix,
+		AccountID:             req.AccountID,
+		ProviderID:            req.ProviderID,
+		Platform:              truncate(cleanLogText(req.Platform), 64),
+		SourceEndpoint:        truncate(cleanLogText(req.SourceEndpoint), 128),
+		TargetProtocol:        truncate(cleanLogText(req.TargetProtocol), 64),
+		Model:                 truncate(cleanLogText(req.Model), 128),
+		StatusCode:            req.StatusCode,
+		UpstreamRequestID:     truncate(cleanLogText(req.UpstreamRequestID), 128),
+		StreamCompletionState: normalizeStreamCompletionState(req.StreamCompletionState),
+		AttemptNo:             positiveOrDefault(req.AttemptNo, 1),
+		LatencyMS:             positiveOrZero(req.LatencyMS),
+		InputTokens:           positiveOrZero(req.InputTokens),
+		OutputTokens:          positiveOrZero(req.OutputTokens),
+		UsageEstimated:        req.UsageEstimated,
+		ErrorClass:            truncate(class, 64),
+		ErrorPhase:            truncate(phase, 64),
+		ErrorOwner:            truncate(defaultString(req.ErrorOwner, "provider"), 64),
+		ErrorSource:           truncate(defaultString(req.ErrorSource, "upstream_http"), 64),
+		ErrorMessage:          truncate(sanitizeMessage(req.ErrorMessage), MaxMessageBytes),
+		ErrorBodyExcerpt:      redactExcerpt(req.ErrorBodyExcerpt, MaxBodyExcerptBytes),
+		UpstreamErrors:        sanitizeUpstreamErrors(req.UpstreamErrors),
+		Resolution:            contract.ResolutionOpen,
+		CreatedAt:             now,
+		UpdatedAt:             now,
 	}
 	if entry.RequestID == "" && entry.StatusCode == nil && entry.ErrorMessage == "" && entry.ErrorBodyExcerpt == "" {
 		return contract.Entry{}, false
@@ -296,6 +297,16 @@ func sanitizeAPIKeyPrefix(value string) string {
 
 func validHTTPStatus(status int) bool {
 	return status >= 100 && status <= 599
+}
+
+func normalizeStreamCompletionState(value string) string {
+	state := strings.TrimSpace(strings.ToLower(value))
+	switch state {
+	case "completed", "interrupted", "idle_timeout", "failed", "unknown":
+		return state
+	default:
+		return ""
+	}
 }
 
 func validUpstreamStatus(status int) int {

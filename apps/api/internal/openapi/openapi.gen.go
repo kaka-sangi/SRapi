@@ -1958,6 +1958,33 @@ func (e OpsErrorLogResolution) Valid() bool {
 	}
 }
 
+// Defines values for OpsErrorLogStreamCompletionState.
+const (
+	OpsErrorLogStreamCompletionStateCompleted   OpsErrorLogStreamCompletionState = "completed"
+	OpsErrorLogStreamCompletionStateFailed      OpsErrorLogStreamCompletionState = "failed"
+	OpsErrorLogStreamCompletionStateIdleTimeout OpsErrorLogStreamCompletionState = "idle_timeout"
+	OpsErrorLogStreamCompletionStateInterrupted OpsErrorLogStreamCompletionState = "interrupted"
+	OpsErrorLogStreamCompletionStateUnknown     OpsErrorLogStreamCompletionState = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the OpsErrorLogStreamCompletionState enum.
+func (e OpsErrorLogStreamCompletionState) Valid() bool {
+	switch e {
+	case OpsErrorLogStreamCompletionStateCompleted:
+		return true
+	case OpsErrorLogStreamCompletionStateFailed:
+		return true
+	case OpsErrorLogStreamCompletionStateIdleTimeout:
+		return true
+	case OpsErrorLogStreamCompletionStateInterrupted:
+		return true
+	case OpsErrorLogStreamCompletionStateUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OpsErrorLogResolutionUpdateResolution.
 const (
 	OpsErrorLogResolutionUpdateResolutionInvestigating OpsErrorLogResolutionUpdateResolution = "investigating"
@@ -3379,19 +3406,19 @@ func (e UserAvatarContentType) Valid() bool {
 
 // Defines values for UserStatus.
 const (
-	Active   UserStatus = "active"
-	Disabled UserStatus = "disabled"
-	Pending  UserStatus = "pending"
+	UserStatusActive   UserStatus = "active"
+	UserStatusDisabled UserStatus = "disabled"
+	UserStatusPending  UserStatus = "pending"
 )
 
 // Valid indicates whether the value is a known member of the UserStatus enum.
 func (e UserStatus) Valid() bool {
 	switch e {
-	case Active:
+	case UserStatusActive:
 		return true
-	case Disabled:
+	case UserStatusDisabled:
 		return true
-	case Pending:
+	case UserStatusPending:
 		return true
 	default:
 		return false
@@ -8747,20 +8774,30 @@ type OpsErrorLog struct {
 	SourceEndpoint   *string                `json:"source_endpoint,omitempty"`
 
 	// SourceProtocol Alias for platform, kept for error-log UI parity.
-	SourceProtocol       *string                `json:"source_protocol,omitempty"`
-	StatusCode           *int                   `json:"status_code,omitempty"`
-	TargetProtocol       *string                `json:"target_protocol,omitempty"`
-	TraceId              *string                `json:"trace_id,omitempty"`
-	UpdatedAt            *time.Time             `json:"updated_at,omitempty"`
-	UpstreamErrors       *[]UpstreamErrorEvent  `json:"upstream_errors,omitempty"`
-	UpstreamRequestId    *string                `json:"upstream_request_id,omitempty"`
-	UsageEstimated       *bool                  `json:"usage_estimated,omitempty"`
-	UserId               *Id                    `json:"user_id,omitempty"`
-	AdditionalProperties map[string]interface{} `json:"-"`
+	SourceProtocol *string `json:"source_protocol,omitempty"`
+	StatusCode     *int    `json:"status_code,omitempty"`
+
+	// StreamCompletionState Low-cardinality terminal state for gateway streaming requests.
+	// Empty when the request was not streamed or the state was not
+	// observed; never contains provider-native frames or response bodies.
+	StreamCompletionState *OpsErrorLogStreamCompletionState `json:"stream_completion_state,omitempty"`
+	TargetProtocol        *string                           `json:"target_protocol,omitempty"`
+	TraceId               *string                           `json:"trace_id,omitempty"`
+	UpdatedAt             *time.Time                        `json:"updated_at,omitempty"`
+	UpstreamErrors        *[]UpstreamErrorEvent             `json:"upstream_errors,omitempty"`
+	UpstreamRequestId     *string                           `json:"upstream_request_id,omitempty"`
+	UsageEstimated        *bool                             `json:"usage_estimated,omitempty"`
+	UserId                *Id                               `json:"user_id,omitempty"`
+	AdditionalProperties  map[string]interface{}            `json:"-"`
 }
 
 // OpsErrorLogResolution defines model for OpsErrorLog.Resolution.
 type OpsErrorLogResolution string
+
+// OpsErrorLogStreamCompletionState Low-cardinality terminal state for gateway streaming requests.
+// Empty when the request was not streamed or the state was not
+// observed; never contains provider-native frames or response bodies.
+type OpsErrorLogStreamCompletionState string
 
 // OpsErrorLogListResponse defines model for OpsErrorLogListResponse.
 type OpsErrorLogListResponse struct {
@@ -18181,6 +18218,14 @@ func (a *OpsErrorLog) UnmarshalJSON(b []byte) error {
 		delete(object, "status_code")
 	}
 
+	if raw, found := object["stream_completion_state"]; found {
+		err = json.Unmarshal(raw, &a.StreamCompletionState)
+		if err != nil {
+			return fmt.Errorf("error reading 'stream_completion_state': %w", err)
+		}
+		delete(object, "stream_completion_state")
+	}
+
 	if raw, found := object["target_protocol"]; found {
 		err = json.Unmarshal(raw, &a.TargetProtocol)
 		if err != nil {
@@ -18442,6 +18487,13 @@ func (a OpsErrorLog) MarshalJSON() ([]byte, error) {
 		object["status_code"], err = json.Marshal(a.StatusCode)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'status_code': %w", err)
+		}
+	}
+
+	if a.StreamCompletionState != nil {
+		object["stream_completion_state"], err = json.Marshal(a.StreamCompletionState)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stream_completion_state': %w", err)
 		}
 	}
 

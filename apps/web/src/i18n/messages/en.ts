@@ -2632,6 +2632,7 @@ export const en = {
     traceId: "Trace ID",
     updatedAt: "Updated",
     upstreamRequestId: "Upstream request ID",
+    streamCompletionState: "Stream state",
     errorPhase: "Phase",
     errorOwner: "Owner",
     errorSource: "Source",

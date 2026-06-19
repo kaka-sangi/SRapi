@@ -3216,6 +3216,13 @@ export type OpsErrorLog = {
     model?: string;
     status_code?: number;
     upstream_request_id?: string;
+    /**
+     * Low-cardinality terminal state for gateway streaming requests.
+     * Empty when the request was not streamed or the state was not
+     * observed; never contains provider-native frames or response bodies.
+     *
+     */
+    stream_completion_state?: 'completed' | 'interrupted' | 'idle_timeout' | 'failed' | 'unknown';
     attempt_no?: number;
     latency_ms?: number;
     input_tokens?: number;

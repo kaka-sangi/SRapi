@@ -1905,6 +1905,7 @@ target_protocol
 model
 status_code nullable
 upstream_request_id
+stream_completion_state
 attempt_no
 latency_ms
 input_tokens
@@ -1940,6 +1941,7 @@ index(account_id, occurred_at)
 index(provider_id, occurred_at)
 index(status_code, occurred_at)
 index(upstream_request_id)
+index(stream_completion_state, occurred_at)
 index(request_id)
 index(trace_id)
 ```
@@ -1951,7 +1953,8 @@ index(trace_id)
 规则：
 
 - `resolution` 使用 `open`、`investigating`、`resolved`、`muted`。
-- `attempt_no`、`target_protocol`、`latency_ms`、token 数、`usage_estimated`、`error_owner`、`error_source`、`upstream_request_id` 和 `upstream_errors_json` 是排障证据字段，来源必须是 Gateway 已分类/脱敏的 attempt evidence，不得从前端或日志文本反推。
+- `attempt_no`、`target_protocol`、`latency_ms`、token 数、`usage_estimated`、`error_owner`、`error_source`、`upstream_request_id`、`stream_completion_state` 和 `upstream_errors_json` 是排障证据字段，来源必须是 Gateway 已分类/脱敏的 attempt evidence，不得从前端或日志文本反推。
+- `stream_completion_state` 只允许保存低基数状态（`completed` / `interrupted` / `idle_timeout` / `failed` / `unknown` 或空值）；不得保存 provider-native SSE frame、响应体、prompt、header 或 credential。
 - `error_message` 和 `error_body_excerpt` 必须在 service 层清理和限长；敏感 JSON key 必须替换为 `[REDACTED]`。
 - `upstream_errors_json` 只允许保存每次失败 attempt 的低敏摘要：时间、attempt 号、账号 ID/名称、上游状态码、上游 request id、上游模型/URL 标识、kind、message、脱敏 body excerpt。不得保存原始请求体、headers 或 credential。
 - 表内只保存低敏错误证据和关联 ID，不保存原始 prompt、完整请求体、完整响应体、Authorization header、Cookie、API Key、OAuth token 或 Provider 凭证。
