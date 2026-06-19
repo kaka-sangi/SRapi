@@ -1275,6 +1275,13 @@ func (rt *runtimeState) enqueueGatewayUsageEvent(ctx context.Context, log usagec
 	})
 	if err != nil {
 		rt.logger.Warn("failed to enqueue gateway usage event", "error", err, "request_id", log.RequestID)
+		rt.recordGatewayUsageEffectFailure(ctx, gatewayUsageRecordFromUsageLog(log), gatewayUsageEffectFailure{
+			Effect:     "event_enqueue",
+			Message:    "failed to enqueue gateway usage event",
+			ErrorClass: "gateway_usage_event_enqueue_failed",
+			Error:      err,
+			UsageLogID: log.ID,
+		})
 	}
 }
 
@@ -1318,6 +1325,35 @@ func (rt *runtimeState) enqueueGatewayUsageFailureEvent(ctx context.Context, rec
 	})
 	if err != nil {
 		rt.logger.Warn("failed to enqueue gateway usage failure event", "error", err, "request_id", rec.RequestID)
+		rt.recordGatewayUsageEffectFailure(ctx, rec, gatewayUsageEffectFailure{
+			Effect:     "event_enqueue",
+			Message:    "failed to enqueue gateway usage failure event",
+			ErrorClass: "gateway_usage_event_enqueue_failed",
+			Error:      err,
+		})
+	}
+}
+
+func gatewayUsageRecordFromUsageLog(log usagecontract.UsageLog) gatewayUsageRecord {
+	return gatewayUsageRecord{
+		RequestID:         log.RequestID,
+		AttemptNo:         log.AttemptNo,
+		ProviderID:        log.ProviderID,
+		AccountID:         log.AccountID,
+		SourceProtocol:    log.SourceProtocol,
+		SourceEndpoint:    log.SourceEndpoint,
+		TargetProtocol:    log.TargetProtocol,
+		Model:             log.Model,
+		Success:           log.Success,
+		ErrorClass:        log.ErrorClass,
+		LatencyMS:         log.LatencyMS,
+		InputTokens:       log.InputTokens,
+		OutputTokens:      log.OutputTokens,
+		CachedTokens:      log.CachedTokens,
+		UsageEstimated:    log.UsageEstimated,
+		RequestedModel:    log.RequestedModel,
+		UpstreamModel:     log.UpstreamModel,
+		UpstreamRequestID: log.UpstreamRequestID,
 	}
 }
 

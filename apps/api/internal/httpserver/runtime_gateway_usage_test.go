@@ -23,6 +23,7 @@ import (
 	apikeymemory "github.com/srapi/srapi/apps/api/internal/modules/api_keys/store/memory"
 	billingservice "github.com/srapi/srapi/apps/api/internal/modules/billing/service"
 	billingmemory "github.com/srapi/srapi/apps/api/internal/modules/billing/store/memory"
+	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
@@ -432,6 +433,115 @@ func TestGatewayUsageSchedulerFeedbackFailureCreatesSystemLog(t *testing.T) {
 		metadataNumber(log.Metadata["provider_id"]) != 43 ||
 		log.Metadata["gateway_success"] != true {
 		t.Fatalf("unexpected feedback failure metadata: %+v", log.Metadata)
+	}
+}
+
+func TestGatewayUsageEventEnqueueFailureCreatesSystemLog(t *testing.T) {
+	ctx := context.Background()
+	operationsStore := operationsmemory.New()
+	operations, err := operationsservice.NewWithStores(operationsStore, operationsStore, nil)
+	if err != nil {
+		t.Fatalf("new operations service: %v", err)
+	}
+	events, err := eventsservice.New(failingEventsStore{Store: eventsmemory.New(), err: errors.New("outbox down")}, nil)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	rt := &runtimeState{
+		logger:     slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		operations: operations,
+		events:     events,
+	}
+
+	rt.enqueueGatewayUsageEvent(ctx, usagecontract.UsageLog{
+		ID:             77,
+		RequestID:      "req_event_enqueue_failure",
+		AttemptNo:      3,
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-ops",
+		Success:        true,
+		AccountID:      ptrInt(12),
+		ProviderID:     ptrInt(34),
+	})
+
+	list, err := operationsStore.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one event enqueue failure system log, got %+v", list.Items)
+	}
+	log := list.Items[0]
+	if log.Level != operationscontract.OpsSystemLogLevelError ||
+		log.Source != "gateway.usage" ||
+		log.Message != "failed to enqueue gateway usage event" ||
+		log.RequestID != "req_event_enqueue_failure" {
+		t.Fatalf("unexpected event enqueue failure log: %+v", log)
+	}
+	if log.Metadata["effect"] != "event_enqueue" ||
+		log.Metadata["error_class"] != "gateway_usage_event_enqueue_failed" ||
+		metadataNumber(log.Metadata["usage_log_id"]) != 77 ||
+		metadataNumber(log.Metadata["attempt_no"]) != 3 ||
+		metadataNumber(log.Metadata["account_id"]) != 12 ||
+		metadataNumber(log.Metadata["provider_id"]) != 34 ||
+		log.Metadata["gateway_success"] != true {
+		t.Fatalf("unexpected event enqueue failure metadata: %+v", log.Metadata)
+	}
+}
+
+func TestGatewayUsageFailureEventEnqueueFailureCreatesSystemLog(t *testing.T) {
+	ctx := context.Background()
+	operationsStore := operationsmemory.New()
+	operations, err := operationsservice.NewWithStores(operationsStore, operationsStore, nil)
+	if err != nil {
+		t.Fatalf("new operations service: %v", err)
+	}
+	events, err := eventsservice.New(failingEventsStore{Store: eventsmemory.New(), err: errors.New("outbox down")}, nil)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	rt := &runtimeState{
+		logger:     slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		operations: operations,
+		events:     events,
+	}
+
+	rt.enqueueGatewayUsageFailureEvent(ctx, gatewayUsageRecord{
+		RequestID:      "req_failure_event_enqueue_failure",
+		AttemptNo:      2,
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/chat/completions",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-ops",
+		Success:        false,
+		AccountID:      ptrInt(21),
+		ProviderID:     ptrInt(43),
+		ErrorClass:     ptrStringValue("timeout"),
+	}, "gpt-ops")
+
+	list, err := operationsStore.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one failure event enqueue system log, got %+v", list.Items)
+	}
+	log := list.Items[0]
+	if log.Level != operationscontract.OpsSystemLogLevelError ||
+		log.Source != "gateway.usage" ||
+		log.Message != "failed to enqueue gateway usage failure event" ||
+		log.RequestID != "req_failure_event_enqueue_failure" {
+		t.Fatalf("unexpected failure event enqueue log: %+v", log)
+	}
+	if log.Metadata["effect"] != "event_enqueue" ||
+		log.Metadata["error_class"] != "gateway_usage_event_enqueue_failed" ||
+		metadataNumber(log.Metadata["attempt_no"]) != 2 ||
+		metadataNumber(log.Metadata["account_id"]) != 21 ||
+		metadataNumber(log.Metadata["provider_id"]) != 43 ||
+		log.Metadata["gateway_success"] != false {
+		t.Fatalf("unexpected failure event enqueue metadata: %+v", log.Metadata)
 	}
 }
 
@@ -1818,6 +1928,15 @@ type failingSchedulerFeedbackStore struct {
 
 func (s failingSchedulerFeedbackStore) CreateFeedback(context.Context, schedulercontract.Feedback) (schedulercontract.Feedback, error) {
 	return schedulercontract.Feedback{}, s.err
+}
+
+type failingEventsStore struct {
+	*eventsmemory.Store
+	err error
+}
+
+func (s failingEventsStore) CreateOutbox(context.Context, eventscontract.OutboxEvent) (eventscontract.OutboxEvent, error) {
+	return eventscontract.OutboxEvent{}, s.err
 }
 
 func metadataNumber(value any) int {
