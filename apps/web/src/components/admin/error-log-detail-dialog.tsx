@@ -22,6 +22,7 @@ import {
   useAdminErrorLog,
   useAdminRequestLogFileDownload,
   useAdminRequestLogFiles,
+  useOpsSystemLogs,
   useUpdateErrorLogResolution,
 } from "@/hooks/admin-queries";
 import { useAccountNameLookup } from "@/hooks/use-account-name-lookup";
@@ -30,9 +31,13 @@ import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatInteger, formatLatency } from "@/lib/admin-format";
-import { adminRequestDumpsHref, adminSystemLogsHref } from "@/lib/admin-log-links";
+import {
+  adminRequestDumpsHref,
+  adminRequestEvidenceHref,
+  adminSystemLogsHref,
+} from "@/lib/admin-log-links";
 import { parseRequestDumpSummary } from "@/lib/request-log-dump-summary";
-import type { OpsErrorLog, RequestLogFileDescriptor } from "@/lib/sdk-types";
+import type { OpsErrorLog, OpsSystemLog, RequestLogFileDescriptor } from "@/lib/sdk-types";
 
 const RESOLUTION_OPTIONS = ["open", "investigating", "resolved", "muted"] as const;
 type ResolutionValue = (typeof RESOLUTION_OPTIONS)[number];
@@ -55,7 +60,7 @@ export function ErrorLogDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>
             {t("adminErrorLogs.detailTitle")}
@@ -84,12 +89,15 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
     { request_id: detail.request_id || undefined, limit: 3 },
     Boolean(detail.request_id),
   );
+  const systemLogLookup = detail.request_id
+    ? { request_id: detail.request_id, page: 1, page_size: 5 }
+    : { trace_id: detail.trace_id || undefined, page: 1, page_size: 5 };
+  const systemLogQuery = useOpsSystemLogs(systemLogLookup, Boolean(detail.request_id || detail.trace_id));
   const protocol = detail.target_protocol
     ? `${detail.source_protocol ?? detail.platform ?? "—"} → ${detail.target_protocol}`
     : detail.source_protocol ?? detail.platform ?? "—";
   const events = detail.upstream_errors ?? [];
   const firstAt = events.length > 0 ? events[0]?.at_unix_ms ?? 0 : 0;
-  const systemLogHref = adminSystemLogsHref(detail);
   const resolutionMutation = useUpdateErrorLogResolution();
 
   return (
@@ -165,16 +173,13 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
         ) : null}
       </div>
 
-      {systemLogHref ? (
-        <div className="flex justify-end">
-          <Button asChild variant="outline" size="sm">
-            <Link href={systemLogHref}>
-              <ExternalLink aria-hidden />
-              {t("adminErrorLogs.openSystemLogs")}
-            </Link>
-          </Button>
-        </div>
-      ) : null}
+      <SystemLogEvidence
+        logs={systemLogQuery.data?.data ?? []}
+        loading={systemLogQuery.isFetching}
+        requestID={detail.request_id}
+        traceID={detail.trace_id}
+        total={systemLogQuery.data?.pagination?.total}
+      />
 
       <RequestLogEvidence
         files={requestLogQuery.data?.data ?? []}
@@ -255,6 +260,95 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
             })}
           </ol>
         </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SystemLogEvidence({
+  logs,
+  loading,
+  requestID,
+  traceID,
+  total,
+}: {
+  logs: OpsSystemLog[];
+  loading: boolean;
+  requestID?: string | null;
+  traceID?: string | null;
+  total?: number;
+}) {
+  const { t } = useLanguage();
+  const systemLogHref = adminSystemLogsHref(
+    requestID ? { request_id: requestID } : { trace_id: traceID },
+  );
+  const requestEvidenceHref = adminRequestEvidenceHref({ request_id: requestID });
+  const relatedTotal = Math.max(total ?? logs.length, logs.length);
+  const remaining = logs.length > 0 ? Math.max(relatedTotal - logs.length, 0) : 0;
+
+  if (!systemLogHref && !requestEvidenceHref) return null;
+
+  return (
+    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+            {t("adminErrorLogs.systemLogs")}
+          </p>
+          <p className="mt-1 text-xs text-srapi-text-tertiary">
+            {loading && logs.length === 0
+              ? t("adminErrorLogs.systemLogLoading")
+              : logs.length === 0
+                ? t("adminErrorLogs.systemLogMissing")
+                : t("adminErrorLogs.systemLogCount", { count: relatedTotal })}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          {systemLogHref ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={systemLogHref}>
+                <ExternalLink aria-hidden />
+                {t("adminErrorLogs.openSystemLogs")}
+              </Link>
+            </Button>
+          ) : null}
+          {requestEvidenceHref ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link href={requestEvidenceHref}>
+                <ExternalLink aria-hidden />
+                {t("adminErrorLogs.openRequestEvidence")}
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {logs.length > 0 ? (
+        <ol className="mt-3 space-y-2">
+          {logs.map((log) => (
+            <li
+              key={log.id}
+              className="rounded-md border border-srapi-border bg-srapi-surface px-3 py-2"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <QuietBadge status={systemLogTone(log.level)} label={log.level} />
+                <span className="font-mono text-2xs text-srapi-text-tertiary">
+                  {formatDateTime(log.created_at)}
+                </span>
+                <span className="font-mono text-2xs text-srapi-text-tertiary">
+                  {log.source || "—"}
+                </span>
+              </div>
+              <p className="mt-1 break-words text-xs text-srapi-text-primary">{log.message}</p>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+
+      {remaining > 0 ? (
+        <p className="mt-2 text-xs text-srapi-text-tertiary">
+          {t("adminErrorLogs.systemLogMore", { count: remaining })}
+        </p>
       ) : null}
     </div>
   );
@@ -566,6 +660,19 @@ function resolutionTone(resolution: OpsErrorLog["resolution"]): QuietStatus {
       return "disabled";
     default:
       return "error";
+  }
+}
+
+function systemLogTone(level: OpsSystemLog["level"]): QuietStatus {
+  switch (level) {
+    case "error":
+      return "error";
+    case "warn":
+      return "limited";
+    case "info":
+      return "active";
+    default:
+      return "disabled";
   }
 }
 

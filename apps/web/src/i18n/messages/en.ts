@@ -1674,6 +1674,7 @@ export const en = {
     relatedEvidence: "Related evidence",
     openErrorLogs: "Error logs",
     openRequestDumps: "Request dumps",
+    openRequestEvidence: "Request evidence",
   },
   adminOpsCleanup: {
     action: "Clean up logs",
@@ -2341,6 +2342,12 @@ export const en = {
     requestDumpMore: "{count} more dump(s) share this request ID.",
     openRequestDumps: "All dumps",
     openSystemLogs: "System logs",
+    systemLogs: "System log context",
+    systemLogLoading: "Checking related system logs…",
+    systemLogMissing: "No related system logs for this request.",
+    systemLogCount: "{count} related system log(s).",
+    systemLogMore: "{count} more system log(s) share this correlation ID.",
+    openRequestEvidence: "Request evidence",
   },
   adminSettings: {
     title: "Settings",

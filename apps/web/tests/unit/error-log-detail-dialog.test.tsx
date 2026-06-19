@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ErrorLogDetailDialog } from "@/components/admin/error-log-detail-dialog";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { OpsErrorLog, RequestLogFileDescriptor } from "@/lib/sdk-types";
+import type { OpsErrorLog, OpsSystemLog, RequestLogFileDescriptor } from "@/lib/sdk-types";
 
 const storage = new Map<string, string>();
 Object.defineProperty(window, "localStorage", {
@@ -53,6 +53,15 @@ const mocks = vi.hoisted(() => ({
     request_id: "req-detail",
     is_error_only: true,
   } satisfies RequestLogFileDescriptor,
+  systemLog: {
+    id: "sys-1",
+    level: "warn",
+    message: "gateway retry exhausted",
+    source: "gateway",
+    request_id: "req-detail",
+    trace_id: "trace-detail",
+    created_at: "2026-06-18T10:00:02Z",
+  } satisfies OpsSystemLog,
   updateResolution: vi.fn(),
 }));
 
@@ -89,6 +98,13 @@ Latency-MS: 891
     data: {
       data: [mocks.file],
       pagination: { page: 1, page_size: 3, total: 1, has_next: false },
+    },
+    isFetching: false,
+  }),
+  useOpsSystemLogs: () => ({
+    data: {
+      data: [mocks.systemLog],
+      pagination: { page: 1, page_size: 5, total: 1, has_next: false },
     },
     isFetching: false,
   }),
@@ -144,5 +160,24 @@ describe("ErrorLogDetailDialog request dump evidence", () => {
     expect(screen.getAllByText("server_bad").length).toBeGreaterThan(0);
     expect(screen.getAllByText("891ms").length).toBeGreaterThan(0);
     expect(screen.getByText("1 请求 / 1 响应")).toBeInTheDocument();
+  });
+
+  it("shows related system logs and request evidence links", () => {
+    render(
+      <ErrorLogDetailDialog errorLogId="err-1" open onOpenChange={() => undefined} />,
+      { wrapper: wrap },
+    );
+
+    expect(screen.getByText("系统日志上下文")).toBeInTheDocument();
+    expect(screen.getByText("gateway retry exhausted")).toBeInTheDocument();
+    expect(screen.getByText("gateway")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "系统日志" })).toHaveAttribute(
+      "href",
+      "/admin/ops/system-logs?f_request_id=req-detail",
+    );
+    expect(screen.getByRole("link", { name: "请求证据" })).toHaveAttribute(
+      "href",
+      "/admin/logs?tab=request-evidence&f_request_id=req-detail",
+    );
   });
 });

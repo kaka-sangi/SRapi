@@ -35,10 +35,11 @@ export function useUpdateOpsSettings() {
   );
 }
 
-export function useOpsSystemLogs(params?: P<typeof adminApi.listOpsSystemLogs>) {
+export function useOpsSystemLogs(params?: P<typeof adminApi.listOpsSystemLogs>, enabled = true) {
   return useQuery({
     queryKey: queryKeys.admin.opsSystemLogs(params),
     queryFn: () => adminApi.listOpsSystemLogs(params),
+    enabled,
   });
 }
 

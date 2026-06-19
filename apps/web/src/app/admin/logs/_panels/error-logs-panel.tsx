@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bug, FileText, ScrollText } from "lucide-react";
+import { Bug, FileText, Link2, ScrollText } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
@@ -20,7 +20,11 @@ import { useProviderNameLookup } from "@/hooks/use-provider-name-lookup";
 import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatLatency } from "@/lib/admin-format";
-import { adminRequestDumpsHref, adminSystemLogsHref } from "@/lib/admin-log-links";
+import {
+  adminRequestDumpsHref,
+  adminRequestEvidenceHref,
+  adminSystemLogsHref,
+} from "@/lib/admin-log-links";
 import type { OpsErrorLog } from "@/lib/sdk-types";
 import {
   LOG_WINDOW_PRESETS,
@@ -383,7 +387,8 @@ function RelatedEvidencePills({ log }: { log: OpsErrorLog }) {
   const { t } = useLanguage();
   const systemHref = adminSystemLogsHref(log);
   const requestDumpHref = adminRequestDumpsHref(log);
-  if (!systemHref && !requestDumpHref) {
+  const requestEvidenceHref = adminRequestEvidenceHref(log);
+  if (!systemHref && !requestDumpHref && !requestEvidenceHref) {
     return <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>;
   }
 
@@ -405,6 +410,15 @@ function RelatedEvidencePills({ log }: { log: OpsErrorLog }) {
         >
           <FileText aria-hidden className="size-3 shrink-0" />
           <span className="truncate">{t("adminErrorLogs.openRequestDumps")}</span>
+        </Link>
+      ) : null}
+      {requestEvidenceHref ? (
+        <Link
+          href={requestEvidenceHref}
+          className="inline-flex max-w-full items-center gap-1 rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+        >
+          <Link2 aria-hidden className="size-3 shrink-0" />
+          <span className="truncate">{t("adminErrorLogs.openRequestEvidence")}</span>
         </Link>
       ) : null}
     </div>

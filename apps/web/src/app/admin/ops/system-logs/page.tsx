@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Bug, ExternalLink, FileText } from "lucide-react";
+import { Bug, ExternalLink, FileText, Link2 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
@@ -25,7 +25,11 @@ import { QuietBadge } from "@/components/ui/quiet-badge";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useOpsSystemLogHealth, useOpsSystemLogs } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
-import { adminErrorLogsHref, adminRequestDumpsHref } from "@/lib/admin-log-links";
+import {
+  adminErrorLogsHref,
+  adminRequestDumpsHref,
+  adminRequestEvidenceHref,
+} from "@/lib/admin-log-links";
 import { formatDateTime, formatInteger, safeJson } from "@/lib/admin-format";
 import type { OpsSystemLog, OpsSystemLogHealth, OpsSystemLogLevel } from "@/lib/sdk-types";
 import { opsSystemLogEvidenceItems } from "./system-log-evidence";
@@ -377,7 +381,8 @@ function EvidenceSummary({ log }: { log: OpsSystemLog }) {
   const items = opsSystemLogEvidenceItems(log);
   const errorHref = adminErrorLogsHref(log);
   const requestDumpHref = adminRequestDumpsHref(log);
-  if (items.length === 0 && !errorHref && !requestDumpHref) {
+  const requestEvidenceHref = adminRequestEvidenceHref(log);
+  if (items.length === 0 && !errorHref && !requestDumpHref && !requestEvidenceHref) {
     return <span className="text-2xs text-srapi-text-tertiary font-mono">—</span>;
   }
   return (
@@ -398,6 +403,14 @@ function EvidenceSummary({ log }: { log: OpsSystemLog }) {
           {t("adminOpsSystemLogs.openRequestDumps")}
         </Link>
       ) : null}
+      {requestEvidenceHref ? (
+        <Link
+          href={requestEvidenceHref}
+          className="max-w-full truncate rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+        >
+          {t("adminOpsSystemLogs.openRequestEvidence")}
+        </Link>
+      ) : null}
       {items.map((item) => (
         <span
           key={`${item.key}:${item.value}`}
@@ -415,7 +428,8 @@ function RelatedEvidenceLinks({ log }: { log: OpsSystemLog }) {
   const { t } = useLanguage();
   const errorHref = adminErrorLogsHref(log);
   const requestDumpHref = adminRequestDumpsHref(log);
-  if (!errorHref && !requestDumpHref) return null;
+  const requestEvidenceHref = adminRequestEvidenceHref(log);
+  if (!errorHref && !requestDumpHref && !requestEvidenceHref) return null;
 
   return (
     <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-3">
@@ -437,6 +451,15 @@ function RelatedEvidenceLinks({ log }: { log: OpsSystemLog }) {
             <Link href={requestDumpHref}>
               <FileText aria-hidden />
               {t("adminOpsSystemLogs.openRequestDumps")}
+              <ExternalLink aria-hidden />
+            </Link>
+          </Button>
+        ) : null}
+        {requestEvidenceHref ? (
+          <Button asChild variant="outline" size="sm">
+            <Link href={requestEvidenceHref}>
+              <Link2 aria-hidden />
+              {t("adminOpsSystemLogs.openRequestEvidence")}
               <ExternalLink aria-hidden />
             </Link>
           </Button>

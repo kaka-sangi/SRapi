@@ -1652,6 +1652,7 @@ export const zh: Messages = {
     relatedEvidence: "关联证据",
     openErrorLogs: "错误日志",
     openRequestDumps: "请求转储",
+    openRequestEvidence: "请求证据",
   },
   adminOpsCleanup: {
     action: "清理日志",
@@ -2318,6 +2319,12 @@ export const zh: Messages = {
     requestDumpMore: "还有 {count} 个转储使用同一请求 ID。",
     openRequestDumps: "全部转储",
     openSystemLogs: "系统日志",
+    systemLogs: "系统日志上下文",
+    systemLogLoading: "正在检查关联系统日志……",
+    systemLogMissing: "该请求没有关联的系统日志。",
+    systemLogCount: "找到 {count} 条关联系统日志。",
+    systemLogMore: "还有 {count} 条系统日志使用同一关联 ID。",
+    openRequestEvidence: "请求证据",
   },
   adminSettings: {
     title: "设置",
