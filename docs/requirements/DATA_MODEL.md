@@ -921,6 +921,7 @@ updated_at
 ### 9A.3 user_platform_quota
 
 按用户 + 平台维度的日/周/月配额（迁移 `000030`；注意表名为单数 `user_platform_quota`）。
+`daily_limit` / `weekly_limit` / `monthly_limit` 为可空、非负十进制 USD 金额；空值表示该窗口不设上限，服务层写入时规范为 8 位小数。
 
 ```txt
 id

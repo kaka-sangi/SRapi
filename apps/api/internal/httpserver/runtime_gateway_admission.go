@@ -653,7 +653,7 @@ func (rt *runtimeState) enforceUserPlatformQuota(ctx context.Context, userID, pr
 		{monthly, spendMonthly, "monthly"},
 	}
 	for _, window := range windows {
-		if window.limit == nil {
+		if !validPlatformQuotaLimit(window.limit) {
 			continue
 		}
 		if compareMoney(money.AddMoney(window.spent, estimated), *window.limit) > 0 {
@@ -665,6 +665,17 @@ func (rt *runtimeState) enforceUserPlatformQuota(ctx context.Context, userID, pr
 		}
 	}
 	return nil
+}
+
+func validPlatformQuotaLimit(limit *string) bool {
+	if limit == nil {
+		return false
+	}
+	if strings.TrimSpace(*limit) == "" {
+		return false
+	}
+	rat, ok := money.DecimalRat(money.NormalizeAmount(*limit))
+	return ok && rat.Sign() >= 0
 }
 
 func gatewayModelReferences(canonical gatewaycontract.CanonicalRequest, resolution modelcontract.ModelResolution) []string {

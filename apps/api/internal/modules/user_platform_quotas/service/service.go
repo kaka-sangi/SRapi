@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/user_platform_quotas/contract"
+	"github.com/srapi/srapi/apps/api/internal/pkg/money"
 )
 
 // ErrInvalidInput is returned for malformed quota input.
@@ -34,9 +35,22 @@ func (s *Service) UpsertQuota(ctx context.Context, input contract.UpsertQuota) (
 	if input.UserID <= 0 || input.Platform == "" {
 		return contract.Quota{}, ErrInvalidInput
 	}
-	if strings.TrimSpace(input.Currency) == "" {
-		input.Currency = "USD"
+	dailyLimit, ok := optionalLimit(input.DailyLimit)
+	if !ok {
+		return contract.Quota{}, ErrInvalidInput
 	}
+	weeklyLimit, ok := optionalLimit(input.WeeklyLimit)
+	if !ok {
+		return contract.Quota{}, ErrInvalidInput
+	}
+	monthlyLimit, ok := optionalLimit(input.MonthlyLimit)
+	if !ok {
+		return contract.Quota{}, ErrInvalidInput
+	}
+	input.DailyLimit = dailyLimit
+	input.WeeklyLimit = weeklyLimit
+	input.MonthlyLimit = monthlyLimit
+	input.Currency = money.NormalizeCurrency(input.Currency)
 	return s.store.UpsertQuota(ctx, input)
 }
 
@@ -62,4 +76,20 @@ func (s *Service) EffectiveQuota(ctx context.Context, userID int, platform strin
 		return contract.Quota{}, false
 	}
 	return quota, true
+}
+
+func optionalLimit(value *string) (*string, bool) {
+	if value == nil {
+		return nil, true
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil, true
+	}
+	rat, ok := money.DecimalRat(money.NormalizeAmount(trimmed))
+	if !ok || rat.Sign() < 0 {
+		return nil, false
+	}
+	normalized := money.FormatRatFixed(rat, 8)
+	return &normalized, true
 }

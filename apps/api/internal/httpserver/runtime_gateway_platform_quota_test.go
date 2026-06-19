@@ -80,6 +80,100 @@ func TestGatewayEnforcesUserPlatformSpendQuota(t *testing.T) {
 	}
 }
 
+func TestGatewayIgnoresInvalidStoredPlatformSpendQuotaLimit(t *testing.T) {
+	quotaStore := userplatformquotasmemory.New()
+	handler := New(config.Load(), nil, WithUserPlatformQuotasStore(quotaStore))
+
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateOpenAIChatGatewayTarget(t, handler, sessionCookie, loginResp.Data.CsrfToken, "bad-platform-quota-provider", "bad-platform-quota-model")
+	adminUserID, err := strconv.Atoi(loginResp.Data.User.Id)
+	if err != nil {
+		t.Fatalf("parse admin user id %q: %v", loginResp.Data.User.Id, err)
+	}
+
+	invalidDaily := "not-money"
+	if _, err := quotaStore.UpsertQuota(context.Background(), userplatformquotascontract.UpsertQuota{
+		UserID:     adminUserID,
+		Platform:   providerResp.Data.Name,
+		DailyLimit: &invalidDaily,
+		Currency:   "USD",
+		Enabled:    true,
+	}); err != nil {
+		t.Fatalf("seed invalid stored platform quota: %v", err)
+	}
+
+	keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"bad-platform-quota-gateway","scopes":["gateway:invoke"]}`)
+	apiKey := keyResp.Data.PlaintextKey
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"bad-platform-quota-model","messages":[{"role":"user","content":"invalid stored quota should fail open"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected gateway to ignore invalid stored quota limit, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdminUserPlatformQuotaRejectsInvalidMoneyLimits(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	adminUserID, err := strconv.Atoi(loginResp.Data.User.Id)
+	if err != nil {
+		t.Fatalf("parse admin user id %q: %v", loginResp.Data.User.Id, err)
+	}
+
+	cases := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "invalid decimal",
+			body: `{"platform":"openai-compatible","daily_limit":"not-money","enabled":true}`,
+		},
+		{
+			name: "negative decimal",
+			body: `{"platform":"openai-compatible","weekly_limit":"-0.01000000","enabled":true}`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/"+strconv.Itoa(adminUserID)+"/platform-quotas", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set(csrfHeaderName, loginResp.Data.CsrfToken)
+			req.AddCookie(sessionCookie)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected invalid platform quota 400, got %d body=%s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+
+	validReq := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/"+strconv.Itoa(adminUserID)+"/platform-quotas", strings.NewReader(`{"platform":"openai-compatible","daily_limit":" 1.5 ","monthly_limit":"","enabled":true}`))
+	validReq.Header.Set("Content-Type", "application/json")
+	validReq.Header.Set(csrfHeaderName, loginResp.Data.CsrfToken)
+	validReq.AddCookie(sessionCookie)
+	validRec := httptest.NewRecorder()
+	handler.ServeHTTP(validRec, validReq)
+	if validRec.Code != http.StatusOK {
+		t.Fatalf("expected valid platform quota 200, got %d body=%s", validRec.Code, validRec.Body.String())
+	}
+	var resp apiopenapi.UserPlatformQuotaResponse
+	if err := json.NewDecoder(validRec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode platform quota response: %v", err)
+	}
+	if resp.Data.DailyLimit == nil || *resp.Data.DailyLimit != "1.50000000" {
+		t.Fatalf("expected normalized daily limit, got %+v", resp.Data.DailyLimit)
+	}
+	if resp.Data.MonthlyLimit != nil {
+		t.Fatalf("expected blank monthly limit to clear, got %+v", resp.Data.MonthlyLimit)
+	}
+}
+
 func TestCurrentUserPlatformQuotasListsOwnQuotas(t *testing.T) {
 	quotaStore := userplatformquotasmemory.New()
 	handler := New(config.Load(), nil, WithUserPlatformQuotasStore(quotaStore))
