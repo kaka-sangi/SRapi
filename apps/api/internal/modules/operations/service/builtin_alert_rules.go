@@ -4,13 +4,19 @@ import (
 	"context"
 	"strings"
 
+	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 )
 
 const (
-	builtinAlertRuleGatewayErrorRate     = "SRapi Gateway error rate baseline"
-	builtinAlertRuleGatewayLatencyP95    = "SRapi Gateway p95 latency baseline"
-	builtinAlertRuleChatCompletionsError = "SRapi Chat Completions error rate baseline"
+	builtinAlertRuleGatewayErrorRate         = "SRapi Gateway error rate baseline"
+	builtinAlertRuleGatewayLatencyP95        = "SRapi Gateway p95 latency baseline"
+	builtinAlertRuleChatCompletionsError     = "SRapi Chat Completions error rate baseline"
+	builtinAlertRuleChatCompletionsLatency   = "SRapi Chat Completions p95 latency baseline"
+	builtinAlertRuleResponsesError           = "SRapi Responses error rate baseline"
+	builtinAlertRuleMessagesError            = "SRapi Messages error rate baseline"
+	builtinAlertRuleResponsesWebSocketError  = "SRapi Responses WebSocket error rate baseline"
+	builtinAlertRuleRealtimeTranscriptsError = "SRapi Realtime Transcripts error rate baseline"
 )
 
 // EnsureBuiltinAlertRules creates missing baseline Ops alert rules without
@@ -84,7 +90,77 @@ var builtinAlertRules = []contract.AlertRule{
 		CooldownSeconds: 10 * 60,
 		MinRequestCount: 10,
 		Scope: contract.AlertRuleScope{
-			SourceEndpoint: "/v1/chat/completions",
+			SourceEndpoint: string(gatewaycontract.EndpointChatCompletions),
+		},
+	},
+	{
+		Name:            builtinAlertRuleChatCompletionsLatency,
+		MetricType:      contract.AlertMetricLatencyP95,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       20000,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   10 * 60,
+		CooldownSeconds: 15 * 60,
+		MinRequestCount: 10,
+		Scope: contract.AlertRuleScope{
+			SourceEndpoint: string(gatewaycontract.EndpointChatCompletions),
+		},
+	},
+	{
+		Name:            builtinAlertRuleResponsesError,
+		MetricType:      contract.AlertMetricErrorRate,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       0.1,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 10,
+		Scope: contract.AlertRuleScope{
+			SourceEndpoint: string(gatewaycontract.EndpointResponses),
+		},
+	},
+	{
+		Name:            builtinAlertRuleMessagesError,
+		MetricType:      contract.AlertMetricErrorRate,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       0.1,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 10,
+		Scope: contract.AlertRuleScope{
+			SourceEndpoint: string(gatewaycontract.EndpointMessages),
+		},
+	},
+	{
+		Name:            builtinAlertRuleResponsesWebSocketError,
+		MetricType:      contract.AlertMetricErrorRate,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       0.1,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 5,
+		Scope: contract.AlertRuleScope{
+			SourceEndpoint: "/v1/responses/ws",
+		},
+	},
+	{
+		Name:            builtinAlertRuleRealtimeTranscriptsError,
+		MetricType:      contract.AlertMetricErrorRate,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       0.1,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 5,
+		Scope: contract.AlertRuleScope{
+			SourceEndpoint: string(gatewaycontract.EndpointRealtime),
 		},
 	},
 }

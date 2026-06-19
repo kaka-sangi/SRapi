@@ -384,7 +384,7 @@ Provider Account metadata 或 Provider config/capabilities 可以把默认 `/mod
 
 默认短窗口为长窗口的 1/12，且不低于 1 分钟；SLO 阈值显式配置 `short_window_seconds` / `long_window_seconds` 时优先生效。相关配置项为 `SLO_EVALUATOR_INTERVAL_SECONDS` 和 `SLO_EVALUATOR_TIMEOUT_SECONDS`。告警 details 只保存 SLO id/name、severity、窗口秒数、请求计数、bad request 计数和 burn-rate 数值，不保存 API key、credential、prompt、request body、cookies 或 provider secret。
 
-AdminOps 启动时会按规则名幂等创建 3 条内置阈值告警基线：全局 Gateway error rate、全局 Gateway p95 latency、`/v1/chat/completions` error rate。已有同名规则会被视为 operator-owned 配置，不会被覆盖；需要停用默认保护时应禁用规则而不是修改数据库。
+AdminOps 启动时会按规则名幂等创建内置阈值告警基线：全局 Gateway error rate、全局 Gateway p95 latency，以及 `/v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1/responses/ws` 和 `/v1/realtime` 的入口级错误率或 p95 latency baseline。已有同名规则会被视为 operator-owned 配置，不会被覆盖；需要停用默认保护时应禁用规则而不是修改数据库。
 
 Prometheus alert rules 可以从 `deploy/prometheus-srapi-alerts.yaml` 加载。该文件基于 `srapi_ops_alert_events{severity,status}` 生成 critical 和 warning Ops posture 告警，也覆盖 scheduler no-available-account、Provider 错误升高，以及 `ops_error_logs` 异步错误证据 recorder 缺失、丢弃、写失败和积压。labels 只保留低基数路由字段，排障说明和 runbook 放在 annotations。修改规则后运行：
 

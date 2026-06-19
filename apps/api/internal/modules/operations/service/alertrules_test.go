@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 )
@@ -85,8 +86,8 @@ func TestEnsureBuiltinAlertRulesCreatesMissingBaselines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ensure builtins: %v", err)
 	}
-	if len(created) != 3 {
-		t.Fatalf("expected 3 builtin rules, got %+v", created)
+	if len(created) != len(builtinAlertRules) {
+		t.Fatalf("expected %d builtin rules, got %+v", len(builtinAlertRules), created)
 	}
 	if created[0].Name != builtinAlertRuleGatewayErrorRate ||
 		created[0].MetricType != contract.AlertMetricErrorRate ||
@@ -105,10 +106,15 @@ func TestEnsureBuiltinAlertRulesCreatesMissingBaselines(t *testing.T) {
 		t.Fatalf("unexpected latency baseline: %+v", created[1])
 	}
 	if created[2].Name != builtinAlertRuleChatCompletionsError ||
-		created[2].Scope.SourceEndpoint != "/v1/chat/completions" ||
+		created[2].Scope.SourceEndpoint != string(gatewaycontract.EndpointChatCompletions) ||
 		created[2].MinRequestCount != 10 {
 		t.Fatalf("unexpected chat baseline: %+v", created[2])
 	}
+	assertBuiltinRule(t, created, builtinAlertRuleChatCompletionsLatency, contract.AlertMetricLatencyP95, string(gatewaycontract.EndpointChatCompletions), 10)
+	assertBuiltinRule(t, created, builtinAlertRuleResponsesError, contract.AlertMetricErrorRate, string(gatewaycontract.EndpointResponses), 10)
+	assertBuiltinRule(t, created, builtinAlertRuleMessagesError, contract.AlertMetricErrorRate, string(gatewaycontract.EndpointMessages), 10)
+	assertBuiltinRule(t, created, builtinAlertRuleResponsesWebSocketError, contract.AlertMetricErrorRate, "/v1/responses/ws", 5)
+	assertBuiltinRule(t, created, builtinAlertRuleRealtimeTranscriptsError, contract.AlertMetricErrorRate, string(gatewaycontract.EndpointRealtime), 5)
 
 	again, err := svc.EnsureBuiltinAlertRules(t.Context())
 	if err != nil {
@@ -145,7 +151,7 @@ func TestEnsureBuiltinAlertRulesRespectsExistingOperatorRule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ensure builtins: %v", err)
 	}
-	if len(created) != 2 {
+	if len(created) != len(builtinAlertRules)-1 {
 		t.Fatalf("expected only missing builtins, got %+v", created)
 	}
 	found, err := svc.ListAlertRules(t.Context())
@@ -164,6 +170,20 @@ func TestEnsureBuiltinAlertRulesRespectsExistingOperatorRule(t *testing.T) {
 		preserved.MinRequestCount != 99 {
 		t.Fatalf("expected existing operator rule preserved, got %+v from %+v", preserved, found)
 	}
+}
+
+func assertBuiltinRule(t *testing.T, rules []contract.AlertRule, name string, metric contract.AlertMetricType, endpoint string, minRequestCount int) {
+	t.Helper()
+	for _, rule := range rules {
+		if rule.Name != name {
+			continue
+		}
+		if rule.MetricType != metric || rule.Scope.SourceEndpoint != endpoint || rule.MinRequestCount != minRequestCount || !rule.Enabled {
+			t.Fatalf("unexpected builtin rule %q: %+v", name, rule)
+		}
+		return
+	}
+	t.Fatalf("builtin rule %q not found in %+v", name, rules)
 }
 
 func TestEvaluateAlertRulesFiresUpdatesAndResolvesEvents(t *testing.T) {
