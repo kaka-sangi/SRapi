@@ -560,6 +560,48 @@ func TestEvaluateAlertRulesMatchesCanonicalErrorClassAliases(t *testing.T) {
 	}
 }
 
+func TestEvaluateAlertRulesMatchesStreamTimeoutAliases(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if _, err := svc.CreateAlertRule(t.Context(), contract.CreateAlertRuleRequest{
+		Name:            "Provider timeout spike",
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       2,
+		Severity:        contract.AlertSeverityWarning,
+		WindowSeconds:   300,
+		MinRequestCount: 1,
+		Scope:           contract.AlertRuleScope{ErrorClass: "timeout"},
+	}); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+	store.usageLogs = []usagecontract.UsageLog{
+		{RequestID: "req_timeout", Success: false, ErrorClass: ptrString("timeout"), CreatedAt: now.Add(-time.Minute)},
+		{RequestID: "req_stream_idle_timeout", Success: false, ErrorClass: ptrString("stream_idle_timeout"), CreatedAt: now.Add(-2 * time.Minute)},
+		{RequestID: "req_ws_idle_timeout", Success: false, ErrorClass: ptrString("ws_idle_timeout"), CreatedAt: now.Add(-3 * time.Minute)},
+		{RequestID: "req_network", Success: false, ErrorClass: ptrString("network_error"), CreatedAt: now.Add(-4 * time.Minute)},
+	}
+
+	result, err := svc.EvaluateAlertRules(t.Context())
+	if err != nil {
+		t.Fatalf("evaluate rules: %v", err)
+	}
+	if result.Evaluated != 1 || result.Breached != 1 || result.Created != 1 {
+		t.Fatalf("unexpected evaluation result: %+v", result)
+	}
+	alerts, err := svc.ListAlerts(t.Context())
+	if err != nil {
+		t.Fatalf("list alerts: %v", err)
+	}
+	if len(alerts) != 1 || alerts[0].Details["error_class"] != "timeout" || alerts[0].Details["total_requests"] != 3 {
+		t.Fatalf("expected canonical timeout alert to include stream/ws timeouts, got %+v", alerts)
+	}
+}
+
 func TestEvaluateAlertRulesSuppressesWithCanonicalErrorClassAlias(t *testing.T) {
 	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
 	store := newCaptureObservabilityStore()
@@ -605,6 +647,54 @@ func TestEvaluateAlertRulesSuppressesWithCanonicalErrorClassAlias(t *testing.T) 
 	}
 	if len(alerts) != 1 || alerts[0].Status != contract.AlertStatusSuppressed || alerts[0].Details["error_class"] != "auth_failed" {
 		t.Fatalf("expected suppressed canonical auth alert, got %+v", alerts)
+	}
+}
+
+func TestEvaluateAlertRulesSuppressesStreamTimeoutWithTimeoutSilence(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if _, err := svc.CreateAlertRule(t.Context(), contract.CreateAlertRuleRequest{
+		Name:            "Provider timeout spike",
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       1,
+		Severity:        contract.AlertSeverityWarning,
+		WindowSeconds:   300,
+		MinRequestCount: 1,
+		Scope:           contract.AlertRuleScope{ErrorClass: "stream_idle_timeout"},
+	}); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+	if _, err := svc.CreateAlertSilence(t.Context(), contract.CreateAlertSilenceRequest{
+		Comment:  "upstream stream maintenance",
+		Matcher:  contract.AlertSilenceMatcher{ErrorClass: "timeout"},
+		StartsAt: now.Add(-time.Hour),
+		EndsAt:   now.Add(time.Hour),
+	}); err != nil {
+		t.Fatalf("create silence: %v", err)
+	}
+	store.usageLogs = []usagecontract.UsageLog{
+		{RequestID: "req_stream_idle_timeout_1", Success: false, ErrorClass: ptrString("stream_idle_timeout"), CreatedAt: now.Add(-time.Minute)},
+		{RequestID: "req_stream_idle_timeout_2", Success: false, ErrorClass: ptrString("stream_idle_timeout"), CreatedAt: now.Add(-2 * time.Minute)},
+	}
+
+	result, err := svc.EvaluateAlertRules(t.Context())
+	if err != nil {
+		t.Fatalf("evaluate rules: %v", err)
+	}
+	if result.Breached != 1 || result.Created != 1 || result.Suppressed != 1 {
+		t.Fatalf("expected timeout alias-matched silence, got %+v", result)
+	}
+	alerts, err := svc.ListAlerts(t.Context())
+	if err != nil {
+		t.Fatalf("list alerts: %v", err)
+	}
+	if len(alerts) != 1 || alerts[0].Status != contract.AlertStatusSuppressed || alerts[0].Details["error_class"] != "timeout" {
+		t.Fatalf("expected suppressed canonical timeout alert, got %+v", alerts)
 	}
 }
 

@@ -627,6 +627,8 @@ func canonicalAlertErrorClass(value string) string {
 		return "rate_limit"
 	case "auth_error", "authentication_error", "credential_error":
 		return "auth_failed"
+	case "stream_idle_timeout", "stream_timeout", "ws_idle_timeout", "acquire_timeout", "request_timeout", "timeout_error":
+		return "timeout"
 	case "permission_error", "permission_denied", "forbidden":
 		return "permission_denied"
 	case "transport_error":
