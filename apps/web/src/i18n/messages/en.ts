@@ -803,6 +803,11 @@ export const en = {
       timeout: "Timeout",
       degraded: "Degraded",
     },
+    healthAction: {
+      recover: "Recover this group",
+      clear_error: "Clear errors for this group",
+      refresh_quota: "Refresh quota for this group",
+    },
     cooldown: "Cooldown",
     detailNoData: "No data yet.",
     usageWindowsTitle: "Usage windows",

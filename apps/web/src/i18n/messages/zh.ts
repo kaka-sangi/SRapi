@@ -799,6 +799,11 @@ export const zh: Messages = {
       timeout: "超时",
       degraded: "退化",
     },
+    healthAction: {
+      recover: "恢复该组账号",
+      clear_error: "清除该组错误",
+      refresh_quota: "刷新该组配额",
+    },
     cooldown: "冷却",
     detailNoData: "暂无数据。",
     usageWindowsTitle: "用量窗口",

@@ -1,18 +1,27 @@
 import Link from "next/link";
-import { CheckSquare, ExternalLink } from "lucide-react";
+import { CheckSquare, ExternalLink, RefreshCw, RotateCcw, ShieldX } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import type { AccountHealthSnapshot } from "@/lib/sdk-types";
 import { cn } from "@/lib/cn";
 import { accountHealthNeedsInvestigation } from "@/lib/admin-account-health-investigation";
-import { buildAccountHealthOpsSummary, type AccountHealthOpsGroup } from "@/lib/admin-account-health-ops";
+import {
+  accountHealthGroupMaintenanceActions,
+  buildAccountHealthOpsSummary,
+  type AccountHealthMaintenanceAction,
+  type AccountHealthOpsGroup,
+} from "@/lib/admin-account-health-ops";
 import { latestQuotaWindows, quotaWindowDisplayLabel, quotaWindowTiming } from "@/lib/quota-display";
 
 export function HealthSummaryStrip({
   healthById,
   onSelectAccounts,
+  onRunGroupAction,
+  actionPending = false,
 }: {
   healthById: Map<string, AccountHealthSnapshot>;
   onSelectAccounts?: (ids: string[]) => void;
+  onRunGroupAction?: (group: AccountHealthOpsGroup, action: AccountHealthMaintenanceAction) => void;
+  actionPending?: boolean;
 }) {
   const { t } = useLanguage();
   const entries = [...healthById.values()];
@@ -34,6 +43,8 @@ export function HealthSummaryStrip({
               key={group.key}
               group={group}
               onSelectAccounts={onSelectAccounts}
+              onRunGroupAction={onRunGroupAction}
+              actionPending={actionPending}
             />
           ))}
         </div>
@@ -45,11 +56,16 @@ export function HealthSummaryStrip({
 function HealthOpsGroupPill({
   group,
   onSelectAccounts,
+  onRunGroupAction,
+  actionPending,
 }: {
   group: AccountHealthOpsGroup;
   onSelectAccounts?: (ids: string[]) => void;
+  onRunGroupAction?: (group: AccountHealthOpsGroup, action: AccountHealthMaintenanceAction) => void;
+  actionPending: boolean;
 }) {
   const { t } = useLanguage();
+  const actions = onRunGroupAction ? accountHealthGroupMaintenanceActions(group) : [];
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-srapi-border bg-srapi-card-muted px-2 py-1 font-mono text-2xs text-srapi-text-secondary">
       <span className="truncate">{t(`adminAccounts.healthIssue.${group.key}`)}</span>
@@ -80,8 +96,35 @@ function HealthOpsGroupPill({
           <CheckSquare className="size-3" aria-hidden />
         </button>
       ) : null}
+      {actions.map((action) => {
+        const Icon = healthActionIcon(action);
+        return (
+          <button
+            key={action}
+            type="button"
+            onClick={() => onRunGroupAction?.(group, action)}
+            disabled={actionPending}
+            className="text-srapi-text-tertiary transition-colors hover:text-srapi-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label={t(`adminAccounts.healthAction.${action}`)}
+            title={t(`adminAccounts.healthAction.${action}`)}
+          >
+            <Icon className="size-3" aria-hidden />
+          </button>
+        );
+      })}
     </span>
   );
+}
+
+function healthActionIcon(action: AccountHealthMaintenanceAction) {
+  switch (action) {
+    case "recover":
+      return RotateCcw;
+    case "clear_error":
+      return ShieldX;
+    case "refresh_quota":
+      return RefreshCw;
+  }
 }
 
 export function AccountHealthCell({

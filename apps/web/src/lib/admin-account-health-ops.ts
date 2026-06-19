@@ -6,6 +6,7 @@ import {
 } from "@/lib/admin-account-health-investigation";
 
 export type AccountHealthOpsGroupKey = "circuit" | "quota" | "rate_limit" | "timeout" | "degraded";
+export type AccountHealthMaintenanceAction = "recover" | "clear_error" | "refresh_quota";
 
 export interface AccountHealthOpsGroup {
   key: AccountHealthOpsGroupKey;
@@ -65,6 +66,24 @@ export function buildAccountHealthOpsSummary(
     attention,
     groups,
   };
+}
+
+/** Return the maintenance actions that best match a grouped health issue. */
+export function accountHealthGroupMaintenanceActions(
+  group: AccountHealthOpsGroup,
+): AccountHealthMaintenanceAction[] {
+  switch (group.key) {
+    case "circuit":
+      return ["recover", "clear_error"];
+    case "quota":
+      return ["refresh_quota", "clear_error"];
+    case "rate_limit":
+      return ["clear_error"];
+    case "timeout":
+      return ["recover", "clear_error"];
+    case "degraded":
+      return ["recover", "clear_error"];
+  }
 }
 
 function primaryHealthIssue(snapshot: AccountHealthSnapshot): AccountHealthOpsGroupKey {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildAccountHealthOpsSummary } from "@/lib/admin-account-health-ops";
+import {
+  accountHealthGroupMaintenanceActions,
+  buildAccountHealthOpsSummary,
+  type AccountHealthOpsGroupKey,
+} from "@/lib/admin-account-health-ops";
 import type { AccountHealthSnapshot } from "@/lib/sdk-types";
 
 function health(
@@ -58,5 +62,25 @@ describe("buildAccountHealthOpsSummary", () => {
     expect(summary.groups[0]?.investigationHref).toBe(
       "/admin/logs?tab=error&f_error_class=rate_limited",
     );
+  });
+
+  it("maps health groups to the matching maintenance actions", () => {
+    const actionsByGroup = new Map(
+      buildAccountHealthOpsSummary([
+        health("open-circuit", { circuit_state: "open", error_class: "timeout" }),
+        health("quota", { quota_exhausted: true, error_class: "quota_exceeded" }),
+        health("rate", { rate_limit_count: 2, error_class: "rate_limited" }),
+        health("timeout", { timeout_count: 1, error_class: "timeout" }),
+        health("degraded", { success_rate: 0.72, error_rate: 0.28, error_class: "upstream_error" }),
+      ]).groups.map((group) => [group.key, accountHealthGroupMaintenanceActions(group)]),
+    );
+
+    expect(Object.fromEntries(actionsByGroup)).toEqual({
+      circuit: ["recover", "clear_error"],
+      quota: ["refresh_quota", "clear_error"],
+      rate_limit: ["clear_error"],
+      timeout: ["recover", "clear_error"],
+      degraded: ["recover", "clear_error"],
+    } satisfies Record<AccountHealthOpsGroupKey, string[]>);
   });
 });

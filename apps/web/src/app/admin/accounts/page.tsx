@@ -76,6 +76,7 @@ import { BulkAddAccountsDialog } from "./bulk-add-dialog";
 import type { Provider, ProviderAccount, ProviderAccountStatus } from "@/lib/sdk-types";
 import { type AccountListMode, metadataString } from "./account-types";
 import { AccountHealthCell, AccountQuotaCell, HealthSummaryStrip } from "./account-health-cells";
+import type { AccountHealthMaintenanceAction, AccountHealthOpsGroup } from "@/lib/admin-account-health-ops";
 import { AccountStatusCell } from "./account-status-cell";
 import { TokenExpiryChip } from "./token-expiry-chip";
 import { AutoRefreshButton, ViewModeToggle } from "./accounts-toolbar";
@@ -108,6 +109,10 @@ function downloadJson(filename: string, data: unknown) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function normalizeAccountIds(ids: string[]): string[] {
+  return [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
 }
 
 function AccountsContent() {
@@ -224,6 +229,27 @@ function AccountsContent() {
   );
   const proxyOptions = (proxies.data?.data ?? []).map((p) => ({ value: p.id, label: p.name }));
   const isFiltered = Boolean(statusFilter || providerFilter);
+
+  function toastBatchResult({
+    total,
+    succeeded,
+    failed,
+  }: {
+    total: number;
+    succeeded: number;
+    failed: number;
+  }) {
+    if (failed > 0 && succeeded > 0) {
+      toast({
+        title: t("feedback.batchPartial", { succeeded, failed }),
+        tone: "warning",
+      });
+    } else if (failed > 0) {
+      toast({ title: t("feedback.batchAllFailed", { count: total }), tone: "error" });
+    } else {
+      toast({ title: t("feedback.batchAllSucceeded", { count: succeeded }), tone: "success" });
+    }
+  }
 
   /** Apply a status to every selected account via the atomic PATCH
    * /admin/accounts/batch endpoint. Previously this fired N concurrent
@@ -398,28 +424,44 @@ function AccountsContent() {
     }
   }
 
+  async function applyQuotaFetchForAccountIds(
+    accountIds: string[],
+    options: { clearSelection?: boolean } = {},
+  ) {
+    const ids = normalizeAccountIds(accountIds);
+    if (ids.length === 0) return;
+    try {
+      const result = await batchQuotaFetch.mutateAsync(ids);
+      if (options.clearSelection) list.clearSelection();
+      toastBatchResult({ total: ids.length, succeeded: result.success, failed: result.failed });
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
+
   /** sub2api `BatchRefreshTier` parity — fan out per-account quota
    *  refresh across the selection in one server call. Per-row failures
    *  come back in result.rows[] (outer call still returns 200), so
    *  surface them as a partial-batch toast. */
   async function applyBulkQuotaFetch() {
-    const ids = [...list.selected];
+    await applyQuotaFetchForAccountIds([...list.selected], { clearSelection: true });
+  }
+
+  async function applyAccountActionForIds(
+    accountIds: string[],
+    action: AccountBatchAction,
+    options: { clearSelection?: boolean } = {},
+  ) {
+    const ids = normalizeAccountIds(accountIds);
     if (ids.length === 0) return;
     try {
-      const result = await batchQuotaFetch.mutateAsync(ids);
-      list.clearSelection();
-      const succeededCount = result.success;
-      const failedCount = result.failed;
-      if (failedCount > 0 && succeededCount > 0) {
-        toast({
-          title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
-          tone: "warning",
-        });
-      } else if (failedCount > 0) {
-        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
-      } else {
-        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
-      }
+      const result = await batchAction.mutateAsync(buildBatchAccountActionBody({ accountIds: ids, action }));
+      if (options.clearSelection) list.clearSelection();
+      toastBatchResult({
+        total: ids.length,
+        succeeded: result.updated_count,
+        failed: result.errors.length,
+      });
     } catch (err) {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
     }
@@ -427,26 +469,18 @@ function AccountsContent() {
 
   /** Run a per-account maintenance action (clear_error / recover) across the selection. */
   async function applyBulkAction(action: AccountBatchAction) {
-    const ids = [...list.selected];
-    if (ids.length === 0) return;
-    try {
-      const result = await batchAction.mutateAsync(buildBatchAccountActionBody({ accountIds: ids, action }));
-      list.clearSelection();
-      const failedCount = result.errors.length;
-      const succeededCount = result.updated_count;
-      if (failedCount > 0 && succeededCount > 0) {
-        toast({
-          title: t("feedback.batchPartial", { succeeded: succeededCount, failed: failedCount }),
-          tone: "warning",
-        });
-      } else if (failedCount > 0) {
-        toast({ title: t("feedback.batchAllFailed", { count: ids.length }), tone: "error" });
-      } else {
-        toast({ title: t("feedback.batchAllSucceeded", { count: succeededCount }), tone: "success" });
-      }
-    } catch (err) {
-      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    await applyAccountActionForIds([...list.selected], action, { clearSelection: true });
+  }
+
+  function runHealthGroupAction(
+    group: AccountHealthOpsGroup,
+    action: AccountHealthMaintenanceAction,
+  ) {
+    if (action === "refresh_quota") {
+      void applyQuotaFetchForAccountIds(group.accountIds);
+      return;
     }
+    void applyAccountActionForIds(group.accountIds, action);
   }
 
   async function runAction(fn: () => Promise<unknown>, okTitle: string) {
@@ -922,6 +956,8 @@ function AccountsContent() {
       <HealthSummaryStrip
         healthById={healthById}
         onSelectAccounts={readOnlyHealthView ? undefined : selectAccountIds}
+        onRunGroupAction={readOnlyHealthView ? undefined : runHealthGroupAction}
+        actionPending={batchAction.isPending || batchQuotaFetch.isPending}
       />
 
       {listMode === "cards" ? (
