@@ -130,6 +130,9 @@ func openAIPreset(providerKey string, displayName string, defaultBaseURL string,
 	if openAIPresetSupportsResponsesCompact(providerKey) {
 		capabilities[capabilitiescontract.KeyResponsesCompact] = true
 	}
+	if openAIPresetSupportsResponsesInputItems(providerKey) {
+		capabilities[capabilitiescontract.KeyResponsesInputItems] = true
+	}
 	preset := compatiblePreset(providerKey, PlatformFamilyOpenAICompatible, displayName, defaultBaseURL, routeAliases, capabilities)
 	if providerKey == "openai" {
 		preset.RuntimeClassAllowlist = []accountscontract.RuntimeClass{
@@ -546,6 +549,15 @@ func openAIPresetSupportsResponsesCompact(providerKey string) bool {
 	}
 }
 
+func openAIPresetSupportsResponsesInputItems(providerKey string) bool {
+	switch strings.TrimSpace(providerKey) {
+	case "openai", "openai-compatible":
+		return true
+	default:
+		return false
+	}
+}
+
 func anthropicCapabilities() map[string]bool {
 	return map[string]bool{
 		capabilitiescontract.KeyChatCompletions:  true,
@@ -590,15 +602,16 @@ func geminiCapabilities() map[string]bool {
 
 func codexCLICapabilities() map[string]bool {
 	return map[string]bool{
-		capabilitiescontract.KeyChatCompletions:  true,
-		capabilitiescontract.KeyMessages:         true,
-		capabilitiescontract.KeyResponses:        true,
-		capabilitiescontract.KeyResponsesCompact: true,
-		capabilitiescontract.KeyStreaming:        true,
-		capabilitiescontract.KeyToolCalling:      true,
-		capabilitiescontract.KeyStructuredOutput: true,
-		capabilitiescontract.KeyVisionInput:      true,
-		capabilitiescontract.KeyReasoningControl: true,
+		capabilitiescontract.KeyChatCompletions:     true,
+		capabilitiescontract.KeyMessages:            true,
+		capabilitiescontract.KeyResponses:           true,
+		capabilitiescontract.KeyResponsesCompact:    true,
+		capabilitiescontract.KeyResponsesInputItems: true,
+		capabilitiescontract.KeyStreaming:           true,
+		capabilitiescontract.KeyToolCalling:         true,
+		capabilitiescontract.KeyStructuredOutput:    true,
+		capabilitiescontract.KeyVisionInput:         true,
+		capabilitiescontract.KeyReasoningControl:    true,
 	}
 }
 

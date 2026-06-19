@@ -71,6 +71,9 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !openaiPreset.Capabilities["responses_compact"] {
 		t.Fatalf("expected openai-compatible preset to advertise responses_compact")
 	}
+	if !openaiPreset.Capabilities["responses_input_items"] {
+		t.Fatalf("expected openai-compatible preset to advertise responses_input_items")
+	}
 	if openaiPreset.Capabilities["realtime_websocket"] {
 		t.Fatalf("expected realtime_websocket to require explicit provider/account capability opt-in")
 	}
@@ -105,6 +108,9 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 	if !anthropicPreset.Capabilities["chat_completions"] || !anthropicPreset.Capabilities["responses"] || !anthropicPreset.Capabilities["messages"] {
 		t.Fatalf("expected anthropic-compatible preset to advertise supported text endpoints, got %+v", anthropicPreset.Capabilities)
+	}
+	if anthropicPreset.Capabilities["responses_input_items"] {
+		t.Fatalf("expected anthropic-compatible preset to exclude responses_input_items")
 	}
 
 	anthropicProviderPreset, ok := registry.Lookup("anthropic")
@@ -269,6 +275,9 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		chatGPTWebPreset.QuotaConfig["quota_plan_path"] != "account_plan.account_plan_id" {
 		t.Fatalf("unexpected chatgpt-web quota config: %+v", chatGPTWebPreset.QuotaConfig)
 	}
+	if chatGPTWebPreset.Capabilities["responses_input_items"] {
+		t.Fatalf("expected chatgpt-web preset to exclude responses_input_items")
+	}
 
 	deepseekPreset, ok := registry.Lookup("deepseek")
 	if !ok {
@@ -346,7 +355,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !containsRuntimeClass(codexPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) {
 		t.Fatalf("expected codex-cli to include oauth_refresh runtime class")
 	}
-	if !codexPreset.Capabilities["chat_completions"] || !codexPreset.Capabilities["responses"] || !codexPreset.Capabilities["messages"] || !codexPreset.Capabilities["responses_compact"] || !codexPreset.Capabilities["streaming"] {
+	if !codexPreset.Capabilities["chat_completions"] || !codexPreset.Capabilities["responses"] || !codexPreset.Capabilities["messages"] || !codexPreset.Capabilities["responses_compact"] || !codexPreset.Capabilities["responses_input_items"] || !codexPreset.Capabilities["streaming"] {
 		t.Fatalf("unexpected codex-cli capabilities: %+v", codexPreset.Capabilities)
 	}
 	if codexPreset.MatchesPath("/backend-api/codex/responses") {
@@ -400,6 +409,9 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 	if !geminiPreset.Capabilities["chat_completions"] || !geminiPreset.Capabilities["messages"] || geminiPreset.Capabilities["responses"] {
 		t.Fatalf("unexpected gemini text endpoint capabilities: %+v", geminiPreset.Capabilities)
+	}
+	if geminiPreset.Capabilities["responses_input_items"] {
+		t.Fatalf("expected gemini preset to exclude responses_input_items")
 	}
 }
 

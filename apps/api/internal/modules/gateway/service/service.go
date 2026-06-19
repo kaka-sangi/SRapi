@@ -119,7 +119,7 @@ func (s *Service) NormalizeResponses(req apiopenapi.ResponsesRequest, meta Reque
 
 func (s *Service) NormalizeResponseInputItems(model string, meta RequestMeta) gatewaycontract.CanonicalRequest {
 	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, model, "", false, "", nil, nil, "", nil)
-	canonical.RequestCapabilities = []gatewaycontract.RequestCapability{{Key: capabilitiescontract.KeyResponses, Version: "v1"}}
+	canonical.RequestCapabilities = []gatewaycontract.RequestCapability{{Key: capabilitiescontract.KeyResponsesInputItems, Version: "v1"}}
 	return canonical
 }
 

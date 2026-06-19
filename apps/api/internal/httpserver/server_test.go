@@ -5497,6 +5497,24 @@ func TestGatewayRootProviderAliasesAreNotRegistered(t *testing.T) {
 	}
 }
 
+func TestGatewayResponsesInputItemsAliasRegistrationUsesNativeCapability(t *testing.T) {
+	handler := New(config.Load(), nil)
+
+	registeredReq := httptest.NewRequest(http.MethodGet, "/api/provider/openai-compatible/v1/responses/resp_alias/input_items?model=gpt-5", nil)
+	registeredRec := httptest.NewRecorder()
+	handler.ServeHTTP(registeredRec, registeredReq)
+	if registeredRec.Code == http.StatusNotFound {
+		t.Fatalf("expected openai-compatible input_items alias to be registered")
+	}
+
+	unregisteredReq := httptest.NewRequest(http.MethodGet, "/api/provider/anthropic-compatible/v1/responses/resp_alias/input_items?model=gpt-5", nil)
+	unregisteredRec := httptest.NewRecorder()
+	handler.ServeHTTP(unregisteredRec, unregisteredReq)
+	if unregisteredRec.Code != http.StatusNotFound {
+		t.Fatalf("expected anthropic-compatible input_items alias to be unregistered, got %d body=%s", unregisteredRec.Code, unregisteredRec.Body.String())
+	}
+}
+
 func TestGatewayOpenAIProviderAliasForcesProviderContext(t *testing.T) {
 	var upstreamCalls int
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -5721,6 +5739,65 @@ func TestGatewayResponsesInputItemsAliasReplaysRawUpstreamJSON(t *testing.T) {
 	}
 	if firstUsage.RequestId != secondUsage.RequestId {
 		t.Fatalf("expected input_items failover attempts to share request id, got %q and %q", firstUsage.RequestId, secondUsage.RequestId)
+	}
+}
+
+func TestGatewayResponsesInputItemsRequiresNativeCapability(t *testing.T) {
+	var upstreamCalls int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+		if r.Method != http.MethodGet || r.URL.Path != "/v1/responses/resp_native/input_items" {
+			t.Fatalf("unexpected upstream request %s %s", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"object":"list","data":[],"has_more":false}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	anthropicProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"input-items-anthropic-compatible","display_name":"Input Items Anthropic Compatible","adapter_type":"anthropic-compatible","protocol":"anthropic-compatible","status":"active","capabilities":{"responses":true,"messages":true}}`)
+	openAIProvider := mustFindProviderByName(t, handler, sessionCookie, "openai-compatible")
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"input-items-native-model","display_name":"Input Items Native Model","status":"active","capabilities":[{"key":"responses","level":"required","status":"stable","version":"v1"},{"key":"responses_input_items","level":"required","status":"experimental","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(anthropicProvider.Data.Id)+`","upstream_model_name":"claude-input-items","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openAIProvider.Id)+`","upstream_model_name":"openai-input-items","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(anthropicProvider.Data.Id)+`","name":"input-items-anthropic-high-priority","runtime_class":"api_key","credential":{"api_key":"anthropic-secret"},"status":"active","priority":1}`)
+	openAIAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(openAIProvider.Id)+`","name":"input-items-openai-native","runtime_class":"api_key","credential":{"api_key":"openai-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":100}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodGet, "/v1/responses/resp_native/input_items?model=input-items-native-model", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected input_items request 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if upstreamCalls != 1 {
+		t.Fatalf("expected one native input_items upstream call, got %d", upstreamCalls)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=input-items-native-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) == 0 ||
+		decisionsResp.Data[0].SelectedAccountId == nil ||
+		*decisionsResp.Data[0].SelectedAccountId != string(openAIAccount.Data.Id) {
+		t.Fatalf("expected native openai-compatible account to be selected, got %+v", decisionsResp.Data)
+	}
+	foundAnthropicMismatch := false
+	for _, reason := range decisionsResp.Data[0].RejectReasons {
+		if strings.Contains(fmt.Sprint(reason), "capability_mismatch:responses_input_items") {
+			foundAnthropicMismatch = true
+			break
+		}
+	}
+	if !foundAnthropicMismatch {
+		t.Fatalf("expected anthropic candidate to be rejected for responses_input_items, got %+v", decisionsResp.Data[0].RejectReasons)
 	}
 }
 

@@ -104,6 +104,7 @@ chat_completions
 responses
 responses_websocket
 responses_compact
+responses_input_items
 messages
 embeddings
 images
@@ -118,6 +119,8 @@ token_counting
 
 `responses_compact` 是独立端点能力，不能从普通 `responses` 自动推导；compact 需要 Provider Account 能返回 `response.compaction` JSON 语义。只有 preset、provider capability 或 account metadata 明确声明 compact 时，Scheduler 才能把该账号作为 `/v1/responses/compact` 候选。
 
+`responses_input_items` 是独立端点能力，不能从普通 `responses` 自动推导；input_items 需要 Provider Account 能读取 OpenAI Responses stateful 子资源并原样回放 JSON list。只有 preset、provider capability 或 account metadata 明确声明 input_items 时，Scheduler 才能把该账号作为 `/v1/responses/{response_id}/input_items` 候选。
+
 `audio_transcriptions` 表示 Provider Account 能处理 `/v1/audio/transcriptions` 兼容端点；`audio_input` 表示模型/Provider 能消费音频输入，`text_output` 表示可产出转写文本。Gateway audio transcription 请求必须要求 `audio_transcriptions.v1`，避免 text-only 或 image-only provider 被误选。
 
 `audio_speech` 表示 Provider Account 能处理 `/v1/audio/speech` 兼容端点；`text_input` 表示模型/Provider 能消费待合成文本，`audio_output` 表示可产出音频。Gateway audio speech 请求必须要求 `audio_speech.v1`，避免 transcription-only 或 text-only provider 被误选。
@@ -129,6 +132,8 @@ token_counting
 `token_counting` 表示 Provider Account 能处理原生 token counting 端点，例如 Gemini `models/{model}:countTokens` 或 Anthropic `/v1/messages/count_tokens`。Gateway countTokens / count_tokens 请求必须要求 `token_counting.v1`，避免只具备生成能力但没有计数端点的候选账号被误选；计数结果不代表生成用量。
 
 `responses_compact` 表示 Provider Account 能处理 OpenAI Responses compact 子资源并返回原生 `response.compaction`。Gateway `/v1/responses/compact` 请求必须要求 `responses_compact.v1`，避免只具备普通 Responses 或 Chat Completions 生成能力的候选账号被误选并伪造压缩语义。
+
+`responses_input_items` 表示 Provider Account 能处理 OpenAI Responses input_items 子资源并返回原生 list JSON。Gateway `/v1/responses/{response_id}/input_items` 请求必须要求 `responses_input_items.v1`，避免只具备普通 Responses 生成转换能力的候选账号被误选并尝试读取不存在的上游 stateful 子资源。
 
 `responses_websocket` 表示 Provider Account 能处理 OpenAI Responses WebSocket relay。Gateway `/v1/responses/ws` 在请求上游 WebSocket relay 时必须要求 `responses_websocket.v1`，避免只具备普通 Responses HTTP/SSE 能力的候选账号被误选并占用 scheduler lease。该能力不等同于 `realtime_websocket`，后者只表示 OpenAI Realtime 双向会话能力。
 

@@ -519,11 +519,14 @@ Canonical AI Response -> OpenAI Chat / Responses / Anthropic Messages / Gemini r
 `GET /v1/responses/{response_id}/input_items` is an OpenAI Responses
 subresource rather than a new conversation runtime. SRapi requires query
 `model` so API key model visibility, entitlement, Scheduler, Provider Adapter,
-usage evidence, and scheduler decision records still apply. The selected
-adapter calls upstream `/responses/{response_id}/input_items` with supported
-pagination query parameters (`after`, repeated `include`, `limit`, `order`) and
-replays the raw JSON list. The SRapi-only `model` query parameter is not
-forwarded upstream, and successful requests record zero generation tokens/cost.
+usage evidence, and scheduler decision records still apply. The request requires
+`responses_input_items.v1`; ordinary `responses.v1` generation support is not
+enough because cross-protocol generation adapters cannot read a native OpenAI
+Responses stateful input item list. The selected adapter calls upstream
+`/responses/{response_id}/input_items` with supported pagination query
+parameters (`after`, repeated `include`, `limit`, `order`) and replays the raw
+JSON list. The SRapi-only `model` query parameter is not forwarded upstream, and
+successful requests record zero generation tokens/cost.
 
 `GET /v1/usage` is a client integration endpoint, not an admin usage export.
 It authenticates the Gateway Bearer key and returns only that key's usage

@@ -40,10 +40,10 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 	}
 	// Preset baseline always merges in first: provider.Capabilities and account
 	// metadata then act as overrides (true to enable, false to disable) rather
-	// than full replacements. This mirrors sub2api's account-extra capability
-	// shape and matches the ported behavior tested by
-	// TestEffectiveCapabilitiesUsesPresetBaselineWithProviderOverrides.
-	if presetCaps := presetCapabilitiesForAdapter(provider.AdapterType); len(presetCaps) > 0 {
+	// than full replacements. Prefer the concrete provider preset over the
+	// adapter family so provider-specific subresources are not inherited by
+	// every OpenAI-compatible adapter.
+	if presetCaps := presetCapabilitiesForProvider(provider); len(presetCaps) > 0 {
 		for key, value := range presetCaps {
 			canonicalKey, ok := capabilitiescontract.CanonicalKeyFromConvenience(key)
 			if !ok {
@@ -145,6 +145,30 @@ func capabilityRequirement(key string) capabilitiescontract.Descriptor {
 	}
 }
 
+func presetCapabilitiesForProvider(provider providercontract.Provider) map[string]any {
+	if presetKey := providerPresetKey(provider); presetKey != "" {
+		if preset, ok := providerpreset.Default().Lookup(presetKey); ok {
+			return boolCapabilitiesAsAny(preset.Capabilities)
+		}
+	}
+	return presetCapabilitiesForAdapter(provider.AdapterType)
+}
+
+func providerPresetKey(provider providercontract.Provider) string {
+	for _, value := range []string{
+		metadataString(provider.ConfigSchema, "provider_key"),
+		provider.Name,
+	} {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		if _, ok := providerpreset.Default().Lookup(value); ok {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
 func presetCapabilitiesForAdapter(adapterType string) map[string]any {
 	if presetKey := adapterTypeToPresetKey(adapterType); presetKey != "" {
 		if preset, ok := providerpreset.Default().Lookup(presetKey); ok {
@@ -236,6 +260,7 @@ func providerScopedCapabilityKeys() []string {
 		capabilitiescontract.KeyRealtimeWebSocket,
 		capabilitiescontract.KeyResponsesWebSocket,
 		capabilitiescontract.KeyResponsesCompact,
+		capabilitiescontract.KeyResponsesInputItems,
 		capabilitiescontract.KeyTokenCounting,
 		capabilitiescontract.KeyVisionInput,
 	}

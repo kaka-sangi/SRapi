@@ -28,6 +28,10 @@ func TestCanonicalKeyFromConvenienceMapsDTOKeys(t *testing.T) {
 	if !ok || got != KeyResponsesCompact {
 		t.Fatalf("expected supports_responses_compact to map to %s, got %q ok=%v", KeyResponsesCompact, got, ok)
 	}
+	got, ok = CanonicalKeyFromConvenience("supports_responses_input_items")
+	if !ok || got != KeyResponsesInputItems {
+		t.Fatalf("expected supports_responses_input_items to map to %s, got %q ok=%v", KeyResponsesInputItems, got, ok)
+	}
 	got, ok = CanonicalKeyFromConvenience("supports_responses_websocket")
 	if !ok || got != KeyResponsesWebSocket {
 		t.Fatalf("expected supports_responses_websocket to map to %s, got %q ok=%v", KeyResponsesWebSocket, got, ok)
@@ -64,6 +68,18 @@ func TestDefaultDefinitionsIncludeResponsesCompact(t *testing.T) {
 		}
 	}
 	t.Fatalf("expected default definitions to include %s", KeyResponsesCompact)
+}
+
+func TestDefaultDefinitionsIncludeResponsesInputItems(t *testing.T) {
+	for _, def := range DefaultDefinitions() {
+		if def.Key == KeyResponsesInputItems {
+			if def.Version != "v1" || def.Category != "endpoint" || def.Status != DefinitionStatusExperimental {
+				t.Fatalf("unexpected responses input_items definition: %+v", def)
+			}
+			return
+		}
+	}
+	t.Fatalf("expected default definitions to include %s", KeyResponsesInputItems)
 }
 
 func TestDefaultDefinitionsIncludeResponsesWebSocket(t *testing.T) {

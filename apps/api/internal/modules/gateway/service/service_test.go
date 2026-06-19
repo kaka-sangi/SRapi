@@ -210,7 +210,7 @@ func TestNormalizeResponsesCompactRequiresCompactCapability(t *testing.T) {
 	}
 }
 
-func TestNormalizeResponseInputItemsRequiresResponsesCapability(t *testing.T) {
+func TestNormalizeResponseInputItemsRequiresInputItemsCapability(t *testing.T) {
 	svc, err := New()
 	if err != nil {
 		t.Fatalf("new service: %v", err)
@@ -218,8 +218,11 @@ func TestNormalizeResponseInputItemsRequiresResponsesCapability(t *testing.T) {
 
 	canonical := svc.NormalizeResponseInputItems("gpt-5", RequestMeta{SourceEndpoint: "/v1/responses/resp_123/input_items"})
 
-	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyResponses) {
-		t.Fatalf("expected responses capability, got %+v", canonical.RequestCapabilities)
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyResponsesInputItems) {
+		t.Fatalf("expected responses_input_items capability, got %+v", canonical.RequestCapabilities)
+	}
+	if requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyResponses) {
+		t.Fatalf("input_items endpoint should not inherit plain responses capability, got %+v", canonical.RequestCapabilities)
 	}
 }
 

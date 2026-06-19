@@ -5262,7 +5262,7 @@ export const createResponse = <ThrowOnError extends boolean = false>(options: Op
 /**
  * List input items for an OpenAI Responses-compatible response.
  *
- * Responses input_items subresource. SRapi uses the required `model` query parameter for API key model policy and Provider Account scheduling, then calls the selected upstream `/responses/{response_id}/input_items` and replays the upstream JSON list. The `model` query parameter is not forwarded upstream.
+ * Responses input_items subresource. SRapi uses the required `model` query parameter for API key model policy and Provider Account scheduling. The request requires `responses_input_items` capability; ordinary `responses` generation support is not enough. SRapi then calls the selected upstream `/responses/{response_id}/input_items` and replays the upstream JSON list. The `model` query parameter is not forwarded upstream.
  *
  */
 export const listResponseInputItems = <ThrowOnError extends boolean = false>(options: Options<ListResponseInputItemsData, ThrowOnError>) => (options.client ?? client).get<ListResponseInputItemsResponses, ListResponseInputItemsErrors, ThrowOnError>({
@@ -5598,7 +5598,7 @@ export const createOpenAiCompatibleResponseAlias = <ThrowOnError extends boolean
 /**
  * List Responses input items with openai-compatible provider context.
  *
- * Provider alias route. It reuses the standard Responses input_items runtime and forces the `openai-compatible` provider context.
+ * Provider alias route. It reuses the standard Responses input_items runtime, requires `responses_input_items` capability, and forces the `openai-compatible` provider context.
  */
 export const listOpenAiCompatibleResponseInputItemsAlias = <ThrowOnError extends boolean = false>(options: Options<ListOpenAiCompatibleResponseInputItemsAliasData, ThrowOnError>) => (options.client ?? client).get<ListOpenAiCompatibleResponseInputItemsAliasResponses, ListOpenAiCompatibleResponseInputItemsAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

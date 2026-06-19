@@ -10,6 +10,7 @@ export const MODEL_CAPABILITY_OPTIONS: { value: string; label: string }[] = [
   { value: "chat_completions", label: "Chat completions" },
   { value: "responses", label: "Responses" },
   { value: "responses_compact", label: "Responses · compact" },
+  { value: "responses_input_items", label: "Responses · input items" },
   { value: "embeddings", label: "Embeddings" },
   { value: "images", label: "Images" },
   { value: "audio_transcriptions", label: "Audio · transcriptions" },

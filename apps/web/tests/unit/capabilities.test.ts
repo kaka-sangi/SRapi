@@ -70,6 +70,7 @@ describe("MODEL_CAPABILITY_OPTIONS", () => {
       "chat_completions",
       "responses",
       "responses_compact",
+      "responses_input_items",
       "embeddings",
       "images",
       "audio_transcriptions",

@@ -156,6 +156,93 @@ func TestEffectiveCapabilitiesResponsesCompactRequiresExplicitCapability(t *test
 	}
 }
 
+func TestEffectiveCapabilitiesResponsesInputItemsRequiresNativeSubresource(t *testing.T) {
+	model := modelcontract.Model{
+		Capabilities: []capabilitiescontract.Descriptor{
+			capabilityRequirement(capabilitiescontract.KeyResponses),
+			capabilityRequirement(capabilitiescontract.KeyResponsesInputItems),
+		},
+	}
+	mapping := modelcontract.ModelProviderMapping{}
+
+	cases := []struct {
+		name      string
+		provider  providercontract.Provider
+		account   accountcontract.ProviderAccount
+		wantInput bool
+	}{
+		{
+			name: "model capability alone does not advertise input_items",
+			provider: providercontract.Provider{
+				AdapterType:  "unknown-provider",
+				Capabilities: map[string]any{capabilitiescontract.KeyResponses: true},
+			},
+		},
+		{
+			name: "generic openai-compatible preset advertises native input_items",
+			provider: providercontract.Provider{
+				Name:        "openai-compatible",
+				AdapterType: "openai-compatible",
+			},
+			wantInput: true,
+		},
+		{
+			name: "concrete openai-compatible provider preset does not inherit generic input_items",
+			provider: providercontract.Provider{
+				Name:         "deepseek",
+				AdapterType:  "openai-compatible",
+				ConfigSchema: map[string]any{"provider_key": "deepseek"},
+			},
+		},
+		{
+			name: "codex reverse proxy advertises native input_items",
+			provider: providercontract.Provider{
+				Name:        "codex-cli",
+				AdapterType: "reverse-proxy-codex-cli",
+			},
+			wantInput: true,
+		},
+		{
+			name: "anthropic responses conversion does not imply input_items",
+			provider: providercontract.Provider{
+				AdapterType: "anthropic-compatible",
+			},
+		},
+		{
+			name: "gemini text conversion does not imply input_items",
+			provider: providercontract.Provider{
+				AdapterType: "gemini-compatible",
+			},
+		},
+		{
+			name: "provider override can enable input_items",
+			provider: providercontract.Provider{
+				AdapterType:  "unknown-provider",
+				Capabilities: map[string]any{capabilitiescontract.KeyResponsesInputItems: true},
+			},
+			wantInput: true,
+		},
+		{
+			name: "account false suppresses preset input_items",
+			provider: providercontract.Provider{
+				AdapterType: "openai-compatible",
+			},
+			account: accountcontract.ProviderAccount{
+				Metadata: map[string]any{"capability_responses_input_items": false},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := effectiveCapabilities(model, mapping, tc.provider, tc.account)
+			if hasCapability(got, capabilitiescontract.KeyResponsesInputItems) != tc.wantInput {
+				t.Fatalf("responses_input_items presence = %v, want %v; capabilities=%+v", hasCapability(got, capabilitiescontract.KeyResponsesInputItems), tc.wantInput, got)
+			}
+		})
+	}
+}
+
 func TestEffectiveCapabilitiesResponsesWebSocketIsCodexAccountScoped(t *testing.T) {
 	model := modelcontract.Model{}
 	mapping := modelcontract.ModelProviderMapping{}

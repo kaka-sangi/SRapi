@@ -13213,9 +13213,11 @@ paths:
       description: >
         Responses input_items subresource. SRapi uses the required `model`
         query parameter for API key model policy and Provider Account
-        scheduling, then calls the selected upstream
-        `/responses/{response_id}/input_items` and replays the upstream JSON
-        list. The `model` query parameter is not forwarded upstream.
+        scheduling. The request requires `responses_input_items` capability;
+        ordinary `responses` generation support is not enough. SRapi then calls
+        the selected upstream `/responses/{response_id}/input_items` and
+        replays the upstream JSON list. The `model` query parameter is not
+        forwarded upstream.
       security:
         - gatewayBearerAuth: []
       parameters:
@@ -14361,7 +14363,7 @@ paths:
         - Gateway
       operationId: listOpenAICompatibleResponseInputItemsAlias
       summary: List Responses input items with openai-compatible provider context.
-      description: Provider alias route. It reuses the standard Responses input_items runtime and forces the `openai-compatible` provider context.
+      description: Provider alias route. It reuses the standard Responses input_items runtime, requires `responses_input_items` capability, and forces the `openai-compatible` provider context.
       security:
         - gatewayBearerAuth: []
       parameters:
