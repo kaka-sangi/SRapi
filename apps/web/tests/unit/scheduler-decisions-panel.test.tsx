@@ -125,7 +125,7 @@ describe("SchedulerDecisionsPanel", () => {
     );
     expect(screen.getByRole("link", { name: /账号健康/i })).toHaveAttribute(
       "href",
-      "/admin/accounts?view=health&f_providerId=3",
+      "/admin/accounts?view=health&f_providerId=3&f_accountId=12",
     );
     expect(screen.getByRole("link", { name: /供应商/i })).toHaveAttribute(
       "href",

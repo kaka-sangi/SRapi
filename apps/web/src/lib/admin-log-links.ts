@@ -81,11 +81,12 @@ export function adminSchedulerDecisionsHref(params: LogCorrelationIDs): string |
   return hasCorrelation(query) ? `${ADMIN_ROUTES.ops}?${query.toString()}` : null;
 }
 
-/** Build an account-health link scoped as tightly as the current accounts API supports. */
+/** Build an account-health link that opens the exact account when an id is available. */
 export function adminAccountsHealthHref(params: AdminAccountHrefParams): string {
   const query = new URLSearchParams();
   query.set("view", "health");
   setIfPresent(query, "f_providerId", params.provider_id);
+  setIfPresent(query, "f_accountId", params.account_id);
   return `${ADMIN_ROUTES.accounts}?${query.toString()}`;
 }
 

@@ -77,7 +77,7 @@ describe("admin log evidence links", () => {
 
   it("builds account-health and provider investigation links", () => {
     expect(adminAccountsHealthHref({ account_id: "12", provider_id: 3 })).toBe(
-      "/admin/accounts?view=health&f_providerId=3",
+      "/admin/accounts?view=health&f_providerId=3&f_accountId=12",
     );
     expect(adminAccountsHealthHref({})).toBe("/admin/accounts?view=health");
     expect(adminProvidersHref(3)).toBe("/admin/providers?q=3");

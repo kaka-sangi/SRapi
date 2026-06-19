@@ -17,6 +17,14 @@ export function useAdminAccounts(params?: P<typeof adminApi.listAccounts>) {
   });
 }
 
+export function useAdminAccount(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.admin.account(id ?? ""),
+    queryFn: () => adminApi.getAccount(id as string),
+    enabled: Boolean(id),
+  });
+}
+
 type AccountList = Awaited<ReturnType<typeof adminApi.listAccounts>>;
 const ACCOUNT_LIST_KEY = ["admin", "accounts"] as const;
 

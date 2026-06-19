@@ -1,11 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PropsWithChildren } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import AdminAccountsPage from "@/app/admin/accounts/page";
 import { LanguageProvider } from "@/context/LanguageContext";
 import type { ProviderAccount } from "@/lib/sdk-types";
+
+const mocks = vi.hoisted(() => ({
+  search: "",
+  focusedAccount: undefined as ProviderAccount | undefined,
+  accountDetailSheet: vi.fn(() => null),
+}));
 
 const storage = new Map<string, string>();
 Object.defineProperty(window, "localStorage", {
@@ -19,7 +25,7 @@ Object.defineProperty(window, "localStorage", {
 });
 
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(mocks.search),
 }));
 
 vi.mock("@/components/layout/admin-shell", () => ({
@@ -39,7 +45,7 @@ vi.mock("@/components/admin/bind-proxy-dialog", () => ({
 }));
 
 vi.mock("@/components/admin/account-detail-sheet", () => ({
-  AccountDetailSheet: () => null,
+  AccountDetailSheet: mocks.accountDetailSheet,
 }));
 
 vi.mock("@/components/features/account-test-dialog", () => ({
@@ -79,6 +85,11 @@ vi.mock("@/hooks/admin-queries", async () => {
       isLoading: false,
       isError: false,
       refetch: vi.fn(),
+    }),
+    useAdminAccount: () => ({
+      data: mocks.focusedAccount,
+      isLoading: false,
+      isError: false,
     }),
     useAdminModels: () => ({
       data: { data: [] },
@@ -141,6 +152,13 @@ vi.mock("@/hooks/admin-queries", async () => {
 });
 
 describe("AdminAccountsPage", () => {
+  beforeEach(() => {
+    mocks.search = "";
+    mocks.focusedAccount = undefined;
+    mocks.accountDetailSheet.mockClear();
+    window.history.replaceState(null, "", "/admin/accounts");
+  });
+
   it("defaults to cards and can switch to the table list", async () => {
     const user = userEvent.setup();
     renderPage();
@@ -152,6 +170,28 @@ describe("AdminAccountsPage", () => {
 
     expect(screen.getByRole("columnheader", { name: "名称" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "codex-main" })).not.toBeInTheDocument();
+  });
+
+  it("opens the focused account detail sheet from a health deep link", async () => {
+    mocks.search = "view=health&f_providerId=provider-1&f_accountId=acct-2";
+    mocks.focusedAccount = providerAccount({
+      id: "acct-2",
+      name: "codex-fallback",
+      provider_id: "provider-1",
+    });
+    window.history.replaceState(null, "", `/admin/accounts?${mocks.search}`);
+
+    renderPage();
+
+    expect(await screen.findByText("正在定位账号：codex-fallback（acct-2）")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mocks.accountDetailSheet).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          account: expect.objectContaining({ id: "acct-2", name: "codex-fallback" }),
+        }),
+        undefined,
+      );
+    });
   });
 });
 

@@ -26,6 +26,7 @@ import {
   disableAdminAccount,
   enableAdminAccount,
   exportAdminAccounts,
+  getAdminAccount,
   getAdminAccountHealth,
   getAdminAccountProxyQuality,
   getAdminAccountsHealthSummary,
@@ -148,6 +149,10 @@ export const accountsApi = {
 
   createAccount(body: CreateAdminAccountData["body"]): Promise<ProviderAccount> {
     return unwrapData(() => createAdminAccount({ body, throwOnError: true }));
+  },
+
+  getAccount(id: Id): Promise<ProviderAccount> {
+    return unwrapData(() => getAdminAccount({ path: { id }, throwOnError: true }));
   },
 
   // Bulk-create — one server call inserts up to 1000 accounts under a shared

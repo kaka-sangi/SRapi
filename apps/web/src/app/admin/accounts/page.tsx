@@ -21,6 +21,7 @@ import { AccountDetailSheet } from "@/components/admin/account-detail-sheet";
 import { AccountTestDialog } from "@/components/features/account-test-dialog";
 import {
   useAdminAccounts,
+  useAdminAccount,
   useAdminGroups,
   useAdminModels,
   useAdminProviders,
@@ -133,6 +134,7 @@ function AccountsContent() {
     (list.filters.status as ProviderAccount["status"]) || (readOnlyHealthView ? "active" : undefined);
   const providerFilter = list.filters.providerId || undefined;
   const groupFilter = list.filters.groupId || undefined;
+  const focusedAccountId = list.filters.accountId || undefined;
   const accounts = useAdminAccounts({
     page: list.page,
     page_size: list.pageSize,
@@ -140,6 +142,8 @@ function AccountsContent() {
     provider_id: providerFilter,
     group_id: groupFilter,
   });
+  const accountRows = accounts.data?.data;
+  const focusedAccount = useAdminAccount(focusedAccountId ?? null);
   const models = useAdminModels({ page: 1, page_size: 200, status: "active" });
   const providers = useAdminProviders();
   const proxies = useAdminProxies();
@@ -177,7 +181,7 @@ function AccountsContent() {
   );
   // Today usage per row — batched into one call so the column is cheap even
   // when the page shows many accounts. Joined back by account_id below.
-  const visibleAccountIds = (accounts.data?.data ?? []).map((a) => a.id);
+  const visibleAccountIds = (accountRows ?? []).map((a) => a.id);
   const usageToday = useAccountsUsageTodayBatch(visibleAccountIds);
   const todayByAccountId = new Map(
     (usageToday.data ?? []).map((t) => [t.account_id, t] as const),
@@ -185,12 +189,13 @@ function AccountsContent() {
 
   const [formTarget, setFormTarget] = useState<ProviderAccount | "new" | null>(null);
   const [proxyTarget, setProxyTarget] = useState<ProviderAccount | null>(null);
-  const [detailTarget, setDetailTarget] = useState<ProviderAccount | null>(null);
+  const [manualDetailTarget, setManualDetailTarget] = useState<ProviderAccount | null>(null);
   const [testTarget, setTestTarget] = useState<ProviderAccount | null>(null);
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkConcurrencyOpen, setBulkConcurrencyOpen] = useState(false);
   const [bulkCredentialOpen, setBulkCredentialOpen] = useState(false);
+  const [dismissedFocusedAccountId, setDismissedFocusedAccountId] = useState<string | null>(null);
   // Mode tracks which target picker the dialog should write back to the
   // applyBulkEdit handler: "selected" sends account_ids, "filtered" sends
   // filters resolved server-side. Distinct from `bulkEditOpen` so closing
@@ -228,6 +233,14 @@ function AccountsContent() {
     (providers.data?.data ?? []).map((p) => [String(p.id), p.display_name || p.name] as const),
   );
   const proxyOptions = (proxies.data?.data ?? []).map((p) => ({ value: p.id, label: p.name }));
+  const focusedAccountTarget = focusedAccountId
+    ? (accountRows ?? []).find((a) => a.id === focusedAccountId) ?? focusedAccount.data
+    : undefined;
+  const autoDetailTarget =
+    readOnlyHealthView && focusedAccountId !== dismissedFocusedAccountId
+      ? focusedAccountTarget ?? null
+      : null;
+  const detailTarget = manualDetailTarget ?? autoDetailTarget;
   const isFiltered = Boolean(statusFilter || providerFilter);
 
   function toastBatchResult({
@@ -840,7 +853,7 @@ function AccountsContent() {
 
   function renderRowActions(a: ProviderAccount) {
     const actions: RowAction[] = [
-      { label: t("adminAccounts.details"), onSelect: () => setDetailTarget(a) },
+      { label: t("adminAccounts.details"), onSelect: () => setManualDetailTarget(a) },
       {
         label: t("adminAccounts.test"),
         onSelect: () => {
@@ -959,6 +972,24 @@ function AccountsContent() {
         onRunGroupAction={readOnlyHealthView ? undefined : runHealthGroupAction}
         actionPending={batchAction.isPending || batchQuotaFetch.isPending}
       />
+      {readOnlyHealthView && focusedAccountId ? (
+        <div className="mb-4 rounded-md border border-srapi-border bg-srapi-card-muted px-3 py-2 font-mono text-2xs text-srapi-text-secondary">
+          {focusedAccountTarget ? (
+            <span>
+              {t("adminAccounts.healthFocusActive", {
+                name: focusedAccountTarget.name,
+                id: focusedAccountTarget.id,
+              })}
+            </span>
+          ) : focusedAccount.isError ? (
+            <span className="text-srapi-error">
+              {t("adminAccounts.healthFocusMissing", { id: focusedAccountId })}
+            </span>
+          ) : (
+            <span>{t("adminAccounts.healthFocusLoading", { id: focusedAccountId })}</span>
+          )}
+        </div>
+      ) : null}
 
       {listMode === "cards" ? (
         <AccountsCardView
@@ -983,7 +1014,7 @@ function AccountsContent() {
               </div>
             )
           }
-          onDetail={setDetailTarget}
+          onDetail={setManualDetailTarget}
           renderActions={renderRowActions}
           renderStatus={(a) => (
             <AccountStatusCell
@@ -1092,7 +1123,9 @@ function AccountsContent() {
       <AccountDetailSheet
         account={detailTarget}
         onOpenChange={(open) => {
-          if (!open) setDetailTarget(null);
+          if (open) return;
+          setManualDetailTarget(null);
+          if (focusedAccountId) setDismissedFocusedAccountId(focusedAccountId);
         }}
       />
 
