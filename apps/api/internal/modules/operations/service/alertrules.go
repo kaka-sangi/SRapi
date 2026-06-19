@@ -411,7 +411,7 @@ func silenceMatchesRule(matcher contract.AlertSilenceMatcher, rule contract.Aler
 	if matcher.Model != "" && matcher.Model != rule.Scope.Model {
 		return false
 	}
-	if matcher.ErrorClass != "" && matcher.ErrorClass != rule.Scope.ErrorClass {
+	if matcher.ErrorClass != "" && canonicalAlertErrorClass(matcher.ErrorClass) != canonicalAlertErrorClass(rule.Scope.ErrorClass) {
 		return false
 	}
 	if matcher.ProviderID != nil {
@@ -557,7 +557,7 @@ func validateAlertSilence(silence contract.AlertSilence) error {
 func normalizeAlertRuleScope(scope contract.AlertRuleScope) contract.AlertRuleScope {
 	scope.SourceEndpoint = strings.TrimSpace(scope.SourceEndpoint)
 	scope.Model = strings.TrimSpace(scope.Model)
-	scope.ErrorClass = strings.TrimSpace(scope.ErrorClass)
+	scope.ErrorClass = canonicalAlertErrorClass(scope.ErrorClass)
 	if scope.ProviderID != nil {
 		providerID := *scope.ProviderID
 		scope.ProviderID = &providerID
@@ -569,7 +569,7 @@ func normalizeAlertSilenceMatcher(matcher contract.AlertSilenceMatcher) contract
 	matcher.RuleID = strings.TrimSpace(matcher.RuleID)
 	matcher.SourceEndpoint = strings.TrimSpace(matcher.SourceEndpoint)
 	matcher.Model = strings.TrimSpace(matcher.Model)
-	matcher.ErrorClass = strings.TrimSpace(matcher.ErrorClass)
+	matcher.ErrorClass = canonicalAlertErrorClass(matcher.ErrorClass)
 	if matcher.ProviderID != nil {
 		providerID := *matcher.ProviderID
 		matcher.ProviderID = &providerID
@@ -589,7 +589,24 @@ func usageLogErrorClassMatches(errorClass string, log usagecontract.UsageLog) bo
 	if log.ErrorClass == nil {
 		return false
 	}
-	return strings.EqualFold(strings.TrimSpace(*log.ErrorClass), strings.TrimSpace(errorClass))
+	return canonicalAlertErrorClass(*log.ErrorClass) == canonicalAlertErrorClass(errorClass)
+}
+
+func canonicalAlertErrorClass(value string) string {
+	class := strings.ToLower(strings.TrimSpace(value))
+	switch class {
+	case "rate_limited", "rate_limit_error", "too_many_requests":
+		return "rate_limit"
+	case "auth_error", "authentication_error", "credential_error":
+		return "auth_failed"
+	case "permission_error", "permission_denied", "forbidden":
+		return "permission_denied"
+	case "transport_error":
+		return "network_error"
+	case "bad_gateway", "server_error", "upstream_5xx":
+		return "provider_5xx"
+	}
+	return class
 }
 
 func cloneAlertSilence(value contract.AlertSilence) contract.AlertSilence {

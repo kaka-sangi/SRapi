@@ -18,10 +18,16 @@ const (
 	builtinAlertRuleResponsesWebSocketError  = "SRapi Responses WebSocket error rate baseline"
 	builtinAlertRuleRealtimeTranscriptsError = "SRapi Realtime Transcripts error rate baseline"
 	builtinAlertRuleSchedulerNoAccount       = "SRapi Scheduler no available account baseline"
+	builtinAlertRuleProviderAuthFailure      = "SRapi Provider auth failure baseline"
+	builtinAlertRuleProviderQuotaExhausted   = "SRapi Provider quota exhausted baseline"
 	builtinAlertRuleProvider5xxSpike         = "SRapi Provider 5xx error baseline"
 	builtinAlertRuleRateLimitSpike           = "SRapi Provider rate limit baseline"
 	builtinAlertRuleTimeoutSpike             = "SRapi Provider timeout baseline"
 	builtinAlertRuleNetworkErrorSpike        = "SRapi Provider network error baseline"
+	builtinAlertRuleInvalidResponseSpike     = "SRapi Provider invalid response baseline"
+	builtinAlertRulePolicyErrorSpike         = "SRapi Provider policy error baseline"
+	builtinAlertRuleUpstreamErrorSpike       = "SRapi Provider upstream error baseline"
+	builtinAlertRuleOverloadedSpike          = "SRapi Provider overloaded baseline"
 )
 
 // EnsureBuiltinAlertRules creates missing baseline Ops alert rules without
@@ -183,6 +189,34 @@ var builtinAlertRules = []contract.AlertRule{
 		},
 	},
 	{
+		Name:            builtinAlertRuleProviderAuthFailure,
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       5,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 1,
+		Scope: contract.AlertRuleScope{
+			ErrorClass: "auth_failed",
+		},
+	},
+	{
+		Name:            builtinAlertRuleProviderQuotaExhausted,
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       5,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 1,
+		Scope: contract.AlertRuleScope{
+			ErrorClass: "quota_exhausted",
+		},
+	},
+	{
 		Name:            builtinAlertRuleProvider5xxSpike,
 		MetricType:      contract.AlertMetricRequestCount,
 		Operator:        contract.AlertOperatorGT,
@@ -236,6 +270,62 @@ var builtinAlertRules = []contract.AlertRule{
 		MinRequestCount: 1,
 		Scope: contract.AlertRuleScope{
 			ErrorClass: "network_error",
+		},
+	},
+	{
+		Name:            builtinAlertRuleInvalidResponseSpike,
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       10,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 1,
+		Scope: contract.AlertRuleScope{
+			ErrorClass: "invalid_response",
+		},
+	},
+	{
+		Name:            builtinAlertRulePolicyErrorSpike,
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       10,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 1,
+		Scope: contract.AlertRuleScope{
+			ErrorClass: "policy_error",
+		},
+	},
+	{
+		Name:            builtinAlertRuleUpstreamErrorSpike,
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       10,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 1,
+		Scope: contract.AlertRuleScope{
+			ErrorClass: "upstream_error",
+		},
+	},
+	{
+		Name:            builtinAlertRuleOverloadedSpike,
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       10,
+		Severity:        contract.AlertSeverityWarning,
+		Enabled:         true,
+		WindowSeconds:   5 * 60,
+		CooldownSeconds: 10 * 60,
+		MinRequestCount: 1,
+		Scope: contract.AlertRuleScope{
+			ErrorClass: "overloaded",
 		},
 	},
 }

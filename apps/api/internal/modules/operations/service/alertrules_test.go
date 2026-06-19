@@ -116,10 +116,16 @@ func TestEnsureBuiltinAlertRulesCreatesMissingBaselines(t *testing.T) {
 	assertBuiltinRule(t, created, builtinAlertRuleResponsesWebSocketError, contract.AlertMetricErrorRate, "/v1/responses/ws", 5)
 	assertBuiltinRule(t, created, builtinAlertRuleRealtimeTranscriptsError, contract.AlertMetricErrorRate, string(gatewaycontract.EndpointRealtime), 5)
 	assertBuiltinErrorClassRule(t, created, builtinAlertRuleSchedulerNoAccount, "no_available_account", contract.AlertSeverityCritical, 5)
+	assertBuiltinErrorClassRule(t, created, builtinAlertRuleProviderAuthFailure, "auth_failed", contract.AlertSeverityWarning, 5)
+	assertBuiltinErrorClassRule(t, created, builtinAlertRuleProviderQuotaExhausted, "quota_exhausted", contract.AlertSeverityWarning, 5)
 	assertBuiltinErrorClassRule(t, created, builtinAlertRuleProvider5xxSpike, "provider_5xx", contract.AlertSeverityWarning, 10)
 	assertBuiltinErrorClassRule(t, created, builtinAlertRuleRateLimitSpike, "rate_limit", contract.AlertSeverityWarning, 10)
 	assertBuiltinErrorClassRule(t, created, builtinAlertRuleTimeoutSpike, "timeout", contract.AlertSeverityWarning, 10)
 	assertBuiltinErrorClassRule(t, created, builtinAlertRuleNetworkErrorSpike, "network_error", contract.AlertSeverityWarning, 10)
+	assertBuiltinErrorClassRule(t, created, builtinAlertRuleInvalidResponseSpike, "invalid_response", contract.AlertSeverityWarning, 10)
+	assertBuiltinErrorClassRule(t, created, builtinAlertRulePolicyErrorSpike, "policy_error", contract.AlertSeverityWarning, 10)
+	assertBuiltinErrorClassRule(t, created, builtinAlertRuleUpstreamErrorSpike, "upstream_error", contract.AlertSeverityWarning, 10)
+	assertBuiltinErrorClassRule(t, created, builtinAlertRuleOverloadedSpike, "overloaded", contract.AlertSeverityWarning, 10)
 
 	again, err := svc.EnsureBuiltinAlertRules(t.Context())
 	if err != nil {
@@ -438,6 +444,96 @@ func TestEvaluateAlertRulesFiltersByErrorClass(t *testing.T) {
 	}
 	if len(alerts) != 1 || alerts[0].Details["error_class"] != "provider_5xx" || alerts[0].Details["total_requests"] != 2 {
 		t.Fatalf("expected scoped provider_5xx alert, got %+v", alerts)
+	}
+}
+
+func TestEvaluateAlertRulesMatchesCanonicalErrorClassAliases(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if _, err := svc.CreateAlertRule(t.Context(), contract.CreateAlertRuleRequest{
+		Name:            "Rate limit spike",
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       2,
+		Severity:        contract.AlertSeverityWarning,
+		WindowSeconds:   300,
+		MinRequestCount: 1,
+		Scope:           contract.AlertRuleScope{ErrorClass: "rate_limited"},
+	}); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+	store.usageLogs = []usagecontract.UsageLog{
+		{RequestID: "req_rate_limit", Success: false, ErrorClass: ptrString("rate_limit"), CreatedAt: now.Add(-time.Minute)},
+		{RequestID: "req_rate_limited", Success: false, ErrorClass: ptrString("rate_limited"), CreatedAt: now.Add(-2 * time.Minute)},
+		{RequestID: "req_rate_limit_error", Success: false, ErrorClass: ptrString("rate_limit_error"), CreatedAt: now.Add(-3 * time.Minute)},
+		{RequestID: "req_timeout", Success: false, ErrorClass: ptrString("timeout"), CreatedAt: now.Add(-4 * time.Minute)},
+	}
+
+	result, err := svc.EvaluateAlertRules(t.Context())
+	if err != nil {
+		t.Fatalf("evaluate rules: %v", err)
+	}
+	if result.Evaluated != 1 || result.Breached != 1 || result.Created != 1 {
+		t.Fatalf("unexpected evaluation result: %+v", result)
+	}
+	alerts, err := svc.ListAlerts(t.Context())
+	if err != nil {
+		t.Fatalf("list alerts: %v", err)
+	}
+	if len(alerts) != 1 || alerts[0].Details["error_class"] != "rate_limit" || alerts[0].Details["total_requests"] != 3 {
+		t.Fatalf("expected canonical rate_limit alert, got %+v", alerts)
+	}
+}
+
+func TestEvaluateAlertRulesSuppressesWithCanonicalErrorClassAlias(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if _, err := svc.CreateAlertRule(t.Context(), contract.CreateAlertRuleRequest{
+		Name:            "Auth failures",
+		MetricType:      contract.AlertMetricRequestCount,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       1,
+		Severity:        contract.AlertSeverityWarning,
+		WindowSeconds:   300,
+		MinRequestCount: 1,
+		Scope:           contract.AlertRuleScope{ErrorClass: "auth_error"},
+	}); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+	if _, err := svc.CreateAlertSilence(t.Context(), contract.CreateAlertSilenceRequest{
+		Comment:  "credential rotation",
+		Matcher:  contract.AlertSilenceMatcher{ErrorClass: "credential_error"},
+		StartsAt: now.Add(-time.Hour),
+		EndsAt:   now.Add(time.Hour),
+	}); err != nil {
+		t.Fatalf("create silence: %v", err)
+	}
+	store.usageLogs = []usagecontract.UsageLog{
+		{RequestID: "req_auth_failed", Success: false, ErrorClass: ptrString("auth_failed"), CreatedAt: now.Add(-time.Minute)},
+		{RequestID: "req_auth_error", Success: false, ErrorClass: ptrString("auth_error"), CreatedAt: now.Add(-2 * time.Minute)},
+	}
+
+	result, err := svc.EvaluateAlertRules(t.Context())
+	if err != nil {
+		t.Fatalf("evaluate rules: %v", err)
+	}
+	if result.Breached != 1 || result.Created != 1 || result.Suppressed != 1 {
+		t.Fatalf("expected alias-matched silence, got %+v", result)
+	}
+	alerts, err := svc.ListAlerts(t.Context())
+	if err != nil {
+		t.Fatalf("list alerts: %v", err)
+	}
+	if len(alerts) != 1 || alerts[0].Status != contract.AlertStatusSuppressed || alerts[0].Details["error_class"] != "auth_failed" {
+		t.Fatalf("expected suppressed canonical auth alert, got %+v", alerts)
 	}
 }
 
