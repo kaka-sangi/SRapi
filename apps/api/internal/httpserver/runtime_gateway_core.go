@@ -190,21 +190,24 @@ func (rt *runtimeState) scheduleGatewayRequest(ctx context.Context, req schedule
 	// match (e.g. an OAuth account marked codex-only), so a generic client can't
 	// drive an account that would get banned for it.
 	candidates = filterCandidatesByAllowedClients(candidates, gatewayInboundClientFromContext(ctx))
-	// Drop accounts already at their per-account active-session cap (max_sessions),
-	// excluding this conversation so it is never evicted from its own account.
-	candidates = rt.filterCandidatesBySessionLimit(ctx, candidates, req.SessionAffinityKey)
 	candidates = rt.filterCandidatesByEnabledChannels(ctx, candidates)
+	var boundSessionAccountID *int
 	if req.StickyAccountID == nil && strings.TrimSpace(req.SessionAffinityKey) != "" {
 		// Prefer a persisted session→account binding (automatic stickiness across
 		// turns); only honor it when the bound account is still a live candidate
 		// for this request, so a drained/disabled account never traps a session.
 		if accountID, ok := rt.lookupGatewaySessionAffinity(ctx, req.APIKeyID, req.SessionAffinityKey); ok && candidatesContainAccount(candidates, accountID) {
 			boundAccountID := accountID
-			req.StickyAccountID = &boundAccountID
-		} else {
-			// Fall back to operator-pinned account metadata affinity keys.
-			req.StickyAccountID = stickyAccountIDFromCandidates(candidates, req.SessionAffinityKey)
+			boundSessionAccountID = &boundAccountID
+			req.StickyAccountID = boundSessionAccountID
 		}
+	}
+	// Drop accounts already at their per-account active-session cap (max_sessions),
+	// excluding this conversation so it is never evicted from its own account.
+	candidates = rt.filterCandidatesBySessionLimit(ctx, candidates, req.SessionAffinityKey, boundSessionAccountID)
+	if req.StickyAccountID == nil && strings.TrimSpace(req.SessionAffinityKey) != "" {
+		// Fall back to operator-pinned account metadata affinity keys.
+		req.StickyAccountID = stickyAccountIDFromCandidates(candidates, req.SessionAffinityKey)
 	}
 	candidates = rt.applyGatewayQualityScores(ctx, candidates, req.Model)
 	req.Candidates = candidates

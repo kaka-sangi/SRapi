@@ -422,7 +422,7 @@ func gatewayAccountSessionID(sessionKey string) string {
 // filterCandidatesBySessionLimit drops accounts that already serve their
 // configured max_sessions distinct conversations (excluding this one, so an
 // existing conversation is never evicted from its own account).
-func (rt *runtimeState) filterCandidatesBySessionLimit(ctx context.Context, candidates []schedulercontract.Candidate, sessionKey string) []schedulercontract.Candidate {
+func (rt *runtimeState) filterCandidatesBySessionLimit(ctx context.Context, candidates []schedulercontract.Candidate, sessionKey string, boundAccountID *int) []schedulercontract.Candidate {
 	if rt == nil || rt.sessionAffinity == nil {
 		return candidates
 	}
@@ -433,6 +433,10 @@ func (rt *runtimeState) filterCandidatesBySessionLimit(ctx context.Context, cand
 	sessionID := gatewayConversationSessionID(sessionKey)
 	filtered := make([]schedulercontract.Candidate, 0, len(candidates))
 	for _, candidate := range candidates {
+		if boundAccountID != nil && candidate.Account.ID == *boundAccountID {
+			filtered = append(filtered, candidate)
+			continue
+		}
 		limit := metadataInt(candidate.Account.Metadata, "max_sessions")
 		if limit <= 0 {
 			filtered = append(filtered, candidate)
