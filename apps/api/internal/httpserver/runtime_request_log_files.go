@@ -43,6 +43,7 @@ func (rt *runtimeState) ensureRequestLogFilesState() *requestLogFilesState {
 		cleaner: rlfservice.NewCleaner(rlfservice.CleanerConfig{
 			LogDir:        logDir,
 			MaxTotalBytes: rlfservice.ResolveMaxTotalBytes(),
+			Logger:        rt.logger,
 		}),
 	}
 	if enabled {

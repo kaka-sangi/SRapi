@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -79,11 +80,15 @@ type CleanerConfig struct {
 	Interval time.Duration
 	// Now is an optional clock override for tests.
 	Now func() time.Time
+	// Logger receives best-effort background sweep diagnostics. SweepOnce still
+	// returns errors to direct callers; Start uses this logger for async runs.
+	Logger *slog.Logger
 }
 
 // Cleaner is the retention sweep implementation.
 type Cleaner struct {
 	cfg     CleanerConfig
+	logger  *slog.Logger
 	running atomic.Bool
 }
 
@@ -104,7 +109,11 @@ func NewCleaner(cfg CleanerConfig) *Cleaner {
 	if cfg.Now == nil {
 		cfg.Now = func() time.Time { return time.Now().UTC() }
 	}
-	return &Cleaner{cfg: cfg}
+	logger := cfg.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return &Cleaner{cfg: cfg, logger: logger}
 }
 
 // LogDir returns the directory the cleaner operates on.
@@ -128,13 +137,7 @@ func (c *Cleaner) Start(ctx context.Context) {
 	}
 	go func() {
 		defer c.running.Store(false)
-		if _, err := c.SweepOnce(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			// We deliberately swallow non-cancel errors — the cleaner
-			// is a best-effort housekeeping job; an unreadable
-			// directory should not panic the API. The next tick will
-			// retry.
-			_ = err
-		}
+		c.sweepAndLog(ctx)
 		ticker := time.NewTicker(c.cfg.Interval)
 		defer ticker.Stop()
 		for {
@@ -142,10 +145,31 @@ func (c *Cleaner) Start(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				_, _ = c.SweepOnce(ctx)
+				c.sweepAndLog(ctx)
 			}
 		}
 	}()
+}
+
+func (c *Cleaner) sweepAndLog(ctx context.Context) {
+	deleted, err := c.SweepOnce(ctx)
+	if err != nil {
+		if !errors.Is(err, context.Canceled) {
+			c.logger.Warn(
+				"request log file retention sweep failed",
+				"error", err,
+				"log_dir", c.LogDir(),
+			)
+		}
+		return
+	}
+	if deleted > 0 {
+		c.logger.Info(
+			"request log file retention sweep completed",
+			"deleted", deleted,
+			"log_dir", c.LogDir(),
+		)
+	}
 }
 
 // SweepOnce performs one retention pass over the configured directory.

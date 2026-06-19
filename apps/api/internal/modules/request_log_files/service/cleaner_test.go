@@ -2,8 +2,11 @@ package service
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -221,4 +224,117 @@ func TestCleaner_MissingDirIsNoOp(t *testing.T) {
 	if deleted != 0 {
 		t.Fatalf("expected 0 deletions on missing dir, got %d", deleted)
 	}
+}
+
+func TestCleaner_StartLogsSweepFailuresAndDeletions(t *testing.T) {
+	t.Run("failure", func(t *testing.T) {
+		handler := &captureSlogHandler{}
+		c := NewCleaner(CleanerConfig{
+			LogDir:   string([]byte{0}),
+			Interval: time.Hour,
+			Logger:   slog.New(handler),
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		c.Start(ctx)
+		defer cancel()
+
+		record := handler.waitFor(t, slog.LevelWarn)
+		if record.Message != "request log file retention sweep failed" {
+			t.Fatalf("unexpected log message: %q", record.Message)
+		}
+		if !strings.Contains(record.attrs["error"], "invalid argument") {
+			t.Fatalf("expected actionable error attr, got %+v", record.attrs)
+		}
+	})
+
+	t.Run("deletion", func(t *testing.T) {
+		dir := t.TempDir()
+		old := filepath.Join(dir, "request-1000-old.log")
+		if err := os.WriteFile(old, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now().UTC()
+		if err := os.Chtimes(old, now.Add(-48*time.Hour), now.Add(-48*time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+		handler := &captureSlogHandler{}
+		c := NewCleaner(CleanerConfig{
+			LogDir:    dir,
+			Retention: 24 * time.Hour,
+			Interval:  time.Hour,
+			Now:       func() time.Time { return now },
+			Logger:    slog.New(handler),
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		c.Start(ctx)
+		defer cancel()
+
+		record := handler.waitFor(t, slog.LevelInfo)
+		if record.Message != "request log file retention sweep completed" {
+			t.Fatalf("unexpected log message: %q", record.Message)
+		}
+		if record.attrs["deleted"] != "1" || record.attrs["log_dir"] != dir {
+			t.Fatalf("unexpected attrs: %+v", record.attrs)
+		}
+	})
+}
+
+type capturedSlogRecord struct {
+	Level   slog.Level
+	Message string
+	attrs   map[string]string
+}
+
+type captureSlogHandler struct {
+	mu      sync.Mutex
+	records []capturedSlogRecord
+}
+
+func (h *captureSlogHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h *captureSlogHandler) Handle(_ context.Context, record slog.Record) error {
+	captured := capturedSlogRecord{
+		Level:   record.Level,
+		Message: record.Message,
+		attrs:   map[string]string{},
+	}
+	record.Attrs(func(attr slog.Attr) bool {
+		captured.attrs[attr.Key] = attr.Value.String()
+		return true
+	})
+	h.mu.Lock()
+	h.records = append(h.records, captured)
+	h.mu.Unlock()
+	return nil
+}
+
+func (h *captureSlogHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+
+func (h *captureSlogHandler) WithGroup(string) slog.Handler { return h }
+
+func (h *captureSlogHandler) waitFor(t *testing.T, level slog.Level) capturedSlogRecord {
+	t.Helper()
+	deadline := time.After(2 * time.Second)
+	tick := time.NewTicker(10 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-deadline:
+			t.Fatalf("timed out waiting for level %s log; records=%+v", level, h.snapshot())
+		case <-tick.C:
+			for _, record := range h.snapshot() {
+				if record.Level == level {
+					return record
+				}
+			}
+		}
+	}
+}
+
+func (h *captureSlogHandler) snapshot() []capturedSlogRecord {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return append([]capturedSlogRecord(nil), h.records...)
 }
