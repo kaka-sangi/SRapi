@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,14 @@ import (
 	payloadrulesmemory "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
+
+type failingSettingsAdminStore struct {
+	*admincontrolmemory.Store
+}
+
+func (s *failingSettingsAdminStore) Get(context.Context, string) (map[string]any, bool, error) {
+	return nil, false, errors.New("admin settings unavailable")
+}
 
 // TestGatewayAppliesPayloadOverrideRule proves the end-to-end path: an operator
 // "override" rule mutates the marshaled upstream request body before dispatch.
@@ -71,6 +80,17 @@ func TestGatewayAppliesPayloadOverrideRule(t *testing.T) {
 	reasoning, _ := doc["reasoning"].(map[string]any)
 	if reasoning["effort"] != "high" {
 		t.Fatalf("expected payload override reasoning.effort=high in upstream body, got %s", sent)
+	}
+}
+
+func TestGatewayRequestShaperDefaultsEnabledWhenSettingUnavailable(t *testing.T) {
+	adminSvc, err := admincontrolservice.New(&failingSettingsAdminStore{Store: admincontrolmemory.New()}, nil)
+	if err != nil {
+		t.Fatalf("new admin control service: %v", err)
+	}
+	rt := &runtimeState{adminControl: adminSvc}
+	if !rt.requestShaperEnabled(t.Context()) {
+		t.Fatal("request shaper should default enabled when admin settings are unavailable")
 	}
 }
 

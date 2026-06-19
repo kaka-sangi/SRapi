@@ -1143,7 +1143,10 @@ func (rt *runtimeState) requestShaperEnabled(ctx context.Context) bool {
 	}
 	settings, err := rt.adminControl.GetAdminSettings(ctx)
 	if err != nil {
-		return false
+		if rt.logger != nil {
+			rt.logger.Warn("request shaper setting unavailable; defaulting enabled", "error", err)
+		}
+		return true
 	}
 	return settings.Gateway.RequestShaperEnabled
 }
