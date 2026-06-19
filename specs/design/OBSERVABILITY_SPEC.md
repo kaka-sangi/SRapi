@@ -135,7 +135,7 @@ srapi_ops_alert_events{severity, status}
 
 该指标表示当前告警事件数量，只允许 `severity` 和 `status` 两个低基数标签。不得加入 alert id、rule id、fingerprint、SLO id、user id、API key、request id、prompt 或 credential label；逐条告警排查应读取 AdminOps alert API。
 
-默认 Prometheus 告警规则保存在 `deploy/prometheus-srapi-alerts.yaml`，覆盖 critical firing / 长期 warning firing 两类 Ops alert posture，以及 `srapi_scheduler_no_available_total` 持续升高的调度无账号可用告警。`deploy/prometheus.yml` 是本地 compose Prometheus profile 的最小配置，会抓取 API `/metrics`、加载这些规则，并把告警发送到同 profile 内的 Alertmanager。`deploy/alertmanager.yml` 提供本地 webhook notification route，按 `service`、`severity`、`component` 聚合通知并发送 resolved 事件。规则 labels 和 Alertmanager grouping 只能使用 `severity`、`status`、`service`、`team` 和 `component` 这类固定低基数维度；排障入口、runbook 和人工动作必须放在 annotations 或接收端系统配置，不能把 alert id、fingerprint、rule id 或账号/API key/user/request 维度放进 labels 或 route grouping。
+默认 Prometheus 告警规则保存在 `deploy/prometheus-srapi-alerts.yaml`，覆盖 critical firing / 长期 warning firing 两类 Ops alert posture、`srapi_scheduler_no_available_total` 持续升高的调度无账号可用告警、`srapi_provider_errors_total` Provider 错误升高，以及 `srapi_ops_error_log_*` 错误证据 recorder 缺失、丢弃、写失败和积压。`deploy/prometheus.yml` 是本地 compose Prometheus profile 的最小配置，会抓取 API `/metrics`、加载这些规则，并把告警发送到同 profile 内的 Alertmanager。`deploy/alertmanager.yml` 提供本地 webhook notification route，按 `service`、`severity`、`component` 聚合通知并发送 resolved 事件。规则 labels 和 Alertmanager grouping 只能使用 `severity`、`status`、`service`、`team` 和 `component` 这类固定低基数维度；排障入口、runbook 和人工动作必须放在 annotations 或接收端系统配置，不能把 alert id、fingerprint、rule id 或账号/API key/user/request 维度放进 labels 或 route grouping。
 
 ### 3.3.1 Trace and Log Correlation
 

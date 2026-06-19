@@ -50,3 +50,64 @@ groups:
             whether capability mapping, quota, credentials, cooldown, or group
             scope is blocking routing.
           runbook_url: docs/requirements/OPERATIONS.md#srapischedulernoavailableaccounts
+
+      - alert: SRapiProviderErrorsSpiking
+        expr: sum by (provider_protocol, error_class) (increase(srapi_provider_errors_total[5m])) > 10
+        for: 5m
+        keep_firing_for: 10m
+        labels:
+          severity: warning
+          component: provider
+        annotations:
+          summary: SRapi provider errors are rising
+          description: >-
+            Provider-facing errors are increasing by protocol and stable error
+            class. Inspect AdminOps error logs, usage attempts, scheduler
+            fallback evidence, account health, and upstream status before
+            widening routing or disabling accounts.
+          runbook_url: docs/requirements/OPERATIONS.md#srapiprovidererrorsspiking
+
+      - alert: SRapiOpsErrorLogRecorderUnavailable
+        expr: absent(srapi_ops_error_log_queue_capacity)
+        for: 2m
+        keep_firing_for: 5m
+        labels:
+          severity: critical
+          component: ops
+        annotations:
+          summary: SRapi Ops error log recorder metrics are missing
+          description: >-
+            The asynchronous Ops error evidence recorder is not exposing queue
+            capacity metrics. Error evidence may be unavailable, so do not treat
+            an empty AdminOps error-log feed as proof that no errors happened.
+          runbook_url: docs/requirements/OPERATIONS.md#srapiopserrorlogrecorderunavailable
+
+      - alert: SRapiOpsErrorLogRecorderDroppingEvidence
+        expr: increase(srapi_ops_error_log_dropped_total[5m]) > 0 or increase(srapi_ops_error_log_write_failures_total[5m]) > 0
+        for: 1m
+        keep_firing_for: 10m
+        labels:
+          severity: critical
+          component: ops
+        annotations:
+          summary: SRapi Ops error log recorder is losing evidence
+          description: >-
+            The asynchronous Ops error evidence recorder has dropped records or
+            failed persistence writes. Gateway errors may still be happening, but
+            the durable evidence feed is incomplete until the recorder recovers.
+          runbook_url: docs/requirements/OPERATIONS.md#srapiopserrorlogrecorderdroppingevidence
+
+      - alert: SRapiOpsErrorLogRecorderBacklogged
+        expr: (srapi_ops_error_log_queue_depth / clamp_min(srapi_ops_error_log_queue_capacity, 1)) > 0.8
+        for: 5m
+        keep_firing_for: 10m
+        labels:
+          severity: warning
+          component: ops
+        annotations:
+          summary: SRapi Ops error log recorder queue is backlogged
+          description: >-
+            The asynchronous Ops error evidence queue has stayed above 80%
+            capacity. Investigate store latency, worker health, and upstream
+            error volume before drops start.
+          runbook_url: docs/requirements/OPERATIONS.md#srapiopserrorlogrecorderbacklogged

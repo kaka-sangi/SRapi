@@ -11,9 +11,17 @@ const composeConfig = "deploy/docker-compose.yml";
 const requiredPhrases = [
   "srapi_ops_alert_events",
   "srapi_scheduler_no_available_total",
+  "srapi_provider_errors_total",
+  "srapi_ops_error_log_queue_capacity",
+  "srapi_ops_error_log_dropped_total",
+  "srapi_ops_error_log_write_failures_total",
   "SRapiCriticalOpsAlertsFiring",
   "SRapiWarningOpsAlertsPersisting",
   "SRapiSchedulerNoAvailableAccounts",
+  "SRapiProviderErrorsSpiking",
+  "SRapiOpsErrorLogRecorderUnavailable",
+  "SRapiOpsErrorLogRecorderDroppingEvidence",
+  "SRapiOpsErrorLogRecorderBacklogged",
   "runbook_url:",
 ];
 

@@ -386,7 +386,7 @@ Provider Account metadata 或 Provider config/capabilities 可以把默认 `/mod
 
 AdminOps 启动时会按规则名幂等创建 3 条内置阈值告警基线：全局 Gateway error rate、全局 Gateway p95 latency、`/v1/chat/completions` error rate。已有同名规则会被视为 operator-owned 配置，不会被覆盖；需要停用默认保护时应禁用规则而不是修改数据库。
 
-Prometheus alert rules 可以从 `deploy/prometheus-srapi-alerts.yaml` 加载。该文件基于 `srapi_ops_alert_events{severity,status}` 生成 critical 和 warning Ops posture 告警，labels 只保留低基数路由字段，排障说明和 runbook 放在 annotations。修改规则后运行：
+Prometheus alert rules 可以从 `deploy/prometheus-srapi-alerts.yaml` 加载。该文件基于 `srapi_ops_alert_events{severity,status}` 生成 critical 和 warning Ops posture 告警，也覆盖 scheduler no-available-account、Provider 错误升高，以及 `ops_error_logs` 异步错误证据 recorder 缺失、丢弃、写失败和积压。labels 只保留低基数路由字段，排障说明和 runbook 放在 annotations。修改规则后运行：
 
 ```bash
 make observability-rules-check
@@ -432,6 +432,55 @@ make observability-rules-check
 4. 打开账号健康页，按 provider/account group 检查 active 账号数量、cooldown/circuit、quota remaining、RPM、proxy quality 和 needs_reauth。
 5. 检查模型映射、provider capabilities、runtime class、account group membership 和 API key/user scope 是否覆盖该请求；不要通过放宽所有 scope 临时恢复，除非有明确事故授权。
 6. 修复后观察 `srapi_scheduler_no_available_total` 增量归零，并抽查新的 Scheduler decision 确认 selected_account_id 和 selected_provider_id 已恢复。
+
+#### SRapiProviderErrorsSpiking
+
+触发条件：`increase(srapi_provider_errors_total[5m]) > 10`，按 provider protocol 和稳定 error class 聚合。该告警表示某类上游错误正在升高，Prometheus 只负责按低基数维度通知；具体 provider、account、request 和 upstream 证据必须回 AdminOps 错误日志和 usage attempt 查看。
+
+处置步骤：
+
+1. 打开 AdminOps 错误日志，按告警中的 provider protocol 和 error class 过滤，确认 source endpoint、model、attempt_no、latency、status code 和 upstream request id。
+2. 对 timeout、network_error 和 invalid_response，检查代理质量、provider runtime class、上游响应体摘要、stream completion state 和最近健康探测。
+3. 对 auth_error、quota_exceeded、rate_limited 和 policy_error，检查账号健康、quota remaining、RPM/TPM、Retry-After、needs_reauth、account_locked/account_banned 和最近管理员变更。
+4. 打开调度决策，确认是否已按 fallback_excluded 避开失败账号；如果 fallback 仍反复打到同类失败账号，优先修 capability、cooldown 或账号组覆盖。
+5. 不要直接扩大路由范围掩盖错误；先定位是单 provider、单 runtime class、账号组退化，还是请求形态触发的 provider policy。
+6. 修复后观察 `srapi_provider_errors_total` 5 分钟增量回落，并抽查新 usage attempt 的 Success、ErrorClass 和 selected provider/account 是否恢复。
+
+#### SRapiOpsErrorLogRecorderUnavailable
+
+触发条件：`absent(srapi_ops_error_log_queue_capacity)` 持续 2 分钟。该告警表示错误证据 recorder 没有暴露队列容量指标，可能未初始化、未注入或 metrics scrape 没有覆盖到正确 API 节点。此时 AdminOps 错误日志为空不能证明系统没有错误。
+
+处置步骤：
+
+1. 先检查 `/readyz` 和 `/metrics` 是否来自同一个 API 服务版本，确认 Prometheus target 没有抓错实例。
+2. 打开 `GET /api/v1/admin/ops/system-logs/health`，查看 error evidence recorder 的 enabled、started、draining、queue depth/capacity、dropped 和 write_failed。
+3. 检查 API 启动日志，确认 ops error logs store 已初始化；生产模式不得因为缺 store 回落成没有证据的半初始化状态。
+4. 如果只有部分副本缺指标，检查该副本配置、迁移状态、store 注入和滚动发布版本漂移。
+5. 恢复后确认 `/metrics` 出现 `srapi_ops_error_log_queue_capacity`，再继续用错误日志判断业务错误量。
+
+#### SRapiOpsErrorLogRecorderDroppingEvidence
+
+触发条件：`increase(srapi_ops_error_log_dropped_total[5m]) > 0` 或 `increase(srapi_ops_error_log_write_failures_total[5m]) > 0` 持续 1 分钟。该告警表示错误证据已经丢失或持久化失败，事故分析必须同时查看系统日志和 usage log，不能只依赖错误日志 feed。
+
+处置步骤：
+
+1. 打开 AdminOps 系统日志，过滤 `ops_error_logs` recorder 相关 warning，区分 queue_full、draining、write failure 和 drain timeout。
+2. 检查 PostgreSQL 延迟、连接池、迁移状态和 `ops_error_logs` 写入错误；如果 write_failed 增长，优先修存储而不是调大队列。
+3. 如果 dropped 增长但写入正常，检查上游错误峰值、Gateway failover 频率和 recorder queue depth；必要时扩容 API 或降低同类错误风暴。
+4. 用 usage logs 和 request evidence 补齐丢失时间段的错误范围，明确哪些 request 可能缺少完整 ops_error_logs 证据。
+5. 恢复后确认 dropped/write_failed 5 分钟增量归零，并抽查新失败请求能落入 AdminOps 错误日志。
+
+#### SRapiOpsErrorLogRecorderBacklogged
+
+触发条件：`srapi_ops_error_log_queue_depth / srapi_ops_error_log_queue_capacity > 0.8` 持续 5 分钟。该告警表示错误证据队列长期接近容量上限，距离丢弃证据已经很近。
+
+处置步骤：
+
+1. 检查 `/metrics` 中 queue depth、capacity、enqueued、processed、dropped 和 write failures 的变化趋势，判断是写入慢还是错误量激增。
+2. 如果 processed 增长慢，检查数据库写延迟、连接池等待、事务锁和 API 节点 CPU。
+3. 如果 enqueued 激增，按错误日志和 usage log 聚合 error class、endpoint、model、provider protocol，优先处理产生错误风暴的上游或账号组。
+4. 不要只调大队列容量；队列变大会延迟证据可见性，根因仍应是存储吞吐或上游错误量。
+5. 恢复后确认队列占用稳定低于 50%，并且 dropped/write_failed 仍为 0。
 
 本地单机部署可以显式启用 Prometheus profile：
 
@@ -500,7 +549,7 @@ srapi_ops_error_log_dropped_total
 srapi_ops_error_log_write_failures_total
 ```
 
-AI Gateway 专项指标和默认 Prometheus 告警规则以 `OBSERVABILITY_SPEC.md` 为准；默认规则必须覆盖 Ops alert posture 和 scheduler no-available-account 持续升高。
+AI Gateway 专项指标和默认 Prometheus 告警规则以 `OBSERVABILITY_SPEC.md` 为准；默认规则必须覆盖 Ops alert posture、scheduler no-available-account 持续升高、Provider 错误升高，以及 `ops_error_logs` 异步错误证据 recorder 缺失、丢弃、写失败和积压。
 
 当前 `/metrics` 使用 Prometheus client SDK 输出 text format，基于持久化 usage logs、scheduler decisions/leases、account health snapshots 和 Reverse Proxy Runtime 快照聚合；Gateway request duration 和 provider probe latency 暴露为 histogram，固定 bucket 为 `0.05`、`0.1`、`0.25`、`0.5`、`1`、`2.5`、`5`、`10` 秒和 `+Inf`。指标 label 只允许低基数 route/model/protocol/result/error/status 类字段，避免使用 API Key、用户邮箱、账号名、account id、prompt 或 credential。
 

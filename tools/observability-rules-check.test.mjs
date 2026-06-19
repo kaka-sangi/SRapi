@@ -93,7 +93,7 @@ test("alertmanager route stays low-cardinality and secret-free", () => {
   );
 });
 
-test("prometheus alert rules cover ops posture and scheduler no-account signals", () => {
+test("prometheus alert rules cover ops posture, provider, scheduler, and error evidence signals", () => {
   const rules = readFileSync("deploy/prometheus-srapi-alerts.yaml", "utf8");
 
   assert.match(
@@ -106,6 +106,14 @@ test("prometheus alert rules cover ops posture and scheduler no-account signals"
   );
   assert.match(rules, /srapi_scheduler_no_available_total/);
   assert.match(rules, /SRapiSchedulerNoAvailableAccounts/);
+  assert.match(rules, /srapi_provider_errors_total/);
+  assert.match(rules, /SRapiProviderErrorsSpiking/);
+  assert.match(rules, /srapi_ops_error_log_queue_capacity/);
+  assert.match(rules, /srapi_ops_error_log_dropped_total/);
+  assert.match(rules, /srapi_ops_error_log_write_failures_total/);
+  assert.match(rules, /SRapiOpsErrorLogRecorderUnavailable/);
+  assert.match(rules, /SRapiOpsErrorLogRecorderDroppingEvidence/);
+  assert.match(rules, /SRapiOpsErrorLogRecorderBacklogged/);
   assert.doesNotMatch(
     rules,
     /fingerprint|rule_id|api_key|account_id|user_id|request_id/i,
@@ -124,6 +132,10 @@ test("prometheus alert rules parse into low-cardinality labels and runbooks", ()
       "SRapiCriticalOpsAlertsFiring",
       "SRapiWarningOpsAlertsPersisting",
       "SRapiSchedulerNoAvailableAccounts",
+      "SRapiProviderErrorsSpiking",
+      "SRapiOpsErrorLogRecorderUnavailable",
+      "SRapiOpsErrorLogRecorderDroppingEvidence",
+      "SRapiOpsErrorLogRecorderBacklogged",
     ],
   );
   for (const rule of parsed) {
