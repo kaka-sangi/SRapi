@@ -41,6 +41,12 @@ import {
   parseSchedulerDiagnostic,
   type SchedulerDiagnostic,
 } from "@/lib/scheduler-diagnostic";
+import {
+  diagnosticParts,
+  parseUpstreamErrorDiagnostic,
+  resolveUpstreamErrorDiagnostic,
+  type UpstreamErrorDiagnostic,
+} from "@/lib/upstream-error-diagnostic";
 import type { OpsErrorLog, OpsSystemLog, RequestLogFileDescriptor } from "@/lib/sdk-types";
 
 const RESOLUTION_OPTIONS = ["open", "investigating", "resolved", "muted"] as const;
@@ -104,6 +110,12 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
   const firstAt = events.length > 0 ? events[0]?.at_unix_ms ?? 0 : 0;
   const resolutionMutation = useUpdateErrorLogResolution();
   const schedulerDiagnostic = parseSchedulerDiagnostic(detail.error_body_excerpt);
+  const upstreamDiagnostic = schedulerDiagnostic
+    ? null
+    : resolveUpstreamErrorDiagnostic({
+        errorBodyExcerpt: detail.error_body_excerpt,
+        upstreamErrors: events,
+      });
 
   return (
     <div className="space-y-4">
@@ -133,6 +145,8 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
       ) : null}
 
       {schedulerDiagnostic ? <SchedulerDiagnosticSummary diagnostic={schedulerDiagnostic} /> : null}
+
+      {upstreamDiagnostic ? <UpstreamErrorDiagnosticSummary diagnostic={upstreamDiagnostic} /> : null}
 
       {detail.error_body_excerpt ? (
         <EvidenceBlock
@@ -219,6 +233,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
             {events.map((ev, idx) => {
               const offsetMs =
                 firstAt > 0 && (ev.at_unix_ms ?? 0) > 0 ? (ev.at_unix_ms ?? 0) - firstAt : 0;
+              const eventDiagnostic = parseUpstreamErrorDiagnostic(ev.body_excerpt);
               return (
                 <li
                   key={`${ev.attempt_no ?? idx}-${idx}`}
@@ -257,6 +272,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
                       {ev.message}
                     </p>
                   ) : null}
+                  {eventDiagnostic ? <UpstreamDiagnosticPills diagnostic={eventDiagnostic} /> : null}
                   {ev.body_excerpt ? (
                     <p className="mt-1 break-words font-mono text-2xs text-srapi-text-tertiary">
                       {ev.body_excerpt}
@@ -694,6 +710,47 @@ function SchedulerDiagnosticSummary({ diagnostic }: { diagnostic: SchedulerDiagn
           {diagnostic.selectionRationale}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+function UpstreamErrorDiagnosticSummary({ diagnostic }: { diagnostic: UpstreamErrorDiagnostic }) {
+  const { t } = useLanguage();
+  return (
+    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+            {t("adminErrorLogs.upstreamDiagnostic")}
+          </p>
+          {diagnostic.message ? (
+            <p className="mt-1 break-words text-sm text-srapi-text-primary">
+              {diagnostic.message}
+            </p>
+          ) : null}
+        </div>
+        {diagnostic.source === "attempt" ? (
+          <QuietBadge status="limited" label={t("adminErrorLogs.attemptEvidence")} />
+        ) : null}
+      </div>
+      <UpstreamDiagnosticPills diagnostic={diagnostic} />
+    </div>
+  );
+}
+
+function UpstreamDiagnosticPills({ diagnostic }: { diagnostic: UpstreamErrorDiagnostic }) {
+  const parts = diagnosticParts(diagnostic);
+  if (parts.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {parts.map((part) => (
+        <span
+          key={part}
+          className="rounded bg-srapi-surface px-2 py-1 font-mono text-2xs text-srapi-text-secondary"
+        >
+          {part}
+        </span>
+      ))}
     </div>
   );
 }

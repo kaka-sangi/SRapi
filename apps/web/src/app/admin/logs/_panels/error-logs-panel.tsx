@@ -33,6 +33,7 @@ import {
   logWindowSince,
 } from "@/lib/log-window-filter";
 import { compactSchedulerDiagnostic } from "@/lib/scheduler-diagnostic";
+import { compactUpstreamErrorDiagnostic } from "@/lib/upstream-error-diagnostic";
 
 const DEFAULT_HIDDEN_COLUMNS = ["api_key_id", "provider_id", "source_endpoint", "error_owner"];
 
@@ -432,6 +433,26 @@ function ErrorMessageCell({ log }: { log: OpsErrorLog }) {
         </div>
         <span className="line-clamp-1 break-words text-xs text-srapi-text-secondary">
           {log.error_message || "—"}
+        </span>
+      </div>
+    );
+  }
+  const upstreamDiagnostic = compactUpstreamErrorDiagnostic(log.error_body_excerpt);
+  if (upstreamDiagnostic) {
+    return (
+      <div className="min-w-0 space-y-1">
+        <div className="flex flex-wrap gap-1">
+          {upstreamDiagnostic.parts.slice(0, 4).map((part) => (
+            <span
+              key={part}
+              className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-primary"
+            >
+              {part}
+            </span>
+          ))}
+        </div>
+        <span className="line-clamp-1 break-words text-xs text-srapi-text-secondary">
+          {upstreamDiagnostic.message || log.error_message || "—"}
         </span>
       </div>
     );

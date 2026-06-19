@@ -19,7 +19,7 @@ Object.defineProperty(window, "localStorage", {
 });
 
 const mocks = vi.hoisted(() => ({
-  detail: {
+  schedulerDetail: {
     id: "err-1",
     occurred_at: "2026-06-18T10:00:00Z",
     created_at: "2026-06-18T10:00:00Z",
@@ -62,6 +62,55 @@ const mocks = vi.hoisted(() => ({
     }),
     resolution: "open",
   } satisfies OpsErrorLog,
+  upstreamDetail: {
+    id: "err-2",
+    occurred_at: "2026-06-18T10:00:00Z",
+    created_at: "2026-06-18T10:00:00Z",
+    updated_at: "2026-06-18T10:05:00Z",
+    request_id: "req-detail",
+    trace_id: "trace-detail",
+    account_id: "12",
+    provider_id: "3",
+    user_id: "4",
+    api_key_id: "5",
+    source_protocol: "openai-compatible",
+    target_protocol: "openai-compatible",
+    source_endpoint: "/v1/chat/completions",
+    model: "gpt-4o-mini",
+    status_code: 503,
+    latency_ms: 891,
+    attempt_no: 2,
+    input_tokens: 10,
+    output_tokens: 0,
+    usage_estimated: false,
+    error_class: "upstream_error",
+    error_phase: "upstream",
+    error_owner: "provider",
+    error_source: "upstream_http",
+    error_message: "Upstream request failed",
+    error_body_excerpt: JSON.stringify({
+      error: {
+        type: "upstream_error",
+        message: "Upstream request failed",
+      },
+    }),
+    upstream_errors: [
+      {
+        at_unix_ms: 1780000000000,
+        attempt_no: 1,
+        account_id: "12",
+        account_name: "account-12",
+        upstream_status_code: 503,
+        upstream_request_id: "up-1",
+        upstream_url: "https://upstream.invalid/v1/chat/completions",
+        kind: "http_error",
+        message: "Upstream request failed",
+        body_excerpt:
+          "class=upstream_error | status=503 | type=overloaded_error | code=server_overloaded | message=real upstream detail",
+      },
+    ],
+    resolution: "open",
+  } satisfies OpsErrorLog,
   file: {
     name: "error-1780000000000-req-detail.log",
     size: 512,
@@ -79,12 +128,13 @@ const mocks = vi.hoisted(() => ({
     created_at: "2026-06-18T10:00:02Z",
   } satisfies OpsSystemLog,
   updateResolution: vi.fn(),
+  detailMode: "scheduler",
 }));
 
 vi.mock("@/hooks/admin-queries", () => ({
   downloadAdminRequestLogFileText: vi.fn(),
   useAdminErrorLog: () => ({
-    data: mocks.detail,
+    data: mocks.detailMode === "upstream" ? mocks.upstreamDetail : mocks.schedulerDetail,
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
@@ -160,6 +210,7 @@ describe("ErrorLogDetailDialog request dump evidence", () => {
   beforeEach(() => {
     storage.clear();
     mocks.updateResolution.mockReset();
+    mocks.detailMode = "scheduler";
   });
 
   it("shows the parsed request dump summary in the evidence preview", () => {
@@ -190,6 +241,21 @@ describe("ErrorLogDetailDialog request dump evidence", () => {
     expect(screen.getByText("77")).toBeInTheDocument();
     expect(screen.getAllByText("3").length).toBeGreaterThan(0);
     expect(screen.getByText("no account satisfied responses capability")).toBeInTheDocument();
+  });
+
+  it("surfaces real upstream diagnostics instead of a generic gateway wrapper", () => {
+    mocks.detailMode = "upstream";
+
+    render(
+      <ErrorLogDetailDialog errorLogId="err-2" open onOpenChange={() => undefined} />,
+      { wrapper: wrap },
+    );
+
+    expect(screen.getByText("上游诊断")).toBeInTheDocument();
+    expect(screen.getByText("尝试证据")).toBeInTheDocument();
+    expect(screen.getByText("real upstream detail")).toBeInTheDocument();
+    expect(screen.getAllByText("overloaded_error").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("server_overloaded").length).toBeGreaterThan(0);
   });
 
   it("shows related system logs and request evidence links", () => {

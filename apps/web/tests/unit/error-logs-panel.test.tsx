@@ -19,7 +19,7 @@ Object.defineProperty(window, "localStorage", {
 
 const mocks = vi.hoisted(() => ({
   useAdminErrorLogs: vi.fn(),
-  log: {
+  schedulerLog: {
     id: "err-row",
     occurred_at: "2026-06-18T10:00:00Z",
     created_at: "2026-06-18T10:00:00Z",
@@ -57,6 +57,33 @@ const mocks = vi.hoisted(() => ({
       },
       scheduler_selection_rationale: "no account satisfied responses capability",
     }),
+    resolution: "open",
+  } satisfies OpsErrorLog,
+  upstreamLog: {
+    id: "err-upstream",
+    occurred_at: "2026-06-18T10:00:00Z",
+    created_at: "2026-06-18T10:00:00Z",
+    updated_at: "2026-06-18T10:00:00Z",
+    request_id: "req-upstream",
+    trace_id: "trace-upstream",
+    account_id: "12",
+    provider_id: "3",
+    user_id: "4",
+    api_key_id: "5",
+    source_protocol: "openai-compatible",
+    target_protocol: "openai-compatible",
+    source_endpoint: "/v1/chat/completions",
+    model: "gpt-4o-mini",
+    status_code: 429,
+    latency_ms: 201,
+    attempt_no: 1,
+    error_class: "rate_limited",
+    error_phase: "upstream",
+    error_owner: "provider",
+    error_source: "upstream_http",
+    error_message: "quota exceeded",
+    error_body_excerpt:
+      "class=rate_limited | status=429 | type=rate_limit_error | code=too_many_requests | message=quota exceeded",
     resolution: "open",
   } satisfies OpsErrorLog,
 }));
@@ -125,7 +152,7 @@ describe("ErrorLogsPanel", () => {
     storage.clear();
     mocks.useAdminErrorLogs.mockReturnValue({
       data: {
-        data: [mocks.log],
+        data: [mocks.schedulerLog],
         pagination: { page: 1, page_size: 20, total: 1, has_next: false },
       },
       isFetching: false,
@@ -165,5 +192,23 @@ describe("ErrorLogsPanel", () => {
         error_class: "no_available_account",
       }),
     );
+  });
+
+  it("summarizes upstream error excerpts in the message column", () => {
+    mocks.useAdminErrorLogs.mockReturnValue({
+      data: {
+        data: [mocks.upstreamLog],
+        pagination: { page: 1, page_size: 20, total: 1, has_next: false },
+      },
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+
+    render(<ErrorLogsPanel />, { wrapper: wrap });
+
+    expect(screen.getAllByText("rate_limited").length).toBeGreaterThan(0);
+    expect(screen.getByText("rate_limit_error")).toBeInTheDocument();
+    expect(screen.getByText("too_many_requests")).toBeInTheDocument();
+    expect(screen.getByText("quota exceeded")).toBeInTheDocument();
   });
 });

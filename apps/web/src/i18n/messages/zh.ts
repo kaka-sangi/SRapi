@@ -2304,6 +2304,8 @@ export const zh: Messages = {
     errorClass: "错误",
     upstreamMessage: "上游错误信息",
     upstreamBodyExcerpt: "上游错误正文",
+    upstreamDiagnostic: "上游诊断",
+    attemptEvidence: "尝试证据",
     schedulerDiagnostic: "调度诊断",
     schedulerDecisionId: "决策 ID",
     schedulerCandidates: "候选数",

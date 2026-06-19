@@ -2327,6 +2327,8 @@ export const en = {
     errorClass: "Error",
     upstreamMessage: "Upstream message",
     upstreamBodyExcerpt: "Upstream body",
+    upstreamDiagnostic: "Upstream diagnostics",
+    attemptEvidence: "Attempt evidence",
     schedulerDiagnostic: "Scheduler diagnostics",
     schedulerDecisionId: "Decision ID",
     schedulerCandidates: "Candidates",
