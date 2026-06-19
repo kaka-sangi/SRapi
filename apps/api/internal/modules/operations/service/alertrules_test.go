@@ -271,6 +271,9 @@ func TestEvaluateAlertRulesFiresUpdatesAndResolvesEvents(t *testing.T) {
 	if alerts[0].Details["source_endpoint"] != "/v1/chat/completions" || alerts[0].Details["model"] != "gpt-ops" || alerts[0].Details["provider_id"] != 7 {
 		t.Fatalf("expected alert rule scope in details, got %+v", alerts[0].Details)
 	}
+	if alerts[0].Details["window_start"] != now.Add(-time.Hour).Format(time.RFC3339) || alerts[0].Details["window_end"] != now.Format(time.RFC3339) {
+		t.Fatalf("expected alert evaluation window in details, got %+v", alerts[0].Details)
+	}
 	deliveries, err := svc.ListNotificationDeliveries(t.Context(), contract.DeliveryListOptions{})
 	if err != nil {
 		t.Fatalf("list notification deliveries: %v", err)

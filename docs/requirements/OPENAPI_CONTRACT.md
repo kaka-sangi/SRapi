@@ -759,6 +759,7 @@ Authorization header, cookie, credential material, or provider secret.
 - `POST /api/v1/admin/ops/alerts/{id}/ack` 必须使用 CSRF，并且 audit 只记录 ack 摘要，不复制 alert `details`。
 - `GET/POST/PATCH/DELETE /api/v1/admin/ops/notification-channels{,/{id}}` 管理内置 Ops alert email 通道；响应只能返回通道元数据和收件目标，不得返回 SMTP secret。
 - `GET /api/v1/admin/ops/notification-deliveries` 返回 alert notification 投递证据，支持 `channel_id` 和 `status` 过滤；delivery 可水合 alert summary 和 channel name，但不得复制 alert details 或邮件正文。
+- `GET /api/v1/admin/scheduler/decisions` 返回调度决策证据，支持 `request_id`、`account_id`、`provider_id`、`model`、`source_endpoint` 以及 `start`/`end` RFC3339 时间窗口过滤；`start` 为包含边界，`end` 为排除边界，用于从 alert event details 精确回放事故窗口。
 - `GET /api/v1/admin/ops/realtime/slots` 返回 active realtime slot 摘要和聚合计数；Redis 可用时该视图覆盖同一 Redis 后端上的 API 节点，本地降级模式只覆盖当前节点内存。它不是持久 upstream session pool 查询，且不得返回原始 affinity key、API key、credential、prompt 或 provider-specific frame。
 
 ## 5. 统一响应格式
@@ -1186,7 +1187,7 @@ GET  /api/v1/admin/ops/overview
 GET  /api/v1/admin/ops/traffic
 GET  /api/v1/admin/ops/errors
 GET  /api/v1/admin/ops/providers
-GET  /api/v1/admin/ops/scheduler/decisions
+GET  /api/v1/admin/scheduler/decisions
 GET  /api/v1/admin/ops/realtime/slots
 GET  /api/v1/admin/ops/alerts
 POST /api/v1/admin/ops/alerts/{id}/ack

@@ -45,7 +45,9 @@ export function RequestEvidencePanel() {
   const model = list.filters.model || undefined;
   const sourceEndpoint = list.filters.source_endpoint || undefined;
   const errorClass = list.filters.error_class || undefined;
-  const start = logWindowSince(windowFilter)?.toISOString();
+  const exactStart = list.filters.start || undefined;
+  const exactEnd = list.filters.end || undefined;
+  const start = exactStart || logWindowSince(windowFilter)?.toISOString();
   const query = useOpsRequestEvidence({
     page: list.page,
     page_size: list.pageSize,
@@ -64,6 +66,7 @@ export function RequestEvidencePanel() {
       | "scheduler_decision"
       | undefined,
     start,
+    end: exactEnd,
     q: list.search || undefined,
   });
   const total = query.data?.pagination?.total ?? query.data?.data.length ?? 0;
@@ -76,6 +79,8 @@ export function RequestEvidencePanel() {
       model ||
       sourceEndpoint ||
       errorClass ||
+      exactStart ||
+      exactEnd ||
       list.search ||
       list.filters.window,
   );

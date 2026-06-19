@@ -20512,6 +20512,15 @@ export type ListAdminSchedulerDecisionsData = {
         account_id?: Id;
         provider_id?: Id;
         model?: string;
+        source_endpoint?: string;
+        /**
+         * Inclusive start time for read-model queries.
+         */
+        start?: string;
+        /**
+         * Exclusive end time for read-model queries.
+         */
+        end?: string;
     };
     url: '/api/v1/admin/scheduler/decisions';
 };

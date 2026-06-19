@@ -66,9 +66,11 @@ describe("admin log evidence links", () => {
         error_class: "rate_limited",
         source_endpoint: "/v1/chat/completions",
         model: "gpt-ops",
+        start: "2026-06-18T10:00:00Z",
+        end: "2026-06-18T10:05:00Z",
       }),
     ).toBe(
-      "/admin/logs?tab=request-evidence&f_account_id=12&f_provider_id=3&f_error_class=rate_limited&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_model=gpt-ops",
+      "/admin/logs?tab=request-evidence&f_account_id=12&f_provider_id=3&f_error_class=rate_limited&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_model=gpt-ops&f_start=2026-06-18T10%3A00%3A00Z&f_end=2026-06-18T10%3A05%3A00Z",
     );
     expect(adminRequestEvidenceHref({ trace_id: "trace_456" })).toBeNull();
   });
@@ -83,8 +85,17 @@ describe("admin log evidence links", () => {
     expect(adminSchedulerDecisionsHref({ request_id: "req_123", trace_id: "trace_456" })).toBe(
       "/admin/ops?tab=scheduler-decisions&f_request_id=req_123",
     );
-    expect(adminSchedulerDecisionsHref({ account_id: "12", provider_id: 3, model: "gpt-ops" })).toBe(
-      "/admin/ops?tab=scheduler-decisions&f_account_id=12&f_provider_id=3&f_model=gpt-ops",
+    expect(
+      adminSchedulerDecisionsHref({
+        account_id: "12",
+        provider_id: 3,
+        model: "gpt-ops",
+        source_endpoint: "/v1/chat/completions",
+        start: "2026-06-18T10:00:00Z",
+        end: "2026-06-18T10:05:00Z",
+      }),
+    ).toBe(
+      "/admin/ops?tab=scheduler-decisions&f_account_id=12&f_provider_id=3&f_model=gpt-ops&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_start=2026-06-18T10%3A00%3A00Z&f_end=2026-06-18T10%3A05%3A00Z",
     );
     expect(adminSchedulerDecisionsHref({ trace_id: "trace_456" })).toBeNull();
   });

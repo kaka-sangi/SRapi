@@ -130,6 +130,7 @@ function buildLinks(detail: OpsErrorLog, routingIssue: boolean): ErrorLogTriageL
         account_id: accountID,
         provider_id: providerID,
         model: clean(detail.model),
+        source_endpoint: clean(detail.source_endpoint),
       }),
     );
   }

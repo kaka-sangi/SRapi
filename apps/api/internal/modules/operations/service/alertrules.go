@@ -437,7 +437,7 @@ func ruleAlert(rule contract.AlertRule, metric ruleMetric, fingerprint string, n
 		Status:      contract.AlertStatusFiring,
 		Fingerprint: fingerprint,
 		Summary:     ruleSummary(rule, metric),
-		Details:     ruleDetails(rule, metric),
+		Details:     ruleDetails(rule, metric, now),
 		StartedAt:   now,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -452,7 +452,7 @@ func updateRuleAlert(alert contract.AlertEvent, rule contract.AlertRule, metric 
 		alert.SuppressedBy = nil
 	}
 	alert.Summary = ruleSummary(rule, metric)
-	alert.Details = ruleDetails(rule, metric)
+	alert.Details = ruleDetails(rule, metric, now)
 	alert.ResolvedAt = nil
 	alert.UpdatedAt = now
 	return alert
@@ -462,7 +462,13 @@ func ruleSummary(rule contract.AlertRule, metric ruleMetric) string {
 	return fmt.Sprintf("%s %s %s %.4g (observed %.4g)", rule.Name, rule.MetricType, rule.Operator, rule.Threshold, ruleObservedValue(rule, metric))
 }
 
-func ruleDetails(rule contract.AlertRule, metric ruleMetric) map[string]any {
+func ruleDetails(rule contract.AlertRule, metric ruleMetric, now time.Time) map[string]any {
+	windowSeconds := rule.WindowSeconds
+	if windowSeconds <= 0 {
+		windowSeconds = 3600
+	}
+	windowEnd := now.UTC()
+	windowStart := windowEnd.Add(-time.Duration(windowSeconds) * time.Second)
 	details := map[string]any{
 		"rule_id":           rule.ID,
 		"rule_name":         rule.Name,
@@ -470,7 +476,9 @@ func ruleDetails(rule contract.AlertRule, metric ruleMetric) map[string]any {
 		"operator":          string(rule.Operator),
 		"threshold":         rule.Threshold,
 		"observed_value":    ruleObservedValue(rule, metric),
-		"window_seconds":    rule.WindowSeconds,
+		"window_seconds":    windowSeconds,
+		"window_start":      windowStart.Format(time.RFC3339Nano),
+		"window_end":        windowEnd.Format(time.RFC3339Nano),
 		"total_requests":    metric.total,
 		"good_requests":     metric.good,
 		"bad_requests":      metric.bad,

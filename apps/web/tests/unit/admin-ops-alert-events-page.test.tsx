@@ -32,6 +32,8 @@ const mocks = vi.hoisted(() => ({
       source_endpoint: "/v1/chat/completions",
       model: "gpt-ops",
       error_class: "timeout",
+      window_start: "2026-06-18T09:55:00Z",
+      window_end: "2026-06-18T10:00:00Z",
     },
     started_at: "2026-06-18T10:00:00Z",
     created_at: "2026-06-18T10:00:00Z",
@@ -80,11 +82,11 @@ describe("AdminOpsAlertEventsPage", () => {
     );
     expect(screen.getByRole("link", { name: "请求证据" })).toHaveAttribute(
       "href",
-      "/admin/logs?tab=request-evidence&f_request_id=req-alert",
+      "/admin/logs?tab=request-evidence&f_request_id=req-alert&f_account_id=acct-1&f_provider_id=provider-1&f_error_class=timeout&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_model=gpt-ops&f_start=2026-06-18T09%3A55%3A00Z&f_end=2026-06-18T10%3A00%3A00Z",
     );
     expect(screen.getByRole("link", { name: "调度决策" })).toHaveAttribute(
       "href",
-      "/admin/ops?tab=scheduler-decisions&f_request_id=req-alert",
+      "/admin/ops?tab=scheduler-decisions&f_request_id=req-alert&f_account_id=acct-1&f_provider_id=provider-1&f_model=gpt-ops&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_start=2026-06-18T09%3A55%3A00Z&f_end=2026-06-18T10%3A00%3A00Z",
     );
     expect(screen.getByRole("link", { name: "账号健康" })).toHaveAttribute(
       "href",

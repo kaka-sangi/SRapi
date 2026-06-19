@@ -18,6 +18,9 @@ export interface SchedulerDecisionListParams {
   account_id?: string;
   provider_id?: string;
   model?: string;
+  source_endpoint?: string;
+  start?: string;
+  end?: string;
 }
 
 export const usageApi = {
@@ -86,6 +89,9 @@ export const usageApi = {
         account_id: params.account_id || undefined,
         provider_id: params.provider_id || undefined,
         model: params.model || undefined,
+        source_endpoint: params.source_endpoint || undefined,
+        start: params.start || undefined,
+        end: params.end || undefined,
       },
       throwOnError: true,
     });

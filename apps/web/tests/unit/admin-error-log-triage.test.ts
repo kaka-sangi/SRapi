@@ -30,7 +30,7 @@ describe("buildErrorLogTriage", () => {
       },
       {
         kind: "schedulerDecision",
-        href: "/admin/ops?tab=scheduler-decisions&f_request_id=req-detail&f_account_id=12&f_provider_id=3&f_model=gpt-4o-mini",
+        href: "/admin/ops?tab=scheduler-decisions&f_request_id=req-detail&f_account_id=12&f_provider_id=3&f_model=gpt-4o-mini&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions",
       },
       { kind: "accountHealth", href: "/admin/accounts?view=health&f_providerId=3&f_accountId=12" },
       { kind: "requestDumps", href: "/admin/logs?tab=request-files&f_request_id=req-detail" },

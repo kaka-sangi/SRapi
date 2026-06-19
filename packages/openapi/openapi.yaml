@@ -12703,6 +12703,12 @@ paths:
           in: query
           schema:
             type: string
+        - name: source_endpoint
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/StartTime"
+        - $ref: "#/components/parameters/EndTime"
       responses:
         "200":
           description: Scheduler decision list.

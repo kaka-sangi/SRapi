@@ -19,12 +19,17 @@ export interface RequestEvidenceInvestigationLinkParams extends LogCorrelationID
   error_class?: string | null;
   source_endpoint?: string | null;
   model?: string | null;
+  start?: string | null;
+  end?: string | null;
 }
 
 export interface SchedulerDecisionInvestigationLinkParams extends LogCorrelationIDs {
   account_id?: string | number | null;
   provider_id?: string | number | null;
   model?: string | null;
+  source_endpoint?: string | null;
+  start?: string | null;
+  end?: string | null;
 }
 
 export interface AdminAccountHrefParams {
@@ -72,6 +77,8 @@ export function adminRequestEvidenceHref(params: RequestEvidenceInvestigationLin
   setIfPresent(query, "f_error_class", params.error_class);
   setIfPresent(query, "f_source_endpoint", params.source_endpoint);
   setIfPresent(query, "f_model", params.model);
+  setIfPresent(query, "f_start", params.start);
+  setIfPresent(query, "f_end", params.end);
   return hasRequestEvidenceFilter(query) ? `${ADMIN_ROUTES.logs}?${query.toString()}` : null;
 }
 
@@ -92,7 +99,7 @@ export function adminRequestDumpsHref(params: LogCorrelationIDs): string | null 
   return hasCorrelation(query) ? `${ADMIN_ROUTES.logs}?${query.toString()}` : null;
 }
 
-/** Build a filtered Scheduler decisions link for request-level investigation. */
+/** Build a filtered Scheduler decisions link for request or routing investigation. */
 export function adminSchedulerDecisionsHref(params: SchedulerDecisionInvestigationLinkParams): string | null {
   const query = new URLSearchParams();
   query.set("tab", "scheduler-decisions");
@@ -100,6 +107,9 @@ export function adminSchedulerDecisionsHref(params: SchedulerDecisionInvestigati
   setIfPresent(query, "f_account_id", params.account_id);
   setIfPresent(query, "f_provider_id", params.provider_id);
   setIfPresent(query, "f_model", params.model);
+  setIfPresent(query, "f_source_endpoint", params.source_endpoint);
+  setIfPresent(query, "f_start", params.start);
+  setIfPresent(query, "f_end", params.end);
   return hasSchedulerDecisionFilter(query) ? `${ADMIN_ROUTES.ops}?${query.toString()}` : null;
 }
 
@@ -133,7 +143,9 @@ function hasRequestEvidenceFilter(query: URLSearchParams): boolean {
       query.get("f_provider_id") ||
       query.get("f_error_class") ||
       query.get("f_source_endpoint") ||
-      query.get("f_model"),
+      query.get("f_model") ||
+      query.get("f_start") ||
+      query.get("f_end"),
   );
 }
 
@@ -142,7 +154,8 @@ function hasSchedulerDecisionFilter(query: URLSearchParams): boolean {
     query.get("f_request_id") ||
       query.get("f_account_id") ||
       query.get("f_provider_id") ||
-      query.get("f_model"),
+      query.get("f_model") ||
+      query.get("f_source_endpoint"),
   );
 }
 

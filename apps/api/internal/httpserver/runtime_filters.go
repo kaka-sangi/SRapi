@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -225,9 +226,10 @@ func filterOpsAlerts(items []operationscontract.AlertEvent, status, severity str
 	return out
 }
 
-func filterSchedulerDecisions(items []schedulercontract.Decision, requestID, model, accountID, providerID string) []schedulercontract.Decision {
+func filterSchedulerDecisions(items []schedulercontract.Decision, requestID, model, sourceEndpoint, accountID, providerID string, start, end *time.Time) []schedulercontract.Decision {
 	requestID = strings.TrimSpace(requestID)
 	model = strings.ToLower(strings.TrimSpace(model))
+	sourceEndpoint = strings.ToLower(strings.TrimSpace(sourceEndpoint))
 	accountIDValue, hasAccountID, validAccountID := positiveIDFilter(accountID)
 	providerIDValue, hasProviderID, validProviderID := positiveIDFilter(providerID)
 	if !validAccountID || !validProviderID {
@@ -238,7 +240,16 @@ func filterSchedulerDecisions(items []schedulercontract.Decision, requestID, mod
 		if requestID != "" && item.RequestID != requestID {
 			continue
 		}
+		if start != nil && item.CreatedAt.Before(*start) {
+			continue
+		}
+		if end != nil && !item.CreatedAt.Before(*end) {
+			continue
+		}
 		if model != "" && !strings.Contains(strings.ToLower(item.Model), model) {
+			continue
+		}
+		if sourceEndpoint != "" && !strings.Contains(strings.ToLower(item.SourceEndpoint), sourceEndpoint) {
 			continue
 		}
 		if hasAccountID && !schedulerDecisionMentionsAccount(item, accountIDValue) {
@@ -250,6 +261,22 @@ func filterSchedulerDecisions(items []schedulercontract.Decision, requestID, mod
 		out = append(out, item)
 	}
 	return out
+}
+
+func schedulerDecisionWindowFromRequest(r *http.Request) (*time.Time, *time.Time, error) {
+	q := r.URL.Query()
+	start, err := parseOptionalRFC3339(q.Get("start"))
+	if err != nil {
+		return nil, nil, errors.New("invalid start timestamp")
+	}
+	end, err := parseOptionalRFC3339(q.Get("end"))
+	if err != nil {
+		return nil, nil, errors.New("invalid end timestamp")
+	}
+	if start != nil && end != nil && !start.Before(*end) {
+		return nil, nil, errors.New("start must be before end")
+	}
+	return start, end, nil
 }
 
 func schedulerDecisionMentionsAccount(item schedulercontract.Decision, accountID int) bool {

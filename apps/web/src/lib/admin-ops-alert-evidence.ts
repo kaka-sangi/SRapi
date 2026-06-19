@@ -45,17 +45,39 @@ export function buildOpsAlertEvidenceLinks(details?: JsonObject): OpsAlertEviden
   const requestID = detailString(details, "request_id", "requestId");
   const accountID = detailString(details, "account_id", "accountId");
   const providerID = detailString(details, "provider_id", "providerId");
+  const errorClass = detailString(details, "error_class", "errorClass");
+  const sourceEndpoint = detailString(details, "source_endpoint", "sourceEndpoint");
+  const model = detailString(details, "model", "canonical_model", "model_alias");
+  const start = detailString(details, "window_start", "windowStart");
+  const end = detailString(details, "window_end", "windowEnd");
 
   return {
     errorLogs: adminErrorInvestigationHref({
       account_id: accountID,
       provider_id: providerID,
-      error_class: detailString(details, "error_class", "errorClass"),
-      source_endpoint: detailString(details, "source_endpoint", "sourceEndpoint"),
-      model: detailString(details, "model", "canonical_model", "model_alias"),
+      error_class: errorClass,
+      source_endpoint: sourceEndpoint,
+      model,
     }),
-    requestEvidence: adminRequestEvidenceHref({ request_id: requestID }),
-    schedulerDecision: adminSchedulerDecisionsHref({ request_id: requestID }),
+    requestEvidence: adminRequestEvidenceHref({
+      request_id: requestID,
+      account_id: accountID,
+      provider_id: providerID,
+      error_class: errorClass,
+      source_endpoint: sourceEndpoint,
+      model,
+      start,
+      end,
+    }),
+    schedulerDecision: adminSchedulerDecisionsHref({
+      request_id: requestID,
+      account_id: accountID,
+      provider_id: providerID,
+      model,
+      source_endpoint: sourceEndpoint,
+      start,
+      end,
+    }),
     accountHealth:
       accountID || providerID
         ? adminAccountsHealthHref({ account_id: accountID, provider_id: providerID })
@@ -79,6 +101,12 @@ export function buildOpsAlertRunbookSteps(details?: JsonObject): OpsAlertRunbook
   const hasRuleSignal = Boolean(
     ruleID || metricType || detailString(details, "rule_name", "ruleName", "observed_value"),
   );
+  const hasRequestEvidenceScope = Boolean(
+    requestID || accountID || providerID || sourceEndpoint || model || errorClass,
+  );
+  const hasSchedulerEvidenceScope = Boolean(
+    requestID || accountID || providerID || sourceEndpoint || model,
+  );
 
   const steps: OpsAlertRunbookStep[] = [];
   const add = (step: OpsAlertRunbookStep) => {
@@ -86,10 +114,8 @@ export function buildOpsAlertRunbookSteps(details?: JsonObject): OpsAlertRunbook
   };
 
   if (errorClass || accountID || providerID || sourceEndpoint || model) add("openErrorLogs");
-  if (requestID) {
-    add("inspectRequestEvidence");
-    add("inspectSchedulerDecision");
-  }
+  if (hasRequestEvidenceScope) add("inspectRequestEvidence");
+  if (hasSchedulerEvidenceScope) add("inspectSchedulerDecision");
   if (accountID || providerID) add("checkAccountHealth");
   if (errorClass && QUOTA_ERROR_CLASSES.has(errorClass)) add("checkQuotaOrRateLimit");
   if (errorClass && CREDENTIAL_ERROR_CLASSES.has(errorClass)) add("checkCredentials");

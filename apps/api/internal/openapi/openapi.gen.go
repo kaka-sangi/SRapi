@@ -12572,12 +12572,19 @@ type ListAdminScheduledTestPlanRunsParams struct {
 
 // ListAdminSchedulerDecisionsParams defines parameters for ListAdminSchedulerDecisions.
 type ListAdminSchedulerDecisionsParams struct {
-	Page       *Page     `form:"page,omitempty" json:"page,omitempty"`
-	PageSize   *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
-	RequestId  *string   `form:"request_id,omitempty" json:"request_id,omitempty"`
-	AccountId  *Id       `form:"account_id,omitempty" json:"account_id,omitempty"`
-	ProviderId *Id       `form:"provider_id,omitempty" json:"provider_id,omitempty"`
-	Model      *string   `form:"model,omitempty" json:"model,omitempty"`
+	Page           *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize       *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+	RequestId      *string   `form:"request_id,omitempty" json:"request_id,omitempty"`
+	AccountId      *Id       `form:"account_id,omitempty" json:"account_id,omitempty"`
+	ProviderId     *Id       `form:"provider_id,omitempty" json:"provider_id,omitempty"`
+	Model          *string   `form:"model,omitempty" json:"model,omitempty"`
+	SourceEndpoint *string   `form:"source_endpoint,omitempty" json:"source_endpoint,omitempty"`
+
+	// Start Inclusive start time for read-model queries.
+	Start *StartTime `form:"start,omitempty" json:"start,omitempty"`
+
+	// End Exclusive end time for read-model queries.
+	End *EndTime `form:"end,omitempty" json:"end,omitempty"`
 }
 
 // ListSchedulerStrategiesParams defines parameters for ListSchedulerStrategies.
@@ -32034,6 +32041,45 @@ func (siw *ServerInterfaceWrapper) ListAdminSchedulerDecisions(w http.ResponseWr
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "model"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "source_endpoint" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "source_endpoint", r.URL.Query(), &params.SourceEndpoint, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "source_endpoint"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source_endpoint", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
 		}
 		return
 	}

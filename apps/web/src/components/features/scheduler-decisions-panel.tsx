@@ -34,11 +34,17 @@ export function SchedulerDecisionsPanel() {
   const accountIDFilter = searchParams?.get("f_account_id")?.trim() || undefined;
   const providerIDFilter = searchParams?.get("f_provider_id")?.trim() || undefined;
   const modelFilter = searchParams?.get("f_model")?.trim() || undefined;
+  const sourceEndpointFilter = searchParams?.get("f_source_endpoint")?.trim() || undefined;
+  const startFilter = searchParams?.get("f_start")?.trim() || undefined;
+  const endFilter = searchParams?.get("f_end")?.trim() || undefined;
   const decisions = useSchedulerDecisions({
     request_id: requestIDFilter,
     account_id: accountIDFilter,
     provider_id: providerIDFilter,
     model: modelFilter,
+    source_endpoint: sourceEndpointFilter,
+    start: startFilter,
+    end: endFilter,
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -78,6 +84,9 @@ export function SchedulerDecisionsPanel() {
                 accountID: accountIDFilter,
                 providerID: providerIDFilter,
                 model: modelFilter,
+                sourceEndpoint: sourceEndpointFilter,
+                start: startFilter,
+                end: endFilter,
               }}
             />
           )
@@ -216,6 +225,9 @@ interface SchedulerDecisionPanelFilters {
   accountID?: string;
   providerID?: string;
   model?: string;
+  sourceEndpoint?: string;
+  start?: string;
+  end?: string;
 }
 
 function SchedulerFilterChips({ filters }: { filters: SchedulerDecisionPanelFilters }) {
@@ -224,6 +236,9 @@ function SchedulerFilterChips({ filters }: { filters: SchedulerDecisionPanelFilt
     filters.accountID ? ["acct", filters.accountID] : null,
     filters.providerID ? ["prov", filters.providerID] : null,
     filters.model ? ["model", filters.model] : null,
+    filters.sourceEndpoint ? ["endpoint", filters.sourceEndpoint] : null,
+    filters.start ? ["from", filters.start] : null,
+    filters.end ? ["until", filters.end] : null,
   ].filter((entry): entry is [string, string] => Boolean(entry));
   return entries.map(([label, value]) => (
     <span
