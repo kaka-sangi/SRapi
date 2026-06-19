@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
-import { extractAlertRules } from "./observability-rules-check.mjs";
+import { extractAlertRules, markdownHeadingAnchors } from "./observability-rules-check.mjs";
 
 test("observability rules check passes for repository rules", () => {
   const result = spawnSync("node", ["tools/observability-rules-check.mjs"], {
@@ -132,6 +132,22 @@ test("prometheus alert rules parse into low-cardinality labels and runbooks", ()
     assert.equal(rule.labels.has("severity"), true);
     assert.equal(rule.labels.has("component"), true);
     assert.equal(rule.annotations.has("runbook_url"), true);
+    assert.match(rule.annotations.get("runbook_url").value, /^docs\/requirements\/OPERATIONS\.md#/);
+  }
+});
+
+test("prometheus alert runbooks point at existing operations headings", () => {
+  const rules = extractAlertRules(
+    "deploy/prometheus-srapi-alerts.yaml",
+    readFileSync("deploy/prometheus-srapi-alerts.yaml", "utf8"),
+  );
+  const anchors = markdownHeadingAnchors(readFileSync("docs/requirements/OPERATIONS.md", "utf8"));
+
+  for (const rule of rules) {
+    const runbook = rule.annotations.get("runbook_url").value;
+    const [targetPath, anchor] = runbook.split("#", 2);
+    assert.equal(targetPath, "docs/requirements/OPERATIONS.md");
+    assert.equal(anchors.has(anchor), true, `missing operations runbook anchor ${anchor}`);
   }
 });
 
@@ -159,6 +175,29 @@ test("observability rules check rejects forbidden high-cardinality fields", () =
     result.stderr,
     /forbidden high-cardinality or sensitive field|unsupported alert label/,
   );
+});
+
+test("observability rules check rejects missing runbook anchors", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "srapi-observability-runbook-"));
+  const rulesPath = join(tempDir, "bad-rules.yaml");
+  writeFileSync(
+    rulesPath,
+    readFileSync("deploy/prometheus-srapi-alerts.yaml", "utf8").replace(
+      "docs/requirements/OPERATIONS.md#srapicriticalopsalertsfiring",
+      "docs/requirements/OPERATIONS.md#missing-alert-runbook",
+    ),
+  );
+  const checker = checkerWithConstant(
+    "ruleFiles",
+    `[${JSON.stringify(rulesPath)}]`,
+  );
+  const checkerPath = join(tempDir, "check.mjs");
+  writeFileSync(checkerPath, checker);
+
+  const result = spawnSync("node", [checkerPath], { encoding: "utf8" });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /runbook anchor #missing-alert-runbook is missing/);
 });
 
 test("observability rules check rejects unsupported alertmanager grouping", () => {

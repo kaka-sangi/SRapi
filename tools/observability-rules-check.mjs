@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync, statSync } from "node:fs";
+import { dirname, normalize, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const ruleFiles = ["deploy/prometheus-srapi-alerts.yaml"];
@@ -78,6 +79,7 @@ function assertRuleLabelNames(file, content) {
       rule.annotations.has("runbook_url"),
       `${file}:${rule.line} alert ${rule.alert} is missing runbook_url annotation`,
     );
+    assertRunbookURL(file, rule);
     for (const pattern of forbiddenPatterns) {
       assert(
         !pattern.test(rule.expr),
@@ -102,6 +104,62 @@ function assertRuleLabelNames(file, content) {
 function readRuleFile(file) {
   assert(statSync(file).isFile(), `${file} is missing`);
   return readFileSync(file, "utf8");
+}
+
+function assertRunbookURL(file, rule) {
+  const runbook = rule.annotations.get("runbook_url");
+  assert(
+    runbook?.value,
+    `${file}:${rule.line} alert ${rule.alert} has an empty runbook_url annotation`,
+  );
+  const [targetPath, anchor] = runbook.value.split("#", 2);
+  assert(
+    targetPath.endsWith(".md"),
+    `${file}:${runbook.line} alert ${rule.alert} runbook_url must point to a Markdown file`,
+  );
+  assert(
+    anchor,
+    `${file}:${runbook.line} alert ${rule.alert} runbook_url must include a heading anchor`,
+  );
+  const normalizedPath = normalize(targetPath);
+  assert(
+    !normalizedPath.startsWith(`..${sep}`) && !normalizedPath.includes(`${sep}..${sep}`),
+    `${file}:${runbook.line} alert ${rule.alert} runbook_url must stay inside the repository`,
+  );
+  assert(
+    statSync(normalizedPath).isFile(),
+    `${file}:${runbook.line} alert ${rule.alert} runbook target ${targetPath} is missing`,
+  );
+  const markdown = readFileSync(normalizedPath, "utf8");
+  const anchors = markdownHeadingAnchors(markdown);
+  assert(
+    anchors.has(anchor),
+    `${file}:${runbook.line} alert ${rule.alert} runbook anchor #${anchor} is missing in ${targetPath}`,
+  );
+  assert(
+    dirname(normalizedPath) === "docs/requirements",
+    `${file}:${runbook.line} alert ${rule.alert} runbook must live in docs/requirements`,
+  );
+}
+
+function markdownHeadingAnchors(markdown) {
+  const anchors = new Set();
+  for (const line of markdown.split("\n")) {
+    const match = line.match(/^#{1,6}\s+(.+?)\s*#*\s*$/);
+    if (!match) continue;
+    anchors.add(markdownAnchor(match[1]));
+  }
+  return anchors;
+}
+
+function markdownAnchor(heading) {
+  return heading
+    .trim()
+    .toLowerCase()
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/[^\p{Letter}\p{Number}\s-]/gu, "")
+    .trim()
+    .replace(/\s+/g, "-");
 }
 
 function assertPrometheusConfig(content) {
@@ -295,7 +353,10 @@ function extractAlertRules(file, content) {
       continue;
     }
     if (section === "annotations" && ruleLabelMatch) {
-      current.annotations.set(ruleLabelMatch[1], lineNumber);
+      current.annotations.set(ruleLabelMatch[1], {
+        line: lineNumber,
+        value: ruleLabelMatch[2].trim(),
+      });
     }
   }
 
@@ -309,7 +370,7 @@ function assert(condition, message) {
   }
 }
 
-export { extractAlertRules };
+export { extractAlertRules, markdownAnchor, markdownHeadingAnchors };
 
 if (isDirectExecution()) {
   try {

@@ -169,6 +169,7 @@ It covers:
 - Deployable SRapi alert rule files exist.
 - Alert expressions use approved low-cardinality metric labels.
 - Rule labels stay limited to fixed routing dimensions.
+- Every alert has a `runbook_url` annotation pointing to an existing Markdown heading in `docs/requirements`.
 - Alertmanager notification grouping stays limited to fixed low-cardinality routing dimensions.
 - API key, account id, user id, request id, fingerprint, rule id, prompt, credential, cookie, and similar sensitive or high-cardinality fields do not enter rule files.
 

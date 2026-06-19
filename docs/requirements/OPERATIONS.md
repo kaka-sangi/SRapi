@@ -382,7 +382,46 @@ Prometheus alert rules 可以从 `deploy/prometheus-srapi-alerts.yaml` 加载。
 make observability-rules-check
 ```
 
-该检查会拒绝 API key、account id、user id、request id、fingerprint、rule id、prompt、credential、cookie 等高基数或敏感字段进入规则文件。
+该检查会拒绝 API key、account id、user id、request id、fingerprint、rule id、prompt、credential、cookie 等高基数或敏感字段进入规则文件，并验证每条告警的 `runbook_url` 指向本文档内真实存在的处置章节。
+
+#### SRapiCriticalOpsAlertsFiring
+
+触发条件：`srapi_ops_alert_events{severity="critical",status="firing"}` 存在 firing 事件超过 2 分钟。该告警代表 AdminOps 内已经有 critical 级别事故信号，Prometheus 只负责把控制面状态升级到通知系统，根因仍以 AdminOps alert event details 为准。
+
+处置步骤：
+
+1. 打开 AdminOps 告警事件页，按 `severity=critical`、`status=firing` 过滤，确认 firing 事件的 summary、started_at、details 和 UI 处置路径。
+2. 先进入错误日志，按 details 中的 `source_endpoint`、`model`、`provider_id`、`account_id`、`error_class` 缩小范围，确认 owner、upstream status、attempt_no、latency 和 stream completion state。
+3. 如果 details 带 `request_id`，继续打开请求证据和调度决策，核对 selected provider/account、reject reasons、score breakdown、fallback_from_decision_id 和 fallback_excluded 证据。
+4. 如果 details 带 provider/account scope，打开账号健康，确认 cooldown、circuit、quota remaining、RPM/TPM、proxy quality、needs_reauth 和最近 health probe 错误。
+5. 如果 critical 由 SLO burn-rate 触发，复核 long/short window、total/bad requests、burn rate、error budget consumed 和 SLO filter 是否符合真实事故范围；不要只因为单个低流量样本恢复就确认事故结束。
+6. 缓解后等待 alert event 自动恢复或人工确认，必须在错误日志、请求证据和账号健康三处都看到趋势回落，再关闭外部事故。
+
+#### SRapiWarningOpsAlertsPersisting
+
+触发条件：`srapi_ops_alert_events{severity="warning",status="firing"}` 持续 15 分钟。该告警代表 warning 事件没有自行恢复，处理目标是阻止它升级为 critical。
+
+处置步骤：
+
+1. 打开 AdminOps 告警事件页，按 `severity=warning`、`status=firing` 过滤，确认是否集中在同一 endpoint/model/provider，还是多个 scope 同时慢性退化。
+2. 如果 UI 处置路径指向配额或限流，检查账号组限额、上游 quota、RPM/TPM、Retry-After、冷却时间和调度候选数量。
+3. 如果处置路径指向凭证，检查 OAuth refresh、needs_reauth、account_locked/account_banned、最近 health probe 和管理员变更审计。
+4. 如果处置路径指向网络或 invalid response，检查 provider protocol、runtime class、代理质量、timeout 分布、上游 5xx 比例和最近 scheduled test。
+5. 对阈值型规则，复核 window_seconds、min_request_count、observed_value 和 scope；如果规则过宽或过窄，先修规则再 silence，避免掩盖真实事故。
+6. 恢复后确认 warning 事件 resolved，或创建有过期时间的 silence，并在 silence comment 写明验证证据。
+
+#### SRapiSchedulerNoAvailableAccounts
+
+触发条件：`increase(srapi_scheduler_no_available_total[5m]) > 5`，按 strategy 和 primary reject reason 聚合。该告警表示 Scheduler 找不到可用账号，通常是 capability、scope、配额、凭证、冷却或账号组覆盖问题。
+
+处置步骤：
+
+1. 打开 AdminOps 系统日志，过滤 no-available-account 事件，确认 strategy、reason、requested capability family、source endpoint 和模型映射。
+2. 打开调度决策页，按最近 request 或时间窗口查看 rejected candidates，重点看 hard filter reject reasons、score breakdown、candidate count 和 group/scope 限制。
+3. 打开错误日志，按 `error_class` 聚合检查是否是 auth_error、quota_exceeded、rate_limited、timeout、network_error、invalid_response 或 policy_error 导致候选被冷却。
+4. 打开账号健康页，按 provider/account group 检查 active 账号数量、cooldown/circuit、quota remaining、RPM、proxy quality 和 needs_reauth。
+5. 检查模型映射、provider capabilities、runtime class、account group membership 和 API key/user scope 是否覆盖该请求；不要通过放宽所有 scope 临时恢复，除非有明确事故授权。
+6. 修复后观察 `srapi_scheduler_no_available_total` 增量归零，并抽查新的 Scheduler decision 确认 selected_account_id 和 selected_provider_id 已恢复。
 
 本地单机部署可以显式启用 Prometheus profile：
 
