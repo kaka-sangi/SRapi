@@ -17,16 +17,6 @@ const (
 	availabilitySnapshotsLimit = 2000
 )
 
-type availabilityRollupPayload struct {
-	Date              string    `json:"date"`
-	ProviderID        int       `json:"provider_id"`
-	TotalSamples      int       `json:"total_samples"`
-	HealthySamples    int       `json:"healthy_samples"`
-	AvailabilityRatio float32   `json:"availability_ratio"`
-	AvgSuccessRate    float32   `json:"avg_success_rate"`
-	ComputedAt        time.Time `json:"computed_at"`
-}
-
 func (s *Server) handleAdminAccountAvailability(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {
@@ -69,26 +59,23 @@ func (s *Server) handleAdminAccountAvailability(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	data := make([]availabilityRollupPayload, 0, len(rollups))
+	data := make([]apiopenapi.AccountAvailabilityRollup, 0, len(rollups))
 	for _, rollup := range rollups {
-		data = append(data, availabilityRollupPayload{
-			Date:              rollup.Date,
-			ProviderID:        rollup.ProviderID,
-			TotalSamples:      rollup.TotalSamples,
-			HealthySamples:    rollup.HealthySamples,
-			AvailabilityRatio: rollup.AvailabilityRatio,
-			AvgSuccessRate:    rollup.AvgSuccessRate,
-			ComputedAt:        rollup.ComputedAt.UTC(),
-		})
+		data = append(data, toAPIAccountAvailabilityRollup(rollup))
 	}
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"account_id":         accountID,
-			"window_days":        days,
-			"overall_uptime":     availabilityOverall(rollups),
-			"daily_availability": data,
+	writeJSONAny(w, http.StatusOK, apiopenapi.AccountAvailabilityResponse{
+		Data: struct {
+			AccountId         int64                                  `json:"account_id"`
+			DailyAvailability []apiopenapi.AccountAvailabilityRollup `json:"daily_availability"`
+			OverallUptime     float32                                `json:"overall_uptime"`
+			WindowDays        int64                                  `json:"window_days"`
+		}{
+			AccountId:         int64(accountID),
+			DailyAvailability: data,
+			OverallUptime:     availabilityOverall(rollups),
+			WindowDays:        int64(days),
 		},
-		"request_id": requestID,
+		RequestId: requestID,
 	})
 }
 
@@ -168,6 +155,18 @@ func healthSnapshotsToSamples(snapshots []accountcontract.AccountHealthSnapshot,
 		})
 	}
 	return samples
+}
+
+func toAPIAccountAvailabilityRollup(rollup healthrollupscontract.Rollup) apiopenapi.AccountAvailabilityRollup {
+	return apiopenapi.AccountAvailabilityRollup{
+		Date:              rollup.Date,
+		ProviderId:        int64(rollup.ProviderID),
+		TotalSamples:      int64(rollup.TotalSamples),
+		HealthySamples:    int64(rollup.HealthySamples),
+		AvailabilityRatio: rollup.AvailabilityRatio,
+		AvgSuccessRate:    rollup.AvgSuccessRate,
+		ComputedAt:        rollup.ComputedAt.UTC(),
+	}
 }
 
 func availabilityOverall(rollups []healthrollupscontract.Rollup) float32 {

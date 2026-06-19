@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
-	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -48,7 +46,7 @@ func (s *Server) handleBatchQuotaFetchAdminAccounts(w http.ResponseWriter, r *ht
 		row := apiopenapi.BatchQuotaFetchRow{
 			AccountId: apiopenapi.Id(strconv.Itoa(accountID)),
 		}
-		if err := s.fetchAccountQuotaOnce(r, accountID); err != nil {
+		if _, err := s.fetchAccountQuotaReportOnce(r, accountID); err != nil {
 			row.Success = false
 			msg := err.Error()
 			row.Error = &msg
@@ -84,62 +82,3 @@ func (s *Server) handleBatchQuotaFetchAdminAccounts(w http.ResponseWriter, r *ht
 		RequestId: requestID,
 	})
 }
-
-// fetchAccountQuotaOnce mirrors handleAdminAccountQuotaFetch's body without
-// the HTTP wrapper — used by the batch loop above so per-row failures stay
-// scoped to their account and don't tear down the rest of the batch. Side
-// effects (quota snapshot persistence, quota-error metadata) match the
-// per-account handler verbatim so a batch run is observably identical to N
-// individual runs.
-func (s *Server) fetchAccountQuotaOnce(r *http.Request, accountID int) error {
-	if accountID <= 0 {
-		return batchQuotaFetchError("invalid account id")
-	}
-	account, err := s.runtime.accounts.FindByID(r.Context(), accountID)
-	if err != nil {
-		return batchQuotaFetchError("account not found")
-	}
-	provider, err := s.runtime.providers.FindByID(r.Context(), account.ProviderID)
-	if err != nil {
-		return batchQuotaFetchError("provider not found")
-	}
-	credential, err := s.runtime.accounts.DecryptCredential(r.Context(), accountID)
-	if err != nil {
-		return batchQuotaFetchError("failed to load account credential")
-	}
-	if refreshed, ok, refreshErr := s.runtime.refreshReverseProxyCredential(r.Context(), account, credential); refreshErr != nil {
-		s.persistQuotaProviderError(r, account, refreshErr)
-		return batchQuotaFetchError("quota fetch credential refresh failed")
-	} else if ok {
-		credential = refreshed
-	}
-	report, err := s.runtime.adapters.FetchAccountQuota(r.Context(), provideradaptercontract.ProbeRequest{
-		Provider:   provider,
-		Account:    account,
-		Credential: credential,
-	})
-	if err != nil {
-		if refreshed, retried := s.runtime.retryAfterAuthRefresh(r.Context(), account, credential, err); retried {
-			credential = refreshed
-			report, err = s.runtime.adapters.FetchAccountQuota(r.Context(), provideradaptercontract.ProbeRequest{
-				Provider:   provider,
-				Account:    account,
-				Credential: credential,
-			})
-		}
-	}
-	if err != nil {
-		s.persistQuotaProviderError(r, account, err)
-		return batchQuotaFetchError("quota fetch failed")
-	}
-	s.persistQuotaReport(r, account, report)
-	return nil
-}
-
-// Keep account import so the import stays needed even if a future refactor
-// drops the explicit account variable usage above.
-var _ = accountcontract.RuntimeClass("")
-
-type batchQuotaFetchError string
-
-func (e batchQuotaFetchError) Error() string { return string(e) }

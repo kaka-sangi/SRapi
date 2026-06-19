@@ -5,10 +5,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -287,6 +290,9 @@ func TestAdminAccountQuotaFetchRefreshesOAuthCredential(t *testing.T) {
 		case "/quota":
 			quotaAuthorization = r.Header.Get("Authorization")
 			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Codex-Primary-Used-Percent", "10")
+			w.Header().Set("X-Codex-Primary-Reset-After-Seconds", "60")
+			w.Header().Set("X-Codex-Primary-Window-Minutes", "300")
 			_, _ = w.Write([]byte(`{"account_plan":{"account_plan_id":"plus","subscription_plan":{"allowance":"90","usage":"10","limit":"100","currency":"credits"}}}`))
 		default:
 			t.Fatalf("unexpected upstream path %s", r.URL.Path)
@@ -320,6 +326,70 @@ func TestAdminAccountQuotaFetchRefreshesOAuthCredential(t *testing.T) {
 	if !resp.Data.Supported || resp.Data.CreditsRemaining != "90" || resp.Data.CreditsLimit != "100" {
 		t.Fatalf("unexpected quota report: %+v", resp.Data)
 	}
+	if resp.Data.StatusCode != http.StatusOK || len(resp.Data.QuotaSignals) != 1 {
+		t.Fatalf("expected openapi quota status and signal, got %+v", resp.Data)
+	}
+	signal := resp.Data.QuotaSignals[0]
+	if signal.QuotaType != "codex_5h_percent" || signal.Used != "10" || signal.Remaining != "90" || signal.QuotaLimit != "100" || signal.RemainingRatio != 0.9 || signal.ResetAt == nil {
+		t.Fatalf("unexpected quota signal: %+v", signal)
+	}
+}
+
+func TestAdminAccountAvailabilityUsesOpenAPIWireTypes(t *testing.T) {
+	handler, srv := newWithServer(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"admin-availability-provider","display_name":"Admin Availability Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"admin-availability-account","runtime_class":"api_key","credential":{"api_key":"availability-secret"},"status":"active"}`)
+	accountID := mustAtoi(t, string(accountResp.Data.Id))
+	providerID := mustAtoi(t, string(providerResp.Data.Id))
+	snapshotAt := time.Now().UTC().Truncate(24 * time.Hour).Add(12 * time.Hour)
+
+	for _, snapshot := range []accountcontract.AccountHealthSnapshot{
+		{
+			AccountID:    accountID,
+			ProviderID:   providerID,
+			Status:       "healthy",
+			SuccessRate:  1,
+			ErrorRate:    0,
+			CircuitState: "closed",
+			SnapshotAt:   snapshotAt,
+		},
+		{
+			AccountID:    accountID,
+			ProviderID:   providerID,
+			Status:       "unhealthy",
+			SuccessRate:  0,
+			ErrorRate:    1,
+			CircuitState: "open",
+			SnapshotAt:   snapshotAt.Add(time.Hour),
+		},
+	} {
+		if _, err := srv.runtime.accounts.RecordHealthSnapshot(t.Context(), snapshot); err != nil {
+			t.Fatalf("seed health snapshot: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/availability?days=1", nil)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected availability 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.AccountAvailabilityResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode availability response: %v", err)
+	}
+	if resp.Data.AccountId != int64(accountID) || resp.Data.WindowDays != 1 || resp.Data.OverallUptime != 0.5 {
+		t.Fatalf("unexpected availability summary: %+v", resp.Data)
+	}
+	if len(resp.Data.DailyAvailability) != 1 {
+		t.Fatalf("expected one daily rollup, got %+v", resp.Data.DailyAvailability)
+	}
+	rollup := resp.Data.DailyAvailability[0]
+	if rollup.ProviderId != int64(providerID) || rollup.TotalSamples != 2 || rollup.HealthySamples != 1 || rollup.AvailabilityRatio != 0.5 || rollup.AvgSuccessRate != 0.5 {
+		t.Fatalf("unexpected availability rollup: %+v", rollup)
+	}
 }
 
 func assertAccountQuotaSnapshot(t *testing.T, snapshots []apiopenapi.AccountQuotaSnapshot, quotaType string, used string, remaining string, remainingRatio float32) {
@@ -334,4 +404,13 @@ func assertAccountQuotaSnapshot(t *testing.T, snapshots []apiopenapi.AccountQuot
 		return
 	}
 	t.Fatalf("missing %s quota snapshot in %+v", quotaType, snapshots)
+}
+
+func mustAtoi(t *testing.T, value string) int {
+	t.Helper()
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		t.Fatalf("parse int %q: %v", value, err)
+	}
+	return parsed
 }
