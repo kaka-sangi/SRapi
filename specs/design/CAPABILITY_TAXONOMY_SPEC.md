@@ -114,6 +114,10 @@ rerank
 token_counting
 ```
 
+`chat_completions`、`responses`、`messages` 分别表示 Provider Account 能处理 OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 形状的对话生成端点。处理可以是上游原生支持，也可以是该 adapter 已实现且被测试覆盖的确定性网关转换，例如 Codex CLI 将 Chat/Messages 入口转换为 Responses 上游，Anthropic/Gemini adapters 将受支持的文本入口转换为各自上游协议。Gateway 对 `/v1/chat/completions`、`/v1/responses`、`/v1/messages` 以及对应 Provider alias 入口必须生成同名 RequestCapability，并由 Scheduler 作为 hard filter 校验，避免只有模型映射但不具备该端点协议的账号被租约选中。
+
+`responses_compact` 是独立端点能力，不能从普通 `responses` 自动推导；compact 需要 Provider Account 能返回 `response.compaction` JSON 语义。只有 preset、provider capability 或 account metadata 明确声明 compact 时，Scheduler 才能把该账号作为 `/v1/responses/compact` 候选。
+
 `audio_transcriptions` 表示 Provider Account 能处理 `/v1/audio/transcriptions` 兼容端点；`audio_input` 表示模型/Provider 能消费音频输入，`text_output` 表示可产出转写文本。Gateway audio transcription 请求必须要求 `audio_transcriptions.v1`，避免 text-only 或 image-only provider 被误选。
 
 `audio_speech` 表示 Provider Account 能处理 `/v1/audio/speech` 兼容端点；`text_input` 表示模型/Provider 能消费待合成文本，`audio_output` 表示可产出音频。Gateway audio speech 请求必须要求 `audio_speech.v1`，避免 transcription-only 或 text-only provider 被误选。

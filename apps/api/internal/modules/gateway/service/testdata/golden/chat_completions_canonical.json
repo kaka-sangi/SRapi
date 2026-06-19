@@ -54,6 +54,10 @@
   "prompt": "system: You are terse.\nuser: Describe this\n[image]",
   "request_capabilities": [
     {
+      "key": "chat_completions",
+      "version": "v1"
+    },
+    {
       "key": "streaming",
       "version": "v1"
     },

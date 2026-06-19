@@ -87,13 +87,7 @@ func hasCapability(values []capabilitiescontract.Descriptor, key string) bool {
 	return false
 }
 
-// TestEffectiveCapabilitiesAutoIncludesResponsesCompactFromResponses proves
-// /v1/responses/compact is treated as a strict non-streaming subset of
-// /v1/responses: any account that declares the responses capability
-// automatically advertises responses_compact too, unless the operator
-// explicitly opted out via metadata.disable_responses_compact or by setting
-// capability_responses_compact=false on the provider or account.
-func TestEffectiveCapabilitiesAutoIncludesResponsesCompactFromResponses(t *testing.T) {
+func TestEffectiveCapabilitiesResponsesCompactRequiresExplicitCapability(t *testing.T) {
 	model := modelcontract.Model{}
 	mapping := modelcontract.ModelProviderMapping{}
 
@@ -104,52 +98,51 @@ func TestEffectiveCapabilitiesAutoIncludesResponsesCompactFromResponses(t *testi
 		wantCompact bool
 	}{
 		{
-			name: "responses on model only auto-includes compact",
+			name: "preset with explicit compact advertises compact",
 			provider: providercontract.Provider{
 				AdapterType: "openai-compatible",
-				// Provider declares no caps map at all (preset baseline applies):
-				// the openai-compatible preset already advertises responses +
-				// responses_compact, so the auto-include is a no-op here.
 			},
 			wantCompact: true,
 		},
 		{
-			name: "preset provider with no overrides auto-includes compact",
+			name: "ordinary responses capability does not imply compact",
 			provider: providercontract.Provider{
-				AdapterType:  "openai-compatible",
+				AdapterType:  "unknown-provider",
 				Capabilities: map[string]any{capabilitiescontract.KeyResponses: true},
 			},
+		},
+		{
+			name: "provider explicit compact true enables compact",
+			provider: providercontract.Provider{
+				AdapterType:  "unknown-provider",
+				Capabilities: map[string]any{capabilitiescontract.KeyResponsesCompact: true},
+			},
 			wantCompact: true,
 		},
 		{
-			name: "provider explicit responses_compact=false suppresses auto-include",
+			name: "provider explicit compact false suppresses preset compact",
 			provider: providercontract.Provider{
 				AdapterType:  "openai-compatible",
 				Capabilities: map[string]any{capabilitiescontract.KeyResponsesCompact: false},
 			},
-			wantCompact: false,
 		},
 		{
-			name: "account capability_responses_compact=false suppresses auto-include",
+			name: "account explicit compact false suppresses preset compact",
 			provider: providercontract.Provider{
-				AdapterType:  "openai-compatible",
-				Capabilities: map[string]any{capabilitiescontract.KeyResponses: true},
+				AdapterType: "openai-compatible",
 			},
 			account: accountcontract.ProviderAccount{
 				Metadata: map[string]any{"capability_responses_compact": false},
 			},
-			wantCompact: false,
 		},
 		{
 			name: "account metadata disable_responses_compact opts out",
 			provider: providercontract.Provider{
-				AdapterType:  "openai-compatible",
-				Capabilities: map[string]any{capabilitiescontract.KeyResponses: true},
+				AdapterType: "openai-compatible",
 			},
 			account: accountcontract.ProviderAccount{
 				Metadata: map[string]any{"disable_responses_compact": true},
 			},
-			wantCompact: false,
 		},
 	}
 
@@ -208,5 +201,129 @@ func TestEffectiveCapabilitiesResponsesWebSocketIsCodexAccountScoped(t *testing.
 				t.Fatalf("responses_websocket presence = %v, want %v; capabilities=%+v", hasCapability(got, capabilitiescontract.KeyResponsesWebSocket), tc.want, got)
 			}
 		})
+	}
+}
+
+func TestEffectiveCapabilitiesConversationEndpointCapabilitiesAreProviderScoped(t *testing.T) {
+	model := modelcontract.Model{
+		Capabilities: []capabilitiescontract.Descriptor{
+			capabilityRequirement(capabilitiescontract.KeyChatCompletions),
+			capabilityRequirement(capabilitiescontract.KeyResponses),
+			capabilityRequirement(capabilitiescontract.KeyMessages),
+		},
+	}
+	mapping := modelcontract.ModelProviderMapping{}
+
+	cases := []struct {
+		name         string
+		provider     providercontract.Provider
+		wantChat     bool
+		wantResponse bool
+		wantMessages bool
+	}{
+		{
+			name: "model capabilities alone do not advertise endpoints",
+			provider: providercontract.Provider{
+				AdapterType:  "unknown-provider",
+				Capabilities: map[string]any{},
+			},
+		},
+		{
+			name: "openai preset supplies openai endpoints",
+			provider: providercontract.Provider{
+				AdapterType: "openai-compatible",
+			},
+			wantChat:     true,
+			wantResponse: true,
+			wantMessages: true,
+		},
+		{
+			name: "anthropic preset supplies supported text endpoints",
+			provider: providercontract.Provider{
+				AdapterType: "anthropic-compatible",
+			},
+			wantChat:     true,
+			wantResponse: true,
+			wantMessages: true,
+		},
+		{
+			name: "claude code reverse proxy supplies anthropic text endpoints",
+			provider: providercontract.Provider{
+				AdapterType: "reverse-proxy-claude-code-cli",
+			},
+			wantChat:     true,
+			wantResponse: true,
+			wantMessages: true,
+		},
+		{
+			name: "gemini preset supplies supported text endpoints",
+			provider: providercontract.Provider{
+				AdapterType: "gemini-compatible",
+			},
+			wantChat:     true,
+			wantMessages: true,
+		},
+		{
+			name: "codex reverse proxy supplies text gateway endpoints",
+			provider: providercontract.Provider{
+				AdapterType: "reverse-proxy-codex-cli",
+			},
+			wantChat:     true,
+			wantResponse: true,
+			wantMessages: true,
+		},
+		{
+			name: "provider override can enable one endpoint",
+			provider: providercontract.Provider{
+				AdapterType:  "unknown-provider",
+				Capabilities: map[string]any{capabilitiescontract.KeyResponses: true},
+			},
+			wantResponse: true,
+		},
+		{
+			name: "generic reverse proxy supplies implemented openai endpoints",
+			provider: providercontract.Provider{
+				AdapterType: "generic-reverse-proxy",
+			},
+			wantChat: true,
+		},
+		{
+			name: "generic reverse proxy does not advertise unsupported text endpoints",
+			provider: providercontract.Provider{
+				AdapterType: "generic-reverse-proxy",
+			},
+			wantChat: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := effectiveCapabilities(model, mapping, tc.provider, accountcontract.ProviderAccount{})
+			if hasCapability(got, capabilitiescontract.KeyChatCompletions) != tc.wantChat {
+				t.Fatalf("chat_completions presence = %v, want %v; capabilities=%+v", hasCapability(got, capabilitiescontract.KeyChatCompletions), tc.wantChat, got)
+			}
+			if hasCapability(got, capabilitiescontract.KeyResponses) != tc.wantResponse {
+				t.Fatalf("responses presence = %v, want %v; capabilities=%+v", hasCapability(got, capabilitiescontract.KeyResponses), tc.wantResponse, got)
+			}
+			if hasCapability(got, capabilitiescontract.KeyMessages) != tc.wantMessages {
+				t.Fatalf("messages presence = %v, want %v; capabilities=%+v", hasCapability(got, capabilitiescontract.KeyMessages), tc.wantMessages, got)
+			}
+		})
+	}
+}
+
+func TestEffectiveCapabilitiesGenericReverseProxyAdvertisesImplementedEmbeddings(t *testing.T) {
+	model := modelcontract.Model{
+		Capabilities: []capabilitiescontract.Descriptor{
+			capabilityRequirement(capabilitiescontract.KeyEmbeddings),
+		},
+	}
+	provider := providercontract.Provider{
+		AdapterType: "generic-reverse-proxy",
+	}
+
+	got := effectiveCapabilities(model, modelcontract.ModelProviderMapping{}, provider, accountcontract.ProviderAccount{})
+	if !hasCapability(got, capabilitiescontract.KeyEmbeddings) {
+		t.Fatalf("expected generic reverse proxy to advertise implemented embeddings endpoint, got %+v", got)
 	}
 }

@@ -59,7 +59,8 @@ func TestNormalizeChatCompletionsProducesCanonicalRequest(t *testing.T) {
 	}
 	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyVisionInput) ||
 		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStructuredOutput) ||
-		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyReasoningControl) {
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyReasoningControl) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyChatCompletions) {
 		t.Fatalf("expected request capabilities, got %+v", canonical.RequestCapabilities)
 	}
 }
@@ -94,6 +95,9 @@ func TestNormalizeResponsesPreservesInstructionsAndReasoning(t *testing.T) {
 	}
 	if canonical.Reasoning["effort"] != "low" {
 		t.Fatalf("expected reasoning control to be preserved, got %+v", canonical.Reasoning)
+	}
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyResponses) {
+		t.Fatalf("expected responses capability, got %+v", canonical.RequestCapabilities)
 	}
 }
 
@@ -200,6 +204,9 @@ func TestNormalizeResponsesCompactRequiresCompactCapability(t *testing.T) {
 
 	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyResponsesCompact) {
 		t.Fatalf("expected responses_compact capability, got %+v", canonical.RequestCapabilities)
+	}
+	if requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyResponses) {
+		t.Fatalf("compact endpoint should require compact capability, got %+v", canonical.RequestCapabilities)
 	}
 }
 
@@ -730,7 +737,8 @@ func TestNormalizeAnthropicMessagesPreservesWebSearchServerTool(t *testing.T) {
 	canonical := svc.NormalizeAnthropicMessages(req, RequestMeta{SourceEndpoint: "/v1/messages"})
 
 	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyToolCalling) ||
-		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyWebSearch) {
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyWebSearch) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyMessages) {
 		t.Fatalf("expected tool calling and web search capabilities, got %+v", canonical.RequestCapabilities)
 	}
 	if len(canonical.Tools) != 1 || canonical.Tools[0]["type"] != "web_search_20250305" || canonical.Tools[0]["name"] != "web_search" {

@@ -103,6 +103,9 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !containsAuthMode(anthropicPreset.AuthModes, AuthModeCustomHeader) {
 		t.Fatalf("expected anthropic-compatible auth modes to include custom_header")
 	}
+	if !anthropicPreset.Capabilities["chat_completions"] || !anthropicPreset.Capabilities["responses"] || !anthropicPreset.Capabilities["messages"] {
+		t.Fatalf("expected anthropic-compatible preset to advertise supported text endpoints, got %+v", anthropicPreset.Capabilities)
+	}
 
 	anthropicProviderPreset, ok := registry.Lookup("anthropic")
 	if !ok {
@@ -343,7 +346,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !containsRuntimeClass(codexPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) {
 		t.Fatalf("expected codex-cli to include oauth_refresh runtime class")
 	}
-	if !codexPreset.Capabilities["responses"] || !codexPreset.Capabilities["responses_compact"] || !codexPreset.Capabilities["streaming"] {
+	if !codexPreset.Capabilities["chat_completions"] || !codexPreset.Capabilities["responses"] || !codexPreset.Capabilities["messages"] || !codexPreset.Capabilities["responses_compact"] || !codexPreset.Capabilities["streaming"] {
 		t.Fatalf("unexpected codex-cli capabilities: %+v", codexPreset.Capabilities)
 	}
 	if codexPreset.MatchesPath("/backend-api/codex/responses") {
@@ -394,6 +397,9 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		containsRuntimeClass(geminiPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthDeviceCode) ||
 		geminiPreset.OAuthConfig != nil {
 		t.Fatalf("expected gemini preset to exclude unsupported OAuth runtimes")
+	}
+	if !geminiPreset.Capabilities["chat_completions"] || !geminiPreset.Capabilities["messages"] || geminiPreset.Capabilities["responses"] {
+		t.Fatalf("unexpected gemini text endpoint capabilities: %+v", geminiPreset.Capabilities)
 	}
 }
 

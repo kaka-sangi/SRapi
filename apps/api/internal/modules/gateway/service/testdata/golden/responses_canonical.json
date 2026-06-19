@@ -47,6 +47,10 @@
       "version": "v1"
     },
     {
+      "key": "responses",
+      "version": "v1"
+    },
+    {
       "key": "streaming",
       "version": "v1"
     },

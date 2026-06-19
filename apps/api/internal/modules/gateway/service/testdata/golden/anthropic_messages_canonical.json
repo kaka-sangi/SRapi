@@ -86,6 +86,10 @@
   "prompt": "system: You are careful.\n[image]\nuser: Draft a response.\n[image]\nassistant: Existing context.",
   "request_capabilities": [
     {
+      "key": "messages",
+      "version": "v1"
+    },
+    {
       "key": "reasoning_control",
       "version": "v1"
     },

@@ -4722,6 +4722,74 @@ func TestGatewayAnthropicCountTokensRequiresProviderScopedCapability(t *testing.
 	}
 }
 
+func TestGatewayChatCompletionsSkipsCandidatesWithoutChatEndpointCapability(t *testing.T) {
+	var upstreamHits int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamHits++
+		var payload struct {
+			Model    string `json:"model"`
+			Messages []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode chat request: %v", err)
+		}
+		if r.URL.Path != "/v1/chat/completions" || payload.Model != "chat-endpoint-upstream" {
+			t.Fatalf("unexpected upstream chat request path=%s payload=%+v", r.URL.Path, payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"chat endpoint ok"}}],"usage":{"prompt_tokens":3,"completion_tokens":4,"total_tokens":7}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	unsupportedProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"chat-endpoint-disabled-provider","display_name":"Chat Endpoint Disabled","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"chat_completions":false,"responses":true}}`)
+	supportedProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"chat-endpoint-supported-provider","display_name":"Chat Endpoint Supported","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"chat_completions":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"chat-endpoint-filter-model","display_name":"Chat Endpoint Filter Model","status":"active","capabilities":[{"key":"chat_completions","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(unsupportedProvider.Data.Id)+`","upstream_model_name":"bad-chat-upstream","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(supportedProvider.Data.Id)+`","upstream_model_name":"chat-endpoint-upstream","status":"active"}`)
+	unsupportedAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(unsupportedProvider.Data.Id)+`","name":"chat-endpoint-disabled-account","runtime_class":"api_key","credential":{"api_key":"bad-chat-secret"},"metadata":{"base_url":"https://bad.example.invalid/v1","quality_score":1,"health_score":1,"latency_p95_ms":1},"status":"active"}`)
+	supportedAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(supportedProvider.Data.Id)+`","name":"chat-endpoint-supported-account","runtime_class":"api_key","credential":{"api_key":"good-chat-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","quality_score":0.1,"health_score":0.1,"latency_p95_ms":1000},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"chat-endpoint-filter-model","messages":[{"role":"user","content":"use chat endpoint"}]}`)
+	var resp apiopenapi.ChatCompletionResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode chat response: %v", err)
+	}
+	if text := decodeChatMessageText(t, resp.Choices[0].Message.Content); text != "chat endpoint ok" {
+		t.Fatalf("unexpected chat response: %q", text)
+	}
+	if upstreamHits != 1 {
+		t.Fatalf("expected supported upstream to be called once, got %d", upstreamHits)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=chat-endpoint-filter-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected scheduler decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode scheduler decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one scheduler decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SelectedAccountId == nil || *decision.SelectedAccountId != string(supportedAccount.Data.Id) {
+		t.Fatalf("expected supported account %s to be selected, got %+v", supportedAccount.Data.Id, decision)
+	}
+	if decision.RejectReasons["account_"+string(unsupportedAccount.Data.Id)] != "capability_mismatch:chat_completions" {
+		t.Fatalf("expected unsupported account capability mismatch, got %+v", decision.RejectReasons)
+	}
+}
+
 func TestGatewayResponsesCompactRequiresProviderScopedCapability(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

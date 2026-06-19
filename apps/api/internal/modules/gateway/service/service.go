@@ -1332,6 +1332,9 @@ func refreshRequestCapabilities(req *gatewaycontract.CanonicalRequest) {
 
 func requestCapabilities(req gatewaycontract.CanonicalRequest) []gatewaycontract.RequestCapability {
 	out := make([]gatewaycontract.RequestCapability, 0, len(req.CompatibilityWarnings)+4)
+	if endpointCapability := requestEndpointCapability(req.SourceEndpoint); endpointCapability != "" {
+		out = append(out, gatewaycontract.RequestCapability{Key: endpointCapability, Version: "v1"})
+	}
 	if req.Stream {
 		out = append(out, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyStreaming, Version: "v1"})
 	}
@@ -1369,6 +1372,22 @@ func requestCapabilities(req gatewaycontract.CanonicalRequest) []gatewaycontract
 		}
 	}
 	return dedupeRequestCapabilities(out)
+}
+
+func requestEndpointCapability(endpoint string) string {
+	endpoint = strings.ToLower(strings.TrimSpace(endpoint))
+	switch {
+	case strings.HasSuffix(endpoint, "/chat/completions"):
+		return capabilitiescontract.KeyChatCompletions
+	case strings.HasSuffix(endpoint, "/responses"):
+		return capabilitiescontract.KeyResponses
+	case responsesCompactEndpoint(endpoint):
+		return capabilitiescontract.KeyResponsesCompact
+	case strings.HasSuffix(endpoint, "/messages"):
+		return capabilitiescontract.KeyMessages
+	default:
+		return ""
+	}
 }
 
 func conversationEndpointHasContentBlockType(req gatewaycontract.CanonicalRequest, blockType gatewaycontract.ContentBlockType) bool {

@@ -43,7 +43,6 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 	// than full replacements. This mirrors sub2api's account-extra capability
 	// shape and matches the ported behavior tested by
 	// TestEffectiveCapabilitiesUsesPresetBaselineWithProviderOverrides.
-	explicitlyDisabled := map[string]bool{}
 	if presetCaps := presetCapabilitiesForAdapter(provider.AdapterType); len(presetCaps) > 0 {
 		for key, value := range presetCaps {
 			canonicalKey, ok := capabilitiescontract.CanonicalKeyFromConvenience(key)
@@ -55,6 +54,10 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 				providerScoped[canonicalKey] = capabilityRequirement(canonicalKey)
 			}
 		}
+	}
+	for key := range genericReverseProxyConfiguredCapabilities(provider) {
+		merged[key] = capabilityRequirement(key)
+		providerScoped[key] = capabilityRequirement(key)
 	}
 	for key, value := range provider.Capabilities {
 		capabilityKey, ok := capabilitiescontract.CanonicalKeyFromConvenience(key)
@@ -68,7 +71,6 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 			merged[capabilityKey] = capabilityRequirement(capabilityKey)
 			providerScoped[capabilityKey] = capabilityRequirement(capabilityKey)
 		} else {
-			explicitlyDisabled[capabilityKey] = true
 			delete(merged, capabilityKey)
 			delete(providerScoped, capabilityKey)
 		}
@@ -85,9 +87,7 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 		if boolValue(value) {
 			merged[canonicalKey] = capabilityRequirement(canonicalKey)
 			providerScoped[canonicalKey] = capabilityRequirement(canonicalKey)
-			delete(explicitlyDisabled, canonicalKey)
 		} else {
-			explicitlyDisabled[canonicalKey] = true
 			delete(merged, canonicalKey)
 			delete(providerScoped, canonicalKey)
 		}
@@ -99,28 +99,13 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 		delete(merged, capabilitiescontract.KeyResponsesWebSocket)
 		delete(providerScoped, capabilitiescontract.KeyResponsesWebSocket)
 	}
-	// Auto-include responses_compact whenever the merged set already declares
-	// responses: compact is a strict non-streaming subset of /v1/responses, so
-	// any account that can serve full responses can also serve compact. The
-	// override is suppressed when the operator explicitly disabled compact via
-	// provider.Capabilities[responses_compact]=false, account metadata
-	// capability_responses_compact=false, or the
-	// metadata.disable_responses_compact opt-out flag. Mirrors sub2api's
-	// openai_gateway_service.openAICompactSupportTier which treats compact
-	// support as a tier on top of /responses rather than an parallel
-	// capability requirement.
-	disableCompact := disableResponsesCompactOptedOut(provider, account)
-	if disableCompact {
+	// responses_compact is a separate endpoint capability. Ordinary
+	// /v1/responses support can be provided by cross-protocol conversion, but
+	// compact requires a provider/account that can return response.compaction
+	// JSON. Operators may still suppress preset/account compact support.
+	if disableResponsesCompactOptedOut(provider, account) {
 		delete(merged, capabilitiescontract.KeyResponsesCompact)
 		delete(providerScoped, capabilitiescontract.KeyResponsesCompact)
-	}
-	if _, hasResponses := merged[capabilitiescontract.KeyResponses]; hasResponses &&
-		!explicitlyDisabled[capabilitiescontract.KeyResponsesCompact] &&
-		!disableCompact {
-		if _, ok := merged[capabilitiescontract.KeyResponsesCompact]; !ok {
-			merged[capabilitiescontract.KeyResponsesCompact] = capabilityRequirement(capabilitiescontract.KeyResponsesCompact)
-			providerScoped[capabilitiescontract.KeyResponsesCompact] = capabilityRequirement(capabilitiescontract.KeyResponsesCompact)
-		}
 	}
 	for _, key := range providerScopedCapabilityKeys() {
 		if _, ok := providerScoped[key]; !ok {
@@ -161,6 +146,11 @@ func capabilityRequirement(key string) capabilitiescontract.Descriptor {
 }
 
 func presetCapabilitiesForAdapter(adapterType string) map[string]any {
+	if presetKey := adapterTypeToPresetKey(adapterType); presetKey != "" {
+		if preset, ok := providerpreset.Default().Lookup(presetKey); ok {
+			return boolCapabilitiesAsAny(preset.Capabilities)
+		}
+	}
 	family := adapterTypeToPlatformFamily(adapterType)
 	if family == "" {
 		return nil
@@ -169,6 +159,10 @@ func presetCapabilitiesForAdapter(adapterType string) map[string]any {
 	if len(caps) == 0 {
 		return nil
 	}
+	return boolCapabilitiesAsAny(caps)
+}
+
+func boolCapabilitiesAsAny(caps map[string]bool) map[string]any {
 	out := make(map[string]any, len(caps))
 	for k, v := range caps {
 		out[k] = v
@@ -176,10 +170,35 @@ func presetCapabilitiesForAdapter(adapterType string) map[string]any {
 	return out
 }
 
+func adapterTypeToPresetKey(adapterType string) string {
+	switch adapterType {
+	case "openai-compatible":
+		return "openai-compatible"
+	case "anthropic-compatible":
+		return "anthropic-compatible"
+	case "gemini-compatible", "native-gemini", "reverse-proxy-gemini-cli":
+		return "gemini"
+	case "reverse-proxy-claude-code-cli":
+		return "anthropic-compatible"
+	case "reverse-proxy-chatgpt-web":
+		return "chatgpt-web"
+	case "reverse-proxy-antigravity":
+		return "antigravity"
+	case "rerank-compatible":
+		return "rerank-compatible"
+	case "reverse-proxy-codex-cli":
+		return "codex-cli"
+	default:
+		return ""
+	}
+}
+
 func adapterTypeToPlatformFamily(adapterType string) providerpreset.PlatformFamily {
 	switch adapterType {
-	case "anthropic-compatible":
+	case "anthropic-compatible", "reverse-proxy-claude-code-cli":
 		return providerpreset.PlatformFamilyAnthropicCompatible
+	case "gemini-compatible", "native-gemini", "reverse-proxy-gemini-cli":
+		return providerpreset.PlatformFamilyGeminiCompatible
 	case "reverse-proxy-antigravity":
 		return providerpreset.PlatformFamilyReverseProxyAntigravity
 	case "rerank-compatible":
@@ -193,8 +212,21 @@ func adapterTypeToPlatformFamily(adapterType string) providerpreset.PlatformFami
 	}
 }
 
+func genericReverseProxyConfiguredCapabilities(provider providercontract.Provider) map[string]bool {
+	if !strings.EqualFold(strings.TrimSpace(provider.AdapterType), "generic-reverse-proxy") {
+		return nil
+	}
+	return map[string]bool{
+		capabilitiescontract.KeyChatCompletions: true,
+		capabilitiescontract.KeyEmbeddings:      true,
+	}
+}
+
 func providerScopedCapabilityKeys() []string {
 	return []string{
+		capabilitiescontract.KeyChatCompletions,
+		capabilitiescontract.KeyResponses,
+		capabilitiescontract.KeyMessages,
 		capabilitiescontract.KeyEmbeddings,
 		capabilitiescontract.KeyImages,
 		capabilitiescontract.KeyAudioTranscriptions,

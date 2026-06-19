@@ -548,6 +548,8 @@ func openAIPresetSupportsResponsesCompact(providerKey string) bool {
 
 func anthropicCapabilities() map[string]bool {
 	return map[string]bool{
+		capabilitiescontract.KeyChatCompletions:  true,
+		capabilitiescontract.KeyResponses:        true,
 		capabilitiescontract.KeyMessages:         true,
 		capabilitiescontract.KeyStreaming:        true,
 		capabilitiescontract.KeyTokenCounting:    true,
@@ -577,15 +579,19 @@ func antigravityCapabilities() map[string]bool {
 
 func geminiCapabilities() map[string]bool {
 	return map[string]bool{
-		capabilitiescontract.KeyStreaming:     true,
-		capabilitiescontract.KeyTokenCounting: true,
-		capabilitiescontract.KeyToolCalling:   true,
-		capabilitiescontract.KeyVisionInput:   true,
+		capabilitiescontract.KeyChatCompletions: true,
+		capabilitiescontract.KeyMessages:        true,
+		capabilitiescontract.KeyStreaming:       true,
+		capabilitiescontract.KeyTokenCounting:   true,
+		capabilitiescontract.KeyToolCalling:     true,
+		capabilitiescontract.KeyVisionInput:     true,
 	}
 }
 
 func codexCLICapabilities() map[string]bool {
 	return map[string]bool{
+		capabilitiescontract.KeyChatCompletions:  true,
+		capabilitiescontract.KeyMessages:         true,
 		capabilitiescontract.KeyResponses:        true,
 		capabilitiescontract.KeyResponsesCompact: true,
 		capabilitiescontract.KeyStreaming:        true,
