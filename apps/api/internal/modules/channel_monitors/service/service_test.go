@@ -264,6 +264,61 @@ func TestRunDefinitionRejectsDisabledMonitor(t *testing.T) {
 	}
 }
 
+func TestRunDefinitionPassesModelAndCustomRequestToProbe(t *testing.T) {
+	svc := newService(t)
+	ctx := context.Background()
+	def, err := svc.CreateDefinition(ctx, contract.CreateDefinition{
+		Name:     "model probe",
+		Enabled:  true,
+		Scope:    contract.ScopeAccount,
+		ScopeRef: "1",
+		Model:    "gpt-monitor",
+		Request: contract.CustomRequest{
+			Method:              "POST",
+			URL:                 "https://probe.example/v1/chat/completions",
+			Headers:             map[string]string{"X-Probe": "monitor"},
+			Body:                `{"input":"ping"}`,
+			ExpectedStatusCodes: []int{202},
+			ResponseJSONPath:    "data.0.id",
+			ResponseContains:    "ok",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	adapter := &monitorProbeAdapter{}
+	deps := monitorDeps()
+	deps.Adapter = adapter
+
+	run, err := svc.RunDefinition(ctx, def.ID, deps, contract.TriggerManual)
+	if err != nil {
+		t.Fatalf("run definition: %v", err)
+	}
+	if !run.OK || run.CheckedCount != 1 {
+		t.Fatalf("unexpected run: %+v", run)
+	}
+	if adapter.last.Model != "gpt-monitor" {
+		t.Fatalf("expected model propagated to probe request, got %q", adapter.last.Model)
+	}
+	metadata := adapter.last.Account.Metadata
+	if metadata["existing"] != "value" ||
+		metadata["health_probe_method"] != "POST" ||
+		metadata["health_probe_url"] != "https://probe.example/v1/chat/completions" ||
+		metadata["health_probe_body"] != `{"input":"ping"}` ||
+		metadata["health_probe_response_path"] != "data.0.id" ||
+		metadata["health_probe_response_contains"] != "ok" {
+		t.Fatalf("unexpected probe metadata: %+v", metadata)
+	}
+	headers, ok := metadata["health_probe_headers"].(map[string]string)
+	if !ok || headers["X-Probe"] != "monitor" {
+		t.Fatalf("unexpected probe headers metadata: %+v", metadata["health_probe_headers"])
+	}
+	codes, ok := metadata["health_probe_expected_status_codes"].([]int)
+	if !ok || len(codes) != 1 || codes[0] != 202 {
+		t.Fatalf("unexpected expected status metadata: %+v", metadata["health_probe_expected_status_codes"])
+	}
+}
+
 func TestRunDueSkipsDisabledAndNotDueAndRecordsScheduled(t *testing.T) {
 	svc := newService(t)
 	ctx := context.Background()
@@ -355,9 +410,12 @@ func (r *monitorModelReader) ListMappingsByModel(context.Context, int) ([]modelc
 	return nil, nil
 }
 
-type monitorProbeAdapter struct{}
+type monitorProbeAdapter struct {
+	last provideradaptercontract.ProbeRequest
+}
 
 func (a *monitorProbeAdapter) ProbeAccount(_ context.Context, req provideradaptercontract.ProbeRequest) (provideradaptercontract.ProbeResponse, error) {
+	a.last = req
 	if req.Account.Metadata["existing"] != "value" {
 		return provideradaptercontract.ProbeResponse{OK: false, StatusCode: 500, ErrorClass: "missing_metadata"}, nil
 	}

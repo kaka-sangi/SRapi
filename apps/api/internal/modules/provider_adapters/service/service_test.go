@@ -352,6 +352,57 @@ func TestProbeAccountUsesConfiguredRequestProfile(t *testing.T) {
 	}
 }
 
+func TestProbeAccountUsesModelSpecificDefaultRequest(t *testing.T) {
+	var gotMethod string
+	var gotPath string
+	var gotBody map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode probe body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"OK"}}]}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.ProbeAccount(context.Background(), contract.ProbeRequest{
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           10,
+			RuntimeClass: accountcontract.RuntimeClassAPIKey,
+			Metadata:     map[string]any{"base_url": upstream.URL + "/v1"},
+		},
+		Model:      "gpt-monitor",
+		Credential: map[string]any{"api_key": "probe-secret"},
+	})
+	if err != nil {
+		t.Fatalf("probe account: %v", err)
+	}
+	if !resp.OK || resp.Metadata["method"] != http.MethodPost {
+		t.Fatalf("unexpected probe response: %+v", resp)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/v1/chat/completions" {
+		t.Fatalf("unexpected probe request %s %s", gotMethod, gotPath)
+	}
+	if gotBody["model"] != "gpt-monitor" || gotBody["stream"] != false {
+		t.Fatalf("unexpected probe body: %+v", gotBody)
+	}
+	if _, ok := gotBody["messages"].([]any); !ok {
+		t.Fatalf("expected chat messages in probe body: %+v", gotBody)
+	}
+}
+
 func TestProbeAccountRejectsUnmetResponseExpectation(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

@@ -102,7 +102,8 @@ type probeHTTPRequest struct {
 
 func buildProbeHTTPRequest(req contract.ProbeRequest) (probeHTTPRequest, error) {
 	values := probeConfigMaps(req)
-	method := strings.ToUpper(firstMapString(values, "health_probe_method", "probe_method"))
+	useModelProbe := shouldUseModelProbe(req, values)
+	method := probeMethod(values, useModelProbe)
 	if method == "" {
 		method = http.MethodGet
 	}
@@ -111,7 +112,7 @@ func buildProbeHTTPRequest(req contract.ProbeRequest) (probeHTTPRequest, error) 
 	default:
 		return probeHTTPRequest{}, errors.New("unsupported probe method")
 	}
-	body, err := probeBody(values)
+	body, err := probeBody(req, values)
 	if err != nil {
 		return probeHTTPRequest{}, err
 	}
@@ -126,6 +127,27 @@ func buildProbeHTTPRequest(req contract.ProbeRequest) (probeHTTPRequest, error) 
 	}, nil
 }
 
+func probeMethod(values []map[string]any, useModelProbe bool) string {
+	method := strings.ToUpper(firstMapString(values, "health_probe_method", "probe_method"))
+	if method != "" {
+		return method
+	}
+	if useModelProbe {
+		return http.MethodPost
+	}
+	return ""
+}
+
+func shouldUseModelProbe(req contract.ProbeRequest, values []map[string]any) bool {
+	if strings.TrimSpace(req.Model) == "" {
+		return false
+	}
+	if firstMapString(values, "health_probe_method", "probe_method", "health_probe_url", "probe_url", "models_url", "models_endpoint") != "" {
+		return false
+	}
+	return firstMapValue(values, "health_probe_body", "probe_body") == nil
+}
+
 func probeConfigMaps(req contract.ProbeRequest) []map[string]any {
 	return []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities}
 }
@@ -138,10 +160,40 @@ func probeEndpoint(req contract.ProbeRequest) string {
 	if baseURL == "" {
 		return ""
 	}
+	if shouldUseModelProbe(req, probeConfigMaps(req)) {
+		endpoint := modelProbeEndpoint(req, baseURL)
+		return endpoint
+	}
 	if strings.HasSuffix(baseURL, "/models") {
 		return baseURL
 	}
 	return strings.TrimRight(baseURL, "/") + "/models"
+}
+
+func modelProbeEndpoint(req contract.ProbeRequest, baseURL string) string {
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		return ""
+	}
+	baseURL = strings.TrimRight(baseURL, "/")
+	switch probeSource(req) {
+	case "anthropic":
+		baseURL = strings.TrimSuffix(baseURL, "/v1/models")
+		baseURL = strings.TrimSuffix(baseURL, "/models")
+		if strings.HasSuffix(baseURL, "/messages") {
+			return baseURL
+		}
+		return baseURL + "/messages"
+	case "gemini":
+		return geminiEndpoint(baseURL, model, false)
+	default:
+		baseURL = strings.TrimSuffix(baseURL, "/v1/models")
+		baseURL = strings.TrimSuffix(baseURL, "/models")
+		if strings.HasSuffix(baseURL, "/chat/completions") {
+			return baseURL
+		}
+		return baseURL + "/chat/completions"
+	}
 }
 
 func probeBaseURL(req contract.ProbeRequest) string {
@@ -265,8 +317,50 @@ func mergeProbeHeaders(headers http.Header, overrides map[string]string) {
 	}
 }
 
-func probeBody(values []map[string]any) ([]byte, error) {
-	return configuredJSONBody(values, "probe body", "health_probe_body", "probe_body")
+func probeBody(req contract.ProbeRequest, values []map[string]any) ([]byte, error) {
+	if firstMapValue(values, "health_probe_body", "probe_body") != nil {
+		return configuredJSONBody(values, "probe body", "health_probe_body", "probe_body")
+	}
+	if shouldUseModelProbe(req, values) {
+		body := defaultModelProbeBody(req)
+		return body, nil
+	}
+	return nil, nil
+}
+
+func defaultModelProbeBody(req contract.ProbeRequest) []byte {
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		return nil
+	}
+	var payload map[string]any
+	switch probeSource(req) {
+	case "anthropic":
+		payload = map[string]any{
+			"model":      model,
+			"messages":   []map[string]string{{"role": "user", "content": "Respond with OK."}},
+			"max_tokens": 8,
+		}
+	case "gemini":
+		payload = map[string]any{
+			"contents": []map[string]any{
+				{"parts": []map[string]string{{"text": "Respond with OK."}}},
+			},
+			"generationConfig": map[string]any{"maxOutputTokens": 8},
+		}
+	default:
+		payload = map[string]any{
+			"model":      model,
+			"messages":   []map[string]string{{"role": "user", "content": "Respond with OK."}},
+			"max_tokens": 8,
+			"stream":     false,
+		}
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil
+	}
+	return body
 }
 
 func configuredJSONBody(values []map[string]any, label string, keys ...string) ([]byte, error) {

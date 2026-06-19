@@ -487,6 +487,7 @@ func runMonitorProbe(ctx context.Context, deps contract.RunnerDependencies, def 
 	resp, err := deps.Adapter.ProbeAccount(ctx, provideradaptercontract.ProbeRequest{
 		Provider:   provider,
 		Account:    probeAccount,
+		Model:      model,
 		Credential: credential,
 	})
 	if err != nil {

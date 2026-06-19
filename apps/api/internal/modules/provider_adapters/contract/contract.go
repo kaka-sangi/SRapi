@@ -605,8 +605,11 @@ type ConversationResponse struct {
 
 // ProbeRequest contains the provider, account, and credential used for a health probe.
 type ProbeRequest struct {
-	Provider   providercontract.Provider
-	Account    accountcontract.ProviderAccount
+	Provider providercontract.Provider
+	Account  accountcontract.ProviderAccount
+	// Model optionally asks the adapter to run a model-specific synthetic probe.
+	// Empty keeps the legacy lightweight endpoint probe behavior.
+	Model      string
 	Credential map[string]any
 }
 

@@ -376,7 +376,7 @@ Provider Account metadata 或 Provider config/capabilities 可以把默认 `/mod
 - `health_probe_response_path` / `probe_response_path` 要求 JSON path 存在且非空；数组索引用数字段，例如 `data.0.id`。
 - `health_probe_response_contains` / `probe_response_contains` 要求响应体包含指定文本。
 
-该机制用于覆盖 sub2api channel-monitor / scheduled-test 里的“用真实请求形态做健康验证”诉求，但仍复用 SRapi 的 Provider Account、credential materialization、account health snapshot、cooldown/circuit 和 Scheduler 证据链，不新增平行监控数据面。
+该机制用于覆盖 sub2api channel-monitor / scheduled-test 里的“用真实请求形态做健康验证”诉求，但仍复用 SRapi 的 Provider Account、credential materialization、account health snapshot、cooldown/circuit 和 Scheduler 证据链，不新增平行监控数据面。通道监控设置 `model` 且未显式设置自定义 URL、method 或 body 时，会生成 provider-appropriate 的最小模型请求验证该模型；普通账号健康探测仍默认使用 `/models` 类轻量端点。
 
 API-key 直连网关请求同样会读取账号级出站 header 配置：
 
