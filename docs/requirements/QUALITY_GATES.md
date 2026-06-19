@@ -111,7 +111,7 @@ It covers:
 - `make check` must include architecture, code-quality, API test, generated drift, migration, and secret-scan gates.
 - `make check` must include observability rule hygiene so deployable alert rules cannot drift outside low-cardinality/sensitive-data guardrails.
 - Secret scanning must cover generated OpenAPI/SDK artifacts and lockfiles.
-- `make bootstrap-env` must generate strong local secrets instead of copying weak placeholders, and `make env-check` must reject existing weak or over-permissive env files.
+- `make bootstrap-env` must generate strong local secrets instead of copying weak placeholders, `make env-check` must reject existing weak or over-permissive env files, and `make env-repair` must repair weak local env files without printing generated secrets.
 - `make deploy-preflight` must reuse env and observability hygiene checks before Compose deployment and warn or fail on missing host deployment tools depending on strict mode.
 - Production Go file-size thresholds, excluding generated Ent/OpenAPI/SDK code.
 - Production Go function-size thresholds, excluding tests and generated Ent/OpenAPI/SDK code.

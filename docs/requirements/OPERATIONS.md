@@ -58,7 +58,7 @@ GET /api/v1/health
 make bootstrap-env
 ```
 
-该命令使用 `tools/bootstrap-env.mjs` 从 `.env.example` 创建 `.env`，并为 `DATABASE_PASSWORD`、`JWT_SECRET`、`SRAPI_MASTER_KEY`、`API_KEY_PEPPER` 和 `BOOTSTRAP_ADMIN_PASSWORD` 生成强随机本地值。已有 `.env` 会原样保留，避免覆盖部署者轮换后的 secret；生成值不会写入终端日志，`.env` 文件权限会设置为 owner-only。生产环境仍应把这些 secret 放入平台 secret manager，并独立备份 `SRAPI_MASTER_KEY` 或 KMS 引用。
+该命令使用 `tools/bootstrap-env.mjs` 从 `.env.example` 创建 `.env`，并为 `DATABASE_PASSWORD`、`JWT_SECRET`、`SRAPI_MASTER_KEY`、`TOTP_ENCRYPTION_KEY`、`API_KEY_PEPPER` 和 `BOOTSTRAP_ADMIN_PASSWORD` 生成强随机本地值。已有 `.env` 会原样保留，避免覆盖部署者轮换后的 secret；生成值不会写入终端日志，`.env` 文件权限会设置为 owner-only。生产环境仍应把这些 secret 放入平台 secret manager，并独立备份 `SRAPI_MASTER_KEY` 或 KMS 引用。
 
 已有环境可以离线审计：
 
@@ -67,6 +67,14 @@ make env-check
 ```
 
 该检查会拒绝缺失关键 secret、`.env.example` 弱占位值、长度过短的本地 secret，以及 group/other 可读的 `.env` 文件权限。可用 `SRAPI_ENV_CHECK_FILE=/path/to/env make env-check` 检查非默认 env 文件。
+
+已有 `.env` 如果来自旧占位值，可以本地修复：
+
+```bash
+make env-repair
+```
+
+该命令只修复缺失或弱占位的关键 secret，并把 `.env` 权限收紧到 owner-only；已有强值和其它配置会保留，生成值不会写入终端日志。可用 `SRAPI_REPAIR_ENV_FILE=/path/to/env make env-repair` 修复非默认 env 文件。生产环境仍必须使用平台 secret manager 或等价机制轮换 secret，不应把本地 `.env` 当成生产密钥来源。
 
 启动 Compose 或交给运维接手前可以运行部署预检：
 

@@ -63,7 +63,7 @@ function assert(condition, message) {
   }
 }
 
-export { rewriteEnv };
+export { randomPassword, randomSecret, rewriteEnv };
 
 if (isDirectExecution()) {
   try {

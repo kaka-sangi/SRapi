@@ -17,6 +17,7 @@ ADMIN_OPENAPI_COVERAGE_CHECK ?= node tools/admin-openapi-coverage-check.mjs
 WEB_ADMIN_SDK_ROUTE_CHECK ?= node tools/web-admin-sdk-route-check.mjs
 BOOTSTRAP_ENV ?= node tools/bootstrap-env.mjs
 ENV_CHECK ?= node tools/env-check.mjs
+ENV_REPAIR ?= node tools/repair-env.mjs
 DEPLOY_PREFLIGHT ?= node tools/deploy-preflight.mjs
 WEB_CHECK ?= node tools/web-check.mjs
 WEB_CHECK_E2E ?= node tools/web-check-e2e.mjs
@@ -48,13 +49,14 @@ TEMPO_QUERY_PORT ?= 13201
 TEMPO_QUERY_TIMEOUT_SECONDS ?= 20
 TEMPO_SMOKE_TIMEOUT ?= 90s
 
-.PHONY: help bootstrap-env env-check deploy-preflight openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-admin-coverage-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-payment-stripe smoke-payment-alipay smoke-payment-wechat smoke-release smoke-jaeger-trace smoke-tempo-trace rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check observability-rules-check secret-scan architecture-check code-quality-check diff-check web-install web-install-ci web-dev web-admin-sdk-route-check web-check web-check-e2e check
+.PHONY: help bootstrap-env env-check env-repair deploy-preflight openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-admin-coverage-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-payment-stripe smoke-payment-alipay smoke-payment-wechat smoke-release smoke-jaeger-trace smoke-tempo-trace rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check observability-rules-check secret-scan architecture-check code-quality-check diff-check web-install web-install-ci web-dev web-admin-sdk-route-check web-check web-check-e2e check
 
 help:
 	@printf '%s\n' \
 		'SRapi development targets:' \
 		'  make bootstrap-env   Create .env from .env.example if missing' \
 		'  make env-check       Verify .env has strong local secrets and private permissions' \
+		'  make env-repair      Repair weak or missing local .env secrets without printing them' \
 		'  make deploy-preflight  Verify local env, deploy files, alerts, and host tooling before Compose' \
 		'  make openapi-lint    Validate OpenAPI contract with Redocly' \
 		'  make openapi-bundle  Bundle OpenAPI contract into build/openapi/' \
@@ -103,6 +105,9 @@ bootstrap-env:
 
 env-check:
 	$(ENV_CHECK)
+
+env-repair:
+	$(ENV_REPAIR)
 
 deploy-preflight:
 	$(DEPLOY_PREFLIGHT)

@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("check", "architecture-check", "api", "up", "observability-up", "down", "logs", "smoke-health", "smoke-gateway", "smoke-rate-limit", "smoke-failover", "smoke-release", "smoke-jaeger-trace", "smoke-tempo-trace", "observability-rules-check", "env-check", "deploy-preflight", "openapi", "openapi-check")]
+    [ValidateSet("check", "architecture-check", "api", "up", "observability-up", "down", "logs", "smoke-health", "smoke-gateway", "smoke-rate-limit", "smoke-failover", "smoke-release", "smoke-jaeger-trace", "smoke-tempo-trace", "observability-rules-check", "env-check", "env-repair", "deploy-preflight", "openapi", "openapi-check")]
     [string]$Command = "check"
 )
 
@@ -178,6 +178,9 @@ switch ($Command) {
     }
     "env-check" {
         Invoke-Step "make" @("env-check")
+    }
+    "env-repair" {
+        Invoke-Step "make" @("env-repair")
     }
     "deploy-preflight" {
         Invoke-Step "make" @("deploy-preflight")
