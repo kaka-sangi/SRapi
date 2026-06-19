@@ -350,6 +350,19 @@ func gatewayFailureCandidate(result schedulercontract.ScheduleResult) *scheduler
 	return &candidate
 }
 
+func gatewaySkippedScheduleResult(result schedulercontract.ScheduleResult, reason string) schedulercontract.ScheduleResult {
+	reason = strings.TrimSpace(reason)
+	if reason == "" || result.Candidate.Account.ID <= 0 {
+		return result
+	}
+	if result.Decision.RejectReasons == nil {
+		result.Decision.RejectReasons = map[string]any{}
+	}
+	result.Decision.RejectReasons["account_"+strconv.Itoa(result.Candidate.Account.ID)] = reason
+	result.Decision.RejectedCount = len(result.Decision.RejectReasons)
+	return result
+}
+
 func (s *Server) invokeProviderConversationWithFailover(
 	ctx context.Context,
 	r *http.Request,
@@ -601,9 +614,16 @@ NextCandidate:
 				"request_id", canonical.RequestID,
 				"account_id", result.Candidate.Account.ID,
 				"attempt_no", attemptNo)
+			s.runtime.releaseGatewaySchedulerLease(ctx, result, "circuit_open")
 			excluded = append(excluded, result.Candidate.Account.ID)
 			decisionID := result.Decision.ID
 			fallbackFromDecisionID = &decisionID
+			if !lastFailure.FailureRecorded {
+				lastFailure = gatewayFailoverResult[T]{
+					ScheduleResult: gatewaySkippedScheduleResult(result, "circuit_open"),
+					Err:            errors.New("no available account"),
+				}
+			}
 			continue
 		}
 
@@ -635,15 +655,17 @@ NextCandidate:
 		if slotErr != nil {
 			breakerDone(false)
 			s.runtime.releaseGatewayAccountQuota(ctx, admission.EstimatedUsage, result.Candidate)
+			s.runtime.releaseGatewaySchedulerLease(ctx, result, "concurrency_slot_failed")
+			skippedResult := gatewaySkippedScheduleResult(result, "concurrency_full")
 			if errIsConcurrencySlotTransient(slotErr) {
 				// Treat as transient — failover to a different candidate.
 				excluded = append(excluded, result.Candidate.Account.ID)
 				decisionID := result.Decision.ID
 				fallbackFromDecisionID = &decisionID
-				lastFailure = gatewayFailoverResult[T]{ScheduleResult: result, Err: slotErr}
+				lastFailure = gatewayFailoverResult[T]{ScheduleResult: skippedResult, Err: slotErr}
 				continue
 			}
-			return gatewayFailoverResult[T]{ScheduleResult: result, Err: slotErr}
+			return gatewayFailoverResult[T]{ScheduleResult: skippedResult, Err: slotErr}
 		}
 		releaseConcurrencySlotOnce := func() {
 			if slotAcquired && slotRelease != nil {

@@ -281,6 +281,7 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 	s.runtime.bindGatewaySessionAffinity(r.Context(), scheduleReq.APIKeyID, scheduleReq.SessionAffinityKey, result.Candidate.Account.ID)
 	session, credential, err := s.runtime.prepareProviderRealtime(r.Context(), providerRealtimeRequest(canonical, result.Candidate, nil, r, realtimeWebSocketHeaders(r)))
 	if err != nil {
+		s.runtime.releaseGatewayAccountQuota(r.Context(), admission.EstimatedUsage, result.Candidate)
 		errorClass, upstreamStatus, _ := providerGatewayError(err)
 		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, errorClass, upstreamStatus, elapsedMillis(startedAt), admission, nil, providerErrorMessage(err)))
 		writeGatewayError(w, providerStatusFromError(err), gatewayErrorTypeForProviderClass(errorClass), providerGatewayMessage(errorClass), errorClass)
@@ -293,6 +294,9 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 	})
 	if err != nil {
 		s.logger.Warn("failed to accept realtime websocket", "error", err, "request_id", requestID)
+		s.runtime.releaseGatewayAccountQuota(r.Context(), admission.EstimatedUsage, result.Candidate)
+		s.runtime.releaseGatewayReservation(r.Context(), authed.UserID, canonical.RequestID)
+		s.runtime.releaseGatewaySchedulerLease(r.Context(), result, "websocket_accept_failed")
 		return
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
@@ -306,6 +310,9 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 	idleSession := globalWSIdleSessionStore.Register(slot.ID, conn, nil, cancelIdle)
 	defer globalWSIdleSessionStore.Unregister(slot.ID)
 	success, errorClass, statusCode := s.relayRealtimeWebSocket(idleCtx, conn, session, idleSession)
+	if !success {
+		s.runtime.releaseGatewayAccountQuota(r.Context(), admission.EstimatedUsage, result.Candidate)
+	}
 	s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, success, errorClass, statusCode, elapsedMillis(startedAt), admission, nil, ""))
 }
 
@@ -721,6 +728,7 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 	s.runtime.bindGatewaySessionAffinity(r.Context(), scheduleReq.APIKeyID, scheduleReq.SessionAffinityKey, result.Candidate.Account.ID)
 	session, credential, err := s.runtime.prepareProviderRealtime(r.Context(), providerRealtimeRequest(canonical, result.Candidate, payload, r))
 	if err != nil {
+		s.runtime.releaseGatewayAccountQuota(r.Context(), admission.EstimatedUsage, result.Candidate)
 		errorClass, upstreamStatus, _ := providerGatewayError(err)
 		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, errorClass, upstreamStatus, elapsedMillis(startedAt), admission, nil, providerErrorMessage(err)))
 		return true, responsesWebSocketTurnState{}, err
@@ -744,6 +752,9 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 	clientToUpstream <- reverseproxycontract.WebSocketMessage{Type: reverseproxycontract.WebSocketMessageText, Data: session.InitialFrame}
 	close(clientToUpstream)
 	success, errorClass, statusCode, usage, terminalForwarded, turnState := s.bridgeResponsesWebSocketRelay(r.Context(), conn, upstreamToClient, relayDone, idleSession, session.ResponseReplacements)
+	if !success {
+		s.runtime.releaseGatewayAccountQuota(r.Context(), admission.EstimatedUsage, result.Candidate)
+	}
 	s.recordResponsesWebSocketUsage(r.Context(), authed, canonical, model.ID, result, success, errorClass, statusCode, elapsedMillis(startedAt), admission, usage, "")
 	if !success && errorClass != "client_closed" && !terminalForwarded {
 		return true, turnState, provideradaptercontract.ProviderError{Class: errorClass, StatusCode: statusCode, Message: providerGatewayMessage(errorClass)}

@@ -46,6 +46,7 @@ import (
 	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	paymentmemory "github.com/srapi/srapi/apps/api/internal/modules/payments/store/memory"
+	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
@@ -5898,6 +5899,100 @@ func TestGatewayChatCompletionRetryCountCapHonored(t *testing.T) {
 	}
 }
 
+func TestGatewayChatCompletionCircuitOpenReleasesSkippedLease(t *testing.T) {
+	var (
+		mu             sync.Mutex
+		primaryCalls   int
+		secondaryCalls int
+	)
+	primaryUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		primaryCalls++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"primary should be skipped"}}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer primaryUpstream.Close()
+
+	secondaryUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		secondaryCalls++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"fallback ok"}}],"usage":{"prompt_tokens":5,"completion_tokens":4,"total_tokens":9}}`))
+	}))
+	defer secondaryUpstream.Close()
+
+	schedulerStore := schedulermemory.New()
+	hookedSchedulerStore := &decisionHookSchedulerStore{Store: schedulerStore}
+	handler, server := newWithServer(config.Load(), nil, WithSchedulerStore(hookedSchedulerStore))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	csrf := loginResp.Data.CsrfToken
+
+	modelResp := mustCreateModel(t, handler, sessionCookie, csrf, `{"canonical_name":"breaker-release-model","display_name":"Breaker Release Model","status":"active"}`)
+	primaryProvider := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"breaker-release-primary-provider","display_name":"Breaker Primary","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	secondaryProvider := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"breaker-release-secondary-provider","display_name":"Breaker Secondary","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, csrf, string(modelResp.Data.Id), `{"provider_id":"`+string(primaryProvider.Data.Id)+`","upstream_model_name":"breaker-release-primary-upstream","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, csrf, string(modelResp.Data.Id), `{"provider_id":"`+string(secondaryProvider.Data.Id)+`","upstream_model_name":"breaker-release-secondary-upstream","status":"active"}`)
+	primaryAccount := mustCreateAccount(t, handler, sessionCookie, csrf, `{"provider_id":"`+string(primaryProvider.Data.Id)+`","name":"breaker-release-primary-account","runtime_class":"api_key","credential":{"api_key":"breaker-primary-secret"},"metadata":{"base_url":"`+primaryUpstream.URL+`/v1","health_score":0.99,"latency_p95_ms":50,"quality_score":0.99},"status":"active"}`)
+	secondaryAccount := mustCreateAccount(t, handler, sessionCookie, csrf, `{"provider_id":"`+string(secondaryProvider.Data.Id)+`","name":"breaker-release-secondary-account","runtime_class":"api_key","credential":{"api_key":"breaker-secondary-secret"},"metadata":{"base_url":"`+secondaryUpstream.URL+`/v1","health_score":0.80,"latency_p95_ms":1000,"quality_score":0.50},"status":"active"}`)
+
+	primaryID, err := strconv.Atoi(string(primaryAccount.Data.Id))
+	if err != nil {
+		t.Fatalf("parse primary account id: %v", err)
+	}
+	secondaryID, err := strconv.Atoi(string(secondaryAccount.Data.Id))
+	if err != nil {
+		t.Fatalf("parse secondary account id: %v", err)
+	}
+	hookedSchedulerStore.onDecision = func(decision schedulercontract.Decision) {
+		if decision.SelectedAccountID == nil || *decision.SelectedAccountID != primaryID {
+			return
+		}
+		breaker := server.runtime.accountBreaker(primaryID)
+		for i := 0; i < 5; i++ {
+			done, err := breaker.Allow()
+			if err != nil {
+				t.Fatalf("allow breaker failure %d: %v", i, err)
+			}
+			done(false)
+		}
+	}
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, csrf)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"breaker-release-model","messages":[{"role":"user","content":"skip open breaker"}]}`)
+	var chatResp apiopenapi.ChatCompletionResponse
+	if err := json.NewDecoder(rec.Body).Decode(&chatResp); err != nil {
+		t.Fatalf("decode chat response: %v", err)
+	}
+	if len(chatResp.Choices) != 1 || decodeChatMessageText(t, chatResp.Choices[0].Message.Content) != "fallback ok" {
+		t.Fatalf("expected fallback response, got %+v", chatResp)
+	}
+
+	mu.Lock()
+	gotPrimaryCalls := primaryCalls
+	gotSecondaryCalls := secondaryCalls
+	mu.Unlock()
+	if gotPrimaryCalls != 0 || gotSecondaryCalls != 1 {
+		t.Fatalf("expected breaker to skip primary and call secondary once, got primary=%d secondary=%d", gotPrimaryCalls, gotSecondaryCalls)
+	}
+
+	leases, err := schedulerStore.ListLeases(t.Context())
+	if err != nil {
+		t.Fatalf("list scheduler leases: %v", err)
+	}
+	statusByAccount := map[int]schedulercontract.LeaseStatus{}
+	for _, lease := range leases {
+		statusByAccount[lease.AccountID] = lease.Status
+	}
+	if statusByAccount[primaryID] != schedulercontract.LeaseStatusReleased {
+		t.Fatalf("expected skipped primary lease released, got leases=%+v", leases)
+	}
+	if statusByAccount[secondaryID] != schedulercontract.LeaseStatusCommitted {
+		t.Fatalf("expected successful secondary lease committed, got leases=%+v", leases)
+	}
+}
+
 func TestGatewayChatCompletionPoolModeRetriesSameCandidateBeforeFailover(t *testing.T) {
 	var upstreamCalls int
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -10210,6 +10305,19 @@ func TestGatewayReverseProxyOAuthRefreshFailureDoesNotPersistCredential(t *testi
 	if !strings.Contains(metricsRec.Body.String(), `reverse_proxy_oauth_refresh_total{status="credential_missing"} 1`) {
 		t.Fatalf("expected reverse proxy refresh missing credential metric, got:\n%s", metricsRec.Body.String())
 	}
+}
+
+type decisionHookSchedulerStore struct {
+	*schedulermemory.Store
+	onDecision func(schedulercontract.Decision)
+}
+
+func (s *decisionHookSchedulerStore) CreateDecisionWithSnapshot(ctx context.Context, input schedulercontract.Decision, snapshot schedulercontract.RequestSnapshot) (schedulercontract.Decision, schedulercontract.RequestSnapshot, error) {
+	decision, createdSnapshot, err := s.Store.CreateDecisionWithSnapshot(ctx, input, snapshot)
+	if err == nil && s.onDecision != nil {
+		s.onDecision(decision)
+	}
+	return decision, createdSnapshot, err
 }
 
 func mustLoginAdmin(t *testing.T, handler http.Handler) (apiopenapi.LoginResponse, *http.Cookie) {

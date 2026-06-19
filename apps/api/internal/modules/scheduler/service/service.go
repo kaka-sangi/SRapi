@@ -381,6 +381,12 @@ func (s *Service) ListLeases(ctx context.Context) ([]contract.Lease, error) {
 	return s.store.ListLeases(ctx)
 }
 
+// ReleaseLease marks a pending scheduler lease as released when the selected
+// account is skipped before any provider attempt is recorded as feedback.
+func (s *Service) ReleaseLease(ctx context.Context, requestID string, attemptNo int) (contract.Lease, error) {
+	return s.store.UpdateLeaseStatus(ctx, strings.TrimSpace(requestID), attemptNo, contract.LeaseStatusReleased)
+}
+
 // ActiveLeaseCount returns the live number of pending scheduler leases without
 // requiring metrics collection to scan historical lease rows.
 func (s *Service) ActiveLeaseCount(ctx context.Context) int {

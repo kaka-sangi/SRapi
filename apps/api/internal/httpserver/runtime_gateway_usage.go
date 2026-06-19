@@ -117,6 +117,31 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	})
 }
 
+func (rt *runtimeState) releaseGatewaySchedulerLease(ctx context.Context, result schedulercontract.ScheduleResult, reason string) {
+	if rt == nil || rt.scheduler == nil || result.Lease.ID == "" {
+		return
+	}
+	requestID := strings.TrimSpace(result.Lease.RequestID)
+	attemptNo := result.Lease.AttemptNo
+	if requestID == "" {
+		requestID = strings.TrimSpace(result.Decision.RequestID)
+	}
+	if attemptNo <= 0 {
+		attemptNo = result.Decision.AttemptNo
+	}
+	if requestID == "" || attemptNo <= 0 {
+		return
+	}
+	if _, err := rt.scheduler.ReleaseLease(ctx, requestID, attemptNo); err != nil && rt.logger != nil {
+		rt.logger.Warn("failed to release scheduler lease",
+			"request_id", requestID,
+			"attempt_no", attemptNo,
+			"account_id", result.Candidate.Account.ID,
+			"reason", reason,
+			"error", err)
+	}
+}
+
 func (rt *runtimeState) recordGatewayUsageWriteFailure(ctx context.Context, rec gatewayUsageRecord, model string) {
 	if rt == nil || rt.operations == nil {
 		return

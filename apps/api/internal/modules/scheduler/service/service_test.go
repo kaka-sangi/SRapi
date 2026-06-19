@@ -1449,6 +1449,46 @@ func TestLeasePreventsConcurrentSchedulingAndFeedbackReleases(t *testing.T) {
 	}
 }
 
+func TestReleaseLeaseFreesPendingConcurrency(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withMaxConcurrency(1), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	first, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("first schedule: %v", err)
+	}
+	if _, err := svc.ReleaseLease(context.Background(), first.Decision.RequestID, first.Decision.AttemptNo); err != nil {
+		t.Fatalf("release lease: %v", err)
+	}
+
+	secondReq := req
+	secondReq.RequestID = "req_scheduler_released"
+	second, err := svc.Schedule(context.Background(), secondReq)
+	if err != nil {
+		t.Fatalf("second schedule after release: %v", err)
+	}
+	if second.Candidate.Account.ID != 1 {
+		t.Fatalf("expected released concurrency to allow same account, got %+v", second.Candidate.Account)
+	}
+	leases, err := svc.ListLeases(context.Background())
+	if err != nil {
+		t.Fatalf("list leases: %v", err)
+	}
+	statusByRequest := map[string]contract.LeaseStatus{}
+	for _, lease := range leases {
+		statusByRequest[lease.RequestID] = lease.Status
+	}
+	if statusByRequest[first.Decision.RequestID] != contract.LeaseStatusReleased {
+		t.Fatalf("expected first lease released, got %+v", leases)
+	}
+	if statusByRequest[second.Decision.RequestID] != contract.LeaseStatusPending {
+		t.Fatalf("expected second lease pending, got %+v", leases)
+	}
+}
+
 func TestRecordFailedFeedbackMarksLeaseFailed(t *testing.T) {
 	svc := newService(t)
 	req := baseRequest()
