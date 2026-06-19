@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
 	rlfcontract "github.com/srapi/srapi/apps/api/internal/modules/request_log_files/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
@@ -22,6 +23,7 @@ const (
 	requestEvidenceOpsPageSize     = 200
 	requestEvidenceMaxOpsRows      = 2000
 	requestEvidenceDetailDumpLimit = 50
+	requestEvidenceSystemLogLimit  = 5
 )
 
 type requestEvidenceQuery struct {
@@ -95,6 +97,7 @@ type requestEvidenceDetail struct {
 	Summary   requestEvidenceSummary
 	Attempts  []requestEvidenceRow
 	Dumps     []rlfcontract.FileDescriptor
+	SystemLog requestEvidenceSystemLogEvidence
 	FirstSeen time.Time
 	LastSeen  time.Time
 }
@@ -121,6 +124,13 @@ type requestEvidenceSummary struct {
 	ErrorOwner            string
 	ErrorSource           string
 	UpstreamRequestID     string
+}
+
+type requestEvidenceSystemLogEvidence struct {
+	Items       []operationscontract.OpsSystemLog
+	Total       int
+	LevelCounts map[operationscontract.OpsSystemLogLevel]int
+	Latest      *operationscontract.OpsSystemLog
 }
 
 // handleListAdminOpsRequestEvidence serves GET /api/v1/admin/ops/request-evidence.
@@ -280,7 +290,11 @@ func (s *Server) requestEvidenceDetail(ctx context.Context, requestID string) (r
 	}
 	dumpEvidence := requestDumpEvidenceFromDescriptors(dumps)
 	rows := requestEvidenceRowsFromExactEvidence(requestID, usageLogs, opsEntries, dumpEvidence)
-	if len(rows) == 0 && len(dumps) == 0 {
+	systemLogEvidence, err := s.requestEvidenceSystemLogsByRequestID(ctx, requestID)
+	if err != nil {
+		return requestEvidenceDetail{}, err
+	}
+	if len(rows) == 0 && len(dumps) == 0 && systemLogEvidence.Total == 0 {
 		return requestEvidenceDetail{}, nil
 	}
 	sort.SliceStable(rows, func(i, j int) bool {
@@ -296,9 +310,10 @@ func (s *Server) requestEvidenceDetail(ctx context.Context, requestID string) (r
 		RequestID: requestID,
 		Attempts:  rows,
 		Dumps:     dumps,
+		SystemLog: systemLogEvidence,
 	}
-	detail.FirstSeen, detail.LastSeen = requestEvidenceDetailBounds(rows, dumps)
-	detail.Summary = requestEvidenceSummaryFromDetail(rows, usageLogs, opsEntries, dumpEvidence)
+	detail.FirstSeen, detail.LastSeen = requestEvidenceDetailBounds(rows, dumps, systemLogEvidence.Items)
+	detail.Summary = requestEvidenceSummaryFromDetail(rows, usageLogs, opsEntries, dumpEvidence, systemLogEvidence)
 	return detail, nil
 }
 
@@ -534,6 +549,49 @@ func requestEvidenceDumpFilesByRequestID(ctx context.Context, reader rlfcontract
 		out = out[len(out)-requestEvidenceDetailDumpLimit:]
 	}
 	return out, nil
+}
+
+func (s *Server) requestEvidenceSystemLogsByRequestID(ctx context.Context, requestID string) (requestEvidenceSystemLogEvidence, error) {
+	if s.runtime == nil || s.runtime.operations == nil {
+		return requestEvidenceSystemLogEvidence{LevelCounts: map[operationscontract.OpsSystemLogLevel]int{}}, nil
+	}
+	list, err := s.runtime.operations.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{
+		RequestID: requestID,
+		Page:      1,
+		PageSize:  requestEvidenceSystemLogLimit,
+	})
+	if err != nil {
+		return requestEvidenceSystemLogEvidence{}, err
+	}
+	evidence := requestEvidenceSystemLogEvidence{
+		Items:       list.Items,
+		Total:       list.Total,
+		LevelCounts: map[operationscontract.OpsSystemLogLevel]int{},
+	}
+	for _, level := range []operationscontract.OpsSystemLogLevel{
+		operationscontract.OpsSystemLogLevelDebug,
+		operationscontract.OpsSystemLogLevelInfo,
+		operationscontract.OpsSystemLogLevelWarn,
+		operationscontract.OpsSystemLogLevelError,
+	} {
+		levelList, err := s.runtime.operations.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{
+			RequestID: requestID,
+			Level:     level,
+			Page:      1,
+			PageSize:  1,
+		})
+		if err != nil {
+			return requestEvidenceSystemLogEvidence{}, err
+		}
+		if levelList.Total > 0 {
+			evidence.LevelCounts[level] = levelList.Total
+		}
+	}
+	if len(evidence.Items) > 0 {
+		latest := evidence.Items[0]
+		evidence.Latest = &latest
+	}
+	return evidence, nil
 }
 
 func requestEvidenceDumps(ctx context.Context, reader rlfcontract.Reader, query requestEvidenceQuery) (map[string]requestDumpEvidence, error) {
@@ -1015,7 +1073,7 @@ func requestEvidenceRowToAPI(row requestEvidenceRow) apiopenapi.RequestEvidenceR
 	return out
 }
 
-func requestEvidenceDetailBounds(rows []requestEvidenceRow, dumps []rlfcontract.FileDescriptor) (time.Time, time.Time) {
+func requestEvidenceDetailBounds(rows []requestEvidenceRow, dumps []rlfcontract.FileDescriptor, systemLogs []operationscontract.OpsSystemLog) (time.Time, time.Time) {
 	var first time.Time
 	var last time.Time
 	observe := func(value time.Time) {
@@ -1039,16 +1097,22 @@ func requestEvidenceDetailBounds(rows []requestEvidenceRow, dumps []rlfcontract.
 	for _, desc := range dumps {
 		observe(desc.CreatedAt)
 	}
+	for _, log := range systemLogs {
+		observe(log.CreatedAt)
+	}
 	return first, last
 }
 
-func requestEvidenceSummaryFromDetail(rows []requestEvidenceRow, usageLogs []usagecontract.UsageLog, opsEntries []opserrorlogscontract.Entry, dumps map[string]requestDumpEvidence) requestEvidenceSummary {
+func requestEvidenceSummaryFromDetail(rows []requestEvidenceRow, usageLogs []usagecontract.UsageLog, opsEntries []opserrorlogscontract.Entry, dumps map[string]requestDumpEvidence, systemLogs requestEvidenceSystemLogEvidence) requestEvidenceSummary {
 	summary := requestEvidenceSummary{
 		Kind:             "unknown",
-		PrimarySource:    "request_dump",
+		PrimarySource:    "system_log",
 		AttemptCount:     len(rows),
 		UsageLogCount:    len(usageLogs),
 		OpsErrorLogCount: len(opsEntries),
+	}
+	if len(rows) > 0 || len(dumps) > 0 {
+		summary.PrimarySource = "request_dump"
 	}
 	for _, dump := range dumps {
 		summary.RequestDumpCount += dump.Count
@@ -1103,6 +1167,9 @@ func requestEvidenceSummaryFromDetail(rows []requestEvidenceRow, usageLogs []usa
 			}
 		}
 	}
+	if latest == nil && systemLogs.Total > 0 {
+		summary.PrimarySource = "system_log"
+	}
 	return summary
 }
 
@@ -1115,18 +1182,41 @@ func requestEvidenceDetailToAPI(detail requestEvidenceDetail, correlationID stri
 	for _, desc := range detail.Dumps {
 		dumps = append(dumps, requestEvidenceDumpDescriptorToAPI(desc))
 	}
+	systemLogs := toAPIOpsSystemLogs(detail.SystemLog.Items)
 	out := apiopenapi.RequestEvidenceDetailResponse{
 		RequestId:         correlationID,
 		EvidenceRequestId: detail.RequestID,
 		Summary:           requestEvidenceSummaryToAPI(detail.Summary),
 		Attempts:          attempts,
 		RequestDumps:      dumps,
+		SystemLogSummary:  requestEvidenceSystemLogSummaryToAPI(detail.SystemLog),
+		SystemLogs:        systemLogs,
 	}
 	if !detail.FirstSeen.IsZero() {
 		out.FirstSeenAt = &detail.FirstSeen
 	}
 	if !detail.LastSeen.IsZero() {
 		out.LastSeenAt = &detail.LastSeen
+	}
+	return out
+}
+
+func requestEvidenceSystemLogSummaryToAPI(evidence requestEvidenceSystemLogEvidence) apiopenapi.RequestEvidenceSystemLogSummary {
+	levelCounts := make(map[string]int, len(evidence.LevelCounts))
+	for level, count := range evidence.LevelCounts {
+		levelCounts[string(level)] = count
+	}
+	out := apiopenapi.RequestEvidenceSystemLogSummary{
+		TotalCount:  evidence.Total,
+		LevelCounts: levelCounts,
+	}
+	if evidence.Latest != nil {
+		level := apiopenapi.OpsSystemLogLevel(evidence.Latest.Level)
+		out.LatestLevel = &level
+		out.LatestMessage = nonEmptyStringPtr(evidence.Latest.Message)
+		out.LatestSource = nonEmptyStringPtr(evidence.Latest.Source)
+		latestAt := evidence.Latest.CreatedAt.UTC()
+		out.LatestAt = &latestAt
 	}
 	return out
 }

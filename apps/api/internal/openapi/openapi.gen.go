@@ -2649,6 +2649,7 @@ func (e RequestEvidenceRowResolution) Valid() bool {
 const (
 	RequestEvidenceSourceOpsError    RequestEvidenceSource = "ops_error"
 	RequestEvidenceSourceRequestDump RequestEvidenceSource = "request_dump"
+	RequestEvidenceSourceSystemLog   RequestEvidenceSource = "system_log"
 	RequestEvidenceSourceUsage       RequestEvidenceSource = "usage"
 )
 
@@ -2658,6 +2659,8 @@ func (e RequestEvidenceSource) Valid() bool {
 	case RequestEvidenceSourceOpsError:
 		return true
 	case RequestEvidenceSourceRequestDump:
+		return true
+	case RequestEvidenceSourceSystemLog:
 		return true
 	case RequestEvidenceSourceUsage:
 		return true
@@ -9661,6 +9664,10 @@ type RequestEvidenceDetailResponse struct {
 	RequestDumps      []RequestEvidenceDumpDescriptor `json:"request_dumps"`
 	RequestId         RequestId                       `json:"request_id"`
 	Summary           RequestEvidenceSummary          `json:"summary"`
+	SystemLogSummary  RequestEvidenceSystemLogSummary `json:"system_log_summary"`
+
+	// SystemLogs Latest sanitized system logs linked to this exact request id.
+	SystemLogs []OpsSystemLog `json:"system_logs"`
 }
 
 // RequestEvidenceDumpDescriptor defines model for RequestEvidenceDumpDescriptor.
@@ -9768,6 +9775,18 @@ type RequestEvidenceSummary struct {
 	TotalTokens           *int                  `json:"total_tokens,omitempty"`
 	UpstreamRequestId     *string               `json:"upstream_request_id,omitempty"`
 	UsageLogCount         int                   `json:"usage_log_count"`
+}
+
+// RequestEvidenceSystemLogSummary defines model for RequestEvidenceSystemLogSummary.
+type RequestEvidenceSystemLogSummary struct {
+	LatestAt      *Timestamp         `json:"latest_at,omitempty"`
+	LatestLevel   *OpsSystemLogLevel `json:"latest_level,omitempty"`
+	LatestMessage *string            `json:"latest_message,omitempty"`
+	LatestSource  *string            `json:"latest_source,omitempty"`
+	LevelCounts   map[string]int     `json:"level_counts"`
+
+	// TotalCount Total sanitized system logs linked to this exact request id.
+	TotalCount int `json:"total_count"`
 }
 
 // RequestId defines model for RequestId.

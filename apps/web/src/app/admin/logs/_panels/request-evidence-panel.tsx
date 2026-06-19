@@ -415,6 +415,40 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
           </div>
           <div className="border-srapi-border-subtle rounded border p-3">
             <div className="text-srapi-text-tertiary mb-2 text-xs font-semibold">
+              {t("adminRequestEvidence.detailSystemLogs")}
+            </div>
+            {detail.system_log_summary.total_count > 0 ? (
+              <div className="space-y-2">
+                <div className="text-srapi-text-tertiary text-xs">
+                  {t("adminRequestEvidence.detailSystemLogCounts", {
+                    total: detail.system_log_summary.total_count,
+                    warn: detail.system_log_summary.level_counts.warn ?? 0,
+                    error: detail.system_log_summary.level_counts.error ?? 0,
+                  })}
+                </div>
+                {detail.system_logs.map((log) => (
+                  <div key={log.id} className="min-w-0 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={systemLogLevelClass(log.level)}>{log.level}</span>
+                      <span className="text-srapi-text-tertiary font-mono">
+                        {formatDateTime(log.created_at)}
+                      </span>
+                    </div>
+                    <div className="text-srapi-text-tertiary truncate font-mono" title={log.source}>
+                      {log.source}
+                    </div>
+                    <div className="text-srapi-text-primary line-clamp-2">{log.message}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-srapi-text-tertiary text-xs">
+                {t("adminRequestEvidence.detailNoSystemLogs")}
+              </div>
+            )}
+          </div>
+          <div className="border-srapi-border-subtle rounded border p-3">
+            <div className="text-srapi-text-tertiary mb-2 text-xs font-semibold">
               {t("adminRequestEvidence.detailDumps")}
             </div>
             {detail.request_dumps.length > 0 ? (
@@ -557,4 +591,12 @@ function statusClass(status: number | undefined): string {
   if (status >= 500) return `${base} text-srapi-error`;
   if (status >= 400) return `${base} text-amber-500`;
   return `${base} text-emerald-400`;
+}
+
+function systemLogLevelClass(level: string): string {
+  const base = "font-mono text-2xs uppercase";
+  if (level === "error") return `${base} text-srapi-error`;
+  if (level === "warn") return `${base} text-amber-500`;
+  if (level === "info") return `${base} text-sky-400`;
+  return `${base} text-srapi-text-tertiary`;
 }

@@ -1534,7 +1534,10 @@ export const en = {
     detailLinks: "Evidence links",
     detailDumps: "Request dumps",
     detailNoDumps: "No request dumps",
+    detailSystemLogs: "System logs",
+    detailNoSystemLogs: "No system logs",
     detailEvidenceCounts: "U {usage} / E {errors} / D {dumps}",
+    detailSystemLogCounts: "{total} total · warn {warn} · error {error}",
   },
   adminLiveErrors: {
     title: "Live errors",

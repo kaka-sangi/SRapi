@@ -27899,6 +27899,7 @@ components:
         - usage
         - ops_error
         - request_dump
+        - system_log
 
     RequestEvidenceRow:
       type: object
@@ -28138,6 +28139,30 @@ components:
         has_summary:
           type: boolean
 
+    RequestEvidenceSystemLogSummary:
+      type: object
+      required:
+        - total_count
+        - level_counts
+      properties:
+        total_count:
+          type: integer
+          minimum: 0
+          description: Total sanitized system logs linked to this exact request id.
+        level_counts:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        latest_level:
+          $ref: "#/components/schemas/OpsSystemLogLevel"
+        latest_message:
+          type: string
+        latest_source:
+          type: string
+        latest_at:
+          $ref: "#/components/schemas/Timestamp"
+
     RequestEvidenceDetailResponse:
       type: object
       required:
@@ -28145,6 +28170,8 @@ components:
         - summary
         - attempts
         - request_dumps
+        - system_log_summary
+        - system_logs
         - request_id
       properties:
         evidence_request_id:
@@ -28160,6 +28187,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RequestEvidenceDumpDescriptor"
+        system_log_summary:
+          $ref: "#/components/schemas/RequestEvidenceSystemLogSummary"
+        system_logs:
+          type: array
+          description: Latest sanitized system logs linked to this exact request id.
+          items:
+            $ref: "#/components/schemas/OpsSystemLog"
         first_seen_at:
           $ref: "#/components/schemas/Timestamp"
         last_seen_at:

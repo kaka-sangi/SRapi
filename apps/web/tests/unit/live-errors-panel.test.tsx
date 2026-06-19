@@ -1,5 +1,4 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LiveErrorsPanel } from "@/app/admin/logs/_panels/live-errors-panel";
 import { LanguageProvider } from "@/context/LanguageContext";

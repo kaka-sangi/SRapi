@@ -102,6 +102,25 @@ vi.mock("@/hooks/admin-queries", () => ({
               has_summary: true,
             },
           ],
+          system_log_summary: {
+            total_count: 1,
+            level_counts: { warn: 1 },
+            latest_level: "warn",
+            latest_message: "scheduler fallback selected secondary account",
+            latest_source: "gateway.scheduler",
+            latest_at: "2026-06-19T08:00:02Z",
+          },
+          system_logs: [
+            {
+              id: "41",
+              level: "warn",
+              message: "scheduler fallback selected secondary account",
+              source: "gateway.scheduler",
+              request_id: "req-evidence",
+              trace_id: "trace-evidence",
+              created_at: "2026-06-19T08:00:02Z",
+            },
+          ],
           first_seen_at: "2026-06-19T08:00:00Z",
           last_seen_at: "2026-06-19T08:00:01Z",
           request_id: "req_detail_correlation",
@@ -162,6 +181,8 @@ describe("RequestEvidencePanel", () => {
     expect(screen.getByText("请求调查")).toBeInTheDocument();
     expect(screen.getByText("尝试")).toBeInTheDocument();
     expect(screen.getByText("U 1 / E 1 / D 1")).toBeInTheDocument();
+    expect(screen.getByText("1 条 · 警告 1 · 错误 0")).toBeInTheDocument();
+    expect(screen.getByText("scheduler fallback selected secondary account")).toBeInTheDocument();
     expect(screen.getByText("error-1780000000000-req-evidence.log")).toBeInTheDocument();
   });
 });

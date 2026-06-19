@@ -7,10 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+	operationsservice "github.com/srapi/srapi/apps/api/internal/modules/operations/service"
+	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
 	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
 	opserrorlogsservice "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/service"
 	opserrorlogsmemory "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/store/memory"
@@ -347,6 +351,82 @@ func TestAdminRequestEvidence_DetailUsesExactHistoricalRequestID(t *testing.T) {
 	handler.ServeHTTP(rec, missingReq)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("missing evidence should return 404, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdminRequestEvidence_DetailIncludesSanitizedSystemLogs(t *testing.T) {
+	usageStore := usagememory.New()
+	operationsStore := operationsmemory.New()
+	operationsSvc, err := operationsservice.NewWithStores(nil, operationsStore, nil)
+	if err != nil {
+		t.Fatalf("new operations service: %v", err)
+	}
+	base := time.Date(2026, 6, 19, 8, 0, 0, 0, time.UTC)
+
+	if _, err := operationsSvc.RecordSystemLog(t.Context(), operationscontract.RecordSystemLogRequest{
+		Level:     operationscontract.OpsSystemLogLevelWarn,
+		Message:   "scheduler fallback selected secondary account Authorization: Bearer secret-token refresh_token=raw-refresh",
+		Source:    "gateway.scheduler",
+		RequestID: "req_system_only",
+		TraceID:   "trace_system",
+		Metadata:  map[string]any{"reason": "primary_timeout", "access_token": "raw-access-token"},
+		CreatedAt: base,
+	}); err != nil {
+		t.Fatalf("seed system log: %v", err)
+	}
+	if _, err := operationsStore.CreateSystemLog(t.Context(), operationscontract.OpsSystemLog{
+		Level:     operationscontract.OpsSystemLogLevelError,
+		Message:   "neighbor request failed",
+		Source:    "gateway.scheduler",
+		RequestID: "req_system_only_neighbor",
+		CreatedAt: base.Add(time.Second),
+	}); err != nil {
+		t.Fatalf("seed neighbor system log: %v", err)
+	}
+
+	handler := New(config.Load(), nil, WithUsageStore(usageStore), WithOperationsStore(operationsStore))
+	_, sessionCookie := mustLoginAdmin(t, handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/request-evidence/req_system_only", nil)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("detail request evidence: got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.RequestEvidenceDetailResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.EvidenceRequestId != "req_system_only" {
+		t.Fatalf("wrong evidence request id: %+v", resp)
+	}
+	if resp.SystemLogSummary.TotalCount != 1 || resp.SystemLogSummary.LevelCounts["warn"] != 1 {
+		t.Fatalf("system log summary mismatch: %+v", resp.SystemLogSummary)
+	}
+	if resp.Summary.PrimarySource != apiopenapi.RequestEvidenceSourceSystemLog {
+		t.Fatalf("system-log-only evidence should report system_log primary source, got %+v", resp.Summary)
+	}
+	if resp.SystemLogSummary.LatestLevel == nil || *resp.SystemLogSummary.LatestLevel != apiopenapi.OpsSystemLogLevelWarn {
+		t.Fatalf("latest system log summary missing level: %+v", resp.SystemLogSummary)
+	}
+	if resp.SystemLogSummary.LatestSource == nil || *resp.SystemLogSummary.LatestSource != "gateway.scheduler" {
+		t.Fatalf("latest system log summary missing source: %+v", resp.SystemLogSummary)
+	}
+	if len(resp.SystemLogs) != 1 || resp.SystemLogs[0].RequestId == nil || *resp.SystemLogs[0].RequestId != "req_system_only" {
+		t.Fatalf("system logs should use exact request id, got %+v", resp.SystemLogs)
+	}
+	if strings.Contains(resp.SystemLogs[0].Message, "secret-token") || strings.Contains(resp.SystemLogs[0].Message, "raw-refresh") {
+		t.Fatalf("system log message should be redacted, got %q", resp.SystemLogs[0].Message)
+	}
+	if !strings.Contains(resp.SystemLogs[0].Message, "[REDACTED]") {
+		t.Fatalf("system log message should contain redaction marker, got %q", resp.SystemLogs[0].Message)
+	}
+	if resp.SystemLogs[0].Metadata == nil || (*resp.SystemLogs[0].Metadata)["access_token"] != "[REDACTED]" {
+		t.Fatalf("system log metadata should be redacted, got %+v", resp.SystemLogs[0].Metadata)
+	}
+	if len(resp.Attempts) != 0 || len(resp.RequestDumps) != 0 {
+		t.Fatalf("system-log-only evidence should not synthesize attempts or dumps: attempts=%+v dumps=%+v", resp.Attempts, resp.RequestDumps)
 	}
 }
 

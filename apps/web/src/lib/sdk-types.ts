@@ -56,6 +56,7 @@ export type {
   RequestEvidenceDumpDescriptor,
   RequestEvidenceRow,
   RequestEvidenceSummary,
+  RequestEvidenceSystemLogSummary,
   RequestLogFileDescriptor,
   ErrorPassthroughRule,
   PayloadRule,

@@ -1512,7 +1512,10 @@ export const zh: Messages = {
     detailLinks: "证据入口",
     detailDumps: "请求转储",
     detailNoDumps: "没有请求转储",
+    detailSystemLogs: "系统日志",
+    detailNoSystemLogs: "没有系统日志",
     detailEvidenceCounts: "U {usage} / E {errors} / D {dumps}",
+    detailSystemLogCounts: "{total} 条 · 警告 {warn} · 错误 {error}",
   },
   adminLiveErrors: {
     title: "实时错误",

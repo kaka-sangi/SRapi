@@ -4803,7 +4803,7 @@ export type RequestLogFileResponse = {
 
 export type RequestEvidenceKind = 'success' | 'error' | 'unknown';
 
-export type RequestEvidenceSource = 'usage' | 'ops_error' | 'request_dump';
+export type RequestEvidenceSource = 'usage' | 'ops_error' | 'request_dump' | 'system_log';
 
 export type RequestEvidenceRow = {
     kind: RequestEvidenceKind;
@@ -4901,6 +4901,20 @@ export type RequestEvidenceDumpDescriptor = {
     has_summary: boolean;
 };
 
+export type RequestEvidenceSystemLogSummary = {
+    /**
+     * Total sanitized system logs linked to this exact request id.
+     */
+    total_count: number;
+    level_counts: {
+        [key: string]: number;
+    };
+    latest_level?: OpsSystemLogLevel;
+    latest_message?: string;
+    latest_source?: string;
+    latest_at?: Timestamp;
+};
+
 export type RequestEvidenceDetailResponse = {
     /**
      * Exact gateway request id being investigated.
@@ -4909,6 +4923,11 @@ export type RequestEvidenceDetailResponse = {
     summary: RequestEvidenceSummary;
     attempts: Array<RequestEvidenceRow>;
     request_dumps: Array<RequestEvidenceDumpDescriptor>;
+    system_log_summary: RequestEvidenceSystemLogSummary;
+    /**
+     * Latest sanitized system logs linked to this exact request id.
+     */
+    system_logs: Array<OpsSystemLog>;
     first_seen_at?: Timestamp;
     last_seen_at?: Timestamp;
     request_id: RequestId;
