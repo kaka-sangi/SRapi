@@ -1,15 +1,31 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	admincontrolservice "github.com/srapi/srapi/apps/api/internal/modules/admin_control/service"
+	admincontrolmemory "github.com/srapi/srapi/apps/api/internal/modules/admin_control/store/memory"
+	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
+
+type failingRiskConfigStore struct {
+	*admincontrolmemory.Store
+}
+
+func (s *failingRiskConfigStore) Get(ctx context.Context, key string) (map[string]any, bool, error) {
+	if key == "admin_control.risk_config" {
+		return nil, false, errors.New("risk config unavailable")
+	}
+	return s.Store.Get(ctx, key)
+}
 
 func TestAdminRiskControlConfigReturnsEmptyArrays(t *testing.T) {
 	handler := New(config.Load(), nil)
@@ -32,6 +48,21 @@ func TestAdminRiskControlConfigReturnsEmptyArrays(t *testing.T) {
 	}
 	if body.Data.BlockedIps == nil {
 		t.Fatal("expected blocked_ips to be an empty array, got nil")
+	}
+}
+
+func TestGatewayRiskControlSkipsGateWhenConfigUnavailable(t *testing.T) {
+	adminSvc, err := admincontrolservice.New(&failingRiskConfigStore{Store: admincontrolmemory.New()}, nil)
+	if err != nil {
+		t.Fatalf("new admin control service: %v", err)
+	}
+	rt := &runtimeState{adminControl: adminSvc}
+	err = rt.enforceGatewayRiskControl(t.Context(), apikeycontract.AuthResult{
+		UserID: 1,
+		Key:    apikeycontract.APIKey{ID: 2},
+	}, "203.0.113.44")
+	if err != nil {
+		t.Fatalf("risk control should fail open when config is unavailable: %v", err)
 	}
 }
 

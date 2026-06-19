@@ -148,9 +148,12 @@ func (rt *runtimeState) applyGatewayContentSafety(ctx context.Context, canonical
 	if rt.adminControl != nil {
 		stored, err := rt.adminControl.GetContentSafetyConfig(ctx)
 		if err != nil {
-			return canonical, contentsafetycontract.Result{}, err
+			if rt.logger != nil {
+				rt.logger.Warn("content safety config unavailable; using defaults", "error", err, "request_id", canonical.RequestID)
+			}
+		} else {
+			config = contentSafetyConfigFromAdminControl(stored)
 		}
-		config = contentSafetyConfigFromAdminControl(stored)
 	}
 	updated, result := rt.contentSafety.ApplyWithConfig(canonical, config)
 	if result.Changed {

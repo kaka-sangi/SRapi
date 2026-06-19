@@ -30,7 +30,10 @@ func (rt *runtimeState) enforceGatewayRiskControl(ctx context.Context, authed ap
 	}
 	config, err := rt.adminControl.GetRiskConfig(ctx)
 	if err != nil {
-		return err
+		if rt.logger != nil {
+			rt.logger.Warn("risk control config unavailable; skipping risk gate", "error", err)
+		}
+		return nil
 	}
 	if !config.Enabled {
 		return nil

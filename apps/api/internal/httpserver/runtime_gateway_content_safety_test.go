@@ -1,15 +1,34 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	admincontrolservice "github.com/srapi/srapi/apps/api/internal/modules/admin_control/service"
+	admincontrolmemory "github.com/srapi/srapi/apps/api/internal/modules/admin_control/store/memory"
+	auditservice "github.com/srapi/srapi/apps/api/internal/modules/audit/service"
+	auditmemory "github.com/srapi/srapi/apps/api/internal/modules/audit/store/memory"
+	contentsafetyservice "github.com/srapi/srapi/apps/api/internal/modules/content_safety/service"
+	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
+
+type failingContentSafetyConfigStore struct {
+	*admincontrolmemory.Store
+}
+
+func (s *failingContentSafetyConfigStore) Get(ctx context.Context, key string) (map[string]any, bool, error) {
+	if key == "admin_control.content_safety_config" {
+		return nil, false, errors.New("content safety config unavailable")
+	}
+	return s.Store.Get(ctx, key)
+}
 
 func TestGatewayContentSafetyRedactsPIIAndRecordsEvidence(t *testing.T) {
 	var upstreamContent string
@@ -106,6 +125,44 @@ func TestGatewayContentSafetyRedactsPIIAndRecordsEvidence(t *testing.T) {
 		if !strings.Contains(payloadText, marker) {
 			t.Fatalf("content safety audit missing %q in %s", marker, payloadText)
 		}
+	}
+}
+
+func TestGatewayContentSafetyDefaultsWhenConfigUnavailable(t *testing.T) {
+	adminSvc, err := admincontrolservice.New(&failingContentSafetyConfigStore{Store: admincontrolmemory.New()}, nil)
+	if err != nil {
+		t.Fatalf("new admin control service: %v", err)
+	}
+	auditSvc, err := auditservice.New(auditmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new audit service: %v", err)
+	}
+	rt := &runtimeState{
+		adminControl:  adminSvc,
+		audit:         auditSvc,
+		contentSafety: contentsafetyservice.New(contentsafetyservice.DefaultConfig()),
+	}
+	canonical := gatewaycontract.CanonicalRequest{
+		RequestID:      "req_content_safety_default",
+		UserID:         1,
+		CanonicalModel: "content-safety-default-model",
+		Model:          "content-safety-default-model",
+		Messages: []gatewaycontract.Message{{
+			Role:    "user",
+			Content: []gatewaycontract.ContentBlock{{Type: "text", Text: "Email ada@example.com"}},
+		}},
+	}
+
+	updated, result, err := rt.applyGatewayContentSafety(t.Context(), canonical)
+	if err != nil {
+		t.Fatalf("content safety should fall back to defaults when config is unavailable: %v", err)
+	}
+	if !result.Changed || len(result.Findings) != 1 || result.Findings[0].Kind != "pii_email" {
+		t.Fatalf("expected default content safety finding, got %+v", result)
+	}
+	got := updated.Messages[0].Content[0].Text
+	if strings.Contains(got, "ada@example.com") || !strings.Contains(got, "[REDACTED_EMAIL]") {
+		t.Fatalf("expected default redaction, got %q", got)
 	}
 }
 
