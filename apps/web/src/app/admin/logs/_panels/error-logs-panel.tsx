@@ -11,6 +11,7 @@ import { ErrorLogDetailDialog } from "@/components/admin/error-log-detail-dialog
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
+import { Input } from "@/components/ui/input";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import { useAdminErrorLogs, useAdminModels } from "@/hooks/admin-queries";
@@ -46,6 +47,8 @@ export function ErrorLogsPanel() {
   const modelFilter = list.filters.model || undefined;
   const userFilter = list.filters.user || undefined;
   const accountFilter = list.filters.account || undefined;
+  const providerFilter = list.filters.provider || undefined;
+  const errorClassFilter = list.filters.error_class || undefined;
   const resolutionFilter = list.filters.resolution || undefined;
   const windowFilter = list.filters.window;
   const sinceFilter = logWindowSince(windowFilter)?.toISOString();
@@ -57,7 +60,9 @@ export function ErrorLogsPanel() {
     model: modelFilter,
     user_id: userFilter,
     account_id: accountFilter,
+    provider_id: providerFilter,
     resolution: resolutionFilter as "open" | "investigating" | "resolved" | "muted" | undefined,
+    error_class: errorClassFilter,
     start: sinceFilter,
     q: searchQuery,
   });
@@ -75,10 +80,23 @@ export function ErrorLogsPanel() {
     label: u.email,
   }));
 
-  const isFiltered = Boolean(modelFilter || userFilter || accountFilter || resolutionFilter || windowFilter || searchQuery);
+  const isFiltered = Boolean(
+    modelFilter ||
+      userFilter ||
+      accountFilter ||
+      providerFilter ||
+      errorClassFilter ||
+      resolutionFilter ||
+      windowFilter ||
+      searchQuery,
+  );
   const accountOptions = (accountLookup.query.data?.data ?? []).map((a) => ({
     value: String(a.id),
     label: a.name,
+  }));
+  const providerOptions = (providerLookup.query.data?.data ?? []).map((p) => ({
+    value: String(p.id),
+    label: p.display_name || p.name,
   }));
   const total = errorLogs.data?.pagination?.total ?? errorLogs.data?.data.length ?? 0;
 
@@ -340,6 +358,18 @@ export function ErrorLogsPanel() {
               allLabel={t("adminAccounts.allAccounts")}
             />
             <FilterSelect
+              value={list.filters.provider}
+              onChange={(v) => list.setFilter("provider", v)}
+              options={providerOptions}
+              allLabel={t("adminAccounts.allProviders")}
+            />
+            <ErrorClassFilter
+              value={list.filters.error_class ?? ""}
+              onChange={(v) => list.setFilter("error_class", v || undefined)}
+              ariaLabel={t("adminErrorLogs.errorClassFilter")}
+              placeholder={t("adminErrorLogs.errorClassPlaceholder")}
+            />
+            <FilterSelect
               value={list.filters.resolution}
               onChange={(v) => list.setFilter("resolution", v)}
               options={[
@@ -380,6 +410,28 @@ export function ErrorLogsPanel() {
         }}
       />
     </>
+  );
+}
+
+function ErrorClassFilter({
+  value,
+  onChange,
+  ariaLabel,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  ariaLabel: string;
+  placeholder: string;
+}) {
+  return (
+    <Input
+      value={value}
+      onChange={(e) => onChange(e.target.value.trim())}
+      aria-label={ariaLabel}
+      placeholder={placeholder}
+      className="h-9 w-full font-mono text-xs sm:w-36"
+    />
   );
 }
 

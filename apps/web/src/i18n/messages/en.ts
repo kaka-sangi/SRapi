@@ -793,6 +793,7 @@ export const en = {
     successRate: "Success rate",
     circuitState: "Circuit",
     lastError: "Last error",
+    investigateErrors: "View error logs",
     cooldown: "Cooldown",
     detailNoData: "No data yet.",
     usageWindowsTitle: "Usage windows",

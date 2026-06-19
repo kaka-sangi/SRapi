@@ -6,6 +6,8 @@ export interface LogCorrelationIDs {
 }
 
 export interface ErrorLogInvestigationLinkParams {
+  account_id?: string | number | null;
+  provider_id?: string | number | null;
   error_class?: string | null;
   source_endpoint?: string | null;
   model?: string | null;
@@ -25,10 +27,19 @@ export function adminErrorLogsHref(params: LogCorrelationIDs): string | null {
 export function adminErrorInvestigationHref(params: ErrorLogInvestigationLinkParams): string | null {
   const query = new URLSearchParams();
   query.set("tab", "error");
-  const search = clean(params.error_class) || clean(params.source_endpoint);
+  const search = clean(params.source_endpoint);
   if (search) query.set("q", search);
+  setIfPresent(query, "f_account", params.account_id);
+  setIfPresent(query, "f_provider", params.provider_id);
+  setIfPresent(query, "f_error_class", params.error_class);
   setIfPresent(query, "f_model", params.model);
-  const hasFilter = Boolean(query.get("q") || query.get("f_model"));
+  const hasFilter = Boolean(
+    query.get("q") ||
+      query.get("f_account") ||
+      query.get("f_provider") ||
+      query.get("f_error_class") ||
+      query.get("f_model"),
+  );
   return hasFilter ? `${ADMIN_ROUTES.logs}?${query.toString()}` : null;
 }
 
@@ -65,11 +76,12 @@ function hasCorrelation(query: URLSearchParams): boolean {
   return Boolean(query.get("f_request_id"));
 }
 
-function setIfPresent(query: URLSearchParams, key: string, value?: string | null): void {
+function setIfPresent(query: URLSearchParams, key: string, value?: string | number | null): void {
   const normalized = clean(value);
   if (normalized) query.set(key, normalized);
 }
 
-function clean(value?: string | null): string {
-  return value?.trim() ?? "";
+function clean(value?: string | number | null): string {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
 }

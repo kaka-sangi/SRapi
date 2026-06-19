@@ -62,6 +62,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ADMIN_ROUTES } from "@/lib/routes";
+import { adminAccountHealthInvestigationHref } from "@/lib/admin-account-health-investigation";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { formatInteger, formatMoney, formatPercent } from "@/lib/admin-format";
 import {
@@ -573,7 +574,15 @@ function AccountsContent() {
       header: t("adminAccounts.healthTitle"),
       hideOnMobile: true,
       sortValue: (a) => healthById.get(a.id)?.success_rate ?? -1,
-      render: (a) => <AccountHealthCell health={healthById.get(a.id)} />,
+      render: (a) => {
+        const health = healthById.get(a.id);
+        return (
+          <AccountHealthCell
+            health={health}
+            investigationHref={adminAccountHealthInvestigationHref(health)}
+          />
+        );
+      },
     },
     {
       key: "quota",
@@ -917,6 +926,7 @@ function AccountsContent() {
           query={accounts}
           providerNameById={providerNameById}
           healthById={healthById}
+          healthInvestigationHref={adminAccountHealthInvestigationHref}
           toolbar={toolbar}
           selection={selection}
           pagination={pagination}

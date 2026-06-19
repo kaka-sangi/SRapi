@@ -2,6 +2,7 @@
 
 import type { UseQueryResult } from "@tanstack/react-query";
 import { Copy, Check, RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { writeClipboard } from "@/components/ui/copy-button";
@@ -19,6 +20,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { adminAccountHealthInvestigationHref } from "@/lib/admin-account-health-investigation";
 import { formatCompactNumber, formatDate, formatMoney, formatPercent } from "@/lib/admin-format";
 import { runtimeClassLabel } from "@/lib/admin-account-form";
 import { cn } from "@/lib/cn";
@@ -357,16 +359,48 @@ export function AccountDetailSheet({
 
         <div className="mt-5 space-y-4">
           <Section title={t("adminAccounts.healthTitle")} query={health}>
-            {(h) => (
-              <div>
-                <Row label={t("adminCommon.status")} value={h.status} />
-                <Row label={t("adminAccounts.successRate")} value={pct(h.success_rate)} />
-                <Row label={`${t("adminAccounts.latency")} p50 / p95`} value={`${Math.round(h.latency_p50_ms)} / ${Math.round(h.latency_p95_ms)}ms`} />
-                <Row label={t("adminAccounts.circuitState")} value={h.circuit_state} />
-                {h.error_class ? <Row label={t("adminAccounts.lastError")} value={h.error_class} /> : null}
-                {h.cooldown_until ? <Row label={t("adminAccounts.cooldown")} value={h.cooldown_reason ?? h.cooldown_until} /> : null}
-              </div>
-            )}
+            {(h) => {
+              const investigationHref = adminAccountHealthInvestigationHref(h);
+              return (
+                <div>
+                  <Row label={t("adminCommon.status")} value={h.status} />
+                  <Row label={t("adminAccounts.successRate")} value={pct(h.success_rate)} />
+                  <Row label={`${t("adminAccounts.latency")} p50 / p95`} value={`${Math.round(h.latency_p50_ms)} / ${Math.round(h.latency_p95_ms)}ms`} />
+                  <Row label={t("adminAccounts.circuitState")} value={h.circuit_state} />
+                  {h.error_class ? (
+                    <Row
+                      label={t("adminAccounts.lastError")}
+                      value={
+                        investigationHref ? (
+                          <Link
+                            href={investigationHref}
+                            className="text-srapi-error underline-offset-2 hover:underline"
+                          >
+                            {h.error_class}
+                          </Link>
+                        ) : (
+                          h.error_class
+                        )
+                      }
+                    />
+                  ) : null}
+                  {investigationHref && !h.error_class ? (
+                    <Row
+                      label={t("adminAccounts.investigateErrors")}
+                      value={
+                        <Link
+                          href={investigationHref}
+                          className="text-srapi-error underline-offset-2 hover:underline"
+                        >
+                          {t("adminErrorLogs.title")}
+                        </Link>
+                      }
+                    />
+                  ) : null}
+                  {h.cooldown_until ? <Row label={t("adminAccounts.cooldown")} value={h.cooldown_reason ?? h.cooldown_until} /> : null}
+                </div>
+              );
+            }}
           </Section>
 
           <Section title={t("adminAccounts.usageTodayTitle")} query={usageToday}>

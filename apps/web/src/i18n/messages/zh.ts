@@ -789,6 +789,7 @@ export const zh: Messages = {
     successRate: "成功率",
     circuitState: "熔断",
     lastError: "最近错误",
+    investigateErrors: "查看错误日志",
     cooldown: "冷却",
     detailNoData: "暂无数据。",
     usageWindowsTitle: "用量窗口",

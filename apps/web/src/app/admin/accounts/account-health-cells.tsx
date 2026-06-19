@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
 import type { AccountHealthSnapshot } from "@/lib/sdk-types";
 import { cn } from "@/lib/cn";
+import { accountHealthNeedsInvestigation } from "@/lib/admin-account-health-investigation";
 import { latestQuotaWindows, quotaWindowDisplayLabel, quotaWindowTiming } from "@/lib/quota-display";
 
 export function HealthSummaryStrip({
@@ -26,7 +28,13 @@ export function HealthSummaryStrip({
   );
 }
 
-export function AccountHealthCell({ health }: { health?: AccountHealthSnapshot }) {
+export function AccountHealthCell({
+  health,
+  investigationHref,
+}: {
+  health?: AccountHealthSnapshot;
+  investigationHref?: string | null;
+}) {
   const { t } = useLanguage();
   if (!health) return <span className="text-2xs text-srapi-text-tertiary">—</span>;
   const rate = health.success_rate;
@@ -41,8 +49,8 @@ export function AccountHealthCell({ health }: { health?: AccountHealthSnapshot }
     : isHalfOpen
       ? t("adminAccounts.circuitHalfOpen")
       : t("adminAccounts.circuitClosed");
-  return (
-    <div className="flex min-w-0 items-center gap-1.5 font-mono text-2xs tabular">
+  const content = (
+    <>
       <span
         title={circuitTitle}
         className={cn(
@@ -57,6 +65,23 @@ export function AccountHealthCell({ health }: { health?: AccountHealthSnapshot }
       {health.error_class ? (
         <span className="max-w-[5rem] truncate text-srapi-text-tertiary" title={health.error_class}>{health.error_class}</span>
       ) : null}
+    </>
+  );
+  const className = "flex min-w-0 items-center gap-1.5 font-mono text-2xs tabular";
+  if (investigationHref && accountHealthNeedsInvestigation(health)) {
+    return (
+      <Link
+        href={investigationHref}
+        className={`${className} rounded-sm underline-offset-2 hover:text-srapi-text-primary hover:underline`}
+        aria-label={t("adminAccounts.investigateErrors")}
+      >
+        {content}
+      </Link>
+    );
+  }
+  return (
+    <div className={className}>
+      {content}
     </div>
   );
 }

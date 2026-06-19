@@ -21,7 +21,17 @@ describe("admin log evidence links", () => {
         source_endpoint: "/v1/chat/completions",
         model: "gpt-ops",
       }),
-    ).toBe("/admin/logs?tab=error&q=server_bad&f_model=gpt-ops");
+    ).toBe("/admin/logs?tab=error&q=%2Fv1%2Fchat%2Fcompletions&f_error_class=server_bad&f_model=gpt-ops");
+  });
+
+  it("builds exact account and provider filters for account-health investigation", () => {
+    expect(
+      adminErrorInvestigationHref({
+        account_id: "12",
+        provider_id: 3,
+        error_class: "rate_limited",
+      }),
+    ).toBe("/admin/logs?tab=error&f_account=12&f_provider=3&f_error_class=rate_limited");
   });
 
   it("falls back to source endpoint for error-log investigation search", () => {

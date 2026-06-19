@@ -18,6 +18,7 @@ Object.defineProperty(window, "localStorage", {
 });
 
 const mocks = vi.hoisted(() => ({
+  useAdminErrorLogs: vi.fn(),
   log: {
     id: "err-row",
     occurred_at: "2026-06-18T10:00:00Z",
@@ -52,14 +53,7 @@ vi.mock("@/hooks/admin-queries", () => ({
     isError: false,
     refetch: vi.fn(),
   }),
-  useAdminErrorLogs: () => ({
-    data: {
-      data: [mocks.log],
-      pagination: { page: 1, page_size: 20, total: 1, has_next: false },
-    },
-    isFetching: false,
-    refetch: vi.fn(),
-  }),
+  useAdminErrorLogs: mocks.useAdminErrorLogs,
   useAdminRequestLogFileDownload: () => ({
     data: undefined,
     isError: false,
@@ -87,7 +81,10 @@ vi.mock("@/hooks/use-api-key-name-lookup", () => ({
   useApiKeyNameLookup: () => ({ get: (id?: string | null) => (id ? `key-${id}` : "—") }),
 }));
 vi.mock("@/hooks/use-provider-name-lookup", () => ({
-  useProviderNameLookup: () => ({ get: (id?: string | null) => (id ? `provider-${id}` : "—") }),
+  useProviderNameLookup: () => ({
+    query: { data: { data: [{ id: "3", name: "provider-3", display_name: "Provider 3" }] } },
+    get: (id?: string | null) => (id ? `provider-${id}` : "—"),
+  }),
 }));
 vi.mock("@/hooks/use-user-email-lookup", () => ({
   useUserEmailLookup: () => ({
@@ -110,6 +107,14 @@ function wrap({ children }: PropsWithChildren) {
 describe("ErrorLogsPanel", () => {
   beforeEach(() => {
     storage.clear();
+    mocks.useAdminErrorLogs.mockReturnValue({
+      data: {
+        data: [mocks.log],
+        pagination: { page: 1, page_size: 20, total: 1, has_next: false },
+      },
+      isFetching: false,
+      refetch: vi.fn(),
+    });
     window.history.replaceState(null, "", "/admin/logs?tab=error");
   });
 
@@ -124,6 +129,23 @@ describe("ErrorLogsPanel", () => {
     expect(screen.getByRole("link", { name: /全部转储/ })).toHaveAttribute(
       "href",
       "/admin/logs?tab=request-files&f_request_id=req-row",
+    );
+  });
+
+  it("maps provider and error-class URL filters to exact backend query params", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/admin/logs?tab=error&f_provider=3&f_error_class=server_bad",
+    );
+
+    render(<ErrorLogsPanel />, { wrapper: wrap });
+
+    expect(mocks.useAdminErrorLogs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider_id: "3",
+        error_class: "server_bad",
+      }),
     );
   });
 });
