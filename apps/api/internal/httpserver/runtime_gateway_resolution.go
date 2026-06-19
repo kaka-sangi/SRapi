@@ -261,6 +261,9 @@ func providerScopedCapabilityKeys() []string {
 		capabilitiescontract.KeyResponsesWebSocket,
 		capabilitiescontract.KeyResponsesCompact,
 		capabilitiescontract.KeyResponsesInputItems,
+		capabilitiescontract.KeyAnthropicCountTokens,
+		capabilitiescontract.KeyGeminiGenerateContent,
+		capabilitiescontract.KeyGeminiCountTokens,
 		capabilitiescontract.KeyTokenCounting,
 		capabilitiescontract.KeyVisionInput,
 	}

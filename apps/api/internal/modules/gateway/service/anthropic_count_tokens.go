@@ -23,6 +23,7 @@ func (s *Service) NormalizeAnthropicCountTokens(req apiopenapi.AnthropicCountTok
 		AdditionalProperties: cloneMap(req.AdditionalProperties),
 	}
 	canonical := s.NormalizeAnthropicMessages(generateReq, meta)
+	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyAnthropicCountTokens, Version: "v1"})
 	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyTokenCounting, Version: "v1"})
 	canonical.RequestCapabilities = dedupeRequestCapabilities(canonical.RequestCapabilities)
 	return canonical, nil

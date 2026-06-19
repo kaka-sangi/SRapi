@@ -106,8 +106,15 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !containsAuthMode(anthropicPreset.AuthModes, AuthModeCustomHeader) {
 		t.Fatalf("expected anthropic-compatible auth modes to include custom_header")
 	}
-	if !anthropicPreset.Capabilities["chat_completions"] || !anthropicPreset.Capabilities["responses"] || !anthropicPreset.Capabilities["messages"] {
+	if !anthropicPreset.Capabilities["chat_completions"] ||
+		!anthropicPreset.Capabilities["responses"] ||
+		!anthropicPreset.Capabilities["messages"] ||
+		!anthropicPreset.Capabilities["anthropic_count_tokens"] ||
+		!anthropicPreset.Capabilities["token_counting"] {
 		t.Fatalf("expected anthropic-compatible preset to advertise supported text endpoints, got %+v", anthropicPreset.Capabilities)
+	}
+	if anthropicPreset.Capabilities["gemini_generate_content"] || anthropicPreset.Capabilities["gemini_count_tokens"] {
+		t.Fatalf("expected anthropic-compatible preset to exclude Gemini-native endpoint capabilities")
 	}
 	if anthropicPreset.Capabilities["responses_input_items"] {
 		t.Fatalf("expected anthropic-compatible preset to exclude responses_input_items")
@@ -187,7 +194,14 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 			t.Fatalf("expected antigravity supported_models to include %s, got %+v", want, antigravitySupportedModels)
 		}
 	}
-	if !antigravityPreset.Capabilities["chat_completions"] || !antigravityPreset.Capabilities["messages"] || !antigravityPreset.Capabilities["images"] || antigravityPreset.Capabilities["embeddings"] {
+	if !antigravityPreset.Capabilities["chat_completions"] ||
+		!antigravityPreset.Capabilities["messages"] ||
+		!antigravityPreset.Capabilities["images"] ||
+		!antigravityPreset.Capabilities["gemini_generate_content"] ||
+		!antigravityPreset.Capabilities["gemini_count_tokens"] ||
+		!antigravityPreset.Capabilities["token_counting"] ||
+		antigravityPreset.Capabilities["anthropic_count_tokens"] ||
+		antigravityPreset.Capabilities["embeddings"] {
 		t.Fatalf("unexpected antigravity capabilities: %+v", antigravityPreset.Capabilities)
 	}
 	if antigravityPreset.QuotaConfig["quota_url"] != "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist" ||
@@ -407,7 +421,13 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		geminiPreset.OAuthConfig != nil {
 		t.Fatalf("expected gemini preset to exclude unsupported OAuth runtimes")
 	}
-	if !geminiPreset.Capabilities["chat_completions"] || !geminiPreset.Capabilities["messages"] || geminiPreset.Capabilities["responses"] {
+	if !geminiPreset.Capabilities["chat_completions"] ||
+		!geminiPreset.Capabilities["messages"] ||
+		!geminiPreset.Capabilities["gemini_generate_content"] ||
+		!geminiPreset.Capabilities["gemini_count_tokens"] ||
+		!geminiPreset.Capabilities["token_counting"] ||
+		geminiPreset.Capabilities["anthropic_count_tokens"] ||
+		geminiPreset.Capabilities["responses"] {
 		t.Fatalf("unexpected gemini text endpoint capabilities: %+v", geminiPreset.Capabilities)
 	}
 	if geminiPreset.Capabilities["responses_input_items"] {

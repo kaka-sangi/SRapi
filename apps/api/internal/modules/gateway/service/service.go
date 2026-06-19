@@ -1385,6 +1385,8 @@ func requestEndpointCapability(endpoint string) string {
 		return capabilitiescontract.KeyResponsesCompact
 	case strings.HasSuffix(endpoint, "/messages"):
 		return capabilitiescontract.KeyMessages
+	case strings.Contains(endpoint, ":generatecontent") || strings.Contains(endpoint, ":streamgeneratecontent"):
+		return capabilitiescontract.KeyGeminiGenerateContent
 	default:
 		return ""
 	}

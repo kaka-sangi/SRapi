@@ -560,14 +560,15 @@ func openAIPresetSupportsResponsesInputItems(providerKey string) bool {
 
 func anthropicCapabilities() map[string]bool {
 	return map[string]bool{
-		capabilitiescontract.KeyChatCompletions:  true,
-		capabilitiescontract.KeyResponses:        true,
-		capabilitiescontract.KeyMessages:         true,
-		capabilitiescontract.KeyStreaming:        true,
-		capabilitiescontract.KeyTokenCounting:    true,
-		capabilitiescontract.KeyToolCalling:      true,
-		capabilitiescontract.KeyStructuredOutput: true,
-		capabilitiescontract.KeyVisionInput:      true,
+		capabilitiescontract.KeyChatCompletions:      true,
+		capabilitiescontract.KeyResponses:            true,
+		capabilitiescontract.KeyMessages:             true,
+		capabilitiescontract.KeyAnthropicCountTokens: true,
+		capabilitiescontract.KeyStreaming:            true,
+		capabilitiescontract.KeyTokenCounting:        true,
+		capabilitiescontract.KeyToolCalling:          true,
+		capabilitiescontract.KeyStructuredOutput:     true,
+		capabilitiescontract.KeyVisionInput:          true,
 	}
 }
 
@@ -579,24 +580,29 @@ func rerankCapabilities() map[string]bool {
 
 func antigravityCapabilities() map[string]bool {
 	return map[string]bool{
-		capabilitiescontract.KeyChatCompletions:  true,
-		capabilitiescontract.KeyImages:           true,
-		capabilitiescontract.KeyMessages:         true,
-		capabilitiescontract.KeyStreaming:        true,
-		capabilitiescontract.KeyToolCalling:      true,
-		capabilitiescontract.KeyStructuredOutput: true,
-		capabilitiescontract.KeyVisionInput:      true,
+		capabilitiescontract.KeyChatCompletions:       true,
+		capabilitiescontract.KeyImages:                true,
+		capabilitiescontract.KeyMessages:              true,
+		capabilitiescontract.KeyGeminiGenerateContent: true,
+		capabilitiescontract.KeyGeminiCountTokens:     true,
+		capabilitiescontract.KeyStreaming:             true,
+		capabilitiescontract.KeyTokenCounting:         true,
+		capabilitiescontract.KeyToolCalling:           true,
+		capabilitiescontract.KeyStructuredOutput:      true,
+		capabilitiescontract.KeyVisionInput:           true,
 	}
 }
 
 func geminiCapabilities() map[string]bool {
 	return map[string]bool{
-		capabilitiescontract.KeyChatCompletions: true,
-		capabilitiescontract.KeyMessages:        true,
-		capabilitiescontract.KeyStreaming:       true,
-		capabilitiescontract.KeyTokenCounting:   true,
-		capabilitiescontract.KeyToolCalling:     true,
-		capabilitiescontract.KeyVisionInput:     true,
+		capabilitiescontract.KeyChatCompletions:       true,
+		capabilitiescontract.KeyMessages:              true,
+		capabilitiescontract.KeyGeminiGenerateContent: true,
+		capabilitiescontract.KeyGeminiCountTokens:     true,
+		capabilitiescontract.KeyStreaming:             true,
+		capabilitiescontract.KeyTokenCounting:         true,
+		capabilitiescontract.KeyToolCalling:           true,
+		capabilitiescontract.KeyVisionInput:           true,
 	}
 }
 

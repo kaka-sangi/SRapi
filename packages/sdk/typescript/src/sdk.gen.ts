@@ -5327,7 +5327,7 @@ export const createMessage = <ThrowOnError extends boolean = false>(options: Opt
 /**
  * Count input tokens with the Anthropic Messages-compatible gateway route.
  *
- * Anthropic-compatible count_tokens route. SRapi authenticates the gateway API key, applies model visibility and entitlement policy, schedules an eligible provider account, invokes the selected provider adapter using upstream count_tokens shape, and renders the upstream token count. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
+ * Anthropic-compatible count_tokens route. SRapi authenticates the gateway API key, applies model visibility and entitlement policy, schedules an eligible provider account with anthropic_count_tokens and token_counting effective capabilities, invokes the selected provider adapter using upstream count_tokens shape, and renders the upstream token count. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
  */
 export const countAnthropicMessageTokens = <ThrowOnError extends boolean = false>(options: Options<CountAnthropicMessageTokensData, ThrowOnError>) => (options.client ?? client).post<CountAnthropicMessageTokensResponses, CountAnthropicMessageTokensErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5434,7 +5434,7 @@ export const createAudioSpeech = <ThrowOnError extends boolean = false>(options:
 /**
  * Generate content with the Gemini-compatible gateway route.
  *
- * Gemini-compatible route. SRapi normalizes the request into the Canonical AI Request, schedules an eligible provider account, invokes the selected provider adapter, and renders a Gemini-shaped response.
+ * Gemini-compatible route. SRapi normalizes the request into the Canonical AI Request, schedules an eligible provider account with gemini_generate_content effective capability, invokes the selected provider adapter, and renders a Gemini-shaped response.
  */
 export const generateGeminiContent = <ThrowOnError extends boolean = false>(options: Options<GenerateGeminiContentData, ThrowOnError>) => (options.client ?? client).post<GenerateGeminiContentResponses, GenerateGeminiContentErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5449,7 +5449,7 @@ export const generateGeminiContent = <ThrowOnError extends boolean = false>(opti
 /**
  * Stream content with the Gemini-compatible gateway route.
  *
- * Gemini-compatible streaming route. SRapi normalizes the request into the Canonical AI Request, schedules an eligible provider account, invokes the selected provider adapter, and emits Gemini-shaped SSE chunks.
+ * Gemini-compatible streaming route. SRapi normalizes the request into the Canonical AI Request, schedules an eligible provider account with gemini_generate_content effective capability, invokes the selected provider adapter, and emits Gemini-shaped SSE chunks.
  */
 export const streamGeminiContent = <ThrowOnError extends boolean = false>(options: Options<StreamGeminiContentData, ThrowOnError, StreamGeminiContentResponse>) => (options.client ?? client).sse.post<StreamGeminiContentResponses, StreamGeminiContentErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5464,7 +5464,7 @@ export const streamGeminiContent = <ThrowOnError extends boolean = false>(option
 /**
  * Count tokens with the Gemini-compatible gateway route.
  *
- * Gemini-compatible countTokens route. SRapi authenticates the gateway API key, applies model visibility and entitlement policy, schedules an eligible provider account, invokes the selected provider adapter using upstream countTokens shape, and renders the upstream token count. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
+ * Gemini-compatible countTokens route. SRapi authenticates the gateway API key, applies model visibility and entitlement policy, schedules an eligible provider account with gemini_count_tokens and token_counting effective capabilities, invokes the selected provider adapter using upstream countTokens shape, and renders the upstream token count. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
  */
 export const countGeminiTokens = <ThrowOnError extends boolean = false>(options: Options<CountGeminiTokensData, ThrowOnError>) => (options.client ?? client).post<CountGeminiTokensResponses, CountGeminiTokensErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5523,7 +5523,7 @@ export const getAntigravityGeminiModelAlias = <ThrowOnError extends boolean = fa
 /**
  * Count Gemini-compatible tokens with Antigravity provider context.
  *
- * Provider alias route. It reuses the standard Gemini-compatible countTokens runtime, forces the `antigravity` provider context, and invokes the Antigravity official-client `v1internal:countTokens` reverse-proxy path for eligible Antigravity accounts. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
+ * Provider alias route. It reuses the standard Gemini-compatible countTokens runtime, forces the `antigravity` provider context, requires gemini_count_tokens and token_counting effective capabilities, and invokes the Antigravity official-client `v1internal:countTokens` reverse-proxy path for eligible Antigravity accounts. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
  */
 export const countAntigravityGeminiTokensAlias = <ThrowOnError extends boolean = false>(options: Options<CountAntigravityGeminiTokensAliasData, ThrowOnError>) => (options.client ?? client).post<CountAntigravityGeminiTokensAliasResponses, CountAntigravityGeminiTokensAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5538,7 +5538,7 @@ export const countAntigravityGeminiTokensAlias = <ThrowOnError extends boolean =
 /**
  * Generate Gemini-compatible content with Antigravity provider context.
  *
- * Provider alias route. It reuses the standard Gemini-compatible runtime and forces the `antigravity` provider context.
+ * Provider alias route. It reuses the standard Gemini-compatible runtime, requires gemini_generate_content effective capability, and forces the `antigravity` provider context.
  */
 export const generateAntigravityGeminiContentAlias = <ThrowOnError extends boolean = false>(options: Options<GenerateAntigravityGeminiContentAliasData, ThrowOnError>) => (options.client ?? client).post<GenerateAntigravityGeminiContentAliasResponses, GenerateAntigravityGeminiContentAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5553,7 +5553,7 @@ export const generateAntigravityGeminiContentAlias = <ThrowOnError extends boole
 /**
  * Stream Gemini-compatible content with Antigravity provider context.
  *
- * Provider alias route. It reuses the standard Gemini-compatible streaming runtime and forces the `antigravity` provider context.
+ * Provider alias route. It reuses the standard Gemini-compatible streaming runtime, requires gemini_generate_content effective capability, and forces the `antigravity` provider context.
  */
 export const streamAntigravityGeminiContentAlias = <ThrowOnError extends boolean = false>(options: Options<StreamAntigravityGeminiContentAliasData, ThrowOnError, StreamAntigravityGeminiContentAliasResponse>) => (options.client ?? client).sse.post<StreamAntigravityGeminiContentAliasResponses, StreamAntigravityGeminiContentAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5836,7 +5836,7 @@ export const createAnthropicCompatibleMessageAlias = <ThrowOnError extends boole
 /**
  * Count Anthropic Messages-compatible input tokens with anthropic-compatible provider context.
  *
- * Provider alias route. It reuses the standard Anthropic count_tokens runtime and forces the `anthropic-compatible` provider context.
+ * Provider alias route. It reuses the standard Anthropic count_tokens runtime, requires anthropic_count_tokens and token_counting effective capabilities, and forces the `anthropic-compatible` provider context.
  */
 export const countAnthropicCompatibleMessageTokensAlias = <ThrowOnError extends boolean = false>(options: Options<CountAnthropicCompatibleMessageTokensAliasData, ThrowOnError>) => (options.client ?? client).post<CountAnthropicCompatibleMessageTokensAliasResponses, CountAnthropicCompatibleMessageTokensAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

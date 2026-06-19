@@ -46,19 +46,22 @@ const (
 	KeyContextCache      = "context_cache"
 	KeyUsageInStream     = "usage_in_stream"
 
-	KeyChatCompletions     = "chat_completions"
-	KeyResponses           = "responses"
-	KeyResponsesWebSocket  = "responses_websocket"
-	KeyResponsesCompact    = "responses_compact"
-	KeyResponsesInputItems = "responses_input_items"
-	KeyMessages            = "messages"
-	KeyEmbeddings          = "embeddings"
-	KeyImages              = "images"
-	KeyAudioTranscriptions = "audio_transcriptions"
-	KeyAudioSpeech         = "audio_speech"
-	KeyModerations         = "moderations"
-	KeyRerank              = "rerank"
-	KeyTokenCounting       = "token_counting"
+	KeyChatCompletions       = "chat_completions"
+	KeyResponses             = "responses"
+	KeyResponsesWebSocket    = "responses_websocket"
+	KeyResponsesCompact      = "responses_compact"
+	KeyResponsesInputItems   = "responses_input_items"
+	KeyMessages              = "messages"
+	KeyAnthropicCountTokens  = "anthropic_count_tokens"
+	KeyGeminiGenerateContent = "gemini_generate_content"
+	KeyGeminiCountTokens     = "gemini_count_tokens"
+	KeyEmbeddings            = "embeddings"
+	KeyImages                = "images"
+	KeyAudioTranscriptions   = "audio_transcriptions"
+	KeyAudioSpeech           = "audio_speech"
+	KeyModerations           = "moderations"
+	KeyRerank                = "rerank"
+	KeyTokenCounting         = "token_counting"
 )
 
 type DefinitionStatus string
@@ -100,6 +103,9 @@ var defaultDefinitions = []Definition{
 	{Key: KeyResponsesCompact, Version: "v1", Category: "endpoint", Status: DefinitionStatusExperimental, Description: "Provider supports native Responses compaction without cross-protocol synthesis."},
 	{Key: KeyResponsesInputItems, Version: "v1", Category: "endpoint", Status: DefinitionStatusExperimental, Description: "Provider supports native Responses input_items reads without cross-protocol synthesis."},
 	{Key: KeyMessages, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Messages-compatible generation."},
+	{Key: KeyAnthropicCountTokens, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Anthropic-compatible count_tokens requests."},
+	{Key: KeyGeminiGenerateContent, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Gemini-compatible generateContent and streamGenerateContent requests."},
+	{Key: KeyGeminiCountTokens, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Gemini-compatible countTokens requests."},
 	{Key: KeyEmbeddings, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports embeddings."},
 	{Key: KeyImages, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports image generation."},
 	{Key: KeyAudioTranscriptions, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports audio transcription."},
@@ -118,67 +124,74 @@ var knownKeys = func() map[string]Definition {
 }()
 
 var convenienceKeys = map[string]string{
-	"supports_stream":                KeyStreaming,
-	"stream":                         KeyStreaming,
-	"supports_realtime":              KeyRealtimeWebSocket,
-	"supports_realtime_websocket":    KeyRealtimeWebSocket,
-	"realtime":                       KeyRealtimeWebSocket,
-	"realtime_websocket":             KeyRealtimeWebSocket,
-	"websocket":                      KeyRealtimeWebSocket,
-	"supports_websockets":            KeyRealtimeWebSocket,
-	"supports_tools":                 KeyToolCalling,
-	"tools":                          KeyToolCalling,
-	"supports_parallel_tool_calls":   KeyParallelToolCalls,
-	"supports_web_search":            KeyWebSearch,
-	"web_search":                     KeyWebSearch,
-	"web_search_preview":             KeyWebSearch,
-	"google_search":                  KeyWebSearch,
-	"supports_vision":                KeyVisionInput,
-	"vision":                         KeyVisionInput,
-	"supports_json":                  KeyJSONMode,
-	"json":                           KeyJSONMode,
-	"supports_json_mode":             KeyJSONMode,
-	"supports_structured_output":     KeyStructuredOutput,
-	"supports_reasoning":             KeyReasoningControl,
-	"reasoning":                      KeyReasoningControl,
-	"thinking":                       KeyReasoningControl,
-	"supports_prompt_cache":          KeyPromptCache,
-	"supports_context_cache":         KeyContextCache,
-	"supports_usage_in_stream":       KeyUsageInStream,
-	"supports_chat_completions":      KeyChatCompletions,
-	"supports_responses":             KeyResponses,
-	"supports_responses_websocket":   KeyResponsesWebSocket,
-	"responses_websocket":            KeyResponsesWebSocket,
-	"responses_websockets":           KeyResponsesWebSocket,
-	"supports_responses_compact":     KeyResponsesCompact,
-	"responses_compact":              KeyResponsesCompact,
-	"supports_responses_input_items": KeyResponsesInputItems,
-	"responses_input_items":          KeyResponsesInputItems,
-	"supports_messages":              KeyMessages,
-	"supports_embeddings":            KeyEmbeddings,
-	"supports_images":                KeyImages,
-	"supports_audio":                 KeyAudioTranscriptions,
-	"supports_audio_transcriptions":  KeyAudioTranscriptions,
-	"audio":                          KeyAudioTranscriptions,
-	"audio_transcriptions":           KeyAudioTranscriptions,
-	"transcriptions":                 KeyAudioTranscriptions,
-	"supports_audio_speech":          KeyAudioSpeech,
-	"supports_speech":                KeyAudioSpeech,
-	"audio_speech":                   KeyAudioSpeech,
-	"speech":                         KeyAudioSpeech,
-	"tts":                            KeyAudioSpeech,
-	"text_to_speech":                 KeyAudioSpeech,
-	"supports_moderations":           KeyModerations,
-	"supports_moderation":            KeyModerations,
-	"moderation":                     KeyModerations,
-	"supports_rerank":                KeyRerank,
-	"supports_reranking":             KeyRerank,
-	"rerank":                         KeyRerank,
-	"reranking":                      KeyRerank,
-	"supports_token_counting":        KeyTokenCounting,
-	"supports_count_tokens":          KeyTokenCounting,
-	"count_tokens":                   KeyTokenCounting,
-	"token_counting":                 KeyTokenCounting,
+	"supports_stream":                  KeyStreaming,
+	"stream":                           KeyStreaming,
+	"supports_realtime":                KeyRealtimeWebSocket,
+	"supports_realtime_websocket":      KeyRealtimeWebSocket,
+	"realtime":                         KeyRealtimeWebSocket,
+	"realtime_websocket":               KeyRealtimeWebSocket,
+	"websocket":                        KeyRealtimeWebSocket,
+	"supports_websockets":              KeyRealtimeWebSocket,
+	"supports_tools":                   KeyToolCalling,
+	"tools":                            KeyToolCalling,
+	"supports_parallel_tool_calls":     KeyParallelToolCalls,
+	"supports_web_search":              KeyWebSearch,
+	"web_search":                       KeyWebSearch,
+	"web_search_preview":               KeyWebSearch,
+	"google_search":                    KeyWebSearch,
+	"supports_vision":                  KeyVisionInput,
+	"vision":                           KeyVisionInput,
+	"supports_json":                    KeyJSONMode,
+	"json":                             KeyJSONMode,
+	"supports_json_mode":               KeyJSONMode,
+	"supports_structured_output":       KeyStructuredOutput,
+	"supports_reasoning":               KeyReasoningControl,
+	"reasoning":                        KeyReasoningControl,
+	"thinking":                         KeyReasoningControl,
+	"supports_prompt_cache":            KeyPromptCache,
+	"supports_context_cache":           KeyContextCache,
+	"supports_usage_in_stream":         KeyUsageInStream,
+	"supports_chat_completions":        KeyChatCompletions,
+	"supports_responses":               KeyResponses,
+	"supports_responses_websocket":     KeyResponsesWebSocket,
+	"responses_websocket":              KeyResponsesWebSocket,
+	"responses_websockets":             KeyResponsesWebSocket,
+	"supports_responses_compact":       KeyResponsesCompact,
+	"responses_compact":                KeyResponsesCompact,
+	"supports_responses_input_items":   KeyResponsesInputItems,
+	"responses_input_items":            KeyResponsesInputItems,
+	"supports_messages":                KeyMessages,
+	"supports_anthropic_count_tokens":  KeyAnthropicCountTokens,
+	"anthropic_count_tokens":           KeyAnthropicCountTokens,
+	"supports_gemini_generate_content": KeyGeminiGenerateContent,
+	"gemini_generate_content":          KeyGeminiGenerateContent,
+	"generate_content":                 KeyGeminiGenerateContent,
+	"supports_gemini_count_tokens":     KeyGeminiCountTokens,
+	"gemini_count_tokens":              KeyGeminiCountTokens,
+	"supports_embeddings":              KeyEmbeddings,
+	"supports_images":                  KeyImages,
+	"supports_audio":                   KeyAudioTranscriptions,
+	"supports_audio_transcriptions":    KeyAudioTranscriptions,
+	"audio":                            KeyAudioTranscriptions,
+	"audio_transcriptions":             KeyAudioTranscriptions,
+	"transcriptions":                   KeyAudioTranscriptions,
+	"supports_audio_speech":            KeyAudioSpeech,
+	"supports_speech":                  KeyAudioSpeech,
+	"audio_speech":                     KeyAudioSpeech,
+	"speech":                           KeyAudioSpeech,
+	"tts":                              KeyAudioSpeech,
+	"text_to_speech":                   KeyAudioSpeech,
+	"supports_moderations":             KeyModerations,
+	"supports_moderation":              KeyModerations,
+	"moderation":                       KeyModerations,
+	"supports_rerank":                  KeyRerank,
+	"supports_reranking":               KeyRerank,
+	"rerank":                           KeyRerank,
+	"reranking":                        KeyRerank,
+	"supports_token_counting":          KeyTokenCounting,
+	"supports_count_tokens":            KeyTokenCounting,
+	"count_tokens":                     KeyTokenCounting,
+	"token_counting":                   KeyTokenCounting,
 }
 
 func DefaultDefinitions() []Definition {

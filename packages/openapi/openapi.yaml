@@ -13513,7 +13513,7 @@ paths:
         - Gateway
       operationId: countAnthropicMessageTokens
       summary: Count input tokens with the Anthropic Messages-compatible gateway route.
-      description: Anthropic-compatible count_tokens route. SRapi authenticates the gateway API key, applies model visibility and entitlement policy, schedules an eligible provider account, invokes the selected provider adapter using upstream count_tokens shape, and renders the upstream token count. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
+      description: Anthropic-compatible count_tokens route. SRapi authenticates the gateway API key, applies model visibility and entitlement policy, schedules an eligible provider account with anthropic_count_tokens and token_counting effective capabilities, invokes the selected provider adapter using upstream count_tokens shape, and renders the upstream token count. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
       security:
         - gatewayBearerAuth: []
       requestBody:
@@ -13879,7 +13879,7 @@ paths:
         - Gateway
       operationId: generateGeminiContent
       summary: Generate content with the Gemini-compatible gateway route.
-      description: Gemini-compatible route. SRapi normalizes the request into the Canonical AI Request, schedules an eligible provider account, invokes the selected provider adapter, and renders a Gemini-shaped response.
+      description: Gemini-compatible route. SRapi normalizes the request into the Canonical AI Request, schedules an eligible provider account with gemini_generate_content effective capability, invokes the selected provider adapter, and renders a Gemini-shaped response.
       security:
         - gatewayBearerAuth: []
       parameters:
@@ -13919,7 +13919,7 @@ paths:
         - Gateway
       operationId: streamGeminiContent
       summary: Stream content with the Gemini-compatible gateway route.
-      description: Gemini-compatible streaming route. SRapi normalizes the request into the Canonical AI Request, schedules an eligible provider account, invokes the selected provider adapter, and emits Gemini-shaped SSE chunks.
+      description: Gemini-compatible streaming route. SRapi normalizes the request into the Canonical AI Request, schedules an eligible provider account with gemini_generate_content effective capability, invokes the selected provider adapter, and emits Gemini-shaped SSE chunks.
       security:
         - gatewayBearerAuth: []
       parameters:
@@ -13960,7 +13960,7 @@ paths:
         - Gateway
       operationId: countGeminiTokens
       summary: Count tokens with the Gemini-compatible gateway route.
-      description: Gemini-compatible countTokens route. SRapi authenticates the gateway API key, applies model visibility and entitlement policy, schedules an eligible provider account, invokes the selected provider adapter using upstream countTokens shape, and renders the upstream token count. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
+      description: Gemini-compatible countTokens route. SRapi authenticates the gateway API key, applies model visibility and entitlement policy, schedules an eligible provider account with gemini_count_tokens and token_counting effective capabilities, invokes the selected provider adapter using upstream countTokens shape, and renders the upstream token count. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
       security:
         - gatewayBearerAuth: []
       parameters:
@@ -14150,7 +14150,7 @@ paths:
         - Gateway
       operationId: countAntigravityGeminiTokensAlias
       summary: Count Gemini-compatible tokens with Antigravity provider context.
-      description: Provider alias route. It reuses the standard Gemini-compatible countTokens runtime, forces the `antigravity` provider context, and invokes the Antigravity official-client `v1internal:countTokens` reverse-proxy path for eligible Antigravity accounts. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
+      description: Provider alias route. It reuses the standard Gemini-compatible countTokens runtime, forces the `antigravity` provider context, requires gemini_count_tokens and token_counting effective capabilities, and invokes the Antigravity official-client `v1internal:countTokens` reverse-proxy path for eligible Antigravity accounts. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
       security:
         - gatewayBearerAuth: []
       parameters:
@@ -14190,7 +14190,7 @@ paths:
         - Gateway
       operationId: generateAntigravityGeminiContentAlias
       summary: Generate Gemini-compatible content with Antigravity provider context.
-      description: Provider alias route. It reuses the standard Gemini-compatible runtime and forces the `antigravity` provider context.
+      description: Provider alias route. It reuses the standard Gemini-compatible runtime, requires gemini_generate_content effective capability, and forces the `antigravity` provider context.
       security:
         - gatewayBearerAuth: []
       parameters:
@@ -14230,7 +14230,7 @@ paths:
         - Gateway
       operationId: streamAntigravityGeminiContentAlias
       summary: Stream Gemini-compatible content with Antigravity provider context.
-      description: Provider alias route. It reuses the standard Gemini-compatible streaming runtime and forces the `antigravity` provider context.
+      description: Provider alias route. It reuses the standard Gemini-compatible streaming runtime, requires gemini_generate_content effective capability, and forces the `antigravity` provider context.
       security:
         - gatewayBearerAuth: []
       parameters:
@@ -15105,7 +15105,7 @@ paths:
         - Gateway
       operationId: countAnthropicCompatibleMessageTokensAlias
       summary: Count Anthropic Messages-compatible input tokens with anthropic-compatible provider context.
-      description: Provider alias route. It reuses the standard Anthropic count_tokens runtime and forces the `anthropic-compatible` provider context.
+      description: Provider alias route. It reuses the standard Anthropic count_tokens runtime, requires anthropic_count_tokens and token_counting effective capabilities, and forces the `anthropic-compatible` provider context.
       security:
         - gatewayBearerAuth: []
       requestBody:

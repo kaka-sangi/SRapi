@@ -106,6 +106,9 @@ responses_websocket
 responses_compact
 responses_input_items
 messages
+anthropic_count_tokens
+gemini_generate_content
+gemini_count_tokens
 embeddings
 images
 audio_transcriptions
@@ -116,6 +119,10 @@ token_counting
 ```
 
 `chat_completions`、`responses`、`messages` 分别表示 Provider Account 能处理 OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 形状的对话生成端点。处理可以是上游原生支持，也可以是该 adapter 已实现且被测试覆盖的确定性网关转换，例如 Codex CLI 将 Chat/Messages 入口转换为 Responses 上游，Anthropic/Gemini adapters 将受支持的文本入口转换为各自上游协议。Gateway 对 `/v1/chat/completions`、`/v1/responses`、`/v1/messages` 以及对应 Provider alias 入口必须生成同名 RequestCapability，并由 Scheduler 作为 hard filter 校验，避免只有模型映射但不具备该端点协议的账号被租约选中。
+
+`gemini_generate_content` 表示 Provider Account 能处理 Gemini-compatible `generateContent` / `streamGenerateContent` 下游入口并调用 Gemini-family 或 Antigravity official-client 上游。Gateway 对 `/v1beta/models/{model}:generateContent`、`/v1beta/models/{model}:streamGenerateContent` 以及 Gemini provider alias 入口必须要求 `gemini_generate_content.v1`；普通 `chat_completions`、`messages` 或模型映射不能替代该协议端点能力。
+
+`anthropic_count_tokens` 与 `gemini_count_tokens` 是协议专属计数端点能力，分别表示 Provider Account 能处理 Anthropic `/v1/messages/count_tokens` 与 Gemini `models/{model}:countTokens` 下游入口。二者都必须同时配合通用 `token_counting.v1`，但不能互相替代；这样具备 Gemini 计数能力的账号不会被 Anthropic count_tokens 请求误选，反之亦然。OpenAI-compatible count_tokens 估算兜底必须由 operator 显式声明 `anthropic_count_tokens` + `token_counting`。
 
 `responses_compact` 是独立端点能力，不能从普通 `responses` 自动推导；compact 需要 Provider Account 能返回 `response.compaction` JSON 语义。只有 preset、provider capability 或 account metadata 明确声明 compact 时，Scheduler 才能把该账号作为 `/v1/responses/compact` 候选。
 
@@ -129,7 +136,7 @@ token_counting
 
 `rerank` 表示 Provider Account 能处理 `/v1/rerank` 兼容端点；`rerank_output` 表示模型/Provider 能产出排序评分。Gateway rerank 请求必须要求 `rerank.v1`，避免 generation-only 或 embedding-only provider 被误选。
 
-`token_counting` 表示 Provider Account 能处理原生 token counting 端点，例如 Gemini `models/{model}:countTokens` 或 Anthropic `/v1/messages/count_tokens`。Gateway countTokens / count_tokens 请求必须要求 `token_counting.v1`，避免只具备生成能力但没有计数端点的候选账号被误选；计数结果不代表生成用量。
+`token_counting` 表示 Provider Account 能处理某种 token counting 能力。Gateway countTokens / count_tokens 请求必须要求 `token_counting.v1`，并额外要求对应协议端点能力（`gemini_count_tokens` 或 `anthropic_count_tokens`），避免只具备另一种协议计数能力的候选账号被误选；计数结果不代表生成用量。
 
 `responses_compact` 表示 Provider Account 能处理 OpenAI Responses compact 子资源并返回原生 `response.compaction`。Gateway `/v1/responses/compact` 请求必须要求 `responses_compact.v1`，避免只具备普通 Responses 或 Chat Completions 生成能力的候选账号被误选并伪造压缩语义。
 

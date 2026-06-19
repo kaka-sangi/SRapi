@@ -16,6 +16,7 @@ func (s *Service) NormalizeGeminiCountTokens(req apiopenapi.GeminiCountTokensReq
 	}
 	canonical := s.NormalizeGeminiGenerateContent(generateReq, model, false, meta)
 	canonical.SourceEndpoint = strings.TrimSpace(meta.SourceEndpoint)
+	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyGeminiCountTokens, Version: "v1"})
 	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyTokenCounting, Version: "v1"})
 	canonical.RequestCapabilities = dedupeRequestCapabilities(canonical.RequestCapabilities)
 	return canonical, nil

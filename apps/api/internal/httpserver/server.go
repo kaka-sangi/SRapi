@@ -1254,7 +1254,7 @@ func (s *Server) registerGatewayProviderAliases(mux *http.ServeMux) {
 			s.registerGatewayAliasRouteForMethod(mux, seen, http.MethodGet, preset.ProviderKey, prefix, "responses/{response_id}/input_items", s.handleListResponseInputItems, presetSupports(preset, capabilitiescontract.KeyResponsesInputItems))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "responses/compact", s.handleCreateResponse, presetSupports(preset, capabilitiescontract.KeyResponsesCompact))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "messages", s.handleCreateMessage, presetSupports(preset, capabilitiescontract.KeyMessages))
-			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "messages/count_tokens", s.handleAnthropicCountTokens, presetSupports(preset, capabilitiescontract.KeyTokenCounting))
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "messages/count_tokens", s.handleAnthropicCountTokens, presetSupports(preset, capabilitiescontract.KeyAnthropicCountTokens))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "embeddings", s.handleCreateEmbedding, presetSupports(preset, capabilitiescontract.KeyEmbeddings))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "images/generations", s.handleCreateImageGeneration, presetSupports(preset, capabilitiescontract.KeyImages))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "images/edits", s.handleCreateImageEdit, presetSupports(preset, capabilitiescontract.KeyImages))

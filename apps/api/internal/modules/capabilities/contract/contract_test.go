@@ -36,6 +36,18 @@ func TestCanonicalKeyFromConvenienceMapsDTOKeys(t *testing.T) {
 	if !ok || got != KeyResponsesWebSocket {
 		t.Fatalf("expected supports_responses_websocket to map to %s, got %q ok=%v", KeyResponsesWebSocket, got, ok)
 	}
+	got, ok = CanonicalKeyFromConvenience("supports_gemini_generate_content")
+	if !ok || got != KeyGeminiGenerateContent {
+		t.Fatalf("expected supports_gemini_generate_content to map to %s, got %q ok=%v", KeyGeminiGenerateContent, got, ok)
+	}
+	got, ok = CanonicalKeyFromConvenience("supports_gemini_count_tokens")
+	if !ok || got != KeyGeminiCountTokens {
+		t.Fatalf("expected supports_gemini_count_tokens to map to %s, got %q ok=%v", KeyGeminiCountTokens, got, ok)
+	}
+	got, ok = CanonicalKeyFromConvenience("supports_anthropic_count_tokens")
+	if !ok || got != KeyAnthropicCountTokens {
+		t.Fatalf("expected supports_anthropic_count_tokens to map to %s, got %q ok=%v", KeyAnthropicCountTokens, got, ok)
+	}
 	got, ok = CanonicalKeyFromConvenience("web_search_preview")
 	if !ok || got != KeyWebSearch {
 		t.Fatalf("expected web_search_preview to map to %s, got %q ok=%v", KeyWebSearch, got, ok)
@@ -92,4 +104,26 @@ func TestDefaultDefinitionsIncludeResponsesWebSocket(t *testing.T) {
 		}
 	}
 	t.Fatalf("expected default definitions to include %s", KeyResponsesWebSocket)
+}
+
+func TestDefaultDefinitionsIncludeProtocolTokenAndGeminiEndpointCapabilities(t *testing.T) {
+	want := map[string]bool{
+		KeyAnthropicCountTokens:  false,
+		KeyGeminiGenerateContent: false,
+		KeyGeminiCountTokens:     false,
+	}
+	for _, def := range DefaultDefinitions() {
+		if _, ok := want[def.Key]; !ok {
+			continue
+		}
+		if def.Version != "v1" || def.Category != "endpoint" || def.Status != DefinitionStatusStable {
+			t.Fatalf("unexpected protocol endpoint definition: %+v", def)
+		}
+		want[def.Key] = true
+	}
+	for key, seen := range want {
+		if !seen {
+			t.Fatalf("expected default definitions to include %s", key)
+		}
+	}
 }

@@ -16,7 +16,7 @@ func TestGatewayCountTokensFallsBackToEstimateOnOpenAIUpstream(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	csrf := loginResp.Data.CsrfToken
-	providerResp := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"openai-count-provider","display_name":"OpenAI Count Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"token_counting":true}}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"openai-count-provider","display_name":"OpenAI Count Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"anthropic_count_tokens":true,"token_counting":true}}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, csrf, `{"canonical_name":"openai-count-model","display_name":"OpenAI Count Model","status":"active","capabilities":[{"key":"token_counting","level":"required","status":"stable","version":"v1"}]}`)
 	mustCreateMapping(t, handler, sessionCookie, csrf, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gpt-count-upstream","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, csrf, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"openai-count-account","runtime_class":"api_key","credential":{"api_key":"openai-count-secret"},"metadata":{"base_url":"https://api.openai.com/v1"},"status":"active"}`)

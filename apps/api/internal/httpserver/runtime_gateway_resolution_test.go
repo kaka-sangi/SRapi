@@ -399,6 +399,111 @@ func TestEffectiveCapabilitiesConversationEndpointCapabilitiesAreProviderScoped(
 	}
 }
 
+func TestEffectiveCapabilitiesProtocolSpecificEndpointCapabilitiesAreProviderScoped(t *testing.T) {
+	model := modelcontract.Model{
+		Capabilities: []capabilitiescontract.Descriptor{
+			capabilityRequirement(capabilitiescontract.KeyGeminiGenerateContent),
+			capabilityRequirement(capabilitiescontract.KeyGeminiCountTokens),
+			capabilityRequirement(capabilitiescontract.KeyAnthropicCountTokens),
+			capabilityRequirement(capabilitiescontract.KeyTokenCounting),
+		},
+	}
+	mapping := modelcontract.ModelProviderMapping{}
+
+	cases := []struct {
+		name                string
+		provider            providercontract.Provider
+		account             accountcontract.ProviderAccount
+		wantGeminiGenerate  bool
+		wantGeminiCount     bool
+		wantAnthropicCount  bool
+		wantGenericCounting bool
+	}{
+		{
+			name: "model capabilities alone do not advertise protocol endpoints",
+			provider: providercontract.Provider{
+				AdapterType:  "unknown-provider",
+				Capabilities: map[string]any{},
+			},
+		},
+		{
+			name: "openai compatible does not inherit native protocol token endpoints",
+			provider: providercontract.Provider{
+				AdapterType:  "openai-compatible",
+				Capabilities: map[string]any{capabilitiescontract.KeyTokenCounting: true},
+			},
+			wantGenericCounting: true,
+		},
+		{
+			name: "openai compatible can explicitly opt into Anthropic count fallback",
+			provider: providercontract.Provider{
+				AdapterType: "openai-compatible",
+				Capabilities: map[string]any{
+					capabilitiescontract.KeyAnthropicCountTokens: true,
+					capabilitiescontract.KeyTokenCounting:        true,
+				},
+			},
+			wantAnthropicCount:  true,
+			wantGenericCounting: true,
+		},
+		{
+			name: "anthropic preset supplies Anthropic count endpoint only",
+			provider: providercontract.Provider{
+				AdapterType: "anthropic-compatible",
+			},
+			wantAnthropicCount:  true,
+			wantGenericCounting: true,
+		},
+		{
+			name: "gemini preset supplies Gemini endpoints only",
+			provider: providercontract.Provider{
+				AdapterType: "gemini-compatible",
+			},
+			wantGeminiGenerate:  true,
+			wantGeminiCount:     true,
+			wantGenericCounting: true,
+		},
+		{
+			name: "antigravity preset supplies Gemini endpoints only",
+			provider: providercontract.Provider{
+				AdapterType: "reverse-proxy-antigravity",
+			},
+			wantGeminiGenerate:  true,
+			wantGeminiCount:     true,
+			wantGenericCounting: true,
+		},
+		{
+			name: "account false suppresses Gemini generate endpoint",
+			provider: providercontract.Provider{
+				AdapterType: "gemini-compatible",
+			},
+			account: accountcontract.ProviderAccount{
+				Metadata: map[string]any{"capability_gemini_generate_content": false},
+			},
+			wantGeminiCount:     true,
+			wantGenericCounting: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := effectiveCapabilities(model, mapping, tc.provider, tc.account)
+			if hasCapability(got, capabilitiescontract.KeyGeminiGenerateContent) != tc.wantGeminiGenerate {
+				t.Fatalf("gemini_generate_content presence = %v, want %v; capabilities=%+v", hasCapability(got, capabilitiescontract.KeyGeminiGenerateContent), tc.wantGeminiGenerate, got)
+			}
+			if hasCapability(got, capabilitiescontract.KeyGeminiCountTokens) != tc.wantGeminiCount {
+				t.Fatalf("gemini_count_tokens presence = %v, want %v; capabilities=%+v", hasCapability(got, capabilitiescontract.KeyGeminiCountTokens), tc.wantGeminiCount, got)
+			}
+			if hasCapability(got, capabilitiescontract.KeyAnthropicCountTokens) != tc.wantAnthropicCount {
+				t.Fatalf("anthropic_count_tokens presence = %v, want %v; capabilities=%+v", hasCapability(got, capabilitiescontract.KeyAnthropicCountTokens), tc.wantAnthropicCount, got)
+			}
+			if hasCapability(got, capabilitiescontract.KeyTokenCounting) != tc.wantGenericCounting {
+				t.Fatalf("token_counting presence = %v, want %v; capabilities=%+v", hasCapability(got, capabilitiescontract.KeyTokenCounting), tc.wantGenericCounting, got)
+			}
+		})
+	}
+}
+
 func TestEffectiveCapabilitiesGenericReverseProxyAdvertisesImplementedEmbeddings(t *testing.T) {
 	model := modelcontract.Model{
 		Capabilities: []capabilitiescontract.Descriptor{

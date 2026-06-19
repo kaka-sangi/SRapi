@@ -222,7 +222,7 @@ func TestGatewayGeminiThinkingConfigReachesOpenAIReasoningEffort(t *testing.T) {
 
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"gemini-to-chat-thinking-provider","display_name":"Gemini To Chat Thinking","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"gemini-to-chat-thinking-provider","display_name":"Gemini To Chat Thinking","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"gemini_generate_content":true}}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"gemini-to-chat-thinking-model","display_name":"Gemini To Chat Thinking Model","status":"active","capabilities":[{"key":"reasoning_control","level":"optional","status":"stable","version":"v1"}]}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gemini-chat-upstream","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"gemini-to-chat-thinking-account","runtime_class":"api_key","credential":{"api_key":"openai-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)

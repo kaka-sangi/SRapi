@@ -707,10 +707,74 @@ func TestNormalizeGeminiGenerateContentProducesCanonicalRequest(t *testing.T) {
 		t.Fatalf("expected Gemini inline media to be preserved, got %+v", canonical.Messages)
 	}
 	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStreaming) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyGeminiGenerateContent) ||
 		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyVisionInput) ||
 		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStructuredOutput) ||
 		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyReasoningControl) {
 		t.Fatalf("expected request capabilities, got %+v", canonical.RequestCapabilities)
+	}
+}
+
+func TestNormalizeGeminiCountTokensRequiresProtocolTokenCapability(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	text := "count this"
+	req := apiopenapi.GeminiCountTokensRequest{
+		Contents: &[]apiopenapi.GeminiContent{{
+			Parts: []apiopenapi.GeminiPart{{Text: &text}},
+		}},
+	}
+
+	canonical, err := svc.NormalizeGeminiCountTokens(req, "gemini-test", RequestMeta{
+		SourceEndpoint: "/v1beta/models/gemini-test:countTokens",
+		CanonicalModel: "gemini-test",
+	})
+	if err != nil {
+		t.Fatalf("normalize Gemini countTokens: %v", err)
+	}
+
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyGeminiCountTokens) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyTokenCounting) {
+		t.Fatalf("expected Gemini count token capabilities, got %+v", canonical.RequestCapabilities)
+	}
+	if requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyGeminiGenerateContent) {
+		t.Fatalf("countTokens must not require generateContent endpoint capability, got %+v", canonical.RequestCapabilities)
+	}
+}
+
+func TestNormalizeAnthropicCountTokensRequiresProtocolTokenCapability(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	content := apiopenapi.AnthropicMessage_Content{}
+	if err := content.FromAnthropicMessageContent0("count this"); err != nil {
+		t.Fatalf("set message content: %v", err)
+	}
+	req := apiopenapi.AnthropicCountTokensRequest{
+		Model: "claude-test",
+		Messages: []apiopenapi.AnthropicMessage{{
+			Role:    apiopenapi.AnthropicMessageRoleUser,
+			Content: content,
+		}},
+	}
+
+	canonical, err := svc.NormalizeAnthropicCountTokens(req, RequestMeta{
+		SourceEndpoint: "/v1/messages/count_tokens",
+		CanonicalModel: "claude-test",
+	})
+	if err != nil {
+		t.Fatalf("normalize Anthropic count_tokens: %v", err)
+	}
+
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyAnthropicCountTokens) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyTokenCounting) {
+		t.Fatalf("expected Anthropic count token capabilities, got %+v", canonical.RequestCapabilities)
+	}
+	if requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyMessages) {
+		t.Fatalf("count_tokens must not require messages generation capability, got %+v", canonical.RequestCapabilities)
 	}
 }
 
