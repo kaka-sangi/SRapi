@@ -73,6 +73,13 @@ export function useOpsAlerts(params?: P<typeof adminApi.listOpsAlerts>) {
   });
 }
 
+export function useOpsAlertEvents(params?: P<typeof adminApi.listOpsAlertEvents>) {
+  return useQuery({
+    queryKey: queryKeys.admin.opsAlertEvents(params),
+    queryFn: () => adminApi.listOpsAlertEvents(params),
+  });
+}
+
 export function useOpsThroughput(params?: P<typeof adminApi.getOpsThroughputTrend>) {
   return useQuery({
     queryKey: queryKeys.admin.opsThroughput(params),

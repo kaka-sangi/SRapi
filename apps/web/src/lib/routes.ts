@@ -50,6 +50,7 @@ export const ADMIN_ROUTES = {
   opsStrategy: "/admin/ops?tab=strategy",
   opsSchedulerDecisions: "/admin/ops?tab=scheduler-decisions",
   opsSystemLogs: "/admin/ops/system-logs",
+  opsAlertEvents: "/admin/ops/alert-events",
   eventsOutbox: "/admin/ops/events",
   diagnostics: "/admin/ops/diagnostics",
   riskControl: "/admin/risk-control",

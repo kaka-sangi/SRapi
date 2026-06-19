@@ -30,6 +30,7 @@ import {
   ShieldCheck,
   Fingerprint,
   Receipt,
+  BellRing,
   type LucideIcon,
 } from "lucide-react";
 import { ADMIN_ROUTES, USER_ROUTES, USER_HOME_ROUTE } from "@/lib/routes";
@@ -112,6 +113,7 @@ const ADMIN_OPS_SECTION: NavSection = {
   titleKey: "nav.sectionAdminOps",
   items: [
     { href: ADMIN_ROUTES.ops, labelKey: "nav.adminOps", icon: HeartPulse },
+    { href: ADMIN_ROUTES.opsAlertEvents, labelKey: "nav.adminOpsAlertEvents", icon: BellRing },
     { href: ADMIN_ROUTES.riskControl, labelKey: "nav.adminRiskControl", icon: ShieldAlert },
     { href: ADMIN_ROUTES.announcements, labelKey: "nav.adminAnnouncements", icon: Megaphone },
     { href: ADMIN_ROUTES.eventsOutbox, labelKey: "nav.adminOutbox", icon: Send },
