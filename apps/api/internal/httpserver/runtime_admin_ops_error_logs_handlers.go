@@ -265,6 +265,8 @@ func opsErrorLogListFilterFromRequest(r *http.Request) (opserrorlogscontract.Lis
 	filter := opserrorlogscontract.ListFilter{
 		Resolution: opserrorlogscontract.Resolution(strings.TrimSpace(q.Get("resolution"))),
 		ErrorClass: strings.TrimSpace(q.Get("error_class")),
+		ErrorPhase: strings.TrimSpace(q.Get("error_phase")),
+		ErrorOwner: strings.TrimSpace(q.Get("error_owner")),
 		Platform:   strings.TrimSpace(q.Get("platform")),
 		Model:      strings.TrimSpace(q.Get("model")),
 		Query:      strings.TrimSpace(q.Get("q")),

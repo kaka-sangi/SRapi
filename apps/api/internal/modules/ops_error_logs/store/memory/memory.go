@@ -161,6 +161,12 @@ func matchesFilter(entry contract.Entry, filter contract.ListFilter) bool {
 	if filter.ErrorClass != "" && entry.ErrorClass != filter.ErrorClass {
 		return false
 	}
+	if filter.ErrorPhase != "" && entry.ErrorPhase != filter.ErrorPhase {
+		return false
+	}
+	if filter.ErrorOwner != "" && entry.ErrorOwner != filter.ErrorOwner {
+		return false
+	}
 	if query := strings.ToLower(strings.TrimSpace(filter.Query)); query != "" && !entryMatchesQuery(entry, query) {
 		return false
 	}

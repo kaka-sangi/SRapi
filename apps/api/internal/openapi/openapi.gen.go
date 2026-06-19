@@ -12007,7 +12007,13 @@ type ListAdminOpsErrorLogsParams struct {
 	ProviderId *Id       `form:"provider_id,omitempty" json:"provider_id,omitempty"`
 	Model      *string   `form:"model,omitempty" json:"model,omitempty"`
 	ErrorClass *string   `form:"error_class,omitempty" json:"error_class,omitempty"`
-	Platform   *string   `form:"platform,omitempty" json:"platform,omitempty"`
+
+	// ErrorPhase Filter by gateway error phase, for example routing or upstream.
+	ErrorPhase *string `form:"error_phase,omitempty" json:"error_phase,omitempty"`
+
+	// ErrorOwner Filter by responsibility bucket, for example provider or scheduler.
+	ErrorOwner *string `form:"error_owner,omitempty" json:"error_owner,omitempty"`
+	Platform   *string `form:"platform,omitempty" json:"platform,omitempty"`
 
 	// Resolution Filter by operator-supplied resolution status.
 	Resolution *ListAdminOpsErrorLogsParamsResolution `form:"resolution,omitempty" json:"resolution,omitempty"`
@@ -27525,6 +27531,32 @@ func (siw *ServerInterfaceWrapper) ListAdminOpsErrorLogs(w http.ResponseWriter, 
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_class"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_class", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error_phase" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_phase", r.URL.Query(), &params.ErrorPhase, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_phase"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_phase", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error_owner" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_owner", r.URL.Query(), &params.ErrorOwner, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_owner"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_owner", Err: err})
 		}
 		return
 	}

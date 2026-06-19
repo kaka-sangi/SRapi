@@ -9660,6 +9660,16 @@ paths:
           in: query
           schema:
             type: string
+        - name: error_phase
+          in: query
+          description: Filter by gateway error phase, for example routing or upstream.
+          schema:
+            type: string
+        - name: error_owner
+          in: query
+          description: Filter by responsibility bucket, for example provider or scheduler.
+          schema:
+            type: string
         - name: platform
           in: query
           schema:

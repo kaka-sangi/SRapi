@@ -17301,6 +17301,14 @@ export type ListAdminOpsErrorLogsData = {
         provider_id?: Id;
         model?: string;
         error_class?: string;
+        /**
+         * Filter by gateway error phase, for example routing or upstream.
+         */
+        error_phase?: string;
+        /**
+         * Filter by responsibility bucket, for example provider or scheduler.
+         */
+        error_owner?: string;
         platform?: string;
         /**
          * Filter by operator-supplied resolution status.

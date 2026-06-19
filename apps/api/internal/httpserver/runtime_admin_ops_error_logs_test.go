@@ -83,7 +83,7 @@ func TestAdminOpsErrorLogsListGetAndResolve(t *testing.T) {
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	csrf := loginResp.Data.CsrfToken
 
-	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/error-logs?page=1&page_size=20&model=ops-model&q=provider&status_min=500", nil)
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/error-logs?page=1&page_size=20&model=ops-model&q=provider&status_min=500&error_phase=upstream&error_owner=provider", nil)
 	listReq.AddCookie(sessionCookie)
 	listRec := httptest.NewRecorder()
 	handler.ServeHTTP(listRec, listReq)

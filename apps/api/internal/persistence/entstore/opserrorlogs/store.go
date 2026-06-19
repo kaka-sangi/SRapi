@@ -180,6 +180,12 @@ func listPredicates(filter contract.ListFilter) []predicate.OpsErrorLog {
 	if errorClass := strings.TrimSpace(filter.ErrorClass); errorClass != "" {
 		predicates = append(predicates, entopserrorlog.ErrorClassEQ(errorClass))
 	}
+	if phase := strings.TrimSpace(filter.ErrorPhase); phase != "" {
+		predicates = append(predicates, entopserrorlog.ErrorPhaseEQ(phase))
+	}
+	if owner := strings.TrimSpace(filter.ErrorOwner); owner != "" {
+		predicates = append(predicates, entopserrorlog.ErrorOwnerEQ(owner))
+	}
 	if query := strings.TrimSpace(filter.Query); query != "" {
 		predicates = append(predicates, entopserrorlog.Or(
 			entopserrorlog.RequestIDContainsFold(query),

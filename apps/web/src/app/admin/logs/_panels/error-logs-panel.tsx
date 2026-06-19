@@ -36,6 +36,29 @@ import { compactSchedulerDiagnostic } from "@/lib/scheduler-diagnostic";
 import { compactUpstreamErrorDiagnostic } from "@/lib/upstream-error-diagnostic";
 
 const DEFAULT_HIDDEN_COLUMNS = ["api_key_id", "provider_id", "source_endpoint", "error_owner"];
+const STATUS_FILTER_OPTIONS = [
+  { value: "4xx", min: 400, max: 499 },
+  { value: "5xx", min: 500, max: 599 },
+  { value: "400", min: 400, max: 400 },
+  { value: "401", min: 401, max: 401 },
+  { value: "403", min: 403, max: 403 },
+  { value: "404", min: 404, max: 404 },
+  { value: "429", min: 429, max: 429 },
+  { value: "500", min: 500, max: 500 },
+  { value: "502", min: 502, max: 502 },
+  { value: "503", min: 503, max: 503 },
+  { value: "504", min: 504, max: 504 },
+] as const;
+const ERROR_PHASE_OPTIONS = ["request", "auth", "routing", "upstream", "network", "internal"] as const;
+const ERROR_OWNER_OPTIONS = [
+  "client",
+  "provider",
+  "scheduler",
+  "reverse_proxy",
+  "platform",
+  "internal",
+  "business",
+] as const;
 
 export function ErrorLogsPanel() {
   const { t } = useLanguage();
@@ -51,7 +74,10 @@ export function ErrorLogsPanel() {
   const accountFilter = list.filters.account || undefined;
   const providerFilter = list.filters.provider || undefined;
   const errorClassFilter = list.filters.error_class || undefined;
+  const errorPhaseFilter = list.filters.error_phase || undefined;
+  const errorOwnerFilter = list.filters.error_owner || undefined;
   const resolutionFilter = list.filters.resolution || undefined;
+  const statusFilter = statusFilterBounds(list.filters.status);
   const windowFilter = list.filters.window;
   const sinceFilter = logWindowSince(windowFilter)?.toISOString();
 
@@ -65,6 +91,10 @@ export function ErrorLogsPanel() {
     provider_id: providerFilter,
     resolution: resolutionFilter as "open" | "investigating" | "resolved" | "muted" | undefined,
     error_class: errorClassFilter,
+    error_phase: errorPhaseFilter,
+    error_owner: errorOwnerFilter,
+    status_min: statusFilter?.min,
+    status_max: statusFilter?.max,
     start: sinceFilter,
     q: searchQuery,
   });
@@ -88,6 +118,9 @@ export function ErrorLogsPanel() {
       accountFilter ||
       providerFilter ||
       errorClassFilter ||
+      errorPhaseFilter ||
+      errorOwnerFilter ||
+      statusFilter ||
       resolutionFilter ||
       windowFilter ||
       searchQuery,
@@ -368,6 +401,33 @@ export function ErrorLogsPanel() {
               placeholder={t("adminErrorLogs.errorClassPlaceholder")}
             />
             <FilterSelect
+              value={list.filters.status}
+              onChange={(v) => list.setFilter("status", v)}
+              options={STATUS_FILTER_OPTIONS.map((option) => ({
+                value: option.value,
+                label: option.value,
+              }))}
+              allLabel={t("adminErrorLogs.allStatuses")}
+            />
+            <FilterSelect
+              value={list.filters.error_phase}
+              onChange={(v) => list.setFilter("error_phase", v)}
+              options={ERROR_PHASE_OPTIONS.map((phase) => ({
+                value: phase,
+                label: t(`adminErrorLogs.phase.${phase}`),
+              }))}
+              allLabel={t("adminErrorLogs.allPhases")}
+            />
+            <FilterSelect
+              value={list.filters.error_owner}
+              onChange={(v) => list.setFilter("error_owner", v)}
+              options={ERROR_OWNER_OPTIONS.map((owner) => ({
+                value: owner,
+                label: t(`adminErrorLogs.owner.${owner}`),
+              }))}
+              allLabel={t("adminErrorLogs.allOwners")}
+            />
+            <FilterSelect
               value={list.filters.resolution}
               onChange={(v) => list.setFilter("resolution", v)}
               options={[
@@ -539,4 +599,8 @@ function resolutionTone(resolution: OpsErrorLog["resolution"]): QuietStatus {
     default:
       return "error";
   }
+}
+
+function statusFilterBounds(value?: string): { min: number; max: number } | undefined {
+  return STATUS_FILTER_OPTIONS.find((option) => option.value === value);
 }

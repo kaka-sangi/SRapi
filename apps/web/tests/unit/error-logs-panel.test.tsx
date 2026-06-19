@@ -167,11 +167,11 @@ describe("ErrorLogsPanel", () => {
     expect(screen.getByText("no_available_account")).toBeInTheDocument();
     expect(screen.getByText("capability_mismatch:responses")).toBeInTheDocument();
     expect(screen.getByText("check_model_capabilities_or_mapping")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /系统日志/ })).toHaveAttribute(
+    expect(screen.getByText("系统日志").closest("a")).toHaveAttribute(
       "href",
       "/admin/ops/system-logs?f_request_id=req-row&f_trace_id=trace-row",
     );
-    expect(screen.getByRole("link", { name: /全部转储/ })).toHaveAttribute(
+    expect(screen.getByText("全部转储").closest("a")).toHaveAttribute(
       "href",
       "/admin/logs?tab=request-files&f_request_id=req-row",
     );
@@ -190,6 +190,25 @@ describe("ErrorLogsPanel", () => {
       expect.objectContaining({
         provider_id: "3",
         error_class: "no_available_account",
+      }),
+    );
+  });
+
+  it("maps diagnostic URL filters to backend phase owner and status params", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/admin/logs?tab=error&f_error_phase=upstream&f_error_owner=provider&f_status=5xx",
+    );
+
+    render(<ErrorLogsPanel />, { wrapper: wrap });
+
+    expect(mocks.useAdminErrorLogs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error_phase: "upstream",
+        error_owner: "provider",
+        status_min: 500,
+        status_max: 599,
       }),
     );
   });

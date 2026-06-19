@@ -127,6 +127,8 @@ type ListFilter struct {
 	Platform      string
 	Model         string
 	ErrorClass    string
+	ErrorPhase    string
+	ErrorOwner    string
 	Query         string
 	Resolution    Resolution
 	StatusCodeMin *int

@@ -89,7 +89,8 @@ func TestStoreListsFiltersAndUpdatesResolution(t *testing.T) {
 		Model:          "gpt-4o-mini",
 		StatusCode:     &statusRateLimit,
 		ErrorClass:     "rate_limit",
-		ErrorPhase:     "upstream",
+		ErrorPhase:     "routing",
+		ErrorOwner:     "scheduler",
 		ErrorMessage:   "provider quota exceeded",
 		Resolution:     contract.ResolutionOpen,
 		CreatedAt:      now,
@@ -121,6 +122,14 @@ func TestStoreListsFiltersAndUpdatesResolution(t *testing.T) {
 	}
 	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != first.ID {
 		t.Fatalf("expected only 5xx row, got %+v", list)
+	}
+
+	list, err = store.List(ctx, contract.ListFilter{ErrorPhase: "upstream", ErrorOwner: "provider", Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("list phase/owner filter: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != first.ID {
+		t.Fatalf("expected only upstream provider row, got %+v", list)
 	}
 
 	list, err = store.List(ctx, contract.ListFilter{RequestID: "req_first", Page: 1, PageSize: 10})
