@@ -40,6 +40,8 @@ export const queryKeys = {
     schedulerOverview: () => ["admin", "scheduler", "overview"] as const,
     schedulerStrategies: () => ["admin", "scheduler", "strategies"] as const,
     opsOverview: (params?: unknown) => ["admin", "ops", "overview", params ?? {}] as const,
+    opsRealtimeTraffic: (params?: unknown) =>
+      ["admin", "ops", "realtime-traffic", params ?? {}] as const,
     opsThroughput: (params?: unknown) => ["admin", "ops", "throughput", params ?? {}] as const,
     opsErrorTrend: (params?: unknown) => ["admin", "ops", "error-trend", params ?? {}] as const,
     opsErrorDistribution: (params?: unknown) =>

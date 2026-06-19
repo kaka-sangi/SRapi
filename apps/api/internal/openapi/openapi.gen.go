@@ -3605,6 +3605,30 @@ func (e GetAdminOpsErrorTrendParamsBucket) Valid() bool {
 	}
 }
 
+// Defines values for GetAdminOpsRealtimeTrafficParamsWindow.
+const (
+	N1h  GetAdminOpsRealtimeTrafficParamsWindow = "1h"
+	N1m  GetAdminOpsRealtimeTrafficParamsWindow = "1m"
+	N30m GetAdminOpsRealtimeTrafficParamsWindow = "30m"
+	N5m  GetAdminOpsRealtimeTrafficParamsWindow = "5m"
+)
+
+// Valid indicates whether the value is a known member of the GetAdminOpsRealtimeTrafficParamsWindow enum.
+func (e GetAdminOpsRealtimeTrafficParamsWindow) Valid() bool {
+	switch e {
+	case N1h:
+		return true
+	case N1m:
+		return true
+	case N30m:
+		return true
+	case N5m:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListAdminOpsRequestEvidenceParamsKind.
 const (
 	ListAdminOpsRequestEvidenceParamsKindAll     ListAdminOpsRequestEvidenceParamsKind = "all"
@@ -9011,6 +9035,44 @@ type OpsOverviewResponse struct {
 	RequestId RequestId   `json:"request_id"`
 }
 
+// OpsRealtimeRateSummary defines model for OpsRealtimeRateSummary.
+type OpsRealtimeRateSummary struct {
+	// Average Full-window average rate per minute.
+	Average int `json:"average"`
+
+	// Current Rate observed in the final minute of the window.
+	Current int `json:"current"`
+
+	// Peak Highest one-minute bucket observed in the window.
+	Peak int `json:"peak"`
+}
+
+// OpsRealtimeTraffic defines model for OpsRealtimeTraffic.
+type OpsRealtimeTraffic struct {
+	// ErrorCount Failed request attempts, including error-only ops logs.
+	ErrorCount  int       `json:"error_count"`
+	ErrorRate   float32   `json:"error_rate"`
+	GeneratedAt Timestamp `json:"generated_at"`
+
+	// OpsErrorLogCount Ops error rows scanned for the selected window.
+	OpsErrorLogCount int                    `json:"ops_error_log_count"`
+	RequestsPerMin   OpsRealtimeRateSummary `json:"requests_per_min"`
+	TokensPerMin     OpsRealtimeRateSummary `json:"tokens_per_min"`
+
+	// TotalRequests Deduplicated request attempts in the selected window.
+	TotalRequests int `json:"total_requests"`
+
+	// UsageLogCount Usage rows scanned for the selected window.
+	UsageLogCount int        `json:"usage_log_count"`
+	Window        TimeWindow `json:"window"`
+}
+
+// OpsRealtimeTrafficResponse defines model for OpsRealtimeTrafficResponse.
+type OpsRealtimeTrafficResponse struct {
+	Data      OpsRealtimeTraffic `json:"data"`
+	RequestId RequestId          `json:"request_id"`
+}
+
 // OpsSLIType defines model for OpsSLIType.
 type OpsSLIType string
 
@@ -12558,6 +12620,15 @@ type GetAdminOpsOverviewParams struct {
 	// End Exclusive end time for read-model queries.
 	End *EndTime `form:"end,omitempty" json:"end,omitempty"`
 }
+
+// GetAdminOpsRealtimeTrafficParams defines parameters for GetAdminOpsRealtimeTraffic.
+type GetAdminOpsRealtimeTrafficParams struct {
+	// Window Recent traffic window.
+	Window *GetAdminOpsRealtimeTrafficParamsWindow `form:"window,omitempty" json:"window,omitempty"`
+}
+
+// GetAdminOpsRealtimeTrafficParamsWindow defines parameters for GetAdminOpsRealtimeTraffic.
+type GetAdminOpsRealtimeTrafficParamsWindow string
 
 // ListAdminOpsRealtimeSlotsParams defines parameters for ListAdminOpsRealtimeSlots.
 type ListAdminOpsRealtimeSlotsParams struct {
@@ -21121,6 +21192,9 @@ type ServerInterface interface {
 	// Get operational golden-signal overview.
 	// (GET /api/v1/admin/ops/overview)
 	GetAdminOpsOverview(w http.ResponseWriter, r *http.Request, params GetAdminOpsOverviewParams)
+	// Get realtime request and token traffic summary.
+	// (GET /api/v1/admin/ops/realtime-traffic)
+	GetAdminOpsRealtimeTraffic(w http.ResponseWriter, r *http.Request, params GetAdminOpsRealtimeTrafficParams)
 	// List active realtime WebSocket slots on this API node.
 	// (GET /api/v1/admin/ops/realtime/slots)
 	ListAdminOpsRealtimeSlots(w http.ResponseWriter, r *http.Request, params ListAdminOpsRealtimeSlotsParams)
@@ -29044,6 +29118,45 @@ func (siw *ServerInterfaceWrapper) GetAdminOpsOverview(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAdminOpsOverview(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminOpsRealtimeTraffic operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminOpsRealtimeTraffic(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminOpsRealtimeTrafficParams
+
+	// ------------- Optional query parameter "window" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "window", r.URL.Query(), &params.Window, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "window"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "window", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminOpsRealtimeTraffic(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -37898,6 +38011,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/ops/notification-channels/{id}", wrapper.UpdateAdminOpsNotificationChannel)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/notification-deliveries", wrapper.ListAdminOpsNotificationDeliveries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/overview", wrapper.GetAdminOpsOverview)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/realtime-traffic", wrapper.GetAdminOpsRealtimeTraffic)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/realtime/slots", wrapper.ListAdminOpsRealtimeSlots)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/request-evidence", wrapper.ListAdminOpsRequestEvidence)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/request-evidence/{request_id}", wrapper.GetAdminOpsRequestEvidence)

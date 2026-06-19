@@ -55,6 +55,8 @@ export type {
   OpsErrorFingerprintListMeta,
   OpsErrorLog,
   UpstreamErrorEvent,
+  OpsRealtimeTraffic,
+  OpsRealtimeRateSummary,
   OpsAlertRuleBaselinePosture,
   OpsAlertRuleBaselinePostureItem,
   OpsAlertRuleBaselineStatus,

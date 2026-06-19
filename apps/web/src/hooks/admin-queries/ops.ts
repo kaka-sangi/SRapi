@@ -88,6 +88,14 @@ export function useOpsThroughput(params?: P<typeof adminApi.getOpsThroughputTren
   });
 }
 
+export function useOpsRealtimeTraffic(params?: P<typeof adminApi.getOpsRealtimeTraffic>) {
+  return useQuery({
+    queryKey: queryKeys.admin.opsRealtimeTraffic(params),
+    queryFn: () => adminApi.getOpsRealtimeTraffic(params),
+    refetchInterval: 30_000,
+  });
+}
+
 export function useOpsErrorTrend(params?: P<typeof adminApi.getOpsErrorTrend>) {
   return useQuery({
     queryKey: queryKeys.admin.opsErrorTrend(params),

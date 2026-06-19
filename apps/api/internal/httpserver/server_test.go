@@ -1594,6 +1594,7 @@ func TestAdminControlPlaneV1EndpointsAndAudit(t *testing.T) {
 	readEndpoints := []string{
 		"/api/v1/admin/dashboard/snapshot",
 		"/api/v1/admin/ops/overview",
+		"/api/v1/admin/ops/realtime-traffic",
 		"/api/v1/admin/ops/throughput-trend",
 		"/api/v1/admin/ops/error-trend",
 		"/api/v1/admin/ops/error-distribution",

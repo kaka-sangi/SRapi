@@ -3117,6 +3117,50 @@ export type OpsOverviewResponse = {
     request_id: RequestId;
 };
 
+export type OpsRealtimeRateSummary = {
+    /**
+     * Rate observed in the final minute of the window.
+     */
+    current: number;
+    /**
+     * Highest one-minute bucket observed in the window.
+     */
+    peak: number;
+    /**
+     * Full-window average rate per minute.
+     */
+    average: number;
+};
+
+export type OpsRealtimeTraffic = {
+    window: TimeWindow;
+    requests_per_min: OpsRealtimeRateSummary;
+    tokens_per_min: OpsRealtimeRateSummary;
+    /**
+     * Deduplicated request attempts in the selected window.
+     */
+    total_requests: number;
+    /**
+     * Failed request attempts, including error-only ops logs.
+     */
+    error_count: number;
+    error_rate: number;
+    /**
+     * Usage rows scanned for the selected window.
+     */
+    usage_log_count: number;
+    /**
+     * Ops error rows scanned for the selected window.
+     */
+    ops_error_log_count: number;
+    generated_at: Timestamp;
+};
+
+export type OpsRealtimeTrafficResponse = {
+    data: OpsRealtimeTraffic;
+    request_id: RequestId;
+};
+
 export type OpsThroughputTrendPoint = {
     bucket_start: Timestamp;
     request_count: number;
@@ -17363,6 +17407,48 @@ export type GetAdminOpsOverviewResponses = {
 };
 
 export type GetAdminOpsOverviewResponse = GetAdminOpsOverviewResponses[keyof GetAdminOpsOverviewResponses];
+
+export type GetAdminOpsRealtimeTrafficData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Recent traffic window.
+         */
+        window?: '1m' | '5m' | '30m' | '1h';
+    };
+    url: '/api/v1/admin/ops/realtime-traffic';
+};
+
+export type GetAdminOpsRealtimeTrafficErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminOpsRealtimeTrafficError = GetAdminOpsRealtimeTrafficErrors[keyof GetAdminOpsRealtimeTrafficErrors];
+
+export type GetAdminOpsRealtimeTrafficResponses = {
+    /**
+     * Realtime traffic summary.
+     */
+    200: OpsRealtimeTrafficResponse;
+};
+
+export type GetAdminOpsRealtimeTrafficResponse = GetAdminOpsRealtimeTrafficResponses[keyof GetAdminOpsRealtimeTrafficResponses];
 
 export type GetAdminOpsThroughputTrendData = {
     body?: never;

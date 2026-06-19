@@ -9523,6 +9523,52 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/ops/realtime-traffic:
+    get:
+      tags:
+        - AdminOps
+      operationId: getAdminOpsRealtimeTraffic
+      summary: Get realtime request and token traffic summary.
+      description: |
+        Returns a low-cardinality operator summary for recent gateway traffic.
+        Current rates cover the last minute, peak rates are the largest minute
+        bucket in the requested window, and averages cover the full window.
+        Error-only requests from ops_error_logs are included when no usage row
+        exists for the same request attempt.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: window
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [1m, 5m, 30m, 1h]
+            default: 5m
+          description: Recent traffic window.
+      responses:
+        "200":
+          description: Realtime traffic summary.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsRealtimeTrafficResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/ops/throughput-trend:
     get:
       tags:
@@ -24353,6 +24399,79 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/OpsOverview"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsRealtimeRateSummary:
+      type: object
+      required:
+        - current
+        - peak
+        - average
+      properties:
+        current:
+          type: integer
+          minimum: 0
+          description: Rate observed in the final minute of the window.
+        peak:
+          type: integer
+          minimum: 0
+          description: Highest one-minute bucket observed in the window.
+        average:
+          type: integer
+          minimum: 0
+          description: Full-window average rate per minute.
+
+    OpsRealtimeTraffic:
+      type: object
+      required:
+        - window
+        - requests_per_min
+        - tokens_per_min
+        - total_requests
+        - error_count
+        - error_rate
+        - usage_log_count
+        - ops_error_log_count
+        - generated_at
+      properties:
+        window:
+          $ref: "#/components/schemas/TimeWindow"
+        requests_per_min:
+          $ref: "#/components/schemas/OpsRealtimeRateSummary"
+        tokens_per_min:
+          $ref: "#/components/schemas/OpsRealtimeRateSummary"
+        total_requests:
+          type: integer
+          minimum: 0
+          description: Deduplicated request attempts in the selected window.
+        error_count:
+          type: integer
+          minimum: 0
+          description: Failed request attempts, including error-only ops logs.
+        error_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+        usage_log_count:
+          type: integer
+          minimum: 0
+          description: Usage rows scanned for the selected window.
+        ops_error_log_count:
+          type: integer
+          minimum: 0
+          description: Ops error rows scanned for the selected window.
+        generated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    OpsRealtimeTrafficResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsRealtimeTraffic"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

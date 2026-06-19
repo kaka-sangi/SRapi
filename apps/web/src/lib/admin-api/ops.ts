@@ -17,6 +17,7 @@ import {
   getAdminOpsErrorTrend,
   getAdminOpsLatencyHistogram,
   getAdminOpsOverview,
+  getAdminOpsRealtimeTraffic,
   getAdminOpsRequestEvidence,
   getAdminOpsSystemLogHealth,
   getAdminOpsThroughputTrend,
@@ -60,6 +61,7 @@ import type {
   RequestEvidenceDetailResponse,
   RequestEvidenceRow,
   OpsOverview,
+  OpsRealtimeTraffic,
   OpsSlo,
   OpsSettings,
   OpsSloDefinition,
@@ -82,6 +84,12 @@ export const opsApi = {
 
   getOpsOverview(query?: AdminTimeRange): Promise<OpsOverview> {
     return unwrapData(() => getAdminOpsOverview({ query, throwOnError: true }));
+  },
+
+  getOpsRealtimeTraffic(
+    query?: { window?: "1m" | "5m" | "30m" | "1h" },
+  ): Promise<OpsRealtimeTraffic> {
+    return unwrapData(() => getAdminOpsRealtimeTraffic({ query, throwOnError: true }));
   },
 
   getOpsThroughputTrend(

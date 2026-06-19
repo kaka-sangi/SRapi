@@ -27,6 +27,7 @@ import {
   useOpsSlos,
   useOpsAlerts,
   useAcknowledgeAlert,
+  useOpsRealtimeTraffic,
   useOpsThroughput,
   useOpsErrorTrend,
   useUpdateOpsSettings,
@@ -56,6 +57,7 @@ import type {
   OpsAlertRuleBaselinePostureItem,
   OpsAlertSilence,
   OpsNotificationChannel,
+  OpsRealtimeTraffic,
 } from "@/lib/sdk-types";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -69,7 +71,7 @@ import { SloCardSkeleton } from "@/components/charts/chart-skeleton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { quietStatusFor } from "@/lib/status-badge";
-import { formatDateTime } from "@/lib/admin-format";
+import { formatDateTime, formatInteger, formatPercent } from "@/lib/admin-format";
 import { MonitorContent } from "@/components/admin/ops-channel-monitor";
 import { ScheduledTestsContent } from "@/components/admin/ops-scheduled-tests";
 import { StrategyContent } from "@/components/admin/ops-strategy";
@@ -203,6 +205,7 @@ function OpsOverviewContent() {
   }
 
   const throughput = useOpsThroughput();
+  const realtimeTraffic = useOpsRealtimeTraffic({ window: "5m" });
   const errorTrend = useOpsErrorTrend();
   const latencyHistogram = useOpsLatencyHistogram();
   const errorDistribution = useOpsErrorDistribution();
@@ -257,6 +260,8 @@ function OpsOverviewContent() {
       />
 
       <OpsEvidenceChainHealth health={systemLogHealth.data} loading={systemLogHealth.isLoading} />
+
+      <RealtimeTrafficPanel traffic={realtimeTraffic.data} loading={realtimeTraffic.isLoading} />
 
       {throughputValues.length > 0 || errorValues.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -828,6 +833,111 @@ function OpsOverviewContent() {
         />
       ) : null}
     </>
+  );
+}
+
+function RealtimeTrafficPanel({
+  traffic,
+  loading,
+}: {
+  traffic?: OpsRealtimeTraffic;
+  loading?: boolean;
+}) {
+  const { t } = useLanguage();
+  const request = traffic?.requests_per_min;
+  const token = traffic?.tokens_per_min;
+  return (
+    <Card>
+      <CardContent>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <span className="text-2xs text-srapi-text-tertiary font-mono uppercase">
+              {t("adminOps.realtimeTraffic")}
+            </span>
+            <div className="text-2xs text-srapi-text-tertiary mt-1">
+              {traffic
+                ? t("adminOps.realtimeTrafficWindow", {
+                    start: formatDateTime(traffic.window.start),
+                    end: formatDateTime(traffic.window.end),
+                  })
+                : loading
+                  ? t("common.loading")
+                  : t("adminOps.realtimeTrafficEmpty")}
+            </div>
+          </div>
+          {traffic ? (
+            <QuietBadge
+              status={traffic.error_rate > 0 ? "limited" : "active"}
+              label={t("adminOps.realtimeTrafficErrors", {
+                count: formatInteger(traffic.error_count),
+                rate: formatPercent(traffic.error_rate),
+              })}
+            />
+          ) : null}
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <RealtimeMetric
+            label="RPM"
+            current={request?.current}
+            peak={request?.peak}
+            average={request?.average}
+          />
+          <RealtimeMetric
+            label="TPM"
+            current={token?.current}
+            peak={token?.peak}
+            average={token?.average}
+          />
+          <CompactMetric
+            label={t("adminOps.realtimeTrafficRequests")}
+            value={formatInteger(traffic?.total_requests)}
+            hint={t("adminOps.realtimeTrafficEvidence", {
+              usage: formatInteger(traffic?.usage_log_count),
+              errors: formatInteger(traffic?.ops_error_log_count),
+            })}
+          />
+          <CompactMetric
+            label={t("adminOps.errorRate")}
+            value={traffic ? formatPercent(traffic.error_rate) : "-"}
+            hint={t("adminOps.realtimeTrafficCurrentHint")}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RealtimeMetric({
+  label,
+  current,
+  peak,
+  average,
+}: {
+  label: string;
+  current?: number;
+  peak?: number;
+  average?: number;
+}) {
+  const { t } = useLanguage();
+  return (
+    <CompactMetric
+      label={label}
+      value={formatInteger(current)}
+      hint={t("adminOps.realtimeTrafficRateHint", {
+        peak: formatInteger(peak),
+        average: formatInteger(average),
+      })}
+    />
+  );
+}
+
+function CompactMetric({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="rounded border border-srapi-border/80 bg-srapi-bg-card-elevated/50 px-3 py-2">
+      <div className="text-2xs text-srapi-text-tertiary font-mono uppercase">{label}</div>
+      <div className="text-srapi-text-primary mt-1 font-mono text-lg tabular-nums">{value}</div>
+      <div className="text-2xs text-srapi-text-tertiary mt-1 truncate">{hint}</div>
+    </div>
   );
 }
 

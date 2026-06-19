@@ -782,6 +782,7 @@ func (s *Server) registerPublicRoutes(mux *http.ServeMux) {
 func (s *Server) registerAdminOpsRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/admin/ops/events/outbox", s.handleListAdminOutboxEvents)
 	mux.HandleFunc("GET /api/v1/admin/ops/overview", s.handleAdminOpsOverview)
+	mux.HandleFunc("GET /api/v1/admin/ops/realtime-traffic", s.handleAdminOpsRealtimeTraffic)
 	mux.HandleFunc("GET /api/v1/admin/ops/throughput-trend", s.handleAdminOpsThroughputTrend)
 	mux.HandleFunc("GET /api/v1/admin/ops/error-trend", s.handleAdminOpsErrorTrend)
 	mux.HandleFunc("GET /api/v1/admin/ops/error-distribution", s.handleAdminOpsErrorDistribution)

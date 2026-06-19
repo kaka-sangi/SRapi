@@ -12,6 +12,7 @@ import (
 	admincontrol "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	usersservice "github.com/srapi/srapi/apps/api/internal/modules/users/service"
@@ -25,6 +26,18 @@ type usageBucket struct {
 	TokenCount   int
 	Cost         string
 }
+
+type realtimeTrafficSample struct {
+	CreatedAt    time.Time
+	RequestCount int
+	TokenCount   int
+	ErrorCount   int
+}
+
+const (
+	opsRealtimeTrafficErrorPageSize = 200
+	opsRealtimeTrafficErrorScanCap  = 5000
+)
 
 func (s *Server) handleAdminDashboardSnapshot(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
@@ -54,6 +67,57 @@ func (s *Server) handleAdminOpsOverview(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpsOverviewResponse{Data: opsOverview(logs, window), RequestId: requestID})
+}
+
+func (s *Server) handleAdminOpsRealtimeTraffic(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	window, err := realtimeTrafficWindow(r.URL.Query().Get("window"))
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.VALIDATIONFAILED, err.Error(), requestID)
+		return
+	}
+	logs, err := s.runtime.usage.ListFiltered(r.Context(), usagecontract.QueryFilter{Start: &window.Start, End: &window.End})
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list usage logs", requestID)
+		return
+	}
+	var opsEntries []opserrorlogscontract.Entry
+	if s.runtime.opsErrorLogs != nil {
+		page := 1
+		for {
+			remaining := opsRealtimeTrafficErrorScanCap - len(opsEntries)
+			if remaining <= 0 {
+				break
+			}
+			pageSize := opsRealtimeTrafficErrorPageSize
+			if remaining < pageSize {
+				pageSize = remaining
+			}
+			res, err := s.runtime.opsErrorLogs.List(r.Context(), opserrorlogscontract.ListFilter{
+				From:     &window.Start,
+				To:       &window.End,
+				Page:     page,
+				PageSize: pageSize,
+			})
+			if err != nil {
+				writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list ops error logs", requestID)
+				return
+			}
+			opsEntries = append(opsEntries, res.Items...)
+			if len(res.Items) < pageSize || len(opsEntries) >= opsRealtimeTrafficErrorScanCap || page*pageSize >= res.Total {
+				break
+			}
+			page++
+		}
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.OpsRealtimeTrafficResponse{
+		Data:      opsRealtimeTraffic(logs, opsEntries, window),
+		RequestId: requestID,
+	})
 }
 
 func (s *Server) handleAdminOpsThroughputTrend(w http.ResponseWriter, r *http.Request) {
@@ -364,6 +428,24 @@ func requestWindow(startRaw, endRaw string, fallback time.Duration) apiopenapi.T
 	return apiopenapi.TimeWindow{Start: start, End: end}
 }
 
+func realtimeTrafficWindow(raw string) (apiopenapi.TimeWindow, error) {
+	end := time.Now().UTC()
+	var duration time.Duration
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1m", "1min":
+		duration = time.Minute
+	case "", "5m", "5min":
+		duration = 5 * time.Minute
+	case "30m", "30min":
+		duration = 30 * time.Minute
+	case "1h", "60m", "60min":
+		duration = time.Hour
+	default:
+		return apiopenapi.TimeWindow{}, errors.New("window must be one of 1m, 5m, 30m, or 1h")
+	}
+	return apiopenapi.TimeWindow{Start: end.Add(-duration), End: end}, nil
+}
+
 func trendBucket(raw string) string {
 	if strings.EqualFold(strings.TrimSpace(raw), "day") {
 		return "day"
@@ -466,6 +548,123 @@ func opsOverview(logs []usagecontract.UsageLog, window apiopenapi.TimeWindow) ap
 		ActiveUsers:      len(distinctUsers(logs)),
 		GeneratedAt:      time.Now().UTC(),
 	}
+}
+
+func opsRealtimeTraffic(logs []usagecontract.UsageLog, opsEntries []opserrorlogscontract.Entry, window apiopenapi.TimeWindow) apiopenapi.OpsRealtimeTraffic {
+	samples := make([]realtimeTrafficSample, 0, len(logs)+len(opsEntries))
+	usageKeys := make(map[string]bool, len(logs))
+	for i, log := range logs {
+		key := realtimeTrafficUsageKey(log, i)
+		usageKeys[key] = true
+		errorCount := 0
+		if !log.Success {
+			errorCount = 1
+		}
+		samples = append(samples, realtimeTrafficSample{
+			CreatedAt:    log.CreatedAt,
+			RequestCount: 1,
+			TokenCount:   log.TotalTokens,
+			ErrorCount:   errorCount,
+		})
+	}
+	seenOpsKeys := map[string]bool{}
+	for i, entry := range opsEntries {
+		key := realtimeTrafficOpsKey(entry, i)
+		if usageKeys[key] || seenOpsKeys[key] {
+			continue
+		}
+		seenOpsKeys[key] = true
+		samples = append(samples, realtimeTrafficSample{
+			CreatedAt:    entry.OccurredAt,
+			RequestCount: 1,
+			TokenCount:   entry.InputTokens + entry.OutputTokens,
+			ErrorCount:   1,
+		})
+	}
+	requests := realtimeTrafficRateSummary(samples, window, func(item realtimeTrafficSample) int {
+		return item.RequestCount
+	})
+	tokens := realtimeTrafficRateSummary(samples, window, func(item realtimeTrafficSample) int {
+		return item.TokenCount
+	})
+	totalRequests := 0
+	totalErrors := 0
+	for _, sample := range samples {
+		totalRequests += sample.RequestCount
+		totalErrors += sample.ErrorCount
+	}
+	return apiopenapi.OpsRealtimeTraffic{
+		Window:           window,
+		RequestsPerMin:   requests,
+		TokensPerMin:     tokens,
+		TotalRequests:    totalRequests,
+		ErrorCount:       totalErrors,
+		ErrorRate:        errorRate(totalRequests, totalErrors),
+		UsageLogCount:    len(logs),
+		OpsErrorLogCount: len(opsEntries),
+		GeneratedAt:      time.Now().UTC(),
+	}
+}
+
+func realtimeTrafficRateSummary(samples []realtimeTrafficSample, window apiopenapi.TimeWindow, value func(realtimeTrafficSample) int) apiopenapi.OpsRealtimeRateSummary {
+	minutes := windowMinutes(window)
+	currentStart := window.End.Add(-time.Minute)
+	total := 0
+	current := 0
+	byMinute := map[time.Time]int{}
+	for _, sample := range samples {
+		amount := value(sample)
+		if amount <= 0 {
+			continue
+		}
+		total += amount
+		if !sample.CreatedAt.Before(currentStart) && sample.CreatedAt.Before(window.End) {
+			current += amount
+		}
+		minute := sample.CreatedAt.UTC().Truncate(time.Minute)
+		if minute.Before(window.Start) || !minute.Before(window.End) {
+			continue
+		}
+		byMinute[minute] += amount
+	}
+	peak := 0
+	for _, amount := range byMinute {
+		if amount > peak {
+			peak = amount
+		}
+	}
+	return apiopenapi.OpsRealtimeRateSummary{
+		Current: current,
+		Peak:    peak,
+		Average: int(float64(total) / minutes),
+	}
+}
+
+func realtimeTrafficUsageKey(log usagecontract.UsageLog, index int) string {
+	fallback := "usage:" + strconv.Itoa(index)
+	if log.ID > 0 {
+		fallback = "usage:" + strconv.Itoa(log.ID)
+	}
+	return realtimeTrafficRequestKey(log.RequestID, log.AttemptNo, fallback)
+}
+
+func realtimeTrafficOpsKey(entry opserrorlogscontract.Entry, index int) string {
+	fallback := "ops:" + strconv.Itoa(index)
+	if entry.ID > 0 {
+		fallback = "ops:" + strconv.FormatInt(entry.ID, 10)
+	}
+	return realtimeTrafficRequestKey(entry.RequestID, entry.AttemptNo, fallback)
+}
+
+func realtimeTrafficRequestKey(requestID string, attemptNo int, fallback string) string {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		requestID = fallback
+	}
+	if attemptNo <= 0 {
+		attemptNo = 1
+	}
+	return requestID + "#" + strconv.Itoa(attemptNo)
 }
 
 func filterLogsByWindow(logs []usagecontract.UsageLog, start, end time.Time) []usagecontract.UsageLog {
