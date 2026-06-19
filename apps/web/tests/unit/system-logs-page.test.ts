@@ -19,6 +19,9 @@ describe("system logs page evidence summary", () => {
         attempted_key_prefix: "sk_aaaaaaaaaaaa",
         deleted_key_id: 24,
         deleted_key_name: "deleted-gateway",
+        usage_log_id: 91,
+        scheduler_decision_id: 33,
+        attempt_no: 2,
         provider_id: 9,
         account_id: 42,
         model: "gpt-4o-mini",
@@ -44,8 +47,40 @@ describe("system logs page evidence summary", () => {
       { key: "attempted_key_prefix", value: "sk_aaaaaaaaaaaa" },
       { key: "deleted_key_id", value: "24" },
       { key: "deleted_key_name", value: "deleted-gateway" },
+      { key: "usage_log_id", value: "91" },
+      { key: "scheduler_decision_id", value: "33" },
+    ]);
+  });
+
+  it("prioritizes effect and stage for gateway effect failures", () => {
+    const log: OpsSystemLog = {
+      id: "2",
+      level: "error",
+      message: "failed to refresh gateway account snapshot",
+      source: "gateway.usage",
+      request_id: "req-ops",
+      trace_id: "",
+      metadata: {
+        effect: "account_snapshot_refresh",
+        stage: "usage_list",
+        event_type: "GatewayAccountSnapshotRefreshRequested",
+        account_id: 42,
+        provider_id: 9,
+        attempt_no: 3,
+        error_class: "account_snapshot_refresh_failed",
+      },
+      created_at: "2026-06-18T10:00:00Z",
+    };
+
+    expect(opsSystemLogEvidenceItems(log)).toEqual([
+      { key: "req", value: "req-ops" },
+      { key: "effect", value: "account_snapshot_refresh" },
+      { key: "stage", value: "usage_list" },
+      { key: "event_type", value: "GatewayAccountSnapshotRefreshRequested" },
+      { key: "attempt_no", value: "3" },
       { key: "provider_id", value: "9" },
       { key: "account_id", value: "42" },
+      { key: "error_class", value: "account_snapshot_refresh_failed" },
     ]);
   });
 

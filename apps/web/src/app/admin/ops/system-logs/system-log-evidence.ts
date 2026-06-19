@@ -1,10 +1,16 @@
 import type { OpsSystemLog } from "@/lib/sdk-types";
 
 const SYSTEM_LOG_METADATA_EVIDENCE_KEYS = [
+  "effect",
+  "stage",
+  "event_type",
   "api_key_prefix",
   "attempted_key_prefix",
   "deleted_key_id",
   "deleted_key_name",
+  "usage_log_id",
+  "scheduler_decision_id",
+  "attempt_no",
   "provider_id",
   "provider",
   "account_id",

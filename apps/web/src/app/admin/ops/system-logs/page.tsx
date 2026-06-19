@@ -90,17 +90,13 @@ function Content() {
       key: "message",
       header: t("adminOpsSystemLogs.message"),
       render: (row) => (
-        <span className="block max-w-2xl truncate text-srapi-text-secondary" title={row.message}>
-          {row.message}
-        </span>
+        <div className="min-w-0 space-y-1">
+          <span className="block max-w-3xl truncate text-srapi-text-secondary" title={row.message}>
+            {row.message}
+          </span>
+          <EvidenceSummary log={row} />
+        </div>
       ),
-    },
-    {
-      key: "evidence",
-      header: t("adminOpsSystemLogs.relatedEvidence"),
-      hideOnMobile: true,
-      className: "max-w-md",
-      render: (row) => <EvidenceSummary log={row} />,
     },
   ];
 
