@@ -964,6 +964,12 @@ func (rt *runtimeState) enqueueGatewayAccountSnapshotRefresh(ctx context.Context
 	})
 	if err != nil {
 		rt.logger.Warn("failed to enqueue gateway account snapshot refresh", "error", err, "request_id", rec.RequestID)
+		rt.recordGatewayUsageEffectFailure(ctx, rec, gatewayUsageEffectFailure{
+			Effect:     "account_snapshot_refresh_enqueue",
+			Message:    "failed to enqueue gateway account snapshot refresh",
+			ErrorClass: "account_snapshot_refresh_enqueue_failed",
+			Error:      err,
+		})
 	}
 }
 

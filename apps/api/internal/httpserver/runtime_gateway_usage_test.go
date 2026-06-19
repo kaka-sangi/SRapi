@@ -545,6 +545,59 @@ func TestGatewayUsageFailureEventEnqueueFailureCreatesSystemLog(t *testing.T) {
 	}
 }
 
+func TestGatewayUsageAccountSnapshotRefreshEnqueueFailureCreatesSystemLog(t *testing.T) {
+	ctx := context.Background()
+	operationsStore := operationsmemory.New()
+	operations, err := operationsservice.NewWithStores(operationsStore, operationsStore, nil)
+	if err != nil {
+		t.Fatalf("new operations service: %v", err)
+	}
+	events, err := eventsservice.New(failingEventsStore{Store: eventsmemory.New(), err: errors.New("outbox down")}, nil)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	rt := &runtimeState{
+		logger:     slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		operations: operations,
+		events:     events,
+	}
+
+	rt.enqueueGatewayAccountSnapshotRefresh(ctx, gatewayUsageRecord{
+		RequestID:      "req_snapshot_refresh_enqueue_failure",
+		AttemptNo:      4,
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-ops",
+		Success:        true,
+		AccountID:      ptrInt(52),
+		ProviderID:     ptrInt(61),
+	})
+
+	list, err := operationsStore.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one account snapshot refresh enqueue system log, got %+v", list.Items)
+	}
+	log := list.Items[0]
+	if log.Level != operationscontract.OpsSystemLogLevelError ||
+		log.Source != "gateway.usage" ||
+		log.Message != "failed to enqueue gateway account snapshot refresh" ||
+		log.RequestID != "req_snapshot_refresh_enqueue_failure" {
+		t.Fatalf("unexpected account snapshot refresh enqueue log: %+v", log)
+	}
+	if log.Metadata["effect"] != "account_snapshot_refresh_enqueue" ||
+		log.Metadata["error_class"] != "account_snapshot_refresh_enqueue_failed" ||
+		metadataNumber(log.Metadata["attempt_no"]) != 4 ||
+		metadataNumber(log.Metadata["account_id"]) != 52 ||
+		metadataNumber(log.Metadata["provider_id"]) != 61 ||
+		log.Metadata["gateway_success"] != true {
+		t.Fatalf("unexpected account snapshot refresh enqueue metadata: %+v", log.Metadata)
+	}
+}
+
 func TestGatewayInvalidAPIKeyCreatesLowSensitiveSystemLog(t *testing.T) {
 	ctx := context.Background()
 	operationsStore := operationsmemory.New()
