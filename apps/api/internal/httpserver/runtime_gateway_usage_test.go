@@ -330,6 +330,111 @@ func TestRecordGatewayUsageWriteFailureCreatesSystemLog(t *testing.T) {
 	}
 }
 
+func TestGatewayUsageBillingAggregationFailureCreatesSystemLog(t *testing.T) {
+	ctx := context.Background()
+	operationsStore := operationsmemory.New()
+	operations, err := operationsservice.NewWithStores(operationsStore, operationsStore, nil)
+	if err != nil {
+		t.Fatalf("new operations service: %v", err)
+	}
+	rt := &runtimeState{
+		logger:          slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		operations:      operations,
+		usageAggregator: failingUsageAggregator{err: errors.New("aggregation store down")},
+	}
+
+	rt.recordGatewayUsageEffects(ctx, gatewayUsageRecord{
+		RequestID:      "req_aggregation_failure",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		AccountID:      ptrInt(12),
+		ProviderID:     ptrInt(34),
+		AttemptNo:      2,
+		Success:        true,
+	}, "gpt-ops", gatewayPricingEvidence{}, 99)
+
+	list, err := operationsStore.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one aggregation failure system log, got %+v", list.Items)
+	}
+	log := list.Items[0]
+	if log.Level != operationscontract.OpsSystemLogLevelError ||
+		log.Source != "gateway.usage" ||
+		log.Message != "failed to aggregate gateway usage billing" ||
+		log.RequestID != "req_aggregation_failure" {
+		t.Fatalf("unexpected aggregation failure log: %+v", log)
+	}
+	if log.Metadata["effect"] != "billing_aggregation" ||
+		log.Metadata["error_class"] != "billing_aggregation_failed" ||
+		metadataNumber(log.Metadata["usage_log_id"]) != 99 ||
+		metadataNumber(log.Metadata["account_id"]) != 12 ||
+		metadataNumber(log.Metadata["provider_id"]) != 34 ||
+		log.Metadata["gateway_success"] != true {
+		t.Fatalf("unexpected aggregation failure metadata: %+v", log.Metadata)
+	}
+}
+
+func TestGatewayUsageSchedulerFeedbackFailureCreatesSystemLog(t *testing.T) {
+	ctx := context.Background()
+	operationsStore := operationsmemory.New()
+	operations, err := operationsservice.NewWithStores(operationsStore, operationsStore, nil)
+	if err != nil {
+		t.Fatalf("new operations service: %v", err)
+	}
+	schedulerStore := failingSchedulerFeedbackStore{
+		Store: schedulermemory.New(),
+		err:   errors.New("feedback store down"),
+	}
+	schedulerSvc, err := schedulerservice.New(schedulerStore, nil)
+	if err != nil {
+		t.Fatalf("new scheduler service: %v", err)
+	}
+	rt := &runtimeState{
+		logger:     slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		operations: operations,
+		scheduler:  schedulerSvc,
+	}
+
+	rt.recordGatewayUsageEffects(ctx, gatewayUsageRecord{
+		RequestID:      "req_feedback_failure",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/chat/completions",
+		TargetProtocol: "openai-compatible",
+		AccountID:      ptrInt(21),
+		ProviderID:     ptrInt(43),
+		DecisionID:     88,
+		AttemptNo:      1,
+		Success:        true,
+	}, "gpt-ops", gatewayPricingEvidence{}, 0)
+
+	list, err := operationsStore.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one scheduler feedback failure system log, got %+v", list.Items)
+	}
+	log := list.Items[0]
+	if log.Level != operationscontract.OpsSystemLogLevelError ||
+		log.Source != "gateway.usage" ||
+		log.Message != "failed to record scheduler feedback" ||
+		log.RequestID != "req_feedback_failure" {
+		t.Fatalf("unexpected feedback failure log: %+v", log)
+	}
+	if log.Metadata["effect"] != "scheduler_feedback" ||
+		log.Metadata["error_class"] != "scheduler_feedback_failed" ||
+		metadataNumber(log.Metadata["scheduler_decision_id"]) != 88 ||
+		metadataNumber(log.Metadata["account_id"]) != 21 ||
+		metadataNumber(log.Metadata["provider_id"]) != 43 ||
+		log.Metadata["gateway_success"] != true {
+		t.Fatalf("unexpected feedback failure metadata: %+v", log.Metadata)
+	}
+}
+
 func TestGatewayInvalidAPIKeyCreatesLowSensitiveSystemLog(t *testing.T) {
 	ctx := context.Background()
 	operationsStore := operationsmemory.New()
@@ -1696,6 +1801,23 @@ func (s failingUsageStore) SummarizeUserWindow(context.Context, usagecontract.Us
 
 func (s failingUsageStore) CleanupLogs(context.Context, usagecontract.CleanupFilter) (usagecontract.CleanupResult, error) {
 	return usagecontract.CleanupResult{}, s.err
+}
+
+type failingUsageAggregator struct {
+	err error
+}
+
+func (a failingUsageAggregator) ApplyAggregation(context.Context, int) (bool, error) {
+	return false, a.err
+}
+
+type failingSchedulerFeedbackStore struct {
+	*schedulermemory.Store
+	err error
+}
+
+func (s failingSchedulerFeedbackStore) CreateFeedback(context.Context, schedulercontract.Feedback) (schedulercontract.Feedback, error) {
+	return schedulercontract.Feedback{}, s.err
 }
 
 func metadataNumber(value any) int {

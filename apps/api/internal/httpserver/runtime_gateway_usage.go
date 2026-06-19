@@ -167,6 +167,13 @@ func (rt *runtimeState) recordGatewayUsageEffects(ctx context.Context, rec gatew
 		if rt.usageAggregator != nil && usageLogID > 0 {
 			if _, err := rt.usageAggregator.ApplyAggregation(ctx, usageLogID); err != nil {
 				rt.logger.Warn("failed to aggregate gateway usage billing", "error", err, "request_id", rec.RequestID, "usage_log_id", usageLogID)
+				rt.recordGatewayUsageEffectFailure(ctx, rec, gatewayUsageEffectFailure{
+					Effect:     "billing_aggregation",
+					Message:    "failed to aggregate gateway usage billing",
+					ErrorClass: "billing_aggregation_failed",
+					Error:      err,
+					UsageLogID: usageLogID,
+				})
 			}
 		} else {
 			rt.recordGatewayMaterializedCosts(ctx, rec, pricing.BillableCost)
@@ -194,6 +201,13 @@ func (rt *runtimeState) recordGatewayUsageEffects(ctx context.Context, rec gatew
 	})
 	if feedbackErr != nil {
 		rt.logger.Warn("failed to record scheduler feedback", "error", feedbackErr, "request_id", rec.RequestID)
+		rt.recordGatewayUsageEffectFailure(ctx, rec, gatewayUsageEffectFailure{
+			Effect:     "scheduler_feedback",
+			Message:    "failed to record scheduler feedback",
+			ErrorClass: "scheduler_feedback_failed",
+			Error:      feedbackErr,
+			DecisionID: rec.DecisionID,
+		})
 	} else if rec.QualityPrompt != "" && rec.QualityOutput != "" {
 		rec.FeedbackID = feedback.ID
 		rt.captureGatewayQualitySample(ctx, rec, rec.QualityPrompt, rec.QualityOutput)
@@ -203,6 +217,63 @@ func (rt *runtimeState) recordGatewayUsageEffects(ctx context.Context, rec gatew
 	}
 	rt.recordGatewayRiskFailure(ctx, rec)
 	rt.enqueueGatewayAccountSnapshotRefresh(ctx, rec)
+}
+
+type gatewayUsageEffectFailure struct {
+	Effect     string
+	Message    string
+	ErrorClass string
+	Error      error
+	UsageLogID int
+	DecisionID int
+}
+
+func (rt *runtimeState) recordGatewayUsageEffectFailure(ctx context.Context, rec gatewayUsageRecord, failure gatewayUsageEffectFailure) {
+	if rt == nil || rt.operations == nil {
+		return
+	}
+	effect := strings.TrimSpace(failure.Effect)
+	message := strings.TrimSpace(failure.Message)
+	errorClass := strings.TrimSpace(failure.ErrorClass)
+	if effect == "" || message == "" || errorClass == "" {
+		return
+	}
+	metadata := map[string]any{
+		"request_id":      rec.RequestID,
+		"source_endpoint": rec.SourceEndpoint,
+		"source_protocol": rec.SourceProtocol,
+		"target_protocol": rec.TargetProtocol,
+		"attempt_no":      rec.AttemptNo,
+		"effect":          effect,
+		"error_class":     errorClass,
+		"gateway_success": rec.Success,
+	}
+	if failure.Error != nil {
+		metadata["error"] = failure.Error.Error()
+	}
+	if failure.UsageLogID > 0 {
+		metadata["usage_log_id"] = failure.UsageLogID
+	}
+	if failure.DecisionID > 0 {
+		metadata["scheduler_decision_id"] = failure.DecisionID
+	}
+	if rec.AccountID != nil && *rec.AccountID > 0 {
+		metadata["account_id"] = *rec.AccountID
+	}
+	if rec.ProviderID != nil && *rec.ProviderID > 0 {
+		metadata["provider_id"] = *rec.ProviderID
+	}
+	if _, err := rt.operations.RecordSystemLog(ctx, operationscontract.RecordSystemLogRequest{
+		Level:     operationscontract.OpsSystemLogLevelError,
+		Message:   message,
+		Source:    "gateway.usage",
+		RequestID: rec.RequestID,
+		TraceID:   traceIDFromContext(ctx),
+		Metadata:  metadata,
+		CreatedAt: time.Now().UTC(),
+	}); err != nil && rt.logger != nil {
+		rt.logger.Warn("operations RecordSystemLog failed", "request_id", rec.RequestID, "error", err)
+	}
 }
 
 func gatewayUsageEventsToContract(events []gatewayUpstreamErrorEvent) []usagecontract.UpstreamErrorEvent {
