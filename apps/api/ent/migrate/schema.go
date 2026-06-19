@@ -1201,6 +1201,81 @@ var (
 			},
 		},
 	}
+	// ObsNotificationChannelsColumns holds the columns for the "obs_notification_channels" table.
+	ObsNotificationChannelsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "channel_type", Type: field.TypeString, Default: "email"},
+		{Name: "status", Type: field.TypeString, Default: "active"},
+		{Name: "min_severity", Type: field.TypeString, Default: "warning"},
+		{Name: "config_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "send_resolved", Type: field.TypeBool, Default: true},
+	}
+	// ObsNotificationChannelsTable holds the schema information for the "obs_notification_channels" table.
+	ObsNotificationChannelsTable = &schema.Table{
+		Name:       "obs_notification_channels",
+		Columns:    ObsNotificationChannelsColumns,
+		PrimaryKey: []*schema.Column{ObsNotificationChannelsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "obsnotificationchannel_status_channel_type",
+				Unique:  false,
+				Columns: []*schema.Column{ObsNotificationChannelsColumns[5], ObsNotificationChannelsColumns[4]},
+			},
+			{
+				Name:    "obsnotificationchannel_name",
+				Unique:  true,
+				Columns: []*schema.Column{ObsNotificationChannelsColumns[3]},
+			},
+		},
+	}
+	// ObsNotificationDeliveriesColumns holds the columns for the "obs_notification_deliveries" table.
+	ObsNotificationDeliveriesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "channel_id", Type: field.TypeInt},
+		{Name: "alert_event_id", Type: field.TypeInt},
+		{Name: "alert_status", Type: field.TypeString, Default: "firing"},
+		{Name: "severity", Type: field.TypeString, Default: "warning"},
+		{Name: "status", Type: field.TypeString, Default: "pending"},
+		{Name: "target", Type: field.TypeString},
+		{Name: "attempt_count", Type: field.TypeInt, Default: 0},
+		{Name: "last_error", Type: field.TypeString, Default: ""},
+		{Name: "next_attempt_at", Type: field.TypeTime},
+		{Name: "delivered_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_attempt_at", Type: field.TypeTime, Nullable: true},
+	}
+	// ObsNotificationDeliveriesTable holds the schema information for the "obs_notification_deliveries" table.
+	ObsNotificationDeliveriesTable = &schema.Table{
+		Name:       "obs_notification_deliveries",
+		Columns:    ObsNotificationDeliveriesColumns,
+		PrimaryKey: []*schema.Column{ObsNotificationDeliveriesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "obsnotificationdelivery_status_next_attempt_at",
+				Unique:  false,
+				Columns: []*schema.Column{ObsNotificationDeliveriesColumns[7], ObsNotificationDeliveriesColumns[11]},
+			},
+			{
+				Name:    "obsnotificationdelivery_channel_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ObsNotificationDeliveriesColumns[3], ObsNotificationDeliveriesColumns[1]},
+			},
+			{
+				Name:    "obsnotificationdelivery_alert_event_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ObsNotificationDeliveriesColumns[4], ObsNotificationDeliveriesColumns[1]},
+			},
+			{
+				Name:    "obsnotificationdelivery_channel_id_alert_event_id_alert_status_target",
+				Unique:  true,
+				Columns: []*schema.Column{ObsNotificationDeliveriesColumns[3], ObsNotificationDeliveriesColumns[4], ObsNotificationDeliveriesColumns[5], ObsNotificationDeliveriesColumns[8]},
+			},
+		},
+	}
 	// ObsSloDefinitionsColumns holds the columns for the "obs_slo_definitions" table.
 	ObsSloDefinitionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -3003,6 +3078,8 @@ var (
 		ObsAlertEventsTable,
 		ObsAlertRulesTable,
 		ObsAlertSilencesTable,
+		ObsNotificationChannelsTable,
+		ObsNotificationDeliveriesTable,
 		ObsSloDefinitionsTable,
 		OpsErrorLogsTable,
 		OpsSystemLogsTable,

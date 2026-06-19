@@ -21,6 +21,7 @@ import (
 	platformredis "github.com/srapi/srapi/apps/api/internal/platform/redis"
 	accountquotaalertworker "github.com/srapi/srapi/apps/api/internal/workers/account_quota_alert"
 	accountstokenrefreshworker "github.com/srapi/srapi/apps/api/internal/workers/accounts_token_refresh"
+	alertnotificationsworker "github.com/srapi/srapi/apps/api/internal/workers/alert_notifications"
 	authcleanupworker "github.com/srapi/srapi/apps/api/internal/workers/auth_session_cleanup"
 	availabilityrollupworker "github.com/srapi/srapi/apps/api/internal/workers/availability_rollup"
 	backupworker "github.com/srapi/srapi/apps/api/internal/workers/backup"
@@ -47,37 +48,42 @@ import (
 const defaultReadHeaderTimeout = 10 * time.Second
 
 type App struct {
-	cfg              config.Config
-	logger           *slog.Logger
-	server           *http.Server
-	db               *platformdb.Client
-	redis            *platformredis.Client
-	tracer           platformotel.ShutdownFunc
-	outbox           *outboxworker.Worker
-	retention        *retentionworker.Worker
-	availability     *availabilityrollupworker.Worker
-	backup           *backupworker.Worker
-	authClean        *authcleanupworker.Worker
-	idemClean        *idempotencycleanupworker.Worker
-	quotaRefresh     *quotarefreshworker.Worker
-	tokenRefresh     *accountstokenrefreshworker.Worker
-	liteLLMPricing   *litellmpricingworker.Worker
-	connectivityTest *connectivitytestworker.Worker
-	scheduledTest    *scheduledtestworker.Worker
-	channelMonitor   *channelmonitorworker.Worker
-	proxyProbe       *proxyprobeworker.Worker
-	expirer          *orderexpirerworker.Worker
-	reconcile        *paymentreconcileworker.Worker
-	subExpiry        *subscriptionexpirerworker.Worker
-	quota            *accountquotaalertworker.Worker
-	balance          *balancechargerworker.Worker
-	health           *healthprobeworker.Worker
-	quality          *qualityevalworker.Worker
-	sloEval          *sloevaluatorworker.Worker
+	cfg     config.Config
+	logger  *slog.Logger
+	server  *http.Server
+	db      *platformdb.Client
+	redis   *platformredis.Client
+	tracer  platformotel.ShutdownFunc
+	workers appWorkers
 	// usageDrain flushes in-flight asynchronous gateway usage/billing writes
 	// during graceful shutdown. Populated by newHandler; nil when async usage
 	// processing is disabled.
 	usageDrain func(context.Context)
+}
+
+type appWorkers struct {
+	outbox             *outboxworker.Worker
+	retention          *retentionworker.Worker
+	availability       *availabilityrollupworker.Worker
+	backup             *backupworker.Worker
+	authClean          *authcleanupworker.Worker
+	idemClean          *idempotencycleanupworker.Worker
+	quotaRefresh       *quotarefreshworker.Worker
+	tokenRefresh       *accountstokenrefreshworker.Worker
+	liteLLMPricing     *litellmpricingworker.Worker
+	connectivityTest   *connectivitytestworker.Worker
+	scheduledTest      *scheduledtestworker.Worker
+	channelMonitor     *channelmonitorworker.Worker
+	proxyProbe         *proxyprobeworker.Worker
+	expirer            *orderexpirerworker.Worker
+	reconcile          *paymentreconcileworker.Worker
+	subExpiry          *subscriptionexpirerworker.Worker
+	quota              *accountquotaalertworker.Worker
+	balance            *balancechargerworker.Worker
+	health             *healthprobeworker.Worker
+	quality            *qualityevalworker.Worker
+	sloEval            *sloevaluatorworker.Worker
+	alertNotifications *alertnotificationsworker.Worker
 	// usageReconciler re-applies billing aggregation for usage_log rows whose
 	// eager apply was dropped (e.g. on a crash). Nil under memory storage.
 	usageReconciler *usageaggregationreconcilerworker.Worker
@@ -105,9 +111,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 
-	var usageDrain func(context.Context)
-	var usageReconciler *usageaggregationreconcilerworker.Worker
-	handler, outbox, retention, availability, backup, authClean, expirer, reconcile, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, liteLLMPricing, connectivityTest, scheduledTest, channelMonitor, proxyProbe, tokenRefresh, err := newHandler(cfg, logger, dbClient, redisClient, &usageDrain, &usageReconciler)
+	handler, workers, usageDrain, err := newHandler(cfg, logger, dbClient, redisClient)
 	if err != nil {
 		_ = dbClient.Close()
 		_ = redisClient.Close()
@@ -121,35 +125,14 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		ReadHeaderTimeout: defaultReadHeaderTimeout,
 	}
 	return &App{
-		cfg:              cfg,
-		logger:           logger,
-		server:           server,
-		db:               dbClient,
-		redis:            redisClient,
-		tracer:           tracerShutdown,
-		outbox:           outbox,
-		retention:        retention,
-		availability:     availability,
-		backup:           backup,
-		authClean:        authClean,
-		idemClean:        idemClean,
-		quotaRefresh:     quotaRefresh,
-		tokenRefresh:     tokenRefresh,
-		liteLLMPricing:   liteLLMPricing,
-		connectivityTest: connectivityTest,
-		scheduledTest:    scheduledTest,
-		channelMonitor:   channelMonitor,
-		proxyProbe:       proxyProbe,
-		expirer:          expirer,
-		reconcile:        reconcile,
-		subExpiry:        subExpiry,
-		quota:            quota,
-		balance:          balance,
-		health:           health,
-		quality:          quality,
-		sloEval:          sloEval,
-		usageDrain:       usageDrain,
-		usageReconciler:  usageReconciler,
+		cfg:        cfg,
+		logger:     logger,
+		server:     server,
+		db:         dbClient,
+		redis:      redisClient,
+		tracer:     tracerShutdown,
+		workers:    workers,
+		usageDrain: usageDrain,
 	}, nil
 }
 
@@ -226,107 +209,113 @@ func Healthcheck(ctx context.Context, cfg config.Config, path string) error {
 	return httpserver.Healthcheck(ctx, cfg.HealthcheckAddress(), path)
 }
 
-func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client, usageDrainSink *func(context.Context), reconcilerSink **usageaggregationreconcilerworker.Worker) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *availabilityrollupworker.Worker, *backupworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *paymentreconcileworker.Worker, *subscriptionexpirerworker.Worker, *accountquotaalertworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, *idempotencycleanupworker.Worker, *quotarefreshworker.Worker, *litellmpricingworker.Worker, *connectivitytestworker.Worker, *scheduledtestworker.Worker, *channelmonitorworker.Worker, *proxyprobeworker.Worker, *accountstokenrefreshworker.Worker, error) {
+func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, appWorkers, func(context.Context), error) {
 	var (
-		handler http.Handler
-		err     error
+		handler    http.Handler
+		workers    appWorkers
+		usageDrain func(context.Context)
+		err        error
 	)
 
-	options, err := runtimeHTTPOptions(cfg, logger, dbClient, redisClient, usageDrainSink)
+	options, err := runtimeHTTPOptions(cfg, logger, dbClient, redisClient, &usageDrain)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
 	stores, err := persistentStores(context.Background(), cfg, logger, dbClient, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
 	workerGuard, err := newWorkerLeaderGuard(dbClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	outbox, err := domainEventsWorker(cfg, stores, logger, workerGuard)
+	workers.outbox, err = domainEventsWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	retention, err := retentionCleanupWorker(cfg, stores, logger, workerGuard)
+	workers.retention, err = retentionCleanupWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	availability, err := availabilityRollupWorker(cfg, stores, logger, workerGuard)
+	workers.availability, err = availabilityRollupWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	backup, err := backupWorker(cfg, stores, logger, workerGuard)
+	workers.backup, err = backupWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	authClean, err := authSessionCleanupWorker(cfg, stores, logger, workerGuard)
+	workers.authClean, err = authSessionCleanupWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	idemClean, err := idempotencyCleanupWorker(stores, logger, workerGuard)
+	workers.idemClean, err = idempotencyCleanupWorker(stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	expirer, err := paymentOrderExpirerWorker(cfg, stores, logger, workerGuard)
+	workers.expirer, err = paymentOrderExpirerWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	reconcile, err := paymentReconcileWorker(cfg, stores, logger, workerGuard)
+	workers.reconcile, err = paymentReconcileWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	subExpiry, err := subscriptionExpirerWorker(stores, logger, workerGuard)
+	workers.subExpiry, err = subscriptionExpirerWorker(stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	quota, err := accountQuotaAlertWorker(cfg, stores, logger, workerGuard)
+	workers.quota, err = accountQuotaAlertWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	balance, err := balanceChargerWorker(cfg, stores, logger, workerGuard)
+	workers.balance, err = balanceChargerWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	health, err := accountHealthProbeWorker(cfg, stores, logger, workerGuard)
+	workers.health, err = accountHealthProbeWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	quality, err := qualityEvalWorker(cfg, stores, logger, workerGuard)
+	workers.quality, err = qualityEvalWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	sloEval, err := sloEvaluatorWorker(cfg, stores, logger, workerGuard)
+	workers.sloEval, err = sloEvaluatorWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	channelMonitor, err := channelMonitorWorker(cfg, stores, logger, workerGuard)
+	workers.alertNotifications, err = alertNotificationsWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	quotaRefresh, err := quotaRefreshWorker(cfg, stores, logger, workerGuard)
+	workers.channelMonitor, err = channelMonitorWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	liteLLMPricing, err := liteLLMPricingWorker(cfg, stores, logger, workerGuard)
+	workers.quotaRefresh, err = quotaRefreshWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	connectivityTest, err := connectivityTestWorker(cfg, stores, logger, workerGuard)
+	workers.liteLLMPricing, err = liteLLMPricingWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	scheduledTest, err := scheduledTestWorker(cfg, stores, logger, workerGuard)
+	workers.connectivityTest, err = connectivityTestWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	proxyProbe, err := proxyProbeWorker(cfg, stores, logger, workerGuard)
+	workers.scheduledTest, err = scheduledTestWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
 	}
-	tokenRefresh, err := accountsTokenRefreshWorker(cfg, stores, logger, workerGuard)
+	workers.proxyProbe, err = proxyProbeWorker(cfg, stores, logger, workerGuard)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, appWorkers{}, nil, err
+	}
+	workers.tokenRefresh, err = accountsTokenRefreshWorker(cfg, stores, logger, workerGuard)
+	if err != nil {
+		return nil, appWorkers{}, nil, err
 	}
 	if stores != nil {
 		options = append(options,
@@ -363,13 +352,13 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithCopilotConversationStore(stores.CopilotConvs),
 			httpserver.WithBackupSnapshotsStore(stores.BackupSnapshots),
 		)
-		if backup != nil {
-			options = append(options, httpserver.WithBackupSnapshotsTrigger(backup))
+		if workers.backup != nil {
+			options = append(options, httpserver.WithBackupSnapshotsTrigger(workers.backup))
 		}
-		if proxyProbe != nil {
+		if workers.proxyProbe != nil {
 			// Capture the worker pointer so /metrics can pull the latest counter
 			// snapshot without the httpserver package having to import workers.
-			worker := proxyProbe
+			worker := workers.proxyProbe
 			options = append(options, httpserver.WithProxyProbeMetricsProvider(func() httpserver.ProxyProbeMetricsSnapshot {
 				snapshot := worker.Metrics()
 				return httpserver.ProxyProbeMetricsSnapshot{
@@ -379,8 +368,8 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 				}
 			}))
 		}
-		if tokenRefresh != nil {
-			worker := tokenRefresh
+		if workers.tokenRefresh != nil {
+			worker := workers.tokenRefresh
 			options = append(options, httpserver.WithTokenRefreshMetricsProvider(func() httpserver.TokenRefreshMetricsSnapshot {
 				snapshot := worker.Metrics()
 				return httpserver.TokenRefreshMetricsSnapshot{
@@ -397,12 +386,10 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		}
 		// The reconciler is non-critical background cleanup; if it can't be built,
 		// log and continue rather than failing the whole server.
-		if reconcilerSink != nil {
-			if w, werr := usageAggregationReconcilerWorker(stores, logger, workerGuard); werr != nil {
-				logger.Error("failed to construct usage aggregation reconciler", "error", werr)
-			} else {
-				*reconcilerSink = w
-			}
+		if w, werr := usageAggregationReconcilerWorker(stores, logger, workerGuard); werr != nil {
+			logger.Error("failed to construct usage aggregation reconciler", "error", werr)
+		} else {
+			workers.usageReconciler = w
 		}
 	}
 
@@ -415,7 +402,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		handler = httpserver.New(cfg, logger, options...)
 	}()
 
-	return handler, outbox, retention, availability, backup, authClean, expirer, reconcile, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, liteLLMPricing, connectivityTest, scheduledTest, channelMonitor, proxyProbe, tokenRefresh, err
+	return handler, workers, usageDrain, err
 }
 
 func runtimeHTTPOptions(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client, usageDrainSink *func(context.Context)) ([]httpserver.Option, error) {
@@ -960,148 +947,184 @@ func sloEvaluatorWorker(cfg config.Config, stores *entstore.Stores, logger *slog
 	})
 }
 
+func alertNotificationsWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger, guards ...*workerLeaderGuard) (*alertnotificationsworker.Worker, error) {
+	if stores == nil || stores.Operations == nil {
+		return nil, nil
+	}
+	return alertnotificationsworker.New(stores.Operations, logger, alertnotificationsworker.Config{
+		Interval:   cfg.AlertNotifications.Interval,
+		Timeout:    cfg.AlertNotifications.Timeout,
+		BatchLimit: cfg.AlertNotifications.BatchLimit,
+		SMTP: alertnotificationsworker.SMTPConfig{
+			PublicBaseURL: cfg.Email.PublicBaseURL,
+			Host:          cfg.Email.SMTPHost,
+			Port:          cfg.Email.SMTPPort,
+			Username:      cfg.Email.SMTPUsername,
+			Password:      cfg.Email.SMTPPassword,
+			From:          cfg.Email.SMTPFrom,
+			FromName:      cfg.Email.SMTPFromName,
+			UseTLS:        cfg.Email.SMTPUseTLS,
+		},
+		RunGuard: optionalWorkerGuard(guards...),
+	})
+}
+
 func (a *App) startWorkers() {
 	if a == nil {
 		return
 	}
-	if a.outbox != nil {
-		a.outbox.Start(context.Background())
-	}
-	if a.retention != nil {
-		a.retention.Start(context.Background())
-	}
-	if a.availability != nil {
-		a.availability.Start(context.Background())
-	}
-	if a.backup != nil {
-		a.backup.Start(context.Background())
-	}
-	if a.authClean != nil {
-		a.authClean.Start(context.Background())
-	}
-	if a.idemClean != nil {
-		a.idemClean.Start(context.Background())
-	}
-	if a.expirer != nil {
-		a.expirer.Start(context.Background())
-	}
-	if a.reconcile != nil {
-		a.reconcile.Start(context.Background())
-	}
-	if a.subExpiry != nil {
-		a.subExpiry.Start(context.Background())
-	}
-	if a.quota != nil {
-		a.quota.Start(context.Background())
-	}
-	if a.balance != nil {
-		a.balance.Start(context.Background())
-	}
-	if a.usageReconciler != nil {
-		a.usageReconciler.Start(context.Background())
-	}
-	if a.health != nil {
-		a.health.Start(context.Background())
-	}
-	if a.quality != nil {
-		a.quality.Start(context.Background())
-	}
-	if a.sloEval != nil {
-		a.sloEval.Start(context.Background())
-	}
-	if a.quotaRefresh != nil {
-		a.quotaRefresh.Start(context.Background())
-	}
-	if a.liteLLMPricing != nil {
-		a.liteLLMPricing.Start(context.Background())
-	}
-	if a.connectivityTest != nil {
-		a.connectivityTest.Start(context.Background())
-	}
-	if a.scheduledTest != nil {
-		a.scheduledTest.Start(context.Background())
-	}
-	if a.channelMonitor != nil {
-		a.channelMonitor.Start(context.Background())
-	}
-	if a.proxyProbe != nil {
-		a.proxyProbe.Start(context.Background())
-	}
-	if a.tokenRefresh != nil {
-		a.tokenRefresh.Start(context.Background())
-	}
+	a.workers.start(context.Background())
 }
 
 func (a *App) stopWorkers(ctx context.Context) error {
 	if a == nil {
 		return nil
 	}
+	return a.workers.shutdown(ctx)
+}
+
+func (w appWorkers) start(ctx context.Context) {
+	if w.outbox != nil {
+		w.outbox.Start(ctx)
+	}
+	if w.retention != nil {
+		w.retention.Start(ctx)
+	}
+	if w.availability != nil {
+		w.availability.Start(ctx)
+	}
+	if w.backup != nil {
+		w.backup.Start(ctx)
+	}
+	if w.authClean != nil {
+		w.authClean.Start(ctx)
+	}
+	if w.idemClean != nil {
+		w.idemClean.Start(ctx)
+	}
+	if w.expirer != nil {
+		w.expirer.Start(ctx)
+	}
+	if w.reconcile != nil {
+		w.reconcile.Start(ctx)
+	}
+	if w.subExpiry != nil {
+		w.subExpiry.Start(ctx)
+	}
+	if w.quota != nil {
+		w.quota.Start(ctx)
+	}
+	if w.balance != nil {
+		w.balance.Start(ctx)
+	}
+	if w.usageReconciler != nil {
+		w.usageReconciler.Start(ctx)
+	}
+	if w.health != nil {
+		w.health.Start(ctx)
+	}
+	if w.quality != nil {
+		w.quality.Start(ctx)
+	}
+	if w.sloEval != nil {
+		w.sloEval.Start(ctx)
+	}
+	if w.alertNotifications != nil {
+		w.alertNotifications.Start(ctx)
+	}
+	if w.quotaRefresh != nil {
+		w.quotaRefresh.Start(ctx)
+	}
+	if w.liteLLMPricing != nil {
+		w.liteLLMPricing.Start(ctx)
+	}
+	if w.connectivityTest != nil {
+		w.connectivityTest.Start(ctx)
+	}
+	if w.scheduledTest != nil {
+		w.scheduledTest.Start(ctx)
+	}
+	if w.channelMonitor != nil {
+		w.channelMonitor.Start(ctx)
+	}
+	if w.proxyProbe != nil {
+		w.proxyProbe.Start(ctx)
+	}
+	if w.tokenRefresh != nil {
+		w.tokenRefresh.Start(ctx)
+	}
+}
+
+func (w appWorkers) shutdown(ctx context.Context) error {
 	var errs []error
-	if a.outbox != nil {
-		errs = append(errs, a.outbox.Shutdown(ctx))
+	if w.outbox != nil {
+		errs = append(errs, w.outbox.Shutdown(ctx))
 	}
-	if a.retention != nil {
-		errs = append(errs, a.retention.Shutdown(ctx))
+	if w.retention != nil {
+		errs = append(errs, w.retention.Shutdown(ctx))
 	}
-	if a.availability != nil {
-		errs = append(errs, a.availability.Shutdown(ctx))
+	if w.availability != nil {
+		errs = append(errs, w.availability.Shutdown(ctx))
 	}
-	if a.backup != nil {
-		errs = append(errs, a.backup.Shutdown(ctx))
+	if w.backup != nil {
+		errs = append(errs, w.backup.Shutdown(ctx))
 	}
-	if a.authClean != nil {
-		errs = append(errs, a.authClean.Shutdown(ctx))
+	if w.authClean != nil {
+		errs = append(errs, w.authClean.Shutdown(ctx))
 	}
-	if a.idemClean != nil {
-		errs = append(errs, a.idemClean.Shutdown(ctx))
+	if w.idemClean != nil {
+		errs = append(errs, w.idemClean.Shutdown(ctx))
 	}
-	if a.expirer != nil {
-		errs = append(errs, a.expirer.Shutdown(ctx))
+	if w.expirer != nil {
+		errs = append(errs, w.expirer.Shutdown(ctx))
 	}
-	if a.reconcile != nil {
-		errs = append(errs, a.reconcile.Shutdown(ctx))
+	if w.reconcile != nil {
+		errs = append(errs, w.reconcile.Shutdown(ctx))
 	}
-	if a.subExpiry != nil {
-		errs = append(errs, a.subExpiry.Shutdown(ctx))
+	if w.subExpiry != nil {
+		errs = append(errs, w.subExpiry.Shutdown(ctx))
 	}
-	if a.quota != nil {
-		errs = append(errs, a.quota.Shutdown(ctx))
+	if w.quota != nil {
+		errs = append(errs, w.quota.Shutdown(ctx))
 	}
-	if a.balance != nil {
-		errs = append(errs, a.balance.Shutdown(ctx))
+	if w.balance != nil {
+		errs = append(errs, w.balance.Shutdown(ctx))
 	}
-	if a.usageReconciler != nil {
-		errs = append(errs, a.usageReconciler.Shutdown(ctx))
+	if w.usageReconciler != nil {
+		errs = append(errs, w.usageReconciler.Shutdown(ctx))
 	}
-	if a.health != nil {
-		errs = append(errs, a.health.Shutdown(ctx))
+	if w.health != nil {
+		errs = append(errs, w.health.Shutdown(ctx))
 	}
-	if a.quality != nil {
-		errs = append(errs, a.quality.Shutdown(ctx))
+	if w.quality != nil {
+		errs = append(errs, w.quality.Shutdown(ctx))
 	}
-	if a.sloEval != nil {
-		errs = append(errs, a.sloEval.Shutdown(ctx))
+	if w.sloEval != nil {
+		errs = append(errs, w.sloEval.Shutdown(ctx))
 	}
-	if a.quotaRefresh != nil {
-		errs = append(errs, a.quotaRefresh.Shutdown(ctx))
+	if w.alertNotifications != nil {
+		errs = append(errs, w.alertNotifications.Shutdown(ctx))
 	}
-	if a.liteLLMPricing != nil {
-		errs = append(errs, a.liteLLMPricing.Shutdown(ctx))
+	if w.quotaRefresh != nil {
+		errs = append(errs, w.quotaRefresh.Shutdown(ctx))
 	}
-	if a.connectivityTest != nil {
-		errs = append(errs, a.connectivityTest.Shutdown(ctx))
+	if w.liteLLMPricing != nil {
+		errs = append(errs, w.liteLLMPricing.Shutdown(ctx))
 	}
-	if a.scheduledTest != nil {
-		errs = append(errs, a.scheduledTest.Shutdown(ctx))
+	if w.connectivityTest != nil {
+		errs = append(errs, w.connectivityTest.Shutdown(ctx))
 	}
-	if a.channelMonitor != nil {
-		errs = append(errs, a.channelMonitor.Shutdown(ctx))
+	if w.scheduledTest != nil {
+		errs = append(errs, w.scheduledTest.Shutdown(ctx))
 	}
-	if a.proxyProbe != nil {
-		errs = append(errs, a.proxyProbe.Shutdown(ctx))
+	if w.channelMonitor != nil {
+		errs = append(errs, w.channelMonitor.Shutdown(ctx))
 	}
-	if a.tokenRefresh != nil {
-		errs = append(errs, a.tokenRefresh.Shutdown(ctx))
+	if w.proxyProbe != nil {
+		errs = append(errs, w.proxyProbe.Shutdown(ctx))
+	}
+	if w.tokenRefresh != nil {
+		errs = append(errs, w.tokenRefresh.Shutdown(ctx))
 	}
 	return errors.Join(errs...)
 }

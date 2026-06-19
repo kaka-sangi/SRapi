@@ -3,13 +3,23 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Activity, BellRing, BellOff, Maximize2, Minimize2, Pencil, Trash2 } from "lucide-react";
+import {
+  Activity,
+  BellRing,
+  BellOff,
+  Mail,
+  Maximize2,
+  Minimize2,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { SloFormDialog } from "@/components/admin/slo-form-dialog";
 import { AlertRuleFormDialog } from "@/components/admin/alert-rule-form-dialog";
 import { AlertSilenceFormDialog } from "@/components/admin/alert-silence-form-dialog";
+import { OpsNotificationChannelFormDialog } from "@/components/admin/ops-notification-channel-form-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { OpsLogCleanupDialog } from "@/components/admin/ops-log-cleanup-dialog";
 import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
@@ -25,12 +35,12 @@ import {
   useDeleteOpsSlo,
   useOpsAlertSilences,
   useDeleteOpsAlertSilence,
+  useOpsNotificationChannels,
+  useOpsNotificationDeliveries,
+  useDeleteOpsNotificationChannel,
   useOpsSystemLogHealth,
 } from "@/hooks/admin-queries";
-import {
-  useOpsLatencyHistogram,
-  useOpsErrorDistribution,
-} from "@/hooks/admin-queries/ops-charts";
+import { useOpsLatencyHistogram, useOpsErrorDistribution } from "@/hooks/admin-queries/ops-charts";
 import { OpsLatencyHistogramChart } from "@/components/admin/ops-latency-histogram-chart";
 import { OpsErrorDistributionChart } from "@/components/admin/ops-error-distribution-chart";
 import { OpsAlertRunbookSteps } from "@/components/admin/ops-alert-runbook-steps";
@@ -39,7 +49,12 @@ import {
   buildOpsSettingsBody,
   type OpsSettingsFormState,
 } from "@/lib/admin-ops-settings-form";
-import type { OpsSloDefinition, OpsAlertRule, OpsAlertSilence } from "@/lib/sdk-types";
+import type {
+  OpsSloDefinition,
+  OpsAlertRule,
+  OpsAlertSilence,
+  OpsNotificationChannel,
+} from "@/lib/sdk-types";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
@@ -78,7 +93,7 @@ function OpsWrapper() {
 
   if (fullscreen) {
     return (
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-srapi-bg p-6">
+      <div className="bg-srapi-bg fixed inset-0 z-50 overflow-y-auto p-6">
         <div className="mx-auto max-w-7xl space-y-6">
           <OpsContent />
         </div>
@@ -146,7 +161,11 @@ function OpsOverviewContent() {
 
   const settingsFields: FieldConfig<OpsSettingsFormState>[] = [
     { name: "autoRefreshEnabled", label: t("adminOpsSettings.autoRefresh"), type: "switch" },
-    { name: "refreshIntervalSeconds", label: t("adminOpsSettings.refreshInterval"), type: "number" },
+    {
+      name: "refreshIntervalSeconds",
+      label: t("adminOpsSettings.refreshInterval"),
+      type: "number",
+    },
   ];
 
   async function ackAlert(id: string) {
@@ -164,15 +183,23 @@ function OpsOverviewContent() {
   const errorDistribution = useOpsErrorDistribution();
   const alertRules = useOpsAlertRules();
   const alertSilences = useOpsAlertSilences();
+  const notificationChannels = useOpsNotificationChannels();
+  const notificationDeliveries = useOpsNotificationDeliveries({ page_size: 6 });
   const deleteRuleMut = useDeleteOpsAlertRule();
   const deleteSilenceMut = useDeleteOpsAlertSilence();
+  const deleteNotificationChannelMut = useDeleteOpsNotificationChannel();
   const deleteSloMut = useDeleteOpsSlo();
   const [sloToDelete, setSloToDelete] = useState<OpsSloDefinition | null>(null);
   const [sloTarget, setSloTarget] = useState<OpsSloDefinition | "new" | null>(null);
   const [ruleTarget, setRuleTarget] = useState<OpsAlertRule | "new" | null>(null);
+  const [notificationChannelTarget, setNotificationChannelTarget] = useState<
+    OpsNotificationChannel | "new" | null
+  >(null);
   const [showSilenceForm, setShowSilenceForm] = useState(false);
   const [ruleToDelete, setRuleToDelete] = useState<OpsAlertRule | null>(null);
   const [silenceToDelete, setSilenceToDelete] = useState<OpsAlertSilence | null>(null);
+  const [notificationChannelToDelete, setNotificationChannelToDelete] =
+    useState<OpsNotificationChannel | null>(null);
   // Only firing alerts are "active". A resolved/suppressed alert also has no
   // acknowledged_at, so the old `!acknowledged_at` check wrongly kept them here.
   const activeAlerts = (alerts.data?.data ?? []).filter((a) => a.status === "firing");
@@ -210,7 +237,7 @@ function OpsOverviewContent() {
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardContent>
-              <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              <span className="text-2xs text-srapi-text-tertiary font-mono uppercase">
                 {t("adminOps.throughput")}
               </span>
               <div className="mt-3">
@@ -220,7 +247,7 @@ function OpsOverviewContent() {
           </Card>
           <Card>
             <CardContent>
-              <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+              <span className="text-2xs text-srapi-text-tertiary font-mono uppercase">
                 {t("adminOps.errorRate")}
               </span>
               <div className="mt-3">
@@ -297,7 +324,7 @@ function OpsOverviewContent() {
                 return (
                   <Card key={def?.id ?? i}>
                     <CardHeader>
-                      <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
+                      <CardTitle className="text-srapi-text-primary font-sans text-base not-italic">
                         {def?.name ?? t("adminOps.slo")}
                       </CardTitle>
                       <div className="flex items-center gap-2">
@@ -311,7 +338,7 @@ function OpsOverviewContent() {
                               type="button"
                               onClick={() => setSloTarget(def)}
                               aria-label={t("adminOps.editSlo")}
-                              className="text-srapi-text-tertiary transition-colors hover:text-srapi-text-primary"
+                              className="text-srapi-text-tertiary hover:text-srapi-text-primary transition-colors"
                             >
                               <Pencil className="size-3.5" />
                             </button>
@@ -319,7 +346,7 @@ function OpsOverviewContent() {
                               type="button"
                               onClick={() => setSloToDelete(def)}
                               aria-label={t("adminOps.deleteSlo")}
-                              className="text-srapi-text-tertiary transition-colors hover:text-srapi-error"
+                              className="text-srapi-text-tertiary hover:text-srapi-error transition-colors"
                             >
                               <Trash2 className="size-3.5" />
                             </button>
@@ -329,15 +356,15 @@ function OpsOverviewContent() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="flex items-baseline justify-between">
-                        <span className="text-xs text-srapi-text-secondary">
+                        <span className="text-srapi-text-secondary text-xs">
                           {t("adminOps.availability")}
                         </span>
-                        <span className="font-serif text-2xl text-srapi-text-primary tabular">
+                        <span className="text-srapi-text-primary tabular font-serif text-2xl">
                           {availability.toFixed(2)}%
                         </span>
                       </div>
                       <QuotaNotchRail value={availability} />
-                      <div className="flex items-center justify-between font-mono text-2xs text-srapi-text-tertiary">
+                      <div className="text-2xs text-srapi-text-tertiary flex items-center justify-between font-mono">
                         <span>
                           {t("adminOps.objective")} {objectivePct.toFixed(1)}%
                         </span>
@@ -357,7 +384,7 @@ function OpsOverviewContent() {
       {activeAlerts.length > 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
+            <CardTitle className="text-srapi-text-primary font-sans text-base not-italic">
               {t("adminOps.alerts")}
             </CardTitle>
           </CardHeader>
@@ -368,11 +395,11 @@ function OpsOverviewContent() {
               return (
                 <div
                   key={alert.id}
-                  className="grid gap-3 border-t border-srapi-border py-3 first:border-t-0 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.75fr)_auto]"
+                  className="border-srapi-border grid gap-3 border-t py-3 first:border-t-0 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.75fr)_auto]"
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm text-srapi-text-primary">{alert.summary}</div>
-                    <div className="font-mono text-2xs text-srapi-text-tertiary tabular">
+                    <div className="text-srapi-text-primary truncate text-sm">{alert.summary}</div>
+                    <div className="text-2xs text-srapi-text-tertiary tabular font-mono">
                       {formatDateTime(alert.started_at ?? alert.created_at)}
                     </div>
                   </div>
@@ -399,10 +426,12 @@ function OpsOverviewContent() {
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <div>
-            <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
+            <CardTitle className="text-srapi-text-primary font-sans text-base not-italic">
               {t("adminOps.alertRules.title")}
             </CardTitle>
-            <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("adminOps.alertRules.subtitle")}</p>
+            <p className="text-2xs text-srapi-text-tertiary mt-1">
+              {t("adminOps.alertRules.subtitle")}
+            </p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setRuleTarget("new")}>
             ＋ {t("adminOps.alertRules.create")}
@@ -419,14 +448,14 @@ function OpsOverviewContent() {
             (alertRules.data?.data ?? []).map((rule) => (
               <div
                 key={rule.id}
-                className="flex items-center justify-between gap-4 border-t border-srapi-border py-2.5 first:border-t-0"
+                className="border-srapi-border flex items-center justify-between gap-4 border-t py-2.5 first:border-t-0"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-sm text-srapi-text-primary">{rule.name}</span>
+                    <span className="text-srapi-text-primary truncate text-sm">{rule.name}</span>
                     <QuietBadge status={quietStatusFor(rule.severity)} label={rule.severity} />
                   </div>
-                  <div className="font-mono text-2xs text-srapi-text-tertiary tabular">
+                  <div className="text-2xs text-srapi-text-tertiary tabular font-mono">
                     {t(`adminOps.alertRules.metricType.${rule.metric_type}`)}{" "}
                     {t(`adminOps.alertRules.operators.${rule.operator}`)} {rule.threshold}
                     {rule.scope.source_endpoint ? ` · ${rule.scope.source_endpoint}` : ""}
@@ -441,7 +470,7 @@ function OpsOverviewContent() {
                     type="button"
                     onClick={() => setRuleTarget(rule)}
                     aria-label={t("adminOps.alertRules.edit")}
-                    className="text-srapi-text-tertiary transition-colors hover:text-srapi-text-primary"
+                    className="text-srapi-text-tertiary hover:text-srapi-text-primary transition-colors"
                   >
                     <Pencil className="size-3.5" />
                   </button>
@@ -449,7 +478,7 @@ function OpsOverviewContent() {
                     type="button"
                     onClick={() => setRuleToDelete(rule)}
                     aria-label={t("common.delete")}
-                    className="text-srapi-text-tertiary transition-colors hover:text-srapi-error"
+                    className="text-srapi-text-tertiary hover:text-srapi-error transition-colors"
                   >
                     <Trash2 className="size-3.5" />
                   </button>
@@ -460,13 +489,151 @@ function OpsOverviewContent() {
         </CardContent>
       </Card>
 
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.75fr)]">
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-srapi-text-primary font-sans text-base not-italic">
+                {t("adminOps.notificationChannels.title")}
+              </CardTitle>
+              <p className="text-2xs text-srapi-text-tertiary mt-1">
+                {t("adminOps.notificationChannels.subtitle")}
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setNotificationChannelTarget("new")}>
+              ＋ {t("adminOps.notificationChannels.create")}
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {(notificationChannels.data?.data ?? []).length === 0 ? (
+              <EmptyState
+                icon={Mail}
+                title={t("adminOps.notificationChannels.empty")}
+                description={t("adminOps.notificationChannels.emptyBody")}
+              />
+            ) : (
+              (notificationChannels.data?.data ?? []).map((channel) => (
+                <div
+                  key={channel.id}
+                  className="border-srapi-border flex items-center justify-between gap-4 border-t py-2.5 first:border-t-0"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-srapi-text-primary truncate text-sm">
+                        {channel.name}
+                      </span>
+                      <QuietBadge
+                        status={channel.status === "active" ? "active" : "disabled"}
+                        label={
+                          channel.status === "active"
+                            ? t("adminOps.notificationChannels.active")
+                            : t("common.disabled")
+                        }
+                      />
+                      <QuietBadge
+                        status={quietStatusFor(channel.min_severity)}
+                        label={channel.min_severity}
+                      />
+                    </div>
+                    <div className="text-2xs text-srapi-text-tertiary truncate font-mono">
+                      {channel.email_recipients.join(", ")}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="text-2xs text-srapi-text-tertiary font-mono">
+                      {channel.send_resolved
+                        ? t("adminOps.notificationChannels.sendsResolved")
+                        : t("adminOps.notificationChannels.firingOnly")}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setNotificationChannelTarget(channel)}
+                      aria-label={t("adminOps.notificationChannels.edit")}
+                      className="text-srapi-text-tertiary hover:text-srapi-text-primary transition-colors"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNotificationChannelToDelete(channel)}
+                      aria-label={t("common.delete")}
+                      className="text-srapi-text-tertiary hover:text-srapi-error transition-colors"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-srapi-text-primary font-sans text-base not-italic">
+              {t("adminOps.notificationDeliveries.title")}
+            </CardTitle>
+            <p className="text-2xs text-srapi-text-tertiary mt-1">
+              {t("adminOps.notificationDeliveries.subtitle")}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {(notificationDeliveries.data?.data ?? []).length === 0 ? (
+              <EmptyState
+                icon={BellRing}
+                title={t("adminOps.notificationDeliveries.empty")}
+                description={t("adminOps.notificationDeliveries.emptyBody")}
+              />
+            ) : (
+              (notificationDeliveries.data?.data ?? []).map((delivery) => (
+                <div
+                  key={delivery.id}
+                  className="border-srapi-border border-t py-2.5 first:border-t-0"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-srapi-text-primary min-w-0 truncate text-sm">
+                      {delivery.alert_summary ?? delivery.target}
+                    </span>
+                    <QuietBadge
+                      status={
+                        delivery.status === "delivered"
+                          ? "active"
+                          : delivery.status === "failed"
+                            ? "error"
+                            : "limited"
+                      }
+                      label={t(`adminOps.notificationDeliveries.status.${delivery.status}`)}
+                    />
+                  </div>
+                  <div className="text-2xs text-srapi-text-tertiary mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono">
+                    <span>{delivery.target}</span>
+                    <span>{delivery.channel_name ?? delivery.channel_id}</span>
+                    <span>
+                      {t("adminOps.notificationDeliveries.attempts")} {delivery.attempt_count}
+                    </span>
+                    <span>{formatDateTime(delivery.updated_at)}</span>
+                  </div>
+                  {delivery.last_error ? (
+                    <div className="text-2xs text-srapi-error mt-1 truncate">
+                      {delivery.last_error}
+                    </div>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <div>
-            <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
+            <CardTitle className="text-srapi-text-primary font-sans text-base not-italic">
               {t("adminOps.silences.title")}
             </CardTitle>
-            <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("adminOps.silences.subtitle")}</p>
+            <p className="text-2xs text-srapi-text-tertiary mt-1">
+              {t("adminOps.silences.subtitle")}
+            </p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setShowSilenceForm(true)}>
             ＋ {t("adminOps.silences.create")}
@@ -489,21 +656,22 @@ function OpsOverviewContent() {
               return (
                 <div
                   key={silence.id}
-                  className="flex items-center justify-between gap-4 border-t border-srapi-border py-2.5 first:border-t-0"
+                  className="border-srapi-border flex items-center justify-between gap-4 border-t py-2.5 first:border-t-0"
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm text-srapi-text-primary">
+                    <div className="text-srapi-text-primary truncate text-sm">
                       {silence.comment || matcherText}
                     </div>
-                    <div className="font-mono text-2xs text-srapi-text-tertiary tabular">
-                      {silence.comment ? `${matcherText} · ` : ""}{formatDateTime(silence.starts_at)} → {formatDateTime(silence.ends_at)}
+                    <div className="text-2xs text-srapi-text-tertiary tabular font-mono">
+                      {silence.comment ? `${matcherText} · ` : ""}
+                      {formatDateTime(silence.starts_at)} → {formatDateTime(silence.ends_at)}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setSilenceToDelete(silence)}
                     aria-label={t("common.delete")}
-                    className="shrink-0 text-srapi-text-tertiary transition-colors hover:text-srapi-error"
+                    className="text-srapi-text-tertiary hover:text-srapi-error shrink-0 transition-colors"
                   >
                     <Trash2 className="size-3.5" />
                   </button>
@@ -536,8 +704,17 @@ function OpsOverviewContent() {
         />
       ) : null}
 
-      {showSilenceForm ? (
-        <AlertSilenceFormDialog open onOpenChange={setShowSilenceForm} />
+      {showSilenceForm ? <AlertSilenceFormDialog open onOpenChange={setShowSilenceForm} /> : null}
+
+      {notificationChannelTarget !== null ? (
+        <OpsNotificationChannelFormDialog
+          key={notificationChannelTarget === "new" ? "new" : notificationChannelTarget.id}
+          open
+          target={notificationChannelTarget === "new" ? null : notificationChannelTarget}
+          onOpenChange={(open) => {
+            if (!open) setNotificationChannelTarget(null);
+          }}
+        />
       ) : null}
 
       {ruleToDelete ? (
@@ -581,6 +758,21 @@ function OpsOverviewContent() {
           successMessage={t("feedback.deleted")}
           isPending={deleteSilenceMut.isPending}
           onConfirm={() => deleteSilenceMut.mutateAsync(silenceToDelete.id)}
+        />
+      ) : null}
+
+      {notificationChannelToDelete ? (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setNotificationChannelToDelete(null);
+          }}
+          title={t("adminOps.notificationChannels.deleteConfirm")}
+          body={notificationChannelToDelete.name}
+          confirmLabel={t("common.delete")}
+          successMessage={t("feedback.deleted")}
+          isPending={deleteNotificationChannelMut.isPending}
+          onConfirm={() => deleteNotificationChannelMut.mutateAsync(notificationChannelToDelete.id)}
         />
       ) : null}
 
@@ -644,7 +836,9 @@ function OpsTabs({ value }: { value: string }) {
         <TabsTrigger value="channel-monitor">{t("adminOps.tabs.channelMonitor")}</TabsTrigger>
         <TabsTrigger value="scheduled-tests">{t("adminOps.tabs.scheduledTests")}</TabsTrigger>
         <TabsTrigger value="strategy">{t("adminOps.tabs.strategy")}</TabsTrigger>
-        <TabsTrigger value="scheduler-decisions">{t("adminOps.tabs.schedulerDecisions")}</TabsTrigger>
+        <TabsTrigger value="scheduler-decisions">
+          {t("adminOps.tabs.schedulerDecisions")}
+        </TabsTrigger>
       </TabsList>
     </Tabs>
   );

@@ -207,7 +207,11 @@ func (s *Service) evaluateAlertRules(ctx context.Context, rules []contract.Alert
 		if !ok {
 			alert := ruleAlert(rule, metric, fingerprint, now)
 			applySilence(&alert, suppressedBy)
-			if _, err := s.observabilityStore.CreateAlert(ctx, alert); err != nil {
+			stored, err := s.observabilityStore.CreateAlert(ctx, alert)
+			if err != nil {
+				return result, err
+			}
+			if err := s.enqueueAlertNotifications(ctx, stored); err != nil {
 				return result, err
 			}
 			result.Created++
@@ -218,7 +222,11 @@ func (s *Service) evaluateAlertRules(ctx context.Context, rules []contract.Alert
 		}
 		updated := updateRuleAlert(existing, rule, metric, now)
 		applySilence(&updated, suppressedBy)
-		if _, err := s.observabilityStore.UpdateAlert(ctx, updated); err != nil {
+		stored, err := s.observabilityStore.UpdateAlert(ctx, updated)
+		if err != nil {
+			return result, err
+		}
+		if err := s.enqueueAlertNotifications(ctx, stored); err != nil {
 			return result, err
 		}
 		result.Updated++
@@ -234,7 +242,11 @@ func (s *Service) evaluateAlertRules(ctx context.Context, rules []contract.Alert
 		resolvedAt := now
 		alert.ResolvedAt = &resolvedAt
 		alert.UpdatedAt = now
-		if _, err := s.observabilityStore.UpdateAlert(ctx, alert); err != nil {
+		stored, err := s.observabilityStore.UpdateAlert(ctx, alert)
+		if err != nil {
+			return result, err
+		}
+		if err := s.enqueueAlertNotifications(ctx, stored); err != nil {
 			return result, err
 		}
 		result.Resolved++

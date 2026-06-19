@@ -48,6 +48,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
 	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
+	"github.com/srapi/srapi/apps/api/ent/obsnotificationchannel"
+	"github.com/srapi/srapi/apps/api/ent/obsnotificationdelivery"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/opserrorlog"
 	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
@@ -164,6 +166,10 @@ type Client struct {
 	ObsAlertRule *ObsAlertRuleClient
 	// ObsAlertSilence is the client for interacting with the ObsAlertSilence builders.
 	ObsAlertSilence *ObsAlertSilenceClient
+	// ObsNotificationChannel is the client for interacting with the ObsNotificationChannel builders.
+	ObsNotificationChannel *ObsNotificationChannelClient
+	// ObsNotificationDelivery is the client for interacting with the ObsNotificationDelivery builders.
+	ObsNotificationDelivery *ObsNotificationDeliveryClient
 	// ObsSLODefinition is the client for interacting with the ObsSLODefinition builders.
 	ObsSLODefinition *ObsSLODefinitionClient
 	// OpsErrorLog is the client for interacting with the OpsErrorLog builders.
@@ -291,6 +297,8 @@ func (c *Client) init() {
 	c.ObsAlertEvent = NewObsAlertEventClient(c.config)
 	c.ObsAlertRule = NewObsAlertRuleClient(c.config)
 	c.ObsAlertSilence = NewObsAlertSilenceClient(c.config)
+	c.ObsNotificationChannel = NewObsNotificationChannelClient(c.config)
+	c.ObsNotificationDelivery = NewObsNotificationDeliveryClient(c.config)
 	c.ObsSLODefinition = NewObsSLODefinitionClient(c.config)
 	c.OpsErrorLog = NewOpsErrorLogClient(c.config)
 	c.OpsSystemLog = NewOpsSystemLogClient(c.config)
@@ -458,6 +466,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ObsAlertEvent:             NewObsAlertEventClient(cfg),
 		ObsAlertRule:              NewObsAlertRuleClient(cfg),
 		ObsAlertSilence:           NewObsAlertSilenceClient(cfg),
+		ObsNotificationChannel:    NewObsNotificationChannelClient(cfg),
+		ObsNotificationDelivery:   NewObsNotificationDeliveryClient(cfg),
 		ObsSLODefinition:          NewObsSLODefinitionClient(cfg),
 		OpsErrorLog:               NewOpsErrorLogClient(cfg),
 		OpsSystemLog:              NewOpsSystemLogClient(cfg),
@@ -552,6 +562,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ObsAlertEvent:             NewObsAlertEventClient(cfg),
 		ObsAlertRule:              NewObsAlertRuleClient(cfg),
 		ObsAlertSilence:           NewObsAlertSilenceClient(cfg),
+		ObsNotificationChannel:    NewObsNotificationChannelClient(cfg),
+		ObsNotificationDelivery:   NewObsNotificationDeliveryClient(cfg),
 		ObsSLODefinition:          NewObsSLODefinitionClient(cfg),
 		OpsErrorLog:               NewOpsErrorLogClient(cfg),
 		OpsSystemLog:              NewOpsSystemLogClient(cfg),
@@ -631,18 +643,18 @@ func (c *Client) Use(hooks ...Hook) {
 		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
 		c.ModelProviderMapping, c.ModelRateLimit, c.ModelRegistry, c.MonitorDefinition,
 		c.MonitorRequestTemplate, c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule,
-		c.ObsAlertSilence, c.ObsSLODefinition, c.OpsErrorLog, c.OpsSystemLog,
-		c.PasswordResetToken, c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingOAuthSession, c.PricingInterval,
-		c.PricingRule, c.PromoCode, c.Provider, c.ProviderAccount, c.Proxy,
-		c.QualityEvalSample, c.QualityEvaluation, c.RedeemCode, c.Role,
-		c.ScheduledTestPlan, c.ScheduledTestPlanRun, c.SchedulerDecision,
-		c.SchedulerFeedback, c.SchedulerRequestSnapshot, c.SchedulerStrategy,
-		c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageLog, c.User,
-		c.UserAnnouncementRead, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserAuthIdentity, c.UserPlatformQuota, c.UserPromoCodeApplication,
-		c.UserRedeemCodeRedemption, c.UserRole, c.UserSubscription, c.UserTOTPSecret,
-		c.Workspace,
+		c.ObsAlertSilence, c.ObsNotificationChannel, c.ObsNotificationDelivery,
+		c.ObsSLODefinition, c.OpsErrorLog, c.OpsSystemLog, c.PasswordResetToken,
+		c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
+		c.PendingOAuthSession, c.PricingInterval, c.PricingRule, c.PromoCode,
+		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
+		c.QualityEvaluation, c.RedeemCode, c.Role, c.ScheduledTestPlan,
+		c.ScheduledTestPlanRun, c.SchedulerDecision, c.SchedulerFeedback,
+		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
+		c.UserPlatformQuota, c.UserPromoCodeApplication, c.UserRedeemCodeRedemption,
+		c.UserRole, c.UserSubscription, c.UserTOTPSecret, c.Workspace,
 	} {
 		n.Use(hooks...)
 	}
@@ -661,18 +673,18 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
 		c.ModelProviderMapping, c.ModelRateLimit, c.ModelRegistry, c.MonitorDefinition,
 		c.MonitorRequestTemplate, c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule,
-		c.ObsAlertSilence, c.ObsSLODefinition, c.OpsErrorLog, c.OpsSystemLog,
-		c.PasswordResetToken, c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingOAuthSession, c.PricingInterval,
-		c.PricingRule, c.PromoCode, c.Provider, c.ProviderAccount, c.Proxy,
-		c.QualityEvalSample, c.QualityEvaluation, c.RedeemCode, c.Role,
-		c.ScheduledTestPlan, c.ScheduledTestPlanRun, c.SchedulerDecision,
-		c.SchedulerFeedback, c.SchedulerRequestSnapshot, c.SchedulerStrategy,
-		c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageLog, c.User,
-		c.UserAnnouncementRead, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserAuthIdentity, c.UserPlatformQuota, c.UserPromoCodeApplication,
-		c.UserRedeemCodeRedemption, c.UserRole, c.UserSubscription, c.UserTOTPSecret,
-		c.Workspace,
+		c.ObsAlertSilence, c.ObsNotificationChannel, c.ObsNotificationDelivery,
+		c.ObsSLODefinition, c.OpsErrorLog, c.OpsSystemLog, c.PasswordResetToken,
+		c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
+		c.PendingOAuthSession, c.PricingInterval, c.PricingRule, c.PromoCode,
+		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
+		c.QualityEvaluation, c.RedeemCode, c.Role, c.ScheduledTestPlan,
+		c.ScheduledTestPlanRun, c.SchedulerDecision, c.SchedulerFeedback,
+		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
+		c.UserPlatformQuota, c.UserPromoCodeApplication, c.UserRedeemCodeRedemption,
+		c.UserRole, c.UserSubscription, c.UserTOTPSecret, c.Workspace,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -749,6 +761,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ObsAlertRule.mutate(ctx, m)
 	case *ObsAlertSilenceMutation:
 		return c.ObsAlertSilence.mutate(ctx, m)
+	case *ObsNotificationChannelMutation:
+		return c.ObsNotificationChannel.mutate(ctx, m)
+	case *ObsNotificationDeliveryMutation:
+		return c.ObsNotificationDelivery.mutate(ctx, m)
 	case *ObsSLODefinitionMutation:
 		return c.ObsSLODefinition.mutate(ctx, m)
 	case *OpsErrorLogMutation:
@@ -5355,6 +5371,272 @@ func (c *ObsAlertSilenceClient) mutate(ctx context.Context, m *ObsAlertSilenceMu
 		return (&ObsAlertSilenceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ObsAlertSilence mutation op: %q", m.Op())
+	}
+}
+
+// ObsNotificationChannelClient is a client for the ObsNotificationChannel schema.
+type ObsNotificationChannelClient struct {
+	config
+}
+
+// NewObsNotificationChannelClient returns a client for the ObsNotificationChannel from the given config.
+func NewObsNotificationChannelClient(c config) *ObsNotificationChannelClient {
+	return &ObsNotificationChannelClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `obsnotificationchannel.Hooks(f(g(h())))`.
+func (c *ObsNotificationChannelClient) Use(hooks ...Hook) {
+	c.hooks.ObsNotificationChannel = append(c.hooks.ObsNotificationChannel, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `obsnotificationchannel.Intercept(f(g(h())))`.
+func (c *ObsNotificationChannelClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ObsNotificationChannel = append(c.inters.ObsNotificationChannel, interceptors...)
+}
+
+// Create returns a builder for creating a ObsNotificationChannel entity.
+func (c *ObsNotificationChannelClient) Create() *ObsNotificationChannelCreate {
+	mutation := newObsNotificationChannelMutation(c.config, OpCreate)
+	return &ObsNotificationChannelCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ObsNotificationChannel entities.
+func (c *ObsNotificationChannelClient) CreateBulk(builders ...*ObsNotificationChannelCreate) *ObsNotificationChannelCreateBulk {
+	return &ObsNotificationChannelCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ObsNotificationChannelClient) MapCreateBulk(slice any, setFunc func(*ObsNotificationChannelCreate, int)) *ObsNotificationChannelCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ObsNotificationChannelCreateBulk{err: fmt.Errorf("calling to ObsNotificationChannelClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ObsNotificationChannelCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ObsNotificationChannelCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ObsNotificationChannel.
+func (c *ObsNotificationChannelClient) Update() *ObsNotificationChannelUpdate {
+	mutation := newObsNotificationChannelMutation(c.config, OpUpdate)
+	return &ObsNotificationChannelUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ObsNotificationChannelClient) UpdateOne(_m *ObsNotificationChannel) *ObsNotificationChannelUpdateOne {
+	mutation := newObsNotificationChannelMutation(c.config, OpUpdateOne, withObsNotificationChannel(_m))
+	return &ObsNotificationChannelUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ObsNotificationChannelClient) UpdateOneID(id int) *ObsNotificationChannelUpdateOne {
+	mutation := newObsNotificationChannelMutation(c.config, OpUpdateOne, withObsNotificationChannelID(id))
+	return &ObsNotificationChannelUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ObsNotificationChannel.
+func (c *ObsNotificationChannelClient) Delete() *ObsNotificationChannelDelete {
+	mutation := newObsNotificationChannelMutation(c.config, OpDelete)
+	return &ObsNotificationChannelDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ObsNotificationChannelClient) DeleteOne(_m *ObsNotificationChannel) *ObsNotificationChannelDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ObsNotificationChannelClient) DeleteOneID(id int) *ObsNotificationChannelDeleteOne {
+	builder := c.Delete().Where(obsnotificationchannel.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ObsNotificationChannelDeleteOne{builder}
+}
+
+// Query returns a query builder for ObsNotificationChannel.
+func (c *ObsNotificationChannelClient) Query() *ObsNotificationChannelQuery {
+	return &ObsNotificationChannelQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeObsNotificationChannel},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ObsNotificationChannel entity by its id.
+func (c *ObsNotificationChannelClient) Get(ctx context.Context, id int) (*ObsNotificationChannel, error) {
+	return c.Query().Where(obsnotificationchannel.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ObsNotificationChannelClient) GetX(ctx context.Context, id int) *ObsNotificationChannel {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ObsNotificationChannelClient) Hooks() []Hook {
+	return c.hooks.ObsNotificationChannel
+}
+
+// Interceptors returns the client interceptors.
+func (c *ObsNotificationChannelClient) Interceptors() []Interceptor {
+	return c.inters.ObsNotificationChannel
+}
+
+func (c *ObsNotificationChannelClient) mutate(ctx context.Context, m *ObsNotificationChannelMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ObsNotificationChannelCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ObsNotificationChannelUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ObsNotificationChannelUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ObsNotificationChannelDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ObsNotificationChannel mutation op: %q", m.Op())
+	}
+}
+
+// ObsNotificationDeliveryClient is a client for the ObsNotificationDelivery schema.
+type ObsNotificationDeliveryClient struct {
+	config
+}
+
+// NewObsNotificationDeliveryClient returns a client for the ObsNotificationDelivery from the given config.
+func NewObsNotificationDeliveryClient(c config) *ObsNotificationDeliveryClient {
+	return &ObsNotificationDeliveryClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `obsnotificationdelivery.Hooks(f(g(h())))`.
+func (c *ObsNotificationDeliveryClient) Use(hooks ...Hook) {
+	c.hooks.ObsNotificationDelivery = append(c.hooks.ObsNotificationDelivery, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `obsnotificationdelivery.Intercept(f(g(h())))`.
+func (c *ObsNotificationDeliveryClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ObsNotificationDelivery = append(c.inters.ObsNotificationDelivery, interceptors...)
+}
+
+// Create returns a builder for creating a ObsNotificationDelivery entity.
+func (c *ObsNotificationDeliveryClient) Create() *ObsNotificationDeliveryCreate {
+	mutation := newObsNotificationDeliveryMutation(c.config, OpCreate)
+	return &ObsNotificationDeliveryCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ObsNotificationDelivery entities.
+func (c *ObsNotificationDeliveryClient) CreateBulk(builders ...*ObsNotificationDeliveryCreate) *ObsNotificationDeliveryCreateBulk {
+	return &ObsNotificationDeliveryCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ObsNotificationDeliveryClient) MapCreateBulk(slice any, setFunc func(*ObsNotificationDeliveryCreate, int)) *ObsNotificationDeliveryCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ObsNotificationDeliveryCreateBulk{err: fmt.Errorf("calling to ObsNotificationDeliveryClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ObsNotificationDeliveryCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ObsNotificationDeliveryCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ObsNotificationDelivery.
+func (c *ObsNotificationDeliveryClient) Update() *ObsNotificationDeliveryUpdate {
+	mutation := newObsNotificationDeliveryMutation(c.config, OpUpdate)
+	return &ObsNotificationDeliveryUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ObsNotificationDeliveryClient) UpdateOne(_m *ObsNotificationDelivery) *ObsNotificationDeliveryUpdateOne {
+	mutation := newObsNotificationDeliveryMutation(c.config, OpUpdateOne, withObsNotificationDelivery(_m))
+	return &ObsNotificationDeliveryUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ObsNotificationDeliveryClient) UpdateOneID(id int) *ObsNotificationDeliveryUpdateOne {
+	mutation := newObsNotificationDeliveryMutation(c.config, OpUpdateOne, withObsNotificationDeliveryID(id))
+	return &ObsNotificationDeliveryUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ObsNotificationDelivery.
+func (c *ObsNotificationDeliveryClient) Delete() *ObsNotificationDeliveryDelete {
+	mutation := newObsNotificationDeliveryMutation(c.config, OpDelete)
+	return &ObsNotificationDeliveryDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ObsNotificationDeliveryClient) DeleteOne(_m *ObsNotificationDelivery) *ObsNotificationDeliveryDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ObsNotificationDeliveryClient) DeleteOneID(id int) *ObsNotificationDeliveryDeleteOne {
+	builder := c.Delete().Where(obsnotificationdelivery.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ObsNotificationDeliveryDeleteOne{builder}
+}
+
+// Query returns a query builder for ObsNotificationDelivery.
+func (c *ObsNotificationDeliveryClient) Query() *ObsNotificationDeliveryQuery {
+	return &ObsNotificationDeliveryQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeObsNotificationDelivery},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ObsNotificationDelivery entity by its id.
+func (c *ObsNotificationDeliveryClient) Get(ctx context.Context, id int) (*ObsNotificationDelivery, error) {
+	return c.Query().Where(obsnotificationdelivery.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ObsNotificationDeliveryClient) GetX(ctx context.Context, id int) *ObsNotificationDelivery {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ObsNotificationDeliveryClient) Hooks() []Hook {
+	return c.hooks.ObsNotificationDelivery
+}
+
+// Interceptors returns the client interceptors.
+func (c *ObsNotificationDeliveryClient) Interceptors() []Interceptor {
+	return c.inters.ObsNotificationDelivery
+}
+
+func (c *ObsNotificationDeliveryClient) mutate(ctx context.Context, m *ObsNotificationDeliveryMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ObsNotificationDeliveryCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ObsNotificationDeliveryUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ObsNotificationDeliveryUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ObsNotificationDeliveryDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ObsNotificationDelivery mutation op: %q", m.Op())
 	}
 }
 
@@ -10822,17 +11104,17 @@ type (
 		ErrorPassthroughRule, IdempotencyRecord, InviteCode, InviteRelationship,
 		ModelAlias, ModelProviderMapping, ModelRateLimit, ModelRegistry,
 		MonitorDefinition, MonitorRequestTemplate, MonitorRunResult, ObsAlertEvent,
-		ObsAlertRule, ObsAlertSilence, ObsSLODefinition, OpsErrorLog, OpsSystemLog,
-		PasswordResetToken, PayloadRule, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PendingOAuthSession, PricingInterval, PricingRule,
-		PromoCode, Provider, ProviderAccount, Proxy, QualityEvalSample,
-		QualityEvaluation, RedeemCode, Role, ScheduledTestPlan, ScheduledTestPlanRun,
-		SchedulerDecision, SchedulerFeedback, SchedulerRequestSnapshot,
-		SchedulerStrategy, Setting, SubscriptionPlan, TLSFingerprintProfile, UsageLog,
-		User, UserAnnouncementRead, UserAttributeDefinition, UserAttributeValue,
-		UserAuthIdentity, UserPlatformQuota, UserPromoCodeApplication,
-		UserRedeemCodeRedemption, UserRole, UserSubscription, UserTOTPSecret,
-		Workspace []ent.Hook
+		ObsAlertRule, ObsAlertSilence, ObsNotificationChannel, ObsNotificationDelivery,
+		ObsSLODefinition, OpsErrorLog, OpsSystemLog, PasswordResetToken, PayloadRule,
+		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingOAuthSession,
+		PricingInterval, PricingRule, PromoCode, Provider, ProviderAccount, Proxy,
+		QualityEvalSample, QualityEvaluation, RedeemCode, Role, ScheduledTestPlan,
+		ScheduledTestPlanRun, SchedulerDecision, SchedulerFeedback,
+		SchedulerRequestSnapshot, SchedulerStrategy, Setting, SubscriptionPlan,
+		TLSFingerprintProfile, UsageLog, User, UserAnnouncementRead,
+		UserAttributeDefinition, UserAttributeValue, UserAuthIdentity,
+		UserPlatformQuota, UserPromoCodeApplication, UserRedeemCodeRedemption,
+		UserRole, UserSubscription, UserTOTPSecret, Workspace []ent.Hook
 	}
 	inters struct {
 		APIKey, APIKeyGroup, AccountAvailabilityRollup, AccountGroup,
@@ -10843,16 +11125,16 @@ type (
 		ErrorPassthroughRule, IdempotencyRecord, InviteCode, InviteRelationship,
 		ModelAlias, ModelProviderMapping, ModelRateLimit, ModelRegistry,
 		MonitorDefinition, MonitorRequestTemplate, MonitorRunResult, ObsAlertEvent,
-		ObsAlertRule, ObsAlertSilence, ObsSLODefinition, OpsErrorLog, OpsSystemLog,
-		PasswordResetToken, PayloadRule, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PendingOAuthSession, PricingInterval, PricingRule,
-		PromoCode, Provider, ProviderAccount, Proxy, QualityEvalSample,
-		QualityEvaluation, RedeemCode, Role, ScheduledTestPlan, ScheduledTestPlanRun,
-		SchedulerDecision, SchedulerFeedback, SchedulerRequestSnapshot,
-		SchedulerStrategy, Setting, SubscriptionPlan, TLSFingerprintProfile, UsageLog,
-		User, UserAnnouncementRead, UserAttributeDefinition, UserAttributeValue,
-		UserAuthIdentity, UserPlatformQuota, UserPromoCodeApplication,
-		UserRedeemCodeRedemption, UserRole, UserSubscription, UserTOTPSecret,
-		Workspace []ent.Interceptor
+		ObsAlertRule, ObsAlertSilence, ObsNotificationChannel, ObsNotificationDelivery,
+		ObsSLODefinition, OpsErrorLog, OpsSystemLog, PasswordResetToken, PayloadRule,
+		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingOAuthSession,
+		PricingInterval, PricingRule, PromoCode, Provider, ProviderAccount, Proxy,
+		QualityEvalSample, QualityEvaluation, RedeemCode, Role, ScheduledTestPlan,
+		ScheduledTestPlanRun, SchedulerDecision, SchedulerFeedback,
+		SchedulerRequestSnapshot, SchedulerStrategy, Setting, SubscriptionPlan,
+		TLSFingerprintProfile, UsageLog, User, UserAnnouncementRead,
+		UserAttributeDefinition, UserAttributeValue, UserAuthIdentity,
+		UserPlatformQuota, UserPromoCodeApplication, UserRedeemCodeRedemption,
+		UserRole, UserSubscription, UserTOTPSecret, Workspace []ent.Interceptor
 	}
 )

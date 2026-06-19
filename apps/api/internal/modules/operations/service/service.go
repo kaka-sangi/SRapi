@@ -250,7 +250,11 @@ func (s *Service) evaluateAlerts(ctx context.Context, definitions []contract.SLO
 			if !ok {
 				created := burnRateAlert(definition, threshold, longEval, shortEval, now)
 				applySilence(&created, suppressedBy)
-				if _, err := s.observabilityStore.CreateAlert(ctx, created); err != nil {
+				stored, err := s.observabilityStore.CreateAlert(ctx, created)
+				if err != nil {
+					return result, err
+				}
+				if err := s.enqueueAlertNotifications(ctx, stored); err != nil {
 					return result, err
 				}
 				result.Created++
@@ -258,7 +262,11 @@ func (s *Service) evaluateAlerts(ctx context.Context, definitions []contract.SLO
 			}
 			updated := updateBurnRateAlert(alert, definition, threshold, longEval, shortEval, now)
 			applySilence(&updated, suppressedBy)
-			if _, err := s.observabilityStore.UpdateAlert(ctx, updated); err != nil {
+			stored, err := s.observabilityStore.UpdateAlert(ctx, updated)
+			if err != nil {
+				return result, err
+			}
+			if err := s.enqueueAlertNotifications(ctx, stored); err != nil {
 				return result, err
 			}
 			result.Updated++
@@ -272,7 +280,11 @@ func (s *Service) evaluateAlerts(ctx context.Context, definitions []contract.SLO
 		resolvedAt := now
 		alert.ResolvedAt = &resolvedAt
 		alert.UpdatedAt = now
-		if _, err := s.observabilityStore.UpdateAlert(ctx, alert); err != nil {
+		stored, err := s.observabilityStore.UpdateAlert(ctx, alert)
+		if err != nil {
+			return result, err
+		}
+		if err := s.enqueueAlertNotifications(ctx, stored); err != nil {
 			return result, err
 		}
 		result.Resolved++

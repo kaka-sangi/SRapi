@@ -213,10 +213,7 @@ export function useUpdateOpsAlertRule() {
   );
 }
 export function useDeleteOpsAlertRule() {
-  return useAdminMutation(
-    (id: string) => adminApi.deleteOpsAlertRule(id),
-    ["admin", "ops"],
-  );
+  return useAdminMutation((id: string) => adminApi.deleteOpsAlertRule(id), ["admin", "ops"]);
 }
 export function useOpsAlertSilences() {
   return useQuery({
@@ -231,8 +228,45 @@ export function useCreateOpsAlertSilence() {
   );
 }
 export function useDeleteOpsAlertSilence() {
+  return useAdminMutation((id: string) => adminApi.deleteOpsAlertSilence(id), ["admin", "ops"]);
+}
+
+export function useOpsNotificationChannels() {
+  return useQuery({
+    queryKey: queryKeys.admin.opsNotificationChannels(),
+    queryFn: () => adminApi.listOpsNotificationChannels(),
+  });
+}
+
+export function useCreateOpsNotificationChannel() {
   return useAdminMutation(
-    (id: string) => adminApi.deleteOpsAlertSilence(id),
+    (body: P<typeof adminApi.createOpsNotificationChannel>) =>
+      adminApi.createOpsNotificationChannel(body),
     ["admin", "ops"],
   );
+}
+
+export function useUpdateOpsNotificationChannel() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateOpsNotificationChannel> }) =>
+      adminApi.updateOpsNotificationChannel(vars.id, vars.body),
+    ["admin", "ops"],
+  );
+}
+
+export function useDeleteOpsNotificationChannel() {
+  return useAdminMutation(
+    (id: string) => adminApi.deleteOpsNotificationChannel(id),
+    ["admin", "ops"],
+  );
+}
+
+export function useOpsNotificationDeliveries(
+  params?: P<typeof adminApi.listOpsNotificationDeliveries>,
+) {
+  return useQuery({
+    queryKey: queryKeys.admin.opsNotificationDeliveries(params),
+    queryFn: () => adminApi.listOpsNotificationDeliveries(params),
+    refetchInterval: 30_000,
+  });
 }

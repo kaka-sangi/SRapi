@@ -577,31 +577,31 @@ func (e AudioTranscriptionRequestResponseFormat) Valid() bool {
 
 // Defines values for AuthIdentityProvider.
 const (
-	Dingtalk AuthIdentityProvider = "dingtalk"
-	Email    AuthIdentityProvider = "email"
-	Github   AuthIdentityProvider = "github"
-	Google   AuthIdentityProvider = "google"
-	Linuxdo  AuthIdentityProvider = "linuxdo"
-	Oidc     AuthIdentityProvider = "oidc"
-	Wechat   AuthIdentityProvider = "wechat"
+	AuthIdentityProviderDingtalk AuthIdentityProvider = "dingtalk"
+	AuthIdentityProviderEmail    AuthIdentityProvider = "email"
+	AuthIdentityProviderGithub   AuthIdentityProvider = "github"
+	AuthIdentityProviderGoogle   AuthIdentityProvider = "google"
+	AuthIdentityProviderLinuxdo  AuthIdentityProvider = "linuxdo"
+	AuthIdentityProviderOidc     AuthIdentityProvider = "oidc"
+	AuthIdentityProviderWechat   AuthIdentityProvider = "wechat"
 )
 
 // Valid indicates whether the value is a known member of the AuthIdentityProvider enum.
 func (e AuthIdentityProvider) Valid() bool {
 	switch e {
-	case Dingtalk:
+	case AuthIdentityProviderDingtalk:
 		return true
-	case Email:
+	case AuthIdentityProviderEmail:
 		return true
-	case Github:
+	case AuthIdentityProviderGithub:
 		return true
-	case Google:
+	case AuthIdentityProviderGoogle:
 		return true
-	case Linuxdo:
+	case AuthIdentityProviderLinuxdo:
 		return true
-	case Oidc:
+	case AuthIdentityProviderOidc:
 		return true
-	case Wechat:
+	case AuthIdentityProviderWechat:
 		return true
 	default:
 		return false
@@ -1970,6 +1970,60 @@ func (e OpsErrorTrendBucket) Valid() bool {
 	case OpsErrorTrendBucketDay:
 		return true
 	case OpsErrorTrendBucketHour:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsNotificationChannelStatus.
+const (
+	OpsNotificationChannelStatusActive   OpsNotificationChannelStatus = "active"
+	OpsNotificationChannelStatusDisabled OpsNotificationChannelStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the OpsNotificationChannelStatus enum.
+func (e OpsNotificationChannelStatus) Valid() bool {
+	switch e {
+	case OpsNotificationChannelStatusActive:
+		return true
+	case OpsNotificationChannelStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsNotificationChannelType.
+const (
+	OpsNotificationChannelTypeEmail OpsNotificationChannelType = "email"
+)
+
+// Valid indicates whether the value is a known member of the OpsNotificationChannelType enum.
+func (e OpsNotificationChannelType) Valid() bool {
+	switch e {
+	case OpsNotificationChannelTypeEmail:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsNotificationDeliveryStatus.
+const (
+	OpsNotificationDeliveryStatusDelivered OpsNotificationDeliveryStatus = "delivered"
+	OpsNotificationDeliveryStatusFailed    OpsNotificationDeliveryStatus = "failed"
+	OpsNotificationDeliveryStatusPending   OpsNotificationDeliveryStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the OpsNotificationDeliveryStatus enum.
+func (e OpsNotificationDeliveryStatus) Valid() bool {
+	switch e {
+	case OpsNotificationDeliveryStatusDelivered:
+		return true
+	case OpsNotificationDeliveryStatusFailed:
+		return true
+	case OpsNotificationDeliveryStatusPending:
 		return true
 	default:
 		return false
@@ -6852,6 +6906,16 @@ type CreateOpsAlertSilenceRequest struct {
 	StartsAt *Timestamp              `json:"starts_at,omitempty"`
 }
 
+// CreateOpsNotificationChannelRequest defines model for CreateOpsNotificationChannelRequest.
+type CreateOpsNotificationChannelRequest struct {
+	EmailRecipients []openapi_types.Email         `json:"email_recipients"`
+	MinSeverity     *OpsAlertSeverity             `json:"min_severity,omitempty"`
+	Name            string                        `json:"name"`
+	SendResolved    *bool                         `json:"send_resolved,omitempty"`
+	Status          *OpsNotificationChannelStatus `json:"status,omitempty"`
+	Type            OpsNotificationChannelType    `json:"type"`
+}
+
 // CreateOpsSLORequest defines model for CreateOpsSLORequest.
 type CreateOpsSLORequest struct {
 	AlertPolicy *OpsAlertPolicy `json:"alert_policy,omitempty"`
@@ -8699,6 +8763,71 @@ type OpsLatencyHistogramResponse struct {
 	Data      OpsLatencyHistogram `json:"data"`
 	RequestId RequestId           `json:"request_id"`
 }
+
+// OpsNotificationChannel defines model for OpsNotificationChannel.
+type OpsNotificationChannel struct {
+	CreatedAt       Timestamp                    `json:"created_at"`
+	EmailRecipients []openapi_types.Email        `json:"email_recipients"`
+	Id              Id                           `json:"id"`
+	MinSeverity     OpsAlertSeverity             `json:"min_severity"`
+	Name            string                       `json:"name"`
+	SendResolved    bool                         `json:"send_resolved"`
+	Status          OpsNotificationChannelStatus `json:"status"`
+	Type            OpsNotificationChannelType   `json:"type"`
+	UpdatedAt       Timestamp                    `json:"updated_at"`
+}
+
+// OpsNotificationChannelListResponse defines model for OpsNotificationChannelListResponse.
+type OpsNotificationChannelListResponse struct {
+	Data       []OpsNotificationChannel `json:"data"`
+	Pagination Pagination               `json:"pagination"`
+	RequestId  RequestId                `json:"request_id"`
+}
+
+// OpsNotificationChannelResponse defines model for OpsNotificationChannelResponse.
+type OpsNotificationChannelResponse struct {
+	Data      OpsNotificationChannel `json:"data"`
+	RequestId RequestId              `json:"request_id"`
+}
+
+// OpsNotificationChannelStatus defines model for OpsNotificationChannelStatus.
+type OpsNotificationChannelStatus string
+
+// OpsNotificationChannelType defines model for OpsNotificationChannelType.
+type OpsNotificationChannelType string
+
+// OpsNotificationDelivery defines model for OpsNotificationDelivery.
+type OpsNotificationDelivery struct {
+	AlertEventId   Id                            `json:"alert_event_id"`
+	AlertStartedAt *time.Time                    `json:"alert_started_at,omitempty"`
+	AlertStatus    OpsAlertStatus                `json:"alert_status"`
+	AlertSummary   *string                       `json:"alert_summary,omitempty"`
+	AlertUpdatedAt *time.Time                    `json:"alert_updated_at,omitempty"`
+	AttemptCount   int                           `json:"attempt_count"`
+	ChannelId      Id                            `json:"channel_id"`
+	ChannelName    *string                       `json:"channel_name,omitempty"`
+	ChannelType    *OpsNotificationChannelType   `json:"channel_type,omitempty"`
+	CreatedAt      Timestamp                     `json:"created_at"`
+	DeliveredAt    *time.Time                    `json:"delivered_at,omitempty"`
+	Id             Id                            `json:"id"`
+	LastAttemptAt  *time.Time                    `json:"last_attempt_at,omitempty"`
+	LastError      *string                       `json:"last_error,omitempty"`
+	NextAttemptAt  Timestamp                     `json:"next_attempt_at"`
+	Severity       OpsAlertSeverity              `json:"severity"`
+	Status         OpsNotificationDeliveryStatus `json:"status"`
+	Target         string                        `json:"target"`
+	UpdatedAt      Timestamp                     `json:"updated_at"`
+}
+
+// OpsNotificationDeliveryListResponse defines model for OpsNotificationDeliveryListResponse.
+type OpsNotificationDeliveryListResponse struct {
+	Data       []OpsNotificationDelivery `json:"data"`
+	Pagination Pagination                `json:"pagination"`
+	RequestId  RequestId                 `json:"request_id"`
+}
+
+// OpsNotificationDeliveryStatus defines model for OpsNotificationDeliveryStatus.
+type OpsNotificationDeliveryStatus string
 
 // OpsOverview defines model for OpsOverview.
 type OpsOverview struct {
@@ -11033,6 +11162,15 @@ type UpdateOpsAlertRuleRequest struct {
 	WindowSeconds   *int                `json:"window_seconds,omitempty"`
 }
 
+// UpdateOpsNotificationChannelRequest defines model for UpdateOpsNotificationChannelRequest.
+type UpdateOpsNotificationChannelRequest struct {
+	EmailRecipients *[]openapi_types.Email        `json:"email_recipients,omitempty"`
+	MinSeverity     *OpsAlertSeverity             `json:"min_severity,omitempty"`
+	Name            *string                       `json:"name,omitempty"`
+	SendResolved    *bool                         `json:"send_resolved,omitempty"`
+	Status          *OpsNotificationChannelStatus `json:"status,omitempty"`
+}
+
 // UpdateOpsSLORequest defines model for UpdateOpsSLORequest.
 type UpdateOpsSLORequest struct {
 	AlertPolicy *OpsAlertPolicy `json:"alert_policy,omitempty"`
@@ -12221,6 +12359,20 @@ type GetAdminOpsLatencyHistogramParams struct {
 	End *EndTime `form:"end,omitempty" json:"end,omitempty"`
 }
 
+// ListAdminOpsNotificationChannelsParams defines parameters for ListAdminOpsNotificationChannels.
+type ListAdminOpsNotificationChannelsParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListAdminOpsNotificationDeliveriesParams defines parameters for ListAdminOpsNotificationDeliveries.
+type ListAdminOpsNotificationDeliveriesParams struct {
+	Page      *Page                          `form:"page,omitempty" json:"page,omitempty"`
+	PageSize  *PageSize                      `form:"page_size,omitempty" json:"page_size,omitempty"`
+	ChannelId *Id                            `form:"channel_id,omitempty" json:"channel_id,omitempty"`
+	Status    *OpsNotificationDeliveryStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
 // GetAdminOpsOverviewParams defines parameters for GetAdminOpsOverview.
 type GetAdminOpsOverviewParams struct {
 	// Start Inclusive start time for read-model queries.
@@ -13015,6 +13167,12 @@ type CreateAdminOpsAlertSilenceJSONRequestBody = CreateOpsAlertSilenceRequest
 
 // UpdateAdminOpsErrorLogResolutionJSONRequestBody defines body for UpdateAdminOpsErrorLogResolution for application/json ContentType.
 type UpdateAdminOpsErrorLogResolutionJSONRequestBody = OpsErrorLogResolutionUpdate
+
+// CreateAdminOpsNotificationChannelJSONRequestBody defines body for CreateAdminOpsNotificationChannel for application/json ContentType.
+type CreateAdminOpsNotificationChannelJSONRequestBody = CreateOpsNotificationChannelRequest
+
+// UpdateAdminOpsNotificationChannelJSONRequestBody defines body for UpdateAdminOpsNotificationChannel for application/json ContentType.
+type UpdateAdminOpsNotificationChannelJSONRequestBody = UpdateOpsNotificationChannelRequest
 
 // UpdateAdminOpsSettingsJSONRequestBody defines body for UpdateAdminOpsSettings for application/json ContentType.
 type UpdateAdminOpsSettingsJSONRequestBody = OpsSettings
@@ -20746,6 +20904,21 @@ type ServerInterface interface {
 	// Get latency histogram buckets.
 	// (GET /api/v1/admin/ops/latency-histogram)
 	GetAdminOpsLatencyHistogram(w http.ResponseWriter, r *http.Request, params GetAdminOpsLatencyHistogramParams)
+	// List SRapi-native Ops alert notification channels.
+	// (GET /api/v1/admin/ops/notification-channels)
+	ListAdminOpsNotificationChannels(w http.ResponseWriter, r *http.Request, params ListAdminOpsNotificationChannelsParams)
+	// Create an email notification channel for Ops alerts.
+	// (POST /api/v1/admin/ops/notification-channels)
+	CreateAdminOpsNotificationChannel(w http.ResponseWriter, r *http.Request)
+	// Delete an Ops alert notification channel.
+	// (DELETE /api/v1/admin/ops/notification-channels/{id})
+	DeleteAdminOpsNotificationChannel(w http.ResponseWriter, r *http.Request, id Id)
+	// Update an Ops alert notification channel.
+	// (PATCH /api/v1/admin/ops/notification-channels/{id})
+	UpdateAdminOpsNotificationChannel(w http.ResponseWriter, r *http.Request, id Id)
+	// List Ops alert notification delivery evidence.
+	// (GET /api/v1/admin/ops/notification-deliveries)
+	ListAdminOpsNotificationDeliveries(w http.ResponseWriter, r *http.Request, params ListAdminOpsNotificationDeliveriesParams)
 	// Get operational golden-signal overview.
 	// (GET /api/v1/admin/ops/overview)
 	GetAdminOpsOverview(w http.ResponseWriter, r *http.Request, params GetAdminOpsOverviewParams)
@@ -28400,6 +28573,226 @@ func (siw *ServerInterfaceWrapper) GetAdminOpsLatencyHistogram(w http.ResponseWr
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAdminOpsLatencyHistogram(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminOpsNotificationChannels operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminOpsNotificationChannels(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminOpsNotificationChannelsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminOpsNotificationChannels(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminOpsNotificationChannel operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminOpsNotificationChannel(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminOpsNotificationChannel(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminOpsNotificationChannel operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminOpsNotificationChannel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminOpsNotificationChannel(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminOpsNotificationChannel operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminOpsNotificationChannel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminOpsNotificationChannel(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminOpsNotificationDeliveries operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminOpsNotificationDeliveries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminOpsNotificationDeliveriesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "channel_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "channel_id", r.URL.Query(), &params.ChannelId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "channel_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminOpsNotificationDeliveries(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -37261,6 +37654,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-trend", wrapper.GetAdminOpsErrorTrend)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/events/outbox", wrapper.ListAdminOutboxEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/latency-histogram", wrapper.GetAdminOpsLatencyHistogram)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/notification-channels", wrapper.ListAdminOpsNotificationChannels)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/notification-channels", wrapper.CreateAdminOpsNotificationChannel)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/ops/notification-channels/{id}", wrapper.DeleteAdminOpsNotificationChannel)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/ops/notification-channels/{id}", wrapper.UpdateAdminOpsNotificationChannel)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/notification-deliveries", wrapper.ListAdminOpsNotificationDeliveries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/overview", wrapper.GetAdminOpsOverview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/realtime/slots", wrapper.ListAdminOpsRealtimeSlots)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/request-evidence", wrapper.ListAdminOpsRequestEvidence)

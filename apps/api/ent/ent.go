@@ -46,6 +46,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
 	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
+	"github.com/srapi/srapi/apps/api/ent/obsnotificationchannel"
+	"github.com/srapi/srapi/apps/api/ent/obsnotificationdelivery"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/opserrorlog"
 	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
@@ -181,6 +183,8 @@ func checkColumn(t, c string) error {
 			obsalertevent.Table:             obsalertevent.ValidColumn,
 			obsalertrule.Table:              obsalertrule.ValidColumn,
 			obsalertsilence.Table:           obsalertsilence.ValidColumn,
+			obsnotificationchannel.Table:    obsnotificationchannel.ValidColumn,
+			obsnotificationdelivery.Table:   obsnotificationdelivery.ValidColumn,
 			obsslodefinition.Table:          obsslodefinition.ValidColumn,
 			opserrorlog.Table:               opserrorlog.ValidColumn,
 			opssystemlog.Table:              opssystemlog.ValidColumn,

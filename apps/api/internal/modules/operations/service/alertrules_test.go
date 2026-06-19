@@ -193,6 +193,18 @@ func TestEvaluateAlertRulesFiresUpdatesAndResolvesEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
+	channel, err := svc.CreateNotificationChannel(t.Context(), contract.CreateNotificationChannelRequest{
+		Name:            "Ops email",
+		Type:            contract.NotificationChannelTypeEmail,
+		MinSeverity:     contract.AlertSeverityWarning,
+		EmailRecipients: []string{"OnCall@Example.COM", "oncall@example.com"},
+	})
+	if err != nil {
+		t.Fatalf("create notification channel: %v", err)
+	}
+	if len(channel.EmailRecipients) != 1 || channel.EmailRecipients[0] != "oncall@example.com" {
+		t.Fatalf("expected normalized channel recipients, got %+v", channel)
+	}
 	if _, err := svc.CreateAlertRule(t.Context(), contract.CreateAlertRuleRequest{
 		Name:            "Chat error rate",
 		MetricType:      contract.AlertMetricErrorRate,
@@ -235,6 +247,13 @@ func TestEvaluateAlertRulesFiresUpdatesAndResolvesEvents(t *testing.T) {
 	if alerts[0].Details["source_endpoint"] != "/v1/chat/completions" || alerts[0].Details["model"] != "gpt-ops" || alerts[0].Details["provider_id"] != 7 {
 		t.Fatalf("expected alert rule scope in details, got %+v", alerts[0].Details)
 	}
+	deliveries, err := svc.ListNotificationDeliveries(t.Context(), contract.DeliveryListOptions{})
+	if err != nil {
+		t.Fatalf("list notification deliveries: %v", err)
+	}
+	if len(deliveries) != 1 || deliveries[0].ChannelID != channel.ID || deliveries[0].AlertEventID != alerts[0].ID || deliveries[0].Target != "oncall@example.com" || deliveries[0].Status != contract.NotificationDeliveryStatusPending {
+		t.Fatalf("unexpected firing delivery: %+v", deliveries)
+	}
 
 	result, err = svc.EvaluateAlertRules(t.Context())
 	if err != nil {
@@ -242,6 +261,13 @@ func TestEvaluateAlertRulesFiresUpdatesAndResolvesEvents(t *testing.T) {
 	}
 	if result.Created != 0 || result.Updated != 1 {
 		t.Fatalf("expected existing alert update, got %+v", result)
+	}
+	deliveries, err = svc.ListNotificationDeliveries(t.Context(), contract.DeliveryListOptions{})
+	if err != nil {
+		t.Fatalf("list notification deliveries after update: %v", err)
+	}
+	if len(deliveries) != 1 {
+		t.Fatalf("expected firing delivery to be deduplicated, got %+v", deliveries)
 	}
 
 	store.usageLogs = []usagecontract.UsageLog{
@@ -254,6 +280,44 @@ func TestEvaluateAlertRulesFiresUpdatesAndResolvesEvents(t *testing.T) {
 	}
 	if result.Breached != 0 || result.Resolved != 1 {
 		t.Fatalf("expected resolution, got %+v", result)
+	}
+	deliveries, err = svc.ListNotificationDeliveries(t.Context(), contract.DeliveryListOptions{})
+	if err != nil {
+		t.Fatalf("list notification deliveries after resolve: %v", err)
+	}
+	if len(deliveries) != 2 {
+		t.Fatalf("expected firing and resolved deliveries, got %+v", deliveries)
+	}
+	var resolvedDelivery contract.NotificationDelivery
+	for _, delivery := range deliveries {
+		if delivery.AlertStatus == contract.AlertStatusResolved {
+			resolvedDelivery = delivery
+		}
+	}
+	if resolvedDelivery.ID == 0 || resolvedDelivery.Target != "oncall@example.com" {
+		t.Fatalf("expected resolved delivery, got %+v", deliveries)
+	}
+}
+
+func TestNotificationChannelValidation(t *testing.T) {
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if _, err := svc.CreateNotificationChannel(t.Context(), contract.CreateNotificationChannelRequest{
+		Name:            "bad",
+		Type:            contract.NotificationChannelTypeEmail,
+		EmailRecipients: []string{"not-an-email"},
+	}); err != ErrInvalidInput {
+		t.Fatalf("expected invalid recipient rejection, got %v", err)
+	}
+	if _, err := svc.CreateNotificationChannel(t.Context(), contract.CreateNotificationChannelRequest{
+		Name:            "unsupported",
+		Type:            contract.NotificationChannelType("webhook"),
+		EmailRecipients: []string{"ops@example.com"},
+	}); err != ErrInvalidInput {
+		t.Fatalf("expected unsupported channel rejection, got %v", err)
 	}
 }
 

@@ -185,6 +185,27 @@ const (
 	AlertStatusSuppressed   AlertStatus = "suppressed"
 )
 
+type NotificationChannelType string
+
+const (
+	NotificationChannelTypeEmail NotificationChannelType = "email"
+)
+
+type NotificationChannelStatus string
+
+const (
+	NotificationChannelStatusActive   NotificationChannelStatus = "active"
+	NotificationChannelStatusDisabled NotificationChannelStatus = "disabled"
+)
+
+type NotificationDeliveryStatus string
+
+const (
+	NotificationDeliveryStatusPending   NotificationDeliveryStatus = "pending"
+	NotificationDeliveryStatusDelivered NotificationDeliveryStatus = "delivered"
+	NotificationDeliveryStatusFailed    NotificationDeliveryStatus = "failed"
+)
+
 type SLOFilter struct {
 	SourceEndpoint    string
 	Model             string
@@ -279,6 +300,71 @@ type AlertEvent struct {
 	SuppressedBy   *string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+}
+
+// NotificationChannel configures SRapi-native Ops alert delivery. Secrets are
+// deployment-owned and must not be exposed through this contract.
+type NotificationChannel struct {
+	ID              int
+	Name            string
+	Type            NotificationChannelType
+	Status          NotificationChannelStatus
+	MinSeverity     AlertSeverity
+	EmailRecipients []string
+	SendResolved    bool
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type CreateNotificationChannelRequest struct {
+	Name            string
+	Type            NotificationChannelType
+	Status          *NotificationChannelStatus
+	MinSeverity     AlertSeverity
+	EmailRecipients []string
+	SendResolved    *bool
+}
+
+type UpdateNotificationChannelRequest struct {
+	Name            *string
+	Status          *NotificationChannelStatus
+	MinSeverity     *AlertSeverity
+	EmailRecipients *[]string
+	SendResolved    *bool
+}
+
+type NotificationDelivery struct {
+	ID             int
+	ChannelID      int
+	AlertEventID   int
+	AlertStatus    AlertStatus
+	Severity       AlertSeverity
+	Status         NotificationDeliveryStatus
+	Target         string
+	AttemptCount   int
+	LastError      string
+	NextAttemptAt  time.Time
+	DeliveredAt    *time.Time
+	LastAttemptAt  *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	AlertSummary   string
+	ChannelName    string
+	ChannelType    NotificationChannelType
+	AlertStartedAt time.Time
+	AlertUpdatedAt time.Time
+}
+
+type DeliveryListOptions struct {
+	ChannelID int
+	Status    NotificationDeliveryStatus
+	Limit     int
+}
+
+type DueDelivery struct {
+	Delivery NotificationDelivery
+	Channel  NotificationChannel
+	Alert    AlertEvent
 }
 
 type AckAlertRequest struct {
@@ -415,6 +501,16 @@ type ObservabilityStore interface {
 	CreateAlertSilence(ctx context.Context, input AlertSilence) (AlertSilence, error)
 	ListAlertSilences(ctx context.Context) ([]AlertSilence, error)
 	DeleteAlertSilence(ctx context.Context, id int) error
+	CreateNotificationChannel(ctx context.Context, input NotificationChannel) (NotificationChannel, error)
+	UpdateNotificationChannel(ctx context.Context, input NotificationChannel) (NotificationChannel, error)
+	FindNotificationChannelByID(ctx context.Context, id int) (NotificationChannel, error)
+	ListNotificationChannels(ctx context.Context) ([]NotificationChannel, error)
+	DeleteNotificationChannel(ctx context.Context, id int) error
+	CreateNotificationDelivery(ctx context.Context, input NotificationDelivery) (NotificationDelivery, error)
+	UpdateNotificationDelivery(ctx context.Context, input NotificationDelivery) (NotificationDelivery, error)
+	ListNotificationDeliveries(ctx context.Context, opts DeliveryListOptions) ([]NotificationDelivery, error)
+	ListDueNotificationDeliveries(ctx context.Context, now time.Time, limit int) ([]DueDelivery, error)
+	FindNotificationDelivery(ctx context.Context, channelID int, alertEventID int, alertStatus AlertStatus, target string) (NotificationDelivery, error)
 }
 
 type Store interface {

@@ -242,6 +242,46 @@ func (s *captureStore) DeleteAlertSilence(_ context.Context, id int) error {
 	return contract.ErrNotFound
 }
 
+func (s *captureStore) ListNotificationChannels(context.Context) ([]contract.NotificationChannel, error) {
+	return nil, nil
+}
+
+func (s *captureStore) CreateNotificationChannel(context.Context, contract.NotificationChannel) (contract.NotificationChannel, error) {
+	return contract.NotificationChannel{}, contract.ErrNotFound
+}
+
+func (s *captureStore) UpdateNotificationChannel(context.Context, contract.NotificationChannel) (contract.NotificationChannel, error) {
+	return contract.NotificationChannel{}, contract.ErrNotFound
+}
+
+func (s *captureStore) FindNotificationChannelByID(context.Context, int) (contract.NotificationChannel, error) {
+	return contract.NotificationChannel{}, contract.ErrNotFound
+}
+
+func (s *captureStore) DeleteNotificationChannel(context.Context, int) error {
+	return contract.ErrNotFound
+}
+
+func (s *captureStore) CreateNotificationDelivery(context.Context, contract.NotificationDelivery) (contract.NotificationDelivery, error) {
+	return contract.NotificationDelivery{}, contract.ErrNotFound
+}
+
+func (s *captureStore) UpdateNotificationDelivery(context.Context, contract.NotificationDelivery) (contract.NotificationDelivery, error) {
+	return contract.NotificationDelivery{}, contract.ErrNotFound
+}
+
+func (s *captureStore) ListNotificationDeliveries(context.Context, contract.DeliveryListOptions) ([]contract.NotificationDelivery, error) {
+	return nil, nil
+}
+
+func (s *captureStore) ListDueNotificationDeliveries(context.Context, time.Time, int) ([]contract.DueDelivery, error) {
+	return nil, nil
+}
+
+func (s *captureStore) FindNotificationDelivery(context.Context, int, int, contract.AlertStatus, string) (contract.NotificationDelivery, error) {
+	return contract.NotificationDelivery{}, contract.ErrNotFound
+}
+
 type fixedClock struct {
 	now time.Time
 }

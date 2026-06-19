@@ -417,6 +417,30 @@ func (f ObsAlertSilenceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Va
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ObsAlertSilenceMutation", m)
 }
 
+// The ObsNotificationChannelFunc type is an adapter to allow the use of ordinary
+// function as ObsNotificationChannel mutator.
+type ObsNotificationChannelFunc func(context.Context, *ent.ObsNotificationChannelMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ObsNotificationChannelFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ObsNotificationChannelMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ObsNotificationChannelMutation", m)
+}
+
+// The ObsNotificationDeliveryFunc type is an adapter to allow the use of ordinary
+// function as ObsNotificationDelivery mutator.
+type ObsNotificationDeliveryFunc func(context.Context, *ent.ObsNotificationDeliveryMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ObsNotificationDeliveryFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ObsNotificationDeliveryMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ObsNotificationDeliveryMutation", m)
+}
+
 // The ObsSLODefinitionFunc type is an adapter to allow the use of ordinary
 // function as ObsSLODefinition mutator.
 type ObsSLODefinitionFunc func(context.Context, *ent.ObsSLODefinitionMutation) (ent.Value, error)

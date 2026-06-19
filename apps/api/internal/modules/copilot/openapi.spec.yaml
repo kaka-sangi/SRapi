@@ -10870,6 +10870,189 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/ops/notification-channels:
+    get:
+      tags:
+        - AdminOps
+      operationId: listAdminOpsNotificationChannels
+      summary: List SRapi-native Ops alert notification channels.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Notification channel list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsNotificationChannelListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminOps
+      operationId: createAdminOpsNotificationChannel
+      summary: Create an email notification channel for Ops alerts.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOpsNotificationChannelRequest"
+      responses:
+        "201":
+          description: Notification channel created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsNotificationChannelResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/notification-channels/{id}:
+    patch:
+      tags:
+        - AdminOps
+      operationId: updateAdminOpsNotificationChannel
+      summary: Update an Ops alert notification channel.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOpsNotificationChannelRequest"
+      responses:
+        "200":
+          description: Notification channel updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsNotificationChannelResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminOps
+      operationId: deleteAdminOpsNotificationChannel
+      summary: Delete an Ops alert notification channel.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "204":
+          description: Notification channel deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/notification-deliveries:
+    get:
+      tags:
+        - AdminOps
+      operationId: listAdminOpsNotificationDeliveries
+      summary: List Ops alert notification delivery evidence.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: channel_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/OpsNotificationDeliveryStatus"
+      responses:
+        "200":
+          description: Notification delivery evidence list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsNotificationDeliveryListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/settings:
     get:
       tags:
@@ -29430,6 +29613,24 @@ components:
         - resolved
         - suppressed
 
+    OpsNotificationChannelType:
+      type: string
+      enum:
+        - email
+
+    OpsNotificationChannelStatus:
+      type: string
+      enum:
+        - active
+        - disabled
+
+    OpsNotificationDeliveryStatus:
+      type: string
+      enum:
+        - pending
+        - delivered
+        - failed
+
     OpsSLOFilter:
       type: object
       required:
@@ -29991,6 +30192,193 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/OpsAlertSilence"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsNotificationChannel:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - status
+        - min_severity
+        - email_recipients
+        - send_resolved
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/OpsNotificationChannelType"
+        status:
+          $ref: "#/components/schemas/OpsNotificationChannelStatus"
+        min_severity:
+          $ref: "#/components/schemas/OpsAlertSeverity"
+        email_recipients:
+          type: array
+          items:
+            type: string
+            format: email
+          default: []
+        send_resolved:
+          type: boolean
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateOpsNotificationChannelRequest:
+      type: object
+      required:
+        - name
+        - type
+        - email_recipients
+      properties:
+        name:
+          type: string
+          minLength: 1
+        type:
+          $ref: "#/components/schemas/OpsNotificationChannelType"
+        status:
+          $ref: "#/components/schemas/OpsNotificationChannelStatus"
+        min_severity:
+          $ref: "#/components/schemas/OpsAlertSeverity"
+        email_recipients:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: email
+        send_resolved:
+          type: boolean
+
+    UpdateOpsNotificationChannelRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        status:
+          $ref: "#/components/schemas/OpsNotificationChannelStatus"
+        min_severity:
+          $ref: "#/components/schemas/OpsAlertSeverity"
+        email_recipients:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: email
+        send_resolved:
+          type: boolean
+
+    OpsNotificationChannelResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsNotificationChannel"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsNotificationChannelListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsNotificationChannel"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsNotificationDelivery:
+      type: object
+      required:
+        - id
+        - channel_id
+        - alert_event_id
+        - alert_status
+        - severity
+        - status
+        - target
+        - attempt_count
+        - next_attempt_at
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        channel_id:
+          $ref: "#/components/schemas/Id"
+        channel_name:
+          type: string
+        channel_type:
+          $ref: "#/components/schemas/OpsNotificationChannelType"
+          nullable: true
+        alert_event_id:
+          $ref: "#/components/schemas/Id"
+        alert_summary:
+          type: string
+        alert_status:
+          $ref: "#/components/schemas/OpsAlertStatus"
+        alert_started_at:
+          type: string
+          format: date-time
+          nullable: true
+        alert_updated_at:
+          type: string
+          format: date-time
+          nullable: true
+        severity:
+          $ref: "#/components/schemas/OpsAlertSeverity"
+        status:
+          $ref: "#/components/schemas/OpsNotificationDeliveryStatus"
+        target:
+          type: string
+        attempt_count:
+          type: integer
+          minimum: 0
+        last_error:
+          type: string
+        next_attempt_at:
+          $ref: "#/components/schemas/Timestamp"
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    OpsNotificationDeliveryListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsNotificationDelivery"
         pagination:
           $ref: "#/components/schemas/Pagination"
         request_id:

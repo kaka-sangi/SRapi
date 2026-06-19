@@ -72,7 +72,7 @@ apps/api/
 ├── ent/
 │   └── schema/             # Ent schema（70 个）
 ├── migrations/
-│   └── postgres/           # 编号迁移（up/down，截至 000033）
+│   └── postgres/           # 编号迁移（up/down，截至 000053）
 └── go.mod
 ```
 

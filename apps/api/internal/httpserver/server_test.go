@@ -11196,6 +11196,120 @@ func TestAdminOpsAlertRulesControlPlane(t *testing.T) {
 		t.Fatalf("expected alert silence delete 204, got %d body=%s", delSilenceRec.Code, delSilenceRec.Body.String())
 	}
 
+	channelReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/ops/notification-channels", strings.NewReader(`{"name":"Ops email","type":"email","email_recipients":["Ops@Example.com","ops@example.com"],"min_severity":"warning","send_resolved":true}`))
+	channelReq.Header.Set("Content-Type", "application/json")
+	channelReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	channelReq.AddCookie(sessionCookie)
+	channelRec := httptest.NewRecorder()
+	handler.ServeHTTP(channelRec, channelReq)
+	if channelRec.Code != http.StatusCreated {
+		t.Fatalf("expected notification channel create 201, got %d body=%s", channelRec.Code, channelRec.Body.String())
+	}
+	var channelResp apiopenapi.OpsNotificationChannelResponse
+	if err := json.NewDecoder(channelRec.Body).Decode(&channelResp); err != nil {
+		t.Fatalf("decode notification channel create: %v", err)
+	}
+	if channelResp.Data.Type != apiopenapi.OpsNotificationChannelTypeEmail || channelResp.Data.Status != apiopenapi.OpsNotificationChannelStatusActive {
+		t.Fatalf("unexpected created notification channel: %+v", channelResp.Data)
+	}
+	if len(channelResp.Data.EmailRecipients) != 1 || string(channelResp.Data.EmailRecipients[0]) != "ops@example.com" {
+		t.Fatalf("expected normalized unique recipients, got %+v", channelResp.Data.EmailRecipients)
+	}
+
+	channelListReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/notification-channels", nil)
+	channelListReq.AddCookie(sessionCookie)
+	channelListRec := httptest.NewRecorder()
+	handler.ServeHTTP(channelListRec, channelListReq)
+	if channelListRec.Code != http.StatusOK {
+		t.Fatalf("expected notification channel list 200, got %d body=%s", channelListRec.Code, channelListRec.Body.String())
+	}
+	var channelListResp apiopenapi.OpsNotificationChannelListResponse
+	if err := json.NewDecoder(channelListRec.Body).Decode(&channelListResp); err != nil {
+		t.Fatalf("decode notification channel list: %v", err)
+	}
+	if len(channelListResp.Data) != 1 || channelListResp.Data[0].Name != "Ops email" {
+		t.Fatalf("unexpected notification channel list: %+v", channelListResp.Data)
+	}
+
+	channelPatchReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/ops/notification-channels/"+string(channelResp.Data.Id), strings.NewReader(`{"status":"disabled","min_severity":"critical"}`))
+	channelPatchReq.Header.Set("Content-Type", "application/json")
+	channelPatchReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	channelPatchReq.AddCookie(sessionCookie)
+	channelPatchRec := httptest.NewRecorder()
+	handler.ServeHTTP(channelPatchRec, channelPatchReq)
+	if channelPatchRec.Code != http.StatusOK {
+		t.Fatalf("expected notification channel patch 200, got %d body=%s", channelPatchRec.Code, channelPatchRec.Body.String())
+	}
+	var channelPatchResp apiopenapi.OpsNotificationChannelResponse
+	if err := json.NewDecoder(channelPatchRec.Body).Decode(&channelPatchResp); err != nil {
+		t.Fatalf("decode notification channel patch: %v", err)
+	}
+	if channelPatchResp.Data.Status != apiopenapi.OpsNotificationChannelStatusDisabled || channelPatchResp.Data.MinSeverity != apiopenapi.OpsAlertSeverityCritical {
+		t.Fatalf("unexpected patched notification channel: %+v", channelPatchResp.Data)
+	}
+
+	alert, err := operationsStore.CreateAlert(ctx, operationscontract.AlertEvent{
+		RuleID:      "ops.test.alert",
+		Fingerprint: "ops-test-alert",
+		Summary:     "Ops test alert",
+		Severity:    operationscontract.AlertSeverityCritical,
+		Status:      operationscontract.AlertStatusFiring,
+		StartedAt:   time.Date(2026, 6, 19, 8, 0, 0, 0, time.UTC),
+		CreatedAt:   time.Date(2026, 6, 19, 8, 0, 0, 0, time.UTC),
+		UpdatedAt:   time.Date(2026, 6, 19, 8, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create alert for delivery evidence: %v", err)
+	}
+	channelID, err := strconv.Atoi(string(channelResp.Data.Id))
+	if err != nil {
+		t.Fatalf("invalid channel id %q: %v", channelResp.Data.Id, err)
+	}
+	if _, err := operationsStore.CreateNotificationDelivery(ctx, operationscontract.NotificationDelivery{
+		ChannelID:     channelID,
+		AlertEventID:  alert.ID,
+		AlertStatus:   operationscontract.AlertStatusFiring,
+		Severity:      operationscontract.AlertSeverityCritical,
+		Status:        operationscontract.NotificationDeliveryStatusPending,
+		Target:        "ops@example.com",
+		NextAttemptAt: time.Date(2026, 6, 19, 8, 1, 0, 0, time.UTC),
+		CreatedAt:     time.Date(2026, 6, 19, 8, 1, 0, 0, time.UTC),
+		UpdatedAt:     time.Date(2026, 6, 19, 8, 1, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("create delivery evidence: %v", err)
+	}
+	deliveryReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/notification-deliveries?channel_id="+string(channelResp.Data.Id)+"&status=pending&page_size=10", nil)
+	deliveryReq.AddCookie(sessionCookie)
+	deliveryRec := httptest.NewRecorder()
+	handler.ServeHTTP(deliveryRec, deliveryReq)
+	if deliveryRec.Code != http.StatusOK {
+		t.Fatalf("expected notification delivery list 200, got %d body=%s", deliveryRec.Code, deliveryRec.Body.String())
+	}
+	var deliveryResp apiopenapi.OpsNotificationDeliveryListResponse
+	if err := json.NewDecoder(deliveryRec.Body).Decode(&deliveryResp); err != nil {
+		t.Fatalf("decode notification delivery list: %v", err)
+	}
+	if len(deliveryResp.Data) != 1 || deliveryResp.Data[0].Target != "ops@example.com" || deliveryResp.Data[0].AlertSummary == nil || *deliveryResp.Data[0].AlertSummary != "Ops test alert" {
+		t.Fatalf("unexpected notification delivery list: %+v", deliveryResp.Data)
+	}
+
+	invalidDeliveryReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/notification-deliveries?status=nope", nil)
+	invalidDeliveryReq.AddCookie(sessionCookie)
+	invalidDeliveryRec := httptest.NewRecorder()
+	handler.ServeHTTP(invalidDeliveryRec, invalidDeliveryReq)
+	if invalidDeliveryRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid notification delivery filter 400, got %d body=%s", invalidDeliveryRec.Code, invalidDeliveryRec.Body.String())
+	}
+
+	delChannelReq := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/ops/notification-channels/"+string(channelResp.Data.Id), nil)
+	delChannelReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	delChannelReq.AddCookie(sessionCookie)
+	delChannelRec := httptest.NewRecorder()
+	handler.ServeHTTP(delChannelRec, delChannelReq)
+	if delChannelRec.Code != http.StatusNoContent {
+		t.Fatalf("expected notification channel delete 204, got %d body=%s", delChannelRec.Code, delChannelRec.Body.String())
+	}
+
 	delRuleReq := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/ops/alert-rules/"+string(createResp.Data.Id), nil)
 	delRuleReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
 	delRuleReq.AddCookie(sessionCookie)
@@ -11209,7 +11323,7 @@ func TestAdminOpsAlertRulesControlPlane(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list audit: %v", err)
 	}
-	for _, action := range []string{"ops_alert_rule.create", "ops_alert_rule.update", "ops_alert_rule.delete", "ops_alert_silence.create", "ops_alert_silence.delete"} {
+	for _, action := range []string{"ops_alert_rule.create", "ops_alert_rule.update", "ops_alert_rule.delete", "ops_alert_silence.create", "ops_alert_silence.delete", "ops_notification_channel.create", "ops_notification_channel.update", "ops_notification_channel.delete"} {
 		if !auditContractLogHasAction(auditLogs, action) {
 			t.Fatalf("expected audit action %s in %+v", action, auditLogs)
 		}

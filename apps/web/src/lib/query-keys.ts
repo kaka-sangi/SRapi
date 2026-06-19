@@ -60,6 +60,9 @@ export const queryKeys = {
     opsSlos: () => ["admin", "ops", "slos"] as const,
     opsAlertRules: () => ["admin", "ops", "alert-rules"] as const,
     opsAlertSilences: () => ["admin", "ops", "alert-silences"] as const,
+    opsNotificationChannels: () => ["admin", "ops", "notification-channels"] as const,
+    opsNotificationDeliveries: (params?: unknown) =>
+      ["admin", "ops", "notification-deliveries", params ?? {}] as const,
     users: (params?: unknown) => ["admin", "users", params ?? {}] as const,
     providers: (params?: unknown) => ["admin", "providers", params ?? {}] as const,
     models: (params?: unknown) => ["admin", "models", params ?? {}] as const,
@@ -87,21 +90,21 @@ export const queryKeys = {
     usageTrends: (params?: unknown) => ["admin", "usage-trends", params ?? {}] as const,
     usageErrorDistribution: (params?: unknown) =>
       ["admin", "usage-error-distribution", params ?? {}] as const,
-    usageDistribution: (params?: unknown) =>
-      ["admin", "usage-distribution", params ?? {}] as const,
+    usageDistribution: (params?: unknown) => ["admin", "usage-distribution", params ?? {}] as const,
     auditLogs: (params?: unknown) => ["admin", "audit-logs", params ?? {}] as const,
     errorLogs: (params?: unknown) => ["admin", "error-logs", params ?? {}] as const,
     errorLogFingerprints: (params?: unknown) =>
       ["admin", "error-logs", "fingerprints", params ?? {}] as const,
     errorLog: (id: string) => ["admin", "error-logs", id] as const,
-    requestLogFiles: (params?: unknown) =>
-      ["admin", "request-log-files", params ?? {}] as const,
+    requestLogFiles: (params?: unknown) => ["admin", "request-log-files", params ?? {}] as const,
     outboxEvents: (params?: unknown) => ["admin", "outbox-events", params ?? {}] as const,
     apiKeys: (params?: unknown) => ["admin", "api-keys", params ?? {}] as const,
     apiKeyUsage: (id: string, days: number) => ["admin", "api-key-usage", id, days] as const,
     billingLedger: (params?: unknown) => ["admin", "billing-ledger", params ?? {}] as const,
-    affiliateInvites: (params?: unknown) => ["admin", "affiliates", "invites", params ?? {}] as const,
-    affiliateRebates: (params?: unknown) => ["admin", "affiliates", "rebates", params ?? {}] as const,
+    affiliateInvites: (params?: unknown) =>
+      ["admin", "affiliates", "invites", params ?? {}] as const,
+    affiliateRebates: (params?: unknown) =>
+      ["admin", "affiliates", "rebates", params ?? {}] as const,
     affiliateTransfers: (params?: unknown) =>
       ["admin", "affiliates", "transfers", params ?? {}] as const,
     affiliateWithdrawals: (params?: unknown) =>
@@ -113,10 +116,8 @@ export const queryKeys = {
     paymentOrders: (params?: unknown) => ["admin", "payment-orders", params ?? {}] as const,
     paymentOrderAuditLogs: (id: string) => ["admin", "payment-orders", id, "audit-logs"] as const,
     paymentDashboard: (days?: number) => ["admin", "payment-dashboard", days ?? 30] as const,
-    subscriptionPlans: (params?: unknown) =>
-      ["admin", "subscription-plans", params ?? {}] as const,
-    userSubscriptions: (params?: unknown) =>
-      ["admin", "user-subscriptions", params ?? {}] as const,
+    subscriptionPlans: (params?: unknown) => ["admin", "subscription-plans", params ?? {}] as const,
+    userSubscriptions: (params?: unknown) => ["admin", "user-subscriptions", params ?? {}] as const,
     pricingRules: (params?: unknown) => ["admin", "pricing-rules", params ?? {}] as const,
     announcements: (params?: unknown) => ["admin", "announcements", params ?? {}] as const,
     announcementReads: (id: string) => ["admin", "announcement-reads", id] as const,

@@ -43,7 +43,7 @@ func TestListOAuthProvidersReturnsEnabledStartableOnly(t *testing.T) {
 	settingsResp.Data.Security.OauthProviders = []string{"oidc"}
 	settingsResp.Data.Security.OauthProviderConfigs = []apiopenapi.OAuthProviderConfig{
 		{
-			Provider:     apiopenapi.Oidc,
+			Provider:     apiopenapi.AuthIdentityProviderOidc,
 			ProviderKey:  "issuer-main",
 			DisplayName:  "Company SSO",
 			ClientId:     "client-123",
@@ -52,7 +52,7 @@ func TestListOAuthProvidersReturnsEnabledStartableOnly(t *testing.T) {
 			Scopes:       []string{"openid", "email"},
 		},
 		{
-			Provider:     apiopenapi.Github,
+			Provider:     apiopenapi.AuthIdentityProviderGithub,
 			ProviderKey:  "gh",
 			DisplayName:  "GitHub",
 			ClientId:     "gh-client",
@@ -67,7 +67,7 @@ func TestListOAuthProvidersReturnsEnabledStartableOnly(t *testing.T) {
 		t.Fatalf("expected exactly 1 enabled provider (github excluded), got %d: %+v", len(resp.Data), resp.Data)
 	}
 	got := resp.Data[0]
-	if got.Provider != apiopenapi.Oidc || got.ProviderKey != "issuer-main" || got.DisplayName != "Company SSO" {
+	if got.Provider != apiopenapi.AuthIdentityProviderOidc || got.ProviderKey != "issuer-main" || got.DisplayName != "Company SSO" {
 		t.Fatalf("unexpected provider entry: %+v", got)
 	}
 }
@@ -80,7 +80,7 @@ func TestListOAuthProvidersEmptyWhenDisabled(t *testing.T) {
 	settingsResp.Data.Security.OauthProviders = []string{"oidc"}
 	settingsResp.Data.Security.OauthProviderConfigs = []apiopenapi.OAuthProviderConfig{
 		{
-			Provider:     apiopenapi.Oidc,
+			Provider:     apiopenapi.AuthIdentityProviderOidc,
 			ProviderKey:  "issuer-main",
 			DisplayName:  "Company SSO",
 			ClientId:     "client-123",

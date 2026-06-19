@@ -1,8 +1,11 @@
 package httpserver
 
 import (
+	"net/http"
 	"strconv"
+	"strings"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	operationsservice "github.com/srapi/srapi/apps/api/internal/modules/operations/service"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -83,6 +86,63 @@ func toAPIOpsAlertSilenceMatcher(matcher operationscontract.AlertSilenceMatcher)
 	return out
 }
 
+func toAPIOpsNotificationChannel(channel operationscontract.NotificationChannel) apiopenapi.OpsNotificationChannel {
+	return apiopenapi.OpsNotificationChannel{
+		CreatedAt:       channel.CreatedAt,
+		EmailRecipients: toAPIEmailRecipients(channel.EmailRecipients),
+		Id:              apiopenapi.Id(strconv.Itoa(channel.ID)),
+		MinSeverity:     apiopenapi.OpsAlertSeverity(channel.MinSeverity),
+		Name:            channel.Name,
+		SendResolved:    channel.SendResolved,
+		Status:          apiopenapi.OpsNotificationChannelStatus(channel.Status),
+		Type:            apiopenapi.OpsNotificationChannelType(channel.Type),
+		UpdatedAt:       channel.UpdatedAt,
+	}
+}
+
+func toAPIOpsNotificationDelivery(delivery operationscontract.NotificationDelivery) apiopenapi.OpsNotificationDelivery {
+	out := apiopenapi.OpsNotificationDelivery{
+		AlertEventId:  apiopenapi.Id(strconv.Itoa(delivery.AlertEventID)),
+		AlertStatus:   apiopenapi.OpsAlertStatus(delivery.AlertStatus),
+		AttemptCount:  delivery.AttemptCount,
+		ChannelId:     apiopenapi.Id(strconv.Itoa(delivery.ChannelID)),
+		CreatedAt:     delivery.CreatedAt,
+		Id:            apiopenapi.Id(strconv.Itoa(delivery.ID)),
+		NextAttemptAt: delivery.NextAttemptAt,
+		Severity:      apiopenapi.OpsAlertSeverity(delivery.Severity),
+		Status:        apiopenapi.OpsNotificationDeliveryStatus(delivery.Status),
+		Target:        delivery.Target,
+		UpdatedAt:     delivery.UpdatedAt,
+	}
+	if delivery.AlertSummary != "" {
+		alertSummary := delivery.AlertSummary
+		out.AlertSummary = &alertSummary
+	}
+	if !delivery.AlertStartedAt.IsZero() {
+		alertStartedAt := delivery.AlertStartedAt
+		out.AlertStartedAt = &alertStartedAt
+	}
+	if !delivery.AlertUpdatedAt.IsZero() {
+		alertUpdatedAt := delivery.AlertUpdatedAt
+		out.AlertUpdatedAt = &alertUpdatedAt
+	}
+	if delivery.ChannelName != "" {
+		channelName := delivery.ChannelName
+		out.ChannelName = &channelName
+	}
+	if delivery.ChannelType != "" {
+		channelType := apiopenapi.OpsNotificationChannelType(delivery.ChannelType)
+		out.ChannelType = &channelType
+	}
+	if delivery.LastError != "" {
+		lastError := delivery.LastError
+		out.LastError = &lastError
+	}
+	out.DeliveredAt = delivery.DeliveredAt
+	out.LastAttemptAt = delivery.LastAttemptAt
+	return out
+}
+
 func toCreateAlertRuleRequest(body apiopenapi.CreateOpsAlertRuleRequest) (operationscontract.CreateAlertRuleRequest, error) {
 	scope, err := toAlertRuleScope(body.Scope)
 	if err != nil {
@@ -139,6 +199,43 @@ func toUpdateAlertRuleRequest(body apiopenapi.UpdateOpsAlertRuleRequest) (operat
 	return req, nil
 }
 
+func toCreateNotificationChannelRequest(body apiopenapi.CreateOpsNotificationChannelRequest) operationscontract.CreateNotificationChannelRequest {
+	req := operationscontract.CreateNotificationChannelRequest{
+		Name:            body.Name,
+		Type:            operationscontract.NotificationChannelType(body.Type),
+		EmailRecipients: fromAPIEmailRecipients(body.EmailRecipients),
+		SendResolved:    body.SendResolved,
+	}
+	if body.Status != nil {
+		status := operationscontract.NotificationChannelStatus(*body.Status)
+		req.Status = &status
+	}
+	if body.MinSeverity != nil {
+		req.MinSeverity = operationscontract.AlertSeverity(*body.MinSeverity)
+	}
+	return req
+}
+
+func toUpdateNotificationChannelRequest(body apiopenapi.UpdateOpsNotificationChannelRequest) operationscontract.UpdateNotificationChannelRequest {
+	req := operationscontract.UpdateNotificationChannelRequest{
+		Name:         body.Name,
+		SendResolved: body.SendResolved,
+	}
+	if body.Status != nil {
+		status := operationscontract.NotificationChannelStatus(*body.Status)
+		req.Status = &status
+	}
+	if body.MinSeverity != nil {
+		severity := operationscontract.AlertSeverity(*body.MinSeverity)
+		req.MinSeverity = &severity
+	}
+	if body.EmailRecipients != nil {
+		recipients := fromAPIEmailRecipients(*body.EmailRecipients)
+		req.EmailRecipients = &recipients
+	}
+	return req
+}
+
 func toCreateAlertSilenceRequest(body apiopenapi.CreateOpsAlertSilenceRequest) (operationscontract.CreateAlertSilenceRequest, error) {
 	matcher, err := toAlertSilenceMatcher(body.Matcher)
 	if err != nil {
@@ -155,6 +252,69 @@ func toCreateAlertSilenceRequest(body apiopenapi.CreateOpsAlertSilenceRequest) (
 		req.StartsAt = *body.StartsAt
 	}
 	return req, nil
+}
+
+func notificationDeliveryListOptionsFromRequest(r *http.Request) (operationscontract.DeliveryListOptions, error) {
+	opts := operationscontract.DeliveryListOptions{Limit: listLimitFromRequest(r, 100, 500)}
+	q := r.URL.Query()
+	if raw := strings.TrimSpace(q.Get("channel_id")); raw != "" {
+		channelID, err := strconv.Atoi(raw)
+		if err != nil || channelID <= 0 {
+			return operationscontract.DeliveryListOptions{}, operationsservice.ErrInvalidInput
+		}
+		opts.ChannelID = channelID
+	}
+	if raw := strings.TrimSpace(q.Get("status")); raw != "" {
+		status := operationscontract.NotificationDeliveryStatus(raw)
+		switch status {
+		case operationscontract.NotificationDeliveryStatusPending,
+			operationscontract.NotificationDeliveryStatusDelivered,
+			operationscontract.NotificationDeliveryStatusFailed:
+			opts.Status = status
+		default:
+			return operationscontract.DeliveryListOptions{}, operationsservice.ErrInvalidInput
+		}
+	}
+	return opts, nil
+}
+
+func listLimitFromRequest(r *http.Request, defaultLimit int, maxLimit int) int {
+	page := 1
+	if raw := strings.TrimSpace(r.URL.Query().Get("page")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			page = parsed
+		}
+	}
+	pageSize := defaultLimit
+	if raw := strings.TrimSpace(r.URL.Query().Get("page_size")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			pageSize = parsed
+		}
+	}
+	limit := page * pageSize
+	if limit < defaultLimit {
+		limit = defaultLimit
+	}
+	if limit > maxLimit {
+		return maxLimit
+	}
+	return limit
+}
+
+func toAPIEmailRecipients(values []string) []openapi_types.Email {
+	out := make([]openapi_types.Email, 0, len(values))
+	for _, value := range values {
+		out = append(out, openapi_types.Email(value))
+	}
+	return out
+}
+
+func fromAPIEmailRecipients(values []openapi_types.Email) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		out = append(out, string(value))
+	}
+	return out
 }
 
 func toAlertRuleScope(value *apiopenapi.OpsAlertRuleScope) (operationscontract.AlertRuleScope, error) {

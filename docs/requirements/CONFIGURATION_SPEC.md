@@ -373,6 +373,9 @@ ACCOUNT_HEALTH_PROBE_MIN_SAMPLES_FOR_ERROR_RATE=3
 ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS=300
 SLO_EVALUATOR_INTERVAL_SECONDS=60
 SLO_EVALUATOR_TIMEOUT_SECONDS=30
+OPS_ALERT_NOTIFICATIONS_INTERVAL_SECONDS=30
+OPS_ALERT_NOTIFICATIONS_TIMEOUT_SECONDS=30
+OPS_ALERT_NOTIFICATIONS_BATCH_LIMIT=20
 ```
 
 运维实时 WebSocket 限额应作为部署级 circuit breaker。
@@ -382,6 +385,8 @@ SLO_EVALUATOR_TIMEOUT_SECONDS=30
 账号健康探测 worker 默认每 5 分钟探测一次活跃 API-key provider account，单个探测 10 秒超时，并发上限为 8。连续 3 次失败或最小样本数内错误率超过 50% 时写入 unhealthy 快照和 cooldown metadata，scheduler 会基于 `cooldown_active` / `circuit_open` 避开该账号。
 
 SLO evaluator worker 默认每 1 分钟读取 `obs_slo_definitions` 与 `usage_logs`，用 availability SLO 的长/短窗口 burn-rate 阈值生成、更新或自动恢复 `obs_alert_events`。单次 evaluation 默认 30 秒超时；告警 details 只包含 SLO id/name、窗口秒数、请求计数和 burn-rate 数值，不包含 API key、credential、prompt、request body 或 provider secret。
+
+Ops alert notification worker 默认每 30 秒读取到期的 `obs_notification_deliveries`，按批量上限投递内置 email 通道，并把每次成功/失败写回投递证据。`OPS_ALERT_NOTIFICATIONS_BATCH_LIMIT` 默认 `20`，上限由 service 侧保护；SMTP 连接信息仍来自 `EMAIL_SMTP_*` 部署环境变量，不进入 Admin Settings 或通知通道响应。
 
 ## 15. Payment
 

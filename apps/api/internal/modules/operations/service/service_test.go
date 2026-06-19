@@ -571,30 +571,38 @@ func TestEvaluateSLOAlertsCreatesUpdatesAndResolvesBurnRateAlerts(t *testing.T) 
 }
 
 type captureObservabilityStore struct {
-	nextSLOID     int
-	nextAlertID   int
-	nextRuleID    int
-	nextSilenceID int
-	nextLogID     int
-	slos          map[int]contract.SLODefinition
-	alerts        map[int]contract.AlertEvent
-	rules         map[int]contract.AlertRule
-	silences      map[int]contract.AlertSilence
-	systemLogs    []contract.OpsSystemLog
-	usageLogs     []usagecontract.UsageLog
+	nextSLOID      int
+	nextAlertID    int
+	nextRuleID     int
+	nextSilenceID  int
+	nextChannelID  int
+	nextDeliveryID int
+	nextLogID      int
+	slos           map[int]contract.SLODefinition
+	alerts         map[int]contract.AlertEvent
+	rules          map[int]contract.AlertRule
+	silences       map[int]contract.AlertSilence
+	channels       map[int]contract.NotificationChannel
+	deliveries     map[int]contract.NotificationDelivery
+	systemLogs     []contract.OpsSystemLog
+	usageLogs      []usagecontract.UsageLog
 }
 
 func newCaptureObservabilityStore() *captureObservabilityStore {
 	return &captureObservabilityStore{
-		nextSLOID:     1,
-		nextAlertID:   1,
-		nextRuleID:    1,
-		nextSilenceID: 1,
-		nextLogID:     1,
-		slos:          map[int]contract.SLODefinition{},
-		alerts:        map[int]contract.AlertEvent{},
-		rules:         map[int]contract.AlertRule{},
-		silences:      map[int]contract.AlertSilence{},
+		nextSLOID:      1,
+		nextAlertID:    1,
+		nextRuleID:     1,
+		nextSilenceID:  1,
+		nextChannelID:  1,
+		nextDeliveryID: 1,
+		nextLogID:      1,
+		slos:           map[int]contract.SLODefinition{},
+		alerts:         map[int]contract.AlertEvent{},
+		rules:          map[int]contract.AlertRule{},
+		silences:       map[int]contract.AlertSilence{},
+		channels:       map[int]contract.NotificationChannel{},
+		deliveries:     map[int]contract.NotificationDelivery{},
 	}
 }
 
@@ -825,6 +833,108 @@ func (s *captureObservabilityStore) DeleteAlertSilence(_ context.Context, id int
 	}
 	delete(s.silences, id)
 	return nil
+}
+
+func (s *captureObservabilityStore) CreateNotificationChannel(_ context.Context, input contract.NotificationChannel) (contract.NotificationChannel, error) {
+	input.ID = s.nextChannelID
+	s.nextChannelID++
+	s.channels[input.ID] = input
+	return input, nil
+}
+
+func (s *captureObservabilityStore) UpdateNotificationChannel(_ context.Context, input contract.NotificationChannel) (contract.NotificationChannel, error) {
+	if _, ok := s.channels[input.ID]; !ok {
+		return contract.NotificationChannel{}, ErrNotFound
+	}
+	s.channels[input.ID] = input
+	return input, nil
+}
+
+func (s *captureObservabilityStore) FindNotificationChannelByID(_ context.Context, id int) (contract.NotificationChannel, error) {
+	value, ok := s.channels[id]
+	if !ok {
+		return contract.NotificationChannel{}, ErrNotFound
+	}
+	return value, nil
+}
+
+func (s *captureObservabilityStore) ListNotificationChannels(_ context.Context) ([]contract.NotificationChannel, error) {
+	out := make([]contract.NotificationChannel, 0, len(s.channels))
+	for _, value := range s.channels {
+		out = append(out, value)
+	}
+	return out, nil
+}
+
+func (s *captureObservabilityStore) DeleteNotificationChannel(_ context.Context, id int) error {
+	if _, ok := s.channels[id]; !ok {
+		return ErrNotFound
+	}
+	delete(s.channels, id)
+	return nil
+}
+
+func (s *captureObservabilityStore) CreateNotificationDelivery(_ context.Context, input contract.NotificationDelivery) (contract.NotificationDelivery, error) {
+	input.ID = s.nextDeliveryID
+	s.nextDeliveryID++
+	s.deliveries[input.ID] = input
+	return input, nil
+}
+
+func (s *captureObservabilityStore) UpdateNotificationDelivery(_ context.Context, input contract.NotificationDelivery) (contract.NotificationDelivery, error) {
+	if _, ok := s.deliveries[input.ID]; !ok {
+		return contract.NotificationDelivery{}, ErrNotFound
+	}
+	s.deliveries[input.ID] = input
+	return input, nil
+}
+
+func (s *captureObservabilityStore) ListNotificationDeliveries(_ context.Context, opts contract.DeliveryListOptions) ([]contract.NotificationDelivery, error) {
+	out := make([]contract.NotificationDelivery, 0, len(s.deliveries))
+	for _, value := range s.deliveries {
+		if opts.ChannelID > 0 && value.ChannelID != opts.ChannelID {
+			continue
+		}
+		if opts.Status != "" && value.Status != opts.Status {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out, nil
+}
+
+func (s *captureObservabilityStore) ListDueNotificationDeliveries(_ context.Context, now time.Time, limit int) ([]contract.DueDelivery, error) {
+	out := []contract.DueDelivery{}
+	for _, delivery := range s.deliveries {
+		if delivery.Status != contract.NotificationDeliveryStatusPending && delivery.Status != contract.NotificationDeliveryStatusFailed {
+			continue
+		}
+		if delivery.NextAttemptAt.After(now) {
+			continue
+		}
+		channel, ok := s.channels[delivery.ChannelID]
+		if !ok || channel.Status != contract.NotificationChannelStatusActive {
+			continue
+		}
+		alert, ok := s.alerts[delivery.AlertEventID]
+		if !ok {
+			continue
+		}
+		out = append(out, contract.DueDelivery{Delivery: delivery, Channel: channel, Alert: alert})
+	}
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
+func (s *captureObservabilityStore) FindNotificationDelivery(_ context.Context, channelID int, alertEventID int, alertStatus contract.AlertStatus, target string) (contract.NotificationDelivery, error) {
+	for _, value := range s.deliveries {
+		if value.ChannelID == channelID && value.AlertEventID == alertEventID && value.AlertStatus == alertStatus && value.Target == target {
+			return value, nil
+		}
+	}
+	return contract.NotificationDelivery{}, ErrNotFound
 }
 
 func findAlertByRule(t *testing.T, alerts []contract.AlertEvent, ruleID string) contract.AlertEvent {

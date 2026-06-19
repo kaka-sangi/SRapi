@@ -2,7 +2,7 @@
 
 > 状态：已落地（v0.1.0）。本文档描述的数据模型已经实现并随产品发布。
 > 真正的权威来源是仓库中的 **`apps/api/ent/schema/`（Ent schema）** 和
-> **`apps/api/migrations/postgres/up/`（Atlas 迁移，截至 `000033`）**；当本文档
+> **`apps/api/migrations/postgres/up/`（Atlas 迁移，截至 `000053`）**；当本文档
 > 与代码出现差异时，以 schema 与迁移为准。本文档保留设计取舍和分组解释，便于阅读。
 
 ## 1. 目标
@@ -1985,7 +1985,7 @@ updated_at
 - AdminOps runtime 会按规则名幂等创建内置基线规则；同名现有规则保留 operator 修改后的阈值、启用状态和 scope。
 - `scope_json` 只保存低基数过滤维度，不得保存请求体、凭证或 prompt。
 
-### 15B.5 obs_alert_silences
+### 15B.6 obs_alert_silences
 
 告警静默窗口（迁移 `000032`），用于在维护期内抑制匹配告警。
 
@@ -2000,7 +2000,73 @@ created_at
 updated_at
 ```
 
-### 15B.6 scheduled_test_plans / scheduled_test_plan_runs
+### 15B.7 obs_notification_channels
+
+AdminOps 内置告警通知通道表（迁移 `000053`）。当前只暴露 `email` 通道；webhook、钉钉、飞书、企业微信等未实现通道不得写入合同或前端。
+
+```txt
+id
+name
+channel_type
+status
+min_severity
+config_json
+send_resolved
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(name)
+index(status, channel_type)
+```
+
+规则：
+
+- `channel_type` 当前只允许 `email`；不保存 webhook URL、token 或外部 secret。
+- `config_json.email_recipients` 只保存规范化后的目标邮箱列表；SMTP host、username、password 和 from address 只来自部署环境。
+- `min_severity` 使用 `ticket`、`warning`、`critical`，低于阈值的告警不会生成投递记录。
+- `send_resolved=false` 时只生成 firing 投递记录；resolved 事件仍保留在 `obs_alert_events`。
+
+### 15B.8 obs_notification_deliveries
+
+AdminOps 告警通知投递证据表（迁移 `000053`）。它记录“应投递/已投递/失败”的证据，不复制 alert `details_json`，不保存邮件正文。
+
+```txt
+id
+channel_id
+alert_event_id
+alert_status
+severity
+status
+target
+attempt_count
+last_error
+next_attempt_at
+delivered_at nullable
+last_attempt_at nullable
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(channel_id, alert_event_id, alert_status, target)
+index(status, next_attempt_at)
+index(channel_id, created_at)
+index(alert_event_id, created_at)
+```
+
+规则：
+
+- `target` 是规范化邮箱或未来通道的低敏目标标识；不得保存 credential、Authorization、cookie 或 webhook secret。
+- worker 每次尝试递增 `attempt_count`，成功写 `delivered_at`，失败写限长 `last_error` 并设置下一次重试时间。
+- delivery API 可水合 channel name/type 和 alert summary/timestamps，仍不得返回 alert details 原文。
+
+### 15B.9 scheduled_test_plans / scheduled_test_plan_runs
 
 计划巡检（定时探测账号/渠道健康）的计划表与运行结果表（迁移 `000032`）。
 
@@ -2287,7 +2353,7 @@ user_totp_secrets.secret_ciphertext
 ## 20. 表清单（核心一等表）
 
 下列为已落库的核心一等表（非穷尽列表）。**权威、完整的表清单以
-`apps/api/migrations/postgres/up/`（截至 `000033`）和 `apps/api/ent/schema/` 为准**；
+`apps/api/migrations/postgres/up/`（截至 `000053`）和 `apps/api/ent/schema/` 为准**；
 本文档随迁移演进，可能滞后于代码。除下表外，还包括 §9A 的限额/配额/payload 表、
 §15B/§15C 的告警、计划巡检、渠道监控、可用性聚合、错误透传、TLS 指纹画像和用户属性表，
 以及订阅/支付/返利相关表（§12–§13）。

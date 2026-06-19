@@ -1,4 +1,4 @@
-h1:MHFAD8KiOVedGNeHcMDDInS9e7Wo5njw5vFcpIgSlcM=
+h1:JJY80ocnP9zc1T50LFw1svOzgq22UUCaZq4iv/uSZFc=
 000001_initial_schema.sql h1:cyZ0pax3l7J4onSmEmgqPwpoJYXPXuJYXeTAGUOEHs4=
 000002_auth_sessions.sql h1:zJ6uEWQDpw4sa3JpABmlbbFR2Sy3JCceNl4UnBtcX9c=
 000003_api_key_concurrency_limit.sql h1:j/8OE2iF7+LUa5XCsyYSC4dvN1Vh2cihbc41rySg4OQ=
@@ -49,4 +49,6 @@ h1:MHFAD8KiOVedGNeHcMDDInS9e7Wo5njw5vFcpIgSlcM=
 000048_proxy_country_and_availability.sql h1:R98IxXbtgXiaKKrmky2OmxQIJK3S0rsdssG6SDZwsdQ=
 000049_provider_account_oauth_refresh.sql h1:GDGG1zpT/SkvfVa0++58Ekt14m/Vx16feu41/2IlWEE=
 000050_backup_snapshots.sql h1:2IdeZ0IyC5JLkyoeTiXnHNmzW8huXx8kKl8JnvAMOl8=
-000051_ops_error_logs.sql h1:xcFF7/YWmZ+XLA4IA4owPX9bY0P0smIA/mCegx/Cd4k=
+000051_ops_error_logs.sql h1:pIk3SmBQFPPUHULLSCIHVRiIAJzJKk5TN7oWRr6imoo=
+000052_ops_error_log_api_key_prefix.sql h1:YSBjYzwuGNjR7B6zHGnChO660aHPLsP6H+6S4kktN30=
+000053_ops_notification_channels.sql h1:ifMWdh+AnxAL1yOKrXL1/MCnaTVef+1u5djeyZjHAnQ=

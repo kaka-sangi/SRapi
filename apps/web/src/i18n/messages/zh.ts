@@ -344,7 +344,8 @@ export const zh: Messages = {
   },
   tour: {
     quickSetupTitle: "快速配置",
-    quickSetupContent: "从这里开始添加第一个上游服务商。选择平台、粘贴 API Key，SRapi 帮你搞定其余一切。",
+    quickSetupContent:
+      "从这里开始添加第一个上游服务商。选择平台、粘贴 API Key，SRapi 帮你搞定其余一切。",
     accountsTitle: "上游账号",
     accountsContent: "所有上游 API 账号都在这里。一目了然地查看健康状态、配额和熔断器。",
     modelsTitle: "模型注册",
@@ -458,7 +459,7 @@ export const zh: Messages = {
     groupsPlaceholder: "全部账号(不限分组)",
     groupsSearch: "搜索分组…",
     groupsEmpty: "还没有分组——留空即可使用全部账号。",
-    groupsUseId: '使用分组 ID “{id}”',
+    groupsUseId: "使用分组 ID “{id}”",
     accessControl: "访问与限流",
     allowedIps: "允许的 IP",
     allowedIpsHint: "允许使用此密钥的 IP 或 CIDR 段，留空表示不限。需配合可信反代。",
@@ -515,7 +516,8 @@ export const zh: Messages = {
     onboardingBaseUrl: "接入地址",
     onboardingPasteLabel: "粘贴密钥(可选)",
     onboardingPasteHint: "粘贴后示例中将内联真实密钥并可在线测试;密钥只会发送给本网关。",
-    onboardingClaudeCodeHint: "让 Claude Code 直接走本网关。任何兼容 Anthropic 协议的客户端都可使用同样的环境变量。",
+    onboardingClaudeCodeHint:
+      "让 Claude Code 直接走本网关。任何兼容 Anthropic 协议的客户端都可使用同样的环境变量。",
     onboardingTest: "测试此密钥",
     onboardingTestOk: "密钥可用 — {count} 个模型({ms}ms)",
     onboardingTestFail: "测试失败:{message}",
@@ -848,10 +850,12 @@ export const zh: Messages = {
     bulkDisableTitle: "停用 {count} 个账号？",
     bulkDisableBody: "选中的账号将停止接收流量，直到重新启用。",
     bulkDeleteTitle: "删除 {count} 个账号？",
-    bulkDeleteBody: "选中的账号将被软删除（调度器与列表不再可见），历史记录保留以供审计。此操作无法撤销。",
+    bulkDeleteBody:
+      "选中的账号将被软删除（调度器与列表不再可见），历史记录保留以供审计。此操作无法撤销。",
     bulkSetConcurrency: "设置并发",
     bulkSetConcurrencyTitle: "为 {count} 个账号设置最大并发",
-    bulkSetConcurrencyHint: "每个账号的最大在途请求并发数（调度器在入口校验该值）。0 表示清除上限。",
+    bulkSetConcurrencyHint:
+      "每个账号的最大在途请求并发数（调度器在入口校验该值）。0 表示清除上限。",
     bulkRefreshTokens: "刷新令牌",
     bulkRotateCredentials: "轮换凭据",
     bulkRotateTitle: "轮换选中账号的凭据",
@@ -875,7 +879,8 @@ export const zh: Messages = {
     bulkQuotaFetch: "刷新配额",
     archive: "归档",
     archiveTitle: "归档此账号？",
-    archiveBody: "账号将从列表隐藏并停止参与调度，但历史用量与审计记录会保留。可在管理员副驾驶或将状态改回启用来恢复。",
+    archiveBody:
+      "账号将从列表隐藏并停止参与调度，但历史用量与审计记录会保留。可在管理员副驾驶或将状态改回启用来恢复。",
     deleteTitle: "删除此账号？",
     deleteBody: "账号及其健康/配额历史将被永久删除，此操作不可撤销。",
     testOk: "连接正常",
@@ -948,7 +953,8 @@ export const zh: Messages = {
     namePrefix: "名称前缀",
     namePrefixPlaceholder: "例如：openai",
     lines: "账号（每行一个）",
-    linesPlaceholder: "https://api.example.com/v1|sk-abc123\nhttps://api.other.com/v1|sk-xyz789\nsk-只填key则使用默认地址",
+    linesPlaceholder:
+      "https://api.example.com/v1|sk-abc123\nhttps://api.other.com/v1|sk-xyz789\nsk-只填key则使用默认地址",
     linesHint: "格式：base_url|api_key 或 base_url,api_key 或仅 api_key。以 # 开头的行会被忽略。",
     linesRequired: "请至少输入一行账号。",
     submit: "添加账号",
@@ -1036,11 +1042,13 @@ export const zh: Messages = {
     create: "新建账号组",
     edit: "编辑账号组",
     deleteTitle: "删除账号组",
-    deleteBody: "确定要删除账号组「{name}」吗？组内成员关系和限速策略会一并清除，组内的上游账号本身不受影响。此操作不可撤销。",
+    deleteBody:
+      "确定要删除账号组「{name}」吗？组内成员关系和限速策略会一并清除，组内的上游账号本身不受影响。此操作不可撤销。",
     strategy: "调度策略",
     strategyHint: "组内账号在路由时的排序策略。",
     rateMultiplier: "计费倍率",
-    rateMultiplierHint: "应用于组内账号每次请求扣费的小数倍率（如 0.8 表示 8 折，1.5 表示加价 50%）。留空则保留现有值。",
+    rateMultiplierHint:
+      "应用于组内账号每次请求扣费的小数倍率（如 0.8 表示 8 折，1.5 表示加价 50%）。留空则保留现有值。",
     bulkSetMultiplier: "批量设置倍率",
     bulkSetMultiplierTitle: "为 {count} 个分组设置计费倍率",
     bulkSetMultiplierHint: "大于 0 的小数（如 0.5, 1.25）。将应用到所有选中分组。",
@@ -1097,7 +1105,8 @@ export const zh: Messages = {
     keyUnbound: "未绑定任何分组,可直接使用你刚刚配置的全部账号。",
     keyFailed: "创建密钥失败",
     noModelsTitle: "尚未关联任何模型",
-    noModelsBody: "该供应商还没有模型映射，目前没有模型会路由到它。请先在“模型”中添加映射，再创建密钥。",
+    noModelsBody:
+      "该供应商还没有模型映射，目前没有模型会路由到它。请先在“模型”中添加映射，再创建密钥。",
     selectAll: "全选",
     selectNone: "清除",
     advanced: "高级选项",
@@ -1132,12 +1141,15 @@ export const zh: Messages = {
     cooldown: "账号刚出错,正在冷却中。请稍候重试,或检查账号健康状态。",
     quotaExhausted: "账号配额已用尽。请等待重置,或添加另一个账号。",
     disabled: "账号或供应商已被禁用。请启用后再路由请求。",
-    contentSafety: "内容安全拦截了此请求——提示词或回复命中了安全规则。请调整内容,或检查内容安全设置。",
-    stickySession: "请求被固定到某个特定账号(会话粘性),而该账号当前不可用。请重试,或放宽会话粘性设置。",
+    contentSafety:
+      "内容安全拦截了此请求——提示词或回复命中了安全规则。请调整内容,或检查内容安全设置。",
+    stickySession:
+      "请求被固定到某个特定账号(会话粘性),而该账号当前不可用。请重试,或放宽会话粘性设置。",
     costLimited: "已达到费用/消费上限。请等待窗口重置,或调高/移除该密钥、账号或套餐上的上限。",
     modelNotSupported: "所选账号不支持该上游模型。请改用该账号支持的模型。",
     modelNotFound: "请求的模型名在系统中不存在。请检查模型名,或为它添加别名。",
-    modelNotAllowed: "该 API 密钥不允许使用此模型。请把它加入密钥的允许模型,或将该列表留空以允许全部模型。",
+    modelNotAllowed:
+      "该 API 密钥不允许使用此模型。请把它加入密钥的允许模型,或将该列表留空以允许全部模型。",
     insufficientBalance: "余额不足。请充值,或关闭“必须有正余额”的开关。",
     ipNotAllowed: "你的 IP 不在该密钥的白名单内。请添加你的 IP,或清空白名单。",
     riskBlocked: "风控拦截了此请求。请检查风控设置。",
@@ -1161,7 +1173,8 @@ export const zh: Messages = {
     create: "新建供应商",
     edit: "编辑供应商",
     deleteTitle: "删除供应商",
-    deleteBody: "确定要删除供应商「{name}」吗？若仍有上游账号属于它，需先归档或删除这些账号，否则无法删除。此操作不可撤销。",
+    deleteBody:
+      "确定要删除供应商「{name}」吗？若仍有上游账号属于它，需先归档或删除这些账号，否则无法删除。此操作不可撤销。",
     test: "测试连通性",
     installPresets: "安装预设",
     installingPresets: "安装中…",
@@ -1180,7 +1193,8 @@ export const zh: Messages = {
     family: "系列",
     familyHelp: "相关模型的分组标签（如 gpt-4、claude-3）。用于展示和筛选，不影响路由。",
     contextWindow: "上下文窗口",
-    contextWindowHelp: "模型单次请求接受的最大总 token 数（输入+输出）。请与供应商公布的限制保持一致。",
+    contextWindowHelp:
+      "模型单次请求接受的最大总 token 数（输入+输出）。请与供应商公布的限制保持一致。",
     maxOutput: "最大输出 tokens",
     maxOutputHelp: "模型单次响应可生成的最大 token 数。超出此值的请求会被截断。",
     qualityTier: "质量档位",
@@ -1209,7 +1223,8 @@ export const zh: Messages = {
     fallbackModelsHint: "每行一个标准模型名；该模型不可用时按序回退。",
     addMapping: "添加跨厂商映射",
     deleteTitle: "删除此模型？",
-    deleteBody: "模型及其别名、跨厂商映射都会被移除，之后将无法再被请求。历史用量记录保留。此操作不可撤销。",
+    deleteBody:
+      "模型及其别名、跨厂商映射都会被移除，之后将无法再被请求。历史用量记录保留。此操作不可撤销。",
     mappingTitle: "新建跨厂商映射",
     mappingProvider: "供应商",
     upstreamModelName: "上游模型名",
@@ -1249,9 +1264,11 @@ export const zh: Messages = {
     edit: "编辑代理",
     urlEditHint: "留空则保持现有 URL 不变。",
     deleteTitle: "删除代理",
-    deleteBody: "确定要删除代理「{name}」吗？通过 ID 绑定该代理的上游账号会自动解绑、改为直连。此操作不可撤销。",
+    deleteBody:
+      "确定要删除代理「{name}」吗？通过 ID 绑定该代理的上游账号会自动解绑、改为直连。此操作不可撤销。",
     bulkDeleteTitle: "批量删除代理",
-    bulkDeleteBody: "确定删除已选 {count} 个代理？绑定到这些代理的上游账号会自动解绑、改为直连。此操作不可撤销。",
+    bulkDeleteBody:
+      "确定删除已选 {count} 个代理？绑定到这些代理的上游账号会自动解绑、改为直连。此操作不可撤销。",
   },
   adminRateLimit: {
     title: "{name} · 限流",
@@ -1272,7 +1289,8 @@ export const zh: Messages = {
     subtitle: "用户的有效订阅。套餐目录请在「套餐」中管理。",
     bulkAssign: "批量分配套餐",
     bulkAssignTitle: "批量分配订阅套餐",
-    bulkAssignBody: "每行一条：user_id,plan_id。如果存在相同 (user, source) 的订阅会幂等复用；否则新建。",
+    bulkAssignBody:
+      "每行一条：user_id,plan_id。如果存在相同 (user, source) 的订阅会幂等复用；否则新建。",
     bulkAssignInputLabel: "用户 → 套餐分配",
     bulkAssignBadLine: "格式错误。使用 user_id,plan_id。",
     bulkAssignEmpty: "至少添加一行。",
@@ -1301,7 +1319,8 @@ export const zh: Messages = {
     presetProDesc: "专业套餐，更高额度",
     presetEnterpriseDesc: "企业套餐，不限额度",
     deletePlanTitle: "删除套餐",
-    deletePlanBody: "确定要删除套餐「{name}」吗？该套餐将不再可售；已订阅的用户不受影响——权益在订阅时已快照保存。此操作不可撤销。",
+    deletePlanBody:
+      "确定要删除套餐「{name}」吗？该套餐将不再可售；已订阅的用户不受影响——权益在订阅时已快照保存。此操作不可撤销。",
     validityDays: "有效天数",
     entitlements: "权益",
     allowedModels: "可用模型",
@@ -1321,7 +1340,8 @@ export const zh: Messages = {
     costQuotaModeAllowance: "包含额度 — 超额计入余额",
     costQuotaModeHint: "设置任一费用额度时生效。",
     schedulerStrategy: "调度策略",
-    schedulerStrategyHelp: "网关选择上游账号的方式：默认使用系统配置，cost 选最便宜，quality 选最高档位，latency 选最快。",
+    schedulerStrategyHelp:
+      "网关选择上游账号的方式：默认使用系统配置，cost 选最便宜，quality 选最高档位，latency 选最快。",
     schedulerDefault: "系统默认",
     accountGroupScope: "账号组范围",
     accountGroupScopeHint: "将路由限制到这些账号组。",
@@ -1417,7 +1437,8 @@ export const zh: Messages = {
     usagesEmpty: "暂无使用记录。",
     createRedeem: "新建兑换码",
     deleteRedeemTitle: "删除兑换码",
-    deleteRedeemBody: "确定要删除兑换码「{code}」吗？该兑换码记录将被彻底移除（已发生的兑换入账不受影响）。此操作不可撤销。",
+    deleteRedeemBody:
+      "确定要删除兑换码「{code}」吗？该兑换码记录将被彻底移除（已发生的兑换入账不受影响）。此操作不可撤销。",
     batchGenerate: "批量生成",
     maxRedemptions: "可兑换次数",
     generatedTitle: "已生成兑换码",
@@ -1438,8 +1459,7 @@ export const zh: Messages = {
     extendRequired: "请选择新的到期时间。",
     deleteSelected: "删除所选",
     deleteSelectedTitle: "删除 {count} 个兑换码？",
-    deleteSelectedBody:
-      "所选兑换码将被彻底删除，无记录保留。若要保留审计轨迹，请改用「停用」。",
+    deleteSelectedBody: "所选兑换码将被彻底删除，无记录保留。若要保留审计轨迹，请改用「停用」。",
     bulkEditSelected: "批量编辑",
     bulkEditTitle: "批量编辑 {count} 个兑换码",
     bulkEditBody: "勾选要修改的字段，未勾选的字段在每行中保持不变。",
@@ -1857,7 +1877,8 @@ export const zh: Messages = {
     toggleEnabled: "规则已启用",
     toggleDisabled: "规则已停用",
     params: "参数",
-    paramsHint: "点路径 → 值（如 reasoning.effort → high）。值会尽量按 JSON 解析；filter 仅取路径。",
+    paramsHint:
+      "点路径 → 值（如 reasoning.effort → high）。值会尽量按 JSON 解析；filter 仅取路径。",
     allActions: "全部动作",
     searchPlaceholder: "搜索名称、路径、模型…",
     emptyTitle: "暂无改写规则",
@@ -1967,9 +1988,11 @@ export const zh: Messages = {
     revokeBody: "确定吊销“{name}”（{prefix}）？使用该密钥的请求将立即失效，之后可重新启用。",
     resetUsage: "重置用量",
     resetUsageTitle: "重置滚动用量计数",
-    resetUsageBody: "将“{name}”（{prefix}）的 5h / 1d / 7d 费用用量计数重置为零并清理窗口起点，使其能继续处理请求？下一次扣费将开启新窗口。",
+    resetUsageBody:
+      "将“{name}”（{prefix}）的 5h / 1d / 7d 费用用量计数重置为零并清理窗口起点，使其能继续处理请求？下一次扣费将开启新窗口。",
     emptyTitle: "暂无 API 密钥",
-    emptyBody: "这是只读审计视图。请在“工作区 · API 密钥”页面创建密钥；任意用户创建的密钥都会显示在这里。",
+    emptyBody:
+      "这是只读审计视图。请在“工作区 · API 密钥”页面创建密钥；任意用户创建的密钥都会显示在这里。",
   },
   adminUserQuota: {
     title: "平台消费配额",
@@ -2300,6 +2323,37 @@ export const zh: Messages = {
       deleteConfirm: "删除该静默？",
       anyMatcher: "匹配任意告警",
     },
+    notificationChannels: {
+      title: "通知通道",
+      subtitle: "将运维告警投递给值班邮箱，并留下投递证据。",
+      create: "新建通道",
+      edit: "编辑通道",
+      empty: "暂无通知通道",
+      emptyBody: "创建邮件通道后，触发告警会产生可追踪的投递记录。",
+      name: "名称",
+      status: "状态",
+      active: "启用",
+      minSeverity: "最低级别",
+      recipients: "收件邮箱",
+      recipientsHint: "每行一个，或用逗号分隔。",
+      recipientsRequired: "请至少添加一个收件邮箱。",
+      sendResolved: "发送恢复告警",
+      sendsResolved: "触发 + 恢复",
+      firingOnly: "仅触发",
+      deleteConfirm: "删除该通知通道？",
+    },
+    notificationDeliveries: {
+      title: "投递证据",
+      subtitle: "最近的告警通知投递、重试与失败原因。",
+      empty: "暂无投递证据",
+      emptyBody: "告警通知尝试会显示在这里。",
+      attempts: "尝试",
+      status: {
+        pending: "待投递",
+        delivered: "已送达",
+        failed: "失败",
+      },
+    },
   },
   adminRisk: {
     title: "风控",
@@ -2318,7 +2372,8 @@ export const zh: Messages = {
     maxFailed: "每分钟最大失败请求数",
     maxFailedHelp: "上游返回 4xx/5xx 的请求。超过阈值会触发配置的动作（记录或拦截）。",
     maxCostPerDay: "每日最大花费",
-    maxCostPerDayHelp: "所有账号的每日消费上限（USD）。0 = 不限。超过后新请求将被拒绝，直到次日重置。",
+    maxCostPerDayHelp:
+      "所有账号的每日消费上限（USD）。0 = 不限。超过后新请求将被拒绝，直到次日重置。",
     cooldown: "冷却时长（秒）",
     cooldownHelp: "风控动作触发后，在此时间内抑制重复触发，避免告警风暴。",
     blockedCountries: "封禁国家/地区",
@@ -2494,7 +2549,7 @@ export const zh: Messages = {
     databaseBackups: "数据库备份",
     snapshotNow: "立即备份",
     snapshotEmpty: "尚未记录任何备份",
-    snapshotEmptyBody: "每日备份任务还没有运行。点击 \"立即备份\" 以按需创建一份。",
+    snapshotEmptyBody: '每日备份任务还没有运行。点击 "立即备份" 以按需创建一份。',
     snapshotStarted: "开始时间",
     snapshotSize: "文件大小",
     snapshotChecksum: "SHA-256",
@@ -2658,7 +2713,8 @@ export const zh: Messages = {
     removeImage: "移除图片",
     egressWarning: "消息、读取的数据与结果都会发送给所配置的模型。请勿粘贴密钥。",
     fileReadFailed: "无法读取该文件(可能过大,或不是文本文件)。",
-    fileUnsupported: "「{name}」暂不支持作为附件——请上传图片,或文本文件(.txt、.csv、.json、.log、.md、代码等)。",
+    fileUnsupported:
+      "「{name}」暂不支持作为附件——请上传图片,或文本文件(.txt、.csv、.json、.log、.md、代码等)。",
     emptyHint: "用自然语言提问。副驾驶可自由读取数据，做任何变更前都会先征求你的同意。",
     example1: "列出已禁用的账号",
     example2: "查看今天的用量",
@@ -2742,7 +2798,8 @@ export const zh: Messages = {
     edit: "编辑支付渠道",
     test: "测试配置",
     deleteTitle: "删除支付渠道",
-    deleteBody: "确定要删除支付渠道「{name}」吗？历史订单与审计记录会保留，但该渠道将停用且不再可选。若仍有进行中的订单引用它，将无法删除。",
+    deleteBody:
+      "确定要删除支付渠道「{name}」吗？历史订单与审计记录会保留，但该渠道将停用且不再可选。若仍有进行中的订单引用它，将无法删除。",
     name: "名称",
     channel: "渠道",
     channelHint: "网关类型，如 stripe、alipay、wechat。",
@@ -2785,7 +2842,8 @@ export const zh: Messages = {
     perRequestPrice: "按次价格",
     perRequestPriceHelp: "按次规则的固定价格，或图片规则未命中尺寸档时的备用单图价格。",
     intervals: "区间",
-    intervalsHelp: "JSON 数组，用于 token 阶梯或图片尺寸档。Token 阶梯使用 min_tokens/max_tokens 和每百万价格；图片档使用 image_size 和 per_image_price。",
+    intervalsHelp:
+      "JSON 数组，用于 token 阶梯或图片尺寸档。Token 阶梯使用 min_tokens/max_tokens 和每百万价格；图片档使用 image_size 和 per_image_price。",
     effectiveFrom: "生效起",
     effectiveFromHelp: "此定价的生效时间。留空 = 立即生效。",
     effectiveTo: "生效止",

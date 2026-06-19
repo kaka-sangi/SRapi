@@ -755,6 +755,8 @@ Authorization header, cookie, credential material, or provider secret.
 - SLO `objective` 请求可接受 `0.995` 或 `99.5`；响应统一返回比例值。
 - `GET /api/v1/admin/ops/alerts` 支持 `status`、`severity` 过滤。
 - `POST /api/v1/admin/ops/alerts/{id}/ack` 必须使用 CSRF，并且 audit 只记录 ack 摘要，不复制 alert `details`。
+- `GET/POST/PATCH/DELETE /api/v1/admin/ops/notification-channels{,/{id}}` 管理内置 Ops alert email 通道；响应只能返回通道元数据和收件目标，不得返回 SMTP secret。
+- `GET /api/v1/admin/ops/notification-deliveries` 返回 alert notification 投递证据，支持 `channel_id` 和 `status` 过滤；delivery 可水合 alert summary 和 channel name，但不得复制 alert details 或邮件正文。
 - `GET /api/v1/admin/ops/realtime/slots` 返回 active realtime slot 摘要和聚合计数；Redis 可用时该视图覆盖同一 Redis 后端上的 API 节点，本地降级模式只覆盖当前节点内存。它不是持久 upstream session pool 查询，且不得返回原始 affinity key、API key、credential、prompt 或 provider-specific frame。
 
 ## 5. 统一响应格式
@@ -1189,6 +1191,11 @@ POST /api/v1/admin/ops/alerts/{id}/ack
 GET  /api/v1/admin/ops/slo
 POST /api/v1/admin/ops/slo
 PATCH /api/v1/admin/ops/slo/{id}
+GET  /api/v1/admin/ops/notification-channels
+POST /api/v1/admin/ops/notification-channels
+PATCH /api/v1/admin/ops/notification-channels/{id}
+DELETE /api/v1/admin/ops/notification-channels/{id}
+GET  /api/v1/admin/ops/notification-deliveries
 GET  /api/v1/admin/ops/events/outbox
 GET  /api/v1/admin/ops/events/dead-letter
 POST /api/v1/admin/ops/events/{event_id}/replay

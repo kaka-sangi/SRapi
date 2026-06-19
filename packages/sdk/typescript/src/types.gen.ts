@@ -5377,6 +5377,12 @@ export type OpsAlertSeverity = 'critical' | 'warning' | 'ticket';
 
 export type OpsAlertStatus = 'firing' | 'acknowledged' | 'resolved' | 'suppressed';
 
+export type OpsNotificationChannelType = 'email';
+
+export type OpsNotificationChannelStatus = 'active' | 'disabled';
+
+export type OpsNotificationDeliveryStatus = 'pending' | 'delivered' | 'failed';
+
 export type OpsSloFilter = {
     source_endpoint: string;
     model: string;
@@ -5594,6 +5600,74 @@ export type OpsAlertSilenceResponse = {
 
 export type OpsAlertSilenceListResponse = {
     data: Array<OpsAlertSilence>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type OpsNotificationChannel = {
+    id: Id;
+    name: string;
+    type: OpsNotificationChannelType;
+    status: OpsNotificationChannelStatus;
+    min_severity: OpsAlertSeverity;
+    email_recipients: Array<string>;
+    send_resolved: boolean;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreateOpsNotificationChannelRequest = {
+    name: string;
+    type: OpsNotificationChannelType;
+    status?: OpsNotificationChannelStatus;
+    min_severity?: OpsAlertSeverity;
+    email_recipients: Array<string>;
+    send_resolved?: boolean;
+};
+
+export type UpdateOpsNotificationChannelRequest = {
+    name?: string;
+    status?: OpsNotificationChannelStatus;
+    min_severity?: OpsAlertSeverity;
+    email_recipients?: Array<string>;
+    send_resolved?: boolean;
+};
+
+export type OpsNotificationChannelResponse = {
+    data: OpsNotificationChannel;
+    request_id: RequestId;
+};
+
+export type OpsNotificationChannelListResponse = {
+    data: Array<OpsNotificationChannel>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type OpsNotificationDelivery = {
+    id: Id;
+    channel_id: Id;
+    channel_name?: string;
+    channel_type?: OpsNotificationChannelType;
+    alert_event_id: Id;
+    alert_summary?: string;
+    alert_status: OpsAlertStatus;
+    alert_started_at?: string | null;
+    alert_updated_at?: string | null;
+    severity: OpsAlertSeverity;
+    status: OpsNotificationDeliveryStatus;
+    target: string;
+    attempt_count: number;
+    last_error?: string;
+    next_attempt_at: Timestamp;
+    delivered_at?: string | null;
+    last_attempt_at?: string | null;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type OpsNotificationDeliveryListResponse = {
+    data: Array<OpsNotificationDelivery>;
     pagination: Pagination;
     request_id: RequestId;
 };
@@ -18507,6 +18581,199 @@ export type DeleteAdminOpsAlertSilenceResponses = {
 };
 
 export type DeleteAdminOpsAlertSilenceResponse = DeleteAdminOpsAlertSilenceResponses[keyof DeleteAdminOpsAlertSilenceResponses];
+
+export type ListAdminOpsNotificationChannelsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/admin/ops/notification-channels';
+};
+
+export type ListAdminOpsNotificationChannelsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminOpsNotificationChannelsError = ListAdminOpsNotificationChannelsErrors[keyof ListAdminOpsNotificationChannelsErrors];
+
+export type ListAdminOpsNotificationChannelsResponses = {
+    /**
+     * Notification channel list.
+     */
+    200: OpsNotificationChannelListResponse;
+};
+
+export type ListAdminOpsNotificationChannelsResponse = ListAdminOpsNotificationChannelsResponses[keyof ListAdminOpsNotificationChannelsResponses];
+
+export type CreateAdminOpsNotificationChannelData = {
+    body: CreateOpsNotificationChannelRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/ops/notification-channels';
+};
+
+export type CreateAdminOpsNotificationChannelErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminOpsNotificationChannelError = CreateAdminOpsNotificationChannelErrors[keyof CreateAdminOpsNotificationChannelErrors];
+
+export type CreateAdminOpsNotificationChannelResponses = {
+    /**
+     * Notification channel created.
+     */
+    201: OpsNotificationChannelResponse;
+};
+
+export type CreateAdminOpsNotificationChannelResponse = CreateAdminOpsNotificationChannelResponses[keyof CreateAdminOpsNotificationChannelResponses];
+
+export type DeleteAdminOpsNotificationChannelData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/ops/notification-channels/{id}';
+};
+
+export type DeleteAdminOpsNotificationChannelErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminOpsNotificationChannelError = DeleteAdminOpsNotificationChannelErrors[keyof DeleteAdminOpsNotificationChannelErrors];
+
+export type DeleteAdminOpsNotificationChannelResponses = {
+    /**
+     * Notification channel deleted.
+     */
+    204: void;
+};
+
+export type DeleteAdminOpsNotificationChannelResponse = DeleteAdminOpsNotificationChannelResponses[keyof DeleteAdminOpsNotificationChannelResponses];
+
+export type UpdateAdminOpsNotificationChannelData = {
+    body: UpdateOpsNotificationChannelRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/ops/notification-channels/{id}';
+};
+
+export type UpdateAdminOpsNotificationChannelErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminOpsNotificationChannelError = UpdateAdminOpsNotificationChannelErrors[keyof UpdateAdminOpsNotificationChannelErrors];
+
+export type UpdateAdminOpsNotificationChannelResponses = {
+    /**
+     * Notification channel updated.
+     */
+    200: OpsNotificationChannelResponse;
+};
+
+export type UpdateAdminOpsNotificationChannelResponse = UpdateAdminOpsNotificationChannelResponses[keyof UpdateAdminOpsNotificationChannelResponses];
+
+export type ListAdminOpsNotificationDeliveriesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        channel_id?: Id;
+        status?: OpsNotificationDeliveryStatus;
+    };
+    url: '/api/v1/admin/ops/notification-deliveries';
+};
+
+export type ListAdminOpsNotificationDeliveriesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminOpsNotificationDeliveriesError = ListAdminOpsNotificationDeliveriesErrors[keyof ListAdminOpsNotificationDeliveriesErrors];
+
+export type ListAdminOpsNotificationDeliveriesResponses = {
+    /**
+     * Notification delivery evidence list.
+     */
+    200: OpsNotificationDeliveryListResponse;
+};
+
+export type ListAdminOpsNotificationDeliveriesResponse = ListAdminOpsNotificationDeliveriesResponses[keyof ListAdminOpsNotificationDeliveriesResponses];
 
 export type GetAdminSettingsData = {
     body?: never;

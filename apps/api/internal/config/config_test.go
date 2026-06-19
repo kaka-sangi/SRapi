@@ -543,16 +543,28 @@ func TestQualityEvalDefaultsOverridesAndValidation(t *testing.T) {
 func TestSLOEvaluatorDefaultsOverridesAndValidation(t *testing.T) {
 	t.Setenv("SLO_EVALUATOR_INTERVAL_SECONDS", "")
 	t.Setenv("SLO_EVALUATOR_TIMEOUT_SECONDS", "")
+	t.Setenv("OPS_ALERT_NOTIFICATIONS_INTERVAL_SECONDS", "")
+	t.Setenv("OPS_ALERT_NOTIFICATIONS_TIMEOUT_SECONDS", "")
+	t.Setenv("OPS_ALERT_NOTIFICATIONS_BATCH_LIMIT", "")
 	cfg := Load()
 	if cfg.SLOEvaluator.Interval != time.Minute || cfg.SLOEvaluator.Timeout != 30*time.Second {
 		t.Fatalf("unexpected SLO evaluator defaults: %+v", cfg.SLOEvaluator)
 	}
+	if cfg.AlertNotifications.Interval != 30*time.Second || cfg.AlertNotifications.Timeout != 30*time.Second || cfg.AlertNotifications.BatchLimit != 20 {
+		t.Fatalf("unexpected alert notification defaults: %+v", cfg.AlertNotifications)
+	}
 
 	t.Setenv("SLO_EVALUATOR_INTERVAL_SECONDS", "120")
 	t.Setenv("SLO_EVALUATOR_TIMEOUT_SECONDS", "5")
+	t.Setenv("OPS_ALERT_NOTIFICATIONS_INTERVAL_SECONDS", "45")
+	t.Setenv("OPS_ALERT_NOTIFICATIONS_TIMEOUT_SECONDS", "7")
+	t.Setenv("OPS_ALERT_NOTIFICATIONS_BATCH_LIMIT", "11")
 	cfg = Load()
 	if cfg.SLOEvaluator.Interval != 2*time.Minute || cfg.SLOEvaluator.Timeout != 5*time.Second {
 		t.Fatalf("unexpected SLO evaluator overrides: %+v", cfg.SLOEvaluator)
+	}
+	if cfg.AlertNotifications.Interval != 45*time.Second || cfg.AlertNotifications.Timeout != 7*time.Second || cfg.AlertNotifications.BatchLimit != 11 {
+		t.Fatalf("unexpected alert notification overrides: %+v", cfg.AlertNotifications)
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("expected SLO evaluator config to validate, got %v", err)
@@ -567,6 +579,24 @@ func TestSLOEvaluatorDefaultsOverridesAndValidation(t *testing.T) {
 	cfg.SLOEvaluator.Timeout = 0
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "SLO_EVALUATOR_TIMEOUT_SECONDS") {
 		t.Fatalf("expected SLO evaluator timeout validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.AlertNotifications.Interval = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "OPS_ALERT_NOTIFICATIONS_INTERVAL_SECONDS") {
+		t.Fatalf("expected alert notifications interval validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.AlertNotifications.Timeout = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "OPS_ALERT_NOTIFICATIONS_TIMEOUT_SECONDS") {
+		t.Fatalf("expected alert notifications timeout validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.AlertNotifications.BatchLimit = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "OPS_ALERT_NOTIFICATIONS_BATCH_LIMIT") {
+		t.Fatalf("expected alert notifications batch validation failure, got %v", err)
 	}
 }
 

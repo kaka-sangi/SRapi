@@ -33,6 +33,7 @@ type Config struct {
 	HealthProbe          HealthProbeConfig
 	QualityEval          QualityEvalConfig
 	SLOEvaluator         SLOEvaluatorConfig
+	AlertNotifications   AlertNotificationsConfig
 	Email                EmailConfig
 	Observability        ObservabilityConfig
 	Captcha              CaptchaConfig
@@ -283,6 +284,13 @@ type SLOEvaluatorConfig struct {
 	Timeout  time.Duration
 }
 
+// AlertNotificationsConfig controls SRapi-native Ops alert delivery.
+type AlertNotificationsConfig struct {
+	Interval   time.Duration
+	Timeout    time.Duration
+	BatchLimit int
+}
+
 // EmailConfig controls outbound transactional email delivery.
 type EmailConfig struct {
 	PublicBaseURL string
@@ -399,6 +407,11 @@ func Load() Config {
 		SLOEvaluator: SLOEvaluatorConfig{
 			Interval: time.Duration(getIntEnv("SLO_EVALUATOR_INTERVAL_SECONDS", 60)) * time.Second,
 			Timeout:  time.Duration(getIntEnv("SLO_EVALUATOR_TIMEOUT_SECONDS", 30)) * time.Second,
+		},
+		AlertNotifications: AlertNotificationsConfig{
+			Interval:   time.Duration(getIntEnv("OPS_ALERT_NOTIFICATIONS_INTERVAL_SECONDS", 30)) * time.Second,
+			Timeout:    time.Duration(getIntEnv("OPS_ALERT_NOTIFICATIONS_TIMEOUT_SECONDS", 30)) * time.Second,
+			BatchLimit: getIntEnv("OPS_ALERT_NOTIFICATIONS_BATCH_LIMIT", 20),
 		},
 		Email: EmailConfig{
 			PublicBaseURL: strings.TrimRight(getEnv("EMAIL_PUBLIC_BASE_URL", ""), "/"),
@@ -664,6 +677,15 @@ func (c Config) Validate() error {
 	}
 	if c.SLOEvaluator.Timeout <= 0 {
 		return fmt.Errorf("SLO_EVALUATOR_TIMEOUT_SECONDS must be positive")
+	}
+	if c.AlertNotifications.Interval <= 0 {
+		return fmt.Errorf("OPS_ALERT_NOTIFICATIONS_INTERVAL_SECONDS must be positive")
+	}
+	if c.AlertNotifications.Timeout <= 0 {
+		return fmt.Errorf("OPS_ALERT_NOTIFICATIONS_TIMEOUT_SECONDS must be positive")
+	}
+	if c.AlertNotifications.BatchLimit <= 0 {
+		return fmt.Errorf("OPS_ALERT_NOTIFICATIONS_BATCH_LIMIT must be positive")
 	}
 	if c.LiteLLMPricing.Interval <= 0 {
 		return fmt.Errorf("LITELLM_PRICING_INTERVAL_SECONDS must be positive")

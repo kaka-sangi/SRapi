@@ -13,18 +13,22 @@ import (
 )
 
 type Store struct {
-	mu            sync.Mutex
-	nextSLOID     int
-	nextAlertID   int
-	nextRuleID    int
-	nextSilenceID int
-	slos          map[int]contract.SLODefinition
-	alerts        map[int]contract.AlertEvent
-	rules         map[int]contract.AlertRule
-	silences      map[int]contract.AlertSilence
-	systemLogs    []contract.OpsSystemLog
-	nextLogID     int
-	usage         usagecontract.Store
+	mu             sync.Mutex
+	nextSLOID      int
+	nextAlertID    int
+	nextRuleID     int
+	nextSilenceID  int
+	nextChannelID  int
+	nextDeliveryID int
+	slos           map[int]contract.SLODefinition
+	alerts         map[int]contract.AlertEvent
+	rules          map[int]contract.AlertRule
+	silences       map[int]contract.AlertSilence
+	channels       map[int]contract.NotificationChannel
+	deliveries     map[int]contract.NotificationDelivery
+	systemLogs     []contract.OpsSystemLog
+	nextLogID      int
+	usage          usagecontract.Store
 }
 
 func New() *Store {
@@ -33,16 +37,20 @@ func New() *Store {
 
 func NewWithUsageStore(usage usagecontract.Store) *Store {
 	return &Store{
-		nextSLOID:     1,
-		nextAlertID:   1,
-		nextRuleID:    1,
-		nextSilenceID: 1,
-		slos:          map[int]contract.SLODefinition{},
-		alerts:        map[int]contract.AlertEvent{},
-		rules:         map[int]contract.AlertRule{},
-		silences:      map[int]contract.AlertSilence{},
-		nextLogID:     1,
-		usage:         usage,
+		nextSLOID:      1,
+		nextAlertID:    1,
+		nextRuleID:     1,
+		nextSilenceID:  1,
+		nextChannelID:  1,
+		nextDeliveryID: 1,
+		slos:           map[int]contract.SLODefinition{},
+		alerts:         map[int]contract.AlertEvent{},
+		rules:          map[int]contract.AlertRule{},
+		silences:       map[int]contract.AlertSilence{},
+		channels:       map[int]contract.NotificationChannel{},
+		deliveries:     map[int]contract.NotificationDelivery{},
+		nextLogID:      1,
+		usage:          usage,
 	}
 }
 
@@ -387,6 +395,187 @@ func (s *Store) DeleteAlertSilence(_ context.Context, id int) error {
 	return nil
 }
 
+func (s *Store) CreateNotificationChannel(_ context.Context, input contract.NotificationChannel) (contract.NotificationChannel, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item := cloneNotificationChannel(input)
+	item.ID = s.nextChannelID
+	if item.CreatedAt.IsZero() {
+		item.CreatedAt = time.Now().UTC()
+	}
+	if item.UpdatedAt.IsZero() {
+		item.UpdatedAt = item.CreatedAt
+	}
+	s.channels[item.ID] = item
+	s.nextChannelID++
+	return cloneNotificationChannel(item), nil
+}
+
+func (s *Store) UpdateNotificationChannel(_ context.Context, input contract.NotificationChannel) (contract.NotificationChannel, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.channels[input.ID]; !ok {
+		return contract.NotificationChannel{}, contract.ErrNotFound
+	}
+	item := cloneNotificationChannel(input)
+	if item.UpdatedAt.IsZero() {
+		item.UpdatedAt = time.Now().UTC()
+	}
+	s.channels[item.ID] = item
+	return cloneNotificationChannel(item), nil
+}
+
+func (s *Store) FindNotificationChannelByID(_ context.Context, id int) (contract.NotificationChannel, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item, ok := s.channels[id]
+	if !ok {
+		return contract.NotificationChannel{}, contract.ErrNotFound
+	}
+	return cloneNotificationChannel(item), nil
+}
+
+func (s *Store) ListNotificationChannels(_ context.Context) ([]contract.NotificationChannel, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.NotificationChannel, 0, len(s.channels))
+	for _, item := range s.channels {
+		out = append(out, cloneNotificationChannel(item))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func (s *Store) DeleteNotificationChannel(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.channels[id]; !ok {
+		return contract.ErrNotFound
+	}
+	delete(s.channels, id)
+	return nil
+}
+
+func (s *Store) CreateNotificationDelivery(_ context.Context, input contract.NotificationDelivery) (contract.NotificationDelivery, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item := cloneNotificationDelivery(input)
+	item.ID = s.nextDeliveryID
+	if item.CreatedAt.IsZero() {
+		item.CreatedAt = time.Now().UTC()
+	}
+	if item.UpdatedAt.IsZero() {
+		item.UpdatedAt = item.CreatedAt
+	}
+	if item.NextAttemptAt.IsZero() {
+		item.NextAttemptAt = item.CreatedAt
+	}
+	s.deliveries[item.ID] = item
+	s.nextDeliveryID++
+	return cloneNotificationDelivery(item), nil
+}
+
+func (s *Store) UpdateNotificationDelivery(_ context.Context, input contract.NotificationDelivery) (contract.NotificationDelivery, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.deliveries[input.ID]; !ok {
+		return contract.NotificationDelivery{}, contract.ErrNotFound
+	}
+	item := cloneNotificationDelivery(input)
+	if item.UpdatedAt.IsZero() {
+		item.UpdatedAt = time.Now().UTC()
+	}
+	s.deliveries[item.ID] = item
+	return cloneNotificationDelivery(item), nil
+}
+
+func (s *Store) ListNotificationDeliveries(_ context.Context, opts contract.DeliveryListOptions) ([]contract.NotificationDelivery, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.NotificationDelivery, 0, len(s.deliveries))
+	for _, item := range s.deliveries {
+		if opts.ChannelID > 0 && item.ChannelID != opts.ChannelID {
+			continue
+		}
+		if opts.Status != "" && item.Status != opts.Status {
+			continue
+		}
+		out = append(out, s.hydrateDeliveryLocked(item))
+	}
+	sortDeliveriesNewestFirst(out)
+	if opts.Limit > 0 && len(out) > opts.Limit {
+		out = out[:opts.Limit]
+	}
+	return cloneNotificationDeliveries(out), nil
+}
+
+func (s *Store) ListDueNotificationDeliveries(_ context.Context, now time.Time, limit int) ([]contract.DueDelivery, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items := make([]contract.NotificationDelivery, 0, len(s.deliveries))
+	for _, item := range s.deliveries {
+		if item.Status != contract.NotificationDeliveryStatusPending && item.Status != contract.NotificationDeliveryStatusFailed {
+			continue
+		}
+		if item.NextAttemptAt.After(now) {
+			continue
+		}
+		channel, ok := s.channels[item.ChannelID]
+		if !ok || channel.Status != contract.NotificationChannelStatusActive {
+			continue
+		}
+		if _, ok := s.alerts[item.AlertEventID]; !ok {
+			continue
+		}
+		items = append(items, item)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].NextAttemptAt.Equal(items[j].NextAttemptAt) {
+			return items[i].ID < items[j].ID
+		}
+		return items[i].NextAttemptAt.Before(items[j].NextAttemptAt)
+	})
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
+	}
+	out := make([]contract.DueDelivery, 0, len(items))
+	for _, item := range items {
+		channel := s.channels[item.ChannelID]
+		alert := s.alerts[item.AlertEventID]
+		out = append(out, contract.DueDelivery{
+			Delivery: s.hydrateDeliveryLocked(item),
+			Channel:  cloneNotificationChannel(channel),
+			Alert:    cloneAlert(alert),
+		})
+	}
+	return out, nil
+}
+
+func (s *Store) FindNotificationDelivery(_ context.Context, channelID int, alertEventID int, alertStatus contract.AlertStatus, target string) (contract.NotificationDelivery, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, item := range s.deliveries {
+		if item.ChannelID == channelID && item.AlertEventID == alertEventID && item.AlertStatus == alertStatus && item.Target == target {
+			return cloneNotificationDelivery(item), nil
+		}
+	}
+	return contract.NotificationDelivery{}, contract.ErrNotFound
+}
+
+func (s *Store) hydrateDeliveryLocked(value contract.NotificationDelivery) contract.NotificationDelivery {
+	value = cloneNotificationDelivery(value)
+	if channel, ok := s.channels[value.ChannelID]; ok {
+		value.ChannelName = channel.Name
+		value.ChannelType = channel.Type
+	}
+	if alert, ok := s.alerts[value.AlertEventID]; ok {
+		value.AlertSummary = alert.Summary
+		value.AlertStartedAt = alert.StartedAt
+		value.AlertUpdatedAt = alert.UpdatedAt
+	}
+	return value
+}
+
 func cloneRule(value contract.AlertRule) contract.AlertRule {
 	value.Scope.ProviderID = cloneInt(value.Scope.ProviderID)
 	return value
@@ -401,6 +590,34 @@ func cloneSilence(value contract.AlertSilence) contract.AlertSilence {
 func cloneSystemLog(value contract.OpsSystemLog) contract.OpsSystemLog {
 	value.Metadata = cloneMap(value.Metadata)
 	return value
+}
+
+func cloneNotificationChannel(value contract.NotificationChannel) contract.NotificationChannel {
+	value.EmailRecipients = append([]string(nil), value.EmailRecipients...)
+	return value
+}
+
+func cloneNotificationDelivery(value contract.NotificationDelivery) contract.NotificationDelivery {
+	value.DeliveredAt = cloneTime(value.DeliveredAt)
+	value.LastAttemptAt = cloneTime(value.LastAttemptAt)
+	return value
+}
+
+func cloneNotificationDeliveries(values []contract.NotificationDelivery) []contract.NotificationDelivery {
+	out := make([]contract.NotificationDelivery, 0, len(values))
+	for _, value := range values {
+		out = append(out, cloneNotificationDelivery(value))
+	}
+	return out
+}
+
+func sortDeliveriesNewestFirst(items []contract.NotificationDelivery) {
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].CreatedAt.Equal(items[j].CreatedAt) {
+			return items[i].ID > items[j].ID
+		}
+		return items[i].CreatedAt.After(items[j].CreatedAt)
+	})
 }
 
 func systemLogMatches(log contract.OpsSystemLog, filter contract.SystemLogCleanupFilter) bool {

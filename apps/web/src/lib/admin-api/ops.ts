@@ -3,15 +3,14 @@
 import {
   acknowledgeAdminOpsAlert,
   cleanupAdminOpsSystemLogs,
-  createAdminOpsSlo,
-  deleteAdminOpsSlo,
-  listAdminOpsAlertRules,
   createAdminOpsAlertRule,
-  updateAdminOpsAlertRule,
-  deleteAdminOpsAlertRule,
-  listAdminOpsAlertSilences,
   createAdminOpsAlertSilence,
+  createAdminOpsNotificationChannel,
+  createAdminOpsSlo,
+  deleteAdminOpsAlertRule,
   deleteAdminOpsAlertSilence,
+  deleteAdminOpsNotificationChannel,
+  deleteAdminOpsSlo,
   getAdminDashboardSnapshot,
   getAdminOpsConcurrency,
   getAdminOpsErrorDistribution,
@@ -19,14 +18,20 @@ import {
   getAdminOpsLatencyHistogram,
   getAdminOpsOverview,
   getAdminOpsRequestEvidence,
-  listAdminOpsRequestEvidence,
   getAdminOpsSystemLogHealth,
   getAdminOpsThroughputTrend,
   listAdminOpsAlertEvents,
+  listAdminOpsAlertRules,
   listAdminOpsAlerts,
+  listAdminOpsAlertSilences,
+  listAdminOpsNotificationChannels,
+  listAdminOpsNotificationDeliveries,
   listAdminOpsRealtimeSlots,
+  listAdminOpsRequestEvidence,
   listAdminOpsSlos,
   listAdminOpsSystemLogs,
+  updateAdminOpsAlertRule,
+  updateAdminOpsNotificationChannel,
   updateAdminOpsSettings,
   updateAdminOpsSlo,
 } from "../../../../../packages/sdk/typescript/src/index";
@@ -39,9 +44,14 @@ import type {
   OpsAlertEvent,
   OpsAlertRule,
   OpsAlertSilence,
+  OpsNotificationChannel,
+  OpsNotificationDelivery,
   CreateAdminOpsAlertRuleData,
   UpdateAdminOpsAlertRuleData,
   CreateAdminOpsAlertSilenceData,
+  CreateAdminOpsNotificationChannelData,
+  UpdateAdminOpsNotificationChannelData,
+  ListAdminOpsNotificationDeliveriesData,
   OpsConcurrency,
   OpsErrorDistribution,
   OpsErrorTrend,
@@ -193,5 +203,35 @@ export const opsApi = {
   async deleteOpsAlertSilence(id: Id): Promise<void> {
     configureAdminClient();
     await deleteAdminOpsAlertSilence({ path: { id }, throwOnError: true });
+  },
+
+  listOpsNotificationChannels(): Promise<AdminListResult<OpsNotificationChannel>> {
+    return unwrapList(() => listAdminOpsNotificationChannels({ throwOnError: true }));
+  },
+
+  createOpsNotificationChannel(
+    body: CreateAdminOpsNotificationChannelData["body"],
+  ): Promise<OpsNotificationChannel> {
+    return unwrapData(() => createAdminOpsNotificationChannel({ body, throwOnError: true }));
+  },
+
+  updateOpsNotificationChannel(
+    id: Id,
+    body: UpdateAdminOpsNotificationChannelData["body"],
+  ): Promise<OpsNotificationChannel> {
+    return unwrapData(() =>
+      updateAdminOpsNotificationChannel({ path: { id }, body, throwOnError: true }),
+    );
+  },
+
+  async deleteOpsNotificationChannel(id: Id): Promise<void> {
+    configureAdminClient();
+    await deleteAdminOpsNotificationChannel({ path: { id }, throwOnError: true });
+  },
+
+  listOpsNotificationDeliveries(
+    query?: ListAdminOpsNotificationDeliveriesData["query"],
+  ): Promise<AdminListResult<OpsNotificationDelivery>> {
+    return unwrapList(() => listAdminOpsNotificationDeliveries({ query, throwOnError: true }));
   },
 };

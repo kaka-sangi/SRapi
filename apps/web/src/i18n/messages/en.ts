@@ -79,7 +79,8 @@ export const en = {
     quantity: "Quantity",
     prefix: "Prefix",
     metadata: "Metadata",
-    metadataHelp: "Arbitrary key-value pairs stored alongside this resource. The gateway does not interpret these; use them for your own labelling or integrations.",
+    metadataHelp:
+      "Arbitrary key-value pairs stored alongside this resource. The gateway does not interpret these; use them for your own labelling or integrations.",
     advanced: "Advanced",
     allStatuses: "All statuses",
     noResults: "No matching results",
@@ -293,7 +294,8 @@ export const en = {
     expired: "Your sign-in session expired or is invalid. Please try again.",
     backToSignIn: "Back to sign in",
     bindTitle: "Confirm your account",
-    bindHint: "An account with this email already exists — enter your password to link this sign-in method and continue.",
+    bindHint:
+      "An account with this email already exists — enter your password to link this sign-in method and continue.",
     password: "Password",
     linkAndSignIn: "Link and sign in",
     bindFailed: "Email or password is incorrect.",
@@ -326,7 +328,8 @@ export const en = {
     stepHealth: "① System check",
     stepAccount: "② Owner account",
     healthTitle: "System health check",
-    healthSubtitle: "Verifying that the API server and database are reachable before creating the owner account.",
+    healthSubtitle:
+      "Verifying that the API server and database are reachable before creating the owner account.",
     apiServer: "API Server",
     database: "Database",
     connected: "Connected",
@@ -335,7 +338,8 @@ export const en = {
     continueToAccount: "Continue",
     back: "Back",
     title: "Create the owner account",
-    subtitle: "This is the first time SRapi has started. Create the owner account to manage providers, accounts and users.",
+    subtitle:
+      "This is the first time SRapi has started. Create the owner account to manage providers, accounts and users.",
     name: "Name",
     email: "Email",
     password: "Password",
@@ -344,13 +348,17 @@ export const en = {
   },
   tour: {
     quickSetupTitle: "Quick Setup",
-    quickSetupContent: "Start here to add your first upstream provider. Pick a platform, paste an API key, and SRapi handles the rest.",
+    quickSetupContent:
+      "Start here to add your first upstream provider. Pick a platform, paste an API key, and SRapi handles the rest.",
     accountsTitle: "Provider Accounts",
-    accountsContent: "Your upstream API accounts live here. Monitor health, quota, and circuit breaker status at a glance.",
+    accountsContent:
+      "Your upstream API accounts live here. Monitor health, quota, and circuit breaker status at a glance.",
     modelsTitle: "Model Registry",
-    modelsContent: "All models available through the gateway. Create aliases, set rate limits, and map models to providers.",
+    modelsContent:
+      "All models available through the gateway. Create aliases, set rate limits, and map models to providers.",
     searchTitle: "Command Palette",
-    searchContent: "Press Cmd+K (or Ctrl+K) to jump to any page instantly. Works from anywhere in the admin console.",
+    searchContent:
+      "Press Cmd+K (or Ctrl+K) to jump to any page instantly. Works from anywhere in the admin console.",
   },
   diagnostics: {
     title: "Runtime diagnostics",
@@ -461,7 +469,8 @@ export const en = {
     groupsUseId: 'Use group ID "{id}"',
     accessControl: "Access & rate control",
     allowedIps: "Allowed IPs",
-    allowedIpsHint: "IPs or CIDR ranges allowed to use this key. Empty = all. Requires a trusted reverse proxy.",
+    allowedIpsHint:
+      "IPs or CIDR ranges allowed to use this key. Empty = all. Requires a trusted reverse proxy.",
     deniedIps: "Denied IPs",
     deniedIpsHint: "IPs or CIDR ranges blocked from this key (takes precedence over allowed).",
     windowLimits: "Request limits (5h / 1d / 7d)",
@@ -483,7 +492,8 @@ export const en = {
     rpm: "RPM",
     tpm: "TPM",
     concurrency: "Concurrency",
-    throughputLimitsHint: "Per-minute request / token ceilings and max concurrent requests. Blank = unlimited.",
+    throughputLimitsHint:
+      "Per-minute request / token ceilings and max concurrent requests. Blank = unlimited.",
     expiresAt: "Expires at",
     expiresAtHint: "Optional. The key stops working after this time.",
     expiresAtEditHint: "Leave blank to keep the current expiry.",
@@ -681,7 +691,8 @@ export const en = {
     bulkEdit: "Bulk edit",
     bulkEditTitle: "Bulk-edit {count} users",
     delete: "Delete user",
-    deleteWarning: "Soft-deletes the user — their email is anonymised, auth identities are severed, and they can no longer sign in.",
+    deleteWarning:
+      "Soft-deletes the user — their email is anonymised, auth identities are severed, and they can no longer sign in.",
     emptyTitle: "No users",
     emptyBody: "No user accounts have been created yet.",
     create: "New user",
@@ -730,7 +741,8 @@ export const en = {
     emptyTitle: "No provider accounts",
     emptyBody: "Add a provider account to start routing requests.",
     emptyQuickSetup: "Quick Setup",
-    circuitOpen: "Benched after repeated errors — not serving requests right now. It retries and recovers automatically.",
+    circuitOpen:
+      "Benched after repeated errors — not serving requests right now. It retries and recovers automatically.",
     circuitHalfOpen: "Recovering — testing a few requests before fully re-enabling.",
     circuitClosed: "Healthy — serving requests normally.",
     create: "New account",
@@ -852,14 +864,17 @@ export const en = {
     bulkDisableTitle: "Disable {count} accounts?",
     bulkDisableBody: "Selected accounts will stop receiving traffic until re-enabled.",
     bulkDeleteTitle: "Delete {count} accounts?",
-    bulkDeleteBody: "Selected accounts will be soft-deleted (removed from the scheduler + admin lists). The history rows are kept for audit. This cannot be undone.",
+    bulkDeleteBody:
+      "Selected accounts will be soft-deleted (removed from the scheduler + admin lists). The history rows are kept for audit. This cannot be undone.",
     bulkSetConcurrency: "Set concurrency",
     bulkSetConcurrencyTitle: "Set max concurrency on {count} accounts",
-    bulkSetConcurrencyHint: "Max concurrent in-flight requests per account (the scheduler reads this at admission). 0 clears the cap.",
+    bulkSetConcurrencyHint:
+      "Max concurrent in-flight requests per account (the scheduler reads this at admission). 0 clears the cap.",
     bulkRefreshTokens: "Refresh tokens",
     bulkRotateCredentials: "Rotate credentials",
     bulkRotateTitle: "Rotate credentials on selected accounts",
-    bulkRotateBody: "One row per line: account_id,key=value,key=value. Only the keys present overwrite the stored credential; the rest is preserved.",
+    bulkRotateBody:
+      "One row per line: account_id,key=value,key=value. Only the keys present overwrite the stored credential; the rest is preserved.",
     bulkRotateInputLabel: "Credential patches",
     bulkRotateBadLine: "A line is malformed. Use account_id,key=value,key=value.",
     bulkRotateEmpty: "Add at least one row.",
@@ -867,11 +882,13 @@ export const en = {
     bulkDone: "{count} accounts updated",
     bulkEdit: "Bulk edit",
     bulkEditTitle: "Bulk-edit {count} accounts",
-    bulkEditHint: "Only fields you tick are written to the selection — every other field stays untouched.",
+    bulkEditHint:
+      "Only fields you tick are written to the selection — every other field stays untouched.",
     bulkEditNumberHint: "Enter a non-negative number.",
     bulkEditPickField: "Tick at least one field to apply.",
     bulkEditFiltered: "Bulk edit (filtered)",
-    bulkEditFilteredHint: "Apply edits to every account that matches the current filters — disabled until a filter is set.",
+    bulkEditFilteredHint:
+      "Apply edits to every account that matches the current filters — disabled until a filter is set.",
     bulkEditFilteredTitle: "Bulk-edit every account matching the current filters",
     runtimeClass: "Runtime class",
     upstreamClientPlaceholder: "Leave empty to clear",
@@ -879,16 +896,19 @@ export const en = {
     bulkQuotaFetch: "Refresh quota",
     archive: "Archive",
     archiveTitle: "Archive this account?",
-    archiveBody: "The account is hidden from the list and excluded from scheduling, but its usage and audit history are kept. Restore it by setting the status back to active.",
+    archiveBody:
+      "The account is hidden from the list and excluded from scheduling, but its usage and audit history are kept. Restore it by setting the status back to active.",
     deleteTitle: "Delete this account?",
-    deleteBody: "The account and its health/quota history are permanently removed. This cannot be undone.",
+    deleteBody:
+      "The account and its health/quota history are permanently removed. This cannot be undone.",
     testOk: "Connection OK",
     testFailed: "Connection failed",
     export: "Export",
     exportDone: "Exported {count} accounts",
     importTitle: "Import accounts",
     importAction: "Import",
-    importHint: "Paste an exported snapshot. Credentials are never exported, so add a credential to each account before importing.",
+    importHint:
+      "Paste an exported snapshot. Credentials are never exported, so add a credential to each account before importing.",
     importJson: "Accounts JSON",
     importSubmit: "Import accounts",
     importDone: "Imported {created} accounts, skipped {skipped}",
@@ -952,8 +972,10 @@ export const en = {
     namePrefix: "Name prefix",
     namePrefixPlaceholder: "e.g. openai",
     lines: "Accounts (one per line)",
-    linesPlaceholder: "https://api.example.com/v1|sk-abc123\nhttps://api.other.com/v1|sk-xyz789\nsk-key-only-uses-provider-default",
-    linesHint: "Format: base_url|api_key or base_url,api_key or just api_key. Lines starting with # are ignored.",
+    linesPlaceholder:
+      "https://api.example.com/v1|sk-abc123\nhttps://api.other.com/v1|sk-xyz789\nsk-key-only-uses-provider-default",
+    linesHint:
+      "Format: base_url|api_key or base_url,api_key or just api_key. Lines starting with # are ignored.",
     linesRequired: "Enter at least one account line.",
     submit: "Add accounts",
     done: "Created {created}, failed {failed}",
@@ -1003,8 +1025,10 @@ export const en = {
     title: "Authorize account",
     authorizeAccount: "Authorize account",
     authorizeAccountHint: "Mint tokens by signing in with the provider instead of pasting them.",
-    authCodeIntro: "Sign in with the provider in a new tab, then paste the returned code to mint tokens.",
-    deviceIntro: "Enter the code at the provider's device page; tokens are minted once you approve.",
+    authCodeIntro:
+      "Sign in with the provider in a new tab, then paste the returned code to mint tokens.",
+    deviceIntro:
+      "Enter the code at the provider's device page; tokens are minted once you approve.",
     clientId: "Client ID",
     clientSecret: "Client secret",
     clientSecretHint: "Leave blank for public / PKCE clients.",
@@ -1047,7 +1071,8 @@ export const en = {
     strategy: "Strategy",
     strategyHint: "How accounts in this group are ranked when routing.",
     rateMultiplier: "Rate multiplier",
-    rateMultiplierHint: "Decimal multiplier applied to per-request usage charges for accounts in this group (e.g. 0.8 = 20% discount, 1.5 = 50% markup). Leave empty to keep the existing value.",
+    rateMultiplierHint:
+      "Decimal multiplier applied to per-request usage charges for accounts in this group (e.g. 0.8 = 20% discount, 1.5 = 50% markup). Leave empty to keep the existing value.",
     bulkSetMultiplier: "Bulk set multiplier",
     bulkSetMultiplierTitle: "Set rate multiplier on {count} groups",
     bulkSetMultiplierHint: "Decimal > 0 (e.g. 0.5, 1.25). Applied to every selected group.",
@@ -1104,7 +1129,8 @@ export const en = {
     keyUnbound: "Not tied to any group, so it can use every account you just set up.",
     keyFailed: "Could not create the key",
     noModelsTitle: "No models wired yet",
-    noModelsBody: "This provider has no model mappings, so no model routes to it yet. Add a mapping under Models before creating a key.",
+    noModelsBody:
+      "This provider has no model mappings, so no model routes to it yet. Add a mapping under Models before creating a key.",
     selectAll: "Select all",
     selectNone: "Clear",
     advanced: "Advanced",
@@ -1126,7 +1152,8 @@ export const en = {
     discoverModels: "Discover models",
     discoverDone: "Models discovered from upstream",
     discoverFailed: "Model discovery failed",
-    discoverFailedHint: "If this provider doesn't support automatic discovery, add models manually on the Models page.",
+    discoverFailedHint:
+      "If this provider doesn't support automatic discovery, add models manually on the Models page.",
     noProvider: "No provider found. Create a provider first.",
   },
   gatewayHints: {
@@ -1140,14 +1167,14 @@ export const en = {
       "The account needs to be re-authorized — its sign-in token expired. Reconnect the account.",
     cooldown:
       "The account hit an error and is cooling down. Wait a moment and retry, or check the account's health.",
-    quotaExhausted:
-      "The account's quota is used up. Wait for it to reset, or add another account.",
+    quotaExhausted: "The account's quota is used up. Wait for it to reset, or add another account.",
     disabled: "The account or provider is disabled. Enable it to route requests.",
     contentSafety:
       "Content safety blocked this request — the prompt or response matched a safety rule. Adjust the content, or review the content-safety settings.",
     stickySession:
       "The request was pinned to a specific account (sticky session) that isn't available right now. Retry, or relax session stickiness.",
-    costLimited: "A cost/spend limit was reached. Wait for the window to reset, or raise/remove the limit on the key, account, or plan.",
+    costLimited:
+      "A cost/spend limit was reached. Wait for the window to reset, or raise/remove the limit on the key, account, or plan.",
     modelNotSupported:
       "The selected account doesn't support this upstream model. Pick a model the account serves.",
     modelNotFound:
@@ -1162,19 +1189,24 @@ export const en = {
   },
   adminProviders: {
     title: "Providers",
-    subtitle: "Upstream platforms and how SRapi talks to them (OpenAI / Anthropic / Gemini compatible, reverse-proxy, etc.).",
+    subtitle:
+      "Upstream platforms and how SRapi talks to them (OpenAI / Anthropic / Gemini compatible, reverse-proxy, etc.).",
     searchPlaceholder: "Search name, key, or provider id…",
     name: "Key",
-    nameHint: "Unique slug — lowercase letters, digits, '_' or '-'. Cannot be changed after creation.",
+    nameHint:
+      "Unique slug — lowercase letters, digits, '_' or '-'. Cannot be changed after creation.",
     displayName: "Display name",
     adapterType: "Adapter type",
     adapterHint: "Determines how SRapi communicates with the upstream.",
     protocol: "Protocol",
-    protocolHelp: "Communication style for the upstream API — e.g. chat-completions, embeddings, or raw proxy passthrough.",
+    protocolHelp:
+      "Communication style for the upstream API — e.g. chat-completions, embeddings, or raw proxy passthrough.",
     capabilities: "Capabilities",
-    capabilitiesHelp: "Key-value flags the gateway checks when routing. Only set capabilities the upstream actually supports.",
+    capabilitiesHelp:
+      "Key-value flags the gateway checks when routing. Only set capabilities the upstream actually supports.",
     configSchema: "Config schema",
-    configSchemaHelp: "Per-account config fields shown when creating accounts under this provider. Keys become form fields; values are default values.",
+    configSchemaHelp:
+      "Per-account config fields shown when creating accounts under this provider. Keys become form fields; values are default values.",
     create: "New provider",
     edit: "Edit provider",
     deleteTitle: "Delete provider",
@@ -1193,16 +1225,21 @@ export const en = {
     title: "Models",
     subtitle: "The model catalog exposed to users, with their capabilities.",
     canonicalName: "Canonical name",
-    canonicalHint: "The model name callers request, e.g. gpt-4o-mini. Cannot be changed after creation.",
+    canonicalHint:
+      "The model name callers request, e.g. gpt-4o-mini. Cannot be changed after creation.",
     displayName: "Display name",
     family: "Family",
-    familyHelp: "Grouping tag for related models (e.g. gpt-4, claude-3). Used for display and filtering, not routing.",
+    familyHelp:
+      "Grouping tag for related models (e.g. gpt-4, claude-3). Used for display and filtering, not routing.",
     contextWindow: "Context window",
-    contextWindowHelp: "Maximum total tokens (input + output) the model accepts in a single request. Match the provider’s published limit.",
+    contextWindowHelp:
+      "Maximum total tokens (input + output) the model accepts in a single request. Match the provider’s published limit.",
     maxOutput: "Max output tokens",
-    maxOutputHelp: "Maximum tokens the model can generate in one response. Requests asking for more are capped to this value.",
+    maxOutputHelp:
+      "Maximum tokens the model can generate in one response. Requests asking for more are capped to this value.",
     qualityTier: "Quality tier",
-    qualityTierHelp: "Relative quality ranking used by the scheduler when the plan strategy is ‘quality’. Higher tier = preferred.",
+    qualityTierHelp:
+      "Relative quality ranking used by the scheduler when the plan strategy is ‘quality’. Higher tier = preferred.",
     capabilities: "Capabilities",
     capabilitiesHint: "Endpoints this model can serve — drives scheduler routing.",
     create: "New model",
@@ -1224,10 +1261,12 @@ export const en = {
     strategyHintLabel: "Strategy hint",
     strategyHintHint: "Optional routing hint, e.g. cost, latency, quality.",
     fallbackModels: "Fallback models",
-    fallbackModelsHint: "One canonical model name per line; tried in order when this model is unavailable.",
+    fallbackModelsHint:
+      "One canonical model name per line; tried in order when this model is unavailable.",
     addMapping: "Add provider mapping",
     deleteTitle: "Delete this model?",
-    deleteBody: "The model and its aliases and provider mappings are removed, so it can no longer be requested. Past usage records are kept. This cannot be undone.",
+    deleteBody:
+      "The model and its aliases and provider mappings are removed, so it can no longer be requested. Past usage records are kept. This cannot be undone.",
     mappingTitle: "New provider mapping",
     mappingProvider: "Provider",
     upstreamModelName: "Upstream model name",
@@ -1235,7 +1274,8 @@ export const en = {
     capabilityOverride: "Capability override",
     capabilityOverrideHint: "Override the model's capabilities for this provider only.",
     pricingOverride: "Pricing override",
-    pricingOverrideHint: "Optional per-mapping pricing, e.g. input_per_million, output_per_million.",
+    pricingOverrideHint:
+      "Optional per-mapping pricing, e.g. input_per_million, output_per_million.",
     emptyTitle: "No models yet",
     emptyBody: "Add a model so users can call it.",
     emptyQuickSetup: "Quick Setup",
@@ -1292,7 +1332,8 @@ export const en = {
     subtitle: "Active user subscriptions. Manage the plan catalog under Plans.",
     bulkAssign: "Bulk assign plan",
     bulkAssignTitle: "Bulk assign a subscription plan",
-    bulkAssignBody: "One row per line: user_id,plan_id. Existing subscriptions on the same (user, source) are reused idempotently; new ones are created.",
+    bulkAssignBody:
+      "One row per line: user_id,plan_id. Existing subscriptions on the same (user, source) are reused idempotently; new ones are created.",
     bulkAssignInputLabel: "User → plan assignments",
     bulkAssignBadLine: "A line is malformed. Use user_id,plan_id.",
     bulkAssignEmpty: "Add at least one row.",
@@ -1316,7 +1357,8 @@ export const en = {
     emptySubs: "No subscriptions",
     emptySubsBody: "No users have an active subscription yet.",
     deleteSubTitle: "Delete this subscription?",
-    deleteSubBody: "The subscription and its entitlements are removed from the user. This cannot be undone.",
+    deleteSubBody:
+      "The subscription and its entitlements are removed from the user. This cannot be undone.",
     createPlan: "New plan",
     editPlan: "Edit plan",
     selectTemplate: "Choose a plan template",
@@ -1342,14 +1384,16 @@ export const en = {
     costQuotaModeAllowance: "Allowance — bill overage to balance",
     costQuotaModeHint: "Applies when any cost quota is set.",
     schedulerStrategy: "Scheduler strategy",
-    schedulerStrategyHelp: "How the gateway picks an upstream account: default uses system config, cost picks the cheapest, quality picks the highest-tier, latency picks the fastest.",
+    schedulerStrategyHelp:
+      "How the gateway picks an upstream account: default uses system config, cost picks the cheapest, quality picks the highest-tier, latency picks the fastest.",
     schedulerDefault: "System default",
     accountGroupScope: "Account group scope",
     accountGroupScopeHint: "Restrict routing to these account groups.",
     extraEntitlements: "Custom entitlements",
     extraEntitlementsHint: "Advanced: extra entitlement keys not covered by the fields above.",
     forSale: "For sale",
-    forSaleHelp: "When off, the plan is hidden from the storefront but existing subscribers keep their entitlements.",
+    forSaleHelp:
+      "When off, the plan is hidden from the storefront but existing subscribers keep their entitlements.",
     sortOrder: "Sort order",
     sortOrderHelp: "Display order on the pricing page. Lower numbers appear first.",
     createSubscription: "New subscription",
@@ -1480,7 +1524,8 @@ export const en = {
     invitesSubtitle: "Who invited whom.",
     bulkRebateRate: "Bulk set rebate rate",
     bulkRebateTitle: "Bulk set per-user rebate rate",
-    bulkRebateBody: "One row per line: user_id,rate (e.g. 123,0.15) or user_id,clear to remove the override. Future rebate calculations consult the override before falling back to the rule rate.",
+    bulkRebateBody:
+      "One row per line: user_id,rate (e.g. 123,0.15) or user_id,clear to remove the override. Future rebate calculations consult the override before falling back to the rule rate.",
     bulkRebateInputLabel: "User rate overrides",
     bulkRebateBadLine: "A line is malformed. Use user_id,rate or user_id,clear.",
     bulkRebateEmpty: "Add at least one row.",
@@ -1516,7 +1561,8 @@ export const en = {
     emptyWithdrawals: "No withdrawal requests",
     emptyWithdrawalsBody: "Affiliate withdrawal requests will appear here.",
     adjustmentsTitle: "Manual adjustments",
-    adjustmentsSubtitle: "Credit or debit a user's affiliate balance outside the normal accrual flow (admin recovery / corrections).",
+    adjustmentsSubtitle:
+      "Credit or debit a user's affiliate balance outside the normal accrual flow (admin recovery / corrections).",
     createAdjustment: "Create adjustment",
     adjustmentUserId: "User ID",
     adjustmentUserIdHint: "Enter a positive integer user ID.",
@@ -1539,7 +1585,8 @@ export const en = {
   },
   adminRequestEvidence: {
     title: "Request evidence",
-    subtitle: "Unified request-level evidence across scheduler decisions, usage logs, upstream error logs, and request dumps.",
+    subtitle:
+      "Unified request-level evidence across scheduler decisions, usage logs, upstream error logs, and request dumps.",
     time: "Time",
     result: "Result",
     request: "Request",
@@ -1588,7 +1635,8 @@ export const en = {
   },
   adminLiveErrors: {
     title: "Live errors",
-    subtitle: "Real-time feed of gateway provider attempt failures. Streamed over SSE from an in-memory ring buffer; capped to 200 entries in the browser.",
+    subtitle:
+      "Real-time feed of gateway provider attempt failures. Streamed over SSE from an in-memory ring buffer; capped to 200 entries in the browser.",
     accountIdPlaceholder: "Account ID",
     errorClassPlaceholder: "Error class (e.g. server_bad)",
     applyFilters: "Apply",
@@ -1613,7 +1661,8 @@ export const en = {
   },
   adminRequestLogFiles: {
     title: "Request dumps",
-    subtitle: "Per-request HTTP envelope captures written to disk. Enable with SRAPI_REQUEST_LOG_ENABLED=true.",
+    subtitle:
+      "Per-request HTTP envelope captures written to disk. Enable with SRAPI_REQUEST_LOG_ENABLED=true.",
     name: "File",
     size: "Size",
     createdAt: "Created",
@@ -1670,7 +1719,8 @@ export const en = {
   },
   adminOutbox: {
     title: "Event outbox",
-    subtitle: "Domain events queued for delivery — pending, published, or failed, with retry and error detail.",
+    subtitle:
+      "Domain events queued for delivery — pending, published, or failed, with retry and error detail.",
     time: "Queued",
     event: "Event",
     producer: "Producer",
@@ -1690,7 +1740,8 @@ export const en = {
   },
   adminOpsAlertEvents: {
     title: "Alert events",
-    subtitle: "Historical ops alerts for incident review, with links back to request and account evidence.",
+    subtitle:
+      "Historical ops alerts for incident review, with links back to request and account evidence.",
     time: "Started",
     alert: "Alert",
     updated: "Updated",
@@ -1710,7 +1761,8 @@ export const en = {
   },
   adminOpsSystemLogs: {
     title: "System logs",
-    subtitle: "Operations-owned evidence for gateway and runtime events. Inspect storage health before cleanup.",
+    subtitle:
+      "Operations-owned evidence for gateway and runtime events. Inspect storage health before cleanup.",
     time: "Time",
     level: "Level",
     source: "Source",
@@ -1873,14 +1925,16 @@ export const en = {
     matchProtocolHint: "Blank matches any upstream protocol.",
     anyProtocol: "any",
     priority: "Priority",
-    priorityHelp: "Lower numbers run first. When two rules target the same field, the lower-priority rule wins.",
+    priorityHelp:
+      "Lower numbers run first. When two rules target the same field, the lower-priority rule wins.",
     enabled: "Enabled",
     clickToEnable: "Click to enable",
     clickToDisable: "Click to disable",
     toggleEnabled: "Rule enabled",
     toggleDisabled: "Rule disabled",
     params: "Params",
-    paramsHint: "Dotted path → value (e.g. reasoning.effort → high). Values parse as JSON when possible; for filter only the paths matter.",
+    paramsHint:
+      "Dotted path → value (e.g. reasoning.effort → high). Values parse as JSON when possible; for filter only the paths matter.",
     allActions: "All actions",
     searchPlaceholder: "Search name, path, model…",
     emptyTitle: "No payload rules",
@@ -1946,12 +2000,15 @@ export const en = {
     edit: "Edit profile",
     name: "Name",
     template: "TLS template",
-    templateHelp: "Predefined TLS fingerprint that mimics a specific browser. Helps avoid bot detection on some upstreams.",
+    templateHelp:
+      "Predefined TLS fingerprint that mimics a specific browser. Helps avoid bot detection on some upstreams.",
     httpPolicy: "HTTP version",
-    httpPolicyHelp: "Force a specific HTTP version for upstream connections. 'auto' lets the library negotiate.",
+    httpPolicyHelp:
+      "Force a specific HTTP version for upstream connections. 'auto' lets the library negotiate.",
     userAgent: "User agent",
     extraHeaders: "Extra headers",
-    extraHeadersHelp: "Additional HTTP headers injected into every upstream request using this profile.",
+    extraHeadersHelp:
+      "Additional HTTP headers injected into every upstream request using this profile.",
     enabled: "Enabled",
     userAgentHint: "Overrides the egress User-Agent header (optional).",
     searchPlaceholder: "Search name, template, UA…",
@@ -1987,12 +2044,15 @@ export const en = {
     enable: "Re-enable",
     revoke: "Revoke",
     revokeTitle: "Revoke API key",
-    revokeBody: "Revoke “{name}” ({prefix})? Requests using this key stop immediately. It can be re-enabled later.",
+    revokeBody:
+      "Revoke “{name}” ({prefix})? Requests using this key stop immediately. It can be re-enabled later.",
     resetUsage: "Reset usage",
     resetUsageTitle: "Reset rolling usage counters",
-    resetUsageBody: "Zero the 5h / 1d / 7d cost-used counters on “{name}” ({prefix}) so it can serve again? Lifetime cost_used is also reset; rolling windows restart on the next charge.",
+    resetUsageBody:
+      "Zero the 5h / 1d / 7d cost-used counters on “{name}” ({prefix}) so it can serve again? Lifetime cost_used is also reset; rolling windows restart on the next charge.",
     emptyTitle: "No API keys",
-    emptyBody: "This is a read-only audit view. Create keys from your workspace API keys page; keys created by any user appear here.",
+    emptyBody:
+      "This is a read-only audit view. Create keys from your workspace API keys page; keys created by any user appear here.",
   },
   adminUserQuota: {
     title: "Platform spend quotas",
@@ -2139,7 +2199,8 @@ export const en = {
     endsAt: "Ends at",
     endsAtHint: "Leave blank for no expiry.",
     segmentRoles: "Target roles",
-    segmentRolesHint: "Within the audience, deliver only to users holding these roles. Leave targeting empty to reach the whole audience.",
+    segmentRolesHint:
+      "Within the audience, deliver only to users holding these roles. Leave targeting empty to reach the whole audience.",
     segmentUserIds: "Target user IDs",
     segmentEmailDomains: "Target email domains",
     readStatus: "Read status",
@@ -2182,10 +2243,13 @@ export const en = {
         openErrorLogs: "Start with error class, owner, upstream status, and attempt evidence.",
         inspectRequestEvidence: "Verify model, endpoint, account, and upstream response evidence.",
         inspectSchedulerDecision: "Inspect reject reasons, score breakdown, and fallback chain.",
-        checkAccountHealth: "Check account health for circuit, cooldown, quota, RPM, and proxy quality.",
-        checkQuotaOrRateLimit: "Review account-group limits, upstream quota, RPM/TPM, and Retry-After.",
+        checkAccountHealth:
+          "Check account health for circuit, cooldown, quota, RPM, and proxy quality.",
+        checkQuotaOrRateLimit:
+          "Review account-group limits, upstream quota, RPM/TPM, and Retry-After.",
         checkCredentials: "Check credentials, OAuth refresh, needs_reauth, and account lock state.",
-        checkProviderNetwork: "Check upstream timeout, network errors, proxy quality, and invalid responses.",
+        checkProviderNetwork:
+          "Check upstream timeout, network errors, proxy quality, and invalid responses.",
         reviewSloBurnRate: "Review SLO windows, request volume, bad requests, and burn rate.",
         reviewAlertRule: "Review alert threshold, window, minimum requests, and observed value.",
         validateRoutingScope: "Verify model, endpoint, provider scope, and account-group coverage.",
@@ -2323,6 +2387,37 @@ export const en = {
       deleteConfirm: "Delete this silence?",
       anyMatcher: "Any matching alert",
     },
+    notificationChannels: {
+      title: "Notification channels",
+      subtitle: "Deliver Ops alerts to on-call email recipients.",
+      create: "New channel",
+      edit: "Edit channel",
+      empty: "No notification channels",
+      emptyBody: "Create an email channel so firing alerts leave delivery evidence.",
+      name: "Name",
+      status: "Status",
+      active: "Active",
+      minSeverity: "Minimum severity",
+      recipients: "Email recipients",
+      recipientsHint: "One per line, or separated by commas.",
+      recipientsRequired: "Add at least one email recipient.",
+      sendResolved: "Send resolved alerts",
+      sendsResolved: "firing + resolved",
+      firingOnly: "firing only",
+      deleteConfirm: "Delete this notification channel?",
+    },
+    notificationDeliveries: {
+      title: "Delivery evidence",
+      subtitle: "Recent alert notification attempts and failure reasons.",
+      empty: "No delivery evidence",
+      emptyBody: "Alert notification attempts will appear here.",
+      attempts: "Attempts",
+      status: {
+        pending: "Pending",
+        delivered: "Delivered",
+        failed: "Failed",
+      },
+    },
   },
   adminRisk: {
     title: "Risk control",
@@ -2339,11 +2434,14 @@ export const en = {
     editConfig: "Edit config",
     enabled: "Enabled",
     maxFailed: "Max failed requests / minute",
-    maxFailedHelp: "Requests that return 4xx/5xx from the upstream. Exceeding this triggers the configured action (log or block).",
+    maxFailedHelp:
+      "Requests that return 4xx/5xx from the upstream. Exceeding this triggers the configured action (log or block).",
     maxCostPerDay: "Max cost / day",
-    maxCostPerDayHelp: "Daily spend ceiling in USD across all accounts. 0 = unlimited. When exceeded, new requests are rejected until the next day.",
+    maxCostPerDayHelp:
+      "Daily spend ceiling in USD across all accounts. 0 = unlimited. When exceeded, new requests are rejected until the next day.",
     cooldown: "Cooldown (seconds)",
-    cooldownHelp: "After a risk action fires, suppress repeated triggers for this many seconds to avoid alert storms.",
+    cooldownHelp:
+      "After a risk action fires, suppress repeated triggers for this many seconds to avoid alert storms.",
     blockedCountries: "Blocked countries",
     blockedIps: "Blocked IPs",
     listHint: "One per line.",
@@ -2517,7 +2615,8 @@ export const en = {
     databaseBackups: "Database backups",
     snapshotNow: "Snapshot now",
     snapshotEmpty: "No backups recorded yet",
-    snapshotEmptyBody: "The daily backup worker has not run yet. Press \"Snapshot now\" to create one on demand.",
+    snapshotEmptyBody:
+      'The daily backup worker has not run yet. Press "Snapshot now" to create one on demand.',
     snapshotStarted: "Started",
     snapshotSize: "Size",
     snapshotChecksum: "SHA-256",
@@ -2651,7 +2750,8 @@ export const en = {
     copy: "Copy",
     copied: "Copied",
     viewAsCode: "View as code",
-    viewAsCodeHint: "The equivalent API request for this conversation. Set your gateway key as SRAPI_API_KEY, then run it as-is.",
+    viewAsCodeHint:
+      "The equivalent API request for this conversation. Set your gateway key as SRAPI_API_KEY, then run it as-is.",
   },
   copilot: {
     title: "AI Copilot",
@@ -2673,8 +2773,10 @@ export const en = {
     egressWarning:
       "Messages, fetched data, and results are sent to the configured model. Avoid pasting secrets.",
     fileReadFailed: "Couldn't read that file (it may be too large or not a text file).",
-    fileUnsupported: "“{name}” isn't a supported attachment — upload an image or a text file (.txt, .csv, .json, .log, .md, code…).",
-    emptyHint: "Ask in plain language. The copilot reads data freely and asks before making any change.",
+    fileUnsupported:
+      "“{name}” isn't a supported attachment — upload an image or a text file (.txt, .csv, .json, .log, .md, code…).",
+    emptyHint:
+      "Ask in plain language. The copilot reads data freely and asks before making any change.",
     example1: "List disabled accounts",
     example2: "Show today's usage",
     example3: "Set user 42's balance to 100",
@@ -2695,7 +2797,8 @@ export const en = {
     dangerTitle: "Confirm this destructive action",
     dangerConfirmHint: "This permanently deletes data. Review the request above before approving.",
     yolo: "Yolo",
-    yoloHint: "Auto-approve mode: run tool calls (including deletes) without asking each time. Remembered across sessions.",
+    yoloHint:
+      "Auto-approve mode: run tool calls (including deletes) without asking each time. Remembered across sessions.",
     approve: "Approve",
     deny: "Deny",
     disabledTitle: "Copilot is turned off",
@@ -2713,7 +2816,8 @@ export const en = {
     fieldModel: "Default model",
     fieldModelHint: "Upstream model name. Use a capable tool-calling model.",
     fieldModels: "Selectable models",
-    fieldModelsHint: "Models offered in the chat picker. Leave empty to auto-derive from the account.",
+    fieldModelsHint:
+      "Models offered in the chat picker. Leave empty to auto-derive from the account.",
     fieldModelsPlaceholder: "Add models…",
     fieldAccount: "Provider account",
     fieldAccountHint: "The copilot uses this account's encrypted credentials.",
@@ -2763,7 +2867,8 @@ export const en = {
     channel: "Channel",
     channelHint: "Gateway type, e.g. stripe, alipay, wechat.",
     config: "Config",
-    configHint: "Provider credentials, e.g. stripe: secret_key, webhook_secret; alipay: app_id, private_key.",
+    configHint:
+      "Provider credentials, e.g. stripe: secret_key, webhook_secret; alipay: app_id, private_key.",
     configEditHint: "Leave blank to keep the stored credentials; enter keys to replace them.",
     supportedMethods: "Supported methods",
     supportedMethodsHint: "One per line, e.g. card, wallet, alipay.",
@@ -2779,7 +2884,8 @@ export const en = {
     feeRateHint: "Decimal channel fee rate, for example 0.006 means 0.6%.",
     feeHeader: "Fee",
     weight: "Weight",
-    weightHint: "Positive round-robin weight used when multiple active channels support the same method.",
+    weightHint:
+      "Positive round-robin weight used when multiple active channels support the same method.",
   },
   adminPricing: {
     title: "Channel pricing",
@@ -2795,13 +2901,17 @@ export const en = {
     outputPrice: "Output / 1M",
     outputPriceHelp: "Your cost per million output tokens from the upstream provider, in USD.",
     cacheReadPrice: "Cache read / 1M",
-    cacheReadPriceHelp: "Cost per million prompt-cache read tokens. Only relevant for providers that report cache hits (e.g. Claude).",
+    cacheReadPriceHelp:
+      "Cost per million prompt-cache read tokens. Only relevant for providers that report cache hits (e.g. Claude).",
     cacheWritePrice: "Cache write / 1M",
-    cacheWritePriceHelp: "Cost per million prompt-cache write tokens. Leave blank if the provider doesn't charge for cache writes.",
+    cacheWritePriceHelp:
+      "Cost per million prompt-cache write tokens. Leave blank if the provider doesn't charge for cache writes.",
     perRequestPrice: "Per request",
-    perRequestPriceHelp: "Flat price for per-request rules, or the fallback per-image price for image rules.",
+    perRequestPriceHelp:
+      "Flat price for per-request rules, or the fallback per-image price for image rules.",
     intervals: "Intervals",
-    intervalsHelp: "JSON array for token tiers or image size tiers. Token tiers use min_tokens/max_tokens and per-1M prices; image tiers use image_size and per_image_price.",
+    intervalsHelp:
+      "JSON array for token tiers or image size tiers. Token tiers use min_tokens/max_tokens and per-1M prices; image tiers use image_size and per_image_price.",
     effectiveFrom: "Effective from",
     effectiveFromHelp: "When this pricing takes effect. Blank = immediately.",
     effectiveTo: "Effective to",
@@ -2816,7 +2926,8 @@ export const en = {
     bulkImportInvalidJson: "Invalid JSON",
     importResult: "Imported {count} rules",
     deleteTitle: "Delete this pricing rule?",
-    deleteBody: "Usage for this model/provider will fall back to the next matching rule (or be uncharged if none). This cannot be undone.",
+    deleteBody:
+      "Usage for this model/provider will fall back to the next matching rule (or be uncharged if none). This cannot be undone.",
   },
   adminChannelsDetail: {
     title: "Channel Detail — {name}",
@@ -2899,7 +3010,8 @@ export const en = {
     linkedLastUsed: "Last used",
     linkedNeverUsed: "Never used",
     signOutAll: "Sign out everywhere",
-    signOutAllHint: "Revoke every active session, including this one. You'll need to sign in again.",
+    signOutAllHint:
+      "Revoke every active session, including this one. You'll need to sign in again.",
     signOutAllButton: "Sign out all sessions",
     signOutAllConfirm: "Sign out of every session, including this device?",
     profileAttributes: "Profile attributes",
@@ -2963,7 +3075,8 @@ export const en = {
     signIn: "Sign in",
     signInRequired: "Sign in to subscribe — you'll come right back here.",
     emptyTitle: "No plans available",
-    emptyBody: "There are no plans for sale right now. Top up your balance from the billing page instead.",
+    emptyBody:
+      "There are no plans for sale right now. Top up your balance from the billing page instead.",
     subscriptionActive: "Subscription activated — you're all set.",
     subscriptionFailed: "Payment didn't complete. Try again or pick a different method.",
     viewBilling: "View billing",
@@ -2977,11 +3090,13 @@ export const en = {
   paymentResult: {
     title: "Payment status",
     pendingTitle: "Waiting for payment…",
-    pendingBody: "We're still waiting for your payment provider to confirm. This page updates automatically.",
+    pendingBody:
+      "We're still waiting for your payment provider to confirm. This page updates automatically.",
     successTitle: "Payment received",
     successBody: "Your order is settled. Funds and entitlements are available now.",
     failureTitle: "Payment didn't complete",
-    failureBody: "The order was cancelled, expired or rejected. You can try again from billing or pricing.",
+    failureBody:
+      "The order was cancelled, expired or rejected. You can try again from billing or pricing.",
     missingOrder: "No order ID was provided.",
     backToBilling: "View billing",
     backToPricing: "Back to pricing",

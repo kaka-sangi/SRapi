@@ -40,7 +40,7 @@ func TestCurrentUserAuthIdentitiesListsEmailIdentity(t *testing.T) {
 		t.Fatalf("expected one derived email identity, got %+v", resp.Data)
 	}
 	identity := resp.Data[0]
-	if identity.Provider != apiopenapi.Email {
+	if identity.Provider != apiopenapi.AuthIdentityProviderEmail {
 		t.Fatalf("expected email provider, got %+v", identity.Provider)
 	}
 	if identity.UserId != loginResp.Data.User.Id || identity.ProviderKey != "local" {
@@ -95,7 +95,7 @@ func TestCurrentUserAuthIdentityUnbindRequiresCSRFAndRemovesExternalIdentity(t *
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode unbind response: %v", err)
 	}
-	if len(resp.Data) != 1 || resp.Data[0].Provider != apiopenapi.Email {
+	if len(resp.Data) != 1 || resp.Data[0].Provider != apiopenapi.AuthIdentityProviderEmail {
 		t.Fatalf("expected only local email identity after unbind, got %+v", resp.Data)
 	}
 }

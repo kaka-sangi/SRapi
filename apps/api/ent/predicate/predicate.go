@@ -108,6 +108,12 @@ type ObsAlertRule func(*sql.Selector)
 // ObsAlertSilence is the predicate function for obsalertsilence builders.
 type ObsAlertSilence func(*sql.Selector)
 
+// ObsNotificationChannel is the predicate function for obsnotificationchannel builders.
+type ObsNotificationChannel func(*sql.Selector)
+
+// ObsNotificationDelivery is the predicate function for obsnotificationdelivery builders.
+type ObsNotificationDelivery func(*sql.Selector)
+
 // ObsSLODefinition is the predicate function for obsslodefinition builders.
 type ObsSLODefinition func(*sql.Selector)
 

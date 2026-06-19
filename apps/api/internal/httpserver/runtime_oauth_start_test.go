@@ -44,7 +44,7 @@ func TestOAuthStartRedirectsWithPKCEAndEncryptedFlowCookie(t *testing.T) {
 	settingsResp.Data.Security.OauthProviders = []string{"oidc"}
 	settingsResp.Data.Security.OauthProviderConfigs = []apiopenapi.OAuthProviderConfig{
 		{
-			Provider:     apiopenapi.Oidc,
+			Provider:     apiopenapi.AuthIdentityProviderOidc,
 			ProviderKey:  "issuer-main",
 			DisplayName:  "Issuer",
 			ClientId:     "client-123",
@@ -125,7 +125,7 @@ func TestOAuthCallbackExchangesCodeAndCreatesPendingCookie(t *testing.T) {
 	settingsResp.Data.Security.OauthProviders = []string{"oidc"}
 	settingsResp.Data.Security.OauthProviderConfigs = []apiopenapi.OAuthProviderConfig{
 		{
-			Provider:        apiopenapi.Oidc,
+			Provider:        apiopenapi.AuthIdentityProviderOidc,
 			ProviderKey:     "issuer-main",
 			DisplayName:     "Issuer",
 			ClientId:        "client-123",
@@ -240,7 +240,7 @@ func TestOAuthCallbackExchangesCodeAndCreatesPendingCookie(t *testing.T) {
 	}
 	var external apiopenapi.CurrentUserAuthIdentity
 	for _, identity := range bindResp.Data {
-		if identity.Provider == apiopenapi.Oidc && identity.External {
+		if identity.Provider == apiopenapi.AuthIdentityProviderOidc && identity.External {
 			external = identity
 			break
 		}
@@ -289,7 +289,7 @@ func TestOAuthCallbackRejectsStateMismatch(t *testing.T) {
 	settingsResp.Data.Security.OauthProviders = []string{"oidc"}
 	settingsResp.Data.Security.OauthProviderConfigs = []apiopenapi.OAuthProviderConfig{
 		{
-			Provider:     apiopenapi.Oidc,
+			Provider:     apiopenapi.AuthIdentityProviderOidc,
 			ProviderKey:  "issuer-main",
 			DisplayName:  "Issuer",
 			ClientId:     "client-123",
@@ -374,7 +374,7 @@ func TestPendingOAuthBindLoginAuthenticatesExistingAccountAndConsumesPending(t *
 	}
 	var external apiopenapi.CurrentUserAuthIdentity
 	for _, identity := range identitiesResp.Data {
-		if identity.Provider == apiopenapi.Oidc && identity.External {
+		if identity.Provider == apiopenapi.AuthIdentityProviderOidc && identity.External {
 			external = identity
 			break
 		}
@@ -543,7 +543,7 @@ func TestPendingOAuthCreateAccountRequiresActionTokenAndBindsIdentity(t *testing
 	}
 	var external apiopenapi.CurrentUserAuthIdentity
 	for _, identity := range identitiesResp.Data {
-		if identity.Provider == apiopenapi.Oidc && identity.External {
+		if identity.Provider == apiopenapi.AuthIdentityProviderOidc && identity.External {
 			external = identity
 			break
 		}
@@ -756,7 +756,7 @@ func TestOAuthStartRejectsDisabledAndUnavailableProvider(t *testing.T) {
 	settingsResp.Data.Security.OauthProviders = []string{"github"}
 	settingsResp.Data.Security.OauthProviderConfigs = []apiopenapi.OAuthProviderConfig{
 		{
-			Provider:     apiopenapi.Github,
+			Provider:     apiopenapi.AuthIdentityProviderGithub,
 			ProviderKey:  "github",
 			DisplayName:  "GitHub",
 			ClientId:     "github-client",
@@ -822,7 +822,7 @@ func newOAuthPendingCookieForTest(t *testing.T, cfg config.Config, subject strin
 	settingsResp.Data.Security.OauthProviders = []string{"oidc"}
 	settingsResp.Data.Security.OauthProviderConfigs = []apiopenapi.OAuthProviderConfig{
 		{
-			Provider:        apiopenapi.Oidc,
+			Provider:        apiopenapi.AuthIdentityProviderOidc,
 			ProviderKey:     "issuer-main",
 			DisplayName:     "Issuer",
 			ClientId:        "client-123",

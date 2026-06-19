@@ -39,6 +39,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
 	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
+	"github.com/srapi/srapi/apps/api/ent/obsnotificationchannel"
+	"github.com/srapi/srapi/apps/api/ent/obsnotificationdelivery"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/opserrorlog"
 	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
@@ -1225,6 +1227,80 @@ func init() {
 	obsalertsilence.DefaultUpdatedAt = obsalertsilenceDescUpdatedAt.Default.(func() time.Time)
 	// obsalertsilence.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	obsalertsilence.UpdateDefaultUpdatedAt = obsalertsilenceDescUpdatedAt.UpdateDefault.(func() time.Time)
+	obsnotificationchannelMixin := schema.ObsNotificationChannel{}.Mixin()
+	obsnotificationchannelMixinFields0 := obsnotificationchannelMixin[0].Fields()
+	_ = obsnotificationchannelMixinFields0
+	obsnotificationchannelFields := schema.ObsNotificationChannel{}.Fields()
+	_ = obsnotificationchannelFields
+	// obsnotificationchannelDescCreatedAt is the schema descriptor for created_at field.
+	obsnotificationchannelDescCreatedAt := obsnotificationchannelMixinFields0[0].Descriptor()
+	// obsnotificationchannel.DefaultCreatedAt holds the default value on creation for the created_at field.
+	obsnotificationchannel.DefaultCreatedAt = obsnotificationchannelDescCreatedAt.Default.(func() time.Time)
+	// obsnotificationchannelDescUpdatedAt is the schema descriptor for updated_at field.
+	obsnotificationchannelDescUpdatedAt := obsnotificationchannelMixinFields0[1].Descriptor()
+	// obsnotificationchannel.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	obsnotificationchannel.DefaultUpdatedAt = obsnotificationchannelDescUpdatedAt.Default.(func() time.Time)
+	// obsnotificationchannel.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	obsnotificationchannel.UpdateDefaultUpdatedAt = obsnotificationchannelDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// obsnotificationchannelDescName is the schema descriptor for name field.
+	obsnotificationchannelDescName := obsnotificationchannelFields[0].Descriptor()
+	// obsnotificationchannel.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	obsnotificationchannel.NameValidator = obsnotificationchannelDescName.Validators[0].(func(string) error)
+	// obsnotificationchannelDescChannelType is the schema descriptor for channel_type field.
+	obsnotificationchannelDescChannelType := obsnotificationchannelFields[1].Descriptor()
+	// obsnotificationchannel.DefaultChannelType holds the default value on creation for the channel_type field.
+	obsnotificationchannel.DefaultChannelType = obsnotificationchannelDescChannelType.Default.(string)
+	// obsnotificationchannelDescStatus is the schema descriptor for status field.
+	obsnotificationchannelDescStatus := obsnotificationchannelFields[2].Descriptor()
+	// obsnotificationchannel.DefaultStatus holds the default value on creation for the status field.
+	obsnotificationchannel.DefaultStatus = obsnotificationchannelDescStatus.Default.(string)
+	// obsnotificationchannelDescMinSeverity is the schema descriptor for min_severity field.
+	obsnotificationchannelDescMinSeverity := obsnotificationchannelFields[3].Descriptor()
+	// obsnotificationchannel.DefaultMinSeverity holds the default value on creation for the min_severity field.
+	obsnotificationchannel.DefaultMinSeverity = obsnotificationchannelDescMinSeverity.Default.(string)
+	// obsnotificationchannelDescSendResolved is the schema descriptor for send_resolved field.
+	obsnotificationchannelDescSendResolved := obsnotificationchannelFields[5].Descriptor()
+	// obsnotificationchannel.DefaultSendResolved holds the default value on creation for the send_resolved field.
+	obsnotificationchannel.DefaultSendResolved = obsnotificationchannelDescSendResolved.Default.(bool)
+	obsnotificationdeliveryMixin := schema.ObsNotificationDelivery{}.Mixin()
+	obsnotificationdeliveryMixinFields0 := obsnotificationdeliveryMixin[0].Fields()
+	_ = obsnotificationdeliveryMixinFields0
+	obsnotificationdeliveryFields := schema.ObsNotificationDelivery{}.Fields()
+	_ = obsnotificationdeliveryFields
+	// obsnotificationdeliveryDescCreatedAt is the schema descriptor for created_at field.
+	obsnotificationdeliveryDescCreatedAt := obsnotificationdeliveryMixinFields0[0].Descriptor()
+	// obsnotificationdelivery.DefaultCreatedAt holds the default value on creation for the created_at field.
+	obsnotificationdelivery.DefaultCreatedAt = obsnotificationdeliveryDescCreatedAt.Default.(func() time.Time)
+	// obsnotificationdeliveryDescUpdatedAt is the schema descriptor for updated_at field.
+	obsnotificationdeliveryDescUpdatedAt := obsnotificationdeliveryMixinFields0[1].Descriptor()
+	// obsnotificationdelivery.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	obsnotificationdelivery.DefaultUpdatedAt = obsnotificationdeliveryDescUpdatedAt.Default.(func() time.Time)
+	// obsnotificationdelivery.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	obsnotificationdelivery.UpdateDefaultUpdatedAt = obsnotificationdeliveryDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// obsnotificationdeliveryDescAlertStatus is the schema descriptor for alert_status field.
+	obsnotificationdeliveryDescAlertStatus := obsnotificationdeliveryFields[2].Descriptor()
+	// obsnotificationdelivery.DefaultAlertStatus holds the default value on creation for the alert_status field.
+	obsnotificationdelivery.DefaultAlertStatus = obsnotificationdeliveryDescAlertStatus.Default.(string)
+	// obsnotificationdeliveryDescSeverity is the schema descriptor for severity field.
+	obsnotificationdeliveryDescSeverity := obsnotificationdeliveryFields[3].Descriptor()
+	// obsnotificationdelivery.DefaultSeverity holds the default value on creation for the severity field.
+	obsnotificationdelivery.DefaultSeverity = obsnotificationdeliveryDescSeverity.Default.(string)
+	// obsnotificationdeliveryDescStatus is the schema descriptor for status field.
+	obsnotificationdeliveryDescStatus := obsnotificationdeliveryFields[4].Descriptor()
+	// obsnotificationdelivery.DefaultStatus holds the default value on creation for the status field.
+	obsnotificationdelivery.DefaultStatus = obsnotificationdeliveryDescStatus.Default.(string)
+	// obsnotificationdeliveryDescTarget is the schema descriptor for target field.
+	obsnotificationdeliveryDescTarget := obsnotificationdeliveryFields[5].Descriptor()
+	// obsnotificationdelivery.TargetValidator is a validator for the "target" field. It is called by the builders before save.
+	obsnotificationdelivery.TargetValidator = obsnotificationdeliveryDescTarget.Validators[0].(func(string) error)
+	// obsnotificationdeliveryDescAttemptCount is the schema descriptor for attempt_count field.
+	obsnotificationdeliveryDescAttemptCount := obsnotificationdeliveryFields[6].Descriptor()
+	// obsnotificationdelivery.DefaultAttemptCount holds the default value on creation for the attempt_count field.
+	obsnotificationdelivery.DefaultAttemptCount = obsnotificationdeliveryDescAttemptCount.Default.(int)
+	// obsnotificationdeliveryDescLastError is the schema descriptor for last_error field.
+	obsnotificationdeliveryDescLastError := obsnotificationdeliveryFields[7].Descriptor()
+	// obsnotificationdelivery.DefaultLastError holds the default value on creation for the last_error field.
+	obsnotificationdelivery.DefaultLastError = obsnotificationdeliveryDescLastError.Default.(string)
 	obsslodefinitionMixin := schema.ObsSLODefinition{}.Mixin()
 	obsslodefinitionMixinFields0 := obsslodefinitionMixin[0].Fields()
 	_ = obsslodefinitionMixinFields0

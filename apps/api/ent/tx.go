@@ -80,6 +80,10 @@ type Tx struct {
 	ObsAlertRule *ObsAlertRuleClient
 	// ObsAlertSilence is the client for interacting with the ObsAlertSilence builders.
 	ObsAlertSilence *ObsAlertSilenceClient
+	// ObsNotificationChannel is the client for interacting with the ObsNotificationChannel builders.
+	ObsNotificationChannel *ObsNotificationChannelClient
+	// ObsNotificationDelivery is the client for interacting with the ObsNotificationDelivery builders.
+	ObsNotificationDelivery *ObsNotificationDeliveryClient
 	// ObsSLODefinition is the client for interacting with the ObsSLODefinition builders.
 	ObsSLODefinition *ObsSLODefinitionClient
 	// OpsErrorLog is the client for interacting with the OpsErrorLog builders.
@@ -327,6 +331,8 @@ func (tx *Tx) init() {
 	tx.ObsAlertEvent = NewObsAlertEventClient(tx.config)
 	tx.ObsAlertRule = NewObsAlertRuleClient(tx.config)
 	tx.ObsAlertSilence = NewObsAlertSilenceClient(tx.config)
+	tx.ObsNotificationChannel = NewObsNotificationChannelClient(tx.config)
+	tx.ObsNotificationDelivery = NewObsNotificationDeliveryClient(tx.config)
 	tx.ObsSLODefinition = NewObsSLODefinitionClient(tx.config)
 	tx.OpsErrorLog = NewOpsErrorLogClient(tx.config)
 	tx.OpsSystemLog = NewOpsSystemLogClient(tx.config)

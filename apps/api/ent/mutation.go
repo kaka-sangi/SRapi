@@ -45,6 +45,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
 	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
+	"github.com/srapi/srapi/apps/api/ent/obsnotificationchannel"
+	"github.com/srapi/srapi/apps/api/ent/obsnotificationdelivery"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/opserrorlog"
 	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
@@ -132,6 +134,8 @@ const (
 	TypeObsAlertEvent             = "ObsAlertEvent"
 	TypeObsAlertRule              = "ObsAlertRule"
 	TypeObsAlertSilence           = "ObsAlertSilence"
+	TypeObsNotificationChannel    = "ObsNotificationChannel"
+	TypeObsNotificationDelivery   = "ObsNotificationDelivery"
 	TypeObsSLODefinition          = "ObsSLODefinition"
 	TypeOpsErrorLog               = "OpsErrorLog"
 	TypeOpsSystemLog              = "OpsSystemLog"
@@ -32776,6 +32780,1849 @@ func (m *ObsAlertSilenceMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *ObsAlertSilenceMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown ObsAlertSilence edge %s", name)
+}
+
+// ObsNotificationChannelMutation represents an operation that mutates the ObsNotificationChannel nodes in the graph.
+type ObsNotificationChannelMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *int
+	created_at    *time.Time
+	updated_at    *time.Time
+	name          *string
+	channel_type  *string
+	status        *string
+	min_severity  *string
+	config_json   *map[string]interface{}
+	send_resolved *bool
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*ObsNotificationChannel, error)
+	predicates    []predicate.ObsNotificationChannel
+}
+
+var _ ent.Mutation = (*ObsNotificationChannelMutation)(nil)
+
+// obsnotificationchannelOption allows management of the mutation configuration using functional options.
+type obsnotificationchannelOption func(*ObsNotificationChannelMutation)
+
+// newObsNotificationChannelMutation creates new mutation for the ObsNotificationChannel entity.
+func newObsNotificationChannelMutation(c config, op Op, opts ...obsnotificationchannelOption) *ObsNotificationChannelMutation {
+	m := &ObsNotificationChannelMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeObsNotificationChannel,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withObsNotificationChannelID sets the ID field of the mutation.
+func withObsNotificationChannelID(id int) obsnotificationchannelOption {
+	return func(m *ObsNotificationChannelMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ObsNotificationChannel
+		)
+		m.oldValue = func(ctx context.Context) (*ObsNotificationChannel, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ObsNotificationChannel.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withObsNotificationChannel sets the old ObsNotificationChannel of the mutation.
+func withObsNotificationChannel(node *ObsNotificationChannel) obsnotificationchannelOption {
+	return func(m *ObsNotificationChannelMutation) {
+		m.oldValue = func(context.Context) (*ObsNotificationChannel, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ObsNotificationChannelMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ObsNotificationChannelMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ObsNotificationChannelMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ObsNotificationChannelMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ObsNotificationChannel.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ObsNotificationChannelMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ObsNotificationChannelMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ObsNotificationChannel entity.
+// If the ObsNotificationChannel object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationChannelMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ObsNotificationChannelMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ObsNotificationChannelMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ObsNotificationChannelMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ObsNotificationChannel entity.
+// If the ObsNotificationChannel object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationChannelMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ObsNotificationChannelMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetName sets the "name" field.
+func (m *ObsNotificationChannelMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *ObsNotificationChannelMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the ObsNotificationChannel entity.
+// If the ObsNotificationChannel object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationChannelMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *ObsNotificationChannelMutation) ResetName() {
+	m.name = nil
+}
+
+// SetChannelType sets the "channel_type" field.
+func (m *ObsNotificationChannelMutation) SetChannelType(s string) {
+	m.channel_type = &s
+}
+
+// ChannelType returns the value of the "channel_type" field in the mutation.
+func (m *ObsNotificationChannelMutation) ChannelType() (r string, exists bool) {
+	v := m.channel_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldChannelType returns the old "channel_type" field's value of the ObsNotificationChannel entity.
+// If the ObsNotificationChannel object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationChannelMutation) OldChannelType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldChannelType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldChannelType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldChannelType: %w", err)
+	}
+	return oldValue.ChannelType, nil
+}
+
+// ResetChannelType resets all changes to the "channel_type" field.
+func (m *ObsNotificationChannelMutation) ResetChannelType() {
+	m.channel_type = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *ObsNotificationChannelMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *ObsNotificationChannelMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the ObsNotificationChannel entity.
+// If the ObsNotificationChannel object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationChannelMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *ObsNotificationChannelMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetMinSeverity sets the "min_severity" field.
+func (m *ObsNotificationChannelMutation) SetMinSeverity(s string) {
+	m.min_severity = &s
+}
+
+// MinSeverity returns the value of the "min_severity" field in the mutation.
+func (m *ObsNotificationChannelMutation) MinSeverity() (r string, exists bool) {
+	v := m.min_severity
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMinSeverity returns the old "min_severity" field's value of the ObsNotificationChannel entity.
+// If the ObsNotificationChannel object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationChannelMutation) OldMinSeverity(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMinSeverity is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMinSeverity requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMinSeverity: %w", err)
+	}
+	return oldValue.MinSeverity, nil
+}
+
+// ResetMinSeverity resets all changes to the "min_severity" field.
+func (m *ObsNotificationChannelMutation) ResetMinSeverity() {
+	m.min_severity = nil
+}
+
+// SetConfigJSON sets the "config_json" field.
+func (m *ObsNotificationChannelMutation) SetConfigJSON(value map[string]interface{}) {
+	m.config_json = &value
+}
+
+// ConfigJSON returns the value of the "config_json" field in the mutation.
+func (m *ObsNotificationChannelMutation) ConfigJSON() (r map[string]interface{}, exists bool) {
+	v := m.config_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfigJSON returns the old "config_json" field's value of the ObsNotificationChannel entity.
+// If the ObsNotificationChannel object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationChannelMutation) OldConfigJSON(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfigJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfigJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfigJSON: %w", err)
+	}
+	return oldValue.ConfigJSON, nil
+}
+
+// ClearConfigJSON clears the value of the "config_json" field.
+func (m *ObsNotificationChannelMutation) ClearConfigJSON() {
+	m.config_json = nil
+	m.clearedFields[obsnotificationchannel.FieldConfigJSON] = struct{}{}
+}
+
+// ConfigJSONCleared returns if the "config_json" field was cleared in this mutation.
+func (m *ObsNotificationChannelMutation) ConfigJSONCleared() bool {
+	_, ok := m.clearedFields[obsnotificationchannel.FieldConfigJSON]
+	return ok
+}
+
+// ResetConfigJSON resets all changes to the "config_json" field.
+func (m *ObsNotificationChannelMutation) ResetConfigJSON() {
+	m.config_json = nil
+	delete(m.clearedFields, obsnotificationchannel.FieldConfigJSON)
+}
+
+// SetSendResolved sets the "send_resolved" field.
+func (m *ObsNotificationChannelMutation) SetSendResolved(b bool) {
+	m.send_resolved = &b
+}
+
+// SendResolved returns the value of the "send_resolved" field in the mutation.
+func (m *ObsNotificationChannelMutation) SendResolved() (r bool, exists bool) {
+	v := m.send_resolved
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSendResolved returns the old "send_resolved" field's value of the ObsNotificationChannel entity.
+// If the ObsNotificationChannel object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationChannelMutation) OldSendResolved(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSendResolved is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSendResolved requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSendResolved: %w", err)
+	}
+	return oldValue.SendResolved, nil
+}
+
+// ResetSendResolved resets all changes to the "send_resolved" field.
+func (m *ObsNotificationChannelMutation) ResetSendResolved() {
+	m.send_resolved = nil
+}
+
+// Where appends a list predicates to the ObsNotificationChannelMutation builder.
+func (m *ObsNotificationChannelMutation) Where(ps ...predicate.ObsNotificationChannel) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ObsNotificationChannelMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ObsNotificationChannelMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ObsNotificationChannel, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ObsNotificationChannelMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ObsNotificationChannelMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ObsNotificationChannel).
+func (m *ObsNotificationChannelMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ObsNotificationChannelMutation) Fields() []string {
+	fields := make([]string, 0, 8)
+	if m.created_at != nil {
+		fields = append(fields, obsnotificationchannel.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, obsnotificationchannel.FieldUpdatedAt)
+	}
+	if m.name != nil {
+		fields = append(fields, obsnotificationchannel.FieldName)
+	}
+	if m.channel_type != nil {
+		fields = append(fields, obsnotificationchannel.FieldChannelType)
+	}
+	if m.status != nil {
+		fields = append(fields, obsnotificationchannel.FieldStatus)
+	}
+	if m.min_severity != nil {
+		fields = append(fields, obsnotificationchannel.FieldMinSeverity)
+	}
+	if m.config_json != nil {
+		fields = append(fields, obsnotificationchannel.FieldConfigJSON)
+	}
+	if m.send_resolved != nil {
+		fields = append(fields, obsnotificationchannel.FieldSendResolved)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ObsNotificationChannelMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case obsnotificationchannel.FieldCreatedAt:
+		return m.CreatedAt()
+	case obsnotificationchannel.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case obsnotificationchannel.FieldName:
+		return m.Name()
+	case obsnotificationchannel.FieldChannelType:
+		return m.ChannelType()
+	case obsnotificationchannel.FieldStatus:
+		return m.Status()
+	case obsnotificationchannel.FieldMinSeverity:
+		return m.MinSeverity()
+	case obsnotificationchannel.FieldConfigJSON:
+		return m.ConfigJSON()
+	case obsnotificationchannel.FieldSendResolved:
+		return m.SendResolved()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ObsNotificationChannelMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case obsnotificationchannel.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case obsnotificationchannel.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case obsnotificationchannel.FieldName:
+		return m.OldName(ctx)
+	case obsnotificationchannel.FieldChannelType:
+		return m.OldChannelType(ctx)
+	case obsnotificationchannel.FieldStatus:
+		return m.OldStatus(ctx)
+	case obsnotificationchannel.FieldMinSeverity:
+		return m.OldMinSeverity(ctx)
+	case obsnotificationchannel.FieldConfigJSON:
+		return m.OldConfigJSON(ctx)
+	case obsnotificationchannel.FieldSendResolved:
+		return m.OldSendResolved(ctx)
+	}
+	return nil, fmt.Errorf("unknown ObsNotificationChannel field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ObsNotificationChannelMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case obsnotificationchannel.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case obsnotificationchannel.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case obsnotificationchannel.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case obsnotificationchannel.FieldChannelType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetChannelType(v)
+		return nil
+	case obsnotificationchannel.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case obsnotificationchannel.FieldMinSeverity:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMinSeverity(v)
+		return nil
+	case obsnotificationchannel.FieldConfigJSON:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfigJSON(v)
+		return nil
+	case obsnotificationchannel.FieldSendResolved:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSendResolved(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ObsNotificationChannel field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ObsNotificationChannelMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ObsNotificationChannelMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ObsNotificationChannelMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown ObsNotificationChannel numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ObsNotificationChannelMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(obsnotificationchannel.FieldConfigJSON) {
+		fields = append(fields, obsnotificationchannel.FieldConfigJSON)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ObsNotificationChannelMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ObsNotificationChannelMutation) ClearField(name string) error {
+	switch name {
+	case obsnotificationchannel.FieldConfigJSON:
+		m.ClearConfigJSON()
+		return nil
+	}
+	return fmt.Errorf("unknown ObsNotificationChannel nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ObsNotificationChannelMutation) ResetField(name string) error {
+	switch name {
+	case obsnotificationchannel.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case obsnotificationchannel.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case obsnotificationchannel.FieldName:
+		m.ResetName()
+		return nil
+	case obsnotificationchannel.FieldChannelType:
+		m.ResetChannelType()
+		return nil
+	case obsnotificationchannel.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case obsnotificationchannel.FieldMinSeverity:
+		m.ResetMinSeverity()
+		return nil
+	case obsnotificationchannel.FieldConfigJSON:
+		m.ResetConfigJSON()
+		return nil
+	case obsnotificationchannel.FieldSendResolved:
+		m.ResetSendResolved()
+		return nil
+	}
+	return fmt.Errorf("unknown ObsNotificationChannel field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ObsNotificationChannelMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ObsNotificationChannelMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ObsNotificationChannelMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ObsNotificationChannelMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ObsNotificationChannelMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ObsNotificationChannelMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ObsNotificationChannelMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown ObsNotificationChannel unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ObsNotificationChannelMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown ObsNotificationChannel edge %s", name)
+}
+
+// ObsNotificationDeliveryMutation represents an operation that mutates the ObsNotificationDelivery nodes in the graph.
+type ObsNotificationDeliveryMutation struct {
+	config
+	op                Op
+	typ               string
+	id                *int
+	created_at        *time.Time
+	updated_at        *time.Time
+	channel_id        *int
+	addchannel_id     *int
+	alert_event_id    *int
+	addalert_event_id *int
+	alert_status      *string
+	severity          *string
+	status            *string
+	target            *string
+	attempt_count     *int
+	addattempt_count  *int
+	last_error        *string
+	next_attempt_at   *time.Time
+	delivered_at      *time.Time
+	last_attempt_at   *time.Time
+	clearedFields     map[string]struct{}
+	done              bool
+	oldValue          func(context.Context) (*ObsNotificationDelivery, error)
+	predicates        []predicate.ObsNotificationDelivery
+}
+
+var _ ent.Mutation = (*ObsNotificationDeliveryMutation)(nil)
+
+// obsnotificationdeliveryOption allows management of the mutation configuration using functional options.
+type obsnotificationdeliveryOption func(*ObsNotificationDeliveryMutation)
+
+// newObsNotificationDeliveryMutation creates new mutation for the ObsNotificationDelivery entity.
+func newObsNotificationDeliveryMutation(c config, op Op, opts ...obsnotificationdeliveryOption) *ObsNotificationDeliveryMutation {
+	m := &ObsNotificationDeliveryMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeObsNotificationDelivery,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withObsNotificationDeliveryID sets the ID field of the mutation.
+func withObsNotificationDeliveryID(id int) obsnotificationdeliveryOption {
+	return func(m *ObsNotificationDeliveryMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ObsNotificationDelivery
+		)
+		m.oldValue = func(ctx context.Context) (*ObsNotificationDelivery, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ObsNotificationDelivery.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withObsNotificationDelivery sets the old ObsNotificationDelivery of the mutation.
+func withObsNotificationDelivery(node *ObsNotificationDelivery) obsnotificationdeliveryOption {
+	return func(m *ObsNotificationDeliveryMutation) {
+		m.oldValue = func(context.Context) (*ObsNotificationDelivery, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ObsNotificationDeliveryMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ObsNotificationDeliveryMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ObsNotificationDeliveryMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ObsNotificationDeliveryMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ObsNotificationDelivery.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ObsNotificationDeliveryMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ObsNotificationDeliveryMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ObsNotificationDelivery entity.
+// If the ObsNotificationDelivery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationDeliveryMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ObsNotificationDeliveryMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ObsNotificationDeliveryMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ObsNotificationDeliveryMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ObsNotificationDelivery entity.
+// If the ObsNotificationDelivery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationDeliveryMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ObsNotificationDeliveryMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetChannelID sets the "channel_id" field.
+func (m *ObsNotificationDeliveryMutation) SetChannelID(i int) {
+	m.channel_id = &i
+	m.addchannel_id = nil
+}
+
+// ChannelID returns the value of the "channel_id" field in the mutation.
+func (m *ObsNotificationDeliveryMutation) ChannelID() (r int, exists bool) {
+	v := m.channel_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldChannelID returns the old "channel_id" field's value of the ObsNotificationDelivery entity.
+// If the ObsNotificationDelivery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationDeliveryMutation) OldChannelID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldChannelID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldChannelID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldChannelID: %w", err)
+	}
+	return oldValue.ChannelID, nil
+}
+
+// AddChannelID adds i to the "channel_id" field.
+func (m *ObsNotificationDeliveryMutation) AddChannelID(i int) {
+	if m.addchannel_id != nil {
+		*m.addchannel_id += i
+	} else {
+		m.addchannel_id = &i
+	}
+}
+
+// AddedChannelID returns the value that was added to the "channel_id" field in this mutation.
+func (m *ObsNotificationDeliveryMutation) AddedChannelID() (r int, exists bool) {
+	v := m.addchannel_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetChannelID resets all changes to the "channel_id" field.
+func (m *ObsNotificationDeliveryMutation) ResetChannelID() {
+	m.channel_id = nil
+	m.addchannel_id = nil
+}
+
+// SetAlertEventID sets the "alert_event_id" field.
+func (m *ObsNotificationDeliveryMutation) SetAlertEventID(i int) {
+	m.alert_event_id = &i
+	m.addalert_event_id = nil
+}
+
+// AlertEventID returns the value of the "alert_event_id" field in the mutation.
+func (m *ObsNotificationDeliveryMutation) AlertEventID() (r int, exists bool) {
+	v := m.alert_event_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAlertEventID returns the old "alert_event_id" field's value of the ObsNotificationDelivery entity.
+// If the ObsNotificationDelivery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationDeliveryMutation) OldAlertEventID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAlertEventID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAlertEventID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAlertEventID: %w", err)
+	}
+	return oldValue.AlertEventID, nil
+}
+
+// AddAlertEventID adds i to the "alert_event_id" field.
+func (m *ObsNotificationDeliveryMutation) AddAlertEventID(i int) {
+	if m.addalert_event_id != nil {
+		*m.addalert_event_id += i
+	} else {
+		m.addalert_event_id = &i
+	}
+}
+
+// AddedAlertEventID returns the value that was added to the "alert_event_id" field in this mutation.
+func (m *ObsNotificationDeliveryMutation) AddedAlertEventID() (r int, exists bool) {
+	v := m.addalert_event_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAlertEventID resets all changes to the "alert_event_id" field.
+func (m *ObsNotificationDeliveryMutation) ResetAlertEventID() {
+	m.alert_event_id = nil
+	m.addalert_event_id = nil
+}
+
+// SetAlertStatus sets the "alert_status" field.
+func (m *ObsNotificationDeliveryMutation) SetAlertStatus(s string) {
+	m.alert_status = &s
+}
+
+// AlertStatus returns the value of the "alert_status" field in the mutation.
+func (m *ObsNotificationDeliveryMutation) AlertStatus() (r string, exists bool) {
+	v := m.alert_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAlertStatus returns the old "alert_status" field's value of the ObsNotificationDelivery entity.
+// If the ObsNotificationDelivery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationDeliveryMutation) OldAlertStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAlertStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAlertStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAlertStatus: %w", err)
+	}
+	return oldValue.AlertStatus, nil
+}
+
+// ResetAlertStatus resets all changes to the "alert_status" field.
+func (m *ObsNotificationDeliveryMutation) ResetAlertStatus() {
+	m.alert_status = nil
+}
+
+// SetSeverity sets the "severity" field.
+func (m *ObsNotificationDeliveryMutation) SetSeverity(s string) {
+	m.severity = &s
+}
+
+// Severity returns the value of the "severity" field in the mutation.
+func (m *ObsNotificationDeliveryMutation) Severity() (r string, exists bool) {
+	v := m.severity
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSeverity returns the old "severity" field's value of the ObsNotificationDelivery entity.
+// If the ObsNotificationDelivery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationDeliveryMutation) OldSeverity(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSeverity is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSeverity requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSeverity: %w", err)
+	}
+	return oldValue.Severity, nil
+}
+
+// ResetSeverity resets all changes to the "severity" field.
+func (m *ObsNotificationDeliveryMutation) ResetSeverity() {
+	m.severity = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *ObsNotificationDeliveryMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *ObsNotificationDeliveryMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the ObsNotificationDelivery entity.
+// If the ObsNotificationDelivery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationDeliveryMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *ObsNotificationDeliveryMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetTarget sets the "target" field.
+func (m *ObsNotificationDeliveryMutation) SetTarget(s string) {
+	m.target = &s
+}
+
+// Target returns the value of the "target" field in the mutation.
+func (m *ObsNotificationDeliveryMutation) Target() (r string, exists bool) {
+	v := m.target
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTarget returns the old "target" field's value of the ObsNotificationDelivery entity.
+// If the ObsNotificationDelivery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationDeliveryMutation) OldTarget(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTarget is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTarget requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTarget: %w", err)
+	}
+	return oldValue.Target, nil
+}
+
+// ResetTarget resets all changes to the "target" field.
+func (m *ObsNotificationDeliveryMutation) ResetTarget() {
+	m.target = nil
+}
+
+// SetAttemptCount sets the "attempt_count" field.
+func (m *ObsNotificationDeliveryMutation) SetAttemptCount(i int) {
+	m.attempt_count = &i
+	m.addattempt_count = nil
+}
+
+// AttemptCount returns the value of the "attempt_count" field in the mutation.
+func (m *ObsNotificationDeliveryMutation) AttemptCount() (r int, exists bool) {
+	v := m.attempt_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttemptCount returns the old "attempt_count" field's value of the ObsNotificationDelivery entity.
+// If the ObsNotificationDelivery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationDeliveryMutation) OldAttemptCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttemptCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttemptCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttemptCount: %w", err)
+	}
+	return oldValue.AttemptCount, nil
+}
+
+// AddAttemptCount adds i to the "attempt_count" field.
+func (m *ObsNotificationDeliveryMutation) AddAttemptCount(i int) {
+	if m.addattempt_count != nil {
+		*m.addattempt_count += i
+	} else {
+		m.addattempt_count = &i
+	}
+}
+
+// AddedAttemptCount returns the value that was added to the "attempt_count" field in this mutation.
+func (m *ObsNotificationDeliveryMutation) AddedAttemptCount() (r int, exists bool) {
+	v := m.addattempt_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAttemptCount resets all changes to the "attempt_count" field.
+func (m *ObsNotificationDeliveryMutation) ResetAttemptCount() {
+	m.attempt_count = nil
+	m.addattempt_count = nil
+}
+
+// SetLastError sets the "last_error" field.
+func (m *ObsNotificationDeliveryMutation) SetLastError(s string) {
+	m.last_error = &s
+}
+
+// LastError returns the value of the "last_error" field in the mutation.
+func (m *ObsNotificationDeliveryMutation) LastError() (r string, exists bool) {
+	v := m.last_error
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastError returns the old "last_error" field's value of the ObsNotificationDelivery entity.
+// If the ObsNotificationDelivery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationDeliveryMutation) OldLastError(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastError is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastError requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastError: %w", err)
+	}
+	return oldValue.LastError, nil
+}
+
+// ResetLastError resets all changes to the "last_error" field.
+func (m *ObsNotificationDeliveryMutation) ResetLastError() {
+	m.last_error = nil
+}
+
+// SetNextAttemptAt sets the "next_attempt_at" field.
+func (m *ObsNotificationDeliveryMutation) SetNextAttemptAt(t time.Time) {
+	m.next_attempt_at = &t
+}
+
+// NextAttemptAt returns the value of the "next_attempt_at" field in the mutation.
+func (m *ObsNotificationDeliveryMutation) NextAttemptAt() (r time.Time, exists bool) {
+	v := m.next_attempt_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNextAttemptAt returns the old "next_attempt_at" field's value of the ObsNotificationDelivery entity.
+// If the ObsNotificationDelivery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationDeliveryMutation) OldNextAttemptAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNextAttemptAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNextAttemptAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNextAttemptAt: %w", err)
+	}
+	return oldValue.NextAttemptAt, nil
+}
+
+// ResetNextAttemptAt resets all changes to the "next_attempt_at" field.
+func (m *ObsNotificationDeliveryMutation) ResetNextAttemptAt() {
+	m.next_attempt_at = nil
+}
+
+// SetDeliveredAt sets the "delivered_at" field.
+func (m *ObsNotificationDeliveryMutation) SetDeliveredAt(t time.Time) {
+	m.delivered_at = &t
+}
+
+// DeliveredAt returns the value of the "delivered_at" field in the mutation.
+func (m *ObsNotificationDeliveryMutation) DeliveredAt() (r time.Time, exists bool) {
+	v := m.delivered_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeliveredAt returns the old "delivered_at" field's value of the ObsNotificationDelivery entity.
+// If the ObsNotificationDelivery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationDeliveryMutation) OldDeliveredAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeliveredAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeliveredAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeliveredAt: %w", err)
+	}
+	return oldValue.DeliveredAt, nil
+}
+
+// ClearDeliveredAt clears the value of the "delivered_at" field.
+func (m *ObsNotificationDeliveryMutation) ClearDeliveredAt() {
+	m.delivered_at = nil
+	m.clearedFields[obsnotificationdelivery.FieldDeliveredAt] = struct{}{}
+}
+
+// DeliveredAtCleared returns if the "delivered_at" field was cleared in this mutation.
+func (m *ObsNotificationDeliveryMutation) DeliveredAtCleared() bool {
+	_, ok := m.clearedFields[obsnotificationdelivery.FieldDeliveredAt]
+	return ok
+}
+
+// ResetDeliveredAt resets all changes to the "delivered_at" field.
+func (m *ObsNotificationDeliveryMutation) ResetDeliveredAt() {
+	m.delivered_at = nil
+	delete(m.clearedFields, obsnotificationdelivery.FieldDeliveredAt)
+}
+
+// SetLastAttemptAt sets the "last_attempt_at" field.
+func (m *ObsNotificationDeliveryMutation) SetLastAttemptAt(t time.Time) {
+	m.last_attempt_at = &t
+}
+
+// LastAttemptAt returns the value of the "last_attempt_at" field in the mutation.
+func (m *ObsNotificationDeliveryMutation) LastAttemptAt() (r time.Time, exists bool) {
+	v := m.last_attempt_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastAttemptAt returns the old "last_attempt_at" field's value of the ObsNotificationDelivery entity.
+// If the ObsNotificationDelivery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsNotificationDeliveryMutation) OldLastAttemptAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastAttemptAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastAttemptAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastAttemptAt: %w", err)
+	}
+	return oldValue.LastAttemptAt, nil
+}
+
+// ClearLastAttemptAt clears the value of the "last_attempt_at" field.
+func (m *ObsNotificationDeliveryMutation) ClearLastAttemptAt() {
+	m.last_attempt_at = nil
+	m.clearedFields[obsnotificationdelivery.FieldLastAttemptAt] = struct{}{}
+}
+
+// LastAttemptAtCleared returns if the "last_attempt_at" field was cleared in this mutation.
+func (m *ObsNotificationDeliveryMutation) LastAttemptAtCleared() bool {
+	_, ok := m.clearedFields[obsnotificationdelivery.FieldLastAttemptAt]
+	return ok
+}
+
+// ResetLastAttemptAt resets all changes to the "last_attempt_at" field.
+func (m *ObsNotificationDeliveryMutation) ResetLastAttemptAt() {
+	m.last_attempt_at = nil
+	delete(m.clearedFields, obsnotificationdelivery.FieldLastAttemptAt)
+}
+
+// Where appends a list predicates to the ObsNotificationDeliveryMutation builder.
+func (m *ObsNotificationDeliveryMutation) Where(ps ...predicate.ObsNotificationDelivery) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ObsNotificationDeliveryMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ObsNotificationDeliveryMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ObsNotificationDelivery, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ObsNotificationDeliveryMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ObsNotificationDeliveryMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ObsNotificationDelivery).
+func (m *ObsNotificationDeliveryMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ObsNotificationDeliveryMutation) Fields() []string {
+	fields := make([]string, 0, 13)
+	if m.created_at != nil {
+		fields = append(fields, obsnotificationdelivery.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, obsnotificationdelivery.FieldUpdatedAt)
+	}
+	if m.channel_id != nil {
+		fields = append(fields, obsnotificationdelivery.FieldChannelID)
+	}
+	if m.alert_event_id != nil {
+		fields = append(fields, obsnotificationdelivery.FieldAlertEventID)
+	}
+	if m.alert_status != nil {
+		fields = append(fields, obsnotificationdelivery.FieldAlertStatus)
+	}
+	if m.severity != nil {
+		fields = append(fields, obsnotificationdelivery.FieldSeverity)
+	}
+	if m.status != nil {
+		fields = append(fields, obsnotificationdelivery.FieldStatus)
+	}
+	if m.target != nil {
+		fields = append(fields, obsnotificationdelivery.FieldTarget)
+	}
+	if m.attempt_count != nil {
+		fields = append(fields, obsnotificationdelivery.FieldAttemptCount)
+	}
+	if m.last_error != nil {
+		fields = append(fields, obsnotificationdelivery.FieldLastError)
+	}
+	if m.next_attempt_at != nil {
+		fields = append(fields, obsnotificationdelivery.FieldNextAttemptAt)
+	}
+	if m.delivered_at != nil {
+		fields = append(fields, obsnotificationdelivery.FieldDeliveredAt)
+	}
+	if m.last_attempt_at != nil {
+		fields = append(fields, obsnotificationdelivery.FieldLastAttemptAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ObsNotificationDeliveryMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case obsnotificationdelivery.FieldCreatedAt:
+		return m.CreatedAt()
+	case obsnotificationdelivery.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case obsnotificationdelivery.FieldChannelID:
+		return m.ChannelID()
+	case obsnotificationdelivery.FieldAlertEventID:
+		return m.AlertEventID()
+	case obsnotificationdelivery.FieldAlertStatus:
+		return m.AlertStatus()
+	case obsnotificationdelivery.FieldSeverity:
+		return m.Severity()
+	case obsnotificationdelivery.FieldStatus:
+		return m.Status()
+	case obsnotificationdelivery.FieldTarget:
+		return m.Target()
+	case obsnotificationdelivery.FieldAttemptCount:
+		return m.AttemptCount()
+	case obsnotificationdelivery.FieldLastError:
+		return m.LastError()
+	case obsnotificationdelivery.FieldNextAttemptAt:
+		return m.NextAttemptAt()
+	case obsnotificationdelivery.FieldDeliveredAt:
+		return m.DeliveredAt()
+	case obsnotificationdelivery.FieldLastAttemptAt:
+		return m.LastAttemptAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ObsNotificationDeliveryMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case obsnotificationdelivery.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case obsnotificationdelivery.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case obsnotificationdelivery.FieldChannelID:
+		return m.OldChannelID(ctx)
+	case obsnotificationdelivery.FieldAlertEventID:
+		return m.OldAlertEventID(ctx)
+	case obsnotificationdelivery.FieldAlertStatus:
+		return m.OldAlertStatus(ctx)
+	case obsnotificationdelivery.FieldSeverity:
+		return m.OldSeverity(ctx)
+	case obsnotificationdelivery.FieldStatus:
+		return m.OldStatus(ctx)
+	case obsnotificationdelivery.FieldTarget:
+		return m.OldTarget(ctx)
+	case obsnotificationdelivery.FieldAttemptCount:
+		return m.OldAttemptCount(ctx)
+	case obsnotificationdelivery.FieldLastError:
+		return m.OldLastError(ctx)
+	case obsnotificationdelivery.FieldNextAttemptAt:
+		return m.OldNextAttemptAt(ctx)
+	case obsnotificationdelivery.FieldDeliveredAt:
+		return m.OldDeliveredAt(ctx)
+	case obsnotificationdelivery.FieldLastAttemptAt:
+		return m.OldLastAttemptAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown ObsNotificationDelivery field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ObsNotificationDeliveryMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case obsnotificationdelivery.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case obsnotificationdelivery.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case obsnotificationdelivery.FieldChannelID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetChannelID(v)
+		return nil
+	case obsnotificationdelivery.FieldAlertEventID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAlertEventID(v)
+		return nil
+	case obsnotificationdelivery.FieldAlertStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAlertStatus(v)
+		return nil
+	case obsnotificationdelivery.FieldSeverity:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSeverity(v)
+		return nil
+	case obsnotificationdelivery.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case obsnotificationdelivery.FieldTarget:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTarget(v)
+		return nil
+	case obsnotificationdelivery.FieldAttemptCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttemptCount(v)
+		return nil
+	case obsnotificationdelivery.FieldLastError:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastError(v)
+		return nil
+	case obsnotificationdelivery.FieldNextAttemptAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNextAttemptAt(v)
+		return nil
+	case obsnotificationdelivery.FieldDeliveredAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeliveredAt(v)
+		return nil
+	case obsnotificationdelivery.FieldLastAttemptAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastAttemptAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ObsNotificationDelivery field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ObsNotificationDeliveryMutation) AddedFields() []string {
+	var fields []string
+	if m.addchannel_id != nil {
+		fields = append(fields, obsnotificationdelivery.FieldChannelID)
+	}
+	if m.addalert_event_id != nil {
+		fields = append(fields, obsnotificationdelivery.FieldAlertEventID)
+	}
+	if m.addattempt_count != nil {
+		fields = append(fields, obsnotificationdelivery.FieldAttemptCount)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ObsNotificationDeliveryMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case obsnotificationdelivery.FieldChannelID:
+		return m.AddedChannelID()
+	case obsnotificationdelivery.FieldAlertEventID:
+		return m.AddedAlertEventID()
+	case obsnotificationdelivery.FieldAttemptCount:
+		return m.AddedAttemptCount()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ObsNotificationDeliveryMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case obsnotificationdelivery.FieldChannelID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddChannelID(v)
+		return nil
+	case obsnotificationdelivery.FieldAlertEventID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAlertEventID(v)
+		return nil
+	case obsnotificationdelivery.FieldAttemptCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAttemptCount(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ObsNotificationDelivery numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ObsNotificationDeliveryMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(obsnotificationdelivery.FieldDeliveredAt) {
+		fields = append(fields, obsnotificationdelivery.FieldDeliveredAt)
+	}
+	if m.FieldCleared(obsnotificationdelivery.FieldLastAttemptAt) {
+		fields = append(fields, obsnotificationdelivery.FieldLastAttemptAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ObsNotificationDeliveryMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ObsNotificationDeliveryMutation) ClearField(name string) error {
+	switch name {
+	case obsnotificationdelivery.FieldDeliveredAt:
+		m.ClearDeliveredAt()
+		return nil
+	case obsnotificationdelivery.FieldLastAttemptAt:
+		m.ClearLastAttemptAt()
+		return nil
+	}
+	return fmt.Errorf("unknown ObsNotificationDelivery nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ObsNotificationDeliveryMutation) ResetField(name string) error {
+	switch name {
+	case obsnotificationdelivery.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case obsnotificationdelivery.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case obsnotificationdelivery.FieldChannelID:
+		m.ResetChannelID()
+		return nil
+	case obsnotificationdelivery.FieldAlertEventID:
+		m.ResetAlertEventID()
+		return nil
+	case obsnotificationdelivery.FieldAlertStatus:
+		m.ResetAlertStatus()
+		return nil
+	case obsnotificationdelivery.FieldSeverity:
+		m.ResetSeverity()
+		return nil
+	case obsnotificationdelivery.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case obsnotificationdelivery.FieldTarget:
+		m.ResetTarget()
+		return nil
+	case obsnotificationdelivery.FieldAttemptCount:
+		m.ResetAttemptCount()
+		return nil
+	case obsnotificationdelivery.FieldLastError:
+		m.ResetLastError()
+		return nil
+	case obsnotificationdelivery.FieldNextAttemptAt:
+		m.ResetNextAttemptAt()
+		return nil
+	case obsnotificationdelivery.FieldDeliveredAt:
+		m.ResetDeliveredAt()
+		return nil
+	case obsnotificationdelivery.FieldLastAttemptAt:
+		m.ResetLastAttemptAt()
+		return nil
+	}
+	return fmt.Errorf("unknown ObsNotificationDelivery field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ObsNotificationDeliveryMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ObsNotificationDeliveryMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ObsNotificationDeliveryMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ObsNotificationDeliveryMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ObsNotificationDeliveryMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ObsNotificationDeliveryMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ObsNotificationDeliveryMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown ObsNotificationDelivery unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ObsNotificationDeliveryMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown ObsNotificationDelivery edge %s", name)
 }
 
 // ObsSLODefinitionMutation represents an operation that mutates the ObsSLODefinition nodes in the graph.

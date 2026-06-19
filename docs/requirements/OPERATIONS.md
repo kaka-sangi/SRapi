@@ -386,6 +386,30 @@ Provider Account metadata 或 Provider config/capabilities 可以把默认 `/mod
 
 AdminOps 启动时会按规则名幂等创建内置阈值告警基线：全局 Gateway error rate、全局 Gateway p95 latency，以及 `/v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1/responses/ws` 和 `/v1/realtime` 的入口级错误率或 p95 latency baseline。已有同名规则会被视为 operator-owned 配置，不会被覆盖；需要停用默认保护时应禁用规则而不是修改数据库。
 
+### Ops 告警通知
+
+AdminOps 控制面内置 email 告警通知通道：
+
+```txt
+GET    /api/v1/admin/ops/notification-channels
+POST   /api/v1/admin/ops/notification-channels
+PATCH  /api/v1/admin/ops/notification-channels/{id}
+DELETE /api/v1/admin/ops/notification-channels/{id}
+GET    /api/v1/admin/ops/notification-deliveries
+```
+
+通道字段包括名称、状态、最低 severity、收件邮箱和是否发送 resolved。当前只支持 `email`；不要在前端或 OpenAPI 中暴露尚未实现的 webhook/IM 通道。SMTP sender 复用 `EMAIL_SMTP_*` 和 `EMAIL_PUBLIC_BASE_URL` 部署环境变量，SMTP 密码不进入数据库、Admin Settings、audit snapshot 或 API 响应。
+
+`alert_notifications` worker 由 `internal/app` 在持久化 operations store 可用时启动。它默认每 30 秒读取到期 `obs_notification_deliveries`，每轮最多处理 20 条；成功投递写 `delivered_at`，失败写限长 `last_error`、递增 `attempt_count` 并调度下一次重试。SMTP 未配置时投递会失败并记录 `not configured`，避免误以为已通知。配置项：
+
+```txt
+OPS_ALERT_NOTIFICATIONS_INTERVAL_SECONDS=30
+OPS_ALERT_NOTIFICATIONS_TIMEOUT_SECONDS=30
+OPS_ALERT_NOTIFICATIONS_BATCH_LIMIT=20
+```
+
+投递记录用于回答“是否已经通知、通知给谁、失败原因是什么”。它只水合 channel name/type、alert summary、alert timestamps 和 target，不复制 alert `details_json`，也不保存邮件正文。
+
 AdminOps 错误日志提供实时指纹摘要：
 
 ```txt
@@ -414,7 +438,8 @@ make observability-rules-check
 4. 如果 details 带 `request_id`，继续打开请求证据和调度决策，核对 selected provider/account、reject reasons、score breakdown、fallback_from_decision_id 和 fallback_excluded 证据。
 5. 如果 details 带 provider/account scope，打开账号健康，确认 cooldown、circuit、quota remaining、RPM/TPM、proxy quality、needs_reauth 和最近 health probe 错误。
 6. 如果 critical 由 SLO burn-rate 触发，复核 long/short window、total/bad requests、burn rate、error budget consumed 和 SLO filter 是否符合真实事故范围；不要只因为单个低流量样本恢复就确认事故结束。
-7. 缓解后等待 alert event 自动恢复或人工确认，必须在错误日志指纹、请求证据和账号健康三处都看到趋势回落，再关闭外部事故。
+7. 打开 AdminOps 通知通道和投递证据，确认对应 firing alert 已生成 delivery 且不是持续 failed；如果失败，优先修复 SMTP 配置或收件人，再等待 worker 重试。
+8. 缓解后等待 alert event 自动恢复或人工确认，必须在错误日志指纹、请求证据和账号健康三处都看到趋势回落，再关闭外部事故。
 
 #### SRapiWarningOpsAlertsPersisting
 
@@ -500,6 +525,8 @@ COMPOSE_PROFILES=observability make dev-up
 该 profile 会用 `deploy/prometheus.yml` 抓取 API `/metrics`、加载 `deploy/prometheus-srapi-alerts.yaml`，并把触发的告警转发给同 profile 内的 Alertmanager。Prometheus 监听端口默认为 `9090`，可通过 `PROMETHEUS_PORT` 覆盖。Alertmanager 监听端口默认为 `9093`，可通过 `ALERTMANAGER_PORT` 覆盖。该 profile 是 opt-in，不影响默认 API/PostgreSQL/Redis 启动路径。
 
 本地 Alertmanager notification route 位于 `deploy/alertmanager.yml`。默认 receiver `srapi-local-webhook` 会向宿主机 `http://host.docker.internal:19093/srapi/alerts` 发送 webhook，并设置 `send_resolved: true`，方便用本地调试接收器确认 firing 和 resolved 通知。生产部署应把 receiver 替换为实际的通知系统或中继，但 route grouping 只能保留 `service`、`severity`、`component` 这类固定低基数字段；不要把 alert id、fingerprint、rule id、API key、account id、user id、request id、prompt、credential、Authorization 或 cookie 放进 labels、grouping 或 webhook URL。
+
+SRapi 内置 email 通知通道和 Alertmanager 可以同时使用：前者保留控制面投递证据，后者适合对接外部 incident 系统。两者都不得把高基数或敏感字段写入 labels、route grouping、URL、邮件标题或 webhook URL。
 
 ### QualityEval 在线评估
 
