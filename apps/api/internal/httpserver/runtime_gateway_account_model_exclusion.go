@@ -2,9 +2,12 @@ package httpserver
 
 import (
 	"context"
+	"strings"
 
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	"github.com/srapi/srapi/apps/api/internal/platform/glob"
 )
 
@@ -48,16 +51,27 @@ func accountExcludesModel(metadata map[string]any, modelNames ...string) bool {
 	return false
 }
 
-// modelsHiddenByExclusion returns the set of catalog canonical model names that
-// should be hidden from /v1/models for the given key because every account that
-// could serve the model (within the key's account-group restriction) excludes
-// it via its excluded_models wildcard list. A model with no serving account at
-// all is NOT hidden — listing it has always been allowed and exclusion only
-// removes per-channel surface, never adds new hiding behavior. Errors loading a
-// model's mappings/accounts are treated as "not hidden" so the listing degrades
-// open rather than silently dropping models.
-func (rt *runtimeState) modelsHiddenByExclusion(ctx context.Context, models []modelcontract.Model, apiKey apikeycontract.APIKey) map[string]struct{} {
-	accounts, err := rt.accounts.List(ctx)
+// modelsHiddenByAvailability returns the catalog canonical model names that
+// should be hidden from model-listing endpoints because every active account in
+// scope that could serve the model is blocked by excluded_models or by the
+// discovery-derived supported_models allowlist. A model with no active serving
+// account remains visible: catalog-only listings are an existing compatibility
+// behavior, while account metadata may only remove a concrete per-account
+// surface. Store/provider lookup errors degrade open instead of silently
+// dropping models.
+func (rt *runtimeState) modelsHiddenByAvailability(ctx context.Context, models []modelcontract.Model, apiKey apikeycontract.APIKey, sourceEndpoint string, forcedProviderKey string) map[string]struct{} {
+	mappingsByModel := make(map[int][]modelcontract.ModelProviderMapping, len(models))
+	providerIDs := []int{}
+	for _, model := range models {
+		mappings, err := rt.models.ListMappingsByModel(ctx, model.ID)
+		if err != nil {
+			return nil
+		}
+		mappings = activeModelMappings(mappings)
+		mappingsByModel[model.ID] = mappings
+		providerIDs = append(providerIDs, providerIDsForMappings(mappings)...)
+	}
+	accounts, err := rt.accounts.ListActiveByProviderIDs(ctx, providerIDs)
 	if err != nil {
 		return nil
 	}
@@ -72,15 +86,32 @@ func (rt *runtimeState) modelsHiddenByExclusion(ctx context.Context, models []mo
 			return nil
 		}
 	}
+	providersByID := map[int]providercontract.Provider{}
+	forcedProviderKey = strings.TrimSpace(forcedProviderKey)
 	hidden := map[string]struct{}{}
 	for _, model := range models {
-		mappings, err := rt.models.ListMappingsByModel(ctx, model.ID)
-		if err != nil || len(mappings) == 0 {
+		mappings := mappingsByModel[model.ID]
+		if len(mappings) == 0 {
 			continue
 		}
 		serving := 0
-		excluded := 0
+		unavailable := 0
 		for _, mapping := range mappings {
+			provider, ok := providersByID[mapping.ProviderID]
+			if !ok {
+				var err error
+				provider, err = rt.providers.FindByID(ctx, mapping.ProviderID)
+				if err != nil {
+					continue
+				}
+				providersByID[mapping.ProviderID] = provider
+			}
+			if provider.ID <= 0 {
+				continue
+			}
+			if forcedProviderKey != "" && provider.Name != forcedProviderKey {
+				continue
+			}
 			for _, account := range accounts {
 				if account.ProviderID != mapping.ProviderID {
 					continue
@@ -89,14 +120,34 @@ func (rt *runtimeState) modelsHiddenByExclusion(ctx context.Context, models []mo
 					continue
 				}
 				serving++
-				if accountExcludesModel(account.Metadata, model.CanonicalName, mapping.UpstreamModelName) {
-					excluded++
+				effectiveMapping := accountEffectiveModelMapping(mapping, account, model.CanonicalName, sourceEndpoint)
+				effectiveMapping = providerEffectiveModelMapping(provider, effectiveMapping)
+				if accountUnavailableForModel(provider, account, model.CanonicalName, effectiveMapping.UpstreamModelName) {
+					unavailable++
 				}
 			}
 		}
-		if serving > 0 && excluded == serving {
+		if serving > 0 && unavailable == serving {
 			hidden[model.CanonicalName] = struct{}{}
 		}
 	}
 	return hidden
+}
+
+func activeModelMappings(mappings []modelcontract.ModelProviderMapping) []modelcontract.ModelProviderMapping {
+	out := make([]modelcontract.ModelProviderMapping, 0, len(mappings))
+	for _, mapping := range mappings {
+		if mapping.Status != modelcontract.StatusActive {
+			continue
+		}
+		out = append(out, mapping)
+	}
+	return out
+}
+
+func accountUnavailableForModel(provider providercontract.Provider, account accountcontract.ProviderAccount, canonicalModel string, upstreamModel string) bool {
+	if accountExcludesModel(account.Metadata, canonicalModel, upstreamModel) {
+		return true
+	}
+	return !accountRoutableForModel(provider, account.Metadata, upstreamModel)
 }

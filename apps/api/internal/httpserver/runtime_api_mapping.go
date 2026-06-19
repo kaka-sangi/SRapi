@@ -151,8 +151,8 @@ func filterGatewayModels(models []apiopenapi.OpenAIModel, allowed []string) []ap
 	return out
 }
 
-// hideGatewayModels drops models whose Id is in the hidden set (canonical
-// names hidden by per-account excluded_models wildcards).
+// hideGatewayModels drops models whose Id is in the hidden set of canonical
+// names unavailable for the current gateway key.
 func hideGatewayModels(models []apiopenapi.OpenAIModel, hidden map[string]struct{}) []apiopenapi.OpenAIModel {
 	if len(hidden) == 0 {
 		return models

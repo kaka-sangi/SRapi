@@ -26,7 +26,7 @@ func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, http.StatusInternalServerError, apiopenapi.InternalError, "failed to list models", "internal_error")
 		return
 	}
-	hidden := s.runtime.modelsHiddenByExclusion(r.Context(), models, authed.Key)
+	hidden := s.runtime.modelsHiddenByAvailability(r.Context(), models, authed.Key, gatewaySourceEndpoint(r.Context(), "/v1/models"), gatewayForcedProviderKey(r.Context()))
 	gatewayModels := toGatewayModelsWithAliases(r.Context(), s.runtime.models, models, hidden)
 	gatewayModels = filterGatewayModels(gatewayModels, authed.Key.AllowedModels)
 	if len(hidden) > 0 {

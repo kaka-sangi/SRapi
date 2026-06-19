@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
@@ -34,7 +35,8 @@ func (s *Server) handleListGeminiModels(w http.ResponseWriter, r *http.Request) 
 		writeGeminiGatewayError(w, http.StatusInternalServerError, "INTERNAL", "failed to list models")
 		return
 	}
-	visible := filterGatewayModels(toGatewayModels(models), authed.Key.AllowedModels)
+	hidden := s.runtime.modelsHiddenByAvailability(r.Context(), models, authed.Key, gatewaySourceEndpoint(r.Context(), "/v1beta/models"), gatewayForcedProviderKey(r.Context()))
+	visible := filterGatewayModels(hideGatewayModels(toGatewayModels(models), hidden), authed.Key.AllowedModels)
 	geminiModels := toGeminiModels(models, visible)
 	page, nextToken := paginateGeminiModels(geminiModels, pageSize, offset)
 	resp := apiopenapi.GeminiModelList{Models: page}
@@ -68,7 +70,17 @@ func (s *Server) handleGetGeminiModel(w http.ResponseWriter, r *http.Request) {
 		writeGeminiGatewayError(w, http.StatusForbidden, "PERMISSION_DENIED", "model not allowed for this api key")
 		return
 	}
+	if s.runtime.geminiModelHiddenByAvailability(r, authed.Key, modelResolution.Model) {
+		writeGeminiGatewayError(w, http.StatusNotFound, "NOT_FOUND", "model not found")
+		return
+	}
 	writeJSONAny(w, http.StatusOK, geminiModelInfo(modelResolution.Model))
+}
+
+func (rt *runtimeState) geminiModelHiddenByAvailability(r *http.Request, apiKey apikeycontract.APIKey, model modelcontract.Model) bool {
+	hidden := rt.modelsHiddenByAvailability(r.Context(), []modelcontract.Model{model}, apiKey, gatewaySourceEndpoint(r.Context(), "/v1beta/models"), gatewayForcedProviderKey(r.Context()))
+	_, ok := hidden[model.CanonicalName]
+	return ok
 }
 
 func (s *Server) filterGeminiModelsForForcedProvider(r *http.Request, models []modelcontract.Model) ([]modelcontract.Model, error) {

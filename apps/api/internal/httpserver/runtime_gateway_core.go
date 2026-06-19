@@ -750,6 +750,7 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 	if err != nil {
 		return nil, err
 	}
+	mappings = activeModelMappings(mappings)
 	providerIDs := providerIDsForMappings(mappings)
 	accounts, err := rt.accounts.ListActiveByProviderIDs(ctx, providerIDs)
 	if err != nil {
