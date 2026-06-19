@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AdminOpsAlertEventsPage from "@/app/admin/ops/alert-events/page";
@@ -26,6 +27,16 @@ const mocks = vi.hoisted(() => ({
     fingerprint: "rule:7:error_rate:gt",
     summary: "Chat error rate gt 0.25",
     details: {
+      rule_name: "Chat error baseline",
+      metric_type: "error_rate",
+      operator: "gt",
+      threshold: 0.25,
+      observed_value: 0.5,
+      total_requests: 40,
+      good_requests: 20,
+      bad_requests: 20,
+      error_rate: 0.5,
+      min_request_count: 10,
       request_id: "req-alert",
       account_id: "acct-1",
       provider_id: "provider-1",
@@ -96,5 +107,27 @@ describe("AdminOpsAlertEventsPage", () => {
     expect(screen.getByText("先看错误日志的 error_class、owner、upstream status 和 attempt。")).toBeInTheDocument();
     expect(screen.getByText("核对请求证据里的模型、端点、账号和上游响应。")).toBeInTheDocument();
     expect(screen.getByText("查看调度拒绝原因、score breakdown 和 fallback 链路。")).toBeInTheDocument();
+  });
+
+  it("shows a structured signal summary in the alert detail dialog", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<AdminOpsAlertEventsPage />, { wrapper: wrap });
+
+    await user.click(screen.getByLabelText("操作"));
+    await user.click(await screen.findByText("查看详情"));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("触发条件")).toBeInTheDocument();
+    expect(screen.getByText("Chat error baseline")).toBeInTheDocument();
+    expect(screen.getByText("error_rate gt 25.0%")).toBeInTheDocument();
+    expect(screen.getAllByText("50.0%").length).toBeGreaterThan(0);
+    expect(screen.getByText("流量样本")).toBeInTheDocument();
+    expect(screen.getByText("40")).toBeInTheDocument();
+    expect(screen.getAllByText("20")).toHaveLength(2);
+    expect(screen.getByText("窗口")).toBeInTheDocument();
+    expect(screen.getByText("2026-06-18T09:55:00Z")).toBeInTheDocument();
+    expect(screen.getByText("范围")).toBeInTheDocument();
+    expect(screen.getByText("/v1/chat/completions")).toBeInTheDocument();
+    expect(screen.getByText("gpt-ops")).toBeInTheDocument();
   });
 });

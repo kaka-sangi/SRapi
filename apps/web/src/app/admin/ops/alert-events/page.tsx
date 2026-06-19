@@ -29,9 +29,9 @@ import {
   buildOpsAlertRunbookSteps,
   type OpsAlertEvidenceLinks,
 } from "@/lib/admin-ops-alert-evidence";
-import { formatDateTime, safeJson } from "@/lib/admin-format";
+import { formatDateTime, formatInteger, formatLatency, formatPercent, safeJson } from "@/lib/admin-format";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
-import type { OpsAlertEvent, OpsAlertSeverity, OpsAlertStatus } from "@/lib/sdk-types";
+import type { JsonObject, OpsAlertEvent, OpsAlertSeverity, OpsAlertStatus } from "@/lib/sdk-types";
 
 const ALERT_STATUSES: OpsAlertStatus[] = ["firing", "acknowledged", "resolved", "suppressed"];
 const ALERT_SEVERITIES: OpsAlertSeverity[] = ["critical", "warning", "ticket"];
@@ -183,7 +183,7 @@ function AlertEventsContent() {
 
       {detail ? (
         <Dialog open onOpenChange={(open) => !open && setDetail(null)}>
-          <DialogContent>
+          <DialogContent className="max-w-4xl">
             <DialogHeader>
               <DialogTitle>{t("adminOpsAlertEvents.detailTitle")}</DialogTitle>
               <DialogDescription>
@@ -191,19 +191,22 @@ function AlertEventsContent() {
               </DialogDescription>
             </DialogHeader>
             <div className="mt-4 max-h-[60vh] space-y-4 overflow-y-auto pr-1">
-              <Meta label={t("adminCommon.status")} value={statusLabel(t, detail.status)} />
-              <Meta label={t("adminOpsAlertEvents.severity")} value={detail.severity} />
-              <Meta label={t("adminOpsAlertEvents.startedAt")} value={formatDateTime(detail.started_at)} />
-              <Meta label={t("adminOpsAlertEvents.updated")} value={formatDateTime(detail.updated_at)} />
-              {detail.resolved_at ? (
-                <Meta label={t("adminOpsAlertEvents.resolvedAt")} value={formatDateTime(detail.resolved_at)} />
-              ) : null}
-              {detail.acknowledged_at ? (
-                <Meta label={t("adminOpsAlertEvents.acknowledgedAt")} value={formatDateTime(detail.acknowledged_at)} />
-              ) : null}
-              {detail.suppressed_by ? (
-                <Meta label={t("adminOpsAlertEvents.suppressedBy")} value={detail.suppressed_by} />
-              ) : null}
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Meta label={t("adminCommon.status")} value={statusLabel(t, detail.status)} />
+                <Meta label={t("adminOpsAlertEvents.severity")} value={detail.severity} />
+                <Meta label={t("adminOpsAlertEvents.startedAt")} value={formatDateTime(detail.started_at)} />
+                <Meta label={t("adminOpsAlertEvents.updated")} value={formatDateTime(detail.updated_at)} />
+                {detail.resolved_at ? (
+                  <Meta label={t("adminOpsAlertEvents.resolvedAt")} value={formatDateTime(detail.resolved_at)} />
+                ) : null}
+                {detail.acknowledged_at ? (
+                  <Meta label={t("adminOpsAlertEvents.acknowledgedAt")} value={formatDateTime(detail.acknowledged_at)} />
+                ) : null}
+                {detail.suppressed_by ? (
+                  <Meta label={t("adminOpsAlertEvents.suppressedBy")} value={detail.suppressed_by} />
+                ) : null}
+              </div>
+              <AlertSignalSummary details={detail.details} />
               <div>
                 <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
                   {t("adminOpsAlertEvents.evidence")}
@@ -220,6 +223,207 @@ function AlertEventsContent() {
       ) : null}
     </>
   );
+}
+
+interface SignalItem {
+  label: string;
+  value: string;
+}
+
+interface SignalSection {
+  title: string;
+  items: SignalItem[];
+}
+
+function AlertSignalSummary({ details }: { details?: JsonObject }) {
+  const { t } = useLanguage();
+  const sections = buildAlertSignalSections(details, t);
+  if (sections.length === 0) return null;
+
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {sections.map((section) => (
+        <div key={section.title} className="rounded border border-srapi-border-subtle p-3">
+          <div className="mb-2 font-mono text-2xs uppercase text-srapi-text-tertiary">
+            {section.title}
+          </div>
+          <div className="grid gap-1.5">
+            {section.items.map((item) => (
+              <div key={`${section.title}:${item.label}`} className="grid grid-cols-[7rem_1fr] gap-2 text-xs">
+                <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+                  {item.label}
+                </span>
+                <span className="min-w-0 break-words font-mono text-srapi-text-secondary">
+                  {item.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function buildAlertSignalSections(
+  details: JsonObject | undefined,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): SignalSection[] {
+  if (!details) return [];
+  const metricType = detailString(details, "metric_type", "metricType");
+  const operator = detailString(details, "operator");
+  const sections: SignalSection[] = [];
+
+  const triggerItems = compactSignalItems([
+    signalString(t("adminOpsAlertEvents.ruleName"), detailString(details, "rule_name", "ruleName")),
+    signalString(t("adminOpsAlertEvents.sloName"), detailString(details, "slo_name", "sloName")),
+    signalString(t("adminOpsAlertEvents.metric"), metricType),
+    metricType && operator && detailNumber(details, "threshold") !== null
+      ? {
+          label: t("adminOpsAlertEvents.condition"),
+          value: `${metricType} ${operator} ${formatAlertNumber("threshold", detailNumber(details, "threshold"), metricType)}`,
+        }
+      : null,
+    signalNumber(t("adminOpsAlertEvents.observed"), "observed_value", details, metricType),
+    signalNumber(t("adminOpsAlertEvents.objective"), "objective", details),
+    signalNumber(t("adminOpsAlertEvents.burnRateThreshold"), "burn_rate_threshold", details),
+  ]);
+  if (triggerItems.length > 0) {
+    sections.push({ title: t("adminOpsAlertEvents.signalTrigger"), items: triggerItems });
+  }
+
+  const trafficItems = compactSignalItems([
+    signalNumber(t("adminOpsAlertEvents.totalRequests"), "total_requests", details),
+    signalNumber(t("adminOpsAlertEvents.goodRequests"), "good_requests", details),
+    signalNumber(t("adminOpsAlertEvents.badRequests"), "bad_requests", details),
+    signalNumber(t("adminOpsAlertEvents.minRequestCount"), "min_request_count", details),
+    signalNumber(t("adminOpsAlertEvents.errorRate"), "error_rate", details),
+    signalNumber(t("adminOpsAlertEvents.successRate"), "success_rate", details),
+    signalNumber(t("adminOpsAlertEvents.latencyP95"), "latency_p95_ms", details),
+  ]);
+  if (trafficItems.length > 0) {
+    sections.push({ title: t("adminOpsAlertEvents.signalTraffic"), items: trafficItems });
+  }
+
+  const burnRateItems = compactSignalItems([
+    signalNumber(t("adminOpsAlertEvents.longBurnRate"), "long_burn_rate", details),
+    signalNumber(t("adminOpsAlertEvents.shortBurnRate"), "short_burn_rate", details),
+    signalNumber(t("adminOpsAlertEvents.errorBudgetConsumed"), "error_budget_consumed", details),
+    signalNumber(t("adminOpsAlertEvents.longTotalRequests"), "long_total_requests", details),
+    signalNumber(t("adminOpsAlertEvents.shortTotalRequests"), "short_total_requests", details),
+    signalNumber(t("adminOpsAlertEvents.longBadRequests"), "long_bad_requests", details),
+    signalNumber(t("adminOpsAlertEvents.shortBadRequests"), "short_bad_requests", details),
+  ]);
+  if (burnRateItems.length > 0) {
+    sections.push({ title: t("adminOpsAlertEvents.signalBurnRate"), items: burnRateItems });
+  }
+
+  const windowItems = compactSignalItems([
+    signalNumber(t("adminOpsAlertEvents.windowSize"), "window_seconds", details),
+    signalNumber(t("adminOpsAlertEvents.longWindow"), "long_window_seconds", details),
+    signalNumber(t("adminOpsAlertEvents.shortWindow"), "short_window_seconds", details),
+    signalString(t("adminOpsAlertEvents.windowStart"), detailString(details, "window_start", "windowStart")),
+    signalString(t("adminOpsAlertEvents.windowEnd"), detailString(details, "window_end", "windowEnd")),
+  ]);
+  if (windowItems.length > 0) {
+    sections.push({ title: t("adminOpsAlertEvents.signalWindow"), items: windowItems });
+  }
+
+  const scopeItems = compactSignalItems([
+    signalString(t("adminOpsAlertEvents.requestId"), detailString(details, "request_id", "requestId")),
+    signalString(t("adminOpsAlertEvents.accountId"), detailString(details, "account_id", "accountId")),
+    signalString(t("adminOpsAlertEvents.providerId"), detailString(details, "provider_id", "providerId")),
+    signalString(t("adminOpsAlertEvents.sourceEndpoint"), detailString(details, "source_endpoint", "sourceEndpoint")),
+    signalString(t("adminOpsAlertEvents.model"), detailString(details, "model", "canonical_model", "model_alias")),
+    signalString(t("adminOpsAlertEvents.errorClass"), detailString(details, "error_class", "errorClass")),
+    signalString(t("adminOpsAlertEvents.errorOwnerExclude"), detailString(details, "error_owner_exclude", "errorOwnerExclude")),
+  ]);
+  if (scopeItems.length > 0) {
+    sections.push({ title: t("adminOpsAlertEvents.signalScope"), items: scopeItems });
+  }
+
+  return sections;
+}
+
+function compactSignalItems(items: Array<SignalItem | null>): SignalItem[] {
+  return items.filter((item): item is SignalItem => Boolean(item));
+}
+
+function signalString(label: string, value: string | null): SignalItem | null {
+  if (!value) return null;
+  return { label, value };
+}
+
+function signalNumber(
+  label: string,
+  key: string,
+  details: JsonObject,
+  metricType?: string | null,
+): SignalItem | null {
+  const value = detailNumber(details, key);
+  if (value === null) return null;
+  return { label, value: formatAlertNumber(key, value, metricType) };
+}
+
+function detailString(details: JsonObject | undefined, ...keys: string[]): string | null {
+  for (const key of keys) {
+    const value = details?.[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    if (Array.isArray(value) && value.length > 0) {
+      const parts = value
+        .map((item) => (typeof item === "string" || typeof item === "number" ? String(item).trim() : ""))
+        .filter(Boolean);
+      if (parts.length > 0) return parts.join(", ");
+    }
+  }
+  return null;
+}
+
+function detailNumber(details: JsonObject | undefined, key: string): number | null {
+  const value = details?.[key];
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function formatAlertNumber(key: string, value: number | null, metricType?: string | null): string {
+  if (value === null) return "-";
+  const normalizedKey = key.toLowerCase();
+  const normalizedMetric = (metricType || "").toLowerCase();
+  if (normalizedKey.includes("burn_rate")) return `${formatDecimal(value)}x`;
+  if (
+    normalizedKey.includes("rate") ||
+    normalizedKey === "objective" ||
+    normalizedKey === "error_budget_consumed" ||
+    normalizedMetric === "error_rate" ||
+    normalizedMetric === "success_rate"
+  ) {
+    return formatPercent(value);
+  }
+  if (normalizedKey.includes("latency") || normalizedMetric === "latency_p95") {
+    return formatLatency(value);
+  }
+  if (normalizedKey.includes("seconds")) {
+    return formatDurationSeconds(value);
+  }
+  if (Number.isInteger(value)) return formatInteger(value);
+  return formatDecimal(value);
+}
+
+function formatDurationSeconds(value: number): string {
+  if (!Number.isFinite(value)) return "-";
+  if (value % 86400 === 0) return `${formatInteger(value / 86400)}d`;
+  if (value % 3600 === 0) return `${formatInteger(value / 3600)}h`;
+  if (value % 60 === 0) return `${formatInteger(value / 60)}m`;
+  return `${formatInteger(value)}s`;
+}
+
+function formatDecimal(value: number): string {
+  return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
 function AlertEvidenceLinks({ links }: { links: OpsAlertEvidenceLinks }) {
