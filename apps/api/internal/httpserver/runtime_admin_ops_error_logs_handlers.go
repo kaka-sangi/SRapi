@@ -21,12 +21,11 @@ import (
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
-// recordOpsErrorLog persists an operator-facing record of an upstream
-// failure. Fire-and-forget: any error is swallowed (and logged) so the
-// gateway hot path is never delayed by a telemetry write. The gating mirrors
-// sub2api's RecordError emit conditions — server-side or network-class
-// failures (5xx, transport errors) are persisted; client-bad classes (4xx
-// from policy) are skipped because they're not actionable for operators.
+// recordOpsErrorLog persists operator-facing gateway failure evidence.
+// Fire-and-forget: any error is swallowed (and logged) so the gateway hot path
+// is never delayed by a telemetry write. Upstream HTTP errors, transport
+// errors, and platform-side no-available-account decisions are persisted;
+// pure client-side failures with no operator action stay on usage logs only.
 func (s *Server) recordOpsErrorLog(ctx context.Context, rec gatewayUsageRecord) {
 	if s == nil || s.runtime == nil || s.runtime.opsErrorLogs == nil {
 		return
@@ -139,6 +138,13 @@ func (rt *runtimeState) recordGatewaySystemLog(ctx context.Context, rec gatewayU
 	if rec.ProviderID != nil && *rec.ProviderID > 0 {
 		metadata["provider_id"] = *rec.ProviderID
 	}
+	for key, value := range rec.DiagnosticMetadata {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		metadata[key] = value
+	}
 	if _, err := rt.operations.RecordSystemLog(ctx, operationscontract.RecordSystemLogRequest{
 		Level:     level,
 		Message:   message,
@@ -188,22 +194,18 @@ func opsErrorLogIntValue(value *int) int {
 	return *value
 }
 
-// opsErrorLogShouldRecord decides whether a failed upstream attempt is
-// operator-actionable enough to persist in ops_error_logs. Earlier this gate
-// dropped every 4xx (so an upstream "provider rejected request" 400 — exactly
-// the Hermes /compact case — never surfaced in the admin panel). The widened
-// gate mirrors sub2api: any upstream HTTP response in the 4xx-5xx range is
-// recorded (operator needs to see Codex's actual rejection reason), and
-// transport-level failures (network_error class) are always recorded. Pure
-// client-side failures with no upstream call (decode error, model_not_found
-// before the scheduler, etc.) are still skipped — they live on usage_log
-// rows but do not pollute the system-log timeline.
+// opsErrorLogShouldRecord decides whether a gateway failure is
+// operator-actionable enough to persist in ops_error_logs. Any upstream HTTP
+// response in the 4xx-5xx range is recorded because operators need the
+// provider's exact rejection reason. Transport-level failures and scheduler
+// no-available-account decisions are also recorded. Pure client-side failures
+// with no operator action stay on usage_log rows only.
 func opsErrorLogShouldRecord(class string, status int) bool {
 	if status >= 400 && status < 600 {
 		return true
 	}
 	switch class {
-	case "server_bad", "network_error":
+	case "server_bad", "network_error", "no_available_account":
 		return true
 	}
 	return false

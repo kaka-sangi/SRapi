@@ -85,9 +85,13 @@ type gatewayUsageRecord struct {
 	// one event per failed candidate attempt. Carried into the persisted
 	// usage_log so the admin panel can render the timeline.
 	UpstreamErrors []gatewayUpstreamErrorEvent
-	QualityPrompt  string
-	QualityOutput  string
-	FeedbackID     int
+	// DiagnosticMetadata carries low-cardinality, sanitized operator evidence
+	// for system logs. Keep it free of prompts, credentials, raw account names,
+	// and other high-sensitive request data.
+	DiagnosticMetadata map[string]any
+	QualityPrompt      string
+	QualityOutput      string
+	FeedbackID         int
 }
 
 // gatewayUpstreamErrorEvent mirrors the persisted UpstreamErrorEvent for the

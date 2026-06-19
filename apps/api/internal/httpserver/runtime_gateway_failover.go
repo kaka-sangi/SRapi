@@ -32,16 +32,13 @@ const defaultGatewayMaxRetryIntervalMS = 2000
 
 const maxGatewayProviderErrorMessageLength = 300
 
+type gatewayNoAvailableDiagnostic struct {
+	BodyExcerpt string
+	Metadata    map[string]any
+}
+
 func gatewayNoAccountMessage(decision schedulercontract.Decision) string {
-	if len(decision.RejectReasons) == 0 {
-		return "no available account"
-	}
-	counts := map[string]int{}
-	for _, reason := range decision.RejectReasons {
-		if s, ok := reason.(string); ok {
-			counts[s]++
-		}
-	}
+	counts := gatewaySchedulerRejectReasonCounts(decision, false)
 	if len(counts) == 0 {
 		return "no available account"
 	}
@@ -55,6 +52,110 @@ func gatewayNoAccountMessage(decision schedulercontract.Decision) string {
 		parts = append(parts, fmt.Sprintf("%s(%d)", k, counts[k]))
 	}
 	return fmt.Sprintf("no available account: %d candidate(s) rejected [%s]", decision.CandidateCount, strings.Join(parts, ", "))
+}
+
+func gatewayNoAvailableDiagnosticForDecision(decision schedulercontract.Decision) gatewayNoAvailableDiagnostic {
+	counts := gatewaySchedulerRejectReasonCounts(decision, true)
+	primaryReason, primaryCount := gatewayPrimaryRejectReason(counts)
+	action := gatewayNoAvailableOperatorAction(primaryReason)
+	body := map[string]any{
+		"response_status":                 http.StatusServiceUnavailable,
+		"scheduler_decision_id":           decision.ID,
+		"scheduler_candidate_count":       decision.CandidateCount,
+		"scheduler_rejected_count":        decision.RejectedCount,
+		"scheduler_primary_reject_reason": primaryReason,
+		"scheduler_primary_reject_count":  primaryCount,
+		"scheduler_operator_action":       action,
+	}
+	if len(counts) > 0 {
+		body["scheduler_reject_reason_counts"] = gatewayRejectReasonCountsMetadata(counts)
+	}
+	if rationale := strings.TrimSpace(decision.SelectionRationale); rationale != "" {
+		body["scheduler_selection_rationale"] = rationale
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		raw = []byte(`{"response_status":503,"scheduler_operator_action":"inspect_scheduler_decision"}`)
+	}
+	return gatewayNoAvailableDiagnostic{
+		BodyExcerpt: string(raw),
+		Metadata:    body,
+	}
+}
+
+func gatewayRejectReasonCountsMetadata(counts map[string]int) map[string]any {
+	if len(counts) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(counts))
+	for key, value := range counts {
+		out[key] = value
+	}
+	return out
+}
+
+func gatewaySchedulerRejectReasonCounts(decision schedulercontract.Decision, includeSynthetic bool) map[string]int {
+	counts := map[string]int{}
+	for _, raw := range decision.RejectReasons {
+		reason := strings.TrimSpace(fmt.Sprint(raw))
+		if reason == "" || reason == "<nil>" {
+			continue
+		}
+		counts[reason]++
+	}
+	if includeSynthetic && len(counts) == 0 && decision.CandidateCount == 0 {
+		counts["no_schedulable_candidates"] = 1
+	}
+	return counts
+}
+
+func gatewayPrimaryRejectReason(counts map[string]int) (string, int) {
+	if len(counts) == 0 {
+		return "unknown", 0
+	}
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	primary := keys[0]
+	primaryCount := counts[primary]
+	for _, key := range keys[1:] {
+		if counts[key] > primaryCount {
+			primary = key
+			primaryCount = counts[key]
+		}
+	}
+	return primary, primaryCount
+}
+
+func gatewayNoAvailableOperatorAction(reason string) string {
+	base := strings.TrimSpace(reason)
+	if idx := strings.Index(base, ":"); idx >= 0 {
+		base = base[:idx]
+	}
+	switch base {
+	case "capability_mismatch":
+		return "check_model_capabilities_or_mapping"
+	case "credential_invalid", "needs_reauth", "auth_error", "auth_failed":
+		return "check_account_credentials"
+	case "quota_exhausted", "quota_protected":
+		return "refresh_or_recover_quota"
+	case "rate_limited", "rpm_limit_exceeded", "tpm_limit_exceeded", "concurrency_full", "cooldown_active":
+		return "wait_or_reduce_load"
+	case "circuit_open":
+		return "recover_account_or_inspect_upstream"
+	case "fallback_excluded":
+		return "inspect_previous_attempts"
+	case "lower_priority_tier":
+		return "inspect_priority_strategy"
+	case "user_balance_insufficient":
+		return "check_user_balance"
+	case "no_schedulable_candidates":
+		return "check_provider_account_scope"
+	default:
+		return "inspect_scheduler_decision"
+	}
 }
 
 // gatewayRetrySettings is the resolved, per-request snapshot of the
@@ -714,26 +815,36 @@ func (s *Server) recordGatewayNoAvailableAccount(r *http.Request, authed apikeyc
 	// Also surface the scheduler-side "no candidate" decision on the system-log
 	// panel so operators see the reason (e.g. capability_mismatch:responses_compact)
 	// alongside actual upstream rejections.
+	diagnostic := gatewayNoAvailableDiagnosticForDecision(result.Decision)
+	phase := classifyErrorPhase("no_available_account", 0)
 	rec := gatewayUsageRecord{
-		RequestID:             canonical.RequestID,
-		Authed:                authed,
-		DecisionID:            result.Decision.ID,
-		AttemptNo:             result.Decision.AttemptNo,
-		SourceProtocol:        string(canonical.SourceProtocol),
-		SourceEndpoint:        canonical.SourceEndpoint,
-		Model:                 canonical.CanonicalModel,
-		RequestedModel:        gatewayRequestedModel(canonical),
-		Success:               false,
-		ErrorClass:            ptrStringValue("no_available_account"),
-		LatencyMS:             elapsedMillis(startedAt),
-		InputTokens:           admission.EstimatedUsage.InputTokens,
-		OutputTokens:          admission.EstimatedUsage.OutputTokens,
-		CachedTokens:          admission.EstimatedUsage.CachedTokens,
-		UsageEstimated:        true,
-		Pricing:               admission.Pricing,
-		CompatibilityWarnings: canonical.CompatibilityWarnings,
+		RequestID:                canonical.RequestID,
+		Authed:                   authed,
+		DecisionID:               result.Decision.ID,
+		AttemptNo:                result.Decision.AttemptNo,
+		SourceProtocol:           string(canonical.SourceProtocol),
+		SourceEndpoint:           canonical.SourceEndpoint,
+		TargetProtocol:           result.Decision.TargetProtocol,
+		Model:                    canonical.CanonicalModel,
+		RequestedModel:           gatewayRequestedModel(canonical),
+		Success:                  false,
+		ErrorClass:               ptrStringValue("no_available_account"),
+		LatencyMS:                elapsedMillis(startedAt),
+		InputTokens:              admission.EstimatedUsage.InputTokens,
+		OutputTokens:             admission.EstimatedUsage.OutputTokens,
+		CachedTokens:             admission.EstimatedUsage.CachedTokens,
+		UsageEstimated:           true,
+		Pricing:                  admission.Pricing,
+		CompatibilityWarnings:    canonical.CompatibilityWarnings,
+		ProviderErrorMessage:     gatewayNoAccountMessage(result.Decision),
+		ProviderErrorBodyExcerpt: diagnostic.BodyExcerpt,
+		ErrorPhase:               phase,
+		ErrorOwner:               classifyErrorOwner(phase),
+		ErrorSource:              classifyErrorSource(phase),
+		DiagnosticMetadata:       diagnostic.Metadata,
 	}
 	s.recordGatewaySystemLog(r.Context(), rec)
+	s.recordOpsErrorLog(r.Context(), rec)
 	s.runtime.recordGatewayUsage(r.Context(), rec)
 }
 

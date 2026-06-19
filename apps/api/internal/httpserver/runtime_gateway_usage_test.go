@@ -30,6 +30,9 @@ import (
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	operationsservice "github.com/srapi/srapi/apps/api/internal/modules/operations/service"
 	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
+	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
+	opserrorlogsservice "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/service"
+	opserrorlogsmemory "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/store/memory"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
@@ -146,6 +149,133 @@ func TestRecordGatewaySystemLogDoesNotDependOnOpsErrorLogs(t *testing.T) {
 		metadataNumber(log.Metadata["provider_id"]) != 11 ||
 		metadataNumber(log.Metadata["account_id"]) != 22 {
 		t.Fatalf("unexpected system log metadata: %+v", log.Metadata)
+	}
+}
+
+func TestRecordGatewayNoAvailableAccountCapturesSchedulerDiagnostics(t *testing.T) {
+	ctx := context.Background()
+	operationsStore := operationsmemory.New()
+	operations, err := operationsservice.NewWithStores(operationsStore, operationsStore, nil)
+	if err != nil {
+		t.Fatalf("new operations service: %v", err)
+	}
+	opsStore := opserrorlogsmemory.New()
+	opsLogs, err := opserrorlogsservice.New(opsStore, nil)
+	if err != nil {
+		t.Fatalf("new ops error log service: %v", err)
+	}
+	usageStore := usagememory.New()
+	usage, err := usageservice.New(usageStore, nil)
+	if err != nil {
+		t.Fatalf("new usage service: %v", err)
+	}
+	events, err := eventsservice.New(eventsmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	billing, err := billingservice.New(billingmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new billing service: %v", err)
+	}
+	rt := &runtimeState{
+		logger:       slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		operations:   operations,
+		opsErrorLogs: opsLogs,
+		usage:        usage,
+		events:       events,
+		billing:      billing,
+	}
+	server := &Server{runtime: rt}
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	req = req.WithContext(ctx)
+
+	server.recordGatewayNoAvailableAccount(req,
+		apikeycontract.AuthResult{UserID: 42, Key: apikeycontract.APIKey{ID: 7, Prefix: "sk_live_test"}},
+		gatewaycontract.CanonicalRequest{
+			RequestID:        "req_no_account_diag",
+			SourceProtocol:   gatewaycontract.ProtocolOpenAICompatible,
+			SourceEndpoint:   string(gatewaycontract.EndpointResponses),
+			Model:            "codex-mini",
+			CanonicalModel:   "codex-mini",
+			ResponseProtocol: gatewaycontract.ProtocolOpenAICompatible,
+		},
+		schedulercontract.ScheduleResult{Decision: schedulercontract.Decision{
+			ID:                 77,
+			RequestID:          "req_no_account_diag",
+			AttemptNo:          2,
+			TargetProtocol:     "openai-compatible",
+			Model:              "codex-mini",
+			CandidateCount:     3,
+			RejectedCount:      3,
+			RejectReasons:      map[string]any{"11": "capability_mismatch:responses", "12": "capability_mismatch:responses", "13": "cooldown_active"},
+			SelectionRationale: "no account satisfied responses capability",
+		}},
+		gatewayAdmission{EstimatedUsage: gatewaycontract.Usage{InputTokens: 8, OutputTokens: 13}},
+		time.Now().Add(-25*time.Millisecond),
+	)
+
+	systemLogs, err := operationsStore.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if len(systemLogs.Items) != 1 {
+		t.Fatalf("expected one system log, got %+v", systemLogs.Items)
+	}
+	systemLog := systemLogs.Items[0]
+	if systemLog.Level != operationscontract.OpsSystemLogLevelInfo || systemLog.Message == "" {
+		t.Fatalf("unexpected system log: %+v", systemLog)
+	}
+	metadata := systemLog.Metadata
+	if metadataNumber(metadata["scheduler_decision_id"]) != 77 ||
+		metadataNumber(metadata["scheduler_candidate_count"]) != 3 ||
+		metadataNumber(metadata["scheduler_rejected_count"]) != 3 ||
+		metadata["scheduler_primary_reject_reason"] != "capability_mismatch:responses" ||
+		metadataNumber(metadata["scheduler_primary_reject_count"]) != 2 ||
+		metadata["scheduler_operator_action"] != "check_model_capabilities_or_mapping" ||
+		metadataNumber(metadata["response_status"]) != http.StatusServiceUnavailable {
+		t.Fatalf("unexpected scheduler diagnostic metadata: %+v", metadata)
+	}
+	reasonCounts, ok := metadata["scheduler_reject_reason_counts"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected reject reason counts, got %#v", metadata["scheduler_reject_reason_counts"])
+	}
+	if metadataNumber(reasonCounts["capability_mismatch:responses"]) != 2 || metadataNumber(reasonCounts["cooldown_active"]) != 1 {
+		t.Fatalf("unexpected reject reason counts: %+v", reasonCounts)
+	}
+
+	opsResult, err := opsStore.List(ctx, opserrorlogscontract.ListFilter{})
+	if err != nil {
+		t.Fatalf("list ops error logs: %v", err)
+	}
+	if len(opsResult.Items) != 1 {
+		t.Fatalf("expected one ops error log, got %+v", opsResult.Items)
+	}
+	opsLog := opsResult.Items[0]
+	if opsLog.ErrorClass != "no_available_account" ||
+		opsLog.ErrorPhase != "routing" ||
+		opsLog.ErrorOwner != "platform" ||
+		opsLog.ErrorSource != "gateway" {
+		t.Fatalf("unexpected ops error classification: %+v", opsLog)
+	}
+	if !strings.Contains(opsLog.ErrorMessage, "3 candidate(s) rejected") ||
+		!strings.Contains(opsLog.ErrorBodyExcerpt, `"scheduler_operator_action":"check_model_capabilities_or_mapping"`) ||
+		!strings.Contains(opsLog.ErrorBodyExcerpt, `"capability_mismatch:responses":2`) {
+		t.Fatalf("unexpected ops error evidence: message=%q body=%q", opsLog.ErrorMessage, opsLog.ErrorBodyExcerpt)
+	}
+
+	usageLogs, err := usageStore.List(ctx)
+	if err != nil {
+		t.Fatalf("list usage logs: %v", err)
+	}
+	if len(usageLogs) != 1 {
+		t.Fatalf("expected one usage log, got %+v", usageLogs)
+	}
+	usageLog := usageLogs[0]
+	if usageLog.ErrorClass == nil || *usageLog.ErrorClass != "no_available_account" ||
+		usageLog.ErrorPhase != "routing" ||
+		usageLog.ProviderErrorMessage != opsLog.ErrorMessage ||
+		!strings.Contains(usageLog.ProviderErrorBodyExcerpt, `"scheduler_decision_id":77`) {
+		t.Fatalf("unexpected usage evidence: %+v", usageLog)
 	}
 }
 
