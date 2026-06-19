@@ -1222,7 +1222,7 @@ GET  /api/v1/admin/affiliates/transfers
 - `/v1/realtime`（OpenAI-compatible Realtime WebSocket，见 §3.3）
 - `stream: true`
 - `messages`、`input`、`model`、`temperature`、`top_p`、`max_tokens`、`max_output_tokens`、`instructions`
-- tool calls
+- tool calls、`tools`、`tool_choice`
 - JSON mode / structured output 字段
 
 端点转换规则以 `AI_ENDPOINT_COMPATIBILITY.md` 为准；路由族与协议边界以 `GATEWAY_ROUTE_MATRIX.md` 为准。

@@ -9982,17 +9982,18 @@ type ResponsesOutputItem struct {
 
 // ResponsesRequest defines model for ResponsesRequest.
 type ResponsesRequest struct {
-	Input                ResponsesRequest_Input `json:"input"`
-	Instructions         *string                `json:"instructions,omitempty"`
-	MaxOutputTokens      *int                   `json:"max_output_tokens,omitempty"`
-	Model                string                 `json:"model"`
-	Reasoning            *JsonObject            `json:"reasoning,omitempty"`
-	Stream               *bool                  `json:"stream,omitempty"`
-	Temperature          *float32               `json:"temperature,omitempty"`
-	Text                 *JsonObject            `json:"text,omitempty"`
-	Tools                *[]ToolDefinition      `json:"tools,omitempty"`
-	TopP                 *float32               `json:"top_p,omitempty"`
-	AdditionalProperties map[string]interface{} `json:"-"`
+	Input                ResponsesRequest_Input       `json:"input"`
+	Instructions         *string                      `json:"instructions,omitempty"`
+	MaxOutputTokens      *int                         `json:"max_output_tokens,omitempty"`
+	Model                string                       `json:"model"`
+	Reasoning            *JsonObject                  `json:"reasoning,omitempty"`
+	Stream               *bool                        `json:"stream,omitempty"`
+	Temperature          *float32                     `json:"temperature,omitempty"`
+	Text                 *JsonObject                  `json:"text,omitempty"`
+	ToolChoice           *ResponsesRequest_ToolChoice `json:"tool_choice,omitempty"`
+	Tools                *[]ToolDefinition            `json:"tools,omitempty"`
+	TopP                 *float32                     `json:"top_p,omitempty"`
+	AdditionalProperties map[string]interface{}       `json:"-"`
 }
 
 // ResponsesRequestInput0 defines model for .
@@ -10003,6 +10004,14 @@ type ResponsesRequestInput1 = []ContentBlock
 
 // ResponsesRequest_Input defines model for ResponsesRequest.Input.
 type ResponsesRequest_Input struct {
+	union json.RawMessage
+}
+
+// ResponsesRequestToolChoice0 defines model for .
+type ResponsesRequestToolChoice0 = string
+
+// ResponsesRequest_ToolChoice defines model for ResponsesRequest.ToolChoice.
+type ResponsesRequest_ToolChoice struct {
 	union json.RawMessage
 }
 
@@ -18887,6 +18896,14 @@ func (a *ResponsesRequest) UnmarshalJSON(b []byte) error {
 		delete(object, "text")
 	}
 
+	if raw, found := object["tool_choice"]; found {
+		err = json.Unmarshal(raw, &a.ToolChoice)
+		if err != nil {
+			return fmt.Errorf("error reading 'tool_choice': %w", err)
+		}
+		delete(object, "tool_choice")
+	}
+
 	if raw, found := object["tools"]; found {
 		err = json.Unmarshal(raw, &a.Tools)
 		if err != nil {
@@ -18971,6 +18988,13 @@ func (a ResponsesRequest) MarshalJSON() ([]byte, error) {
 		object["text"], err = json.Marshal(a.Text)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'text': %w", err)
+		}
+	}
+
+	if a.ToolChoice != nil {
+		object["tool_choice"], err = json.Marshal(a.ToolChoice)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tool_choice': %w", err)
 		}
 	}
 
@@ -19880,6 +19904,68 @@ func (t ResponsesRequest_Input) MarshalJSON() ([]byte, error) {
 }
 
 func (t *ResponsesRequest_Input) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsResponsesRequestToolChoice0 returns the union data inside the ResponsesRequest_ToolChoice as a ResponsesRequestToolChoice0
+func (t ResponsesRequest_ToolChoice) AsResponsesRequestToolChoice0() (ResponsesRequestToolChoice0, error) {
+	var body ResponsesRequestToolChoice0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromResponsesRequestToolChoice0 overwrites any union data inside the ResponsesRequest_ToolChoice as the provided ResponsesRequestToolChoice0
+func (t *ResponsesRequest_ToolChoice) FromResponsesRequestToolChoice0(v ResponsesRequestToolChoice0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeResponsesRequestToolChoice0 performs a merge with any union data inside the ResponsesRequest_ToolChoice, using the provided ResponsesRequestToolChoice0
+func (t *ResponsesRequest_ToolChoice) MergeResponsesRequestToolChoice0(v ResponsesRequestToolChoice0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsJsonObject returns the union data inside the ResponsesRequest_ToolChoice as a JsonObject
+func (t ResponsesRequest_ToolChoice) AsJsonObject() (JsonObject, error) {
+	var body JsonObject
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromJsonObject overwrites any union data inside the ResponsesRequest_ToolChoice as the provided JsonObject
+func (t *ResponsesRequest_ToolChoice) FromJsonObject(v JsonObject) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeJsonObject performs a merge with any union data inside the ResponsesRequest_ToolChoice, using the provided JsonObject
+func (t *ResponsesRequest_ToolChoice) MergeJsonObject(v JsonObject) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ResponsesRequest_ToolChoice) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ResponsesRequest_ToolChoice) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

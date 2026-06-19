@@ -109,6 +109,7 @@ func (s *Service) NormalizeResponses(req apiopenapi.ResponsesRequest, meta Reque
 	canonical.TopP = req.TopP
 	canonical.MaxOutputTokens = cloneInt(req.MaxOutputTokens)
 	canonical.Tools = toolDefinitionsToMaps(req.Tools)
+	canonical.ToolChoice = responsesToolChoice(req.ToolChoice, req.AdditionalProperties)
 	canonical.ResponseFormat = responseFormatFromResponsesText(req.Text)
 	canonical.Reasoning = cloneJSONMap(req.Reasoning)
 	canonical.CompatibilityWarnings = uniqueStrings(warnings)
@@ -1474,6 +1475,40 @@ func chatToolChoice(value *apiopenapi.ChatCompletionRequest_ToolChoice) any {
 		return cloneMap(choice)
 	}
 	return nil
+}
+
+func responsesToolChoice(value *apiopenapi.ResponsesRequest_ToolChoice, values map[string]any) any {
+	if value != nil {
+		if choice, err := value.AsResponsesRequestToolChoice0(); err == nil {
+			choice = strings.TrimSpace(choice)
+			if choice == "" {
+				return nil
+			}
+			return choice
+		}
+		if choice, err := value.AsJsonObject(); err == nil {
+			return cloneMap(choice)
+		}
+	}
+	raw, ok := values["tool_choice"]
+	if !ok || raw == nil {
+		return nil
+	}
+	switch typed := raw.(type) {
+	case string:
+		choice := strings.TrimSpace(typed)
+		if choice == "" {
+			return nil
+		}
+		return choice
+	case map[string]any:
+		if len(typed) == 0 {
+			return nil
+		}
+		return cloneMap(typed)
+	default:
+		return nil
+	}
 }
 
 func responseFormatFromResponsesText(value *apiopenapi.JsonObject) map[string]any {

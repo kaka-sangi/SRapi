@@ -9823,6 +9823,65 @@ func TestReverseProxyCodexCLIAdapterNormalizesToolSchemasAndInvalidChoice(t *tes
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesChatBuiltinWebSearchTool(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"searched\"}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_terminator\",\"status\":\"completed\"}}\n\ndata: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_builtin_web_search",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/chat/completions",
+		Model:          "codex-local",
+		InputParts:     textParts("find current docs"),
+		Tools: []map[string]any{{
+			"type":                "web_search",
+			"search_context_size": "high",
+		}},
+		ToolChoice: map[string]any{"type": "web_search"},
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             25,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"access_token": "oauth-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke raw codex reverse proxy adapter: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode raw codex payload: %v", err)
+	}
+	tools, ok := payload["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("expected one builtin tool, got %+v", payload["tools"])
+	}
+	tool, _ := tools[0].(map[string]any)
+	if tool["type"] != "web_search" || tool["search_context_size"] != "high" {
+		t.Fatalf("expected web_search tool to be preserved, got %+v", tool)
+	}
+	choice, ok := payload["tool_choice"].(map[string]any)
+	if !ok || choice["type"] != "web_search" {
+		t.Fatalf("expected web_search tool_choice to be preserved, got %+v", payload["tool_choice"])
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterNormalizesRawImageGenerationToolAliases(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

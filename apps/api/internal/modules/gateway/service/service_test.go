@@ -129,6 +129,31 @@ func TestNormalizeResponsesRequiresWebSearchCapability(t *testing.T) {
 	}
 }
 
+func TestNormalizeResponsesPreservesToolChoice(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	var req apiopenapi.ResponsesRequest
+	if err := json.Unmarshal([]byte(`{
+		"model":"gpt-5.5",
+		"input":"search current docs",
+		"tool_choice":{"type":"web_search"}
+	}`), &req); err != nil {
+		t.Fatalf("unmarshal responses request: %v", err)
+	}
+
+	canonical := svc.NormalizeResponses(req, RequestMeta{SourceEndpoint: "/v1/responses"})
+
+	choice, ok := canonical.ToolChoice.(map[string]any)
+	if !ok || choice["type"] != "web_search" {
+		t.Fatalf("expected Responses tool_choice to be preserved, got %+v", canonical.ToolChoice)
+	}
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyWebSearch) {
+		t.Fatalf("expected web search capability from tool_choice, got %+v", canonical.RequestCapabilities)
+	}
+}
+
 func TestNormalizeImageGenerationConsumesStreamLocally(t *testing.T) {
 	svc, err := New()
 	if err != nil {

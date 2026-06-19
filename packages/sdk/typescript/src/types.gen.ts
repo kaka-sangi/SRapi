@@ -6293,6 +6293,7 @@ export type ResponsesRequest = {
     instructions?: string;
     stream?: boolean;
     tools?: Array<ToolDefinition>;
+    tool_choice?: string | JsonObject;
     temperature?: number;
     top_p?: number;
     max_output_tokens?: number;
