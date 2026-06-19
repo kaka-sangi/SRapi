@@ -1548,6 +1548,8 @@ export const en = {
     error: "Error",
     latency: "Latency",
     tokens: "Tokens",
+    exact: "Exact",
+    estimated: "Estimated",
     source: "Source",
     evidence: "Evidence",
     userShort: "U",

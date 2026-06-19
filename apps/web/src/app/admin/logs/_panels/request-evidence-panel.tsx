@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Activity, Bug, FileText, ScrollText } from "lucide-react";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { FilterSelect, ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
@@ -18,7 +18,7 @@ import {
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useOpsRequestEvidence, useOpsRequestEvidenceDetail } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatDateTime, formatLatency } from "@/lib/admin-format";
+import { formatDateTime, formatInteger, formatLatency } from "@/lib/admin-format";
 import {
   adminErrorLogsHref,
   adminRequestDumpsHref,
@@ -180,9 +180,7 @@ export function RequestEvidencePanel() {
       align: "right",
       hideOnMobile: true,
       render: (row) => (
-        <span className="text-2xs text-srapi-text-tertiary tabular font-mono">
-          {row.total_tokens ?? "—"}
-        </span>
+        <TokenEvidenceValue total={row.total_tokens} estimated={row.usage_estimated} compact />
       ),
     },
     {
@@ -376,7 +374,12 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
         />
         <DetailMetric
           label={t("adminRequestEvidence.tokens")}
-          value={summary.total_tokens ?? "—"}
+          value={
+            <TokenEvidenceValue
+              total={summary.total_tokens}
+              estimated={summaryUsageEstimated(detail.attempts)}
+            />
+          }
         />
         <DetailMetric
           label={t("adminRequestEvidence.evidence")}
@@ -406,8 +409,11 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
                   </div>
                 </div>
                 <div className={statusClass(row.status_code)}>{row.status_code ?? "—"}</div>
-                <div className="text-srapi-text-tertiary font-mono">
-                  {typeof row.latency_ms === "number" ? formatLatency(row.latency_ms) : "—"}
+                <div className="space-y-1 text-right">
+                  <div className="text-srapi-text-tertiary font-mono">
+                    {typeof row.latency_ms === "number" ? formatLatency(row.latency_ms) : "—"}
+                  </div>
+                  <TokenEvidenceValue total={row.total_tokens} estimated={row.usage_estimated} compact />
                 </div>
                 {row.error_message ? (
                   <div className="text-srapi-error md:col-span-4 line-clamp-2">{row.error_message}</div>
@@ -493,7 +499,7 @@ function DetailMetric({
   tone = "neutral",
 }: {
   label: string;
-  value: string | number;
+  value: ReactNode;
   tone?: "neutral" | "success" | "error" | "muted";
 }) {
   const valueClass =
@@ -509,6 +515,44 @@ function DetailMetric({
       <div className="text-srapi-text-tertiary text-2xs uppercase">{label}</div>
       <div className={`mt-1 text-sm font-semibold ${valueClass}`}>{value}</div>
     </div>
+  );
+}
+
+function summaryUsageEstimated(rows: RequestEvidenceRow[]): boolean | undefined {
+  const tokenRows = rows.filter((row) => typeof row.total_tokens === "number");
+  if (tokenRows.length === 0) return undefined;
+  if (tokenRows.some((row) => row.usage_estimated === true)) return true;
+  if (tokenRows.every((row) => row.usage_estimated === false)) return false;
+  return undefined;
+}
+
+function TokenEvidenceValue({
+  total,
+  estimated,
+  compact = false,
+}: {
+  total: number | undefined;
+  estimated: boolean | undefined;
+  compact?: boolean;
+}) {
+  const { t } = useLanguage();
+  if (typeof total !== "number" || !Number.isFinite(total)) {
+    return <span className="text-srapi-text-tertiary">—</span>;
+  }
+  const tone = estimated === true ? "text-amber-400" : "text-emerald-400";
+  const label =
+    estimated === undefined
+      ? null
+      : estimated
+        ? t("adminRequestEvidence.estimated")
+        : t("adminRequestEvidence.exact");
+  return (
+    <span className="inline-flex items-baseline justify-end gap-1 font-mono tabular">
+      <span className="text-srapi-text-primary">{formatInteger(total)}</span>
+      {label ? (
+        <span className={`${compact ? "text-[10px]" : "text-2xs"} ${tone}`}>{label}</span>
+      ) : null}
+    </span>
   );
 }
 

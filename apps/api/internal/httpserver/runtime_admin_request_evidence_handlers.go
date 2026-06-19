@@ -118,6 +118,7 @@ type requestEvidenceSummary struct {
 	HasUsageLog           bool
 	HasOpsErrorLog        bool
 	HasRequestDump        bool
+	HasTokenEvidence      bool
 	LatencyMS             *int
 	InputTokens           int
 	OutputTokens          int
@@ -1290,6 +1291,9 @@ func requestEvidenceSummaryFromDetail(rows []requestEvidenceRow, usageLogs []usa
 			value := intPtrValue(summary.LatencyMS) + *row.LatencyMS
 			summary.LatencyMS = &value
 		}
+		if row.InputTokens != nil || row.OutputTokens != nil || row.TotalTokens != nil {
+			summary.HasTokenEvidence = true
+		}
 		summary.InputTokens += intPtrValue(row.InputTokens)
 		summary.OutputTokens += intPtrValue(row.OutputTokens)
 		summary.TotalTokens += intPtrValue(row.TotalTokens)
@@ -1391,13 +1395,9 @@ func requestEvidenceSummaryToAPI(summary requestEvidenceSummary) apiopenapi.Requ
 		HasRequestDump:        summary.HasRequestDump,
 	}
 	out.LatencyMs = summary.LatencyMS
-	if summary.InputTokens > 0 {
+	if summary.HasTokenEvidence {
 		out.InputTokens = &summary.InputTokens
-	}
-	if summary.OutputTokens > 0 {
 		out.OutputTokens = &summary.OutputTokens
-	}
-	if summary.TotalTokens > 0 {
 		out.TotalTokens = &summary.TotalTokens
 	}
 	out.StatusCode = summary.StatusCode

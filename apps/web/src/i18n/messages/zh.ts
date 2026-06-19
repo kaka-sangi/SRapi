@@ -1526,6 +1526,8 @@ export const zh: Messages = {
     error: "错误",
     latency: "延迟",
     tokens: "Tokens",
+    exact: "精确",
+    estimated: "估算",
     source: "来源",
     evidence: "证据",
     userShort: "用户",

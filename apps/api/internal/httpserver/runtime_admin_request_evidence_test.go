@@ -488,6 +488,54 @@ func TestAdminRequestEvidence_DetailUsesExactHistoricalRequestID(t *testing.T) {
 	}
 }
 
+func TestAdminRequestEvidence_DetailPreservesExplicitZeroUsageSummary(t *testing.T) {
+	base := time.Date(2026, 6, 19, 8, 0, 0, 0, time.UTC)
+	usageStore := usagememory.New()
+	seedUsageLog(t, usageStore, usagecontract.UsageLog{
+		RequestID:             "req_zero_usage",
+		AttemptNo:             1,
+		UserID:                44,
+		APIKeyID:              8,
+		SourceProtocol:        "gemini-compatible",
+		SourceEndpoint:        "/v1beta/models/gemini-pro:generateContent",
+		TargetProtocol:        "gemini-compatible",
+		Model:                 "gemini-pro",
+		InputTokens:           0,
+		OutputTokens:          0,
+		TotalTokens:           0,
+		UsageEstimated:        false,
+		LatencyMS:             77,
+		Success:               true,
+		Cost:                  "0.00000000",
+		Currency:              "USD",
+		CompatibilityWarnings: []string{},
+		CreatedAt:             base,
+	})
+
+	handler := New(config.Load(), nil, WithUsageStore(usageStore))
+	_, sessionCookie := mustLoginAdmin(t, handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/request-evidence/req_zero_usage", nil)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("detail request evidence: got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.RequestEvidenceDetailResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.Summary.TotalTokens == nil || *resp.Summary.TotalTokens != 0 ||
+		resp.Summary.InputTokens == nil || *resp.Summary.InputTokens != 0 ||
+		resp.Summary.OutputTokens == nil || *resp.Summary.OutputTokens != 0 {
+		t.Fatalf("summary should preserve explicit zero token evidence: %+v", resp.Summary)
+	}
+	if len(resp.Attempts) != 1 || resp.Attempts[0].TotalTokens == nil || *resp.Attempts[0].TotalTokens != 0 || resp.Attempts[0].UsageEstimated == nil || *resp.Attempts[0].UsageEstimated {
+		t.Fatalf("attempt should preserve exact zero usage evidence: %+v", resp.Attempts)
+	}
+}
+
 func TestAdminRequestEvidence_DetailIncludesSanitizedSystemLogs(t *testing.T) {
 	usageStore := usagememory.New()
 	operationsStore := operationsmemory.New()
