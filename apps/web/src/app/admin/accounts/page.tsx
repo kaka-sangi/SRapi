@@ -919,7 +919,10 @@ function AccountsContent() {
           </div>
         }
       />
-      <HealthSummaryStrip healthById={healthById} total={accounts.data?.data.length ?? 0} />
+      <HealthSummaryStrip
+        healthById={healthById}
+        onSelectAccounts={readOnlyHealthView ? undefined : selectAccountIds}
+      />
 
       {listMode === "cards" ? (
         <AccountsCardView
@@ -1156,6 +1159,11 @@ function AccountsContent() {
       ) : null}
     </>
   );
+
+  function selectAccountIds(ids: string[]) {
+    if (ids.length === 0) return;
+    list.togglePage(ids, true);
+  }
 }
 
 // Bulk-rotate-credentials dialog. Operator pastes one row per line in the

@@ -1,30 +1,86 @@
 import Link from "next/link";
+import { CheckSquare, ExternalLink } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import type { AccountHealthSnapshot } from "@/lib/sdk-types";
 import { cn } from "@/lib/cn";
 import { accountHealthNeedsInvestigation } from "@/lib/admin-account-health-investigation";
+import { buildAccountHealthOpsSummary, type AccountHealthOpsGroup } from "@/lib/admin-account-health-ops";
 import { latestQuotaWindows, quotaWindowDisplayLabel, quotaWindowTiming } from "@/lib/quota-display";
 
 export function HealthSummaryStrip({
   healthById,
-  total,
+  onSelectAccounts,
 }: {
   healthById: Map<string, AccountHealthSnapshot>;
-  total: number;
+  onSelectAccounts?: (ids: string[]) => void;
 }) {
   const { t } = useLanguage();
-  if (healthById.size === 0 || total === 0) return null;
   const entries = [...healthById.values()];
-  const healthy = entries.filter((h) => h.circuit_state === "closed" && h.success_rate >= 0.9).length;
-  const degraded = entries.filter((h) => h.circuit_state === "closed" && h.success_rate < 0.9 && h.success_rate > 0).length;
-  const tripped = entries.filter((h) => h.circuit_state !== "closed").length;
+  if (entries.length === 0) return null;
+  const summary = buildAccountHealthOpsSummary(entries);
   return (
-    <div className="mb-4 flex items-center gap-4 font-mono text-2xs text-srapi-text-tertiary">
-      <span>{healthy} {t("dashboard.healthyAccounts")}</span>
-      {degraded > 0 && <span>{degraded} {t("dashboard.degradedAccounts")}</span>}
-      {tripped > 0 && <span>{tripped} {t("dashboard.trippedAccounts")}</span>}
-      <span className="ml-auto">{t("dashboard.total")} {total}</span>
+    <div className="mb-4 space-y-2">
+      <div className="flex items-center gap-4 font-mono text-2xs text-srapi-text-tertiary">
+        <span>{summary.healthy} {t("dashboard.healthyAccounts")}</span>
+        {summary.attention > 0 ? (
+          <span className="text-srapi-warning">{summary.attention} {t("adminAccounts.healthNeedsAttention")}</span>
+        ) : null}
+        <span className="ml-auto">{t("dashboard.total")} {summary.total}</span>
+      </div>
+      {summary.groups.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {summary.groups.map((group) => (
+            <HealthOpsGroupPill
+              key={group.key}
+              group={group}
+              onSelectAccounts={onSelectAccounts}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+function HealthOpsGroupPill({
+  group,
+  onSelectAccounts,
+}: {
+  group: AccountHealthOpsGroup;
+  onSelectAccounts?: (ids: string[]) => void;
+}) {
+  const { t } = useLanguage();
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-srapi-border bg-srapi-card-muted px-2 py-1 font-mono text-2xs text-srapi-text-secondary">
+      <span className="truncate">{t(`adminAccounts.healthIssue.${group.key}`)}</span>
+      <span className="text-srapi-text-tertiary tabular">{group.count}</span>
+      {group.errorClass ? (
+        <span className="max-w-[7rem] truncate text-srapi-error" title={group.errorClass}>
+          {group.errorClass}
+        </span>
+      ) : null}
+      {group.investigationHref ? (
+        <Link
+          href={group.investigationHref}
+          className="text-srapi-text-tertiary transition-colors hover:text-srapi-text-primary"
+          aria-label={t("adminAccounts.investigateErrors")}
+          title={t("adminAccounts.investigateErrors")}
+        >
+          <ExternalLink className="size-3" aria-hidden />
+        </Link>
+      ) : null}
+      {onSelectAccounts ? (
+        <button
+          type="button"
+          onClick={() => onSelectAccounts(group.accountIds)}
+          className="text-srapi-text-tertiary transition-colors hover:text-srapi-text-primary"
+          aria-label={t("adminAccounts.selectHealthGroup", { count: group.count })}
+          title={t("adminAccounts.selectHealthGroup", { count: group.count })}
+        >
+          <CheckSquare className="size-3" aria-hidden />
+        </button>
+      ) : null}
+    </span>
   );
 }
 
