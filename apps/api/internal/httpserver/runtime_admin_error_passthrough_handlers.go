@@ -4,84 +4,11 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"time"
 
 	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
 	errorpassthroughservice "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/service"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
-
-type errorPassthroughRulePayload struct {
-	ID             int       `json:"id"`
-	Name           string    `json:"name"`
-	Enabled        bool      `json:"enabled"`
-	Priority       int       `json:"priority"`
-	Action         string    `json:"action"`
-	StatusCodes    []int     `json:"status_codes"`
-	Classes        []string  `json:"classes"`
-	Keywords       []string  `json:"keywords"`
-	ResponseStatus *int      `json:"response_status,omitempty"`
-	ResponseCode   *int      `json:"response_code,omitempty"`
-	CustomMessage  string    `json:"custom_message,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-}
-
-type createErrorPassthroughRuleRequest struct {
-	Name           string   `json:"name"`
-	Enabled        *bool    `json:"enabled"`
-	Priority       int      `json:"priority"`
-	Action         string   `json:"action"`
-	StatusCodes    []int    `json:"status_codes"`
-	Classes        []string `json:"classes"`
-	Keywords       []string `json:"keywords"`
-	ResponseStatus *int     `json:"response_status"`
-	ResponseCode   *int     `json:"response_code"`
-	CustomMessage  string   `json:"custom_message"`
-}
-
-type updateErrorPassthroughRuleRequest struct {
-	Name           *string   `json:"name"`
-	Enabled        *bool     `json:"enabled"`
-	Priority       *int      `json:"priority"`
-	Action         *string   `json:"action"`
-	StatusCodes    *[]int    `json:"status_codes"`
-	Classes        *[]string `json:"classes"`
-	Keywords       *[]string `json:"keywords"`
-	ResponseStatus *int      `json:"response_status"`
-	ResponseCode   *int      `json:"response_code"`
-	CustomMessage  *string   `json:"custom_message"`
-}
-
-func toErrorPassthroughRulePayload(rule errorpassthroughcontract.Rule) errorPassthroughRulePayload {
-	statusCodes := rule.StatusCodes
-	if statusCodes == nil {
-		statusCodes = []int{}
-	}
-	classes := rule.Classes
-	if classes == nil {
-		classes = []string{}
-	}
-	keywords := rule.Keywords
-	if keywords == nil {
-		keywords = []string{}
-	}
-	return errorPassthroughRulePayload{
-		ID:             rule.ID,
-		Name:           rule.Name,
-		Enabled:        rule.Enabled,
-		Priority:       rule.Priority,
-		Action:         string(rule.Action),
-		StatusCodes:    statusCodes,
-		Classes:        classes,
-		Keywords:       keywords,
-		ResponseStatus: cloneIntPtr(rule.ResponseStatus),
-		ResponseCode:   cloneIntPtr(rule.ResponseStatus),
-		CustomMessage:  rule.CustomMessage,
-		CreatedAt:      rule.CreatedAt.UTC(),
-		UpdatedAt:      rule.UpdatedAt.UTC(),
-	}
-}
 
 func toAPIErrorPassthroughRule(rule errorpassthroughcontract.Rule) apiopenapi.ErrorPassthroughRule {
 	statusCodes := make([]int64, 0, len(rule.StatusCodes))
@@ -113,6 +40,43 @@ func toAPIErrorPassthroughRule(rule errorpassthroughcontract.Rule) apiopenapi.Er
 	}
 }
 
+func optionalIntSlicePtrFromInt64Ptr(value *[]int64) (*[]int, bool) {
+	if value == nil {
+		return nil, true
+	}
+	converted, ok := nonNegativeIntSliceFromInt64Ptr(value)
+	if !ok {
+		return nil, false
+	}
+	return &converted, true
+}
+
+func firstInt64PtrAsIntPtr(values ...*int64) (*int, bool) {
+	for _, value := range values {
+		converted, ok := intPtrFromInt64Ptr(value)
+		if !ok {
+			return nil, false
+		}
+		if converted != nil {
+			return converted, true
+		}
+	}
+	return nil, true
+}
+
+func firstOptionalInt64PtrAsIntPtr(values ...*int64) (**int, bool) {
+	for _, value := range values {
+		converted, ok := intPtrFromInt64Ptr(value)
+		if !ok {
+			return nil, false
+		}
+		if value != nil {
+			return &converted, true
+		}
+	}
+	return nil, true
+}
+
 func (s *Server) handleListAdminErrorPassthroughRules(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {
@@ -124,15 +88,15 @@ func (s *Server) handleListAdminErrorPassthroughRules(w http.ResponseWriter, r *
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list error passthrough rules", requestID)
 		return
 	}
-	data := make([]errorPassthroughRulePayload, 0, len(rules))
+	data := make([]apiopenapi.ErrorPassthroughRule, 0, len(rules))
 	for _, rule := range rules {
-		data = append(data, toErrorPassthroughRulePayload(rule))
+		data = append(data, toAPIErrorPassthroughRule(rule))
 	}
 	data, pg := paginate(r, data)
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       data,
-		"pagination": pg,
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.ErrorPassthroughRuleListResponse{
+		Data:       data,
+		Pagination: pg,
+		RequestId:  requestID,
 	})
 }
 
@@ -147,7 +111,7 @@ func (s *Server) handleCreateAdminErrorPassthroughRule(w http.ResponseWriter, r 
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
 		return
 	}
-	var body createErrorPassthroughRuleRequest
+	var body apiopenapi.CreateErrorPassthroughRuleRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid error passthrough rule request", requestID)
 		return
@@ -156,19 +120,35 @@ func (s *Server) handleCreateAdminErrorPassthroughRule(w http.ResponseWriter, r 
 	if body.Enabled != nil {
 		enabled = *body.Enabled
 	}
+	priorityPtr, ok := intPtrFromInt64Ptr(body.Priority)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid error passthrough rule request", requestID)
+		return
+	}
+	priority := 0
+	if priorityPtr != nil {
+		priority = *priorityPtr
+	}
+	statusCodes, ok := nonNegativeIntSliceFromInt64Ptr(body.StatusCodes)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid error passthrough rule request", requestID)
+		return
+	}
+	responseStatus, ok := firstInt64PtrAsIntPtr(body.ResponseStatus, body.ResponseCode)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid error passthrough rule request", requestID)
+		return
+	}
 	rule, err := s.runtime.errorPassthrough.CreateRule(r.Context(), errorpassthroughcontract.CreateRule{
-		Name:        body.Name,
-		Enabled:     enabled,
-		Priority:    body.Priority,
-		Action:      errorpassthroughcontract.Action(body.Action),
-		StatusCodes: body.StatusCodes,
-		Classes:     body.Classes,
-		Keywords:    body.Keywords,
-		ResponseStatus: firstIntPtr(
-			body.ResponseStatus,
-			body.ResponseCode,
-		),
-		CustomMessage: body.CustomMessage,
+		Name:           body.Name,
+		Enabled:        enabled,
+		Priority:       priority,
+		Action:         errorpassthroughcontract.Action(body.Action),
+		StatusCodes:    statusCodes,
+		Classes:        openapiOptionalStringSlice(body.Classes),
+		Keywords:       openapiOptionalStringSlice(body.Keywords),
+		ResponseStatus: responseStatus,
+		CustomMessage:  openapiOptionalString(body.CustomMessage),
 	})
 	if err != nil {
 		s.writeErrorPassthroughError(w, err, requestID)
@@ -179,9 +159,9 @@ func (s *Server) handleCreateAdminErrorPassthroughRule(w http.ResponseWriter, r 
 		"action":  rule.Action,
 		"enabled": rule.Enabled,
 	}))
-	writeJSONAny(w, http.StatusCreated, map[string]any{
-		"data":       toErrorPassthroughRulePayload(rule),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusCreated, apiopenapi.ErrorPassthroughRuleResponse{
+		Data:      toAPIErrorPassthroughRule(rule),
+		RequestId: requestID,
 	})
 }
 
@@ -201,21 +181,34 @@ func (s *Server) handleUpdateAdminErrorPassthroughRule(w http.ResponseWriter, r 
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid error passthrough rule id", requestID)
 		return
 	}
-	var body updateErrorPassthroughRuleRequest
+	var body apiopenapi.UpdateErrorPassthroughRuleRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid error passthrough rule request", requestID)
 		return
 	}
-	input := errorpassthroughcontract.UpdateRule{
-		Name:        body.Name,
-		Enabled:     body.Enabled,
-		Priority:    body.Priority,
-		StatusCodes: body.StatusCodes,
-		Classes:     body.Classes,
-		Keywords:    body.Keywords,
+	priority, ok := intPtrFromInt64Ptr(body.Priority)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid error passthrough rule request", requestID)
+		return
 	}
-	if responseStatus := firstIntPtr(body.ResponseStatus, body.ResponseCode); responseStatus != nil {
-		input.ResponseStatus = &responseStatus
+	statusCodes, ok := optionalIntSlicePtrFromInt64Ptr(body.StatusCodes)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid error passthrough rule request", requestID)
+		return
+	}
+	responseStatus, ok := firstOptionalInt64PtrAsIntPtr(body.ResponseStatus, body.ResponseCode)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid error passthrough rule request", requestID)
+		return
+	}
+	input := errorpassthroughcontract.UpdateRule{
+		Name:           body.Name,
+		Enabled:        body.Enabled,
+		Priority:       priority,
+		StatusCodes:    statusCodes,
+		Classes:        body.Classes,
+		Keywords:       body.Keywords,
+		ResponseStatus: responseStatus,
 	}
 	if body.CustomMessage != nil {
 		input.CustomMessage = body.CustomMessage
@@ -234,20 +227,10 @@ func (s *Server) handleUpdateAdminErrorPassthroughRule(w http.ResponseWriter, r 
 		"action":  rule.Action,
 		"enabled": rule.Enabled,
 	}))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       toErrorPassthroughRulePayload(rule),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.ErrorPassthroughRuleResponse{
+		Data:      toAPIErrorPassthroughRule(rule),
+		RequestId: requestID,
 	})
-}
-
-func firstIntPtr(values ...*int) *int {
-	for _, value := range values {
-		if value == nil {
-			continue
-		}
-		return cloneIntPtr(value)
-	}
-	return nil
 }
 
 func (s *Server) handleDeleteAdminErrorPassthroughRule(w http.ResponseWriter, r *http.Request) {
@@ -271,10 +254,7 @@ func (s *Server) handleDeleteAdminErrorPassthroughRule(w http.ResponseWriter, r 
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "error_passthrough_rule.delete", "error_passthrough_rule", strconv.Itoa(ruleID), nil, nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"id": ruleID, "deleted": true},
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
 func (s *Server) writeErrorPassthroughError(w http.ResponseWriter, err error, requestID string) {

@@ -52,7 +52,11 @@ func (s *Service) CreateRule(ctx context.Context, input contract.CreateRule) (co
 	}
 	input.Classes = cleanStrings(input.Classes)
 	input.Keywords = cleanStrings(input.Keywords)
-	input.StatusCodes = cleanStatusCodes(input.StatusCodes)
+	statusCodes, ok := cleanStatusCodes(input.StatusCodes)
+	if !ok {
+		return contract.Rule{}, ErrInvalidInput
+	}
+	input.StatusCodes = statusCodes
 	if input.ResponseStatus != nil {
 		status, ok := cleanResponseStatus(input.ResponseStatus)
 		if !ok {
@@ -95,7 +99,10 @@ func (s *Service) UpdateRule(ctx context.Context, id int, input contract.UpdateR
 		input.Keywords = &keywords
 	}
 	if input.StatusCodes != nil {
-		codes := cleanStatusCodes(*input.StatusCodes)
+		codes, ok := cleanStatusCodes(*input.StatusCodes)
+		if !ok {
+			return contract.Rule{}, ErrInvalidInput
+		}
 		input.StatusCodes = &codes
 	}
 	if input.ResponseStatus != nil {
@@ -251,12 +258,12 @@ func cleanStrings(values []string) []string {
 	return out
 }
 
-func cleanStatusCodes(codes []int) []int {
+func cleanStatusCodes(codes []int) ([]int, bool) {
 	out := make([]int, 0, len(codes))
 	seen := map[int]struct{}{}
 	for _, code := range codes {
 		if code < 100 || code > 599 {
-			continue
+			return nil, false
 		}
 		if _, ok := seen[code]; ok {
 			continue
@@ -264,7 +271,7 @@ func cleanStatusCodes(codes []int) []int {
 		seen[code] = struct{}{}
 		out = append(out, code)
 	}
-	return out
+	return out, true
 }
 
 func cleanResponseStatus(status *int) (*int, bool) {

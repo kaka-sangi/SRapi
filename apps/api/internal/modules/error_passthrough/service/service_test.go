@@ -113,3 +113,35 @@ func TestResolveReturnsResponseOverridesAndClearsThem(t *testing.T) {
 		t.Fatalf("expected custom message to clear, got %q", resolution.CustomMessage)
 	}
 }
+
+func TestRejectsInvalidStatusCodes(t *testing.T) {
+	store := errorpassthroughmemory.New()
+	svc, err := service.New(store)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := t.Context()
+
+	if _, err := svc.CreateRule(ctx, contract.CreateRule{
+		Name:        "invalid status",
+		Enabled:     true,
+		Action:      contract.ActionExpose,
+		StatusCodes: []int{99},
+	}); err == nil {
+		t.Fatal("expected invalid create status code to fail")
+	}
+
+	rule, err := svc.CreateRule(ctx, contract.CreateRule{
+		Name:        "valid status",
+		Enabled:     true,
+		Action:      contract.ActionExpose,
+		StatusCodes: []int{400},
+	})
+	if err != nil {
+		t.Fatalf("create valid rule: %v", err)
+	}
+	invalidCodes := []int{600}
+	if _, err := svc.UpdateRule(ctx, rule.ID, contract.UpdateRule{StatusCodes: &invalidCodes}); err == nil {
+		t.Fatal("expected invalid update status code to fail")
+	}
+}
