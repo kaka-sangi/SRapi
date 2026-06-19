@@ -632,6 +632,23 @@ func (s *Service) ManagedEgressClient(account contract.AccountRuntime) (*http.Cl
 	return client, true, nil
 }
 
+// AccountEgressRequestHeaders returns account/profile headers that live outside
+// the HTTP client itself. Direct API-key provider adapters use it with
+// ManagedEgressClient so named TLS profiles affect direct traffic the same way
+// they affect Reverse Proxy Runtime traffic.
+func (s *Service) AccountEgressRequestHeaders(account contract.AccountRuntime) (http.Header, error) {
+	profile, err := resolveEgressProfile(account)
+	if err != nil {
+		return nil, err
+	}
+	headers := http.Header{}
+	applyEgressStaticHeaders(headers, profile)
+	if ua := explicitUserAgentForProfile(account, profile); ua != "" {
+		headers.Set("User-Agent", ua)
+	}
+	return headers, nil
+}
+
 // accountHasManagedEgress reports whether the account configures transport-level
 // egress (an explicit proxy or a uTLS/HTTP-version egress profile). Static header
 // or user-agent overrides are applied by Do, not by the client, so they do not
@@ -815,6 +832,19 @@ func userAgent(account contract.AccountRuntime) string {
 }
 
 func userAgentForProfile(account contract.AccountRuntime, profile egressProfile) string {
+	if ua := explicitUserAgentForProfile(account, profile); ua != "" {
+		return ua
+	}
+	if account.UpstreamClient != nil && strings.TrimSpace(*account.UpstreamClient) != "" {
+		if ua := defaultUserAgentForUpstreamClient(*account.UpstreamClient); ua != "" {
+			return ua
+		}
+		return strings.TrimSpace(*account.UpstreamClient)
+	}
+	return "Mozilla/5.0"
+}
+
+func explicitUserAgentForProfile(account contract.AccountRuntime, profile egressProfile) string {
 	if strings.TrimSpace(account.UserAgent) != "" {
 		return strings.TrimSpace(account.UserAgent)
 	}
@@ -827,13 +857,7 @@ func userAgentForProfile(account contract.AccountRuntime, profile egressProfile)
 	if value := credentialString(account.Metadata, "user_agent"); value != "" && !strings.HasPrefix(strings.ToLower(value), "srapi/") {
 		return value
 	}
-	if account.UpstreamClient != nil && strings.TrimSpace(*account.UpstreamClient) != "" {
-		if ua := defaultUserAgentForUpstreamClient(*account.UpstreamClient); ua != "" {
-			return ua
-		}
-		return strings.TrimSpace(*account.UpstreamClient)
-	}
-	return "Mozilla/5.0"
+	return ""
 }
 
 func firstCredentialString(values map[string]any, keys ...string) string {

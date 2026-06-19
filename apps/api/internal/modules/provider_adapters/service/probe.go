@@ -35,7 +35,7 @@ func (s *Service) ProbeAccount(ctx context.Context, req contract.ProbeRequest) (
 		return probeFailure(startedAt, "auth_failed", http.StatusUnauthorized), nil
 	}
 	mergeProbeHeaders(headers, probeReq.Headers)
-	resp, err := s.doProbe(ctx, req.Account, probeReq, headers)
+	resp, err := s.doProbe(ctx, req.Account, req.Credential, probeReq, headers)
 	if err != nil {
 		return probeResponseFromError(startedAt, err), nil
 	}
@@ -57,7 +57,7 @@ func (s *Service) ProbeAccount(ctx context.Context, req contract.ProbeRequest) (
 	}, nil
 }
 
-func (s *Service) doProbe(ctx context.Context, account accountcontract.ProviderAccount, req probeHTTPRequest, headers http.Header) (probeHTTPResponse, error) {
+func (s *Service) doProbe(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any, req probeHTTPRequest, headers http.Header) (probeHTTPResponse, error) {
 	if account.RuntimeClass != accountcontract.RuntimeClassAPIKey {
 		return probeHTTPResponse{}, contract.ProviderError{Class: "unsupported_runtime", StatusCode: http.StatusBadRequest, Message: "account runtime cannot be probed without reverse proxy runtime"}
 	}
@@ -69,7 +69,8 @@ func (s *Service) doProbe(ctx context.Context, account accountcontract.ProviderA
 	if len(req.Body) > 0 && httpReq.Header.Get("Content-Type") == "" {
 		httpReq.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := s.egressHTTPClient(account, nil).Do(httpReq)
+	s.applyAccountRequestHeadersIfMissing(httpReq.Header, account, credential)
+	resp, err := s.egressHTTPClient(account, credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return probeHTTPResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider probe timed out"}

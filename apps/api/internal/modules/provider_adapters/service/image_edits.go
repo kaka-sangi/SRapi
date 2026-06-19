@@ -58,8 +58,9 @@ func (s *Service) invokeOpenAICompatibleImageEdit(ctx context.Context, req contr
 	}
 	httpReq.Header.Set("Content-Type", contentType)
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 
-	resp, err := s.client.Do(httpReq)
+	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}

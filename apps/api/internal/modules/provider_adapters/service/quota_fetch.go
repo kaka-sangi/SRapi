@@ -66,7 +66,7 @@ func (s *Service) fetchAccountQuotaUncached(ctx context.Context, req contract.Pr
 	if err != nil {
 		return report, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "invalid quota fetch request body"}
 	}
-	status, body, respHeaders, err := s.doQuotaFetch(ctx, req.Account, method, endpoint, headers, requestBody)
+	status, body, respHeaders, err := s.doQuotaFetch(ctx, req.Account, req.Credential, method, endpoint, headers, requestBody)
 	if err != nil {
 		return report, err
 	}
@@ -104,7 +104,7 @@ func (s *Service) fetchAccountQuotaUncached(ctx context.Context, req contract.Pr
 	return report, nil
 }
 
-func (s *Service) doQuotaFetch(ctx context.Context, account accountcontract.ProviderAccount, method, endpoint string, headers http.Header, requestBody []byte) (int, []byte, http.Header, error) {
+func (s *Service) doQuotaFetch(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any, method, endpoint string, headers http.Header, requestBody []byte) (int, []byte, http.Header, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(requestBody))
 	if err != nil {
 		return 0, nil, nil, err
@@ -113,7 +113,9 @@ func (s *Service) doQuotaFetch(ctx context.Context, account accountcontract.Prov
 	if len(requestBody) > 0 && httpReq.Header.Get("Content-Type") == "" {
 		httpReq.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := s.egressHTTPClient(quotaAccountWithCloudflareTLSDefault(account, endpoint), nil).Do(httpReq)
+	quotaAccount := quotaAccountWithCloudflareTLSDefault(account, endpoint)
+	s.applyAccountRequestHeadersIfMissing(httpReq.Header, quotaAccount, credential)
+	resp, err := s.egressHTTPClient(quotaAccount, credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return 0, nil, nil, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "quota fetch timed out"}

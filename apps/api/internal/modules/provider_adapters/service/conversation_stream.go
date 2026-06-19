@@ -184,6 +184,7 @@ func (s *Service) streamDirectOpenAICompatible(ctx context.Context, req contract
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 	return s.egressStreamConversation(ctx, req, httpReq,
 		func(status int, header http.Header, body []byte) error {
 			return classifyProviderHTTPErrorWithHeaders(status, header, body)
@@ -207,6 +208,7 @@ func (s *Service) streamDirectAnthropicCompatible(ctx context.Context, req contr
 		return contract.ConversationResponse{}, err
 	}
 	httpReq.Header = headers
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 	streamResp, err := s.egressStreamConversation(ctx, req, httpReq,
 		func(status int, header http.Header, body []byte) error {
 			return classifyProviderHTTPErrorWithHeaders(status, header, body)
@@ -235,6 +237,7 @@ func (s *Service) streamDirectGeminiCompatible(ctx context.Context, req contract
 		return contract.ConversationResponse{}, err
 	}
 	httpReq.Header = headers
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 	return s.egressStreamConversation(ctx, req, httpReq,
 		func(status int, header http.Header, body []byte) error {
 			return classifyGeminiProviderHTTPErrorWithHeaders(status, header, body)

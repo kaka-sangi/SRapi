@@ -159,7 +159,11 @@ func TestOpenAICompatibleAdapterInvokesUpstream(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer upstream-secret" {
 			t.Fatalf("unexpected auth header %q", got)
 		}
-		if r.Header.Get("X-Request-ID") != "" || strings.Contains(r.Header.Get("User-Agent"), "SRapi") {
+		if r.Header.Get("X-Request-ID") != "" ||
+			r.Header.Get("X-Forwarded-For") != "" ||
+			r.Header.Get("X-Egress-Static") != "static-profile" ||
+			r.Header.Get("X-Account-Custom") != "custom-account" ||
+			strings.Contains(r.Header.Get("User-Agent"), "SRapi") {
 			t.Fatalf("unexpected SRapi header leakage: %+v", r.Header)
 		}
 		var payload struct {
@@ -194,8 +198,20 @@ func TestOpenAICompatibleAdapterInvokesUpstream(t *testing.T) {
 			Protocol:    "openai-compatible",
 		},
 		Account: accountcontract.ProviderAccount{
-			ID:       1,
-			Metadata: map[string]any{"base_url": upstream.URL + "/v1"},
+			ID: 1,
+			Metadata: map[string]any{
+				"base_url": upstream.URL + "/v1",
+				"egress_profile": map[string]any{
+					"extra_static_headers": map[string]any{
+						"X-Egress-Static": "static-profile",
+					},
+				},
+				"headers": map[string]any{
+					"X-Account-Custom": " custom-account ",
+					"Authorization":    "Bearer attacker",
+					"X-Forwarded-For":  "127.0.0.1",
+				},
+			},
 		},
 		Mapping: modelcontract.ModelProviderMapping{
 			UpstreamModelName: "gpt-upstream",
@@ -207,6 +223,69 @@ func TestOpenAICompatibleAdapterInvokesUpstream(t *testing.T) {
 	}
 	if conversationResponseText(resp) != "upstream says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 3 || resp.Usage.OutputTokens != 4 {
 		t.Fatalf("unexpected adapter response: %+v", resp)
+	}
+}
+
+func TestDirectOpenAIAdapterAppliesNamedProfileEgressHeaders(t *testing.T) {
+	reverseproxyservice.SetNamedProfileExpander(func(metadata map[string]any) (map[string]any, bool) {
+		if metadata["tls_profile"] != "named-profile" {
+			return nil, false
+		}
+		out := map[string]any{}
+		for key, value := range metadata {
+			out[key] = value
+		}
+		out["egress_profile"] = map[string]any{
+			"user_agent":           "NamedProfile/1.0",
+			"extra_static_headers": map[string]any{"X-Named-Profile": "profile"},
+		}
+		return out, true
+	})
+	t.Cleanup(func() { reverseproxyservice.SetNamedProfileExpander(nil) })
+
+	var gotHeaders http.Header
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHeaders = r.Header.Clone()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(upstream.Client(), runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_named_profile",
+		Model:      "gpt-local",
+		InputParts: textParts("hello"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           1,
+			RuntimeClass: accountcontract.RuntimeClassAPIKey,
+			Metadata: map[string]any{
+				"base_url":    upstream.URL + "/v1",
+				"tls_profile": "named-profile",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke upstream: %v", err)
+	}
+	if gotHeaders.Get("Authorization") != "Bearer upstream-secret" ||
+		gotHeaders.Get("User-Agent") != "NamedProfile/1.0" ||
+		gotHeaders.Get("X-Named-Profile") != "profile" {
+		t.Fatalf("named profile headers not applied: %+v", gotHeaders)
 	}
 }
 

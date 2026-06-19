@@ -53,8 +53,9 @@ func (s *Service) invokeGeminiTokenCount(ctx context.Context, req contract.Token
 		return contract.TokenCountResponse{}, err
 	}
 	httpReq.Header = headers
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 
-	resp, err := s.client.Do(httpReq)
+	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return contract.TokenCountResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
@@ -131,8 +132,9 @@ func (s *Service) invokeAnthropicTokenCount(ctx context.Context, req contract.To
 		return contract.TokenCountResponse{}, err
 	}
 	httpReq.Header = headers
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 
-	resp, err := s.client.Do(httpReq)
+	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return contract.TokenCountResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}

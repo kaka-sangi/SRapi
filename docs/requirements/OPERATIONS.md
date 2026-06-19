@@ -378,6 +378,12 @@ Provider Account metadata 或 Provider config/capabilities 可以把默认 `/mod
 
 该机制用于覆盖 sub2api channel-monitor / scheduled-test 里的“用真实请求形态做健康验证”诉求，但仍复用 SRapi 的 Provider Account、credential materialization、account health snapshot、cooldown/circuit 和 Scheduler 证据链，不新增平行监控数据面。
 
+API-key 直连网关请求同样会读取账号级出站 header 配置：
+
+- `metadata.headers` 可添加低敏上游业务 header；空值、非字符串值、`Authorization`、API-key、cookie、host、`Content-Type`、hop-by-hop、转发链路和 SRapi/Gateway 内部 header 会被忽略。
+- `egress_profile.extra_static_headers` / 命名 TLS Profile `extra_headers` 会作为缺省 header 注入，不覆盖 adapter 已经设置的认证、`Accept`、`Content-Type` 或显式 `metadata.headers`。
+- `egress_profile.user_agent` / 命名 TLS Profile `user_agent` 会在请求尚未设置 `User-Agent` 时作为上游 UA 使用；以 `SRapi/` 开头的 UA 仍会被拒绝。
+
 ### SLO 告警评估
 
 `slo_evaluator` worker 由 `internal/app` 在持久化 operations store 可用时启动。它默认每 1 分钟读取 `obs_slo_definitions`、`usage_logs` 和当前 active `obs_alert_events`，对 active availability SLO 执行多窗口 burn-rate 判断：长窗口和短窗口都超过阈值才创建或更新告警，恢复时只自动 resolve `slo.burn_rate.*` 规则生成的 active/acknowledged 告警，不会修改人工或其他规则告警。

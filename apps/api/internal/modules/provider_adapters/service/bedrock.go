@@ -56,11 +56,12 @@ func (s *Service) invokeBedrockAnthropic(ctx context.Context, req contract.Conve
 	}
 	httpReq.Header.Set("Accept", bedrockAcceptHeader(req.Stream))
 	httpReq.Header.Set("Content-Type", "application/json")
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 	if err := signBedrockRequest(ctx, httpReq, raw, awsCredential, region); err != nil {
 		return contract.ConversationResponse{}, err
 	}
 
-	resp, err := s.client.Do(httpReq)
+	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return contract.ConversationResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}

@@ -107,7 +107,8 @@ func (s *Service) doGenericReverseProxy(ctx context.Context, account accountcont
 		return reverseproxycontract.Response{}, err
 	}
 	httpReq.Header = headers
-	resp, err := s.client.Do(httpReq)
+	s.applyAccountRequestHeadersIfMissing(httpReq.Header, account, credential)
+	resp, err := s.egressHTTPClient(account, credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return reverseproxycontract.Response{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}

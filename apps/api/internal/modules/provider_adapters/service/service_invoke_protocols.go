@@ -105,6 +105,7 @@ func (s *Service) invokeOpenAICompatibleEmbeddings(ctx context.Context, req cont
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 
 	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
@@ -186,6 +187,7 @@ func (s *Service) invokeOpenAICompatibleImages(ctx context.Context, req contract
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 
 	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
@@ -269,6 +271,7 @@ func (s *Service) invokeGeminiCompatible(ctx context.Context, req contract.Conve
 			return nil, 0, nil, err
 		}
 		httpReq.Header = headers
+		s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 
 		resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 		if err != nil {
@@ -368,6 +371,7 @@ func (s *Service) invokeAnthropicCompatible(ctx context.Context, req contract.Co
 		return contract.ConversationResponse{}, err
 	}
 	httpReq.Header = headers
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 
 	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
@@ -426,6 +430,7 @@ func (s *Service) invokeOpenAICompatible(ctx context.Context, req contract.Conve
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 
 	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
@@ -473,6 +478,7 @@ func (s *Service) invokeOpenAICompatibleResponses(ctx context.Context, req contr
 	httpReq.Header.Set("Accept", openAIResponsesAccept(req.Stream))
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 
 	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
@@ -511,6 +517,7 @@ func (s *Service) invokeOpenAIResponseInputItems(ctx context.Context, req contra
 	}
 	httpReq.Header.Set("Accept", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 
 	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
@@ -768,6 +775,7 @@ func (s *Service) invokeOpenAICompatibleResponsesCompact(ctx context.Context, re
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+	s.applyAccountRequestHeaders(httpReq.Header, req.Account, req.Credential)
 
 	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
