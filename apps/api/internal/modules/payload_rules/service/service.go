@@ -132,7 +132,8 @@ func (s *Service) Resolve(ctx context.Context, model, protocol string) []contrac
 		if !protocolMatch(rule.MatchProtocol, protocol) {
 			continue
 		}
-		for path, value := range rule.Params {
+		for _, path := range sortedParamPaths(rule.Params) {
+			value := rule.Params[path]
 			path = strings.TrimSpace(path)
 			if path == "" {
 				continue
@@ -204,6 +205,15 @@ func cleanParams(params map[string]any) map[string]any {
 		out[key] = value
 	}
 	return out
+}
+
+func sortedParamPaths(params map[string]any) []string {
+	paths := make([]string, 0, len(params))
+	for path := range params {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths
 }
 
 func protocolMatch(rule, actual string) bool {
