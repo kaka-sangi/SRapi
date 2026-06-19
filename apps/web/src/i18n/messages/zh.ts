@@ -2122,6 +2122,12 @@ export const zh: Messages = {
     emptySloBody: "定义 SLO 即可跟踪网关可靠性。",
     acknowledge: "确认",
     investigate: "调查",
+    evidence: {
+      errorLogs: "错误日志",
+      requestEvidence: "请求证据",
+      schedulerDecision: "调度决策",
+      accountHealth: "账号健康",
+    },
     alertsEmpty: "暂无活跃告警",
     trends: "趋势",
     throughput: "请求数",

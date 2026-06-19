@@ -2145,6 +2145,12 @@ export const en = {
     emptySloBody: "Define an SLO to track gateway reliability.",
     acknowledge: "Acknowledge",
     investigate: "Investigate",
+    evidence: {
+      errorLogs: "Error logs",
+      requestEvidence: "Request evidence",
+      schedulerDecision: "Scheduler decision",
+      accountHealth: "Account health",
+    },
     alertsEmpty: "No active alerts",
     trends: "Trends",
     throughput: "Requests",

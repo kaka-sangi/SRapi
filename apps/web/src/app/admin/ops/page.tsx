@@ -38,7 +38,7 @@ import {
   buildOpsSettingsBody,
   type OpsSettingsFormState,
 } from "@/lib/admin-ops-settings-form";
-import type { JsonObject, OpsSloDefinition, OpsAlertRule, OpsAlertSilence } from "@/lib/sdk-types";
+import type { OpsSloDefinition, OpsAlertRule, OpsAlertSilence } from "@/lib/sdk-types";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
@@ -57,6 +57,7 @@ import { ScheduledTestsContent } from "@/components/admin/ops-scheduled-tests";
 import { StrategyContent } from "@/components/admin/ops-strategy";
 import { SchedulerDecisionsPanel } from "@/components/features/scheduler-decisions-panel";
 import { adminErrorInvestigationHref } from "@/lib/admin-log-links";
+import { buildOpsAlertEvidenceLinks } from "@/lib/admin-ops-alert-evidence";
 import { OpsEvidenceChainHealth } from "./evidence-chain-health";
 
 export default function AdminOpsPage() {
@@ -358,11 +359,11 @@ function OpsOverviewContent() {
           </CardHeader>
           <CardContent className="space-y-2">
             {activeAlerts.map((alert) => {
-              const investigationHref = alertInvestigationHref(alert.details);
+              const evidenceLinks = buildOpsAlertEvidenceLinks(alert.details);
               return (
                 <div
                   key={alert.id}
-                  className="flex items-center justify-between gap-4 border-t border-srapi-border py-2.5 first:border-t-0"
+                  className="flex flex-col gap-3 border-t border-srapi-border py-2.5 first:border-t-0 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
                     <div className="truncate text-sm text-srapi-text-primary">{alert.summary}</div>
@@ -370,13 +371,9 @@ function OpsOverviewContent() {
                       {formatDateTime(alert.started_at ?? alert.created_at)}
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     <QuietBadge status={quietStatusFor(alert.severity)} label={alert.severity} />
-                    {investigationHref ? (
-                      <Button asChild variant="ghost" size="sm">
-                        <Link href={investigationHref}>{t("adminOps.investigate")}</Link>
-                      </Button>
-                    ) : null}
+                    <AlertEvidenceActions links={evidenceLinks} />
                     <Button
                       variant="outline"
                       size="sm"
@@ -601,6 +598,26 @@ function OpsOverviewContent() {
   );
 }
 
+function AlertEvidenceActions({ links }: { links: ReturnType<typeof buildOpsAlertEvidenceLinks> }) {
+  const { t } = useLanguage();
+  const actions = [
+    { href: links.errorLogs, label: t("adminOps.evidence.errorLogs") },
+    { href: links.requestEvidence, label: t("adminOps.evidence.requestEvidence") },
+    { href: links.schedulerDecision, label: t("adminOps.evidence.schedulerDecision") },
+    { href: links.accountHealth, label: t("adminOps.evidence.accountHealth") },
+  ].filter((item): item is { href: string; label: string } => Boolean(item.href));
+  if (actions.length === 0) return null;
+  return (
+    <div className="flex flex-wrap justify-end gap-1">
+      {actions.map((action) => (
+        <Button key={`${action.label}:${action.href}`} asChild variant="ghost" size="sm">
+          <Link href={action.href}>{action.label}</Link>
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 function OpsTabs({ value }: { value: string }) {
   const { t } = useLanguage();
   const router = useRouter();
@@ -625,17 +642,4 @@ function OpsTabs({ value }: { value: string }) {
       </TabsList>
     </Tabs>
   );
-}
-
-function alertInvestigationHref(details: JsonObject | undefined): string | null {
-  return adminErrorInvestigationHref({
-    error_class: detailString(details, "error_class"),
-    source_endpoint: detailString(details, "source_endpoint"),
-    model: detailString(details, "model"),
-  });
-}
-
-function detailString(details: JsonObject | undefined, key: string): string | null {
-  const value = details?.[key];
-  return typeof value === "string" && value.trim() ? value : null;
 }
