@@ -4841,8 +4841,10 @@ export type RequestEvidenceRow = {
     has_usage_log: boolean;
     has_ops_error_log: boolean;
     has_request_dump: boolean;
+    has_system_log: boolean;
     request_dump_count: number;
     request_dump_error_count: number;
+    system_log_count: number;
     latest_request_dump_name?: string;
     latest_request_dump_created_at?: Timestamp;
 };
@@ -17333,9 +17335,9 @@ export type ListAdminOpsRequestEvidenceData = {
          */
         kind?: 'all' | 'success' | 'error' | 'unknown';
         /**
-         * Filter by the primary evidence source used for the row.
+         * Filter by evidence source present on the row.
          */
-        evidence_source?: 'all' | 'usage' | 'ops_error' | 'request_dump';
+        evidence_source?: 'all' | 'usage' | 'ops_error' | 'request_dump' | 'system_log';
         min_latency_ms?: number;
         max_latency_ms?: number;
         /**

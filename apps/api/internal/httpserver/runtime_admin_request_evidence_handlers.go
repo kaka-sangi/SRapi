@@ -17,13 +17,15 @@ import (
 )
 
 const (
-	requestEvidenceDefaultPageSize = 50
-	requestEvidenceMaxPageSize     = 200
-	requestEvidenceDefaultWindow   = time.Hour
-	requestEvidenceOpsPageSize     = 200
-	requestEvidenceMaxOpsRows      = 2000
-	requestEvidenceDetailDumpLimit = 50
-	requestEvidenceSystemLogLimit  = 5
+	requestEvidenceDefaultPageSize   = 50
+	requestEvidenceMaxPageSize       = 200
+	requestEvidenceDefaultWindow     = time.Hour
+	requestEvidenceOpsPageSize       = 200
+	requestEvidenceMaxOpsRows        = 2000
+	requestEvidenceSystemLogPageSize = 1000
+	requestEvidenceMaxSystemLogRows  = 2000
+	requestEvidenceDetailDumpLimit   = 50
+	requestEvidenceSystemLogLimit    = 5
 )
 
 type requestEvidenceQuery struct {
@@ -80,8 +82,11 @@ type requestEvidenceRow struct {
 	HasUsageLog                bool
 	HasOpsErrorLog             bool
 	HasRequestDump             bool
+	HasSystemLog               bool
 	RequestDumpCount           int
 	RequestDumpErrorCount      int
+	SystemLogCount             int
+	SystemLogSearchText        string
 	LatestRequestDumpName      string
 	LatestRequestDumpCreatedAt *time.Time
 }
@@ -136,7 +141,7 @@ type requestEvidenceSystemLogEvidence struct {
 // handleListAdminOpsRequestEvidence serves GET /api/v1/admin/ops/request-evidence.
 //
 // It deliberately lives in the HTTP/admin layer: request evidence is a read-only
-// operator projection over three existing evidence stores, not a new write-side
+// operator projection over existing evidence stores, not a new write-side
 // business concept. The response avoids raw dump bodies and headers; those stay
 // behind the existing request-log-file preview/download endpoints.
 func (s *Server) handleListAdminOpsRequestEvidence(w http.ResponseWriter, r *http.Request) {
@@ -212,6 +217,10 @@ func (s *Server) requestEvidenceRows(ctx context.Context, query requestEvidenceQ
 	if err != nil {
 		return nil, err
 	}
+	systemLogs, err := s.requestEvidenceSystemLogRows(ctx, query)
+	if err != nil {
+		return nil, err
+	}
 	rowsByKey := make(map[string]*requestEvidenceRow, len(usageLogs))
 	rowsByRequest := make(map[string][]*requestEvidenceRow)
 	rows := make([]*requestEvidenceRow, 0, len(usageLogs))
@@ -252,7 +261,18 @@ func (s *Server) requestEvidenceRows(ctx context.Context, query requestEvidenceQ
 			continue
 		}
 		row := requestEvidenceRowFromDump(dump)
-		if !requestEvidenceRowMatches(*row, query) {
+		rows = append(rows, row)
+		rowsByRequest[row.RequestID] = append(rowsByRequest[row.RequestID], row)
+	}
+	for requestID, evidence := range systemLogs {
+		if existing := rowsByRequest[requestID]; len(existing) > 0 {
+			for _, row := range existing {
+				attachRequestEvidenceSystemLog(row, evidence)
+			}
+			continue
+		}
+		row := requestEvidenceRowFromSystemLog(requestID, evidence)
+		if row == nil || !requestEvidenceRowMatches(*row, query) {
 			continue
 		}
 		rows = append(rows, row)
@@ -293,6 +313,11 @@ func (s *Server) requestEvidenceDetail(ctx context.Context, requestID string) (r
 	systemLogEvidence, err := s.requestEvidenceSystemLogsByRequestID(ctx, requestID)
 	if err != nil {
 		return requestEvidenceDetail{}, err
+	}
+	if systemLogEvidence.Total > 0 {
+		for i := range rows {
+			attachRequestEvidenceSystemLog(&rows[i], systemLogEvidence)
+		}
 	}
 	if len(rows) == 0 && len(dumps) == 0 && systemLogEvidence.Total == 0 {
 		return requestEvidenceDetail{}, nil
@@ -367,7 +392,7 @@ func requestEvidenceQueryFromRequest(r *http.Request, now time.Time) (requestEvi
 		source = "all"
 	}
 	switch source {
-	case "all", "usage", "ops_error", "request_dump":
+	case "all", "usage", "ops_error", "request_dump", "system_log":
 	default:
 		return requestEvidenceQuery{}, errors.New("invalid evidence_source")
 	}
@@ -547,6 +572,48 @@ func requestEvidenceDumpFilesByRequestID(ctx context.Context, reader rlfcontract
 	})
 	if len(out) > requestEvidenceDetailDumpLimit {
 		out = out[len(out)-requestEvidenceDetailDumpLimit:]
+	}
+	return out, nil
+}
+
+func (s *Server) requestEvidenceSystemLogRows(ctx context.Context, query requestEvidenceQuery) (map[string]requestEvidenceSystemLogEvidence, error) {
+	if s.runtime == nil || s.runtime.operations == nil {
+		return map[string]requestEvidenceSystemLogEvidence{}, nil
+	}
+	opts := operationscontract.SystemLogListOptions{
+		Start:    &query.Start,
+		End:      &query.End,
+		PageSize: requestEvidenceSystemLogPageSize,
+	}
+	out := make(map[string]requestEvidenceSystemLogEvidence)
+	seen := 0
+	for page := 1; ; page++ {
+		opts.Page = page
+		list, err := s.runtime.operations.ListSystemLogs(ctx, opts)
+		if err != nil {
+			return nil, err
+		}
+		for _, log := range list.Items {
+			seen++
+			if !requestEvidenceSystemLogMatches(log, query) {
+				continue
+			}
+			evidence := out[log.RequestID]
+			if evidence.LevelCounts == nil {
+				evidence.LevelCounts = map[operationscontract.OpsSystemLogLevel]int{}
+			}
+			evidence.Items = append(evidence.Items, log)
+			evidence.Total++
+			evidence.LevelCounts[log.Level]++
+			if evidence.Latest == nil || requestEvidenceSystemLogNewer(log, *evidence.Latest) {
+				latest := log
+				evidence.Latest = &latest
+			}
+			out[log.RequestID] = evidence
+		}
+		if seen >= requestEvidenceMaxSystemLogRows || len(list.Items) == 0 || page*requestEvidenceSystemLogPageSize >= list.Total {
+			break
+		}
 	}
 	return out, nil
 }
@@ -813,6 +880,24 @@ func requestEvidenceRowFromDump(dump requestDumpEvidence) *requestEvidenceRow {
 	return row
 }
 
+func requestEvidenceRowFromSystemLog(requestID string, evidence requestEvidenceSystemLogEvidence) *requestEvidenceRow {
+	if evidence.Latest == nil {
+		return nil
+	}
+	latest := evidence.Latest
+	return &requestEvidenceRow{
+		Kind:                "unknown",
+		EvidenceSource:      "system_log",
+		CreatedAt:           latest.CreatedAt.UTC(),
+		RequestID:           requestID,
+		ErrorMessage:        strings.TrimSpace(latest.Message),
+		ErrorSource:         strings.TrimSpace(latest.Source),
+		HasSystemLog:        true,
+		SystemLogCount:      evidence.Total,
+		SystemLogSearchText: requestEvidenceSystemLogSearchText(evidence),
+	}
+}
+
 func mergeRequestEvidenceOpsError(row *requestEvidenceRow, entry opserrorlogscontract.Entry) {
 	id := entry.ID
 	row.OpsErrorLogID = &id
@@ -858,6 +943,18 @@ func attachRequestDumpEvidence(row *requestEvidenceRow, dump requestDumpEvidence
 	row.LatestRequestDumpCreatedAt = &createdAt
 }
 
+func attachRequestEvidenceSystemLog(row *requestEvidenceRow, evidence requestEvidenceSystemLogEvidence) {
+	if evidence.Total <= 0 {
+		return
+	}
+	row.HasSystemLog = true
+	row.SystemLogCount = evidence.Total
+	row.SystemLogSearchText = requestEvidenceSystemLogSearchText(evidence)
+	if evidence.Latest == nil {
+		return
+	}
+}
+
 func requestEvidenceUsageLogMatches(log usagecontract.UsageLog, query requestEvidenceQuery) bool {
 	if query.RequestID != "" && !strings.HasPrefix(log.RequestID, query.RequestID) {
 		return false
@@ -896,6 +993,20 @@ func requestEvidenceOpsErrorLogMatches(entry opserrorlogscontract.Entry, query r
 		return false
 	}
 	if query.SourceEndpoint != "" && !strings.Contains(strings.ToLower(entry.SourceEndpoint), strings.ToLower(query.SourceEndpoint)) {
+		return false
+	}
+	return true
+}
+
+func requestEvidenceSystemLogMatches(log operationscontract.OpsSystemLog, query requestEvidenceQuery) bool {
+	if log.RequestID == "" {
+		return false
+	}
+	if query.RequestID != "" && !strings.HasPrefix(log.RequestID, query.RequestID) {
+		return false
+	}
+	createdAt := log.CreatedAt.UTC()
+	if createdAt.Before(query.Start) || !createdAt.Before(query.End) {
 		return false
 	}
 	return true
@@ -943,6 +1054,10 @@ func requestEvidenceRowMatches(row requestEvidenceRow, query requestEvidenceQuer
 			if !row.HasRequestDump {
 				return false
 			}
+		case "system_log":
+			if !row.HasSystemLog {
+				return false
+			}
 		}
 	}
 	if query.MinLatencyMS != nil {
@@ -979,6 +1094,7 @@ func requestEvidenceRowContains(row requestEvidenceRow, raw string) bool {
 		row.ErrorSource,
 		row.UpstreamRequestID,
 		row.LatestRequestDumpName,
+		row.SystemLogSearchText,
 	}
 	for _, field := range fields {
 		if strings.Contains(strings.ToLower(field), needle) {
@@ -986,6 +1102,44 @@ func requestEvidenceRowContains(row requestEvidenceRow, raw string) bool {
 		}
 	}
 	return false
+}
+
+func requestEvidenceSystemLogSearchText(evidence requestEvidenceSystemLogEvidence) string {
+	if len(evidence.Items) == 0 && evidence.Latest == nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, log := range evidence.Items {
+		appendRequestEvidenceSearchField(&b, log.Message)
+		appendRequestEvidenceSearchField(&b, log.Source)
+		appendRequestEvidenceSearchField(&b, log.TraceID)
+	}
+	if evidence.Latest != nil {
+		appendRequestEvidenceSearchField(&b, evidence.Latest.Message)
+		appendRequestEvidenceSearchField(&b, evidence.Latest.Source)
+		appendRequestEvidenceSearchField(&b, evidence.Latest.TraceID)
+	}
+	return b.String()
+}
+
+func appendRequestEvidenceSearchField(b *strings.Builder, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return
+	}
+	if b.Len() > 0 {
+		b.WriteByte(' ')
+	}
+	b.WriteString(value)
+}
+
+func requestEvidenceSystemLogNewer(left, right operationscontract.OpsSystemLog) bool {
+	leftAt := left.CreatedAt.UTC()
+	rightAt := right.CreatedAt.UTC()
+	if leftAt.Equal(rightAt) {
+		return left.ID > right.ID
+	}
+	return leftAt.After(rightAt)
 }
 
 func sortRequestEvidenceRows(rows []requestEvidenceRow, sortValue string) {
@@ -1026,8 +1180,10 @@ func requestEvidenceRowToAPI(row requestEvidenceRow) apiopenapi.RequestEvidenceR
 		HasUsageLog:           row.HasUsageLog,
 		HasOpsErrorLog:        row.HasOpsErrorLog,
 		HasRequestDump:        row.HasRequestDump,
+		HasSystemLog:          row.HasSystemLog,
 		RequestDumpCount:      row.RequestDumpCount,
 		RequestDumpErrorCount: row.RequestDumpErrorCount,
+		SystemLogCount:        row.SystemLogCount,
 	}
 	if row.UsageLogID != nil {
 		value := apiopenapi.Id(strconv.Itoa(*row.UsageLogID))

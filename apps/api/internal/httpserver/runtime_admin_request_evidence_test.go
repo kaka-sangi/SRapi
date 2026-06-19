@@ -128,13 +128,27 @@ func TestAdminRequestEvidence_ListMergesUsageOpsErrorsAndDumps(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	operationsStore := operationsmemory.New()
+	operationsSvc, err := operationsservice.NewWithStores(nil, operationsStore, nil)
+	if err != nil {
+		t.Fatalf("new operations service: %v", err)
+	}
+	if _, err := operationsSvc.RecordSystemLog(t.Context(), operationscontract.RecordSystemLogRequest{
+		Level:     operationscontract.OpsSystemLogLevelWarn,
+		Message:   "merged request scheduler fallback",
+		Source:    "gateway.scheduler",
+		RequestID: "req_merge",
+		CreatedAt: base.Add(-17 * time.Minute),
+	}); err != nil {
+		t.Fatalf("seed merged system log: %v", err)
+	}
 
 	mergeDumpName := "error-" + strconv.FormatInt(base.Add(-18*time.Minute).UnixMilli(), 10) + "-req_merge.log"
 	dumpOnlyName := "request-" + strconv.FormatInt(base.Add(-5*time.Minute).UnixMilli(), 10) + "-req_dump_only.log"
 	writeRequestEvidenceDump(t, dir, mergeDumpName, "req_merge", false, 503, "server_bad", 910, base.Add(-18*time.Minute))
 	writeRequestEvidenceDump(t, dir, dumpOnlyName, "req_dump_only", true, 200, "", 44, base.Add(-5*time.Minute))
 
-	handler := New(config.Load(), nil, WithUsageStore(usageStore), WithOpsErrorLogsStore(opsStore))
+	handler := New(config.Load(), nil, WithUsageStore(usageStore), WithOpsErrorLogsStore(opsStore), WithOperationsStore(operationsStore))
 	_, sessionCookie := mustLoginAdmin(t, handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/request-evidence?start=2026-06-19T07:00:00Z&end=2026-06-19T09:00:00Z&page_size=10", nil)
@@ -170,6 +184,9 @@ func TestAdminRequestEvidence_ListMergesUsageOpsErrorsAndDumps(t *testing.T) {
 	}
 	if merged.RequestDumpCount != 1 || merged.RequestDumpErrorCount != 1 {
 		t.Fatalf("merged row dump counts mismatch: %+v", merged)
+	}
+	if !merged.HasSystemLog || merged.SystemLogCount != 1 {
+		t.Fatalf("merged row should report system logs: %+v", merged)
 	}
 
 	success := byRequest["req_success"]
@@ -208,6 +225,94 @@ func TestAdminRequestEvidence_ListMergesUsageOpsErrorsAndDumps(t *testing.T) {
 	}
 	if len(resp.Data) != 1 || resp.Data[0].RequestId != "req_merge" || !resp.Data[0].HasUsageLog {
 		t.Fatalf("evidence_source=ops_error should keep the merged usage row, got %+v", resp.Data)
+	}
+
+	systemReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/request-evidence?start=2026-06-19T07:00:00Z&end=2026-06-19T09:00:00Z&evidence_source=system_log&q=scheduler", nil)
+	systemReq.AddCookie(sessionCookie)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, systemReq)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("evidence_source=system_log filter: got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].RequestId != "req_merge" || !resp.Data[0].HasUsageLog || !resp.Data[0].HasSystemLog {
+		t.Fatalf("evidence_source=system_log should keep the merged usage row, got %+v", resp.Data)
+	}
+}
+
+func TestAdminRequestEvidence_ListIncludesSystemLogEvidence(t *testing.T) {
+	usageStore := usagememory.New()
+	operationsStore := operationsmemory.New()
+	operationsSvc, err := operationsservice.NewWithStores(nil, operationsStore, nil)
+	if err != nil {
+		t.Fatalf("new operations service: %v", err)
+	}
+	base := time.Date(2026, 6, 19, 8, 0, 0, 0, time.UTC)
+
+	if _, err := operationsSvc.RecordSystemLog(t.Context(), operationscontract.RecordSystemLogRequest{
+		Level:     operationscontract.OpsSystemLogLevelWarn,
+		Message:   "scheduler fallback selected secondary account",
+		Source:    "gateway.scheduler",
+		RequestID: "req_system_feed",
+		TraceID:   "trace_system_feed",
+		CreatedAt: base.Add(-2 * time.Minute),
+	}); err != nil {
+		t.Fatalf("seed system log: %v", err)
+	}
+	if _, err := operationsSvc.RecordSystemLog(t.Context(), operationscontract.RecordSystemLogRequest{
+		Level:     operationscontract.OpsSystemLogLevelError,
+		Message:   "gateway retry exhausted",
+		Source:    "gateway.proxy",
+		RequestID: "req_system_feed",
+		TraceID:   "trace_system_feed",
+		CreatedAt: base.Add(-1 * time.Minute),
+	}); err != nil {
+		t.Fatalf("seed latest system log: %v", err)
+	}
+	if _, err := operationsSvc.RecordSystemLog(t.Context(), operationscontract.RecordSystemLogRequest{
+		Level:     operationscontract.OpsSystemLogLevelInfo,
+		Message:   "unrelated request",
+		Source:    "gateway.proxy",
+		RequestID: "req_system_neighbor",
+		CreatedAt: base.Add(-30 * time.Second),
+	}); err != nil {
+		t.Fatalf("seed neighbor system log: %v", err)
+	}
+
+	handler := New(config.Load(), nil, WithUsageStore(usageStore), WithOperationsStore(operationsStore))
+	_, sessionCookie := mustLoginAdmin(t, handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/request-evidence?start=2026-06-19T07:00:00Z&end=2026-06-19T09:00:00Z&evidence_source=system_log&q=retry&page_size=10", nil)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list request evidence: got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.RequestEvidenceListResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Pagination.Total != 1 || len(resp.Data) != 1 {
+		t.Fatalf("expected one system-log evidence row, got total=%d data=%d (%+v)", resp.Pagination.Total, len(resp.Data), resp.Data)
+	}
+	row := resp.Data[0]
+	if row.RequestId != "req_system_feed" || row.Kind != apiopenapi.RequestEvidenceKindUnknown || row.EvidenceSource != apiopenapi.RequestEvidenceSourceSystemLog {
+		t.Fatalf("system-log-only row identity mismatch: %+v", row)
+	}
+	if !row.HasSystemLog || row.SystemLogCount != 2 || row.HasUsageLog || row.HasOpsErrorLog || row.HasRequestDump {
+		t.Fatalf("system-log-only evidence flags mismatch: %+v", row)
+	}
+	if row.AttemptNo != nil || row.LatencyMs != nil || row.StatusCode != nil || row.TotalTokens != nil {
+		t.Fatalf("system-log-only row should not synthesize attempt fields: %+v", row)
+	}
+	if row.ErrorMessage == nil || *row.ErrorMessage != "gateway retry exhausted" {
+		t.Fatalf("system-log-only row should expose latest sanitized message, got %+v", row)
+	}
+	if row.ErrorSource == nil || *row.ErrorSource != "gateway.proxy" {
+		t.Fatalf("system-log-only row should expose latest source, got %+v", row)
 	}
 }
 
@@ -308,6 +413,29 @@ func TestAdminRequestEvidence_DetailUsesExactHistoricalRequestID(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	operationsStore := operationsmemory.New()
+	operationsSvc, err := operationsservice.NewWithStores(nil, operationsStore, nil)
+	if err != nil {
+		t.Fatalf("new operations service: %v", err)
+	}
+	if _, err := operationsSvc.RecordSystemLog(t.Context(), operationscontract.RecordSystemLogRequest{
+		Level:     operationscontract.OpsSystemLogLevelWarn,
+		Message:   "historical request fallback recorded",
+		Source:    "gateway.scheduler",
+		RequestID: "req_historical",
+		CreatedAt: base.Add(-48*time.Hour + 3*time.Minute),
+	}); err != nil {
+		t.Fatalf("seed historical system log: %v", err)
+	}
+	if _, err := operationsSvc.RecordSystemLog(t.Context(), operationscontract.RecordSystemLogRequest{
+		Level:     operationscontract.OpsSystemLogLevelError,
+		Message:   "historical neighbor request failed",
+		Source:    "gateway.scheduler",
+		RequestID: "req_historical_neighbor",
+		CreatedAt: base.Add(-48*time.Hour + 4*time.Minute),
+	}); err != nil {
+		t.Fatalf("seed historical neighbor system log: %v", err)
+	}
 
 	dumpName := "error-" + strconv.FormatInt(base.Add(-48*time.Hour+2*time.Minute).UnixMilli(), 10) + "-req_historical.log"
 	writeRequestEvidenceDump(t, dir, dumpName, "req_historical", false, 504, "timeout", 1515, base.Add(-48*time.Hour+2*time.Minute))
@@ -318,7 +446,7 @@ func TestAdminRequestEvidence_DetailUsesExactHistoricalRequestID(t *testing.T) {
 		writeRequestEvidenceDump(t, dir, neighborDump, neighborID, false, 500, "other", 20, createdAt)
 	}
 
-	handler := New(config.Load(), nil, WithUsageStore(usageStore), WithOpsErrorLogsStore(opsStore))
+	handler := New(config.Load(), nil, WithUsageStore(usageStore), WithOpsErrorLogsStore(opsStore), WithOperationsStore(operationsStore))
 	_, sessionCookie := mustLoginAdmin(t, handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/request-evidence/req_historical", nil)
@@ -340,6 +468,12 @@ func TestAdminRequestEvidence_DetailUsesExactHistoricalRequestID(t *testing.T) {
 	}
 	if len(resp.Attempts) != 1 || !resp.Attempts[0].HasUsageLog || !resp.Attempts[0].HasOpsErrorLog || !resp.Attempts[0].HasRequestDump {
 		t.Fatalf("attempt evidence mismatch: %+v", resp.Attempts)
+	}
+	if !resp.Attempts[0].HasSystemLog || resp.Attempts[0].SystemLogCount != 1 {
+		t.Fatalf("attempt should carry exact system-log evidence: %+v", resp.Attempts)
+	}
+	if resp.SystemLogSummary.TotalCount != 1 || resp.SystemLogSummary.LevelCounts["warn"] != 1 {
+		t.Fatalf("system log summary should use exact request id, got %+v", resp.SystemLogSummary)
 	}
 	if len(resp.RequestDumps) != 1 || resp.RequestDumps[0].Name != dumpName {
 		t.Fatalf("dump exact filter mismatch: %+v", resp.RequestDumps)

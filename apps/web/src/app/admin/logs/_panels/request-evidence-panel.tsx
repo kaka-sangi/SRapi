@@ -45,7 +45,7 @@ export function RequestEvidencePanel() {
     page_size: list.pageSize,
     request_id: requestID,
     kind: kind as "success" | "error" | "unknown" | undefined,
-    evidence_source: source as "usage" | "ops_error" | "request_dump" | undefined,
+    evidence_source: source as "usage" | "ops_error" | "request_dump" | "system_log" | undefined,
     start,
     q: list.search || undefined,
   });
@@ -201,6 +201,12 @@ export function RequestEvidencePanel() {
               tone="info"
             />
           ) : null}
+          {row.has_system_log ? (
+            <SourceChip
+              label={`${t("adminRequestEvidence.systemLog")} ${row.system_log_count}`}
+              tone="info"
+            />
+          ) : null}
         </div>
       ),
     },
@@ -270,6 +276,7 @@ export function RequestEvidencePanel() {
                 { value: "usage", label: t("adminRequestEvidence.usage") },
                 { value: "ops_error", label: t("adminRequestEvidence.opsError") },
                 { value: "request_dump", label: t("adminRequestEvidence.dump") },
+                { value: "system_log", label: t("adminRequestEvidence.systemLog") },
               ]}
             />
             <FilterSelect
@@ -349,7 +356,11 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
     request_id: detail.evidence_request_id,
     has_ops_error_log: summary.has_ops_error_log,
     has_request_dump: summary.has_request_dump,
+    has_system_log: detail.system_log_summary.total_count > 0,
     has_usage_log: summary.has_usage_log,
+    request_dump_count: summary.request_dump_count,
+    request_dump_error_count: summary.request_dump_error_count,
+    system_log_count: detail.system_log_summary.total_count,
   } as RequestEvidenceRow);
   return (
     <div className="space-y-5">
@@ -516,7 +527,7 @@ function EvidenceLinks({ row }: { row: RequestEvidenceRow }) {
           label={t("adminRequestEvidence.errorLog")}
         />
       ) : null}
-      {systemHref ? (
+      {row.has_system_log && systemHref ? (
         <EvidenceLink
           href={systemHref}
           icon={<ScrollText className="size-3" />}

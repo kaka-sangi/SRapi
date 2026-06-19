@@ -3418,6 +3418,7 @@ const (
 	ListAdminOpsRequestEvidenceParamsEvidenceSourceAll         ListAdminOpsRequestEvidenceParamsEvidenceSource = "all"
 	ListAdminOpsRequestEvidenceParamsEvidenceSourceOpsError    ListAdminOpsRequestEvidenceParamsEvidenceSource = "ops_error"
 	ListAdminOpsRequestEvidenceParamsEvidenceSourceRequestDump ListAdminOpsRequestEvidenceParamsEvidenceSource = "request_dump"
+	ListAdminOpsRequestEvidenceParamsEvidenceSourceSystemLog   ListAdminOpsRequestEvidenceParamsEvidenceSource = "system_log"
 	ListAdminOpsRequestEvidenceParamsEvidenceSourceUsage       ListAdminOpsRequestEvidenceParamsEvidenceSource = "usage"
 )
 
@@ -3429,6 +3430,8 @@ func (e ListAdminOpsRequestEvidenceParamsEvidenceSource) Valid() bool {
 	case ListAdminOpsRequestEvidenceParamsEvidenceSourceOpsError:
 		return true
 	case ListAdminOpsRequestEvidenceParamsEvidenceSourceRequestDump:
+		return true
+	case ListAdminOpsRequestEvidenceParamsEvidenceSourceSystemLog:
 		return true
 	case ListAdminOpsRequestEvidenceParamsEvidenceSourceUsage:
 		return true
@@ -9718,6 +9721,7 @@ type RequestEvidenceRow struct {
 	EvidenceSource             RequestEvidenceSource         `json:"evidence_source"`
 	HasOpsErrorLog             bool                          `json:"has_ops_error_log"`
 	HasRequestDump             bool                          `json:"has_request_dump"`
+	HasSystemLog               bool                          `json:"has_system_log"`
 	HasUsageLog                bool                          `json:"has_usage_log"`
 	InputTokens                *int                          `json:"input_tokens,omitempty"`
 	Kind                       RequestEvidenceKind           `json:"kind"`
@@ -9736,6 +9740,7 @@ type RequestEvidenceRow struct {
 	SourceProtocol             *string                       `json:"source_protocol,omitempty"`
 	StatusCode                 *int                          `json:"status_code,omitempty"`
 	Success                    *bool                         `json:"success,omitempty"`
+	SystemLogCount             int                           `json:"system_log_count"`
 	TargetProtocol             *string                       `json:"target_protocol,omitempty"`
 	TotalTokens                *int                          `json:"total_tokens,omitempty"`
 	UpstreamRequestId          *string                       `json:"upstream_request_id,omitempty"`
@@ -12043,7 +12048,7 @@ type ListAdminOpsRequestEvidenceParams struct {
 	// Kind Filter by the final request outcome.
 	Kind *ListAdminOpsRequestEvidenceParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
 
-	// EvidenceSource Filter by the primary evidence source used for the row.
+	// EvidenceSource Filter by evidence source present on the row.
 	EvidenceSource *ListAdminOpsRequestEvidenceParamsEvidenceSource `form:"evidence_source,omitempty" json:"evidence_source,omitempty"`
 	MinLatencyMs   *int                                             `form:"min_latency_ms,omitempty" json:"min_latency_ms,omitempty"`
 	MaxLatencyMs   *int                                             `form:"max_latency_ms,omitempty" json:"max_latency_ms,omitempty"`
