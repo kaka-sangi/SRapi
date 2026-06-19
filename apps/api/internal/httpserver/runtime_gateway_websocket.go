@@ -12,6 +12,7 @@ import (
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
+	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
@@ -712,6 +713,7 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 		return false, responsesWebSocketTurnState{}, errors.New(gatewayEntitlementMessage(gatewayEntitlementErrorClass(admission.Entitlement)))
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
+	scheduleReq.RequestCapabilities = append(scheduleReq.RequestCapabilities, capabilityRequirement(capabilitiescontract.KeyResponsesWebSocket))
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
 	result, err := s.runtime.scheduleGatewayRequest(withGatewayInboundClient(r.Context(), r), scheduleReq, model.ID, gatewayForcedProviderKey(r.Context()), authed.Key)
 	if err != nil {
@@ -719,6 +721,7 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 		return false, responsesWebSocketTurnState{}, err
 	}
 	if !strings.EqualFold(strings.TrimSpace(result.Candidate.Provider.AdapterType), "reverse-proxy-codex-cli") || !accountCodexWebSocketEnabled(result.Candidate.Account.Metadata) {
+		s.runtime.releaseGatewaySchedulerLease(r.Context(), result, "responses_websocket_unsupported")
 		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, "invalid_request", http.StatusBadRequest, elapsedMillis(startedAt), admission, nil, ""))
 		return true, responsesWebSocketTurnState{}, errors.New("selected account does not support Codex Responses WebSocket reverse proxy")
 	}
@@ -1149,6 +1152,8 @@ func providerStatusFromError(err error) int {
 
 func accountCodexWebSocketEnabled(metadata map[string]any) bool {
 	for _, key := range []string{
+		"capability_responses_websocket",
+		"responses_websocket",
 		"codex_responses_websocket",
 		"codex_responses_websockets",
 		"responses_websockets_v2_enabled",

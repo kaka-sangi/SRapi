@@ -48,6 +48,7 @@ const (
 
 	KeyChatCompletions     = "chat_completions"
 	KeyResponses           = "responses"
+	KeyResponsesWebSocket  = "responses_websocket"
 	KeyResponsesCompact    = "responses_compact"
 	KeyMessages            = "messages"
 	KeyEmbeddings          = "embeddings"
@@ -94,6 +95,7 @@ var defaultDefinitions = []Definition{
 	{Key: KeyUsageInStream, Version: "v1", Category: "usage", Status: DefinitionStatusStable, Description: "Provider can emit usage in streaming responses."},
 	{Key: KeyChatCompletions, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Chat Completions-compatible generation."},
 	{Key: KeyResponses, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Responses-compatible generation."},
+	{Key: KeyResponsesWebSocket, Version: "v1", Category: "endpoint", Status: DefinitionStatusExperimental, Description: "Provider account supports Responses-compatible WebSocket relay."},
 	{Key: KeyResponsesCompact, Version: "v1", Category: "endpoint", Status: DefinitionStatusExperimental, Description: "Provider supports native Responses compaction without cross-protocol synthesis."},
 	{Key: KeyMessages, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Messages-compatible generation."},
 	{Key: KeyEmbeddings, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports embeddings."},
@@ -143,6 +145,9 @@ var convenienceKeys = map[string]string{
 	"supports_usage_in_stream":      KeyUsageInStream,
 	"supports_chat_completions":     KeyChatCompletions,
 	"supports_responses":            KeyResponses,
+	"supports_responses_websocket":  KeyResponsesWebSocket,
+	"responses_websocket":           KeyResponsesWebSocket,
+	"responses_websockets":          KeyResponsesWebSocket,
 	"supports_responses_compact":    KeyResponsesCompact,
 	"responses_compact":             KeyResponsesCompact,
 	"supports_messages":             KeyMessages,

@@ -19,6 +19,7 @@ import (
 	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
+	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	"nhooyr.io/websocket"
 )
@@ -710,6 +711,107 @@ func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 		usageResp.Data[0].CachedTokens != 1 ||
 		usageResp.Data[0].UsageEstimated {
 		t.Fatalf("unexpected codex websocket usage record: %+v", usageResp.Data)
+	}
+}
+
+func TestGatewayResponsesWebSocketSkipsAccountsWithoutResponsesWebSocketCapability(t *testing.T) {
+	var (
+		mu            sync.Mutex
+		upstreamCalls int
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		upstreamCalls++
+		mu.Unlock()
+		conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: websocket.CompressionDisabled})
+		if err != nil {
+			t.Errorf("accept codex upstream websocket: %v", err)
+			return
+		}
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		if _, _, err := conn.Read(r.Context()); err != nil {
+			t.Errorf("read codex upstream frame: %v", err)
+			return
+		}
+		if err := conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"response.completed","response":{"id":"resp_ws_cap","model":"codex-upstream","output":[{"type":"message","content":[{"type":"output_text","text":"capability ok"}]}],"usage":{"input_tokens":1,"output_tokens":2}}}`)); err != nil {
+			t.Errorf("write codex completed frame: %v", err)
+		}
+	}))
+	defer upstream.Close()
+
+	schedulerStore := schedulermemory.New()
+	handler := New(config.Load(), nil, WithSchedulerStore(schedulerStore))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp410-codex-ws-cap-provider","display_name":"WP410 Codex WS Cap Provider","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp410-codex-ws-cap-model","display_name":"WP410 Codex WS Cap Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"codex-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	unsupportedAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp410-codex-ws-no-cap","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"unsupported-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex","priority":100,"quality_score":1.0,"health_score":1.0,"latency_p95_ms":1},"status":"active"}`)
+	supportedAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp410-codex-ws-cap","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"supported-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex","codex_responses_websocket":true,"priority":1,"quality_score":0.1,"health_score":0.1,"latency_p95_ms":1000},"status":"active"}`)
+	unsupportedID, err := strconv.Atoi(string(unsupportedAccount.Data.Id))
+	if err != nil {
+		t.Fatalf("parse unsupported account id: %v", err)
+	}
+	supportedID, err := strconv.Atoi(string(supportedAccount.Data.Id))
+	if err != nil {
+		t.Fatalf("parse supported account id: %v", err)
+	}
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	conn := mustDialResponsesWebSocket(t, server.URL+"/v1/responses/ws?model=wp410-codex-ws-cap-model&upstream_ws=true", apiKey)
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	writeWebSocketJSON(t, conn, map[string]any{
+		"type": "response.create",
+		"response": map[string]any{
+			"input": "needs ws capability",
+		},
+	})
+	completed := readWebSocketEvent(t, conn)
+	if completed["type"] != "response.completed" || !strings.Contains(mustMarshalString(t, completed), "capability ok") {
+		t.Fatalf("expected supported account completion, got %+v", completed)
+	}
+	mu.Lock()
+	gotUpstreamCalls := upstreamCalls
+	mu.Unlock()
+	if gotUpstreamCalls != 1 {
+		t.Fatalf("expected one upstream websocket call, got %d", gotUpstreamCalls)
+	}
+
+	var leases []schedulercontract.Lease
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		var err error
+		leases, err = schedulerStore.ListLeases(t.Context())
+		if err != nil {
+			t.Fatalf("list scheduler leases: %v", err)
+		}
+		if len(leases) == 1 && leases[0].AccountID == supportedID && leases[0].Status == schedulercontract.LeaseStatusCommitted {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected only supported account committed lease, unsupported=%d supported=%d leases=%+v", unsupportedID, supportedID, leases)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp410-codex-ws-cap-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected scheduler decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode scheduler decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 ||
+		decisionsResp.Data[0].SelectedAccountId == nil ||
+		*decisionsResp.Data[0].SelectedAccountId != string(supportedAccount.Data.Id) ||
+		!jsonObjectContainsString(decisionsResp.Data[0].RejectReasons, "capability_mismatch:responses_websocket") {
+		t.Fatalf("expected unsupported account rejected before lease, got %+v", decisionsResp.Data)
 	}
 }
 

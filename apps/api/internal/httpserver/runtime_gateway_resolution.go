@@ -61,6 +61,9 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 		if !ok {
 			continue
 		}
+		if capabilityKey == capabilitiescontract.KeyResponsesWebSocket {
+			continue
+		}
 		if boolValue(value) {
 			merged[capabilityKey] = capabilityRequirement(capabilityKey)
 			providerScoped[capabilityKey] = capabilityRequirement(capabilityKey)
@@ -88,6 +91,13 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 			delete(merged, canonicalKey)
 			delete(providerScoped, canonicalKey)
 		}
+	}
+	if strings.EqualFold(strings.TrimSpace(provider.AdapterType), "reverse-proxy-codex-cli") && accountCodexWebSocketEnabled(account.Metadata) {
+		merged[capabilitiescontract.KeyResponsesWebSocket] = capabilityRequirement(capabilitiescontract.KeyResponsesWebSocket)
+		providerScoped[capabilitiescontract.KeyResponsesWebSocket] = capabilityRequirement(capabilitiescontract.KeyResponsesWebSocket)
+	} else {
+		delete(merged, capabilitiescontract.KeyResponsesWebSocket)
+		delete(providerScoped, capabilitiescontract.KeyResponsesWebSocket)
 	}
 	// Auto-include responses_compact whenever the merged set already declares
 	// responses: compact is a strict non-streaming subset of /v1/responses, so
@@ -192,6 +202,7 @@ func providerScopedCapabilityKeys() []string {
 		capabilitiescontract.KeyModerations,
 		capabilitiescontract.KeyRerank,
 		capabilitiescontract.KeyRealtimeWebSocket,
+		capabilitiescontract.KeyResponsesWebSocket,
 		capabilitiescontract.KeyResponsesCompact,
 		capabilitiescontract.KeyTokenCounting,
 		capabilitiescontract.KeyVisionInput,

@@ -162,3 +162,51 @@ func TestEffectiveCapabilitiesAutoIncludesResponsesCompactFromResponses(t *testi
 		})
 	}
 }
+
+func TestEffectiveCapabilitiesResponsesWebSocketIsCodexAccountScoped(t *testing.T) {
+	model := modelcontract.Model{}
+	mapping := modelcontract.ModelProviderMapping{}
+
+	cases := []struct {
+		name     string
+		provider providercontract.Provider
+		account  accountcontract.ProviderAccount
+		want     bool
+	}{
+		{
+			name: "provider capability alone is ignored",
+			provider: providercontract.Provider{
+				AdapterType:  "reverse-proxy-codex-cli",
+				Capabilities: map[string]any{capabilitiescontract.KeyResponsesWebSocket: true},
+			},
+		},
+		{
+			name: "codex account metadata enables capability",
+			provider: providercontract.Provider{
+				AdapterType: "reverse-proxy-codex-cli",
+			},
+			account: accountcontract.ProviderAccount{
+				Metadata: map[string]any{"codex_responses_websocket": true},
+			},
+			want: true,
+		},
+		{
+			name: "non codex account metadata does not enable capability",
+			provider: providercontract.Provider{
+				AdapterType: "openai-compatible",
+			},
+			account: accountcontract.ProviderAccount{
+				Metadata: map[string]any{"codex_responses_websocket": true},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := effectiveCapabilities(model, mapping, tc.provider, tc.account)
+			if hasCapability(got, capabilitiescontract.KeyResponsesWebSocket) != tc.want {
+				t.Fatalf("responses_websocket presence = %v, want %v; capabilities=%+v", hasCapability(got, capabilitiescontract.KeyResponsesWebSocket), tc.want, got)
+			}
+		})
+	}
+}
