@@ -52,9 +52,16 @@ const mocks = vi.hoisted(() => ({
     has_ops_error_log: true,
     has_request_dump: true,
     has_system_log: true,
+    has_scheduler_decision: true,
     request_dump_count: 1,
     request_dump_error_count: 1,
     system_log_count: 1,
+    scheduler_decision_count: 1,
+    scheduler_decision_id: "77",
+    scheduler_candidate_count: 4,
+    scheduler_rejected_count: 1,
+    scheduler_strategy: "latency_first",
+    scheduler_selection_rationale: "lowest latency healthy account",
     latest_request_dump_name: "error-1780000000000-req-evidence.log",
     latest_request_dump_created_at: "2026-06-19T08:00:01Z",
   } satisfies RequestEvidenceRow,
@@ -82,9 +89,16 @@ vi.mock("@/hooks/admin-queries", () => ({
             ops_error_log_count: 1,
             request_dump_count: 1,
             request_dump_error_count: 1,
+            scheduler_decision_count: 1,
             has_usage_log: true,
             has_ops_error_log: true,
             has_request_dump: true,
+            has_scheduler_decision: true,
+            scheduler_decision_id: "77",
+            scheduler_candidate_count: 4,
+            scheduler_rejected_count: 1,
+            scheduler_strategy: "latency_first",
+            scheduler_selection_rationale: "lowest latency healthy account",
             latency_ms: 891,
             total_tokens: 30,
             status_code: 503,
@@ -164,6 +178,10 @@ describe("RequestEvidencePanel", () => {
       "href",
       "/admin/logs?tab=error&q=req-evidence",
     );
+    expect(screen.getByRole("link", { name: /调度/ })).toHaveAttribute(
+      "href",
+      "/admin/ops?tab=scheduler-decisions&f_request_id=req-evidence",
+    );
     expect(screen.getByRole("link", { name: /系统/ })).toHaveAttribute(
       "href",
       "/admin/ops/system-logs?f_request_id=req-evidence",
@@ -182,7 +200,7 @@ describe("RequestEvidencePanel", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("请求调查")).toBeInTheDocument();
     expect(screen.getByText("尝试")).toBeInTheDocument();
-    expect(screen.getByText("U 1 / E 1 / D 1")).toBeInTheDocument();
+    expect(screen.getByText("U 1 / S 1 / E 1 / D 1")).toBeInTheDocument();
     expect(screen.getByText("1 条 · 警告 1 · 错误 0")).toBeInTheDocument();
     expect(screen.getByText("scheduler fallback selected secondary account")).toBeInTheDocument();
     expect(screen.getByText("error-1780000000000-req-evidence.log")).toBeInTheDocument();

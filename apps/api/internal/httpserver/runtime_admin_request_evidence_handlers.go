@@ -12,6 +12,7 @@ import (
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
 	rlfcontract "github.com/srapi/srapi/apps/api/internal/modules/request_log_files/contract"
+	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
@@ -50,45 +51,52 @@ type requestEvidenceQuery struct {
 }
 
 type requestEvidenceRow struct {
-	Kind                       string
-	EvidenceSource             string
-	CreatedAt                  time.Time
-	RequestID                  string
-	UsageLogID                 *int
-	OpsErrorLogID              *int64
-	UserID                     *int
-	APIKeyID                   *int
-	AccountID                  *int
-	ProviderID                 *int
-	SourceProtocol             string
-	SourceEndpoint             string
-	TargetProtocol             string
-	Model                      string
-	StatusCode                 *int
-	Success                    *bool
-	ErrorClass                 string
-	ErrorMessage               string
-	ErrorPhase                 string
-	ErrorOwner                 string
-	ErrorSource                string
-	UpstreamRequestID          string
-	AttemptNo                  *int
-	LatencyMS                  *int
-	InputTokens                *int
-	OutputTokens               *int
-	TotalTokens                *int
-	UsageEstimated             *bool
-	Resolution                 string
-	HasUsageLog                bool
-	HasOpsErrorLog             bool
-	HasRequestDump             bool
-	HasSystemLog               bool
-	RequestDumpCount           int
-	RequestDumpErrorCount      int
-	SystemLogCount             int
-	SystemLogSearchText        string
-	LatestRequestDumpName      string
-	LatestRequestDumpCreatedAt *time.Time
+	Kind                        string
+	EvidenceSource              string
+	CreatedAt                   time.Time
+	RequestID                   string
+	UsageLogID                  *int
+	OpsErrorLogID               *int64
+	UserID                      *int
+	APIKeyID                    *int
+	AccountID                   *int
+	ProviderID                  *int
+	SourceProtocol              string
+	SourceEndpoint              string
+	TargetProtocol              string
+	Model                       string
+	StatusCode                  *int
+	Success                     *bool
+	ErrorClass                  string
+	ErrorMessage                string
+	ErrorPhase                  string
+	ErrorOwner                  string
+	ErrorSource                 string
+	UpstreamRequestID           string
+	AttemptNo                   *int
+	LatencyMS                   *int
+	InputTokens                 *int
+	OutputTokens                *int
+	TotalTokens                 *int
+	UsageEstimated              *bool
+	Resolution                  string
+	HasUsageLog                 bool
+	HasOpsErrorLog              bool
+	HasRequestDump              bool
+	HasSystemLog                bool
+	HasSchedulerDecision        bool
+	RequestDumpCount            int
+	RequestDumpErrorCount       int
+	SystemLogCount              int
+	SchedulerDecisionCount      int
+	SchedulerDecisionID         *int
+	SchedulerCandidateCount     *int
+	SchedulerRejectedCount      *int
+	SchedulerStrategy           string
+	SchedulerSelectionRationale string
+	SystemLogSearchText         string
+	LatestRequestDumpName       string
+	LatestRequestDumpCreatedAt  *time.Time
 }
 
 type requestDumpEvidence struct {
@@ -108,28 +116,35 @@ type requestEvidenceDetail struct {
 }
 
 type requestEvidenceSummary struct {
-	Kind                  string
-	PrimarySource         string
-	AttemptCount          int
-	UsageLogCount         int
-	OpsErrorLogCount      int
-	RequestDumpCount      int
-	RequestDumpErrorCount int
-	HasUsageLog           bool
-	HasOpsErrorLog        bool
-	HasRequestDump        bool
-	HasTokenEvidence      bool
-	LatencyMS             *int
-	InputTokens           int
-	OutputTokens          int
-	TotalTokens           int
-	StatusCode            *int
-	ErrorClass            string
-	ErrorMessage          string
-	ErrorPhase            string
-	ErrorOwner            string
-	ErrorSource           string
-	UpstreamRequestID     string
+	Kind                        string
+	PrimarySource               string
+	AttemptCount                int
+	UsageLogCount               int
+	OpsErrorLogCount            int
+	RequestDumpCount            int
+	RequestDumpErrorCount       int
+	SchedulerDecisionCount      int
+	HasUsageLog                 bool
+	HasOpsErrorLog              bool
+	HasRequestDump              bool
+	HasSchedulerDecision        bool
+	HasTokenEvidence            bool
+	LatencyMS                   *int
+	InputTokens                 int
+	OutputTokens                int
+	TotalTokens                 int
+	StatusCode                  *int
+	ErrorClass                  string
+	ErrorMessage                string
+	ErrorPhase                  string
+	ErrorOwner                  string
+	ErrorSource                 string
+	UpstreamRequestID           string
+	SchedulerDecisionID         *int
+	SchedulerCandidateCount     *int
+	SchedulerRejectedCount      *int
+	SchedulerStrategy           string
+	SchedulerSelectionRationale string
 }
 
 type requestEvidenceSystemLogEvidence struct {
@@ -137,6 +152,11 @@ type requestEvidenceSystemLogEvidence struct {
 	Total       int
 	LevelCounts map[operationscontract.OpsSystemLogLevel]int
 	Latest      *operationscontract.OpsSystemLog
+}
+
+type requestSchedulerDecisionEvidence struct {
+	Count  int
+	Latest schedulercontract.Decision
 }
 
 // handleListAdminOpsRequestEvidence serves GET /api/v1/admin/ops/request-evidence.
@@ -222,6 +242,10 @@ func (s *Server) requestEvidenceRows(ctx context.Context, query requestEvidenceQ
 	if err != nil {
 		return nil, err
 	}
+	schedulerEvidence, err := requestEvidenceSchedulerDecisions(ctx, s.runtime.schedulerStore, query)
+	if err != nil {
+		return nil, err
+	}
 	rowsByKey := make(map[string]*requestEvidenceRow, len(usageLogs))
 	rowsByRequest := make(map[string][]*requestEvidenceRow)
 	rows := make([]*requestEvidenceRow, 0, len(usageLogs))
@@ -278,6 +302,29 @@ func (s *Server) requestEvidenceRows(ctx context.Context, query requestEvidenceQ
 		}
 		rows = append(rows, row)
 	}
+	for key, evidence := range schedulerEvidence {
+		if existing := rowsByKey[key]; existing != nil {
+			attachRequestEvidenceSchedulerDecision(existing, evidence)
+			continue
+		}
+		attached := false
+		for _, row := range rowsByRequest[evidence.Latest.RequestID] {
+			if row.AttemptNo == nil || intPtrValue(row.AttemptNo) == evidence.Latest.AttemptNo {
+				attachRequestEvidenceSchedulerDecision(row, evidence)
+				attached = true
+			}
+		}
+		if attached {
+			continue
+		}
+		row := requestEvidenceRowFromSchedulerDecision(evidence)
+		if row == nil || !requestEvidenceRowMatches(*row, query) {
+			continue
+		}
+		rows = append(rows, row)
+		rowsByKey[key] = row
+		rowsByRequest[row.RequestID] = append(rowsByRequest[row.RequestID], row)
+	}
 
 	filtered := make([]requestEvidenceRow, 0, len(rows))
 	for _, row := range rows {
@@ -309,8 +356,12 @@ func (s *Server) requestEvidenceDetail(ctx context.Context, requestID string) (r
 		}
 		opsEntries = res
 	}
+	schedulerEvidence, err := requestEvidenceSchedulerDecisionsByRequestID(ctx, s.runtime.schedulerStore, requestID)
+	if err != nil {
+		return requestEvidenceDetail{}, err
+	}
 	dumpEvidence := requestDumpEvidenceFromDescriptors(dumps)
-	rows := requestEvidenceRowsFromExactEvidence(requestID, usageLogs, opsEntries, dumpEvidence)
+	rows := requestEvidenceRowsFromExactEvidence(requestID, usageLogs, opsEntries, dumpEvidence, schedulerEvidence)
 	systemLogEvidence, err := s.requestEvidenceSystemLogsByRequestID(ctx, requestID)
 	if err != nil {
 		return requestEvidenceDetail{}, err
@@ -393,7 +444,7 @@ func requestEvidenceQueryFromRequest(r *http.Request, now time.Time) (requestEvi
 		source = "all"
 	}
 	switch source {
-	case "all", "usage", "ops_error", "request_dump", "system_log":
+	case "all", "usage", "ops_error", "request_dump", "system_log", "scheduler_decision":
 	default:
 		return requestEvidenceQuery{}, errors.New("invalid evidence_source")
 	}
@@ -577,6 +628,55 @@ func requestEvidenceDumpFilesByRequestID(ctx context.Context, reader rlfcontract
 	return out, nil
 }
 
+func requestEvidenceSchedulerDecisions(ctx context.Context, store schedulercontract.Store, query requestEvidenceQuery) (map[string]requestSchedulerDecisionEvidence, error) {
+	if store == nil {
+		return map[string]requestSchedulerDecisionEvidence{}, nil
+	}
+	decisions, err := store.ListDecisions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]requestSchedulerDecisionEvidence)
+	for _, decision := range decisions {
+		if !requestEvidenceSchedulerDecisionMatches(decision, query) {
+			continue
+		}
+		key := requestEvidenceKey(decision.RequestID, &decision.AttemptNo, nil)
+		evidence := out[key]
+		evidence.Count++
+		if evidence.Latest.ID == 0 || decision.CreatedAt.After(evidence.Latest.CreatedAt) || (decision.CreatedAt.Equal(evidence.Latest.CreatedAt) && decision.ID > evidence.Latest.ID) {
+			evidence.Latest = decision
+		}
+		out[key] = evidence
+	}
+	return out, nil
+}
+
+func requestEvidenceSchedulerDecisionsByRequestID(ctx context.Context, store schedulercontract.Store, requestID string) (map[string]requestSchedulerDecisionEvidence, error) {
+	requestID = strings.TrimSpace(requestID)
+	if store == nil || requestID == "" {
+		return map[string]requestSchedulerDecisionEvidence{}, nil
+	}
+	decisions, err := store.ListDecisions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]requestSchedulerDecisionEvidence)
+	for _, decision := range decisions {
+		if decision.RequestID != requestID {
+			continue
+		}
+		key := requestEvidenceKey(decision.RequestID, &decision.AttemptNo, nil)
+		evidence := out[key]
+		evidence.Count++
+		if evidence.Latest.ID == 0 || decision.CreatedAt.After(evidence.Latest.CreatedAt) || (decision.CreatedAt.Equal(evidence.Latest.CreatedAt) && decision.ID > evidence.Latest.ID) {
+			evidence.Latest = decision
+		}
+		out[key] = evidence
+	}
+	return out, nil
+}
+
 func (s *Server) requestEvidenceSystemLogRows(ctx context.Context, query requestEvidenceQuery) (map[string]requestEvidenceSystemLogEvidence, error) {
 	if s.runtime == nil || s.runtime.operations == nil {
 		return map[string]requestEvidenceSystemLogEvidence{}, nil
@@ -711,7 +811,13 @@ func requestDumpEvidenceFromDescriptors(descs []rlfcontract.FileDescriptor) map[
 	return out
 }
 
-func requestEvidenceRowsFromExactEvidence(requestID string, usageLogs []usagecontract.UsageLog, opsEntries []opserrorlogscontract.Entry, dumps map[string]requestDumpEvidence) []requestEvidenceRow {
+func requestEvidenceRowsFromExactEvidence(
+	requestID string,
+	usageLogs []usagecontract.UsageLog,
+	opsEntries []opserrorlogscontract.Entry,
+	dumps map[string]requestDumpEvidence,
+	schedulerEvidence map[string]requestSchedulerDecisionEvidence,
+) []requestEvidenceRow {
 	rowsByKey := make(map[string]*requestEvidenceRow, len(usageLogs))
 	rows := make([]*requestEvidenceRow, 0, len(usageLogs)+len(opsEntries))
 	for _, log := range usageLogs {
@@ -743,6 +849,28 @@ func requestEvidenceRowsFromExactEvidence(requestID string, usageLogs []usagecon
 				attachRequestDumpEvidence(row, dump)
 			}
 		}
+	}
+	for key, evidence := range schedulerEvidence {
+		if existing := rowsByKey[key]; existing != nil {
+			attachRequestEvidenceSchedulerDecision(existing, evidence)
+			continue
+		}
+		attached := false
+		for _, row := range rows {
+			if row.AttemptNo == nil || intPtrValue(row.AttemptNo) == evidence.Latest.AttemptNo {
+				attachRequestEvidenceSchedulerDecision(row, evidence)
+				attached = true
+			}
+		}
+		if attached {
+			continue
+		}
+		row := requestEvidenceRowFromSchedulerDecision(evidence)
+		if row == nil || row.RequestID != requestID {
+			continue
+		}
+		rows = append(rows, row)
+		rowsByKey[key] = row
 	}
 	out := make([]requestEvidenceRow, 0, len(rows))
 	for _, row := range rows {
@@ -899,6 +1027,42 @@ func requestEvidenceRowFromSystemLog(requestID string, evidence requestEvidenceS
 	}
 }
 
+func requestEvidenceRowFromSchedulerDecision(evidence requestSchedulerDecisionEvidence) *requestEvidenceRow {
+	if evidence.Latest.ID <= 0 {
+		return nil
+	}
+	decision := evidence.Latest
+	row := &requestEvidenceRow{
+		Kind:                        "unknown",
+		EvidenceSource:              "scheduler_decision",
+		CreatedAt:                   decision.CreatedAt.UTC(),
+		RequestID:                   decision.RequestID,
+		UserID:                      &decision.UserID,
+		APIKeyID:                    &decision.APIKeyID,
+		AccountID:                   decision.SelectedAccountID,
+		ProviderID:                  decision.SelectedProviderID,
+		SourceProtocol:              decision.SourceProtocol,
+		SourceEndpoint:              decision.SourceEndpoint,
+		TargetProtocol:              decision.TargetProtocol,
+		Model:                       decision.Model,
+		AttemptNo:                   &decision.AttemptNo,
+		HasSchedulerDecision:        true,
+		SchedulerDecisionCount:      evidence.Count,
+		SchedulerDecisionID:         &decision.ID,
+		SchedulerStrategy:           string(decision.Strategy),
+		SchedulerSelectionRationale: strings.TrimSpace(decision.SelectionRationale),
+	}
+	if decision.CandidateCount > 0 {
+		value := decision.CandidateCount
+		row.SchedulerCandidateCount = &value
+	}
+	if decision.RejectedCount > 0 {
+		value := decision.RejectedCount
+		row.SchedulerRejectedCount = &value
+	}
+	return row
+}
+
 func mergeRequestEvidenceOpsError(row *requestEvidenceRow, entry opserrorlogscontract.Entry) {
 	id := entry.ID
 	row.OpsErrorLogID = &id
@@ -953,6 +1117,48 @@ func attachRequestEvidenceSystemLog(row *requestEvidenceRow, evidence requestEvi
 	row.SystemLogSearchText = requestEvidenceSystemLogSearchText(evidence)
 	if evidence.Latest == nil {
 		return
+	}
+}
+
+func attachRequestEvidenceSchedulerDecision(row *requestEvidenceRow, evidence requestSchedulerDecisionEvidence) {
+	if evidence.Latest.ID <= 0 {
+		return
+	}
+	decision := evidence.Latest
+	row.HasSchedulerDecision = true
+	row.SchedulerDecisionCount += evidence.Count
+	row.SchedulerDecisionID = &decision.ID
+	if decision.CandidateCount > 0 {
+		value := decision.CandidateCount
+		row.SchedulerCandidateCount = &value
+	}
+	if decision.RejectedCount > 0 {
+		value := decision.RejectedCount
+		row.SchedulerRejectedCount = &value
+	}
+	if row.AccountID == nil {
+		row.AccountID = decision.SelectedAccountID
+	}
+	if row.ProviderID == nil {
+		row.ProviderID = decision.SelectedProviderID
+	}
+	if row.SourceProtocol == "" {
+		row.SourceProtocol = decision.SourceProtocol
+	}
+	if row.SourceEndpoint == "" {
+		row.SourceEndpoint = decision.SourceEndpoint
+	}
+	if row.TargetProtocol == "" {
+		row.TargetProtocol = decision.TargetProtocol
+	}
+	if row.Model == "" {
+		row.Model = decision.Model
+	}
+	if row.SchedulerStrategy == "" {
+		row.SchedulerStrategy = string(decision.Strategy)
+	}
+	if row.SchedulerSelectionRationale == "" {
+		row.SchedulerSelectionRationale = strings.TrimSpace(decision.SelectionRationale)
 	}
 }
 
@@ -1013,6 +1219,38 @@ func requestEvidenceSystemLogMatches(log operationscontract.OpsSystemLog, query 
 	return true
 }
 
+func requestEvidenceSchedulerDecisionMatches(decision schedulercontract.Decision, query requestEvidenceQuery) bool {
+	if decision.RequestID == "" {
+		return false
+	}
+	if query.RequestID != "" && !strings.HasPrefix(decision.RequestID, query.RequestID) {
+		return false
+	}
+	if query.UserID != nil && decision.UserID != *query.UserID {
+		return false
+	}
+	if query.APIKeyID != nil && decision.APIKeyID != *query.APIKeyID {
+		return false
+	}
+	if query.AccountID != nil && intPtrValue(decision.SelectedAccountID) != *query.AccountID {
+		return false
+	}
+	if query.ProviderID != nil && intPtrValue(decision.SelectedProviderID) != *query.ProviderID {
+		return false
+	}
+	if query.Model != "" && !strings.Contains(strings.ToLower(decision.Model), strings.ToLower(query.Model)) {
+		return false
+	}
+	if query.SourceEndpoint != "" && !strings.Contains(strings.ToLower(decision.SourceEndpoint), strings.ToLower(query.SourceEndpoint)) {
+		return false
+	}
+	createdAt := decision.CreatedAt.UTC()
+	if createdAt.Before(query.Start) || !createdAt.Before(query.End) {
+		return false
+	}
+	return true
+}
+
 func requestEvidenceRowMatches(row requestEvidenceRow, query requestEvidenceQuery) bool {
 	if query.RequestID != "" && !strings.HasPrefix(row.RequestID, query.RequestID) {
 		return false
@@ -1059,6 +1297,10 @@ func requestEvidenceRowMatches(row requestEvidenceRow, query requestEvidenceQuer
 			if !row.HasSystemLog {
 				return false
 			}
+		case "scheduler_decision":
+			if !row.HasSchedulerDecision {
+				return false
+			}
 		}
 	}
 	if query.MinLatencyMS != nil {
@@ -1096,6 +1338,8 @@ func requestEvidenceRowContains(row requestEvidenceRow, raw string) bool {
 		row.UpstreamRequestID,
 		row.LatestRequestDumpName,
 		row.SystemLogSearchText,
+		row.SchedulerStrategy,
+		row.SchedulerSelectionRationale,
 	}
 	for _, field := range fields {
 		if strings.Contains(strings.ToLower(field), needle) {
@@ -1174,17 +1418,19 @@ func paginateRequestEvidenceRows(rows []requestEvidenceRow, page, pageSize int) 
 
 func requestEvidenceRowToAPI(row requestEvidenceRow) apiopenapi.RequestEvidenceRow {
 	out := apiopenapi.RequestEvidenceRow{
-		Kind:                  apiopenapi.RequestEvidenceKind(row.Kind),
-		EvidenceSource:        apiopenapi.RequestEvidenceSource(row.EvidenceSource),
-		CreatedAt:             row.CreatedAt.UTC(),
-		RequestId:             row.RequestID,
-		HasUsageLog:           row.HasUsageLog,
-		HasOpsErrorLog:        row.HasOpsErrorLog,
-		HasRequestDump:        row.HasRequestDump,
-		HasSystemLog:          row.HasSystemLog,
-		RequestDumpCount:      row.RequestDumpCount,
-		RequestDumpErrorCount: row.RequestDumpErrorCount,
-		SystemLogCount:        row.SystemLogCount,
+		Kind:                   apiopenapi.RequestEvidenceKind(row.Kind),
+		EvidenceSource:         apiopenapi.RequestEvidenceSource(row.EvidenceSource),
+		CreatedAt:              row.CreatedAt.UTC(),
+		RequestId:              row.RequestID,
+		HasUsageLog:            row.HasUsageLog,
+		HasOpsErrorLog:         row.HasOpsErrorLog,
+		HasRequestDump:         row.HasRequestDump,
+		HasSystemLog:           row.HasSystemLog,
+		HasSchedulerDecision:   row.HasSchedulerDecision,
+		RequestDumpCount:       row.RequestDumpCount,
+		RequestDumpErrorCount:  row.RequestDumpErrorCount,
+		SystemLogCount:         row.SystemLogCount,
+		SchedulerDecisionCount: row.SchedulerDecisionCount,
 	}
 	if row.UsageLogID != nil {
 		value := apiopenapi.Id(strconv.Itoa(*row.UsageLogID))
@@ -1222,6 +1468,14 @@ func requestEvidenceRowToAPI(row requestEvidenceRow) apiopenapi.RequestEvidenceR
 	out.OutputTokens = row.OutputTokens
 	out.TotalTokens = row.TotalTokens
 	out.UsageEstimated = row.UsageEstimated
+	if row.SchedulerDecisionID != nil {
+		value := apiopenapi.Id(strconv.Itoa(*row.SchedulerDecisionID))
+		out.SchedulerDecisionId = &value
+	}
+	out.SchedulerCandidateCount = row.SchedulerCandidateCount
+	out.SchedulerRejectedCount = row.SchedulerRejectedCount
+	out.SchedulerStrategy = nonEmptyStringPtr(row.SchedulerStrategy)
+	out.SchedulerSelectionRationale = nonEmptyStringPtr(row.SchedulerSelectionRationale)
 	if row.Resolution != "" {
 		out.Resolution = (*apiopenapi.RequestEvidenceRowResolution)(&row.Resolution)
 	}
@@ -1276,6 +1530,7 @@ func requestEvidenceSummaryFromDetail(rows []requestEvidenceRow, usageLogs []usa
 		summary.RequestDumpErrorCount += dump.ErrorCount
 	}
 	var latest *requestEvidenceRow
+	var latestScheduler *requestEvidenceRow
 	for i := range rows {
 		row := &rows[i]
 		if row.HasUsageLog {
@@ -1286,6 +1541,13 @@ func requestEvidenceSummaryFromDetail(rows []requestEvidenceRow, usageLogs []usa
 		}
 		if row.HasRequestDump {
 			summary.HasRequestDump = true
+		}
+		if row.HasSchedulerDecision {
+			summary.HasSchedulerDecision = true
+			summary.SchedulerDecisionCount += row.SchedulerDecisionCount
+			if latestScheduler == nil || row.CreatedAt.After(latestScheduler.CreatedAt) {
+				latestScheduler = row
+			}
 		}
 		if row.LatencyMS != nil {
 			value := intPtrValue(summary.LatencyMS) + *row.LatencyMS
@@ -1312,6 +1574,13 @@ func requestEvidenceSummaryFromDetail(rows []requestEvidenceRow, usageLogs []usa
 		summary.ErrorSource = latest.ErrorSource
 		summary.UpstreamRequestID = latest.UpstreamRequestID
 	}
+	if latestScheduler != nil {
+		summary.SchedulerDecisionID = latestScheduler.SchedulerDecisionID
+		summary.SchedulerCandidateCount = latestScheduler.SchedulerCandidateCount
+		summary.SchedulerRejectedCount = latestScheduler.SchedulerRejectedCount
+		summary.SchedulerStrategy = latestScheduler.SchedulerStrategy
+		summary.SchedulerSelectionRationale = latestScheduler.SchedulerSelectionRationale
+	}
 	if summary.Kind != "error" {
 		for _, row := range rows {
 			if row.Kind == "error" {
@@ -1329,6 +1598,9 @@ func requestEvidenceSummaryFromDetail(rows []requestEvidenceRow, usageLogs []usa
 	}
 	if latest == nil && systemLogs.Total > 0 {
 		summary.PrimarySource = "system_log"
+	}
+	if latest == nil && latestScheduler != nil {
+		summary.PrimarySource = "scheduler_decision"
 	}
 	return summary
 }
@@ -1383,16 +1655,18 @@ func requestEvidenceSystemLogSummaryToAPI(evidence requestEvidenceSystemLogEvide
 
 func requestEvidenceSummaryToAPI(summary requestEvidenceSummary) apiopenapi.RequestEvidenceSummary {
 	out := apiopenapi.RequestEvidenceSummary{
-		Kind:                  apiopenapi.RequestEvidenceKind(summary.Kind),
-		PrimarySource:         apiopenapi.RequestEvidenceSource(summary.PrimarySource),
-		AttemptCount:          summary.AttemptCount,
-		UsageLogCount:         summary.UsageLogCount,
-		OpsErrorLogCount:      summary.OpsErrorLogCount,
-		RequestDumpCount:      summary.RequestDumpCount,
-		RequestDumpErrorCount: summary.RequestDumpErrorCount,
-		HasUsageLog:           summary.HasUsageLog,
-		HasOpsErrorLog:        summary.HasOpsErrorLog,
-		HasRequestDump:        summary.HasRequestDump,
+		Kind:                   apiopenapi.RequestEvidenceKind(summary.Kind),
+		PrimarySource:          apiopenapi.RequestEvidenceSource(summary.PrimarySource),
+		AttemptCount:           summary.AttemptCount,
+		UsageLogCount:          summary.UsageLogCount,
+		OpsErrorLogCount:       summary.OpsErrorLogCount,
+		RequestDumpCount:       summary.RequestDumpCount,
+		RequestDumpErrorCount:  summary.RequestDumpErrorCount,
+		SchedulerDecisionCount: summary.SchedulerDecisionCount,
+		HasUsageLog:            summary.HasUsageLog,
+		HasOpsErrorLog:         summary.HasOpsErrorLog,
+		HasRequestDump:         summary.HasRequestDump,
+		HasSchedulerDecision:   summary.HasSchedulerDecision,
 	}
 	out.LatencyMs = summary.LatencyMS
 	if summary.HasTokenEvidence {
@@ -1407,6 +1681,14 @@ func requestEvidenceSummaryToAPI(summary requestEvidenceSummary) apiopenapi.Requ
 	out.ErrorOwner = nonEmptyStringPtr(summary.ErrorOwner)
 	out.ErrorSource = nonEmptyStringPtr(summary.ErrorSource)
 	out.UpstreamRequestId = nonEmptyStringPtr(summary.UpstreamRequestID)
+	if summary.SchedulerDecisionID != nil {
+		value := apiopenapi.Id(strconv.Itoa(*summary.SchedulerDecisionID))
+		out.SchedulerDecisionId = &value
+	}
+	out.SchedulerCandidateCount = summary.SchedulerCandidateCount
+	out.SchedulerRejectedCount = summary.SchedulerRejectedCount
+	out.SchedulerStrategy = nonEmptyStringPtr(summary.SchedulerStrategy)
+	out.SchedulerSelectionRationale = nonEmptyStringPtr(summary.SchedulerSelectionRationale)
 	return out
 }
 

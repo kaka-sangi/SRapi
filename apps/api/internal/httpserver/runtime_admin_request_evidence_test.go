@@ -18,6 +18,8 @@ import (
 	opserrorlogscontract "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/contract"
 	opserrorlogsservice "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/service"
 	opserrorlogsmemory "github.com/srapi/srapi/apps/api/internal/modules/ops_error_logs/store/memory"
+	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
+	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	usagememory "github.com/srapi/srapi/apps/api/internal/modules/usage/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -313,6 +315,158 @@ func TestAdminRequestEvidence_ListIncludesSystemLogEvidence(t *testing.T) {
 	}
 	if row.ErrorSource == nil || *row.ErrorSource != "gateway.proxy" {
 		t.Fatalf("system-log-only row should expose latest source, got %+v", row)
+	}
+}
+
+func TestAdminRequestEvidence_ListAndDetailIncludeSchedulerDecisionEvidence(t *testing.T) {
+	base := time.Date(2026, 6, 19, 8, 0, 0, 0, time.UTC)
+	usageStore := usagememory.New()
+	accountID := 81
+	providerID := 91
+	seedUsageLog(t, usageStore, usagecontract.UsageLog{
+		RequestID:             "req_scheduler_evidence",
+		AttemptNo:             1,
+		UserID:                42,
+		APIKeyID:              7,
+		AccountID:             &accountID,
+		ProviderID:            &providerID,
+		SourceProtocol:        "openai-compatible",
+		SourceEndpoint:        "/v1/chat/completions",
+		TargetProtocol:        "openai-compatible",
+		Model:                 "scheduler-model",
+		InputTokens:           10,
+		OutputTokens:          20,
+		TotalTokens:           30,
+		LatencyMS:             250,
+		Success:               true,
+		Cost:                  "0.00000000",
+		Currency:              "USD",
+		CompatibilityWarnings: []string{},
+		CreatedAt:             base.Add(-2 * time.Minute),
+	})
+	schedulerStore := schedulermemory.New()
+	decision, err := schedulerStore.CreateDecision(t.Context(), schedulercontract.Decision{
+		RequestID:          "req_scheduler_evidence",
+		AttemptNo:          1,
+		UserID:             42,
+		APIKeyID:           7,
+		SourceProtocol:     "openai-compatible",
+		SourceEndpoint:     "/v1/chat/completions",
+		TargetProtocol:     "openai-compatible",
+		Model:              "scheduler-model",
+		Strategy:           schedulercontract.StrategyLatencyFirst,
+		StrategyVersion:    "v1",
+		StrategyConfigHash: "hash_scheduler_evidence",
+		SelectedProviderID: &providerID,
+		SelectedAccountID:  &accountID,
+		CandidateCount:     5,
+		RejectedCount:      2,
+		Scores:             map[string]any{"final": 0.91},
+		RejectReasons:      map[string]any{"quota_exhausted": 1},
+		StrategyWeights:    map[string]any{"latency": 0.5},
+		SelectionRationale: "lowest latency healthy account",
+		EstimatedCost:      "0.00000000",
+		Currency:           "USD",
+		CreatedAt:          base.Add(-3 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("seed scheduler decision: %v", err)
+	}
+	if _, err := schedulerStore.CreateDecision(t.Context(), schedulercontract.Decision{
+		RequestID:          "req_scheduler_only",
+		AttemptNo:          1,
+		UserID:             42,
+		APIKeyID:           7,
+		SourceProtocol:     "openai-compatible",
+		SourceEndpoint:     "/v1/responses",
+		TargetProtocol:     "openai-compatible",
+		Model:              "scheduler-only-model",
+		Strategy:           schedulercontract.StrategyBalanced,
+		StrategyVersion:    "v1",
+		StrategyConfigHash: "hash_scheduler_only",
+		SelectedProviderID: &providerID,
+		SelectedAccountID:  &accountID,
+		CandidateCount:     3,
+		RejectedCount:      1,
+		Scores:             map[string]any{"final": 0.72},
+		RejectReasons:      map[string]any{"cooldown_active": 1},
+		StrategyWeights:    map[string]any{"health": 0.3},
+		SelectionRationale: "balanced account selected",
+		EstimatedCost:      "0.00000000",
+		Currency:           "USD",
+		CreatedAt:          base.Add(-1 * time.Minute),
+	}); err != nil {
+		t.Fatalf("seed scheduler-only decision: %v", err)
+	}
+
+	handler := New(config.Load(), nil, WithUsageStore(usageStore), WithSchedulerStore(schedulerStore))
+	_, sessionCookie := mustLoginAdmin(t, handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/request-evidence?start=2026-06-19T07:00:00Z&end=2026-06-19T09:00:00Z&page_size=10", nil)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list request evidence: got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.RequestEvidenceListResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	byRequest := map[string]apiopenapi.RequestEvidenceRow{}
+	for _, row := range resp.Data {
+		byRequest[row.RequestId] = row
+	}
+	merged := byRequest["req_scheduler_evidence"]
+	if !merged.HasUsageLog || !merged.HasSchedulerDecision {
+		t.Fatalf("usage row should carry scheduler evidence: %+v", merged)
+	}
+	if merged.SchedulerDecisionId == nil || *merged.SchedulerDecisionId != apiopenapi.Id(strconv.Itoa(decision.ID)) {
+		t.Fatalf("merged row missing scheduler decision id: %+v", merged)
+	}
+	if merged.SchedulerCandidateCount == nil || *merged.SchedulerCandidateCount != 5 ||
+		merged.SchedulerRejectedCount == nil || *merged.SchedulerRejectedCount != 2 ||
+		merged.SchedulerStrategy == nil || *merged.SchedulerStrategy != string(schedulercontract.StrategyLatencyFirst) {
+		t.Fatalf("merged row scheduler fields mismatch: %+v", merged)
+	}
+	schedulerOnly := byRequest["req_scheduler_only"]
+	if schedulerOnly.EvidenceSource != apiopenapi.RequestEvidenceSourceSchedulerDecision || schedulerOnly.HasUsageLog || !schedulerOnly.HasSchedulerDecision {
+		t.Fatalf("scheduler-only row mismatch: %+v", schedulerOnly)
+	}
+
+	sourceReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/request-evidence?start=2026-06-19T07:00:00Z&end=2026-06-19T09:00:00Z&evidence_source=scheduler_decision", nil)
+	sourceReq.AddCookie(sessionCookie)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, sourceReq)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("scheduler evidence filter: got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Data) != 2 {
+		t.Fatalf("scheduler evidence filter should return two rows, got %+v", resp.Data)
+	}
+
+	detailReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/request-evidence/req_scheduler_evidence", nil)
+	detailReq.AddCookie(sessionCookie)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, detailReq)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("detail request evidence: got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var detail apiopenapi.RequestEvidenceDetailResponse
+	if err := json.NewDecoder(rec.Body).Decode(&detail); err != nil {
+		t.Fatal(err)
+	}
+	if !detail.Summary.HasSchedulerDecision || detail.Summary.SchedulerDecisionCount != 1 {
+		t.Fatalf("detail summary should include scheduler evidence: %+v", detail.Summary)
+	}
+	if detail.Summary.SchedulerDecisionId == nil || *detail.Summary.SchedulerDecisionId != apiopenapi.Id(strconv.Itoa(decision.ID)) {
+		t.Fatalf("detail summary missing scheduler decision id: %+v", detail.Summary)
+	}
+	if len(detail.Attempts) != 1 || !detail.Attempts[0].HasSchedulerDecision || !detail.Attempts[0].HasUsageLog {
+		t.Fatalf("detail attempts should merge usage and scheduler evidence: %+v", detail.Attempts)
 	}
 }
 

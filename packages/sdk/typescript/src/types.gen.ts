@@ -4818,7 +4818,7 @@ export type RequestLogFileResponse = {
 
 export type RequestEvidenceKind = 'success' | 'error' | 'unknown';
 
-export type RequestEvidenceSource = 'usage' | 'ops_error' | 'request_dump' | 'system_log';
+export type RequestEvidenceSource = 'usage' | 'ops_error' | 'request_dump' | 'system_log' | 'scheduler_decision';
 
 export type RequestEvidenceRow = {
     kind: RequestEvidenceKind;
@@ -4857,9 +4857,19 @@ export type RequestEvidenceRow = {
     has_ops_error_log: boolean;
     has_request_dump: boolean;
     has_system_log: boolean;
+    has_scheduler_decision: boolean;
     request_dump_count: number;
     request_dump_error_count: number;
     system_log_count: number;
+    scheduler_decision_count: number;
+    scheduler_decision_id?: Id;
+    scheduler_candidate_count?: number;
+    scheduler_rejected_count?: number;
+    scheduler_strategy?: string;
+    /**
+     * Non-sensitive scheduler explanation from the latest linked decision.
+     */
+    scheduler_selection_rationale?: string;
     latest_request_dump_name?: string;
     latest_request_dump_created_at?: Timestamp;
 };
@@ -4878,9 +4888,19 @@ export type RequestEvidenceSummary = {
     ops_error_log_count: number;
     request_dump_count: number;
     request_dump_error_count: number;
+    scheduler_decision_count: number;
     has_usage_log: boolean;
     has_ops_error_log: boolean;
     has_request_dump: boolean;
+    has_scheduler_decision: boolean;
+    scheduler_decision_id?: Id;
+    scheduler_candidate_count?: number;
+    scheduler_rejected_count?: number;
+    scheduler_strategy?: string;
+    /**
+     * Non-sensitive scheduler explanation from the latest linked decision.
+     */
+    scheduler_selection_rationale?: string;
     /**
      * Sum of known attempt latencies for the request.
      */
@@ -17352,7 +17372,7 @@ export type ListAdminOpsRequestEvidenceData = {
         /**
          * Filter by evidence source present on the row.
          */
-        evidence_source?: 'all' | 'usage' | 'ops_error' | 'request_dump' | 'system_log';
+        evidence_source?: 'all' | 'usage' | 'ops_error' | 'request_dump' | 'system_log' | 'scheduler_decision';
         min_latency_ms?: number;
         max_latency_ms?: number;
         /**

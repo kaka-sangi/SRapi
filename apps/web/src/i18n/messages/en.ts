@@ -1538,7 +1538,7 @@ export const en = {
   },
   adminRequestEvidence: {
     title: "Request evidence",
-    subtitle: "Unified request-level evidence across usage logs, upstream error logs, and request dumps.",
+    subtitle: "Unified request-level evidence across scheduler decisions, usage logs, upstream error logs, and request dumps.",
     time: "Time",
     result: "Result",
     request: "Request",
@@ -1556,6 +1556,7 @@ export const en = {
     keyShort: "K",
     accountShort: "A",
     usage: "Usage",
+    scheduler: "Scheduler",
     opsError: "Ops error",
     dump: "Dump",
     errorLog: "Error",
@@ -1581,7 +1582,7 @@ export const en = {
     detailNoDumps: "No request dumps",
     detailSystemLogs: "System logs",
     detailNoSystemLogs: "No system logs",
-    detailEvidenceCounts: "U {usage} / E {errors} / D {dumps}",
+    detailEvidenceCounts: "U {usage} / S {scheduler} / E {errors} / D {dumps}",
     detailSystemLogCounts: "{total} total · warn {warn} · error {error}",
   },
   adminLiveErrors: {

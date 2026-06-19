@@ -2647,10 +2647,11 @@ func (e RequestEvidenceRowResolution) Valid() bool {
 
 // Defines values for RequestEvidenceSource.
 const (
-	RequestEvidenceSourceOpsError    RequestEvidenceSource = "ops_error"
-	RequestEvidenceSourceRequestDump RequestEvidenceSource = "request_dump"
-	RequestEvidenceSourceSystemLog   RequestEvidenceSource = "system_log"
-	RequestEvidenceSourceUsage       RequestEvidenceSource = "usage"
+	RequestEvidenceSourceOpsError          RequestEvidenceSource = "ops_error"
+	RequestEvidenceSourceRequestDump       RequestEvidenceSource = "request_dump"
+	RequestEvidenceSourceSchedulerDecision RequestEvidenceSource = "scheduler_decision"
+	RequestEvidenceSourceSystemLog         RequestEvidenceSource = "system_log"
+	RequestEvidenceSourceUsage             RequestEvidenceSource = "usage"
 )
 
 // Valid indicates whether the value is a known member of the RequestEvidenceSource enum.
@@ -2659,6 +2660,8 @@ func (e RequestEvidenceSource) Valid() bool {
 	case RequestEvidenceSourceOpsError:
 		return true
 	case RequestEvidenceSourceRequestDump:
+		return true
+	case RequestEvidenceSourceSchedulerDecision:
 		return true
 	case RequestEvidenceSourceSystemLog:
 		return true
@@ -3415,11 +3418,12 @@ func (e ListAdminOpsRequestEvidenceParamsKind) Valid() bool {
 
 // Defines values for ListAdminOpsRequestEvidenceParamsEvidenceSource.
 const (
-	ListAdminOpsRequestEvidenceParamsEvidenceSourceAll         ListAdminOpsRequestEvidenceParamsEvidenceSource = "all"
-	ListAdminOpsRequestEvidenceParamsEvidenceSourceOpsError    ListAdminOpsRequestEvidenceParamsEvidenceSource = "ops_error"
-	ListAdminOpsRequestEvidenceParamsEvidenceSourceRequestDump ListAdminOpsRequestEvidenceParamsEvidenceSource = "request_dump"
-	ListAdminOpsRequestEvidenceParamsEvidenceSourceSystemLog   ListAdminOpsRequestEvidenceParamsEvidenceSource = "system_log"
-	ListAdminOpsRequestEvidenceParamsEvidenceSourceUsage       ListAdminOpsRequestEvidenceParamsEvidenceSource = "usage"
+	ListAdminOpsRequestEvidenceParamsEvidenceSourceAll               ListAdminOpsRequestEvidenceParamsEvidenceSource = "all"
+	ListAdminOpsRequestEvidenceParamsEvidenceSourceOpsError          ListAdminOpsRequestEvidenceParamsEvidenceSource = "ops_error"
+	ListAdminOpsRequestEvidenceParamsEvidenceSourceRequestDump       ListAdminOpsRequestEvidenceParamsEvidenceSource = "request_dump"
+	ListAdminOpsRequestEvidenceParamsEvidenceSourceSchedulerDecision ListAdminOpsRequestEvidenceParamsEvidenceSource = "scheduler_decision"
+	ListAdminOpsRequestEvidenceParamsEvidenceSourceSystemLog         ListAdminOpsRequestEvidenceParamsEvidenceSource = "system_log"
+	ListAdminOpsRequestEvidenceParamsEvidenceSourceUsage             ListAdminOpsRequestEvidenceParamsEvidenceSource = "usage"
 )
 
 // Valid indicates whether the value is a known member of the ListAdminOpsRequestEvidenceParamsEvidenceSource enum.
@@ -3430,6 +3434,8 @@ func (e ListAdminOpsRequestEvidenceParamsEvidenceSource) Valid() bool {
 	case ListAdminOpsRequestEvidenceParamsEvidenceSourceOpsError:
 		return true
 	case ListAdminOpsRequestEvidenceParamsEvidenceSourceRequestDump:
+		return true
+	case ListAdminOpsRequestEvidenceParamsEvidenceSourceSchedulerDecision:
 		return true
 	case ListAdminOpsRequestEvidenceParamsEvidenceSourceSystemLog:
 		return true
@@ -9737,6 +9743,7 @@ type RequestEvidenceRow struct {
 	EvidenceSource             RequestEvidenceSource         `json:"evidence_source"`
 	HasOpsErrorLog             bool                          `json:"has_ops_error_log"`
 	HasRequestDump             bool                          `json:"has_request_dump"`
+	HasSchedulerDecision       bool                          `json:"has_scheduler_decision"`
 	HasSystemLog               bool                          `json:"has_system_log"`
 	HasUsageLog                bool                          `json:"has_usage_log"`
 	InputTokens                *int                          `json:"input_tokens,omitempty"`
@@ -9752,17 +9759,25 @@ type RequestEvidenceRow struct {
 	RequestDumpErrorCount      int                           `json:"request_dump_error_count"`
 	RequestId                  string                        `json:"request_id"`
 	Resolution                 *RequestEvidenceRowResolution `json:"resolution,omitempty"`
-	SourceEndpoint             *string                       `json:"source_endpoint,omitempty"`
-	SourceProtocol             *string                       `json:"source_protocol,omitempty"`
-	StatusCode                 *int                          `json:"status_code,omitempty"`
-	Success                    *bool                         `json:"success,omitempty"`
-	SystemLogCount             int                           `json:"system_log_count"`
-	TargetProtocol             *string                       `json:"target_protocol,omitempty"`
-	TotalTokens                *int                          `json:"total_tokens,omitempty"`
-	UpstreamRequestId          *string                       `json:"upstream_request_id,omitempty"`
-	UsageEstimated             *bool                         `json:"usage_estimated,omitempty"`
-	UsageLogId                 *Id                           `json:"usage_log_id,omitempty"`
-	UserId                     *Id                           `json:"user_id,omitempty"`
+	SchedulerCandidateCount    *int                          `json:"scheduler_candidate_count,omitempty"`
+	SchedulerDecisionCount     int                           `json:"scheduler_decision_count"`
+	SchedulerDecisionId        *Id                           `json:"scheduler_decision_id,omitempty"`
+	SchedulerRejectedCount     *int                          `json:"scheduler_rejected_count,omitempty"`
+
+	// SchedulerSelectionRationale Non-sensitive scheduler explanation from the latest linked decision.
+	SchedulerSelectionRationale *string `json:"scheduler_selection_rationale,omitempty"`
+	SchedulerStrategy           *string `json:"scheduler_strategy,omitempty"`
+	SourceEndpoint              *string `json:"source_endpoint,omitempty"`
+	SourceProtocol              *string `json:"source_protocol,omitempty"`
+	StatusCode                  *int    `json:"status_code,omitempty"`
+	Success                     *bool   `json:"success,omitempty"`
+	SystemLogCount              int     `json:"system_log_count"`
+	TargetProtocol              *string `json:"target_protocol,omitempty"`
+	TotalTokens                 *int    `json:"total_tokens,omitempty"`
+	UpstreamRequestId           *string `json:"upstream_request_id,omitempty"`
+	UsageEstimated              *bool   `json:"usage_estimated,omitempty"`
+	UsageLogId                  *Id     `json:"usage_log_id,omitempty"`
+	UserId                      *Id     `json:"user_id,omitempty"`
 }
 
 // RequestEvidenceRowResolution defines model for RequestEvidenceRow.Resolution.
@@ -9773,29 +9788,38 @@ type RequestEvidenceSource string
 
 // RequestEvidenceSummary defines model for RequestEvidenceSummary.
 type RequestEvidenceSummary struct {
-	AttemptCount   int                 `json:"attempt_count"`
-	ErrorClass     *string             `json:"error_class,omitempty"`
-	ErrorMessage   *string             `json:"error_message,omitempty"`
-	ErrorOwner     *string             `json:"error_owner,omitempty"`
-	ErrorPhase     *string             `json:"error_phase,omitempty"`
-	ErrorSource    *string             `json:"error_source,omitempty"`
-	HasOpsErrorLog bool                `json:"has_ops_error_log"`
-	HasRequestDump bool                `json:"has_request_dump"`
-	HasUsageLog    bool                `json:"has_usage_log"`
-	InputTokens    *int                `json:"input_tokens,omitempty"`
-	Kind           RequestEvidenceKind `json:"kind"`
+	AttemptCount         int                 `json:"attempt_count"`
+	ErrorClass           *string             `json:"error_class,omitempty"`
+	ErrorMessage         *string             `json:"error_message,omitempty"`
+	ErrorOwner           *string             `json:"error_owner,omitempty"`
+	ErrorPhase           *string             `json:"error_phase,omitempty"`
+	ErrorSource          *string             `json:"error_source,omitempty"`
+	HasOpsErrorLog       bool                `json:"has_ops_error_log"`
+	HasRequestDump       bool                `json:"has_request_dump"`
+	HasSchedulerDecision bool                `json:"has_scheduler_decision"`
+	HasUsageLog          bool                `json:"has_usage_log"`
+	InputTokens          *int                `json:"input_tokens,omitempty"`
+	Kind                 RequestEvidenceKind `json:"kind"`
 
 	// LatencyMs Sum of known attempt latencies for the request.
-	LatencyMs             *int                  `json:"latency_ms,omitempty"`
-	OpsErrorLogCount      int                   `json:"ops_error_log_count"`
-	OutputTokens          *int                  `json:"output_tokens,omitempty"`
-	PrimarySource         RequestEvidenceSource `json:"primary_source"`
-	RequestDumpCount      int                   `json:"request_dump_count"`
-	RequestDumpErrorCount int                   `json:"request_dump_error_count"`
-	StatusCode            *int                  `json:"status_code,omitempty"`
-	TotalTokens           *int                  `json:"total_tokens,omitempty"`
-	UpstreamRequestId     *string               `json:"upstream_request_id,omitempty"`
-	UsageLogCount         int                   `json:"usage_log_count"`
+	LatencyMs               *int                  `json:"latency_ms,omitempty"`
+	OpsErrorLogCount        int                   `json:"ops_error_log_count"`
+	OutputTokens            *int                  `json:"output_tokens,omitempty"`
+	PrimarySource           RequestEvidenceSource `json:"primary_source"`
+	RequestDumpCount        int                   `json:"request_dump_count"`
+	RequestDumpErrorCount   int                   `json:"request_dump_error_count"`
+	SchedulerCandidateCount *int                  `json:"scheduler_candidate_count,omitempty"`
+	SchedulerDecisionCount  int                   `json:"scheduler_decision_count"`
+	SchedulerDecisionId     *Id                   `json:"scheduler_decision_id,omitempty"`
+	SchedulerRejectedCount  *int                  `json:"scheduler_rejected_count,omitempty"`
+
+	// SchedulerSelectionRationale Non-sensitive scheduler explanation from the latest linked decision.
+	SchedulerSelectionRationale *string `json:"scheduler_selection_rationale,omitempty"`
+	SchedulerStrategy           *string `json:"scheduler_strategy,omitempty"`
+	StatusCode                  *int    `json:"status_code,omitempty"`
+	TotalTokens                 *int    `json:"total_tokens,omitempty"`
+	UpstreamRequestId           *string `json:"upstream_request_id,omitempty"`
+	UsageLogCount               int     `json:"usage_log_count"`
 }
 
 // RequestEvidenceSystemLogSummary defines model for RequestEvidenceSystemLogSummary.

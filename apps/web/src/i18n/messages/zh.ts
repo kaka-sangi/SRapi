@@ -1516,7 +1516,7 @@ export const zh: Messages = {
   },
   adminRequestEvidence: {
     title: "请求证据",
-    subtitle: "按请求聚合 usage、上游错误日志和请求转储摘要。",
+    subtitle: "按请求聚合调度决策、usage、上游错误日志和请求转储摘要。",
     time: "时间",
     result: "结果",
     request: "请求",
@@ -1534,6 +1534,7 @@ export const zh: Messages = {
     keyShort: "Key",
     accountShort: "账号",
     usage: "Usage",
+    scheduler: "调度",
     opsError: "上游错误",
     dump: "转储",
     errorLog: "错误",
@@ -1559,7 +1560,7 @@ export const zh: Messages = {
     detailNoDumps: "没有请求转储",
     detailSystemLogs: "系统日志",
     detailNoSystemLogs: "没有系统日志",
-    detailEvidenceCounts: "U {usage} / E {errors} / D {dumps}",
+    detailEvidenceCounts: "U {usage} / S {scheduler} / E {errors} / D {dumps}",
     detailSystemLogCounts: "{total} 条 · 警告 {warn} · 错误 {error}",
   },
   adminLiveErrors: {

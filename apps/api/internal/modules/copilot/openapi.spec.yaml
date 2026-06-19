@@ -9781,7 +9781,7 @@ paths:
           description: Filter by evidence source present on the row.
           schema:
             type: string
-            enum: [all, usage, ops_error, request_dump, system_log]
+            enum: [all, usage, ops_error, request_dump, system_log, scheduler_decision]
             default: all
         - name: min_latency_ms
           in: query
@@ -27953,6 +27953,7 @@ components:
         - ops_error
         - request_dump
         - system_log
+        - scheduler_decision
 
     RequestEvidenceRow:
       type: object
@@ -27965,9 +27966,11 @@ components:
         - has_ops_error_log
         - has_request_dump
         - has_system_log
+        - has_scheduler_decision
         - request_dump_count
         - request_dump_error_count
         - system_log_count
+        - scheduler_decision_count
       properties:
         kind:
           $ref: "#/components/schemas/RequestEvidenceKind"
@@ -28044,6 +28047,8 @@ components:
           type: boolean
         has_system_log:
           type: boolean
+        has_scheduler_decision:
+          type: boolean
         request_dump_count:
           type: integer
           minimum: 0
@@ -28053,6 +28058,23 @@ components:
         system_log_count:
           type: integer
           minimum: 0
+        scheduler_decision_count:
+          type: integer
+          minimum: 0
+        scheduler_decision_id:
+          $ref: "#/components/schemas/Id"
+          description: Latest scheduler decision linked to this request evidence row.
+        scheduler_candidate_count:
+          type: integer
+          minimum: 0
+        scheduler_rejected_count:
+          type: integer
+          minimum: 0
+        scheduler_strategy:
+          type: string
+        scheduler_selection_rationale:
+          type: string
+          description: Non-sensitive scheduler explanation from the latest linked decision.
         latest_request_dump_name:
           type: string
         latest_request_dump_created_at:
@@ -28084,9 +28106,11 @@ components:
         - ops_error_log_count
         - request_dump_count
         - request_dump_error_count
+        - scheduler_decision_count
         - has_usage_log
         - has_ops_error_log
         - has_request_dump
+        - has_scheduler_decision
       properties:
         kind:
           $ref: "#/components/schemas/RequestEvidenceKind"
@@ -28107,12 +28131,31 @@ components:
         request_dump_error_count:
           type: integer
           minimum: 0
+        scheduler_decision_count:
+          type: integer
+          minimum: 0
         has_usage_log:
           type: boolean
         has_ops_error_log:
           type: boolean
         has_request_dump:
           type: boolean
+        has_scheduler_decision:
+          type: boolean
+        scheduler_decision_id:
+          $ref: "#/components/schemas/Id"
+          description: Latest scheduler decision linked to the investigated request.
+        scheduler_candidate_count:
+          type: integer
+          minimum: 0
+        scheduler_rejected_count:
+          type: integer
+          minimum: 0
+        scheduler_strategy:
+          type: string
+        scheduler_selection_rationale:
+          type: string
+          description: Non-sensitive scheduler explanation from the latest linked decision.
         latency_ms:
           type: integer
           minimum: 0

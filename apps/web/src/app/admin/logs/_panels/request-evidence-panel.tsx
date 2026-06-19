@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { Activity, Bug, FileText, ScrollText } from "lucide-react";
+import { Activity, Bug, FileText, Route, ScrollText } from "lucide-react";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { FilterSelect, ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import { PageHeader } from "@/components/layout/page-header";
@@ -22,6 +22,7 @@ import { formatDateTime, formatInteger, formatLatency } from "@/lib/admin-format
 import {
   adminErrorLogsHref,
   adminRequestDumpsHref,
+  adminSchedulerDecisionsHref,
   adminSystemLogsHref,
 } from "@/lib/admin-log-links";
 import {
@@ -45,7 +46,13 @@ export function RequestEvidencePanel() {
     page_size: list.pageSize,
     request_id: requestID,
     kind: kind as "success" | "error" | "unknown" | undefined,
-    evidence_source: source as "usage" | "ops_error" | "request_dump" | "system_log" | undefined,
+    evidence_source: source as
+      | "usage"
+      | "ops_error"
+      | "request_dump"
+      | "system_log"
+      | "scheduler_decision"
+      | undefined,
     start,
     q: list.search || undefined,
   });
@@ -190,6 +197,12 @@ export function RequestEvidencePanel() {
       render: (row) => (
         <div className="flex flex-wrap gap-1">
           {row.has_usage_log ? <SourceChip label={t("adminRequestEvidence.usage")} /> : null}
+          {row.has_scheduler_decision ? (
+            <SourceChip
+              label={`${t("adminRequestEvidence.scheduler")} ${row.scheduler_decision_count}`}
+              tone="info"
+            />
+          ) : null}
           {row.has_ops_error_log ? (
             <SourceChip label={t("adminRequestEvidence.opsError")} tone="error" />
           ) : null}
@@ -272,6 +285,7 @@ export function RequestEvidencePanel() {
               allLabel={t("adminRequestEvidence.allSources")}
               options={[
                 { value: "usage", label: t("adminRequestEvidence.usage") },
+                { value: "scheduler_decision", label: t("adminRequestEvidence.scheduler") },
                 { value: "ops_error", label: t("adminRequestEvidence.opsError") },
                 { value: "request_dump", label: t("adminRequestEvidence.dump") },
                 { value: "system_log", label: t("adminRequestEvidence.systemLog") },
@@ -356,9 +370,16 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
     has_request_dump: summary.has_request_dump,
     has_system_log: detail.system_log_summary.total_count > 0,
     has_usage_log: summary.has_usage_log,
+    has_scheduler_decision: summary.has_scheduler_decision,
     request_dump_count: summary.request_dump_count,
     request_dump_error_count: summary.request_dump_error_count,
     system_log_count: detail.system_log_summary.total_count,
+    scheduler_decision_count: summary.scheduler_decision_count,
+    scheduler_decision_id: summary.scheduler_decision_id,
+    scheduler_candidate_count: summary.scheduler_candidate_count,
+    scheduler_rejected_count: summary.scheduler_rejected_count,
+    scheduler_strategy: summary.scheduler_strategy,
+    scheduler_selection_rationale: summary.scheduler_selection_rationale,
   } as RequestEvidenceRow);
   return (
     <div className="space-y-5">
@@ -385,6 +406,7 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
           label={t("adminRequestEvidence.evidence")}
           value={t("adminRequestEvidence.detailEvidenceCounts", {
             usage: summary.usage_log_count,
+            scheduler: summary.scheduler_decision_count,
             errors: summary.ops_error_log_count,
             dumps: summary.request_dump_count,
           })}
@@ -405,7 +427,9 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
                     {row.source_endpoint || row.source_protocol || "—"}
                   </div>
                   <div className="text-srapi-text-tertiary truncate">
-                    {row.model || "—"} {row.error_class ? `/ ${row.error_class}` : ""}
+                    {row.model || "—"}
+                    {row.scheduler_strategy ? ` / ${row.scheduler_strategy}` : ""}
+                    {row.error_class ? ` / ${row.error_class}` : ""}
                   </div>
                 </div>
                 <div className={statusClass(row.status_code)}>{row.status_code ?? "—"}</div>
@@ -417,6 +441,11 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
                 </div>
                 {row.error_message ? (
                   <div className="text-srapi-error md:col-span-4 line-clamp-2">{row.error_message}</div>
+                ) : null}
+                {row.scheduler_selection_rationale ? (
+                  <div className="text-srapi-text-tertiary md:col-span-4 line-clamp-2">
+                    {row.scheduler_selection_rationale}
+                  </div>
                 ) : null}
               </div>
             ))}
@@ -562,8 +591,16 @@ function EvidenceLinks({ row }: { row: RequestEvidenceRow }) {
   const errorHref = adminErrorLogsHref(params);
   const systemHref = adminSystemLogsHref(params);
   const dumpHref = adminRequestDumpsHref(params);
+  const schedulerHref = adminSchedulerDecisionsHref(params);
   return (
     <div className="flex flex-wrap gap-1">
+      {row.has_scheduler_decision && schedulerHref ? (
+        <EvidenceLink
+          href={schedulerHref}
+          icon={<Route className="size-3" />}
+          label={t("adminRequestEvidence.scheduler")}
+        />
+      ) : null}
       {row.has_ops_error_log && errorHref ? (
         <EvidenceLink
           href={errorHref}
