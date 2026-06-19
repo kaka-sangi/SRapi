@@ -413,6 +413,8 @@ type AlertRule struct {
 	CooldownSeconds int
 	MinRequestCount int
 	Scope           AlertRuleScope
+	BuiltinBaseline bool
+	BaselineKey     string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }

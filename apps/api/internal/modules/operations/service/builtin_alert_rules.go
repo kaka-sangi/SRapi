@@ -30,6 +30,28 @@ const (
 	builtinAlertRuleOverloadedSpike          = "SRapi Provider overloaded baseline"
 )
 
+var builtinAlertRuleKeys = map[string]string{
+	normalizedRuleName(builtinAlertRuleGatewayErrorRate):         "gateway.error_rate",
+	normalizedRuleName(builtinAlertRuleGatewayLatencyP95):        "gateway.latency_p95",
+	normalizedRuleName(builtinAlertRuleChatCompletionsError):     "gateway.chat_completions.error_rate",
+	normalizedRuleName(builtinAlertRuleChatCompletionsLatency):   "gateway.chat_completions.latency_p95",
+	normalizedRuleName(builtinAlertRuleResponsesError):           "gateway.responses.error_rate",
+	normalizedRuleName(builtinAlertRuleMessagesError):            "gateway.messages.error_rate",
+	normalizedRuleName(builtinAlertRuleResponsesWebSocketError):  "gateway.responses_ws.error_rate",
+	normalizedRuleName(builtinAlertRuleRealtimeTranscriptsError): "gateway.realtime.error_rate",
+	normalizedRuleName(builtinAlertRuleSchedulerNoAccount):       "scheduler.no_available_account",
+	normalizedRuleName(builtinAlertRuleProviderAuthFailure):      "provider.auth_failed",
+	normalizedRuleName(builtinAlertRuleProviderQuotaExhausted):   "provider.quota_exhausted",
+	normalizedRuleName(builtinAlertRuleProvider5xxSpike):         "provider.provider_5xx",
+	normalizedRuleName(builtinAlertRuleRateLimitSpike):           "provider.rate_limit",
+	normalizedRuleName(builtinAlertRuleTimeoutSpike):             "provider.timeout",
+	normalizedRuleName(builtinAlertRuleNetworkErrorSpike):        "provider.network_error",
+	normalizedRuleName(builtinAlertRuleInvalidResponseSpike):     "provider.invalid_response",
+	normalizedRuleName(builtinAlertRulePolicyErrorSpike):         "provider.policy_error",
+	normalizedRuleName(builtinAlertRuleUpstreamErrorSpike):       "provider.upstream_error",
+	normalizedRuleName(builtinAlertRuleOverloadedSpike):          "provider.overloaded",
+}
+
 // EnsureBuiltinAlertRules creates missing baseline Ops alert rules without
 // overwriting operator-edited rules that already use the same stable names.
 func (s *Service) EnsureBuiltinAlertRules(ctx context.Context) ([]contract.AlertRule, error) {
@@ -61,7 +83,7 @@ func (s *Service) EnsureBuiltinAlertRules(ctx context.Context) ([]contract.Alert
 		if err != nil {
 			return nil, err
 		}
-		created = append(created, stored)
+		created = append(created, cloneAlertRule(stored))
 		names[normalizedRuleName(rule.Name)] = struct{}{}
 	}
 	return created, nil
@@ -332,4 +354,8 @@ var builtinAlertRules = []contract.AlertRule{
 
 func normalizedRuleName(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func builtinAlertRuleKey(name string) string {
+	return builtinAlertRuleKeys[normalizedRuleName(name)]
 }

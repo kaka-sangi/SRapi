@@ -754,7 +754,7 @@ Authorization header, cookie, credential material, or provider secret.
 - `POST /api/v1/admin/ops/slo`、`PATCH /api/v1/admin/ops/slo/{id}` 必须使用 `cookieAuth` + `csrfHeader`，并记录安全 audit before/after。
 - SLO `objective` 请求可接受 `0.995` 或 `99.5`；响应统一返回比例值。
 - `GET /api/v1/admin/ops/alerts` 支持 `status`、`severity` 过滤。
-- `GET/POST/PATCH/DELETE /api/v1/admin/ops/alert-rules{,/{id}}` 管理内置 metric 告警规则；规则 scope 可用低基数 `source_endpoint`、`model`、`provider_id` 和 `error_class` 限定评估范围，不得引入 API key、用户邮箱、prompt 或 credential 等高基数/敏感维度。
+- `GET/POST/PATCH/DELETE /api/v1/admin/ops/alert-rules{,/{id}}` 管理内置 metric 告警规则；规则 scope 可用低基数 `source_endpoint`、`model`、`provider_id` 和 `error_class` 限定评估范围，不得引入 API key、用户邮箱、prompt 或 credential 等高基数/敏感维度。响应中的 `builtin_baseline` / `baseline_key` 是服务端派生的只读元数据，用于标识规则是否占用 SRapi 默认保护基线槽位；create/update 请求不得接受这两个字段，阈值、级别和启停状态仍以规则本体字段为准。
 - `GET/POST/DELETE /api/v1/admin/ops/alert-silences{,/{id}}` 管理静默窗口；matcher 允许同样的低基数 scope 字段和 `rule_id` / `severity`，用于维护期压制匹配告警。
 - `POST /api/v1/admin/ops/alerts/{id}/ack` 必须使用 CSRF，并且 audit 只记录 ack 摘要，不复制 alert `details`。
 - `GET/POST/PATCH/DELETE /api/v1/admin/ops/notification-channels{,/{id}}` 管理内置 Ops alert email 通道；响应只能返回通道元数据和收件目标，不得返回 SMTP secret。

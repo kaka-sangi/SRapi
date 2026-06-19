@@ -55,7 +55,11 @@ func (s *Service) CreateAlertRule(ctx context.Context, req contract.CreateAlertR
 	if err := validateAlertRule(rule); err != nil {
 		return contract.AlertRule{}, err
 	}
-	return s.observabilityStore.CreateAlertRule(ctx, rule)
+	stored, err := s.observabilityStore.CreateAlertRule(ctx, rule)
+	if err != nil {
+		return contract.AlertRule{}, err
+	}
+	return cloneAlertRule(stored), nil
 }
 
 // UpdateAlertRule applies a partial update to an existing alert rule.
@@ -102,7 +106,11 @@ func (s *Service) UpdateAlertRule(ctx context.Context, id int, req contract.Upda
 	if err := validateAlertRule(current); err != nil {
 		return contract.AlertRule{}, err
 	}
-	return s.observabilityStore.UpdateAlertRule(ctx, current)
+	updated, err := s.observabilityStore.UpdateAlertRule(ctx, current)
+	if err != nil {
+		return contract.AlertRule{}, err
+	}
+	return cloneAlertRule(updated), nil
 }
 
 // DeleteAlertRule removes an alert rule by id.
@@ -581,6 +589,13 @@ func cloneAlertRule(value contract.AlertRule) contract.AlertRule {
 	if value.Scope.ProviderID != nil {
 		providerID := *value.Scope.ProviderID
 		value.Scope.ProviderID = &providerID
+	}
+	if key := builtinAlertRuleKey(value.Name); key != "" {
+		value.BuiltinBaseline = true
+		value.BaselineKey = key
+	} else {
+		value.BuiltinBaseline = false
+		value.BaselineKey = ""
 	}
 	return value
 }

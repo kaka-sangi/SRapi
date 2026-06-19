@@ -2407,6 +2407,7 @@ export const en = {
       errorClass: "Error class",
       provider: "Provider ID",
       globalScope: "global",
+      builtinBaseline: "Built-in baseline",
       thresholdHint: "Ratio for rates (0–1), milliseconds for latency.",
       metricType: {
         error_rate: "Error rate",

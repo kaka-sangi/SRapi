@@ -11140,6 +11140,17 @@ func TestAdminOpsAlertRulesControlPlane(t *testing.T) {
 		"SRapi Messages error rate baseline",
 		"SRapi Responses WebSocket error rate baseline",
 		"SRapi Realtime Transcripts error rate baseline",
+		"SRapi Scheduler no available account baseline",
+		"SRapi Provider auth failure baseline",
+		"SRapi Provider quota exhausted baseline",
+		"SRapi Provider 5xx error baseline",
+		"SRapi Provider rate limit baseline",
+		"SRapi Provider timeout baseline",
+		"SRapi Provider network error baseline",
+		"SRapi Provider invalid response baseline",
+		"SRapi Provider policy error baseline",
+		"SRapi Provider upstream error baseline",
+		"SRapi Provider overloaded baseline",
 	}
 	if len(listResp.Data) < len(expectedBaselineNames)+1 {
 		t.Fatalf("expected created rule plus built-in baselines, got %+v", listResp.Data)
@@ -11148,6 +11159,9 @@ func TestAdminOpsAlertRulesControlPlane(t *testing.T) {
 		if !opsAlertRuleListContainsName(listResp.Data, name) {
 			t.Fatalf("expected built-in alert rule %q in %+v", name, listResp.Data)
 		}
+	}
+	if !opsAlertRuleListContainsBaseline(listResp.Data, "gateway.error_rate") {
+		t.Fatalf("expected built-in alert rule metadata in %+v", listResp.Data)
 	}
 	if !opsAlertRuleListContainsName(listResp.Data, "Chat error rate") {
 		t.Fatalf("expected created alert rule in %+v", listResp.Data)
@@ -11333,6 +11347,15 @@ func TestAdminOpsAlertRulesControlPlane(t *testing.T) {
 func opsAlertRuleListContainsName(rules []apiopenapi.OpsAlertRule, name string) bool {
 	for _, rule := range rules {
 		if rule.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func opsAlertRuleListContainsBaseline(rules []apiopenapi.OpsAlertRule, key string) bool {
+	for _, rule := range rules {
+		if rule.BuiltinBaseline && rule.BaselineKey == key {
 			return true
 		}
 	}

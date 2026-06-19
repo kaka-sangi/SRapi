@@ -8459,6 +8459,11 @@ type OpsAlertResponse struct {
 
 // OpsAlertRule defines model for OpsAlertRule.
 type OpsAlertRule struct {
+	// BaselineKey Stable SRapi baseline identifier when builtin_baseline is true; empty for operator-defined rules.
+	BaselineKey string `json:"baseline_key"`
+
+	// BuiltinBaseline True when this rule occupies one of SRapi's built-in baseline slots. Operators may still have edited its threshold, severity, or enabled state.
+	BuiltinBaseline bool               `json:"builtin_baseline"`
 	CooldownSeconds int                `json:"cooldown_seconds"`
 	CreatedAt       Timestamp          `json:"created_at"`
 	Enabled         bool               `json:"enabled"`

@@ -5530,6 +5530,14 @@ export type OpsAlertRule = {
     cooldown_seconds: number;
     min_request_count: number;
     scope: OpsAlertRuleScope;
+    /**
+     * True when this rule occupies one of SRapi's built-in baseline slots. Operators may still have edited its threshold, severity, or enabled state.
+     */
+    builtin_baseline: boolean;
+    /**
+     * Stable SRapi baseline identifier when builtin_baseline is true; empty for operator-defined rules.
+     */
+    baseline_key: string;
     created_at: Timestamp;
     updated_at: Timestamp;
 };

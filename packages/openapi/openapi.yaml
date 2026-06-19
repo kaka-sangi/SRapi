@@ -30000,6 +30000,8 @@ components:
         - cooldown_seconds
         - min_request_count
         - scope
+        - builtin_baseline
+        - baseline_key
         - created_at
         - updated_at
       properties:
@@ -30029,6 +30031,12 @@ components:
           minimum: 0
         scope:
           $ref: "#/components/schemas/OpsAlertRuleScope"
+        builtin_baseline:
+          type: boolean
+          description: True when this rule occupies one of SRapi's built-in baseline slots. Operators may still have edited its threshold, severity, or enabled state.
+        baseline_key:
+          type: string
+          description: Stable SRapi baseline identifier when builtin_baseline is true; empty for operator-defined rules.
         created_at:
           $ref: "#/components/schemas/Timestamp"
         updated_at:

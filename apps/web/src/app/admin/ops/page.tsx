@@ -477,12 +477,21 @@ function OpsOverviewContent() {
                   <div className="flex items-center gap-2">
                     <span className="text-srapi-text-primary truncate text-sm">{rule.name}</span>
                     <QuietBadge status={quietStatusFor(rule.severity)} label={rule.severity} />
+                    {rule.builtin_baseline ? (
+                      <QuietBadge status="active" label={t("adminOps.alertRules.builtinBaseline")} />
+                    ) : null}
                   </div>
                   <div className="text-2xs text-srapi-text-tertiary tabular font-mono">
                     {t(`adminOps.alertRules.metricType.${rule.metric_type}`)}{" "}
                     {t(`adminOps.alertRules.operators.${rule.operator}`)} {rule.threshold}
                     {" · "}
                     {alertRuleScopeLabel(rule, t("adminOps.alertRules.globalScope"))}
+                    {rule.builtin_baseline && rule.baseline_key ? (
+                      <>
+                        {" · "}
+                        {rule.baseline_key}
+                      </>
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">

@@ -95,6 +95,8 @@ func TestEnsureBuiltinAlertRulesCreatesMissingBaselines(t *testing.T) {
 		created[0].Threshold != 0.05 ||
 		created[0].WindowSeconds != 300 ||
 		created[0].MinRequestCount != 20 ||
+		!created[0].BuiltinBaseline ||
+		created[0].BaselineKey != "gateway.error_rate" ||
 		!created[0].Enabled ||
 		!created[0].CreatedAt.Equal(now) {
 		t.Fatalf("unexpected gateway error-rate baseline: %+v", created[0])
@@ -178,7 +180,9 @@ func TestEnsureBuiltinAlertRulesRespectsExistingOperatorRule(t *testing.T) {
 	}
 	if preserved.ID == 0 || preserved.Enabled || preserved.Threshold != 0.9 ||
 		preserved.Severity != contract.AlertSeverityTicket ||
-		preserved.MinRequestCount != 99 {
+		preserved.MinRequestCount != 99 ||
+		!preserved.BuiltinBaseline ||
+		preserved.BaselineKey != "gateway.error_rate" {
 		t.Fatalf("expected existing operator rule preserved, got %+v from %+v", preserved, found)
 	}
 }

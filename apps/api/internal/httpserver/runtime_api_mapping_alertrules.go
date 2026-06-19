@@ -13,6 +13,8 @@ import (
 
 func toAPIOpsAlertRule(rule operationscontract.AlertRule) apiopenapi.OpsAlertRule {
 	return apiopenapi.OpsAlertRule{
+		BaselineKey:     rule.BaselineKey,
+		BuiltinBaseline: rule.BuiltinBaseline,
 		CooldownSeconds: rule.CooldownSeconds,
 		CreatedAt:       rule.CreatedAt,
 		Enabled:         rule.Enabled,
