@@ -14,6 +14,7 @@ describe("buildErrorLogTriage", () => {
       error_class: "no_available_account",
       error_phase: "routing",
       error_owner: "scheduler",
+      occurred_at: "2026-06-18T10:00:00Z",
     });
 
     expect(triage.steps).toEqual([
@@ -26,11 +27,11 @@ describe("buildErrorLogTriage", () => {
       { kind: "systemLogs", href: "/admin/ops/system-logs?f_request_id=req-detail" },
       {
         kind: "requestEvidence",
-        href: "/admin/logs?tab=request-evidence&f_request_id=req-detail&f_account_id=12&f_provider_id=3&f_error_class=no_available_account&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_model=gpt-4o-mini",
+        href: "/admin/logs?tab=request-evidence&f_request_id=req-detail&f_account_id=12&f_provider_id=3&f_error_class=no_available_account&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_model=gpt-4o-mini&f_start=2026-06-18T09%3A55%3A00.000Z&f_end=2026-06-18T10%3A05%3A00.000Z",
       },
       {
         kind: "schedulerDecision",
-        href: "/admin/ops?tab=scheduler-decisions&f_request_id=req-detail&f_account_id=12&f_provider_id=3&f_model=gpt-4o-mini&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions",
+        href: "/admin/ops?tab=scheduler-decisions&f_request_id=req-detail&f_account_id=12&f_provider_id=3&f_model=gpt-4o-mini&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_start=2026-06-18T09%3A55%3A00.000Z&f_end=2026-06-18T10%3A05%3A00.000Z",
       },
       { kind: "accountHealth", href: "/admin/accounts?view=health&f_providerId=3&f_accountId=12" },
       { kind: "requestDumps", href: "/admin/logs?tab=request-files&f_request_id=req-detail" },

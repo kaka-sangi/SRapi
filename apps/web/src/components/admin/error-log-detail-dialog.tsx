@@ -37,7 +37,6 @@ import {
 } from "@/lib/admin-error-log-triage";
 import {
   adminRequestDumpsHref,
-  adminRequestEvidenceHref,
   adminSchedulerDecisionsHref,
   adminSystemLogsHref,
 } from "@/lib/admin-log-links";
@@ -123,6 +122,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
         errorBodyExcerpt: detail.error_body_excerpt,
         upstreamErrors: events,
       });
+  const triage = useMemo(() => buildErrorLogTriage(detail), [detail]);
 
   return (
     <div className="space-y-4">
@@ -157,7 +157,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
 
       {upstreamDiagnostic ? <UpstreamErrorDiagnosticSummary diagnostic={upstreamDiagnostic} /> : null}
 
-      <ErrorLogTriageSummary detail={detail} />
+      <ErrorLogTriageSummary detail={detail} triage={triage} />
 
       {detail.error_body_excerpt ? (
         <EvidenceBlock
@@ -211,6 +211,7 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
         requestID={detail.request_id}
         traceID={detail.trace_id}
         total={systemLogQuery.data?.pagination?.total}
+        requestEvidenceHref={triage.links.find((link) => link.kind === "requestEvidence")?.href}
       />
 
       <RequestLogEvidence
@@ -336,9 +337,14 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
   );
 }
 
-function ErrorLogTriageSummary({ detail }: { detail: OpsErrorLog }) {
+function ErrorLogTriageSummary({
+  detail,
+  triage,
+}: {
+  detail: OpsErrorLog;
+  triage: ReturnType<typeof buildErrorLogTriage>;
+}) {
   const { t } = useLanguage();
-  const triage = useMemo(() => buildErrorLogTriage(detail), [detail]);
   if (triage.steps.length === 0 && triage.links.length === 0) return null;
 
   return (
@@ -394,18 +400,19 @@ function SystemLogEvidence({
   requestID,
   traceID,
   total,
+  requestEvidenceHref,
 }: {
   logs: OpsSystemLog[];
   loading: boolean;
   requestID?: string | null;
   traceID?: string | null;
   total?: number;
+  requestEvidenceHref?: string | null;
 }) {
   const { t } = useLanguage();
   const systemLogHref = adminSystemLogsHref(
     requestID ? { request_id: requestID } : { trace_id: traceID },
   );
-  const requestEvidenceHref = adminRequestEvidenceHref({ request_id: requestID });
   const relatedTotal = Math.max(total ?? logs.length, logs.length);
   const remaining = logs.length > 0 ? Math.max(relatedTotal - logs.length, 0) : 0;
 

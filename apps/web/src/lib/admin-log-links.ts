@@ -155,7 +155,9 @@ function hasSchedulerDecisionFilter(query: URLSearchParams): boolean {
       query.get("f_account_id") ||
       query.get("f_provider_id") ||
       query.get("f_model") ||
-      query.get("f_source_endpoint"),
+      query.get("f_source_endpoint") ||
+      query.get("f_start") ||
+      query.get("f_end"),
   );
 }
 

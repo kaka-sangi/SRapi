@@ -28,9 +28,9 @@ import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatLatency } from "@/lib/admin-format";
 import {
   adminRequestDumpsHref,
-  adminRequestEvidenceHref,
   adminSystemLogsHref,
 } from "@/lib/admin-log-links";
+import { buildErrorLogTriage } from "@/lib/admin-error-log-triage";
 import type { OpsErrorFingerprint, OpsErrorLog } from "@/lib/sdk-types";
 import {
   LOG_WINDOW_PRESETS,
@@ -724,9 +724,10 @@ function ErrorClassFilter({
 
 function RelatedEvidencePills({ log }: { log: OpsErrorLog }) {
   const { t } = useLanguage();
+  const triage = buildErrorLogTriage(log);
   const systemHref = adminSystemLogsHref(log);
   const requestDumpHref = adminRequestDumpsHref(log);
-  const requestEvidenceHref = adminRequestEvidenceHref(log);
+  const requestEvidenceHref = triage.links.find((link) => link.kind === "requestEvidence")?.href;
   if (!systemHref && !requestDumpHref && !requestEvidenceHref) {
     return <span className="text-2xs text-srapi-text-tertiary font-mono">—</span>;
   }

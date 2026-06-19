@@ -8,6 +8,8 @@ import {
 import type { OpsAlertRunbookStep } from "@/lib/admin-ops-alert-evidence";
 import type { OpsErrorLog } from "@/lib/sdk-types";
 
+const ERROR_EVIDENCE_WINDOW_MS = 5 * 60 * 1000;
+
 export type ErrorLogTriageLinkKind =
   | "systemLogs"
   | "requestEvidence"
@@ -105,6 +107,10 @@ function buildLinks(detail: OpsErrorLog, routingIssue: boolean): ErrorLogTriageL
   const traceID = clean(detail.trace_id);
   const accountID = clean(detail.account_id);
   const providerID = clean(detail.provider_id);
+  const errorClass = clean(detail.error_class);
+  const sourceEndpoint = clean(detail.source_endpoint);
+  const model = clean(detail.model);
+  const window = errorEvidenceWindow(detail.occurred_at);
   const links: ErrorLogTriageLink[] = [];
   const addLink = (kind: ErrorLogTriageLinkKind, href: string | null) => {
     if (href && !links.some((link) => link.href === href)) links.push({ kind, href });
@@ -117,9 +123,11 @@ function buildLinks(detail: OpsErrorLog, routingIssue: boolean): ErrorLogTriageL
       request_id: requestID,
       account_id: accountID,
       provider_id: providerID,
-      error_class: clean(detail.error_class),
-      source_endpoint: clean(detail.source_endpoint),
-      model: clean(detail.model),
+      error_class: errorClass,
+      source_endpoint: sourceEndpoint,
+      model,
+      start: window?.start,
+      end: window?.end,
     }),
   );
   if (routingIssue || requestID) {
@@ -129,8 +137,10 @@ function buildLinks(detail: OpsErrorLog, routingIssue: boolean): ErrorLogTriageL
         request_id: requestID,
         account_id: accountID,
         provider_id: providerID,
-        model: clean(detail.model),
-        source_endpoint: clean(detail.source_endpoint),
+        model,
+        source_endpoint: sourceEndpoint,
+        start: window?.start,
+        end: window?.end,
       }),
     );
   }
@@ -140,6 +150,17 @@ function buildLinks(detail: OpsErrorLog, routingIssue: boolean): ErrorLogTriageL
   addLink("requestDumps", adminRequestDumpsHref({ request_id: requestID }));
 
   return links;
+}
+
+function errorEvidenceWindow(value?: string | null): { start: string; end: string } | null {
+  const raw = clean(value);
+  if (!raw) return null;
+  const occurredAt = new Date(raw);
+  if (Number.isNaN(occurredAt.getTime())) return null;
+  return {
+    start: new Date(occurredAt.getTime() - ERROR_EVIDENCE_WINDOW_MS).toISOString(),
+    end: new Date(occurredAt.getTime() + ERROR_EVIDENCE_WINDOW_MS).toISOString(),
+  };
 }
 
 function isRoutingIssue(errorClass: string, phase: string, owner: string): boolean {

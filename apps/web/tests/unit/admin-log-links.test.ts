@@ -97,6 +97,14 @@ describe("admin log evidence links", () => {
     ).toBe(
       "/admin/ops?tab=scheduler-decisions&f_account_id=12&f_provider_id=3&f_model=gpt-ops&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_start=2026-06-18T10%3A00%3A00Z&f_end=2026-06-18T10%3A05%3A00Z",
     );
+    expect(
+      adminSchedulerDecisionsHref({
+        start: "2026-06-18T10:00:00Z",
+        end: "2026-06-18T10:05:00Z",
+      }),
+    ).toBe(
+      "/admin/ops?tab=scheduler-decisions&f_start=2026-06-18T10%3A00%3A00Z&f_end=2026-06-18T10%3A05%3A00Z",
+    );
     expect(adminSchedulerDecisionsHref({ trace_id: "trace_456" })).toBeNull();
   });
 

@@ -247,7 +247,7 @@ describe("ErrorLogDetailDialog request dump evidence", () => {
         .some(
           (link) =>
             link.getAttribute("href") ===
-            "/admin/ops?tab=scheduler-decisions&f_request_id=req-detail&f_account_id=12&f_provider_id=3&f_model=gpt-4o-mini",
+            "/admin/ops?tab=scheduler-decisions&f_request_id=req-detail&f_account_id=12&f_provider_id=3&f_model=gpt-4o-mini&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_start=2026-06-18T09%3A55%3A00.000Z&f_end=2026-06-18T10%3A05%3A00.000Z",
         ),
     ).toBe(true);
     expect(screen.getByRole("link", { name: "账号健康" })).toHaveAttribute(
@@ -297,7 +297,7 @@ describe("ErrorLogDetailDialog request dump evidence", () => {
     );
     expect(screen.getAllByRole("link", { name: "请求证据" })[0]).toHaveAttribute(
       "href",
-      "/admin/logs?tab=request-evidence&f_request_id=req-detail&f_account_id=12&f_provider_id=3&f_error_class=no_available_account&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_model=gpt-4o-mini",
+      "/admin/logs?tab=request-evidence&f_request_id=req-detail&f_account_id=12&f_provider_id=3&f_error_class=no_available_account&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_model=gpt-4o-mini&f_start=2026-06-18T09%3A55%3A00.000Z&f_end=2026-06-18T10%3A05%3A00.000Z",
     );
   });
 });
