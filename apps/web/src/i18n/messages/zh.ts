@@ -2344,6 +2344,17 @@ export const zh: Messages = {
       provider: "渠道 ID",
       globalScope: "全局",
       builtinBaseline: "内置基线",
+      baselinePosture: "内置保护",
+      baselinePostureSummary:
+        "已启用 {enabled}/{total} · 已禁用 {disabled} · 已偏离 {modified} · 缺失 {missing}",
+      baselineHealthy: "覆盖完整",
+      baselineNeedsAttention: "需要处理",
+      baselineStatus: {
+        covered: "已覆盖",
+        disabled: "已禁用",
+        modified: "已偏离",
+        missing: "缺失",
+      },
       thresholdHint: "比率指标填 0–1，延迟填毫秒。",
       metricType: {
         error_rate: "错误率",

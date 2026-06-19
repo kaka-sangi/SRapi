@@ -1835,6 +1835,30 @@ func (e OpsAlertOperator) Valid() bool {
 	}
 }
 
+// Defines values for OpsAlertRuleBaselineStatus.
+const (
+	OpsAlertRuleBaselineStatusCovered  OpsAlertRuleBaselineStatus = "covered"
+	OpsAlertRuleBaselineStatusDisabled OpsAlertRuleBaselineStatus = "disabled"
+	OpsAlertRuleBaselineStatusMissing  OpsAlertRuleBaselineStatus = "missing"
+	OpsAlertRuleBaselineStatusModified OpsAlertRuleBaselineStatus = "modified"
+)
+
+// Valid indicates whether the value is a known member of the OpsAlertRuleBaselineStatus enum.
+func (e OpsAlertRuleBaselineStatus) Valid() bool {
+	switch e {
+	case OpsAlertRuleBaselineStatusCovered:
+		return true
+	case OpsAlertRuleBaselineStatusDisabled:
+		return true
+	case OpsAlertRuleBaselineStatusMissing:
+		return true
+	case OpsAlertRuleBaselineStatusModified:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OpsAlertSeverity.
 const (
 	OpsAlertSeverityCritical OpsAlertSeverity = "critical"
@@ -3355,19 +3379,19 @@ func (e UserAvatarContentType) Valid() bool {
 
 // Defines values for UserStatus.
 const (
-	UserStatusActive   UserStatus = "active"
-	UserStatusDisabled UserStatus = "disabled"
-	UserStatusPending  UserStatus = "pending"
+	Active   UserStatus = "active"
+	Disabled UserStatus = "disabled"
+	Pending  UserStatus = "pending"
 )
 
 // Valid indicates whether the value is a known member of the UserStatus enum.
 func (e UserStatus) Valid() bool {
 	switch e {
-	case UserStatusActive:
+	case Active:
 		return true
-	case UserStatusDisabled:
+	case Disabled:
 		return true
-	case UserStatusPending:
+	case Pending:
 		return true
 	default:
 		return false
@@ -8481,11 +8505,46 @@ type OpsAlertRule struct {
 	WindowSeconds int       `json:"window_seconds"`
 }
 
+// OpsAlertRuleBaselinePosture defines model for OpsAlertRuleBaselinePosture.
+type OpsAlertRuleBaselinePosture struct {
+	ConfiguredCount int                               `json:"configured_count"`
+	DisabledCount   int                               `json:"disabled_count"`
+	EnabledCount    int                               `json:"enabled_count"`
+	Items           []OpsAlertRuleBaselinePostureItem `json:"items"`
+	MissingCount    int                               `json:"missing_count"`
+	ModifiedCount   int                               `json:"modified_count"`
+	TotalCount      int                               `json:"total_count"`
+}
+
+// OpsAlertRuleBaselinePostureItem defines model for OpsAlertRuleBaselinePostureItem.
+type OpsAlertRuleBaselinePostureItem struct {
+	// BaselineKey Stable SRapi baseline identifier.
+	BaselineKey string `json:"baseline_key"`
+
+	// Differences Rule fields that differ from SRapi's current default baseline definition.
+	Differences []string `json:"differences"`
+
+	// Enabled True when the configured baseline rule is enabled.
+	Enabled bool `json:"enabled"`
+
+	// Modified True when the configured baseline differs from SRapi's current default rule body.
+	Modified bool `json:"modified"`
+
+	// Name Built-in alert rule display name.
+	Name   string                     `json:"name"`
+	RuleId *Id                        `json:"rule_id,omitempty"`
+	Status OpsAlertRuleBaselineStatus `json:"status"`
+}
+
+// OpsAlertRuleBaselineStatus defines model for OpsAlertRuleBaselineStatus.
+type OpsAlertRuleBaselineStatus string
+
 // OpsAlertRuleListResponse defines model for OpsAlertRuleListResponse.
 type OpsAlertRuleListResponse struct {
-	Data       []OpsAlertRule `json:"data"`
-	Pagination Pagination     `json:"pagination"`
-	RequestId  RequestId      `json:"request_id"`
+	BaselinePosture OpsAlertRuleBaselinePosture `json:"baseline_posture"`
+	Data            []OpsAlertRule              `json:"data"`
+	Pagination      Pagination                  `json:"pagination"`
+	RequestId       RequestId                   `json:"request_id"`
 }
 
 // OpsAlertRuleResponse defines model for OpsAlertRuleResponse.

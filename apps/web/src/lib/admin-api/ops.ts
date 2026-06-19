@@ -43,6 +43,7 @@ import type {
   ListAdminOpsSystemLogsData,
   OpsAlertEvent,
   OpsAlertRule,
+  OpsAlertRuleBaselinePosture,
   OpsAlertSilence,
   OpsNotificationChannel,
   OpsNotificationDelivery,
@@ -175,8 +176,19 @@ export const opsApi = {
     return unwrapData(() => deleteAdminOpsSlo({ path: { id }, throwOnError: true }));
   },
 
-  listOpsAlertRules(): Promise<AdminListResult<OpsAlertRule>> {
-    return unwrapList(() => listAdminOpsAlertRules({ throwOnError: true }));
+  async listOpsAlertRules(): Promise<
+    AdminListResult<OpsAlertRule, { baseline_posture: OpsAlertRuleBaselinePosture }>
+  > {
+    configureAdminClient();
+    const response = await listAdminOpsAlertRules({ throwOnError: true });
+    if (!response.data || !Array.isArray(response.data.data)) {
+      throw new Error("Admin API returned an empty alert rule list response.");
+    }
+    return {
+      data: response.data.data,
+      pagination: response.data.pagination,
+      baseline_posture: response.data.baseline_posture,
+    };
   },
 
   createOpsAlertRule(body: CreateAdminOpsAlertRuleData["body"]): Promise<OpsAlertRule> {

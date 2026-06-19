@@ -52,6 +52,8 @@ import {
 import type {
   OpsSloDefinition,
   OpsAlertRule,
+  OpsAlertRuleBaselinePosture,
+  OpsAlertRuleBaselinePostureItem,
   OpsAlertSilence,
   OpsNotificationChannel,
 } from "@/lib/sdk-types";
@@ -461,6 +463,7 @@ function OpsOverviewContent() {
           </Button>
         </CardHeader>
         <CardContent className="space-y-2">
+          <AlertRuleBaselinePostureSummary posture={alertRules.data?.baseline_posture} />
           {(alertRules.data?.data ?? []).length === 0 ? (
             <EmptyState
               icon={BellRing}
@@ -826,6 +829,83 @@ function OpsOverviewContent() {
       ) : null}
     </>
   );
+}
+
+function AlertRuleBaselinePostureSummary({
+  posture,
+}: {
+  posture: OpsAlertRuleBaselinePosture | undefined;
+}) {
+  const { t } = useLanguage();
+  if (!posture) return null;
+  const attention = posture.items.filter((item) => item.status !== "covered");
+  const status =
+    posture.missing_count > 0 || posture.disabled_count > 0
+      ? "error"
+      : posture.modified_count > 0
+        ? "limited"
+        : "active";
+
+  return (
+    <div className="border-srapi-border bg-srapi-surface-muted/50 space-y-2 rounded-md border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-srapi-text-primary text-sm font-medium">
+            {t("adminOps.alertRules.baselinePosture")}
+          </div>
+          <div className="text-2xs text-srapi-text-tertiary">
+            {t("adminOps.alertRules.baselinePostureSummary", {
+              enabled: posture.enabled_count,
+              total: posture.total_count,
+              disabled: posture.disabled_count,
+              modified: posture.modified_count,
+              missing: posture.missing_count,
+            })}
+          </div>
+        </div>
+        <QuietBadge
+          status={status}
+          label={
+            status === "active"
+              ? t("adminOps.alertRules.baselineHealthy")
+              : t("adminOps.alertRules.baselineNeedsAttention")
+          }
+        />
+      </div>
+      {attention.length > 0 ? (
+        <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-3">
+          {attention.slice(0, 6).map((item) => (
+            <div key={item.baseline_key} className="min-w-0 rounded border border-srapi-border/80 px-2 py-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-srapi-text-primary truncate text-2xs font-medium">
+                  {item.baseline_key}
+                </span>
+                <QuietBadge status={baselinePostureTone(item)} label={baselinePostureLabel(t, item)} />
+              </div>
+              {item.differences.length > 0 ? (
+                <div className="text-2xs text-srapi-text-tertiary mt-1 truncate font-mono">
+                  {item.differences.join(", ")}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function baselinePostureTone(item: OpsAlertRuleBaselinePostureItem) {
+  if (item.status === "covered") return "active";
+  if (item.status === "modified") return "limited";
+  return "error";
+}
+
+function baselinePostureLabel(
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  item: OpsAlertRuleBaselinePostureItem,
+) {
+  return t(`adminOps.alertRules.baselineStatus.${item.status}`);
 }
 
 function AlertEvidenceActions({ links }: { links: ReturnType<typeof buildOpsAlertEvidenceLinks> }) {

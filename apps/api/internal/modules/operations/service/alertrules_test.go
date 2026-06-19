@@ -187,6 +187,73 @@ func TestEnsureBuiltinAlertRulesRespectsExistingOperatorRule(t *testing.T) {
 	}
 }
 
+func TestListAlertRulesWithPostureReportsBaselineDrift(t *testing.T) {
+	now := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	disabled := false
+	if _, err := svc.CreateAlertRule(t.Context(), contract.CreateAlertRuleRequest{
+		Name:            builtinAlertRuleGatewayErrorRate,
+		MetricType:      contract.AlertMetricErrorRate,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       0.9,
+		Severity:        contract.AlertSeverityCritical,
+		Enabled:         &disabled,
+		WindowSeconds:   300,
+		CooldownSeconds: 600,
+		MinRequestCount: 20,
+	}); err != nil {
+		t.Fatalf("create drifted baseline: %v", err)
+	}
+	if _, err := svc.CreateAlertRule(t.Context(), contract.CreateAlertRuleRequest{
+		Name:      "Custom request count",
+		Threshold: 42,
+	}); err != nil {
+		t.Fatalf("create custom rule: %v", err)
+	}
+
+	result, err := svc.ListAlertRulesWithPosture(t.Context())
+	if err != nil {
+		t.Fatalf("list rules with posture: %v", err)
+	}
+	posture := result.BaselinePosture
+	if len(result.Rules) != 2 || posture.TotalCount != len(builtinAlertRules) ||
+		posture.ConfiguredCount != 1 ||
+		posture.EnabledCount != 0 ||
+		posture.DisabledCount != 1 ||
+		posture.ModifiedCount != 1 ||
+		posture.MissingCount != len(builtinAlertRules)-1 {
+		t.Fatalf("unexpected baseline posture: result=%+v", result)
+	}
+	item := findBaselinePostureItem(t, posture.Items, "gateway.error_rate")
+	if item.Status != contract.AlertRuleBaselineDisabled ||
+		item.RuleID == 0 ||
+		item.Enabled ||
+		!item.Modified ||
+		len(item.Differences) != 1 ||
+		item.Differences[0] != "threshold" {
+		t.Fatalf("unexpected drifted baseline posture item: %+v", item)
+	}
+	missing := findBaselinePostureItem(t, posture.Items, "gateway.latency_p95")
+	if missing.Status != contract.AlertRuleBaselineMissing || missing.RuleID != 0 || missing.Enabled || missing.Modified {
+		t.Fatalf("unexpected missing baseline posture item: %+v", missing)
+	}
+}
+
+func findBaselinePostureItem(t *testing.T, items []contract.AlertRuleBaselinePostureItem, key string) contract.AlertRuleBaselinePostureItem {
+	t.Helper()
+	for _, item := range items {
+		if item.BaselineKey == key {
+			return item
+		}
+	}
+	t.Fatalf("baseline posture item %q not found in %+v", key, items)
+	return contract.AlertRuleBaselinePostureItem{}
+}
+
 func assertBuiltinRule(t *testing.T, rules []contract.AlertRule, name string, metric contract.AlertMetricType, endpoint string, minRequestCount int) {
 	t.Helper()
 	for _, rule := range rules {

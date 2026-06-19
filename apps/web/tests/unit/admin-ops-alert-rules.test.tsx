@@ -4,7 +4,7 @@ import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AdminOpsPage from "@/app/admin/ops/page";
 import { LanguageProvider } from "@/context/LanguageContext";
-import type { OpsAlertRule } from "@/lib/sdk-types";
+import type { OpsAlertRule, OpsAlertRuleBaselinePosture } from "@/lib/sdk-types";
 
 const storage = new Map<string, string>();
 Object.defineProperty(window, "localStorage", {
@@ -60,6 +60,42 @@ const mocks = vi.hoisted(() => ({
     created_at: "2026-06-18T10:00:00Z",
     updated_at: "2026-06-18T10:00:00Z",
   } satisfies OpsAlertRule,
+  baselinePosture: {
+    total_count: 3,
+    configured_count: 2,
+    enabled_count: 1,
+    disabled_count: 1,
+    modified_count: 1,
+    missing_count: 1,
+    items: [
+      {
+        baseline_key: "provider.timeout",
+        name: "SRapi Provider timeout baseline",
+        status: "modified",
+        rule_id: "1",
+        enabled: true,
+        modified: true,
+        differences: ["threshold"],
+      },
+      {
+        baseline_key: "gateway.error_rate",
+        name: "SRapi Gateway error rate baseline",
+        status: "disabled",
+        rule_id: "3",
+        enabled: false,
+        modified: false,
+        differences: [],
+      },
+      {
+        baseline_key: "gateway.latency_p95",
+        name: "SRapi Gateway p95 latency baseline",
+        status: "missing",
+        enabled: false,
+        modified: false,
+        differences: [],
+      },
+    ],
+  } satisfies OpsAlertRuleBaselinePosture,
 }));
 
 vi.mock("@/components/layout/admin-shell", () => ({
@@ -113,7 +149,7 @@ vi.mock("@/hooks/admin-queries", () => ({
   useOpsErrorTrend: () => ({ data: { points: [] }, isLoading: false }),
   useUpdateOpsSettings: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useOpsAlertRules: () => ({
-    data: { data: [mocks.baselineRule, mocks.customRule] },
+    data: { data: [mocks.baselineRule, mocks.customRule], baseline_posture: mocks.baselinePosture },
     isLoading: false,
     isError: false,
   }),
@@ -152,8 +188,15 @@ describe("AdminOpsPage alert rules", () => {
     render(<AdminOpsPage />, { wrapper: wrap });
 
     expect(screen.getByText("SRapi Provider timeout baseline")).toBeInTheDocument();
+    expect(screen.getByText("内置保护")).toBeInTheDocument();
+    expect(screen.getByText("已启用 1/3 · 已禁用 1 · 已偏离 1 · 缺失 1")).toBeInTheDocument();
+    expect(screen.getAllByText("provider.timeout").length).toBeGreaterThan(0);
+    expect(screen.getByText("gateway.error_rate")).toBeInTheDocument();
+    expect(screen.getByText("gateway.latency_p95")).toBeInTheDocument();
+    expect(screen.getByText("已偏离")).toBeInTheDocument();
+    expect(screen.getAllByText("已禁用").length).toBeGreaterThan(0);
+    expect(screen.getByText("缺失")).toBeInTheDocument();
     expect(screen.getByText("内置基线")).toBeInTheDocument();
-    expect(screen.getByText(/provider\.timeout/)).toBeInTheDocument();
     expect(screen.getByText("Custom chat error rate")).toBeInTheDocument();
     expect(screen.getAllByText("内置基线")).toHaveLength(1);
   });

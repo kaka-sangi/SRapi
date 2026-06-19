@@ -32,20 +32,21 @@ func (s *Server) handleListAdminOpsAlertRules(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	items, err := s.runtime.operations.ListAlertRules(r.Context())
+	result, err := s.runtime.operations.ListAlertRulesWithPosture(r.Context())
 	if err != nil {
 		writeOperationsServiceError(w, err, requestID)
 		return
 	}
-	data := make([]apiopenapi.OpsAlertRule, 0, len(items))
-	for _, item := range items {
+	data := make([]apiopenapi.OpsAlertRule, 0, len(result.Rules))
+	for _, item := range result.Rules {
 		data = append(data, toAPIOpsAlertRule(item))
 	}
 	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpsAlertRuleListResponse{
-		Data:       data,
-		Pagination: pg,
-		RequestId:  requestID,
+		BaselinePosture: toAPIOpsAlertRuleBaselinePosture(result.BaselinePosture),
+		Data:            data,
+		Pagination:      pg,
+		RequestId:       requestID,
 	})
 }
 

@@ -30042,6 +30042,81 @@ components:
         updated_at:
           $ref: "#/components/schemas/Timestamp"
 
+    OpsAlertRuleBaselineStatus:
+      type: string
+      enum:
+        - covered
+        - disabled
+        - modified
+        - missing
+
+    OpsAlertRuleBaselinePostureItem:
+      type: object
+      required:
+        - baseline_key
+        - name
+        - status
+        - enabled
+        - modified
+        - differences
+      properties:
+        baseline_key:
+          type: string
+          description: Stable SRapi baseline identifier.
+        name:
+          type: string
+          description: Built-in alert rule display name.
+        status:
+          $ref: "#/components/schemas/OpsAlertRuleBaselineStatus"
+        rule_id:
+          $ref: "#/components/schemas/Id"
+          description: Configured alert rule id when this baseline exists.
+        enabled:
+          type: boolean
+          description: True when the configured baseline rule is enabled.
+        modified:
+          type: boolean
+          description: True when the configured baseline differs from SRapi's current default rule body.
+        differences:
+          type: array
+          description: Rule fields that differ from SRapi's current default baseline definition.
+          items:
+            type: string
+
+    OpsAlertRuleBaselinePosture:
+      type: object
+      required:
+        - total_count
+        - configured_count
+        - enabled_count
+        - disabled_count
+        - modified_count
+        - missing_count
+        - items
+      properties:
+        total_count:
+          type: integer
+          minimum: 0
+        configured_count:
+          type: integer
+          minimum: 0
+        enabled_count:
+          type: integer
+          minimum: 0
+        disabled_count:
+          type: integer
+          minimum: 0
+        modified_count:
+          type: integer
+          minimum: 0
+        missing_count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsAlertRuleBaselinePostureItem"
+
     CreateOpsAlertRuleRequest:
       type: object
       required:
@@ -30118,6 +30193,7 @@ components:
       type: object
       required:
         - data
+        - baseline_posture
         - pagination
         - request_id
       properties:
@@ -30125,6 +30201,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/OpsAlertRule"
+        baseline_posture:
+          $ref: "#/components/schemas/OpsAlertRuleBaselinePosture"
         pagination:
           $ref: "#/components/schemas/Pagination"
         request_id:

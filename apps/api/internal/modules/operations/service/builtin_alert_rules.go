@@ -359,3 +359,108 @@ func normalizedRuleName(value string) string {
 func builtinAlertRuleKey(name string) string {
 	return builtinAlertRuleKeys[normalizedRuleName(name)]
 }
+
+func alertRuleBaselinePosture(rules []contract.AlertRule) contract.AlertRuleBaselinePosture {
+	byKey := make(map[string]contract.AlertRule, len(rules))
+	for _, rule := range rules {
+		key := builtinAlertRuleKey(rule.Name)
+		if key == "" {
+			continue
+		}
+		rule = cloneAlertRule(rule)
+		byKey[key] = rule
+	}
+
+	out := contract.AlertRuleBaselinePosture{
+		TotalCount: len(builtinAlertRules),
+		Items:      make([]contract.AlertRuleBaselinePostureItem, 0, len(builtinAlertRules)),
+	}
+	for _, baseline := range builtinAlertRules {
+		expected := baseline
+		applyAlertRuleDefaults(&expected)
+		expected = cloneAlertRule(expected)
+
+		item := contract.AlertRuleBaselinePostureItem{
+			BaselineKey: expected.BaselineKey,
+			Name:        expected.Name,
+			Status:      contract.AlertRuleBaselineMissing,
+		}
+		actual, ok := byKey[expected.BaselineKey]
+		if !ok {
+			out.MissingCount++
+			out.Items = append(out.Items, item)
+			continue
+		}
+
+		differences := alertRuleBaselineDifferences(expected, actual)
+		item.RuleID = actual.ID
+		item.Enabled = actual.Enabled
+		item.Modified = len(differences) > 0
+		item.Differences = differences
+		switch {
+		case !actual.Enabled:
+			item.Status = contract.AlertRuleBaselineDisabled
+			out.DisabledCount++
+		case item.Modified:
+			item.Status = contract.AlertRuleBaselineModified
+		default:
+			item.Status = contract.AlertRuleBaselineCovered
+		}
+		out.ConfiguredCount++
+		if actual.Enabled {
+			out.EnabledCount++
+		}
+		if item.Modified {
+			out.ModifiedCount++
+		}
+		out.Items = append(out.Items, item)
+	}
+	return out
+}
+
+func alertRuleBaselineDifferences(expected contract.AlertRule, actual contract.AlertRule) []string {
+	differences := make([]string, 0, 8)
+	if expected.MetricType != actual.MetricType {
+		differences = append(differences, "metric_type")
+	}
+	if expected.Operator != actual.Operator {
+		differences = append(differences, "operator")
+	}
+	if expected.Threshold != actual.Threshold {
+		differences = append(differences, "threshold")
+	}
+	if expected.Severity != actual.Severity {
+		differences = append(differences, "severity")
+	}
+	if expected.WindowSeconds != actual.WindowSeconds {
+		differences = append(differences, "window_seconds")
+	}
+	if expected.CooldownSeconds != actual.CooldownSeconds {
+		differences = append(differences, "cooldown_seconds")
+	}
+	if expected.MinRequestCount != actual.MinRequestCount {
+		differences = append(differences, "min_request_count")
+	}
+	if !alertRuleScopeEqual(expected.Scope, actual.Scope) {
+		differences = append(differences, "scope")
+	}
+	return differences
+}
+
+func alertRuleScopeEqual(expected contract.AlertRuleScope, actual contract.AlertRuleScope) bool {
+	return expected.SourceEndpoint == actual.SourceEndpoint &&
+		expected.Model == actual.Model &&
+		expected.ErrorClass == actual.ErrorClass &&
+		alertRuleProviderIDEqual(expected.ProviderID, actual.ProviderID)
+}
+
+func alertRuleProviderIDEqual(expected *int, actual *int) bool {
+	switch {
+	case expected == nil && actual == nil:
+		return true
+	case expected == nil || actual == nil:
+		return false
+	default:
+		return *expected == *actual
+	}
+}

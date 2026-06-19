@@ -5542,6 +5542,43 @@ export type OpsAlertRule = {
     updated_at: Timestamp;
 };
 
+export type OpsAlertRuleBaselineStatus = 'covered' | 'disabled' | 'modified' | 'missing';
+
+export type OpsAlertRuleBaselinePostureItem = {
+    /**
+     * Stable SRapi baseline identifier.
+     */
+    baseline_key: string;
+    /**
+     * Built-in alert rule display name.
+     */
+    name: string;
+    status: OpsAlertRuleBaselineStatus;
+    rule_id?: Id;
+    /**
+     * True when the configured baseline rule is enabled.
+     */
+    enabled: boolean;
+    /**
+     * True when the configured baseline differs from SRapi's current default rule body.
+     */
+    modified: boolean;
+    /**
+     * Rule fields that differ from SRapi's current default baseline definition.
+     */
+    differences: Array<string>;
+};
+
+export type OpsAlertRuleBaselinePosture = {
+    total_count: number;
+    configured_count: number;
+    enabled_count: number;
+    disabled_count: number;
+    modified_count: number;
+    missing_count: number;
+    items: Array<OpsAlertRuleBaselinePostureItem>;
+};
+
 export type CreateOpsAlertRuleRequest = {
     name: string;
     metric_type: OpsAlertMetricType;
@@ -5575,6 +5612,7 @@ export type OpsAlertRuleResponse = {
 
 export type OpsAlertRuleListResponse = {
     data: Array<OpsAlertRule>;
+    baseline_posture: OpsAlertRuleBaselinePosture;
     pagination: Pagination;
     request_id: RequestId;
 };

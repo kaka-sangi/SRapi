@@ -2408,6 +2408,17 @@ export const en = {
       provider: "Provider ID",
       globalScope: "global",
       builtinBaseline: "Built-in baseline",
+      baselinePosture: "Built-in protection",
+      baselinePostureSummary:
+        "{enabled}/{total} enabled · {disabled} disabled · {modified} modified · {missing} missing",
+      baselineHealthy: "Covered",
+      baselineNeedsAttention: "Needs attention",
+      baselineStatus: {
+        covered: "Covered",
+        disabled: "Disabled",
+        modified: "Modified",
+        missing: "Missing",
+      },
       thresholdHint: "Ratio for rates (0–1), milliseconds for latency.",
       metricType: {
         error_rate: "Error rate",

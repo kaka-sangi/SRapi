@@ -1,9 +1,9 @@
 import type { Pagination } from "../../../../../packages/sdk/typescript/src/types.gen";
 
-export interface AdminListResult<T> {
+export type AdminListResult<T, Extra extends object = object> = Extra & {
   data: T[];
   pagination?: Pagination;
-}
+};
 
 export interface AdminTimeRange {
   start?: string;

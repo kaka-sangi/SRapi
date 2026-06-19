@@ -386,6 +386,8 @@ Provider Account metadata 或 Provider config/capabilities 可以把默认 `/mod
 
 AdminOps 启动时会按规则名幂等创建内置阈值告警基线：全局 Gateway error rate、全局 Gateway p95 latency，以及 `/v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1/responses/ws` 和 `/v1/realtime` 的入口级错误率或 p95 latency baseline。Provider / Scheduler 错误类基线覆盖 `no_available_account`、`auth_failed`、`quota_exhausted`、`provider_5xx`、`rate_limit`、`timeout`、`network_error`、`invalid_response`、`policy_error`、`upstream_error` 和 `overloaded`；评估时会把历史同义类如 `rate_limited` / `rate_limit_error` 归入 `rate_limit`，把 `auth_error` / `credential_error` 归入 `auth_failed`。已有同名规则会被视为 operator-owned 配置，不会被覆盖；需要停用默认保护时应禁用规则而不是修改数据库。
 
+`GET /api/v1/admin/ops/alert-rules` 会随列表返回 `baseline_posture`，由 operations service 按当前内置基线定义实时派生，用于判断默认保护是否完整覆盖。姿态会统计 configured/enabled/disabled/modified/missing，并列出每条内置基线的 `baseline_key`、状态和偏离字段；偏离只比较 metric/operator/threshold/severity/window/cooldown/min_request_count/scope 等低敏规则字段。前端只展示该服务端姿态，不能自行硬编码内置规则名来推导覆盖状态。
+
 ### Ops 告警通知
 
 AdminOps 控制面内置 email 告警通知通道：

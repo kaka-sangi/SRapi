@@ -778,7 +778,7 @@ func TestUpdateCurrentUserProfileRequiresCSRFAndAllowlistsFields(t *testing.T) {
 	if updateResp.Data.Name != "Updated Name" {
 		t.Fatalf("expected updated name, got %+v", updateResp.Data)
 	}
-	if updateResp.Data.Email != "profile-update@srapi.local" || updateResp.Data.Status != apiopenapi.UserStatusActive || len(updateResp.Data.Roles) != 1 || updateResp.Data.Roles[0] != "user" {
+	if updateResp.Data.Email != "profile-update@srapi.local" || updateResp.Data.Status != apiopenapi.Active || len(updateResp.Data.Roles) != 1 || updateResp.Data.Roles[0] != "user" {
 		t.Fatalf("profile update changed protected fields: %+v", updateResp.Data)
 	}
 }
@@ -11162,6 +11162,14 @@ func TestAdminOpsAlertRulesControlPlane(t *testing.T) {
 	}
 	if !opsAlertRuleListContainsBaseline(listResp.Data, "gateway.error_rate") {
 		t.Fatalf("expected built-in alert rule metadata in %+v", listResp.Data)
+	}
+	if listResp.BaselinePosture.TotalCount != len(expectedBaselineNames) ||
+		listResp.BaselinePosture.ConfiguredCount != len(expectedBaselineNames) ||
+		listResp.BaselinePosture.EnabledCount != len(expectedBaselineNames) ||
+		listResp.BaselinePosture.DisabledCount != 0 ||
+		listResp.BaselinePosture.ModifiedCount != 0 ||
+		listResp.BaselinePosture.MissingCount != 0 {
+		t.Fatalf("unexpected baseline posture: %+v", listResp.BaselinePosture)
 	}
 	if !opsAlertRuleListContainsName(listResp.Data, "Chat error rate") {
 		t.Fatalf("expected created alert rule in %+v", listResp.Data)

@@ -419,6 +419,47 @@ type AlertRule struct {
 	UpdatedAt       time.Time
 }
 
+// AlertRuleBaselineStatus describes whether one SRapi built-in alert-rule
+// baseline is present and still aligned with the current default definition.
+type AlertRuleBaselineStatus string
+
+const (
+	AlertRuleBaselineCovered  AlertRuleBaselineStatus = "covered"
+	AlertRuleBaselineDisabled AlertRuleBaselineStatus = "disabled"
+	AlertRuleBaselineModified AlertRuleBaselineStatus = "modified"
+	AlertRuleBaselineMissing  AlertRuleBaselineStatus = "missing"
+)
+
+// AlertRuleBaselinePostureItem reports the posture of one built-in baseline.
+type AlertRuleBaselinePostureItem struct {
+	BaselineKey string
+	Name        string
+	Status      AlertRuleBaselineStatus
+	RuleID      int
+	Enabled     bool
+	Modified    bool
+	Differences []string
+}
+
+// AlertRuleBaselinePosture summarizes SRapi built-in alert-rule baseline
+// coverage for operator diagnostics.
+type AlertRuleBaselinePosture struct {
+	TotalCount      int
+	ConfiguredCount int
+	EnabledCount    int
+	DisabledCount   int
+	ModifiedCount   int
+	MissingCount    int
+	Items           []AlertRuleBaselinePostureItem
+}
+
+// AlertRuleListResult returns configured alert rules with the service-derived
+// built-in baseline posture for the same snapshot.
+type AlertRuleListResult struct {
+	Rules           []AlertRule
+	BaselinePosture AlertRuleBaselinePosture
+}
+
 type CreateAlertRuleRequest struct {
 	Name            string
 	MetricType      AlertMetricType

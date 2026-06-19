@@ -31,6 +31,38 @@ func toAPIOpsAlertRule(rule operationscontract.AlertRule) apiopenapi.OpsAlertRul
 	}
 }
 
+func toAPIOpsAlertRuleBaselinePosture(posture operationscontract.AlertRuleBaselinePosture) apiopenapi.OpsAlertRuleBaselinePosture {
+	items := make([]apiopenapi.OpsAlertRuleBaselinePostureItem, 0, len(posture.Items))
+	for _, item := range posture.Items {
+		items = append(items, toAPIOpsAlertRuleBaselinePostureItem(item))
+	}
+	return apiopenapi.OpsAlertRuleBaselinePosture{
+		ConfiguredCount: posture.ConfiguredCount,
+		DisabledCount:   posture.DisabledCount,
+		EnabledCount:    posture.EnabledCount,
+		Items:           items,
+		MissingCount:    posture.MissingCount,
+		ModifiedCount:   posture.ModifiedCount,
+		TotalCount:      posture.TotalCount,
+	}
+}
+
+func toAPIOpsAlertRuleBaselinePostureItem(item operationscontract.AlertRuleBaselinePostureItem) apiopenapi.OpsAlertRuleBaselinePostureItem {
+	out := apiopenapi.OpsAlertRuleBaselinePostureItem{
+		BaselineKey: item.BaselineKey,
+		Differences: append([]string(nil), item.Differences...),
+		Enabled:     item.Enabled,
+		Modified:    item.Modified,
+		Name:        item.Name,
+		Status:      apiopenapi.OpsAlertRuleBaselineStatus(item.Status),
+	}
+	if item.RuleID > 0 {
+		ruleID := apiopenapi.Id(strconv.Itoa(item.RuleID))
+		out.RuleId = &ruleID
+	}
+	return out
+}
+
 func toAPIOpsAlertRuleScope(scope operationscontract.AlertRuleScope) apiopenapi.OpsAlertRuleScope {
 	out := apiopenapi.OpsAlertRuleScope{
 		ErrorClass:     scope.ErrorClass,

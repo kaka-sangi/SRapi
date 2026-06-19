@@ -15,17 +15,30 @@ const alertRuleIDPrefix = "rule."
 
 // ListAlertRules returns all configured generic metric alert rules.
 func (s *Service) ListAlertRules(ctx context.Context) ([]contract.AlertRule, error) {
+	result, err := s.ListAlertRulesWithPosture(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return result.Rules, nil
+}
+
+// ListAlertRulesWithPosture returns alert rules plus service-derived built-in
+// baseline posture metadata for AdminOps.
+func (s *Service) ListAlertRulesWithPosture(ctx context.Context) (contract.AlertRuleListResult, error) {
 	if s == nil || s.observabilityStore == nil {
-		return nil, ErrInvalidInput
+		return contract.AlertRuleListResult{}, ErrInvalidInput
 	}
 	rules, err := s.observabilityStore.ListAlertRules(ctx)
 	if err != nil {
-		return nil, err
+		return contract.AlertRuleListResult{}, err
 	}
 	for idx := range rules {
 		rules[idx] = cloneAlertRule(rules[idx])
 	}
-	return rules, nil
+	return contract.AlertRuleListResult{
+		Rules:           rules,
+		BaselinePosture: alertRuleBaselinePosture(rules),
+	}, nil
 }
 
 // CreateAlertRule validates and persists a new generic metric alert rule.
