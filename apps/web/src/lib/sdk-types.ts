@@ -51,6 +51,8 @@ export type {
   BillingLedgerEntry,
   DomainEventOutbox,
   ErrorLog,
+  OpsErrorFingerprint,
+  OpsErrorFingerprintListMeta,
   OpsErrorLog,
   UpstreamErrorEvent,
   RequestEvidenceDetailResponse,

@@ -174,6 +174,9 @@ func listPredicates(filter contract.ListFilter) []predicate.OpsErrorLog {
 	if platform := strings.TrimSpace(filter.Platform); platform != "" {
 		predicates = append(predicates, entopserrorlog.PlatformEQ(platform))
 	}
+	if sourceEndpoint := strings.TrimSpace(filter.SourceEndpoint); sourceEndpoint != "" {
+		predicates = append(predicates, entopserrorlog.SourceEndpointEQ(sourceEndpoint))
+	}
 	if model := strings.TrimSpace(filter.Model); model != "" {
 		predicates = append(predicates, entopserrorlog.ModelEQ(model))
 	}

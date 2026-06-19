@@ -73,3 +73,36 @@ func TestListFiltersErrorPhaseAndOwner(t *testing.T) {
 		t.Fatalf("expected upstream provider row, got %+v", list)
 	}
 }
+
+func TestListFiltersSourceEndpoint(t *testing.T) {
+	store := New()
+	ctx := context.Background()
+	now := time.Date(2026, 6, 19, 8, 0, 0, 0, time.UTC)
+	responses, err := store.Insert(ctx, contract.Entry{
+		OccurredAt:     now,
+		RequestID:      "req_responses",
+		SourceEndpoint: "/v1/responses",
+		ErrorClass:     "server_bad",
+		ErrorMessage:   "server bad",
+	})
+	if err != nil {
+		t.Fatalf("insert responses: %v", err)
+	}
+	if _, err := store.Insert(ctx, contract.Entry{
+		OccurredAt:     now.Add(time.Second),
+		RequestID:      "req_chat",
+		SourceEndpoint: "/v1/chat/completions",
+		ErrorClass:     "server_bad",
+		ErrorMessage:   "server bad",
+	}); err != nil {
+		t.Fatalf("insert chat: %v", err)
+	}
+
+	list, err := store.List(ctx, contract.ListFilter{SourceEndpoint: "/v1/responses", Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("list by source endpoint: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != responses.ID {
+		t.Fatalf("expected responses row, got %+v", list)
+	}
+}

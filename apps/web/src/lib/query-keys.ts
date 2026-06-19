@@ -91,6 +91,8 @@ export const queryKeys = {
       ["admin", "usage-distribution", params ?? {}] as const,
     auditLogs: (params?: unknown) => ["admin", "audit-logs", params ?? {}] as const,
     errorLogs: (params?: unknown) => ["admin", "error-logs", params ?? {}] as const,
+    errorLogFingerprints: (params?: unknown) =>
+      ["admin", "error-logs", "fingerprints", params ?? {}] as const,
     errorLog: (id: string) => ["admin", "error-logs", id] as const,
     requestLogFiles: (params?: unknown) =>
       ["admin", "request-log-files", params ?? {}] as const,

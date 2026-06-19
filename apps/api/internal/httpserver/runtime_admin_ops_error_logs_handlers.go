@@ -308,13 +308,14 @@ func (s *Server) handleListAdminOpsErrorLogFingerprints(w http.ResponseWriter, r
 func opsErrorLogListFilterFromRequest(r *http.Request) (opserrorlogscontract.ListFilter, error) {
 	q := r.URL.Query()
 	filter := opserrorlogscontract.ListFilter{
-		Resolution: opserrorlogscontract.Resolution(strings.TrimSpace(q.Get("resolution"))),
-		ErrorClass: strings.TrimSpace(q.Get("error_class")),
-		ErrorPhase: strings.TrimSpace(q.Get("error_phase")),
-		ErrorOwner: strings.TrimSpace(q.Get("error_owner")),
-		Platform:   strings.TrimSpace(q.Get("platform")),
-		Model:      strings.TrimSpace(q.Get("model")),
-		Query:      strings.TrimSpace(q.Get("q")),
+		Resolution:     opserrorlogscontract.Resolution(strings.TrimSpace(q.Get("resolution"))),
+		ErrorClass:     strings.TrimSpace(q.Get("error_class")),
+		ErrorPhase:     strings.TrimSpace(q.Get("error_phase")),
+		ErrorOwner:     strings.TrimSpace(q.Get("error_owner")),
+		Platform:       strings.TrimSpace(q.Get("platform")),
+		SourceEndpoint: strings.TrimSpace(q.Get("source_endpoint")),
+		Model:          strings.TrimSpace(q.Get("model")),
+		Query:          strings.TrimSpace(q.Get("q")),
 	}
 	if filter.Resolution != "" && !validOpsErrorLogResolution(filter.Resolution) {
 		return opserrorlogscontract.ListFilter{}, errors.New("invalid resolution")

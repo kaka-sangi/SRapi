@@ -17371,6 +17371,10 @@ export type ListAdminOpsErrorLogsData = {
         error_owner?: string;
         platform?: string;
         /**
+         * Exact gateway source endpoint, for example /v1/responses.
+         */
+        source_endpoint?: string;
+        /**
          * Filter by operator-supplied resolution status.
          */
         resolution?: 'open' | 'investigating' | 'resolved' | 'muted';
@@ -17434,6 +17438,10 @@ export type ListAdminOpsErrorLogFingerprintsData = {
          */
         error_owner?: string;
         platform?: string;
+        /**
+         * Exact gateway source endpoint, for example /v1/responses.
+         */
+        source_endpoint?: string;
         /**
          * Filter by operator-supplied resolution status.
          */

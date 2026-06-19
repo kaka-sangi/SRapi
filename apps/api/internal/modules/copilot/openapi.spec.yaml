@@ -9674,6 +9674,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: source_endpoint
+          in: query
+          description: Exact gateway source endpoint, for example /v1/responses.
+          schema:
+            type: string
         - name: resolution
           in: query
           description: Filter by operator-supplied resolution status.
@@ -9777,6 +9782,11 @@ paths:
             type: string
         - name: platform
           in: query
+          schema:
+            type: string
+        - name: source_endpoint
+          in: query
+          description: Exact gateway source endpoint, for example /v1/responses.
           schema:
             type: string
         - name: resolution

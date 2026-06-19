@@ -355,6 +355,7 @@ func normalizeListFilter(filter contract.ListFilter) (contract.ListFilter, error
 		return contract.ListFilter{}, ErrInvalidInput
 	}
 	filter.Platform = truncate(cleanLogText(filter.Platform), 64)
+	filter.SourceEndpoint = truncate(cleanLogText(filter.SourceEndpoint), 128)
 	filter.Model = truncate(cleanLogText(filter.Model), 128)
 	filter.ErrorClass = truncate(cleanLogText(filter.ErrorClass), 64)
 	filter.Query = truncate(redactSecretText(filter.Query), MaxMessageBytes)

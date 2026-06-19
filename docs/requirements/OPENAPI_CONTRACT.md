@@ -657,9 +657,9 @@ PATCH /api/v1/admin/ops/error-logs/{id}
 
 `GET /api/v1/admin/ops/error-logs` returns persisted `ops_error_logs` rows,
 not usage-derived guesses. Query filters may include `user_id`, `account_id`,
-`provider_id`, `model`, `error_class`, `platform`, `resolution`, `status_min`,
-`status_max`, `start`, `end`, and `q`. Pagination uses the shared `Pagination`
-schema.
+`provider_id`, `model`, `source_endpoint`, `error_class`, `platform`,
+`resolution`, `status_min`, `status_max`, `start`, `end`, and `q`. Pagination
+uses the shared `Pagination` schema.
 
 `GET /api/v1/admin/ops/error-logs/fingerprints` returns a bounded real-time
 aggregation over `ops_error_logs` for incident triage. It supports the same

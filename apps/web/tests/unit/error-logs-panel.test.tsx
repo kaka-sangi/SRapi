@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ErrorLogsPanel } from "@/app/admin/logs/_panels/error-logs-panel";
@@ -18,6 +18,7 @@ Object.defineProperty(window, "localStorage", {
 });
 
 const mocks = vi.hoisted(() => ({
+  useAdminErrorLogFingerprints: vi.fn(),
   useAdminErrorLogs: vi.fn(),
   schedulerLog: {
     id: "err-row",
@@ -86,6 +87,29 @@ const mocks = vi.hoisted(() => ({
       "class=rate_limited | status=429 | type=rate_limit_error | code=too_many_requests | message=quota exceeded",
     resolution: "open",
   } satisfies OpsErrorLog,
+  fingerprint: {
+    fingerprint: "errfp_123",
+    count: 12,
+    open_count: 10,
+    investigating_count: 2,
+    resolved_count: 0,
+    muted_count: 0,
+    first_occurred_at: "2026-06-18T09:00:00Z",
+    last_occurred_at: "2026-06-18T10:00:00Z",
+    example_error_log_id: "err-upstream",
+    example_request_id: "req-upstream",
+    example_error_message: "provider returned 503 for request req-upstream",
+    source_endpoint: "/v1/responses",
+    target_protocol: "openai-compatible",
+    model: "gpt-4o-mini",
+    status_code: 503,
+    status_class: "5xx",
+    error_class: "server_bad",
+    error_phase: "upstream",
+    error_owner: "provider",
+    error_source: "upstream_http",
+    message_pattern: "provider returned {n} for request {request}",
+  },
 }));
 
 vi.mock("@/hooks/admin-queries", () => ({
@@ -96,6 +120,7 @@ vi.mock("@/hooks/admin-queries", () => ({
     isError: false,
     refetch: vi.fn(),
   }),
+  useAdminErrorLogFingerprints: mocks.useAdminErrorLogFingerprints,
   useAdminErrorLogs: mocks.useAdminErrorLogs,
   useAdminRequestLogFileDownload: () => ({
     data: undefined,
@@ -157,6 +182,14 @@ describe("ErrorLogsPanel", () => {
       },
       isFetching: false,
       refetch: vi.fn(),
+    });
+    mocks.useAdminErrorLogFingerprints.mockReturnValue({
+      data: {
+        data: [mocks.fingerprint],
+        meta: { total: 1, scanned: 12, truncated: false },
+      },
+      isLoading: false,
+      isError: false,
     });
     window.history.replaceState(null, "", "/admin/logs?tab=error");
   });
@@ -229,5 +262,27 @@ describe("ErrorLogsPanel", () => {
     expect(screen.getByText("rate_limit_error")).toBeInTheDocument();
     expect(screen.getByText("too_many_requests")).toBeInTheDocument();
     expect(screen.getByText("quota exceeded")).toBeInTheDocument();
+  });
+
+  it("renders error fingerprints and maps focus to exact list filters", () => {
+    render(<ErrorLogsPanel />, { wrapper: wrap });
+
+    expect(screen.getByText("错误指纹")).toBeInTheDocument();
+    expect(screen.getByText("provider returned {n} for request {request}")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("定位"));
+
+    expect(mocks.useAdminErrorLogs).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        source_endpoint: "/v1/responses",
+        model: "gpt-4o-mini",
+        error_class: "server_bad",
+        error_phase: "upstream",
+        error_owner: "provider",
+        status_min: 500,
+        status_max: 599,
+      }),
+    );
+    expect(window.location.search).toContain("f_source_endpoint=%2Fv1%2Fresponses");
   });
 });

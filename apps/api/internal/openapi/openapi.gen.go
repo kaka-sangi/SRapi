@@ -12133,6 +12133,9 @@ type ListAdminOpsErrorLogsParams struct {
 	ErrorOwner *string `form:"error_owner,omitempty" json:"error_owner,omitempty"`
 	Platform   *string `form:"platform,omitempty" json:"platform,omitempty"`
 
+	// SourceEndpoint Exact gateway source endpoint, for example /v1/responses.
+	SourceEndpoint *string `form:"source_endpoint,omitempty" json:"source_endpoint,omitempty"`
+
 	// Resolution Filter by operator-supplied resolution status.
 	Resolution *ListAdminOpsErrorLogsParamsResolution `form:"resolution,omitempty" json:"resolution,omitempty"`
 	StatusMin  *int                                   `form:"status_min,omitempty" json:"status_min,omitempty"`
@@ -12161,6 +12164,9 @@ type ListAdminOpsErrorLogFingerprintsParams struct {
 	// ErrorOwner Filter by responsibility bucket, for example provider or scheduler.
 	ErrorOwner *string `form:"error_owner,omitempty" json:"error_owner,omitempty"`
 	Platform   *string `form:"platform,omitempty" json:"platform,omitempty"`
+
+	// SourceEndpoint Exact gateway source endpoint, for example /v1/responses.
+	SourceEndpoint *string `form:"source_endpoint,omitempty" json:"source_endpoint,omitempty"`
 
 	// Resolution Filter by operator-supplied resolution status.
 	Resolution *ListAdminOpsErrorLogFingerprintsParamsResolution `form:"resolution,omitempty" json:"resolution,omitempty"`
@@ -27808,6 +27814,19 @@ func (siw *ServerInterfaceWrapper) ListAdminOpsErrorLogs(w http.ResponseWriter, 
 		return
 	}
 
+	// ------------- Optional query parameter "source_endpoint" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "source_endpoint", r.URL.Query(), &params.SourceEndpoint, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "source_endpoint"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source_endpoint", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "resolution" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "resolution", r.URL.Query(), &params.Resolution, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
@@ -28012,6 +28031,19 @@ func (siw *ServerInterfaceWrapper) ListAdminOpsErrorLogFingerprints(w http.Respo
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "platform"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "platform", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "source_endpoint" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "source_endpoint", r.URL.Query(), &params.SourceEndpoint, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "source_endpoint"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source_endpoint", Err: err})
 		}
 		return
 	}

@@ -132,6 +132,14 @@ func TestStoreListsFiltersAndUpdatesResolution(t *testing.T) {
 		t.Fatalf("expected only upstream provider row, got %+v", list)
 	}
 
+	list, err = store.List(ctx, contract.ListFilter{SourceEndpoint: "/v1/responses", Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("list source endpoint filter: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != first.ID {
+		t.Fatalf("expected only responses row, got %+v", list)
+	}
+
 	list, err = store.List(ctx, contract.ListFilter{RequestID: "req_first", Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("list request id filter: %v", err)

@@ -120,23 +120,24 @@ type UpstreamErrorEvent struct {
 // surface (paginated list with optional user/account/status/resolution
 // filters and a time window).
 type ListFilter struct {
-	UserID        *int
-	AccountID     *int
-	ProviderID    *int
-	RequestID     string
-	Platform      string
-	Model         string
-	ErrorClass    string
-	ErrorPhase    string
-	ErrorOwner    string
-	Query         string
-	Resolution    Resolution
-	StatusCodeMin *int
-	StatusCodeMax *int
-	From          *time.Time
-	To            *time.Time
-	Page          int
-	PageSize      int
+	UserID         *int
+	AccountID      *int
+	ProviderID     *int
+	RequestID      string
+	Platform       string
+	SourceEndpoint string
+	Model          string
+	ErrorClass     string
+	ErrorPhase     string
+	ErrorOwner     string
+	Query          string
+	Resolution     Resolution
+	StatusCodeMin  *int
+	StatusCodeMax  *int
+	From           *time.Time
+	To             *time.Time
+	Page           int
+	PageSize       int
 }
 
 // ListResult is the paginated envelope returned by Service.List.

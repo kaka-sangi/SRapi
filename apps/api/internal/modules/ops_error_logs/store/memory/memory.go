@@ -155,6 +155,9 @@ func matchesFilter(entry contract.Entry, filter contract.ListFilter) bool {
 	if filter.Platform != "" && entry.Platform != filter.Platform {
 		return false
 	}
+	if filter.SourceEndpoint != "" && entry.SourceEndpoint != filter.SourceEndpoint {
+		return false
+	}
 	if filter.Model != "" && entry.Model != filter.Model {
 		return false
 	}
