@@ -12,6 +12,7 @@ import (
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	"github.com/srapi/srapi/apps/api/internal/pkg/metacoerce"
@@ -29,20 +30,24 @@ func (h domainEventHandler) refreshGatewayAccountSnapshot(ctx context.Context, e
 	}
 	account, err := h.accounts.FindByID(ctx, accountID)
 	if err != nil {
+		h.recordGatewayAccountSnapshotRefreshFailure(ctx, event, "account_load", err)
 		return err
 	}
 	now := time.Now().UTC()
 	logs, err := h.accountSnapshotUsageLogs(ctx, account, now)
 	if err != nil {
+		h.recordGatewayAccountSnapshotRefreshFailure(ctx, event, "usage_list", err)
 		return err
 	}
 	if err := h.updateAccountRuntimeQuotaMetadata(ctx, account, logs, now); err != nil {
+		h.recordGatewayAccountSnapshotRefreshFailure(ctx, event, "quota_metadata_update", err)
 		return err
 	}
 	signals := gatewayQuotaSignalsFromPayload(event.Payload["quota_signals"])
 	if len(signals) > 0 {
 		updated, err := h.accounts.FindByID(ctx, accountID)
 		if err != nil {
+			h.recordGatewayAccountSnapshotRefreshFailure(ctx, event, "quota_signal_account_reload", err)
 			return err
 		}
 		account = updated
@@ -52,14 +57,46 @@ func (h domainEventHandler) refreshGatewayAccountSnapshot(ctx context.Context, e
 			QuotaSignals: signals,
 			FetchedAt:    now,
 		}); err != nil {
+			h.recordGatewayAccountSnapshotRefreshFailure(ctx, event, "quota_signal_apply", err)
 			return err
 		}
 	}
 	if _, err := h.accounts.RecordHealthSnapshot(ctx, buildAccountHealthSnapshot(account, logs, now)); err != nil {
+		h.recordGatewayAccountSnapshotRefreshFailure(ctx, event, "health_snapshot_record", err)
 		return err
 	}
 	_, err = h.accounts.RecordQuotaSnapshot(ctx, buildAccountQuotaSnapshot(account, logs, now))
+	if err != nil {
+		h.recordGatewayAccountSnapshotRefreshFailure(ctx, event, "quota_snapshot_record", err)
+	}
 	return err
+}
+
+func (h domainEventHandler) recordGatewayAccountSnapshotRefreshFailure(ctx context.Context, event eventscontract.OutboxEvent, stage string, failure error) {
+	if h.operations == nil || failure == nil {
+		return
+	}
+	metadata := map[string]any{
+		"request_id":   payloadString(event.Payload, "request_id"),
+		"event_id":     event.EventID,
+		"event_type":   event.EventType,
+		"aggregate_id": event.AggregateID,
+		"account_id":   payloadInt(event.Payload, "account_id"),
+		"provider_id":  payloadInt(event.Payload, "provider_id"),
+		"attempt_no":   payloadInt(event.Payload, "attempt_no"),
+		"effect":       "account_snapshot_refresh",
+		"stage":        strings.TrimSpace(stage),
+		"error_class":  "account_snapshot_refresh_failed",
+		"error":        failure.Error(),
+	}
+	_, _ = h.operations.RecordSystemLog(ctx, operationscontract.RecordSystemLogRequest{
+		Level:     operationscontract.OpsSystemLogLevelError,
+		Message:   "failed to refresh gateway account snapshot",
+		Source:    "gateway.usage",
+		RequestID: payloadString(event.Payload, "request_id"),
+		Metadata:  metadata,
+		CreatedAt: time.Now().UTC(),
+	})
 }
 
 func (h domainEventHandler) accountSnapshotUsageLogs(ctx context.Context, account accountcontract.ProviderAccount, now time.Time) ([]usagecontract.UsageLog, error) {

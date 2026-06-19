@@ -662,6 +662,7 @@ func domainEventsWorker(cfg config.Config, stores *entstore.Stores, logger *slog
 		EmailSMTPFromName:  cfg.Email.SMTPFromName,
 		EmailSMTPUseTLS:    cfg.Email.SMTPUseTLS,
 		MasterKey:          cfg.Security.MasterKey,
+		OperationsStore:    stores.Operations,
 		SubscriptionStore:  stores.Subscriptions,
 		UsageStore:         stores.Usage,
 		RunGuard:           optionalWorkerGuard(guards...),

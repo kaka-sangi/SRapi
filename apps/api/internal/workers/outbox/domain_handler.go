@@ -17,6 +17,7 @@ import (
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	notificationscontract "github.com/srapi/srapi/apps/api/internal/modules/notifications/contract"
 	notificationsservice "github.com/srapi/srapi/apps/api/internal/modules/notifications/service"
+	operationsservice "github.com/srapi/srapi/apps/api/internal/modules/operations/service"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 	usageservice "github.com/srapi/srapi/apps/api/internal/modules/usage/service"
@@ -110,7 +111,15 @@ func defaultEventHandler(events *eventsservice.Service, cfg Config) (eventsservi
 			return nil, err
 		}
 	}
-	return domainEventHandler{accounts: accounts, affiliate: affiliate, audit: audit, adminControl: adminControl, subscriptions: subscriptions, notifications: notifications, usage: usage}, nil
+	var operations *operationsservice.Service
+	if cfg.OperationsStore != nil {
+		var err error
+		operations, err = operationsservice.NewWithStores(cfg.OperationsStore, cfg.OperationsStore, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return domainEventHandler{accounts: accounts, affiliate: affiliate, audit: audit, adminControl: adminControl, operations: operations, subscriptions: subscriptions, notifications: notifications, usage: usage}, nil
 }
 
 func notificationEmailConfig(cfg Config) notificationscontract.EmailConfig {
@@ -148,6 +157,7 @@ type domainEventHandler struct {
 	audit         *auditservice.Service
 	adminControl  *admincontrolservice.Service
 	notifications *notificationsservice.Service
+	operations    *operationsservice.Service
 	subscriptions *subscriptionservice.Service
 	usage         *usageservice.Service
 }

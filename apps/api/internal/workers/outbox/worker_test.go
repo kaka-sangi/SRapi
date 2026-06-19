@@ -21,6 +21,8 @@ import (
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
 	notificationscontract "github.com/srapi/srapi/apps/api/internal/modules/notifications/contract"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
@@ -206,6 +208,99 @@ func TestWorkerRunOnceRefreshesGatewayAccountSnapshot(t *testing.T) {
 	}
 	if !foundSignal || !foundSynthetic {
 		t.Fatalf("expected provider and synthetic quota snapshots, got %+v", quotas)
+	}
+}
+
+func TestWorkerRecordsSystemLogWhenGatewayAccountSnapshotRefreshFails(t *testing.T) {
+	ctx := t.Context()
+	eventStore := eventsmemory.New()
+	operationsStore := operationsmemory.New()
+	clock := &fixedClock{now: time.Date(2026, 5, 21, 10, 0, 0, 0, time.UTC)}
+	events, err := eventsservice.New(eventStore, clock)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	accountStore := accountmemory.New()
+	accounts, err := accountservice.New(accountStore, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new accounts service: %v", err)
+	}
+	account, err := accounts.Create(ctx, accountcontract.CreateRequest{
+		ProviderID:   12,
+		Name:         "outbox-snapshot-failure-account",
+		RuntimeClass: accountcontract.RuntimeClassCliClientToken,
+		Credential:   map[string]any{"cli_client_token": "secret"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	if _, err := events.Enqueue(ctx, contract.EnqueueRequest{
+		EventType:      "GatewayAccountSnapshotRefreshRequested",
+		ProducerModule: "gateway",
+		AggregateType:  "provider_account",
+		AggregateID:    "1",
+		IdempotencyKey: "gateway.account_snapshot:failure",
+		Payload: map[string]any{
+			"request_id":  "req_outbox_snapshot_failure",
+			"attempt_no":  3,
+			"account_id":  account.ID,
+			"provider_id": account.ProviderID,
+		},
+	}); err != nil {
+		t.Fatalf("enqueue refresh event: %v", err)
+	}
+	worker, err := outbox.New(eventStore, discardLogger(), outbox.Config{
+		ConsumerName:    "test-consumer",
+		RetryBackoff:    time.Minute,
+		DispatchClock:   clock,
+		AccountStore:    accountStore,
+		MasterKey:       "0123456789abcdef0123456789abcdef",
+		OperationsStore: operationsStore,
+		UsageStore: failingAccountWindowUsageStore{
+			Store: usagememory.New(),
+			err:   errors.New("usage window unavailable"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+
+	result, err := worker.RunOnce(ctx)
+	if err != nil {
+		t.Fatalf("run worker once: %v", err)
+	}
+	if result.Selected != 1 || result.Published != 0 || result.Failed != 1 {
+		t.Fatalf("unexpected dispatch result: %+v", result)
+	}
+	outboxRows, err := events.ListOutbox(ctx)
+	if err != nil {
+		t.Fatalf("list outbox: %v", err)
+	}
+	if len(outboxRows) != 1 || outboxRows[0].Status != contract.OutboxStatusFailed || outboxRows[0].NextRetryAt == nil {
+		t.Fatalf("expected failed refresh event to remain retryable, got %+v", outboxRows)
+	}
+
+	logs, err := operationsStore.ListSystemLogs(ctx, operationscontract.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if len(logs.Items) != 1 {
+		t.Fatalf("expected one snapshot refresh failure system log, got %+v", logs.Items)
+	}
+	log := logs.Items[0]
+	if log.Level != operationscontract.OpsSystemLogLevelError ||
+		log.Source != "gateway.usage" ||
+		log.Message != "failed to refresh gateway account snapshot" ||
+		log.RequestID != "req_outbox_snapshot_failure" {
+		t.Fatalf("unexpected snapshot refresh failure system log: %+v", log)
+	}
+	if log.Metadata["effect"] != "account_snapshot_refresh" ||
+		log.Metadata["stage"] != "usage_list" ||
+		log.Metadata["error_class"] != "account_snapshot_refresh_failed" ||
+		testMetadataInt(log.Metadata, "account_id") != account.ID ||
+		testMetadataInt(log.Metadata, "provider_id") != account.ProviderID ||
+		testMetadataInt(log.Metadata, "attempt_no") != 3 {
+		t.Fatalf("unexpected snapshot refresh failure metadata: %+v", log.Metadata)
 	}
 }
 
@@ -691,6 +786,15 @@ func (c *fixedClock) Now() time.Time {
 
 func discardLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+type failingAccountWindowUsageStore struct {
+	*usagememory.Store
+	err error
+}
+
+func (s failingAccountWindowUsageStore) ListByAccountWindow(context.Context, usagecontract.AccountWindowFilter) ([]usagecontract.UsageLog, error) {
+	return nil, s.err
 }
 
 func testMetadataInt(metadata map[string]any, key string) int {

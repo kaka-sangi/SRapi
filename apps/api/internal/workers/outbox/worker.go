@@ -15,6 +15,7 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	notificationscontract "github.com/srapi/srapi/apps/api/internal/modules/notifications/contract"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
@@ -54,6 +55,7 @@ type Config struct {
 	EmailTemplates        map[string]string
 	EmailTemplateProvider notificationscontract.EmailTemplateProvider
 	MasterKey             string
+	OperationsStore       operationscontract.Store
 	SubscriptionStore     subscriptioncontract.Store
 	UsageStore            usagecontract.Store
 	RunGuard              runonceguard.Guard
