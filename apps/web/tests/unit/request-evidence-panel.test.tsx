@@ -213,7 +213,7 @@ describe("RequestEvidencePanel", () => {
     window.history.replaceState(
       null,
       "",
-      "/admin/logs?tab=request-evidence&f_account_id=9&f_provider_id=3&f_error_class=server_bad&f_model=gpt-4.1&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions",
+      "/admin/logs?tab=request-evidence&f_account_id=9&f_provider_id=3&f_error_class=server_bad&f_model=gpt-4.1&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_sort=latency_desc&f_min_latency_ms=500&f_max_latency_ms=1200",
     );
 
     render(<RequestEvidencePanel />, { wrapper: wrap });
@@ -225,6 +225,24 @@ describe("RequestEvidencePanel", () => {
         error_class: "server_bad",
         model: "gpt-4.1",
         source_endpoint: "/v1/chat/completions",
+        sort: "latency_desc",
+        min_latency_ms: 500,
+        max_latency_ms: 1200,
+      }),
+    );
+  });
+
+  it("maps latency controls into request evidence filters", () => {
+    const { rerender } = render(<RequestEvidencePanel />, { wrapper: wrap });
+
+    fireEvent.change(screen.getByPlaceholderText("最小 ms"), { target: { value: "750" } });
+    fireEvent.change(screen.getByPlaceholderText("最大 ms"), { target: { value: "1500" } });
+    rerender(<RequestEvidencePanel />);
+
+    expect(mocks.useOpsRequestEvidence).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        min_latency_ms: 750,
+        max_latency_ms: 1500,
       }),
     );
   });

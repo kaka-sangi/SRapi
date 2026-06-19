@@ -7,6 +7,7 @@ import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { FilterSelect, ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import { PageHeader } from "@/components/layout/page-header";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
+import { Input } from "@/components/ui/input";
 import { QuietBadge, type QuietStatus } from "@/components/ui/quiet-badge";
 import {
   Dialog,
@@ -45,6 +46,9 @@ export function RequestEvidencePanel() {
   const model = list.filters.model || undefined;
   const sourceEndpoint = list.filters.source_endpoint || undefined;
   const errorClass = list.filters.error_class || undefined;
+  const sort = requestEvidenceSortValue(list.filters.sort);
+  const minLatencyMS = latencyFilterValue(list.filters.min_latency_ms);
+  const maxLatencyMS = latencyFilterValue(list.filters.max_latency_ms);
   const exactStart = list.filters.start || undefined;
   const exactEnd = list.filters.end || undefined;
   const start = exactStart || logWindowSince(windowFilter)?.toISOString();
@@ -57,6 +61,8 @@ export function RequestEvidencePanel() {
     model,
     source_endpoint: sourceEndpoint,
     error_class: errorClass,
+    min_latency_ms: minLatencyMS,
+    max_latency_ms: maxLatencyMS,
     kind: kind as "success" | "error" | "unknown" | undefined,
     evidence_source: source as
       | "usage"
@@ -67,6 +73,7 @@ export function RequestEvidencePanel() {
       | undefined,
     start,
     end: exactEnd,
+    sort,
     q: list.search || undefined,
   });
   const total = query.data?.pagination?.total ?? query.data?.data.length ?? 0;
@@ -79,6 +86,9 @@ export function RequestEvidencePanel() {
       model ||
       sourceEndpoint ||
       errorClass ||
+      minLatencyMS !== undefined ||
+      maxLatencyMS !== undefined ||
+      sort !== "created_at_desc" ||
       exactStart ||
       exactEnd ||
       list.search ||
@@ -326,6 +336,25 @@ export function RequestEvidencePanel() {
                 label: t(preset.labelKey),
               }))}
             />
+            <FilterSelect
+              value={sort === "created_at_desc" ? undefined : sort}
+              onChange={(value) => list.setFilter("sort", value)}
+              allLabel={t("adminRequestEvidence.sortNewest")}
+              options={[
+                { value: "latency_desc", label: t("adminRequestEvidence.sortSlowest") },
+              ]}
+              className="min-w-[9.5rem]"
+            />
+            <LatencyFilterInput
+              value={list.filters.min_latency_ms ?? ""}
+              onChange={(value) => list.setFilter("min_latency_ms", value)}
+              placeholder={t("adminRequestEvidence.minLatencyPlaceholder")}
+            />
+            <LatencyFilterInput
+              value={list.filters.max_latency_ms ?? ""}
+              onChange={(value) => list.setFilter("max_latency_ms", value)}
+              placeholder={t("adminRequestEvidence.maxLatencyPlaceholder")}
+            />
             <div className="text-srapi-text-tertiary ml-auto text-xs">
               {t("adminRequestEvidence.total", { count: total })}
             </div>
@@ -347,6 +376,29 @@ export function RequestEvidencePanel() {
         onClose={() => setDetailRequestID(undefined)}
       />
     </div>
+  );
+}
+
+function LatencyFilterInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string | undefined) => void;
+  placeholder: string;
+}) {
+  return (
+    <Input
+      type="number"
+      inputMode="numeric"
+      min={0}
+      step={1}
+      value={value}
+      onChange={(event) => onChange(normalizeLatencyFilterInput(event.target.value))}
+      placeholder={placeholder}
+      className="h-9 w-full sm:w-28"
+    />
   );
 }
 
@@ -709,6 +761,25 @@ function statusClass(status: number | undefined): string {
   if (status >= 500) return `${base} text-srapi-error`;
   if (status >= 400) return `${base} text-amber-500`;
   return `${base} text-emerald-400`;
+}
+
+function requestEvidenceSortValue(raw?: string): "created_at_desc" | "latency_desc" {
+  return raw === "latency_desc" ? "latency_desc" : "created_at_desc";
+}
+
+function latencyFilterValue(raw?: string): number | undefined {
+  if (!raw) return undefined;
+  if (!/^\d+$/.test(raw.trim())) return undefined;
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isFinite(value) || value < 0) return undefined;
+  return value;
+}
+
+function normalizeLatencyFilterInput(raw: string): string | undefined {
+  const trimmed = raw.trim();
+  if (trimmed === "") return undefined;
+  const value = latencyFilterValue(trimmed);
+  return value === undefined ? undefined : String(value);
 }
 
 function systemLogLevelClass(level: string): string {
