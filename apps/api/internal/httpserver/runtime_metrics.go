@@ -42,6 +42,8 @@ type runtimeMetricDescs struct {
 	gatewayErrors                 *prometheus.Desc
 	gatewayFailover               *prometheus.Desc
 	schedulerDecisions            *prometheus.Desc
+	schedulerCandidateCount       *prometheus.Desc
+	schedulerNoAvailable          *prometheus.Desc
 	schedulerCostScore            *prometheus.Desc
 	schedulerStrategySelected     *prometheus.Desc
 	schedulerStrategyFallback     *prometheus.Desc
@@ -148,6 +150,18 @@ func initSchedulerMetricDescs(descs *runtimeMetricDescs) {
 		"srapi_scheduler_decisions_total",
 		"Scheduler decisions by strategy and outcome.",
 		[]string{"strategy", "outcome", "reason"},
+		nil,
+	)
+	descs.schedulerCandidateCount = prometheus.NewDesc(
+		"srapi_scheduler_candidate_count",
+		"Scheduler candidate counts by strategy and outcome.",
+		[]string{"strategy", "outcome"},
+		nil,
+	)
+	descs.schedulerNoAvailable = prometheus.NewDesc(
+		"srapi_scheduler_no_available_total",
+		"Scheduler no-available-account decisions by strategy and primary reject reason.",
+		[]string{"strategy", "reason"},
 		nil,
 	)
 	descs.schedulerCostScore = prometheus.NewDesc(
@@ -343,6 +357,8 @@ func (d runtimeMetricDescs) all() []*prometheus.Desc {
 		d.gatewayErrors,
 		d.gatewayFailover,
 		d.schedulerDecisions,
+		d.schedulerCandidateCount,
+		d.schedulerNoAvailable,
 		d.schedulerCostScore,
 		d.schedulerStrategySelected,
 		d.schedulerStrategyFallback,
@@ -448,6 +464,17 @@ func (c *runtimeMetricsCollector) collectSchedulerMetrics(ch chan<- prometheus.M
 	for _, key := range sortedKeys(counts) {
 		labels := strings.Split(key, "\xff")
 		emitConstMetric(ch, emitted, "srapi_scheduler_decisions_total", c.descs.schedulerDecisions, prometheus.CounterValue, float64(counts[key]), labels...)
+	}
+	candidateCounts := schedulerCandidateCountHistograms(snapshot.schedulerDecisions)
+	for _, key := range sortedKeys(candidateCounts) {
+		labels := strings.Split(key, "\xff")
+		aggregate := candidateCounts[key]
+		emitConstHistogram(ch, emitted, "srapi_scheduler_candidate_count", c.descs.schedulerCandidateCount, aggregate.count, aggregate.sum, aggregate.buckets, labels...)
+	}
+	noAvailable := schedulerNoAvailableCounts(snapshot.schedulerDecisions)
+	for _, key := range sortedKeys(noAvailable) {
+		labels := strings.Split(key, "\xff")
+		emitConstMetric(ch, emitted, "srapi_scheduler_no_available_total", c.descs.schedulerNoAvailable, prometheus.CounterValue, float64(noAvailable[key]), labels...)
 	}
 	costScores := schedulerCostScoreAverages(snapshot.schedulerDecisions)
 	for _, strategy := range sortedKeys(costScores) {
@@ -611,6 +638,12 @@ func (c *runtimeMetricsCollector) collectBaselineMetrics(ch chan<- prometheus.Me
 	if !emitted["srapi_scheduler_decisions_total"] {
 		emitConstMetric(ch, emitted, "srapi_scheduler_decisions_total", c.descs.schedulerDecisions, prometheus.CounterValue, 0, "unknown", "selected", "selected")
 	}
+	if !emitted["srapi_scheduler_candidate_count"] {
+		emitConstHistogram(ch, emitted, "srapi_scheduler_candidate_count", c.descs.schedulerCandidateCount, 0, 0, emptyCandidateCountBuckets(), "unknown", "selected")
+	}
+	if !emitted["srapi_scheduler_no_available_total"] {
+		emitConstMetric(ch, emitted, "srapi_scheduler_no_available_total", c.descs.schedulerNoAvailable, prometheus.CounterValue, 0, "unknown", "unknown")
+	}
 	if !emitted["srapi_scheduler_cost_score_avg"] {
 		emitConstMetric(ch, emitted, "srapi_scheduler_cost_score_avg", c.descs.schedulerCostScore, prometheus.GaugeValue, 0, "unknown")
 	}
@@ -668,7 +701,7 @@ func newHistogramAggregate() *histogramAggregate {
 func (h *histogramAggregate) observe(value float64) {
 	h.count++
 	h.sum += value
-	for _, bucket := range metricDurationBuckets {
+	for bucket := range h.buckets {
 		if value <= bucket {
 			h.buckets[bucket]++
 		}
@@ -738,11 +771,44 @@ func schedulerDecisionCounts(decisions []schedulercontract.Decision) map[string]
 		reason := "selected"
 		if decision.SelectedAccountID == nil {
 			outcome = "rejected"
-			reason = primaryRejectReason(decision.RejectReasons)
+			reason = schedulerPrimaryRejectReason(decision)
 		}
 		counts[strings.Join([]string{string(decision.Strategy), outcome, reason}, "\xff")]++
 	}
 	return counts
+}
+
+func schedulerCandidateCountHistograms(decisions []schedulercontract.Decision) map[string]*histogramAggregate {
+	aggregates := map[string]*histogramAggregate{}
+	for _, decision := range decisions {
+		outcome := "selected"
+		if decision.SelectedAccountID == nil {
+			outcome = "rejected"
+		}
+		key := strings.Join([]string{metricLabelValue(string(decision.Strategy), "unknown"), outcome}, "\xff")
+		if aggregates[key] == nil {
+			aggregates[key] = newCandidateCountAggregate()
+		}
+		aggregates[key].observe(float64(decision.CandidateCount))
+	}
+	return aggregates
+}
+
+func schedulerNoAvailableCounts(decisions []schedulercontract.Decision) map[string]int {
+	counts := map[string]int{}
+	for _, decision := range decisions {
+		if decision.SelectedAccountID != nil {
+			continue
+		}
+		reason := schedulerPrimaryRejectReason(decision)
+		counts[strings.Join([]string{metricLabelValue(string(decision.Strategy), "unknown"), reason}, "\xff")]++
+	}
+	return counts
+}
+
+func schedulerPrimaryRejectReason(decision schedulercontract.Decision) string {
+	reason, _ := gatewayPrimaryRejectReason(gatewaySchedulerRejectReasonCounts(decision, true))
+	return metricLabelValue(reason, "unknown")
 }
 
 func schedulerCostScoreAverages(decisions []schedulercontract.Decision) map[string]float64 {
@@ -1031,9 +1097,23 @@ func realtimeEmptySnapshot() realtimecontract.Snapshot {
 
 var metricDurationBuckets = []float64{0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 
+var metricCandidateCountBuckets = []float64{0, 1, 2, 5, 10, 25, 50, 100}
+
 func emptyBuckets() map[float64]uint64 {
 	buckets := make(map[float64]uint64, len(metricDurationBuckets))
 	for _, bucket := range metricDurationBuckets {
+		buckets[bucket] = 0
+	}
+	return buckets
+}
+
+func newCandidateCountAggregate() *histogramAggregate {
+	return &histogramAggregate{buckets: emptyCandidateCountBuckets()}
+}
+
+func emptyCandidateCountBuckets() map[float64]uint64 {
+	buckets := make(map[float64]uint64, len(metricCandidateCountBuckets))
+	for _, bucket := range metricCandidateCountBuckets {
 		buckets[bucket] = 0
 	}
 	return buckets

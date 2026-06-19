@@ -381,6 +381,23 @@ func TestMetricsExposeSchedulerStrategyOperationalSignals(t *testing.T) {
 		t.Fatalf("create fallback decision: %v", err)
 	}
 	metricsState.RecordSchedulerDecision(secondDecision)
+	rejectedDecision, err := schedulerStore.CreateDecision(t.Context(), schedulercontract.Decision{
+		RequestID:          "strategy-metrics-rejected",
+		AttemptNo:          1,
+		UserID:             1,
+		APIKeyID:           1,
+		Model:              firstDecision.Model,
+		Strategy:           schedulercontract.StrategyCostSaver,
+		StrategyVersion:    "v1",
+		CandidateCount:     3,
+		RejectedCount:      3,
+		RejectReasons:      map[string]any{"account_1": "capability_mismatch:responses", "account_2": "capability_mismatch:responses", "account_3": "cooldown_active"},
+		SelectionRationale: "no available account",
+	})
+	if err != nil {
+		t.Fatalf("create rejected decision: %v", err)
+	}
+	metricsState.RecordSchedulerDecision(rejectedDecision)
 	errorClass := "upstream_error"
 	for _, log := range []usagecontract.UsageLog{
 		{RequestID: firstDecision.RequestID, AttemptNo: 1, Success: false, ErrorClass: &errorClass, SourceEndpoint: "/v1/chat/completions", TargetProtocol: "openai-compatible", Model: firstDecision.Model},
@@ -398,7 +415,12 @@ func TestMetricsExposeSchedulerStrategyOperationalSignals(t *testing.T) {
 		`scheduler_strategy_cost_delta{strategy="cost_saver",version="v1"}`,
 		`scheduler_strategy_latency_delta{strategy="cost_saver",version="v1"}`,
 		`scheduler_strategy_error_rate{strategy="cost_saver",version="v1"} 0.5`,
+		`srapi_scheduler_candidate_count_bucket{outcome="selected",strategy="cost_saver",le="2"} 2`,
+		`srapi_scheduler_candidate_count_count{outcome="selected",strategy="cost_saver"} 2`,
+		`srapi_scheduler_candidate_count_bucket{outcome="rejected",strategy="cost_saver",le="5"} 1`,
+		`srapi_scheduler_no_available_total{reason="capability_mismatch:responses",strategy="cost_saver"} 1`,
 		`scheduler_strategy_reject_reason_total{reason="fallback_excluded",strategy="cost_saver",version="v1"} 1`,
+		`scheduler_strategy_reject_reason_total{reason="capability_mismatch:responses",strategy="cost_saver",version="v1"} 2`,
 	} {
 		if !strings.Contains(metrics, expected) {
 			t.Fatalf("expected metrics to contain %s, got:\n%s", expected, metrics)

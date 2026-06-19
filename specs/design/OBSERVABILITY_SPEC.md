@@ -121,9 +121,11 @@ scheduler_strategy_cost_delta{strategy, version}
 scheduler_strategy_latency_delta{strategy, version}
 scheduler_strategy_error_rate{strategy, version}
 scheduler_strategy_reject_reason_total{strategy, version, reason}
+srapi_scheduler_candidate_count{strategy, outcome}
+srapi_scheduler_no_available_total{strategy, reason}
 ```
 
-这些指标只允许 strategy、strategy version、shadow strategy、current/shadow selection 和结构化 reject reason 这类低基数标签。`cost_delta` / `latency_delta` 表示选中账号分数相对同次候选集平均分数的平均差值；`error_rate` 来自同 request_id + attempt_no 的 usage 成败。不得加入 API key、account id、provider id、user id、request id、prompt、cookie 或 credential label；逐请求排查仍应读取 Scheduler decision、request snapshot 和 usage log。
+这些指标只允许 strategy、strategy version、shadow strategy、current/shadow selection、selected/rejected outcome 和结构化 reject reason 这类低基数标签。`cost_delta` / `latency_delta` 表示选中账号分数相对同次候选集平均分数的平均差值；`error_rate` 来自同 request_id + attempt_no 的 usage 成败。`srapi_scheduler_candidate_count` 用于观察候选集规模分布，`srapi_scheduler_no_available_total` 用于告警 no-available-account 决策升高；逐请求排查仍应读取 Scheduler decision、request snapshot、usage log 和 ops error log。不得加入 API key、account id、provider id、user id、request id、prompt、cookie 或 credential label。
 
 Ops alert 当前状态由已持久化的 `obs_alert_events` 在 scrape 时聚合：
 

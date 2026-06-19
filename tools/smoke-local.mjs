@@ -517,6 +517,8 @@ async function smokeReleasePlatformEndpoints() {
     "srapi_gateway_inflight_requests",
     "srapi_gateway_errors_total",
     "srapi_scheduler_decisions_total",
+    "srapi_scheduler_candidate_count",
+    "srapi_scheduler_no_available_total",
     "srapi_provider_errors_total",
     "srapi_usage_tokens_total",
     "srapi_reverse_proxy_ban_signals_total",
