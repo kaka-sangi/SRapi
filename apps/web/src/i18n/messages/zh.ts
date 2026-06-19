@@ -2307,6 +2307,7 @@ export const zh: Messages = {
     upstreamDiagnostic: "上游诊断",
     attemptEvidence: "尝试证据",
     schedulerDiagnostic: "调度诊断",
+    openSchedulerDecision: "调度决策",
     schedulerDecisionId: "决策 ID",
     schedulerCandidates: "候选数",
     schedulerRejected: "拒绝数",

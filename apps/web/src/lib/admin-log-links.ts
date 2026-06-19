@@ -68,6 +68,14 @@ export function adminRequestDumpsHref(params: LogCorrelationIDs): string | null 
   return hasCorrelation(query) ? `${ADMIN_ROUTES.logs}?${query.toString()}` : null;
 }
 
+/** Build a filtered Scheduler decisions link for request-level investigation. */
+export function adminSchedulerDecisionsHref(params: LogCorrelationIDs): string | null {
+  const query = new URLSearchParams();
+  query.set("tab", "scheduler-decisions");
+  setIfPresent(query, "f_request_id", params.request_id);
+  return hasCorrelation(query) ? `${ADMIN_ROUTES.ops}?${query.toString()}` : null;
+}
+
 function firstCorrelation(params: LogCorrelationIDs): string {
   return clean(params.request_id) || clean(params.trace_id);
 }

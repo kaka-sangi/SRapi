@@ -238,6 +238,10 @@ describe("ErrorLogDetailDialog request dump evidence", () => {
     expect(screen.getByText("调度诊断")).toBeInTheDocument();
     expect(screen.getAllByText("capability_mismatch:responses").length).toBeGreaterThan(0);
     expect(screen.getByText("check_model_capabilities_or_mapping")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /调度决策/ })).toHaveAttribute(
+      "href",
+      "/admin/ops?tab=scheduler-decisions&f_request_id=req-detail",
+    );
     expect(screen.getByText("77")).toBeInTheDocument();
     expect(screen.getAllByText("3").length).toBeGreaterThan(0);
     expect(screen.getByText("no account satisfied responses capability")).toBeInTheDocument();

@@ -160,10 +160,10 @@ export function useAvailableModels() {
   });
 }
 
-export function useSchedulerDecisions() {
+export function useSchedulerDecisions(params?: Parameters<typeof apiService.listSchedulerDecisions>[0]) {
   return useQuery({
-    queryKey: queryKeys.schedulerDecisions(),
-    queryFn: () => apiService.listSchedulerDecisions(),
+    queryKey: queryKeys.schedulerDecisions(params),
+    queryFn: () => apiService.listSchedulerDecisions(params),
   });
 }
 

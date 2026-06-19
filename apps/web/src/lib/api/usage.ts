@@ -13,6 +13,11 @@ import type {
 import { configureSDKClient, parseMoneyValue } from './_shared';
 import type { LiveSchedulerDecision, LiveSlo, LiveUsageLog } from './types';
 
+export interface SchedulerDecisionListParams {
+  request_id?: string;
+  model?: string;
+}
+
 export const usageApi = {
   async listUsageLogs(): Promise<UsageLogSummary[]> {
     const response = await sdkGetCurrentUserUsage({ throwOnError: true });
@@ -72,8 +77,14 @@ export const usageApi = {
     }));
   },
 
-  async listSchedulerDecisions(): Promise<SchedulerDecisionSummary[]> {
-    const response = await sdkListAdminSchedulerDecisions({ throwOnError: true });
+  async listSchedulerDecisions(params: SchedulerDecisionListParams = {}): Promise<SchedulerDecisionSummary[]> {
+    const response = await sdkListAdminSchedulerDecisions({
+      query: {
+        request_id: params.request_id || undefined,
+        model: params.model || undefined,
+      },
+      throwOnError: true,
+    });
     if (response.data) {
       return ((response.data.data || []) as LiveSchedulerDecision[]).map((decision) => ({
         created_at: decision.created_at,

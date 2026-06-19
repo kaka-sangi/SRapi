@@ -12,7 +12,7 @@ export const queryKeys = {
   usageLogs: () => ["usage-logs"] as const,
   availableModels: () => ["available-models"] as const,
   providerAccounts: () => ["provider-accounts"] as const,
-  schedulerDecisions: () => ["scheduler-decisions"] as const,
+  schedulerDecisions: (params?: unknown) => ["scheduler-decisions", params ?? {}] as const,
   slos: () => ["slos"] as const,
   me: {
     profile: () => ["me", "profile"] as const,

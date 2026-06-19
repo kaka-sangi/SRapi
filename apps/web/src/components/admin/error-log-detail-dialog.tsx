@@ -34,6 +34,7 @@ import { formatDateTime, formatInteger, formatLatency } from "@/lib/admin-format
 import {
   adminRequestDumpsHref,
   adminRequestEvidenceHref,
+  adminSchedulerDecisionsHref,
   adminSystemLogsHref,
 } from "@/lib/admin-log-links";
 import { parseRequestDumpSummary } from "@/lib/request-log-dump-summary";
@@ -144,7 +145,9 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
         />
       ) : null}
 
-      {schedulerDiagnostic ? <SchedulerDiagnosticSummary diagnostic={schedulerDiagnostic} /> : null}
+      {schedulerDiagnostic ? (
+        <SchedulerDiagnosticSummary diagnostic={schedulerDiagnostic} requestID={detail.request_id} />
+      ) : null}
 
       {upstreamDiagnostic ? <UpstreamErrorDiagnosticSummary diagnostic={upstreamDiagnostic} /> : null}
 
@@ -644,9 +647,16 @@ function EvidenceBlock({
   );
 }
 
-function SchedulerDiagnosticSummary({ diagnostic }: { diagnostic: SchedulerDiagnostic }) {
+function SchedulerDiagnosticSummary({
+  diagnostic,
+  requestID,
+}: {
+  diagnostic: SchedulerDiagnostic;
+  requestID?: string | null;
+}) {
   const { t } = useLanguage();
   const topReasons = diagnostic.reasonCounts.slice(0, 4);
+  const schedulerHref = adminSchedulerDecisionsHref({ request_id: requestID });
   return (
     <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -663,9 +673,19 @@ function SchedulerDiagnosticSummary({ diagnostic }: { diagnostic: SchedulerDiagn
             ) : null}
           </p>
         </div>
-        {diagnostic.operatorAction ? (
-          <QuietBadge status="limited" label={diagnostic.operatorAction} />
-        ) : null}
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          {diagnostic.operatorAction ? (
+            <QuietBadge status="limited" label={diagnostic.operatorAction} />
+          ) : null}
+          {schedulerHref ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link href={schedulerHref}>
+                <ExternalLink aria-hidden />
+                {t("adminErrorLogs.openSchedulerDecision")}
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">

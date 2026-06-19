@@ -4,6 +4,7 @@ import {
   adminErrorLogsHref,
   adminRequestDumpsHref,
   adminRequestEvidenceHref,
+  adminSchedulerDecisionsHref,
   adminSystemLogsHref,
 } from "@/lib/admin-log-links";
 
@@ -65,6 +66,13 @@ describe("admin log evidence links", () => {
     );
   });
 
+  it("builds a scheduler decisions exact filter link from request id", () => {
+    expect(adminSchedulerDecisionsHref({ request_id: "req_123", trace_id: "trace_456" })).toBe(
+      "/admin/ops?tab=scheduler-decisions&f_request_id=req_123",
+    );
+    expect(adminSchedulerDecisionsHref({ trace_id: "trace_456" })).toBeNull();
+  });
+
   it("trims correlation ids before building links", () => {
     expect(adminErrorLogsHref({ request_id: "  req_123  " })).toBe(
       "/admin/logs?tab=error&q=req_123",
@@ -75,12 +83,16 @@ describe("admin log evidence links", () => {
     expect(adminRequestEvidenceHref({ request_id: "  req_123  " })).toBe(
       "/admin/logs?tab=request-evidence&f_request_id=req_123",
     );
+    expect(adminSchedulerDecisionsHref({ request_id: "  req_123  " })).toBe(
+      "/admin/ops?tab=scheduler-decisions&f_request_id=req_123",
+    );
   });
 
   it("omits links without correlation ids", () => {
     expect(adminErrorLogsHref({})).toBeNull();
     expect(adminRequestEvidenceHref({})).toBeNull();
     expect(adminRequestDumpsHref({})).toBeNull();
+    expect(adminSchedulerDecisionsHref({})).toBeNull();
     expect(adminSystemLogsHref({})).toBeNull();
   });
 });

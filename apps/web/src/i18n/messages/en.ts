@@ -2330,6 +2330,7 @@ export const en = {
     upstreamDiagnostic: "Upstream diagnostics",
     attemptEvidence: "Attempt evidence",
     schedulerDiagnostic: "Scheduler diagnostics",
+    openSchedulerDecision: "Scheduler decision",
     schedulerDecisionId: "Decision ID",
     schedulerCandidates: "Candidates",
     schedulerRejected: "Rejected",

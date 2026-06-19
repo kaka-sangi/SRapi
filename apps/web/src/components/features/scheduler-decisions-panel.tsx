@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { GitBranch } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
@@ -17,7 +18,9 @@ import type { SchedulerDecisionSummary } from "@/lib/srapi-types";
 
 export function SchedulerDecisionsPanel() {
   const { t } = useLanguage();
-  const decisions = useSchedulerDecisions();
+  const searchParams = useSearchParams();
+  const requestIDFilter = searchParams?.get("f_request_id")?.trim() || undefined;
+  const decisions = useSchedulerDecisions({ request_id: requestIDFilter });
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   return (
@@ -51,6 +54,7 @@ export function SchedulerDecisionsPanel() {
               decisions={data}
               selected={data.find((d) => d.request_id === selectedId) ?? data[0]}
               onSelect={setSelectedId}
+              requestIDFilter={requestIDFilter}
             />
           )
         }
@@ -63,10 +67,12 @@ function SchedulerBody({
   decisions,
   selected,
   onSelect,
+  requestIDFilter,
 }: {
   decisions: SchedulerDecisionSummary[];
   selected: SchedulerDecisionSummary;
   onSelect: (id: string) => void;
+  requestIDFilter?: string;
 }) {
   const { t } = useLanguage();
 
@@ -76,9 +82,16 @@ function SchedulerBody({
         <Card>
           <CardHeader>
             <CardTitle>{t("scheduler.title")}</CardTitle>
-            <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
-              {decisions.length}
-            </span>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              {requestIDFilter ? (
+                <span className="max-w-56 truncate rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
+                  {requestIDFilter}
+                </span>
+              ) : null}
+              <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+                {decisions.length}
+              </span>
+            </div>
           </CardHeader>
           <div className="max-h-[640px] divide-y divide-srapi-border overflow-y-auto">
             {decisions.map((d) => {
