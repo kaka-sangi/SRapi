@@ -169,3 +169,53 @@ func TestGatewayEmbeddingsIdempotencyReplays(t *testing.T) {
 		t.Fatalf("expected embeddings replay to reuse stored response, got %d upstream calls", calls)
 	}
 }
+
+func TestGatewayResponsesCompactIdempotencyReplaysEvenWhenStreamRequested(t *testing.T) {
+	var calls int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/responses/compact" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"cmp_idem","object":"response.compaction","input_tokens":4,"output_tokens":1,"text":"compact summary"}`)
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"idem-compact-provider","display_name":"Idem Compact","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"responses_compact":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"idem-compact-model","display_name":"Idem Compact Model","status":"active","capabilities":[{"key":"responses_compact","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"idem-compact-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"idem-compact-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","capability_responses_compact":true},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	body := `{"model":"idem-compact-model","input":"compact this","previous_response_id":"resp_prev","stream":true}`
+	post := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/v1/responses/compact", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		req.Header.Set("Idempotency-Key", "compact-key")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+
+	first := post()
+	if first.Code != http.StatusOK {
+		t.Fatalf("expected first compact request 200, got %d body=%s", first.Code, first.Body.String())
+	}
+	replay := post()
+	if replay.Code != http.StatusOK {
+		t.Fatalf("expected compact replay 200, got %d body=%s", replay.Code, replay.Body.String())
+	}
+	if replay.Header().Get(idempotencyReplayedHeader) != "true" {
+		t.Fatalf("expected %s header on compact replay", idempotencyReplayedHeader)
+	}
+	if replay.Body.String() != first.Body.String() {
+		t.Fatalf("expected compact replay body to match first response")
+	}
+	if calls != 1 {
+		t.Fatalf("expected compact replay to reuse stored response, got %d upstream calls", calls)
+	}
+}

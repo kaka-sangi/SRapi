@@ -21328,6 +21328,12 @@ export type ListResponseInputItemsResponse = ListResponseInputItemsResponses[key
 
 export type CreateResponseCompactData = {
     body: ResponsesRequest;
+    headers?: {
+        /**
+         * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/v1/responses/compact';
@@ -21346,6 +21352,10 @@ export type CreateResponseCompactErrors = {
      * Gateway API key or user policy forbids this operation.
      */
     403: GatewayErrorResponse;
+    /**
+     * A request with this Idempotency-Key is already being processed or already completed without a replayable response.
+     */
+    409: GatewayErrorResponse;
     /**
      * Request cannot be converted without semantic loss.
      */
@@ -22367,6 +22377,12 @@ export type StreamAntigravityGeminiContentAliasResponse = StreamAntigravityGemin
 
 export type CreateOpenAiCompatibleChatCompletionAliasData = {
     body: ChatCompletionRequest;
+    headers?: {
+        /**
+         * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/api/provider/openai-compatible/v1/chat/completions';
@@ -22385,6 +22401,10 @@ export type CreateOpenAiCompatibleChatCompletionAliasErrors = {
      * Gateway API key or user policy forbids this operation.
      */
     403: GatewayErrorResponse;
+    /**
+     * A request with this Idempotency-Key is already being processed or already completed without a replayable response.
+     */
+    409: GatewayErrorResponse;
     /**
      * Request cannot be converted without semantic loss.
      */
@@ -22412,6 +22432,12 @@ export type CreateOpenAiCompatibleChatCompletionAliasResponse = CreateOpenAiComp
 
 export type CreateOpenAiCompatibleResponseAliasData = {
     body: ResponsesRequest;
+    headers?: {
+        /**
+         * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/api/provider/openai-compatible/v1/responses';
@@ -22430,6 +22456,10 @@ export type CreateOpenAiCompatibleResponseAliasErrors = {
      * Gateway API key or user policy forbids this operation.
      */
     403: GatewayErrorResponse;
+    /**
+     * A request with this Idempotency-Key is already being processed or already completed without a replayable response.
+     */
+    409: GatewayErrorResponse;
     /**
      * Request cannot be converted without semantic loss.
      */
@@ -22513,6 +22543,12 @@ export type ListOpenAiCompatibleResponseInputItemsAliasResponse = ListOpenAiComp
 
 export type CreateOpenAiCompatibleResponseCompactAliasData = {
     body: ResponsesRequest;
+    headers?: {
+        /**
+         * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/api/provider/openai-compatible/v1/responses/compact';
@@ -22531,6 +22567,10 @@ export type CreateOpenAiCompatibleResponseCompactAliasErrors = {
      * Gateway API key or user policy forbids this operation.
      */
     403: GatewayErrorResponse;
+    /**
+     * A request with this Idempotency-Key is already being processed or already completed without a replayable response.
+     */
+    409: GatewayErrorResponse;
     /**
      * Request cannot be converted without semantic loss.
      */
@@ -22558,6 +22598,12 @@ export type CreateOpenAiCompatibleResponseCompactAliasResponse = CreateOpenAiCom
 
 export type CreateOpenAiCompatibleMessageAliasData = {
     body: AnthropicMessagesRequest;
+    headers?: {
+        /**
+         * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/api/provider/openai-compatible/v1/messages';
@@ -22576,6 +22622,10 @@ export type CreateOpenAiCompatibleMessageAliasErrors = {
      * Gateway API key or user policy forbids this operation.
      */
     403: GatewayErrorResponse;
+    /**
+     * A request with this Idempotency-Key is already being processed or already completed without a replayable response.
+     */
+    409: GatewayErrorResponse;
     /**
      * Request cannot be converted without semantic loss.
      */
@@ -22603,6 +22653,12 @@ export type CreateOpenAiCompatibleMessageAliasResponse = CreateOpenAiCompatibleM
 
 export type CreateAntigravityChatCompletionAliasData = {
     body: ChatCompletionRequest;
+    headers?: {
+        /**
+         * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/api/provider/antigravity/v1/chat/completions';
@@ -22621,6 +22677,10 @@ export type CreateAntigravityChatCompletionAliasErrors = {
      * Gateway API key or user policy forbids this operation.
      */
     403: GatewayErrorResponse;
+    /**
+     * A request with this Idempotency-Key is already being processed or already completed without a replayable response.
+     */
+    409: GatewayErrorResponse;
     /**
      * Request cannot be converted without semantic loss.
      */
@@ -22648,6 +22708,12 @@ export type CreateAntigravityChatCompletionAliasResponse = CreateAntigravityChat
 
 export type CreateAntigravityMessageAliasData = {
     body: AnthropicMessagesRequest;
+    headers?: {
+        /**
+         * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/api/provider/antigravity/v1/messages';
@@ -22666,6 +22732,10 @@ export type CreateAntigravityMessageAliasErrors = {
      * Gateway API key or user policy forbids this operation.
      */
     403: GatewayErrorResponse;
+    /**
+     * A request with this Idempotency-Key is already being processed or already completed without a replayable response.
+     */
+    409: GatewayErrorResponse;
     /**
      * Request cannot be converted without semantic loss.
      */
@@ -22783,6 +22853,12 @@ export type CreateRerankResponse = CreateRerankResponses[keyof CreateRerankRespo
 
 export type CreateOpenAiCompatibleEmbeddingAliasData = {
     body: EmbeddingRequest;
+    headers?: {
+        /**
+         * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/api/provider/openai-compatible/v1/embeddings';
@@ -22801,6 +22877,10 @@ export type CreateOpenAiCompatibleEmbeddingAliasErrors = {
      * Gateway API key or user policy forbids this operation.
      */
     403: GatewayErrorResponse;
+    /**
+     * A request with this Idempotency-Key is already being processed or already completed without a replayable response.
+     */
+    409: GatewayErrorResponse;
     /**
      * Request cannot be converted without semantic loss.
      */
@@ -23143,6 +23223,12 @@ export type CreateOpenAiCompatibleImageVariationAliasResponse = CreateOpenAiComp
 
 export type CreateAnthropicCompatibleMessageAliasData = {
     body: AnthropicMessagesRequest;
+    headers?: {
+        /**
+         * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/api/provider/anthropic-compatible/v1/messages';
@@ -23161,6 +23247,10 @@ export type CreateAnthropicCompatibleMessageAliasErrors = {
      * Gateway API key or user policy forbids this operation.
      */
     403: GatewayErrorResponse;
+    /**
+     * A request with this Idempotency-Key is already being processed or already completed without a replayable response.
+     */
+    409: GatewayErrorResponse;
     /**
      * Request cannot be converted without semantic loss.
      */

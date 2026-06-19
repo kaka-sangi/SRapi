@@ -5274,7 +5274,7 @@ export const listResponseInputItems = <ThrowOnError extends boolean = false>(opt
 /**
  * Compact an OpenAI Responses-compatible conversation context.
  *
- * OpenAI Responses compact subresource. The request body reuses ResponsesRequest and executes through the standard Gateway auth, model policy, Scheduler, Provider Adapter, usage, and decision evidence chain. Same-protocol Codex/OpenAI compact responses are replayed as raw upstream JSON to preserve the `response.compaction` shape.
+ * OpenAI Responses compact subresource. The request body reuses ResponsesRequest and executes through the standard Gateway auth, model policy, Scheduler, Provider Adapter, usage, and decision evidence chain. Same-protocol Codex/OpenAI compact responses are replayed as raw upstream JSON to preserve the `response.compaction` shape. Optional `Idempotency-Key` replay protection applies because compact is non-streaming by contract, even when a client sends `stream: true`.
  *
  */
 export const createResponseCompact = <ThrowOnError extends boolean = false>(options: Options<CreateResponseCompactData, ThrowOnError>) => (options.client ?? client).post<CreateResponseCompactResponses, CreateResponseCompactErrors, ThrowOnError>({
@@ -5568,7 +5568,7 @@ export const streamAntigravityGeminiContentAlias = <ThrowOnError extends boolean
 /**
  * Create an OpenAI-compatible chat completion with openai-compatible provider context.
  *
- * Provider alias route. It reuses the standard chat completion runtime and forces the `openai-compatible` provider context.
+ * Provider alias route. It reuses the standard chat completion runtime, forces the `openai-compatible` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/chat/completions`.
  */
 export const createOpenAiCompatibleChatCompletionAlias = <ThrowOnError extends boolean = false>(options: Options<CreateOpenAiCompatibleChatCompletionAliasData, ThrowOnError>) => (options.client ?? client).post<CreateOpenAiCompatibleChatCompletionAliasResponses, CreateOpenAiCompatibleChatCompletionAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5583,7 +5583,7 @@ export const createOpenAiCompatibleChatCompletionAlias = <ThrowOnError extends b
 /**
  * Create an OpenAI Responses-compatible response with openai-compatible provider context.
  *
- * Provider alias route. It reuses the standard Responses runtime and forces the `openai-compatible` provider context.
+ * Provider alias route. It reuses the standard Responses runtime, forces the `openai-compatible` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/responses`.
  */
 export const createOpenAiCompatibleResponseAlias = <ThrowOnError extends boolean = false>(options: Options<CreateOpenAiCompatibleResponseAliasData, ThrowOnError>) => (options.client ?? client).post<CreateOpenAiCompatibleResponseAliasResponses, CreateOpenAiCompatibleResponseAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5609,7 +5609,7 @@ export const listOpenAiCompatibleResponseInputItemsAlias = <ThrowOnError extends
 /**
  * Compact an OpenAI Responses-compatible conversation context with openai-compatible provider context.
  *
- * Provider alias route. It reuses the standard Responses compact runtime and forces the `openai-compatible` provider context.
+ * Provider alias route. It reuses the standard Responses compact runtime, forces the `openai-compatible` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/responses/compact`.
  */
 export const createOpenAiCompatibleResponseCompactAlias = <ThrowOnError extends boolean = false>(options: Options<CreateOpenAiCompatibleResponseCompactAliasData, ThrowOnError>) => (options.client ?? client).post<CreateOpenAiCompatibleResponseCompactAliasResponses, CreateOpenAiCompatibleResponseCompactAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5624,7 +5624,7 @@ export const createOpenAiCompatibleResponseCompactAlias = <ThrowOnError extends 
 /**
  * Create an Anthropic Messages-compatible message with openai-compatible provider context.
  *
- * Provider alias route. It reuses the standard Messages runtime and forces the `openai-compatible` provider context.
+ * Provider alias route. It reuses the standard Messages runtime, forces the `openai-compatible` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/messages`.
  */
 export const createOpenAiCompatibleMessageAlias = <ThrowOnError extends boolean = false>(options: Options<CreateOpenAiCompatibleMessageAliasData, ThrowOnError>) => (options.client ?? client).post<CreateOpenAiCompatibleMessageAliasResponses, CreateOpenAiCompatibleMessageAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5639,7 +5639,7 @@ export const createOpenAiCompatibleMessageAlias = <ThrowOnError extends boolean 
 /**
  * Create an OpenAI-compatible chat completion with Antigravity provider context.
  *
- * Provider alias route. It reuses the standard chat completion runtime and forces the `antigravity` provider context.
+ * Provider alias route. It reuses the standard chat completion runtime, forces the `antigravity` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/chat/completions`.
  */
 export const createAntigravityChatCompletionAlias = <ThrowOnError extends boolean = false>(options: Options<CreateAntigravityChatCompletionAliasData, ThrowOnError>) => (options.client ?? client).post<CreateAntigravityChatCompletionAliasResponses, CreateAntigravityChatCompletionAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5654,7 +5654,7 @@ export const createAntigravityChatCompletionAlias = <ThrowOnError extends boolea
 /**
  * Create an Anthropic Messages-compatible message with Antigravity provider context.
  *
- * Provider alias route. It reuses the standard Messages runtime and forces the `antigravity` provider context.
+ * Provider alias route. It reuses the standard Messages runtime, forces the `antigravity` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/messages`.
  */
 export const createAntigravityMessageAlias = <ThrowOnError extends boolean = false>(options: Options<CreateAntigravityMessageAliasData, ThrowOnError>) => (options.client ?? client).post<CreateAntigravityMessageAliasResponses, CreateAntigravityMessageAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5699,7 +5699,7 @@ export const createRerank = <ThrowOnError extends boolean = false>(options: Opti
 /**
  * Create OpenAI-compatible embeddings with openai-compatible provider context.
  *
- * Provider alias route. It reuses the standard embeddings runtime and forces the `openai-compatible` provider context.
+ * Provider alias route. It reuses the standard embeddings runtime, forces the `openai-compatible` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/embeddings`.
  */
 export const createOpenAiCompatibleEmbeddingAlias = <ThrowOnError extends boolean = false>(options: Options<CreateOpenAiCompatibleEmbeddingAliasData, ThrowOnError>) => (options.client ?? client).post<CreateOpenAiCompatibleEmbeddingAliasResponses, CreateOpenAiCompatibleEmbeddingAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -5821,7 +5821,7 @@ export const createOpenAiCompatibleImageVariationAlias = <ThrowOnError extends b
 /**
  * Create an Anthropic Messages-compatible message with anthropic-compatible provider context.
  *
- * Provider alias route. It reuses the standard Messages runtime and forces the `anthropic-compatible` provider context.
+ * Provider alias route. It reuses the standard Messages runtime, forces the `anthropic-compatible` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/messages`.
  */
 export const createAnthropicCompatibleMessageAlias = <ThrowOnError extends boolean = false>(options: Options<CreateAnthropicCompatibleMessageAliasData, ThrowOnError>) => (options.client ?? client).post<CreateAnthropicCompatibleMessageAliasResponses, CreateAnthropicCompatibleMessageAliasErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

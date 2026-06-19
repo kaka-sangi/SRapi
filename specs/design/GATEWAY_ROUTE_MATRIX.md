@@ -43,7 +43,7 @@ POST /v1/messages
 - 非流式和 SSE 流式。
 - Scheduler decision / feedback / usage log。
 - OpenAI-compatible 错误渲染。
-- 已实现的 Provider alias 必须复用标准 Gateway runtime，只改变 provider context，并把实际 alias path 写入 usage log 与 scheduler decision。
+- 已实现的 Provider alias 必须复用标准 Gateway runtime，只改变 provider context，并把实际 alias path 写入 usage log 与 scheduler decision；如果标准入口支持 `Idempotency-Key`，对应 alias 必须继承同一幂等语义。
 
 当前 Provider alias 由 Compatible Provider preset registry 动态注册，不为每个 Provider 复制 handler。已实现规则：
 
@@ -191,7 +191,7 @@ Antigravity adapter 会把生成请求转为 `v1internal:generateContent` /
 | `/v1/chat/completions` | Compatible text runtime | 校验 OpenAI body，转 Canonical AI Request，渲染 OpenAI 响应。 | Shipped |
 | `/v1/responses` | Compatible text runtime | 校验 Responses body，处理 stream/tools/structured output 兼容边界。默认 OpenAI-compatible provider 继续降级到 `/chat/completions`；`native-openai`、provider.name=openai 或显式 native Responses opt-in 时发送上游 `/responses` 并允许同协议 raw JSON/SSE 回放。`gpt-image-*` 顶层 image-only model 仅在配置 Responses main model 后迁移为 `image_generation` tool，否则拒绝。 | Shipped |
 | `/v1/responses/{response_id}/input_items` | Responses subresource runtime | OpenAI Responses input_items 子资源；Gateway 通过 query `model` 做 API Key 模型策略、entitlement、Scheduler 和 Provider Adapter 选择，调用选中上游 `/responses/{response_id}/input_items` 并原样回放 JSON list。`model` 只用于 SRapi 调度，不转发上游；成功请求 usage tokens 和 cost 记 0。 | Shipped |
-| `/v1/responses/compact` | Responses compact runtime | OpenAI Responses compact 子资源；复用 Gateway auth/model policy/Scheduler/Provider Adapter/usage evidence 链路，并要求 `responses_compact` effective capability。OpenAI-compatible API-key / OpenAI reverse-proxy / `reverse-proxy-codex-cli` 同协议请求发送到上游 `/responses/compact` 并原样回放 `response.compaction` JSON。跨协议不做伪转换。 | Shipped |
+| `/v1/responses/compact` | Responses compact runtime | OpenAI Responses compact 子资源；复用 Gateway auth/model policy/Scheduler/Provider Adapter/usage evidence 链路，并要求 `responses_compact` effective capability。该路由按非流式契约处理，即使请求体带 `stream=true` 也返回单个 JSON body，并支持可选 `Idempotency-Key` 重放保护。OpenAI-compatible API-key / OpenAI reverse-proxy / `reverse-proxy-codex-cli` 同协议请求发送到上游 `/responses/compact` 并原样回放 `response.compaction` JSON。跨协议不做伪转换。 | Shipped |
 | `/v1/messages` | Anthropic-compatible runtime | 校验 Messages body，转 Canonical AI Request，渲染 Anthropic 响应。 | Shipped |
 | `/v1/messages/count_tokens` | Anthropic-compatible native runtime | Anthropic-shaped count_tokens request/response/error；Gateway 只用 Canonical request 做 policy / entitlement / Scheduler；Provider Adapter 保留 Anthropic body shape、映射上游 model 后调用 `/messages/count_tokens`，Claude Code 2api 账号走 Reverse Proxy Runtime official-client shape，成功请求不进入生成用量。 | Shipped (WP-560) |
 | `/v1/embeddings` | Passthrough runtime | 最小解析 model/input，调度后调用 OpenAI-compatible `/embeddings`，记录用量和调度证据。 | Shipped (WP-270) |

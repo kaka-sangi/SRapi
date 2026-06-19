@@ -12325,6 +12325,24 @@ type csrfHeaderContextKey string
 // gatewayBearerAuthContextKey is the context key for gatewayBearerAuth security scheme
 type gatewayBearerAuthContextKey string
 
+// CreateAnthropicCompatibleMessageAliasParams defines parameters for CreateAnthropicCompatibleMessageAlias.
+type CreateAnthropicCompatibleMessageAliasParams struct {
+	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateAntigravityChatCompletionAliasParams defines parameters for CreateAntigravityChatCompletionAlias.
+type CreateAntigravityChatCompletionAliasParams struct {
+	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateAntigravityMessageAliasParams defines parameters for CreateAntigravityMessageAlias.
+type CreateAntigravityMessageAliasParams struct {
+	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListAntigravityGeminiModelsAliasParams defines parameters for ListAntigravityGeminiModelsAlias.
 type ListAntigravityGeminiModelsAliasParams struct {
 	// PageSize Maximum number of models to return. Defaults to all visible Antigravity-mapped models when omitted.
@@ -12332,6 +12350,36 @@ type ListAntigravityGeminiModelsAliasParams struct {
 
 	// PageToken Opaque pagination token returned by a previous listAntigravityGeminiModelsAlias response.
 	PageToken *string `form:"pageToken,omitempty" json:"pageToken,omitempty"`
+}
+
+// CreateOpenAICompatibleChatCompletionAliasParams defines parameters for CreateOpenAICompatibleChatCompletionAlias.
+type CreateOpenAICompatibleChatCompletionAliasParams struct {
+	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateOpenAICompatibleEmbeddingAliasParams defines parameters for CreateOpenAICompatibleEmbeddingAlias.
+type CreateOpenAICompatibleEmbeddingAliasParams struct {
+	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateOpenAICompatibleMessageAliasParams defines parameters for CreateOpenAICompatibleMessageAlias.
+type CreateOpenAICompatibleMessageAliasParams struct {
+	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateOpenAICompatibleResponseAliasParams defines parameters for CreateOpenAICompatibleResponseAlias.
+type CreateOpenAICompatibleResponseAliasParams struct {
+	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateOpenAICompatibleResponseCompactAliasParams defines parameters for CreateOpenAICompatibleResponseCompactAlias.
+type CreateOpenAICompatibleResponseCompactAliasParams struct {
+	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // ListOpenAICompatibleResponseInputItemsAliasParams defines parameters for ListOpenAICompatibleResponseInputItemsAlias.
@@ -13205,6 +13253,12 @@ type ConnectRealtimeWebSocketParamsStickyStrength string
 
 // CreateResponseParams defines parameters for CreateResponse.
 type CreateResponseParams struct {
+	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateResponseCompactParams defines parameters for CreateResponseCompact.
+type CreateResponseCompactParams struct {
 	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
 	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
@@ -20705,16 +20759,16 @@ func (t *BulkImportAdminPricingRulesJSONBody) UnmarshalJSON(b []byte) error {
 type ServerInterface interface {
 	// Create an Anthropic Messages-compatible message with anthropic-compatible provider context.
 	// (POST /api/provider/anthropic-compatible/v1/messages)
-	CreateAnthropicCompatibleMessageAlias(w http.ResponseWriter, r *http.Request)
+	CreateAnthropicCompatibleMessageAlias(w http.ResponseWriter, r *http.Request, params CreateAnthropicCompatibleMessageAliasParams)
 	// Count Anthropic Messages-compatible input tokens with anthropic-compatible provider context.
 	// (POST /api/provider/anthropic-compatible/v1/messages/count_tokens)
 	CountAnthropicCompatibleMessageTokensAlias(w http.ResponseWriter, r *http.Request)
 	// Create an OpenAI-compatible chat completion with Antigravity provider context.
 	// (POST /api/provider/antigravity/v1/chat/completions)
-	CreateAntigravityChatCompletionAlias(w http.ResponseWriter, r *http.Request)
+	CreateAntigravityChatCompletionAlias(w http.ResponseWriter, r *http.Request, params CreateAntigravityChatCompletionAliasParams)
 	// Create an Anthropic Messages-compatible message with Antigravity provider context.
 	// (POST /api/provider/antigravity/v1/messages)
-	CreateAntigravityMessageAlias(w http.ResponseWriter, r *http.Request)
+	CreateAntigravityMessageAlias(w http.ResponseWriter, r *http.Request, params CreateAntigravityMessageAliasParams)
 	// List Gemini-compatible models with Antigravity provider context.
 	// (GET /api/provider/antigravity/v1beta/models)
 	ListAntigravityGeminiModelsAlias(w http.ResponseWriter, r *http.Request, params ListAntigravityGeminiModelsAliasParams)
@@ -20738,10 +20792,10 @@ type ServerInterface interface {
 	CreateOpenAICompatibleAudioTranscriptionAlias(w http.ResponseWriter, r *http.Request)
 	// Create an OpenAI-compatible chat completion with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/chat/completions)
-	CreateOpenAICompatibleChatCompletionAlias(w http.ResponseWriter, r *http.Request)
+	CreateOpenAICompatibleChatCompletionAlias(w http.ResponseWriter, r *http.Request, params CreateOpenAICompatibleChatCompletionAliasParams)
 	// Create OpenAI-compatible embeddings with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/embeddings)
-	CreateOpenAICompatibleEmbeddingAlias(w http.ResponseWriter, r *http.Request)
+	CreateOpenAICompatibleEmbeddingAlias(w http.ResponseWriter, r *http.Request, params CreateOpenAICompatibleEmbeddingAliasParams)
 	// Create OpenAI-compatible image edits with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/images/edits)
 	CreateOpenAICompatibleImageEditAlias(w http.ResponseWriter, r *http.Request)
@@ -20753,16 +20807,16 @@ type ServerInterface interface {
 	CreateOpenAICompatibleImageVariationAlias(w http.ResponseWriter, r *http.Request)
 	// Create an Anthropic Messages-compatible message with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/messages)
-	CreateOpenAICompatibleMessageAlias(w http.ResponseWriter, r *http.Request)
+	CreateOpenAICompatibleMessageAlias(w http.ResponseWriter, r *http.Request, params CreateOpenAICompatibleMessageAliasParams)
 	// Create OpenAI-compatible moderation classifications with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/moderations)
 	CreateOpenAICompatibleModerationAlias(w http.ResponseWriter, r *http.Request)
 	// Create an OpenAI Responses-compatible response with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/responses)
-	CreateOpenAICompatibleResponseAlias(w http.ResponseWriter, r *http.Request)
+	CreateOpenAICompatibleResponseAlias(w http.ResponseWriter, r *http.Request, params CreateOpenAICompatibleResponseAliasParams)
 	// Compact an OpenAI Responses-compatible conversation context with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/responses/compact)
-	CreateOpenAICompatibleResponseCompactAlias(w http.ResponseWriter, r *http.Request)
+	CreateOpenAICompatibleResponseCompactAlias(w http.ResponseWriter, r *http.Request, params CreateOpenAICompatibleResponseCompactAliasParams)
 	// List Responses input items with openai-compatible provider context.
 	// (GET /api/provider/openai-compatible/v1/responses/{response_id}/input_items)
 	ListOpenAICompatibleResponseInputItemsAlias(w http.ResponseWriter, r *http.Request, responseId string, params ListOpenAICompatibleResponseInputItemsAliasParams)
@@ -21992,7 +22046,7 @@ type ServerInterface interface {
 	CreateResponse(w http.ResponseWriter, r *http.Request, params CreateResponseParams)
 	// Compact an OpenAI Responses-compatible conversation context.
 	// (POST /v1/responses/compact)
-	CreateResponseCompact(w http.ResponseWriter, r *http.Request)
+	CreateResponseCompact(w http.ResponseWriter, r *http.Request, params CreateResponseCompactParams)
 	// Connect to the Responses WebSocket gateway.
 	// (GET /v1/responses/ws)
 	ConnectResponsesWebSocket(w http.ResponseWriter, r *http.Request, params ConnectResponsesWebSocketParams)
@@ -22031,14 +22085,41 @@ type MiddlewareFunc func(http.Handler) http.Handler
 // CreateAnthropicCompatibleMessageAlias operation middleware
 func (siw *ServerInterfaceWrapper) CreateAnthropicCompatibleMessageAlias(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAnthropicCompatibleMessageAliasParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey GatewayIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateAnthropicCompatibleMessageAlias(w, r)
+		siw.Handler.CreateAnthropicCompatibleMessageAlias(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -22071,14 +22152,41 @@ func (siw *ServerInterfaceWrapper) CountAnthropicCompatibleMessageTokensAlias(w 
 // CreateAntigravityChatCompletionAlias operation middleware
 func (siw *ServerInterfaceWrapper) CreateAntigravityChatCompletionAlias(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAntigravityChatCompletionAliasParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey GatewayIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateAntigravityChatCompletionAlias(w, r)
+		siw.Handler.CreateAntigravityChatCompletionAlias(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -22091,14 +22199,41 @@ func (siw *ServerInterfaceWrapper) CreateAntigravityChatCompletionAlias(w http.R
 // CreateAntigravityMessageAlias operation middleware
 func (siw *ServerInterfaceWrapper) CreateAntigravityMessageAlias(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAntigravityMessageAliasParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey GatewayIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateAntigravityMessageAlias(w, r)
+		siw.Handler.CreateAntigravityMessageAlias(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -22331,14 +22466,41 @@ func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleAudioTranscriptionAlias
 // CreateOpenAICompatibleChatCompletionAlias operation middleware
 func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleChatCompletionAlias(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateOpenAICompatibleChatCompletionAliasParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey GatewayIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAICompatibleChatCompletionAlias(w, r)
+		siw.Handler.CreateOpenAICompatibleChatCompletionAlias(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -22351,14 +22513,41 @@ func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleChatCompletionAlias(w h
 // CreateOpenAICompatibleEmbeddingAlias operation middleware
 func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleEmbeddingAlias(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateOpenAICompatibleEmbeddingAliasParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey GatewayIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAICompatibleEmbeddingAlias(w, r)
+		siw.Handler.CreateOpenAICompatibleEmbeddingAlias(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -22431,14 +22620,41 @@ func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleImageVariationAlias(w h
 // CreateOpenAICompatibleMessageAlias operation middleware
 func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleMessageAlias(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateOpenAICompatibleMessageAliasParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey GatewayIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAICompatibleMessageAlias(w, r)
+		siw.Handler.CreateOpenAICompatibleMessageAlias(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -22471,14 +22687,41 @@ func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleModerationAlias(w http.
 // CreateOpenAICompatibleResponseAlias operation middleware
 func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleResponseAlias(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateOpenAICompatibleResponseAliasParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey GatewayIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAICompatibleResponseAlias(w, r)
+		siw.Handler.CreateOpenAICompatibleResponseAlias(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -22491,14 +22734,41 @@ func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleResponseAlias(w http.Re
 // CreateOpenAICompatibleResponseCompactAlias operation middleware
 func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleResponseCompactAlias(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateOpenAICompatibleResponseCompactAliasParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey GatewayIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOpenAICompatibleResponseCompactAlias(w, r)
+		siw.Handler.CreateOpenAICompatibleResponseCompactAlias(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -37374,14 +37644,41 @@ func (siw *ServerInterfaceWrapper) CreateResponse(w http.ResponseWriter, r *http
 // CreateResponseCompact operation middleware
 func (siw *ServerInterfaceWrapper) CreateResponseCompact(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateResponseCompactParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey GatewayIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateResponseCompact(w, r)
+		siw.Handler.CreateResponseCompact(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {

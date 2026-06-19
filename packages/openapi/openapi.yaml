@@ -13288,9 +13288,13 @@ paths:
         ResponsesRequest and executes through the standard Gateway auth,
         model policy, Scheduler, Provider Adapter, usage, and decision evidence
         chain. Same-protocol Codex/OpenAI compact responses are replayed as raw
-        upstream JSON to preserve the `response.compaction` shape.
+        upstream JSON to preserve the `response.compaction` shape. Optional
+        `Idempotency-Key` replay protection applies because compact is
+        non-streaming by contract, even when a client sends `stream: true`.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GatewayIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -13317,6 +13321,8 @@ paths:
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
           $ref: "#/components/responses/GatewayForbidden"
+        "409":
+          $ref: "#/components/responses/GatewayIdempotencyConflict"
         "422":
           $ref: "#/components/responses/GatewayValidationError"
         "503":
@@ -14263,9 +14269,11 @@ paths:
         - Gateway
       operationId: createOpenAICompatibleChatCompletionAlias
       summary: Create an OpenAI-compatible chat completion with openai-compatible provider context.
-      description: Provider alias route. It reuses the standard chat completion runtime and forces the `openai-compatible` provider context.
+      description: Provider alias route. It reuses the standard chat completion runtime, forces the `openai-compatible` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/chat/completions`.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GatewayIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -14292,6 +14300,8 @@ paths:
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
           $ref: "#/components/responses/GatewayForbidden"
+        "409":
+          $ref: "#/components/responses/GatewayIdempotencyConflict"
         "422":
           $ref: "#/components/responses/GatewayValidationError"
         "503":
@@ -14305,9 +14315,11 @@ paths:
         - Gateway
       operationId: createOpenAICompatibleResponseAlias
       summary: Create an OpenAI Responses-compatible response with openai-compatible provider context.
-      description: Provider alias route. It reuses the standard Responses runtime and forces the `openai-compatible` provider context.
+      description: Provider alias route. It reuses the standard Responses runtime, forces the `openai-compatible` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/responses`.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GatewayIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -14334,6 +14346,8 @@ paths:
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
           $ref: "#/components/responses/GatewayForbidden"
+        "409":
+          $ref: "#/components/responses/GatewayIdempotencyConflict"
         "422":
           $ref: "#/components/responses/GatewayValidationError"
         "503":
@@ -14415,9 +14429,11 @@ paths:
         - Gateway
       operationId: createOpenAICompatibleResponseCompactAlias
       summary: Compact an OpenAI Responses-compatible conversation context with openai-compatible provider context.
-      description: Provider alias route. It reuses the standard Responses compact runtime and forces the `openai-compatible` provider context.
+      description: Provider alias route. It reuses the standard Responses compact runtime, forces the `openai-compatible` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/responses/compact`.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GatewayIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -14444,6 +14460,8 @@ paths:
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
           $ref: "#/components/responses/GatewayForbidden"
+        "409":
+          $ref: "#/components/responses/GatewayIdempotencyConflict"
         "422":
           $ref: "#/components/responses/GatewayValidationError"
         "503":
@@ -14457,9 +14475,11 @@ paths:
         - Gateway
       operationId: createOpenAICompatibleMessageAlias
       summary: Create an Anthropic Messages-compatible message with openai-compatible provider context.
-      description: Provider alias route. It reuses the standard Messages runtime and forces the `openai-compatible` provider context.
+      description: Provider alias route. It reuses the standard Messages runtime, forces the `openai-compatible` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/messages`.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GatewayIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -14486,6 +14506,8 @@ paths:
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
           $ref: "#/components/responses/GatewayForbidden"
+        "409":
+          $ref: "#/components/responses/GatewayIdempotencyConflict"
         "422":
           $ref: "#/components/responses/GatewayValidationError"
         "503":
@@ -14499,9 +14521,11 @@ paths:
         - Gateway
       operationId: createAntigravityChatCompletionAlias
       summary: Create an OpenAI-compatible chat completion with Antigravity provider context.
-      description: Provider alias route. It reuses the standard chat completion runtime and forces the `antigravity` provider context.
+      description: Provider alias route. It reuses the standard chat completion runtime, forces the `antigravity` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/chat/completions`.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GatewayIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -14528,6 +14552,8 @@ paths:
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
           $ref: "#/components/responses/GatewayForbidden"
+        "409":
+          $ref: "#/components/responses/GatewayIdempotencyConflict"
         "422":
           $ref: "#/components/responses/GatewayValidationError"
         "503":
@@ -14541,9 +14567,11 @@ paths:
         - Gateway
       operationId: createAntigravityMessageAlias
       summary: Create an Anthropic Messages-compatible message with Antigravity provider context.
-      description: Provider alias route. It reuses the standard Messages runtime and forces the `antigravity` provider context.
+      description: Provider alias route. It reuses the standard Messages runtime, forces the `antigravity` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/messages`.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GatewayIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -14570,6 +14598,8 @@ paths:
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
           $ref: "#/components/responses/GatewayForbidden"
+        "409":
+          $ref: "#/components/responses/GatewayIdempotencyConflict"
         "422":
           $ref: "#/components/responses/GatewayValidationError"
         "503":
@@ -14675,9 +14705,11 @@ paths:
         - Gateway
       operationId: createOpenAICompatibleEmbeddingAlias
       summary: Create OpenAI-compatible embeddings with openai-compatible provider context.
-      description: Provider alias route. It reuses the standard embeddings runtime and forces the `openai-compatible` provider context.
+      description: Provider alias route. It reuses the standard embeddings runtime, forces the `openai-compatible` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/embeddings`.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GatewayIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -14700,6 +14732,8 @@ paths:
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
           $ref: "#/components/responses/GatewayForbidden"
+        "409":
+          $ref: "#/components/responses/GatewayIdempotencyConflict"
         "422":
           $ref: "#/components/responses/GatewayValidationError"
         "503":
@@ -15023,9 +15057,11 @@ paths:
         - Gateway
       operationId: createAnthropicCompatibleMessageAlias
       summary: Create an Anthropic Messages-compatible message with anthropic-compatible provider context.
-      description: Provider alias route. It reuses the standard Messages runtime and forces the `anthropic-compatible` provider context.
+      description: Provider alias route. It reuses the standard Messages runtime, forces the `anthropic-compatible` provider context, and supports the same optional `Idempotency-Key` replay protection as `/v1/messages`.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GatewayIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -15052,6 +15088,8 @@ paths:
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
           $ref: "#/components/responses/GatewayForbidden"
+        "409":
+          $ref: "#/components/responses/GatewayIdempotencyConflict"
         "422":
           $ref: "#/components/responses/GatewayValidationError"
         "503":

@@ -839,7 +839,7 @@ func (s *Server) registerGatewayEndpointRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/chat/completions", s.withGatewayIdempotency(s.handleCreateChatCompletion))
 	mux.HandleFunc("POST /v1/responses", s.withGatewayIdempotency(s.handleCreateResponse))
 	mux.HandleFunc("GET /v1/responses/{response_id}/input_items", s.handleListResponseInputItems)
-	mux.HandleFunc("POST /v1/responses/compact", s.withGatewaySourceEndpoint(string(gatewaycontract.EndpointResponsesCompact), s.handleCreateResponse))
+	mux.HandleFunc("POST /v1/responses/compact", s.withGatewaySourceEndpoint(string(gatewaycontract.EndpointResponsesCompact), s.withGatewayIdempotency(s.handleCreateResponse)))
 	mux.HandleFunc("GET /v1/responses/ws", s.handleResponsesWebSocket)
 	mux.HandleFunc("GET /v1/realtime", s.handleRealtimeWebSocket)
 	mux.HandleFunc("POST /v1/messages", s.withGatewayIdempotency(s.handleCreateMessage))
@@ -1295,7 +1295,23 @@ func (s *Server) registerGatewayAliasRouteForMethod(mux *http.ServeMux, seen map
 		return
 	}
 	seen[pattern] = struct{}{}
-	mux.HandleFunc(pattern, s.withGatewayProviderAlias(providerKey, handler))
+	wrapped := handler
+	if gatewayAliasRouteUsesIdempotency(method, endpoint) {
+		wrapped = s.withGatewayIdempotency(wrapped)
+	}
+	mux.HandleFunc(pattern, s.withGatewayProviderAlias(providerKey, wrapped))
+}
+
+func gatewayAliasRouteUsesIdempotency(method, endpoint string) bool {
+	if !strings.EqualFold(strings.TrimSpace(method), http.MethodPost) {
+		return false
+	}
+	switch strings.Trim(strings.ToLower(strings.TrimSpace(endpoint)), "/") {
+	case "chat/completions", "responses", "responses/compact", "messages", "embeddings":
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Server) registerGatewayGeminiAliasRoute(mux *http.ServeMux, seen map[string]struct{}, providerKey, prefix string) {

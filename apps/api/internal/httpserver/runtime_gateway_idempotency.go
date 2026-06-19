@@ -47,7 +47,7 @@ func (s *Server) withGatewayIdempotency(next http.HandlerFunc) http.HandlerFunc 
 		}
 		// Restore the consumed body so the wrapped handler can read it normally.
 		r.Body = io.NopCloser(bytes.NewReader(body))
-		if gatewayRequestIsStreaming(body) {
+		if gatewayRequestIsStreaming(r, body) {
 			// v1: streaming responses are not snapshotted/replayed.
 			next(w, r)
 			return
@@ -99,7 +99,10 @@ func (s *Server) readGatewayIdempotencyBody(r *http.Request) ([]byte, bool, erro
 	return body, false, nil
 }
 
-func gatewayRequestIsStreaming(body []byte) bool {
+func gatewayRequestIsStreaming(r *http.Request, body []byte) bool {
+	if gatewaySourceEndpointIsResponsesCompact(gatewaySourceEndpoint(r.Context(), r.URL.Path)) {
+		return false
+	}
 	var probe struct {
 		Stream *bool `json:"stream"`
 	}
