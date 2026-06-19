@@ -22,16 +22,23 @@ import { OpsAlertRunbookSteps } from "@/components/admin/ops-alert-runbook-steps
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
-import { useOpsAlertEvents } from "@/hooks/admin-queries";
+import { useAdminErrorLogFingerprints, useOpsAlertEvents } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   buildOpsAlertEvidenceLinks,
   buildOpsAlertRunbookSteps,
   type OpsAlertEvidenceLinks,
 } from "@/lib/admin-ops-alert-evidence";
+import { adminErrorLogDetailHref } from "@/lib/admin-log-links";
 import { formatDateTime, formatInteger, formatLatency, formatPercent, safeJson } from "@/lib/admin-format";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
-import type { JsonObject, OpsAlertEvent, OpsAlertSeverity, OpsAlertStatus } from "@/lib/sdk-types";
+import type {
+  JsonObject,
+  OpsAlertEvent,
+  OpsAlertSeverity,
+  OpsAlertStatus,
+  OpsErrorFingerprint,
+} from "@/lib/sdk-types";
 
 const ALERT_STATUSES: OpsAlertStatus[] = ["firing", "acknowledged", "resolved", "suppressed"];
 const ALERT_SEVERITIES: OpsAlertSeverity[] = ["critical", "warning", "ticket"];
@@ -207,6 +214,7 @@ function AlertEventsContent() {
                 ) : null}
               </div>
               <AlertSignalSummary details={detail.details} />
+              <AlertFingerprintPanel details={detail.details} />
               <div>
                 <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
                   {t("adminOpsAlertEvents.evidence")}
@@ -222,6 +230,114 @@ function AlertEventsContent() {
         </Dialog>
       ) : null}
     </>
+  );
+}
+
+function AlertFingerprintPanel({ details }: { details?: JsonObject }) {
+  const { t } = useLanguage();
+  const query = buildAlertFingerprintQuery(details);
+  const fingerprints = useAdminErrorLogFingerprints(query ?? undefined, Boolean(query));
+  if (!query) return null;
+  if (fingerprints.isLoading) {
+    return (
+      <section>
+        <SectionLabel>{t("adminOpsAlertEvents.fingerprintAttribution")}</SectionLabel>
+        <div className="text-2xs text-srapi-text-tertiary">
+          {t("adminOpsAlertEvents.fingerprintsLoading")}
+        </div>
+      </section>
+    );
+  }
+  if (fingerprints.isError) {
+    return (
+      <section>
+        <SectionLabel>{t("adminOpsAlertEvents.fingerprintAttribution")}</SectionLabel>
+        <div className="text-2xs text-srapi-error">
+          {t("adminOpsAlertEvents.fingerprintsFailed")}
+        </div>
+      </section>
+    );
+  }
+
+  const data = fingerprints.data?.data ?? [];
+  const meta = fingerprints.data?.meta;
+  return (
+    <section>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <SectionLabel>{t("adminOpsAlertEvents.fingerprintAttribution")}</SectionLabel>
+        {meta ? (
+          <span className="font-mono text-2xs text-srapi-text-tertiary">
+            {t("adminOpsAlertEvents.fingerprintsMeta", {
+              total: meta.total,
+              scanned: meta.scanned,
+            })}
+            {meta.truncated ? ` · ${t("adminOpsAlertEvents.fingerprintsTruncated")}` : ""}
+          </span>
+        ) : null}
+      </div>
+      {data.length === 0 ? (
+        <div className="text-2xs text-srapi-text-tertiary">
+          {t("adminOpsAlertEvents.fingerprintsEmpty")}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {data.slice(0, 5).map((item) => (
+            <AlertFingerprintItem key={item.fingerprint} item={item} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AlertFingerprintItem({ item }: { item: OpsErrorFingerprint }) {
+  const { t } = useLanguage();
+  const exampleHref = adminErrorLogDetailHref({ id: item.example_error_log_id });
+  return (
+    <div className="rounded border border-srapi-border-subtle p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-mono text-xs text-srapi-text-primary">
+            {item.message_pattern || item.error_class || item.fingerprint}
+          </div>
+          <div className="mt-1 truncate font-mono text-2xs text-srapi-text-tertiary">
+            {[
+              item.source_endpoint,
+              item.model,
+              item.error_class,
+              item.error_owner,
+              item.status_class,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          <QuietBadge status="error" label={t("adminOpsAlertEvents.fingerprintCount", { count: item.count })} />
+          {item.open_count > 0 ? (
+            <QuietBadge status="limited" label={t("adminOpsAlertEvents.fingerprintOpen", { count: item.open_count })} />
+          ) : null}
+          {item.investigating_count > 0 ? (
+            <QuietBadge
+              status="limited"
+              label={t("adminOpsAlertEvents.fingerprintInvestigating", {
+                count: item.investigating_count,
+              })}
+            />
+          ) : null}
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-2xs text-srapi-text-tertiary">
+        <span className="font-mono">
+          {formatDateTime(item.first_occurred_at)} → {formatDateTime(item.last_occurred_at)}
+        </span>
+        {exampleHref ? (
+          <Button asChild variant="ghost" size="sm">
+            <Link href={exampleHref}>{t("adminOpsAlertEvents.openFingerprintExample")}</Link>
+          </Button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -345,6 +461,30 @@ function buildAlertSignalSections(
   return sections;
 }
 
+function buildAlertFingerprintQuery(details: JsonObject | undefined) {
+  if (!details) return null;
+  const query = {
+    account_id: detailString(details, "account_id", "accountId") || undefined,
+    provider_id: detailString(details, "provider_id", "providerId") || undefined,
+    model: detailString(details, "model", "canonical_model", "model_alias") || undefined,
+    error_class: detailString(details, "error_class", "errorClass") || undefined,
+    source_endpoint: detailString(details, "source_endpoint", "sourceEndpoint") || undefined,
+    start: detailString(details, "window_start", "windowStart") || undefined,
+    end: detailString(details, "window_end", "windowEnd") || undefined,
+    limit: 5,
+  };
+  const hasScope = Boolean(
+    query.account_id ||
+      query.provider_id ||
+      query.model ||
+      query.error_class ||
+      query.source_endpoint ||
+      query.start ||
+      query.end,
+  );
+  return hasScope ? query : null;
+}
+
 function compactSignalItems(items: Array<SignalItem | null>): SignalItem[] {
   return items.filter((item): item is SignalItem => Boolean(item));
 }
@@ -462,10 +602,14 @@ function Meta({ label, value }: { label: string; value: string }) {
 function JsonBlock({ label, value }: { label: string; value: unknown }) {
   return (
     <div>
-      <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</span>
+      <SectionLabel>{label}</SectionLabel>
       <pre className="mt-1.5 max-h-48 overflow-auto rounded-lg bg-srapi-card-muted p-3 font-mono text-2xs text-srapi-text-secondary">
         {safeJson(value)}
       </pre>
     </div>
   );
+}
+
+function SectionLabel({ children }: { children: string }) {
+  return <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">{children}</span>;
 }

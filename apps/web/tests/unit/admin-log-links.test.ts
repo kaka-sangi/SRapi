@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   adminErrorInvestigationHref,
+  adminErrorLogDetailHref,
   adminErrorLogsHref,
   adminAccountsHealthHref,
   adminProvidersHref,
@@ -25,6 +26,12 @@ describe("admin log evidence links", () => {
         model: "gpt-ops",
       }),
     ).toBe("/admin/logs?tab=error&q=%2Fv1%2Fchat%2Fcompletions&f_error_class=server_bad&f_model=gpt-ops");
+  });
+
+  it("builds an error-log detail link from a durable row id", () => {
+    expect(adminErrorLogDetailHref({ id: "err-1" })).toBe("/admin/logs?tab=error&id=err-1");
+    expect(adminErrorLogDetailHref({ id: " err 1 " })).toBe("/admin/logs?tab=error&id=err%201");
+    expect(adminErrorLogDetailHref({})).toBeNull();
   });
 
   it("builds exact account and provider filters for account-health investigation", () => {

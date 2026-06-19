@@ -420,6 +420,8 @@ GET /api/v1/admin/ops/error-logs/fingerprints
 
 该接口按低敏稳定维度聚合最近 `ops_error_logs`，用于告警后的快速归因。默认窗口为最近 24 小时，返回前 20 个指纹；`limit` 最多 100。响应 `meta.scanned` 和 `meta.truncated` 会说明 live scan 是否覆盖完整匹配行。指纹只使用 endpoint、target protocol、model、status class/code、error class/phase/owner/source 和归一化 message pattern，不使用 request id、API key、user/account/provider 原始标识、请求体、prompt、credential 或 cookie。
 
+AdminOps 告警事件详情必须把 alert `details` 中的低敏 scope（窗口、endpoint、model、provider/account id、error_class）传给该接口，展示同一告警窗口内的 top error fingerprints、open/investigating 计数和样例 error log 链接。该面板是告警后的第一归因入口；前端不能只展示裸 JSON 或要求管理员手工复制过滤条件。
+
 Prometheus alert rules 可以从 `deploy/prometheus-srapi-alerts.yaml` 加载。该文件基于 `srapi_ops_alert_events{severity,status}` 生成 critical 和 warning Ops posture 告警，也覆盖 scheduler no-available-account、Provider 错误升高，以及 `ops_error_logs` 异步错误证据 recorder 缺失、丢弃、写失败和积压。labels 只保留低基数路由字段，排障说明和 runbook 放在 annotations。修改规则后运行：
 
 ```bash

@@ -19,10 +19,14 @@ export function useAdminErrorLogs(params?: P<typeof adminApi.listErrorLogs>) {
   });
 }
 
-export function useAdminErrorLogFingerprints(params?: P<typeof adminApi.listErrorLogFingerprints>) {
+export function useAdminErrorLogFingerprints(
+  params?: P<typeof adminApi.listErrorLogFingerprints>,
+  enabled = true,
+) {
   return useQuery({
     queryKey: queryKeys.admin.errorLogFingerprints(params),
     queryFn: () => adminApi.listErrorLogFingerprints(params),
+    enabled,
   });
 }
 

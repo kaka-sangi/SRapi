@@ -19,6 +19,7 @@ Object.defineProperty(window, "localStorage", {
 });
 
 const mocks = vi.hoisted(() => ({
+  fingerprintQuery: vi.fn(),
   alert: {
     id: "alert-1",
     rule_id: "rule.7",
@@ -50,6 +51,29 @@ const mocks = vi.hoisted(() => ({
     created_at: "2026-06-18T10:00:00Z",
     updated_at: "2026-06-18T10:01:00Z",
   } satisfies OpsAlertEvent,
+  fingerprint: {
+    fingerprint: "fp_timeout",
+    count: 12,
+    open_count: 7,
+    investigating_count: 2,
+    resolved_count: 3,
+    muted_count: 0,
+    first_occurred_at: "2026-06-18T09:56:00Z",
+    last_occurred_at: "2026-06-18T09:59:30Z",
+    example_error_log_id: "err-1",
+    example_request_id: "req-alert",
+    example_error_message: "upstream timeout after 30s",
+    source_endpoint: "/v1/chat/completions",
+    target_protocol: "openai",
+    model: "gpt-ops",
+    status_code: 504,
+    status_class: "5xx",
+    error_class: "timeout",
+    error_phase: "upstream",
+    error_owner: "provider",
+    error_source: "gateway",
+    message_pattern: "upstream timeout after {n}s",
+  },
 }));
 
 vi.mock("@/components/layout/admin-shell", () => ({
@@ -64,6 +88,17 @@ vi.mock("@/hooks/admin-queries", () => ({
     },
     isFetching: false,
   }),
+  useAdminErrorLogFingerprints: (params: unknown, enabled = true) => {
+    mocks.fingerprintQuery(params, enabled);
+    return {
+      data: {
+        data: [mocks.fingerprint],
+        meta: { total: 1, scanned: 12, truncated: false },
+      },
+      isLoading: false,
+      isError: false,
+    };
+  },
 }));
 
 function wrap({ children }: PropsWithChildren) {
@@ -80,6 +115,7 @@ function wrap({ children }: PropsWithChildren) {
 describe("AdminOpsAlertEventsPage", () => {
   beforeEach(() => {
     storage.clear();
+    mocks.fingerprintQuery.mockClear();
     window.history.replaceState(null, "", "/admin/ops/alert-events");
   });
 
@@ -129,5 +165,29 @@ describe("AdminOpsAlertEventsPage", () => {
     expect(screen.getByText("范围")).toBeInTheDocument();
     expect(screen.getByText("/v1/chat/completions")).toBeInTheDocument();
     expect(screen.getByText("gpt-ops")).toBeInTheDocument();
+    expect(screen.getByText("可能错误簇")).toBeInTheDocument();
+    expect(screen.getByText("1 组 · 已扫描 12 行")).toBeInTheDocument();
+    expect(screen.getByText("upstream timeout after {n}s")).toBeInTheDocument();
+    expect(screen.getByText("/v1/chat/completions · gpt-ops · timeout · provider · 5xx")).toBeInTheDocument();
+    expect(screen.getByText("12 次")).toBeInTheDocument();
+    expect(screen.getByText("待处理 7")).toBeInTheDocument();
+    expect(screen.getByText("调查中 2")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "打开样例" })).toHaveAttribute(
+      "href",
+      "/admin/logs?tab=error&id=err-1",
+    );
+    expect(mocks.fingerprintQuery).toHaveBeenLastCalledWith(
+      {
+        account_id: "acct-1",
+        provider_id: "provider-1",
+        model: "gpt-ops",
+        error_class: "timeout",
+        source_endpoint: "/v1/chat/completions",
+        start: "2026-06-18T09:55:00Z",
+        end: "2026-06-18T10:00:00Z",
+        limit: 5,
+      },
+      true,
+    );
   });
 });

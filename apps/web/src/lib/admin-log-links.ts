@@ -13,6 +13,10 @@ export interface ErrorLogInvestigationLinkParams {
   model?: string | null;
 }
 
+export interface ErrorLogDetailLinkParams {
+  id?: string | number | null;
+}
+
 export interface RequestEvidenceInvestigationLinkParams extends LogCorrelationIDs {
   account_id?: string | number | null;
   provider_id?: string | number | null;
@@ -65,6 +69,12 @@ export function adminErrorInvestigationHref(params: ErrorLogInvestigationLinkPar
       query.get("f_model"),
   );
   return hasFilter ? `${ADMIN_ROUTES.logs}?${query.toString()}` : null;
+}
+
+/** Build an Error logs deep link for one durable ops_error_logs row. */
+export function adminErrorLogDetailHref(params: ErrorLogDetailLinkParams): string | null {
+  const id = clean(params.id);
+  return id ? `${ADMIN_ROUTES.logs}?tab=error&id=${encodeURIComponent(id)}` : null;
 }
 
 /** Build a filtered Request evidence link for a request investigation. */
