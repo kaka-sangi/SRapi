@@ -102,6 +102,21 @@ func TestAdminOpsSystemLogsListAndCleanup(t *testing.T) {
 	if healthResp.Data.StorageMode != "durable" || !healthResp.Data.Writable || healthResp.Data.TotalCount != 2 || healthResp.Data.Stale {
 		t.Fatalf("unexpected health response: %+v", healthResp.Data)
 	}
+	recorder := healthResp.Data.ErrorEvidenceRecorder
+	if !recorder.Enabled || recorder.QueueCapacity == 0 || recorder.Degraded {
+		t.Fatalf("unexpected recorder health response: %+v", recorder)
+	}
+	if recorder.QueueDepth != 0 || recorder.DroppedCount != 0 || recorder.WriteFailedCount != 0 {
+		t.Fatalf("unexpected recorder counters: %+v", recorder)
+	}
+	fullRecorder := toAPIOpsErrorEvidenceRecorderHealth(opsErrorLogRecorderSnapshot{
+		Queued:   1,
+		Capacity: 1,
+		Enabled:  true,
+	})
+	if !fullRecorder.Degraded {
+		t.Fatalf("full recorder queue must be degraded: %+v", fullRecorder)
+	}
 
 	cleanupReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/ops/system-logs/cleanup", strings.NewReader(`{"source":"ops.dashboard","q":"rotate","request_id":"req_cleanup","trace_id":"trace_cleanup","dry_run":true,"max_delete":1}`))
 	cleanupReq.Header.Set("Content-Type", "application/json")

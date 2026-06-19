@@ -8454,6 +8454,21 @@ type OpsErrorDistributionResponse struct {
 	RequestId RequestId            `json:"request_id"`
 }
 
+// OpsErrorEvidenceRecorderHealth defines model for OpsErrorEvidenceRecorderHealth.
+type OpsErrorEvidenceRecorderHealth struct {
+	Degraded         bool  `json:"degraded"`
+	Draining         bool  `json:"draining"`
+	DroppedCount     int64 `json:"dropped_count"`
+	Enabled          bool  `json:"enabled"`
+	EnqueuedCount    int64 `json:"enqueued_count"`
+	ProcessedCount   int64 `json:"processed_count"`
+	QueueCapacity    int   `json:"queue_capacity"`
+	QueueDepth       int   `json:"queue_depth"`
+	RecordedCount    int64 `json:"recorded_count"`
+	Started          bool  `json:"started"`
+	WriteFailedCount int64 `json:"write_failed_count"`
+}
+
 // OpsErrorLog Operator-facing record of a single upstream failure observed by the
 // gateway hot path. Body excerpts are sanitised and credential-like
 // keys are redacted to "[REDACTED]" before persistence.
@@ -8712,17 +8727,18 @@ type OpsSystemLogCleanupResult struct {
 
 // OpsSystemLogHealth defines model for OpsSystemLogHealth.
 type OpsSystemLogHealth struct {
-	CheckedAt        Timestamp                     `json:"checked_at"`
-	Degraded         bool                          `json:"degraded"`
-	LastErrorAt      *Timestamp                    `json:"last_error_at,omitempty"`
-	LastErrorMessage *string                       `json:"last_error_message,omitempty"`
-	LastErrorSource  *string                       `json:"last_error_source,omitempty"`
-	LastLogAt        *Timestamp                    `json:"last_log_at,omitempty"`
-	LevelCounts      map[string]int                `json:"level_counts"`
-	Stale            bool                          `json:"stale"`
-	StorageMode      OpsSystemLogHealthStorageMode `json:"storage_mode"`
-	TotalCount       int                           `json:"total_count"`
-	Writable         bool                          `json:"writable"`
+	CheckedAt             Timestamp                      `json:"checked_at"`
+	Degraded              bool                           `json:"degraded"`
+	ErrorEvidenceRecorder OpsErrorEvidenceRecorderHealth `json:"error_evidence_recorder"`
+	LastErrorAt           *Timestamp                     `json:"last_error_at,omitempty"`
+	LastErrorMessage      *string                        `json:"last_error_message,omitempty"`
+	LastErrorSource       *string                        `json:"last_error_source,omitempty"`
+	LastLogAt             *Timestamp                     `json:"last_log_at,omitempty"`
+	LevelCounts           map[string]int                 `json:"level_counts"`
+	Stale                 bool                           `json:"stale"`
+	StorageMode           OpsSystemLogHealthStorageMode  `json:"storage_mode"`
+	TotalCount            int                            `json:"total_count"`
+	Writable              bool                           `json:"writable"`
 }
 
 // OpsSystemLogHealthStorageMode defines model for OpsSystemLogHealth.StorageMode.

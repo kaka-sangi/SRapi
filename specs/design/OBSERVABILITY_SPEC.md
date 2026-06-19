@@ -409,6 +409,13 @@ DELETE /api/v1/admin/ops/alert-silences/{id}
 
 Scheduler decision 下钻不在 `ops/` 命名空间下，而是 `GET /api/v1/admin/scheduler/decisions`（及 `/{id}`，见 §9 与 `SCHEDULER_V1_SPEC.md`）。本文 §2 中 `traffic` / `errors` / `providers` 等信息架构页面由上述 throughput/error/latency/concurrency 等读模型接口拼装，而非各自独立路由。
 
+`GET /api/v1/admin/ops/system-logs/health` is the console's evidence-chain
+health endpoint. It reports both durable `ops_system_logs` store health and the
+active asynchronous `ops_error_logs` recorder snapshot, including queue depth,
+capacity, enqueued/processed/recorded counts, dropped count, write-failure
+count, and lifecycle flags. Operators must be able to distinguish "no error
+evidence exists" from "the evidence recorder is dropping or failing writes".
+
 已实现的 SLO 写接口使用控制台 Cookie + CSRF；SLO objective 可输入 `0.995` 或 `99.5`，响应和持久化统一为 `0.995`。`ops/settings` 使用 `PUT`。
 
 ## 12. 隐私与脱敏

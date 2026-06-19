@@ -253,7 +253,8 @@ function SystemLogEvidencePanel({
   const { t } = useLanguage();
   if (loading && !health) {
     return (
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <EvidenceTileSkeleton />
         <EvidenceTileSkeleton />
         <EvidenceTileSkeleton />
         <EvidenceTileSkeleton />
@@ -265,8 +266,9 @@ function SystemLogEvidencePanel({
   const lastErrorHint = health?.last_error_at
     ? [formatDateTime(health.last_error_at), health.last_error_source].filter(Boolean).join(" · ")
     : t("adminOpsSystemLogs.noRecentError");
+  const recorder = health?.error_evidence_recorder;
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
       <EvidenceTile
         label={t("adminOpsSystemLogs.backend")}
         value={health?.storage_mode ?? "-"}
@@ -287,6 +289,13 @@ function SystemLogEvidencePanel({
             )}
           </span>
         }
+      />
+      <EvidenceTile
+        label={t("adminOpsSystemLogs.errorEvidence")}
+        value={`${formatInteger(recorder?.queue_depth ?? 0)}/${formatInteger(
+          recorder?.queue_capacity ?? 0,
+        )}`}
+        footer={<ErrorEvidenceRecorderSummary recorder={recorder} />}
       />
       <EvidenceTile
         label={t("adminOpsSystemLogs.lastWrite")}
@@ -313,6 +322,42 @@ function SystemLogEvidencePanel({
         footer={<LevelCounts counts={health?.level_counts} />}
       />
     </div>
+  );
+}
+
+function ErrorEvidenceRecorderSummary({
+  recorder,
+}: {
+  recorder: OpsSystemLogHealth["error_evidence_recorder"] | undefined;
+}) {
+  const { t } = useLanguage();
+  if (!recorder?.enabled) {
+    return <QuietBadge status="error" label={t("adminOpsSystemLogs.recorderDisabled")} />;
+  }
+  const status = recorder.degraded ? "error" : "active";
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      <QuietBadge
+        status={status}
+        label={
+          recorder.degraded
+            ? t("adminOpsSystemLogs.recorderDegraded")
+            : t("adminOpsSystemLogs.recorderHealthy")
+        }
+      />
+      <QuietBadge
+        status={recorder.dropped_count > 0 ? "error" : "disabled"}
+        label={`${t("adminOpsSystemLogs.dropped")}:${formatInteger(recorder.dropped_count)}`}
+      />
+      <QuietBadge
+        status={recorder.write_failed_count > 0 ? "error" : "disabled"}
+        label={`${t("adminOpsSystemLogs.failed")}:${formatInteger(recorder.write_failed_count)}`}
+      />
+      <QuietBadge
+        status="disabled"
+        label={`${t("adminOpsSystemLogs.recorded")}:${formatInteger(recorder.recorded_count)}`}
+      />
+    </span>
   );
 }
 

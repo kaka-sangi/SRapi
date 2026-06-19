@@ -202,8 +202,12 @@ func (s *Server) handleAdminOpsSystemLogHealth(w http.ResponseWriter, r *http.Re
 		writeOperationsServiceError(w, err, requestID)
 		return
 	}
+	var recorderSnapshot opsErrorLogRecorderSnapshot
+	if s.runtime.opsErrorLogRecorder != nil {
+		recorderSnapshot = s.runtime.opsErrorLogRecorder.snapshot()
+	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpsSystemLogHealthResponse{
-		Data:      toAPIOpsSystemLogHealth(health),
+		Data:      toAPIOpsSystemLogHealth(health, recorderSnapshot),
 		RequestId: requestID,
 	})
 }

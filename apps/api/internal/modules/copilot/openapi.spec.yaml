@@ -24444,6 +24444,7 @@ components:
         - stale
         - total_count
         - level_counts
+        - error_evidence_recorder
         - checked_at
       properties:
         storage_mode:
@@ -24473,8 +24474,60 @@ components:
           type: string
         last_error_message:
           type: string
+        error_evidence_recorder:
+          $ref: "#/components/schemas/OpsErrorEvidenceRecorderHealth"
         checked_at:
           $ref: "#/components/schemas/Timestamp"
+
+    OpsErrorEvidenceRecorderHealth:
+      type: object
+      required:
+        - enabled
+        - started
+        - draining
+        - degraded
+        - queue_depth
+        - queue_capacity
+        - enqueued_count
+        - processed_count
+        - recorded_count
+        - dropped_count
+        - write_failed_count
+      properties:
+        enabled:
+          type: boolean
+        started:
+          type: boolean
+        draining:
+          type: boolean
+        degraded:
+          type: boolean
+        queue_depth:
+          type: integer
+          minimum: 0
+        queue_capacity:
+          type: integer
+          minimum: 0
+        enqueued_count:
+          type: integer
+          format: int64
+          minimum: 0
+        processed_count:
+          type: integer
+          format: int64
+          minimum: 0
+        recorded_count:
+          type: integer
+          format: int64
+          minimum: 0
+        dropped_count:
+          type: integer
+          format: int64
+          minimum: 0
+        write_failed_count:
+          type: integer
+          format: int64
+          minimum: 0
 
     OpsSystemLogHealthResponse:
       type: object

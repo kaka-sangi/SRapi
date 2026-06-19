@@ -142,6 +142,7 @@ type opsErrorLogRecorderSnapshot struct {
 	Processed   int64
 	Dropped     int64
 	WriteFailed int64
+	Enabled     bool
 	Started     bool
 	Draining    bool
 }
@@ -160,6 +161,7 @@ func (r *opsErrorLogRecorder) snapshot() opsErrorLogRecorderSnapshot {
 		Processed:   r.processed.Load(),
 		Dropped:     r.dropped.Load(),
 		WriteFailed: r.writeFailed.Load(),
+		Enabled:     true,
 		Started:     r.started.Load(),
 		Draining:    draining,
 	}

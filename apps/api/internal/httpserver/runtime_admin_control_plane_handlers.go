@@ -1526,24 +1526,49 @@ func toAPIOpsSystemLogs(items []operationscontract.OpsSystemLog) []apiopenapi.Op
 	return out
 }
 
-func toAPIOpsSystemLogHealth(health operationscontract.SystemLogHealth) apiopenapi.OpsSystemLogHealth {
+func toAPIOpsSystemLogHealth(health operationscontract.SystemLogHealth, recorder opsErrorLogRecorderSnapshot) apiopenapi.OpsSystemLogHealth {
 	levelCounts := map[string]int{}
 	for level, count := range health.LevelCounts {
 		levelCounts[string(level)] = count
 	}
 	return apiopenapi.OpsSystemLogHealth{
-		CheckedAt:        health.CheckedAt,
-		Degraded:         health.Degraded,
-		LastErrorAt:      cloneTimePtr(health.LastErrorAt),
-		LastErrorMessage: optionalString(health.LastErrorMessage),
-		LastErrorSource:  optionalString(health.LastErrorSource),
-		LastLogAt:        cloneTimePtr(health.LastLogAt),
-		LevelCounts:      levelCounts,
-		Stale:            health.Stale,
-		StorageMode:      apiopenapi.OpsSystemLogHealthStorageMode(health.StorageMode),
-		TotalCount:       health.TotalCount,
-		Writable:         health.Writable,
+		CheckedAt:             health.CheckedAt,
+		Degraded:              health.Degraded,
+		ErrorEvidenceRecorder: toAPIOpsErrorEvidenceRecorderHealth(recorder),
+		LastErrorAt:           cloneTimePtr(health.LastErrorAt),
+		LastErrorMessage:      optionalString(health.LastErrorMessage),
+		LastErrorSource:       optionalString(health.LastErrorSource),
+		LastLogAt:             cloneTimePtr(health.LastLogAt),
+		LevelCounts:           levelCounts,
+		Stale:                 health.Stale,
+		StorageMode:           apiopenapi.OpsSystemLogHealthStorageMode(health.StorageMode),
+		TotalCount:            health.TotalCount,
+		Writable:              health.Writable,
 	}
+}
+
+func toAPIOpsErrorEvidenceRecorderHealth(snapshot opsErrorLogRecorderSnapshot) apiopenapi.OpsErrorEvidenceRecorderHealth {
+	recorded := snapshot.Processed - snapshot.WriteFailed
+	if recorded < 0 {
+		recorded = 0
+	}
+	return apiopenapi.OpsErrorEvidenceRecorderHealth{
+		Degraded:         !snapshot.Enabled || snapshot.Draining || recorderQueueFull(snapshot) || snapshot.Dropped > 0 || snapshot.WriteFailed > 0,
+		Draining:         snapshot.Draining,
+		DroppedCount:     snapshot.Dropped,
+		Enabled:          snapshot.Enabled,
+		EnqueuedCount:    snapshot.Enqueued,
+		ProcessedCount:   snapshot.Processed,
+		QueueCapacity:    snapshot.Capacity,
+		QueueDepth:       snapshot.Queued,
+		RecordedCount:    recorded,
+		Started:          snapshot.Started,
+		WriteFailedCount: snapshot.WriteFailed,
+	}
+}
+
+func recorderQueueFull(snapshot opsErrorLogRecorderSnapshot) bool {
+	return snapshot.Capacity > 0 && snapshot.Queued >= snapshot.Capacity
 }
 
 func toAPIBatchOperationResult(in admincontrol.BatchOperationResult) apiopenapi.BatchOperationResult {

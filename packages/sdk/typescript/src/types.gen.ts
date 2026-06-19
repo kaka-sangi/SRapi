@@ -3298,7 +3298,22 @@ export type OpsSystemLogHealth = {
     last_error_at?: Timestamp;
     last_error_source?: string;
     last_error_message?: string;
+    error_evidence_recorder: OpsErrorEvidenceRecorderHealth;
     checked_at: Timestamp;
+};
+
+export type OpsErrorEvidenceRecorderHealth = {
+    enabled: boolean;
+    started: boolean;
+    draining: boolean;
+    degraded: boolean;
+    queue_depth: number;
+    queue_capacity: number;
+    enqueued_count: number;
+    processed_count: number;
+    recorded_count: number;
+    dropped_count: number;
+    write_failed_count: number;
 };
 
 export type OpsSystemLogHealthResponse = {

@@ -119,7 +119,9 @@ Ops v1 is read-model based:
   owned by the operations module. Listing supports bounded filters by level,
   source, text query, and time range. Health evidence reports durable-store
   mode, writability, freshness, level counts, and last-error summary from
-  store statistics. Cleanup is a CSRF-protected admin write with dry-run
+  store statistics. It also reports the active asynchronous `ops_error_logs`
+  recorder queue/counter health so operators can see dropped or failed detailed
+  error-evidence writes. Cleanup is a CSRF-protected admin write with dry-run
   support, `max_delete` caps, and safe audit summaries that do not copy raw
   query text. The endpoint must not read local stdout/stderr files.
 

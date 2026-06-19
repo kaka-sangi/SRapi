@@ -604,8 +604,12 @@ breakage from the console.
 
 `GET /api/v1/admin/ops/system-logs/health` returns store health evidence:
 storage mode, writable/degraded/stale flags, total rows, level counts, last log
-time, and last error summary. It must derive these facts from store statistics,
-not from a sampled list page.
+time, and last error summary. It also returns `error_evidence_recorder`
+runtime health for the asynchronous `ops_error_logs` writer: enabled/started/
+draining flags, queue depth/capacity, enqueued/processed/recorded counters, and
+dropped/write-failure counters. Store facts must derive from store statistics,
+not from a sampled list page; recorder facts must derive from the active runtime
+snapshot so operators can see when detailed error evidence is being dropped.
 
 `POST /api/v1/admin/ops/system-logs/cleanup` is a write route and must require
 `cookieAuth` plus `csrfHeader`. Cleanup requires at least one bounded filter,

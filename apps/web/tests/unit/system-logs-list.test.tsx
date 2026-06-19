@@ -43,6 +43,19 @@ const mocks = vi.hoisted(() => ({
     last_error_at: "2026-06-18T10:00:00Z",
     last_error_source: "gateway",
     last_error_message: "gateway failed",
+    error_evidence_recorder: {
+      enabled: true,
+      started: true,
+      draining: false,
+      degraded: false,
+      queue_depth: 2,
+      queue_capacity: 256,
+      enqueued_count: 12,
+      processed_count: 10,
+      recorded_count: 9,
+      dropped_count: 1,
+      write_failed_count: 1,
+    },
     checked_at: "2026-06-18T10:00:00Z",
   } satisfies OpsSystemLogHealth,
 }));
@@ -99,5 +112,8 @@ describe("AdminOpsSystemLogsPage", () => {
       "href",
       "/admin/logs?tab=request-files&f_request_id=req-sys",
     );
+    expect(screen.getByText("2/256")).toBeInTheDocument();
+    expect(screen.getByText("丢弃:1")).toBeInTheDocument();
+    expect(screen.getByText("失败:1")).toBeInTheDocument();
   });
 });
