@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { Activity, Bug, FileText, Route, ScrollText } from "lucide-react";
+import { Activity, Bug, FileText, Route, ScrollText, X } from "lucide-react";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
 import { FilterSelect, ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import { PageHeader } from "@/components/layout/page-header";
@@ -293,6 +293,21 @@ export function RequestEvidencePanel() {
         minWidth={1120}
         toolbar={
           <ListToolbar>
+            <RequestEvidenceScopeFilters
+              requestID={requestID}
+              accountID={accountID}
+              providerID={providerID}
+              model={model}
+              sourceEndpoint={sourceEndpoint}
+              errorClass={errorClass}
+              exactStart={exactStart}
+              exactEnd={exactEnd}
+              onClear={(key) => list.setFilter(key, undefined)}
+              onClearExactWindow={() => {
+                list.setFilter("start", undefined);
+                list.setFilter("end", undefined);
+              }}
+            />
             <SearchInput
               value={list.searchInput}
               onChange={list.setSearchInput}
@@ -376,6 +391,111 @@ export function RequestEvidencePanel() {
         onClose={() => setDetailRequestID(undefined)}
       />
     </div>
+  );
+}
+
+interface RequestEvidenceScopeFiltersProps {
+  requestID?: string;
+  accountID?: string;
+  providerID?: string;
+  model?: string;
+  sourceEndpoint?: string;
+  errorClass?: string;
+  exactStart?: string;
+  exactEnd?: string;
+  onClear: (key: string) => void;
+  onClearExactWindow: () => void;
+}
+
+function RequestEvidenceScopeFilters({
+  requestID,
+  accountID,
+  providerID,
+  model,
+  sourceEndpoint,
+  errorClass,
+  exactStart,
+  exactEnd,
+  onClear,
+  onClearExactWindow,
+}: RequestEvidenceScopeFiltersProps) {
+  const { t } = useLanguage();
+  const chips = [
+    requestID
+      ? { key: "request_id", label: t("adminRequestEvidence.scopeRequest"), value: requestID }
+      : null,
+    accountID
+      ? { key: "account_id", label: t("adminRequestEvidence.scopeAccount"), value: accountID }
+      : null,
+    providerID
+      ? { key: "provider_id", label: t("adminRequestEvidence.scopeProvider"), value: providerID }
+      : null,
+    model ? { key: "model", label: t("adminRequestEvidence.scopeModel"), value: model } : null,
+    sourceEndpoint
+      ? { key: "source_endpoint", label: t("adminRequestEvidence.scopeEndpoint"), value: sourceEndpoint }
+      : null,
+    errorClass
+      ? { key: "error_class", label: t("adminRequestEvidence.scopeErrorClass"), value: errorClass }
+      : null,
+  ].filter((chip): chip is { key: string; label: string; value: string } => Boolean(chip));
+  const hasExactWindow = Boolean(exactStart || exactEnd);
+  if (chips.length === 0 && !hasExactWindow) return null;
+
+  return (
+    <div className="flex w-full flex-wrap items-center gap-1.5">
+      <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+        {t("adminRequestEvidence.scope")}
+      </span>
+      {chips.map((chip) => (
+        <ScopeChip
+          key={`${chip.key}:${chip.value}`}
+          label={chip.label}
+          value={chip.value}
+          clearLabel={t("adminRequestEvidence.scopeClear", { label: chip.label })}
+          onClear={() => onClear(chip.key)}
+        />
+      ))}
+      {hasExactWindow ? (
+        <ScopeChip
+          label={t("adminRequestEvidence.scopeWindow")}
+          value={`${exactStart || "…"} → ${exactEnd || "…"}`}
+          clearLabel={t("adminRequestEvidence.scopeClear", {
+            label: t("adminRequestEvidence.scopeWindow"),
+          })}
+          onClear={onClearExactWindow}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ScopeChip({
+  label,
+  value,
+  clearLabel,
+  onClear,
+}: {
+  label: string;
+  value: string;
+  clearLabel: string;
+  onClear: () => void;
+}) {
+  return (
+    <span
+      className="border-srapi-border-subtle bg-srapi-card-muted inline-flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary sm:max-w-80"
+      title={`${label}:${value}`}
+    >
+      <span className="text-srapi-text-tertiary">{label}</span>
+      <span className="max-w-48 truncate text-srapi-text-primary sm:max-w-56">{value}</span>
+      <button
+        type="button"
+        className="text-srapi-text-tertiary hover:text-srapi-text-primary"
+        aria-label={clearLabel}
+        onClick={onClear}
+      >
+        <X className="size-3" aria-hidden="true" />
+      </button>
+    </span>
   );
 }
 

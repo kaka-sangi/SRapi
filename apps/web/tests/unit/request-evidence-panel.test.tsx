@@ -213,11 +213,19 @@ describe("RequestEvidencePanel", () => {
     window.history.replaceState(
       null,
       "",
-      "/admin/logs?tab=request-evidence&f_account_id=9&f_provider_id=3&f_error_class=server_bad&f_model=gpt-4.1&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_sort=latency_desc&f_min_latency_ms=500&f_max_latency_ms=1200",
+      "/admin/logs?tab=request-evidence&f_account_id=9&f_provider_id=3&f_error_class=server_bad&f_model=gpt-4.1&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_start=2026-06-19T07%3A55%3A00Z&f_end=2026-06-19T08%3A00%3A00Z&f_sort=latency_desc&f_min_latency_ms=500&f_max_latency_ms=1200",
     );
 
     render(<RequestEvidencePanel />, { wrapper: wrap });
 
+    expect(screen.getByText("范围")).toBeInTheDocument();
+    expect(screen.getByTitle("账号:9")).toBeInTheDocument();
+    expect(screen.getByTitle("供应商:3")).toBeInTheDocument();
+    expect(screen.getByTitle("端点:/v1/chat/completions")).toBeInTheDocument();
+    expect(screen.getByTitle("分类:server_bad")).toBeInTheDocument();
+    expect(
+      screen.getByTitle("窗口:2026-06-19T07:55:00Z → 2026-06-19T08:00:00Z"),
+    ).toBeInTheDocument();
     expect(mocks.useOpsRequestEvidence).toHaveBeenCalledWith(
       expect.objectContaining({
         account_id: "9",
@@ -228,7 +236,44 @@ describe("RequestEvidencePanel", () => {
         sort: "latency_desc",
         min_latency_ms: 500,
         max_latency_ms: 1200,
+        start: "2026-06-19T07:55:00Z",
+        end: "2026-06-19T08:00:00Z",
       }),
+    );
+  });
+
+  it("clears scoped investigation chips without dropping unrelated filters", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/admin/logs?tab=request-evidence&f_account_id=9&f_provider_id=3&f_error_class=server_bad&f_start=2026-06-19T07%3A55%3A00Z&f_end=2026-06-19T08%3A00%3A00Z&f_sort=latency_desc",
+    );
+
+    const { rerender } = render(<RequestEvidencePanel />, { wrapper: wrap });
+
+    fireEvent.click(screen.getByRole("button", { name: "清除 账号" }));
+    rerender(<RequestEvidencePanel />);
+
+    expect(mocks.useOpsRequestEvidence).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        account_id: undefined,
+        provider_id: "3",
+        error_class: "server_bad",
+        sort: "latency_desc",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "清除 窗口" }));
+    rerender(<RequestEvidencePanel />);
+
+    expect(mocks.useOpsRequestEvidence).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        start: expect.any(String),
+        end: undefined,
+      }),
+    );
+    expect(mocks.useOpsRequestEvidence.mock.calls.at(-1)?.[0].start).not.toBe(
+      "2026-06-19T07:55:00Z",
     );
   });
 
