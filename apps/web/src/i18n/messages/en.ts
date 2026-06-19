@@ -1692,6 +1692,7 @@ export const en = {
     detailLoadFailed: "Failed to load the captured request file.",
     deleteTitle: "Delete request dump",
     relatedEvidence: "Related evidence",
+    openRequestEvidence: "Request evidence",
     openErrorLogs: "Error logs",
     openSystemLogs: "System logs",
     diagnosticSummary: "Diagnostic summary",

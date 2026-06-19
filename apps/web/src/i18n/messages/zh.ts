@@ -1641,6 +1641,7 @@ export const zh: Messages = {
     detailLoadFailed: "无法加载请求转储文件。",
     deleteTitle: "删除请求转储",
     relatedEvidence: "关联证据",
+    openRequestEvidence: "请求证据",
     openErrorLogs: "错误日志",
     openSystemLogs: "系统日志",
     diagnosticSummary: "诊断摘要",

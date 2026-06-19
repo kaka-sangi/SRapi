@@ -101,13 +101,17 @@ describe("RequestLogFilesPanel", () => {
     mocks.downloadFile.mockReset();
   });
 
-  it("links each request dump row to related error and system logs", () => {
+  it("links each request dump row to unified request evidence and related logs", () => {
     render(<RequestLogFilesPanel />, { wrapper: wrap });
 
     expect(screen.getByText("req-dump")).toBeInTheDocument();
     expect(screen.getByText("server_bad")).toBeInTheDocument();
     expect(screen.getByText("891ms")).toBeInTheDocument();
     expect(screen.getByText("1 请求 / 1 响应")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "请求证据" })).toHaveAttribute(
+      "href",
+      "/admin/logs?tab=request-evidence&f_request_id=req-dump",
+    );
     expect(screen.getByRole("link", { name: "错误日志" })).toHaveAttribute(
       "href",
       "/admin/logs?tab=error&q=req-dump",
@@ -130,5 +134,12 @@ describe("RequestLogFilesPanel", () => {
     expect(screen.getAllByText("891ms").length).toBeGreaterThan(1);
     expect(screen.getAllByText("1 请求 / 1 响应").length).toBeGreaterThan(1);
     expect(screen.getAllByText("/v1/chat/completions").length).toBeGreaterThan(1);
+    expect(
+      screen.getAllByRole("link").some((link) =>
+        link
+          .getAttribute("href")
+          ?.includes("tab=request-evidence&f_request_id=req-dump"),
+      ),
+    ).toBe(true);
   });
 });

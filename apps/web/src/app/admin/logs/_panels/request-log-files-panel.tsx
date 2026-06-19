@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bug, FileText, ExternalLink } from "lucide-react";
+import { Bug, FileSearch, FileText, ExternalLink } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { RequestDumpSummaryGrid } from "@/components/admin/request-log-dump-summary-panel";
 import { PageHeader } from "@/components/layout/page-header";
@@ -17,7 +17,11 @@ import {
 } from "@/components/ui/dialog";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime } from "@/lib/admin-format";
-import { adminErrorLogsHref, adminSystemLogsHref } from "@/lib/admin-log-links";
+import {
+  adminErrorLogsHref,
+  adminRequestEvidenceHref,
+  adminSystemLogsHref,
+} from "@/lib/admin-log-links";
 import {
   parseRequestDumpSummary,
   requestLogDescriptorSummary,
@@ -361,13 +365,22 @@ function RequestDumpDescriptorSummary({
 
 function RequestDumpEvidencePills({ file }: { file: RequestLogFileDescriptor }) {
   const { t } = useLanguage();
+  const requestEvidenceHref = adminRequestEvidenceHref({ request_id: file.request_id });
   const errorHref = adminErrorLogsHref({ request_id: file.request_id });
   const systemHref = adminSystemLogsHref({ request_id: file.request_id });
-  if (!errorHref && !systemHref) {
+  if (!requestEvidenceHref && !errorHref && !systemHref) {
     return <span className="font-mono text-2xs text-srapi-text-tertiary">—</span>;
   }
   return (
     <div className="flex flex-wrap gap-1.5">
+      {requestEvidenceHref ? (
+        <Link
+          href={requestEvidenceHref}
+          className="rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-secondary underline-offset-2 hover:text-srapi-text-primary hover:underline"
+        >
+          {t("adminRequestLogFiles.openRequestEvidence")}
+        </Link>
+      ) : null}
       {errorHref ? (
         <Link
           href={errorHref}
@@ -390,9 +403,10 @@ function RequestDumpEvidencePills({ file }: { file: RequestLogFileDescriptor }) 
 
 function RequestDumpEvidenceLinks({ file }: { file: RequestLogFileDescriptor }) {
   const { t } = useLanguage();
+  const requestEvidenceHref = adminRequestEvidenceHref({ request_id: file.request_id });
   const errorHref = adminErrorLogsHref({ request_id: file.request_id });
   const systemHref = adminSystemLogsHref({ request_id: file.request_id });
-  if (!errorHref && !systemHref) return null;
+  if (!requestEvidenceHref && !errorHref && !systemHref) return null;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-srapi-border-subtle bg-srapi-bg-card-elevated px-3 py-2">
@@ -400,6 +414,15 @@ function RequestDumpEvidenceLinks({ file }: { file: RequestLogFileDescriptor }) 
         {t("adminRequestLogFiles.relatedEvidence")}
       </span>
       <div className="flex flex-wrap gap-2">
+        {requestEvidenceHref ? (
+          <Button asChild variant="outline" size="sm">
+            <Link href={requestEvidenceHref}>
+              <FileSearch aria-hidden />
+              {t("adminRequestLogFiles.openRequestEvidence")}
+              <ExternalLink aria-hidden />
+            </Link>
+          </Button>
+        ) : null}
         {errorHref ? (
           <Button asChild variant="outline" size="sm">
             <Link href={errorHref}>
