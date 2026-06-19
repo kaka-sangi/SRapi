@@ -99,6 +99,23 @@ func accountSessionsKey(accountID int) string {
 	return accountSessionsKeyPrefix + strconv.Itoa(accountID)
 }
 
+var addAccountSessionScript = redis.NewScript(`
+local key = KEYS[1]
+local session_id = ARGV[1]
+local now_ms = ARGV[2]
+local expires_at_ms = ARGV[3]
+local ttl_ms = tonumber(ARGV[4])
+
+redis.call("ZREMRANGEBYSCORE", key, "-inf", now_ms)
+redis.call("ZADD", key, expires_at_ms, session_id)
+
+local current_ttl = redis.call("PTTL", key)
+if current_ttl < ttl_ms then
+  redis.call("PEXPIRE", key, ttl_ms)
+end
+return 1
+`)
+
 // AddAccountSession records sessionID as active on accountID (ZSET scored by
 // expiry; re-adding refreshes the score so one conversation never double-counts).
 func (s *Store) AddAccountSession(ctx context.Context, accountID int, sessionID string, ttl time.Duration) error {
@@ -111,11 +128,12 @@ func (s *Store) AddAccountSession(ctx context.Context, accountID int, sessionID 
 	}
 	key := accountSessionsKey(accountID)
 	nowMs := time.Now().UnixMilli()
-	pipe := s.client.Pipeline()
-	pipe.ZRemRangeByScore(ctx, key, "-inf", strconv.FormatInt(nowMs, 10))
-	pipe.ZAdd(ctx, key, redis.Z{Score: float64(nowMs + ttl.Milliseconds()), Member: sessionID})
-	pipe.PExpire(ctx, key, ttl)
-	_, err := pipe.Exec(ctx)
+	ttlMs := ttl.Milliseconds()
+	if ttlMs <= 0 {
+		ttlMs = 1
+	}
+	expiresAtMs := nowMs + ttlMs
+	_, err := addAccountSessionScript.Run(ctx, s.client, []string{key}, sessionID, nowMs, expiresAtMs, ttlMs).Result()
 	return err
 }
 
