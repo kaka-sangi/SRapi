@@ -200,6 +200,52 @@ func TestStoreListsFiltersAndUpdatesResolution(t *testing.T) {
 	}
 }
 
+func TestStoreListFiltersEquivalentErrorClasses(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	ctx := context.Background()
+	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
+	streamTimeout, err := store.Insert(ctx, contract.Entry{
+		OccurredAt:   now,
+		RequestID:    "req_stream_timeout",
+		ErrorClass:   "stream_idle_timeout",
+		ErrorMessage: "stream timed out",
+	})
+	if err != nil {
+		t.Fatalf("insert stream timeout: %v", err)
+	}
+	rateLimit, err := store.Insert(ctx, contract.Entry{
+		OccurredAt:   now.Add(time.Second),
+		RequestID:    "req_rate_limit",
+		ErrorClass:   "rate_limit",
+		ErrorMessage: "slow down",
+	})
+	if err != nil {
+		t.Fatalf("insert rate limit: %v", err)
+	}
+
+	list, err := store.List(ctx, contract.ListFilter{ErrorClass: "timeout", Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("list timeout aliases: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != streamTimeout.ID {
+		t.Fatalf("expected stream timeout row for timeout filter, got %+v", list)
+	}
+
+	list, err = store.List(ctx, contract.ListFilter{ErrorClass: "rate_limit_error", Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("list rate limit aliases: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != rateLimit.ID {
+		t.Fatalf("expected rate limit row for alias filter, got %+v", list)
+	}
+}
+
 func TestStoreDeleteOlderThanAndNotFound(t *testing.T) {
 	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
 	defer client.Close()

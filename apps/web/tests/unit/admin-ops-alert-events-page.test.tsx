@@ -176,6 +176,11 @@ describe("AdminOpsAlertEventsPage", () => {
       "href",
       "/admin/logs?tab=error&id=err-1",
     );
+    expect(
+      screen
+        .getAllByRole("link", { name: "请求证据" })
+        .map((link) => link.getAttribute("href")),
+    ).toContain("/admin/logs?tab=request-evidence&f_request_id=req-alert");
     expect(mocks.fingerprintQuery).toHaveBeenLastCalledWith(
       {
         account_id: "acct-1",

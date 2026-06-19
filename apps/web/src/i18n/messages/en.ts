@@ -2312,6 +2312,7 @@ export const en = {
         checkCredentials: "Check credentials, OAuth refresh, needs_reauth, and account lock state.",
         checkProviderNetwork:
           "Check upstream timeout, network errors, proxy quality, and invalid responses.",
+        checkPolicyOrAccountState: "Check content policy, abuse controls, and account-side limits.",
         reviewSloBurnRate: "Review SLO windows, request volume, bad requests, and burn rate.",
         reviewAlertRule: "Review alert threshold, window, minimum requests, and observed value.",
         validateRoutingScope: "Verify model, endpoint, provider scope, and account-group coverage.",

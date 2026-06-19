@@ -29,7 +29,7 @@ import {
   buildOpsAlertRunbookSteps,
   type OpsAlertEvidenceLinks,
 } from "@/lib/admin-ops-alert-evidence";
-import { adminErrorLogDetailHref } from "@/lib/admin-log-links";
+import { adminErrorLogDetailHref, adminRequestEvidenceHref } from "@/lib/admin-log-links";
 import { formatDateTime, formatInteger, formatLatency, formatPercent, safeJson } from "@/lib/admin-format";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import type {
@@ -293,6 +293,7 @@ function AlertFingerprintPanel({ details }: { details?: JsonObject }) {
 function AlertFingerprintItem({ item }: { item: OpsErrorFingerprint }) {
   const { t } = useLanguage();
   const exampleHref = adminErrorLogDetailHref({ id: item.example_error_log_id });
+  const requestEvidenceHref = adminRequestEvidenceHref({ request_id: item.example_request_id });
   return (
     <div className="rounded border border-srapi-border-subtle p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -331,11 +332,18 @@ function AlertFingerprintItem({ item }: { item: OpsErrorFingerprint }) {
         <span className="font-mono">
           {formatDateTime(item.first_occurred_at)} → {formatDateTime(item.last_occurred_at)}
         </span>
-        {exampleHref ? (
-          <Button asChild variant="ghost" size="sm">
-            <Link href={exampleHref}>{t("adminOpsAlertEvents.openFingerprintExample")}</Link>
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-1">
+          {requestEvidenceHref ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link href={requestEvidenceHref}>{t("adminOps.evidence.requestEvidence")}</Link>
+            </Button>
+          ) : null}
+          {exampleHref ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link href={exampleHref}>{t("adminOpsAlertEvents.openFingerprintExample")}</Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
     </div>
   );

@@ -368,7 +368,7 @@ func normalizeListFilter(filter contract.ListFilter) (contract.ListFilter, error
 	filter.Platform = truncate(cleanLogText(filter.Platform), 64)
 	filter.SourceEndpoint = truncate(cleanLogText(filter.SourceEndpoint), 128)
 	filter.Model = truncate(cleanLogText(filter.Model), 128)
-	filter.ErrorClass = truncate(cleanLogText(filter.ErrorClass), 64)
+	filter.ErrorClass = truncate(contract.CanonicalErrorClassForFilter(filter.ErrorClass), 64)
 	filter.Query = truncate(redactSecretText(filter.Query), MaxMessageBytes)
 	if filter.Page <= 0 {
 		filter.Page = 1

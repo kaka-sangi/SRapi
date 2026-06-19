@@ -8,6 +8,7 @@ package contract
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -140,6 +141,45 @@ type ListFilter struct {
 	To             *time.Time
 	Page           int
 	PageSize       int
+}
+
+// CanonicalErrorClassForFilter maps historical and protocol-specific classes
+// into the same stable families used by AdminOps alert rules. Store filters use
+// this for equality checks so alert details and error-log evidence stay aligned.
+func CanonicalErrorClassForFilter(value string) string {
+	class := strings.ToLower(strings.TrimSpace(value))
+	for canonical, aliases := range errorClassFilterAliasFamilies {
+		if class == canonical {
+			return canonical
+		}
+		for _, alias := range aliases {
+			if class == alias {
+				return canonical
+			}
+		}
+	}
+	return class
+}
+
+// ErrorClassFilterAliases returns all stored error_class values that should
+// match a filter value after canonical alert-class folding.
+func ErrorClassFilterAliases(value string) []string {
+	canonical := CanonicalErrorClassForFilter(value)
+	if canonical == "" {
+		return nil
+	}
+	aliases := []string{canonical}
+	aliases = append(aliases, errorClassFilterAliasFamilies[canonical]...)
+	return aliases
+}
+
+var errorClassFilterAliasFamilies = map[string][]string{
+	"rate_limit":        {"rate_limited", "provider_rate_limited", "rate_limit_error", "rate_limit_exceeded", "too_many_requests", "rpm_limit_exceeded", "tpm_limit_exceeded"},
+	"auth_failed":       {"auth_error", "authentication_error", "credential_error"},
+	"timeout":           {"stream_idle_timeout", "stream_timeout", "ws_idle_timeout", "acquire_timeout", "request_timeout", "timeout_error"},
+	"permission_denied": {"permission_error", "forbidden"},
+	"network_error":     {"transport_error"},
+	"provider_5xx":      {"bad_gateway", "server_error", "upstream_5xx"},
 }
 
 // ListResult is the paginated envelope returned by Service.List.

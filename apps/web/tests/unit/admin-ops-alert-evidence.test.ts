@@ -98,7 +98,7 @@ describe("buildOpsAlertRunbookSteps", () => {
     expect(
       buildOpsAlertRunbookSteps({
         provider_id: "provider-1",
-        error_class: "rate_limited",
+        error_class: "rate_limit_error",
       }),
     ).toEqual([
       "openErrorLogs",
@@ -111,10 +111,42 @@ describe("buildOpsAlertRunbookSteps", () => {
   });
 
   it("adds credential guidance for auth-related alerts", () => {
-    expect(buildOpsAlertRunbookSteps({ errorClass: "session_invalid" })).toEqual([
+    expect(buildOpsAlertRunbookSteps({ errorClass: "auth_error" })).toEqual([
       "openErrorLogs",
       "inspectRequestEvidence",
       "checkCredentials",
+    ]);
+  });
+
+  it("normalizes built-in provider error classes to targeted runbook checks", () => {
+    expect(buildOpsAlertRunbookSteps({ error_class: "stream_idle_timeout" })).toEqual([
+      "openErrorLogs",
+      "inspectRequestEvidence",
+      "checkProviderNetwork",
+    ]);
+    expect(buildOpsAlertRunbookSteps({ error_class: "provider_5xx" })).toEqual([
+      "openErrorLogs",
+      "inspectRequestEvidence",
+      "checkProviderNetwork",
+    ]);
+    expect(buildOpsAlertRunbookSteps({ error_class: "quota_exhausted" })).toEqual([
+      "openErrorLogs",
+      "inspectRequestEvidence",
+      "checkQuotaOrRateLimit",
+    ]);
+    expect(buildOpsAlertRunbookSteps({ error_class: "policy_error" })).toEqual([
+      "openErrorLogs",
+      "inspectRequestEvidence",
+      "checkPolicyOrAccountState",
+    ]);
+  });
+
+  it("routes scheduler no-account alerts to scheduler evidence and scope validation", () => {
+    expect(buildOpsAlertRunbookSteps({ error_class: "no_available_account" })).toEqual([
+      "openErrorLogs",
+      "inspectRequestEvidence",
+      "inspectSchedulerDecision",
+      "validateRoutingScope",
     ]);
   });
 

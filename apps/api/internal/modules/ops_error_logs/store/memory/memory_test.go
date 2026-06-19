@@ -106,3 +106,43 @@ func TestListFiltersSourceEndpoint(t *testing.T) {
 		t.Fatalf("expected responses row, got %+v", list)
 	}
 }
+
+func TestListFiltersEquivalentErrorClasses(t *testing.T) {
+	store := New()
+	ctx := context.Background()
+	now := time.Date(2026, 6, 19, 8, 0, 0, 0, time.UTC)
+	streamTimeout, err := store.Insert(ctx, contract.Entry{
+		OccurredAt:   now,
+		RequestID:    "req_stream_timeout",
+		ErrorClass:   "stream_idle_timeout",
+		ErrorMessage: "stream timed out",
+	})
+	if err != nil {
+		t.Fatalf("insert stream timeout: %v", err)
+	}
+	rateLimit, err := store.Insert(ctx, contract.Entry{
+		OccurredAt:   now.Add(time.Second),
+		RequestID:    "req_rate_limit",
+		ErrorClass:   "rate_limit",
+		ErrorMessage: "slow down",
+	})
+	if err != nil {
+		t.Fatalf("insert rate limit: %v", err)
+	}
+
+	list, err := store.List(ctx, contract.ListFilter{ErrorClass: "timeout", Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("list timeout aliases: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != streamTimeout.ID {
+		t.Fatalf("expected stream timeout row for timeout filter, got %+v", list)
+	}
+
+	list, err = store.List(ctx, contract.ListFilter{ErrorClass: "rate_limit_error", Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("list rate limit aliases: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != rateLimit.ID {
+		t.Fatalf("expected rate limit row for alias filter, got %+v", list)
+	}
+}

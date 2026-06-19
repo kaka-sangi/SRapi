@@ -182,7 +182,7 @@ func listPredicates(filter contract.ListFilter) []predicate.OpsErrorLog {
 		predicates = append(predicates, entopserrorlog.ModelEQ(model))
 	}
 	if errorClass := strings.TrimSpace(filter.ErrorClass); errorClass != "" {
-		predicates = append(predicates, entopserrorlog.ErrorClassEQ(errorClass))
+		predicates = append(predicates, entopserrorlog.ErrorClassIn(contract.ErrorClassFilterAliases(errorClass)...))
 	}
 	if phase := strings.TrimSpace(filter.ErrorPhase); phase != "" {
 		predicates = append(predicates, entopserrorlog.ErrorPhaseEQ(phase))

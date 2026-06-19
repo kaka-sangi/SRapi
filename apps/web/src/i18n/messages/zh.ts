@@ -2248,6 +2248,7 @@ export const zh: Messages = {
         checkQuotaOrRateLimit: "检查账号组限额、上游 quota、RPM/TPM 和 Retry-After。",
         checkCredentials: "检查凭证、OAuth 刷新、needs_reauth 与账号封禁状态。",
         checkProviderNetwork: "检查上游超时、网络错误、代理质量和 invalid response。",
+        checkPolicyOrAccountState: "检查内容策略、风控拦截和账号侧限制状态。",
         reviewSloBurnRate: "复核 SLO 窗口、请求量、bad request 和燃烧率是否匹配事故。",
         reviewAlertRule: "复核告警阈值、窗口、最小请求数和 observed value。",
         validateRoutingScope: "核对模型、端点、provider scope 和账号组覆盖是否正确。",

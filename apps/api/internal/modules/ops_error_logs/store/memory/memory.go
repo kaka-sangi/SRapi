@@ -161,7 +161,7 @@ func matchesFilter(entry contract.Entry, filter contract.ListFilter) bool {
 	if filter.Model != "" && entry.Model != filter.Model {
 		return false
 	}
-	if filter.ErrorClass != "" && entry.ErrorClass != filter.ErrorClass {
+	if errorClass := contract.CanonicalErrorClassForFilter(filter.ErrorClass); errorClass != "" && contract.CanonicalErrorClassForFilter(entry.ErrorClass) != errorClass {
 		return false
 	}
 	if filter.ErrorPhase != "" && entry.ErrorPhase != filter.ErrorPhase {
