@@ -1469,7 +1469,7 @@ func (rt *runtimeState) doRefreshReverseProxyCredential(ctx context.Context, acc
 	// retry without bookkeeping. Uses the same adapter the operator-
 	// initiated /admin/accounts/{id}/refresh handler uses, so the two
 	// paths produce identical state transitions.
-	adapter := adminAccountRefresherAdapter{refresher: rt.reverseProxy}
+	adapter := adminAccountRefresherAdapter{refresher: rt.reverseProxy, accounts: rt.accounts}
 	outcome, refreshErr := rt.accounts.RefreshAccessTokenWithOutcome(ctx, account.ID, adapter)
 	if refreshErr != nil {
 		rt.recordAudit(ctx, auditcontract.RecordRequest{

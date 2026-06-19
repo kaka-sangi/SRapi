@@ -282,6 +282,15 @@ func (w *Worker) refreshPass(ctx context.Context) (Result, error) {
 func (w *Worker) refreshOne(parent context.Context, account accountcontract.ProviderAccount, provider providercontract.Provider, mu *sync.Mutex, result *Result, firstErr *error) {
 	ctx, cancel := context.WithTimeout(parent, w.timeout)
 	defer cancel()
+	runtimeAccount, err := w.accountWithRuntimeProxy(ctx, account)
+	if err != nil {
+		w.persistQuotaProviderError(ctx, account, err)
+		mu.Lock()
+		result.Failed++
+		*firstErr = errors.Join(*firstErr, err)
+		mu.Unlock()
+		return
+	}
 	credential, err := w.accounts.DecryptCredential(ctx, account.ID)
 	if err != nil {
 		mu.Lock()
@@ -290,7 +299,7 @@ func (w *Worker) refreshOne(parent context.Context, account accountcontract.Prov
 		mu.Unlock()
 		return
 	}
-	if refreshed, ok, err := w.refreshCredential(ctx, account, credential); err != nil {
+	if refreshed, ok, err := w.refreshCredential(ctx, runtimeAccount, credential); err != nil {
 		w.persistQuotaProviderError(ctx, account, err)
 		mu.Lock()
 		result.Failed++
@@ -302,15 +311,15 @@ func (w *Worker) refreshOne(parent context.Context, account accountcontract.Prov
 	}
 	report, err := w.adapter.FetchAccountQuota(ctx, provideradaptercontract.ProbeRequest{
 		Provider:   provider,
-		Account:    account,
+		Account:    runtimeAccount,
 		Credential: credential,
 	})
 	if err != nil {
-		if refreshed, retried := w.retryAfterAuthRefresh(ctx, account, credential, err); retried {
+		if refreshed, retried := w.retryAfterAuthRefresh(ctx, runtimeAccount, credential, err); retried {
 			credential = refreshed
 			report, err = w.adapter.FetchAccountQuota(ctx, provideradaptercontract.ProbeRequest{
 				Provider:   provider,
-				Account:    account,
+				Account:    runtimeAccount,
 				Credential: credential,
 			})
 		}
@@ -376,6 +385,18 @@ func (w *Worker) forceRefreshCredential(ctx context.Context, account accountcont
 		return credential, false, err
 	}
 	return refreshed, true, nil
+}
+
+func (w *Worker) accountWithRuntimeProxy(ctx context.Context, account accountcontract.ProviderAccount) (accountcontract.ProviderAccount, error) {
+	if account.ProxyID == nil || strings.TrimSpace(*account.ProxyID) == "" {
+		return account, nil
+	}
+	runtimeProxyURL, err := w.accounts.ResolveProxyURL(ctx, account.ProxyID)
+	if err != nil {
+		return accountcontract.ProviderAccount{}, provideradaptercontract.ProviderError{Class: "proxy_unavailable", StatusCode: http.StatusBadGateway, Message: "provider account proxy unavailable"}
+	}
+	account.ProxyID = runtimeProxyURL
+	return account, nil
 }
 
 func (w *Worker) persistQuotaProviderError(ctx context.Context, account accountcontract.ProviderAccount, err error) {

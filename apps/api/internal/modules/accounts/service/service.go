@@ -98,7 +98,7 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 		}
 		riskLevel = normalized
 	}
-	proxyID, err := normalizeProxyID(req.ProxyID)
+	proxyID, err := s.normalizeAvailableProxyID(ctx, req.ProxyID)
 	if err != nil {
 		return contract.ProviderAccount{}, err
 	}
@@ -1506,7 +1506,7 @@ func (s *Service) Update(ctx context.Context, id int, req contract.UpdateRequest
 		account.Metadata = cloneMap(*req.Metadata)
 	}
 	if req.ProxyID != nil {
-		proxyID, err := normalizeProxyID(*req.ProxyID)
+		proxyID, err := s.normalizeAvailableProxyID(ctx, *req.ProxyID)
 		if err != nil {
 			return contract.ProviderAccount{}, err
 		}
@@ -1697,11 +1697,22 @@ func (s *Service) BindProxy(ctx context.Context, id int, proxyID *string) (contr
 	if id <= 0 {
 		return contract.ProviderAccount{}, ErrInvalidInput
 	}
-	normalized, err := normalizeProxyID(proxyID)
+	normalized, err := s.normalizeAvailableProxyID(ctx, proxyID)
 	if err != nil {
 		return contract.ProviderAccount{}, err
 	}
 	return s.Update(ctx, id, contract.UpdateRequest{ProxyID: &normalized})
+}
+
+func (s *Service) normalizeAvailableProxyID(ctx context.Context, value *string) (*string, error) {
+	normalized, err := normalizeProxyID(value)
+	if err != nil || normalized == nil {
+		return normalized, err
+	}
+	if _, err := s.ResolveProxyURL(ctx, normalized); err != nil {
+		return nil, ErrProxyUnavailable
+	}
+	return normalized, nil
 }
 
 func (s *Service) ResolveProxyURL(ctx context.Context, proxyID *string) (*string, error) {

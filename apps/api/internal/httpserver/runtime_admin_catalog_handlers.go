@@ -1489,7 +1489,7 @@ func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request
 	})
 	if err != nil {
 		switch {
-		case errors.Is(err, accountservice.ErrCredentialMissing), errors.Is(err, accountservice.ErrInvalidInput):
+		case errors.Is(err, accountservice.ErrCredentialMissing), errors.Is(err, accountservice.ErrInvalidInput), errors.Is(err, accountservice.ErrProxyUnavailable):
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account update request", requestID)
 		default:
 			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to update account", requestID)
@@ -1507,11 +1507,15 @@ func (s *Server) refreshImportCredential(ctx context.Context, runtimeClass accou
 	if !isRefreshTokenOnlyImportCredential(runtimeClass, upstreamClient, credential) {
 		return credential, nil
 	}
+	runtimeProxyID, err := s.runtime.accounts.ResolveProxyURL(ctx, proxyID)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := s.runtime.reverseProxy.Refresh(ctx, reverseproxycontract.RefreshRequest{
 		Account: reverseproxycontract.AccountRuntime{
 			RuntimeClass:   string(runtimeClass),
 			UpstreamClient: upstreamClient,
-			ProxyID:        proxyID,
+			ProxyID:        runtimeProxyID,
 			UserAgent:      mapString(metadata, "user_agent"),
 			Metadata:       metadata,
 			Credential:     credential,
@@ -1686,15 +1690,24 @@ func (s *Server) handleRecoverAdminAccount(w http.ResponseWriter, r *http.Reques
 // package just for the adapter type.
 type adminAccountRefresherAdapter struct {
 	refresher reverseproxycontract.Refresher
+	accounts  *accountservice.Service
 }
 
 func (a adminAccountRefresherAdapter) RefreshAccount(ctx context.Context, req accountservice.RefreshRequest) (accountservice.RefreshResult, error) {
+	proxyID := req.ProxyID
+	if a.accounts != nil {
+		resolved, err := a.accounts.ResolveProxyURL(ctx, req.ProxyID)
+		if err != nil {
+			return accountservice.RefreshResult{}, err
+		}
+		proxyID = resolved
+	}
 	resp, err := a.refresher.Refresh(ctx, reverseproxycontract.RefreshRequest{
 		Account: reverseproxycontract.AccountRuntime{
 			AccountID:      req.AccountID,
 			RuntimeClass:   string(req.RuntimeClass),
 			UpstreamClient: req.UpstreamClient,
-			ProxyID:        req.ProxyID,
+			ProxyID:        proxyID,
 			UserAgent:      mapString(req.Metadata, "user_agent"),
 			Metadata:       req.Metadata,
 			Credential:     req.Credential,
@@ -1735,7 +1748,7 @@ func (s *Server) handleRefreshAdminAccount(w http.ResponseWriter, r *http.Reques
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "reverse proxy refresher unavailable", requestID)
 		return
 	}
-	adapter := adminAccountRefresherAdapter{refresher: s.runtime.reverseProxy}
+	adapter := adminAccountRefresherAdapter{refresher: s.runtime.reverseProxy, accounts: s.runtime.accounts}
 	outcome, refreshErr := s.runtime.accounts.RefreshAccessTokenWithOutcome(r.Context(), accountID, adapter)
 	updated := outcome.Account
 	auditOutcome := map[string]any{"ok": refreshErr == nil, "class": string(outcome.Class), "attempts": outcome.Attempts, "needs_reauth_flipped": outcome.NeedsReauthFlipped}
@@ -1958,7 +1971,7 @@ func (s *Server) handleSetAdminAccountStatus(w http.ResponseWriter, r *http.Requ
 
 func writeAccountServiceError(w http.ResponseWriter, err error, requestID string) {
 	switch {
-	case errors.Is(err, accountservice.ErrInvalidInput), errors.Is(err, accountservice.ErrCredentialMissing):
+	case errors.Is(err, accountservice.ErrInvalidInput), errors.Is(err, accountservice.ErrCredentialMissing), errors.Is(err, accountservice.ErrProxyUnavailable):
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account request", requestID)
 	default:
 		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "account not found", requestID)

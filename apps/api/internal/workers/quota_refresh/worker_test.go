@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -262,6 +263,90 @@ func TestWorkerRefreshesOAuthCredentialBeforeQuotaFetch(t *testing.T) {
 	}
 }
 
+func TestWorkerMaterializesProxyDefinitionIDForQuotaRefresh(t *testing.T) {
+	ctx := context.Background()
+	accountStore := accountmemory.New()
+	providerStore := providermemory.New()
+	provider, err := providerStore.Create(ctx, providercontract.CreateStoredProvider{
+		Name:        "codex-cli-proxy-refresh",
+		DisplayName: "Codex CLI Proxy Refresh",
+		AdapterType: "reverse-proxy-codex-cli",
+		Protocol:    "openai-compatible",
+		Status:      providercontract.StatusActive,
+		ConfigSchema: map[string]any{
+			"quota_url": "https://example.invalid/quota",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+	accountsSvc, err := accountservice.New(accountStore, testMasterKey, nil)
+	if err != nil {
+		t.Fatalf("new account service: %v", err)
+	}
+	proxyURL := "http://proxy.example.invalid:8080"
+	proxy, err := accountsSvc.CreateProxy(ctx, accountcontract.CreateProxyRequest{
+		Name: "quota-egress",
+		Type: accountcontract.ProxyTypeHTTP,
+		URL:  proxyURL,
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+	proxyID := strconv.Itoa(proxy.ID)
+	account, err := accountsSvc.Create(ctx, accountcontract.CreateRequest{
+		ProviderID:   provider.ID,
+		Name:         "codex-oauth-proxy",
+		RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+		Credential:   map[string]any{"access_token": "expired-token", "refresh_token": "old-refresh", "expires_at": "2000-01-01T00:00:00Z"},
+		ProxyID:      &proxyID,
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	adapter := recordingQuotaAdapter{
+		report: adaptercontract.QuotaReport{
+			Provider:         "codex-cli-proxy-refresh",
+			Supported:        true,
+			Source:           "endpoint",
+			CreditsRemaining: "9",
+			CreditsUsed:      "1",
+			CreditsLimit:     "10",
+			FetchedAt:        time.Date(2026, 6, 9, 1, 2, 3, 0, time.UTC),
+		},
+	}
+	refresher := stubRefresher{
+		credential: map[string]any{
+			"access_token":  "fresh-token",
+			"refresh_token": "new-refresh",
+			"expires_at":    "2099-01-01T00:00:00Z",
+		},
+	}
+	worker, err := New(accountStore, providerStore, slog.Default(), Config{
+		MasterKey:     testMasterKey,
+		MaxConcurrent: 1,
+		Adapter:       &adapter,
+		Refresher:     &refresher,
+	})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+
+	result, err := worker.RunOnce(ctx)
+	if err != nil {
+		t.Fatalf("run worker: %v", err)
+	}
+	if result.Refreshed != 1 || result.Failed != 0 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if refresher.accountID != account.ID || refresher.proxyID == nil || *refresher.proxyID != proxyURL {
+		t.Fatalf("expected refresh runtime proxy url %q, got account=%d proxy=%v", proxyURL, refresher.accountID, refresher.proxyID)
+	}
+	if adapter.proxyID == nil || *adapter.proxyID != proxyURL {
+		t.Fatalf("expected quota runtime proxy url %q, got %v", proxyURL, adapter.proxyID)
+	}
+}
+
 type forbiddenQuotaAdapter struct {
 	err error
 }
@@ -289,6 +374,7 @@ func (a quotaReportAdapter) QuotaConfigured(adaptercontract.ProbeRequest) bool {
 type recordingQuotaAdapter struct {
 	report      adaptercontract.QuotaReport
 	accessToken string
+	proxyID     *string
 }
 
 func (a *recordingQuotaAdapter) FetchAccountQuota(_ context.Context, req adaptercontract.ProbeRequest) (adaptercontract.QuotaReport, error) {
@@ -297,6 +383,7 @@ func (a *recordingQuotaAdapter) FetchAccountQuota(_ context.Context, req adapter
 		return adaptercontract.QuotaReport{}, errors.New("missing access token")
 	}
 	a.accessToken = token
+	a.proxyID = cloneString(req.Account.ProxyID)
 	return a.report, nil
 }
 
@@ -308,13 +395,23 @@ type stubRefresher struct {
 	credential   map[string]any
 	accountID    int
 	refreshToken string
+	proxyID      *string
 }
 
 func (s *stubRefresher) Refresh(_ context.Context, req reverseproxycontract.RefreshRequest) (reverseproxycontract.RefreshResponse, error) {
 	s.accountID = req.Account.AccountID
 	s.refreshToken, _ = req.Account.Credential["refresh_token"].(string)
+	s.proxyID = cloneString(req.Account.ProxyID)
 	return reverseproxycontract.RefreshResponse{
 		AccountID:  req.Account.AccountID,
 		Credential: s.credential,
 	}, nil
+}
+
+func cloneString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }

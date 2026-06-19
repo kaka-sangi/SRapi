@@ -27,9 +27,10 @@ func (s *Server) handleListAdminProxies(w http.ResponseWriter, r *http.Request) 
 		}
 		data = append(data, toAPIProxyDefinition(item))
 	}
+	data, pg := paginate(r, data)
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProxyDefinitionListResponse{
 		Data:       data,
-		Pagination: paginationWithRequest(r, len(data)),
+		Pagination: pg,
 		RequestId:  requestID,
 	})
 }
@@ -275,10 +276,7 @@ func (s *Server) handleDeleteAdminProxy(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "proxy.delete", "proxy", strconv.Itoa(id), proxyAuditSnapshot(before), nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"id": id, "deleted": true},
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
 // handleBatchTestAdminProxies probes many proxies in one call. The body is

@@ -62,7 +62,7 @@ func (s *Server) handleBatchRefreshAdminAccounts(w http.ResponseWriter, r *http.
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "reverse proxy refresher unavailable", requestID)
 		return
 	}
-	adapter := adminAccountRefresherAdapter{refresher: s.runtime.reverseProxy}
+	adapter := adminAccountRefresherAdapter{refresher: s.runtime.reverseProxy, accounts: s.runtime.accounts}
 	results, err := s.runtime.accounts.BatchRefreshAccounts(r.Context(), ids, adapter)
 	if err != nil {
 		switch {

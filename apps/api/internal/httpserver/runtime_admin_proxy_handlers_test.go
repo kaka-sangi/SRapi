@@ -1,13 +1,19 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	accountservice "github.com/srapi/srapi/apps/api/internal/modules/accounts/service"
+	accountmemory "github.com/srapi/srapi/apps/api/internal/modules/accounts/store/memory"
+	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -51,6 +57,57 @@ func TestAdminProxyRegistryDoesNotExposeRawURL(t *testing.T) {
 	}
 	if len(listed.Data) != 1 || listed.Data[0].Id != created.Data.Id || !listed.Data[0].UrlConfigured {
 		t.Fatalf("unexpected proxy list: %+v", listed.Data)
+	}
+}
+
+func TestAdminProxyRegistryPaginatesListAndUsesDeleteResponse(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	for _, body := range []string{
+		`{"name":"first-egress","type":"http","url":"http://proxy-one.example.invalid:8080","status":"active"}`,
+		`{"name":"second-egress","type":"http","url":"http://proxy-two.example.invalid:8080","status":"active"}`,
+	} {
+		createReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/proxies", strings.NewReader(body))
+		createReq.Header.Set("Content-Type", "application/json")
+		createReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+		createReq.AddCookie(sessionCookie)
+		createRec := httptest.NewRecorder()
+		handler.ServeHTTP(createRec, createReq)
+		if createRec.Code != http.StatusCreated {
+			t.Fatalf("expected proxy create 201, got %d body=%s", createRec.Code, createRec.Body.String())
+		}
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/proxies?page=2&page_size=1", nil)
+	listReq.AddCookie(sessionCookie)
+	listRec := httptest.NewRecorder()
+	handler.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected proxy list 200, got %d body=%s", listRec.Code, listRec.Body.String())
+	}
+	var listed apiopenapi.ProxyDefinitionListResponse
+	if err := json.NewDecoder(listRec.Body).Decode(&listed); err != nil {
+		t.Fatalf("decode list proxy response: %v", err)
+	}
+	if len(listed.Data) != 1 || listed.Pagination.Page != 2 || listed.Pagination.PageSize != 1 || listed.Pagination.Total != 2 || listed.Pagination.HasNext {
+		t.Fatalf("unexpected paginated proxy list: data=%+v pagination=%+v", listed.Data, listed.Pagination)
+	}
+
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/proxies/"+string(listed.Data[0].Id), nil)
+	deleteReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	deleteReq.AddCookie(sessionCookie)
+	deleteRec := httptest.NewRecorder()
+	handler.ServeHTTP(deleteRec, deleteReq)
+	if deleteRec.Code != http.StatusOK {
+		t.Fatalf("expected proxy delete 200, got %d body=%s", deleteRec.Code, deleteRec.Body.String())
+	}
+	var deleted apiopenapi.DeleteResponse
+	if err := json.NewDecoder(deleteRec.Body).Decode(&deleted); err != nil {
+		t.Fatalf("decode delete proxy response: %v", err)
+	}
+	if !deleted.Data.Deleted {
+		t.Fatalf("expected delete response deleted=true, got %+v", deleted.Data)
 	}
 }
 
@@ -136,4 +193,96 @@ func TestAdminAccountRejectsRawProxyIDValues(t *testing.T) {
 	if bindRec.Code != http.StatusBadRequest {
 		t.Fatalf("expected raw proxy_id bind 400, got %d body=%s", bindRec.Code, bindRec.Body.String())
 	}
+
+	missingBindReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/proxy", strings.NewReader(`{"proxy_id":"999"}`))
+	missingBindReq.Header.Set("Content-Type", "application/json")
+	missingBindReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	missingBindReq.AddCookie(sessionCookie)
+	missingBindRec := httptest.NewRecorder()
+	handler.ServeHTTP(missingBindRec, missingBindReq)
+	if missingBindRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected missing proxy_id bind 400, got %d body=%s", missingBindRec.Code, missingBindRec.Body.String())
+	}
+
+	missingUpdateReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), strings.NewReader(`{"proxy_id":"999"}`))
+	missingUpdateReq.Header.Set("Content-Type", "application/json")
+	missingUpdateReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	missingUpdateReq.AddCookie(sessionCookie)
+	missingUpdateRec := httptest.NewRecorder()
+	handler.ServeHTTP(missingUpdateRec, missingUpdateReq)
+	if missingUpdateRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected missing proxy_id update 400, got %d body=%s", missingUpdateRec.Code, missingUpdateRec.Body.String())
+	}
+
+	disabledProxyReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/proxies", strings.NewReader(`{"name":"disabled-egress","type":"http","url":"http://proxy.example.invalid:8080","status":"disabled"}`))
+	disabledProxyReq.Header.Set("Content-Type", "application/json")
+	disabledProxyReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	disabledProxyReq.AddCookie(sessionCookie)
+	disabledProxyRec := httptest.NewRecorder()
+	handler.ServeHTTP(disabledProxyRec, disabledProxyReq)
+	if disabledProxyRec.Code != http.StatusCreated {
+		t.Fatalf("expected disabled proxy create 201, got %d body=%s", disabledProxyRec.Code, disabledProxyRec.Body.String())
+	}
+	var disabledProxy apiopenapi.ProxyDefinitionResponse
+	if err := json.NewDecoder(disabledProxyRec.Body).Decode(&disabledProxy); err != nil {
+		t.Fatalf("decode disabled proxy response: %v", err)
+	}
+	disabledBindReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/proxy", strings.NewReader(`{"proxy_id":"`+string(disabledProxy.Data.Id)+`"}`))
+	disabledBindReq.Header.Set("Content-Type", "application/json")
+	disabledBindReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	disabledBindReq.AddCookie(sessionCookie)
+	disabledBindRec := httptest.NewRecorder()
+	handler.ServeHTTP(disabledBindRec, disabledBindReq)
+	if disabledBindRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected disabled proxy_id bind 400, got %d body=%s", disabledBindRec.Code, disabledBindRec.Body.String())
+	}
+}
+
+func TestAdminAccountRefresherAdapterMaterializesProxyDefinitionID(t *testing.T) {
+	ctx := context.Background()
+	accounts, err := accountservice.New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new account service: %v", err)
+	}
+	proxyURL := "http://proxy.example.invalid:8080"
+	proxy, err := accounts.CreateProxy(ctx, accountcontract.CreateProxyRequest{
+		Name: "refresh-egress",
+		Type: accountcontract.ProxyTypeHTTP,
+		URL:  proxyURL,
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+	proxyID := strconv.Itoa(proxy.ID)
+	refresher := &capturingRefresher{credential: map[string]any{"access_token": "new-token"}}
+	adapter := adminAccountRefresherAdapter{refresher: refresher, accounts: accounts}
+	if _, err := adapter.RefreshAccount(ctx, accountservice.RefreshRequest{
+		AccountID:    42,
+		RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+		ProxyID:      &proxyID,
+		Credential:   map[string]any{"refresh_token": "old-token"},
+	}); err != nil {
+		t.Fatalf("refresh account: %v", err)
+	}
+	if refresher.proxyID == nil || *refresher.proxyID != proxyURL {
+		t.Fatalf("expected runtime proxy url %q, got %v", proxyURL, refresher.proxyID)
+	}
+}
+
+type capturingRefresher struct {
+	credential map[string]any
+	proxyID    *string
+}
+
+func (r *capturingRefresher) Refresh(_ context.Context, req reverseproxycontract.RefreshRequest) (reverseproxycontract.RefreshResponse, error) {
+	r.proxyID = cloneString(req.Account.ProxyID)
+	return reverseproxycontract.RefreshResponse{Credential: r.credential}, nil
+}
+
+func cloneString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }

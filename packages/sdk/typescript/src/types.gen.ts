@@ -1454,7 +1454,7 @@ export type AdminQuickSetupRequest = {
      */
     discover_models?: boolean;
     /**
-     * Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+     * Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
      */
     proxy_id?: string | null;
     priority?: number;
@@ -1797,7 +1797,7 @@ export type CreateProviderAccountRequest = {
     runtime_class: RuntimeClass;
     upstream_client?: string | null;
     /**
-     * Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+     * Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
      */
     proxy_id?: string | null;
     status?: ProviderAccountStatus;
@@ -1823,7 +1823,7 @@ export type BatchCreateProviderAccountsRequest = {
          */
         group_id?: number | null;
         /**
-         * Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+         * Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
          */
         proxy_id?: string | null;
         priority?: number;
@@ -2164,7 +2164,7 @@ export type UpdateProviderAccountRequest = {
     runtime_class?: RuntimeClass;
     upstream_client?: string | null;
     /**
-     * Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first. Set null or an empty string to clear proxy binding.
+     * Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first. Set null or an empty string to clear proxy binding.
      */
     proxy_id?: string | null;
     status?: ProviderAccountStatus;
@@ -2176,7 +2176,7 @@ export type UpdateProviderAccountRequest = {
 
 export type BindProviderAccountProxyRequest = {
     /**
-     * Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first. Set null or an empty string to clear proxy binding.
+     * Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first. Set null or an empty string to clear proxy binding.
      */
     proxy_id: string | null;
 };
@@ -2517,7 +2517,7 @@ export type ProviderAccountImportItem = {
     runtime_class: RuntimeClass;
     upstream_client?: string | null;
     /**
-     * Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+     * Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
      */
     proxy_id?: string | null;
     status?: ProviderAccountStatus;
@@ -2566,7 +2566,7 @@ export type CodexSessionImportRequest = {
     update_existing?: boolean;
     group_ids?: Array<Id>;
     /**
-     * Registered proxy definition id to bind to imported accounts. Raw proxy URLs are rejected; create a proxy definition first.
+     * Registered active proxy definition id to bind to imported accounts. Raw proxy URLs are rejected; create and enable a proxy definition first.
      */
     proxy_id?: string | null;
     status?: ProviderAccountStatus;
@@ -2679,7 +2679,8 @@ export type BulkUpdateProviderAccountsRequest = {
      */
     max_concurrency?: number;
     /**
-     * Optional proxy binding. Empty string clears the binding.
+     * Optional active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
+     * Empty string clears the binding.
      * Encode `null` as JSON null to leave unchanged.
      *
      */
@@ -7605,7 +7606,7 @@ export type AdminQuickSetupRequestWritable = {
      */
     discover_models?: boolean;
     /**
-     * Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+     * Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
      */
     proxy_id?: string | null;
     priority?: number;
@@ -7624,7 +7625,7 @@ export type CreateProviderAccountRequestWritable = {
         [key: string]: unknown;
     };
     /**
-     * Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+     * Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
      */
     proxy_id?: string | null;
     status?: ProviderAccountStatus;
@@ -7650,7 +7651,7 @@ export type BatchCreateProviderAccountsRequestWritable = {
          */
         group_id?: number | null;
         /**
-         * Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+         * Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
          */
         proxy_id?: string | null;
         priority?: number;
@@ -7686,7 +7687,7 @@ export type UpdateProviderAccountRequestWritable = {
         [key: string]: unknown;
     };
     /**
-     * Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first. Set null or an empty string to clear proxy binding.
+     * Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first. Set null or an empty string to clear proxy binding.
      */
     proxy_id?: string | null;
     status?: ProviderAccountStatus;
@@ -7769,7 +7770,7 @@ export type ProviderAccountImportItemWritable = {
         [key: string]: unknown;
     };
     /**
-     * Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+     * Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
      */
     proxy_id?: string | null;
     status?: ProviderAccountStatus;

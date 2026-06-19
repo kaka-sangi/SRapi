@@ -294,7 +294,7 @@ func (w *Worker) refreshPass(ctx context.Context) (Result, error) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var firstErr error
-	adapter := refresherAdapter{refresher: w.refresher}
+	adapter := refresherAdapter{refresher: w.refresher, accounts: w.accounts}
 	for _, account := range due {
 		account := account
 		wg.Add(1)
@@ -365,15 +365,24 @@ func (w *Worker) eligibleForRefresh(account accountcontract.ProviderAccount, dea
 // one-way (accounts has no idea reverse_proxy exists).
 type refresherAdapter struct {
 	refresher reverseproxycontract.Refresher
+	accounts  *accountservice.Service
 }
 
 func (a refresherAdapter) RefreshAccount(ctx context.Context, req accountservice.RefreshRequest) (accountservice.RefreshResult, error) {
+	proxyID := req.ProxyID
+	if a.accounts != nil {
+		resolved, err := a.accounts.ResolveProxyURL(ctx, req.ProxyID)
+		if err != nil {
+			return accountservice.RefreshResult{}, err
+		}
+		proxyID = resolved
+	}
 	resp, err := a.refresher.Refresh(ctx, reverseproxycontract.RefreshRequest{
 		Account: reverseproxycontract.AccountRuntime{
 			AccountID:      req.AccountID,
 			RuntimeClass:   string(req.RuntimeClass),
 			UpstreamClient: req.UpstreamClient,
-			ProxyID:        req.ProxyID,
+			ProxyID:        proxyID,
 			Metadata:       req.Metadata,
 			Credential:     req.Credential,
 		},

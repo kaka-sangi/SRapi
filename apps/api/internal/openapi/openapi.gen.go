@@ -4674,7 +4674,7 @@ type AdminQuickSetupRequest struct {
 	Platform string `json:"platform"`
 	Priority *int   `json:"priority,omitempty"`
 
-	// ProxyId Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+	// ProxyId Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
 	ProxyId      *string       `json:"proxy_id,omitempty"`
 	RuntimeClass *RuntimeClass `json:"runtime_class,omitempty"`
 	Weight       *float32      `json:"weight,omitempty"`
@@ -5694,7 +5694,7 @@ type BatchCreateProviderAccountsRequest struct {
 		Priority   *int        `json:"priority,omitempty"`
 		ProviderId Id          `json:"provider_id"`
 
-		// ProxyId Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+		// ProxyId Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
 		ProxyId        *string                                              `json:"proxy_id,omitempty"`
 		RiskLevel      *BatchCreateProviderAccountsRequestDefaultsRiskLevel `json:"risk_level,omitempty"`
 		RuntimeClass   RuntimeClass                                         `json:"runtime_class"`
@@ -6263,7 +6263,7 @@ type BillingMode string
 
 // BindProviderAccountProxyRequest defines model for BindProviderAccountProxyRequest.
 type BindProviderAccountProxyRequest struct {
-	// ProxyId Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first. Set null or an empty string to clear proxy binding.
+	// ProxyId Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first. Set null or an empty string to clear proxy binding.
 	ProxyId *string `json:"proxy_id"`
 }
 
@@ -6353,7 +6353,8 @@ type BulkUpdateProviderAccountsRequest struct {
 	// Priority Optional scheduler-tier priority. Higher = preferred.
 	Priority *int `json:"priority,omitempty"`
 
-	// ProxyId Optional proxy binding. Empty string clears the binding.
+	// ProxyId Optional active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
+	// Empty string clears the binding.
 	// Encode `null` as JSON null to leave unchanged.
 	ProxyId *string `json:"proxy_id,omitempty"`
 
@@ -6702,7 +6703,7 @@ type CodexSessionImportRequest struct {
 	Name       *string `json:"name,omitempty"`
 	ProviderId Id      `json:"provider_id"`
 
-	// ProxyId Registered proxy definition id to bind to imported accounts. Raw proxy URLs are rejected; create a proxy definition first.
+	// ProxyId Registered active proxy definition id to bind to imported accounts. Raw proxy URLs are rejected; create and enable a proxy definition first.
 	ProxyId *string                `json:"proxy_id,omitempty"`
 	Status  *ProviderAccountStatus `json:"status,omitempty"`
 
@@ -7186,7 +7187,7 @@ type CreateProviderAccountRequest struct {
 	Priority   *int                    `json:"priority,omitempty"`
 	ProviderId Id                      `json:"provider_id"`
 
-	// ProxyId Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+	// ProxyId Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
 	ProxyId        *string                                `json:"proxy_id,omitempty"`
 	RiskLevel      *CreateProviderAccountRequestRiskLevel `json:"risk_level,omitempty"`
 	RuntimeClass   RuntimeClass                           `json:"runtime_class"`
@@ -9878,7 +9879,7 @@ type ProviderAccountImportItem struct {
 	Priority   *int                    `json:"priority,omitempty"`
 	ProviderId Id                      `json:"provider_id"`
 
-	// ProxyId Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+	// ProxyId Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
 	ProxyId        *string                             `json:"proxy_id,omitempty"`
 	RiskLevel      *ProviderAccountImportItemRiskLevel `json:"risk_level,omitempty"`
 	RuntimeClass   RuntimeClass                        `json:"runtime_class"`
@@ -11569,7 +11570,7 @@ type UpdateProviderAccountRequest struct {
 	Name       *string                 `json:"name,omitempty"`
 	Priority   *int                    `json:"priority,omitempty"`
 
-	// ProxyId Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first. Set null or an empty string to clear proxy binding.
+	// ProxyId Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first. Set null or an empty string to clear proxy binding.
 	ProxyId        *string                                `json:"proxy_id,omitempty"`
 	RiskLevel      *UpdateProviderAccountRequestRiskLevel `json:"risk_level,omitempty"`
 	RuntimeClass   *RuntimeClass                          `json:"runtime_class,omitempty"`

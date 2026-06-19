@@ -20788,7 +20788,7 @@ components:
         proxy_id:
           type: string
           nullable: true
-          description: Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+          description: Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
         priority:
           type: integer
           default: 0
@@ -21639,7 +21639,7 @@ components:
         proxy_id:
           type: string
           nullable: true
-          description: Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+          description: Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
         status:
           $ref: "#/components/schemas/ProviderAccountStatus"
         priority:
@@ -21689,7 +21689,7 @@ components:
             proxy_id:
               type: string
               nullable: true
-              description: Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+              description: Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
             priority:
               type: integer
               default: 0
@@ -22392,7 +22392,7 @@ components:
         proxy_id:
           type: string
           nullable: true
-          description: Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first. Set null or an empty string to clear proxy binding.
+          description: Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first. Set null or an empty string to clear proxy binding.
         status:
           $ref: "#/components/schemas/ProviderAccountStatus"
         priority:
@@ -22417,7 +22417,7 @@ components:
         proxy_id:
           type: string
           nullable: true
-          description: Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first. Set null or an empty string to clear proxy binding.
+          description: Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first. Set null or an empty string to clear proxy binding.
 
     ProxyDefinitionType:
       type: string
@@ -23069,7 +23069,7 @@ components:
         proxy_id:
           type: string
           nullable: true
-          description: Registered proxy definition id. Raw proxy URLs are rejected; create a proxy definition first.
+          description: Registered active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
         status:
           $ref: "#/components/schemas/ProviderAccountStatus"
         risk_level:
@@ -23205,7 +23205,7 @@ components:
         proxy_id:
           type: string
           nullable: true
-          description: Registered proxy definition id to bind to imported accounts. Raw proxy URLs are rejected; create a proxy definition first.
+          description: Registered active proxy definition id to bind to imported accounts. Raw proxy URLs are rejected; create and enable a proxy definition first.
         status:
           $ref: "#/components/schemas/ProviderAccountStatus"
 
@@ -23389,7 +23389,8 @@ components:
           type: string
           nullable: true
           description: |
-            Optional proxy binding. Empty string clears the binding.
+            Optional active proxy definition id. Raw proxy URLs are rejected; create and enable a proxy definition first.
+            Empty string clears the binding.
             Encode `null` as JSON null to leave unchanged.
         upstream_client:
           type: string

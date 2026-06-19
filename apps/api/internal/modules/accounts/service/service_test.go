@@ -268,6 +268,56 @@ func TestAccountProxyIDRejectsRawURLAndNonNumericValues(t *testing.T) {
 	}
 }
 
+func TestAccountProxyBindingRequiresAvailableProxyDefinition(t *testing.T) {
+	svc, err := New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+
+	missingProxyID := "999"
+	if _, err := svc.Create(ctx, contract.CreateRequest{
+		ProviderID:   1,
+		Name:         "missing-proxy-create",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret-value"},
+		ProxyID:      &missingProxyID,
+	}); !errors.Is(err, ErrProxyUnavailable) {
+		t.Fatalf("expected missing proxy create to fail, got %v", err)
+	}
+
+	disabled := contract.ProxyStatusDisabled
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name:   "disabled-egress",
+		Type:   contract.ProxyTypeHTTP,
+		URL:    "http://proxy.example.invalid:8080",
+		Status: &disabled,
+	})
+	if err != nil {
+		t.Fatalf("create disabled proxy: %v", err)
+	}
+	disabledProxyID := strconv.Itoa(proxy.ID)
+	account, err := svc.Create(ctx, contract.CreateRequest{
+		ProviderID:   1,
+		Name:         "proxy-boundary-account",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret-value"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	if _, err := svc.BindProxy(ctx, account.ID, &disabledProxyID); !errors.Is(err, ErrProxyUnavailable) {
+		t.Fatalf("expected disabled proxy bind to fail, got %v", err)
+	}
+	updateProxyID := &disabledProxyID
+	if _, err := svc.Update(ctx, account.ID, contract.UpdateRequest{ProxyID: &updateProxyID}); !errors.Is(err, ErrProxyUnavailable) {
+		t.Fatalf("expected disabled proxy update to fail, got %v", err)
+	}
+	if _, err := svc.BindProxy(ctx, account.ID, nil); err != nil {
+		t.Fatalf("clearing proxy binding should still succeed: %v", err)
+	}
+}
+
 func TestAccountOperationsManageGroupsProxyRecoveryAndSnapshots(t *testing.T) {
 	svc, err := New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
 	if err != nil {
