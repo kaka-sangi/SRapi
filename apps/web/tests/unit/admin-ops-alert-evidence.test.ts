@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildOpsAlertEvidenceLinks } from "@/lib/admin-ops-alert-evidence";
+import {
+  buildOpsAlertEvidenceLinks,
+  buildOpsAlertRunbookSteps,
+} from "@/lib/admin-ops-alert-evidence";
 
 describe("buildOpsAlertEvidenceLinks", () => {
   it("builds scoped alert evidence links from SLO/rule details", () => {
@@ -56,5 +59,65 @@ describe("buildOpsAlertEvidenceLinks", () => {
       schedulerDecision: null,
       accountHealth: null,
     });
+  });
+});
+
+describe("buildOpsAlertRunbookSteps", () => {
+  it("prioritizes request, scheduler, account, provider-network, rule, and scope checks", () => {
+    expect(
+      buildOpsAlertRunbookSteps({
+        request_id: "req_123",
+        account_id: "acct-1",
+        provider_id: "provider-1",
+        source_endpoint: "/v1/chat/completions",
+        model: "gpt-ops",
+        error_class: "timeout",
+        rule_id: "rule.7",
+        metric_type: "error_rate",
+      }),
+    ).toEqual([
+      "openErrorLogs",
+      "inspectRequestEvidence",
+      "inspectSchedulerDecision",
+      "checkAccountHealth",
+      "checkProviderNetwork",
+      "reviewAlertRule",
+      "validateRoutingScope",
+    ]);
+  });
+
+  it("adds quota/rate-limit guidance for provider throttling alerts", () => {
+    expect(
+      buildOpsAlertRunbookSteps({
+        provider_id: "provider-1",
+        error_class: "rate_limited",
+      }),
+    ).toEqual([
+      "openErrorLogs",
+      "checkAccountHealth",
+      "checkQuotaOrRateLimit",
+      "validateRoutingScope",
+    ]);
+  });
+
+  it("adds credential guidance for auth-related alerts", () => {
+    expect(buildOpsAlertRunbookSteps({ errorClass: "session_invalid" })).toEqual([
+      "openErrorLogs",
+      "checkCredentials",
+    ]);
+  });
+
+  it("recognizes SLO burn-rate details without request-level evidence", () => {
+    expect(
+      buildOpsAlertRunbookSteps({
+        slo_id: "slo-1",
+        source_endpoint: "/v1/responses",
+        long_burn_rate: 12,
+      }),
+    ).toEqual(["openErrorLogs", "reviewSloBurnRate", "validateRoutingScope"]);
+  });
+
+  it("falls back to alert-rule review when details contain no diagnostic fields", () => {
+    expect(buildOpsAlertRunbookSteps({ observed_value: 0.5 })).toEqual(["reviewAlertRule"]);
   });
 });

@@ -90,5 +90,9 @@ describe("AdminOpsAlertEventsPage", () => {
       "href",
       "/admin/accounts?view=health&f_providerId=provider-1&f_accountId=acct-1",
     );
+    expect(screen.getAllByText("处置路径").length).toBeGreaterThan(0);
+    expect(screen.getByText("先看错误日志的 error_class、owner、upstream status 和 attempt。")).toBeInTheDocument();
+    expect(screen.getByText("核对请求证据里的模型、端点、账号和上游响应。")).toBeInTheDocument();
+    expect(screen.getByText("查看调度拒绝原因、score breakdown 和 fallback 链路。")).toBeInTheDocument();
   });
 });

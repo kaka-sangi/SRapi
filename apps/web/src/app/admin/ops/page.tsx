@@ -33,6 +33,7 @@ import {
 } from "@/hooks/admin-queries/ops-charts";
 import { OpsLatencyHistogramChart } from "@/components/admin/ops-latency-histogram-chart";
 import { OpsErrorDistributionChart } from "@/components/admin/ops-error-distribution-chart";
+import { OpsAlertRunbookSteps } from "@/components/admin/ops-alert-runbook-steps";
 import {
   defaultOpsSettingsForm,
   buildOpsSettingsBody,
@@ -57,7 +58,10 @@ import { ScheduledTestsContent } from "@/components/admin/ops-scheduled-tests";
 import { StrategyContent } from "@/components/admin/ops-strategy";
 import { SchedulerDecisionsPanel } from "@/components/features/scheduler-decisions-panel";
 import { adminErrorInvestigationHref } from "@/lib/admin-log-links";
-import { buildOpsAlertEvidenceLinks } from "@/lib/admin-ops-alert-evidence";
+import {
+  buildOpsAlertEvidenceLinks,
+  buildOpsAlertRunbookSteps,
+} from "@/lib/admin-ops-alert-evidence";
 import { OpsEvidenceChainHealth } from "./evidence-chain-health";
 
 export default function AdminOpsPage() {
@@ -360,10 +364,11 @@ function OpsOverviewContent() {
           <CardContent className="space-y-2">
             {activeAlerts.map((alert) => {
               const evidenceLinks = buildOpsAlertEvidenceLinks(alert.details);
+              const runbookSteps = buildOpsAlertRunbookSteps(alert.details);
               return (
                 <div
                   key={alert.id}
-                  className="flex flex-col gap-3 border-t border-srapi-border py-2.5 first:border-t-0 sm:flex-row sm:items-center sm:justify-between"
+                  className="grid gap-3 border-t border-srapi-border py-3 first:border-t-0 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.75fr)_auto]"
                 >
                   <div className="min-w-0">
                     <div className="truncate text-sm text-srapi-text-primary">{alert.summary}</div>
@@ -371,7 +376,8 @@ function OpsOverviewContent() {
                       {formatDateTime(alert.started_at ?? alert.created_at)}
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  <OpsAlertRunbookSteps steps={runbookSteps} compact />
+                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                     <QuietBadge status={quietStatusFor(alert.severity)} label={alert.severity} />
                     <AlertEvidenceActions links={evidenceLinks} />
                     <Button

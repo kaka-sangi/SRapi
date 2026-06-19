@@ -18,12 +18,17 @@ import {
 } from "@/components/ui/dialog";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
+import { OpsAlertRunbookSteps } from "@/components/admin/ops-alert-runbook-steps";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
 import { useOpsAlertEvents } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
-import { buildOpsAlertEvidenceLinks, type OpsAlertEvidenceLinks } from "@/lib/admin-ops-alert-evidence";
+import {
+  buildOpsAlertEvidenceLinks,
+  buildOpsAlertRunbookSteps,
+  type OpsAlertEvidenceLinks,
+} from "@/lib/admin-ops-alert-evidence";
 import { formatDateTime, safeJson } from "@/lib/admin-format";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import type { OpsAlertEvent, OpsAlertSeverity, OpsAlertStatus } from "@/lib/sdk-types";
@@ -95,6 +100,14 @@ function AlertEventsContent() {
       render: (event) => <AlertEvidenceLinks links={buildOpsAlertEvidenceLinks(event.details)} />,
     },
     {
+      key: "runbook",
+      header: t("adminOps.runbook.title"),
+      hideOnMobile: true,
+      render: (event) => (
+        <OpsAlertRunbookSteps steps={buildOpsAlertRunbookSteps(event.details)} compact />
+      ),
+    },
+    {
       key: "updated",
       header: t("adminOpsAlertEvents.updated"),
       hideOnMobile: true,
@@ -133,7 +146,7 @@ function AlertEventsContent() {
         emptyIcon={BellRing}
         emptyTitle={t("adminOpsAlertEvents.emptyTitle")}
         emptyBody={t("adminOpsAlertEvents.emptyBody")}
-        minWidth={820}
+        minWidth={1040}
         isFiltered={Boolean(statusFilter || severityFilter)}
         onClearFilters={list.clearFilters}
         sort={list.sort}
@@ -199,6 +212,7 @@ function AlertEventsContent() {
                   <AlertEvidenceLinks links={buildOpsAlertEvidenceLinks(detail.details)} />
                 </div>
               </div>
+              <OpsAlertRunbookSteps steps={buildOpsAlertRunbookSteps(detail.details)} />
               <JsonBlock label={t("adminOpsAlertEvents.details")} value={detail.details} />
             </div>
           </DialogContent>

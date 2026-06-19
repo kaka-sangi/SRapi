@@ -13,6 +13,34 @@ export interface OpsAlertEvidenceLinks {
   accountHealth: string | null;
 }
 
+export type OpsAlertRunbookStep =
+  | "openErrorLogs"
+  | "inspectRequestEvidence"
+  | "inspectSchedulerDecision"
+  | "checkAccountHealth"
+  | "checkQuotaOrRateLimit"
+  | "checkCredentials"
+  | "checkProviderNetwork"
+  | "reviewSloBurnRate"
+  | "reviewAlertRule"
+  | "validateRoutingScope";
+
+const QUOTA_ERROR_CLASSES = new Set(["quota_exceeded", "rate_limited", "provider_rate_limited"]);
+const CREDENTIAL_ERROR_CLASSES = new Set([
+  "auth_error",
+  "authentication_error",
+  "credential_invalid",
+  "session_invalid",
+  "account_locked",
+  "account_banned",
+]);
+const PROVIDER_NETWORK_ERROR_CLASSES = new Set([
+  "timeout",
+  "network_error",
+  "invalid_response",
+  "upstream_error",
+]);
+
 export function buildOpsAlertEvidenceLinks(details?: JsonObject): OpsAlertEvidenceLinks {
   const requestID = detailString(details, "request_id", "requestId");
   const accountID = detailString(details, "account_id", "accountId");
@@ -33,6 +61,45 @@ export function buildOpsAlertEvidenceLinks(details?: JsonObject): OpsAlertEviden
         ? adminAccountsHealthHref({ account_id: accountID, provider_id: providerID })
         : null,
   };
+}
+
+export function buildOpsAlertRunbookSteps(details?: JsonObject): OpsAlertRunbookStep[] {
+  const requestID = detailString(details, "request_id", "requestId");
+  const accountID = detailString(details, "account_id", "accountId");
+  const providerID = detailString(details, "provider_id", "providerId");
+  const sourceEndpoint = detailString(details, "source_endpoint", "sourceEndpoint");
+  const model = detailString(details, "model", "canonical_model", "model_alias");
+  const errorClass = detailString(details, "error_class", "errorClass")?.toLowerCase();
+  const ruleID = detailString(details, "rule_id", "ruleId");
+  const sloID = detailString(details, "slo_id", "sloId");
+  const metricType = detailString(details, "metric_type", "metricType");
+  const hasBurnRateSignal = Boolean(
+    detailString(details, "burn_rate_threshold", "long_burn_rate", "short_burn_rate"),
+  );
+  const hasRuleSignal = Boolean(
+    ruleID || metricType || detailString(details, "rule_name", "ruleName", "observed_value"),
+  );
+
+  const steps: OpsAlertRunbookStep[] = [];
+  const add = (step: OpsAlertRunbookStep) => {
+    if (!steps.includes(step)) steps.push(step);
+  };
+
+  if (errorClass || accountID || providerID || sourceEndpoint || model) add("openErrorLogs");
+  if (requestID) {
+    add("inspectRequestEvidence");
+    add("inspectSchedulerDecision");
+  }
+  if (accountID || providerID) add("checkAccountHealth");
+  if (errorClass && QUOTA_ERROR_CLASSES.has(errorClass)) add("checkQuotaOrRateLimit");
+  if (errorClass && CREDENTIAL_ERROR_CLASSES.has(errorClass)) add("checkCredentials");
+  if (errorClass && PROVIDER_NETWORK_ERROR_CLASSES.has(errorClass)) add("checkProviderNetwork");
+  if (sloID || ruleID?.startsWith("slo.") || hasBurnRateSignal) add("reviewSloBurnRate");
+  if (hasRuleSignal) add("reviewAlertRule");
+  if (sourceEndpoint || model || providerID) add("validateRoutingScope");
+  if (steps.length === 0) add("reviewAlertRule");
+
+  return steps;
 }
 
 function detailString(details: JsonObject | undefined, ...keys: string[]): string | null {
