@@ -98,18 +98,33 @@ export type LiveUsageLog = {
 };
 
 export type LiveSchedulerDecision = {
+  id?: string;
   created_at: string;
   request_id: string;
+  attempt_no?: number;
   model: string;
+  source_protocol?: string;
   source_endpoint: string;
+  target_protocol?: string;
+  strategy?: string;
+  strategy_version?: string;
+  fallback_from_decision_id?: string | null;
   candidate_count?: number;
+  selected_provider_id?: string | null;
   selected_account_id?: string | null;
   selected_account?: {
     name?: string;
   };
   rejected_count?: number;
+  reject_reasons?: unknown;
   rejected_reasons?: unknown;
   scores?: unknown;
+  selection_rationale?: string;
+  sticky_hit?: boolean;
+  cache_affinity_hit?: boolean;
+  estimated_cost?: string;
+  currency?: string;
+  compatibility_warnings?: string[];
   warnings?: string[];
   logs?: string[];
 };

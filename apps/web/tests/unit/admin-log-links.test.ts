@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   adminErrorInvestigationHref,
   adminErrorLogsHref,
+  adminAccountsHealthHref,
+  adminProvidersHref,
   adminRequestDumpsHref,
   adminRequestEvidenceHref,
   adminSchedulerDecisionsHref,
@@ -71,6 +73,15 @@ describe("admin log evidence links", () => {
       "/admin/ops?tab=scheduler-decisions&f_request_id=req_123",
     );
     expect(adminSchedulerDecisionsHref({ trace_id: "trace_456" })).toBeNull();
+  });
+
+  it("builds account-health and provider investigation links", () => {
+    expect(adminAccountsHealthHref({ account_id: "12", provider_id: 3 })).toBe(
+      "/admin/accounts?view=health&f_providerId=3",
+    );
+    expect(adminAccountsHealthHref({})).toBe("/admin/accounts?view=health");
+    expect(adminProvidersHref(3)).toBe("/admin/providers?q=3");
+    expect(adminProvidersHref()).toBe("/admin/providers");
   });
 
   it("trims correlation ids before building links", () => {

@@ -8,7 +8,7 @@ import { AdminListView, ListCount, type Column } from "@/components/admin/admin-
 import { ADMIN_ROUTES } from "@/lib/routes";
 import { RowActionsMenu } from "@/components/admin/row-actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
-import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
+import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { ColumnToggle } from "@/components/ui/column-toggle";
@@ -58,10 +58,12 @@ function ProvidersContent() {
   const list = useAdminList();
   const colVis = useColumnVisibility("admin-providers", []);
   const statusFilter = (list.filters.status as Provider["status"]) || undefined;
+  const searchQuery = list.search || undefined;
   const providers = useAdminProviders({
     page: list.page,
     page_size: list.pageSize,
     status: statusFilter,
+    q: searchQuery,
   });
   const createMut = useCreateProvider();
   const updateMut = useUpdateProvider();
@@ -286,13 +288,18 @@ function ProvidersContent() {
           </div>
         }
         minWidth={560}
-        isFiltered={Boolean(statusFilter)}
+        isFiltered={Boolean(statusFilter || searchQuery)}
         onClearFilters={list.clearFilters}
         sort={list.sort}
         onSort={list.toggleSort}
         dimRow={(p) => p.status === "disabled"}
         toolbar={
           <ListToolbar>
+            <SearchInput
+              value={list.searchInput}
+              onChange={list.setSearchInput}
+              placeholder={t("adminProviders.searchPlaceholder")}
+            />
             <FilterSelect
               value={statusFilter}
               onChange={(v) => list.setFilter("status", v)}

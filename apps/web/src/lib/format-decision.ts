@@ -6,9 +6,12 @@ import type { SchedulerDecisionSummary } from "./srapi-types";
  */
 export function decisionToLines(decision: SchedulerDecisionSummary): string[] {
   const lines: string[] = [];
-  lines.push(`[1/5] request received  id=${decision.request_id} model=${decision.model}`);
-  lines.push(`[2/5] scheduler         capability ok, candidates=${decision.candidate_count}`);
-  lines.push(`[3/5] candidates        scoring ${decision.candidate_count} accounts`);
+  const attempt = decision.attempt_no > 1 ? ` attempt=${decision.attempt_no}` : "";
+  lines.push(`[1/5] request received  id=${decision.request_id} model=${decision.model}${attempt}`);
+  lines.push(
+    `[2/5] scheduler         strategy=${decision.strategy} candidates=${decision.candidate_count} rejected=${decision.rejected_count}`,
+  );
+  lines.push(`[3/5] candidates        scoring ${decision.scores.length || decision.candidate_count} accounts`);
 
   const firstRejection = decision.rejected_reasons[0];
   if (firstRejection) {
@@ -22,7 +25,15 @@ export function decisionToLines(decision: SchedulerDecisionSummary): string[] {
   lines.push(`[5/5] selected          ${decision.selected_account_name}  ${scoreText}`.trimEnd());
 
   for (const s of decision.scores.slice(0, 4)) {
-    lines.push(`                        - ${s.account} score=${s.score.toFixed(2)}`);
+    lines.push(
+      `                        - ${s.account} score=${s.score.toFixed(2)} health=${s.health.toFixed(2)} quota=${s.quota.toFixed(2)} latency=${s.latency.toFixed(2)} cost=${s.cost.toFixed(2)}`,
+    );
+  }
+  if (decision.fallback_from_decision_id) {
+    lines.push(`                        fallback from decision=${decision.fallback_from_decision_id}`);
+  }
+  if (decision.selection_rationale) {
+    lines.push(`                        rationale ${decision.selection_rationale}`);
   }
   return lines;
 }

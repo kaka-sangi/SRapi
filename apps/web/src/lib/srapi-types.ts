@@ -105,18 +105,55 @@ export interface AvailableModelSummary {
 }
 
 export interface SchedulerDecisionSummary {
+  id: string;
   created_at: string;
   request_id: string;
+  attempt_no: number;
   model: string;
+  source_protocol: string;
   source_endpoint: string;
+  target_protocol: string;
+  strategy: string;
+  strategy_version: string;
+  fallback_from_decision_id?: string | null;
   candidate_count: number;
-  selected_account_id: string;
+  selected_provider_id?: string | null;
+  selected_account_id?: string | null;
   selected_account_name: string;
   rejected_count: number;
-  rejected_reasons: { account: string; reason: string }[];
-  scores: { account: string; score: number; latency: number; cost: number; quota: number }[];
+  rejected_reasons: SchedulerRejectReasonSummary[];
+  scores: SchedulerScoreSummary[];
+  selection_rationale: string;
+  sticky_hit: boolean;
+  cache_affinity_hit: boolean;
+  estimated_cost: string;
+  currency: string;
   warnings: string[];
   logs: string[];
+}
+
+export interface SchedulerRejectReasonSummary {
+  account_id?: string;
+  account: string;
+  reason: string;
+}
+
+export interface SchedulerScoreSummary {
+  account_id?: string;
+  account: string;
+  score: number;
+  health: number;
+  latency: number;
+  cost: number;
+  quota: number;
+  quality: number;
+  sticky: number;
+  cache: number;
+  fairness: number;
+  risk_penalty: number;
+  saturation_penalty: number;
+  quality_tier?: string;
+  pareto_frontier: boolean;
 }
 
 export interface SloSummary {

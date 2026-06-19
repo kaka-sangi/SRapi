@@ -13,6 +13,11 @@ export interface ErrorLogInvestigationLinkParams {
   model?: string | null;
 }
 
+export interface AdminAccountHrefParams {
+  account_id?: string | number | null;
+  provider_id?: string | number | null;
+}
+
 /** Build a filtered Error logs link for a request/trace investigation. */
 export function adminErrorLogsHref(params: LogCorrelationIDs): string | null {
   const query = new URLSearchParams();
@@ -74,6 +79,20 @@ export function adminSchedulerDecisionsHref(params: LogCorrelationIDs): string |
   query.set("tab", "scheduler-decisions");
   setIfPresent(query, "f_request_id", params.request_id);
   return hasCorrelation(query) ? `${ADMIN_ROUTES.ops}?${query.toString()}` : null;
+}
+
+/** Build an account-health link scoped as tightly as the current accounts API supports. */
+export function adminAccountsHealthHref(params: AdminAccountHrefParams): string {
+  const query = new URLSearchParams();
+  query.set("view", "health");
+  setIfPresent(query, "f_providerId", params.provider_id);
+  return `${ADMIN_ROUTES.accounts}?${query.toString()}`;
+}
+
+/** Build a provider-list link scoped by provider id when available. */
+export function adminProvidersHref(providerID?: string | number | null): string {
+  const id = clean(providerID);
+  return id ? `${ADMIN_ROUTES.providers}?q=${encodeURIComponent(id)}` : ADMIN_ROUTES.providers;
 }
 
 function firstCorrelation(params: LogCorrelationIDs): string {
