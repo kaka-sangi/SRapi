@@ -25,6 +25,7 @@ import {
   useDeleteOpsSlo,
   useOpsAlertSilences,
   useDeleteOpsAlertSilence,
+  useOpsSystemLogHealth,
 } from "@/hooks/admin-queries";
 import {
   useOpsLatencyHistogram,
@@ -56,6 +57,7 @@ import { ScheduledTestsContent } from "@/components/admin/ops-scheduled-tests";
 import { StrategyContent } from "@/components/admin/ops-strategy";
 import { SchedulerDecisionsPanel } from "@/components/features/scheduler-decisions-panel";
 import { adminErrorInvestigationHref } from "@/lib/admin-log-links";
+import { OpsEvidenceChainHealth } from "./evidence-chain-health";
 
 export default function AdminOpsPage() {
   return (
@@ -120,6 +122,7 @@ function OpsOverviewContent() {
   const fullscreen = searchParams.get("fullscreen") === "1";
   const slos = useOpsSlos();
   const alerts = useOpsAlerts();
+  const systemLogHealth = useOpsSystemLogHealth();
   const ackMut = useAcknowledgeAlert();
   const settingsMut = useUpdateOpsSettings();
   const [showCleanup, setShowCleanup] = useState(false);
@@ -195,6 +198,8 @@ function OpsOverviewContent() {
           </div>
         }
       />
+
+      <OpsEvidenceChainHealth health={systemLogHealth.data} loading={systemLogHealth.isLoading} />
 
       {throughputValues.length > 0 || errorValues.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
