@@ -73,6 +73,99 @@ func TestAlertRuleCRUDValidatesAndDefaults(t *testing.T) {
 	}
 }
 
+func TestEnsureBuiltinAlertRulesCreatesMissingBaselines(t *testing.T) {
+	now := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	created, err := svc.EnsureBuiltinAlertRules(t.Context())
+	if err != nil {
+		t.Fatalf("ensure builtins: %v", err)
+	}
+	if len(created) != 3 {
+		t.Fatalf("expected 3 builtin rules, got %+v", created)
+	}
+	if created[0].Name != builtinAlertRuleGatewayErrorRate ||
+		created[0].MetricType != contract.AlertMetricErrorRate ||
+		created[0].Severity != contract.AlertSeverityCritical ||
+		created[0].Threshold != 0.05 ||
+		created[0].WindowSeconds != 300 ||
+		created[0].MinRequestCount != 20 ||
+		!created[0].Enabled ||
+		!created[0].CreatedAt.Equal(now) {
+		t.Fatalf("unexpected gateway error-rate baseline: %+v", created[0])
+	}
+	if created[1].Name != builtinAlertRuleGatewayLatencyP95 ||
+		created[1].MetricType != contract.AlertMetricLatencyP95 ||
+		created[1].Threshold != 15000 ||
+		created[1].Severity != contract.AlertSeverityWarning {
+		t.Fatalf("unexpected latency baseline: %+v", created[1])
+	}
+	if created[2].Name != builtinAlertRuleChatCompletionsError ||
+		created[2].Scope.SourceEndpoint != "/v1/chat/completions" ||
+		created[2].MinRequestCount != 10 {
+		t.Fatalf("unexpected chat baseline: %+v", created[2])
+	}
+
+	again, err := svc.EnsureBuiltinAlertRules(t.Context())
+	if err != nil {
+		t.Fatalf("ensure builtins again: %v", err)
+	}
+	if len(again) != 0 {
+		t.Fatalf("expected idempotent ensure to create no rules, got %+v", again)
+	}
+}
+
+func TestEnsureBuiltinAlertRulesRespectsExistingOperatorRule(t *testing.T) {
+	now := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	disabled := false
+	existing, err := svc.CreateAlertRule(t.Context(), contract.CreateAlertRuleRequest{
+		Name:            builtinAlertRuleGatewayErrorRate,
+		MetricType:      contract.AlertMetricErrorRate,
+		Operator:        contract.AlertOperatorGT,
+		Threshold:       0.9,
+		Severity:        contract.AlertSeverityTicket,
+		Enabled:         &disabled,
+		WindowSeconds:   1800,
+		MinRequestCount: 99,
+	})
+	if err != nil {
+		t.Fatalf("create operator rule: %v", err)
+	}
+
+	created, err := svc.EnsureBuiltinAlertRules(t.Context())
+	if err != nil {
+		t.Fatalf("ensure builtins: %v", err)
+	}
+	if len(created) != 2 {
+		t.Fatalf("expected only missing builtins, got %+v", created)
+	}
+	found, err := svc.ListAlertRules(t.Context())
+	if err != nil {
+		t.Fatalf("list rules: %v", err)
+	}
+	var preserved contract.AlertRule
+	for _, rule := range found {
+		if rule.ID == existing.ID {
+			preserved = rule
+			break
+		}
+	}
+	if preserved.ID == 0 || preserved.Enabled || preserved.Threshold != 0.9 ||
+		preserved.Severity != contract.AlertSeverityTicket ||
+		preserved.MinRequestCount != 99 {
+		t.Fatalf("expected existing operator rule preserved, got %+v from %+v", preserved, found)
+	}
+}
+
 func TestEvaluateAlertRulesFiresUpdatesAndResolvesEvents(t *testing.T) {
 	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
 	store := newCaptureObservabilityStore()

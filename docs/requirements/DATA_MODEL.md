@@ -1982,6 +1982,7 @@ updated_at
 规则：
 
 - `metric_type` 默认 `error_rate`，`operator` 默认 `gt`，`severity` 默认 `warning`。
+- AdminOps runtime 会按规则名幂等创建内置基线规则；同名现有规则保留 operator 修改后的阈值、启用状态和 scope。
 - `scope_json` 只保存低基数过滤维度，不得保存请求体、凭证或 prompt。
 
 ### 15B.5 obs_alert_silences

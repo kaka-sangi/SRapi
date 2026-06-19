@@ -11131,8 +11131,17 @@ func TestAdminOpsAlertRulesControlPlane(t *testing.T) {
 	if err := json.NewDecoder(listRec.Body).Decode(&listResp); err != nil {
 		t.Fatalf("decode alert rule list: %v", err)
 	}
-	if len(listResp.Data) != 1 {
-		t.Fatalf("expected one rule, got %+v", listResp.Data)
+	if len(listResp.Data) != 4 {
+		t.Fatalf("expected created rule plus built-in baselines, got %+v", listResp.Data)
+	}
+	for _, name := range []string{
+		"SRapi Gateway error rate baseline",
+		"SRapi Gateway p95 latency baseline",
+		"SRapi Chat Completions error rate baseline",
+	} {
+		if !opsAlertRuleListContainsName(listResp.Data, name) {
+			t.Fatalf("expected built-in alert rule %q in %+v", name, listResp.Data)
+		}
 	}
 
 	patchReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/ops/alert-rules/"+string(createResp.Data.Id), strings.NewReader(`{"enabled":false,"threshold":0.5}`))
@@ -11196,4 +11205,13 @@ func TestAdminOpsAlertRulesControlPlane(t *testing.T) {
 			t.Fatalf("expected audit action %s in %+v", action, auditLogs)
 		}
 	}
+}
+
+func opsAlertRuleListContainsName(rules []apiopenapi.OpsAlertRule, name string) bool {
+	for _, rule := range rules {
+		if rule.Name == name {
+			return true
+		}
+	}
+	return false
 }

@@ -1181,6 +1181,9 @@ func newOperationsRuntime(store operationscontract.Store, usageStore usagecontra
 	if err != nil {
 		return nil, nil, err
 	}
+	if _, err := service.EnsureBuiltinAlertRules(context.Background()); err != nil {
+		return nil, nil, err
+	}
 	return store, service, nil
 }
 
