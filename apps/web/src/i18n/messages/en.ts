@@ -1595,6 +1595,7 @@ export const en = {
     status: "Status",
     error: "Error",
     latency: "Latency",
+    stream: "Stream",
     tokens: "Tokens",
     exact: "Exact",
     estimated: "Estimated",
@@ -1645,6 +1646,13 @@ export const en = {
     detailNoSystemLogs: "No system logs",
     detailEvidenceCounts: "U {usage} / S {scheduler} / E {errors} / D {dumps}",
     detailSystemLogCounts: "{total} total · warn {warn} · error {error}",
+    streamState: {
+      completed: "Completed",
+      interrupted: "Interrupted",
+      idle_timeout: "Idle timeout",
+      failed: "Failed",
+      unknown: "Unknown",
+    },
   },
   adminLiveErrors: {
     title: "Live errors",

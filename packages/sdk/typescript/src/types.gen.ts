@@ -4912,6 +4912,13 @@ export type RequestEvidenceRow = {
     error_owner?: string;
     error_source?: string;
     upstream_request_id?: string;
+    /**
+     * Low-cardinality terminal state for gateway streaming requests when
+     * available from ops_error_logs. Empty when the request was not
+     * streamed or the state was not observed.
+     *
+     */
+    stream_completion_state?: 'completed' | 'interrupted' | 'idle_timeout' | 'failed' | 'unknown';
     attempt_no?: number;
     latency_ms?: number;
     input_tokens?: number;
@@ -4981,6 +4988,12 @@ export type RequestEvidenceSummary = {
     error_owner?: string;
     error_source?: string;
     upstream_request_id?: string;
+    /**
+     * Latest low-cardinality terminal state among linked gateway
+     * streaming attempts when available.
+     *
+     */
+    stream_completion_state?: 'completed' | 'interrupted' | 'idle_timeout' | 'failed' | 'unknown';
 };
 
 export type RequestEvidenceDumpDescriptor = {

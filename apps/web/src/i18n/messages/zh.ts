@@ -1546,6 +1546,7 @@ export const zh: Messages = {
     status: "状态",
     error: "错误",
     latency: "延迟",
+    stream: "流式",
     tokens: "Tokens",
     exact: "精确",
     estimated: "估算",
@@ -1596,6 +1597,13 @@ export const zh: Messages = {
     detailNoSystemLogs: "没有系统日志",
     detailEvidenceCounts: "U {usage} / S {scheduler} / E {errors} / D {dumps}",
     detailSystemLogCounts: "{total} 条 · 警告 {warn} · 错误 {error}",
+    streamState: {
+      completed: "完成",
+      interrupted: "中断",
+      idle_timeout: "空闲超时",
+      failed: "失败",
+      unknown: "未知",
+    },
   },
   adminLiveErrors: {
     title: "实时错误",

@@ -212,9 +212,12 @@ export function RequestEvidencePanel() {
       align: "right",
       hideOnMobile: true,
       render: (row) => (
-        <span className="text-2xs text-srapi-text-tertiary tabular font-mono">
-          {typeof row.latency_ms === "number" ? formatLatency(row.latency_ms) : "—"}
-        </span>
+        <div className="space-y-0.5 text-right">
+          <div className="text-2xs text-srapi-text-tertiary tabular font-mono">
+            {typeof row.latency_ms === "number" ? formatLatency(row.latency_ms) : "—"}
+          </div>
+          <StreamCompletionBadge state={row.stream_completion_state} />
+        </div>
       ),
     },
     {
@@ -581,7 +584,7 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
   } as RequestEvidenceRow);
   return (
     <div className="space-y-5">
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <DetailMetric
           label={t("adminRequestEvidence.result")}
           value={kindLabel(t, summary.kind)}
@@ -599,6 +602,10 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
               estimated={summaryUsageEstimated(detail.attempts)}
             />
           }
+        />
+        <DetailMetric
+          label={t("adminRequestEvidence.stream")}
+          value={<StreamCompletionBadge state={summary.stream_completion_state} />}
         />
         <DetailMetric
           label={t("adminRequestEvidence.evidence")}
@@ -628,6 +635,9 @@ function RequestEvidenceDetailContent({ detail }: { detail: RequestEvidenceDetai
                     {row.model || "—"}
                     {row.scheduler_strategy ? ` / ${row.scheduler_strategy}` : ""}
                     {row.error_class ? ` / ${row.error_class}` : ""}
+                  </div>
+                  <div className="mt-1">
+                    <StreamCompletionBadge state={row.stream_completion_state} />
                   </div>
                 </div>
                 <div className={statusClass(row.status_code)}>{row.status_code ?? "—"}</div>
@@ -779,6 +789,24 @@ function TokenEvidenceValue({
       {label ? (
         <span className={`${compact ? "text-[10px]" : "text-2xs"} ${tone}`}>{label}</span>
       ) : null}
+    </span>
+  );
+}
+
+function StreamCompletionBadge({ state }: { state?: RequestEvidenceRow["stream_completion_state"] }) {
+  const { t } = useLanguage();
+  if (!state) return <span className="text-srapi-text-tertiary">—</span>;
+  const className =
+    state === "completed"
+      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+      : state === "idle_timeout" || state === "failed"
+        ? "border-red-500/30 bg-red-500/10 text-red-300"
+        : state === "interrupted"
+          ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+          : "border-srapi-border-subtle bg-srapi-bg-card-elevated text-srapi-text-tertiary";
+  return (
+    <span className={`inline-flex rounded border px-1.5 py-0.5 font-mono text-2xs ${className}`}>
+      {t(`adminRequestEvidence.streamState.${state}`)}
     </span>
   );
 }

@@ -28478,6 +28478,13 @@ components:
           type: string
         upstream_request_id:
           type: string
+        stream_completion_state:
+          type: string
+          enum: [completed, interrupted, idle_timeout, failed, unknown]
+          description: |
+            Low-cardinality terminal state for gateway streaming requests when
+            available from ops_error_logs. Empty when the request was not
+            streamed or the state was not observed.
         attempt_no:
           type: integer
           minimum: 1
@@ -28644,6 +28651,12 @@ components:
           type: string
         upstream_request_id:
           type: string
+        stream_completion_state:
+          type: string
+          enum: [completed, interrupted, idle_timeout, failed, unknown]
+          description: |
+            Latest low-cardinality terminal state among linked gateway
+            streaming attempts when available.
 
     RequestEvidenceDumpDescriptor:
       type: object

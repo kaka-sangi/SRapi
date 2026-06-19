@@ -2780,6 +2780,33 @@ func (e RequestEvidenceRowResolution) Valid() bool {
 	}
 }
 
+// Defines values for RequestEvidenceRowStreamCompletionState.
+const (
+	RequestEvidenceRowStreamCompletionStateCompleted   RequestEvidenceRowStreamCompletionState = "completed"
+	RequestEvidenceRowStreamCompletionStateFailed      RequestEvidenceRowStreamCompletionState = "failed"
+	RequestEvidenceRowStreamCompletionStateIdleTimeout RequestEvidenceRowStreamCompletionState = "idle_timeout"
+	RequestEvidenceRowStreamCompletionStateInterrupted RequestEvidenceRowStreamCompletionState = "interrupted"
+	RequestEvidenceRowStreamCompletionStateUnknown     RequestEvidenceRowStreamCompletionState = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the RequestEvidenceRowStreamCompletionState enum.
+func (e RequestEvidenceRowStreamCompletionState) Valid() bool {
+	switch e {
+	case RequestEvidenceRowStreamCompletionStateCompleted:
+		return true
+	case RequestEvidenceRowStreamCompletionStateFailed:
+		return true
+	case RequestEvidenceRowStreamCompletionStateIdleTimeout:
+		return true
+	case RequestEvidenceRowStreamCompletionStateInterrupted:
+		return true
+	case RequestEvidenceRowStreamCompletionStateUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RequestEvidenceSource.
 const (
 	RequestEvidenceSourceOpsError          RequestEvidenceSource = "ops_error"
@@ -2801,6 +2828,33 @@ func (e RequestEvidenceSource) Valid() bool {
 	case RequestEvidenceSourceSystemLog:
 		return true
 	case RequestEvidenceSourceUsage:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RequestEvidenceSummaryStreamCompletionState.
+const (
+	RequestEvidenceSummaryStreamCompletionStateCompleted   RequestEvidenceSummaryStreamCompletionState = "completed"
+	RequestEvidenceSummaryStreamCompletionStateFailed      RequestEvidenceSummaryStreamCompletionState = "failed"
+	RequestEvidenceSummaryStreamCompletionStateIdleTimeout RequestEvidenceSummaryStreamCompletionState = "idle_timeout"
+	RequestEvidenceSummaryStreamCompletionStateInterrupted RequestEvidenceSummaryStreamCompletionState = "interrupted"
+	RequestEvidenceSummaryStreamCompletionStateUnknown     RequestEvidenceSummaryStreamCompletionState = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the RequestEvidenceSummaryStreamCompletionState enum.
+func (e RequestEvidenceSummaryStreamCompletionState) Valid() bool {
+	switch e {
+	case RequestEvidenceSummaryStreamCompletionStateCompleted:
+		return true
+	case RequestEvidenceSummaryStreamCompletionStateFailed:
+		return true
+	case RequestEvidenceSummaryStreamCompletionStateIdleTimeout:
+		return true
+	case RequestEvidenceSummaryStreamCompletionStateInterrupted:
+		return true
+	case RequestEvidenceSummaryStreamCompletionStateUnknown:
 		return true
 	default:
 		return false
@@ -10113,18 +10167,28 @@ type RequestEvidenceRow struct {
 	SourceEndpoint              *string `json:"source_endpoint,omitempty"`
 	SourceProtocol              *string `json:"source_protocol,omitempty"`
 	StatusCode                  *int    `json:"status_code,omitempty"`
-	Success                     *bool   `json:"success,omitempty"`
-	SystemLogCount              int     `json:"system_log_count"`
-	TargetProtocol              *string `json:"target_protocol,omitempty"`
-	TotalTokens                 *int    `json:"total_tokens,omitempty"`
-	UpstreamRequestId           *string `json:"upstream_request_id,omitempty"`
-	UsageEstimated              *bool   `json:"usage_estimated,omitempty"`
-	UsageLogId                  *Id     `json:"usage_log_id,omitempty"`
-	UserId                      *Id     `json:"user_id,omitempty"`
+
+	// StreamCompletionState Low-cardinality terminal state for gateway streaming requests when
+	// available from ops_error_logs. Empty when the request was not
+	// streamed or the state was not observed.
+	StreamCompletionState *RequestEvidenceRowStreamCompletionState `json:"stream_completion_state,omitempty"`
+	Success               *bool                                    `json:"success,omitempty"`
+	SystemLogCount        int                                      `json:"system_log_count"`
+	TargetProtocol        *string                                  `json:"target_protocol,omitempty"`
+	TotalTokens           *int                                     `json:"total_tokens,omitempty"`
+	UpstreamRequestId     *string                                  `json:"upstream_request_id,omitempty"`
+	UsageEstimated        *bool                                    `json:"usage_estimated,omitempty"`
+	UsageLogId            *Id                                      `json:"usage_log_id,omitempty"`
+	UserId                *Id                                      `json:"user_id,omitempty"`
 }
 
 // RequestEvidenceRowResolution defines model for RequestEvidenceRow.Resolution.
 type RequestEvidenceRowResolution string
+
+// RequestEvidenceRowStreamCompletionState Low-cardinality terminal state for gateway streaming requests when
+// available from ops_error_logs. Empty when the request was not
+// streamed or the state was not observed.
+type RequestEvidenceRowStreamCompletionState string
 
 // RequestEvidenceSource defines model for RequestEvidenceSource.
 type RequestEvidenceSource string
@@ -10160,10 +10224,18 @@ type RequestEvidenceSummary struct {
 	SchedulerSelectionRationale *string `json:"scheduler_selection_rationale,omitempty"`
 	SchedulerStrategy           *string `json:"scheduler_strategy,omitempty"`
 	StatusCode                  *int    `json:"status_code,omitempty"`
-	TotalTokens                 *int    `json:"total_tokens,omitempty"`
-	UpstreamRequestId           *string `json:"upstream_request_id,omitempty"`
-	UsageLogCount               int     `json:"usage_log_count"`
+
+	// StreamCompletionState Latest low-cardinality terminal state among linked gateway
+	// streaming attempts when available.
+	StreamCompletionState *RequestEvidenceSummaryStreamCompletionState `json:"stream_completion_state,omitempty"`
+	TotalTokens           *int                                         `json:"total_tokens,omitempty"`
+	UpstreamRequestId     *string                                      `json:"upstream_request_id,omitempty"`
+	UsageLogCount         int                                          `json:"usage_log_count"`
 }
+
+// RequestEvidenceSummaryStreamCompletionState Latest low-cardinality terminal state among linked gateway
+// streaming attempts when available.
+type RequestEvidenceSummaryStreamCompletionState string
 
 // RequestEvidenceSystemLogSummary defines model for RequestEvidenceSystemLogSummary.
 type RequestEvidenceSystemLogSummary struct {

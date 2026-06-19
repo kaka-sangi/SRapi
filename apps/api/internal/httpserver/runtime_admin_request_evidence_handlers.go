@@ -73,6 +73,7 @@ type requestEvidenceRow struct {
 	ErrorOwner                  string
 	ErrorSource                 string
 	UpstreamRequestID           string
+	StreamCompletionState       string
 	AttemptNo                   *int
 	LatencyMS                   *int
 	InputTokens                 *int
@@ -140,6 +141,7 @@ type requestEvidenceSummary struct {
 	ErrorOwner                  string
 	ErrorSource                 string
 	UpstreamRequestID           string
+	StreamCompletionState       string
 	SchedulerDecisionID         *int
 	SchedulerCandidateCount     *int
 	SchedulerRejectedCount      *int
@@ -938,35 +940,36 @@ func requestEvidenceRowFromOpsError(entry opserrorlogscontract.Entry) *requestEv
 	usageEstimated := entry.UsageEstimated
 	success := false
 	row := &requestEvidenceRow{
-		Kind:              "error",
-		EvidenceSource:    "ops_error",
-		CreatedAt:         entry.OccurredAt.UTC(),
-		RequestID:         entry.RequestID,
-		OpsErrorLogID:     &id,
-		UserID:            entry.UserID,
-		APIKeyID:          entry.APIKeyID,
-		AccountID:         entry.AccountID,
-		ProviderID:        entry.ProviderID,
-		SourceProtocol:    entry.Platform,
-		SourceEndpoint:    entry.SourceEndpoint,
-		TargetProtocol:    entry.TargetProtocol,
-		Model:             entry.Model,
-		StatusCode:        entry.StatusCode,
-		Success:           &success,
-		ErrorClass:        entry.ErrorClass,
-		ErrorMessage:      entry.ErrorMessage,
-		ErrorPhase:        entry.ErrorPhase,
-		ErrorOwner:        entry.ErrorOwner,
-		ErrorSource:       entry.ErrorSource,
-		UpstreamRequestID: entry.UpstreamRequestID,
-		AttemptNo:         &attemptNo,
-		LatencyMS:         &latency,
-		InputTokens:       &inputTokens,
-		OutputTokens:      &outputTokens,
-		TotalTokens:       &totalTokens,
-		UsageEstimated:    &usageEstimated,
-		Resolution:        string(entry.Resolution),
-		HasOpsErrorLog:    true,
+		Kind:                  "error",
+		EvidenceSource:        "ops_error",
+		CreatedAt:             entry.OccurredAt.UTC(),
+		RequestID:             entry.RequestID,
+		OpsErrorLogID:         &id,
+		UserID:                entry.UserID,
+		APIKeyID:              entry.APIKeyID,
+		AccountID:             entry.AccountID,
+		ProviderID:            entry.ProviderID,
+		SourceProtocol:        entry.Platform,
+		SourceEndpoint:        entry.SourceEndpoint,
+		TargetProtocol:        entry.TargetProtocol,
+		Model:                 entry.Model,
+		StatusCode:            entry.StatusCode,
+		Success:               &success,
+		ErrorClass:            entry.ErrorClass,
+		ErrorMessage:          entry.ErrorMessage,
+		ErrorPhase:            entry.ErrorPhase,
+		ErrorOwner:            entry.ErrorOwner,
+		ErrorSource:           entry.ErrorSource,
+		UpstreamRequestID:     entry.UpstreamRequestID,
+		StreamCompletionState: entry.StreamCompletionState,
+		AttemptNo:             &attemptNo,
+		LatencyMS:             &latency,
+		InputTokens:           &inputTokens,
+		OutputTokens:          &outputTokens,
+		TotalTokens:           &totalTokens,
+		UsageEstimated:        &usageEstimated,
+		Resolution:            string(entry.Resolution),
+		HasOpsErrorLog:        true,
 	}
 	return row
 }
@@ -1093,6 +1096,9 @@ func mergeRequestEvidenceOpsError(row *requestEvidenceRow, entry opserrorlogscon
 	}
 	if row.UpstreamRequestID == "" {
 		row.UpstreamRequestID = entry.UpstreamRequestID
+	}
+	if row.StreamCompletionState == "" {
+		row.StreamCompletionState = entry.StreamCompletionState
 	}
 	if row.Resolution == "" {
 		row.Resolution = string(entry.Resolution)
@@ -1462,6 +1468,10 @@ func requestEvidenceRowToAPI(row requestEvidenceRow) apiopenapi.RequestEvidenceR
 	out.ErrorOwner = nonEmptyStringPtr(row.ErrorOwner)
 	out.ErrorSource = nonEmptyStringPtr(row.ErrorSource)
 	out.UpstreamRequestId = nonEmptyStringPtr(row.UpstreamRequestID)
+	if row.StreamCompletionState != "" {
+		state := apiopenapi.RequestEvidenceRowStreamCompletionState(row.StreamCompletionState)
+		out.StreamCompletionState = &state
+	}
 	out.AttemptNo = row.AttemptNo
 	out.LatencyMs = row.LatencyMS
 	out.InputTokens = row.InputTokens
@@ -1573,6 +1583,7 @@ func requestEvidenceSummaryFromDetail(rows []requestEvidenceRow, usageLogs []usa
 		summary.ErrorOwner = latest.ErrorOwner
 		summary.ErrorSource = latest.ErrorSource
 		summary.UpstreamRequestID = latest.UpstreamRequestID
+		summary.StreamCompletionState = latest.StreamCompletionState
 	}
 	if latestScheduler != nil {
 		summary.SchedulerDecisionID = latestScheduler.SchedulerDecisionID
@@ -1592,6 +1603,7 @@ func requestEvidenceSummaryFromDetail(rows []requestEvidenceRow, usageLogs []usa
 				summary.ErrorOwner = row.ErrorOwner
 				summary.ErrorSource = row.ErrorSource
 				summary.UpstreamRequestID = row.UpstreamRequestID
+				summary.StreamCompletionState = row.StreamCompletionState
 				break
 			}
 		}
@@ -1681,6 +1693,10 @@ func requestEvidenceSummaryToAPI(summary requestEvidenceSummary) apiopenapi.Requ
 	out.ErrorOwner = nonEmptyStringPtr(summary.ErrorOwner)
 	out.ErrorSource = nonEmptyStringPtr(summary.ErrorSource)
 	out.UpstreamRequestId = nonEmptyStringPtr(summary.UpstreamRequestID)
+	if summary.StreamCompletionState != "" {
+		state := apiopenapi.RequestEvidenceSummaryStreamCompletionState(summary.StreamCompletionState)
+		out.StreamCompletionState = &state
+	}
 	if summary.SchedulerDecisionID != nil {
 		value := apiopenapi.Id(strconv.Itoa(*summary.SchedulerDecisionID))
 		out.SchedulerDecisionId = &value

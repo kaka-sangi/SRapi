@@ -550,20 +550,21 @@ func TestAdminRequestEvidence_DetailUsesExactHistoricalRequestID(t *testing.T) {
 	}
 	status := 504
 	if err := opsSvc.RecordError(t.Context(), opserrorlogscontract.RecordRequest{
-		OccurredAt:     base.Add(-48*time.Hour + time.Minute),
-		RequestID:      "req_historical",
-		UserID:         intPtr(44),
-		APIKeyID:       intPtr(8),
-		AccountID:      &accountID,
-		Platform:       "openai-compatible",
-		SourceEndpoint: "/v1/responses",
-		TargetProtocol: "openai",
-		Model:          "detail-model",
-		StatusCode:     &status,
-		AttemptNo:      1,
-		LatencyMS:      1510,
-		ErrorClass:     "timeout",
-		ErrorMessage:   "ops timeout",
+		OccurredAt:            base.Add(-48*time.Hour + time.Minute),
+		RequestID:             "req_historical",
+		UserID:                intPtr(44),
+		APIKeyID:              intPtr(8),
+		AccountID:             &accountID,
+		Platform:              "openai-compatible",
+		SourceEndpoint:        "/v1/responses",
+		TargetProtocol:        "openai",
+		Model:                 "detail-model",
+		StatusCode:            &status,
+		AttemptNo:             1,
+		LatencyMS:             1510,
+		StreamCompletionState: "idle_timeout",
+		ErrorClass:            "timeout",
+		ErrorMessage:          "ops timeout",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -625,6 +626,12 @@ func TestAdminRequestEvidence_DetailUsesExactHistoricalRequestID(t *testing.T) {
 	}
 	if !resp.Attempts[0].HasSystemLog || resp.Attempts[0].SystemLogCount != 1 {
 		t.Fatalf("attempt should carry exact system-log evidence: %+v", resp.Attempts)
+	}
+	if resp.Attempts[0].StreamCompletionState == nil || *resp.Attempts[0].StreamCompletionState != apiopenapi.RequestEvidenceRowStreamCompletionStateIdleTimeout {
+		t.Fatalf("attempt should expose stream completion state: %+v", resp.Attempts[0])
+	}
+	if resp.Summary.StreamCompletionState == nil || *resp.Summary.StreamCompletionState != apiopenapi.RequestEvidenceSummaryStreamCompletionStateIdleTimeout {
+		t.Fatalf("summary should expose stream completion state: %+v", resp.Summary)
 	}
 	if resp.SystemLogSummary.TotalCount != 1 || resp.SystemLogSummary.LevelCounts["warn"] != 1 {
 		t.Fatalf("system log summary should use exact request id, got %+v", resp.SystemLogSummary)

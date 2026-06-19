@@ -41,6 +41,7 @@ const mocks = vi.hoisted(() => ({
     error_owner: "provider",
     error_source: "upstream_http",
     upstream_request_id: "up-req",
+    stream_completion_state: "idle_timeout",
     attempt_no: 1,
     latency_ms: 891,
     input_tokens: 10,
@@ -98,6 +99,7 @@ vi.mock("@/hooks/admin-queries", () => ({
             status_code: 503,
             error_class: "server_bad",
             error_message: "upstream failed",
+            stream_completion_state: "idle_timeout",
           },
           attempts: [mocks.row],
           request_dumps: [
@@ -176,6 +178,7 @@ describe("RequestEvidencePanel", () => {
     expect(screen.getByText("gpt-4.1")).toBeInTheDocument();
     expect(screen.getByText("server_bad")).toBeInTheDocument();
     expect(screen.getByText("891ms")).toBeInTheDocument();
+    expect(screen.getByText("空闲超时")).toBeInTheDocument();
     expect(screen.getByText("30")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /错误/ })).toHaveAttribute(
       "href",
@@ -204,6 +207,7 @@ describe("RequestEvidencePanel", () => {
     expect(screen.getByText("请求调查")).toBeInTheDocument();
     expect(screen.getByText("尝试")).toBeInTheDocument();
     expect(screen.getByText("U 1 / S 1 / E 1 / D 1")).toBeInTheDocument();
+    expect(screen.getAllByText("空闲超时").length).toBeGreaterThan(0);
     expect(screen.getByText("1 条 · 警告 1 · 错误 0")).toBeInTheDocument();
     expect(screen.getByText("scheduler fallback selected secondary account")).toBeInTheDocument();
     expect(screen.getByText("error-1780000000000-req-evidence.log")).toBeInTheDocument();
