@@ -6,60 +6,11 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	tlsprofilescontract "github.com/srapi/srapi/apps/api/internal/modules/tls_profiles/contract"
 	tlsprofilesservice "github.com/srapi/srapi/apps/api/internal/modules/tls_profiles/service"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
-
-type tlsProfilePayload struct {
-	ID                int               `json:"id"`
-	Name              string            `json:"name"`
-	TLSTemplate       string            `json:"tls_template"`
-	HTTPVersionPolicy string            `json:"http_version_policy"`
-	UserAgent         string            `json:"user_agent"`
-	ExtraHeaders      map[string]string `json:"extra_headers"`
-	Enabled           bool              `json:"enabled"`
-	CreatedAt         time.Time         `json:"created_at"`
-	UpdatedAt         time.Time         `json:"updated_at"`
-}
-
-type createTLSProfileRequest struct {
-	Name              string            `json:"name"`
-	TLSTemplate       string            `json:"tls_template"`
-	HTTPVersionPolicy string            `json:"http_version_policy"`
-	UserAgent         string            `json:"user_agent"`
-	ExtraHeaders      map[string]string `json:"extra_headers"`
-	Enabled           *bool             `json:"enabled"`
-}
-
-type updateTLSProfileRequest struct {
-	Name              *string            `json:"name"`
-	TLSTemplate       *string            `json:"tls_template"`
-	HTTPVersionPolicy *string            `json:"http_version_policy"`
-	UserAgent         *string            `json:"user_agent"`
-	ExtraHeaders      *map[string]string `json:"extra_headers"`
-	Enabled           *bool              `json:"enabled"`
-}
-
-func toTLSProfilePayload(profile tlsprofilescontract.Profile) tlsProfilePayload {
-	headers := profile.ExtraHeaders
-	if headers == nil {
-		headers = map[string]string{}
-	}
-	return tlsProfilePayload{
-		ID:                profile.ID,
-		Name:              profile.Name,
-		TLSTemplate:       profile.TLSTemplate,
-		HTTPVersionPolicy: profile.HTTPVersionPolicy,
-		UserAgent:         profile.UserAgent,
-		ExtraHeaders:      headers,
-		Enabled:           profile.Enabled,
-		CreatedAt:         profile.CreatedAt.UTC(),
-		UpdatedAt:         profile.UpdatedAt.UTC(),
-	}
-}
 
 func toAPITLSProfile(profile tlsprofilescontract.Profile) apiopenapi.TLSProfile {
 	headers := profile.ExtraHeaders
@@ -90,15 +41,15 @@ func (s *Server) handleListAdminTLSProfiles(w http.ResponseWriter, r *http.Reque
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list tls profiles", requestID)
 		return
 	}
-	data := make([]tlsProfilePayload, 0, len(profiles))
+	data := make([]apiopenapi.TLSProfile, 0, len(profiles))
 	for _, profile := range profiles {
-		data = append(data, toTLSProfilePayload(profile))
+		data = append(data, toAPITLSProfile(profile))
 	}
 	data, pg := paginate(r, data)
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       data,
-		"pagination": pg,
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.TLSProfileListResponse{
+		Data:       data,
+		Pagination: pg,
+		RequestId:  requestID,
 	})
 }
 
@@ -113,7 +64,7 @@ func (s *Server) handleCreateAdminTLSProfile(w http.ResponseWriter, r *http.Requ
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
 		return
 	}
-	var body createTLSProfileRequest
+	var body apiopenapi.CreateTLSProfileRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid tls profile request", requestID)
 		return
@@ -124,10 +75,10 @@ func (s *Server) handleCreateAdminTLSProfile(w http.ResponseWriter, r *http.Requ
 	}
 	profile, err := s.runtime.tlsProfiles.CreateProfile(r.Context(), tlsprofilescontract.CreateProfile{
 		Name:              body.Name,
-		TLSTemplate:       body.TLSTemplate,
-		HTTPVersionPolicy: body.HTTPVersionPolicy,
-		UserAgent:         body.UserAgent,
-		ExtraHeaders:      body.ExtraHeaders,
+		TLSTemplate:       openapiOptionalString(body.TlsTemplate),
+		HTTPVersionPolicy: openapiOptionalString(body.HttpVersionPolicy),
+		UserAgent:         openapiOptionalString(body.UserAgent),
+		ExtraHeaders:      openapiOptionalStringMap(body.ExtraHeaders),
 		Enabled:           enabled,
 	})
 	if err != nil {
@@ -139,9 +90,9 @@ func (s *Server) handleCreateAdminTLSProfile(w http.ResponseWriter, r *http.Requ
 		"tls_template": profile.TLSTemplate,
 		"enabled":      profile.Enabled,
 	}))
-	writeJSONAny(w, http.StatusCreated, map[string]any{
-		"data":       toTLSProfilePayload(profile),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusCreated, apiopenapi.TLSProfileResponse{
+		Data:      toAPITLSProfile(profile),
+		RequestId: requestID,
 	})
 }
 
@@ -161,15 +112,15 @@ func (s *Server) handleUpdateAdminTLSProfile(w http.ResponseWriter, r *http.Requ
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid tls profile id", requestID)
 		return
 	}
-	var body updateTLSProfileRequest
+	var body apiopenapi.UpdateTLSProfileRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid tls profile request", requestID)
 		return
 	}
 	profile, err := s.runtime.tlsProfiles.UpdateProfile(r.Context(), profileID, tlsprofilescontract.UpdateProfile{
 		Name:              body.Name,
-		TLSTemplate:       body.TLSTemplate,
-		HTTPVersionPolicy: body.HTTPVersionPolicy,
+		TLSTemplate:       body.TlsTemplate,
+		HTTPVersionPolicy: body.HttpVersionPolicy,
 		UserAgent:         body.UserAgent,
 		ExtraHeaders:      body.ExtraHeaders,
 		Enabled:           body.Enabled,
@@ -183,9 +134,9 @@ func (s *Server) handleUpdateAdminTLSProfile(w http.ResponseWriter, r *http.Requ
 		"tls_template": profile.TLSTemplate,
 		"enabled":      profile.Enabled,
 	}))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       toTLSProfilePayload(profile),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.TLSProfileResponse{
+		Data:      toAPITLSProfile(profile),
+		RequestId: requestID,
 	})
 }
 
@@ -210,10 +161,7 @@ func (s *Server) handleDeleteAdminTLSProfile(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "tls_profile.delete", "tls_profile", strconv.Itoa(profileID), nil, nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"id": profileID, "deleted": true},
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
 func (s *Server) writeTLSProfileError(w http.ResponseWriter, err error, requestID string) {
