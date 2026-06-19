@@ -185,6 +185,7 @@ func (rt *runtimeState) scheduleGatewayRequest(ctx context.Context, req schedule
 			return schedulercontract.ScheduleResult{}, err
 		}
 	}
+	candidates = rt.filterCandidatesByAvailableProxy(ctx, candidates)
 	// Drop accounts restricted to official client signatures the caller doesn't
 	// match (e.g. an OAuth account marked codex-only), so a generic client can't
 	// drive an account that would get banned for it.
@@ -814,6 +815,34 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 	}
 	rt.fillCandidateRuntimeStates(ctx, candidates)
 	return candidates, nil
+}
+
+func (rt *runtimeState) filterCandidatesByAvailableProxy(ctx context.Context, candidates []schedulercontract.Candidate) []schedulercontract.Candidate {
+	if len(candidates) == 0 || rt == nil || rt.accounts == nil {
+		return candidates
+	}
+	filtered := make([]schedulercontract.Candidate, 0, len(candidates))
+	proxyAvailability := make(map[string]bool)
+	for _, candidate := range candidates {
+		proxyID := optionalStringValue(candidate.Account.ProxyID)
+		if proxyID == "" {
+			filtered = append(filtered, candidate)
+			continue
+		}
+		available, ok := proxyAvailability[proxyID]
+		if !ok {
+			_, err := rt.accounts.ResolveProxyURL(ctx, candidate.Account.ProxyID)
+			available = err == nil
+			proxyAvailability[proxyID] = available
+			if err != nil && rt.logger != nil {
+				rt.logger.Debug("skipping gateway candidate with unavailable proxy", "account_id", candidate.Account.ID, "proxy_id", proxyID, "error", err)
+			}
+		}
+		if available {
+			filtered = append(filtered, candidate)
+		}
+	}
+	return filtered
 }
 
 func providerEffectiveModelMapping(provider providercontract.Provider, mapping modelcontract.ModelProviderMapping) modelcontract.ModelProviderMapping {
@@ -1997,7 +2026,7 @@ func gatewayErrorTypeForProviderClass(errorClass string) apiopenapi.GatewayError
 		return apiopenapi.RateLimitError
 	case "auth_failed", "auth_error", "permission_denied", "session_invalid", "account_locked", "account_banned", "abuse_detected", "device_unrecognized":
 		return apiopenapi.PermissionError
-	case "timeout", "network_error", "configuration_error", "stream_interrupted", "no_available_account", "overloaded":
+	case "timeout", "network_error", "configuration_error", "proxy_unavailable", "stream_interrupted", "no_available_account", "overloaded":
 		return apiopenapi.ServiceUnavailableError
 	default:
 		return apiopenapi.UpstreamError
@@ -2045,6 +2074,8 @@ func providerGatewayMessage(errorClass string) string {
 		return "provider authentication failed"
 	case "configuration_error":
 		return "provider configuration unavailable"
+	case "proxy_unavailable":
+		return "provider proxy unavailable"
 	case "invalid_request":
 		return "provider rejected request"
 	case "model_unavailable":

@@ -238,6 +238,53 @@ func TestAdminAccountRejectsRawProxyIDValues(t *testing.T) {
 	}
 }
 
+func TestGatewaySkipsAccountWithUnavailableProxy(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"gateway-proxy-provider","display_name":"Gateway Proxy Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"gateway-proxy-model","display_name":"Gateway Proxy Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gateway-proxy-upstream","status":"active"}`)
+
+	createProxyReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/proxies", strings.NewReader(`{"name":"gateway-disabled-egress","type":"http","url":"http://proxy.example.invalid:8080","status":"active"}`))
+	createProxyReq.Header.Set("Content-Type", "application/json")
+	createProxyReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	createProxyReq.AddCookie(sessionCookie)
+	createProxyRec := httptest.NewRecorder()
+	handler.ServeHTTP(createProxyRec, createProxyReq)
+	if createProxyRec.Code != http.StatusCreated {
+		t.Fatalf("expected proxy create 201, got %d body=%s", createProxyRec.Code, createProxyRec.Body.String())
+	}
+	var proxyResp apiopenapi.ProxyDefinitionResponse
+	if err := json.NewDecoder(createProxyRec.Body).Decode(&proxyResp); err != nil {
+		t.Fatalf("decode proxy response: %v", err)
+	}
+
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"gateway-proxy-account","runtime_class":"api_key","credential":{"api_key":"secret"},"proxy_id":"`+string(proxyResp.Data.Id)+`","metadata":{"base_url":"https://upstream.example.invalid/v1"},"status":"active"}`)
+
+	disableProxyReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/proxies/"+string(proxyResp.Data.Id), strings.NewReader(`{"status":"disabled"}`))
+	disableProxyReq.Header.Set("Content-Type", "application/json")
+	disableProxyReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	disableProxyReq.AddCookie(sessionCookie)
+	disableProxyRec := httptest.NewRecorder()
+	handler.ServeHTTP(disableProxyRec, disableProxyReq)
+	if disableProxyRec.Code != http.StatusOK {
+		t.Fatalf("expected proxy disable 200, got %d body=%s", disableProxyRec.Code, disableProxyRec.Body.String())
+	}
+
+	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gateway-proxy-model","messages":[{"role":"user","content":"hi"}]}`))
+	chatReq.Header.Set("Content-Type", "application/json")
+	chatReq.Header.Set("Authorization", "Bearer "+apiKey)
+	chatRec := httptest.NewRecorder()
+	handler.ServeHTTP(chatRec, chatReq)
+	if chatRec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected no available account 503, got %d body=%s", chatRec.Code, chatRec.Body.String())
+	}
+	if !strings.Contains(chatRec.Body.String(), `"code":"no_available_account"`) {
+		t.Fatalf("expected no_available_account body, got %s", chatRec.Body.String())
+	}
+}
+
 func TestAdminAccountRefresherAdapterMaterializesProxyDefinitionID(t *testing.T) {
 	ctx := context.Background()
 	accounts, err := accountservice.New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)

@@ -554,6 +554,8 @@ Adapter 不直接管理代理池，但必须使用平台层 HTTP client factory 
 account.proxy_id -> platform/httpclient -> provider request
 ```
 
+Gateway 在调度前会解析账号绑定的 `proxy_id`：代理被禁用、删除、密文不可解或 URL 与类型不匹配时，该账号不会进入本次候选集；调用前仍会再次 materialize runtime proxy URL 作为并发变更兜底。
+
 ## 17. 重试边界
 
 Adapter 内部只允许做协议级安全重试。

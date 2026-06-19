@@ -282,6 +282,7 @@ WP-390 起，Reverse Proxy Runtime 提供直接 WebSocket relay primitive：
 - 不同账号必须可以走不同出口 IP。
 - 代理类型支持：`http`、`https`、`socks5`、`socks5h`。
 - 代理凭证加密存储。
+- Gateway 调度前必须校验账号绑定的代理仍可解析；代理被禁用、删除、密文不可解或类型/URL 不匹配时，该账号不得进入候选集。
 - 必须支持按 `Egress Profile` 限制可用国家/区域，避免 cookie 与 IP 国别明显不匹配。
 
 可选能力：
