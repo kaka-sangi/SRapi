@@ -81,6 +81,25 @@ func toUserAttributeDefinitionPayload(def userattributescontract.Definition) use
 	}
 }
 
+func toAPIUserAttributeDefinition(def userattributescontract.Definition) apiopenapi.UserAttributeDefinition {
+	options := def.Options
+	if options == nil {
+		options = []string{}
+	}
+	return apiopenapi.UserAttributeDefinition{
+		Id:           int64(def.ID),
+		Key:          def.Key,
+		Name:         def.Name,
+		DataType:     apiopenapi.UserAttributeDefinitionDataType(def.DataType),
+		Options:      options,
+		Required:     def.Required,
+		DisplayOrder: int64(def.DisplayOrder),
+		Enabled:      def.Enabled,
+		CreatedAt:    def.CreatedAt.UTC(),
+		UpdatedAt:    def.UpdatedAt.UTC(),
+	}
+}
+
 func (s *Server) handleListAdminUserAttributeDefinitions(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {

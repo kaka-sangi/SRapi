@@ -726,7 +726,35 @@ Authorization header, cookie, credential material, or provider secret.
 - WP-530 起，Antigravity discovery 在账号缺少 project metadata 时会先通过同一 Reverse Proxy Runtime / selected account credential 调用 `{base_url}/v1internal:loadCodeAssist`，必要时调用 `{base_url}/v1internal:onboardUser`，再进行模型发现；`persist=true` 时写回解析到的 project metadata。
 - 该 discovery 结果必须用于后续 Provider Account model 选择，保持 `supported_models` 与现有 Scheduler/Gateway 边界一致。
 
-### 4.17 RBAC Matrix
+### 4.17 Admin Config Snapshot / Import
+
+`GET /api/v1/admin/config-snapshot` exports operator-managed gateway
+configuration, while `POST /api/v1/admin/config-snapshot/import` applies the
+importable sections by natural key. Payload transform rules are exported in the
+same shape as `CreatePayloadRuleRequest` so the `payload_rules` array can be
+submitted back to the import endpoint without runtime-only `id` or timestamp
+fields.
+
+Proxy definitions are exported as `SnapshotProxyDefinition`: name, type, status,
+metadata, region fields, and `url_configured` only. Raw proxy URLs remain
+write-only; import accepts `ImportProxyDefinition.url` for operators who want to
+seed or replace encrypted proxy URLs in the target environment. A new proxy row
+without `url` is skipped rather than creating an unusable proxy. Existing proxy
+rows may omit `url` to retain the encrypted target URL and its current type
+while updating metadata, region, or status.
+
+Scheduled test plans are exported as `ImportScheduledTestPlan` so the
+`scheduled_test_plans` array can be imported by name. Account-scoped plans use
+`scope_account_provider_name` plus `scope_account_name`; group-scoped plans use
+`scope_group_name`. Source-environment integer `scope_id` values are not
+exported, and import skips rows whose referenced account or group cannot be
+resolved in the target environment.
+
+Config snapshots must not become credential backups. Provider account
+credentials, OAuth tokens, cookies, API keys, SMTP passwords, request bodies,
+prompts, and operational logs remain outside this surface.
+
+### 4.18 RBAC Matrix
 
 管理员接口必须在 OpenAPI 描述中标注权限需求。
 
@@ -749,7 +777,7 @@ Authorization header, cookie, credential material, or provider secret.
 | `/api/v1/admin/risk-control` | yes | yes | read only | no |
 | `/api/v1/admin/audit-logs` | yes | yes | no | no |
 
-### 4.18 Ops SLO / Alert APIs
+### 4.19 Ops SLO / Alert APIs
 
 `/api/v1/admin/ops/slo` 和 `/api/v1/admin/ops/alerts` 属于 AdminOps 控制面：
 

@@ -310,6 +310,25 @@ func toAPIProxyDefinition(proxy accountcontract.ProxyDefinition) apiopenapi.Prox
 	return out
 }
 
+func toSnapshotProxyDefinition(proxy accountcontract.ProxyDefinition) apiopenapi.SnapshotProxyDefinition {
+	out := apiopenapi.SnapshotProxyDefinition{
+		Metadata:      mapToJsonObjectPtr(proxy.Metadata),
+		Name:          proxy.Name,
+		Status:        apiopenapi.ProxyDefinitionStatus(proxy.Status),
+		Type:          apiopenapi.ProxyDefinitionType(proxy.Type),
+		UrlConfigured: proxy.URLCiphertext != "",
+	}
+	if proxy.CountryCode != "" {
+		code := proxy.CountryCode
+		out.CountryCode = &code
+	}
+	if proxy.CountryName != "" {
+		name := proxy.CountryName
+		out.CountryName = &name
+	}
+	return out
+}
+
 func (s *Server) apiAccount(ctx context.Context, account accountcontract.ProviderAccount) apiopenapi.ProviderAccount {
 	out := toAPIAccount(account)
 	groupIDs, err := s.runtime.accounts.ListGroupIDsByAccount(ctx, account.ID)

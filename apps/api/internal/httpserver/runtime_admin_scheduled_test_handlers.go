@@ -4,82 +4,23 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"time"
 
 	scheduledcontract "github.com/srapi/srapi/apps/api/internal/modules/scheduled_tests/contract"
 	scheduledservice "github.com/srapi/srapi/apps/api/internal/modules/scheduled_tests/service"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
-type scheduledTestPlanPayload struct {
-	ID              int        `json:"id"`
-	Name            string     `json:"name"`
-	Enabled         bool       `json:"enabled"`
-	ScopeType       string     `json:"scope_type"`
-	ScopeID         *int       `json:"scope_id"`
-	IntervalSeconds int        `json:"interval_seconds"`
-	CronExpression  string     `json:"cron_expression"`
-	ProbeModel      string     `json:"probe_model"`
-	MaxResults      int        `json:"max_results"`
-	AutoRecover     bool       `json:"auto_recover"`
-	LastRunAt       *time.Time `json:"last_run_at"`
-	LastStatus      string     `json:"last_status"`
-	LastSummary     string     `json:"last_summary"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-}
-
-type scheduledTestPlanRunPayload struct {
-	ID         int       `json:"id"`
-	PlanID     int       `json:"plan_id"`
-	Trigger    string    `json:"trigger"`
-	Status     string    `json:"status"`
-	Selected   int       `json:"selected"`
-	Probed     int       `json:"probed"`
-	Skipped    int       `json:"skipped"`
-	Failed     int       `json:"failed"`
-	Unhealthy  int       `json:"unhealthy"`
-	Recovered  int       `json:"recovered"`
-	Summary    string    `json:"summary"`
-	StartedAt  time.Time `json:"started_at"`
-	FinishedAt time.Time `json:"finished_at"`
-}
-
-type createScheduledTestPlanRequest struct {
-	Name            string `json:"name"`
-	Enabled         *bool  `json:"enabled"`
-	ScopeType       string `json:"scope_type"`
-	ScopeID         *int   `json:"scope_id"`
-	IntervalSeconds *int   `json:"interval_seconds"`
-	CronExpression  string `json:"cron_expression"`
-	ProbeModel      string `json:"probe_model"`
-	MaxResults      *int   `json:"max_results"`
-	AutoRecover     *bool  `json:"auto_recover"`
-}
-
-type updateScheduledTestPlanRequest struct {
-	Name            *string `json:"name"`
-	Enabled         *bool   `json:"enabled"`
-	ScopeType       *string `json:"scope_type"`
-	ScopeID         *int    `json:"scope_id"`
-	IntervalSeconds *int    `json:"interval_seconds"`
-	CronExpression  *string `json:"cron_expression"`
-	ProbeModel      *string `json:"probe_model"`
-	MaxResults      *int    `json:"max_results"`
-	AutoRecover     *bool   `json:"auto_recover"`
-}
-
-func toScheduledTestPlanPayload(plan scheduledcontract.Plan) scheduledTestPlanPayload {
-	return scheduledTestPlanPayload{
-		ID:              plan.ID,
+func toAPIScheduledTestPlan(plan scheduledcontract.Plan) apiopenapi.ScheduledTestPlan {
+	return apiopenapi.ScheduledTestPlan{
+		Id:              int64(plan.ID),
 		Name:            plan.Name,
 		Enabled:         plan.Enabled,
-		ScopeType:       string(plan.ScopeType),
-		ScopeID:         plan.ScopeID,
-		IntervalSeconds: plan.IntervalSeconds,
+		ScopeType:       apiopenapi.ScheduledTestPlanScopeType(plan.ScopeType),
+		ScopeId:         int64PtrFromIntPtr(plan.ScopeID),
+		IntervalSeconds: int64(plan.IntervalSeconds),
 		CronExpression:  plan.CronExpression,
 		ProbeModel:      plan.ProbeModel,
-		MaxResults:      plan.MaxResults,
+		MaxResults:      int64(plan.MaxResults),
 		AutoRecover:     plan.AutoRecover,
 		LastRunAt:       plan.LastRunAt,
 		LastStatus:      plan.LastStatus,
@@ -89,18 +30,18 @@ func toScheduledTestPlanPayload(plan scheduledcontract.Plan) scheduledTestPlanPa
 	}
 }
 
-func toScheduledTestPlanRunPayload(run scheduledcontract.Run) scheduledTestPlanRunPayload {
-	return scheduledTestPlanRunPayload{
-		ID:         run.ID,
-		PlanID:     run.PlanID,
-		Trigger:    run.Trigger,
-		Status:     run.Status,
-		Selected:   run.Selected,
-		Probed:     run.Probed,
-		Skipped:    run.Skipped,
-		Failed:     run.Failed,
-		Unhealthy:  run.Unhealthy,
-		Recovered:  run.Recovered,
+func toAPIScheduledTestPlanRun(run scheduledcontract.Run) apiopenapi.ScheduledTestPlanRun {
+	return apiopenapi.ScheduledTestPlanRun{
+		Id:         int64(run.ID),
+		PlanId:     int64(run.PlanID),
+		Trigger:    apiopenapi.ScheduledTestPlanRunTrigger(run.Trigger),
+		Status:     apiopenapi.ScheduledTestPlanRunStatus(run.Status),
+		Selected:   int64(run.Selected),
+		Probed:     int64(run.Probed),
+		Skipped:    int64(run.Skipped),
+		Failed:     int64(run.Failed),
+		Unhealthy:  int64(run.Unhealthy),
+		Recovered:  int64(run.Recovered),
 		Summary:    run.Summary,
 		StartedAt:  run.StartedAt.UTC(),
 		FinishedAt: run.FinishedAt.UTC(),
@@ -118,15 +59,15 @@ func (s *Server) handleListAdminScheduledTestPlans(w http.ResponseWriter, r *htt
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduled test plans", requestID)
 		return
 	}
-	data := make([]scheduledTestPlanPayload, 0, len(plans))
+	data := make([]apiopenapi.ScheduledTestPlan, 0, len(plans))
 	for _, plan := range plans {
-		data = append(data, toScheduledTestPlanPayload(plan))
+		data = append(data, toAPIScheduledTestPlan(plan))
 	}
 	data, pg := paginate(r, data)
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       data,
-		"pagination": pg,
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.ScheduledTestPlanListResponse{
+		Data:       data,
+		Pagination: pg,
+		RequestId:  requestID,
 	})
 }
 
@@ -141,27 +82,42 @@ func (s *Server) handleCreateAdminScheduledTestPlan(w http.ResponseWriter, r *ht
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
 		return
 	}
-	var body createScheduledTestPlanRequest
+	var body apiopenapi.CreateScheduledTestPlanRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid scheduled test plan request", requestID)
+		return
+	}
+	scopeID, ok := intPtrFromInt64Ptr(body.ScopeId)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduled test plan request", requestID)
 		return
 	}
 	input := scheduledcontract.CreatePlan{
 		Name:           body.Name,
 		Enabled:        true,
 		ScopeType:      scheduledcontract.ScopeType(body.ScopeType),
-		ScopeID:        body.ScopeID,
-		CronExpression: body.CronExpression,
-		ProbeModel:     body.ProbeModel,
+		ScopeID:        scopeID,
+		CronExpression: openapiOptionalString(body.CronExpression),
+		ProbeModel:     openapiOptionalString(body.ProbeModel),
 	}
 	if body.Enabled != nil {
 		input.Enabled = *body.Enabled
 	}
 	if body.IntervalSeconds != nil {
-		input.IntervalSeconds = *body.IntervalSeconds
+		interval, ok := intPtrFromInt64Ptr(body.IntervalSeconds)
+		if !ok {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduled test plan request", requestID)
+			return
+		}
+		input.IntervalSeconds = *interval
 	}
 	if body.MaxResults != nil {
-		input.MaxResults = *body.MaxResults
+		maxResults, ok := intPtrFromInt64Ptr(body.MaxResults)
+		if !ok {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduled test plan request", requestID)
+			return
+		}
+		input.MaxResults = *maxResults
 	}
 	if body.AutoRecover != nil {
 		input.AutoRecover = *body.AutoRecover
@@ -175,9 +131,9 @@ func (s *Server) handleCreateAdminScheduledTestPlan(w http.ResponseWriter, r *ht
 		"name":  plan.Name,
 		"scope": plan.ScopeType,
 	}))
-	writeJSONAny(w, http.StatusCreated, map[string]any{
-		"data":       toScheduledTestPlanPayload(plan),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusCreated, apiopenapi.ScheduledTestPlanResponse{
+		Data:      toAPIScheduledTestPlan(plan),
+		RequestId: requestID,
 	})
 }
 
@@ -197,19 +153,34 @@ func (s *Server) handleUpdateAdminScheduledTestPlan(w http.ResponseWriter, r *ht
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduled test plan id", requestID)
 		return
 	}
-	var body updateScheduledTestPlanRequest
+	var body apiopenapi.UpdateScheduledTestPlanRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid scheduled test plan request", requestID)
+		return
+	}
+	scopeID, ok := intPtrFromInt64Ptr(body.ScopeId)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduled test plan request", requestID)
+		return
+	}
+	intervalSeconds, ok := intPtrFromInt64Ptr(body.IntervalSeconds)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduled test plan request", requestID)
+		return
+	}
+	maxResults, ok := intPtrFromInt64Ptr(body.MaxResults)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduled test plan request", requestID)
 		return
 	}
 	input := scheduledcontract.UpdatePlan{
 		Name:            body.Name,
 		Enabled:         body.Enabled,
-		ScopeID:         body.ScopeID,
-		IntervalSeconds: body.IntervalSeconds,
+		ScopeID:         scopeID,
+		IntervalSeconds: intervalSeconds,
 		CronExpression:  body.CronExpression,
 		ProbeModel:      body.ProbeModel,
-		MaxResults:      body.MaxResults,
+		MaxResults:      maxResults,
 		AutoRecover:     body.AutoRecover,
 	}
 	if body.ScopeType != nil {
@@ -225,9 +196,9 @@ func (s *Server) handleUpdateAdminScheduledTestPlan(w http.ResponseWriter, r *ht
 		"name":    plan.Name,
 		"enabled": plan.Enabled,
 	}))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       toScheduledTestPlanPayload(plan),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.ScheduledTestPlanResponse{
+		Data:      toAPIScheduledTestPlan(plan),
+		RequestId: requestID,
 	})
 }
 
@@ -252,9 +223,11 @@ func (s *Server) handleDeleteAdminScheduledTestPlan(w http.ResponseWriter, r *ht
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "scheduled_test_plan.delete", "scheduled_test_plan", strconv.Itoa(planID), nil, nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"id": planID, "deleted": true},
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.DeleteResponse{
+		Data: struct {
+			Deleted bool `json:"deleted"`
+		}{Deleted: true},
+		RequestId: requestID,
 	})
 }
 
@@ -280,15 +253,15 @@ func (s *Server) handleListAdminScheduledTestPlanRuns(w http.ResponseWriter, r *
 		s.writeScheduledTestPlanError(w, err, requestID)
 		return
 	}
-	data := make([]scheduledTestPlanRunPayload, 0, len(runs))
+	data := make([]apiopenapi.ScheduledTestPlanRun, 0, len(runs))
 	for _, run := range runs {
-		data = append(data, toScheduledTestPlanRunPayload(run))
+		data = append(data, toAPIScheduledTestPlanRun(run))
 	}
 	data, pg := paginate(r, data)
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       data,
-		"pagination": pg,
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.ScheduledTestPlanRunListResponse{
+		Data:       data,
+		Pagination: pg,
+		RequestId:  requestID,
 	})
 }
 
@@ -326,9 +299,9 @@ func (s *Server) handleRunAdminScheduledTestPlan(w http.ResponseWriter, r *http.
 		"trigger": scheduledcontract.TriggerManual,
 		"status":  run.Status,
 	}))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       toScheduledTestPlanRunPayload(run),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.ScheduledTestPlanRunResponse{
+		Data:      toAPIScheduledTestPlanRun(run),
+		RequestId: requestID,
 	})
 }
 

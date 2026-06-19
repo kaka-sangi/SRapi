@@ -2257,6 +2257,40 @@ export type UpdateProxyDefinitionRequest = {
     country_name?: string | null;
 };
 
+export type SnapshotProxyDefinition = {
+    name: string;
+    type: ProxyDefinitionType;
+    status: ProxyDefinitionStatus;
+    /**
+     * True when an encrypted proxy URL exists in the source environment. Raw URLs are never exported.
+     */
+    url_configured: boolean;
+    metadata?: JsonObject;
+    /**
+     * ISO-3166-1 alpha-2 country code, operator-supplied.
+     */
+    country_code?: string | null;
+    /**
+     * Localized display name for the country, snapshotted at write time.
+     */
+    country_name?: string | null;
+};
+
+export type ImportProxyDefinition = {
+    name: string;
+    type: ProxyDefinitionType;
+    status?: ProxyDefinitionStatus;
+    metadata?: JsonObject;
+    /**
+     * ISO-3166-1 alpha-2 country code, operator-supplied.
+     */
+    country_code?: string | null;
+    /**
+     * Localized display name for the country, snapshotted at write time.
+     */
+    country_name?: string | null;
+};
+
 export type BatchCreateProxiesRequest = {
     proxies: Array<CreateProxyDefinitionRequest>;
 };
@@ -7077,7 +7111,7 @@ export type ScheduledTestPlanRun = {
     id: number;
     plan_id: number;
     trigger: 'schedule' | 'manual';
-    status: 'ok' | 'partial' | 'failed';
+    status: 'ok' | 'warning' | 'partial' | 'failed';
     selected: number;
     probed: number;
     skipped: number;
@@ -7109,6 +7143,33 @@ export type ScheduledTestPlanRunListResponse = {
     data: Array<ScheduledTestPlanRun>;
     pagination: Pagination;
     request_id: RequestId;
+};
+
+/**
+ * Importable scheduled-test-plan shape. Account/group scopes are remapped by natural key; snapshots do not export source-environment integer scope IDs.
+ *
+ */
+export type ImportScheduledTestPlan = {
+    name: string;
+    enabled?: boolean;
+    scope_type: 'all' | 'account' | 'group';
+    /**
+     * Provider name used with scope_account_name for account-scoped plans.
+     */
+    scope_account_provider_name?: string;
+    /**
+     * Provider account name used for account-scoped plans.
+     */
+    scope_account_name?: string;
+    /**
+     * Account group name used for group-scoped plans.
+     */
+    scope_group_name?: string;
+    interval_seconds?: number;
+    cron_expression?: string;
+    probe_model?: string;
+    max_results?: number;
+    auto_recover?: boolean;
 };
 
 /**
@@ -7453,6 +7514,9 @@ export type ConfigSnapshotResponse = {
         account_groups?: Array<AccountGroup>;
         subscription_plans?: Array<SubscriptionPlan>;
         pricing_rules?: Array<PricingRule>;
+        payload_rules?: Array<CreatePayloadRuleRequest>;
+        proxies?: Array<SnapshotProxyDefinition>;
+        scheduled_test_plans?: Array<ImportScheduledTestPlan>;
         model_rate_limits?: Array<SnapshotModelRateLimit>;
         group_rate_limits?: Array<SnapshotGroupRateLimit>;
         error_passthrough_rules?: Array<ErrorPassthroughRule>;
@@ -7483,6 +7547,9 @@ export type ConfigImportRequest = {
     tls_profiles?: Array<CreateTlsProfileRequest>;
     user_attribute_definitions?: Array<CreateUserAttributeDefinitionRequest>;
     error_passthrough_rules?: Array<CreateErrorPassthroughRuleRequest>;
+    payload_rules?: Array<CreatePayloadRuleRequest>;
+    proxies?: Array<ImportProxyDefinition>;
+    scheduled_test_plans?: Array<ImportScheduledTestPlan>;
     model_rate_limits?: Array<ImportModelRateLimit>;
     group_rate_limits?: Array<ImportGroupRateLimit>;
 };
@@ -7504,6 +7571,9 @@ export type ConfigImportResponse = {
         tls_profiles: ImportSectionResult;
         user_attribute_definitions: ImportSectionResult;
         error_passthrough_rules: ImportSectionResult;
+        payload_rules: ImportSectionResult;
+        proxies: ImportRemapResult;
+        scheduled_test_plans: ImportRemapResult;
         model_rate_limits: ImportRemapResult;
         group_rate_limits: ImportRemapResult;
     };
@@ -7650,6 +7720,25 @@ export type UpdateProxyDefinitionRequestWritable = {
     type?: ProxyDefinitionType;
     /**
      * Replacement proxy URL. Omit to keep the existing encrypted URL.
+     */
+    url?: string;
+    status?: ProxyDefinitionStatus;
+    metadata?: JsonObject;
+    /**
+     * ISO-3166-1 alpha-2 country code, operator-supplied.
+     */
+    country_code?: string | null;
+    /**
+     * Localized display name for the country, snapshotted at write time.
+     */
+    country_name?: string | null;
+};
+
+export type ImportProxyDefinitionWritable = {
+    name: string;
+    type: ProxyDefinitionType;
+    /**
+     * Proxy URL with credentials if needed. Required to create a proxy that does not already exist; omit to keep an existing encrypted URL.
      */
     url?: string;
     status?: ProxyDefinitionStatus;
@@ -7856,6 +7945,9 @@ export type ConfigSnapshotResponseWritable = {
         account_groups?: Array<AccountGroup>;
         subscription_plans?: Array<SubscriptionPlan>;
         pricing_rules?: Array<PricingRule>;
+        payload_rules?: Array<CreatePayloadRuleRequest>;
+        proxies?: Array<SnapshotProxyDefinition>;
+        scheduled_test_plans?: Array<ImportScheduledTestPlan>;
         model_rate_limits?: Array<SnapshotModelRateLimit>;
         group_rate_limits?: Array<SnapshotGroupRateLimit>;
         error_passthrough_rules?: Array<ErrorPassthroughRule>;
@@ -7864,6 +7956,17 @@ export type ConfigSnapshotResponseWritable = {
         settings?: AdminSettingsWritable;
     };
     request_id: RequestId;
+};
+
+export type ConfigImportRequestWritable = {
+    tls_profiles?: Array<CreateTlsProfileRequest>;
+    user_attribute_definitions?: Array<CreateUserAttributeDefinitionRequest>;
+    error_passthrough_rules?: Array<CreateErrorPassthroughRuleRequest>;
+    payload_rules?: Array<CreatePayloadRuleRequest>;
+    proxies?: Array<ImportProxyDefinitionWritable>;
+    scheduled_test_plans?: Array<ImportScheduledTestPlan>;
+    model_rate_limits?: Array<ImportModelRateLimit>;
+    group_rate_limits?: Array<ImportGroupRateLimit>;
 };
 
 export type Page = number;
@@ -25020,7 +25123,7 @@ export type GetAdminConfigSnapshotResponses = {
 export type GetAdminConfigSnapshotResponse = GetAdminConfigSnapshotResponses[keyof GetAdminConfigSnapshotResponses];
 
 export type ImportAdminConfigSnapshotData = {
-    body: ConfigImportRequest;
+    body: ConfigImportRequestWritable;
     path?: never;
     query?: {
         dry_run?: boolean;

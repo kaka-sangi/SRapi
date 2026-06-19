@@ -1625,6 +1625,27 @@ func (e ImageVariationRequestSize) Valid() bool {
 	}
 }
 
+// Defines values for ImportScheduledTestPlanScopeType.
+const (
+	ImportScheduledTestPlanScopeTypeAccount ImportScheduledTestPlanScopeType = "account"
+	ImportScheduledTestPlanScopeTypeAll     ImportScheduledTestPlanScopeType = "all"
+	ImportScheduledTestPlanScopeTypeGroup   ImportScheduledTestPlanScopeType = "group"
+)
+
+// Valid indicates whether the value is a known member of the ImportScheduledTestPlanScopeType enum.
+func (e ImportScheduledTestPlanScopeType) Valid() bool {
+	switch e {
+	case ImportScheduledTestPlanScopeTypeAccount:
+		return true
+	case ImportScheduledTestPlanScopeTypeAll:
+		return true
+	case ImportScheduledTestPlanScopeTypeGroup:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LoginTwoFactorRequiredRequired.
 const (
 	True LoginTwoFactorRequiredRequired = true
@@ -3025,6 +3046,7 @@ const (
 	ScheduledTestPlanRunStatusFailed  ScheduledTestPlanRunStatus = "failed"
 	ScheduledTestPlanRunStatusOk      ScheduledTestPlanRunStatus = "ok"
 	ScheduledTestPlanRunStatusPartial ScheduledTestPlanRunStatus = "partial"
+	ScheduledTestPlanRunStatusWarning ScheduledTestPlanRunStatus = "warning"
 )
 
 // Valid indicates whether the value is a known member of the ScheduledTestPlanRunStatus enum.
@@ -3035,6 +3057,8 @@ func (e ScheduledTestPlanRunStatus) Valid() bool {
 	case ScheduledTestPlanRunStatusOk:
 		return true
 	case ScheduledTestPlanRunStatusPartial:
+		return true
+	case ScheduledTestPlanRunStatusWarning:
 		return true
 	default:
 		return false
@@ -6716,6 +6740,9 @@ type ConfigImportRequest struct {
 	ErrorPassthroughRules    *[]CreateErrorPassthroughRuleRequest    `json:"error_passthrough_rules,omitempty"`
 	GroupRateLimits          *[]ImportGroupRateLimit                 `json:"group_rate_limits,omitempty"`
 	ModelRateLimits          *[]ImportModelRateLimit                 `json:"model_rate_limits,omitempty"`
+	PayloadRules             *[]CreatePayloadRuleRequest             `json:"payload_rules,omitempty"`
+	Proxies                  *[]ImportProxyDefinition                `json:"proxies,omitempty"`
+	ScheduledTestPlans       *[]ImportScheduledTestPlan              `json:"scheduled_test_plans,omitempty"`
 	TlsProfiles              *[]CreateTLSProfileRequest              `json:"tls_profiles,omitempty"`
 	UserAttributeDefinitions *[]CreateUserAttributeDefinitionRequest `json:"user_attribute_definitions,omitempty"`
 }
@@ -6727,6 +6754,9 @@ type ConfigImportResponse struct {
 		ErrorPassthroughRules    ImportSectionResult `json:"error_passthrough_rules"`
 		GroupRateLimits          ImportRemapResult   `json:"group_rate_limits"`
 		ModelRateLimits          ImportRemapResult   `json:"model_rate_limits"`
+		PayloadRules             ImportSectionResult `json:"payload_rules"`
+		Proxies                  ImportRemapResult   `json:"proxies"`
+		ScheduledTestPlans       ImportRemapResult   `json:"scheduled_test_plans"`
 		TlsProfiles              ImportSectionResult `json:"tls_profiles"`
 		UserAttributeDefinitions ImportSectionResult `json:"user_attribute_definitions"`
 	} `json:"data"`
@@ -6736,19 +6766,22 @@ type ConfigImportResponse struct {
 // ConfigSnapshotResponse defines model for ConfigSnapshotResponse.
 type ConfigSnapshotResponse struct {
 	Data struct {
-		AccountGroups            *[]AccountGroup            `json:"account_groups,omitempty"`
-		ErrorPassthroughRules    *[]ErrorPassthroughRule    `json:"error_passthrough_rules,omitempty"`
-		GeneratedAt              time.Time                  `json:"generated_at"`
-		GroupRateLimits          *[]SnapshotGroupRateLimit  `json:"group_rate_limits,omitempty"`
-		ModelRateLimits          *[]SnapshotModelRateLimit  `json:"model_rate_limits,omitempty"`
-		Models                   *[]Model                   `json:"models,omitempty"`
-		PricingRules             *[]PricingRule             `json:"pricing_rules,omitempty"`
-		Providers                *[]Provider                `json:"providers,omitempty"`
-		Settings                 *AdminSettings             `json:"settings,omitempty"`
-		SnapshotVersion          string                     `json:"snapshot_version"`
-		SubscriptionPlans        *[]SubscriptionPlan        `json:"subscription_plans,omitempty"`
-		TlsProfiles              *[]TLSProfile              `json:"tls_profiles,omitempty"`
-		UserAttributeDefinitions *[]UserAttributeDefinition `json:"user_attribute_definitions,omitempty"`
+		AccountGroups            *[]AccountGroup             `json:"account_groups,omitempty"`
+		ErrorPassthroughRules    *[]ErrorPassthroughRule     `json:"error_passthrough_rules,omitempty"`
+		GeneratedAt              time.Time                   `json:"generated_at"`
+		GroupRateLimits          *[]SnapshotGroupRateLimit   `json:"group_rate_limits,omitempty"`
+		ModelRateLimits          *[]SnapshotModelRateLimit   `json:"model_rate_limits,omitempty"`
+		Models                   *[]Model                    `json:"models,omitempty"`
+		PayloadRules             *[]CreatePayloadRuleRequest `json:"payload_rules,omitempty"`
+		PricingRules             *[]PricingRule              `json:"pricing_rules,omitempty"`
+		Providers                *[]Provider                 `json:"providers,omitempty"`
+		Proxies                  *[]SnapshotProxyDefinition  `json:"proxies,omitempty"`
+		ScheduledTestPlans       *[]ImportScheduledTestPlan  `json:"scheduled_test_plans,omitempty"`
+		Settings                 *AdminSettings              `json:"settings,omitempty"`
+		SnapshotVersion          string                      `json:"snapshot_version"`
+		SubscriptionPlans        *[]SubscriptionPlan         `json:"subscription_plans,omitempty"`
+		TlsProfiles              *[]TLSProfile               `json:"tls_profiles,omitempty"`
+		UserAttributeDefinitions *[]UserAttributeDefinition  `json:"user_attribute_definitions,omitempty"`
 	} `json:"data"`
 	RequestId RequestId `json:"request_id"`
 }
@@ -8106,12 +8139,52 @@ type ImportModelRateLimit struct {
 	TpmLimit       *int64 `json:"tpm_limit,omitempty"`
 }
 
+// ImportProxyDefinition defines model for ImportProxyDefinition.
+type ImportProxyDefinition struct {
+	// CountryCode ISO-3166-1 alpha-2 country code, operator-supplied.
+	CountryCode *string `json:"country_code,omitempty"`
+
+	// CountryName Localized display name for the country, snapshotted at write time.
+	CountryName *string                `json:"country_name,omitempty"`
+	Metadata    *JsonObject            `json:"metadata,omitempty"`
+	Name        string                 `json:"name"`
+	Status      *ProxyDefinitionStatus `json:"status,omitempty"`
+	Type        ProxyDefinitionType    `json:"type"`
+
+	// Url Proxy URL with credentials if needed. Required to create a proxy that does not already exist; omit to keep an existing encrypted URL.
+	Url *string `json:"url,omitempty"`
+}
+
 // ImportRemapResult defines model for ImportRemapResult.
 type ImportRemapResult struct {
 	Created int64 `json:"created"`
 	Skipped int64 `json:"skipped"`
 	Updated int64 `json:"updated"`
 }
+
+// ImportScheduledTestPlan Importable scheduled-test-plan shape. Account/group scopes are remapped by natural key; snapshots do not export source-environment integer scope IDs.
+type ImportScheduledTestPlan struct {
+	AutoRecover     *bool   `json:"auto_recover,omitempty"`
+	CronExpression  *string `json:"cron_expression,omitempty"`
+	Enabled         *bool   `json:"enabled,omitempty"`
+	IntervalSeconds *int64  `json:"interval_seconds,omitempty"`
+	MaxResults      *int64  `json:"max_results,omitempty"`
+	Name            string  `json:"name"`
+	ProbeModel      *string `json:"probe_model,omitempty"`
+
+	// ScopeAccountName Provider account name used for account-scoped plans.
+	ScopeAccountName *string `json:"scope_account_name,omitempty"`
+
+	// ScopeAccountProviderName Provider name used with scope_account_name for account-scoped plans.
+	ScopeAccountProviderName *string `json:"scope_account_provider_name,omitempty"`
+
+	// ScopeGroupName Account group name used for group-scoped plans.
+	ScopeGroupName *string                          `json:"scope_group_name,omitempty"`
+	ScopeType      ImportScheduledTestPlanScopeType `json:"scope_type"`
+}
+
+// ImportScheduledTestPlanScopeType defines model for ImportScheduledTestPlan.ScopeType.
+type ImportScheduledTestPlanScopeType string
 
 // ImportSectionResult defines model for ImportSectionResult.
 type ImportSectionResult struct {
@@ -11080,6 +11153,22 @@ type SnapshotModelRateLimit struct {
 	ModelName      string `json:"model_name"`
 	RpmLimit       int64  `json:"rpm_limit"`
 	TpmLimit       int64  `json:"tpm_limit"`
+}
+
+// SnapshotProxyDefinition defines model for SnapshotProxyDefinition.
+type SnapshotProxyDefinition struct {
+	// CountryCode ISO-3166-1 alpha-2 country code, operator-supplied.
+	CountryCode *string `json:"country_code,omitempty"`
+
+	// CountryName Localized display name for the country, snapshotted at write time.
+	CountryName *string               `json:"country_name,omitempty"`
+	Metadata    *JsonObject           `json:"metadata,omitempty"`
+	Name        string                `json:"name"`
+	Status      ProxyDefinitionStatus `json:"status"`
+	Type        ProxyDefinitionType   `json:"type"`
+
+	// UrlConfigured True when an encrypted proxy URL exists in the source environment. Raw URLs are never exported.
+	UrlConfigured bool `json:"url_configured"`
 }
 
 // SubscriptionPlan defines model for SubscriptionPlan.

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	scheduledcontract "github.com/srapi/srapi/apps/api/internal/modules/scheduled_tests/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -28,9 +29,10 @@ func snapshotSection[T any, R any](ctx context.Context, list func(context.Contex
 
 // handleAdminConfigSnapshot returns a single versioned, re-importable JSON
 // snapshot of operator-managed configuration (providers, models, groups, rate
-// limits, error-passthrough rules, TLS profiles, user attributes, plans, pricing
-// rules, settings). It is read-only and excludes account credentials and
-// operational data (usage/audit/snapshots), which have their own surfaces.
+// limits, scheduled tests, payload rules, error-passthrough rules, TLS profiles,
+// user attributes, plans, pricing rules, settings). It is read-only and excludes account
+// credentials and operational data (usage/audit/snapshots), which have their
+// own surfaces.
 func (s *Server) handleAdminConfigSnapshot(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {
@@ -64,6 +66,21 @@ func (s *Server) handleAdminConfigSnapshot(w http.ResponseWriter, r *http.Reques
 		s.writeConfigSnapshotError(w, requestID)
 		return
 	}
+	payloadRules, err := snapshotSection(ctx, s.runtime.payloadRules.ListRules, toImportPayloadRule)
+	if err != nil {
+		s.writeConfigSnapshotError(w, requestID)
+		return
+	}
+	proxies, err := snapshotSection(ctx, s.runtime.accounts.ListProxies, toSnapshotProxyDefinition)
+	if err != nil {
+		s.writeConfigSnapshotError(w, requestID)
+		return
+	}
+	scheduledTestPlans, err := s.snapshotScheduledTestPlans(ctx)
+	if err != nil {
+		s.writeConfigSnapshotError(w, requestID)
+		return
+	}
 	modelRateLimits, err := s.snapshotModelRateLimits(ctx)
 	if err != nil {
 		s.writeConfigSnapshotError(w, requestID)
@@ -74,17 +91,17 @@ func (s *Server) handleAdminConfigSnapshot(w http.ResponseWriter, r *http.Reques
 		s.writeConfigSnapshotError(w, requestID)
 		return
 	}
-	errorRules, err := snapshotSection(ctx, s.runtime.errorPassthrough.ListRules, toErrorPassthroughRulePayload)
+	errorRules, err := snapshotSection(ctx, s.runtime.errorPassthrough.ListRules, toAPIErrorPassthroughRule)
 	if err != nil {
 		s.writeConfigSnapshotError(w, requestID)
 		return
 	}
-	tlsProfiles, err := snapshotSection(ctx, s.runtime.tlsProfiles.ListProfiles, toTLSProfilePayload)
+	tlsProfiles, err := snapshotSection(ctx, s.runtime.tlsProfiles.ListProfiles, toAPITLSProfile)
 	if err != nil {
 		s.writeConfigSnapshotError(w, requestID)
 		return
 	}
-	userAttributes, err := snapshotSection(ctx, s.runtime.userAttributes.ListDefinitions, toUserAttributeDefinitionPayload)
+	userAttributes, err := snapshotSection(ctx, s.runtime.userAttributes.ListDefinitions, toAPIUserAttributeDefinition)
 	if err != nil {
 		s.writeConfigSnapshotError(w, requestID)
 		return
@@ -95,23 +112,43 @@ func (s *Server) handleAdminConfigSnapshot(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"snapshot_version":           snapshotConfigVersion,
-			"generated_at":               time.Now().UTC(),
-			"providers":                  providers,
-			"models":                     models,
-			"account_groups":             groups,
-			"subscription_plans":         plans,
-			"pricing_rules":              pricingRules,
-			"model_rate_limits":          modelRateLimits,
-			"group_rate_limits":          groupRateLimits,
-			"error_passthrough_rules":    errorRules,
-			"tls_profiles":               tlsProfiles,
-			"user_attribute_definitions": userAttributes,
-			"settings":                   s.toAPIAdminSettings(settings),
+	writeJSONAny(w, http.StatusOK, apiopenapi.ConfigSnapshotResponse{
+		Data: struct {
+			AccountGroups            *[]apiopenapi.AccountGroup             `json:"account_groups,omitempty"`
+			ErrorPassthroughRules    *[]apiopenapi.ErrorPassthroughRule     `json:"error_passthrough_rules,omitempty"`
+			GeneratedAt              time.Time                              `json:"generated_at"`
+			GroupRateLimits          *[]apiopenapi.SnapshotGroupRateLimit   `json:"group_rate_limits,omitempty"`
+			ModelRateLimits          *[]apiopenapi.SnapshotModelRateLimit   `json:"model_rate_limits,omitempty"`
+			Models                   *[]apiopenapi.Model                    `json:"models,omitempty"`
+			PayloadRules             *[]apiopenapi.CreatePayloadRuleRequest `json:"payload_rules,omitempty"`
+			PricingRules             *[]apiopenapi.PricingRule              `json:"pricing_rules,omitempty"`
+			Providers                *[]apiopenapi.Provider                 `json:"providers,omitempty"`
+			Proxies                  *[]apiopenapi.SnapshotProxyDefinition  `json:"proxies,omitempty"`
+			ScheduledTestPlans       *[]apiopenapi.ImportScheduledTestPlan  `json:"scheduled_test_plans,omitempty"`
+			Settings                 *apiopenapi.AdminSettings              `json:"settings,omitempty"`
+			SnapshotVersion          string                                 `json:"snapshot_version"`
+			SubscriptionPlans        *[]apiopenapi.SubscriptionPlan         `json:"subscription_plans,omitempty"`
+			TlsProfiles              *[]apiopenapi.TLSProfile               `json:"tls_profiles,omitempty"`
+			UserAttributeDefinitions *[]apiopenapi.UserAttributeDefinition  `json:"user_attribute_definitions,omitempty"`
+		}{
+			SnapshotVersion:          snapshotConfigVersion,
+			GeneratedAt:              time.Now().UTC(),
+			Providers:                &providers,
+			Models:                   &models,
+			AccountGroups:            &groups,
+			SubscriptionPlans:        &plans,
+			PricingRules:             &pricingRules,
+			PayloadRules:             &payloadRules,
+			Proxies:                  &proxies,
+			ScheduledTestPlans:       &scheduledTestPlans,
+			ModelRateLimits:          &modelRateLimits,
+			GroupRateLimits:          &groupRateLimits,
+			ErrorPassthroughRules:    &errorRules,
+			TlsProfiles:              &tlsProfiles,
+			UserAttributeDefinitions: &userAttributes,
+			Settings:                 ptrAPIAdminSettings(s.toAPIAdminSettings(settings)),
 		},
-		"request_id": requestID,
+		RequestId: requestID,
 	})
 }
 
@@ -119,28 +156,79 @@ func (s *Server) writeConfigSnapshotError(w http.ResponseWriter, requestID strin
 	writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to assemble config snapshot", requestID)
 }
 
+func (s *Server) snapshotScheduledTestPlans(ctx context.Context) ([]apiopenapi.ImportScheduledTestPlan, error) {
+	plans, err := s.runtime.scheduledTests.ListPlans(ctx)
+	if err != nil {
+		return nil, err
+	}
+	accounts, err := s.runtime.accounts.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	groups, err := s.runtime.accounts.ListGroups(ctx)
+	if err != nil {
+		return nil, err
+	}
+	providers, err := s.runtime.providers.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	providerNameByID := make(map[int]string, len(providers))
+	for _, provider := range providers {
+		providerNameByID[provider.ID] = provider.Name
+	}
+	accountByID := make(map[int]struct {
+		name         string
+		providerName string
+	}, len(accounts))
+	for _, account := range accounts {
+		accountByID[account.ID] = struct {
+			name         string
+			providerName string
+		}{
+			name:         account.Name,
+			providerName: providerNameByID[account.ProviderID],
+		}
+	}
+	groupNameByID := make(map[int]string, len(groups))
+	for _, group := range groups {
+		groupNameByID[group.ID] = group.Name
+	}
+
+	out := make([]apiopenapi.ImportScheduledTestPlan, 0, len(plans))
+	for _, plan := range plans {
+		item := apiopenapi.ImportScheduledTestPlan{
+			Name:            plan.Name,
+			Enabled:         &plan.Enabled,
+			ScopeType:       apiopenapi.ImportScheduledTestPlanScopeType(plan.ScopeType),
+			IntervalSeconds: int64Ptr(plan.IntervalSeconds),
+			CronExpression:  stringPtr(plan.CronExpression),
+			ProbeModel:      stringPtr(plan.ProbeModel),
+			MaxResults:      int64Ptr(plan.MaxResults),
+			AutoRecover:     &plan.AutoRecover,
+		}
+		switch plan.ScopeType {
+		case scheduledcontract.ScopeAccount:
+			if plan.ScopeID != nil {
+				if account, ok := accountByID[*plan.ScopeID]; ok {
+					item.ScopeAccountName = optionalNonEmptyStringPtr(account.name)
+					item.ScopeAccountProviderName = optionalNonEmptyStringPtr(account.providerName)
+				}
+			}
+		case scheduledcontract.ScopeGroup:
+			if plan.ScopeID != nil {
+				item.ScopeGroupName = optionalNonEmptyStringPtr(groupNameByID[*plan.ScopeID])
+			}
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
 // snapshotModelRateLimit / snapshotGroupRateLimit denormalize the model/group
 // natural key (name) onto each rate limit so import can remap to the target
 // environment's IDs (integer IDs do not port across environments).
-type snapshotModelRateLimit struct {
-	ModelID        int    `json:"model_id"`
-	ModelName      string `json:"model_name"`
-	RPMLimit       int    `json:"rpm_limit"`
-	TPMLimit       int    `json:"tpm_limit"`
-	MaxConcurrency int    `json:"max_concurrency"`
-	Enabled        bool   `json:"enabled"`
-}
-
-type snapshotGroupRateLimit struct {
-	GroupID        int    `json:"account_group_id"`
-	GroupName      string `json:"account_group_name"`
-	RPMLimit       int    `json:"rpm_limit"`
-	TPMLimit       int    `json:"tpm_limit"`
-	MaxConcurrency int    `json:"max_concurrency"`
-	Enabled        bool   `json:"enabled"`
-}
-
-func (s *Server) snapshotModelRateLimits(ctx context.Context) ([]snapshotModelRateLimit, error) {
+func (s *Server) snapshotModelRateLimits(ctx context.Context) ([]apiopenapi.SnapshotModelRateLimit, error) {
 	limits, err := s.runtime.modelRateLimits.ListLimits(ctx)
 	if err != nil {
 		return nil, err
@@ -153,21 +241,21 @@ func (s *Server) snapshotModelRateLimits(ctx context.Context) ([]snapshotModelRa
 	for _, model := range models {
 		nameByID[model.ID] = model.CanonicalName
 	}
-	out := make([]snapshotModelRateLimit, 0, len(limits))
+	out := make([]apiopenapi.SnapshotModelRateLimit, 0, len(limits))
 	for _, limit := range limits {
-		out = append(out, snapshotModelRateLimit{
-			ModelID:        limit.ModelID,
+		out = append(out, apiopenapi.SnapshotModelRateLimit{
+			ModelId:        int64(limit.ModelID),
 			ModelName:      nameByID[limit.ModelID],
-			RPMLimit:       limit.RPMLimit,
-			TPMLimit:       limit.TPMLimit,
-			MaxConcurrency: limit.MaxConcurrency,
+			RpmLimit:       int64(limit.RPMLimit),
+			TpmLimit:       int64(limit.TPMLimit),
+			MaxConcurrency: int64(limit.MaxConcurrency),
 			Enabled:        limit.Enabled,
 		})
 	}
 	return out, nil
 }
 
-func (s *Server) snapshotGroupRateLimits(ctx context.Context) ([]snapshotGroupRateLimit, error) {
+func (s *Server) snapshotGroupRateLimits(ctx context.Context) ([]apiopenapi.SnapshotGroupRateLimit, error) {
 	limits, err := s.runtime.groupRateLimits.ListLimits(ctx)
 	if err != nil {
 		return nil, err
@@ -180,15 +268,15 @@ func (s *Server) snapshotGroupRateLimits(ctx context.Context) ([]snapshotGroupRa
 	for _, group := range groups {
 		nameByID[group.ID] = group.Name
 	}
-	out := make([]snapshotGroupRateLimit, 0, len(limits))
+	out := make([]apiopenapi.SnapshotGroupRateLimit, 0, len(limits))
 	for _, limit := range limits {
-		out = append(out, snapshotGroupRateLimit{
-			GroupID:        limit.GroupID,
-			GroupName:      nameByID[limit.GroupID],
-			RPMLimit:       limit.RPMLimit,
-			TPMLimit:       limit.TPMLimit,
-			MaxConcurrency: limit.MaxConcurrency,
-			Enabled:        limit.Enabled,
+		out = append(out, apiopenapi.SnapshotGroupRateLimit{
+			AccountGroupId:   int64(limit.GroupID),
+			AccountGroupName: nameByID[limit.GroupID],
+			RpmLimit:         int64(limit.RPMLimit),
+			TpmLimit:         int64(limit.TPMLimit),
+			MaxConcurrency:   int64(limit.MaxConcurrency),
+			Enabled:          limit.Enabled,
 		})
 	}
 	return out, nil

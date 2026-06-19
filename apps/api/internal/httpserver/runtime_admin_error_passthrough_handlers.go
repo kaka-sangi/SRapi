@@ -83,6 +83,36 @@ func toErrorPassthroughRulePayload(rule errorpassthroughcontract.Rule) errorPass
 	}
 }
 
+func toAPIErrorPassthroughRule(rule errorpassthroughcontract.Rule) apiopenapi.ErrorPassthroughRule {
+	statusCodes := make([]int64, 0, len(rule.StatusCodes))
+	for _, code := range rule.StatusCodes {
+		statusCodes = append(statusCodes, int64(code))
+	}
+	classes := rule.Classes
+	if classes == nil {
+		classes = []string{}
+	}
+	keywords := rule.Keywords
+	if keywords == nil {
+		keywords = []string{}
+	}
+	return apiopenapi.ErrorPassthroughRule{
+		Id:             int64(rule.ID),
+		Name:           rule.Name,
+		Enabled:        rule.Enabled,
+		Priority:       int64(rule.Priority),
+		Action:         apiopenapi.ErrorPassthroughRuleAction(rule.Action),
+		StatusCodes:    statusCodes,
+		Classes:        classes,
+		Keywords:       keywords,
+		ResponseStatus: int64PtrFromIntPtr(rule.ResponseStatus),
+		ResponseCode:   int64PtrFromIntPtr(rule.ResponseStatus),
+		CustomMessage:  optionalNonEmptyStringPtr(rule.CustomMessage),
+		CreatedAt:      rule.CreatedAt.UTC(),
+		UpdatedAt:      rule.UpdatedAt.UTC(),
+	}
+}
+
 func (s *Server) handleListAdminErrorPassthroughRules(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {

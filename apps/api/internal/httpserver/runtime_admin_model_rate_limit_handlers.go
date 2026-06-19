@@ -4,37 +4,18 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"time"
 
 	modelratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/model_rate_limits/contract"
 	modelratelimitsservice "github.com/srapi/srapi/apps/api/internal/modules/model_rate_limits/service"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
-type modelRateLimitPayload struct {
-	ModelID        int       `json:"model_id"`
-	RPMLimit       int       `json:"rpm_limit"`
-	TPMLimit       int       `json:"tpm_limit"`
-	MaxConcurrency int       `json:"max_concurrency"`
-	Enabled        bool      `json:"enabled"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-}
-
-type upsertModelRateLimitRequest struct {
-	ModelID        int   `json:"model_id"`
-	RPMLimit       int   `json:"rpm_limit"`
-	TPMLimit       int   `json:"tpm_limit"`
-	MaxConcurrency int   `json:"max_concurrency"`
-	Enabled        *bool `json:"enabled"`
-}
-
-func toModelRateLimitPayload(limit modelratelimitscontract.Limit) modelRateLimitPayload {
-	return modelRateLimitPayload{
-		ModelID:        limit.ModelID,
-		RPMLimit:       limit.RPMLimit,
-		TPMLimit:       limit.TPMLimit,
-		MaxConcurrency: limit.MaxConcurrency,
+func toAPIModelRateLimit(limit modelratelimitscontract.Limit) apiopenapi.ModelRateLimit {
+	return apiopenapi.ModelRateLimit{
+		ModelId:        int64(limit.ModelID),
+		RpmLimit:       int64(limit.RPMLimit),
+		TpmLimit:       int64(limit.TPMLimit),
+		MaxConcurrency: int64(limit.MaxConcurrency),
 		Enabled:        limit.Enabled,
 		CreatedAt:      limit.CreatedAt.UTC(),
 		UpdatedAt:      limit.UpdatedAt.UTC(),
@@ -52,15 +33,15 @@ func (s *Server) handleListAdminModelRateLimits(w http.ResponseWriter, r *http.R
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list model rate limits", requestID)
 		return
 	}
-	data := make([]modelRateLimitPayload, 0, len(limits))
+	data := make([]apiopenapi.ModelRateLimit, 0, len(limits))
 	for _, limit := range limits {
-		data = append(data, toModelRateLimitPayload(limit))
+		data = append(data, toAPIModelRateLimit(limit))
 	}
 	data, pg := paginate(r, data)
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       data,
-		"pagination": pg,
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.ModelRateLimitListResponse{
+		Data:       data,
+		Pagination: pg,
+		RequestId:  requestID,
 	})
 }
 
@@ -75,16 +56,17 @@ func (s *Server) handleUpsertAdminModelRateLimit(w http.ResponseWriter, r *http.
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
 		return
 	}
-	var body upsertModelRateLimitRequest
+	var body apiopenapi.UpsertModelRateLimitRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid model rate limit request", requestID)
 		return
 	}
-	if body.ModelID <= 0 {
+	modelID, ok := positiveIntFromInt64(body.ModelId)
+	if !ok {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
 		return
 	}
-	if _, err := s.runtime.models.FindByID(r.Context(), body.ModelID); err != nil {
+	if _, err := s.runtime.models.FindByID(r.Context(), modelID); err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "model not found", requestID)
 		return
 	}
@@ -92,11 +74,26 @@ func (s *Server) handleUpsertAdminModelRateLimit(w http.ResponseWriter, r *http.
 	if body.Enabled != nil {
 		enabled = *body.Enabled
 	}
+	rpmLimit, ok := nonNegativeIntFromInt64Ptr(body.RpmLimit)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model rate limit request", requestID)
+		return
+	}
+	tpmLimit, ok := nonNegativeIntFromInt64Ptr(body.TpmLimit)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model rate limit request", requestID)
+		return
+	}
+	maxConcurrency, ok := nonNegativeIntFromInt64Ptr(body.MaxConcurrency)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model rate limit request", requestID)
+		return
+	}
 	limit, err := s.runtime.modelRateLimits.UpsertLimit(r.Context(), modelratelimitscontract.UpsertLimit{
-		ModelID:        body.ModelID,
-		RPMLimit:       body.RPMLimit,
-		TPMLimit:       body.TPMLimit,
-		MaxConcurrency: body.MaxConcurrency,
+		ModelID:        modelID,
+		RPMLimit:       rpmLimit,
+		TPMLimit:       tpmLimit,
+		MaxConcurrency: maxConcurrency,
 		Enabled:        enabled,
 	})
 	if err != nil {
@@ -110,9 +107,9 @@ func (s *Server) handleUpsertAdminModelRateLimit(w http.ResponseWriter, r *http.
 		"max_concurrency": limit.MaxConcurrency,
 		"enabled":         limit.Enabled,
 	}))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       toModelRateLimitPayload(limit),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.ModelRateLimitResponse{
+		Data:      toAPIModelRateLimit(limit),
+		RequestId: requestID,
 	})
 }
 

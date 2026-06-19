@@ -22555,6 +22555,66 @@ components:
           nullable: true
           description: Localized display name for the country, snapshotted at write time.
 
+    SnapshotProxyDefinition:
+      type: object
+      required:
+        - name
+        - type
+        - status
+        - url_configured
+      properties:
+        name:
+          type: string
+          minLength: 1
+        type:
+          $ref: "#/components/schemas/ProxyDefinitionType"
+        status:
+          $ref: "#/components/schemas/ProxyDefinitionStatus"
+        url_configured:
+          type: boolean
+          description: True when an encrypted proxy URL exists in the source environment. Raw URLs are never exported.
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+        country_code:
+          type: string
+          maxLength: 2
+          nullable: true
+          description: ISO-3166-1 alpha-2 country code, operator-supplied.
+        country_name:
+          type: string
+          nullable: true
+          description: Localized display name for the country, snapshotted at write time.
+
+    ImportProxyDefinition:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          minLength: 1
+        type:
+          $ref: "#/components/schemas/ProxyDefinitionType"
+        url:
+          type: string
+          format: uri
+          writeOnly: true
+          description: Proxy URL with credentials if needed. Required to create a proxy that does not already exist; omit to keep an existing encrypted URL.
+        status:
+          $ref: "#/components/schemas/ProxyDefinitionStatus"
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+        country_code:
+          type: string
+          maxLength: 2
+          nullable: true
+          description: ISO-3166-1 alpha-2 country code, operator-supplied.
+        country_name:
+          type: string
+          nullable: true
+          description: Localized display name for the country, snapshotted at write time.
+
     BatchCreateProxiesRequest:
       type: object
       required:
@@ -33974,6 +34034,7 @@ components:
           type: string
           enum:
             - ok
+            - warning
             - partial
             - failed
         selected:
@@ -34052,6 +34113,47 @@ components:
           $ref: "#/components/schemas/Pagination"
         request_id:
           $ref: "#/components/schemas/RequestId"
+    ImportScheduledTestPlan:
+      type: object
+      required:
+        - name
+        - scope_type
+      description: >
+        Importable scheduled-test-plan shape. Account/group scopes are remapped
+        by natural key; snapshots do not export source-environment integer
+        scope IDs.
+      properties:
+        name:
+          type: string
+        enabled:
+          type: boolean
+        scope_type:
+          type: string
+          enum:
+            - all
+            - account
+            - group
+        scope_account_provider_name:
+          type: string
+          description: Provider name used with scope_account_name for account-scoped plans.
+        scope_account_name:
+          type: string
+          description: Provider account name used for account-scoped plans.
+        scope_group_name:
+          type: string
+          description: Account group name used for group-scoped plans.
+        interval_seconds:
+          type: integer
+          format: int64
+        cron_expression:
+          type: string
+        probe_model:
+          type: string
+        max_results:
+          type: integer
+          format: int64
+        auto_recover:
+          type: boolean
 
     ChannelMonitorScope:
       type: string
@@ -34900,6 +35002,18 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/PricingRule"
+            payload_rules:
+              type: array
+              items:
+                $ref: "#/components/schemas/CreatePayloadRuleRequest"
+            proxies:
+              type: array
+              items:
+                $ref: "#/components/schemas/SnapshotProxyDefinition"
+            scheduled_test_plans:
+              type: array
+              items:
+                $ref: "#/components/schemas/ImportScheduledTestPlan"
             model_rate_limits:
               type: array
               items:
@@ -34975,6 +35089,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CreateErrorPassthroughRuleRequest"
+        payload_rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreatePayloadRuleRequest"
+        proxies:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportProxyDefinition"
+        scheduled_test_plans:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportScheduledTestPlan"
         model_rate_limits:
           type: array
           items:
@@ -35024,6 +35150,9 @@ components:
             - tls_profiles
             - user_attribute_definitions
             - error_passthrough_rules
+            - payload_rules
+            - proxies
+            - scheduled_test_plans
             - model_rate_limits
             - group_rate_limits
           properties:
@@ -35035,6 +35164,12 @@ components:
               $ref: "#/components/schemas/ImportSectionResult"
             error_passthrough_rules:
               $ref: "#/components/schemas/ImportSectionResult"
+            payload_rules:
+              $ref: "#/components/schemas/ImportSectionResult"
+            proxies:
+              $ref: "#/components/schemas/ImportRemapResult"
+            scheduled_test_plans:
+              $ref: "#/components/schemas/ImportRemapResult"
             model_rate_limits:
               $ref: "#/components/schemas/ImportRemapResult"
             group_rate_limits:

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
 func TestAdminScheduledTestPlanProbeModelRoundTrip(t *testing.T) {
@@ -31,9 +32,7 @@ func TestAdminScheduledTestPlanProbeModelRoundTrip(t *testing.T) {
 	if createRec.Code != http.StatusCreated {
 		t.Fatalf("expected create scheduled test 201, got %d body=%s", createRec.Code, createRec.Body.String())
 	}
-	var created struct {
-		Data scheduledTestPlanPayload `json:"data"`
-	}
+	var created apiopenapi.ScheduledTestPlanResponse
 	if err := json.NewDecoder(createRec.Body).Decode(&created); err != nil {
 		t.Fatalf("decode create response: %v", err)
 	}
@@ -41,7 +40,7 @@ func TestAdminScheduledTestPlanProbeModelRoundTrip(t *testing.T) {
 		t.Fatalf("expected probe model and cron round trip, got %+v", created.Data)
 	}
 
-	updateReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/scheduled-test-plans/"+strconv.Itoa(created.Data.ID), strings.NewReader(`{"probe_model":"gpt-updated"}`))
+	updateReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/scheduled-test-plans/"+strconv.FormatInt(created.Data.Id, 10), strings.NewReader(`{"probe_model":"gpt-updated"}`))
 	updateReq.Header.Set("Content-Type", "application/json")
 	updateReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
 	updateReq.AddCookie(sessionCookie)
@@ -50,9 +49,7 @@ func TestAdminScheduledTestPlanProbeModelRoundTrip(t *testing.T) {
 	if updateRec.Code != http.StatusOK {
 		t.Fatalf("expected update scheduled test 200, got %d body=%s", updateRec.Code, updateRec.Body.String())
 	}
-	var updated struct {
-		Data scheduledTestPlanPayload `json:"data"`
-	}
+	var updated apiopenapi.ScheduledTestPlanResponse
 	if err := json.NewDecoder(updateRec.Body).Decode(&updated); err != nil {
 		t.Fatalf("decode update response: %v", err)
 	}
@@ -67,14 +64,12 @@ func TestAdminScheduledTestPlanProbeModelRoundTrip(t *testing.T) {
 	if listRec.Code != http.StatusOK {
 		t.Fatalf("expected list scheduled tests 200, got %d body=%s", listRec.Code, listRec.Body.String())
 	}
-	var listed struct {
-		Data []scheduledTestPlanPayload `json:"data"`
-	}
+	var listed apiopenapi.ScheduledTestPlanListResponse
 	if err := json.NewDecoder(listRec.Body).Decode(&listed); err != nil {
 		t.Fatalf("decode list response: %v", err)
 	}
 	for _, plan := range listed.Data {
-		if plan.ID == created.Data.ID {
+		if plan.Id == created.Data.Id {
 			if plan.ProbeModel != "gpt-updated" {
 				t.Fatalf("expected listed probe model to match update, got %+v", plan)
 			}

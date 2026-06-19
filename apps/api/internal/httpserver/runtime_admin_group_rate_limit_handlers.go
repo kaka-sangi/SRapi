@@ -4,37 +4,18 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"time"
 
 	groupratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/group_rate_limits/contract"
 	groupratelimitsservice "github.com/srapi/srapi/apps/api/internal/modules/group_rate_limits/service"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
-type groupRateLimitPayload struct {
-	GroupID        int       `json:"account_group_id"`
-	RPMLimit       int       `json:"rpm_limit"`
-	TPMLimit       int       `json:"tpm_limit"`
-	MaxConcurrency int       `json:"max_concurrency"`
-	Enabled        bool      `json:"enabled"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-}
-
-type upsertGroupRateLimitRequest struct {
-	GroupID        int   `json:"account_group_id"`
-	RPMLimit       int   `json:"rpm_limit"`
-	TPMLimit       int   `json:"tpm_limit"`
-	MaxConcurrency int   `json:"max_concurrency"`
-	Enabled        *bool `json:"enabled"`
-}
-
-func toGroupRateLimitPayload(limit groupratelimitscontract.Limit) groupRateLimitPayload {
-	return groupRateLimitPayload{
-		GroupID:        limit.GroupID,
-		RPMLimit:       limit.RPMLimit,
-		TPMLimit:       limit.TPMLimit,
-		MaxConcurrency: limit.MaxConcurrency,
+func toAPIGroupRateLimit(limit groupratelimitscontract.Limit) apiopenapi.AccountGroupRateLimit {
+	return apiopenapi.AccountGroupRateLimit{
+		AccountGroupId: int64(limit.GroupID),
+		RpmLimit:       int64(limit.RPMLimit),
+		TpmLimit:       int64(limit.TPMLimit),
+		MaxConcurrency: int64(limit.MaxConcurrency),
 		Enabled:        limit.Enabled,
 		CreatedAt:      limit.CreatedAt.UTC(),
 		UpdatedAt:      limit.UpdatedAt.UTC(),
@@ -52,15 +33,15 @@ func (s *Server) handleListAdminGroupRateLimits(w http.ResponseWriter, r *http.R
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list group rate limits", requestID)
 		return
 	}
-	data := make([]groupRateLimitPayload, 0, len(limits))
+	data := make([]apiopenapi.AccountGroupRateLimit, 0, len(limits))
 	for _, limit := range limits {
-		data = append(data, toGroupRateLimitPayload(limit))
+		data = append(data, toAPIGroupRateLimit(limit))
 	}
 	data, pg := paginate(r, data)
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       data,
-		"pagination": pg,
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.GroupRateLimitListResponse{
+		Data:       data,
+		Pagination: pg,
+		RequestId:  requestID,
 	})
 }
 
@@ -75,16 +56,17 @@ func (s *Server) handleUpsertAdminGroupRateLimit(w http.ResponseWriter, r *http.
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
 		return
 	}
-	var body upsertGroupRateLimitRequest
+	var body apiopenapi.UpsertGroupRateLimitRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid group rate limit request", requestID)
 		return
 	}
-	if body.GroupID <= 0 {
+	groupID, ok := positiveIntFromInt64(body.AccountGroupId)
+	if !ok {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account group id", requestID)
 		return
 	}
-	if _, err := s.runtime.accounts.FindGroupByID(r.Context(), body.GroupID); err != nil {
+	if _, err := s.runtime.accounts.FindGroupByID(r.Context(), groupID); err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "account group not found", requestID)
 		return
 	}
@@ -92,11 +74,26 @@ func (s *Server) handleUpsertAdminGroupRateLimit(w http.ResponseWriter, r *http.
 	if body.Enabled != nil {
 		enabled = *body.Enabled
 	}
+	rpmLimit, ok := nonNegativeIntFromInt64Ptr(body.RpmLimit)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid group rate limit request", requestID)
+		return
+	}
+	tpmLimit, ok := nonNegativeIntFromInt64Ptr(body.TpmLimit)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid group rate limit request", requestID)
+		return
+	}
+	maxConcurrency, ok := nonNegativeIntFromInt64Ptr(body.MaxConcurrency)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid group rate limit request", requestID)
+		return
+	}
 	limit, err := s.runtime.groupRateLimits.UpsertLimit(r.Context(), groupratelimitscontract.UpsertLimit{
-		GroupID:        body.GroupID,
-		RPMLimit:       body.RPMLimit,
-		TPMLimit:       body.TPMLimit,
-		MaxConcurrency: body.MaxConcurrency,
+		GroupID:        groupID,
+		RPMLimit:       rpmLimit,
+		TPMLimit:       tpmLimit,
+		MaxConcurrency: maxConcurrency,
 		Enabled:        enabled,
 	})
 	if err != nil {
@@ -110,9 +107,9 @@ func (s *Server) handleUpsertAdminGroupRateLimit(w http.ResponseWriter, r *http.
 		"max_concurrency":  limit.MaxConcurrency,
 		"enabled":          limit.Enabled,
 	}))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       toGroupRateLimitPayload(limit),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.GroupRateLimitResponse{
+		Data:      toAPIGroupRateLimit(limit),
+		RequestId: requestID,
 	})
 }
 

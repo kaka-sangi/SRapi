@@ -61,6 +61,24 @@ func toTLSProfilePayload(profile tlsprofilescontract.Profile) tlsProfilePayload 
 	}
 }
 
+func toAPITLSProfile(profile tlsprofilescontract.Profile) apiopenapi.TLSProfile {
+	headers := profile.ExtraHeaders
+	if headers == nil {
+		headers = map[string]string{}
+	}
+	return apiopenapi.TLSProfile{
+		Id:                int64(profile.ID),
+		Name:              profile.Name,
+		TlsTemplate:       profile.TLSTemplate,
+		HttpVersionPolicy: profile.HTTPVersionPolicy,
+		UserAgent:         profile.UserAgent,
+		ExtraHeaders:      headers,
+		Enabled:           profile.Enabled,
+		CreatedAt:         profile.CreatedAt.UTC(),
+		UpdatedAt:         profile.UpdatedAt.UTC(),
+	}
+}
+
 func (s *Server) handleListAdminTLSProfiles(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {

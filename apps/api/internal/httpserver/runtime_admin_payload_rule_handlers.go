@@ -4,62 +4,46 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"time"
 
 	payloadrulescontract "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/contract"
 	payloadrulesservice "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/service"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
-type payloadRulePayload struct {
-	ID            int            `json:"id"`
-	Name          string         `json:"name"`
-	Enabled       bool           `json:"enabled"`
-	Priority      int            `json:"priority"`
-	Action        string         `json:"action"`
-	MatchModel    string         `json:"match_model"`
-	MatchProtocol string         `json:"match_protocol"`
-	Params        map[string]any `json:"params"`
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
-}
-
-type createPayloadRuleRequest struct {
-	Name          string         `json:"name"`
-	Enabled       *bool          `json:"enabled"`
-	Priority      int            `json:"priority"`
-	Action        string         `json:"action"`
-	MatchModel    string         `json:"match_model"`
-	MatchProtocol string         `json:"match_protocol"`
-	Params        map[string]any `json:"params"`
-}
-
-type updatePayloadRuleRequest struct {
-	Name          *string         `json:"name"`
-	Enabled       *bool           `json:"enabled"`
-	Priority      *int            `json:"priority"`
-	Action        *string         `json:"action"`
-	MatchModel    *string         `json:"match_model"`
-	MatchProtocol *string         `json:"match_protocol"`
-	Params        *map[string]any `json:"params"`
-}
-
-func toPayloadRulePayload(rule payloadrulescontract.Rule) payloadRulePayload {
+func toAPIPayloadRule(rule payloadrulescontract.Rule) apiopenapi.PayloadRule {
 	params := rule.Params
 	if params == nil {
 		params = map[string]any{}
 	}
-	return payloadRulePayload{
-		ID:            rule.ID,
+	return apiopenapi.PayloadRule{
+		Id:            int64(rule.ID),
 		Name:          rule.Name,
 		Enabled:       rule.Enabled,
-		Priority:      rule.Priority,
-		Action:        string(rule.Action),
+		Priority:      int64(rule.Priority),
+		Action:        apiopenapi.PayloadRuleAction(rule.Action),
 		MatchModel:    rule.MatchModel,
 		MatchProtocol: rule.MatchProtocol,
 		Params:        params,
 		CreatedAt:     rule.CreatedAt.UTC(),
 		UpdatedAt:     rule.UpdatedAt.UTC(),
+	}
+}
+
+func toImportPayloadRule(rule payloadrulescontract.Rule) apiopenapi.CreatePayloadRuleRequest {
+	params := rule.Params
+	if params == nil {
+		params = map[string]any{}
+	}
+	enabled := rule.Enabled
+	priority := int64(rule.Priority)
+	return apiopenapi.CreatePayloadRuleRequest{
+		Name:          rule.Name,
+		Enabled:       &enabled,
+		Priority:      &priority,
+		Action:        apiopenapi.CreatePayloadRuleRequestAction(rule.Action),
+		MatchModel:    optionalNonEmptyStringPtr(rule.MatchModel),
+		MatchProtocol: optionalNonEmptyStringPtr(rule.MatchProtocol),
+		Params:        params,
 	}
 }
 
@@ -74,15 +58,15 @@ func (s *Server) handleListAdminPayloadRules(w http.ResponseWriter, r *http.Requ
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list payload rules", requestID)
 		return
 	}
-	data := make([]payloadRulePayload, 0, len(rules))
+	data := make([]apiopenapi.PayloadRule, 0, len(rules))
 	for _, rule := range rules {
-		data = append(data, toPayloadRulePayload(rule))
+		data = append(data, toAPIPayloadRule(rule))
 	}
 	data, pg := paginate(r, data)
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       data,
-		"pagination": pg,
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.PayloadRuleListResponse{
+		Data:       data,
+		Pagination: pg,
+		RequestId:  requestID,
 	})
 }
 
@@ -97,7 +81,7 @@ func (s *Server) handleCreateAdminPayloadRule(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
 		return
 	}
-	var body createPayloadRuleRequest
+	var body apiopenapi.CreatePayloadRuleRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid payload rule request", requestID)
 		return
@@ -106,13 +90,22 @@ func (s *Server) handleCreateAdminPayloadRule(w http.ResponseWriter, r *http.Req
 	if body.Enabled != nil {
 		enabled = *body.Enabled
 	}
+	priorityPtr, ok := intPtrFromInt64Ptr(body.Priority)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payload rule request", requestID)
+		return
+	}
+	priority := 0
+	if priorityPtr != nil {
+		priority = *priorityPtr
+	}
 	rule, err := s.runtime.payloadRules.CreateRule(r.Context(), payloadrulescontract.CreateRule{
 		Name:          body.Name,
 		Enabled:       enabled,
-		Priority:      body.Priority,
+		Priority:      priority,
 		Action:        payloadrulescontract.Action(body.Action),
-		MatchModel:    body.MatchModel,
-		MatchProtocol: body.MatchProtocol,
+		MatchModel:    openapiOptionalString(body.MatchModel),
+		MatchProtocol: openapiOptionalString(body.MatchProtocol),
 		Params:        body.Params,
 	})
 	if err != nil {
@@ -124,9 +117,9 @@ func (s *Server) handleCreateAdminPayloadRule(w http.ResponseWriter, r *http.Req
 		"action":  rule.Action,
 		"enabled": rule.Enabled,
 	}))
-	writeJSONAny(w, http.StatusCreated, map[string]any{
-		"data":       toPayloadRulePayload(rule),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusCreated, apiopenapi.PayloadRuleResponse{
+		Data:      toAPIPayloadRule(rule),
+		RequestId: requestID,
 	})
 }
 
@@ -146,15 +139,20 @@ func (s *Server) handleUpdateAdminPayloadRule(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payload rule id", requestID)
 		return
 	}
-	var body updatePayloadRuleRequest
+	var body apiopenapi.UpdatePayloadRuleRequest
 	if err := s.decodeJSONBody(w, r, &body); err != nil {
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid payload rule request", requestID)
+		return
+	}
+	priority, ok := intPtrFromInt64Ptr(body.Priority)
+	if !ok {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payload rule request", requestID)
 		return
 	}
 	input := payloadrulescontract.UpdateRule{
 		Name:          body.Name,
 		Enabled:       body.Enabled,
-		Priority:      body.Priority,
+		Priority:      priority,
 		MatchModel:    body.MatchModel,
 		MatchProtocol: body.MatchProtocol,
 		Params:        body.Params,
@@ -173,9 +171,9 @@ func (s *Server) handleUpdateAdminPayloadRule(w http.ResponseWriter, r *http.Req
 		"action":  rule.Action,
 		"enabled": rule.Enabled,
 	}))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       toPayloadRulePayload(rule),
-		"request_id": requestID,
+	writeJSONAny(w, http.StatusOK, apiopenapi.PayloadRuleResponse{
+		Data:      toAPIPayloadRule(rule),
+		RequestId: requestID,
 	})
 }
 
@@ -200,10 +198,7 @@ func (s *Server) handleDeleteAdminPayloadRule(w http.ResponseWriter, r *http.Req
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "payload_rule.delete", "payload_rule", strconv.Itoa(ruleID), nil, nil))
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data":       map[string]any{"id": ruleID, "deleted": true},
-		"request_id": requestID,
-	})
+	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
 func (s *Server) writePayloadRuleError(w http.ResponseWriter, err error, requestID string) {
