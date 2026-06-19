@@ -236,11 +236,23 @@ describe("ErrorLogDetailDialog request dump evidence", () => {
     );
 
     expect(screen.getByText("调度诊断")).toBeInTheDocument();
+    expect(screen.getByText("处置路径")).toBeInTheDocument();
+    expect(screen.getByText("查看调度拒绝原因、score breakdown 和 fallback 链路。")).toBeInTheDocument();
+    expect(screen.getByText("核对模型、端点、provider scope 和账号组覆盖是否正确。")).toBeInTheDocument();
     expect(screen.getAllByText("capability_mismatch:responses").length).toBeGreaterThan(0);
     expect(screen.getByText("check_model_capabilities_or_mapping")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /调度决策/ })).toHaveAttribute(
+    expect(
+      screen
+        .getAllByRole("link", { name: /调度决策/ })
+        .some(
+          (link) =>
+            link.getAttribute("href") ===
+            "/admin/ops?tab=scheduler-decisions&f_request_id=req-detail&f_account_id=12&f_provider_id=3&f_model=gpt-4o-mini",
+        ),
+    ).toBe(true);
+    expect(screen.getByRole("link", { name: "账号健康" })).toHaveAttribute(
       "href",
-      "/admin/ops?tab=scheduler-decisions&f_request_id=req-detail",
+      "/admin/accounts?view=health&f_providerId=3&f_accountId=12",
     );
     expect(screen.getByText("77")).toBeInTheDocument();
     expect(screen.getAllByText("3").length).toBeGreaterThan(0);
@@ -256,6 +268,11 @@ describe("ErrorLogDetailDialog request dump evidence", () => {
     );
 
     expect(screen.getByText("上游诊断")).toBeInTheDocument();
+    expect(screen.getByText("检查上游超时、网络错误、代理质量和 invalid response。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "账号健康" })).toHaveAttribute(
+      "href",
+      "/admin/accounts?view=health&f_providerId=3&f_accountId=12",
+    );
     expect(screen.getByText("尝试证据")).toBeInTheDocument();
     expect(screen.getByText("real upstream detail")).toBeInTheDocument();
     expect(screen.getAllByText("overloaded_error").length).toBeGreaterThan(0);
@@ -274,13 +291,13 @@ describe("ErrorLogDetailDialog request dump evidence", () => {
     expect(screen.getByText("系统日志上下文")).toBeInTheDocument();
     expect(screen.getByText("gateway retry exhausted")).toBeInTheDocument();
     expect(screen.getAllByText("gateway").length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: "系统日志" })).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: "系统日志" })[0]).toHaveAttribute(
       "href",
       "/admin/ops/system-logs?f_request_id=req-detail",
     );
-    expect(screen.getByRole("link", { name: "请求证据" })).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: "请求证据" })[0]).toHaveAttribute(
       "href",
-      "/admin/logs?tab=request-evidence&f_request_id=req-detail",
+      "/admin/logs?tab=request-evidence&f_request_id=req-detail&f_account_id=12&f_provider_id=3&f_error_class=no_available_account&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_model=gpt-4o-mini",
     );
   });
 });

@@ -32,6 +32,10 @@ import { useUserEmailLookup } from "@/hooks/use-user-email-lookup";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatDateTime, formatInteger, formatLatency } from "@/lib/admin-format";
 import {
+  buildErrorLogTriage,
+  type ErrorLogTriageLinkKind,
+} from "@/lib/admin-error-log-triage";
+import {
   adminRequestDumpsHref,
   adminRequestEvidenceHref,
   adminSchedulerDecisionsHref,
@@ -152,6 +156,8 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
       ) : null}
 
       {upstreamDiagnostic ? <UpstreamErrorDiagnosticSummary diagnostic={upstreamDiagnostic} /> : null}
+
+      <ErrorLogTriageSummary detail={detail} />
 
       {detail.error_body_excerpt ? (
         <EvidenceBlock
@@ -325,6 +331,58 @@ function ErrorLogDetailBody({ detail }: { detail: OpsErrorLog }) {
             })}
           </ol>
         </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ErrorLogTriageSummary({ detail }: { detail: OpsErrorLog }) {
+  const { t } = useLanguage();
+  const triage = useMemo(() => buildErrorLogTriage(detail), [detail]);
+  if (triage.steps.length === 0 && triage.links.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-srapi-border bg-srapi-card-muted p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-2xs uppercase text-srapi-text-tertiary">
+            {t("adminOps.runbook.title")}
+          </p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {detail.error_owner ? (
+              <QuietBadge status={ownerTone(detail.error_owner)} label={detail.error_owner} />
+            ) : null}
+            {detail.error_phase ? (
+              <QuietBadge status="disabled" label={detail.error_phase} />
+            ) : null}
+            {detail.status_code != null ? (
+              <QuietBadge status={statusTone(detail.status_code)} label={String(detail.status_code)} />
+            ) : null}
+          </div>
+        </div>
+        {triage.links.length > 0 ? (
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {triage.links.slice(0, 4).map((link) => (
+              <Button key={`${link.kind}:${link.href}`} asChild variant="ghost" size="sm">
+                <Link href={link.href}>
+                  <ExternalLink aria-hidden />
+                  {triageLinkLabel(t, link.kind)}
+                </Link>
+              </Button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      {triage.steps.length > 0 ? (
+        <ol className="mt-3 grid gap-1.5">
+          {triage.steps.slice(0, 4).map((step, index) => (
+            <li key={step} className="flex gap-2 text-xs text-srapi-text-secondary">
+              <span className="font-mono text-2xs text-srapi-text-tertiary">{index + 1}</span>
+              <span>{t(`adminOps.runbook.steps.${step}`)}</span>
+            </li>
+          ))}
+        </ol>
       ) : null}
     </div>
   );
@@ -866,6 +924,48 @@ function systemLogTone(level: OpsSystemLog["level"]): QuietStatus {
       return "active";
     default:
       return "disabled";
+  }
+}
+
+function ownerTone(owner: string): QuietStatus {
+  switch (owner) {
+    case "provider":
+    case "scheduler":
+    case "reverse_proxy":
+      return "limited";
+    case "platform":
+    case "internal":
+      return "error";
+    case "client":
+    case "business":
+      return "disabled";
+    default:
+      return "disabled";
+  }
+}
+
+function statusTone(statusCode: number): QuietStatus {
+  if (statusCode >= 500) return "error";
+  if (statusCode === 429 || statusCode === 408) return "limited";
+  if (statusCode >= 400) return "disabled";
+  return "active";
+}
+
+function triageLinkLabel(
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  kind: ErrorLogTriageLinkKind,
+): string {
+  switch (kind) {
+    case "systemLogs":
+      return t("adminErrorLogs.openSystemLogs");
+    case "requestEvidence":
+      return t("adminErrorLogs.openRequestEvidence");
+    case "requestDumps":
+      return t("adminErrorLogs.openRequestDumps");
+    case "schedulerDecision":
+      return t("adminErrorLogs.openSchedulerDecision");
+    case "accountHealth":
+      return t("adminOps.evidence.accountHealth");
   }
 }
 
