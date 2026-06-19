@@ -1,4 +1,7 @@
-import { adminErrorInvestigationHref } from "@/lib/admin-log-links";
+import {
+  adminErrorInvestigationHref,
+  adminRequestEvidenceHref,
+} from "@/lib/admin-log-links";
 import type { AccountHealthSnapshot } from "@/lib/sdk-types";
 import {
   accountHealthNeedsInvestigation,
@@ -14,6 +17,7 @@ export interface AccountHealthOpsGroup {
   count: number;
   errorClass: string | null;
   investigationHref: string | null;
+  requestEvidenceHref: string | null;
 }
 
 export interface AccountHealthOpsSummary {
@@ -56,6 +60,9 @@ export function buildAccountHealthOpsSummary(
       investigationHref: errorClass
         ? adminErrorInvestigationHref({ error_class: errorClass })
         : adminAccountHealthInvestigationHref(members[0]),
+      requestEvidenceHref: errorClass
+        ? adminRequestEvidenceHref({ error_class: errorClass })
+        : null,
     }];
   });
 

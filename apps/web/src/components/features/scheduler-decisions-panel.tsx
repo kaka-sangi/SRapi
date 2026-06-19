@@ -31,7 +31,15 @@ export function SchedulerDecisionsPanel() {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
   const requestIDFilter = searchParams?.get("f_request_id")?.trim() || undefined;
-  const decisions = useSchedulerDecisions({ request_id: requestIDFilter });
+  const accountIDFilter = searchParams?.get("f_account_id")?.trim() || undefined;
+  const providerIDFilter = searchParams?.get("f_provider_id")?.trim() || undefined;
+  const modelFilter = searchParams?.get("f_model")?.trim() || undefined;
+  const decisions = useSchedulerDecisions({
+    request_id: requestIDFilter,
+    account_id: accountIDFilter,
+    provider_id: providerIDFilter,
+    model: modelFilter,
+  });
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   return (
@@ -65,7 +73,12 @@ export function SchedulerDecisionsPanel() {
               decisions={data}
               selected={data.find((d) => decisionKey(d) === selectedId) ?? data[0]}
               onSelect={setSelectedId}
-              requestIDFilter={requestIDFilter}
+              filters={{
+                requestID: requestIDFilter,
+                accountID: accountIDFilter,
+                providerID: providerIDFilter,
+                model: modelFilter,
+              }}
             />
           )
         }
@@ -78,12 +91,12 @@ function SchedulerBody({
   decisions,
   selected,
   onSelect,
-  requestIDFilter,
+  filters,
 }: {
   decisions: SchedulerDecisionSummary[];
   selected: SchedulerDecisionSummary;
   onSelect: (id: string) => void;
-  requestIDFilter?: string;
+  filters: SchedulerDecisionPanelFilters;
 }) {
   const { t } = useLanguage();
   const accountLookup = useAccountNameLookup();
@@ -97,11 +110,7 @@ function SchedulerBody({
           <CardHeader>
             <CardTitle>{t("scheduler.title")}</CardTitle>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              {requestIDFilter ? (
-                <span className="max-w-56 truncate rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary">
-                  {requestIDFilter}
-                </span>
-              ) : null}
+              <SchedulerFilterChips filters={filters} />
               <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
                 {decisions.length}
               </span>
@@ -200,6 +209,31 @@ function SchedulerBody({
       </div>
     </div>
   );
+}
+
+interface SchedulerDecisionPanelFilters {
+  requestID?: string;
+  accountID?: string;
+  providerID?: string;
+  model?: string;
+}
+
+function SchedulerFilterChips({ filters }: { filters: SchedulerDecisionPanelFilters }) {
+  const entries = [
+    filters.requestID ? ["req", filters.requestID] : null,
+    filters.accountID ? ["acct", filters.accountID] : null,
+    filters.providerID ? ["prov", filters.providerID] : null,
+    filters.model ? ["model", filters.model] : null,
+  ].filter((entry): entry is [string, string] => Boolean(entry));
+  return entries.map(([label, value]) => (
+    <span
+      key={`${label}:${value}`}
+      className="max-w-56 truncate rounded bg-srapi-card-muted px-1.5 py-0.5 font-mono text-2xs text-srapi-text-tertiary"
+      title={`${label}:${value}`}
+    >
+      {label}:{value}
+    </span>
+  ));
 }
 
 function DecisionInvestigationSummary({

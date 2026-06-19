@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckSquare, ExternalLink, RefreshCw, RotateCcw, ShieldX } from "lucide-react";
+import { CheckSquare, ExternalLink, FileSearch, RefreshCw, RotateCcw, ShieldX } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import type { AccountHealthSnapshot } from "@/lib/sdk-types";
 import { cn } from "@/lib/cn";
@@ -83,6 +83,16 @@ function HealthOpsGroupPill({
           title={t("adminAccounts.investigateErrors")}
         >
           <ExternalLink className="size-3" aria-hidden />
+        </Link>
+      ) : null}
+      {group.requestEvidenceHref ? (
+        <Link
+          href={group.requestEvidenceHref}
+          className="text-srapi-text-tertiary transition-colors hover:text-srapi-accent"
+          aria-label={t("adminRequestEvidence.title")}
+          title={t("adminRequestEvidence.title")}
+        >
+          <FileSearch className="size-3" aria-hidden />
         </Link>
       ) : null}
       {onSelectAccounts ? (

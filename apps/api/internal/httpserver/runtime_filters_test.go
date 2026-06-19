@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 )
 
@@ -61,6 +62,49 @@ func idsOf(items []usagecontract.UsageLog) []string {
 	out := make([]string, 0, len(items))
 	for _, it := range items {
 		out = append(out, strconv.Itoa(it.ID))
+	}
+	return out
+}
+
+func TestFilterSchedulerDecisionsAccountAndProvider(t *testing.T) {
+	acc12 := 12
+	acc13 := 13
+	prov3 := 3
+	prov4 := 4
+	items := []schedulercontract.Decision{
+		{ID: 1, RequestID: "req-a", Model: "gpt-4o-mini", SelectedAccountID: &acc12, SelectedProviderID: &prov3},
+		{ID: 2, RequestID: "req-b", Model: "claude-sonnet", SelectedAccountID: &acc13, SelectedProviderID: &prov3},
+		{ID: 3, RequestID: "req-c", Model: "gpt-4.1", SelectedAccountID: &acc12, SelectedProviderID: &prov4},
+		{ID: 4, RequestID: "req-d", Model: "gpt-4.1", SelectedProviderID: &prov3, RejectReasons: map[string]any{"account_12": "cooldown_active"}},
+		{ID: 5, RequestID: "req-e", Model: "gpt-4.1", SelectedProviderID: &prov3, Scores: map[string]any{"12": map[string]any{"final_score": 0.8}}},
+		{ID: 6, RequestID: "req-f", Model: "gpt-4.1", SelectedProviderID: &prov3},
+	}
+
+	got := filterSchedulerDecisions(items, "", "", "12", "3")
+	if len(got) != 3 || got[0].ID != 1 || got[1].ID != 4 || got[2].ID != 5 {
+		t.Fatalf("account_id=12&provider_id=3: want [1 4 5], got %v", schedulerDecisionIDs(got))
+	}
+
+	got = filterSchedulerDecisions(items, "", "gpt", "12", "")
+	if len(got) != 4 || got[0].ID != 1 || got[1].ID != 3 || got[2].ID != 4 || got[3].ID != 5 {
+		t.Fatalf("model=gpt&account_id=12: want [1 3 4 5], got %v", schedulerDecisionIDs(got))
+	}
+
+	got = filterSchedulerDecisions(items, "req-f", "", "12", "")
+	if len(got) != 0 {
+		t.Fatalf("request without account evidence must not match account filter, got %v", schedulerDecisionIDs(got))
+	}
+
+	got = filterSchedulerDecisions(items, "", "", "not-an-id", "")
+	if len(got) != 0 {
+		t.Fatalf("invalid account id: want no rows, got %v", schedulerDecisionIDs(got))
+	}
+}
+
+func schedulerDecisionIDs(items []schedulercontract.Decision) []int {
+	out := make([]int, 0, len(items))
+	for _, item := range items {
+		out = append(out, item.ID)
 	}
 	return out
 }

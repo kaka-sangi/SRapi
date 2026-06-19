@@ -40,11 +40,21 @@ export function RequestEvidencePanel() {
   const source = list.filters.source || undefined;
   const windowFilter = list.filters.window || "1h";
   const requestID = list.filters.request_id || undefined;
+  const accountID = list.filters.account_id || undefined;
+  const providerID = list.filters.provider_id || undefined;
+  const model = list.filters.model || undefined;
+  const sourceEndpoint = list.filters.source_endpoint || undefined;
+  const errorClass = list.filters.error_class || undefined;
   const start = logWindowSince(windowFilter)?.toISOString();
   const query = useOpsRequestEvidence({
     page: list.page,
     page_size: list.pageSize,
     request_id: requestID,
+    account_id: accountID,
+    provider_id: providerID,
+    model,
+    source_endpoint: sourceEndpoint,
+    error_class: errorClass,
     kind: kind as "success" | "error" | "unknown" | undefined,
     evidence_source: source as
       | "usage"
@@ -57,7 +67,18 @@ export function RequestEvidencePanel() {
     q: list.search || undefined,
   });
   const total = query.data?.pagination?.total ?? query.data?.data.length ?? 0;
-  const isFiltered = Boolean(kind || source || requestID || list.search || list.filters.window);
+  const isFiltered = Boolean(
+    kind ||
+      source ||
+      requestID ||
+      accountID ||
+      providerID ||
+      model ||
+      sourceEndpoint ||
+      errorClass ||
+      list.search ||
+      list.filters.window,
+  );
 
   const columns: Column<RequestEvidenceRow>[] = [
     {

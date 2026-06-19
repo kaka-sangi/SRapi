@@ -816,6 +816,7 @@ export const zh: Messages = {
     successRate: "成功率",
     circuitState: "熔断",
     lastError: "最近错误",
+    evidence: "证据",
     investigateErrors: "查看错误日志",
     healthNeedsAttention: "需处理",
     selectHealthGroup: "选择 {count} 个账号",

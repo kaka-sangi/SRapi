@@ -62,6 +62,9 @@ describe("buildAccountHealthOpsSummary", () => {
     expect(summary.groups[0]?.investigationHref).toBe(
       "/admin/logs?tab=error&f_error_class=rate_limited",
     );
+    expect(summary.groups[0]?.requestEvidenceHref).toBe(
+      "/admin/logs?tab=request-evidence&f_error_class=rate_limited",
+    );
   });
 
   it("maps health groups to the matching maintenance actions", () => {

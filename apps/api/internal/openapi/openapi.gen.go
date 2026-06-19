@@ -12250,10 +12250,12 @@ type ListAdminScheduledTestPlanRunsParams struct {
 
 // ListAdminSchedulerDecisionsParams defines parameters for ListAdminSchedulerDecisions.
 type ListAdminSchedulerDecisionsParams struct {
-	Page      *Page     `form:"page,omitempty" json:"page,omitempty"`
-	PageSize  *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
-	RequestId *string   `form:"request_id,omitempty" json:"request_id,omitempty"`
-	Model     *string   `form:"model,omitempty" json:"model,omitempty"`
+	Page       *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize   *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+	RequestId  *string   `form:"request_id,omitempty" json:"request_id,omitempty"`
+	AccountId  *Id       `form:"account_id,omitempty" json:"account_id,omitempty"`
+	ProviderId *Id       `form:"provider_id,omitempty" json:"provider_id,omitempty"`
+	Model      *string   `form:"model,omitempty" json:"model,omitempty"`
 }
 
 // ListSchedulerStrategiesParams defines parameters for ListSchedulerStrategies.
@@ -31077,6 +31079,32 @@ func (siw *ServerInterfaceWrapper) ListAdminSchedulerDecisions(w http.ResponseWr
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "request_id"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "request_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "account_id", r.URL.Query(), &params.AccountId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "provider_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "provider_id", r.URL.Query(), &params.ProviderId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "provider_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider_id", Err: err})
 		}
 		return
 	}

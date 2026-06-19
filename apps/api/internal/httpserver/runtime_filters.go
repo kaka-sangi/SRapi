@@ -225,9 +225,14 @@ func filterOpsAlerts(items []operationscontract.AlertEvent, status, severity str
 	return out
 }
 
-func filterSchedulerDecisions(items []schedulercontract.Decision, requestID, model string) []schedulercontract.Decision {
+func filterSchedulerDecisions(items []schedulercontract.Decision, requestID, model, accountID, providerID string) []schedulercontract.Decision {
 	requestID = strings.TrimSpace(requestID)
 	model = strings.ToLower(strings.TrimSpace(model))
+	accountIDValue, hasAccountID, validAccountID := positiveIDFilter(accountID)
+	providerIDValue, hasProviderID, validProviderID := positiveIDFilter(providerID)
+	if !validAccountID || !validProviderID {
+		return nil
+	}
 	out := make([]schedulercontract.Decision, 0, len(items))
 	for _, item := range items {
 		if requestID != "" && item.RequestID != requestID {
@@ -236,9 +241,59 @@ func filterSchedulerDecisions(items []schedulercontract.Decision, requestID, mod
 		if model != "" && !strings.Contains(strings.ToLower(item.Model), model) {
 			continue
 		}
+		if hasAccountID && !schedulerDecisionMentionsAccount(item, accountIDValue) {
+			continue
+		}
+		if hasProviderID && (item.SelectedProviderID == nil || *item.SelectedProviderID != providerIDValue) {
+			continue
+		}
 		out = append(out, item)
 	}
 	return out
+}
+
+func schedulerDecisionMentionsAccount(item schedulercontract.Decision, accountID int) bool {
+	if item.SelectedAccountID != nil && *item.SelectedAccountID == accountID {
+		return true
+	}
+	if schedulerEvidenceMapHasAccount(item.Scores, accountID) {
+		return true
+	}
+	return schedulerEvidenceMapHasAccount(item.RejectReasons, accountID)
+}
+
+func schedulerEvidenceMapHasAccount(values map[string]any, accountID int) bool {
+	if len(values) == 0 {
+		return false
+	}
+	for key := range values {
+		if schedulerAccountIDFromEvidenceKey(key) == accountID {
+			return true
+		}
+	}
+	return false
+}
+
+func schedulerAccountIDFromEvidenceKey(key string) int {
+	value := strings.TrimSpace(key)
+	value = strings.TrimPrefix(value, "account_")
+	id, err := strconv.Atoi(value)
+	if err != nil || id <= 0 {
+		return 0
+	}
+	return id
+}
+
+func positiveIDFilter(raw string) (value int, present bool, valid bool) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return 0, false, true
+	}
+	id, err := strconv.Atoi(trimmed)
+	if err != nil || id <= 0 {
+		return 0, true, false
+	}
+	return id, true, true
 }
 
 func buildSchedulerOverview(decisions []schedulercontract.Decision, usageLogs []usagecontract.UsageLog) apiopenapi.SchedulerOverview {

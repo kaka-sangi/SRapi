@@ -66,17 +66,11 @@ const mocks = vi.hoisted(() => ({
     latest_request_dump_created_at: "2026-06-19T08:00:01Z",
   } satisfies RequestEvidenceRow,
   refetch: vi.fn(),
+  useOpsRequestEvidence: vi.fn(),
 }));
 
 vi.mock("@/hooks/admin-queries", () => ({
-  useOpsRequestEvidence: () => ({
-    data: {
-      data: [mocks.row],
-      pagination: { page: 1, page_size: 50, total: 1, has_next: false },
-    },
-    isFetching: false,
-    refetch: mocks.refetch,
-  }),
+  useOpsRequestEvidence: (params: unknown) => mocks.useOpsRequestEvidence(params),
   useOpsRequestEvidenceDetail: (requestID?: string) => ({
     data: requestID
       ? {
@@ -162,6 +156,15 @@ describe("RequestEvidencePanel", () => {
   beforeEach(() => {
     storage.clear();
     mocks.refetch.mockReset();
+    mocks.useOpsRequestEvidence.mockReset();
+    mocks.useOpsRequestEvidence.mockReturnValue({
+      data: {
+        data: [mocks.row],
+        pagination: { page: 1, page_size: 50, total: 1, has_next: false },
+      },
+      isFetching: false,
+      refetch: mocks.refetch,
+    });
     window.history.replaceState(null, "", "/admin/logs?tab=request-evidence");
   });
 
@@ -204,5 +207,25 @@ describe("RequestEvidencePanel", () => {
     expect(screen.getByText("1 条 · 警告 1 · 错误 0")).toBeInTheDocument();
     expect(screen.getByText("scheduler fallback selected secondary account")).toBeInTheDocument();
     expect(screen.getByText("error-1780000000000-req-evidence.log")).toBeInTheDocument();
+  });
+
+  it("passes URL investigation filters to the request evidence query", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/admin/logs?tab=request-evidence&f_account_id=9&f_provider_id=3&f_error_class=server_bad&f_model=gpt-4.1&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions",
+    );
+
+    render(<RequestEvidencePanel />, { wrapper: wrap });
+
+    expect(mocks.useOpsRequestEvidence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account_id: "9",
+        provider_id: "3",
+        error_class: "server_bad",
+        model: "gpt-4.1",
+        source_endpoint: "/v1/chat/completions",
+      }),
+    );
   });
 });

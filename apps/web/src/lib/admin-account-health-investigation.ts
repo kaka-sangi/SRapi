@@ -1,5 +1,15 @@
-import { adminErrorInvestigationHref } from "@/lib/admin-log-links";
+import {
+  adminErrorInvestigationHref,
+  adminRequestEvidenceHref,
+  adminSchedulerDecisionsHref,
+} from "@/lib/admin-log-links";
 import type { AccountHealthSnapshot } from "@/lib/sdk-types";
+
+export interface AccountHealthInvestigationLinks {
+  errorLogs: string | null;
+  requestEvidence: string | null;
+  schedulerDecisions: string | null;
+}
 
 /** Return whether an account-health snapshot is abnormal enough to warrant error-log investigation. */
 export function accountHealthNeedsInvestigation(health?: AccountHealthSnapshot | null): boolean {
@@ -14,14 +24,31 @@ export function accountHealthNeedsInvestigation(health?: AccountHealthSnapshot |
   );
 }
 
+/** Build the cross-plane evidence links for an abnormal account-health snapshot. */
+export function adminAccountHealthInvestigationLinks(
+  health?: AccountHealthSnapshot | null,
+): AccountHealthInvestigationLinks | null {
+  if (!health || !accountHealthNeedsInvestigation(health)) return null;
+  const common = {
+    account_id: health.account_id,
+    provider_id: health.provider_id,
+  };
+  return {
+    errorLogs: adminErrorInvestigationHref({
+      ...common,
+      error_class: health.error_class,
+    }),
+    requestEvidence: adminRequestEvidenceHref({
+      ...common,
+      error_class: health.error_class,
+    }),
+    schedulerDecisions: adminSchedulerDecisionsHref({ account_id: health.account_id }),
+  };
+}
+
 /** Build a precise Error logs link for an abnormal account-health snapshot. */
 export function adminAccountHealthInvestigationHref(
   health?: AccountHealthSnapshot | null,
 ): string | null {
-  if (!health || !accountHealthNeedsInvestigation(health)) return null;
-  return adminErrorInvestigationHref({
-    account_id: health.account_id,
-    provider_id: health.provider_id,
-    error_class: health.error_class,
-  });
+  return adminAccountHealthInvestigationLinks(health)?.errorLogs ?? null;
 }

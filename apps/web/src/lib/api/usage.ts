@@ -15,6 +15,8 @@ import type { LiveSchedulerDecision, LiveSlo, LiveUsageLog } from './types';
 
 export interface SchedulerDecisionListParams {
   request_id?: string;
+  account_id?: string;
+  provider_id?: string;
   model?: string;
 }
 
@@ -81,6 +83,8 @@ export const usageApi = {
     const response = await sdkListAdminSchedulerDecisions({
       query: {
         request_id: params.request_id || undefined,
+        account_id: params.account_id || undefined,
+        provider_id: params.provider_id || undefined,
         model: params.model || undefined,
       },
       throwOnError: true,

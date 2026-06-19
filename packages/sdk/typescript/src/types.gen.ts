@@ -20084,6 +20084,8 @@ export type ListAdminSchedulerDecisionsData = {
         page?: number;
         page_size?: number;
         request_id?: string;
+        account_id?: Id;
+        provider_id?: Id;
         model?: string;
     };
     url: '/api/v1/admin/scheduler/decisions';

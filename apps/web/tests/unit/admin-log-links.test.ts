@@ -55,9 +55,20 @@ describe("admin log evidence links", () => {
     expect(adminRequestDumpsHref({ trace_id: "trace_456" })).toBeNull();
   });
 
-  it("builds a request-evidence link only when request id is present", () => {
+  it("builds a request-evidence link from request id and ops filters", () => {
     expect(adminRequestEvidenceHref({ request_id: "req_123", trace_id: "trace_456" })).toBe(
       "/admin/logs?tab=request-evidence&f_request_id=req_123",
+    );
+    expect(
+      adminRequestEvidenceHref({
+        account_id: "12",
+        provider_id: 3,
+        error_class: "rate_limited",
+        source_endpoint: "/v1/chat/completions",
+        model: "gpt-ops",
+      }),
+    ).toBe(
+      "/admin/logs?tab=request-evidence&f_account_id=12&f_provider_id=3&f_error_class=rate_limited&f_source_endpoint=%2Fv1%2Fchat%2Fcompletions&f_model=gpt-ops",
     );
     expect(adminRequestEvidenceHref({ trace_id: "trace_456" })).toBeNull();
   });
@@ -68,9 +79,12 @@ describe("admin log evidence links", () => {
     );
   });
 
-  it("builds a scheduler decisions exact filter link from request id", () => {
+  it("builds a scheduler decisions exact filter link from request and account filters", () => {
     expect(adminSchedulerDecisionsHref({ request_id: "req_123", trace_id: "trace_456" })).toBe(
       "/admin/ops?tab=scheduler-decisions&f_request_id=req_123",
+    );
+    expect(adminSchedulerDecisionsHref({ account_id: "12", provider_id: 3, model: "gpt-ops" })).toBe(
+      "/admin/ops?tab=scheduler-decisions&f_account_id=12&f_provider_id=3&f_model=gpt-ops",
     );
     expect(adminSchedulerDecisionsHref({ trace_id: "trace_456" })).toBeNull();
   });

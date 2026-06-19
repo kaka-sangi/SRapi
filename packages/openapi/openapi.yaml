@@ -12374,6 +12374,14 @@ paths:
           in: query
           schema:
             type: string
+        - name: account_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: provider_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
         - name: model
           in: query
           schema:

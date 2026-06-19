@@ -20,7 +20,10 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
-import { adminAccountHealthInvestigationHref } from "@/lib/admin-account-health-investigation";
+import {
+  adminAccountHealthInvestigationLinks,
+  type AccountHealthInvestigationLinks,
+} from "@/lib/admin-account-health-investigation";
 import { formatCompactNumber, formatDate, formatMoney, formatPercent } from "@/lib/admin-format";
 import { runtimeClassLabel } from "@/lib/admin-account-form";
 import { cn } from "@/lib/cn";
@@ -60,6 +63,29 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
       <span className="text-2xs uppercase tracking-wide text-srapi-text-tertiary">{label}</span>
       <span className="font-mono text-xs text-srapi-text-primary tabular">{value}</span>
     </div>
+  );
+}
+
+function AccountHealthEvidenceLinks({ links }: { links: AccountHealthInvestigationLinks }) {
+  const { t } = useLanguage();
+  const items = [
+    links.errorLogs ? [links.errorLogs, t("adminErrorLogs.title")] : null,
+    links.requestEvidence ? [links.requestEvidence, t("adminRequestEvidence.title")] : null,
+    links.schedulerDecisions ? [links.schedulerDecisions, t("scheduler.title")] : null,
+  ].filter((item): item is [string, string] => Boolean(item));
+
+  return (
+    <span className="flex flex-wrap justify-end gap-x-2 gap-y-1">
+      {items.map(([href, label]) => (
+        <Link
+          key={href}
+          href={href}
+          className="text-srapi-accent underline-offset-2 hover:underline"
+        >
+          {label}
+        </Link>
+      ))}
+    </span>
   );
 }
 
@@ -360,7 +386,7 @@ export function AccountDetailSheet({
         <div className="mt-5 space-y-4">
           <Section title={t("adminAccounts.healthTitle")} query={health}>
             {(h) => {
-              const investigationHref = adminAccountHealthInvestigationHref(h);
+              const investigationLinks = adminAccountHealthInvestigationLinks(h);
               return (
                 <div>
                   <Row label={t("adminCommon.status")} value={h.status} />
@@ -371,9 +397,9 @@ export function AccountDetailSheet({
                     <Row
                       label={t("adminAccounts.lastError")}
                       value={
-                        investigationHref ? (
+                        investigationLinks?.errorLogs ? (
                           <Link
-                            href={investigationHref}
+                            href={investigationLinks.errorLogs}
                             className="text-srapi-error underline-offset-2 hover:underline"
                           >
                             {h.error_class}
@@ -384,17 +410,10 @@ export function AccountDetailSheet({
                       }
                     />
                   ) : null}
-                  {investigationHref && !h.error_class ? (
+                  {investigationLinks ? (
                     <Row
-                      label={t("adminAccounts.investigateErrors")}
-                      value={
-                        <Link
-                          href={investigationHref}
-                          className="text-srapi-error underline-offset-2 hover:underline"
-                        >
-                          {t("adminErrorLogs.title")}
-                        </Link>
-                      }
+                      label={t("adminAccounts.evidence")}
+                      value={<AccountHealthEvidenceLinks links={investigationLinks} />}
                     />
                   ) : null}
                   {h.cooldown_until ? <Row label={t("adminAccounts.cooldown")} value={h.cooldown_reason ?? h.cooldown_until} /> : null}

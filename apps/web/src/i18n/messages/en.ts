@@ -820,6 +820,7 @@ export const en = {
     successRate: "Success rate",
     circuitState: "Circuit",
     lastError: "Last error",
+    evidence: "Evidence",
     investigateErrors: "View error logs",
     healthNeedsAttention: "need attention",
     selectHealthGroup: "Select {count} accounts",

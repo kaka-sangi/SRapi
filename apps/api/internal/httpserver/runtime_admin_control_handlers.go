@@ -1483,7 +1483,13 @@ func (s *Server) handleListAdminSchedulerDecisions(w http.ResponseWriter, r *htt
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler decisions", requestID)
 		return
 	}
-	items = filterSchedulerDecisions(items, r.URL.Query().Get("request_id"), r.URL.Query().Get("model"))
+	items = filterSchedulerDecisions(
+		items,
+		r.URL.Query().Get("request_id"),
+		r.URL.Query().Get("model"),
+		r.URL.Query().Get("account_id"),
+		r.URL.Query().Get("provider_id"),
+	)
 	data := make([]apiopenapi.SchedulerDecision, 0, len(items))
 	for _, item := range items {
 		data = append(data, toAPISchedulerDecision(item))

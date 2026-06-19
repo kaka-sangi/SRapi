@@ -46,7 +46,7 @@ describe("SchedulerDecisionsPanel", () => {
     window.history.replaceState(
       null,
       "",
-      "/admin/ops?tab=scheduler-decisions&f_request_id=req-filter",
+      "/admin/ops?tab=scheduler-decisions&f_request_id=req-filter&f_account_id=12&f_provider_id=3&f_model=gpt-4o-mini",
     );
     mocks.useSchedulerDecisions.mockReturnValue({
       data: [
@@ -106,8 +106,16 @@ describe("SchedulerDecisionsPanel", () => {
   it("passes the request id URL filter to scheduler decisions query", () => {
     render(<SchedulerDecisionsPanel />, { wrapper: LanguageProvider });
 
-    expect(mocks.useSchedulerDecisions).toHaveBeenCalledWith({ request_id: "req-filter" });
-    expect(screen.getAllByText("req-filter").length).toBeGreaterThan(0);
+    expect(mocks.useSchedulerDecisions).toHaveBeenCalledWith({
+      request_id: "req-filter",
+      account_id: "12",
+      provider_id: "3",
+      model: "gpt-4o-mini",
+    });
+    expect(screen.getByTitle("req:req-filter")).toBeInTheDocument();
+    expect(screen.getByTitle("acct:12")).toBeInTheDocument();
+    expect(screen.getByTitle("prov:3")).toBeInTheDocument();
+    expect(screen.getByTitle("model:gpt-4o-mini")).toBeInTheDocument();
     expect(screen.getByText("gpt-4o-mini")).toBeInTheDocument();
     expect(screen.getAllByText("account-12").length).toBeGreaterThan(0);
     expect(screen.getAllByText("故障转移").length).toBeGreaterThan(0);
