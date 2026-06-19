@@ -899,7 +899,7 @@ func (rt *runtimeState) fillCandidateRuntimeStates(ctx context.Context, candidat
 			state.CooldownActive = state.CooldownActive || (latest.CooldownUntil != nil && latest.CooldownUntil.After(now))
 		}
 		if quotas := quotasByAccount[account.ID]; len(quotas) > 0 {
-			if constrained, ok := mostConstrainedRealQuotaSnapshot(quotas); ok {
+			if constrained, ok := mostConstrainedActiveRealQuotaSnapshot(quotas); ok {
 				remainingRatio := float64(constrained.RemainingRatio)
 				state.QuotaRemainingRatio = &remainingRatio
 				state.QuotaExhausted = state.QuotaExhausted || constrained.RemainingRatio <= 0

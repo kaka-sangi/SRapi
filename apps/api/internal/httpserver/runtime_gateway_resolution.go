@@ -215,8 +215,13 @@ func dedupeCapabilityDescriptors(values []capabilitiescontract.Descriptor) []cap
 }
 
 func schedulerRuntimeState(metadata map[string]any) schedulercontract.RuntimeState {
+	now := time.Now().UTC()
 	quotaRemainingRatio := metadataOptionalFloat(metadata, "remaining_ratio", "quota_remaining_ratio")
 	quotaExhausted := metadataBool(metadata, "quota_exhausted")
+	if quotaMetadataWindowReset(metadata, now) {
+		quotaRemainingRatio = nil
+		quotaExhausted = false
+	}
 	if quotaRemainingRatio != nil && *quotaRemainingRatio <= 0 {
 		quotaExhausted = true
 	}
@@ -226,7 +231,7 @@ func schedulerRuntimeState(metadata map[string]any) schedulercontract.RuntimeSta
 		QuotaRemainingRatio: quotaRemainingRatio,
 		LatencyP95MS:        metadataOptionalInt(metadata, "latency_p95_ms", "p95_latency_ms", "latency_p95"),
 		CircuitOpen:         metadataBool(metadata, "circuit_open"),
-		CooldownActive:      metadataBool(metadata, "cooldown_active") || metadataCooldownActive(metadata, time.Now().UTC()),
+		CooldownActive:      metadataBool(metadata, "cooldown_active") || metadataCooldownActive(metadata, now),
 		CurrentConcurrency:  metadataInt(metadata, "current_concurrency"),
 		RPMUsed:             metadataInt(metadata, "rpm_used"),
 		TPMUsed:             metadataInt(metadata, "tpm_used"),
@@ -296,4 +301,23 @@ func metadataCooldownActive(metadata map[string]any, now time.Time) bool {
 	}
 	until, err := time.Parse(time.RFC3339, strings.TrimSpace(raw))
 	return err == nil && now.Before(until)
+}
+
+func quotaMetadataWindowReset(metadata map[string]any, now time.Time) bool {
+	if metadata == nil {
+		return false
+	}
+	value, ok := metadata["quota_reset_at"]
+	if !ok || value == nil {
+		return false
+	}
+	raw := strings.TrimSpace(fmt.Sprint(value))
+	if raw == "" {
+		return false
+	}
+	resetAt, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return false
+	}
+	return !now.Before(resetAt.UTC())
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -436,11 +437,12 @@ func overlayAccountQuotaWindowsOnHealth(target *apiopenapi.AccountHealthSnapshot
 	target.QuotaWindows = &windows
 }
 
-func mostConstrainedRealQuotaSnapshot(snapshots []accountcontract.AccountQuotaSnapshot) (accountcontract.AccountQuotaSnapshot, bool) {
+func mostConstrainedActiveRealQuotaSnapshot(snapshots []accountcontract.AccountQuotaSnapshot) (accountcontract.AccountQuotaSnapshot, bool) {
+	now := time.Now().UTC()
 	var selected accountcontract.AccountQuotaSnapshot
 	found := false
 	for _, snapshot := range snapshots {
-		if accountcontract.IsSyntheticQuotaSnapshot(snapshot) {
+		if accountcontract.IsSyntheticQuotaSnapshot(snapshot) || quotaSnapshotWindowReset(snapshot, now) {
 			continue
 		}
 		if !found || snapshot.RemainingRatio < selected.RemainingRatio {

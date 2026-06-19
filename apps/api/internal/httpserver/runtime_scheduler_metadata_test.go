@@ -57,6 +57,15 @@ func TestSchedulerRuntimeMetadataParsesHealthQuotaLatency(t *testing.T) {
 	if !exhaustedState.QuotaExhausted {
 		t.Fatalf("expected zero remaining_ratio to mark quota exhausted, got %+v", exhaustedState)
 	}
+
+	resetState := schedulerRuntimeState(map[string]any{
+		"quota_remaining_ratio": 0,
+		"quota_exhausted":       true,
+		"quota_reset_at":        time.Now().UTC().Add(-time.Minute).Format(time.RFC3339),
+	})
+	if resetState.QuotaExhausted || resetState.QuotaRemainingRatio != nil {
+		t.Fatalf("expected reset quota metadata to be ignored, got %+v", resetState)
+	}
 }
 
 func TestGatewaySchedulerScoresUseAccountRuntimeMetadata(t *testing.T) {

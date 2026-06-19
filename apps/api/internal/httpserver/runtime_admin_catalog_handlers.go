@@ -2015,7 +2015,7 @@ func (s *Server) handleAdminAccountsHealthSummary(w http.ResponseWriter, r *http
 		}
 		if quotas := latestQuotasByAccount[account.ID]; len(quotas) > 0 {
 			overlayAccountQuotaWindowsOnHealth(&snap, quotas)
-			if constrained, ok := mostConstrainedRealQuotaSnapshot(quotas); ok {
+			if constrained, ok := mostConstrainedActiveRealQuotaSnapshot(quotas); ok {
 				overlayAccountQuotaOnHealth(&snap, constrained)
 			}
 		}
@@ -2054,7 +2054,7 @@ func (s *Server) handleAdminAccountHealth(w http.ResponseWriter, r *http.Request
 	}
 	if quotas, err := s.runtime.accounts.ListQuotaSnapshotsByAccount(r.Context(), account.ID, 1); err == nil && len(quotas) > 0 {
 		overlayAccountQuotaWindowsOnHealth(&snapshot, quotas)
-		if constrained, ok := mostConstrainedRealQuotaSnapshot(quotas); ok {
+		if constrained, ok := mostConstrainedActiveRealQuotaSnapshot(quotas); ok {
 			overlayAccountQuotaOnHealth(&snapshot, constrained)
 		}
 	}

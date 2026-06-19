@@ -1599,6 +1599,46 @@ func TestAccountSchedulerRuntimeStateIgnoresSyntheticQuotaSnapshots(t *testing.T
 	}
 }
 
+func TestAccountSchedulerRuntimeStateSkipsResetQuotaSnapshots(t *testing.T) {
+	ctx := context.Background()
+	accounts, err := accountservice.New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new account service: %v", err)
+	}
+	account, err := accounts.Create(ctx, accountcontract.CreateRequest{
+		ProviderID:   12,
+		Name:         "reset-quota-account",
+		RuntimeClass: accountcontract.RuntimeClassCliClientToken,
+		Credential:   map[string]any{"cli_client_token": "secret"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	now := time.Now().UTC()
+	resetAt := now.Add(-time.Minute)
+	if _, err := accounts.RecordQuotaSnapshot(ctx, accountcontract.AccountQuotaSnapshot{
+		AccountID:      account.ID,
+		ProviderID:     account.ProviderID,
+		QuotaType:      "codex_5h_percent",
+		Remaining:      "0",
+		Used:           "100",
+		QuotaLimit:     "100",
+		RemainingRatio: 0,
+		ResetAt:        &resetAt,
+		SnapshotAt:     now.Add(-2 * time.Minute),
+	}); err != nil {
+		t.Fatalf("record reset quota: %v", err)
+	}
+	rt := &runtimeState{accounts: accounts}
+
+	candidates := []schedulercontract.Candidate{{Account: account}}
+	rt.fillCandidateRuntimeStates(ctx, candidates)
+	state := candidates[0].RuntimeState
+	if state.QuotaExhausted || state.QuotaRemainingRatio != nil {
+		t.Fatalf("expected reset quota snapshot to be ignored, got %+v", state)
+	}
+}
+
 func TestAccountSchedulerRuntimeStateAutoPausesByQuotaThreshold(t *testing.T) {
 	ctx := context.Background()
 	accounts, err := accountservice.New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
